@@ -13,6 +13,11 @@ on:
         description: 'Release tag (e.g. v0.4.25)'
         required: true
         type: string
+      only:
+        description: 'Optional: build a single platform (mac-arm64 | win-x64 | linux-amd64 | linux-arm64). Saves runner time when retrying one failed platform.'
+        required: false
+        type: string
+        default: ''
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
@@ -45,6 +50,9 @@ jobs:
             platform: linux-arm64
 
     name: Build (${{ matrix.platform }})
+    # `only` (workflow_dispatch) narrows a retry to one platform; empty (and
+    # workflow_call from release.yml) builds everything.
+    if: inputs.only == '' || inputs.only == null || inputs.only == matrix.platform
     runs-on: ${{ matrix.os }}
     # Hard ceiling for the whole job. Without it a stalled Apple notarization
     # once kept the mac job "in progress" for 5+ hours. Typical green mac run
