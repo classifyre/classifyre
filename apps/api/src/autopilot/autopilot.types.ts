@@ -19,7 +19,9 @@ export interface AutopilotJob {
    * treat the job as explicit operator intent (instance enable-flags bypassed).
    * DREAM is carried via `dream`; DUPLICATES runs on the correlation queue.
    */
-  agentKinds?: Array<'INQUIRY' | 'CASE' | 'CONFIG' | 'DETECTOR_AUTHOR'>;
+  agentKinds?: Array<
+    'INQUIRY' | 'CASE' | 'CONFIG' | 'DETECTOR_AUTHOR' | 'ESCALATION'
+  >;
   /** Focus the case agent on one case (full case detail in context). */
   caseId?: string;
 }

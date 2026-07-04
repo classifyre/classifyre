@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import {
+  BellRing,
   Copy,
   FlaskConical,
   FolderSearch,
@@ -17,6 +18,7 @@ const KIND_ICON: Record<string, LucideIcon> = {
   CASE: Workflow,
   CONFIG: SlidersHorizontal,
   DETECTOR_AUTHOR: FlaskConical,
+  ESCALATION: BellRing,
   DREAM: Moon,
   DUPLICATES: Copy,
 };

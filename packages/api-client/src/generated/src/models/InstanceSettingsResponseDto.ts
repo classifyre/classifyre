@@ -116,6 +116,18 @@ export interface InstanceSettingsResponseDto {
      */
     autopilotDetectorGuidance: string | null;
     /**
+     * When true, the escalation agent may raise operator notifications for high-severity cases.
+     * @type {boolean}
+     * @memberof InstanceSettingsResponseDto
+     */
+    autopilotEscalationEnabled: boolean;
+    /**
+     * Operator guidance for the escalation agent.
+     * @type {string}
+     * @memberof InstanceSettingsResponseDto
+     */
+    autopilotEscalationGuidance: string | null;
+    /**
      * When true, the harness may call tools from connected external MCP servers.
      * @type {boolean}
      * @memberof InstanceSettingsResponseDto
@@ -195,6 +207,8 @@ export function instanceOfInstanceSettingsResponseDto(value: object): value is I
     if (!('autopilotConfigGuidance' in value) || value['autopilotConfigGuidance'] === undefined) return false;
     if (!('autopilotDetectorEnabled' in value) || value['autopilotDetectorEnabled'] === undefined) return false;
     if (!('autopilotDetectorGuidance' in value) || value['autopilotDetectorGuidance'] === undefined) return false;
+    if (!('autopilotEscalationEnabled' in value) || value['autopilotEscalationEnabled'] === undefined) return false;
+    if (!('autopilotEscalationGuidance' in value) || value['autopilotEscalationGuidance'] === undefined) return false;
     if (!('autopilotMcpEnabled' in value) || value['autopilotMcpEnabled'] === undefined) return false;
     if (!('demoMode' in value) || value['demoMode'] === undefined) return false;
     if (!('hfTokenSet' in value) || value['hfTokenSet'] === undefined) return false;
@@ -230,6 +244,8 @@ export function InstanceSettingsResponseDtoFromJSONTyped(json: any, ignoreDiscri
         'autopilotConfigGuidance': json['autopilotConfigGuidance'],
         'autopilotDetectorEnabled': json['autopilotDetectorEnabled'],
         'autopilotDetectorGuidance': json['autopilotDetectorGuidance'],
+        'autopilotEscalationEnabled': json['autopilotEscalationEnabled'],
+        'autopilotEscalationGuidance': json['autopilotEscalationGuidance'],
         'autopilotMcpEnabled': json['autopilotMcpEnabled'],
         'demoMode': json['demoMode'],
         'hfTokenSet': json['hfTokenSet'],
@@ -266,6 +282,8 @@ export function InstanceSettingsResponseDtoToJSONTyped(value?: InstanceSettingsR
         'autopilotConfigGuidance': value['autopilotConfigGuidance'],
         'autopilotDetectorEnabled': value['autopilotDetectorEnabled'],
         'autopilotDetectorGuidance': value['autopilotDetectorGuidance'],
+        'autopilotEscalationEnabled': value['autopilotEscalationEnabled'],
+        'autopilotEscalationGuidance': value['autopilotEscalationGuidance'],
         'autopilotMcpEnabled': value['autopilotMcpEnabled'],
         'demoMode': value['demoMode'],
         'hfTokenSet': value['hfTokenSet'],
