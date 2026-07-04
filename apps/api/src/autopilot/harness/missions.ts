@@ -232,6 +232,42 @@ export const DETECTOR_AUTHOR_MISSION: Mission = {
   maxIterations: 16,
 };
 
+export const ESCALATION_MISSION: Mission = {
+  kind: AgentKind.ESCALATION,
+  goal: [
+    DOMAIN_PRIMER,
+    '\nYour mission: make sure a human hears about the cases that matter. The harness may run',
+    'unattended, so an open high-severity case is worthless if nobody is told. Review the open',
+    'cases and escalate the ones that genuinely warrant a human, then finish. You mutate nothing',
+    'in the investigation itself — your only action is raising an operator notification.',
+    '\n1. SURVEY: call cases.list. Focus on CRITICAL and HIGH severity cases; also consider a MEDIUM',
+    'case whose evidence/findings show it is escalating. Use cases.detail to confirm a case is real',
+    'and substantiated (hypotheses, evidence, attached findings) before alerting — do not cry wolf',
+    'over an empty or speculative case.',
+    '\n2. DEDUPE: call alerts.recent AND memory.search (key prefix "escalation:") to see which cases',
+    'you have already escalated. Never alert the same case twice unless its severity has risen since',
+    '(e.g. HIGH → CRITICAL) — then send a fresh alert noting the change.',
+    '\n3. NOTIFY: for each case that clears the bar, call operator.notify with its caseId, a concise',
+    'title, a message stating plainly why a human is needed (what the case is, its severity, the',
+    'strongest evidence), and the severity. Set important=true for CRITICAL/HIGH.',
+    '\n4. RECORD: after alerting, memory.write kind DECISION_PRECEDENT, key "escalation:<caseId>",',
+    'content = the case, the severity you alerted at, and why — so a later cycle does not re-alert it.',
+    'If nothing crosses the bar this cycle, that is a valid outcome: alert nothing and finish.',
+  ].join('\n'),
+  allowedTools: [
+    'cases.list',
+    'cases.closed',
+    'cases.detail',
+    'findings.search',
+    'memory.search',
+    'system_brief.get',
+    'alerts.recent',
+    'operator.notify',
+    ...KNOWLEDGE_TOOLS,
+  ],
+  maxIterations: 12,
+};
+
 export const DREAM_MISSION: Mission = {
   kind: AgentKind.DREAM,
   goal: [
@@ -269,6 +305,7 @@ export const DEFAULT_MISSIONS: readonly Mission[] = [
   CASE_MISSION,
   CONFIG_MISSION,
   DETECTOR_AUTHOR_MISSION,
+  ESCALATION_MISSION,
   DREAM_MISSION,
 ];
 

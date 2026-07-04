@@ -25,6 +25,8 @@ import { KnowledgeToolset } from './tools/knowledge/knowledge.toolset';
 import { ConfigToolset } from './tools/config/config.toolset';
 import { DetectorToolset } from './tools/detector/detector.toolset';
 import { FingerprintsToolset } from './tools/fingerprints/fingerprints.toolset';
+import { AlertToolset } from './tools/alert/alert.toolset';
+import { NotificationsService } from '../notifications.service';
 import { ToolRegistry } from './tools/tool-registry.service';
 import { ToolDispatcherService } from './tools/tool-dispatcher.service';
 import { HarnessService } from './harness/harness.service';
@@ -70,6 +72,8 @@ import { AutopilotController } from './autopilot.controller';
     ConfigToolset,
     DetectorToolset,
     FingerprintsToolset,
+    AlertToolset,
+    NotificationsService,
     ToolRegistry,
     ToolDispatcherService,
     SystemBriefService,

@@ -2578,6 +2578,7 @@
       "CASE": "Case",
       "CONFIG": "Config",
       "DETECTOR_AUTHOR": "Detector",
+      "ESCALATION": "Escalation",
       "DREAM": "Dream",
       "DUPLICATES": "Duplicates"
     },

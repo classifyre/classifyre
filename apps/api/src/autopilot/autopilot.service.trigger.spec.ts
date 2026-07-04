@@ -48,6 +48,7 @@ describe('AutopilotService.trigger — agent selection & chaining', () => {
       AgentKind.CASE,
       AgentKind.CONFIG,
       AgentKind.DETECTOR_AUTHOR,
+      AgentKind.ESCALATION,
     ]);
     expect(calls[0].payload.instruction).toBe('focus on secrets');
   });

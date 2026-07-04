@@ -22,6 +22,7 @@ const PIPELINE_KINDS = [
   AgentKind.CASE,
   AgentKind.CONFIG,
   AgentKind.DETECTOR_AUTHOR,
+  AgentKind.ESCALATION,
 ] as const;
 import {
   AgentActivityItemDto,

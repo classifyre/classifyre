@@ -417,6 +417,10 @@ model InstanceSettings {
   // Detector-authoring agent: may create/train custom detectors. Opt-in.
   autopilotDetectorEnabled   Boolean @default(false) @map("autopilot_detector_enabled")
   autopilotDetectorGuidance  String? @db.Text @map("autopilot_detector_guidance")
+  // Escalation agent: reviews open cases and raises operator notifications for
+  // high-severity ones so the harness can run unattended. Opt-in.
+  autopilotEscalationEnabled  Boolean @default(false) @map("autopilot_escalation_enabled")
+  autopilotEscalationGuidance String? @db.Text @map("autopilot_escalation_guidance")
   // Allow the harness to call tools from connected external MCP servers. Opt-in.
   autopilotMcpEnabled        Boolean @default(false) @map("autopilot_mcp_enabled")
 
@@ -1118,6 +1122,10 @@ enum AgentKind {
   CONFIG
   // Detector-authoring agent: creates/trains custom detectors when needed.
   DETECTOR_AUTHOR
+  // Alerting/escalation agent: reviews open cases and notifies an operator when
+  // a high-severity case appears, so the harness can run unattended. Mutates
+  // nothing in the investigation graph — it only raises operator notifications.
+  ESCALATION
 }
 
 enum AgentRunStatus {
@@ -1176,6 +1184,8 @@ enum AgentDecisionAction {
   RECOMPUTE_CORRELATION
   // Fingerprints: tuned correlation config (weights/exclusions/thresholds).
   TUNE_CORRELATION
+  // Escalation agent: raised an operator notification about a high-severity case.
+  NOTIFY_OPERATOR
   NO_ACTION
 }
 
