@@ -30,7 +30,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: macos-latest
+          # Pinned (not macos-latest): release builds sign + notarize, and
+          # image rollovers have broken that before. Bump deliberately.
+          - os: macos-15
             platform: mac-arm64
           # Intel-mac (x86_64) dropped: onnxruntime stopped shipping macOS
           # x86_64 wheels at 1.27.0, so the CLI venv can no longer be staged
@@ -167,50 +169,91 @@ jobs:
             echo "::error::No .app bundle found to notarize"
             exit 1
           fi
+          ts() { date -u '+%H:%M:%S'; }
+          sw_vers
+          xcrun notarytool --version || true
+
+          # Connectivity preflight: if Apple is unreachable before we even
+          # upload, say so directly instead of burning notarytool attempts.
+          if ! curl -sSI --connect-timeout 15 https://appstoreconnect.apple.com >/dev/null; then
+            echo "::warning::appstoreconnect.apple.com unreachable from this runner — expect upload trouble"
+          fi
+
           ZIP="$RUNNER_TEMP/classifyre-notarize.zip"
-          echo "Zipping $APP for notarization…"
+          echo "[$(ts)] Zipping $APP for notarization…"
           ditto -c -k --keepParent "$APP" "$ZIP"
           du -h "$ZIP"
 
-          # GitHub's mac runners cannot reliably reach notarytool's default
-          # upload path: it uses the S3 transfer-acceleration endpoint, which
-          # from these runners stalls mid-upload ("The Internet connection
-          # appears to be offline") or loses the route entirely ("No network
-          # route", run #36). Disable IPv6 (classic flake source on these
-          # hosts) and force the plain S3 endpoint with --no-s3-acceleration.
-          sudo networksetup -setv6off "Ethernet" 2>/dev/null || true
-          sudo networksetup -setv6off "Wi-Fi" 2>/dev/null || true
-
+          # --no-s3-acceleration: notarytool defaults to the S3
+          # transfer-acceleration endpoint, which GitHub's mac runners cannot
+          # reach reliably (run #36: stalled uploads, "No network route").
           KEYCHAIN_ARGS=(--key "$APPLE_API_KEY" --key-id "$APPLE_API_KEY_ID" --issuer "$APPLE_API_ISSUER_ID")
+
+          # Phase 1 — upload ONCE (submit without --wait returns the
+          # submission id immediately after upload; Apple's scan continues
+          # server-side). Only transport failures are retried, with backoff.
+          SUBMISSION_ID=""
+          delay=30
           for attempt in 1 2 3; do
-            echo "=== Notarization attempt $attempt ==="
+            echo "[$(ts)] Upload attempt $attempt"
             set +e
             xcrun notarytool submit "$ZIP" "${KEYCHAIN_ARGS[@]}" \
-              --no-s3-acceleration --verbose \
-              --wait --timeout 40m --output-format json > /tmp/notary.json
+              --no-s3-acceleration --output-format json \
+              > "$RUNNER_TEMP/notary-submit.json"
             rc=$?
             set -e
-            cat /tmp/notary.json || true
-            STATUS=$(jq -r '.status // empty' /tmp/notary.json 2>/dev/null || true)
-            SUBMISSION_ID=$(jq -r '.id // empty' /tmp/notary.json 2>/dev/null || true)
-            if [ "$STATUS" = "Accepted" ]; then
-              echo "Notarization accepted (submission $SUBMISSION_ID); stapling…"
-              xcrun stapler staple "$APP"
-              xcrun stapler validate "$APP"
-              exit 0
+            cat "$RUNNER_TEMP/notary-submit.json" || true
+            SUBMISSION_ID=$(jq -r '.id // empty' "$RUNNER_TEMP/notary-submit.json" 2>/dev/null || true)
+            if [ -n "$SUBMISSION_ID" ]; then
+              echo "[$(ts)] Uploaded; submission id: $SUBMISSION_ID"
+              break
             fi
-            if [ "$STATUS" = "Invalid" ] || [ "$STATUS" = "Rejected" ]; then
-              # A real verdict from Apple — retrying won't change it. Surface why.
-              echo "::error::Notarization $STATUS (submission $SUBMISSION_ID)"
-              xcrun notarytool log "$SUBMISSION_ID" "${KEYCHAIN_ARGS[@]}" || true
-              exit 1
+            if ! curl -sSI --connect-timeout 15 https://appstoreconnect.apple.com >/dev/null; then
+              echo "::warning::Upload attempt $attempt failed (rc=$rc) — runner lost connectivity to Apple"
+            else
+              echo "::warning::Upload attempt $attempt failed (rc=$rc); Apple reachable — retrying in ${delay}s"
             fi
-            # rc != 0 with no verdict → upload/poll flake or 40m timeout while
-            # Apple was still scanning. A resubmission is safe (and often fast:
-            # Apple caches scan results by content hash).
-            echo "::warning::Attempt $attempt inconclusive (rc=$rc, status='$STATUS'); retrying"
+            sleep "$delay"; delay=$((delay * 2))
           done
-          echo "::error::Notarization did not complete after 3 attempts"
+          if [ -z "$SUBMISSION_ID" ]; then
+            echo "::error::Could not upload for notarization after 3 attempts"
+            exit 1
+          fi
+
+          # Phase 2 — poll the SAME submission (no re-upload). `wait` failing
+          # here is only a dropped long-poll; the scan keeps running at Apple,
+          # so polling again is free. Backoff between reconnects.
+          delay=30
+          for attempt in 1 2 3 4 5; do
+            echo "[$(ts)] Waiting for verdict (poll attempt $attempt)"
+            set +e
+            xcrun notarytool wait "$SUBMISSION_ID" "${KEYCHAIN_ARGS[@]}" \
+              --timeout 20m --output-format json \
+              > "$RUNNER_TEMP/notary-wait.json"
+            rc=$?
+            set -e
+            cat "$RUNNER_TEMP/notary-wait.json" || true
+            STATUS=$(jq -r '.status // empty' "$RUNNER_TEMP/notary-wait.json" 2>/dev/null || true)
+            case "$STATUS" in
+              Accepted)
+                echo "[$(ts)] Notarization accepted; stapling…"
+                xcrun stapler staple "$APP"
+                xcrun stapler validate "$APP"
+                exit 0
+                ;;
+              Invalid|Rejected)
+                # A real verdict — retrying cannot change it. Surface Apple's
+                # reasons and fail fast.
+                echo "::error::Notarization $STATUS (submission $SUBMISSION_ID)"
+                xcrun notarytool log "$SUBMISSION_ID" "${KEYCHAIN_ARGS[@]}" || true
+                exit 1
+                ;;
+            esac
+            echo "::warning::Poll attempt $attempt inconclusive (rc=$rc, status='${STATUS:-none}'); retrying in ${delay}s"
+            sleep "$delay"; delay=$((delay * 2))
+          done
+          echo "::error::No notarization verdict for $SUBMISSION_ID after ~100 minutes of polling"
+          xcrun notarytool info "$SUBMISSION_ID" "${KEYCHAIN_ARGS[@]}" || true
           exit 1
 
       # Fallback for builds without signing secrets: Apple Silicon refuses to
