@@ -172,11 +172,21 @@ jobs:
           ditto -c -k --keepParent "$APP" "$ZIP"
           du -h "$ZIP"
 
+          # GitHub's mac runners cannot reliably reach notarytool's default
+          # upload path: it uses the S3 transfer-acceleration endpoint, which
+          # from these runners stalls mid-upload ("The Internet connection
+          # appears to be offline") or loses the route entirely ("No network
+          # route", run #36). Disable IPv6 (classic flake source on these
+          # hosts) and force the plain S3 endpoint with --no-s3-acceleration.
+          sudo networksetup -setv6off "Ethernet" 2>/dev/null || true
+          sudo networksetup -setv6off "Wi-Fi" 2>/dev/null || true
+
           KEYCHAIN_ARGS=(--key "$APPLE_API_KEY" --key-id "$APPLE_API_KEY_ID" --issuer "$APPLE_API_ISSUER_ID")
           for attempt in 1 2 3; do
             echo "=== Notarization attempt $attempt ==="
             set +e
             xcrun notarytool submit "$ZIP" "${KEYCHAIN_ARGS[@]}" \
+              --no-s3-acceleration --verbose \
               --wait --timeout 40m --output-format json > /tmp/notary.json
             rc=$?
             set -e
