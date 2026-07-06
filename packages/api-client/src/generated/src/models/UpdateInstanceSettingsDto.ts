@@ -110,18 +110,6 @@ export interface UpdateInstanceSettingsDto {
      */
     autopilotDetectorGuidance?: string | null;
     /**
-     * When true, the escalation agent may raise operator notifications for high-severity cases.
-     * @type {boolean}
-     * @memberof UpdateInstanceSettingsDto
-     */
-    autopilotEscalationEnabled?: boolean;
-    /**
-     * Operator guidance for the escalation agent.
-     * @type {string}
-     * @memberof UpdateInstanceSettingsDto
-     */
-    autopilotEscalationGuidance?: string | null;
-    /**
      * When true, the harness may call tools from connected external MCP servers.
      * @type {boolean}
      * @memberof UpdateInstanceSettingsDto
@@ -189,8 +177,6 @@ export function UpdateInstanceSettingsDtoFromJSONTyped(json: any, ignoreDiscrimi
         'autopilotConfigGuidance': json['autopilotConfigGuidance'] == null ? undefined : json['autopilotConfigGuidance'],
         'autopilotDetectorEnabled': json['autopilotDetectorEnabled'] == null ? undefined : json['autopilotDetectorEnabled'],
         'autopilotDetectorGuidance': json['autopilotDetectorGuidance'] == null ? undefined : json['autopilotDetectorGuidance'],
-        'autopilotEscalationEnabled': json['autopilotEscalationEnabled'] == null ? undefined : json['autopilotEscalationEnabled'],
-        'autopilotEscalationGuidance': json['autopilotEscalationGuidance'] == null ? undefined : json['autopilotEscalationGuidance'],
         'autopilotMcpEnabled': json['autopilotMcpEnabled'] == null ? undefined : json['autopilotMcpEnabled'],
         'hfToken': json['hfToken'] == null ? undefined : json['hfToken'],
     };
@@ -222,8 +208,6 @@ export function UpdateInstanceSettingsDtoToJSONTyped(value?: UpdateInstanceSetti
         'autopilotConfigGuidance': value['autopilotConfigGuidance'],
         'autopilotDetectorEnabled': value['autopilotDetectorEnabled'],
         'autopilotDetectorGuidance': value['autopilotDetectorGuidance'],
-        'autopilotEscalationEnabled': value['autopilotEscalationEnabled'],
-        'autopilotEscalationGuidance': value['autopilotEscalationGuidance'],
         'autopilotMcpEnabled': value['autopilotMcpEnabled'],
         'hfToken': value['hfToken'],
     };

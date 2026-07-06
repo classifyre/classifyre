@@ -1,5 +1,9 @@
 import { Injectable } from '@nestjs/common';
-import { AgentDecisionAction, AiManagementMode, Severity } from '@prisma/client';
+import {
+  AgentDecisionAction,
+  AiManagementMode,
+  Severity,
+} from '@prisma/client';
 import { PrismaService } from '../../../prisma.service';
 import { NotificationsService } from '../../../notifications.service';
 import {
@@ -46,7 +50,10 @@ export class AlertToolset {
    * manual/targeted runs force it on). Off ⇒ OBSERVE_ONLY, so a stray call is
    * recorded but not delivered.
    */
-  private escalationGate = (_input: unknown, tc: ToolContext): Promise<ToolGate> =>
+  private escalationGate = (
+    _input: unknown,
+    tc: ToolContext,
+  ): Promise<ToolGate> =>
     Promise.resolve({
       mode: tc.ctx.settings.autopilotEscalationEnabled
         ? AiManagementMode.MANAGED
@@ -102,7 +109,8 @@ export class AlertToolset {
             },
             message: {
               type: 'string',
-              description: 'Why this case needs a human, in one or two sentences.',
+              description:
+                'Why this case needs a human, in one or two sentences.',
             },
             severity: {
               type: 'string',
