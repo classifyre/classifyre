@@ -265,5 +265,20 @@ if [ "${SKIP_PYTHON:-0}" != "1" ]; then
   fi
 fi
 
+# --- macOS: collapse the API tree into one archive ----------------------------
+# The api/node_modules tree is ~65k tiny files — 92% of the bundle's file
+# count. Apple's notary service scans per file, which turned notarization into
+# a multi-hour wait (and codesign walks the same tree). Shipping it as ONE
+# tar.gz brings the notarized payload down to ~5k files; the app extracts it
+# to userData on first workspace open (same pattern as the Python runtime
+# relocation). Linux/Windows keep the plain directory — they have no
+# notarization step and extraction would only cost disk and first-run time.
+if [ "$(uname -s)" = "Darwin" ]; then
+  echo "=== Pack resources/api into api.tar.gz (macOS notarization) ==="
+  tar -czf "$RESOURCES/api.tar.gz" -C "$RESOURCES" api
+  rm -rf "$RESOURCES/api"
+  du -sh "$RESOURCES/api.tar.gz"
+fi
+
 echo "=== Resources staged ==="
 du -sh "$RESOURCES"/* 2>/dev/null || true

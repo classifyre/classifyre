@@ -24,6 +24,7 @@ import {
   Globe,
   Languages,
   Loader2,
+  MessageSquare,
   Server,
   Settings,
   SlidersHorizontal,
@@ -31,6 +32,7 @@ import {
 import { toast } from "sonner";
 import { useInstanceSettings } from "@/components/instance-settings-provider";
 import { McpSettingsCard } from "@/components/mcp-settings-card";
+import { ChatBotsCard } from "@/components/chat-bots-card";
 import { AiProvidersCard } from "@/components/ai-providers-card";
 import { AiAssistantSettingsCard } from "@/components/ai-assistant-settings-card";
 import { HarnessPointerCard } from "@/components/harness/harness-pointer-card";
@@ -211,6 +213,10 @@ export default function SettingsPage() {
             <Server className="h-3.5 w-3.5" />
             {t("settings.tabs.mcp")}
           </TabsTrigger>
+          <TabsTrigger value="chat" className={TAB_TRIGGER_CLASS}>
+            <MessageSquare className="h-3.5 w-3.5" />
+            {t("settings.tabs.chat")}
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent
@@ -376,6 +382,13 @@ export default function SettingsPage() {
           className="duration-300 animate-in fade-in-50 slide-in-from-bottom-1"
         >
           <McpSettingsCard />
+        </TabsContent>
+
+        <TabsContent
+          value="chat"
+          className="duration-300 animate-in fade-in-50 slide-in-from-bottom-1"
+        >
+          <ChatBotsCard />
         </TabsContent>
       </Tabs>
     </div>

@@ -15,6 +15,7 @@ import { McpOverviewService } from './mcp-overview.service';
 import { McpToolExecutorService } from './mcp-tool-executor.service';
 import { SchedulerService } from './scheduler/scheduler.service';
 import { SourceService } from './source.service';
+import { ValidationService } from './validation.service';
 
 const jsonObjectSchema = z.record(z.string(), z.unknown());
 
@@ -85,6 +86,7 @@ export class McpServerFactoryService {
     private readonly assetService: AssetService,
     private readonly mcpOverviewService: McpOverviewService,
     private readonly mcpToolExecutor: McpToolExecutorService,
+    private readonly validationService: ValidationService,
   ) {}
 
   createServer(): McpServer {
@@ -201,6 +203,41 @@ export class McpServerFactoryService {
   }
 
   private registerSourceTools(server: McpServerCompat) {
+    server.registerTool(
+      'list_source_types',
+      {
+        title: 'List Source Types',
+        description:
+          'List every source type that can be created (type id + label). Call this before create_source when unsure of the exact type id.',
+        inputSchema: {},
+        annotations: {
+          readOnlyHint: true,
+          idempotentHint: true,
+        },
+      },
+      () => jsonResult(this.validationService.listSourceTypes()),
+    );
+
+    server.registerTool(
+      'get_source_schema',
+      {
+        title: 'Get Source Config Schema',
+        description:
+          'The full JSON Schema for one source type config — exact field names, required/masked/optional sections, defaults and enums. Call this before create_source/update_source and build the config to match.',
+        inputSchema: {
+          type: z
+            .string()
+            .describe('Source type id from list_source_types, e.g. POSTGRESQL'),
+        },
+        annotations: {
+          readOnlyHint: true,
+          idempotentHint: true,
+        },
+      },
+      ({ type }) =>
+        jsonResult(this.validationService.getSourceTypeSchema(type)),
+    );
+
     server.registerTool(
       'search_sources',
       {

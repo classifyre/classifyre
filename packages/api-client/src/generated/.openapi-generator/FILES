@@ -64,6 +64,14 @@ docs/CaseListResponseDto.md
 docs/CaseResponseDto.md
 docs/CaseTimelineResponseDto.md
 docs/CasesApi.md
+docs/ChatBotActivityEntryDto.md
+docs/ChatBotDiagnosticsDto.md
+docs/ChatBotResponseDto.md
+docs/ChatBotSimulateDto.md
+docs/ChatBotSimulateResultDto.md
+docs/ChatBotTestCheckDto.md
+docs/ChatBotTestResultDto.md
+docs/ChatBotsApi.md
 docs/CliRunnerControllerUpdateRunnerStatusRequest.md
 docs/CloseCaseDto.md
 docs/CloseCaseResponseDto.md
@@ -74,6 +82,7 @@ docs/CorrelationLabelWeightDto.md
 docs/CreateAgentMemoryDto.md
 docs/CreateAiProviderConfigDto.md
 docs/CreateCaseDto.md
+docs/CreateChatBotDto.md
 docs/CreateCustomDetectorDto.md
 docs/CreateExternalRunnerDto.md
 docs/CreateFindingDto.md
@@ -249,6 +258,7 @@ docs/UpdateAgentMemoryDto.md
 docs/UpdateAiProviderConfigDto.md
 docs/UpdateCaseDto.md
 docs/UpdateCaseFindingNoteDto.md
+docs/UpdateChatBotDto.md
 docs/UpdateCorrelationConfigDto.md
 docs/UpdateCustomDetectorDto.md
 docs/UpdateEdgeDto.md
@@ -272,6 +282,7 @@ src/apis/AssetsApi.ts
 src/apis/AssistantApi.ts
 src/apis/AutopilotApi.ts
 src/apis/CasesApi.ts
+src/apis/ChatBotsApi.ts
 src/apis/CorrelationApi.ts
 src/apis/CustomDetectorExtractionsApi.ts
 src/apis/CustomDetectorTestsApi.ts
@@ -345,6 +356,13 @@ src/models/CaseLinkedInquiryDto.ts
 src/models/CaseListResponseDto.ts
 src/models/CaseResponseDto.ts
 src/models/CaseTimelineResponseDto.ts
+src/models/ChatBotActivityEntryDto.ts
+src/models/ChatBotDiagnosticsDto.ts
+src/models/ChatBotResponseDto.ts
+src/models/ChatBotSimulateDto.ts
+src/models/ChatBotSimulateResultDto.ts
+src/models/ChatBotTestCheckDto.ts
+src/models/ChatBotTestResultDto.ts
 src/models/CliRunnerControllerUpdateRunnerStatusRequest.ts
 src/models/CloseCaseDto.ts
 src/models/CloseCaseResponseDto.ts
@@ -354,6 +372,7 @@ src/models/CorrelationLabelWeightDto.ts
 src/models/CreateAgentMemoryDto.ts
 src/models/CreateAiProviderConfigDto.ts
 src/models/CreateCaseDto.ts
+src/models/CreateChatBotDto.ts
 src/models/CreateCustomDetectorDto.ts
 src/models/CreateExternalRunnerDto.ts
 src/models/CreateFindingDto.ts
@@ -516,6 +535,7 @@ src/models/UpdateAgentMemoryDto.ts
 src/models/UpdateAiProviderConfigDto.ts
 src/models/UpdateCaseDto.ts
 src/models/UpdateCaseFindingNoteDto.ts
+src/models/UpdateChatBotDto.ts
 src/models/UpdateCorrelationConfigDto.ts
 src/models/UpdateCustomDetectorDto.ts
 src/models/UpdateEdgeDto.ts
