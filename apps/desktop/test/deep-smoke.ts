@@ -31,6 +31,13 @@ async function main(): Promise<void> {
     executablePath: appPath!,
     args: launchArgs,
     timeout: 120_000,
+    // Launch from OUTSIDE the repo. The API resolves its bundled JSON schemas by
+    // walking up from the api dir AND process.cwd(); if cwd sits inside the
+    // monorepo (the default here is apps/desktop) a missing bundle can still
+    // find the source packages/schemas and silently pass — masking a broken
+    // install. Running from a temp dir forces the test to exercise what a real
+    // user gets.
+    cwd: dataDir,
     env: {
       ...process.env,
       CLASSIFYRE_DATA_DIR: dataDir,

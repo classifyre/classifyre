@@ -1,4 +1,4 @@
-import { app, BrowserWindow, WebContentsView, dialog } from 'electron';
+import { app, BrowserWindow, WebContentsView, dialog, protocol } from 'electron';
 import path from 'path';
 import { PostgresManager } from './postgres-manager.js';
 import { NamespaceManager } from './namespace-manager.js';
@@ -8,6 +8,7 @@ import { registerIpcHandlers } from './ipc-handlers.js';
 import { registerAppProtocol } from './protocol-handler.js';
 import { SettingsManager } from './settings-manager.js';
 import { UpdateChecker } from './update-checker.js';
+import { initFileLogging } from './logger.js';
 
 // embedded-postgres registers an async-exit-hook that calls done() on process
 // exit, but Electron's quit path doesn't always provide the callback. Suppress
@@ -18,6 +19,20 @@ process.on('unhandledRejection', (reason) => {
   }
   console.error('Unhandled rejection:', reason);
 });
+
+// The packaged Next.js static export references assets with ABSOLUTE paths
+// (/_next/static/...). Loading index.html over file:// resolves those against
+// the filesystem root, so every chunk 404s and the window renders blank. They
+// are instead served by the custom 'app' scheme (registerAppProtocol), but that
+// scheme must be declared privileged BEFORE app 'ready' so it behaves as a
+// standard, secure origin — otherwise absolute paths and fetch() don't resolve.
+// Harmless in dev (the app scheme is only loaded when packaged).
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: 'app',
+    privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true, stream: true },
+  },
+]);
 
 const isDev = !app.isPackaged;
 
@@ -104,6 +119,12 @@ app.on('ready', async () => {
     app.quit();
     return;
   }
+
+  // Tee stdout/stderr to userData/logs/main.log before anything else runs, so
+  // startup and workspace-open failures are diagnosable without launching the
+  // app from a terminal.
+  const logFile = initFileLogging();
+  if (logFile) console.log(`Logging to ${logFile}`);
 
   if (!isDev) {
     const webDir = path.join(process.resourcesPath, 'web');
