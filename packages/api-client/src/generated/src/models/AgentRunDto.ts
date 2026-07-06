@@ -145,7 +145,8 @@ export const AgentRunDtoAgentKindEnum = {
     Dream: 'DREAM',
     Duplicates: 'DUPLICATES',
     Config: 'CONFIG',
-    DetectorAuthor: 'DETECTOR_AUTHOR'
+    DetectorAuthor: 'DETECTOR_AUTHOR',
+    Chat: 'CHAT'
 } as const;
 export type AgentRunDtoAgentKindEnum = typeof AgentRunDtoAgentKindEnum[keyof typeof AgentRunDtoAgentKindEnum];
 
