@@ -1126,7 +1126,6 @@ enum AgentKind {
   CONFIG
   // Detector-authoring agent: creates/trains custom detectors when needed.
   DETECTOR_AUTHOR
-<<<<<<< HEAD
   // Alerting/escalation agent: reviews open cases and notifies an operator when
   // a high-severity case appears, so the harness can run unattended. Mutates
   // nothing in the investigation graph — it only raises operator notifications.

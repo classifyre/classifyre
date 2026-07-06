@@ -256,8 +256,12 @@ describe('CliRunnerService', () => {
     expect(JSON.parse(Buffer.from(encoded, 'base64').toString('utf8'))).toEqual(
       cursor,
     );
-    expect((service as any).encodeSamplingCursor({ samplingCursor: {} })).toBeUndefined();
-    expect((service as any).encodeSamplingCursor({ samplingCursor: null })).toBeUndefined();
+    expect(
+      (service as any).encodeSamplingCursor({ samplingCursor: {} }),
+    ).toBeUndefined();
+    expect(
+      (service as any).encodeSamplingCursor({ samplingCursor: null }),
+    ).toBeUndefined();
     expect((service as any).encodeSamplingCursor({})).toBeUndefined();
   });
 

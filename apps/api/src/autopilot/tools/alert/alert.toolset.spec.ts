@@ -15,7 +15,9 @@ describe('AlertToolset — operator.notify', () => {
     mockPrisma as unknown as PrismaService,
     mockNotifications as unknown as NotificationsService,
   );
-  const notify = toolset.list().find((t) => t.name === 'operator.notify') as Tool;
+  const notify = toolset
+    .list()
+    .find((t) => t.name === 'operator.notify') as Tool;
 
   const ctxWith = (escalationEnabled: boolean): ToolContext =>
     ({
@@ -143,8 +145,8 @@ describe('AlertToolset — alerts.recent', () => {
     expect(mockPrisma.notification.findMany).toHaveBeenCalledWith(
       expect.objectContaining({ where: { event: 'case.escalated' } }),
     );
-    expect(rows[0]!.caseId).toBe('c1');
-    expect(rows[1]!.caseId).toBeNull();
-    expect(rows[1]!.read).toBe(true);
+    expect(rows[0].caseId).toBe('c1');
+    expect(rows[1].caseId).toBeNull();
+    expect(rows[1].read).toBe(true);
   });
 });
