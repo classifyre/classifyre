@@ -7098,6 +7098,7 @@
                 "DUPLICATES",
                 "CONFIG",
                 "DETECTOR_AUTHOR",
+                "ESCALATION",
                 "CHAT"
               ]
             }
@@ -7156,6 +7157,7 @@
                 "DUPLICATES",
                 "CONFIG",
                 "DETECTOR_AUTHOR",
+                "ESCALATION",
                 "CHAT"
               ]
             }
@@ -7197,6 +7199,7 @@
                 "UPDATE_SYSTEM_BRIEF",
                 "RECOMPUTE_CORRELATION",
                 "TUNE_CORRELATION",
+                "NOTIFY_OPERATOR",
                 "NO_ACTION"
               ]
             }
@@ -7348,6 +7351,7 @@
                 "DUPLICATES",
                 "CONFIG",
                 "DETECTOR_AUTHOR",
+                "ESCALATION",
                 "CHAT"
               ]
             }
@@ -7450,6 +7454,7 @@
                 "DUPLICATES",
                 "CONFIG",
                 "DETECTOR_AUTHOR",
+                "ESCALATION",
                 "CHAT"
               ]
             }
@@ -11872,6 +11877,16 @@
             "description": "Operator guidance for the detector-authoring agent.",
             "nullable": true
           },
+          "autopilotEscalationEnabled": {
+            "type": "boolean",
+            "description": "When true, the escalation agent may raise operator notifications for high-severity cases.",
+            "example": false
+          },
+          "autopilotEscalationGuidance": {
+            "type": "string",
+            "description": "Operator guidance for the escalation agent.",
+            "nullable": true
+          },
           "autopilotMcpEnabled": {
             "type": "boolean",
             "description": "When true, the harness may call tools from connected external MCP servers.",
@@ -11918,6 +11933,8 @@
           "autopilotConfigGuidance",
           "autopilotDetectorEnabled",
           "autopilotDetectorGuidance",
+          "autopilotEscalationEnabled",
+          "autopilotEscalationGuidance",
           "autopilotMcpEnabled",
           "demoMode",
           "hfTokenSet",
@@ -12010,6 +12027,16 @@
           "autopilotDetectorGuidance": {
             "type": "string",
             "description": "Operator guidance for the detector-authoring agent.",
+            "nullable": true
+          },
+          "autopilotEscalationEnabled": {
+            "type": "boolean",
+            "description": "When true, the escalation agent may raise operator notifications for high-severity cases.",
+            "example": false
+          },
+          "autopilotEscalationGuidance": {
+            "type": "string",
+            "description": "Operator guidance for the escalation agent.",
             "nullable": true
           },
           "autopilotMcpEnabled": {
@@ -16075,7 +16102,7 @@
           },
           "agentKinds": {
             "type": "array",
-            "description": "Which agents to run. Pipeline agents (INQUIRY, CASE, CONFIG, DETECTOR_AUTHOR) run in canonical order as one chained cycle; DREAM (memory consolidation, steered by instruction) and DUPLICATES (fingerprint consolidation, deterministic — instruction ignored) run as their own jobs. Omit to run the full pipeline. Forced to [CASE] when caseId is set.",
+            "description": "Which agents to run. Pipeline agents (INQUIRY, CASE, CONFIG, DETECTOR_AUTHOR, ESCALATION) run in canonical order as one chained cycle; DREAM (memory consolidation, steered by instruction) and DUPLICATES (fingerprint consolidation, deterministic — instruction ignored) run as their own jobs. Omit to run the full pipeline. Forced to [CASE] when caseId is set.",
             "items": {
               "type": "string",
               "enum": [
@@ -16085,6 +16112,7 @@
                 "DUPLICATES",
                 "CONFIG",
                 "DETECTOR_AUTHOR",
+                "ESCALATION",
                 "CHAT"
               ]
             }
@@ -16198,6 +16226,7 @@
               "DUPLICATES",
               "CONFIG",
               "DETECTOR_AUTHOR",
+              "ESCALATION",
               "CHAT"
             ]
           },
@@ -16295,6 +16324,7 @@
               "DUPLICATES",
               "CONFIG",
               "DETECTOR_AUTHOR",
+              "ESCALATION",
               "CHAT"
             ]
           },
@@ -16342,6 +16372,7 @@
               "UPDATE_SYSTEM_BRIEF",
               "RECOMPUTE_CORRELATION",
               "TUNE_CORRELATION",
+              "NOTIFY_OPERATOR",
               "NO_ACTION"
             ]
           },
@@ -16453,6 +16484,7 @@
               "DUPLICATES",
               "CONFIG",
               "DETECTOR_AUTHOR",
+              "ESCALATION",
               "CHAT"
             ]
           },
@@ -16511,6 +16543,7 @@
               "DUPLICATES",
               "CONFIG",
               "DETECTOR_AUTHOR",
+              "ESCALATION",
               "CHAT"
             ]
           },
@@ -16750,6 +16783,7 @@
               "DUPLICATES",
               "CONFIG",
               "DETECTOR_AUTHOR",
+              "ESCALATION",
               "CHAT"
             ]
           },
@@ -16910,6 +16944,7 @@
               "UPDATE_SYSTEM_BRIEF",
               "RECOMPUTE_CORRELATION",
               "TUNE_CORRELATION",
+              "NOTIFY_OPERATOR",
               "NO_ACTION"
             ]
           },
@@ -16967,6 +17002,7 @@
               "DUPLICATES",
               "CONFIG",
               "DETECTOR_AUTHOR",
+              "ESCALATION",
               "CHAT"
             ]
           },
@@ -17413,6 +17449,7 @@
                 "DUPLICATES",
                 "CONFIG",
                 "DETECTOR_AUTHOR",
+                "ESCALATION",
                 "CHAT"
               ]
             }
@@ -17499,6 +17536,7 @@
                 "DUPLICATES",
                 "CONFIG",
                 "DETECTOR_AUTHOR",
+                "ESCALATION",
                 "CHAT"
               ]
             }

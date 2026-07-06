@@ -32,7 +32,7 @@ export interface TriggerAutopilotDto {
      */
     sourceId?: string;
     /**
-     * Which agents to run. Pipeline agents (INQUIRY, CASE, CONFIG, DETECTOR_AUTHOR) run in canonical order as one chained cycle; DREAM (memory consolidation, steered by instruction) and DUPLICATES (fingerprint consolidation, deterministic — instruction ignored) run as their own jobs. Omit to run the full pipeline. Forced to [CASE] when caseId is set.
+     * Which agents to run. Pipeline agents (INQUIRY, CASE, CONFIG, DETECTOR_AUTHOR, ESCALATION) run in canonical order as one chained cycle; DREAM (memory consolidation, steered by instruction) and DUPLICATES (fingerprint consolidation, deterministic — instruction ignored) run as their own jobs. Omit to run the full pipeline. Forced to [CASE] when caseId is set.
      * @type {Array<string>}
      * @memberof TriggerAutopilotDto
      */
@@ -56,6 +56,7 @@ export const TriggerAutopilotDtoAgentKindsEnum = {
     Duplicates: 'DUPLICATES',
     Config: 'CONFIG',
     DetectorAuthor: 'DETECTOR_AUTHOR',
+    Escalation: 'ESCALATION',
     Chat: 'CHAT'
 } as const;
 export type TriggerAutopilotDtoAgentKindsEnum = typeof TriggerAutopilotDtoAgentKindsEnum[keyof typeof TriggerAutopilotDtoAgentKindsEnum];
