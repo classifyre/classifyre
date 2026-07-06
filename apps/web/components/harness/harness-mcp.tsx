@@ -43,6 +43,7 @@ const MISSION_KINDS = [
   "CASE",
   "CONFIG",
   "DETECTOR_AUTHOR",
+  "ESCALATION",
   "DREAM",
 ] as const;
 

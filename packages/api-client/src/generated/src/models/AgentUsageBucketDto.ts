@@ -68,6 +68,7 @@ export const AgentUsageBucketDtoAgentKindEnum = {
     Duplicates: 'DUPLICATES',
     Config: 'CONFIG',
     DetectorAuthor: 'DETECTOR_AUTHOR',
+    Escalation: 'ESCALATION',
     Chat: 'CHAT'
 } as const;
 export type AgentUsageBucketDtoAgentKindEnum = typeof AgentUsageBucketDtoAgentKindEnum[keyof typeof AgentUsageBucketDtoAgentKindEnum];

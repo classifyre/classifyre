@@ -110,9 +110,7 @@ class MeilisearchSource(BaseSource):
         selected: list[dict[str, Any]] = []
         offset = 0
         while True:
-            data = self._get(
-                session, "/indexes", offset=offset, limit=self.INDEX_LIST_PAGE_SIZE
-            )
+            data = self._get(session, "/indexes", offset=offset, limit=self.INDEX_LIST_PAGE_SIZE)
             results = data.get("results") or []
             if not results:
                 break
