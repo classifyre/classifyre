@@ -256,6 +256,16 @@ export class AutopilotWorker implements OnApplicationBootstrap {
         sourceName,
       );
     }
+
+    // Escalation agent — opt-in, off by default. Runs last, once every case
+    // mutation for this cycle has settled, so it alerts operators on the final
+    // state of the open high-severity cases.
+    const escalationEnabled = cycle.only
+      ? cycle.only.includes(AgentKind.ESCALATION)
+      : settings.autopilotEscalationEnabled;
+    if (escalationEnabled) {
+      await this.runAgent(AgentKind.ESCALATION, settings, cycle, sourceName);
+    }
   }
 
   private async runAgent(
@@ -294,6 +304,7 @@ export class AutopilotWorker implements OnApplicationBootstrap {
             autopilotCaseEnabled: true,
             autopilotConfigEnabled: true,
             autopilotDetectorEnabled: true,
+            autopilotEscalationEnabled: true,
           }
         : settings;
 

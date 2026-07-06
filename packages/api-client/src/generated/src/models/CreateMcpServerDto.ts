@@ -107,6 +107,7 @@ export const CreateMcpServerDtoAgentKindsEnum = {
     Duplicates: 'DUPLICATES',
     Config: 'CONFIG',
     DetectorAuthor: 'DETECTOR_AUTHOR',
+    Escalation: 'ESCALATION',
     Chat: 'CHAT'
 } as const;
 export type CreateMcpServerDtoAgentKindsEnum = typeof CreateMcpServerDtoAgentKindsEnum[keyof typeof CreateMcpServerDtoAgentKindsEnum];

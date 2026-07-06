@@ -104,6 +104,7 @@ export const AgentDecisionDtoActionEnum = {
     UpdateSystemBrief: 'UPDATE_SYSTEM_BRIEF',
     RecomputeCorrelation: 'RECOMPUTE_CORRELATION',
     TuneCorrelation: 'TUNE_CORRELATION',
+    NotifyOperator: 'NOTIFY_OPERATOR',
     NoAction: 'NO_ACTION'
 } as const;
 export type AgentDecisionDtoActionEnum = typeof AgentDecisionDtoActionEnum[keyof typeof AgentDecisionDtoActionEnum];

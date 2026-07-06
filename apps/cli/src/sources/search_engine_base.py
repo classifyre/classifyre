@@ -241,7 +241,9 @@ class SearchEngineSourceMixin:
             return self._execute_search(index_name, body)
 
         if strategy == SamplingStrategy.LATEST:
-            return self._execute_search(index_name, {"size": max_count, "sort": self._latest_sort()})
+            return self._execute_search(
+                index_name, {"size": max_count, "sort": self._latest_sort()}
+            )
 
         # ALL: bounded first page only; fetch_content_pages does the full scan.
         return self._execute_search(

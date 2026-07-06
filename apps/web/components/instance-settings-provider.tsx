@@ -71,6 +71,8 @@ const DEFAULT_SETTINGS: InstanceSettingsResponse = {
   autopilotConfigGuidance: null,
   autopilotDetectorEnabled: false,
   autopilotDetectorGuidance: null,
+  autopilotEscalationEnabled: false,
+  autopilotEscalationGuidance: null,
   autopilotMcpEnabled: false,
   hfTokenSet: false,
   hfTokenInstanceSet: false,

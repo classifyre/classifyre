@@ -5,6 +5,7 @@ import { KnowledgeToolset } from './knowledge/knowledge.toolset';
 import { ConfigToolset } from './config/config.toolset';
 import { DetectorToolset } from './detector/detector.toolset';
 import { FingerprintsToolset } from './fingerprints/fingerprints.toolset';
+import { AlertToolset } from './alert/alert.toolset';
 import type { Tool } from './tool.types';
 
 /** A provider that contributes a set of statically-defined tools. */
@@ -31,6 +32,7 @@ export class ToolRegistry {
     private readonly config: ConfigToolset,
     private readonly detector: DetectorToolset,
     private readonly fingerprints: FingerprintsToolset,
+    private readonly alert: AlertToolset,
   ) {
     this.loadStatic([
       this.observe,
@@ -39,6 +41,7 @@ export class ToolRegistry {
       this.config,
       this.detector,
       this.fingerprints,
+      this.alert,
     ]);
   }
 
