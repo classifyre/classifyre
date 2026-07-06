@@ -11,7 +11,10 @@ import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-const allResources = ['api', 'web', 'pg', 'venv', 'python', 'pyapp'];
+// 'api' is a directory on Linux/Windows but a single api.tar.gz on macOS
+// (65k loose node_modules files made Apple's notary scan take hours); the
+// existsSync filter below picks whichever the staging script produced.
+const allResources = ['api', 'api.tar.gz', 'web', 'pg', 'venv', 'python', 'pyapp'];
 const extraResource = allResources
   .map((name) => path.resolve(__dirname, 'resources', name))
   .filter((abs) => fs.existsSync(abs));
@@ -26,14 +29,13 @@ const signingEnabled = process.env['MACOS_SIGN'] === '1' || !!signingIdentity;
 const osxSign = signingEnabled
   ? (signingIdentity ? { identity: signingIdentity } : {})
   : undefined;
-const osxNotarize =
-  process.env['APPLE_API_KEY'] && process.env['APPLE_API_KEY_ID'] && process.env['APPLE_API_ISSUER_ID']
-    ? {
-        appleApiKey: process.env['APPLE_API_KEY'],
-        appleApiKeyId: process.env['APPLE_API_KEY_ID'],
-        appleApiIssuer: process.env['APPLE_API_ISSUER_ID'],
-      }
-    : undefined;
+// Notarization is deliberately NOT done through Forge (no osxNotarize):
+// @electron/notarize runs `notarytool submit --wait` with no timeout inside
+// the packaging step, and Apple's long-poll can hang for hours on CI — and a
+// retry then repeats the entire 40-minute deep-sign before reaching Apple
+// again. The release workflow notarizes + staples the signed .app itself with
+// explicit `xcrun notarytool --timeout`, retries, and `notarytool log`
+// diagnostics (see release-desktop.yml "Notarize and staple").
 
 const linuxOptions = {
   name: 'classifyre-desktop',
@@ -57,7 +59,6 @@ const config: ForgeConfig = {
     icon: path.resolve(__dirname, 'build/icon'),
     asar: true,
     ...(osxSign ? { osxSign } : {}),
-    ...(osxNotarize ? { osxNotarize } : {}),
     ...(extraResource.length > 0 ? { extraResource } : {}),
   },
   makers: [

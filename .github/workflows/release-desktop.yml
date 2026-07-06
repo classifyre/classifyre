@@ -13,6 +13,11 @@ on:
         description: 'Release tag (e.g. v0.4.25)'
         required: true
         type: string
+      only:
+        description: 'Optional: build a single platform (mac-arm64 | win-x64 | linux-amd64 | linux-arm64). Saves runner time when retrying one failed platform.'
+        required: false
+        type: string
+        default: ''
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
@@ -25,32 +30,65 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # Computes the build matrix. The optional `only` input (workflow_dispatch)
+  # narrows a retry to a single platform — rebuilding all four to retry one
+  # failed mac notarization wastes ~45 runner-minutes per attempt. The
+  # release-triggered path (workflow_call, no `only`) builds everything.
+  # (A job-level `if` can't see the matrix context, hence this planning job.)
+  plan:
+    name: Plan build matrix
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.m.outputs.matrix }}
+    steps:
+      - id: m
+        env:
+          ONLY: ${{ inputs.only }}
+        run: |
+          # Pinned mac image (not macos-latest): release builds sign +
+          # notarize, and image rollovers have broken that before.
+          # Intel-mac (x86_64) dropped: onnxruntime stopped shipping macOS
+          # x86_64 wheels at 1.27.0, so the CLI venv can no longer be staged
+          # on that target. Apple Silicon is the only supported mac build.
+          ALL='[
+            {"os":"macos-15","platform":"mac-arm64"},
+            {"os":"windows-latest","platform":"win-x64"},
+            {"os":"ubuntu-latest","platform":"linux-amd64"},
+            {"os":"ubuntu-24.04-arm","platform":"linux-arm64"}
+          ]'
+          if [ -n "${ONLY:-}" ]; then
+            MATRIX=$(echo "$ALL" | jq -c --arg p "$ONLY" '[.[] | select(.platform == $p)]')
+          else
+            MATRIX=$(echo "$ALL" | jq -c .)
+          fi
+          if [ "$(echo "$MATRIX" | jq length)" -eq 0 ]; then
+            echo "::error::Unknown platform '$ONLY' (expected mac-arm64 | win-x64 | linux-amd64 | linux-arm64)"
+            exit 1
+          fi
+          echo "Building: $(echo "$MATRIX" | jq -r '[.[].platform] | join(", ")')"
+          echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
+
   build:
+    needs: plan
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - os: macos-latest
-            platform: mac-arm64
-          # Intel-mac (x86_64) dropped: onnxruntime stopped shipping macOS
-          # x86_64 wheels at 1.27.0, so the CLI venv can no longer be staged
-          # on this target. Apple Silicon is the only supported mac build.
-          - os: windows-latest
-            platform: win-x64
-          - os: ubuntu-latest
-            platform: linux-amd64
-          - os: ubuntu-24.04-arm
-            platform: linux-arm64
+        include: ${{ fromJSON(needs.plan.outputs.matrix) }}
 
     name: Build (${{ matrix.platform }})
     runs-on: ${{ matrix.os }}
+    # Hard ceiling for the whole job. Without it a stalled Apple notarization
+    # once kept the mac job "in progress" for 5+ hours. Typical green mac run
+    # is ~90 min; the ceiling only exists for the pathological case (bounded
+    # notarize retries can add up to ~2h on top of staging + signing).
+    timeout-minutes: 240
 
     env:
       HAS_APPLE_CERT: ${{ secrets.APPLE_CERTIFICATE_BASE64 != '' }}
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set desktop version from tag
         shell: bash
@@ -67,7 +105,7 @@ jobs:
           echo "Set desktop version to $VERSION"
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: 22
 
@@ -77,7 +115,7 @@ jobs:
           bun-version: latest
 
       - name: Setup uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@v7
 
       - name: Install Linux packaging tools
         if: runner.os == 'Linux'
@@ -87,7 +125,7 @@ jobs:
       # e.g. fork PRs; the ad-hoc fallback below keeps those builds bootable).
       - name: Import Apple signing certificate
         if: runner.os == 'macOS' && env.HAS_APPLE_CERT == 'true'
-        uses: apple-actions/import-codesign-certs@v3
+        uses: apple-actions/import-codesign-certs@v7
         with:
           p12-file-base64: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
           p12-password: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
@@ -126,8 +164,12 @@ jobs:
         shell: bash
         run: bash apps/desktop/scripts/stage-resources.sh
 
+      # Packaging only copies + signs here — notarization happens in the
+      # dedicated step below. Keeping notarytool out of Forge means a notary
+      # retry never repeats the expensive deep-sign.
       - name: Package Electron app
         shell: bash
+        timeout-minutes: 60
         run: |
           # macOS signs every Mach-O in the bundle (~1000 venv .so files)
           # via concurrent `codesign` spawns. This exhausts file descriptors and
@@ -140,6 +182,110 @@ jobs:
             echo "open-file limit: $(ulimit -n); kern.maxfilesperproc: $(sysctl -n kern.maxfilesperproc)"
           fi
           bun run --cwd apps/desktop build
+
+      # Notarization is driven directly (not via Forge/@electron/notarize)
+      # because their `notarytool submit --wait` has NO timeout — Apple's
+      # long-poll hung CI runs for 2.5-5 h (run #35 cleanup killed an orphan
+      # notarytool after 150 min). Doing it here gives: a native --timeout,
+      # cheap retries (re-upload only — the deep-sign is not repeated),
+      # visible per-attempt progress, and `notarytool log` output when Apple
+      # actually rejects something.
+      - name: Notarize and staple (macOS)
+        if: runner.os == 'macOS' && env.MACOS_SIGN == '1'
+        shell: bash
+        timeout-minutes: 140
+        run: |
+          APP=$(find apps/desktop/out -name 'Classifyre.app' -type d | head -1)
+          if [ -z "$APP" ]; then
+            echo "::error::No .app bundle found to notarize"
+            exit 1
+          fi
+          ts() { date -u '+%H:%M:%S'; }
+          sw_vers
+          xcrun notarytool --version || true
+
+          # Connectivity preflight: if Apple is unreachable before we even
+          # upload, say so directly instead of burning notarytool attempts.
+          if ! curl -sSI --connect-timeout 15 https://appstoreconnect.apple.com >/dev/null; then
+            echo "::warning::appstoreconnect.apple.com unreachable from this runner — expect upload trouble"
+          fi
+
+          ZIP="$RUNNER_TEMP/classifyre-notarize.zip"
+          echo "[$(ts)] Zipping $APP for notarization…"
+          ditto -c -k --keepParent "$APP" "$ZIP"
+          du -h "$ZIP"
+
+          # --no-s3-acceleration: notarytool defaults to the S3
+          # transfer-acceleration endpoint, which GitHub's mac runners cannot
+          # reach reliably (run #36: stalled uploads, "No network route").
+          KEYCHAIN_ARGS=(--key "$APPLE_API_KEY" --key-id "$APPLE_API_KEY_ID" --issuer "$APPLE_API_ISSUER_ID")
+
+          # Phase 1 — upload ONCE (submit without --wait returns the
+          # submission id immediately after upload; Apple's scan continues
+          # server-side). Only transport failures are retried, with backoff.
+          SUBMISSION_ID=""
+          delay=30
+          for attempt in 1 2 3; do
+            echo "[$(ts)] Upload attempt $attempt"
+            set +e
+            xcrun notarytool submit "$ZIP" "${KEYCHAIN_ARGS[@]}" \
+              --no-s3-acceleration --output-format json \
+              > "$RUNNER_TEMP/notary-submit.json"
+            rc=$?
+            set -e
+            cat "$RUNNER_TEMP/notary-submit.json" || true
+            SUBMISSION_ID=$(jq -r '.id // empty' "$RUNNER_TEMP/notary-submit.json" 2>/dev/null || true)
+            if [ -n "$SUBMISSION_ID" ]; then
+              echo "[$(ts)] Uploaded; submission id: $SUBMISSION_ID"
+              break
+            fi
+            if ! curl -sSI --connect-timeout 15 https://appstoreconnect.apple.com >/dev/null; then
+              echo "::warning::Upload attempt $attempt failed (rc=$rc) — runner lost connectivity to Apple"
+            else
+              echo "::warning::Upload attempt $attempt failed (rc=$rc); Apple reachable — retrying in ${delay}s"
+            fi
+            sleep "$delay"; delay=$((delay * 2))
+          done
+          if [ -z "$SUBMISSION_ID" ]; then
+            echo "::error::Could not upload for notarization after 3 attempts"
+            exit 1
+          fi
+
+          # Phase 2 — poll the SAME submission (no re-upload). `wait` failing
+          # here is only a dropped long-poll; the scan keeps running at Apple,
+          # so polling again is free. Backoff between reconnects.
+          delay=30
+          for attempt in 1 2 3 4 5; do
+            echo "[$(ts)] Waiting for verdict (poll attempt $attempt)"
+            set +e
+            xcrun notarytool wait "$SUBMISSION_ID" "${KEYCHAIN_ARGS[@]}" \
+              --timeout 20m --output-format json \
+              > "$RUNNER_TEMP/notary-wait.json"
+            rc=$?
+            set -e
+            cat "$RUNNER_TEMP/notary-wait.json" || true
+            STATUS=$(jq -r '.status // empty' "$RUNNER_TEMP/notary-wait.json" 2>/dev/null || true)
+            case "$STATUS" in
+              Accepted)
+                echo "[$(ts)] Notarization accepted; stapling…"
+                xcrun stapler staple "$APP"
+                xcrun stapler validate "$APP"
+                exit 0
+                ;;
+              Invalid|Rejected)
+                # A real verdict — retrying cannot change it. Surface Apple's
+                # reasons and fail fast.
+                echo "::error::Notarization $STATUS (submission $SUBMISSION_ID)"
+                xcrun notarytool log "$SUBMISSION_ID" "${KEYCHAIN_ARGS[@]}" || true
+                exit 1
+                ;;
+            esac
+            echo "::warning::Poll attempt $attempt inconclusive (rc=$rc, status='${STATUS:-none}'); retrying in ${delay}s"
+            sleep "$delay"; delay=$((delay * 2))
+          done
+          echo "::error::No notarization verdict for $SUBMISSION_ID after ~100 minutes of polling"
+          xcrun notarytool info "$SUBMISSION_ID" "${KEYCHAIN_ARGS[@]}" || true
+          exit 1
 
       # Fallback for builds without signing secrets: Apple Silicon refuses to
       # launch completely unsigned binaries, so ad-hoc sign them.
@@ -173,6 +319,7 @@ jobs:
       # mac build whose asar had no embedded-postgres).
       - name: Smoke test packaged app
         shell: bash
+        timeout-minutes: 30
         run: |
           case "${{ runner.os }}" in
             macOS)
@@ -229,6 +376,7 @@ jobs:
         run: printf '%%__os_install_post %%{nil}\n' > "$HOME/.rpmmacros"
 
       - name: Create distributables
+        timeout-minutes: 60
         run: bun run --cwd apps/desktop make --skip-package
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -257,7 +405,7 @@ jobs:
           fi
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: desktop-${{ matrix.platform }}
           path: |

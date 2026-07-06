@@ -1,6 +1,6 @@
 {
   "name": "@classifyre/api",
-  "version": "0.4.38",
+  "version": "0.4.39",
   "description": "",
   "author": "",
   "private": true,
@@ -53,6 +53,8 @@
     "@opentelemetry/sdk-node": "^0.218.0",
     "@prisma/adapter-pg": "^7.8.0",
     "@prisma/client": "^7.8.0",
+    "@slack/socket-mode": "^2.0.7",
+    "@slack/web-api": "^7.18.0",
     "@workspace/schemas": "workspace:*",
     "ajv": "^8.18.0",
     "ajv-formats": "^3.0.1",

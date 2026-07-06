@@ -8,7 +8,9 @@ describe('AgentSearchService — asset observation (cold start)', () => {
 
   const mockPrisma = {
     asset: { findMany: jest.fn() },
-    finding: { count: jest.fn(), findMany: jest.fn() },
+    finding: { count: jest.fn(), findMany: jest.fn(), groupBy: jest.fn() },
+    customDetector: { findMany: jest.fn() },
+    customDetectorFeedback: { groupBy: jest.fn() },
   };
 
   beforeEach(async () => {
@@ -114,6 +116,79 @@ describe('AgentSearchService — asset observation (cold start)', () => {
       await service.summarizeNewFindings('s1', null);
       const where = mockPrisma.finding.findMany.mock.calls[0]![0].where;
       expect(where.customDetectorKey).toBeUndefined();
+    });
+  });
+
+  describe('customDetectorPrecision', () => {
+    it('folds operator triage into a per-detector false-positive rate + verdict', async () => {
+      mockPrisma.customDetector.findMany.mockResolvedValue([
+        { key: 'noisy', name: 'Noisy' },
+        { key: 'clean', name: 'Clean' },
+        { key: 'thin', name: 'Thin' },
+        { key: 'fresh', name: 'Fresh' },
+      ]);
+      mockPrisma.customDetectorFeedback.groupBy.mockResolvedValue([
+        // noisy: 8 dismissed (FP+IGNORED) / 10 reviewed = 0.8 → noisy
+        { customDetectorKey: 'noisy', status: 'FALSE_POSITIVE', _count: 6 },
+        { customDetectorKey: 'noisy', status: 'IGNORED', _count: 2 },
+        { customDetectorKey: 'noisy', status: 'RESOLVED', _count: 2 },
+        // clean: 1 dismissed / 10 reviewed = 0.1 → clean
+        { customDetectorKey: 'clean', status: 'FALSE_POSITIVE', _count: 1 },
+        { customDetectorKey: 'clean', status: 'RESOLVED', _count: 9 },
+        // thin: only 2 reviews — below sample floor → unproven
+        { customDetectorKey: 'thin', status: 'FALSE_POSITIVE', _count: 2 },
+      ]);
+      mockPrisma.finding.groupBy.mockResolvedValue([
+        { customDetectorKey: 'noisy', _count: 4 },
+      ]);
+
+      const rows = await service.customDetectorPrecision();
+
+      // Sorted noisiest-first.
+      expect(rows.map((r) => r.customDetectorKey)).toEqual([
+        'noisy',
+        'clean',
+        'thin',
+        'fresh',
+      ]);
+
+      const noisy = rows.find((r) => r.customDetectorKey === 'noisy')!;
+      expect(noisy).toMatchObject({
+        openFindings: 4,
+        dismissed: 8,
+        confirmed: 2,
+        reviewed: 10,
+        falsePositiveRate: 0.8,
+        verdict: 'noisy',
+      });
+
+      const clean = rows.find((r) => r.customDetectorKey === 'clean')!;
+      expect(clean).toMatchObject({ falsePositiveRate: 0.1, verdict: 'clean' });
+
+      const thin = rows.find((r) => r.customDetectorKey === 'thin')!;
+      expect(thin.verdict).toBe('unproven');
+
+      // No feedback at all → rate null, verdict unproven, zero open findings.
+      const fresh = rows.find((r) => r.customDetectorKey === 'fresh')!;
+      expect(fresh).toMatchObject({
+        reviewed: 0,
+        falsePositiveRate: null,
+        verdict: 'unproven',
+        openFindings: 0,
+      });
+    });
+
+    it('scopes to one detector key and short-circuits when none exist', async () => {
+      mockPrisma.customDetector.findMany.mockResolvedValue([]);
+      const rows = await service.customDetectorPrecision('cust_x');
+      expect(rows).toEqual([]);
+      expect(mockPrisma.customDetector.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ isActive: true, key: 'cust_x' }),
+        }),
+      );
+      // Nothing to aggregate — feedback/finding groupBy never runs.
+      expect(mockPrisma.customDetectorFeedback.groupBy).not.toHaveBeenCalled();
     });
   });
 });

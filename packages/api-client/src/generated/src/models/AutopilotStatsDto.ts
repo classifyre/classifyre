@@ -79,6 +79,18 @@ export interface AutopilotStatsDto {
      * @memberof AutopilotStatsDto
      */
     runsByKind: { [key: string]: number; };
+    /**
+     * LLM tokens (in + out) consumed by autopilot runs in the last 24h. Scoped to the harness — assistant chat and LLM detectors are not metered here.
+     * @type {number}
+     * @memberof AutopilotStatsDto
+     */
+    tokensLast24h: number;
+    /**
+     * Estimated autopilot LLM cost (USD) of the last 24h. Null when no run carries pricing.
+     * @type {number}
+     * @memberof AutopilotStatsDto
+     */
+    costLast24h?: number | null;
 }
 
 /**
@@ -94,6 +106,7 @@ export function instanceOfAutopilotStatsDto(value: object): value is AutopilotSt
     if (!('memoryCount' in value) || value['memoryCount'] === undefined) return false;
     if (!('briefVersion' in value) || value['briefVersion'] === undefined) return false;
     if (!('runsByKind' in value) || value['runsByKind'] === undefined) return false;
+    if (!('tokensLast24h' in value) || value['tokensLast24h'] === undefined) return false;
     return true;
 }
 
@@ -117,6 +130,8 @@ export function AutopilotStatsDtoFromJSONTyped(json: any, ignoreDiscriminator: b
         'briefVersion': json['briefVersion'],
         'lastActivityAt': json['lastActivityAt'] == null ? undefined : (new Date(json['lastActivityAt'])),
         'runsByKind': json['runsByKind'],
+        'tokensLast24h': json['tokensLast24h'],
+        'costLast24h': json['costLast24h'] == null ? undefined : json['costLast24h'],
     };
 }
 
@@ -141,6 +156,8 @@ export function AutopilotStatsDtoToJSONTyped(value?: AutopilotStatsDto | null, i
         'briefVersion': value['briefVersion'],
         'lastActivityAt': value['lastActivityAt'] == null ? value['lastActivityAt'] : value['lastActivityAt'].toISOString(),
         'runsByKind': value['runsByKind'],
+        'tokensLast24h': value['tokensLast24h'],
+        'costLast24h': value['costLast24h'],
     };
 }
 

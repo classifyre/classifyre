@@ -106,9 +106,7 @@ def test_meilisearch_test_connection_success(_patch_requests: dict[str, Any]) ->
 
 
 def test_meilisearch_excludes_via_scope(_patch_requests: dict[str, Any]) -> None:
-    src = MeilisearchSource(
-        _recipe(optional={"scope": {"exclude_indices": ["internal_logs"]}})
-    )
+    src = MeilisearchSource(_recipe(optional={"scope": {"exclude_indices": ["internal_logs"]}}))
     rows = src._list_indices()
     assert [r["uid"] for r in rows] == ["products"]
 

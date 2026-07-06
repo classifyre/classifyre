@@ -55,7 +55,9 @@ export const HarnessMissionDtoKindEnum = {
     Dream: 'DREAM',
     Duplicates: 'DUPLICATES',
     Config: 'CONFIG',
-    DetectorAuthor: 'DETECTOR_AUTHOR'
+    DetectorAuthor: 'DETECTOR_AUTHOR',
+    Escalation: 'ESCALATION',
+    Chat: 'CHAT'
 } as const;
 export type HarnessMissionDtoKindEnum = typeof HarnessMissionDtoKindEnum[keyof typeof HarnessMissionDtoKindEnum];
 

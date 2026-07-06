@@ -3,6 +3,7 @@ import { DetectorToolset } from './detector.toolset';
 import type { CustomDetectorsService } from '../../../custom-detectors.service';
 import type { CustomDetectorTestsService } from '../../../custom-detector-tests.service';
 import type { DecisionApplierService } from '../../decision-applier.service';
+import type { AgentSearchService } from '../../search/agent-search.service';
 import type { Tool, ToolContext } from '../tool.types';
 
 describe('DetectorToolset', () => {
@@ -16,11 +17,13 @@ describe('DetectorToolset', () => {
   };
   const mockTests = { evaluateSample: jest.fn() };
   const mockApplier = { detectorGate: jest.fn(), effectiveMode: jest.fn() };
+  const mockSearch = { customDetectorPrecision: jest.fn() };
 
   const toolset = new DetectorToolset(
     mockDetectors as unknown as CustomDetectorsService,
     mockTests as unknown as CustomDetectorTestsService,
     mockApplier as unknown as DecisionApplierService,
+    mockSearch as unknown as AgentSearchService,
   );
   const tools = toolset.list();
   const byName = (name: string) => tools.find((t) => t.name === name) as Tool;
@@ -133,6 +136,35 @@ describe('DetectorToolset', () => {
       expect(mockDetectors.delete).toHaveBeenCalledWith('d1');
       expect(out).toEqual({ deleted: true });
       expect(tool.decisionAction).toBe(AgentDecisionAction.DELETE_DETECTOR);
+    });
+  });
+
+  describe('detectors.precision', () => {
+    it('is a read tool that forwards the optional key to the search service', async () => {
+      const tool = byName('detectors.precision');
+      expect(tool.sideEffect).toBe('read');
+      const rows = [
+        {
+          customDetectorKey: 'cust_x',
+          customDetectorName: 'X',
+          openFindings: 3,
+          dismissed: 8,
+          confirmed: 2,
+          reviewed: 10,
+          falsePositiveRate: 0.8,
+          verdict: 'noisy',
+        },
+      ];
+      mockSearch.customDetectorPrecision.mockResolvedValue(rows);
+      const out = await tool.handler({ customDetectorKey: 'cust_x' }, tc);
+      expect(mockSearch.customDetectorPrecision).toHaveBeenCalledWith('cust_x');
+      expect(out).toBe(rows);
+    });
+
+    it('passes null when no key is given', async () => {
+      mockSearch.customDetectorPrecision.mockResolvedValue([]);
+      await byName('detectors.precision').handler({}, tc);
+      expect(mockSearch.customDetectorPrecision).toHaveBeenCalledWith(null);
     });
   });
 

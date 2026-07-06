@@ -21,6 +21,8 @@ Name | Type
 `autopilotConfigGuidance` | string
 `autopilotDetectorEnabled` | boolean
 `autopilotDetectorGuidance` | string
+`autopilotEscalationEnabled` | boolean
+`autopilotEscalationGuidance` | string
 `autopilotMcpEnabled` | boolean
 `hfToken` | string
 
@@ -46,6 +48,8 @@ const example = {
   "autopilotConfigGuidance": null,
   "autopilotDetectorEnabled": false,
   "autopilotDetectorGuidance": null,
+  "autopilotEscalationEnabled": false,
+  "autopilotEscalationGuidance": null,
   "autopilotMcpEnabled": false,
   "hfToken": null,
 } satisfies UpdateInstanceSettingsDto

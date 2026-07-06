@@ -74,6 +74,18 @@ export interface AiProviderConfigResponseDto {
      */
     supportsVision: boolean;
     /**
+     * Cost in USD per 1M input tokens. Null when pricing is not configured.
+     * @type {number}
+     * @memberof AiProviderConfigResponseDto
+     */
+    inputCostPerMTok: number | null;
+    /**
+     * Cost in USD per 1M output tokens. Null when pricing is not configured.
+     * @type {number}
+     * @memberof AiProviderConfigResponseDto
+     */
+    outputCostPerMTok: number | null;
+    /**
      * 
      * @type {Date}
      * @memberof AiProviderConfigResponseDto
@@ -112,6 +124,8 @@ export function instanceOfAiProviderConfigResponseDto(value: object): value is A
     if (!('baseUrl' in value) || value['baseUrl'] === undefined) return false;
     if (!('contextSize' in value) || value['contextSize'] === undefined) return false;
     if (!('supportsVision' in value) || value['supportsVision'] === undefined) return false;
+    if (!('inputCostPerMTok' in value) || value['inputCostPerMTok'] === undefined) return false;
+    if (!('outputCostPerMTok' in value) || value['outputCostPerMTok'] === undefined) return false;
     if (!('createdAt' in value) || value['createdAt'] === undefined) return false;
     if (!('updatedAt' in value) || value['updatedAt'] === undefined) return false;
     return true;
@@ -136,6 +150,8 @@ export function AiProviderConfigResponseDtoFromJSONTyped(json: any, ignoreDiscri
         'baseUrl': json['baseUrl'],
         'contextSize': json['contextSize'],
         'supportsVision': json['supportsVision'],
+        'inputCostPerMTok': json['inputCostPerMTok'],
+        'outputCostPerMTok': json['outputCostPerMTok'],
         'createdAt': (new Date(json['createdAt'])),
         'updatedAt': (new Date(json['updatedAt'])),
     };
@@ -161,6 +177,8 @@ export function AiProviderConfigResponseDtoToJSONTyped(value?: AiProviderConfigR
         'baseUrl': value['baseUrl'],
         'contextSize': value['contextSize'],
         'supportsVision': value['supportsVision'],
+        'inputCostPerMTok': value['inputCostPerMTok'],
+        'outputCostPerMTok': value['outputCostPerMTok'],
         'createdAt': value['createdAt'].toISOString(),
         'updatedAt': value['updatedAt'].toISOString(),
     };

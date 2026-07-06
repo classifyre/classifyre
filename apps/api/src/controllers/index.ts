@@ -26,3 +26,4 @@ export {
   CaseThreadsController,
 } from './case-threads.controller';
 export { GraphController } from './graph.controller';
+export { ChatBotsController } from './chat-bots.controller';

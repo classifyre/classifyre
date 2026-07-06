@@ -8,6 +8,7 @@ import {
 import type {
   AiCompletionOptions,
   AiMessage,
+  AiProviderResult,
   AiProviderRuntimeConfig,
   IAiProvider,
 } from '../types';
@@ -17,7 +18,7 @@ export class GeminiProvider implements IAiProvider {
     messages: AiMessage[],
     config: AiProviderRuntimeConfig,
     options: AiCompletionOptions,
-  ): Promise<string> {
+  ): Promise<AiProviderResult> {
     const client = new GoogleGenAI({
       apiKey: config.apiKey,
       httpOptions: { timeout: 30 * 60 * 1000 },
@@ -48,7 +49,19 @@ export class GeminiProvider implements IAiProvider {
         },
       });
 
-      return response.text ?? '';
+      const meta = response.usageMetadata;
+      return {
+        text: response.text ?? '',
+        usage: meta
+          ? {
+              inputTokens: meta.promptTokenCount ?? 0,
+              // Include thinking tokens — they are billed as output.
+              outputTokens:
+                (meta.candidatesTokenCount ?? 0) +
+                (meta.thoughtsTokenCount ?? 0),
+            }
+          : null,
+      };
     } catch (err) {
       throw mapGeminiError(err);
     }

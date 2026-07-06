@@ -55,6 +55,14 @@ export class AiProviderConfigService {
       baseUrl: config.baseUrl,
       contextSize: config.contextSize,
       supportsVision: config.supportsVision,
+      inputCostPerMTok:
+        config.inputCostPerMTok != null
+          ? Number(config.inputCostPerMTok)
+          : null,
+      outputCostPerMTok:
+        config.outputCostPerMTok != null
+          ? Number(config.outputCostPerMTok)
+          : null,
       createdAt: config.createdAt,
       updatedAt: config.updatedAt,
     };
@@ -96,6 +104,8 @@ export class AiProviderConfigService {
         baseUrl: dto.baseUrl && dto.baseUrl.length > 0 ? dto.baseUrl : null,
         contextSize: dto.contextSize ?? null,
         supportsVision: dto.supportsVision ?? false,
+        inputCostPerMTok: dto.inputCostPerMTok ?? null,
+        outputCostPerMTok: dto.outputCostPerMTok ?? null,
       },
     });
     return this.toResponse(created);
@@ -130,6 +140,12 @@ export class AiProviderConfigService {
     }
     if (dto.supportsVision !== undefined) {
       data.supportsVision = dto.supportsVision;
+    }
+    if (dto.inputCostPerMTok !== undefined) {
+      data.inputCostPerMTok = dto.inputCostPerMTok;
+    }
+    if (dto.outputCostPerMTok !== undefined) {
+      data.outputCostPerMTok = dto.outputCostPerMTok;
     }
 
     const updated = await this.prisma.aiProviderConfig.update({

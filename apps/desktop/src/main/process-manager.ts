@@ -1,4 +1,4 @@
-import { spawn, execFileSync, type ChildProcess } from 'child_process';
+import { spawn, spawnSync, execFileSync, type ChildProcess } from 'child_process';
 import { app } from 'electron';
 import path from 'path';
 import fs from 'fs';
@@ -102,6 +102,7 @@ export class ProcessManager {
   private processes = new Map<string, ManagedProcess>();
   private venvPathOverride: string | null = null;
   private venvPrepared = false;
+  private apiDirCache: string | null = null;
 
   // Rewires the bundled Python venv for this machine. Lazy: runs on the first
   // workspace open (covered by the loading indicator) rather than at app
@@ -117,9 +118,52 @@ export class ProcessManager {
     }
   }
 
+  // On macOS the API tree ships as ONE api.tar.gz (its ~65k node_modules
+  // files made Apple's notary scan take hours) and is unpacked to userData on
+  // first workspace open, once per app version. Other platforms bundle the
+  // plain resources/api directory.
+  private ensureApiDir(): string {
+    if (this.apiDirCache) return this.apiDirCache;
+
+    const bundledDir = path.join(process.resourcesPath, 'api');
+    const archive = path.join(process.resourcesPath, 'api.tar.gz');
+    if (fs.existsSync(bundledDir) || !fs.existsSync(archive)) {
+      this.apiDirCache = bundledDir;
+      return bundledDir;
+    }
+
+    const root = path.join(app.getPath('userData'), 'api-runtime');
+    const markerFile = path.join(root, 'version.json');
+    const extractedDir = path.join(root, 'api');
+    try {
+      const marker = JSON.parse(fs.readFileSync(markerFile, 'utf-8')) as { version?: string };
+      if (marker.version === app.getVersion() && fs.existsSync(extractedDir)) {
+        this.apiDirCache = extractedDir;
+        return extractedDir;
+      }
+    } catch {
+      // no valid extraction yet
+    }
+
+    console.log(`[api-runtime] Extracting bundled API to ${root}…`);
+    fs.rmSync(root, { recursive: true, force: true });
+    fs.mkdirSync(root, { recursive: true });
+    const result = spawnSync('tar', ['-xzf', archive, '-C', root], { stdio: 'inherit' });
+    if (result.status !== 0) {
+      throw new Error(`Failed to extract bundled API (tar exited ${result.status})`);
+    }
+    fs.writeFileSync(markerFile, JSON.stringify({ version: app.getVersion() }));
+    console.log('[api-runtime] Extraction complete');
+    this.apiDirCache = extractedDir;
+    return extractedDir;
+  }
+
   private getApiEntryPath(): string {
     if (app.isPackaged) {
-      return path.join(process.resourcesPath, 'api', 'dist', 'src', 'main.js');
+      // Packaged: the whole API is one esbuild bundle at the api-tree root
+      // (see apps/desktop/scripts/bundle-api.mjs). Dev still runs the plain
+      // tsc output.
+      return path.join(this.ensureApiDir(), 'backend.js');
     }
     return path.join(__dirname, '../../../api/dist/src/main.js');
   }
@@ -145,14 +189,14 @@ export class ProcessManager {
     if (app.isPackaged) {
       // Staged inside the api tree so `prisma generate` at build time and
       // `prisma migrate deploy` at runtime share one schema location.
-      return path.join(process.resourcesPath, 'api', 'prisma');
+      return path.join(this.ensureApiDir(), 'prisma');
     }
     return path.join(__dirname, '../../../api/prisma');
   }
 
   private getApiDir(): string {
     if (app.isPackaged) {
-      return path.join(process.resourcesPath, 'api');
+      return this.ensureApiDir();
     }
     return path.join(__dirname, '../../../api');
   }

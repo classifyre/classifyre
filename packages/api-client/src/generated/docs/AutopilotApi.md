@@ -12,6 +12,7 @@ All URIs are relative to *http://localhost*
 | [**autopilotControllerGetStats**](AutopilotApi.md#autopilotcontrollergetstats) | **GET** /autopilot/stats | Mission-control counters (runs, decisions, memory, brief version) |
 | [**autopilotControllerGetSystemBrief**](AutopilotApi.md#autopilotcontrollergetsystembrief) | **GET** /autopilot/system-brief | The living system brief the autopilot maintains and injects |
 | [**autopilotControllerGetTools**](AutopilotApi.md#autopilotcontrollergettools) | **GET** /autopilot/tools | The harness capability map — every registered tool (read/mutate, domain) and the missions that use them |
+| [**autopilotControllerGetUsage**](AutopilotApi.md#autopilotcontrollergetusage) | **GET** /autopilot/usage | LLM token/cost usage per day and agent (for the harness usage charts) — filter by agent kind and time range |
 | [**autopilotControllerListActivity**](AutopilotApi.md#autopilotcontrollerlistactivity) | **GET** /autopilot/activity | Cross-run activity feed (the business timeline) — server-side filter by kind, action, outcome, entity, text and time |
 | [**autopilotControllerListLogs**](AutopilotApi.md#autopilotcontrollerlistlogs) | **GET** /autopilot/runs/{id}/logs | Execution log of a run — filter by channel (BUSINESS narrative vs TECHNICAL mechanics/raw model output) |
 | [**autopilotControllerListMemory**](AutopilotApi.md#autopilotcontrollerlistmemory) | **GET** /autopilot/memory | List the agent memory (glossary, precedents, topic map) |
@@ -519,6 +520,77 @@ No authorization required
 [[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
 
 
+## autopilotControllerGetUsage
+
+> AgentUsageResponseDto autopilotControllerGetUsage(agentKind, since, until)
+
+LLM token/cost usage per day and agent (for the harness usage charts) — filter by agent kind and time range
+
+### Example
+
+```ts
+import {
+  Configuration,
+  AutopilotApi,
+} from '@workspace/api-client';
+import type { AutopilotControllerGetUsageRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new AutopilotApi();
+
+  const body = {
+    // 'INQUIRY' | 'CASE' | 'DREAM' | 'DUPLICATES' | 'CONFIG' | 'DETECTOR_AUTHOR' | 'ESCALATION' | 'CHAT' (optional)
+    agentKind: agentKind_example,
+    // string | ISO lower bound for run creation (default: 30 days ago) (optional)
+    since: since_example,
+    // string | ISO upper bound for run creation (optional)
+    until: until_example,
+  } satisfies AutopilotControllerGetUsageRequest;
+
+  try {
+    const data = await api.autopilotControllerGetUsage(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **agentKind** | `INQUIRY`, `CASE`, `DREAM`, `DUPLICATES`, `CONFIG`, `DETECTOR_AUTHOR`, `ESCALATION`, `CHAT` |  | [Optional] [Defaults to `undefined`] [Enum: INQUIRY, CASE, DREAM, DUPLICATES, CONFIG, DETECTOR_AUTHOR, ESCALATION, CHAT] |
+| **since** | `string` | ISO lower bound for run creation (default: 30 days ago) | [Optional] [Defaults to `undefined`] |
+| **until** | `string` | ISO upper bound for run creation | [Optional] [Defaults to `undefined`] |
+
+### Return type
+
+[**AgentUsageResponseDto**](AgentUsageResponseDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
 ## autopilotControllerListActivity
 
 > AgentActivityListResponseDto autopilotControllerListActivity(agentKind, action, outcome, entityType, search, since, until, skip, limit)
@@ -539,9 +611,9 @@ async function example() {
   const api = new AutopilotApi();
 
   const body = {
-    // 'INQUIRY' | 'CASE' | 'DREAM' | 'DUPLICATES' | 'CONFIG' | 'DETECTOR_AUTHOR' (optional)
+    // 'INQUIRY' | 'CASE' | 'DREAM' | 'DUPLICATES' | 'CONFIG' | 'DETECTOR_AUTHOR' | 'ESCALATION' | 'CHAT' (optional)
     agentKind: agentKind_example,
-    // 'CREATE_INQUIRY' | 'UPDATE_INQUIRY' | 'ENRICH_INQUIRY_MATCHERS' | 'SIGNAL_CASE_READY' | 'CREATE_CASE' | 'UPDATE_CASE' | 'ADD_HYPOTHESIS' | 'UPDATE_HYPOTHESIS' | 'ADD_EVIDENCE' | 'ATTACH_FINDINGS' | 'ADD_NOTE' | 'ADD_THREAD_ENTRY' | 'CREATE_EDGE' | 'REMOVE_EDGE' | 'LINK_SUPPORT' | 'CHANGE_STATUS' | 'LINK_INQUIRY' | 'CONSOLIDATE_MEMORY' | 'LINK_DUPLICATE' | 'UPDATE_CLUSTER' | 'TOOL_CALL' | 'TUNE_SOURCE' | 'CREATE_DETECTOR' | 'TRAIN_DETECTOR' | 'UPDATE_DETECTOR' | 'DELETE_DETECTOR' | 'TRIGGER_SCAN' | 'UPDATE_SYSTEM_BRIEF' | 'RECOMPUTE_CORRELATION' | 'TUNE_CORRELATION' | 'NO_ACTION' (optional)
+    // 'CREATE_INQUIRY' | 'UPDATE_INQUIRY' | 'ENRICH_INQUIRY_MATCHERS' | 'SIGNAL_CASE_READY' | 'CREATE_CASE' | 'UPDATE_CASE' | 'ADD_HYPOTHESIS' | 'UPDATE_HYPOTHESIS' | 'ADD_EVIDENCE' | 'ATTACH_FINDINGS' | 'ADD_NOTE' | 'ADD_THREAD_ENTRY' | 'CREATE_EDGE' | 'REMOVE_EDGE' | 'LINK_SUPPORT' | 'CHANGE_STATUS' | 'LINK_INQUIRY' | 'CONSOLIDATE_MEMORY' | 'LINK_DUPLICATE' | 'UPDATE_CLUSTER' | 'TOOL_CALL' | 'TUNE_SOURCE' | 'CREATE_DETECTOR' | 'TRAIN_DETECTOR' | 'UPDATE_DETECTOR' | 'DELETE_DETECTOR' | 'TRIGGER_SCAN' | 'UPDATE_SYSTEM_BRIEF' | 'RECOMPUTE_CORRELATION' | 'TUNE_CORRELATION' | 'NOTIFY_OPERATOR' | 'NO_ACTION' (optional)
     action: action_example,
     // 'APPLIED' | 'SKIPPED_OBSERVE_ONLY' | 'FAILED' (optional)
     outcome: outcome_example,
@@ -576,8 +648,8 @@ example().catch(console.error);
 
 | Name | Type | Description  | Notes |
 |------------- | ------------- | ------------- | -------------|
-| **agentKind** | `INQUIRY`, `CASE`, `DREAM`, `DUPLICATES`, `CONFIG`, `DETECTOR_AUTHOR` |  | [Optional] [Defaults to `undefined`] [Enum: INQUIRY, CASE, DREAM, DUPLICATES, CONFIG, DETECTOR_AUTHOR] |
-| **action** | `CREATE_INQUIRY`, `UPDATE_INQUIRY`, `ENRICH_INQUIRY_MATCHERS`, `SIGNAL_CASE_READY`, `CREATE_CASE`, `UPDATE_CASE`, `ADD_HYPOTHESIS`, `UPDATE_HYPOTHESIS`, `ADD_EVIDENCE`, `ATTACH_FINDINGS`, `ADD_NOTE`, `ADD_THREAD_ENTRY`, `CREATE_EDGE`, `REMOVE_EDGE`, `LINK_SUPPORT`, `CHANGE_STATUS`, `LINK_INQUIRY`, `CONSOLIDATE_MEMORY`, `LINK_DUPLICATE`, `UPDATE_CLUSTER`, `TOOL_CALL`, `TUNE_SOURCE`, `CREATE_DETECTOR`, `TRAIN_DETECTOR`, `UPDATE_DETECTOR`, `DELETE_DETECTOR`, `TRIGGER_SCAN`, `UPDATE_SYSTEM_BRIEF`, `RECOMPUTE_CORRELATION`, `TUNE_CORRELATION`, `NO_ACTION` |  | [Optional] [Defaults to `undefined`] [Enum: CREATE_INQUIRY, UPDATE_INQUIRY, ENRICH_INQUIRY_MATCHERS, SIGNAL_CASE_READY, CREATE_CASE, UPDATE_CASE, ADD_HYPOTHESIS, UPDATE_HYPOTHESIS, ADD_EVIDENCE, ATTACH_FINDINGS, ADD_NOTE, ADD_THREAD_ENTRY, CREATE_EDGE, REMOVE_EDGE, LINK_SUPPORT, CHANGE_STATUS, LINK_INQUIRY, CONSOLIDATE_MEMORY, LINK_DUPLICATE, UPDATE_CLUSTER, TOOL_CALL, TUNE_SOURCE, CREATE_DETECTOR, TRAIN_DETECTOR, UPDATE_DETECTOR, DELETE_DETECTOR, TRIGGER_SCAN, UPDATE_SYSTEM_BRIEF, RECOMPUTE_CORRELATION, TUNE_CORRELATION, NO_ACTION] |
+| **agentKind** | `INQUIRY`, `CASE`, `DREAM`, `DUPLICATES`, `CONFIG`, `DETECTOR_AUTHOR`, `ESCALATION`, `CHAT` |  | [Optional] [Defaults to `undefined`] [Enum: INQUIRY, CASE, DREAM, DUPLICATES, CONFIG, DETECTOR_AUTHOR, ESCALATION, CHAT] |
+| **action** | `CREATE_INQUIRY`, `UPDATE_INQUIRY`, `ENRICH_INQUIRY_MATCHERS`, `SIGNAL_CASE_READY`, `CREATE_CASE`, `UPDATE_CASE`, `ADD_HYPOTHESIS`, `UPDATE_HYPOTHESIS`, `ADD_EVIDENCE`, `ATTACH_FINDINGS`, `ADD_NOTE`, `ADD_THREAD_ENTRY`, `CREATE_EDGE`, `REMOVE_EDGE`, `LINK_SUPPORT`, `CHANGE_STATUS`, `LINK_INQUIRY`, `CONSOLIDATE_MEMORY`, `LINK_DUPLICATE`, `UPDATE_CLUSTER`, `TOOL_CALL`, `TUNE_SOURCE`, `CREATE_DETECTOR`, `TRAIN_DETECTOR`, `UPDATE_DETECTOR`, `DELETE_DETECTOR`, `TRIGGER_SCAN`, `UPDATE_SYSTEM_BRIEF`, `RECOMPUTE_CORRELATION`, `TUNE_CORRELATION`, `NOTIFY_OPERATOR`, `NO_ACTION` |  | [Optional] [Defaults to `undefined`] [Enum: CREATE_INQUIRY, UPDATE_INQUIRY, ENRICH_INQUIRY_MATCHERS, SIGNAL_CASE_READY, CREATE_CASE, UPDATE_CASE, ADD_HYPOTHESIS, UPDATE_HYPOTHESIS, ADD_EVIDENCE, ATTACH_FINDINGS, ADD_NOTE, ADD_THREAD_ENTRY, CREATE_EDGE, REMOVE_EDGE, LINK_SUPPORT, CHANGE_STATUS, LINK_INQUIRY, CONSOLIDATE_MEMORY, LINK_DUPLICATE, UPDATE_CLUSTER, TOOL_CALL, TUNE_SOURCE, CREATE_DETECTOR, TRAIN_DETECTOR, UPDATE_DETECTOR, DELETE_DETECTOR, TRIGGER_SCAN, UPDATE_SYSTEM_BRIEF, RECOMPUTE_CORRELATION, TUNE_CORRELATION, NOTIFY_OPERATOR, NO_ACTION] |
 | **outcome** | `APPLIED`, `SKIPPED_OBSERVE_ONLY`, `FAILED` |  | [Optional] [Defaults to `undefined`] [Enum: APPLIED, SKIPPED_OBSERVE_ONLY, FAILED] |
 | **entityType** | `string` | inquiry | case | source | detector | memory | system | asset | [Optional] [Defaults to `undefined`] |
 | **search** | `string` | Substring search over the rationale | [Optional] [Defaults to `undefined`] |
@@ -776,7 +848,7 @@ async function example() {
   const api = new AutopilotApi();
 
   const body = {
-    // 'INQUIRY' | 'CASE' | 'DREAM' | 'DUPLICATES' | 'CONFIG' | 'DETECTOR_AUTHOR' (optional)
+    // 'INQUIRY' | 'CASE' | 'DREAM' | 'DUPLICATES' | 'CONFIG' | 'DETECTOR_AUTHOR' | 'ESCALATION' | 'CHAT' (optional)
     agentKind: agentKind_example,
     // string | Only runs focused on this case (optional)
     caseId: caseId_example,
@@ -815,7 +887,7 @@ example().catch(console.error);
 
 | Name | Type | Description  | Notes |
 |------------- | ------------- | ------------- | -------------|
-| **agentKind** | `INQUIRY`, `CASE`, `DREAM`, `DUPLICATES`, `CONFIG`, `DETECTOR_AUTHOR` |  | [Optional] [Defaults to `undefined`] [Enum: INQUIRY, CASE, DREAM, DUPLICATES, CONFIG, DETECTOR_AUTHOR] |
+| **agentKind** | `INQUIRY`, `CASE`, `DREAM`, `DUPLICATES`, `CONFIG`, `DETECTOR_AUTHOR`, `ESCALATION`, `CHAT` |  | [Optional] [Defaults to `undefined`] [Enum: INQUIRY, CASE, DREAM, DUPLICATES, CONFIG, DETECTOR_AUTHOR, ESCALATION, CHAT] |
 | **caseId** | `string` | Only runs focused on this case | [Optional] [Defaults to `undefined`] |
 | **sourceId** | `string` | Only runs for this source | [Optional] [Defaults to `undefined`] |
 | **status** | `PENDING`, `RUNNING`, `COMPLETED`, `FAILED`, `SKIPPED`, `CANCELLED` |  | [Optional] [Defaults to `undefined`] [Enum: PENDING, RUNNING, COMPLETED, FAILED, SKIPPED, CANCELLED] |
@@ -1055,7 +1127,7 @@ async function example() {
   const api = new AutopilotApi();
 
   const body = {
-    // 'INQUIRY' | 'CASE' | 'DREAM' | 'DUPLICATES' | 'CONFIG' | 'DETECTOR_AUTHOR'
+    // 'INQUIRY' | 'CASE' | 'DREAM' | 'DUPLICATES' | 'CONFIG' | 'DETECTOR_AUTHOR' | 'ESCALATION' | 'CHAT'
     kind: kind_example,
     // UpdateAgentConfigDto
     updateAgentConfigDto: ...,
@@ -1078,7 +1150,7 @@ example().catch(console.error);
 
 | Name | Type | Description  | Notes |
 |------------- | ------------- | ------------- | -------------|
-| **kind** | `INQUIRY`, `CASE`, `DREAM`, `DUPLICATES`, `CONFIG`, `DETECTOR_AUTHOR` |  | [Defaults to `undefined`] [Enum: INQUIRY, CASE, DREAM, DUPLICATES, CONFIG, DETECTOR_AUTHOR] |
+| **kind** | `INQUIRY`, `CASE`, `DREAM`, `DUPLICATES`, `CONFIG`, `DETECTOR_AUTHOR`, `ESCALATION`, `CHAT` |  | [Defaults to `undefined`] [Enum: INQUIRY, CASE, DREAM, DUPLICATES, CONFIG, DETECTOR_AUTHOR, ESCALATION, CHAT] |
 | **updateAgentConfigDto** | [UpdateAgentConfigDto](UpdateAgentConfigDto.md) |  | |
 
 ### Return type

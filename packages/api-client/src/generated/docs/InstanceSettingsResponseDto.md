@@ -22,6 +22,8 @@ Name | Type
 `autopilotConfigGuidance` | string
 `autopilotDetectorEnabled` | boolean
 `autopilotDetectorGuidance` | string
+`autopilotEscalationEnabled` | boolean
+`autopilotEscalationGuidance` | string
 `autopilotMcpEnabled` | boolean
 `demoMode` | boolean
 `hfTokenSet` | boolean
@@ -52,6 +54,8 @@ const example = {
   "autopilotConfigGuidance": null,
   "autopilotDetectorEnabled": false,
   "autopilotDetectorGuidance": null,
+  "autopilotEscalationEnabled": false,
+  "autopilotEscalationGuidance": null,
   "autopilotMcpEnabled": false,
   "demoMode": false,
   "hfTokenSet": false,

@@ -35,6 +35,12 @@ import { InquiriesService } from './inquiries.service';
 import { CaseThreadsService } from './case-threads.service';
 import { CaseActivityService } from './case-activity.service';
 import { GraphService } from './graph.service';
+import { BuiltinMcpToolsService } from './chat-gateway/builtin-mcp-tools.service';
+import { ChatAgentService } from './chat-gateway/chat-agent.service';
+import { ChatBotsService } from './chat-gateway/chat-bots.service';
+import { ChatGatewayService } from './chat-gateway/chat-gateway.service';
+import { ChatHarnessToolset } from './chat-gateway/chat-harness.toolset';
+import { ChatSessionService } from './chat-gateway/chat-session.service';
 
 // Import organized controllers
 import {
@@ -59,6 +65,7 @@ import {
   CaseThreadsController,
   CaseTimelineController,
   GraphController,
+  ChatBotsController,
 } from './controllers';
 
 @Module({
@@ -94,6 +101,7 @@ import {
     CaseTimelineController,
     CaseThreadsController,
     GraphController,
+    ChatBotsController,
   ],
   providers: [
     { provide: APP_GUARD, useClass: DemoModeGuard },
@@ -123,6 +131,14 @@ import {
     CaseThreadsService,
     GraphService,
     AgentMemoryService,
+    // Chat gateway (Telegram/Slack bots → chat agent over the harness tools).
+    // Registry/dispatcher/audit instances come from AutopilotModule's exports.
+    BuiltinMcpToolsService,
+    ChatHarnessToolset,
+    ChatSessionService,
+    ChatAgentService,
+    ChatGatewayService,
+    ChatBotsService,
   ],
 })
 export class AppModule {}

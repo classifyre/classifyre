@@ -40,6 +40,22 @@ export { HypothesesApi } from "./generated/src/apis/HypothesesApi";
 export { ThreadsApi } from "./generated/src/apis/ThreadsApi";
 export { AutopilotApi } from "./generated/src/apis/AutopilotApi";
 export { CorrelationApi } from "./generated/src/apis/CorrelationApi";
+export { ChatBotsApi } from "./generated/src/apis/ChatBotsApi";
+export type {
+  ChatBotResponseDto,
+  ChatBotDiagnosticsDto,
+  ChatBotActivityEntryDto,
+  ChatBotSimulateDto,
+  ChatBotSimulateResultDto,
+  ChatBotTestResultDto,
+  ChatBotTestCheckDto,
+  CreateChatBotDto,
+  UpdateChatBotDto,
+} from "./generated/src/models";
+export {
+  ChatBotResponseDtoPlatformEnum,
+  CreateChatBotDtoPlatformEnum,
+} from "./generated/src/models";
 export type {
   AgentRunDto,
   AgentRunDetailDto,
@@ -64,6 +80,9 @@ export type {
   HarnessToolsResponseDto,
   AgentConfigDto,
   AgentConfigListResponseDto,
+  AgentUsageBucketDto,
+  AgentUsageResponseDto,
+  AgentUsageTotalsDto,
   UpdateAgentConfigDto,
   UpdateSystemBriefDto,
   McpServerResponseDto,
@@ -160,6 +179,7 @@ export {
   AutopilotControllerListActivityAgentKindEnum,
   AutopilotControllerListActivityActionEnum,
   AutopilotControllerListActivityOutcomeEnum,
+  AutopilotControllerGetUsageAgentKindEnum,
 } from "./generated/src/apis/AutopilotApi";
 export {
   CreateMcpServerDtoTransportEnum,
@@ -883,6 +903,7 @@ import { HypothesesApi } from "./generated/src/apis/HypothesesApi";
 import { ThreadsApi } from "./generated/src/apis/ThreadsApi";
 import { AutopilotApi } from "./generated/src/apis/AutopilotApi";
 import { CorrelationApi } from "./generated/src/apis/CorrelationApi";
+import { ChatBotsApi } from "./generated/src/apis/ChatBotsApi";
 
 // Determine the correct base URL
 // In browser: use relative path /api which is proxied by Next.js
@@ -944,6 +965,7 @@ class ApiClient {
   public threads: ThreadsApi;
   public autopilot: AutopilotApi;
   public correlation: CorrelationApi;
+  public chatBots: ChatBotsApi;
 
   constructor(baseUrl?: string) {
     this.config = createConfiguration(baseUrl);
@@ -964,6 +986,7 @@ class ApiClient {
     this.threads = new ThreadsApi(this.config);
     this.autopilot = new AutopilotApi(this.config);
     this.correlation = new CorrelationApi(this.config);
+    this.chatBots = new ChatBotsApi(this.config);
   }
 
   async searchAssets(

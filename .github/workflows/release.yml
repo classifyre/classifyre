@@ -50,7 +50,7 @@ jobs:
 
       # ── 2. Checkout with FULL history of ALL branches ──────────────────
       - name: Checkout develop (full history)
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           ref: develop
           fetch-depth: 0
