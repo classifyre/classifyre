@@ -5689,6 +5689,234 @@
         ]
       }
     },
+    "/instance-settings/chat/bots": {
+      "get": {
+        "description": "Returns every configured Telegram/Slack bot with masked token previews, permissions and connection status.",
+        "operationId": "ChatBotsController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ChatBotResponseDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "List chat bots",
+        "tags": [
+          "Chat Bots"
+        ]
+      },
+      "post": {
+        "description": "Stores the bot credentials encrypted and (when enabled) connects it: Telegram via long-polling, Slack via Socket Mode.",
+        "operationId": "ChatBotsController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateChatBotDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatBotResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Create a chat bot",
+        "tags": [
+          "Chat Bots"
+        ]
+      }
+    },
+    "/instance-settings/chat/bots/{id}": {
+      "patch": {
+        "description": "Updates settings/permissions and reconnects the bot. Omitted or empty token fields keep the stored values.",
+        "operationId": "ChatBotsController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateChatBotDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatBotResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Update a chat bot",
+        "tags": [
+          "Chat Bots"
+        ]
+      },
+      "delete": {
+        "description": "Disconnects the bot and deletes it with all its sessions and messages.",
+        "operationId": "ChatBotsController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted."
+          }
+        },
+        "summary": "Delete a chat bot",
+        "tags": [
+          "Chat Bots"
+        ]
+      }
+    },
+    "/instance-settings/chat/bots/{id}/diagnostics": {
+      "get": {
+        "description": "Runtime connector telemetry: whether the connector runs, message/reply counters and the recent in-memory activity log (newest first).",
+        "operationId": "ChatBotsController_diagnostics",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatBotDiagnosticsDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Chat bot diagnostics",
+        "tags": [
+          "Chat Bots"
+        ]
+      }
+    },
+    "/instance-settings/chat/bots/{id}/test": {
+      "post": {
+        "description": "Runs live checks with the stored credentials: Telegram getMe + webhook conflict detection, Slack auth.test (bot token) + apps.connections.open (app token).",
+        "operationId": "ChatBotsController_test",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatBotTestResultDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Test chat bot connection",
+        "tags": [
+          "Chat Bots"
+        ]
+      }
+    },
+    "/instance-settings/chat/bots/{id}/simulate": {
+      "post": {
+        "description": "Runs one real agent turn (tools, audit, history in a dedicated simulator session) without going through Telegram/Slack, and returns the reply. Slow — the turn runs synchronously.",
+        "operationId": "ChatBotsController_simulate",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChatBotSimulateDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatBotSimulateResultDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Send a test message to a chat bot",
+        "tags": [
+          "Chat Bots"
+        ]
+      }
+    },
     "/sources/{sourceId}/run": {
       "post": {
         "operationId": "CliRunnerController_startRunner",
@@ -6869,7 +7097,8 @@
                 "DREAM",
                 "DUPLICATES",
                 "CONFIG",
-                "DETECTOR_AUTHOR"
+                "DETECTOR_AUTHOR",
+                "CHAT"
               ]
             }
           },
@@ -6926,7 +7155,8 @@
                 "DREAM",
                 "DUPLICATES",
                 "CONFIG",
-                "DETECTOR_AUTHOR"
+                "DETECTOR_AUTHOR",
+                "CHAT"
               ]
             }
           },
@@ -7117,7 +7347,8 @@
                 "DREAM",
                 "DUPLICATES",
                 "CONFIG",
-                "DETECTOR_AUTHOR"
+                "DETECTOR_AUTHOR",
+                "CHAT"
               ]
             }
           }
@@ -7218,7 +7449,8 @@
                 "DREAM",
                 "DUPLICATES",
                 "CONFIG",
-                "DETECTOR_AUTHOR"
+                "DETECTOR_AUTHOR",
+                "CHAT"
               ]
             }
           },
@@ -14235,6 +14467,371 @@
           "relationType"
         ]
       },
+      "ChatBotResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "platform": {
+            "type": "string",
+            "enum": [
+              "TELEGRAM",
+              "SLACK"
+            ],
+            "example": "TELEGRAM"
+          },
+          "name": {
+            "type": "string",
+            "description": "User-friendly label",
+            "example": "Ops Telegram bot"
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "Whether the connector is started."
+          },
+          "botTokenPreview": {
+            "type": "string",
+            "description": "Masked preview of the stored bot token (never the raw value).",
+            "example": "8123…kXw"
+          },
+          "appTokenPreview": {
+            "type": "string",
+            "description": "Masked preview of the Slack app-level token, if stored.",
+            "nullable": true,
+            "example": "xapp…9Qz"
+          },
+          "capabilityGroups": {
+            "description": "MCP capability group ids the bot may use (see MCP overview). Empty = all groups.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "agentKinds": {
+            "description": "Autopilot agent kinds the bot may steer. Empty = all steerable kinds.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "allowMutations": {
+            "type": "boolean",
+            "description": "When false, every mutating tool is recorded observe-only and never executed."
+          },
+          "lastError": {
+            "type": "string",
+            "nullable": true,
+            "description": "Last connector error, if any."
+          },
+          "lastConnectedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "platform",
+          "name",
+          "enabled",
+          "botTokenPreview",
+          "appTokenPreview",
+          "capabilityGroups",
+          "agentKinds",
+          "allowMutations",
+          "lastError",
+          "lastConnectedAt",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "CreateChatBotDto": {
+        "type": "object",
+        "properties": {
+          "platform": {
+            "type": "string",
+            "enum": [
+              "TELEGRAM",
+              "SLACK"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "description": "User-friendly label."
+          },
+          "botToken": {
+            "type": "string",
+            "description": "Bot token (Telegram BotFather token, or Slack bot token xoxb-…). Sent once, stored encrypted."
+          },
+          "appToken": {
+            "type": "string",
+            "description": "Slack app-level token (xapp-…) for Socket Mode. Required for Slack bots."
+          },
+          "enabled": {
+            "type": "boolean",
+            "default": false
+          },
+          "capabilityGroups": {
+            "description": "Empty/omitted = all groups.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "agentKinds": {
+            "type": "array",
+            "description": "Empty/omitted = all steerable kinds.",
+            "items": {
+              "type": "string",
+              "enum": [
+                "INQUIRY",
+                "CASE",
+                "CONFIG",
+                "DETECTOR_AUTHOR",
+                "DREAM",
+                "DUPLICATES"
+              ]
+            }
+          },
+          "allowMutations": {
+            "type": "boolean",
+            "default": true
+          }
+        },
+        "required": [
+          "platform",
+          "name",
+          "botToken"
+        ]
+      },
+      "UpdateChatBotDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "botToken": {
+            "type": "string",
+            "description": "New bot token. Omit (or send empty) to keep the stored one."
+          },
+          "appToken": {
+            "type": "string",
+            "description": "New Slack app token. Omit (or send empty) to keep the stored one."
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "capabilityGroups": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "agentKinds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "INQUIRY",
+                "CASE",
+                "CONFIG",
+                "DETECTOR_AUTHOR",
+                "DREAM",
+                "DUPLICATES"
+              ]
+            }
+          },
+          "allowMutations": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ChatBotActivityEntryDto": {
+        "type": "object",
+        "properties": {
+          "at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "level": {
+            "type": "string",
+            "enum": [
+              "INFO",
+              "ERROR"
+            ],
+            "example": "INFO"
+          },
+          "code": {
+            "type": "string",
+            "description": "Stable event code for client-side translation (e.g. slackMention).",
+            "example": "slackMention"
+          },
+          "params": {
+            "type": "object",
+            "description": "Values to interpolate into the translated event text.",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "message": {
+            "type": "string",
+            "description": "English fallback text, pre-rendered from code + params.",
+            "example": "Mention from U0123ABC in C0456DEF."
+          }
+        },
+        "required": [
+          "at",
+          "level",
+          "code",
+          "params",
+          "message"
+        ]
+      },
+      "ChatBotDiagnosticsDto": {
+        "type": "object",
+        "properties": {
+          "running": {
+            "type": "boolean",
+            "description": "Whether a live connector currently runs for this bot."
+          },
+          "processing": {
+            "type": "boolean",
+            "description": "Whether an agent turn is currently running (a reply is being worked on)."
+          },
+          "connectedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          },
+          "lastEventAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true,
+            "description": "When the connector last received a platform message."
+          },
+          "eventsReceived": {
+            "type": "number",
+            "description": "Messages received since the connector started."
+          },
+          "repliesSent": {
+            "type": "number",
+            "description": "Replies posted since the connector started."
+          },
+          "lastError": {
+            "type": "string",
+            "nullable": true,
+            "description": "Last connector error, if any."
+          },
+          "activity": {
+            "description": "Most recent connector activity, newest first (in-memory).",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChatBotActivityEntryDto"
+            }
+          }
+        },
+        "required": [
+          "running",
+          "processing",
+          "connectedAt",
+          "lastEventAt",
+          "eventsReceived",
+          "repliesSent",
+          "lastError",
+          "activity"
+        ]
+      },
+      "ChatBotTestCheckDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Stable check id: botToken, appToken or polling.",
+            "example": "botToken"
+          },
+          "ok": {
+            "type": "boolean"
+          },
+          "code": {
+            "type": "string",
+            "description": "Stable result code for client-side translation (e.g. slackAuthenticated).",
+            "example": "slackAuthenticated"
+          },
+          "params": {
+            "type": "object",
+            "description": "Values to interpolate into the translated result text.",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "detail": {
+            "type": "string",
+            "description": "English fallback text, pre-rendered from code + params.",
+            "example": "Authenticated as @classifyre-bot in workspace Acme."
+          }
+        },
+        "required": [
+          "id",
+          "ok",
+          "code",
+          "params",
+          "detail"
+        ]
+      },
+      "ChatBotTestResultDto": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "description": "True when every check passed."
+          },
+          "checks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChatBotTestCheckDto"
+            }
+          }
+        },
+        "required": [
+          "ok",
+          "checks"
+        ]
+      },
+      "ChatBotSimulateDto": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "description": "The message to send to the bot, as if typed in the chat.",
+            "example": "how are my sources?"
+          }
+        },
+        "required": [
+          "message"
+        ]
+      },
+      "ChatBotSimulateResultDto": {
+        "type": "object",
+        "properties": {
+          "reply": {
+            "type": "string",
+            "nullable": true,
+            "description": "The bot reply, or null when the message was ignored (duplicate/empty)."
+          }
+        },
+        "required": [
+          "reply"
+        ]
+      },
       "StartRunnerDto": {
         "type": "object",
         "properties": {
@@ -15487,7 +16084,8 @@
                 "DREAM",
                 "DUPLICATES",
                 "CONFIG",
-                "DETECTOR_AUTHOR"
+                "DETECTOR_AUTHOR",
+                "CHAT"
               ]
             }
           },
@@ -15599,7 +16197,8 @@
               "DREAM",
               "DUPLICATES",
               "CONFIG",
-              "DETECTOR_AUTHOR"
+              "DETECTOR_AUTHOR",
+              "CHAT"
             ]
           },
           "runs": {
@@ -15695,7 +16294,8 @@
               "DREAM",
               "DUPLICATES",
               "CONFIG",
-              "DETECTOR_AUTHOR"
+              "DETECTOR_AUTHOR",
+              "CHAT"
             ]
           },
           "runStatus": {
@@ -15852,7 +16452,8 @@
               "DREAM",
               "DUPLICATES",
               "CONFIG",
-              "DETECTOR_AUTHOR"
+              "DETECTOR_AUTHOR",
+              "CHAT"
             ]
           },
           "goal": {
@@ -15909,7 +16510,8 @@
               "DREAM",
               "DUPLICATES",
               "CONFIG",
-              "DETECTOR_AUTHOR"
+              "DETECTOR_AUTHOR",
+              "CHAT"
             ]
           },
           "enabled": {
@@ -16147,7 +16749,8 @@
               "DREAM",
               "DUPLICATES",
               "CONFIG",
-              "DETECTOR_AUTHOR"
+              "DETECTOR_AUTHOR",
+              "CHAT"
             ]
           },
           "status": {
@@ -16363,7 +16966,8 @@
               "DREAM",
               "DUPLICATES",
               "CONFIG",
-              "DETECTOR_AUTHOR"
+              "DETECTOR_AUTHOR",
+              "CHAT"
             ]
           },
           "status": {
@@ -16808,7 +17412,8 @@
                 "DREAM",
                 "DUPLICATES",
                 "CONFIG",
-                "DETECTOR_AUTHOR"
+                "DETECTOR_AUTHOR",
+                "CHAT"
               ]
             }
           },
@@ -16893,7 +17498,8 @@
                 "DREAM",
                 "DUPLICATES",
                 "CONFIG",
-                "DETECTOR_AUTHOR"
+                "DETECTOR_AUTHOR",
+                "CHAT"
               ]
             }
           },

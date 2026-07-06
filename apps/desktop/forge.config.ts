@@ -11,7 +11,10 @@ import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-const allResources = ['api', 'web', 'pg', 'venv', 'python', 'pyapp'];
+// 'api' is a directory on Linux/Windows but a single api.tar.gz on macOS
+// (65k loose node_modules files made Apple's notary scan take hours); the
+// existsSync filter below picks whichever the staging script produced.
+const allResources = ['api', 'api.tar.gz', 'web', 'pg', 'venv', 'python', 'pyapp'];
 const extraResource = allResources
   .map((name) => path.resolve(__dirname, 'resources', name))
   .filter((abs) => fs.existsSync(abs));
