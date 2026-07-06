@@ -125,7 +125,7 @@ jobs:
       # e.g. fork PRs; the ad-hoc fallback below keeps those builds bootable).
       - name: Import Apple signing certificate
         if: runner.os == 'macOS' && env.HAS_APPLE_CERT == 'true'
-        uses: apple-actions/import-codesign-certs@v3
+        uses: apple-actions/import-codesign-certs@v7
         with:
           p12-file-base64: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
           p12-password: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
