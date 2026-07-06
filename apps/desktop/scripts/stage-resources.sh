@@ -6,7 +6,9 @@ set -euo pipefail
 # build-desktop.sh) and the GitHub Actions release workflow.
 #
 # Layout produced:
-#   resources/api/     — compiled NestJS API + production node_modules (incl. prisma CLI)
+#   resources/api/     — esbuild single-file bundle (backend.js) + minimal
+#                        external node_modules (Prisma client/engines, prisma
+#                        CLI, NestJS framework — see scripts/bundle-api.mjs)
 #   resources/web/     — Next.js static export
 #   resources/pg/      — embedded-postgres npm tree (main app loads it from here)
 #   resources/pyapp/   — Python CLI (apps/cli) + schemas (packages/schemas),
@@ -59,54 +61,56 @@ echo "=== Stage artifacts into resources/ ==="
 rm -rf "$RESOURCES"
 mkdir -p "$RESOURCES"/{api,web}
 
-# --- API: dist + standalone production install --------------------------------
-# The monorepo uses bun's isolated (pnpm-style) store: apps/api/node_modules
-# only holds symlinks to direct deps, and transitive deps resolve through the
-# repo root. Copying that tree produces a broken bundle. Instead we do a real
-# production install into the staged directory so the tree is complete and
-# self-contained.
-cp -R "$MONOREPO_ROOT/apps/api/dist" "$RESOURCES/api/dist"
+# --- API: esbuild single-file bundle + minimal external install ---------------
+# The compiled dist/ + a full production node_modules is ~65k files / 768 MB —
+# 92% of the desktop bundle's file count. Instead we bundle the tsc OUTPUT
+# (apps/api/dist, which carries the decorator metadata Nest DI needs and esbuild
+# cannot re-emit) into a single backend.js with scripts/bundle-api.mjs, and
+# install ONLY the packages that must stay real files on disk (see that script's
+# `external` list: Prisma client+engines, the prisma CLI, the NestJS framework,
+# fastify, rxjs, class-transformer/validator, pg, natural, socket.io, swagger's
+# static assets). Everything else is inlined into backend.js.
+echo "Bundling API into backend.js (esbuild)…"
+API_MAIN_NODE="$(to_node_path "$MONOREPO_ROOT/apps/api/dist/src/main.js")"
+BACKEND_OUT_NODE="$(to_node_path "$RESOURCES/api/backend.js")"
+(cd "$DESKTOP_DIR" && node scripts/bundle-api.mjs "$API_MAIN_NODE" "$BACKEND_OUT_NODE")
 
-echo "Installing API production dependencies (standalone npm install)…"
-# `prisma` must be a production dep here: the app runs `prisma migrate deploy`
-# from this tree at runtime. @workspace/schemas is vendored below instead.
+echo "Installing API external dependencies (standalone npm install)…"
+# Only the externalized framework layer is installed as real files; every other
+# dependency is inlined into backend.js. KEEP must stay in sync with the
+# `external` list in scripts/bundle-api.mjs. `prisma` (the migrate-deploy CLI)
+# and @prisma/client-runtime-utils live in devDependencies upstream, so we merge
+# both dep maps when resolving versions. @workspace/schemas is vendored below;
+# @kubernetes/client-node and @opentelemetry/* are intentionally omitted (lazy /
+# stubbed on desktop).
 node -e "
   const fs = require('fs');
   const pkg = JSON.parse(fs.readFileSync('$MONOREPO_ROOT_NODE/apps/api/package.json', 'utf8'));
-  const prismaVersion = (pkg.devDependencies && pkg.devDependencies.prisma) || pkg.dependencies.prisma;
-  delete pkg.dependencies['@workspace/schemas'];
-  pkg.dependencies.prisma = prismaVersion;
-  delete pkg.devDependencies;
-  delete pkg.scripts;
-  fs.writeFileSync('$RESOURCES_NODE/api/package.json', JSON.stringify(pkg, null, 2));
+  const allDeps = { ...pkg.dependencies, ...pkg.devDependencies };
+  const KEEP = [
+    '@nestjs/common', '@nestjs/core', '@nestjs/platform-express',
+    '@nestjs/platform-fastify', '@nestjs/platform-socket.io', '@nestjs/swagger',
+    '@nestjs/websockets',
+    '@fastify/multipart', '@fastify/static', '@fastify/under-pressure',
+    '@prisma/adapter-pg', '@prisma/client', '@prisma/client-runtime-utils',
+    'class-transformer', 'class-validator', 'fastify', 'pg',
+    'reflect-metadata', 'rxjs', 'socket.io', 'prisma',
+  ];
+  const dependencies = {};
+  for (const name of KEEP) {
+    const v = allDeps[name];
+    if (!v) throw new Error('KEEP dep missing from apps/api/package.json: ' + name);
+    dependencies[name] = v;
+  }
+  const out = { name: pkg.name, version: pkg.version, private: true, dependencies };
+  fs.writeFileSync('$RESOURCES_NODE/api/package.json', JSON.stringify(out, null, 2));
 "
 (cd "$RESOURCES/api" && npm install --omit=dev --no-audit --no-fund --loglevel=error)
 
-# Vendor @workspace/schemas as plain CommonJS. Its published form exports .ts
-# files (fine in dev where Node's type stripping applies, but stripping is
-# disabled for files inside node_modules), so we compile it for the bundle.
-echo "Vendoring @workspace/schemas (compiled to CommonJS)…"
-SCHEMAS_DEST="$RESOURCES/api/node_modules/@workspace/schemas"
-SCHEMAS_DEST_NODE="$(to_node_path "$SCHEMAS_DEST")"
-mkdir -p "$SCHEMAS_DEST"
-(cd "$MONOREPO_ROOT/packages/schemas" && bun x tsc src/*.ts \
-  --outDir "$SCHEMAS_DEST/src" \
-  --module commonjs --target es2022 --moduleResolution node \
-  --esModuleInterop --resolveJsonModule --skipLibCheck --noCheck \
-  --declaration false)
-mkdir -p "$SCHEMAS_DEST/src/schemas"
-cp -R "$MONOREPO_ROOT/packages/schemas/src/schemas/." "$SCHEMAS_DEST/src/schemas/"
-node -e "
-  const fs = require('fs');
-  const pkg = JSON.parse(fs.readFileSync('$MONOREPO_ROOT_NODE/packages/schemas/package.json', 'utf8'));
-  pkg.type = 'commonjs';
-  for (const key of Object.keys(pkg.exports || {})) {
-    if (typeof pkg.exports[key] === 'string') {
-      pkg.exports[key] = pkg.exports[key].replace(/\.ts$/, '.js');
-    }
-  }
-  fs.writeFileSync('$SCHEMAS_DEST_NODE/package.json', JSON.stringify(pkg, null, 2));
-"
+# @workspace/schemas is compiled into backend.js by esbuild (not external), so
+# no vendoring is needed here. The JSON schema files that package also ships are
+# resolved at runtime by filesystem path (apps/api utils/schema-path.ts), which
+# walks up to packages/schemas — independent of node_modules.
 
 # Generate the Prisma client into the staged tree for this platform. The
 # schema must sit inside resources/api so prisma resolves the staged
@@ -122,11 +126,15 @@ cp "$MONOREPO_ROOT/apps/api/prisma.config.ts" "$RESOURCES/api/prisma.config.ts"
 (cd "$RESOURCES/api" && node node_modules/prisma/build/index.js generate \
   --schema prisma/schema.prisma)
 
-# Sanity checks: migration CLI + client + vendored schemas must be loadable.
+# Sanity checks: the bundle, migration CLI, client + vendored schemas must all
+# be present/loadable. `node --check` parses backend.js without executing it
+# (a full require would boot Nest and connect to a database).
+[ -f "$RESOURCES/api/backend.js" ] || { echo "backend.js missing in staged tree" >&2; exit 1; }
 [ -f "$RESOURCES/api/node_modules/prisma/build/index.js" ] || { echo "prisma CLI missing in staged tree" >&2; exit 1; }
+node --check "$RESOURCES/api/backend.js" || { echo "backend.js failed to parse" >&2; exit 1; }
 node -e "
-  require('$RESOURCES_NODE/api/node_modules/@workspace/schemas/src/assistant.js');
   require('$RESOURCES_NODE/api/node_modules/@prisma/client/package.json');
+  require('$RESOURCES_NODE/api/node_modules/@nestjs/core/package.json');
   console.log('Staged API tree sanity checks passed.');
 "
 
@@ -266,10 +274,10 @@ if [ "${SKIP_PYTHON:-0}" != "1" ]; then
 fi
 
 # --- macOS: collapse the API tree into one archive ----------------------------
-# The api/node_modules tree is ~65k tiny files — 92% of the bundle's file
-# count. Apple's notary service scans per file, which turned notarization into
-# a multi-hour wait (and codesign walks the same tree). Shipping it as ONE
-# tar.gz brings the notarized payload down to ~5k files; the app extracts it
+# Even after esbuild bundling, the external node_modules (Prisma engines, the
+# NestJS framework, rxjs, …) is a few thousand small files. Apple's notary
+# service scans per file (and codesign walks the same tree), so we still ship
+# the API as ONE tar.gz to keep the notarized payload small; the app extracts it
 # to userData on first workspace open (same pattern as the Python runtime
 # relocation). Linux/Windows keep the plain directory — they have no
 # notarization step and extraction would only cost disk and first-run time.
