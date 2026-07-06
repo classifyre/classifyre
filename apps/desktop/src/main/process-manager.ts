@@ -160,7 +160,10 @@ export class ProcessManager {
 
   private getApiEntryPath(): string {
     if (app.isPackaged) {
-      return path.join(this.ensureApiDir(), 'dist', 'src', 'main.js');
+      // Packaged: the whole API is one esbuild bundle at the api-tree root
+      // (see apps/desktop/scripts/bundle-api.mjs). Dev still runs the plain
+      // tsc output.
+      return path.join(this.ensureApiDir(), 'backend.js');
     }
     return path.join(__dirname, '../../../api/dist/src/main.js');
   }
