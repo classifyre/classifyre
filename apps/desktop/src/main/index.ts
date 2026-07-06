@@ -1,4 +1,4 @@
-import { app, BrowserWindow, WebContentsView, dialog } from 'electron';
+import { app, BrowserWindow, WebContentsView, dialog, protocol } from 'electron';
 import path from 'path';
 import { PostgresManager } from './postgres-manager.js';
 import { NamespaceManager } from './namespace-manager.js';
@@ -19,6 +19,20 @@ process.on('unhandledRejection', (reason) => {
   }
   console.error('Unhandled rejection:', reason);
 });
+
+// The packaged Next.js static export references assets with ABSOLUTE paths
+// (/_next/static/...). Loading index.html over file:// resolves those against
+// the filesystem root, so every chunk 404s and the window renders blank. They
+// are instead served by the custom 'app' scheme (registerAppProtocol), but that
+// scheme must be declared privileged BEFORE app 'ready' so it behaves as a
+// standard, secure origin — otherwise absolute paths and fetch() don't resolve.
+// Harmless in dev (the app scheme is only loaded when packaged).
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: 'app',
+    privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true, stream: true },
+  },
+]);
 
 const isDev = !app.isPackaged;
 
