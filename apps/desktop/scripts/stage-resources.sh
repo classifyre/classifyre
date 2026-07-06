@@ -273,7 +273,7 @@ if [ "${SKIP_PYTHON:-0}" != "1" ]; then
   fi
 fi
 
-# --- macOS: collapse the API tree into one archive ----------------------------
+# --- macOS: sign the API's Mach-O binaries, then collapse into one archive ----
 # Even after esbuild bundling, the external node_modules (Prisma engines, the
 # NestJS framework, rxjs, …) is a few thousand small files. Apple's notary
 # service scans per file (and codesign walks the same tree), so we still ship
@@ -281,7 +281,43 @@ fi
 # to userData on first workspace open (same pattern as the Python runtime
 # relocation). Linux/Windows keep the plain directory — they have no
 # notarization step and extraction would only cost disk and first-run time.
+#
+# The notary service DOES recurse into api.tar.gz, so any Mach-O inside it must
+# already carry a valid Developer ID signature with the hardened runtime and a
+# secure timestamp — otherwise notarization returns Invalid ("binary is not
+# signed with a valid Developer ID certificate"). @electron/osx-sign only walks
+# the .app bundle; it never opens this tarball, so we sign the inner binaries
+# here, before packing. The Prisma query-engine .node is loaded by the API at
+# runtime — signing it with the SAME Developer ID (same Team ID) as the app also
+# satisfies library validation under the hardened runtime.
 if [ "$(uname -s)" = "Darwin" ]; then
+  if [ "${MACOS_SIGN:-0}" = "1" ]; then
+    echo "=== Sign Mach-O binaries in resources/api (Developer ID + hardened runtime) ==="
+    IDENTITY="${APPLE_SIGNING_IDENTITY:-}"
+    if [ -z "$IDENTITY" ]; then
+      IDENTITY="$(security find-identity -v -p codesigning \
+        | grep -m1 'Developer ID Application' \
+        | sed -E 's/.*"(.*)".*/\1/')"
+    fi
+    [ -n "$IDENTITY" ] || { echo "No 'Developer ID Application' identity in keychain" >&2; exit 1; }
+    echo "Signing identity: $IDENTITY"
+    signed=0
+    while IFS= read -r f; do
+      # Only Mach-O objects need signing; skip scripts, JSON, JS, etc.
+      case "$(file -b "$f")" in
+        Mach-O*)
+          codesign --force --options runtime --timestamp \
+            --sign "$IDENTITY" "$f"
+          signed=$((signed + 1))
+          ;;
+      esac
+    done < <(find "$RESOURCES/api" -type f)
+    echo "Signed $signed Mach-O binaries under resources/api"
+    [ "$signed" -gt 0 ] || echo "::warning::No Mach-O binaries found under resources/api to sign"
+  else
+    echo "MACOS_SIGN != 1 — skipping inner API binary signing (unsigned build)"
+  fi
+
   echo "=== Pack resources/api into api.tar.gz (macOS notarization) ==="
   tar -czf "$RESOURCES/api.tar.gz" -C "$RESOURCES" api
   rm -rf "$RESOURCES/api"
