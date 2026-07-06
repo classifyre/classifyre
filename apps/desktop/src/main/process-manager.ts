@@ -7,6 +7,7 @@ import os from 'os';
 import crypto from 'crypto';
 import treeKill from 'tree-kill';
 import { ensurePythonRuntime } from './python-env.js';
+import { getLogFilePath } from './logger.js';
 
 // In dev mode we inherit the developer's login-shell PATH so locally installed
 // tooling (uv, java, node) is visible. In packaged mode we never touch the
@@ -347,14 +348,26 @@ export class ProcessManager {
 
   private waitForReady(
     port: number,
-    timeoutMs = 60_000,
+    // The FIRST workspace open does heavy one-time work before the API binds
+    // its port — pg-boss creates its whole schema, Nest wires every module, and
+    // on macOS the embedded Postgres runs under Rosetta. 60s was too tight for
+    // that cold start (users hit "not ready after 60000ms" on first launch);
+    // warm opens are ~2s, so a generous ceiling only affects the cold case and
+    // resolves the instant the API is up.
+    timeoutMs = 180_000,
     intervalMs = 500,
   ): Promise<void> {
     const start = Date.now();
     return new Promise((resolve, reject) => {
       const check = () => {
         if (Date.now() - start > timeoutMs) {
-          reject(new Error(`API on port ${port} not ready after ${timeoutMs}ms`));
+          const logFile = getLogFilePath();
+          reject(
+            new Error(
+              `API on port ${port} not ready after ${timeoutMs}ms` +
+                (logFile ? ` — see log for details: ${logFile}` : ''),
+            ),
+          );
           return;
         }
 

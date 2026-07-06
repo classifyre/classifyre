@@ -8,6 +8,7 @@ import { registerIpcHandlers } from './ipc-handlers.js';
 import { registerAppProtocol } from './protocol-handler.js';
 import { SettingsManager } from './settings-manager.js';
 import { UpdateChecker } from './update-checker.js';
+import { initFileLogging } from './logger.js';
 
 // embedded-postgres registers an async-exit-hook that calls done() on process
 // exit, but Electron's quit path doesn't always provide the callback. Suppress
@@ -104,6 +105,12 @@ app.on('ready', async () => {
     app.quit();
     return;
   }
+
+  // Tee stdout/stderr to userData/logs/main.log before anything else runs, so
+  // startup and workspace-open failures are diagnosable without launching the
+  // app from a terminal.
+  const logFile = initFileLogging();
+  if (logFile) console.log(`Logging to ${logFile}`);
 
   if (!isDev) {
     const webDir = path.join(process.resourcesPath, 'web');
