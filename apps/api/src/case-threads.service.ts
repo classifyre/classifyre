@@ -272,7 +272,7 @@ export class CaseThreadsService {
     });
     if (!thread) throw new NotFoundException(`Thread ${threadId} not found`);
 
-    const targetLabel = await this.validateTarget(
+    const { label: targetLabel, canonicalId } = await this.validateTarget(
       dto.targetType,
       dto.targetId,
       thread.caseId,
@@ -284,13 +284,13 @@ export class CaseThreadsService {
           threadId_targetType_targetId: {
             threadId,
             targetType: dto.targetType,
-            targetId: dto.targetId,
+            targetId: canonicalId,
           },
         },
         create: {
           threadId,
           targetType: dto.targetType,
-          targetId: dto.targetId,
+          targetId: canonicalId,
           stance: dto.stance ?? EvidenceStance.SUPPORTS,
           weight: dto.weight,
           note: dto.note,
@@ -383,32 +383,47 @@ export class CaseThreadsService {
     if (!found) throw new NotFoundException(`Case with ID ${caseId} not found`);
   }
 
-  /** Validates the target belongs to the case and returns its display label. */
+  /**
+   * Validates the target belongs to the case and returns its display label
+   * plus the canonical link-row id. Accepts either the link-row id
+   * (CaseEvidence/CaseFinding) or the underlying entity id (asset/finding) —
+   * agents naturally pass the latter.
+   */
   private async validateTarget(
     targetType: 'evidence' | 'finding',
     targetId: string,
     caseId: string,
-  ): Promise<string> {
+  ): Promise<{ label: string; canonicalId: string }> {
     if (targetType === 'evidence') {
-      const ev = await this.prisma.caseEvidence.findUnique({
-        where: { id: targetId },
-        select: { caseId: true, label: true, entityId: true },
-      });
+      const ev =
+        (await this.prisma.caseEvidence.findUnique({
+          where: { id: targetId },
+          select: { id: true, caseId: true, label: true, entityId: true },
+        })) ??
+        (await this.prisma.caseEvidence.findFirst({
+          where: { caseId, entityId: targetId },
+          select: { id: true, caseId: true, label: true, entityId: true },
+        }));
       if (!ev || ev.caseId !== caseId)
         throw new BadRequestException(
           'Evidence must belong to the same case as the thread',
         );
-      return ev.label ?? ev.entityId;
+      return { label: ev.label ?? ev.entityId, canonicalId: ev.id };
     }
-    const cf = await this.prisma.caseFinding.findUnique({
-      where: { id: targetId },
-      select: { caseId: true, label: true },
-    });
+    const cf =
+      (await this.prisma.caseFinding.findUnique({
+        where: { id: targetId },
+        select: { id: true, caseId: true, label: true },
+      })) ??
+      (await this.prisma.caseFinding.findFirst({
+        where: { caseId, findingId: targetId },
+        select: { id: true, caseId: true, label: true },
+      }));
     if (!cf || cf.caseId !== caseId)
       throw new BadRequestException(
         'Finding must belong to the same case as the thread',
       );
-    return cf.label;
+    return { label: cf.label, canonicalId: cf.id };
   }
 
   /** Best-effort display label for a support target (used when unlinking). */

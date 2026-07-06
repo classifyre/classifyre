@@ -1193,7 +1193,8 @@ export const AutopilotControllerGetUsageAgentKindEnum = {
     Dream: 'DREAM',
     Duplicates: 'DUPLICATES',
     Config: 'CONFIG',
-    DetectorAuthor: 'DETECTOR_AUTHOR'
+    DetectorAuthor: 'DETECTOR_AUTHOR',
+    Chat: 'CHAT'
 } as const;
 export type AutopilotControllerGetUsageAgentKindEnum = typeof AutopilotControllerGetUsageAgentKindEnum[keyof typeof AutopilotControllerGetUsageAgentKindEnum];
 /**
@@ -1205,7 +1206,8 @@ export const AutopilotControllerListActivityAgentKindEnum = {
     Dream: 'DREAM',
     Duplicates: 'DUPLICATES',
     Config: 'CONFIG',
-    DetectorAuthor: 'DETECTOR_AUTHOR'
+    DetectorAuthor: 'DETECTOR_AUTHOR',
+    Chat: 'CHAT'
 } as const;
 export type AutopilotControllerListActivityAgentKindEnum = typeof AutopilotControllerListActivityAgentKindEnum[keyof typeof AutopilotControllerListActivityAgentKindEnum];
 /**
@@ -1293,7 +1295,8 @@ export const AutopilotControllerListRunsAgentKindEnum = {
     Dream: 'DREAM',
     Duplicates: 'DUPLICATES',
     Config: 'CONFIG',
-    DetectorAuthor: 'DETECTOR_AUTHOR'
+    DetectorAuthor: 'DETECTOR_AUTHOR',
+    Chat: 'CHAT'
 } as const;
 export type AutopilotControllerListRunsAgentKindEnum = typeof AutopilotControllerListRunsAgentKindEnum[keyof typeof AutopilotControllerListRunsAgentKindEnum];
 /**
@@ -1317,6 +1320,7 @@ export const AutopilotControllerUpdateAgentKindEnum = {
     Dream: 'DREAM',
     Duplicates: 'DUPLICATES',
     Config: 'CONFIG',
-    DetectorAuthor: 'DETECTOR_AUTHOR'
+    DetectorAuthor: 'DETECTOR_AUTHOR',
+    Chat: 'CHAT'
 } as const;
 export type AutopilotControllerUpdateAgentKindEnum = typeof AutopilotControllerUpdateAgentKindEnum[keyof typeof AutopilotControllerUpdateAgentKindEnum];
