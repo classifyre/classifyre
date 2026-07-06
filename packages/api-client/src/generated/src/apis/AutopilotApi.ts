@@ -1194,6 +1194,7 @@ export const AutopilotControllerGetUsageAgentKindEnum = {
     Duplicates: 'DUPLICATES',
     Config: 'CONFIG',
     DetectorAuthor: 'DETECTOR_AUTHOR',
+    Escalation: 'ESCALATION',
     Chat: 'CHAT'
 } as const;
 export type AutopilotControllerGetUsageAgentKindEnum = typeof AutopilotControllerGetUsageAgentKindEnum[keyof typeof AutopilotControllerGetUsageAgentKindEnum];
@@ -1207,6 +1208,7 @@ export const AutopilotControllerListActivityAgentKindEnum = {
     Duplicates: 'DUPLICATES',
     Config: 'CONFIG',
     DetectorAuthor: 'DETECTOR_AUTHOR',
+    Escalation: 'ESCALATION',
     Chat: 'CHAT'
 } as const;
 export type AutopilotControllerListActivityAgentKindEnum = typeof AutopilotControllerListActivityAgentKindEnum[keyof typeof AutopilotControllerListActivityAgentKindEnum];
@@ -1244,6 +1246,7 @@ export const AutopilotControllerListActivityActionEnum = {
     UpdateSystemBrief: 'UPDATE_SYSTEM_BRIEF',
     RecomputeCorrelation: 'RECOMPUTE_CORRELATION',
     TuneCorrelation: 'TUNE_CORRELATION',
+    NotifyOperator: 'NOTIFY_OPERATOR',
     NoAction: 'NO_ACTION'
 } as const;
 export type AutopilotControllerListActivityActionEnum = typeof AutopilotControllerListActivityActionEnum[keyof typeof AutopilotControllerListActivityActionEnum];
@@ -1296,6 +1299,7 @@ export const AutopilotControllerListRunsAgentKindEnum = {
     Duplicates: 'DUPLICATES',
     Config: 'CONFIG',
     DetectorAuthor: 'DETECTOR_AUTHOR',
+    Escalation: 'ESCALATION',
     Chat: 'CHAT'
 } as const;
 export type AutopilotControllerListRunsAgentKindEnum = typeof AutopilotControllerListRunsAgentKindEnum[keyof typeof AutopilotControllerListRunsAgentKindEnum];
@@ -1321,6 +1325,7 @@ export const AutopilotControllerUpdateAgentKindEnum = {
     Duplicates: 'DUPLICATES',
     Config: 'CONFIG',
     DetectorAuthor: 'DETECTOR_AUTHOR',
+    Escalation: 'ESCALATION',
     Chat: 'CHAT'
 } as const;
 export type AutopilotControllerUpdateAgentKindEnum = typeof AutopilotControllerUpdateAgentKindEnum[keyof typeof AutopilotControllerUpdateAgentKindEnum];
