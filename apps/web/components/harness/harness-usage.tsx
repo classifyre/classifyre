@@ -28,6 +28,7 @@ const AGENT_KINDS = [
   "DETECTOR_AUTHOR",
   "DREAM",
   "DUPLICATES",
+  "CHAT",
 ] as const;
 
 /**
@@ -42,6 +43,7 @@ const AGENT_COLORS: Record<string, { light: string; dark: string }> = {
   DETECTOR_AUTHOR: { light: "#8B5CF6", dark: "#8B5CF6" },
   DREAM: { light: "#EC4899", dark: "#EC4899" },
   DUPLICATES: { light: "#06B6D4", dark: "#0891B2" },
+  CHAT: { light: "#84CC16", dark: "#65A30D" },
 };
 
 const INPUT_COLOR = AGENT_COLORS.INQUIRY!;

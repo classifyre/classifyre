@@ -194,9 +194,14 @@ export class AiClientService {
               err.statusCode === 429 ||
               err.statusCode >= 500));
         if (!retryable || attempt >= retries) throw err;
-        const delay = delaysMs[Math.min(attempt, delaysMs.length - 1)];
+        // Incremental backoff with ±20% jitter so parallel agents don't
+        // hammer an overloaded provider in lockstep.
+        const base = delaysMs[Math.min(attempt, delaysMs.length - 1)];
+        const delay = Math.round(base * (0.8 + Math.random() * 0.4));
         this.logger.warn(
-          `Provider busy (${err instanceof Error ? err.message : String(err)}); retrying in ${delay / 1000}s (attempt ${attempt + 1}/${retries})`,
+          `Provider busy (${err instanceof Error ? err.message : String(err)}); ` +
+            `retry ${attempt + 1}/${retries} in ${Math.round(delay / 1000)}s ` +
+            `(incremental schedule ${delaysMs.map((d) => `${d / 1000}s`).join(' → ')})`,
         );
         await new Promise((resolve) => setTimeout(resolve, delay));
       }

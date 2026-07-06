@@ -1122,6 +1122,9 @@ enum AgentKind {
   CONFIG
   // Detector-authoring agent: creates/trains custom detectors when needed.
   DETECTOR_AUTHOR
+  // Conversational chat-gateway turn (Telegram/Slack bot). Never enqueued by
+  // the autopilot pipeline; one run per inbound chat message for usage/audit.
+  CHAT
 }
 
 enum AgentRunStatus {
@@ -1386,4 +1389,87 @@ model AgentMemory {
   @@index([kind])
   @@index([tags], type: Gin)
   @@map("agent_memories")
+}
+
+// ── Chat gateway (Telegram / Slack bots) ─────────────────────────────────────
+// Conversational interface into the AI harness: each configured bot connects
+// via long-polling (Telegram) or Socket Mode (Slack), and every chat turn runs
+// the chat agent loop with the built-in MCP toolset (AgentRun kind CHAT).
+
+enum ChatPlatform {
+  TELEGRAM
+  SLACK
+}
+
+enum ChatMessageRole {
+  USER
+  ASSISTANT
+}
+
+model ChatBot {
+  id       String       @id @default(uuid())
+  platform ChatPlatform
+  name     String
+  enabled  Boolean      @default(false)
+  // Bot credentials, AES-GCM encrypted (MaskedConfigCryptoService).
+  botTokenEnc String  @map("bot_token_enc")
+  // Slack Socket Mode app-level token (xapp-…); unused for Telegram.
+  appTokenEnc String? @map("app_token_enc")
+  // MCP capability group ids the bot may use (mcp-catalog.ts); empty = all.
+  capabilityGroups String[] @default([]) @map("capability_groups")
+  // AgentKinds the bot may steer via autopilot tools; empty = all.
+  agentKinds String[] @default([]) @map("agent_kinds")
+  // When false every mutating tool resolves OBSERVE_ONLY (read-only bot).
+  allowMutations Boolean @default(true) @map("allow_mutations")
+  // Connector status, mirrored by ChatGatewayService.
+  lastError       String?   @db.Text @map("last_error")
+  lastConnectedAt DateTime? @map("last_connected_at")
+  // Telegram getUpdates offset — survives restarts without replaying messages.
+  telegramLastUpdateId BigInt?  @map("telegram_last_update_id")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  sessions ChatSession[]
+
+  @@map("chat_bots")
+}
+
+model ChatSession {
+  id    String @id @default(uuid())
+  botId String @map("bot_id")
+  // Platform conversation identity: Telegram chat id, Slack "channel:thread_ts".
+  externalChatKey String  @map("external_chat_key")
+  title           String?
+  // Compacted summary of history older than the sliding window.
+  summary          String    @default("") @db.Text
+  summarizedUpToAt DateTime? @map("summarized_up_to_at")
+  lastMessageAt    DateTime  @default(now()) @map("last_message_at")
+  createdAt        DateTime  @default(now()) @map("created_at")
+
+  bot      ChatBot       @relation(fields: [botId], references: [id], onDelete: Cascade)
+  messages ChatMessage[]
+
+  @@unique([botId, externalChatKey])
+  @@index([botId, lastMessageAt(sort: Desc)])
+  @@map("chat_sessions")
+}
+
+model ChatMessage {
+  id        String          @id @default(uuid())
+  sessionId String          @map("session_id")
+  role      ChatMessageRole
+  content   String          @db.Text
+  // Compact record of tool activity behind an assistant reply (UI/debugging).
+  toolCalls Json? @map("tool_calls") @db.JsonB
+  // AgentRun that produced this reply — links to token usage and decisions.
+  agentRunId String? @map("agent_run_id")
+  // Platform message id, deduped on connector redelivery.
+  externalMessageId String?  @map("external_message_id")
+  externalUserId    String?  @map("external_user_id")
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  session ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, createdAt])
+  @@map("chat_messages")
 }
