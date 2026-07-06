@@ -1,5 +1,4 @@
 import { BrowserWindow, WebContentsView, dialog } from 'electron';
-import path from 'path';
 import http from 'http';
 import { PostgresManager } from './postgres-manager.js';
 import { ProcessManager } from './process-manager.js';
