@@ -55,7 +55,8 @@ export const TriggerAutopilotDtoAgentKindsEnum = {
     Dream: 'DREAM',
     Duplicates: 'DUPLICATES',
     Config: 'CONFIG',
-    DetectorAuthor: 'DETECTOR_AUTHOR'
+    DetectorAuthor: 'DETECTOR_AUTHOR',
+    Chat: 'CHAT'
 } as const;
 export type TriggerAutopilotDtoAgentKindsEnum = typeof TriggerAutopilotDtoAgentKindsEnum[keyof typeof TriggerAutopilotDtoAgentKindsEnum];
 

@@ -12,6 +12,8 @@ export const MCP_CAPABILITY_GROUPS: McpCapabilityGroupDto[] = [
     description:
       'Create, validate, update, delete, inspect, and run ingestion sources.',
     toolNames: [
+      'list_source_types',
+      'get_source_schema',
       'search_sources',
       'get_source',
       'create_source',
