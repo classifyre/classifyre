@@ -158,8 +158,11 @@ export class NamespaceRuntime {
         },
       );
     } else {
-      const webDir = path.join(process.resourcesPath, 'web');
-      void view.webContents.loadFile(path.join(webDir, 'index.html'));
+      // Served by the 'app' scheme (registerAppProtocol) — NOT loadFile/file://,
+      // under which the export's absolute /_next/... asset paths resolve to the
+      // filesystem root and 404, leaving a blank window. The host segment is
+      // arbitrary; the handler resolves the path against the bundled web dir.
+      void view.webContents.loadURL('app://classifyre/index.html');
     }
 
     return view;
