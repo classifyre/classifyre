@@ -1,5 +1,4 @@
 import { BrowserWindow, WebContentsView, dialog } from 'electron';
-import path from 'path';
 import http from 'http';
 import { PostgresManager } from './postgres-manager.js';
 import { ProcessManager } from './process-manager.js';
@@ -143,6 +142,16 @@ export class NamespaceRuntime {
     }
     view.setVisible(false);
 
+    // Renderer diagnostics → main log (userData/logs/main.log). A blank
+    // workspace window is otherwise invisible to the main process; surfacing
+    // failed asset loads and renderer crashes here makes it debuggable.
+    view.webContents.on('did-fail-load', (_e, code, desc, url) => {
+      console.error(`[web] did-fail-load ${url || '(main)'}: ${desc} (${code})`);
+    });
+    view.webContents.on('render-process-gone', (_e, details) => {
+      console.error(`[web] render process gone: ${details.reason} (exitCode ${details.exitCode})`);
+    });
+
     if (this.isDev) {
       const webUrl = 'http://localhost:3000';
       void this.waitForDevServer(webUrl).then(
@@ -158,8 +167,11 @@ export class NamespaceRuntime {
         },
       );
     } else {
-      const webDir = path.join(process.resourcesPath, 'web');
-      void view.webContents.loadFile(path.join(webDir, 'index.html'));
+      // Served by the 'app' scheme (registerAppProtocol) — NOT loadFile/file://,
+      // under which the export's absolute /_next/... asset paths resolve to the
+      // filesystem root and 404, leaving a blank window. The host segment is
+      // arbitrary; the handler resolves the path against the bundled web dir.
+      void view.webContents.loadURL('app://classifyre/index.html');
     }
 
     return view;
