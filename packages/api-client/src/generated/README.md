@@ -80,6 +80,7 @@ All URIs are relative to *http://localhost*
 *AutopilotApi* | [**autopilotControllerGetStats**](docs/AutopilotApi.md#autopilotcontrollergetstats) | **GET** /autopilot/stats | Mission-control counters (runs, decisions, memory, brief version)
 *AutopilotApi* | [**autopilotControllerGetSystemBrief**](docs/AutopilotApi.md#autopilotcontrollergetsystembrief) | **GET** /autopilot/system-brief | The living system brief the autopilot maintains and injects
 *AutopilotApi* | [**autopilotControllerGetTools**](docs/AutopilotApi.md#autopilotcontrollergettools) | **GET** /autopilot/tools | The harness capability map — every registered tool (read/mutate, domain) and the missions that use them
+*AutopilotApi* | [**autopilotControllerGetUsage**](docs/AutopilotApi.md#autopilotcontrollergetusage) | **GET** /autopilot/usage | LLM token/cost usage per day and agent (for the harness usage charts) — filter by agent kind and time range
 *AutopilotApi* | [**autopilotControllerListActivity**](docs/AutopilotApi.md#autopilotcontrollerlistactivity) | **GET** /autopilot/activity | Cross-run activity feed (the business timeline) — server-side filter by kind, action, outcome, entity, text and time
 *AutopilotApi* | [**autopilotControllerListLogs**](docs/AutopilotApi.md#autopilotcontrollerlistlogs) | **GET** /autopilot/runs/{id}/logs | Execution log of a run — filter by channel (BUSINESS narrative vs TECHNICAL mechanics/raw model output)
 *AutopilotApi* | [**autopilotControllerListMemory**](docs/AutopilotApi.md#autopilotcontrollerlistmemory) | **GET** /autopilot/memory | List the agent memory (glossary, precedents, topic map)
@@ -114,6 +115,13 @@ All URIs are relative to *http://localhost*
 *CasesApi* | [**casesControllerRemoveFinding**](docs/CasesApi.md#casescontrollerremovefinding) | **DELETE** /cases/{id}/findings/{caseFindingId} | Remove a finding from the case
 *CasesApi* | [**casesControllerUnlinkInquiry**](docs/CasesApi.md#casescontrollerunlinkinquiry) | **DELETE** /cases/{id}/inquiries/{inquiryId} | Unlink an inquiry from a case (the inquiry is untouched)
 *CasesApi* | [**casesControllerUpdate**](docs/CasesApi.md#casescontrollerupdate) | **PATCH** /cases/{id} | Update a case
+*ChatBotsApi* | [**chatBotsControllerCreate**](docs/ChatBotsApi.md#chatbotscontrollercreate) | **POST** /instance-settings/chat/bots | Create a chat bot
+*ChatBotsApi* | [**chatBotsControllerDiagnostics**](docs/ChatBotsApi.md#chatbotscontrollerdiagnostics) | **GET** /instance-settings/chat/bots/{id}/diagnostics | Chat bot diagnostics
+*ChatBotsApi* | [**chatBotsControllerList**](docs/ChatBotsApi.md#chatbotscontrollerlist) | **GET** /instance-settings/chat/bots | List chat bots
+*ChatBotsApi* | [**chatBotsControllerRemove**](docs/ChatBotsApi.md#chatbotscontrollerremove) | **DELETE** /instance-settings/chat/bots/{id} | Delete a chat bot
+*ChatBotsApi* | [**chatBotsControllerSimulate**](docs/ChatBotsApi.md#chatbotscontrollersimulate) | **POST** /instance-settings/chat/bots/{id}/simulate | Send a test message to a chat bot
+*ChatBotsApi* | [**chatBotsControllerTest**](docs/ChatBotsApi.md#chatbotscontrollertest) | **POST** /instance-settings/chat/bots/{id}/test | Test chat bot connection
+*ChatBotsApi* | [**chatBotsControllerUpdate**](docs/ChatBotsApi.md#chatbotscontrollerupdate) | **PATCH** /instance-settings/chat/bots/{id} | Update a chat bot
 *CorrelationApi* | [**correlationControllerAddExclusion**](docs/CorrelationApi.md#correlationcontrolleraddexclusion) | **POST** /correlation/exclusions | Add an exclusion rule (ignore noisy values) and recompute
 *CorrelationApi* | [**correlationControllerCaseAction**](docs/CorrelationApi.md#correlationcontrollercaseaction) | **POST** /correlation/case-action | Create a case (or add to one) from assets selected in the fingerprints graph
 *CorrelationApi* | [**correlationControllerGetConfig**](docs/CorrelationApi.md#correlationcontrollergetconfig) | **GET** /correlation/config | Correlation tuning: per-label weights (dynamic) + match thresholds
@@ -249,6 +257,9 @@ All URIs are relative to *http://localhost*
 - [AgentRunDto](docs/AgentRunDto.md)
 - [AgentRunListResponseDto](docs/AgentRunListResponseDto.md)
 - [AgentSystemBriefDto](docs/AgentSystemBriefDto.md)
+- [AgentUsageBucketDto](docs/AgentUsageBucketDto.md)
+- [AgentUsageResponseDto](docs/AgentUsageResponseDto.md)
+- [AgentUsageTotalsDto](docs/AgentUsageTotalsDto.md)
 - [AiCompleteRequestDto](docs/AiCompleteRequestDto.md)
 - [AiCompleteResponseDto](docs/AiCompleteResponseDto.md)
 - [AiMessageDto](docs/AiMessageDto.md)
@@ -286,6 +297,13 @@ All URIs are relative to *http://localhost*
 - [CaseListResponseDto](docs/CaseListResponseDto.md)
 - [CaseResponseDto](docs/CaseResponseDto.md)
 - [CaseTimelineResponseDto](docs/CaseTimelineResponseDto.md)
+- [ChatBotActivityEntryDto](docs/ChatBotActivityEntryDto.md)
+- [ChatBotDiagnosticsDto](docs/ChatBotDiagnosticsDto.md)
+- [ChatBotResponseDto](docs/ChatBotResponseDto.md)
+- [ChatBotSimulateDto](docs/ChatBotSimulateDto.md)
+- [ChatBotSimulateResultDto](docs/ChatBotSimulateResultDto.md)
+- [ChatBotTestCheckDto](docs/ChatBotTestCheckDto.md)
+- [ChatBotTestResultDto](docs/ChatBotTestResultDto.md)
 - [CliRunnerControllerUpdateRunnerStatusRequest](docs/CliRunnerControllerUpdateRunnerStatusRequest.md)
 - [CloseCaseDto](docs/CloseCaseDto.md)
 - [CloseCaseResponseDto](docs/CloseCaseResponseDto.md)
@@ -295,6 +313,7 @@ All URIs are relative to *http://localhost*
 - [CreateAgentMemoryDto](docs/CreateAgentMemoryDto.md)
 - [CreateAiProviderConfigDto](docs/CreateAiProviderConfigDto.md)
 - [CreateCaseDto](docs/CreateCaseDto.md)
+- [CreateChatBotDto](docs/CreateChatBotDto.md)
 - [CreateCustomDetectorDto](docs/CreateCustomDetectorDto.md)
 - [CreateExternalRunnerDto](docs/CreateExternalRunnerDto.md)
 - [CreateFindingDto](docs/CreateFindingDto.md)
@@ -457,6 +476,7 @@ All URIs are relative to *http://localhost*
 - [UpdateAiProviderConfigDto](docs/UpdateAiProviderConfigDto.md)
 - [UpdateCaseDto](docs/UpdateCaseDto.md)
 - [UpdateCaseFindingNoteDto](docs/UpdateCaseFindingNoteDto.md)
+- [UpdateChatBotDto](docs/UpdateChatBotDto.md)
 - [UpdateCorrelationConfigDto](docs/UpdateCorrelationConfigDto.md)
 - [UpdateCustomDetectorDto](docs/UpdateCustomDetectorDto.md)
 - [UpdateEdgeDto](docs/UpdateEdgeDto.md)

@@ -15,6 +15,8 @@ Name | Type
 `baseUrl` | string
 `contextSize` | number
 `supportsVision` | boolean
+`inputCostPerMTok` | number
+`outputCostPerMTok` | number
 `createdAt` | Date
 `updatedAt` | Date
 
@@ -34,6 +36,8 @@ const example = {
   "baseUrl": https://openrouter.ai/api/v1,
   "contextSize": 200000,
   "supportsVision": false,
+  "inputCostPerMTok": 3,
+  "outputCostPerMTok": 15,
   "createdAt": null,
   "updatedAt": null,
 } satisfies AiProviderConfigResponseDto

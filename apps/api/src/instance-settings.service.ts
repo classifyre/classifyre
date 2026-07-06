@@ -38,6 +38,8 @@ export class InstanceSettingsService {
       autopilotConfigGuidance: settings.autopilotConfigGuidance,
       autopilotDetectorEnabled: settings.autopilotDetectorEnabled,
       autopilotDetectorGuidance: settings.autopilotDetectorGuidance,
+      autopilotEscalationEnabled: settings.autopilotEscalationEnabled,
+      autopilotEscalationGuidance: settings.autopilotEscalationGuidance,
       autopilotMcpEnabled: settings.autopilotMcpEnabled,
       hfTokenSet: !!settings.hfTokenEnc,
       hfTokenInstanceSet: isInstanceTokenSet,
@@ -159,6 +161,16 @@ export class InstanceSettingsService {
         ? {
             autopilotDetectorGuidance: emptyToNull(
               updateDto.autopilotDetectorGuidance,
+            ),
+          }
+        : {}),
+      ...(updateDto.autopilotEscalationEnabled !== undefined
+        ? { autopilotEscalationEnabled: updateDto.autopilotEscalationEnabled }
+        : {}),
+      ...(updateDto.autopilotEscalationGuidance !== undefined
+        ? {
+            autopilotEscalationGuidance: emptyToNull(
+              updateDto.autopilotEscalationGuidance,
             ),
           }
         : {}),

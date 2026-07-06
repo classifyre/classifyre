@@ -301,6 +301,15 @@ export class SystemBriefService {
       });
     }
 
+    if (settings && !settings.autopilotEscalationEnabled) {
+      items.push({
+        status: 'info',
+        label: 'Escalation agent is off',
+        detail:
+          'No operator is notified when a high-severity case appears. Turn on the escalation agent in Settings → Autopilot so the harness can raise alerts while running unattended.',
+      });
+    }
+
     return items;
   }
 

@@ -43,7 +43,9 @@ export interface AiSchemaAttempt {
 /**
  * Structured-output parsing or schema validation failed after all retries.
  * `cause` contains the last parse/validation error; `attempts` the raw model
- * responses so callers can log exactly what came back.
+ * responses so callers can log exactly what came back. `usage` carries the
+ * tokens consumed across the failed attempts — they were billed even though
+ * no valid output was produced, so callers can still attribute them.
  */
 export class AiSchemaError extends Error {
   readonly code = 'AI_SCHEMA_ERROR' as const;
@@ -51,6 +53,10 @@ export class AiSchemaError extends Error {
     message: string,
     public readonly cause?: unknown,
     public readonly attempts: AiSchemaAttempt[] = [],
+    public readonly usage: {
+      inputTokens: number;
+      outputTokens: number;
+    } | null = null,
   ) {
     super(message);
     this.name = 'AiSchemaError';

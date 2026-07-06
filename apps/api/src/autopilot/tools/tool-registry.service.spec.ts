@@ -5,13 +5,16 @@ import { KnowledgeToolset } from './knowledge/knowledge.toolset';
 import { ConfigToolset } from './config/config.toolset';
 import { DetectorToolset } from './detector/detector.toolset';
 import { FingerprintsToolset } from './fingerprints/fingerprints.toolset';
+import { AlertToolset } from './alert/alert.toolset';
 import {
   INQUIRY_MISSION,
   CASE_MISSION,
   CONFIG_MISSION,
   DETECTOR_AUTHOR_MISSION,
+  ESCALATION_MISSION,
   DREAM_MISSION,
 } from '../harness/missions';
+import type { NotificationsService } from '../../notifications.service';
 import type { AgentSearchService } from '../search/agent-search.service';
 import type { AgentMemoryService } from '../memory/agent-memory.service';
 import type { DecisionApplierService } from '../decision-applier.service';
@@ -42,6 +45,7 @@ describe('ToolRegistry', () => {
       {} as CustomDetectorsService,
       {} as CustomDetectorTestsService,
       {} as DecisionApplierService,
+      {} as AgentSearchService,
     ),
     new FingerprintsToolset(
       {} as PrismaService,
@@ -49,6 +53,7 @@ describe('ToolRegistry', () => {
       {} as DuplicatesFinderAgentService,
       {} as DecisionApplierService,
     ),
+    new AlertToolset({} as PrismaService, {} as NotificationsService),
   );
 
   it('registers observe, investigation, knowledge and config tools', () => {
@@ -61,9 +66,12 @@ describe('ToolRegistry', () => {
     expect(registry.get('sources.get_config')).toBeDefined();
     expect(registry.get('detector.create')).toBeDefined();
     expect(registry.get('detectors.list')).toBeDefined();
+    expect(registry.get('detectors.precision')).toBeDefined();
     expect(registry.get('fingerprints.similar_assets')).toBeDefined();
     expect(registry.get('cases.from_cluster')).toBeDefined();
     expect(registry.get('fingerprints.tune_config')).toBeDefined();
+    expect(registry.get('operator.notify')).toBeDefined();
+    expect(registry.get('alerts.recent')).toBeDefined();
   });
 
   it('every tool referenced by a mission exists in the registry', () => {
@@ -72,6 +80,7 @@ describe('ToolRegistry', () => {
       CASE_MISSION,
       CONFIG_MISSION,
       DETECTOR_AUTHOR_MISSION,
+      ESCALATION_MISSION,
       DREAM_MISSION,
     ]) {
       for (const name of mission.allowedTools) {

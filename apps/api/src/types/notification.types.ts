@@ -11,4 +11,5 @@ export enum NotificationEvent {
   FINDINGS_SPIKE = 'findings.spike',
   FINDINGS_MASS_RESOLVED = 'findings.mass_resolved',
   SOURCE_FIRST_SCAN = 'source.first_scan',
+  CASE_ESCALATED = 'case.escalated',
 }

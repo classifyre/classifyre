@@ -18,6 +18,7 @@ const ENABLE_FLAG: Partial<Record<AgentKind, keyof InstanceSettings>> = {
   [AgentKind.CASE]: 'autopilotCaseEnabled',
   [AgentKind.CONFIG]: 'autopilotConfigEnabled',
   [AgentKind.DETECTOR_AUTHOR]: 'autopilotDetectorEnabled',
+  [AgentKind.ESCALATION]: 'autopilotEscalationEnabled',
 };
 
 /** Effective + default configuration for one agent, for the management UI. */

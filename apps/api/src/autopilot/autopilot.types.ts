@@ -19,7 +19,9 @@ export interface AutopilotJob {
    * treat the job as explicit operator intent (instance enable-flags bypassed).
    * DREAM is carried via `dream`; DUPLICATES runs on the correlation queue.
    */
-  agentKinds?: Array<'INQUIRY' | 'CASE' | 'CONFIG' | 'DETECTOR_AUTHOR'>;
+  agentKinds?: Array<
+    'INQUIRY' | 'CASE' | 'CONFIG' | 'DETECTOR_AUTHOR' | 'ESCALATION'
+  >;
   /** Focus the case agent on one case (full case detail in context). */
   caseId?: string;
 }
@@ -34,6 +36,30 @@ export interface FindingGroupSummary {
   sampleValues: string[];
   sampleFindingIds: string[];
   sampleAssetIds: string[];
+}
+
+/**
+ * Measured precision of one custom detector, derived from operator triage.
+ * Operators dismissing a finding (FALSE_POSITIVE / IGNORED) or confirming it
+ * (RESOLVED) is logged per detector; this turns that append-only feedback into
+ * a per-detector false-positive rate the DETECTOR_AUTHOR consults instead of
+ * judging quality from the prompt alone. `verdict` is the coarse, sample-aware
+ * label: a rate over too few reviews is "unproven", not "clean" or "noisy".
+ */
+export interface DetectorPrecisionSummary {
+  customDetectorKey: string;
+  customDetectorName: string;
+  /** Untriaged findings currently produced by the detector (volume context). */
+  openFindings: number;
+  /** Operator dismissals: FALSE_POSITIVE + IGNORED feedback (cumulative). */
+  dismissed: number;
+  /** Operator confirmations: RESOLVED feedback (cumulative). */
+  confirmed: number;
+  /** dismissed + confirmed — the denominator of the rate. */
+  reviewed: number;
+  /** dismissed / reviewed, rounded to 2dp; null when nothing was reviewed yet. */
+  falsePositiveRate: number | null;
+  verdict: 'noisy' | 'mixed' | 'clean' | 'unproven';
 }
 
 /**

@@ -150,6 +150,24 @@ export class UpdateInstanceSettingsDto {
 
   @ApiPropertyOptional({
     description:
+      'When true, the escalation agent may raise operator notifications for high-severity cases.',
+    example: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  autopilotEscalationEnabled?: boolean;
+
+  @ApiPropertyOptional({
+    description: 'Operator guidance for the escalation agent.',
+    nullable: true,
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(4000)
+  autopilotEscalationGuidance?: string | null;
+
+  @ApiPropertyOptional({
+    description:
       'When true, the harness may call tools from connected external MCP servers.',
     example: false,
   })

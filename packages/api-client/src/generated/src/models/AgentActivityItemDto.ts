@@ -97,7 +97,9 @@ export const AgentActivityItemDtoAgentKindEnum = {
     Dream: 'DREAM',
     Duplicates: 'DUPLICATES',
     Config: 'CONFIG',
-    DetectorAuthor: 'DETECTOR_AUTHOR'
+    DetectorAuthor: 'DETECTOR_AUTHOR',
+    Escalation: 'ESCALATION',
+    Chat: 'CHAT'
 } as const;
 export type AgentActivityItemDtoAgentKindEnum = typeof AgentActivityItemDtoAgentKindEnum[keyof typeof AgentActivityItemDtoAgentKindEnum];
 
@@ -148,6 +150,7 @@ export const AgentActivityItemDtoActionEnum = {
     UpdateSystemBrief: 'UPDATE_SYSTEM_BRIEF',
     RecomputeCorrelation: 'RECOMPUTE_CORRELATION',
     TuneCorrelation: 'TUNE_CORRELATION',
+    NotifyOperator: 'NOTIFY_OPERATOR',
     NoAction: 'NO_ACTION'
 } as const;
 export type AgentActivityItemDtoActionEnum = typeof AgentActivityItemDtoActionEnum[keyof typeof AgentActivityItemDtoActionEnum];

@@ -92,6 +92,30 @@ export interface AgentRunDto {
      */
     decisionCount: number;
     /**
+     * LLM input (prompt) tokens consumed by the run
+     * @type {number}
+     * @memberof AgentRunDto
+     */
+    inputTokens: number;
+    /**
+     * LLM output (completion) tokens produced
+     * @type {number}
+     * @memberof AgentRunDto
+     */
+    outputTokens: number;
+    /**
+     * Estimated cost in USD (provider per-MTok prices at recording time). Null when no pricing is configured.
+     * @type {number}
+     * @memberof AgentRunDto
+     */
+    costUsd?: number | null;
+    /**
+     * Wall-clock duration in ms (running runs measure up to now). Null before the run starts.
+     * @type {number}
+     * @memberof AgentRunDto
+     */
+    durationMs?: number | null;
+    /**
      * 
      * @type {Date}
      * @memberof AgentRunDto
@@ -121,7 +145,9 @@ export const AgentRunDtoAgentKindEnum = {
     Dream: 'DREAM',
     Duplicates: 'DUPLICATES',
     Config: 'CONFIG',
-    DetectorAuthor: 'DETECTOR_AUTHOR'
+    DetectorAuthor: 'DETECTOR_AUTHOR',
+    Escalation: 'ESCALATION',
+    Chat: 'CHAT'
 } as const;
 export type AgentRunDtoAgentKindEnum = typeof AgentRunDtoAgentKindEnum[keyof typeof AgentRunDtoAgentKindEnum];
 
@@ -149,6 +175,8 @@ export function instanceOfAgentRunDto(value: object): value is AgentRunDto {
     if (!('trigger' in value) || value['trigger'] === undefined) return false;
     if (!('attempts' in value) || value['attempts'] === undefined) return false;
     if (!('decisionCount' in value) || value['decisionCount'] === undefined) return false;
+    if (!('inputTokens' in value) || value['inputTokens'] === undefined) return false;
+    if (!('outputTokens' in value) || value['outputTokens'] === undefined) return false;
     if (!('createdAt' in value) || value['createdAt'] === undefined) return false;
     return true;
 }
@@ -175,6 +203,10 @@ export function AgentRunDtoFromJSONTyped(json: any, ignoreDiscriminator: boolean
         'error': json['error'] == null ? undefined : json['error'],
         'summary': json['summary'] == null ? undefined : json['summary'],
         'decisionCount': json['decisionCount'],
+        'inputTokens': json['inputTokens'],
+        'outputTokens': json['outputTokens'],
+        'costUsd': json['costUsd'] == null ? undefined : json['costUsd'],
+        'durationMs': json['durationMs'] == null ? undefined : json['durationMs'],
         'startedAt': json['startedAt'] == null ? undefined : (new Date(json['startedAt'])),
         'finishedAt': json['finishedAt'] == null ? undefined : (new Date(json['finishedAt'])),
         'createdAt': (new Date(json['createdAt'])),
@@ -204,6 +236,10 @@ export function AgentRunDtoToJSONTyped(value?: AgentRunDto | null, ignoreDiscrim
         'error': value['error'],
         'summary': value['summary'],
         'decisionCount': value['decisionCount'],
+        'inputTokens': value['inputTokens'],
+        'outputTokens': value['outputTokens'],
+        'costUsd': value['costUsd'],
+        'durationMs': value['durationMs'],
         'startedAt': value['startedAt'] == null ? value['startedAt'] : value['startedAt'].toISOString(),
         'finishedAt': value['finishedAt'] == null ? value['finishedAt'] : value['finishedAt'].toISOString(),
         'createdAt': value['createdAt'].toISOString(),
