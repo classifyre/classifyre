@@ -143,6 +143,16 @@ export class NamespaceRuntime {
     }
     view.setVisible(false);
 
+    // Renderer diagnostics → main log (userData/logs/main.log). A blank
+    // workspace window is otherwise invisible to the main process; surfacing
+    // failed asset loads and renderer crashes here makes it debuggable.
+    view.webContents.on('did-fail-load', (_e, code, desc, url) => {
+      console.error(`[web] did-fail-load ${url || '(main)'}: ${desc} (${code})`);
+    });
+    view.webContents.on('render-process-gone', (_e, details) => {
+      console.error(`[web] render process gone: ${details.reason} (exitCode ${details.exitCode})`);
+    });
+
     if (this.isDev) {
       const webUrl = 'http://localhost:3000';
       void this.waitForDevServer(webUrl).then(
