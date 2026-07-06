@@ -107,10 +107,19 @@ node -e "
 "
 (cd "$RESOURCES/api" && npm install --omit=dev --no-audit --no-fund --loglevel=error)
 
-# @workspace/schemas is compiled into backend.js by esbuild (not external), so
-# no vendoring is needed here. The JSON schema files that package also ships are
-# resolved at runtime by filesystem path (apps/api utils/schema-path.ts), which
-# walks up to packages/schemas — independent of node_modules.
+# @workspace/schemas TypeScript is compiled into backend.js by esbuild, but the
+# JSON schema FILES that package ships are read at runtime by filesystem path:
+# apps/api utils/schema-path.ts walks UP from the api dir (and process.cwd())
+# looking for packages/schemas/src/schemas. In a shipped bundle there is no
+# monorepo to walk up to — and on macOS the api tree is extracted to userData,
+# far from anything — so the API crashed on boot with "Schemas directory not
+# found" (it only ever worked in dev/CI because cwd happened to sit inside the
+# repo). Vendor the JSON schemas INTO the api tree so schema-path finds
+# api/packages/schemas/src/schemas as its first walk-up candidate,
+# deterministically and independent of cwd.
+echo "Vendoring JSON schemas into staged api tree…"
+mkdir -p "$RESOURCES/api/packages/schemas/src"
+cp -R "$MONOREPO_ROOT/packages/schemas/src/schemas" "$RESOURCES/api/packages/schemas/src/schemas"
 
 # Generate the Prisma client into the staged tree for this platform. The
 # schema must sit inside resources/api so prisma resolves the staged
@@ -131,6 +140,10 @@ cp "$MONOREPO_ROOT/apps/api/prisma.config.ts" "$RESOURCES/api/prisma.config.ts"
 # (a full require would boot Nest and connect to a database).
 [ -f "$RESOURCES/api/backend.js" ] || { echo "backend.js missing in staged tree" >&2; exit 1; }
 [ -f "$RESOURCES/api/node_modules/prisma/build/index.js" ] || { echo "prisma CLI missing in staged tree" >&2; exit 1; }
+# The API reads this at module load; if it's absent the packaged app crashes on
+# first workspace open with "Schemas directory not found".
+[ -f "$RESOURCES/api/packages/schemas/src/schemas/all_input_sources.json" ] \
+  || { echo "JSON schemas missing in staged api tree" >&2; exit 1; }
 node --check "$RESOURCES/api/backend.js" || { echo "backend.js failed to parse" >&2; exit 1; }
 node -e "
   require('$RESOURCES_NODE/api/node_modules/@prisma/client/package.json');
