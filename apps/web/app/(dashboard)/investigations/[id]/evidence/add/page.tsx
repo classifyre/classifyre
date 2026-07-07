@@ -1,7 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useRouteId } from "@/lib/use-route-id";
 import { ArrowLeft, Loader2, Paperclip } from "lucide-react";
 import { toast } from "sonner";
 import { api, type CaseResponseDto } from "@workspace/api-client";
@@ -23,11 +24,10 @@ export default function AddCaseEvidencePage() {
 }
 
 function AddCaseEvidencePageInner() {
-  const params = useParams();
   const router = useRouter();
   const searchParams = useSearchParams();
   const { t } = useTranslation();
-  const caseId = params.id as string;
+  const caseId = useRouteId();
   // Optional asset context (e.g. "add more findings for this evidence row").
   const assetId = searchParams.get("assetId");
 

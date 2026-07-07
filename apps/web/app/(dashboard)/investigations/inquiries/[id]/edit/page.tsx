@@ -1,13 +1,12 @@
 "use client";
 
 import * as React from "react";
-import { useParams } from "next/navigation";
 import { api, type InquiryResponseDto } from "@workspace/api-client";
 import { InquiryForm } from "@/components/inquiry-form";
+import { useRouteId } from "@/lib/use-route-id";
 
 export default function EditInquiryPage() {
-  const params = useParams();
-  const inquiryId = params.id as string;
+  const inquiryId = useRouteId();
   const [inquiry, setInquiry] = React.useState<InquiryResponseDto | null>(null);
 
   React.useEffect(() => {

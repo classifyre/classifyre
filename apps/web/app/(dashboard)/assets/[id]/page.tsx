@@ -1,7 +1,8 @@
 "use client";
 
 import { Suspense, useEffect, useMemo, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
+import { useRouteId } from "@/lib/use-route-id";
 import Link from "next/link";
 import { ShieldAlert } from "lucide-react";
 import { api, type AssetListItemDto } from "@workspace/api-client";
@@ -32,9 +33,8 @@ import { useTranslation } from "@/hooks/use-translation";
 
 export default function AssetDetailPage() {
   const router = useRouter();
-  const params = useParams();
   const { t } = useTranslation();
-  const assetId = params.id as string;
+  const assetId = useRouteId();
 
   const [assetDetails, setAssetDetails] = useState<AssetListItemDto | null>(
     null,

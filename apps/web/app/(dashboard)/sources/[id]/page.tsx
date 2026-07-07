@@ -1,7 +1,8 @@
 "use client";
 
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
+import { useRouteId } from "@/lib/use-route-id";
 import { formatDate, formatRelative, formatShortUTC } from "@/lib/date";
 import {
   CalendarClock,
@@ -93,8 +94,7 @@ export default function SourceViewPage() {
   const { t } = useTranslation();
   const formatDuration = useFormatDuration();
   const router = useRouter();
-  const params = useParams();
-  const sourceId = params.id as string;
+  const sourceId = useRouteId();
 
   const [source, setSource] = useState<SourceResponseDto | null>(null);
   const [assetCharts, setAssetCharts] =
