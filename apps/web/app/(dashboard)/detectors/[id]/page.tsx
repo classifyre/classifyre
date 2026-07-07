@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
+import { useRouteId } from "@/lib/use-route-id";
 import { ArrowLeft, Play, Trash2 } from "lucide-react";
 import {
   api,
@@ -53,9 +54,8 @@ type DetectorWithPipeline = CustomDetectorResponseDto & {
 
 export default function CustomDetectorDetailsPage() {
   const router = useRouter();
-  const params = useParams();
   const { t } = useTranslation();
-  const detectorId = params.id as string;
+  const detectorId = useRouteId();
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);

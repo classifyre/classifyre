@@ -2,7 +2,8 @@
 
 import * as React from "react";
 import dynamic from "next/dynamic";
-import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useRouteId } from "@/lib/use-route-id";
 import {
   ArrowRight,
   Bot,
@@ -93,11 +94,10 @@ export default function CaseWorkspacePage() {
 }
 
 function CaseWorkspaceInner() {
-  const params = useParams();
   const router = useRouter();
   const searchParams = useSearchParams();
   const { t } = useTranslation();
-  const caseId = params.id as string;
+  const caseId = useRouteId();
 
   const urlTab = searchParams.get("tab");
   const [tab, setTab] = React.useState<TabValue>(

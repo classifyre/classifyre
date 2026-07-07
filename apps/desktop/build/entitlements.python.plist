@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+  <dict>
+    <!--
+      Entitlements for the bundled CPython interpreter (resources/python) and its
+      virtualenv (resources/venv).
+
+      Only BASE Python deps are baked into the venv at build time; optional source
+      connectors (e.g. psycopg2 for PostgreSQL) are installed on demand at runtime
+      via `uv sync --group <name>` on the user's machine. Those wheels ship native
+      extension modules (.so) that are ad-hoc signed (TeamIdentifier "not set") —
+      they were never signed with our Developer ID.
+
+      Under the hardened runtime, macOS library validation refuses to dlopen a
+      Mach-O whose Team ID differs from the loading process, which is exactly the
+      python3.12 interpreter we sign with our Developer ID. The result is a load
+      failure: "mapping process and mapped file (non-platform) have different Team
+      IDs", and the connector reports its optional dependency as unavailable even
+      after a successful install.
+
+      disable-library-validation lets the interpreter load these runtime-installed
+      extension modules. It is permitted for Developer ID notarization. We scope it
+      to the Python binaries via forge.config.ts `optionsForFile` so the Electron
+      app/helpers keep their stricter defaults.
+    -->
+    <key>com.apple.security.cs.disable-library-validation</key>
+    <true/>
+    <key>com.apple.security.cs.allow-jit</key>
+    <true/>
+    <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+    <true/>
+    <key>com.apple.security.cs.allow-dyld-environment-variables</key>
+    <true/>
+  </dict>
+</plist>

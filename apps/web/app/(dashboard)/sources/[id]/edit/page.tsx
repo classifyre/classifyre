@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
-import { useRouter, useParams } from "next/navigation";
+import { useRouter } from "next/navigation";
+import { useRouteId } from "@/lib/use-route-id";
 import {
   Card,
   CardContent,
@@ -65,8 +66,7 @@ const normalizeDetectors = (detectors: DetectorConfigInput[]) =>
 export default function EditSourcePage() {
   const router = useRouter();
   const { t } = useTranslation();
-  const params = useParams();
-  const sourceId = params.id as string;
+  const sourceId = useRouteId();
   const sourceFormRef = useRef<SourceFormHandle | null>(null);
   const [source, setSource] = useState<{
     id: string;
