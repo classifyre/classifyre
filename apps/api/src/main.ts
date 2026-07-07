@@ -27,6 +27,11 @@ async function bootstrap() {
 
   app.enableCors({
     origin: process.env.CORS_ORIGIN ?? 'http://localhost:3000',
+    // @fastify/cors (used by the Fastify adapter) defaults Access-Control-Allow-
+    // Methods to only 'GET,HEAD,POST' — unlike the Express cors package. The
+    // desktop web talks to the API cross-origin (app://classifyre → 127.0.0.1),
+    // so without listing PUT/PATCH/DELETE every mutating request fails preflight.
+    methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   });
 
   await app.register(multipart, {

@@ -29,7 +29,7 @@ export function TestConnectionDialog({
   onOpenChange,
 }: TestConnectionDialogProps) {
   const { t } = useTranslation();
-  const isLocked = status === "loading";
+  const isLoading = status === "loading";
 
   const titleByStatus: Record<TestConnectionStatus, string> = {
     loading: t("sources.testConnection.titleTesting"),
@@ -44,33 +44,9 @@ export function TestConnectionDialog({
   };
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(nextOpen) => {
-        if (isLocked && !nextOpen) {
-          return;
-        }
-        onOpenChange(nextOpen);
-      }}
-    >
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         className="rounded-[6px] border-2 border-border shadow-[6px_6px_0_var(--color-border)] sm:max-w-md"
-        showCloseButton={!isLocked}
-        onEscapeKeyDown={(event) => {
-          if (isLocked) {
-            event.preventDefault();
-          }
-        }}
-        onPointerDownOutside={(event) => {
-          if (isLocked) {
-            event.preventDefault();
-          }
-        }}
-        onInteractOutside={(event) => {
-          if (isLocked) {
-            event.preventDefault();
-          }
-        }}
       >
         <DialogHeader className="gap-3 text-left">
           <div className="flex items-center gap-2">
@@ -97,21 +73,20 @@ export function TestConnectionDialog({
           {message}
         </div>
 
-        <DialogFooter className="sm:justify-end">
-          {isLocked ? (
-            <div className="text-xs text-muted-foreground">
+        <DialogFooter className="sm:items-center sm:justify-end">
+          {isLoading && (
+            <span className="mr-auto text-xs text-muted-foreground">
               {t("sources.testConnection.wait")}
-            </div>
-          ) : (
-            <Button
-              type="button"
-              onClick={() => onOpenChange(false)}
-              className="rounded-[4px] border-2 border-border bg-black text-white hover:bg-black/90"
-              data-testid="btn-test-connection-close"
-            >
-              {t("sources.testConnection.close")}
-            </Button>
+            </span>
           )}
+          <Button
+            type="button"
+            onClick={() => onOpenChange(false)}
+            className="rounded-[4px] border-2 border-border bg-black text-white hover:bg-black/90"
+            data-testid="btn-test-connection-close"
+          >
+            {t("sources.testConnection.close")}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
