@@ -136,9 +136,17 @@ export class ProcessManager {
     const root = path.join(app.getPath('userData'), 'api-runtime');
     const markerFile = path.join(root, 'version.json');
     const extractedDir = path.join(root, 'api');
+
+    // Re-extract whenever the bundled archive changes, not just when the app
+    // version string changes. Gating purely on app.getVersion() leaves a stale
+    // API running whenever the archive is rebuilt under the same version (e.g.
+    // every -SNAPSHOT dev/test iteration), which silently ships old backend code.
+    // The signature also forces a fresh extract after a partial/corrupt unpack.
+    const archiveStat = fs.statSync(archive);
+    const signature = `${app.getVersion()}:${archiveStat.size}:${Math.round(archiveStat.mtimeMs)}`;
     try {
-      const marker = JSON.parse(fs.readFileSync(markerFile, 'utf-8')) as { version?: string };
-      if (marker.version === app.getVersion() && fs.existsSync(extractedDir)) {
+      const marker = JSON.parse(fs.readFileSync(markerFile, 'utf-8')) as { signature?: string };
+      if (marker.signature === signature && fs.existsSync(extractedDir)) {
         this.apiDirCache = extractedDir;
         return extractedDir;
       }
@@ -153,7 +161,7 @@ export class ProcessManager {
     if (result.status !== 0) {
       throw new Error(`Failed to extract bundled API (tar exited ${result.status})`);
     }
-    fs.writeFileSync(markerFile, JSON.stringify({ version: app.getVersion() }));
+    fs.writeFileSync(markerFile, JSON.stringify({ signature }));
     console.log('[api-runtime] Extraction complete');
     this.apiDirCache = extractedDir;
     return extractedDir;
