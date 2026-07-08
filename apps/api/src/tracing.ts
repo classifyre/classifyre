@@ -38,9 +38,7 @@ if (isTelemetryEnabled()) {
       exporter: new OTLPMetricExporter(),
       exportIntervalMillis: 15_000,
     }),
-    logRecordProcessor: new BatchLogRecordProcessor({
-      exporter: new OTLPLogExporter(),
-    }),
+    logRecordProcessor: new BatchLogRecordProcessor(new OTLPLogExporter()),
     instrumentations: [
       getNodeAutoInstrumentations({
         // fs instrumentation is too noisy in production
