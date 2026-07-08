@@ -34,6 +34,14 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
+  webpack: (config, { webpack }) => {
+    config.plugins.push(
+      new webpack.ProvidePlugin({
+        React: "react",
+      }),
+    );
+    return config;
+  },
 };
 
 export default withNextra(nextConfig);
