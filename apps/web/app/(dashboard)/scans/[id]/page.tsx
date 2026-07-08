@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
+import { useRouteId } from "@/lib/use-route-id";
 import {
   formatDate,
   formatRelative,
@@ -79,9 +80,8 @@ export default function RunnerDetailPage() {
   const { t } = useTranslation();
   const formatDuration = useFormatDuration();
   const { s3Configured } = useServerConfig();
-  const params = useParams();
   const router = useRouter();
-  const runnerId = params.id as string;
+  const runnerId = useRouteId();
 
   const [runner, setRunner] = useState<RunnerDto | null>(null);
   const [loading, setLoading] = useState(true);

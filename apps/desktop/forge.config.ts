@@ -26,8 +26,23 @@ const extraResource = allResources
 // .p8 file), APPLE_API_KEY_ID, APPLE_API_ISSUER_ID. See apps/desktop/README.md.
 const signingIdentity = process.env['APPLE_SIGNING_IDENTITY'];
 const signingEnabled = process.env['MACOS_SIGN'] === '1' || !!signingIdentity;
+
+// The bundled CPython interpreter installs optional source connectors (e.g.
+// psycopg2) on demand at runtime. Those wheels carry ad-hoc-signed native .so
+// files, which the hardened runtime's library validation refuses to dlopen into
+// our Developer ID-signed python3.12 ("different Team IDs"). Sign the Python
+// binaries with disable-library-validation so runtime-installed extensions load;
+// every other file keeps @electron/osx-sign's stricter per-file defaults.
+const pythonEntitlements = path.resolve(__dirname, 'build/entitlements.python.plist');
+const isPythonResource = (filePath: string): boolean =>
+  filePath.includes('/Contents/Resources/python/') ||
+  filePath.includes('/Contents/Resources/venv/');
 const osxSign = signingEnabled
-  ? (signingIdentity ? { identity: signingIdentity } : {})
+  ? {
+      ...(signingIdentity ? { identity: signingIdentity } : {}),
+      optionsForFile: (filePath: string) =>
+        isPythonResource(filePath) ? { entitlements: pythonEntitlements } : {},
+    }
   : undefined;
 // Notarization is deliberately NOT done through Forge (no osxNotarize):
 // @electron/notarize runs `notarytool submit --wait` with no timeout inside
