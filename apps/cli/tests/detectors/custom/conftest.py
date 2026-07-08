@@ -19,3 +19,10 @@ requires_pdfplumber = pytest.mark.skipif(
     not _pdfplumber_available,
     reason="pdfplumber not available (install file-processing group)",
 )
+
+_litellm_available = find_spec("litellm") is not None
+
+requires_litellm = pytest.mark.skipif(
+    not _litellm_available,
+    reason="litellm not installed (install llm group)",
+)
