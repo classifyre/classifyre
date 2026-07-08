@@ -21,6 +21,10 @@ from src.models.generated_detectors import (
     Severity,
 )
 
+from .conftest import requires_litellm
+
+pytestmark = requires_litellm
+
 TEXT = "Dieses Produkt ist schrecklich und gewalttätig."
 
 

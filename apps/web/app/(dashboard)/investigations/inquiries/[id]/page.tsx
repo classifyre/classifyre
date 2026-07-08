@@ -1,7 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useRouteId } from "@/lib/use-route-id";
 import {
   Archive,
   ArrowLeft,
@@ -59,11 +60,10 @@ export default function InquiryDetailPage() {
 }
 
 function InquiryDetailInner() {
-  const params = useParams();
   const router = useRouter();
   const searchParams = useSearchParams();
   const { t } = useTranslation();
-  const inquiryId = params.id as string;
+  const inquiryId = useRouteId();
   const preferredCaseId = searchParams.get("caseId");
 
   const [inquiry, setInquiry] = React.useState<InquiryResponseDto | null>(null);

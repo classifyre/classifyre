@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
-import { useRouter, useParams } from "next/navigation";
+import { useRouter } from "next/navigation";
+import { useRouteId } from "@/lib/use-route-id";
 import {
   Card,
   CardContent,
@@ -65,9 +66,9 @@ const normalizeDetectors = (detectors: DetectorConfigInput[]) =>
 export default function EditSourcePage() {
   const router = useRouter();
   const { t } = useTranslation();
-  const params = useParams();
-  const sourceId = params.id as string;
+  const sourceId = useRouteId();
   const sourceFormRef = useRef<SourceFormHandle | null>(null);
+  const lastSaveError = useRef<string | null>(null);
   const [source, setSource] = useState<{
     id: string;
     name: string;
@@ -345,14 +346,16 @@ export default function EditSourcePage() {
         });
       }
 
+      lastSaveError.current = null;
       return true;
     } catch (error) {
       console.error("Failed to update source:", error);
-      toast.error(
-        error instanceof Error
-          ? `Failed to update source: ${error.message}`
-          : "Failed to update source",
+      const message = await extractApiErrorMessage(
+        error,
+        "Failed to update source",
       );
+      lastSaveError.current = message;
+      toast.error(message);
       return false;
     } finally {
       setIsSavingConfig(false);
@@ -371,7 +374,17 @@ export default function EditSourcePage() {
       setIsTestingConfig(true);
 
       const didPersist = await persistSource(data);
-      if (!didPersist) return;
+      if (!didPersist) {
+        // Saving the config failed (e.g. the update request was rejected). Move
+        // the dialog out of the locked "loading" state and show why, instead of
+        // leaving it stuck on the spinner with no way to close.
+        setTestConnectionDialog({
+          open: true,
+          status: "error",
+          message: lastSaveError.current ?? t("sources.new.connectionFailed"),
+        });
+        return;
+      }
 
       const result = await api.sources.sourcesControllerTestConnection({
         id: sourceId,

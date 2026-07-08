@@ -151,6 +151,16 @@ export class NamespaceRuntime {
     view.webContents.on('render-process-gone', (_e, details) => {
       console.error(`[web] render process gone: ${details.reason} (exitCode ${details.exitCode})`);
     });
+    // Forward renderer warnings/errors to the main log. Client-side code never
+    // touches the main process, so without this a broken page (e.g. a failed
+    // fetch or a React error) is invisible in the log. Verbose/info levels are
+    // dropped to keep the log readable.
+    view.webContents.on('console-message', (details) => {
+      if (details.level !== 'warning' && details.level !== 'error') return;
+      const tag = details.level === 'error' ? 'error' : 'warn';
+      const where = details.sourceId ? ` (${details.sourceId}:${details.lineNumber})` : '';
+      console.log(`[web:${tag}] ${details.message}${where}`);
+    });
 
     if (this.isDev) {
       const webUrl = 'http://localhost:3000';

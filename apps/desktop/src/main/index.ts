@@ -9,6 +9,7 @@ import { registerAppProtocol } from './protocol-handler.js';
 import { SettingsManager } from './settings-manager.js';
 import { UpdateChecker } from './update-checker.js';
 import { initFileLogging } from './logger.js';
+import { buildApplicationMenu } from './menu.js';
 
 // embedded-postgres registers an async-exit-hook that calls done() on process
 // exit, but Electron's quit path doesn't always provide the callback. Suppress
@@ -125,6 +126,10 @@ app.on('ready', async () => {
   // app from a terminal.
   const logFile = initFileLogging();
   if (logFile) console.log(`Logging to ${logFile}`);
+
+  // Install the application menu (adds a "Logs" menu to open/reveal main.log;
+  // Electron's bare default menu has no such entry).
+  buildApplicationMenu();
 
   if (!isDev) {
     const webDir = path.join(process.resourcesPath, 'web');

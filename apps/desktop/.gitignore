@@ -1,5 +1,6 @@
 out/
 resources/
 .vite/
-# Keep icon files needed for packaging
+# Keep icon files and signing entitlements needed for packaging
 !build/icon.*
+!build/entitlements.*.plist

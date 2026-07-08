@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
+import { useRouteId } from "@/lib/use-route-id";
 import {
   formatDate,
   formatRelative,
@@ -158,9 +159,8 @@ function DateCell({ value }: { value?: Date | string | null }) {
 
 export default function FindingDetailPage() {
   const router = useRouter();
-  const params = useParams();
   const { t } = useTranslation();
-  const findingId = params.id as string;
+  const findingId = useRouteId();
 
   const [finding, setFinding] = useState<FindingResponseDto | null>(null);
   const [loading, setLoading] = useState(true);
