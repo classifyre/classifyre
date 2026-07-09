@@ -38,7 +38,7 @@
     "@workspace/eslint-config": "workspace:*",
     "@workspace/typescript-config": "workspace:*",
     "electron": "^35.0.0",
-    "esbuild": "^0.25.0",
+    "esbuild": "^0.28.1",
     "eslint": "^10.5.0",
     "playwright": "^1.59.1",
     "typescript": "5.9.3",
