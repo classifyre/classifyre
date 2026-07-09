@@ -22,7 +22,7 @@ opentelemetry-collector:
 
   image:
     repository: otel/opentelemetry-collector-contrib
-    tag: "0.153.0"
+    tag: "0.155.0"
 
   replicaCount: 1
 

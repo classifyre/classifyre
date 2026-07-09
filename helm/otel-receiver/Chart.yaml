@@ -22,7 +22,7 @@ maintainers:
 dependencies:
   # OTel Collector — the single OTLP ingestion endpoint that fans out to all backends.
   - name: opentelemetry-collector
-    version: 0.158.1
+    version: 0.159.1
     repository: "https://open-telemetry.github.io/opentelemetry-helm-charts"
     condition: opentelemetry-collector.enabled
 
@@ -52,6 +52,6 @@ dependencies:
 
   # Mimir — horizontally-scalable metrics backend.
   - name: mimir-distributed
-    version: "6.0.6"
+    version: 6.1.0
     repository: "https://grafana.github.io/helm-charts"
     condition: mimir-distributed.enabled
