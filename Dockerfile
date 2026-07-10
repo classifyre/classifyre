@@ -36,11 +36,27 @@ RUN rm -f /repo/apps/web/public/_ci_dir_marker
 # so dynamically-required packages (styled-jsx, @swc/helpers, etc.) end up only
 # in .bun/ with no top-level entry. Create top-level entries for all .bun/
 # packages that are missing, then delete .bun/ to avoid duplicate files.
+#
+# When a package has multiple versions in .bun/ (e.g. @next/env is pinned to
+# 16.2.10 by apps/web but 16.1.7 by apps/blog+docs), one of them can be an
+# incomplete stub — only package.json, with its code files pruned as dangling
+# symlinks by scripts/stage-docker-artifacts.sh. .bun/ dirs iterate in version
+# order, so a stub copied first would block the real package ("skip if dst
+# exists"), leaving e.g. @next/env with no dist/index.js and crashing the server.
+# So treat a dir with no JS/native file as incomplete: a complete source always
+# replaces an incomplete destination, regardless of iteration order.
 RUN NM="/repo/apps/web/.next/standalone/node_modules" && \
+  is_complete() { \
+    find "$1" -type f 2>/dev/null | grep -qE '\.(js|cjs|mjs|node)$'; \
+  }; \
   install_pkg() { \
     src="$1" dst="$2"; \
     [ -d "$src" ] || return 0; \
-    [ -e "$dst" ] && return 0; \
+    if [ -e "$dst" ]; then \
+      is_complete "$dst" && return 0; \
+      is_complete "$src" || return 0; \
+      rm -rf "$dst"; \
+    fi; \
     cp -r "$src" "$dst"; \
   }; \
   install_scope() { \
