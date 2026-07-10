@@ -41,12 +41,23 @@ spec:
                 - sh
                 - -c
                 - |
-                  echo "Cache size before prune:" && du -sh {{ .Values.api.cliJobs.uvCache.mountPath }}
-                  UV_CACHE_DIR={{ .Values.api.cliJobs.uvCache.mountPath }} uv cache prune
-                  echo "Cache size after prune:" && du -sh {{ .Values.api.cliJobs.uvCache.mountPath }}
+                  set -eu
+                  echo "Cache size before:" && du -sh "$UV_CACHE_DIR" || true
+                  SIZE_MB=$(du -sm "$UV_CACHE_DIR" 2>/dev/null | cut -f1)
+                  SIZE_MB=${SIZE_MB:-0}
+                  if [ "$SIZE_MB" -gt "$UV_CACHE_MAX_MB" ]; then
+                    echo "Cache ${SIZE_MB}MB exceeds cap ${UV_CACHE_MAX_MB}MB -> uv cache clean (full bust)"
+                    uv cache clean
+                  else
+                    echo "Cache ${SIZE_MB}MB within cap ${UV_CACHE_MAX_MB}MB -> uv cache prune (soft)"
+                    uv cache prune
+                  fi
+                  echo "Cache size after:" && du -sh "$UV_CACHE_DIR" || true
               env:
                 - name: UV_CACHE_DIR
                   value: {{ .Values.api.cliJobs.uvCache.mountPath | quote }}
+                - name: UV_CACHE_MAX_MB
+                  value: {{ .Values.api.cliJobs.uvCache.prune.maxMB | quote }}
               volumeMounts:
                 - name: uv-cache
                   mountPath: {{ .Values.api.cliJobs.uvCache.mountPath }}

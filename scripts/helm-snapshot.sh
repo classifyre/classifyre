@@ -22,6 +22,7 @@ OUT_DIR="${OUT_DIR_DEFAULT}"
 CHECK_MODE=0
 HELM_COMMON_ARGS=(
   --set "postgres.external.password=${POSTGRES_EXTERNAL_PASSWORD:-snapshot-password}"
+  --set "postgres.embedded.password=${POSTGRES_EMBEDDED_PASSWORD:-snapshot-password}"
   --set "api.maskedConfigEncryption.value=${CLASSIFYRE_MASKED_CONFIG_KEY:-snapshot-classifyre-masked-key-0001}"
 )
 

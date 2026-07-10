@@ -6,6 +6,7 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 CHART_DIR="${CHART_DIR:-${REPO_ROOT}/helm/classifyre}"
 HELM_COMMON_ARGS=(
   --set "postgres.external.password=${POSTGRES_EXTERNAL_PASSWORD:-snapshot-password}"
+  --set "postgres.embedded.password=${POSTGRES_EMBEDDED_PASSWORD:-snapshot-password}"
   --set "api.maskedConfigEncryption.value=${CLASSIFYRE_MASKED_CONFIG_KEY:-snapshot-classifyre-masked-key-0001}"
 )
 
