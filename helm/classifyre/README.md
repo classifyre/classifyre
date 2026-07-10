@@ -1,6 +1,6 @@
-# classifyre
+# classifyre-core
 
-Production-ready Helm chart for Classifyre (web, api, and Kubernetes CLI jobs)
+Production-ready Helm chart for Classifyre — web, api, and Kubernetes CLI jobs
 
 ## Purpose
 
@@ -76,35 +76,46 @@ helm upgrade --install classifyre ./helm/classifyre \
 | api.autoscaling.minReplicas | int | `2` | Minimum API replicas under HPA. |
 | api.autoscaling.targetCPUUtilizationPercentage | int | `70` | Target average CPU utilization for API HPA. |
 | api.autoscaling.targetMemoryUtilizationPercentage | int | `75` | Target average memory utilization for API HPA. |
-| api.cliJobs.activeDeadlineSeconds | int | `3600` | Max runtime per CLI job (seconds). |
+| api.cliJobs.activeDeadlineSeconds | int | `86400` | Max runtime per CLI job (seconds). Increase for large data sources. |
 | api.cliJobs.affinity | object | `{}` | CLI job scheduling: affinity rules. |
-| api.cliJobs.autoInstallOptionalDeps | bool | `true` | Allow CLI to auto-install optional detector dependencies. |
+| api.cliJobs.autoInstallOptionalDeps | bool | `true` | lock + cross-process group accumulation + self-heal in uv_sync.py. |
 | api.cliJobs.automountServiceAccountToken | bool | `false` | Mount service account token into CLI job pods. |
 | api.cliJobs.backoffLimit | int | `2` | Retry attempts for failed CLI jobs. |
 | api.cliJobs.cleanupPolicy | string | `"always"` | Cleanup policy for CLI jobs: none, failed, or always. |
 | api.cliJobs.containerSecurityContext | object | `{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]},"readOnlyRootFilesystem":false}` | Container security context for CLI job container. |
+| api.cliJobs.detectorFlushBatchSize | int | `5` | Number of detector-processed assets to accumulate before pushing findings to the API. |
 | api.cliJobs.enabled | bool | `true` | Enable Kubernetes-backed CLI jobs. |
 | api.cliJobs.extraEnv | list | `[]` | Additional environment variables for CLI jobs (list of EnvVar objects; supports secretKeyRef etc.). |
+| api.cliJobs.extraVolumeMounts | list | `[]` | Extra volume mounts for CLI job containers. |
+| api.cliJobs.extraVolumes | list | `[]` | Extra volumes for CLI job pods. |
+| api.cliJobs.huggingFace.existingKey | string | `"token"` | Key inside existingSecret that holds the HF_TOKEN value. |
+| api.cliJobs.huggingFace.existingSecret | string | `""` | Name of an existing Kubernetes Secret containing the Hugging Face authentication token (HF_TOKEN). When set, the token is injected into every CLI job pod via a secretKeyRef env var. This authenticates requests to hf.co, which significantly increases download rate limits and avoids the "unauthenticated requests" warning from the huggingface-hub library.  When this value is set, the Hugging Face token field in the web UI Settings page becomes read-only and disabled — the instance-level token always takes priority over any user-configured token.  Create the Secret manually (or via your preferred tool — SealedSecrets, External Secrets, SOPS, etc.) in the same namespace as the CLI jobs:    kubectl create secret generic hf-token \     --from-literal=token=hf_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx  The chart does NOT create or manage this Secret — you must create it yourself. This keeps the token out of Helm state and lets you rotate it independently of Helm releases. |
 | api.cliJobs.image.pullPolicy | string | `"IfNotPresent"` | CLI job image pull policy. |
 | api.cliJobs.image.repository | string | `"classifyre/cli"` | CLI job image repository. |
 | api.cliJobs.image.tag | string | `""` | CLI job image tag. Defaults to the chart appVersion when empty. |
 | api.cliJobs.namespace | string | `""` | Namespace used for CLI jobs. Empty means release namespace. |
 | api.cliJobs.nodeSelector | object | `{}` | CLI job scheduling: node selector. |
+| api.cliJobs.outputRestTimeoutSec | int | `120` | HTTP read timeout (seconds) for CLI→API REST calls (bulk ingest, finalize, status updates). The API processes each batch in a Postgres transaction that can take 30-60 s under load; this must be set higher than the API's transaction timeout to avoid spurious read-timeout failures. |
 | api.cliJobs.podSecurityContext | object | `{"fsGroup":10001,"runAsGroup":10001,"runAsNonRoot":true,"runAsUser":10001,"seccompProfile":{"type":"RuntimeDefault"}}` | Pod security context for CLI job pods. |
 | api.cliJobs.pollIntervalMs | int | `2000` | Poll interval while waiting for job completion (milliseconds). |
 | api.cliJobs.priorityClassName | string | `""` | CLI job priority class. |
-| api.cliJobs.resources.limits | object | `{"cpu":"2","memory":"4Gi"}` | CLI job resource limits. |
-| api.cliJobs.resources.requests | object | `{"cpu":"500m","memory":"1Gi"}` | CLI job resource requests. |
+| api.cliJobs.resources.limits | object | `{"cpu":"2","ephemeral-storage":"20Gi","memory":"4Gi"}` | CLI job resource limits. |
+| api.cliJobs.resources.requests | object | `{"cpu":"500m","ephemeral-storage":"6Gi","memory":"1Gi"}` | CLI job resource requests. |
 | api.cliJobs.serviceAccountName | string | `""` | Service account for CLI jobs. Empty uses API service account. |
 | api.cliJobs.tolerations | list | `[]` | CLI job scheduling: tolerations. |
 | api.cliJobs.ttlSecondsAfterFinished | int | `1800` | TTL for completed CLI jobs (seconds). Ignored when cleanup policy deletes jobs immediately. |
-| api.cliJobs.uvCache.accessModes | list | `["ReadWriteOnce"]` | Access modes for uv cache PVC. |
-| api.cliJobs.uvCache.enabled | bool | `true` | Enable shared PVC for uv cache. |
+| api.cliJobs.uvCache.accessModes | list | `["ReadWriteOnce"]` | Use ReadWriteMany only if your cluster has a shared filesystem StorageClass (e.g. EFS, NFS). |
+| api.cliJobs.uvCache.enabled | bool | `true` | Enable shared PVC for uv cache (pip package cache shared across CLI jobs). |
 | api.cliJobs.uvCache.existingClaim | string | `""` | Existing PVC name for uv cache. Empty creates a new PVC. |
 | api.cliJobs.uvCache.mountPath | string | `"/cache/uv"` | Mount path for uv cache in CLI job container. |
-| api.cliJobs.uvCache.size | string | `"20Gi"` | Requested size for uv cache PVC. |
+| api.cliJobs.uvCache.prune.enabled | bool | `true` | Enable a CronJob that keeps the uv cache bounded on a schedule. |
+| api.cliJobs.uvCache.prune.image | string | `""` | Image used by the prune CronJob (defaults to the CLI job image). |
+| api.cliJobs.uvCache.prune.maxMB | int | `8000` | the soft `uv cache prune`. Keep below the PVC `size` above. |
+| api.cliJobs.uvCache.prune.schedule | string | `"0 2 * * *"` | The job hard-clears the cache once it exceeds `maxMB` (see below). |
+| api.cliJobs.uvCache.prune.ttlSecondsAfterFinished | int | `3600` | TTL for completed prune jobs (seconds). |
+| api.cliJobs.uvCache.size | string | `"10Gi"` | to avoid jobs hanging with "Multi-Attach error" when two jobs land on different nodes. |
 | api.cliJobs.uvCache.storageClassName | string | `""` | Storage class for uv cache PVC. |
-| api.cliJobs.waitTimeoutSeconds | int | `3900` | Max time API waits for job completion (seconds). |
+| api.cliJobs.waitTimeoutSeconds | int | `87300` | Max time API waits for job completion (seconds). Should exceed activeDeadlineSeconds. |
 | api.cliJobs.workDir | string | `"/app/apps/cli"` | Working directory inside CLI job container. |
 | api.command | list | `[]` | Optional API container command override. |
 | api.containerSecurityContext.allowPrivilegeEscalation | bool | `false` | Disallow privilege escalation in API container. |
@@ -112,12 +123,16 @@ helm upgrade --install classifyre ./helm/classifyre \
 | api.containerSecurityContext.readOnlyRootFilesystem | bool | `false` | path the app writes to at runtime (e.g. /tmp, log dirs). Hardening step for advanced users. |
 | api.env.DEMO_MODE | string | `"false"` | Enable read-only demo mode. When "true" all mutating API operations return 403. |
 | api.env.ENVIRONMENT | string | `"kubernetes"` | Execution mode used by API. |
+| api.env.MAX_CONCURRENT_RUNNERS | string | `"3"` | Set to "0" to disable the limit (unlimited concurrency). |
+| api.env.MAX_RUNNERS_PER_SOURCE | string | `"5"` | exceeds this value. Set to "0" to disable cleanup. |
 | api.env.NODE_ENV | string | `"production"` | Runtime environment passed to API container. |
 | api.env.PORT | string | `"8000"` | API listen port. |
-| api.env.RUNNER_LOGS_DIR | string | `"/var/lib/classifyre/runner-logs"` | Filesystem directory for runner execution logs. |
+| api.env.RUNNER_LOGS_DIR | string | `"/var/lib/classifyre/runner-logs"` | Filesystem directory for runner execution logs (filesystem backend only; unused when S3 is configured). |
 | api.env.TEMP_DIR | string | `"/tmp"` | Temporary directory used by API. |
 | api.extraEnv | list | `[]` | Extra environment variables for API container. |
 | api.extraEnvFrom | list | `[]` | Extra envFrom sources for API container. |
+| api.extraVolumeMounts | list | `[]` | Extra volume mounts for the API container. |
+| api.extraVolumes | list | `[]` | Extra volumes for the API pod. |
 | api.image.pullPolicy | string | `"IfNotPresent"` | API image pull policy. |
 | api.image.repository | string | `"classifyre/api"` | API container image repository. |
 | api.image.tag | string | `""` | API container image tag. Defaults to the chart appVersion when empty. |
@@ -156,12 +171,8 @@ helm upgrade --install classifyre ./helm/classifyre \
 | api.replicaCount | int | `2` | Number of API replicas when autoscaling is disabled. |
 | api.resources.limits | object | `{"cpu":"1","memory":"1Gi"}` | API resource limits. |
 | api.resources.requests | object | `{"cpu":"250m","memory":"512Mi"}` | API resource requests. |
-| api.runnerLogs.accessModes | list | `["ReadWriteOnce"]` | Access modes for runner logs PVC. |
-| api.runnerLogs.enabled | bool | `true` | Enable PVC-backed storage for runner logs. |
-| api.runnerLogs.existingClaim | string | `""` | Existing PVC name for runner logs. Empty creates a new PVC. |
-| api.runnerLogs.mountPath | string | `"/var/lib/classifyre/runner-logs"` | Mount path for runner logs directory. |
-| api.runnerLogs.size | string | `"20Gi"` | Requested size for runner logs PVC. |
-| api.runnerLogs.storageClassName | string | `""` | Storage class for runner logs PVC. |
+| api.sandbox.tempDir | string | `"/var/lib/classifyre/sandbox-tmp"` | Mount path for the sandbox emptyDir volume (temp files for local subprocess mode). Must match SANDBOX_TEMP_DIR env var. The emptyDir keeps temp files off the container overlay filesystem and ensures they are cleared on pod restart. In Kubernetes (K8S_JOBS_ENABLED=1) sandbox runs as a K8s Job: file data is passed via base64 env vars (same pattern as RECIPE_B64 for extractions) and decoded inside the job pod's /tmp — no shared volume required. |
+| api.sandbox.tempSizeLimit | string | `"2Gi"` | Size limit for the sandbox emptyDir. Prevents runaway uploads filling the node. |
 | api.service.annotations | object | `{}` | Additional API service annotations. |
 | api.service.nodePort | string | `nil` | Fixed nodePort when `type` is `NodePort` or `LoadBalancer`. |
 | api.service.port | int | `8000` | API service port. |
@@ -196,6 +207,8 @@ helm upgrade --install classifyre ./helm/classifyre \
 | frontend.env.PORT | string | `"3100"` | Web listen port. |
 | frontend.extraEnv | list | `[]` | Extra environment variables for web container. |
 | frontend.extraEnvFrom | list | `[]` | Extra envFrom sources for web container. |
+| frontend.extraVolumeMounts | list | `[]` | Extra volume mounts for the web container. |
+| frontend.extraVolumes | list | `[]` | Extra volumes for the web pod. |
 | frontend.image.pullPolicy | string | `"IfNotPresent"` | Web image pull policy. |
 | frontend.image.repository | string | `"classifyre/web"` | Web container image repository. |
 | frontend.image.tag | string | `""` | Web container image tag. Defaults to the chart appVersion when empty. |
@@ -216,6 +229,11 @@ helm upgrade --install classifyre ./helm/classifyre \
 | frontend.podSecurityContext.runAsNonRoot | bool | `true` | Require web container to run as non-root. |
 | frontend.podSecurityContext.runAsUser | int | `10001` | Web pod user ID. |
 | frontend.podSecurityContext.seccompProfile.type | string | `"RuntimeDefault"` | Web pod seccomp profile type. |
+| frontend.posthog.enabled | bool | `false` | Enable PostHog analytics. When false, no env vars are injected. |
+| frontend.posthog.host | string | `"/classifyre-usr"` | subdomain (e.g. https://e.yourcompany.com) for extra reliability. |
+| frontend.posthog.ingestHost | string | `"https://us.i.posthog.com"` | Use https://eu.i.posthog.com for EU Cloud, or your managed proxy CNAME. |
+| frontend.posthog.token | string | `""` | PostHog project token (phc_...). Required when enabled=true. |
+| frontend.posthog.uiHost | string | `"https://us.posthog.com"` | Use https://eu.posthog.com for EU Cloud. |
 | frontend.priorityClassName | string | `""` | Web pod priority class. |
 | frontend.readinessProbe.enabled | bool | `true` | Enable web readiness probe. |
 | frontend.readinessProbe.failureThreshold | int | `6` | Web readiness failure threshold. |
@@ -247,9 +265,21 @@ helm upgrade --install classifyre ./helm/classifyre \
 | ingress.enabled | bool | `false` | Enable ingress resources for web/api/socket routes. |
 | ingress.host | string | `""` | Hostname for all ingress rules. Required when ingress.enabled=true. |
 | ingress.tls | list | `[]` | TLS configuration for ingress. |
-| nameOverride | string | `""` | Override chart name used in resource names. |
+| nameOverride | string | `"classifyre"` | Override chart name used in resource names. |
 | networkPolicy.enabled | bool | `false` | Enable network policies for API and web pods. |
 | networkPolicy.ingressNamespaceSelector | object | `{}` | Namespace selector allowed to reach API/web when network policy is enabled. |
+| objectStorage.accessKeyId | string | `""` | Inline access key ID. Prefer existingSecret for production. |
+| objectStorage.bucket | string | `"classifyre-logs"` | S3 bucket used for runner logs. |
+| objectStorage.enabled | bool | `false` | Set to true to enable S3-compatible object storage. |
+| objectStorage.endpoint | string | `""` | S3 endpoint URL. Leave empty for AWS S3 (SDK auto-resolves). Required for all other providers. |
+| objectStorage.existingSecret | string | `""` | Name of a pre-created Kubernetes Secret with S3 credentials. When set, accessKeyId/secretAccessKey are ignored. |
+| objectStorage.existingSecretAccessKeyIdKey | string | `"access-key-id"` | Key inside existingSecret that holds the access key ID. |
+| objectStorage.existingSecretSecretAccessKeyKey | string | `"secret-access-key"` | Key inside existingSecret that holds the secret access key. |
+| objectStorage.forcePathStyle | bool | `false` | Force path-style S3 URLs. Required for MinIO, Garage, Backblaze B2, and most non-AWS providers. |
+| objectStorage.logPrefix | string | `"runner-logs/"` | S3 object key prefix for runner logs. |
+| objectStorage.region | string | `"us-east-1"` | AWS region. Required for AWS S3; ignored by most self-hosted providers. |
+| objectStorage.sandboxBucket | string | `"classifyre-sandbox"` | S3 bucket used for sandbox uploaded files. |
+| objectStorage.secretAccessKey | string | `""` | Inline secret access key. Prefer existingSecret for production. |
 | postgres.cnpg.appPassword | string | `""` | Application password for generated CNPG secret. |
 | postgres.cnpg.bootstrapSecretName | string | `""` | Existing CNPG app secret name. |
 | postgres.cnpg.clusterName | string | `"classifyre-cnpg"` | CloudNativePG cluster resource name. |
@@ -281,7 +311,7 @@ helm upgrade --install classifyre ./helm/classifyre \
 | postgres.embedded.podSecurityContext | object | `{"fsGroup":999,"runAsGroup":999,"runAsUser":999,"seccompProfile":{"type":"RuntimeDefault"}}` | Embedded Postgres pod security context. |
 | postgres.embedded.port | int | `5432` | Embedded Postgres service and container port. |
 | postgres.embedded.priorityClassName | string | `""` | Embedded Postgres pod priority class. |
-| postgres.embedded.resources.limits | object | `{"cpu":"1","memory":"1Gi"}` | Embedded Postgres resource limits. |
+| postgres.embedded.resources.limits | object | `{"cpu":"2","memory":"4Gi"}` | Embedded Postgres resource limits. |
 | postgres.embedded.resources.requests | object | `{"cpu":"100m","memory":"256Mi"}` | Embedded Postgres resource requests. |
 | postgres.embedded.service.annotations | object | `{}` | Additional annotations for embedded Postgres service. |
 | postgres.embedded.terminationGracePeriodSeconds | string | `nil` | Embedded Postgres pod termination grace period (seconds). Set to null to use Kubernetes default. |
@@ -296,7 +326,7 @@ helm upgrade --install classifyre ./helm/classifyre \
 | postgres.external.port | int | `5432` | External Postgres port. |
 | postgres.external.sslMode | string | `"disable"` | Deprecated: use `postgres.connection.sslMode` instead. |
 | postgres.external.username | string | `"classifyre"` | External Postgres user name. |
-| postgres.mode | string | `"external"` | PostgreSQL mode: external, cnpg, or embedded. |
+| postgres.mode | string | `"embedded"` | PostgreSQL mode: external, cnpg, or embedded. |
 | priorityClasses.batchName | string | `"batch-low-priority"` | Priority class name for batch workloads. |
 | priorityClasses.batchValue | int | `1000` | Numeric priority value for batch workloads. |
 | priorityClasses.create | bool | `false` | Create service and batch priority classes. |
@@ -307,171 +337,10 @@ helm upgrade --install classifyre ./helm/classifyre \
 | serviceAccount.automount | bool | `true` | Mount service account token into API pods (required for Kubernetes CLI jobs). |
 | serviceAccount.create | bool | `true` | Create the API service account. |
 | serviceAccount.name | string | `""` | Existing service account name to use when `create=false`. |
-
-# Object Storage (S3-compatible)
-
-Classifyre uses S3-compatible object storage to persist **runner logs** and **sandbox file uploads**. When object storage is not configured the application still works — logs are visible live during a run but are discarded once it completes, and the UI shows a warning banner on the Logs tab.
-
-## What is stored
-
-| Purpose | Bucket | Key pattern |
-|---------|--------|-------------|
-| Runner (scan) logs | `objectStorage.bucket` | `{logPrefix}{sourceId}/{runnerId}.ndjson` |
-| Sandbox uploaded files | `objectStorage.sandboxBucket` | varies |
-
-## Disabled mode (default)
-
-By default `objectStorage.enabled` is `false`. No S3 credentials are required and no S3-related environment variables are injected into the API container. The API stores logs in memory for the duration of the run, then discards them. The web UI displays an amber warning banner on the scan Logs tab:
-
-> **Log Persistence Unavailable** — This instance has no object storage (S3) configured. Scan logs are visible in real time during a run, but are not retained once the run completes.
-
-## Enabling object storage
-
-Set `objectStorage.enabled: true` in your values file and supply credentials for any S3-compatible provider.
-
-### Quick-reference: provider settings
-
-| Provider | `endpoint` | `forcePathStyle` | `region` |
-|----------|-----------|------------------|----------|
-| AWS S3 | *(empty)* | `false` | e.g. `us-east-1` |
-| Google Cloud Storage | *(empty)* | `false` | e.g. `us-central1` |
-| Backblaze B2 | `https://s3.<region>.backblazeb2.com` | `false` | e.g. `us-west-004` |
-| MinIO | `http://minio.<ns>.svc.cluster.local:9000` | `true` | any |
-| Garage | `http://<svc>:3900` | `true` | any |
-
-### AWS S3
-
-```yaml
-objectStorage:
-  enabled: true
-  bucket: my-classifyre-logs
-  sandboxBucket: my-classifyre-sandbox
-  region: us-east-1
-  forcePathStyle: false
-  existingSecret: classifyre-s3-credentials   # keys: access-key-id, secret-access-key
-```
-
-Minimum IAM policy for the credentials:
-
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Effect": "Allow",
-      "Action": ["s3:GetObject", "s3:PutObject", "s3:DeleteObject", "s3:ListBucket"],
-      "Resource": [
-        "arn:aws:s3:::my-classifyre-logs",
-        "arn:aws:s3:::my-classifyre-logs/*",
-        "arn:aws:s3:::my-classifyre-sandbox",
-        "arn:aws:s3:::my-classifyre-sandbox/*"
-      ]
-    }
-  ]
-}
-```
-
-### Backblaze B2
-
-```yaml
-objectStorage:
-  enabled: true
-  bucket: my-classifyre-logs
-  sandboxBucket: my-classifyre-sandbox
-  endpoint: "https://s3.us-west-004.backblazeb2.com"
-  region: us-west-004
-  forcePathStyle: false
-  existingSecret: classifyre-s3-credentials
-```
-
-### MinIO (self-hosted in-cluster)
-
-```yaml
-objectStorage:
-  enabled: true
-  bucket: classifyre-logs
-  sandboxBucket: classifyre-sandbox
-  endpoint: "http://minio.minio-ns.svc.cluster.local:9000"
-  forcePathStyle: true
-  accessKeyId: minioadmin
-  secretAccessKey: minioadmin
-```
-
-### Garage (self-hosted)
-
-```yaml
-objectStorage:
-  enabled: true
-  bucket: classifyre-logs
-  sandboxBucket: classifyre-sandbox
-  endpoint: "http://garage.storage-ns.svc.cluster.local:3900"
-  forcePathStyle: true
-  existingSecret: classifyre-s3-credentials
-```
-
-## Using an existing Kubernetes Secret
-
-For production, store credentials in a Secret created outside Helm:
-
-```bash
-kubectl create secret generic classifyre-s3-credentials \
-  --from-literal=access-key-id=AKIA... \
-  --from-literal=secret-access-key=...
-```
-
-Then reference it in values:
-
-```yaml
-objectStorage:
-  enabled: true
-  existingSecret: classifyre-s3-credentials
-  # existingSecretAccessKeyIdKey: access-key-id      (default)
-  # existingSecretSecretAccessKeyKey: secret-access-key (default)
-```
-
-If your Secret uses different key names, override them:
-
-```yaml
-objectStorage:
-  existingSecret: my-s3-secret
-  existingSecretAccessKeyIdKey: aws_access_key_id
-  existingSecretSecretAccessKeyKey: aws_secret_access_key
-```
-
-### AWS S3
-
-```yaml
-objectStorage:
-  enabled: true
-  bucket: my-classifyre-logs
-  sandboxBucket: my-classifyre-sandbox
-  region: us-east-1
-  forcePathStyle: false
-  existingSecret: classifyre-s3-credentials   # keys: access-key-id, secret-access-key
-```
-
-### MinIO (self-hosted)
-
-```yaml
-objectStorage:
-  enabled: true
-  bucket: classifyre-logs
-  sandboxBucket: classifyre-sandbox
-  endpoint: "http://minio.minio-ns.svc.cluster.local:9000"
-  forcePathStyle: true
-  accessKeyId: minioadmin
-  secretAccessKey: minioadmin
-```
-
-### Backblaze B2
-
-```yaml
-objectStorage:
-  enabled: true
-  bucket: my-classifyre-logs
-  sandboxBucket: my-classifyre-sandbox
-  endpoint: "https://s3.us-west-004.backblazeb2.com"
-  region: us-west-004
-  forcePathStyle: false
-  existingSecret: classifyre-s3-credentials
-```
+| telemetry.deployEnv | string | `"production"` | Deployment environment tag attached to every span/metric/log. |
+| telemetry.enabled | bool | `false` | Opt out (already default): set enabled=false, or set TELEMETRY_DISABLED=1 / DO_NOT_TRACK=1 at runtime. |
+| telemetry.instanceId.configMapKey | string | `"instance-id"` | Key inside the ConfigMap that holds the UUID string. |
+| telemetry.instanceId.enabled | bool | `true` | Persist a stable anonymous instance UUID in a ConfigMap so it survives upgrades. |
+| telemetry.instanceId.existingConfigMap | string | `""` | Use an existing ConfigMap instead of creating one. Must contain instanceId.configMapKey. |
+| telemetry.otlpEndpoint | string | `""` | otlpEndpoint: "http://otel-receiver-opentelemetry-collector.monitoring:4318" |
+| telemetry.otlpProtocol | string | `"http/protobuf"` | OTLP export protocol: "http/protobuf" (default) or "grpc". |

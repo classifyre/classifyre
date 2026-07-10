@@ -384,10 +384,17 @@ api:
       # -- to avoid jobs hanging with "Multi-Attach error" when two jobs land on different nodes.
       size: 10Gi
       prune:
-        # -- Enable a CronJob that runs `uv cache prune` on a schedule to prevent unbounded cache growth.
+        # -- Enable a CronJob that keeps the uv cache bounded on a schedule.
         enabled: true
-        # -- Cron schedule for cache pruning. Default: weekly on Sunday at 02:00.
-        schedule: "0 2 * * 0"
+        # -- Cron schedule for cache pruning. Default: daily at 02:00.
+        # -- `uv cache prune` alone only evicts *unreferenced* entries, so a cache
+        # -- holding many large dependency groups (e.g. ML/LLM extras) grows unbounded.
+        # -- The job hard-clears the cache once it exceeds `maxMB` (see below).
+        schedule: "0 2 * * *"
+        # -- Hard size cap (MiB). When the cache exceeds this, the job runs
+        # -- `uv cache clean` (full bust; wheels re-download on next job) instead of
+        # -- the soft `uv cache prune`. Keep below the PVC `size` above.
+        maxMB: 8000
         # -- Image used by the prune CronJob (defaults to the CLI job image).
         image: ""
         # -- TTL for completed prune jobs (seconds).
