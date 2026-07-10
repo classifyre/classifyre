@@ -183,6 +183,36 @@ jobs:
           fi
           bun run --cwd apps/desktop build
 
+      # Fail-fast signature gate BEFORE the ~45-min notary round-trip. Apple
+      # rejects builds with "The signature of the binary is invalid" on the
+      # Electron helper apps (GPU/Renderer/Plugin) when a codesign spawn is
+      # dropped during packaging's concurrent deep-sign of the ~1000-Mach-O
+      # bundle (FD exhaustion), leaving a helper with a truncated signature.
+      # `codesign --verify --deep --strict` catches that locally in seconds; on
+      # failure resign-macos.mjs re-runs osx-sign's own signer sequentially
+      # (inside-out, correct per-helper entitlements) and we re-verify.
+      - name: Verify signatures before notarization (macOS)
+        if: runner.os == 'macOS' && env.MACOS_SIGN == '1'
+        shell: bash
+        run: |
+          APP=$(find apps/desktop/out -name 'Classifyre.app' -type d | head -1)
+          if [ -z "$APP" ]; then
+            echo "::error::No .app bundle found to verify"
+            exit 1
+          fi
+          # Match the packaging step's raised FD limits (a re-sign walks the
+          # same ~1000-Mach-O bundle).
+          sudo sysctl -w kern.maxfiles=1048576 kern.maxfilesperproc=1048576 || true
+          ulimit -n 1048576 2>/dev/null || ulimit -n 200000 2>/dev/null || ulimit -n 65536 || true
+          if codesign --verify --deep --strict --verbose=2 "$APP"; then
+            echo "All nested signatures valid"
+          else
+            echo "::warning::Invalid nested signature detected — re-signing $APP"
+            node apps/desktop/scripts/resign-macos.mjs "$APP"
+            echo "Re-verifying after re-sign…"
+            codesign --verify --deep --strict --verbose=2 "$APP"
+          fi
+
       # Notarization is driven directly (not via Forge/@electron/notarize)
       # because their `notarytool submit --wait` has NO timeout — Apple's
       # long-poll hung CI runs for 2.5-5 h (run #35 cleanup killed an orphan
