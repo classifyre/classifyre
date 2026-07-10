@@ -1,21 +1,24 @@
-// Re-sign a packaged macOS .app when its nested code signatures fail
-// verification. Called from the release workflow's post-package verify gate:
+// Re-sign the packaged macOS .app with the MODERN @electron/osx-sign (2.x),
+// then hand off to notarization. Called from the release workflow after
+// `forge package`:
 //
 //   node scripts/resign-macos.mjs <path-to-Classifyre.app>
 //
-// Why this exists: Apple's notary rejects builds with "The signature of the
-// binary is invalid" on the Electron helper apps (GPU/Renderer/Plugin) when a
-// codesign spawn is dropped during packaging's deep-sign (FD exhaustion on the
-// ~1000-Mach-O bundle), leaving a helper with a truncated signature. Rather
-// than waste a ~45-minute notary round-trip discovering that, the workflow
-// verifies locally right after packaging and, on failure, re-signs here.
+// Why this exists: Apple's notary rejected builds with "The signature of the
+// binary is invalid" on the Electron helper apps (GPU/Renderer/Plugin). Those
+// signatures are produced by the osx-sign that @electron/packager 18.4.4 pins
+// (`^1.0.5` → 1.3.3, the last CJS release). packager cannot use osx-sign 2.x
+// because it `require()`s the module and 2.x is ESM-only (Node >=22.12), which
+// is why the whole tree is stuck on 1.3.3 for packaging. This standalone ESM
+// script is NOT bound by that constraint: apps/desktop depends directly on
+// `@electron/osx-sign@^2.5.0`, so importing it here resolves the modern signer
+// and re-signs the final bundle that actually goes to the notary — replacing
+// 1.3.3's signatures wholesale.
 //
-// This re-invokes @electron/osx-sign's own sign() — the SAME engine
-// @electron/packager uses during `forge package` — so it reuses the correct
-// per-helper default entitlements and signs strictly inside-out (children
-// deepest-first, top-level app last). Unlike the packaging path it signs
-// sequentially, so the re-sign cannot re-trigger the FD-exhaustion that caused
-// the invalid signature in the first place.
+// osx-sign 2.x signs strictly inside-out (helpers deepest-first, top-level app
+// last), applies the correct per-helper default entitlements, and runs
+// sequentially. The re-sign of this bundle takes ~40s (api ships as a single
+// api.tar.gz, so the Mach-O count is modest).
 //
 // The optionsForFile mapping MUST stay in sync with apps/desktop/forge.config.ts
 // (the Python resources need disable-library-validation via
