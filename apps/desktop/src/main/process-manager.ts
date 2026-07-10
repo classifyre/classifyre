@@ -89,6 +89,54 @@ function getMaskedConfigKey(): string {
   return key;
 }
 
+// Optional detector/source dependency groups install on first use via
+// `uv sync --group X`, so uv's download/wheel cache grows over time. Left at
+// uv's OS default (~/.cache/uv, ~/Library/Caches/uv, %LOCALAPPDATA%\uv\cache)
+// it would pollute the user's global cache and grow unbounded. Contain it under
+// userData so it is isolated per install, wiped on uninstall/reset, and can be
+// size-capped by us. Dev keeps uv's global cache for fast iteration.
+function getUvCacheDir(): string | null {
+  if (!app.isPackaged) return null;
+  return path.join(app.getPath('userData'), 'uv-cache');
+}
+
+// Hard cap for the contained uv cache. Once exceeded we wipe it (equivalent to
+// `uv cache clean` for a cache dir we fully own — uv rebuilds it on next sync)
+// rather than a soft prune, which only drops unreferenced entries and lets the
+// cache creep past the cap. Kept modest since this lives on the user's machine.
+const UV_CACHE_MAX_BYTES = 4 * 1024 ** 3; // 4 GiB
+
+// Recursive directory size with early exit: stops walking as soon as the
+// running total passes `limit`, so an oversized cache is detected without
+// traversing the whole tree. Cross-platform (no `du`). Best-effort.
+function dirSizeExceeds(dir: string, limit: number): boolean {
+  let total = 0;
+  const stack = [dir];
+  while (stack.length > 0) {
+    const current = stack.pop() as string;
+    let entries: fs.Dirent[];
+    try {
+      entries = fs.readdirSync(current, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+    for (const entry of entries) {
+      const full = path.join(current, entry.name);
+      if (entry.isDirectory()) {
+        stack.push(full);
+      } else if (entry.isFile()) {
+        try {
+          total += fs.statSync(full).size;
+        } catch {
+          continue;
+        }
+        if (total > limit) return true;
+      }
+    }
+  }
+  return false;
+}
+
 export interface ApiRuntimeOptions {
   maxParallelScans?: number;
   memoryLimitMb?: number;
@@ -116,6 +164,30 @@ export class ProcessManager {
       if (venvPath) this.venvPathOverride = venvPath;
     } catch (err) {
       console.error('Failed to prepare Python runtime:', err);
+    }
+    this.bustUvCacheIfOversized();
+  }
+
+  // Keep the contained uv cache under its size cap. Runs once per app launch
+  // alongside venv prep (which is already covered by the loading indicator).
+  // Best-effort: cache maintenance must never block or fail a workspace open.
+  private bustUvCacheIfOversized(): void {
+    const cacheDir = getUvCacheDir();
+    if (!cacheDir) return;
+    try {
+      if (!fs.existsSync(cacheDir)) {
+        fs.mkdirSync(cacheDir, { recursive: true });
+        return;
+      }
+      if (dirSizeExceeds(cacheDir, UV_CACHE_MAX_BYTES)) {
+        console.log(
+          `[uv-cache] ${cacheDir} exceeds ${UV_CACHE_MAX_BYTES} bytes — clearing`,
+        );
+        fs.rmSync(cacheDir, { recursive: true, force: true });
+        fs.mkdirSync(cacheDir, { recursive: true });
+      }
+    } catch (err) {
+      console.error('Failed to maintain uv cache:', err);
     }
   }
 
@@ -264,6 +336,10 @@ export class ProcessManager {
         // base deps are baked; optional detector/source groups install on
         // first use, so auto-install must stay enabled (it defaults to on).
         UV_PROJECT_ENVIRONMENT: venvPath,
+        // Contain uv's download/wheel cache under userData (see getUvCacheDir).
+        // The API spawns the CLI via `uv run` / `uv sync --group X`, which
+        // inherit this env, so pinning it here covers every child uv invocation.
+        ...(getUvCacheDir() ? { UV_CACHE_DIR: getUvCacheDir() as string } : {}),
         CLASSIFYRE_MASKED_CONFIG_KEY: getMaskedConfigKey(),
         CORS_ORIGIN: '*',
         NODE_ENV: app.isPackaged ? 'production' : 'development',
