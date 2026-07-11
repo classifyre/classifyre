@@ -1,7 +1,7 @@
 {
   "name": "classifyre-desktop",
   "productName": "Classifyre",
-  "version": "0.4.43",
+  "version": "0.4.44",
   "private": true,
   "description": "Classifyre Desktop — Electron app with embedded PostgreSQL",
   "main": ".vite/build/index.js",
@@ -26,6 +26,7 @@
   },
   "devDependencies": {
     "@electron-forge/cli": "^7.8.0",
+    "@electron/osx-sign": "^2.5.0",
     "@electron-forge/maker-deb": "^7.8.0",
     "@electron-forge/maker-dmg": "^7.8.0",
     "@electron-forge/maker-rpm": "^7.8.0",
