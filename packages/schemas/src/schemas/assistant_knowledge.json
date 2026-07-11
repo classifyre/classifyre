@@ -362,6 +362,55 @@
         }
       }
     },
+    "LOCAL_FOLDER": {
+      "sections": {
+        "name": {
+          "title": "Source name",
+          "summary": "Use a folder-scoped name that makes the scanned path obvious. Desktop-only: this source scans a folder on the machine running the app and is not available in hosted/kubernetes/docker deployments.",
+          "suggestions": [
+            "Include the folder's purpose (example: Local Downloads Folder).",
+            "Add environment or machine markers when needed."
+          ]
+        },
+        "required": {
+          "title": "Required",
+          "summary": "Set required.path to the absolute path of the local folder to scan.",
+          "suggestions": [
+            "Only available in the desktop application (or local development) — scans run with the app's own filesystem permissions.",
+            "Use an absolute path (example: /Users/jane/Documents)."
+          ],
+          "questions": [
+            "What absolute folder path should be scanned?"
+          ]
+        },
+        "masked": {
+          "title": "Authentication",
+          "summary": "No credentials are required; scans run with the desktop application's filesystem permissions.",
+          "suggestions": [
+            "Leave masked empty — there is nothing to configure here."
+          ]
+        },
+        "optional": {
+          "title": "Optional",
+          "summary": "Use optional.traversal and optional.scope to tune directory traversal and file filtering.",
+          "suggestions": [
+            "Set optional.traversal.max_depth to limit how deep the scan recurses.",
+            "Use include_extensions/exclude_extensions to limit formats (for example .pdf, .csv, .docx).",
+            "Enable optional.traversal.include_hidden to include dot-files and hidden directories.",
+            "Tune optional.traversal.max_file_bytes to control how much of each file is read for detection."
+          ]
+        },
+        "sampling": {
+          "title": "Sampling",
+          "summary": "Controls how many files are listed/processed each run.",
+          "suggestions": [
+            "Use LATEST to prioritize recently modified files.",
+            "Use RANDOM for broad coverage across large folders.",
+            "Use ALL for full inventory sweeps when runtime and cost are acceptable."
+          ]
+        }
+      }
+    },
     "POSTGRESQL": {
       "sections": {
         "name": {

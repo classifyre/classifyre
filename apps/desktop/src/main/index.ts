@@ -10,6 +10,7 @@ import { SettingsManager } from './settings-manager.js';
 import { UpdateChecker } from './update-checker.js';
 import { initFileLogging } from './logger.js';
 import { buildApplicationMenu } from './menu.js';
+import { AppTray } from './tray.js';
 
 // embedded-postgres registers an async-exit-hook that calls done() on process
 // exit, but Electron's quit path doesn't always provide the callback. Suppress
@@ -44,6 +45,23 @@ let settingsManager: SettingsManager;
 let processManager: ProcessManager;
 let runtime: NamespaceRuntime;
 let updateChecker: UpdateChecker;
+let tray: AppTray | null = null;
+let isQuitting = false;
+
+/** Restores the window, recreating it if it was fully closed. */
+function showMainWindow(): void {
+  if (!runtime) return; // fired before startup finished (or after a failed start)
+  if (mainWindow) {
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.show();
+    mainWindow.focus();
+  } else {
+    mainWindow = createMainWindow();
+    mainWindow.on('closed', () => {
+      mainWindow = null;
+    });
+  }
+}
 
 function getPreloadPath(): string {
   return path.join(__dirname, 'preload.js');
@@ -123,6 +141,21 @@ function createMainWindow(): BrowserWindow {
     void updateChecker.checkForUpdates();
   });
 
+  // Background mode: closing the window hides it instead, keeping running
+  // workspaces (and their WebContentsViews) alive. The tray/dock/second
+  // launch brings it back. Real quit goes through before-quit (isQuitting).
+  win.on('close', (e) => {
+    if (isQuitting || !settingsManager.get().runInBackground) return;
+    e.preventDefault();
+    win.hide();
+  });
+
+  // Without background mode a closed window means "stop": tear down the
+  // running workspaces so a recreated window doesn't hold destroyed views.
+  win.on('closed', () => {
+    if (!isQuitting) void runtime.closeAll();
+  });
+
   return win;
 }
 
@@ -137,10 +170,6 @@ app.on('ready', async () => {
   // app from a terminal.
   const logFile = initFileLogging();
   if (logFile) console.log(`Logging to ${logFile}`);
-
-  // Install the application menu (adds a "Logs" menu to open/reveal main.log;
-  // Electron's bare default menu has no such entry).
-  buildApplicationMenu();
 
   if (!isDev) {
     const webDir = path.join(process.resourcesPath, 'web');
@@ -161,6 +190,26 @@ app.on('ready', async () => {
 
   updateChecker = new UpdateChecker();
   registerIpcHandlers(runtime, namespaceManager, settingsManager, updateChecker, pg);
+
+  // Application menu (Logs menu, Workspaces menu, Check for Updates…);
+  // Electron's bare default menu has none of these. Rebuilt when workspaces
+  // change so the Workspaces menu stays current.
+  const rebuildMenu = () =>
+    buildApplicationMenu({ runtime, namespaceManager, updateChecker, showMainWindow });
+  rebuildMenu();
+  runtime.onStateChange(rebuildMenu);
+
+  tray = new AppTray({
+    runtime,
+    namespaceManager,
+    settingsManager,
+    updateChecker,
+    showWindow: showMainWindow,
+    quit: () => app.quit(),
+  });
+  tray.create();
+
+  updateChecker.startPeriodicChecks();
 
   try {
     await pg.start();
@@ -185,25 +234,22 @@ app.on('ready', async () => {
 });
 
 app.on('second-instance', () => {
-  if (mainWindow) {
-    if (mainWindow.isMinimized()) mainWindow.restore();
-    mainWindow.focus();
-  }
+  showMainWindow();
 });
 
 app.on('window-all-closed', () => {
+  // Background mode keeps the app (tray + workspaces) alive on every
+  // platform; the tray or a relaunch brings the window back.
+  if (settingsManager?.get().runInBackground) return;
   if (process.platform !== 'darwin') {
     app.quit();
   }
 });
 
 app.on('activate', () => {
-  if (!mainWindow) {
-    mainWindow = createMainWindow();
-  }
+  showMainWindow();
 });
 
-let isQuitting = false;
 app.on('before-quit', (e) => {
   if (isQuitting) return;
   e.preventDefault();
@@ -217,6 +263,7 @@ app.on('before-quit', (e) => {
     app.quit();
   }, 30_000);
 
+  tray?.destroy();
   Promise.resolve()
     .then(() => runtime?.closeAll())
     .then(() => pg?.stop())

@@ -52,7 +52,7 @@ import {
   ToggleGroup,
   ToggleGroupItem,
 } from "@workspace/ui/components/toggle-group";
-import { Plus, X } from "lucide-react";
+import { FolderOpen, Plus, X } from "lucide-react";
 import { AiAssistedCard } from "@/components/ai-assisted-card";
 import {
   buildSourcePrompt,
@@ -105,6 +105,20 @@ function formatPlaceholder(
     schema.description ||
     t("forms.enterValue") + " " + formatLabel(name, schema).toLowerCase()
   );
+}
+
+/**
+ * Identifies the LOCAL_FOLDER source's `required.path` field, which is the
+ * only field across all source schemas shaped as `required.path` (an
+ * absolute local filesystem path). When running inside the desktop app this
+ * field gets a native "Browse..." folder picker button (see the Electron
+ * `dialog:select-folder` IPC channel wired up in
+ * apps/desktop/src/main/ipc-handlers.ts). This targeted check avoids
+ * threading a source-type prop through every layer of the generic
+ * schema-driven form renderer.
+ */
+function isDesktopFolderPathField(fieldPath: string, schema: JSONSchema7): boolean {
+  return fieldPath === "required.path" && schema.type === "string";
 }
 
 function hasNullType(schema: JSONSchema7): boolean {
@@ -1935,6 +1949,7 @@ function SchemaField({
   const isUrl =
     normalizedSchema.format === "uri" || name.toLowerCase().includes("url");
   const isLongField = isCertField || isLongText(normalizedSchema);
+  const isFolderPathField = isDesktopFolderPathField(fieldPath, normalizedSchema);
 
   return (
     <FormField
@@ -1968,6 +1983,13 @@ function SchemaField({
                 disabled={disabled}
                 data-testid={`input-${fieldName.toLowerCase().replace(/[^a-z0-9]/g, "-")}`}
               />
+            ) : isFolderPathField ? (
+              <FolderPathField
+                field={field}
+                fieldName={fieldName}
+                placeholder={formatPlaceholder(name, normalizedSchema, t)}
+                disabled={disabled}
+              />
             ) : (
               <Input
                 type={isUrl ? "url" : "text"}
@@ -1984,6 +2006,86 @@ function SchemaField({
         </FormItem>
       )}
     />
+  );
+}
+
+/**
+ * Text input for the LOCAL_FOLDER source's `required.path` field. Adds a
+ * native "Browse..." button when running inside the Classifyre desktop app
+ * (`window.electronAPI.selectFolder` is only exposed by the Electron
+ * preload script). Falls back to a plain text input in the browser.
+ */
+function FolderPathField({
+  field,
+  fieldName,
+  placeholder,
+  disabled,
+}: {
+  field: {
+    value: unknown;
+    onChange: (value: unknown) => void;
+    onBlur: () => void;
+    name: string;
+    ref: React.Ref<HTMLInputElement>;
+  };
+  fieldName: string;
+  placeholder: string;
+  disabled?: boolean;
+}) {
+  const { t } = useTranslation();
+  const [canBrowse, setCanBrowse] = React.useState(false);
+  const [isBrowsing, setIsBrowsing] = React.useState(false);
+
+  React.useEffect(() => {
+    setCanBrowse(
+      typeof window !== "undefined" &&
+        typeof window.electronAPI?.selectFolder === "function",
+    );
+  }, []);
+
+  const testId = fieldName.toLowerCase().replace(/[^a-z0-9]/g, "-");
+
+  const handleBrowse = async () => {
+    if (!window.electronAPI?.selectFolder) return;
+    setIsBrowsing(true);
+    try {
+      const result = await window.electronAPI.selectFolder();
+      if (!result.canceled && result.path) {
+        field.onChange(result.path);
+      }
+    } finally {
+      setIsBrowsing(false);
+    }
+  };
+
+  return (
+    <div className="flex gap-2">
+      <Input
+        type="text"
+        placeholder={placeholder}
+        name={field.name}
+        ref={field.ref}
+        onBlur={field.onBlur}
+        onChange={(event) => field.onChange(event.target.value)}
+        value={(field.value as string | undefined) ?? ""}
+        autoComplete="off"
+        disabled={disabled}
+        data-testid={`input-${testId}`}
+        className="flex-1"
+      />
+      {canBrowse && (
+        <Button
+          type="button"
+          variant="outline"
+          onClick={handleBrowse}
+          disabled={disabled || isBrowsing}
+          data-testid={`browse-${testId}`}
+        >
+          <FolderOpen className="h-4 w-4 mr-1" />
+          {t("forms.browse")}
+        </Button>
+      )}
+    </div>
   );
 }
 
@@ -2252,6 +2354,7 @@ export const JsonSchemaForm = React.forwardRef<
     ELASTICSEARCH: false,
     OPENSEARCH: false,
     MEILISEARCH: false,
+    LOCAL_FOLDER: false,
   };
   const isTabular =
     assistantSourceType && isIngestionSourceType(assistantSourceType)

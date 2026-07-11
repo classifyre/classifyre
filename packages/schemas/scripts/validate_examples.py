@@ -38,6 +38,7 @@ TYPE_TO_DEFINITION = {
     "ELASTICSEARCH": "ElasticsearchInput",
     "OPENSEARCH": "OpenSearchInput",
     "MEILISEARCH": "MeilisearchInput",
+    "LOCAL_FOLDER": "LocalFolderInput",
 }
 
 SCHEMAS_DIR = Path(__file__).parent.parent / "src" / "schemas"

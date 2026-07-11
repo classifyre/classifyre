@@ -50,12 +50,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Update operations
   checkForUpdate: () => ipcRenderer.invoke('update:check'),
+  downloadUpdate: () => ipcRenderer.invoke('update:download'),
+  installUpdate: () => ipcRenderer.invoke('update:install'),
   openDownloadPage: () => ipcRenderer.invoke('update:open-download-page'),
   onUpdateStatus: (cb: (data: unknown) => void) => {
     ipcRenderer.on('update:status', (_event, data) => cb(data));
   },
 
   // Runtime info
-  getApiPort: () => ipcRenderer.invoke('runtime:api-port'),
+  getApiPort: (namespaceId?: string) => ipcRenderer.invoke('runtime:api-port', namespaceId),
   getAppVersion: () => ipcRenderer.invoke('runtime:version'),
+
+  // Native dialogs
+  selectFolder: (): Promise<{ canceled: boolean; path: string | null }> =>
+    ipcRenderer.invoke('dialog:select-folder'),
 });

@@ -5,10 +5,13 @@ import fs from 'fs';
 export interface AppSettings {
   /** Preferred embedded-Postgres port; the app skips forward if it's busy. */
   postgresPort: number;
+  /** Keep the app (tray + running workspaces) alive when the window closes. */
+  runInBackground: boolean;
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
   postgresPort: 54320,
+  runInBackground: true,
 };
 
 export class SettingsManager {
@@ -41,6 +44,9 @@ export class SettingsManager {
         throw new Error('Database port must be between 1024 and 65535');
       }
       this.settings.postgresPort = port;
+    }
+    if (patch.runInBackground !== undefined) {
+      this.settings.runInBackground = patch.runInBackground === true;
     }
     fs.writeFileSync(this.filePath, JSON.stringify(this.settings, null, 2));
     return this.get();

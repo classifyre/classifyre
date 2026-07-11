@@ -1176,6 +1176,7 @@
                   "ELASTICSEARCH",
                   "OPENSEARCH",
                   "MEILISEARCH",
+                  "LOCAL_FOLDER",
                   "CUSTOM"
                 ]
               }
@@ -1525,6 +1526,7 @@
                   "ELASTICSEARCH",
                   "OPENSEARCH",
                   "MEILISEARCH",
+                  "LOCAL_FOLDER",
                   "CUSTOM"
                 ]
               }
@@ -1896,6 +1898,7 @@
                   "ELASTICSEARCH",
                   "OPENSEARCH",
                   "MEILISEARCH",
+                  "LOCAL_FOLDER",
                   "CUSTOM"
                 ]
               }
@@ -8434,7 +8437,8 @@
               "KAFKA",
               "ELASTICSEARCH",
               "OPENSEARCH",
-              "MEILISEARCH"
+              "MEILISEARCH",
+              "LOCAL_FOLDER"
             ],
             "description": "The type of the source",
             "example": "WORDPRESS"
@@ -8625,7 +8629,8 @@
               "KAFKA",
               "ELASTICSEARCH",
               "OPENSEARCH",
-              "MEILISEARCH"
+              "MEILISEARCH",
+              "LOCAL_FOLDER"
             ],
             "description": "The type of the source",
             "example": "WORDPRESS"
@@ -8758,6 +8763,7 @@
                 "ELASTICSEARCH",
                 "OPENSEARCH",
                 "MEILISEARCH",
+                "LOCAL_FOLDER",
                 "CUSTOM"
               ]
             }
@@ -9072,6 +9078,7 @@
               "ELASTICSEARCH",
               "OPENSEARCH",
               "MEILISEARCH",
+              "LOCAL_FOLDER",
               "CUSTOM"
             ]
           },
@@ -9215,6 +9222,7 @@
                 "ELASTICSEARCH",
                 "OPENSEARCH",
                 "MEILISEARCH",
+                "LOCAL_FOLDER",
                 "CUSTOM"
               ]
             }
@@ -9987,6 +9995,7 @@
               "ELASTICSEARCH",
               "OPENSEARCH",
               "MEILISEARCH",
+              "LOCAL_FOLDER",
               "CUSTOM"
             ]
           }
@@ -15413,6 +15422,7 @@
                 "ELASTICSEARCH",
                 "OPENSEARCH",
                 "MEILISEARCH",
+                "LOCAL_FOLDER",
                 "CUSTOM"
               ]
             }

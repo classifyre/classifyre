@@ -19,6 +19,7 @@ export class NamespaceRuntime {
   private tabBarView: WebContentsView | null = null;
   private selectorView: WebContentsView | null = null;
   private activeTabId: string | null = null;
+  private stateChangeListeners = new Set<() => void>();
 
   constructor(
     private pg: PostgresManager,
@@ -53,9 +54,10 @@ export class NamespaceRuntime {
 
     let apiPort = 0;
     let view: WebContentsView;
+    let loaded: Promise<void>;
 
     if (ns.type === 'remote' && ns.remoteUrl) {
-      view = this.createRemoteView(ns);
+      ({ view, loaded } = this.createRemoteView(ns));
     } else {
       if (!this.pg.isRunning()) {
         await this.pg.start();
@@ -84,7 +86,22 @@ export class NamespaceRuntime {
         memoryLimitMb: ns.memoryLimitMb,
       });
 
-      view = this.createNamespaceView(ns, apiPort);
+      ({ view, loaded } = this.createNamespaceView(ns, apiPort));
+    }
+
+    // Don't reveal the tab until the interface has actually rendered — the
+    // API being ready doesn't mean the page has painted, and switching early
+    // shows a white view with no feedback. The selector keeps its "Loading
+    // interface…" indicator until this resolves.
+    try {
+      await loaded;
+    } catch (err) {
+      if (this.mainWindow) this.mainWindow.contentView.removeChildView(view);
+      view.webContents.close();
+      if (ns.type !== 'remote') {
+        await this.processManager.stopApi(namespaceId).catch(() => {});
+      }
+      throw err;
     }
 
     this.namespaceManager.updateLastOpened(namespaceId);
@@ -98,7 +115,63 @@ export class NamespaceRuntime {
     return entry;
   }
 
-  private createRemoteView(ns: Namespace): WebContentsView {
+  /** Registers a listener fired whenever tabs/running state changes. */
+  onStateChange(listener: () => void): void {
+    this.stateChangeListeners.add(listener);
+  }
+
+  /** Notifies tab bar + external listeners (tray, menus) of a state change. */
+  emitStateChange(): void {
+    this.notifyTabBar();
+  }
+
+  /**
+   * Resolves when the view's page has finished loading; rejects on a
+   * main-frame load failure or renderer crash. A stuck-but-alive load
+   * resolves after the timeout so a slow page is still shown eventually.
+   */
+  private waitForViewLoad(view: WebContentsView, timeoutMs = 30_000): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const wc = view.webContents;
+      const cleanup = () => {
+        wc.removeListener('did-finish-load', onDone);
+        wc.removeListener('did-fail-load', onFail);
+        wc.removeListener('render-process-gone', onGone);
+        clearTimeout(timer);
+      };
+      const onDone = () => {
+        cleanup();
+        resolve();
+      };
+      const onFail = (
+        _e: unknown,
+        code: number,
+        desc: string,
+        _url: string,
+        isMainFrame: boolean,
+      ) => {
+        // Subframe/asset failures and ERR_ABORTED (-3, e.g. a redirect) are
+        // not fatal for the page as a whole.
+        if (!isMainFrame || code === -3) return;
+        cleanup();
+        reject(new Error(`The interface failed to load: ${desc} (${code})`));
+      };
+      const onGone = (_e: unknown, details: Electron.RenderProcessGoneDetails) => {
+        cleanup();
+        reject(new Error(`The interface crashed while loading (${details.reason})`));
+      };
+      const timer = setTimeout(() => {
+        cleanup();
+        console.warn('[runtime] view load timed out — showing it anyway');
+        resolve();
+      }, timeoutMs);
+      wc.on('did-finish-load', onDone);
+      wc.on('did-fail-load', onFail);
+      wc.on('render-process-gone', onGone);
+    });
+  }
+
+  private createRemoteView(ns: Namespace): { view: WebContentsView; loaded: Promise<void> } {
     const view = new WebContentsView({
       webPreferences: {
         contextIsolation: true,
@@ -131,11 +204,15 @@ export class NamespaceRuntime {
       e.preventDefault();
     });
 
+    const loaded = this.waitForViewLoad(view);
     void view.webContents.loadURL(url);
-    return view;
+    return { view, loaded };
   }
 
-  private createNamespaceView(ns: Namespace, apiPort: number): WebContentsView {
+  private createNamespaceView(
+    ns: Namespace,
+    apiPort: number,
+  ): { view: WebContentsView; loaded: Promise<void> } {
     const view = new WebContentsView({
       webPreferences: {
         contextIsolation: true,
@@ -189,10 +266,15 @@ export class NamespaceRuntime {
       console.log(`[web:${tag}] ${details.message}${where}`);
     });
 
+    const viewLoaded = this.waitForViewLoad(view);
+    let loaded = viewLoaded;
     if (this.isDev) {
       const webUrl = 'http://localhost:3000';
-      void this.waitForDevServer(webUrl).then(
-        () => view.webContents.loadURL(webUrl),
+      loaded = this.waitForDevServer(webUrl).then(
+        () => {
+          void view.webContents.loadURL(webUrl);
+          return viewLoaded;
+        },
         () => {
           if (this.mainWindow) {
             void dialog.showMessageBox(this.mainWindow, {
@@ -201,6 +283,7 @@ export class NamespaceRuntime {
               message: 'Next.js dev server is not available at localhost:3000.\n\nStart it with: cd apps/web && bun dev',
             });
           }
+          throw new Error('Web dev server is not running at localhost:3000');
         },
       );
     } else {
@@ -211,12 +294,15 @@ export class NamespaceRuntime {
       void view.webContents.loadURL('app://classifyre/index.html');
     }
 
-    return view;
+    return { view, loaded };
   }
 
   switchToTab(tabId: string): void {
     console.log(`[runtime] switchToTab: ${tabId}, running tabs: ${[...this.running.keys()].join(', ')}`);
     this.activeTabId = tabId;
+    // After the window is destroyed (background-off close path) the views are
+    // gone too — only the bookkeeping above should happen.
+    if (!this.mainWindow || this.mainWindow.isDestroyed()) return;
 
     const showSelector = tabId === '__selector__';
     if (this.selectorView) {
@@ -245,7 +331,7 @@ export class NamespaceRuntime {
 
     this.running.delete(namespaceId);
 
-    if (this.mainWindow) {
+    if (this.mainWindow && !this.mainWindow.isDestroyed()) {
       this.mainWindow.contentView.removeChildView(entry.view);
     }
 
@@ -269,7 +355,7 @@ export class NamespaceRuntime {
   }
 
   private layoutViews(): void {
-    if (!this.mainWindow) return;
+    if (!this.mainWindow || this.mainWindow.isDestroyed()) return;
 
     const size = this.mainWindow.getContentSize();
     const w = size[0] ?? 1400;
@@ -291,7 +377,8 @@ export class NamespaceRuntime {
   }
 
   private notifyTabBar(): void {
-    if (!this.tabBarView) return;
+    for (const listener of this.stateChangeListeners) listener();
+    if (!this.tabBarView || this.tabBarView.webContents.isDestroyed()) return;
 
     const data = this.getTabState();
     const js = `

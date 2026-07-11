@@ -80,6 +80,7 @@ export const SearchSourcesFiltersDtoTypeEnum = {
     Elasticsearch: 'ELASTICSEARCH',
     Opensearch: 'OPENSEARCH',
     Meilisearch: 'MEILISEARCH',
+    LocalFolder: 'LOCAL_FOLDER',
     Custom: 'CUSTOM'
 } as const;
 export type SearchSourcesFiltersDtoTypeEnum = typeof SearchSourcesFiltersDtoTypeEnum[keyof typeof SearchSourcesFiltersDtoTypeEnum];

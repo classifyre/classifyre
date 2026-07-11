@@ -96,7 +96,8 @@ export const UpdateSourceDtoTypeEnum = {
     Kafka: 'KAFKA',
     Elasticsearch: 'ELASTICSEARCH',
     Opensearch: 'OPENSEARCH',
-    Meilisearch: 'MEILISEARCH'
+    Meilisearch: 'MEILISEARCH',
+    LocalFolder: 'LOCAL_FOLDER'
 } as const;
 export type UpdateSourceDtoTypeEnum = typeof UpdateSourceDtoTypeEnum[keyof typeof UpdateSourceDtoTypeEnum];
 
