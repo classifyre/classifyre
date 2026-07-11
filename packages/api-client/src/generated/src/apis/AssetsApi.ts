@@ -915,6 +915,7 @@ export const SearchAssetsControllerExportAssetsAssetSourceTypeEnum = {
     Elasticsearch: 'ELASTICSEARCH',
     Opensearch: 'OPENSEARCH',
     Meilisearch: 'MEILISEARCH',
+    LocalFolder: 'LOCAL_FOLDER',
     Custom: 'CUSTOM'
 } as const;
 export type SearchAssetsControllerExportAssetsAssetSourceTypeEnum = typeof SearchAssetsControllerExportAssetsAssetSourceTypeEnum[keyof typeof SearchAssetsControllerExportAssetsAssetSourceTypeEnum];
@@ -1034,6 +1035,7 @@ export const SearchAssetsControllerQueryAssetsAssetSourceTypeEnum = {
     Elasticsearch: 'ELASTICSEARCH',
     Opensearch: 'OPENSEARCH',
     Meilisearch: 'MEILISEARCH',
+    LocalFolder: 'LOCAL_FOLDER',
     Custom: 'CUSTOM'
 } as const;
 export type SearchAssetsControllerQueryAssetsAssetSourceTypeEnum = typeof SearchAssetsControllerQueryAssetsAssetSourceTypeEnum[keyof typeof SearchAssetsControllerQueryAssetsAssetSourceTypeEnum];
@@ -1153,6 +1155,7 @@ export const SourceAssetsControllerListSourceAssetsSourceTypesEnum = {
     Elasticsearch: 'ELASTICSEARCH',
     Opensearch: 'OPENSEARCH',
     Meilisearch: 'MEILISEARCH',
+    LocalFolder: 'LOCAL_FOLDER',
     Custom: 'CUSTOM'
 } as const;
 export type SourceAssetsControllerListSourceAssetsSourceTypesEnum = typeof SourceAssetsControllerListSourceAssetsSourceTypesEnum[keyof typeof SourceAssetsControllerListSourceAssetsSourceTypesEnum];

@@ -58,4 +58,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Runtime info
   getApiPort: () => ipcRenderer.invoke('runtime:api-port'),
   getAppVersion: () => ipcRenderer.invoke('runtime:version'),
+
+  // Native dialogs
+  selectFolder: (): Promise<{ canceled: boolean; path: string | null }> =>
+    ipcRenderer.invoke('dialog:select-folder'),
 });

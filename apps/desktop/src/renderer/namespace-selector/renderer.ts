@@ -24,6 +24,7 @@ interface ElectronAPI {
   isNamespaceOpen(id: string): Promise<boolean>;
   getSettings(): Promise<AppSettings>;
   updateSettings(patch: Partial<AppSettings>): Promise<AppSettings>;
+  selectFolder(): Promise<{ canceled: boolean; path: string | null }>;
 }
 
 const api = (window as unknown as { electronAPI: ElectronAPI }).electronAPI;

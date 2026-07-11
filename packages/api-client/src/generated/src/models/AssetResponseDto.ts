@@ -104,6 +104,7 @@ export const AssetResponseDtoSourceTypeEnum = {
     Elasticsearch: 'ELASTICSEARCH',
     Opensearch: 'OPENSEARCH',
     Meilisearch: 'MEILISEARCH',
+    LocalFolder: 'LOCAL_FOLDER',
     Custom: 'CUSTOM'
 } as const;
 export type AssetResponseDtoSourceTypeEnum = typeof AssetResponseDtoSourceTypeEnum[keyof typeof AssetResponseDtoSourceTypeEnum];

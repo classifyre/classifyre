@@ -217,6 +217,66 @@
       }
     }
   ],
+  "LOCAL_FOLDER": [
+    {
+      "name": "Documents folder scan",
+      "description": "Scan a local folder on this computer for documents, spreadsheets, and images (desktop app only)",
+      "config": {
+        "type": "LOCAL_FOLDER",
+        "required": {
+          "path": "/Users/you/Documents"
+        },
+        "optional": {
+          "scope": {
+            "include_content_preview": true
+          }
+        },
+        "sampling": {
+          "strategy": "AUTOMATIC"
+        }
+      }
+    },
+    {
+      "name": "Project folder scan with file-type filter",
+      "description": "Scan a project folder restricted to office documents, skipping hidden files and very large files",
+      "config": {
+        "type": "LOCAL_FOLDER",
+        "required": {
+          "path": "/Users/you/Projects/reports"
+        },
+        "optional": {
+          "traversal": {
+            "include_hidden": false,
+            "max_depth": 10,
+            "max_file_bytes": 10485760
+          },
+          "scope": {
+            "include_extensions": [
+              ".pdf",
+              ".docx",
+              ".xlsx",
+              ".csv",
+              ".txt"
+            ],
+            "include_content_preview": true
+          }
+        },
+        "sampling": {
+          "strategy": "ALL"
+        },
+        "detectors": [
+          {
+            "type": "PII",
+            "enabled": true
+          },
+          {
+            "type": "SECRETS",
+            "enabled": true
+          }
+        ]
+      }
+    }
+  ],
   "S3_COMPATIBLE_STORAGE": [
     {
       "name": "AWS S3 bucket scan",

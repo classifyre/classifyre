@@ -1,4 +1,4 @@
-import { ipcMain, app } from 'electron';
+import { ipcMain, app, dialog, BrowserWindow } from 'electron';
 import { NamespaceRuntime } from './namespace-runtime.js';
 import { NamespaceManager, type NamespaceUpdate } from './namespace-manager.js';
 import { SettingsManager, type AppSettings } from './settings-manager.js';
@@ -95,4 +95,23 @@ export function registerIpcHandlers(
   ipcMain.handle('runtime:version', () => {
     return app.getVersion();
   });
+
+  // Native folder picker (used by LOCAL_FOLDER source config forms)
+  ipcMain.handle(
+    'dialog:select-folder',
+    async (event): Promise<{ canceled: boolean; path: string | null }> => {
+      const win = BrowserWindow.fromWebContents(event.sender) ?? undefined;
+      const result = await (win
+        ? dialog.showOpenDialog(win, {
+            properties: ['openDirectory', 'createDirectory'],
+          })
+        : dialog.showOpenDialog({
+            properties: ['openDirectory', 'createDirectory'],
+          }));
+      return {
+        canceled: result.canceled,
+        path: result.filePaths[0] ?? null,
+      };
+    },
+  );
 }
