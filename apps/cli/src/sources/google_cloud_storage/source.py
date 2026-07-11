@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import json
+import logging
 from collections.abc import Iterator
 from typing import Any
 
 from ...models.generated_input import GoogleCloudStorageInput
 from ..dependencies import require_module
 from ..object_storage.base import ObjectRef, ObjectStorageSourceBase
+
+logger = logging.getLogger(__name__)
 
 
 class GoogleCloudStorageSource(ObjectStorageSourceBase):
@@ -97,11 +100,26 @@ class GoogleCloudStorageSource(ObjectStorageSourceBase):
 
     def _download_object(self, ref: ObjectRef) -> tuple[bytes, str | None]:
         client = self._client()
-        bucket = client.bucket(self._required_bucket())
+        bucket_name = self._required_bucket()
+        bucket = client.bucket(bucket_name)
         blob = bucket.blob(ref.key)
 
         timeout = self._request_timeout_seconds()
-        file_bytes = blob.download_as_bytes(timeout=timeout)
+        max_bytes = self._max_object_bytes()
+        # Ranged download: fetch only the capped prefix instead of the whole blob.
+        file_bytes = blob.download_as_bytes(start=0, end=max_bytes - 1, timeout=timeout)
+
+        if len(file_bytes) > max_bytes:
+            file_bytes = file_bytes[:max_bytes]
+        if ref.size > max_bytes:
+            logger.warning(
+                "Truncated gs://%s/%s to %d of %d bytes for content extraction",
+                bucket_name,
+                ref.key,
+                max_bytes,
+                ref.size,
+            )
+
         return file_bytes, ref.content_type_hint
 
     def _external_url(self, key: str) -> str:

@@ -293,7 +293,12 @@ api:
       # -- CLI job resource requests.
       requests:
         cpu: 500m
-        memory: 1Gi
+        # Detector workers hold ML models permanently (one copy per worker) and
+        # discovery keeps the full asset list in memory, so real usage sits close
+        # to the limit. A 1Gi request against a 4Gi limit made these pods prime
+        # node-pressure eviction targets mid-scan; requesting near the limit keeps
+        # the scheduler honest and lets long scans finish.
+        memory: 3Gi
         # CLI containers routinely use 5-6 Gi (uv package downloads, pip wheels,
         # extracted asset temp files). Requesting 6 Gi matches real usage so the
         # scheduler only places jobs on nodes with enough disk and kubelet does not

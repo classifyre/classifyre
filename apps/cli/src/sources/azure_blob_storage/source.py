@@ -111,12 +111,28 @@ class AzureBlobStorageSource(ObjectStorageSourceBase):
 
     def _download_object(self, ref: ObjectRef) -> tuple[bytes, str | None]:
         blob_service_client = self._client()
-        container_client = blob_service_client.get_container_client(self._required_container())
+        container = self._required_container()
+        container_client = blob_service_client.get_container_client(container)
         blob_client = container_client.get_blob_client(ref.key)
 
         timeout = self._request_timeout_seconds()
-        downloader = blob_client.download_blob(offset=0, length=None, timeout=timeout)
+        max_bytes = self._max_object_bytes()
+        # Ranged download: fetch only the capped prefix instead of the whole blob.
+        downloader = blob_client.download_blob(offset=0, length=max_bytes, timeout=timeout)
         file_bytes = downloader.readall()
+
+        if len(file_bytes) > max_bytes:
+            file_bytes = file_bytes[:max_bytes]
+        if ref.size > max_bytes:
+            logger.warning(
+                "Truncated %s/%s/%s to %d of %d bytes for content extraction",
+                self._required_account_url(),
+                container,
+                ref.key,
+                max_bytes,
+                ref.size,
+            )
+
         return file_bytes, ref.content_type_hint
 
     def _external_url(self, key: str) -> str:

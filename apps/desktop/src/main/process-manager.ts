@@ -100,6 +100,14 @@ function getUvCacheDir(): string | null {
   return path.join(app.getPath('userData'), 'uv-cache');
 }
 
+// Scan (runner) logs are persisted as NDJSON files per run, namespaced so
+// separate workspaces never mix logs. Sits under CLASSIFYRE_DATA_DIR/userData
+// alongside the Postgres data so uninstall/reset wipes it too.
+function getRunnerLogDir(namespaceId: string): string {
+  const base = process.env['CLASSIFYRE_DATA_DIR'] || app.getPath('userData');
+  return path.join(base, 'runner-logs', namespaceId);
+}
+
 // Hard cap for the contained uv cache. Once exceeded we wipe it (equivalent to
 // `uv cache clean` for a cache dir we fully own — uv rebuilds it on next sync)
 // rather than a soft prune, which only drops unreferenced entries and lets the
@@ -346,6 +354,9 @@ export class ProcessManager {
         // inherit this env, so pinning it here covers every child uv invocation.
         ...(getUvCacheDir() ? { UV_CACHE_DIR: getUvCacheDir() as string } : {}),
         CLASSIFYRE_MASKED_CONFIG_KEY: getMaskedConfigKey(),
+        // Persist scan logs on the local filesystem (desktop has no S3).
+        // The storage service enforces per-run and total-size caps itself.
+        RUNNER_LOG_DIR: getRunnerLogDir(namespaceId),
         CORS_ORIGIN: '*',
         NODE_ENV: app.isPackaged ? 'production' : 'development',
         ...(options.maxParallelScans && options.maxParallelScans > 0

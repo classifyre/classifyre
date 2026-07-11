@@ -139,6 +139,26 @@ describe('GraphService', () => {
       expect(result.edgeCount).toBe(5);
     });
 
+    it('resolves hash-valued links (CLI generate_hash_id output) to asset ids', async () => {
+      mockPrisma.$executeRaw.mockResolvedValue(1);
+      const linkHash =
+        'url_sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+      mockPrisma.asset.findMany
+        .mockResolvedValueOnce([{ id: 'a1', links: [linkHash] }])
+        .mockResolvedValueOnce([
+          { id: 'a7', hash: linkHash, externalUrl: 'http://a7' },
+        ]);
+      mockPrisma.edge.createMany.mockResolvedValue({ count: 1 });
+      mockPrisma.edge.count.mockResolvedValue(1);
+
+      await service.rebuildEdges();
+
+      const createArg = mockPrisma.edge.createMany.mock.calls[0][0];
+      expect(createArg.data).toEqual([
+        expect.objectContaining({ fromId: 'a1', toId: 'a7' }),
+      ]);
+    });
+
     it('does not create self-referencing edges', async () => {
       mockPrisma.$executeRaw.mockResolvedValue(1);
       mockPrisma.asset.findMany

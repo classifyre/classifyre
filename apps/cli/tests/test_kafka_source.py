@@ -1,11 +1,19 @@
 from __future__ import annotations
 
+import base64
+import json
 from typing import Any
 
 import pytest
 
 from src.models.generated_input import SamplingStrategy
 from src.sources.kafka.source import KafkaSource
+
+CURSOR_ENV = "CLASSIFYRE_SAMPLING_CURSOR"
+
+
+def _encode_cursor(cursor: dict[str, Any]) -> str:
+    return base64.b64encode(json.dumps(cursor).encode()).decode()
 
 # ── confluent-kafka fakes ────────────────────────────────────────────────
 
@@ -64,25 +72,33 @@ class _FakeConsumer:
         self._module = module
         self.conf = conf
         self.assigned: list[_TopicPartition] = []
-        self._consumed = False
+        self._assigned_offsets: dict[int, int] = {}
+        self._pointer = 0
 
     def list_topics(self, topic: str | None = None, timeout: float = 0) -> _ClusterMetadata:
         if topic is not None:
             return _ClusterMetadata([topic] if topic in self._module.topic_names else [])
         return _ClusterMetadata(self._module.topic_names)
 
-    def get_watermark_offsets(self, _tp: _TopicPartition, timeout: float = 0) -> tuple[int, int]:
-        return (0, 100)
+    def get_watermark_offsets(self, tp: _TopicPartition, timeout: float = 0) -> tuple[int, int]:
+        return self._module.watermarks.get((tp.topic, tp.partition), (0, 100))
 
     def assign(self, tps: list[_TopicPartition]) -> None:
         self.assigned = tps
         self._module.last_assigned = tps
+        self._assigned_offsets = {tp.partition: tp.offset for tp in tps}
 
     def consume(self, num_messages: int, timeout: float = 0) -> list[_FakeMessage]:
-        if self._consumed:
-            return []
-        self._consumed = True
-        return self._module.messages[:num_messages]
+        assigned_partitions = set(self._assigned_offsets)
+        available = [
+            m
+            for m in self._module.messages
+            if m.partition() in assigned_partitions
+            and m.offset() >= self._assigned_offsets[m.partition()]
+        ]
+        batch = available[self._pointer : self._pointer + num_messages]
+        self._pointer += len(batch)
+        return batch
 
     def close(self) -> None:
         pass
@@ -126,6 +142,8 @@ class _FakeKafkaModule:
         self.ConfigResource = _ConfigResource
         self.last_consumer_conf: dict[str, Any] | None = None
         self.last_assigned: list[_TopicPartition] = []
+        # Optional per-(topic, partition) watermark override; defaults to (0, 100).
+        self.watermarks: dict[tuple[str, int], tuple[int, int]] = {}
 
     def Consumer(self, conf: dict[str, Any]) -> _FakeConsumer:  # noqa: N802
         self.last_consumer_conf = conf
@@ -146,8 +164,11 @@ def _recipe(**overrides: Any) -> dict[str, Any]:
     return base
 
 
-def _messages(count: int) -> list[_FakeMessage]:
-    return [_FakeMessage(0, i, f"k{i}".encode(), f"value-{i}".encode()) for i in range(count)]
+def _messages(count: int, *, start: int = 0, partition: int = 0) -> list[_FakeMessage]:
+    return [
+        _FakeMessage(partition, start + i, f"k{start + i}".encode(), f"value-{start + i}".encode())
+        for i in range(count)
+    ]
 
 
 @pytest.fixture
@@ -186,7 +207,13 @@ async def test_kafka_extract_emits_topic_assets(_patch_kafka: _FakeKafkaModule) 
     assert meta["cleanup_policy"] == "delete"
 
 
-async def test_kafka_fetch_content_samples_messages(_patch_kafka: _FakeKafkaModule) -> None:
+async def test_kafka_fetch_content_samples_messages(
+    _patch_kafka: _FakeKafkaModule, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Keep the random start offset within the range of fake messages available (0-11),
+    # and pin it deterministically so the sampled window is known.
+    _patch_kafka.watermarks[("payments", 0)] = (0, 12)
+    monkeypatch.setattr("src.sources.kafka.source.random.randint", lambda _a, _b: 0)
     src = KafkaSource(_recipe(sampling={"strategy": "RANDOM", "rows_per_page": 10}))
     assets = [a async for batch in src.extract_raw() for a in batch]
     result = await src.fetch_content(assets[0].hash)
@@ -249,3 +276,74 @@ def test_kafka_latest_strategy_assigns_tail_offsets(_patch_kafka: _FakeKafkaModu
     src._consume("payments", 10)
     assert len(module.last_assigned) == 1
     assert module.last_assigned[0].offset == 90
+
+
+# ── AUTOMATIC sampling ───────────────────────────────────────────────────
+
+
+def test_kafka_automatic_first_run_starts_at_low_and_records_cursor(
+    _patch_kafka: _FakeKafkaModule, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv(CURSOR_ENV, raising=False)
+    module = _patch_kafka
+    module.watermarks[("payments", 0)] = (0, 100)
+    module.messages = _messages(12, start=0)
+
+    src = KafkaSource(_recipe(sampling={"strategy": "AUTOMATIC", "rows_per_page": 10}))
+    out = src._consume("payments", 5)
+
+    assert module.last_assigned[0].offset == 0  # first run: start at low
+    assert [m["offset"] for m in out] == [0, 1, 2, 3, 4]
+    # advanced past the highest offset consumed
+    assert src.current_sampling_cursor() == {"payments:0": 5}
+
+
+def test_kafka_automatic_second_run_resumes_from_saved_cursor(
+    _patch_kafka: _FakeKafkaModule, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module = _patch_kafka
+    module.watermarks[("payments", 0)] = (0, 100)
+    module.messages = _messages(12, start=0)
+    monkeypatch.setenv(CURSOR_ENV, _encode_cursor({"payments:0": 5}))
+
+    src = KafkaSource(_recipe(sampling={"strategy": "AUTOMATIC", "rows_per_page": 10}))
+    out = src._consume("payments", 5)
+
+    assert module.last_assigned[0].offset == 5
+    assert [m["offset"] for m in out] == [5, 6, 7, 8, 9]
+    assert src.current_sampling_cursor() == {"payments:0": 10}
+
+
+def test_kafka_automatic_wraps_to_low_when_caught_up(
+    _patch_kafka: _FakeKafkaModule, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module = _patch_kafka
+    module.watermarks[("payments", 0)] = (0, 10)
+    # Only two messages left before the high watermark.
+    module.messages = _messages(2, start=8)
+    monkeypatch.setenv(CURSOR_ENV, _encode_cursor({"payments:0": 8}))
+
+    src = KafkaSource(_recipe(sampling={"strategy": "AUTOMATIC", "rows_per_page": 10}))
+    out = src._consume("payments", 5)
+
+    assert module.last_assigned[0].offset == 8
+    assert [m["offset"] for m in out] == [8, 9]
+    # 9 + 1 == 10 == high watermark → wraps back to low (0) for the next run
+    assert src.current_sampling_cursor() == {"payments:0": 0}
+
+
+def test_kafka_automatic_stale_cursor_below_low_clamps_to_low(
+    _patch_kafka: _FakeKafkaModule, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module = _patch_kafka
+    # Retention has advanced: earliest retained offset is now 20.
+    module.watermarks[("payments", 0)] = (20, 100)
+    module.messages = _messages(5, start=20)
+    monkeypatch.setenv(CURSOR_ENV, _encode_cursor({"payments:0": 5}))
+
+    src = KafkaSource(_recipe(sampling={"strategy": "AUTOMATIC", "rows_per_page": 10}))
+    out = src._consume("payments", 5)
+
+    assert module.last_assigned[0].offset == 20  # clamped up to low, not the stale 5
+    assert [m["offset"] for m in out] == [20, 21, 22, 23, 24]
+    assert src.current_sampling_cursor() == {"payments:0": 25}

@@ -8,7 +8,6 @@ import {
   S3Client,
   PutObjectCommand,
   GetObjectCommand,
-  type GetObjectCommandOutput,
   DeleteObjectCommand,
   CreateBucketCommand,
   HeadBucketCommand,
@@ -16,6 +15,8 @@ import {
   NoSuchKey,
 } from '@aws-sdk/client-s3';
 import { Readable } from 'stream';
+import { promises as fsp, createReadStream } from 'fs';
+import * as path from 'path';
 import { type LogLevel, RunnerLogEntryDto, RunnerLogsResponseDto } from './dto';
 
 type RunnerLogStream = 'stderr' | 'stdout' | 'combined';
@@ -26,10 +27,26 @@ interface StoredRunnerLogEntry {
   message: string;
 }
 
-interface S3Config {
-  client: S3Client;
-  bucket: string;
-  prefix: string;
+interface StoredLogObject {
+  sourceId: string;
+  runnerId: string;
+  key: string;
+  size: number;
+  lastModified: Date | null;
+}
+
+/**
+ * Persistence backend for per-run NDJSON log objects.
+ * Two implementations: S3-compatible object storage and the local filesystem
+ * (used by the desktop app, where no object storage exists).
+ */
+interface LogObjectStore {
+  /** Overwrite the whole object for a run with the given NDJSON content. */
+  put(sourceId: string, runnerId: string, content: string): Promise<void>;
+  /** Stream the object back, or null when it does not exist. */
+  getStream(sourceId: string, runnerId: string): Promise<Readable | null>;
+  delete(sourceId: string, runnerId: string): Promise<void>;
+  list(): Promise<StoredLogObject[]>;
 }
 
 /** Resolved parameters used internally by listLogs / paginateEntries. */
@@ -40,6 +57,203 @@ interface ResolvedListParams {
   searchLower: string;
   levelFilter: Set<string>;
   streamFilter: Set<string>;
+}
+
+const SYNC_INTERVAL_MS = 5_000;
+
+// ── S3 store ────────────────────────────────────────────────────────────────
+
+class S3LogObjectStore implements LogObjectStore {
+  constructor(
+    private readonly client: S3Client,
+    private readonly bucket: string,
+    private readonly prefix: string,
+  ) {}
+
+  private key(sourceId: string, runnerId: string): string {
+    return `${this.prefix}${sourceId}/${runnerId}.ndjson`;
+  }
+
+  async put(
+    sourceId: string,
+    runnerId: string,
+    content: string,
+  ): Promise<void> {
+    await this.client.send(
+      new PutObjectCommand({
+        Bucket: this.bucket,
+        Key: this.key(sourceId, runnerId),
+        Body: Buffer.from(content, 'utf8'),
+        ContentType: 'application/x-ndjson',
+      }),
+    );
+  }
+
+  async getStream(
+    sourceId: string,
+    runnerId: string,
+  ): Promise<Readable | null> {
+    try {
+      const obj = await this.client.send(
+        new GetObjectCommand({
+          Bucket: this.bucket,
+          Key: this.key(sourceId, runnerId),
+        }),
+      );
+      return obj.Body as Readable;
+    } catch (err: any) {
+      if (
+        err instanceof NoSuchKey ||
+        err?.name === 'NoSuchKey' ||
+        err?.$metadata?.httpStatusCode === 404
+      ) {
+        return null;
+      }
+      throw err;
+    }
+  }
+
+  async delete(sourceId: string, runnerId: string): Promise<void> {
+    await this.client.send(
+      new DeleteObjectCommand({
+        Bucket: this.bucket,
+        Key: this.key(sourceId, runnerId),
+      }),
+    );
+  }
+
+  async list(): Promise<StoredLogObject[]> {
+    const out: StoredLogObject[] = [];
+    let continuationToken: string | undefined;
+    do {
+      const res = await this.client.send(
+        new ListObjectsV2Command({
+          Bucket: this.bucket,
+          Prefix: this.prefix,
+          ContinuationToken: continuationToken,
+        }),
+      );
+      for (const obj of res.Contents ?? []) {
+        if (!obj.Key || !obj.Key.startsWith(this.prefix)) continue;
+        const rest = obj.Key.slice(this.prefix.length);
+        const match = rest.match(/^(.+)\/([^/]+)\.ndjson$/);
+        if (!match) continue;
+        out.push({
+          sourceId: match[1],
+          runnerId: match[2],
+          key: obj.Key,
+          size: obj.Size ?? 0,
+          lastModified: obj.LastModified ?? null,
+        });
+      }
+      continuationToken = res.IsTruncated
+        ? res.NextContinuationToken
+        : undefined;
+    } while (continuationToken);
+    return out;
+  }
+
+  async ensureBucket(logger: Logger): Promise<void> {
+    try {
+      await this.client.send(new HeadBucketCommand({ Bucket: this.bucket }));
+    } catch {
+      try {
+        await this.client.send(
+          new CreateBucketCommand({ Bucket: this.bucket }),
+        );
+        logger.log(`Created S3 bucket: ${this.bucket}`);
+      } catch (err: any) {
+        if (err?.Code !== 'BucketAlreadyOwnedByYou') {
+          logger.error(
+            `Failed to create S3 bucket ${this.bucket}: ${err?.message}`,
+          );
+        }
+      }
+    }
+  }
+}
+
+// ── Local filesystem store (desktop) ───────────────────────────────────────
+
+class LocalFileLogObjectStore implements LogObjectStore {
+  constructor(private readonly rootDir: string) {}
+
+  private filePath(sourceId: string, runnerId: string): string {
+    // sourceId / runnerId are UUIDs generated by the API, safe as path segments.
+    return path.join(this.rootDir, sourceId, `${runnerId}.ndjson`);
+  }
+
+  async put(
+    sourceId: string,
+    runnerId: string,
+    content: string,
+  ): Promise<void> {
+    const file = this.filePath(sourceId, runnerId);
+    await fsp.mkdir(path.dirname(file), { recursive: true });
+    // Write via temp file + rename so readers never see a half-written object.
+    const tmp = `${file}.tmp`;
+    await fsp.writeFile(tmp, content, 'utf8');
+    await fsp.rename(tmp, file);
+  }
+
+  async getStream(
+    sourceId: string,
+    runnerId: string,
+  ): Promise<Readable | null> {
+    const file = this.filePath(sourceId, runnerId);
+    try {
+      await fsp.access(file);
+    } catch {
+      return null;
+    }
+    return createReadStream(file, { encoding: 'utf8' });
+  }
+
+  async delete(sourceId: string, runnerId: string): Promise<void> {
+    const file = this.filePath(sourceId, runnerId);
+    await fsp.rm(file, { force: true });
+    await fsp.rm(`${file}.tmp`, { force: true });
+    // Remove the source directory when it became empty (ignore failures).
+    await fsp.rmdir(path.dirname(file)).catch(() => undefined);
+  }
+
+  async list(): Promise<StoredLogObject[]> {
+    const out: StoredLogObject[] = [];
+    let sourceDirs: string[];
+    try {
+      sourceDirs = await fsp.readdir(this.rootDir);
+    } catch {
+      return out;
+    }
+    for (const sourceId of sourceDirs) {
+      const dir = path.join(this.rootDir, sourceId);
+      let files: string[];
+      try {
+        const stat = await fsp.stat(dir);
+        if (!stat.isDirectory()) continue;
+        files = await fsp.readdir(dir);
+      } catch {
+        continue;
+      }
+      for (const file of files) {
+        if (!file.endsWith('.ndjson')) continue;
+        const full = path.join(dir, file);
+        try {
+          const stat = await fsp.stat(full);
+          out.push({
+            sourceId,
+            runnerId: file.slice(0, -'.ndjson'.length),
+            key: full,
+            size: stat.size,
+            lastModified: stat.mtime,
+          });
+        } catch {
+          // File disappeared between readdir and stat — skip.
+        }
+      }
+    }
+    return out;
+  }
 }
 
 @Injectable()
@@ -54,29 +268,72 @@ export class RunnerLogStorageService implements OnModuleInit, OnModuleDestroy {
   // Partial-line buffers (one per runnerId:stream key)
   private readonly lineBuffers = new Map<string, string>();
 
-  // S3 backend (populated when S3_BUCKET is set)
-  private s3: S3Config | null = null;
+  // Per-run size accounting for the in-memory buffer (approximate bytes)
+  private readonly bufferBytes = new Map<string, number>();
+  // Number of earliest lines dropped per run once the per-run cap was hit
+  private readonly droppedLines = new Map<string, number>();
 
-  // Per-runner S3 sync timers (periodic upload during active run)
-  private readonly s3SyncTimers = new Map<string, NodeJS.Timeout>();
+  // Persistence backend (S3 or local filesystem), null = ephemeral logs
+  private store: LogObjectStore | null = null;
+  private storeMode: 's3' | 'local' | null = null;
+  private localRootDir: string | null = null;
+
+  // Per-run size caps (0 = disabled)
+  private maxLinesPerRun = 100_000;
+  private maxBytesPerRun = 50 * 1024 * 1024;
+  // Total local storage cap in bytes (0 = disabled; local store only)
+  private maxTotalBytes = 0;
+
+  // Per-runner persistence sync timers (periodic snapshot during active run)
+  private readonly syncTimers = new Map<string, NodeJS.Timeout>();
 
   // Per-runner sourceId lookup (needed by onModuleDestroy)
   private readonly runnerSourceIds = new Map<string, string>();
 
   /**
-   * Serialized S3 upload chain per runner.
-   * Guarantees that uploads never race: the next PutObject always waits for
-   * the previous one to finish, so the latest upload always wins.
+   * Serialized upload chain per runner.
+   * Guarantees that snapshot writes never race: the next put always waits for
+   * the previous one to finish, so the latest snapshot always wins.
    */
-  private readonly s3SyncChains = new Map<string, Promise<void>>();
+  private readonly syncChains = new Map<string, Promise<void>>();
 
   // ── Lifecycle ─────────────────────────────────────────────────────────────
 
   async onModuleInit(): Promise<void> {
+    this.maxLinesPerRun = this.readIntEnv(
+      'RUNNER_LOG_MAX_LINES_PER_RUN',
+      100_000,
+    );
+    this.maxBytesPerRun =
+      this.readIntEnv('RUNNER_LOG_MAX_MB_PER_RUN', 50) * 1024 * 1024;
+
+    const localDir = process.env.RUNNER_LOG_DIR;
     const bucket = process.env.S3_BUCKET;
+
+    if (localDir) {
+      this.localRootDir = path.resolve(localDir);
+      await fsp
+        .mkdir(this.localRootDir, { recursive: true })
+        .catch((err: any) => {
+          this.logger.error(
+            `Could not create RUNNER_LOG_DIR ${this.localRootDir}: ${err?.message}`,
+          );
+        });
+      this.store = new LocalFileLogObjectStore(this.localRootDir);
+      this.storeMode = 'local';
+      this.maxTotalBytes =
+        this.readIntEnv('RUNNER_LOG_MAX_TOTAL_MB', 2048) * 1024 * 1024;
+      this.logger.log(
+        `Local filesystem log storage: dir=${this.localRootDir} ` +
+          `perRunCap=${Math.round(this.maxBytesPerRun / 1024 / 1024)}MB/${this.maxLinesPerRun} lines ` +
+          `totalCap=${Math.round(this.maxTotalBytes / 1024 / 1024)}MB`,
+      );
+      return;
+    }
+
     if (!bucket) {
       this.logger.warn(
-        'S3_BUCKET is not set — runner logs will be streamed in real time but not persisted after the run completes.',
+        'Neither RUNNER_LOG_DIR nor S3_BUCKET is set — runner logs will be streamed in real time but not persisted after the run completes.',
       );
       return;
     }
@@ -98,118 +355,68 @@ export class RunnerLogStorageService implements OnModuleInit, OnModuleDestroy {
           : undefined,
     });
 
-    this.s3 = {
+    const s3Store = new S3LogObjectStore(
       client,
       bucket,
-      prefix: process.env.S3_LOG_PREFIX || 'runner-logs/',
-    };
+      process.env.S3_LOG_PREFIX || 'runner-logs/',
+    );
 
     await this.retryWithBackoff(
-      () => this.ensureBucket(),
+      () => s3Store.ensureBucket(this.logger),
       10,
       1000,
       `S3 bucket ${bucket}`,
     );
 
+    this.store = s3Store;
+    this.storeMode = 's3';
     this.logger.log(
-      `S3 log storage: bucket=${bucket} endpoint=${endpoint || 'aws'} prefix=${this.s3.prefix}`,
+      `S3 log storage: bucket=${bucket} endpoint=${endpoint || 'aws'}`,
     );
   }
 
   async onModuleDestroy(): Promise<void> {
-    // Final upload for any active runners before process shuts down
-    if (this.s3) {
+    // Final snapshot for any active runners before process shuts down
+    if (this.store) {
       await Promise.all(
-        Array.from(this.s3SyncTimers.keys()).map(async (runnerId) => {
+        Array.from(this.syncTimers.keys()).map(async (runnerId) => {
           const sourceId = this.runnerSourceIds.get(runnerId);
           if (!sourceId) return;
           try {
-            await this.syncToS3Serialized(sourceId, runnerId);
+            await this.syncSerialized(sourceId, runnerId);
           } catch (err: any) {
             this.logger.warn(
-              `Final S3 sync failed for ${runnerId}: ${err?.message}`,
+              `Final log sync failed for ${runnerId}: ${err?.message}`,
             );
           }
         }),
       );
     }
 
-    for (const timer of this.s3SyncTimers.values()) {
+    for (const timer of this.syncTimers.values()) {
       clearInterval(timer);
     }
-    this.s3SyncTimers.clear();
+    this.syncTimers.clear();
     this.runnerSourceIds.clear();
-    this.s3SyncChains.clear();
+    this.syncChains.clear();
   }
 
   // ── Public API ────────────────────────────────────────────────────────────
 
-  /** True when S3 persistence is configured (S3_BUCKET set). */
-  get isS3Enabled(): boolean {
-    return this.s3 !== null;
+  /** True when log persistence (S3 or local filesystem) is configured. */
+  get isPersistenceEnabled(): boolean {
+    return this.store !== null;
   }
 
   /**
-   * List every persisted log object under the configured prefix.
+   * List every persisted log object.
    * Used by the nightly cleanup job to detect orphaned logs (objects whose
-   * runner row no longer exists). Returns an empty list when S3 is disabled.
+   * runner row no longer exists). Returns an empty list when persistence is
+   * disabled.
    */
-  async listStoredLogObjects(): Promise<
-    Array<{
-      sourceId: string;
-      runnerId: string;
-      key: string;
-      size: number;
-      lastModified: Date | null;
-    }>
-  > {
-    if (!this.s3) return [];
-    const { client, bucket, prefix } = this.s3;
-    const out: Array<{
-      sourceId: string;
-      runnerId: string;
-      key: string;
-      size: number;
-      lastModified: Date | null;
-    }> = [];
-
-    let continuationToken: string | undefined;
-    do {
-      const res = await client.send(
-        new ListObjectsV2Command({
-          Bucket: bucket,
-          Prefix: prefix,
-          ContinuationToken: continuationToken,
-        }),
-      );
-      for (const obj of res.Contents ?? []) {
-        if (!obj.Key) continue;
-        const parsed = this.parseLogKey(obj.Key);
-        if (!parsed) continue;
-        out.push({
-          ...parsed,
-          key: obj.Key,
-          size: obj.Size ?? 0,
-          lastModified: obj.LastModified ?? null,
-        });
-      }
-      continuationToken = res.IsTruncated
-        ? res.NextContinuationToken
-        : undefined;
-    } while (continuationToken);
-
-    return out;
-  }
-
-  /** Parse a `{prefix}{sourceId}/{runnerId}.ndjson` key back into its parts. */
-  private parseLogKey(
-    key: string,
-  ): { sourceId: string; runnerId: string } | null {
-    if (!this.s3 || !key.startsWith(this.s3.prefix)) return null;
-    const rest = key.slice(this.s3.prefix.length);
-    const match = rest.match(/^(.+)\/([^/]+)\.ndjson$/);
-    if (!match) return null;
-    return { sourceId: match[1], runnerId: match[2] };
+  async listStoredLogObjects(): Promise<StoredLogObject[]> {
+    if (!this.store) return [];
+    return this.store.list();
   }
 
   /** Returns the sourceId recorded at initializeRunner time, or undefined if unknown. */
@@ -219,14 +426,16 @@ export class RunnerLogStorageService implements OnModuleInit, OnModuleDestroy {
 
   async initializeRunner(sourceId: string, runnerId: string): Promise<void> {
     this.inMemoryLogs.set(runnerId, []);
+    this.bufferBytes.set(runnerId, 0);
+    this.droppedLines.delete(runnerId);
     this.clearRunnerBuffers(runnerId);
-    this.s3SyncChains.delete(runnerId);
+    this.syncChains.delete(runnerId);
 
-    if (this.s3) {
+    if (this.store) {
       this.runnerSourceIds.set(runnerId, sourceId);
       this.startSyncTimer(sourceId, runnerId);
-      // Immediately create an empty object so the key exists in S3
-      await this.doSyncToS3(sourceId, runnerId).catch(() => undefined);
+      // Immediately create an empty object so the key exists in storage
+      await this.doSync(sourceId, runnerId).catch(() => undefined);
     }
   }
 
@@ -258,12 +467,65 @@ export class RunnerLogStorageService implements OnModuleInit, OnModuleDestroy {
     const buffer = this.inMemoryLogs.get(runnerId);
     if (buffer) {
       const baseIndex = buffer.length;
-      buffer.push(...entries);
+      this.pushEntries(runnerId, buffer, entries);
       return entries.map((e, i) => this.entryToDto(e, baseIndex + i));
     }
 
     // Runner not initialised on this replica — return DTOs with ephemeral index
     return entries.map((e, i) => this.entryToDto(e, i));
+  }
+
+  /**
+   * Append entries while enforcing the per-run caps: when the buffer grows
+   * beyond maxLinesPerRun / maxBytesPerRun, the earliest lines are dropped
+   * (the tail is what matters for diagnosing a run) and the drop is counted
+   * so a truncation notice can be surfaced to readers.
+   */
+  private pushEntries(
+    runnerId: string,
+    buffer: StoredRunnerLogEntry[],
+    entries: StoredRunnerLogEntry[],
+  ): void {
+    let bytes = this.bufferBytes.get(runnerId) ?? 0;
+    for (const entry of entries) {
+      bytes += this.approxEntryBytes(entry);
+    }
+    buffer.push(...entries);
+
+    let dropped = 0;
+    while (
+      buffer.length > 0 &&
+      ((this.maxLinesPerRun > 0 && buffer.length > this.maxLinesPerRun) ||
+        (this.maxBytesPerRun > 0 && bytes > this.maxBytesPerRun))
+    ) {
+      const removed = buffer.shift()!;
+      bytes -= this.approxEntryBytes(removed);
+      dropped++;
+    }
+
+    this.bufferBytes.set(runnerId, Math.max(0, bytes));
+    if (dropped > 0) {
+      this.droppedLines.set(
+        runnerId,
+        (this.droppedLines.get(runnerId) ?? 0) + dropped,
+      );
+    }
+  }
+
+  private approxEntryBytes(entry: StoredRunnerLogEntry): number {
+    // message + JSON envelope overhead (timestamp, stream, punctuation)
+    return entry.message.length + 64;
+  }
+
+  /** Synthetic first entry describing how many earliest lines were dropped. */
+  private truncationEntry(runnerId: string): StoredRunnerLogEntry | null {
+    const dropped = this.droppedLines.get(runnerId);
+    if (!dropped) return null;
+    return {
+      timestamp: new Date().toISOString(),
+      stream: 'combined',
+      message: `[log truncated] ${dropped.toLocaleString()} earliest lines were discarded because this run exceeded the per-run log size cap.`,
+    };
   }
 
   async finalizeRunner(sourceId: string, runnerId: string): Promise<void> {
@@ -277,33 +539,45 @@ export class RunnerLogStorageService implements OnModuleInit, OnModuleDestroy {
       const remainder = this.lineBuffers.get(bufferKey);
       if (remainder?.trim().length) {
         const entry = this.createEntry(remainder.replace(/\r$/, ''), stream);
-        this.inMemoryLogs.get(runnerId)?.push(entry);
+        const buffer = this.inMemoryLogs.get(runnerId);
+        if (buffer) this.pushEntries(runnerId, buffer, [entry]);
       }
       this.lineBuffers.delete(bufferKey);
     }
 
-    if (this.s3) {
-      // Stop periodic syncs, then perform a final serialised upload so there
-      // is no race between the timer and this final write.
+    if (this.store) {
+      // Stop periodic syncs, then perform a final serialised snapshot so
+      // there is no race between the timer and this final write.
       this.stopSyncTimer(runnerId);
-      await this.syncToS3Serialized(sourceId, runnerId);
-      this.s3SyncChains.delete(runnerId);
+      await this.syncSerialized(sourceId, runnerId);
+      this.syncChains.delete(runnerId);
     }
 
-    // Always clear in-memory state; without S3 logs are ephemeral by design.
+    // Always clear in-memory state; without persistence logs are ephemeral.
     this.inMemoryLogs.delete(runnerId);
+    this.bufferBytes.delete(runnerId);
+    this.droppedLines.delete(runnerId);
+
+    // Enforce the total local-disk cap in the background (local store only).
+    if (this.storeMode === 'local' && this.maxTotalBytes > 0) {
+      void this.enforceTotalStorageCap().catch((err: any) => {
+        this.logger.warn(`Log storage cap enforcement failed: ${err?.message}`);
+      });
+    }
   }
 
   async deleteRunnerLogs(sourceId: string, runnerId: string): Promise<void> {
     this.inMemoryLogs.delete(runnerId);
+    this.bufferBytes.delete(runnerId);
+    this.droppedLines.delete(runnerId);
     this.clearRunnerBuffers(runnerId);
 
-    if (this.s3) {
+    if (this.store) {
       this.stopSyncTimer(runnerId);
-      this.s3SyncChains.delete(runnerId);
-      await this.s3DeleteObject(sourceId, runnerId).catch((err) => {
+      this.syncChains.delete(runnerId);
+      await this.store.delete(sourceId, runnerId).catch((err) => {
         this.logger.warn(
-          `Could not delete S3 log for ${runnerId}: ${err?.message}`,
+          `Could not delete stored log for ${runnerId}: ${err?.message}`,
         );
       });
     }
@@ -325,16 +599,24 @@ export class RunnerLogStorageService implements OnModuleInit, OnModuleDestroy {
     // ── Active run on this replica (in-memory) ─────────────────────────────
     const buffer = this.inMemoryLogs.get(params.runnerId);
     if (buffer !== undefined) {
-      const dtos = buffer.map((e, i) => this.entryToDto(e, i));
+      const truncation = this.truncationEntry(params.runnerId);
+      const all = truncation ? [truncation, ...buffer] : buffer;
+      const dtos = all.map((e, i) => this.entryToDto(e, i));
       return this.paginateEntries(params.runnerId, dtos, resolved);
     }
 
-    // ── S3 mode (completed run or different replica) ───────────────────────
-    if (this.s3) {
-      return this.listLogsFromS3(params.sourceId, params.runnerId, resolved);
+    // ── Persisted (completed run or different replica) ─────────────────────
+    if (this.store) {
+      const stream = await this.store.getStream(
+        params.sourceId,
+        params.runnerId,
+      );
+      if (!stream) return this.emptyResponse(params.runnerId, resolved.take);
+      const allEntries = await this.readAllEntriesFromStream(stream);
+      return this.paginateEntries(params.runnerId, allEntries, resolved);
     }
 
-    // No S3 configured and no active in-memory run: logs are not retained.
+    // No persistence configured and no active in-memory run.
     return this.emptyResponse(params.runnerId, resolved.take);
   }
 
@@ -372,84 +654,91 @@ export class RunnerLogStorageService implements OnModuleInit, OnModuleDestroy {
     };
   }
 
-  // ── S3 streaming (completed run / different replica) ─────────────────────
-
-  private async listLogsFromS3(
-    sourceId: string,
-    runnerId: string,
-    params: ResolvedListParams,
-  ): Promise<RunnerLogsResponseDto> {
-    let obj: GetObjectCommandOutput;
-    try {
-      obj = await this.s3!.client.send(
-        new GetObjectCommand({
-          Bucket: this.s3!.bucket,
-          Key: this.s3Key(sourceId, runnerId),
-        }),
-      );
-    } catch (err: any) {
-      if (
-        err instanceof NoSuchKey ||
-        err?.name === 'NoSuchKey' ||
-        err?.$metadata?.httpStatusCode === 404
-      ) {
-        return this.emptyResponse(runnerId, params.take);
-      }
-      throw err;
-    }
-
-    const allEntries = await this.readAllEntriesFromStream(
-      obj.Body as Readable,
-    );
-    return this.paginateEntries(runnerId, allEntries, params);
-  }
-
-  // ── S3 sync helpers ───────────────────────────────────────────────────────
+  // ── Persistence sync helpers ──────────────────────────────────────────────
 
   /**
-   * Schedule an S3 upload that is chained after the previous one for this
-   * runner.  This prevents concurrent PutObject calls from racing.
+   * Schedule a snapshot write that is chained after the previous one for this
+   * runner.  This prevents concurrent puts from racing.
    */
-  private syncToS3Serialized(
-    sourceId: string,
-    runnerId: string,
-  ): Promise<void> {
-    const prev = this.s3SyncChains.get(runnerId) ?? Promise.resolve();
+  private syncSerialized(sourceId: string, runnerId: string): Promise<void> {
+    const prev = this.syncChains.get(runnerId) ?? Promise.resolve();
     const next = prev
-      .then(() => this.doSyncToS3(sourceId, runnerId))
+      .then(() => this.doSync(sourceId, runnerId))
       .catch((err: any) => {
-        this.logger.warn(`S3 sync failed for ${runnerId}: ${err?.message}`);
+        this.logger.warn(`Log sync failed for ${runnerId}: ${err?.message}`);
       });
-    this.s3SyncChains.set(runnerId, next);
+    this.syncChains.set(runnerId, next);
     return next;
   }
 
-  /** Serialise the in-memory buffer and upload it as a single PutObject. */
-  private async doSyncToS3(sourceId: string, runnerId: string): Promise<void> {
+  /** Serialise the in-memory buffer and write it as a single object. */
+  private async doSync(sourceId: string, runnerId: string): Promise<void> {
+    if (!this.store) return;
     const entries = this.inMemoryLogs.get(runnerId);
     if (entries === undefined) return; // Already finalized or not on this replica
-    const ndjson = entries.map((e) => this.encodeEntry(e)).join('');
-    await this.s3PutObject(sourceId, runnerId, ndjson);
+    const truncation = this.truncationEntry(runnerId);
+    const all = truncation ? [truncation, ...entries] : entries;
+    const ndjson = all.map((e) => this.encodeEntry(e)).join('');
+    await this.store.put(sourceId, runnerId, ndjson);
   }
 
   private startSyncTimer(sourceId: string, runnerId: string): void {
     this.runnerSourceIds.set(runnerId, sourceId);
     const timer = setInterval(() => {
-      void this.syncToS3Serialized(sourceId, runnerId);
-    }, 5_000);
-    this.s3SyncTimers.set(runnerId, timer);
+      void this.syncSerialized(sourceId, runnerId);
+    }, SYNC_INTERVAL_MS);
+    this.syncTimers.set(runnerId, timer);
   }
 
   private stopSyncTimer(runnerId: string): void {
-    const timer = this.s3SyncTimers.get(runnerId);
+    const timer = this.syncTimers.get(runnerId);
     if (timer) {
       clearInterval(timer);
-      this.s3SyncTimers.delete(runnerId);
+      this.syncTimers.delete(runnerId);
     }
     this.runnerSourceIds.delete(runnerId);
   }
 
-  // ── Stream parser (for S3 reads) ─────────────────────────────────────────
+  // ── Total local-disk cap ──────────────────────────────────────────────────
+
+  /**
+   * Keep the local log directory under RUNNER_LOG_MAX_TOTAL_MB by deleting
+   * the oldest completed-run log files first. Files of currently active
+   * runners are never deleted.
+   */
+  private async enforceTotalStorageCap(): Promise<void> {
+    if (!this.store || this.storeMode !== 'local' || this.maxTotalBytes <= 0) {
+      return;
+    }
+    const objects = await this.store.list();
+    let total = objects.reduce((sum, o) => sum + o.size, 0);
+    if (total <= this.maxTotalBytes) return;
+
+    const active = new Set(this.inMemoryLogs.keys());
+    const deletable = objects
+      .filter((o) => !active.has(o.runnerId))
+      .sort(
+        (a, b) =>
+          (a.lastModified?.getTime() ?? 0) - (b.lastModified?.getTime() ?? 0),
+      );
+
+    for (const obj of deletable) {
+      if (total <= this.maxTotalBytes) break;
+      try {
+        await this.store.delete(obj.sourceId, obj.runnerId);
+        total -= obj.size;
+        this.logger.log(
+          `Deleted old runner log ${obj.runnerId} (${Math.round(obj.size / 1024)}KB) to stay under the local log storage cap.`,
+        );
+      } catch (err: any) {
+        this.logger.warn(
+          `Could not delete log ${obj.runnerId} during cap enforcement: ${err?.message}`,
+        );
+      }
+    }
+  }
+
+  // ── Stream parser (for persisted reads) ──────────────────────────────────
 
   private async readAllEntriesFromStream(
     readable: Readable,
@@ -482,60 +771,6 @@ export class RunnerLogStorageService implements OnModuleInit, OnModuleDestroy {
     }
 
     return entries;
-  }
-
-  // ── S3 object helpers ─────────────────────────────────────────────────────
-
-  private s3Key(sourceId: string, runnerId: string): string {
-    return `${this.s3!.prefix}${sourceId}/${runnerId}.ndjson`;
-  }
-
-  private async ensureBucket(): Promise<void> {
-    const { client, bucket } = this.s3!;
-    try {
-      await client.send(new HeadBucketCommand({ Bucket: bucket }));
-    } catch {
-      try {
-        await client.send(new CreateBucketCommand({ Bucket: bucket }));
-        this.logger.log(`Created S3 bucket: ${bucket}`);
-      } catch (err: any) {
-        if (err?.Code !== 'BucketAlreadyOwnedByYou') {
-          this.logger.error(
-            `Failed to create S3 bucket ${bucket}: ${err?.message}`,
-          );
-        }
-      }
-    }
-  }
-
-  private async s3PutObject(
-    sourceId: string,
-    runnerId: string,
-    content: string | Buffer,
-  ): Promise<void> {
-    const { client, bucket } = this.s3!;
-    await client.send(
-      new PutObjectCommand({
-        Bucket: bucket,
-        Key: this.s3Key(sourceId, runnerId),
-        Body:
-          typeof content === 'string' ? Buffer.from(content, 'utf8') : content,
-        ContentType: 'application/x-ndjson',
-      }),
-    );
-  }
-
-  private async s3DeleteObject(
-    sourceId: string,
-    runnerId: string,
-  ): Promise<void> {
-    const { client, bucket } = this.s3!;
-    await client.send(
-      new DeleteObjectCommand({
-        Bucket: bucket,
-        Key: this.s3Key(sourceId, runnerId),
-      }),
-    );
   }
 
   // ── Filtering ─────────────────────────────────────────────────────────────
@@ -741,6 +976,13 @@ export class RunnerLogStorageService implements OnModuleInit, OnModuleDestroy {
       take,
       total: 0,
     };
+  }
+
+  private readIntEnv(name: string, fallback: number): number {
+    const raw = process.env[name];
+    if (raw === undefined || raw === '') return fallback;
+    const parsed = Number.parseInt(raw, 10);
+    return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
   }
 
   // ── Retry helper ──────────────────────────────────────────────────────────

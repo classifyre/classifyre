@@ -71,3 +71,68 @@ async def test_google_cloud_storage_extract_uses_all_sampling(monkeypatch):
     assert [asset.name for asset in assets] == ["new.txt", "data.parquet"]
     assert assets[0].asset_type == OutputAssetType.TXT
     assert assets[1].asset_type == OutputAssetType.TABLE
+
+
+class _FakeBlob:
+    def __init__(self, data: bytes) -> None:
+        self._data = data
+
+    def download_as_bytes(
+        self, start: int | None = None, end: int | None = None, timeout: float | None = None
+    ) -> bytes:
+        if start is None and end is None:
+            return self._data
+        range_start = start or 0
+        range_end = len(self._data) - 1 if end is None else end
+        return self._data[range_start : range_end + 1]
+
+
+class _FakeBucket:
+    def __init__(self, data: bytes) -> None:
+        self._data = data
+
+    def blob(self, key: str) -> _FakeBlob:
+        return _FakeBlob(self._data)
+
+
+class _FakeGcsClient:
+    def __init__(self, data: bytes) -> None:
+        self._data = data
+
+    def bucket(self, name: str) -> _FakeBucket:
+        return _FakeBucket(self._data)
+
+
+def test_google_cloud_storage_download_object_truncates_oversized_blob(monkeypatch, caplog):
+    source = GoogleCloudStorageSource(
+        {
+            **_recipe(),
+            "optional": {
+                "connection": {"max_object_bytes": 1024},
+                "scope": {"include_content_preview": True},
+            },
+        }
+    )
+    big_bytes = b"y" * 3000
+    monkeypatch.setattr(source, "_client", lambda: _FakeGcsClient(big_bytes))
+    ref = _ref("exports/big.bin", days_ago=0, size=len(big_bytes))
+
+    with caplog.at_level("WARNING"):
+        file_bytes, _content_type = source._download_object(ref)
+
+    assert len(file_bytes) == 1024
+    assert any("Truncated" in record.message for record in caplog.records)
+
+
+def test_google_cloud_storage_download_object_leaves_normal_blob_unchanged(monkeypatch, caplog):
+    source = GoogleCloudStorageSource(_recipe())
+    small_bytes = b"hello gcs"
+    monkeypatch.setattr(source, "_client", lambda: _FakeGcsClient(small_bytes))
+    ref = _ref("exports/small.txt", days_ago=0, size=len(small_bytes))
+
+    with caplog.at_level("WARNING"):
+        file_bytes, content_type = source._download_object(ref)
+
+    assert file_bytes == small_bytes
+    assert content_type == "text/plain"
+    assert not any("Truncated" in record.message for record in caplog.records)

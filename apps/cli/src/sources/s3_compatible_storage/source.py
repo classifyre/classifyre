@@ -87,16 +87,29 @@ class S3CompatibleStorageSource(ObjectStorageSourceBase):
     def _download_object(self, ref: ObjectRef) -> tuple[bytes, str | None]:
         client = self._client()
         bucket = self._required_bucket()
+        max_bytes = self._max_object_bytes()
 
         response = client.get_object(Bucket=bucket, Key=ref.key)
         body = response["Body"]
         try:
-            file_bytes = body.read()
+            # Read one byte past the cap so we can detect truncation without
+            # ever materializing the full (potentially huge) object body.
+            file_bytes = body.read(max_bytes + 1)
         finally:
             try:
                 body.close()
             except Exception:
                 logger.debug("Failed to close S3 response body")
+
+        if len(file_bytes) > max_bytes:
+            file_bytes = file_bytes[:max_bytes]
+            logger.warning(
+                "Truncated s3://%s/%s to %d of %d bytes for content extraction",
+                bucket,
+                ref.key,
+                max_bytes,
+                ref.size,
+            )
 
         content_type = response.get("ContentType")
         return file_bytes, str(content_type) if content_type else None
