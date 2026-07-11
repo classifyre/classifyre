@@ -261,7 +261,16 @@ connectBtn.addEventListener('click', async () => {
 
   try {
     const parsed = new URL(url);
-    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') throw new Error('bad protocol');
+    // Mirrors the main process (assertValidRemoteUrl): https required, http
+    // allowed only for loopback hosts.
+    const loopback =
+      parsed.hostname === 'localhost' ||
+      parsed.hostname.endsWith('.localhost') ||
+      /^127(\.\d{1,3}){3}$/.test(parsed.hostname) ||
+      parsed.hostname === '[::1]';
+    if (parsed.protocol !== 'https:' && !(parsed.protocol === 'http:' && loopback)) {
+      throw new Error('bad protocol');
+    }
   } catch {
     remoteUrlInput.classList.add('input-error');
     return;
@@ -275,6 +284,9 @@ connectBtn.addEventListener('click', async () => {
     remoteUrlInput.value = '';
     showPanel(null);
     await render();
+  } catch {
+    // Main-process validation rejected the URL — mirror the local error state.
+    remoteUrlInput.classList.add('input-error');
   } finally {
     connectBtn.removeAttribute('disabled');
   }

@@ -23,6 +23,28 @@ export type NamespaceUpdate = Partial<
   Pick<Namespace, 'name' | 'remoteUrl' | 'apiPort' | 'maxParallelScans' | 'memoryLimitMb'>
 >;
 
+// A remote workspace is a full Classifyre server the app renders in a trusted
+// tab, so plaintext HTTP would let a network attacker rewrite the page and
+// harvest the session. Require https:, except for loopback hosts (local
+// development against a server on this machine).
+export function assertValidRemoteUrl(url: string): void {
+  const parsed = new URL(url); // throws on malformed input
+  if (parsed.protocol === 'https:') return;
+  if (parsed.protocol !== 'http:') {
+    throw new Error(`Unsupported protocol: ${parsed.protocol}`);
+  }
+  const host = parsed.hostname;
+  const isLoopback =
+    host === 'localhost' ||
+    host.endsWith('.localhost') ||
+    /^127(\.\d{1,3}){3}$/.test(host) ||
+    host === '::1' ||
+    host === '[::1]';
+  if (!isLoopback) {
+    throw new Error('Remote workspaces must use https:// (http:// is only allowed for localhost)');
+  }
+}
+
 export class NamespaceManager {
   private filePath: string;
   private namespaces: Namespace[] = [];
@@ -65,6 +87,7 @@ export class NamespaceManager {
   create(name: string, remoteUrl?: string): Namespace {
     const id = randomUUID();
     const isRemote = !!remoteUrl;
+    if (remoteUrl) assertValidRemoteUrl(remoteUrl);
     const slug = this.slugify(name) || id.slice(0, 8);
 
     const existing = this.namespaces.map((n) => n.schemaName);
@@ -104,10 +127,7 @@ export class NamespaceManager {
       ns.name = name;
     }
     if (patch.remoteUrl !== undefined && ns.type === 'remote') {
-      const parsed = new URL(patch.remoteUrl);
-      if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
-        throw new Error(`Unsupported protocol: ${parsed.protocol}`);
-      }
+      assertValidRemoteUrl(patch.remoteUrl);
       ns.remoteUrl = patch.remoteUrl;
     }
     for (const key of ['apiPort', 'maxParallelScans', 'memoryLimitMb'] as const) {
