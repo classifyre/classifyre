@@ -13,6 +13,7 @@ interface Namespace {
 
 interface AppSettings {
   postgresPort: number;
+  runInBackground: boolean;
 }
 
 interface ElectronAPI {
@@ -24,6 +25,7 @@ interface ElectronAPI {
   isNamespaceOpen(id: string): Promise<boolean>;
   getSettings(): Promise<AppSettings>;
   updateSettings(patch: Partial<AppSettings>): Promise<AppSettings>;
+  getApiPort(namespaceId: string): Promise<number | null>;
   selectFolder(): Promise<{ canceled: boolean; path: string | null }>;
 }
 
@@ -70,13 +72,20 @@ async function render(): Promise<void> {
   el<HTMLButtonElement>('create-cancel').classList.remove('hidden');
 
   const openChecks = await Promise.all(
-    namespaces.map(async (ns) => ({ id: ns.id, isOpen: await api.isNamespaceOpen(ns.id) })),
+    namespaces.map(async (ns) => {
+      const isOpen = await api.isNamespaceOpen(ns.id);
+      // The live port matters: without a fixed apiPort it's allocated per
+      // start, and it's the address MCP clients must use.
+      const livePort = isOpen ? await api.getApiPort(ns.id) : null;
+      return { id: ns.id, isOpen, livePort };
+    }),
   );
-  const openMap = new Map(openChecks.map((c) => [c.id, c.isOpen]));
+  const openMap = new Map(openChecks.map((c) => [c.id, c]));
 
   listEl.innerHTML = namespaces
     .map((ns) => {
-      const isOpen = openMap.get(ns.id) ?? false;
+      const check = openMap.get(ns.id);
+      const isOpen = check?.isOpen ?? false;
       const isRemote = ns.type === 'remote';
       const date = new Date(ns.lastOpenedAt).toLocaleDateString();
       const typeBadge = isRemote
@@ -84,7 +93,9 @@ async function render(): Promise<void> {
         : '<span class="type-badge local">local</span>';
       const meta = isRemote
         ? escapeHtml(ns.remoteUrl || '')
-        : `Last opened ${date}${ns.apiPort ? ` · API :${ns.apiPort}` : ''}`;
+        : isOpen && check?.livePort
+          ? `Running · API http://127.0.0.1:${check.livePort}`
+          : `Last opened ${date}${ns.apiPort ? ` · API :${ns.apiPort}` : ''}`;
       return `
         <div class="namespace-item" data-id="${ns.id}" role="button" tabindex="0"
              aria-label="Open workspace">
