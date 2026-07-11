@@ -8,9 +8,20 @@
  * Electron app.
  */
 export function isDesktopRuntime(): boolean {
-  if (typeof window !== "undefined" && !!(window as any).__CLASSIFYRE_DESKTOP__) {
+  if (isDesktopShell()) {
     return true;
   }
 
   return process.env.NODE_ENV === "development";
+}
+
+/**
+ * True only inside the real Electron shell (never in local web development).
+ * Use this for behavior that depends on the desktop backend actually running,
+ * e.g. local scan-log persistence.
+ */
+export function isDesktopShell(): boolean {
+  return (
+    typeof window !== "undefined" && !!(window as any).__CLASSIFYRE_DESKTOP__
+  );
 }
