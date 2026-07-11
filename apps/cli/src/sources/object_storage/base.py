@@ -211,6 +211,20 @@ class ObjectStorageSourceBase(BaseSource, ABC):
     def _include_content_preview(self) -> bool:
         return bool(self._scope_option("include_content_preview", True))
 
+    # Shared cap across the object-storage family (S3-compatible, GCS, Azure Blob)
+    # so a single huge object can't OOM the scan pod. Mirrors local_folder's
+    # DEFAULT_MAX_FILE_BYTES guard, but sourced from each provider's own
+    # optional.connection.max_object_bytes field (schema default 5MB) when set.
+    DEFAULT_MAX_OBJECT_BYTES = 5 * 1024 * 1024
+
+    def _max_object_bytes(self) -> int:
+        value = self._connection_option("max_object_bytes", self.DEFAULT_MAX_OBJECT_BYTES)
+        try:
+            parsed = int(value)
+        except (TypeError, ValueError):
+            return self.DEFAULT_MAX_OBJECT_BYTES
+        return max(parsed, 1024)
+
     def _normalized_extension_filters(self, key: str) -> list[str]:
         values = self._scope_option(key, [])
         if not isinstance(values, list):

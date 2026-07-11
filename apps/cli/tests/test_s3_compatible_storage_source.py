@@ -278,3 +278,68 @@ def test_s3_storage_snapshot_prefers_detected_mime_for_octet_stream_hint(monkeyp
     snapshot = source._build_snapshot(ref)
 
     assert snapshot.mime_type == "application/pdf"
+
+
+class _FakeStreamingBody:
+    """Mimics botocore's StreamingBody: read(amt) reads at most amt bytes."""
+
+    def __init__(self, data: bytes) -> None:
+        self._data = data
+        self._pos = 0
+        self.closed = False
+
+    def read(self, amt: int | None = None) -> bytes:
+        if amt is None:
+            chunk = self._data[self._pos :]
+            self._pos = len(self._data)
+            return chunk
+        chunk = self._data[self._pos : self._pos + amt]
+        self._pos += len(chunk)
+        return chunk
+
+    def close(self) -> None:
+        self.closed = True
+
+
+class _FakeS3Client:
+    def __init__(self, data: bytes, content_type: str | None = "text/plain") -> None:
+        self._data = data
+        self._content_type = content_type
+
+    def get_object(self, **kwargs: object) -> dict:
+        return {"Body": _FakeStreamingBody(self._data), "ContentType": self._content_type}
+
+
+def test_s3_storage_download_object_truncates_oversized_object(monkeypatch, caplog):
+    source = S3CompatibleStorageSource(
+        {
+            **_recipe(),
+            "optional": {
+                "connection": {"max_object_bytes": 1024},
+                "scope": {"include_content_preview": True},
+            },
+        }
+    )
+    big_bytes = b"x" * 3000
+    monkeypatch.setattr(source, "_client", lambda: _FakeS3Client(big_bytes))
+    ref = _ref("exports/big.bin", days_ago=0, size=len(big_bytes))
+
+    with caplog.at_level("WARNING"):
+        file_bytes, content_type = source._download_object(ref)
+
+    assert len(file_bytes) == 1024
+    assert content_type == "text/plain"
+    assert any("Truncated" in record.message for record in caplog.records)
+
+
+def test_s3_storage_download_object_leaves_normal_object_unchanged(monkeypatch, caplog):
+    source = S3CompatibleStorageSource(_recipe())
+    small_bytes = b"hello world"
+    monkeypatch.setattr(source, "_client", lambda: _FakeS3Client(small_bytes))
+    ref = _ref("exports/small.txt", days_ago=0, size=len(small_bytes))
+
+    with caplog.at_level("WARNING"):
+        file_bytes, _content_type = source._download_object(ref)
+
+    assert file_bytes == small_bytes
+    assert not any("Truncated" in record.message for record in caplog.records)

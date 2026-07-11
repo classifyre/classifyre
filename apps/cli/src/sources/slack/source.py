@@ -322,10 +322,9 @@ class SlackSource(BaseSource):
         is_automatic = strategy == SamplingStrategy.AUTOMATIC
         if strategy == SamplingStrategy.ALL:
             max_total: int | None = None
-        elif is_automatic:
-            max_total = int(sampling.rows_per_page or 100)
         else:
-            max_total = 100
+            # AUTOMATIC / LATEST / RANDOM all honor the configured window size.
+            max_total = int(sampling.rows_per_page or 100)
         oldest = self._normalize_ts(time_range_options.oldest)
         latest = self._normalize_ts(time_range_options.latest)
         batch_size = min(int(ingestion_options.batch_size or 200), 200)
