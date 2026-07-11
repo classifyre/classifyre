@@ -8,7 +8,11 @@ Sampling strategies map to consumer positioning:
 
 * ``LATEST``    — start near the tail of each partition (newest messages).
 * ``RANDOM``    — start at a random offset within each partition.
-* ``AUTOMATIC`` / ``ALL`` — start at the earliest retained offset.
+* ``ALL``       — start at the earliest retained offset.
+* ``AUTOMATIC`` — resume each partition from a saved per-partition cursor
+  (keyed ``"{topic}:{partition}"``), advancing it each run. Once a
+  partition's cursor catches up to the high watermark it wraps back to the
+  low watermark so the next run re-ingests from the start.
 
 All strategies read up to ``sampling.rows_per_page`` messages per topic.
 """
@@ -302,14 +306,56 @@ class KafkaSource(BaseSource):
             return max(low, high - per)
         if strategy == SamplingStrategy.RANDOM:
             return random.randint(low, max(low, high - per))
-        # AUTOMATIC / ALL: read from the earliest retained offset.
+        # ALL: read from the earliest retained offset.
         return low
+
+    def _automatic_start_offset(self, key: str, low: int, high: int) -> int:
+        """Resume offset for AUTOMATIC sampling, clamped to the retained range.
+
+        Retention may have deleted the previously saved offset (or this may be
+        the first run), in which case we fall back to the earliest retained
+        offset.
+        """
+        saved = self.automatic_offset(key)
+        if saved < low or saved > high:
+            return low
+        return saved
+
+    def _record_automatic_cursors(
+        self,
+        topic: str,
+        messages: list[dict[str, Any]],
+        starts: dict[int, int],
+        watermarks: dict[int, tuple[int, int]],
+    ) -> None:
+        """Advance the per-partition AUTOMATIC cursor after a consume pass.
+
+        Partitions that yielded messages resume from one past the highest
+        offset consumed; partitions that were assigned but yielded nothing
+        keep their (already-clamped) start offset. A partition that has
+        caught up to its high watermark wraps back to the low watermark so
+        the next run re-ingests from the start instead of stalling forever.
+        """
+        consumed_next: dict[int, int] = {}
+        for message in messages:
+            partition_id = int(message["partition"])
+            next_offset = int(message["offset"]) + 1
+            if next_offset > consumed_next.get(partition_id, -1):
+                consumed_next[partition_id] = next_offset
+
+        for partition_id, (low, high) in watermarks.items():
+            next_offset = consumed_next.get(partition_id, starts[partition_id])
+            if next_offset >= high:
+                next_offset = low  # fully caught up: wrap for the next run
+            self._record_cursor_key(f"{topic}:{partition_id}", next_offset)
 
     def _consume(self, topic: str, max_count: int) -> list[dict[str, Any]]:
         strategy = self._sampling().strategy
         consumer = self._make_consumer()
         timeout = self._request_timeout_seconds()
         out: list[dict[str, Any]] = []
+        starts: dict[int, int] = {}
+        watermarks: dict[int, tuple[int, int]] = {}
         try:
             metadata = self._cluster_metadata(consumer, topic)
             topic_meta = metadata.topics.get(topic)
@@ -325,9 +371,17 @@ class KafkaSource(BaseSource):
                 except Exception as exc:
                     logger.debug("Watermark lookup failed for %s[%s]: %s", topic, partition_id, exc)
                     continue
+                low, high = int(low), int(high)
                 if high <= low:
                     continue  # empty partition
-                tp.offset = self._start_offset(strategy, int(low), int(high), per)
+                if strategy == SamplingStrategy.AUTOMATIC:
+                    key = f"{topic}:{partition_id}"
+                    start = self._automatic_start_offset(key, low, high)
+                    starts[partition_id] = start
+                    watermarks[partition_id] = (low, high)
+                else:
+                    start = self._start_offset(strategy, low, high, per)
+                tp.offset = start
                 assignments.append(tp)
             if not assignments:
                 return out
@@ -357,6 +411,10 @@ class KafkaSource(BaseSource):
                         break
         finally:
             consumer.close()
+
+        if strategy == SamplingStrategy.AUTOMATIC and watermarks:
+            self._record_automatic_cursors(topic, out, starts, watermarks)
+
         return out
 
     def _format_messages(

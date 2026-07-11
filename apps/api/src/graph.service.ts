@@ -172,21 +172,33 @@ export class GraphService {
     if (perAsset.length === 0) return;
 
     const allTargets = Array.from(new Set(perAsset.flatMap((a) => a.targets)));
+    // CLI connectors populate Asset.links with asset *hashes* (generate_hash_id
+    // output), so hash is the primary resolution key; id/externalUrl remain for
+    // links written by other producers.
     const matches = await this.prisma.asset.findMany({
       where: {
-        OR: [{ id: { in: allTargets } }, { externalUrl: { in: allTargets } }],
+        OR: [
+          { hash: { in: allTargets } },
+          { id: { in: allTargets } },
+          { externalUrl: { in: allTargets } },
+        ],
       },
-      select: { id: true, externalUrl: true },
+      select: { id: true, hash: true, externalUrl: true },
     });
 
     const byId = new Set(matches.map((m) => m.id));
+    const byHash = new Map(matches.map((m) => [m.hash, m.id]));
     const byUrl = new Map(matches.map((m) => [m.externalUrl, m.id]));
 
     const rows: Prisma.EdgeCreateManyInput[] = [];
     const seen = new Set<string>();
     for (const a of perAsset) {
       for (const target of a.targets) {
-        const targetId = byId.has(target) ? target : byUrl.get(target);
+        const targetId = byHash.has(target)
+          ? byHash.get(target)
+          : byId.has(target)
+            ? target
+            : byUrl.get(target);
         if (!targetId || targetId === a.id) continue;
         const dedupe = `${a.id}->${targetId}`;
         if (seen.has(dedupe)) continue;
