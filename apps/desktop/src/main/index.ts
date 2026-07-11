@@ -52,6 +52,14 @@ function getPreloadPath(): string {
 declare const NAMESPACE_SELECTOR_VITE_DEV_SERVER_URL: string | undefined;
 declare const NAMESPACE_SELECTOR_VITE_NAME: string | undefined;
 
+// The app-chrome views (window shell, tab bar, selector) only ever display
+// their own bundled pages. Deny window.open and in-place navigation so a
+// compromised or buggy page can't turn app chrome into an arbitrary browser.
+function lockDownChrome(contents: Electron.WebContents): void {
+  contents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  contents.on('will-navigate', (e) => e.preventDefault());
+}
+
 function createMainWindow(): BrowserWindow {
   const win = new BrowserWindow({
     width: 1400,
@@ -73,6 +81,8 @@ function createMainWindow(): BrowserWindow {
       preload: getPreloadPath(),
     },
   });
+  lockDownChrome(win.webContents);
+  lockDownChrome(tabBarView.webContents);
   win.contentView.addChildView(tabBarView);
 
   const tabBarHtml = isDev
@@ -88,6 +98,7 @@ function createMainWindow(): BrowserWindow {
       preload: getPreloadPath(),
     },
   });
+  lockDownChrome(selectorView.webContents);
   win.contentView.addChildView(selectorView);
 
   if (typeof NAMESPACE_SELECTOR_VITE_DEV_SERVER_URL !== 'undefined' && NAMESPACE_SELECTOR_VITE_DEV_SERVER_URL) {
@@ -198,9 +209,20 @@ app.on('before-quit', (e) => {
   e.preventDefault();
   isQuitting = true;
 
+  // If graceful shutdown hangs (e.g. pg_ctl stop blocked on a stuck
+  // connection), quit anyway — otherwise the app appears frozen and the user
+  // force-kills it, which is the unclean shutdown this chain tries to avoid.
+  const forceQuitTimer = setTimeout(() => {
+    console.error('Shutdown timed out after 30s — quitting anyway');
+    app.quit();
+  }, 30_000);
+
   Promise.resolve()
     .then(() => runtime?.closeAll())
     .then(() => pg?.stop())
     .catch((err) => console.error('Shutdown error:', err))
-    .finally(() => app.quit());
+    .finally(() => {
+      clearTimeout(forceQuitTimer);
+      app.quit();
+    });
 });
