@@ -461,11 +461,11 @@ class YouTubeSource(BaseSource):
             if transcript.available_languages:
                 asset_metadata["caption_tracks"] = transcript.available_languages
 
+        # Checksum must only reflect content changes: view/like counters move on
+        # every re-scan and would flip UNCHANGED assets to UPDATED spuriously.
         checksum_data = {
             "video_id": video_id,
             "title": title,
-            "view_count": asset_metadata.get("view_count"),
-            "like_count": asset_metadata.get("like_count"),
             "transcript_available": asset_metadata["transcript_available"],
         }
 
