@@ -1554,7 +1554,8 @@
     "noItemsAdded": "No {{label}} added yet.",
     "addItem": "Add {{label}}",
     "enterValue": "Enter value",
-    "itemIndex": "Item {{index}}"
+    "itemIndex": "Item {{index}}",
+    "browse": "Browse..."
   },
   "ai": {
     "ask": "Ask a question about this section...",

@@ -70,6 +70,16 @@ export class ValidationService {
    * The schema uses oneOf to support all source types, validation is automatic
    */
   validate(type: string, data: any): Record<string, unknown> {
+    if (String(type).toUpperCase() === 'LOCAL_FOLDER') {
+      const environment = (
+        process.env.ENVIRONMENT || 'development'
+      ).toLowerCase();
+      if (environment === 'kubernetes' || environment === 'docker') {
+        throw new BadRequestException(
+          'LOCAL_FOLDER sources are only available in the desktop application',
+        );
+      }
+    }
     const normalized = normalizeSourceConfig(type, data);
     const valid = this.inputValidator(normalized);
     if (!valid) {

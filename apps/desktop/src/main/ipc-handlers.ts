@@ -1,4 +1,4 @@
-import { ipcMain, app } from 'electron';
+import { ipcMain, app, dialog, BrowserWindow } from 'electron';
 import { NamespaceRuntime } from './namespace-runtime.js';
 import { NamespaceManager, type NamespaceUpdate } from './namespace-manager.js';
 import { SettingsManager, type AppSettings } from './settings-manager.js';
@@ -17,7 +17,9 @@ export function registerIpcHandlers(
   });
 
   ipcMain.handle('namespace:create', (_event, name: string, remoteUrl?: string) => {
-    return namespaceManager.create(name, remoteUrl);
+    const ns = namespaceManager.create(name, remoteUrl);
+    runtime.emitStateChange(); // refresh tray + Workspaces menu
+    return ns;
   });
 
   ipcMain.handle('namespace:delete', async (_event, id: string) => {
@@ -34,10 +36,13 @@ export function registerIpcHandlers(
         console.error(`Failed to drop schema ${ns.schemaName}:`, err);
       }
     }
+    runtime.emitStateChange();
   });
 
   ipcMain.handle('namespace:update', (_event, id: string, patch: NamespaceUpdate) => {
-    return namespaceManager.update(id, patch);
+    const updated = namespaceManager.update(id, patch);
+    runtime.emitStateChange();
+    return updated;
   });
 
   ipcMain.handle('namespace:open', async (_event, id: string) => {
@@ -84,15 +89,45 @@ export function registerIpcHandlers(
     await updateChecker.checkForUpdates();
   });
 
+  ipcMain.handle('update:download', async () => {
+    await updateChecker.downloadUpdate();
+  });
+
+  ipcMain.handle('update:install', () => {
+    updateChecker.restartAndInstall();
+  });
+
   ipcMain.handle('update:open-download-page', () => {
     updateChecker.openDownloadPage();
   });
 
-  ipcMain.handle('runtime:api-port', () => {
-    return null;
+  // Live API port of a running workspace (undefined port = not running).
+  // Lets the selector show the actual dynamically-allocated port, which is
+  // what an MCP client must be pointed at.
+  ipcMain.handle('runtime:api-port', (_event, id?: string) => {
+    return id ? (runtime.getApiPort(id) ?? null) : null;
   });
 
   ipcMain.handle('runtime:version', () => {
     return app.getVersion();
   });
+
+  // Native folder picker (used by LOCAL_FOLDER source config forms)
+  ipcMain.handle(
+    'dialog:select-folder',
+    async (event): Promise<{ canceled: boolean; path: string | null }> => {
+      const win = BrowserWindow.fromWebContents(event.sender) ?? undefined;
+      const result = await (win
+        ? dialog.showOpenDialog(win, {
+            properties: ['openDirectory', 'createDirectory'],
+          })
+        : dialog.showOpenDialog({
+            properties: ['openDirectory', 'createDirectory'],
+          }));
+      return {
+        canceled: result.canceled,
+        path: result.filePaths[0] ?? null,
+      };
+    },
+  );
 }

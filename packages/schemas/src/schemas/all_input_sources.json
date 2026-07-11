@@ -10,6 +10,9 @@
       "$ref": "#/definitions/S3CompatibleStorageInput"
     },
     {
+      "$ref": "#/definitions/LocalFolderInput"
+    },
+    {
       "$ref": "#/definitions/AzureBlobStorageInput"
     },
     {
@@ -367,6 +370,110 @@
             "object_key": {
               "type": "string",
               "description": "Object key/path"
+            }
+          },
+          "required": [
+            "provider",
+            "object_key"
+          ]
+        }
+      },
+      "LOCAL_FOLDER": {
+        "file": {
+          "use": [
+            "file",
+            "image",
+            "document",
+            "spreadsheet",
+            "text",
+            "json"
+          ],
+          "properties": {
+            "provider": {
+              "type": "string",
+              "description": "Storage provider label"
+            },
+            "object_key": {
+              "type": "string",
+              "description": "File path relative to the scanned folder"
+            },
+            "etag": {
+              "type": "string",
+              "description": "Change signature derived from file size and modification time"
+            }
+          },
+          "required": [
+            "provider",
+            "object_key"
+          ]
+        },
+        "image": {
+          "use": [
+            "file"
+          ],
+          "properties": {
+            "provider": {
+              "type": "string",
+              "description": "Storage provider label"
+            },
+            "object_key": {
+              "type": "string",
+              "description": "File path relative to the scanned folder"
+            },
+            "etag": {
+              "type": "string",
+              "description": "Change signature derived from file size and modification time"
+            },
+            "source_hash": {
+              "type": "string",
+              "description": "Hash of the parent file asset (embedded images only)"
+            },
+            "location": {
+              "type": "string",
+              "description": "Location of the embedded image within the parent (embedded images only)"
+            }
+          },
+          "required": []
+        },
+        "audio": {
+          "use": [
+            "file"
+          ],
+          "properties": {
+            "provider": {
+              "type": "string",
+              "description": "Storage provider label"
+            },
+            "object_key": {
+              "type": "string",
+              "description": "File path relative to the scanned folder"
+            },
+            "etag": {
+              "type": "string",
+              "description": "Change signature derived from file size and modification time"
+            }
+          },
+          "required": [
+            "provider",
+            "object_key"
+          ]
+        },
+        "video": {
+          "use": [
+            "file"
+          ],
+          "properties": {
+            "provider": {
+              "type": "string",
+              "description": "Storage provider label"
+            },
+            "object_key": {
+              "type": "string",
+              "description": "File path relative to the scanned folder"
+            },
+            "etag": {
+              "type": "string",
+              "description": "Change signature derived from file size and modification time"
             }
           },
           "required": [
@@ -1672,7 +1779,8 @@
         "KAFKA",
         "ELASTICSEARCH",
         "OPENSEARCH",
-        "MEILISEARCH"
+        "MEILISEARCH",
+        "LOCAL_FOLDER"
       ],
       "description": "Type of the asset or source"
     },
@@ -2452,6 +2560,71 @@
       "properties": {
         "connection": {
           "$ref": "#/definitions/S3CompatibleStorageOptionalConnection"
+        },
+        "scope": {
+          "$ref": "#/definitions/ObjectStorageOptionalScope"
+        }
+      },
+      "additionalProperties": false
+    },
+    "LocalFolderRequired": {
+      "title": "LocalFolderRequired",
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string",
+          "description": "Absolute path of the local folder to scan (for example, /Users/jane/Documents)"
+        }
+      },
+      "required": [
+        "path"
+      ],
+      "additionalProperties": false
+    },
+    "LocalFolderMasked": {
+      "title": "LocalFolderMasked",
+      "type": "object",
+      "description": "Local folder scans run with the desktop application's filesystem permissions; no credentials are required.",
+      "properties": {},
+      "additionalProperties": false
+    },
+    "LocalFolderOptionalTraversal": {
+      "title": "LocalFolderOptionalTraversal",
+      "type": "object",
+      "description": "Directory traversal controls.",
+      "properties": {
+        "follow_symlinks": {
+          "type": "boolean",
+          "default": false,
+          "description": "Follow symbolic links while traversing (loops are not detected; leave off unless needed)"
+        },
+        "include_hidden": {
+          "type": "boolean",
+          "default": false,
+          "description": "Include hidden files and dot-directories (names starting with a dot)"
+        },
+        "max_depth": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 64,
+          "description": "Maximum directory depth below the selected folder (unset scans all levels)"
+        },
+        "max_file_bytes": {
+          "type": "integer",
+          "minimum": 1024,
+          "maximum": 104857600,
+          "default": 10485760,
+          "description": "Maximum bytes read per file for MIME detection and text extraction"
+        }
+      },
+      "additionalProperties": false
+    },
+    "LocalFolderOptional": {
+      "title": "LocalFolderOptional",
+      "type": "object",
+      "properties": {
+        "traversal": {
+          "$ref": "#/definitions/LocalFolderOptionalTraversal"
         },
         "scope": {
           "$ref": "#/definitions/ObjectStorageOptionalScope"
@@ -4828,6 +5001,49 @@
             },
             "optional": {
               "$ref": "#/definitions/S3CompatibleStorageOptional"
+            },
+            "detectors": {
+              "$ref": "#/definitions/Detectors"
+            },
+            "custom_detectors": {
+              "$ref": "#/definitions/CustomDetectorSelections"
+            },
+            "sampling": {
+              "$ref": "#/definitions/SamplingConfig"
+            },
+            "resources": {
+              "$ref": "#/definitions/ResourceOverrides"
+            }
+          },
+          "required": [
+            "required",
+            "sampling"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "LocalFolderInput": {
+      "title": "LocalFolderInput",
+      "label": "Local Folder",
+      "allOf": [
+        {
+          "$ref": "#/definitions/CoreInput"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "LOCAL_FOLDER"
+            },
+            "required": {
+              "$ref": "#/definitions/LocalFolderRequired"
+            },
+            "masked": {
+              "$ref": "#/definitions/LocalFolderMasked"
+            },
+            "optional": {
+              "$ref": "#/definitions/LocalFolderOptional"
             },
             "detectors": {
               "$ref": "#/definitions/Detectors"
