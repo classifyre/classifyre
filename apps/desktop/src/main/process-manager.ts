@@ -150,22 +150,27 @@ interface ManagedProcess {
 export class ProcessManager {
   private processes = new Map<string, ManagedProcess>();
   private venvPathOverride: string | null = null;
-  private venvPrepared = false;
+  private venvPreparation: Promise<void> | null = null;
   private apiDirCache: string | null = null;
 
   // Rewires the bundled Python venv for this machine. Lazy: runs on the first
   // workspace open (covered by the loading indicator) rather than at app
   // startup — the first-launch copy can move gigabytes.
-  private prepareVenv(): void {
-    if (this.venvPrepared) return;
-    this.venvPrepared = true;
-    try {
-      const venvPath = ensurePythonRuntime();
-      if (venvPath) this.venvPathOverride = venvPath;
-    } catch (err) {
-      console.error('Failed to prepare Python runtime:', err);
+  // Single-flight: a second workspace opened during the first-launch copy must
+  // await the same preparation, not race ahead with an unpatched venv path.
+  private prepareVenv(): Promise<void> {
+    if (!this.venvPreparation) {
+      this.venvPreparation = (async () => {
+        try {
+          const venvPath = await ensurePythonRuntime();
+          if (venvPath) this.venvPathOverride = venvPath;
+        } catch (err) {
+          console.error('Failed to prepare Python runtime:', err);
+        }
+        this.bustUvCacheIfOversized();
+      })();
     }
-    this.bustUvCacheIfOversized();
+    return this.venvPreparation;
   }
 
   // Keep the contained uv cache under its size cap. Runs once per app launch
@@ -302,7 +307,7 @@ export class ProcessManager {
       return;
     }
 
-    this.prepareVenv();
+    await this.prepareVenv();
 
     const entryPath = this.getApiEntryPath();
     const cliPath = this.getCliPath();
@@ -363,10 +368,22 @@ export class ProcessManager {
       this.processes.delete(namespaceId);
     });
 
+    // Without an 'error' listener a failed spawn (ENOENT/EACCES from a
+    // corrupted install, AV quarantine, missing entry file) throws an uncaught
+    // exception in the main process and crashes the whole app. Surface it as a
+    // failed workspace open instead, without waiting out the ready timeout.
+    const spawnFailed = new Promise<never>((_, reject) => {
+      child.on('error', (err) => {
+        process.stderr.write(`[API:${namespaceId}] process error: ${err.message}\n`);
+        reject(new Error(`Failed to launch the API process: ${err.message}`));
+      });
+    });
+    spawnFailed.catch(() => {}); // late errors are logged above, not rethrown
+
     this.processes.set(namespaceId, { child, port });
 
     try {
-      await this.waitForReady(port);
+      await Promise.race([this.waitForReady(port), spawnFailed]);
     } catch (err) {
       await this.stopApi(namespaceId);
       throw err;

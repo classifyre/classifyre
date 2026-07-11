@@ -49,8 +49,11 @@ function isWritable(dir: string): boolean {
   }
 }
 
-function copyDirSync(src: string, dest: string): void {
-  fs.cpSync(src, dest, {
+// Async: the first-launch copy can move gigabytes, and a synchronous copy
+// would freeze the (single-threaded) main process — every window and IPC
+// call — for its whole duration.
+function copyDir(src: string, dest: string): Promise<void> {
+  return fs.promises.cp(src, dest, {
     recursive: true,
     // Preserve symlinks inside the tree; we re-point the venv ones below.
     verbatimSymlinks: true,
@@ -201,7 +204,7 @@ function writeMarker(marker: RelocationMarker): void {
  * Ensures the bundled Python venv is usable on this machine and returns its
  * path, or null when no venv is bundled (dev mode uses apps/cli/.venv).
  */
-export function ensurePythonRuntime(): string | null {
+export async function ensurePythonRuntime(): Promise<string | null> {
   if (!app.isPackaged) return null;
 
   const resourcesVenv = path.join(process.resourcesPath, 'venv');
@@ -249,10 +252,10 @@ export function ensurePythonRuntime(): string | null {
   const userVenv = path.join(runtimeRoot, 'venv');
 
   console.log(`[python-env] Resources read-only; copying Python runtime to ${runtimeRoot}`);
-  fs.rmSync(runtimeRoot, { recursive: true, force: true });
-  fs.mkdirSync(runtimeRoot, { recursive: true });
-  copyDirSync(resourcesPython, userPython);
-  copyDirSync(resourcesVenv, userVenv);
+  await fs.promises.rm(runtimeRoot, { recursive: true, force: true });
+  await fs.promises.mkdir(runtimeRoot, { recursive: true });
+  await copyDir(resourcesPython, userPython);
+  await copyDir(resourcesVenv, userVenv);
 
   patchPyvenvCfg(userVenv, userPython);
   repointVenvSymlinks(userVenv, userPython);

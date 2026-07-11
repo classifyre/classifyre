@@ -229,11 +229,23 @@ export class PostgresManager {
   }
 
   async stop(): Promise<void> {
-    if (!this.running || !this.pg) return;
+    // A quit can race an in-flight first start (which may take minutes on a
+    // cold data dir). Wait for it so the just-spawned postgres process isn't
+    // orphaned with an unflushed data dir and a stale postmaster.pid.
+    if (this.startPromise) {
+      try {
+        await this.startPromise;
+      } catch {
+        // failed start — fall through and stop whatever was spawned
+      }
+    }
+    if (!this.pg) return;
     try {
       await this.pg.stop();
-    } catch {
-      // Best-effort shutdown
+    } catch (err) {
+      // Best-effort, but an unclean stop can leave a stale postmaster.pid that
+      // blocks the next launch — it must be visible in main.log.
+      console.error('Embedded PostgreSQL shutdown failed:', err);
     }
     this.running = false;
     this.pg = null;
