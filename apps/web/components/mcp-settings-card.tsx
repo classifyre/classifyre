@@ -146,7 +146,14 @@ export function McpSettingsCard() {
 
   React.useEffect(() => {
     if (typeof window !== "undefined") {
-      setOrigin(window.location.origin);
+      // In the desktop app the page origin is the app:// bundle, not the API —
+      // the MCP endpoint clients must call is the per-workspace API server.
+      const desktop = (
+        window as unknown as {
+          __CLASSIFYRE_DESKTOP__?: { apiBaseUrl?: string };
+        }
+      ).__CLASSIFYRE_DESKTOP__;
+      setOrigin(desktop?.apiBaseUrl ?? window.location.origin);
     }
   }, []);
 

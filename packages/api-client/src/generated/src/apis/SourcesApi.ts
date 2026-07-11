@@ -735,6 +735,7 @@ export const SourceAssetsControllerListSourceAssetsSourceTypesEnum = {
     Elasticsearch: 'ELASTICSEARCH',
     Opensearch: 'OPENSEARCH',
     Meilisearch: 'MEILISEARCH',
+    LocalFolder: 'LOCAL_FOLDER',
     Custom: 'CUSTOM'
 } as const;
 export type SourceAssetsControllerListSourceAssetsSourceTypesEnum = typeof SourceAssetsControllerListSourceAssetsSourceTypesEnum[keyof typeof SourceAssetsControllerListSourceAssetsSourceTypesEnum];

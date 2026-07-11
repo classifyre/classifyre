@@ -36,7 +36,9 @@ The desktop app runs an **embedded PostgreSQL** instance and spawns per-workspac
 | `src/main/settings-manager.ts` | App-wide settings (database port), persisted to `settings.json` |
 | `src/main/python-env.ts` | Makes the bundled Python venv relocatable on first launch |
 | `src/main/namespace-runtime.ts` | Tab management, view layout, IPC coordination |
-| `src/main/update-checker.ts` | GitHub Releases version check (badge → download page) |
+| `src/main/update-checker.ts` | GitHub Releases version check + in-app download/install |
+| `src/main/tray.ts` | System tray / menu-bar item (workspaces, updates, background mode) |
+| `src/main/menu.ts` | Application menu (Workspaces, Logs, Check for Updates) + dock menu |
 | `src/main/protocol-handler.ts` | Custom `app://` protocol for serving static web files |
 | `src/preload/preload.ts` | Context bridge exposing `electronAPI` to renderers |
 | `src/renderer/namespace-selector/` | Workspace picker UI + settings dialog |
@@ -193,4 +195,13 @@ Each job stages resources with the same `stage-resources.sh` as local builds, pa
 
 ## Updates
 
-The app checks GitHub Releases on launch and shows an "Update available" badge in the tab bar; clicking opens the download page. Full in-app auto-update is deferred until code signing is in place (unsigned macOS apps cannot self-update).
+The app checks GitHub Releases on launch (and every 6 hours) and shows an "Update available" badge in the tab bar. Clicking it downloads the update:
+
+- **macOS (signed builds)**: the release's darwin zip is handed to Electron's built-in Squirrel.Mac updater via a loopback JSON feed; when downloaded the badge becomes "Restart to update", which installs in place and relaunches. Unsigned/dev builds fall back to a plain DMG download.
+- **Windows/Linux**: the matching zip/deb/rpm is downloaded to `~/Downloads` with progress; the badge then reveals the archive (zip) or opens the system package installer (deb/rpm).
+
+The same actions are available from the tray menu and "Check for Updates…" in the application menu.
+
+## Background mode & tray
+
+A system-tray (macOS menu-bar) item lists workspaces — running ones are checked — and can open/switch them, trigger updates, and quit. With "Keep Running in Background" enabled (default, persisted in `settings.json` as `runInBackground`), closing the window hides it and keeps running workspaces alive; the tray, dock, or relaunching the app brings it back. When disabled, closing the window stops all workspaces.

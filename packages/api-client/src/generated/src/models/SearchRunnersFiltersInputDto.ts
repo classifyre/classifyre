@@ -110,6 +110,7 @@ export const SearchRunnersFiltersInputDtoSourceTypeEnum = {
     Elasticsearch: 'ELASTICSEARCH',
     Opensearch: 'OPENSEARCH',
     Meilisearch: 'MEILISEARCH',
+    LocalFolder: 'LOCAL_FOLDER',
     Custom: 'CUSTOM'
 } as const;
 export type SearchRunnersFiltersInputDtoSourceTypeEnum = typeof SearchRunnersFiltersInputDtoSourceTypeEnum[keyof typeof SearchRunnersFiltersInputDtoSourceTypeEnum];

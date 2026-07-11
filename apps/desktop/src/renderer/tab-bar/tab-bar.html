@@ -206,12 +206,30 @@
       var badge = document.getElementById('update-badge');
       if (!badge || !window.electronAPI || !window.electronAPI.onUpdateStatus) return;
       window.electronAPI.onUpdateStatus(function (s) {
-        if (s && s.status === 'available') {
+        if (!s) return;
+        if (s.status === 'available') {
           badge.className = 'update-badge available';
-          badge.textContent = 'Update ' + s.version + ' available';
-          badge.title = 'Open the download page';
-          badge.onclick = function () { window.electronAPI.openDownloadPage(); };
-        } else {
+          badge.textContent = 'Update ' + s.version + ' — download';
+          badge.title = 'Download the update';
+          badge.onclick = function () { window.electronAPI.downloadUpdate(); };
+        } else if (s.status === 'downloading') {
+          badge.className = 'update-badge downloading';
+          badge.textContent = s.percent === null
+            ? 'Downloading ' + s.version + '…'
+            : 'Downloading ' + s.version + '… ' + s.percent + '%';
+          badge.title = 'Update is downloading';
+          badge.onclick = null;
+        } else if (s.status === 'ready') {
+          badge.className = 'update-badge ready';
+          badge.textContent = 'Restart to update to ' + s.version;
+          badge.title = 'Restart Classifyre and install the update';
+          badge.onclick = function () { window.electronAPI.installUpdate(); };
+        } else if (s.status === 'manual-ready') {
+          badge.className = 'update-badge ready';
+          badge.textContent = 'Update ' + s.version + ' downloaded — install';
+          badge.title = 'Open the downloaded update';
+          badge.onclick = function () { window.electronAPI.installUpdate(); };
+        } else if (s.status !== 'checking') {
           badge.className = 'update-badge';
           badge.textContent = '';
           badge.onclick = null;
