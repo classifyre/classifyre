@@ -142,6 +142,7 @@ export MACOS_SIGN=1                                   # sign with the keychain's
 export APPLE_API_KEY="$HOME/apple-csr/AuthKey_XXXXXXXXXX.p8"   # \
 export APPLE_API_KEY_ID="XXXXXXXXXX"                           #  > notarization (App Store Connect API key)
 export APPLE_API_ISSUER_ID="00000000-0000-0000-0000-000000000000"  # /
+make stage   # required: packaging fails if resources aren't staged
 make dist
 ```
 
