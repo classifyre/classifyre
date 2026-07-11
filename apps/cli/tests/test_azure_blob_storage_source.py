@@ -80,3 +80,74 @@ def test_azure_blob_storage_external_url():
         source._external_url("folder/report.csv")
         == "https://acme.blob.core.windows.net/documents/folder/report.csv"
     )
+
+
+class _FakeDownloader:
+    def __init__(self, data: bytes) -> None:
+        self._data = data
+
+    def readall(self) -> bytes:
+        return self._data
+
+
+class _FakeBlobClient:
+    def __init__(self, data: bytes) -> None:
+        self._data = data
+
+    def download_blob(
+        self, offset: int = 0, length: int | None = None, timeout: float | None = None
+    ) -> _FakeDownloader:
+        start = offset or 0
+        end = len(self._data) if length is None else start + length
+        return _FakeDownloader(self._data[start:end])
+
+
+class _FakeContainerClient:
+    def __init__(self, data: bytes) -> None:
+        self._data = data
+
+    def get_blob_client(self, key: str) -> _FakeBlobClient:
+        return _FakeBlobClient(self._data)
+
+
+class _FakeAzureClient:
+    def __init__(self, data: bytes) -> None:
+        self._data = data
+
+    def get_container_client(self, container: str) -> _FakeContainerClient:
+        return _FakeContainerClient(self._data)
+
+
+def test_azure_blob_storage_download_object_truncates_oversized_blob(monkeypatch, caplog):
+    source = AzureBlobStorageSource(
+        {
+            **_recipe(),
+            "optional": {
+                "connection": {"max_object_bytes": 1024},
+                "scope": {"include_content_preview": True},
+            },
+        }
+    )
+    big_bytes = b"z" * 3000
+    monkeypatch.setattr(source, "_client", lambda: _FakeAzureClient(big_bytes))
+    ref = _ref("exports/big.bin", size=len(big_bytes))
+
+    with caplog.at_level("WARNING"):
+        file_bytes, _content_type = source._download_object(ref)
+
+    assert len(file_bytes) == 1024
+    assert any("Truncated" in record.message for record in caplog.records)
+
+
+def test_azure_blob_storage_download_object_leaves_normal_blob_unchanged(monkeypatch, caplog):
+    source = AzureBlobStorageSource(_recipe())
+    small_bytes = b"hello azure"
+    monkeypatch.setattr(source, "_client", lambda: _FakeAzureClient(small_bytes))
+    ref = _ref("exports/small.txt", size=len(small_bytes))
+
+    with caplog.at_level("WARNING"):
+        file_bytes, content_type = source._download_object(ref)
+
+    assert file_bytes == small_bytes
+    assert content_type == "text/plain"
+    assert not any("Truncated" in record.message for record in caplog.records)

@@ -141,12 +141,13 @@ export class RunnerCleanupService implements OnApplicationBootstrap {
   }
 
   /**
-   * Remove S3 log objects that no longer have a matching runner row. Only
-   * objects older than the cutoff are considered, so logs for freshly-started
-   * runs (whose row may not be committed yet) are never touched.
+   * Remove stored log objects (S3 or local files) that no longer have a
+   * matching runner row. Only objects older than the cutoff are considered,
+   * so logs for freshly-started runs (whose row may not be committed yet)
+   * are never touched.
    */
   private async sweepOrphanedLogs(cutoff: Date): Promise<number> {
-    if (!this.runnerLogStorage.isS3Enabled) return 0;
+    if (!this.runnerLogStorage.isPersistenceEnabled) return 0;
 
     const objects = await this.runnerLogStorage.listStoredLogObjects();
     const candidates = objects.filter(
