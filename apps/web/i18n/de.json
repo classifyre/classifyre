@@ -1554,7 +1554,8 @@
     "noItemsAdded": "Noch keine {{label}} hinzugefügt.",
     "addItem": "{{label}} hinzufügen",
     "enterValue": "Wert eingeben",
-    "itemIndex": "Element {{index}}"
+    "itemIndex": "Element {{index}}",
+    "browse": "Durchsuchen..."
   },
   "ai": {
     "ask": "Eine Frage zu diesem Abschnitt stellen...",

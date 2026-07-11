@@ -51,6 +51,7 @@ class AssetType(StrEnum):
     ELASTICSEARCH = 'ELASTICSEARCH'
     OPENSEARCH = 'OPENSEARCH'
     MEILISEARCH = 'MEILISEARCH'
+    LOCAL_FOLDER = 'LOCAL_FOLDER'
 
 
 class DetectorType(StrEnum):
@@ -355,6 +356,7 @@ class Type(StrEnum):
     ELASTICSEARCH = 'ELASTICSEARCH'
     OPENSEARCH = 'OPENSEARCH'
     MEILISEARCH = 'MEILISEARCH'
+    LOCAL_FOLDER = 'LOCAL_FOLDER'
 
 
 class YouTubeRequired(BaseModel):
@@ -641,6 +643,64 @@ class S3CompatibleStorageOptional(BaseModel):
         extra='forbid',
     )
     connection: S3CompatibleStorageOptionalConnection | None = None
+    scope: ObjectStorageOptionalScope | None = None
+
+
+class LocalFolderRequired(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    path: str = Field(
+        ...,
+        description='Absolute path of the local folder to scan (for example, /Users/jane/Documents)',
+    )
+
+
+class LocalFolderMasked(BaseModel):
+    """
+    Local folder scans run with the desktop application's filesystem permissions; no credentials are required.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+
+
+class LocalFolderOptionalTraversal(BaseModel):
+    """
+    Directory traversal controls.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    follow_symlinks: bool | None = Field(
+        False,
+        description='Follow symbolic links while traversing (loops are not detected; leave off unless needed)',
+    )
+    include_hidden: bool | None = Field(
+        False,
+        description='Include hidden files and dot-directories (names starting with a dot)',
+    )
+    max_depth: int | None = Field(
+        None,
+        description='Maximum directory depth below the selected folder (unset scans all levels)',
+        ge=1,
+        le=64,
+    )
+    max_file_bytes: int | None = Field(
+        10485760,
+        description='Maximum bytes read per file for MIME detection and text extraction',
+        ge=1024,
+        le=104857600,
+    )
+
+
+class LocalFolderOptional(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    traversal: LocalFolderOptionalTraversal | None = None
     scope: ObjectStorageOptionalScope | None = None
 
 
@@ -2100,6 +2160,24 @@ class S3CompatibleStorageInput(CoreInput):
     resources: ResourceOverrides | None = None
 
 
+class LocalFolderInput(CoreInput):
+    type: Literal['LOCAL_FOLDER'] | None = Field(
+        None, description='Type of the asset or source'
+    )
+    required: LocalFolderRequired
+    masked: LocalFolderMasked | None = None
+    optional: LocalFolderOptional | None = None
+    detectors: list[Detector] | None = Field(
+        None, description='Detectors to run on ingested content'
+    )
+    custom_detectors: list[CustomDetectorSelection] | None = Field(
+        None,
+        description='Reusable custom detector IDs selected from the custom detector catalog.',
+    )
+    sampling: SamplingConfig
+    resources: ResourceOverrides | None = None
+
+
 class AzureBlobStorageInput(CoreInput):
     type: Literal['AZURE_BLOB_STORAGE'] | None = Field(
         None, description='Type of the asset or source'
@@ -2531,7 +2609,7 @@ class ConfluenceOptionalConnection(BaseModel):
     )
 
 
-class Type18(StrEnum):
+class Type19(StrEnum):
     """
     Filter spaces by space type
     """
@@ -2568,7 +2646,7 @@ class ConfluenceOptionalScopeSpaces(BaseModel):
     keys: list[str] | None = Field(
         None, description='Filter spaces by keys (up to 250)', max_length=250
     )
-    type: Type18 | None = Field(None, description='Filter spaces by space type')
+    type: Type19 | None = Field(None, description='Filter spaces by space type')
     status: Status | None = Field(None, description='Filter spaces by status')
     labels: list[str] | None = Field(
         None,
@@ -2834,7 +2912,7 @@ class ServiceDeskOptional(BaseModel):
     content: ServiceDeskOptionalContent | None = None
 
 
-class Type19(StrEnum):
+class Type20(StrEnum):
     """
     Type of the asset or source
     """
@@ -2868,6 +2946,7 @@ class Type19(StrEnum):
     ELASTICSEARCH = 'ELASTICSEARCH'
     OPENSEARCH = 'OPENSEARCH'
     MEILISEARCH = 'MEILISEARCH'
+    LOCAL_FOLDER = 'LOCAL_FOLDER'
 
 
 class ConfluenceInput(CoreInput):
@@ -3682,6 +3761,7 @@ class SourceInput(
     RootModel[
         SlackInput
         | S3CompatibleStorageInput
+        | LocalFolderInput
         | AzureBlobStorageInput
         | GoogleCloudStorageInput
         | PostgreSQLInput
@@ -3714,6 +3794,7 @@ class SourceInput(
     root: (
         SlackInput
         | S3CompatibleStorageInput
+        | LocalFolderInput
         | AzureBlobStorageInput
         | GoogleCloudStorageInput
         | PostgreSQLInput

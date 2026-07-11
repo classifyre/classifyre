@@ -129,7 +129,12 @@ const config: ForgeConfig = {
     // -full.nupkg, and the release upload only shipped the 539 KB Setup.exe
     // bootstrapper stub — which cannot install anything without its sibling
     // nupkg — so users got a broken installer. A zip is self-contained.
-    new MakerZIP({}, ['win32']),
+    //
+    // macOS additionally gets a zip: it is the Squirrel.Mac payload the
+    // in-app updater downloads for restart-in-place updates (a DMG cannot be
+    // consumed by Squirrel). The zip is made from the already signed +
+    // notarized .app because `make --skip-package` runs after stapling in CI.
+    new MakerZIP({}, ['win32', 'darwin']),
     // Linux → .deb (Debian/Ubuntu) and .rpm (Fedora/RHEL)
     new MakerDeb({ options: linuxOptions }),
     new MakerRpm({ options: linuxOptions }),

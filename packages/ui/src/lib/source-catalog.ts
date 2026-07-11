@@ -278,6 +278,13 @@ export const SOURCE_TYPE_CATALOG_META: Record<string, SourceCatalogMetaBase> = {
     category: "DATABASES",
     keywords: ["search", "index", "full-text", "meilisearch"],
   },
+  LOCAL_FOLDER: {
+    description:
+      "Scan a folder on this computer for documents, spreadsheets, and images.",
+    icon: CreateSourceDtoTypeEnum.LocalFolder,
+    category: "WAREHOUSE_LAKEHOUSE",
+    keywords: ["folder", "files", "local", "filesystem", "desktop", "documents"],
+  },
 };
 
 export function resolveSourceCatalogMeta(
