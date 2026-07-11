@@ -46,6 +46,14 @@ type SortOrder = "asc" | "desc";
 
 const DEFAULT_TAKE = 100;
 
+/**
+ * Upper bound on entries kept mounted while a run streams live over the
+ * WebSocket. Long scans can emit hundreds of thousands of lines; without a
+ * cap the list grows unboundedly and the page becomes unusable. Older lines
+ * remain available via Load More / Download All.
+ */
+const MAX_LIVE_ENTRIES = 2000;
+
 export interface LogFetchParams {
   cursor?: string;
   take?: number;
@@ -259,7 +267,10 @@ export function RunnerLogViewer({
     setEntries((prev) => {
       const existingKeys = new Set(prev.map((e) => `${e.timestamp}|${e.message}`));
       const newOnes = wsEntries.filter((e) => !existingKeys.has(`${e.timestamp}|${e.message}`));
-      return newOnes.length ? [...newOnes, ...prev] : prev;
+      if (!newOnes.length) return prev;
+      // Cap the mounted list during live streaming; older lines stay
+      // reachable via Load More / Download All.
+      return [...newOnes, ...prev].slice(0, MAX_LIVE_ENTRIES);
     });
   }, [wsEntries]);
 
@@ -316,15 +327,36 @@ export function RunnerLogViewer({
     }
   }, [exportEntries, handleDownloadVisible, onDownloadAll, runnerId, t]);
 
+  // Map DTOs to display rows with a WeakMap cache so unchanged entries keep
+  // the same object identity (and a stable id/key) across prepends. This lets
+  // the memoized rows in TechnicalLogViewer skip re-rendering when new lines
+  // stream in at the top.
+  const technicalEntryCache = useRef(
+    new WeakMap<RunnerLogEntryDto, { id: string; timestamp: string; level: string; message: string }>(),
+  );
+  const technicalEntryIdSeq = useRef(0);
   const technicalEntries = useMemo(
     () =>
-      entries.map((entry, index) => ({
-        id: `${entry.timestamp ?? ""}-${index}`,
-        timestamp: formatLogTimestamp(entry.timestamp),
-        level: entry.level,
-        message: entry.message,
-      })),
+      entries.map((entry) => {
+        const cached = technicalEntryCache.current.get(entry);
+        if (cached) return cached;
+        const row = {
+          id: `log-${technicalEntryIdSeq.current++}`,
+          timestamp: formatLogTimestamp(entry.timestamp),
+          level: entry.level,
+          message: entry.message,
+        };
+        technicalEntryCache.current.set(entry, row);
+        return row;
+      }),
     [entries],
+  );
+
+  const renderRowActions = useCallback(
+    (entry: { timestamp: string; level: string; message: string }) => (
+      <CopyButton text={`${entry.timestamp} [${entry.level}] ${entry.message}`} />
+    ),
+    [],
   );
 
   const showInitialLoading = loading && entries.length === 0;
@@ -427,9 +459,7 @@ export function RunnerLogViewer({
           <TechnicalLogViewer
             entries={technicalEntries}
             wrapLines={wrapLines}
-            renderActions={(entry) => (
-              <CopyButton text={`${entry.timestamp} [${entry.level}] ${entry.message}`} />
-            )}
+            renderActions={renderRowActions}
           />
         )}
 
