@@ -1,8 +1,8 @@
-import { BrowserWindow, WebContentsView, dialog } from 'electron';
+import { BrowserWindow, WebContentsView, dialog, shell } from 'electron';
 import http from 'http';
 import { PostgresManager } from './postgres-manager.js';
 import { ProcessManager } from './process-manager.js';
-import { NamespaceManager, type Namespace } from './namespace-manager.js';
+import { NamespaceManager, assertValidRemoteUrl, type Namespace } from './namespace-manager.js';
 import { getAvailablePort } from './port-manager.js';
 
 const TAB_BAR_HEIGHT = 44;
@@ -113,12 +113,23 @@ export class NamespaceRuntime {
     view.setVisible(false);
 
     const url = ns.remoteUrl!;
-    const parsed = new URL(url);
-    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
-      throw new Error(`Unsupported protocol: ${parsed.protocol}`);
-    }
+    // Re-validated here (not only at create/update) so a namespaces.json
+    // edited by hand can't smuggle in a plaintext or non-http(s) URL.
+    assertValidRemoteUrl(url);
+    const allowedOrigin = new URL(url).origin;
 
     view.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+    // Remote workspaces may legitimately hop origins for redirect-based
+    // SSO/OAuth login, so cross-origin https navigation stays allowed. What
+    // must never happen inside a tab the chrome presents as trusted is a
+    // downgrade to plaintext http (MITM rewrite) or a non-web scheme — except
+    // when the workspace itself is an http://localhost dev server.
+    view.webContents.on('will-navigate', (e, target) => {
+      const targetUrl = new URL(target);
+      if (targetUrl.protocol === 'https:') return;
+      if (targetUrl.protocol === 'http:' && targetUrl.origin === allowedOrigin) return;
+      e.preventDefault();
+    });
 
     void view.webContents.loadURL(url);
     return view;
@@ -141,6 +152,22 @@ export class NamespaceRuntime {
       this.mainWindow.contentView.addChildView(view);
     }
     view.setVisible(false);
+
+    // The local workspace view must stay on the bundled app (app:// packaged,
+    // localhost:3000 dev). Outbound links open in the system browser instead
+    // of turning the workspace tab — or a fresh unhardened window — into an
+    // arbitrary browser if the bundled web app ever has an XSS or a stray link.
+    const isAppUrl = (target: string): boolean =>
+      this.isDev ? target.startsWith('http://localhost:3000') : target.startsWith('app://');
+    view.webContents.setWindowOpenHandler(({ url }) => {
+      if (/^https?:/.test(url)) void shell.openExternal(url);
+      return { action: 'deny' };
+    });
+    view.webContents.on('will-navigate', (e, target) => {
+      if (isAppUrl(target)) return;
+      e.preventDefault();
+      if (/^https?:/.test(target)) void shell.openExternal(target);
+    });
 
     // Renderer diagnostics → main log (userData/logs/main.log). A blank
     // workspace window is otherwise invisible to the main process; surfacing

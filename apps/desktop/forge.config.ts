@@ -65,8 +65,37 @@ const linuxOptions = {
   license: 'Proprietary',
 };
 
+// Packaging with missing staged resources must fail loudly. The existsSync
+// filter above silently drops absent directories, so a `make dist` / `bun run
+// make` on a fresh checkout (or after `make clean`) would otherwise produce a
+// signed installer with no embedded Postgres/API/web/Python — indistinguishable
+// from a good build until a user launches it. Runs as a prePackage hook so
+// `start` (dev) is unaffected.
+function assertStagedResources(): void {
+  const required: string[][] = [
+    ['web'],
+    ['pg'],
+    ['venv'],
+    ['python'],
+    ['pyapp'],
+    ['api', 'api.tar.gz'], // directory on Linux/Windows, tarball on macOS
+  ];
+  const missing = required
+    .filter((alts) => !alts.some((name) => fs.existsSync(path.resolve(__dirname, 'resources', name))))
+    .map((alts) => alts.join(' or '));
+  if (missing.length > 0) {
+    throw new Error(
+      `Cannot package: staged resources missing (${missing.join(', ')}). ` +
+        'Run `make stage` (scripts/stage-resources.sh) first.',
+    );
+  }
+}
+
 const config: ForgeConfig = {
   buildIdentifier: 'classifyre',
+  hooks: {
+    prePackage: async () => assertStagedResources(),
+  },
   packagerConfig: {
     name: 'Classifyre',
     executableName: 'classifyre-desktop',
