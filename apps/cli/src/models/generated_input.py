@@ -53,6 +53,7 @@ class AssetType(StrEnum):
     MEILISEARCH = 'MEILISEARCH'
     LOCAL_FOLDER = 'LOCAL_FOLDER'
     MICROSOFT_365 = 'MICROSOFT_365'
+    GOOGLE_WORKSPACE = 'GOOGLE_WORKSPACE'
 
 
 class DetectorType(StrEnum):
@@ -359,6 +360,7 @@ class Type(StrEnum):
     MEILISEARCH = 'MEILISEARCH'
     LOCAL_FOLDER = 'LOCAL_FOLDER'
     MICROSOFT_365 = 'MICROSOFT_365'
+    GOOGLE_WORKSPACE = 'GOOGLE_WORKSPACE'
 
 
 class YouTubeRequired(BaseModel):
@@ -2950,6 +2952,7 @@ class Type20(StrEnum):
     MEILISEARCH = 'MEILISEARCH'
     LOCAL_FOLDER = 'LOCAL_FOLDER'
     MICROSOFT_365 = 'MICROSOFT_365'
+    GOOGLE_WORKSPACE = 'GOOGLE_WORKSPACE'
 
 
 class ConfluenceInput(CoreInput):
@@ -3872,6 +3875,146 @@ class Microsoft365Input(CoreInput):
     resources: ResourceOverrides | None = None
 
 
+class GoogleWorkspaceRequiredServiceAccount(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    auth_method: Literal['service_account']
+    delegated_subject: str | None = Field(
+        None,
+        description='User email to impersonate via domain-wide delegation (optional)',
+    )
+
+
+class GoogleWorkspaceRequiredOAuth(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    auth_method: Literal['oauth']
+    client_id: str = Field(..., description='OAuth 2.0 client ID')
+
+
+class GoogleWorkspaceMaskedServiceAccount(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    service_account_json: str = Field(
+        ..., description='Full JSON key for the Google service account'
+    )
+
+
+class GoogleWorkspaceMaskedOAuth(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    client_secret: str = Field(..., description='OAuth 2.0 client secret')
+    refresh_token: str = Field(..., description='OAuth 2.0 refresh token')
+
+
+class GoogleWorkspaceOptionalScope(BaseModel):
+    """
+    Drive/folder selection and content filtering.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    drive_ids: list[str] | None = Field(
+        None,
+        description='Shared drive IDs to scan (empty = all accessible shared drives)',
+    )
+    folder_ids: list[str] | None = Field(
+        None, description='Only scan these folder IDs recursively (empty = full drives)'
+    )
+    include_my_drive: bool | None = Field(
+        True, description="Include the authenticated/delegated user's My Drive"
+    )
+    include_shared_drives: bool | None = Field(
+        True, description='Include shared drives'
+    )
+    include_file_extensions: list[str] | None = Field(
+        None, description='Only include files with these extensions (e.g. .pdf, .docx)'
+    )
+    exclude_file_extensions: list[str] | None = Field(
+        None, description='Skip files with these extensions'
+    )
+    include_permissions: bool | None = Field(
+        False, description='Include file sharing permission metadata'
+    )
+
+
+class GoogleWorkspaceOptionalConnection(BaseModel):
+    """
+    Network and pagination controls for Drive API requests.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    page_size: int | None = Field(
+        1000, description='Items per page for Drive API list requests', ge=1, le=1000
+    )
+    max_object_bytes: int | None = Field(
+        104857600,
+        description='Skip files larger than this many bytes (default 100 MB)',
+        ge=0,
+    )
+    max_retries: int | None = Field(
+        5, description='Maximum retries on transient errors', ge=0, le=10
+    )
+    timeout_seconds: int | None = Field(
+        30, description='Socket timeout for Drive API operations', ge=5, le=300
+    )
+
+
+class GoogleWorkspaceOptionalExtraction(BaseModel):
+    """
+    Controls which structural assets to emit and how Google-native files are handled.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    include_drive_metadata: bool | None = Field(
+        True, description='Emit drive-level assets with metadata'
+    )
+    export_google_formats: bool | None = Field(
+        True,
+        description='Export Google-native files (Docs/Sheets/Slides) to Office formats for content extraction',
+    )
+
+
+class GoogleWorkspaceOptional(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    scope: GoogleWorkspaceOptionalScope | None = None
+    connection: GoogleWorkspaceOptionalConnection | None = None
+    extraction: GoogleWorkspaceOptionalExtraction | None = None
+
+
+class GoogleWorkspaceInput(CoreInput):
+    type: Literal['GOOGLE_WORKSPACE'] | None = Field(
+        None, description='Type of the asset or source'
+    )
+    required: GoogleWorkspaceRequiredServiceAccount | GoogleWorkspaceRequiredOAuth = (
+        Field(..., title='GoogleWorkspaceRequired')
+    )
+    masked: GoogleWorkspaceMaskedServiceAccount | GoogleWorkspaceMaskedOAuth = Field(
+        ..., title='GoogleWorkspaceMasked'
+    )
+    optional: GoogleWorkspaceOptional | None = None
+    detectors: list[Detector] | None = Field(
+        None, description='Detectors to run on ingested content'
+    )
+    custom_detectors: list[CustomDetectorSelection] | None = Field(
+        None,
+        description='Reusable custom detector IDs selected from the custom detector catalog.',
+    )
+    sampling: SamplingConfig
+    resources: ResourceOverrides | None = None
+
+
 class YouTubeInput(CoreInput):
     type: Literal['YOUTUBE'] | None = Field(
         None, description='Type of the asset or source'
@@ -3975,6 +4118,7 @@ class SourceInput(
         | OpenSearchInput
         | MeilisearchInput
         | Microsoft365Input
+        | GoogleWorkspaceInput
     ]
 ):
     root: (
@@ -4009,6 +4153,7 @@ class SourceInput(
         | OpenSearchInput
         | MeilisearchInput
         | Microsoft365Input
+        | GoogleWorkspaceInput
     ) = Field(
         ...,
         description='Merged configuration schema with all source types and common definitions',

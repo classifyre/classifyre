@@ -81,6 +81,8 @@ export const SearchSourcesFiltersDtoTypeEnum = {
     Opensearch: 'OPENSEARCH',
     Meilisearch: 'MEILISEARCH',
     LocalFolder: 'LOCAL_FOLDER',
+    Microsoft365: 'MICROSOFT_365',
+    GoogleWorkspace: 'GOOGLE_WORKSPACE',
     Custom: 'CUSTOM'
 } as const;
 export type SearchSourcesFiltersDtoTypeEnum = typeof SearchSourcesFiltersDtoTypeEnum[keyof typeof SearchSourcesFiltersDtoTypeEnum];

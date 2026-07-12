@@ -2802,5 +2802,141 @@
         }
       }
     }
+  ],
+  "GOOGLE_WORKSPACE": [
+    {
+      "name": "Domain-wide delegation scan of all shared drives",
+      "description": "Scan every shared drive using a service account with domain-wide delegation impersonating an admin user",
+      "schedule": {
+        "enabled": true,
+        "preset": "nightly",
+        "cron": "20 1 * * *",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "GOOGLE_WORKSPACE",
+        "required": {
+          "auth_method": "service_account",
+          "delegated_subject": "admin@example.com"
+        },
+        "masked": {
+          "service_account_json": "{\"type\": \"service_account\", \"project_id\": \"example-project\", \"private_key_id\": \"...\", \"private_key\": \"-----BEGIN PRIVATE KEY-----\\n...\\n-----END PRIVATE KEY-----\\n\", \"client_email\": \"scanner@example-project.iam.gserviceaccount.com\", \"client_id\": \"1234567890\"}"
+        },
+        "optional": {
+          "scope": {
+            "include_my_drive": false,
+            "include_shared_drives": true
+          },
+          "extraction": {
+            "include_drive_metadata": true,
+            "export_google_formats": true
+          }
+        },
+        "sampling": {
+          "strategy": "AUTOMATIC"
+        },
+        "detectors": [
+          {
+            "type": "PII",
+            "enabled": true
+          },
+          {
+            "type": "SECRETS",
+            "enabled": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "OAuth refresh-token scan of specific folders",
+      "description": "Scan a fixed set of Drive folders using a user-authorized OAuth refresh token, with random sampling",
+      "schedule": {
+        "enabled": true,
+        "preset": "weekly",
+        "cron": "15 3 * * 0",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "GOOGLE_WORKSPACE",
+        "required": {
+          "auth_method": "oauth",
+          "client_id": "1234567890-abcdefg.apps.googleusercontent.com"
+        },
+        "masked": {
+          "client_secret": "your-oauth-client-secret",
+          "refresh_token": "1//your-refresh-token"
+        },
+        "optional": {
+          "scope": {
+            "folder_ids": [
+              "1AbCdEfGhIjKlMnOpQrStUvWxYz01234",
+              "1ZyXwVuTsRqPoNmLkJiHgFeDcBa98765"
+            ],
+            "include_my_drive": true,
+            "include_shared_drives": false
+          }
+        },
+        "sampling": {
+          "strategy": "RANDOM",
+          "rows_per_page": 25
+        },
+        "detectors": [
+          {
+            "type": "PII",
+            "enabled": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "Service account scan of specific drives with permissions",
+      "description": "Scan named shared drives with a service account, including sharing permissions and extension filtering",
+      "schedule": {
+        "enabled": true,
+        "preset": "weekday_morning",
+        "cron": "0 6 * * 1-5",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "GOOGLE_WORKSPACE",
+        "required": {
+          "auth_method": "service_account"
+        },
+        "masked": {
+          "service_account_json": "{\"type\": \"service_account\", \"project_id\": \"example-project\", \"private_key_id\": \"...\", \"private_key\": \"-----BEGIN PRIVATE KEY-----\\n...\\n-----END PRIVATE KEY-----\\n\", \"client_email\": \"scanner@example-project.iam.gserviceaccount.com\", \"client_id\": \"1234567890\"}"
+        },
+        "optional": {
+          "scope": {
+            "drive_ids": [
+              "0AbCdEfGhIjKlMnOpQrStUvWxYz01234",
+              "0ZyXwVuTsRqPoNmLkJiHgFeDcBa98765"
+            ],
+            "include_my_drive": false,
+            "include_permissions": true,
+            "include_file_extensions": [
+              ".pdf",
+              ".docx",
+              ".xlsx"
+            ]
+          },
+          "connection": {
+            "page_size": 500
+          }
+        },
+        "sampling": {
+          "strategy": "ALL"
+        },
+        "detectors": [
+          {
+            "type": "PII",
+            "enabled": true
+          },
+          {
+            "type": "SECRETS",
+            "enabled": true
+          }
+        ]
+      }
+    }
   ]
 }

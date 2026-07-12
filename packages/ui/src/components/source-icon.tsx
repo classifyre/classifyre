@@ -154,6 +154,7 @@ const SOURCE_SIMPLE_ICON_BY_INGESTION_TYPE: Record<
   [CreateSourceDtoTypeEnum.Meilisearch]: siMeilisearch,
   [CreateSourceDtoTypeEnum.LocalFolder]: null,
   [CreateSourceDtoTypeEnum.Microsoft365]: null,
+  [CreateSourceDtoTypeEnum.GoogleWorkspace]: siGoogledrive,
 };
 
 const SOURCE_CUSTOM_ICON_BY_INGESTION_TYPE: Partial<
@@ -205,6 +206,7 @@ const SOURCE_ICON_BY_INGESTION_TYPE: Record<ApiSourceType, IconComponent> = {
   [CreateSourceDtoTypeEnum.Meilisearch]: createSimpleIconComponent(siMeilisearch),
   [CreateSourceDtoTypeEnum.LocalFolder]: Folder,
   [CreateSourceDtoTypeEnum.Microsoft365]: Microsoft365Icon,
+  [CreateSourceDtoTypeEnum.GoogleWorkspace]: createSimpleIconComponent(siGoogledrive),
 };
 
 const SOURCE_ICON_BY_INGESTION_TYPE_LOWERCASE: Record<string, IconComponent> =
