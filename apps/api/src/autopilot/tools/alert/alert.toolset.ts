@@ -152,7 +152,7 @@ export class AlertToolset {
             severity,
             title: String(input.title),
             message: String(input.message),
-            actionUrl: `/cases/${caseId}`,
+            actionUrl: `/investigations/${caseId}`,
             triggeredBy: AI_ACTOR,
             isImportant: important,
             metadata: {
