@@ -58,7 +58,10 @@ export class McpToolExecutorService {
     private readonly demoMode: DemoModeService,
   ) {}
 
-  private assertNotDemoMode(): void {
+  /** Guard for any mutating MCP tool. Public so the factory can call it
+   * directly for tools that talk to a domain service without an executor
+   * passthrough method. */
+  assertNotDemoMode(): void {
     if (this.demoMode.isDemoMode) {
       throw new DemoModeException();
     }
