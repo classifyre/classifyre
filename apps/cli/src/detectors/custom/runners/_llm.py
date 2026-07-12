@@ -39,6 +39,10 @@ _VISION_CONTENT_TYPES = [*_IMAGE_CONTENT_TYPES, "application/pdf"]
 # token cost and request size for multi-page PDFs.
 _MAX_VISION_IMAGES = 20
 
+# Hard request timeout so a hung provider endpoint can never stall a pool
+# worker for litellm's ~10-minute default. Overridable per deployment.
+_COMPLETION_TIMEOUT_SECONDS = float(os.environ.get("CLASSIFYRE_LLM_TIMEOUT_SECONDS", "90"))
+
 
 class LLMRunner(BaseRunner):
     """AI detector — sends content to a configured LLM provider for classification + extraction."""
@@ -136,6 +140,7 @@ class LLMRunner(BaseRunner):
                 max_tokens=self._max_tokens(),
                 messages=messages,
                 response_format={"type": "json_object"},
+                timeout=_COMPLETION_TIMEOUT_SECONDS,
             )
             raw = response.choices[0].message.content or "{}"
             parsed = self._parse_json(raw)

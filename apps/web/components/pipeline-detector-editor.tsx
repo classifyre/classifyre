@@ -1079,6 +1079,14 @@ export const PipelineDetectorEditor = React.forwardRef<
         errs.push(`Classification task "${task}" must have at least one label`);
       }
     }
+    if (
+      Object.keys(pipeline.entities).length === 0 &&
+      Object.keys(pipeline.classification).length === 0
+    ) {
+      errs.push(
+        "Define at least one entity or one classification task",
+      );
+    }
     return errs;
   };
 

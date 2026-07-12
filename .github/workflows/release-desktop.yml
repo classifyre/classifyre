@@ -4,9 +4,20 @@ on:
   workflow_call:
     inputs:
       tag:
-        description: 'Release tag (e.g. v0.4.25)'
-        required: true
+        description: 'Release tag (e.g. v0.4.25). Empty = snapshot build: keeps the -SNAPSHOT package.json version and skips the release upload.'
+        required: false
         type: string
+        default: ''
+      publish:
+        description: 'Upload distributables to the GitHub Release (requires tag)'
+        required: false
+        type: boolean
+        default: true
+      only:
+        description: 'Optional: build a single platform (mac-arm64 | win-x64 | linux-amd64 | linux-arm64)'
+        required: false
+        type: string
+        default: ''
   workflow_dispatch:
     inputs:
       tag:
@@ -25,8 +36,10 @@ env:
 permissions:
   contents: write
 
+# Real releases (tag set) serialize per tag; snapshot builds (no tag) get a
+# unique group so they never queue behind a release or each other.
 concurrency:
-  group: release-desktop
+  group: release-desktop-${{ inputs.tag || github.run_id }}
   cancel-in-progress: false
 
 jobs:
@@ -90,19 +103,25 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
-      - name: Set desktop version from tag
+      # Snapshot builds (no tag) keep the -SNAPSHOT versions from the repo.
+      # The ROOT package.json must be stamped too: the web bundle bakes it in
+      # (packages/ui/src/lib/software-version.ts), so stamping only the desktop
+      # package left released apps showing x.y.z-SNAPSHOT in Settings.
+      - name: Set version from tag
+        if: inputs.tag != ''
         shell: bash
         run: |
           TAG="${{ inputs.tag }}"
           VERSION="${TAG#v}"
-          cd apps/desktop
-          node -e "
-            const fs = require('fs');
-            const pkg = JSON.parse(fs.readFileSync('package.json','utf8'));
-            pkg.version = '${VERSION}';
-            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
-          "
-          echo "Set desktop version to $VERSION"
+          for PKG in package.json apps/desktop/package.json apps/api/package.json apps/web/package.json; do
+            node -e "
+              const fs = require('fs');
+              const pkg = JSON.parse(fs.readFileSync('$PKG','utf8'));
+              pkg.version = '${VERSION}';
+              fs.writeFileSync('$PKG', JSON.stringify(pkg, null, 2) + '\n');
+            "
+          done
+          echo "Set version to $VERSION"
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
@@ -419,15 +438,26 @@ jobs:
       # so no platform-suffix rename is needed (the old rename produced the
       # confusing Classifyre-x.y.z-arm64-mac-arm64.dmg double-arch name).
 
+      # Only scan the maker output (out/classifyre/make — forge.config.ts sets
+      # buildIdentifier 'classifyre'). The packaged app trees under out/
+      # contain the API's full node_modules on win/linux, and a bare
+      # out/**/*.zip glob swept npm test fixtures (thread-stream's
+      # test-package.zip / ts-commonjs-default-export.zip) into the release —
+      # and their duplicate names across platform artifacts broke the upload.
       - name: Find artifacts
         id: artifacts
         shell: bash
         run: |
-          OUTDIR="apps/desktop/out"
+          OUTDIR="apps/desktop/out/classifyre/make"
           echo "Files in make output:"
+          if [ ! -d "$OUTDIR" ]; then
+            echo "::error::Make output directory not found: $OUTDIR"
+            ls -la apps/desktop/out/ 2>/dev/null || echo "  (apps/desktop/out also missing)"
+            exit 1
+          fi
           find "$OUTDIR" -type f \( -name '*.dmg' -o -name '*.deb' -o -name '*.rpm' -o -name '*.zip' \) | tee /tmp/artifacts.txt
           if [ ! -s /tmp/artifacts.txt ]; then
-            echo "::error::No desktop artifacts found"
+            echo "::error::No desktop artifacts found in $OUTDIR"
             exit 1
           fi
 
@@ -436,16 +466,16 @@ jobs:
         with:
           name: desktop-${{ matrix.platform }}
           path: |
-            apps/desktop/out/**/*.dmg
-            apps/desktop/out/**/*.deb
-            apps/desktop/out/**/*.rpm
-            apps/desktop/out/**/*.zip
+            apps/desktop/out/classifyre/make/**/*.dmg
+            apps/desktop/out/classifyre/make/**/*.deb
+            apps/desktop/out/classifyre/make/**/*.rpm
+            apps/desktop/out/classifyre/make/**/*.zip
           if-no-files-found: error
 
   upload-release:
     name: Upload to GitHub Release
     needs: build
-    if: always() && !cancelled() && needs.build.result != 'cancelled'
+    if: always() && !cancelled() && needs.build.result != 'cancelled' && inputs.publish != false && inputs.tag != ''
     runs-on: ubuntu-latest
 
     steps:

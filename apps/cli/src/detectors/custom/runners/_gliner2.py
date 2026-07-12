@@ -18,8 +18,19 @@ from ....models.generated_detectors import (
 )
 from ...dependencies import MissingDependencyError, require_module
 from ._base import _DEFAULT_GLINER2_MODEL, BaseRunner
+from ._text_classification import _chunk_text
 
 logger = logging.getLogger(__name__)
+
+# GLiNER2's encoder window is a few hundred tokens; anything past it is silently
+# dropped by a plain extract_entities call. Above this char threshold we use the
+# library's extract_entities_long (chunked) API when available, and run
+# classification per-chunk with max-confidence aggregation.
+_LONG_TEXT_CHAR_THRESHOLD = 3000
+_CLS_CHUNK_SIZE = 3000
+_CLS_CHUNK_OVERLAP = 200
+# Bound per-asset CPU cost on pathological inputs.
+_MAX_CLS_CHUNKS = 50
 
 
 class GLiNER2Runner(BaseRunner):
@@ -38,6 +49,7 @@ class GLiNER2Runner(BaseRunner):
         self._detector_key = detector_key
         self._detector_name = detector_name
         self._model: Any | None = None
+        self._load_error: str | None = None
         self._setfit_models: dict[str, Any] | None = None
         self._setfit_labels: dict[str, list[str]] = {}
         self._artifact_dir: Path | None = None
@@ -70,21 +82,15 @@ class GLiNER2Runner(BaseRunner):
 
         try:
             if entity_schema:
-                raw = model.extract_entities(
-                    text,
-                    entity_schema,
-                    threshold=0.0,
-                    include_confidence=True,
-                    include_spans=True,
-                )
+                raw = self._extract_entities(model, text, entity_schema)
                 raw_entities = _normalise_entity_output(raw, text)
 
             for task_name, labels in classification_tasks.items():
                 setfit = self._get_setfit_model(task_name)
                 if setfit is not None:
-                    raw_cls = self._run_setfit(setfit, task_name, text)
+                    raw_cls: Any = self._run_setfit(setfit, task_name, text)
                 else:
-                    raw_cls = model.classify(text, labels, threshold=0.0)
+                    raw_cls = self._classify_chunked(model, text, labels)
                 raw_classification[task_name] = _normalise_classification_output(raw_cls)
 
         except Exception as exc:  # pragma: no cover - runtime specific
@@ -113,9 +119,50 @@ class GLiNER2Runner(BaseRunner):
             },
         )
 
+    def _extract_entities(self, model: Any, text: str, entity_schema: dict[str, str]) -> Any:
+        """Extract entities, using the library's chunked long-document API for large texts."""
+        kwargs: dict[str, Any] = {
+            "threshold": 0.0,
+            "include_confidence": True,
+            "include_spans": True,
+        }
+        extract_long = getattr(model, "extract_entities_long", None)
+        if extract_long is not None and len(text) > _LONG_TEXT_CHAR_THRESHOLD:
+            try:
+                return extract_long(text, entity_schema, **kwargs)
+            except TypeError:
+                logger.debug(
+                    "extract_entities_long signature mismatch for detector '%s', "
+                    "falling back to extract_entities",
+                    self._detector_key,
+                )
+        return model.extract_entities(text, entity_schema, **kwargs)
+
+    def _classify_chunked(self, model: Any, text: str, labels: list[str]) -> dict[str, object]:
+        """Classify text, chunking long inputs and keeping the max-confidence label."""
+        chunks = _chunk_text(text, _CLS_CHUNK_SIZE, _CLS_CHUNK_OVERLAP)[:_MAX_CLS_CHUNKS]
+        if len(chunks) == 1:
+            return _normalise_classification_output(model.classify(text, labels, threshold=0.0))
+
+        best: dict[str, object] = {}
+        for chunk in chunks:
+            outcome = _normalise_classification_output(model.classify(chunk, labels, threshold=0.0))
+            if outcome and float(outcome.get("confidence", 0.0)) > float(
+                best.get("confidence", -1.0)
+            ):
+                best = outcome
+        return best
+
     def _load_model(self) -> Any | None:
         if self._model is not None:
             return self._model
+        if self._load_error is not None:
+            logger.debug(
+                "GLiNER2 model previously failed to load for detector '%s': %s",
+                self._detector_key,
+                self._load_error,
+            )
+            return None
 
         if self._artifact_dir is not None:
             gliner_path = self._artifact_dir / "gliner2"
@@ -153,13 +200,14 @@ class GLiNER2Runner(BaseRunner):
         except MissingDependencyError:
             raise
         except Exception as exc:  # pragma: no cover - environment specific
-            logger.warning(
-                "Failed to load GLiNER2 model '%s' for detector '%s': %s",
-                model_name,
-                self._detector_key,
-                exc,
-            )
-            return None
+            # Raise on the first failure so the scan records one structured error
+            # instead of silently reporting zero findings; later assets skip
+            # quietly via the cached _load_error above.
+            self._load_error = str(exc)
+            raise RuntimeError(
+                f"GLiNER2 model '{model_name}' failed to load for detector "
+                f"'{self._detector_key}': {exc}"
+            ) from exc
 
     def _get_setfit_model(self, task_name: str) -> Any | None:
         """Return the SetFit model for task_name if a trained artifact exists."""
