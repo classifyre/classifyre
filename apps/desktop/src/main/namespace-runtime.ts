@@ -431,6 +431,14 @@ export class NamespaceRuntime {
     return new Map(this.running);
   }
 
+  /** Maps a WebContents back to the namespace whose view owns it. */
+  findNamespaceIdByWebContents(wc: Electron.WebContents): string | undefined {
+    for (const [id, entry] of this.running) {
+      if (entry.view.webContents === wc) return id;
+    }
+    return undefined;
+  }
+
   getApiPort(namespaceId: string): number | undefined {
     return this.running.get(namespaceId)?.apiPort;
   }

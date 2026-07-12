@@ -5,6 +5,7 @@ import { NamespaceManager } from './namespace-manager.js';
 import { ProcessManager } from './process-manager.js';
 import { NamespaceRuntime } from './namespace-runtime.js';
 import { registerIpcHandlers } from './ipc-handlers.js';
+import { registerNotificationHandlers } from './notification-service.js';
 import { registerAppProtocol } from './protocol-handler.js';
 import { SettingsManager } from './settings-manager.js';
 import { UpdateChecker } from './update-checker.js';
@@ -176,6 +177,12 @@ app.on('ready', async () => {
     return;
   }
 
+  // Windows toast notifications are dropped unless the process carries an
+  // explicit App User Model ID. No-op on macOS/Linux.
+  if (process.platform === 'win32') {
+    app.setAppUserModelId('com.classifyre.desktop');
+  }
+
   // Tee stdout/stderr to userData/logs/main.log before anything else runs, so
   // startup and workspace-open failures are diagnosable without launching the
   // app from a terminal.
@@ -201,6 +208,7 @@ app.on('ready', async () => {
 
   updateChecker = new UpdateChecker();
   registerIpcHandlers(runtime, namespaceManager, settingsManager, updateChecker, pg);
+  registerNotificationHandlers({ runtime, settingsManager, showWindow: showMainWindow });
 
   // Application menu (Logs menu, Workspaces menu, Check for Updates…);
   // Electron's bare default menu has none of these. Rebuilt when workspaces
