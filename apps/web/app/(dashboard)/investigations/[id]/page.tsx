@@ -59,6 +59,7 @@ import {
   AlertDialogTrigger,
 } from "@workspace/ui/components/alert-dialog";
 import { EmptyState } from "@workspace/ui/components/empty-state";
+import { useRegisterAssistantBridge } from "@/components/assistant-workflow-provider";
 import { CaseStatusBadge } from "@/components/case-status-badge";
 import { RunAutopilotDialog } from "@/components/autopilot/run-autopilot-dialog";
 import { CaseAutopilotStatus } from "@/components/autopilot/case-autopilot-status";
@@ -185,6 +186,31 @@ function CaseWorkspaceInner() {
     void loadGraph();
     void loadRecentActivity();
   }, [loadCase, loadThreads, loadGraph, loadRecentActivity]);
+
+  const assistantBridge = React.useMemo(
+    () => ({
+      contextKey: "case.manage" as const,
+      canOpen: true,
+      getContext: () => ({
+        key: "case.manage" as const,
+        route: `/investigations/${caseId}`,
+        title: "Case Assistant",
+        entityId: caseId,
+        values: caseData
+          ? { title: caseData.title, status: caseData.status }
+          : {},
+        schema: null,
+        validation: { isValid: true, missingFields: [], errors: [] },
+        metadata: {},
+      }),
+      // Case title/status are managed through dedicated dialogs elsewhere on
+      // this page, so field patches aren't applied here.
+      applyAction: () => undefined,
+    }),
+    [caseData, caseId],
+  );
+
+  useRegisterAssistantBridge(assistantBridge);
 
   // ── Derived ────────────────────────────────────────────────────────────────
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useRouteId } from "@/lib/use-route-id";
 import { ArrowLeft, Play, Trash2 } from "lucide-react";
@@ -10,6 +10,7 @@ import {
   type CustomDetectorTrainingRunDto,
   type UpdateCustomDetectorDto,
 } from "@workspace/api-client";
+import { useRegisterAssistantBridge } from "@/components/assistant-workflow-provider";
 import { Button } from "@workspace/ui/components/button";
 import {
   Card,
@@ -155,6 +156,38 @@ export default function CustomDetectorDetailsPage() {
       setShowDeleteDialog(false);
     }
   };
+
+  const assistantBridge = useMemo(
+    () => ({
+      contextKey: "detector.edit" as const,
+      canOpen: true,
+      getContext: () => ({
+        key: "detector.edit" as const,
+        route: `/detectors/${detectorId}`,
+        title: "Detector Tuning Assistant",
+        entityId: detectorId,
+        values: detector
+          ? {
+              name: detector.name,
+              key: detector.key,
+              method: detector.method,
+              config: detector.config,
+              description: detector.description ?? "",
+              isActive: detector.isActive,
+            }
+          : {},
+        schema: null,
+        validation: { isValid: true, missingFields: [], errors: [] },
+        metadata: {},
+      }),
+      // This page renders one of several read-only-with-dialogs detector
+      // editors depending on detector kind; field patches aren't applied here.
+      applyAction: () => undefined,
+    }),
+    [detector, detectorId],
+  );
+
+  useRegisterAssistantBridge(assistantBridge);
 
   if (isLoading || !detector) {
     return (

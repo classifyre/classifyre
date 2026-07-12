@@ -49,6 +49,7 @@ import {
   InquiryMatchesPanel,
   type InquiryMatchesStats,
 } from "@/components/inquiry-matches-panel";
+import { useRegisterAssistantBridge } from "@/components/assistant-workflow-provider";
 import { useTranslation } from "@/hooks/use-translation";
 
 export default function InquiryDetailPage() {
@@ -90,6 +91,42 @@ function InquiryDetailInner() {
       return q.cases.length === 1 ? q.cases[0]!.id : null;
     });
   }, [inquiryId, preferredCaseId]);
+
+  const assistantBridge = React.useMemo(
+    () => ({
+      contextKey: "inquiry.manage" as const,
+      canOpen: true,
+      getContext: () => ({
+        key: "inquiry.manage" as const,
+        route: `/investigations/inquiries/${inquiryId}`,
+        title: "Inquiry Assistant",
+        entityId: inquiryId,
+        values: inquiry
+          ? {
+              title: inquiry.title,
+              matchers: {
+                matchAllSources: inquiry.matchAllSources,
+                sourceIds: inquiry.sourceIds,
+                detectorTypes: inquiry.detectorTypes,
+                customDetectorKeys: inquiry.customDetectorKeys,
+                findingTypes: inquiry.findingTypes,
+                findingTypeRegex: inquiry.findingTypeRegex,
+                findingValueRegex: inquiry.findingValueRegex,
+              },
+            }
+          : {},
+        schema: null,
+        validation: { isValid: true, missingFields: [], errors: [] },
+        metadata: {},
+      }),
+      // Matcher edits go through the dedicated edit page; this view doesn't
+      // apply field patches directly.
+      applyAction: () => undefined,
+    }),
+    [inquiry, inquiryId],
+  );
+
+  useRegisterAssistantBridge(assistantBridge);
 
   // Viewing the matches clears the "new" badge — but only after the first page
   // has loaded, so the server still flags rows as new for that initial fetch.
