@@ -64,4 +64,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Native dialogs
   selectFolder: (): Promise<{ canceled: boolean; path: string | null }> =>
     ipcRenderer.invoke('dialog:select-folder'),
+
+  // Native OS notifications: the web app forwards freshly-received in-app
+  // notifications here; main renders the toast and, on click, deep-links the
+  // originating workspace tab back through onNotificationNavigate.
+  showNotification: (payload: Record<string, unknown>) =>
+    ipcRenderer.send('notification:show', payload),
+  onNotificationNavigate: (cb: (url: string) => void) => {
+    ipcRenderer.on('desktop-notification:navigate', (_event, url: string) => cb(url));
+  },
 });

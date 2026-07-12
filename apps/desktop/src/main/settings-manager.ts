@@ -7,11 +7,14 @@ export interface AppSettings {
   postgresPort: number;
   /** Keep the app (tray + running workspaces) alive when the window closes. */
   runInBackground: boolean;
+  /** Show native OS notifications for in-app notifications (scan failures etc.). */
+  desktopNotifications: boolean;
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
   postgresPort: 54320,
   runInBackground: true,
+  desktopNotifications: true,
 };
 
 export class SettingsManager {
@@ -47,6 +50,9 @@ export class SettingsManager {
     }
     if (patch.runInBackground !== undefined) {
       this.settings.runInBackground = patch.runInBackground === true;
+    }
+    if (patch.desktopNotifications !== undefined) {
+      this.settings.desktopNotifications = patch.desktopNotifications === true;
     }
     fs.writeFileSync(this.filePath, JSON.stringify(this.settings, null, 2));
     return this.get();
