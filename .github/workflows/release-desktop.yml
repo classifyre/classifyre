@@ -449,9 +449,14 @@ jobs:
         run: |
           OUTDIR="apps/desktop/out/make"
           echo "Files in make output:"
+          if [ ! -d "$OUTDIR" ]; then
+            echo "::error::Make output directory not found: $OUTDIR"
+            ls -la apps/desktop/out/ 2>/dev/null || echo "  (apps/desktop/out also missing)"
+            exit 1
+          fi
           find "$OUTDIR" -type f \( -name '*.dmg' -o -name '*.deb' -o -name '*.rpm' -o -name '*.zip' \) | tee /tmp/artifacts.txt
           if [ ! -s /tmp/artifacts.txt ]; then
-            echo "::error::No desktop artifacts found"
+            echo "::error::No desktop artifacts found in $OUTDIR"
             exit 1
           fi
 
