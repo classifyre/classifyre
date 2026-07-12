@@ -2,6 +2,8 @@ import {
   Database,
   File,
   FileText,
+  Globe,
+  HardDrive,
   Hash,
   Image,
   Link2,
@@ -41,6 +43,8 @@ const assetKindIconMap: Record<string, LucideIcon> = {
   item: File,
   video: Video,
   audio: Music,
+  site: Globe,
+  drive: HardDrive,
 };
 
 export function getAssetKindIcon(kind?: string | null): LucideIcon {

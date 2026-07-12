@@ -68,6 +68,21 @@ const OracleIcon: IconComponent = ({ className }) => (
   </svg>
 );
 
+const Microsoft365Icon: IconComponent = ({ className }) => (
+  <svg
+    viewBox="0 0 23 23"
+    className={className}
+    fill="currentColor"
+    role="img"
+    aria-label="Microsoft 365"
+  >
+    <rect x="1" y="1" width="10" height="10" />
+    <rect x="12" y="1" width="10" height="10" />
+    <rect x="1" y="12" width="10" height="10" />
+    <rect x="12" y="12" width="10" height="10" />
+  </svg>
+);
+
 const TableauIcon: IconComponent = ({ className }) => (
   <svg
     viewBox="0 0 100.2 98"
@@ -138,6 +153,8 @@ const SOURCE_SIMPLE_ICON_BY_INGESTION_TYPE: Record<
   [CreateSourceDtoTypeEnum.Opensearch]: siOpensearch,
   [CreateSourceDtoTypeEnum.Meilisearch]: siMeilisearch,
   [CreateSourceDtoTypeEnum.LocalFolder]: null,
+  [CreateSourceDtoTypeEnum.Microsoft365]: null,
+  [CreateSourceDtoTypeEnum.GoogleWorkspace]: siGoogledrive,
 };
 
 const SOURCE_CUSTOM_ICON_BY_INGESTION_TYPE: Partial<
@@ -146,6 +163,7 @@ const SOURCE_CUSTOM_ICON_BY_INGESTION_TYPE: Partial<
   [CreateSourceDtoTypeEnum.Slack]: SlackIcon,
   [CreateSourceDtoTypeEnum.Oracle]: OracleIcon,
   [CreateSourceDtoTypeEnum.Tableau]: TableauIcon,
+  [CreateSourceDtoTypeEnum.Microsoft365]: Microsoft365Icon,
 };
 
 export const MISSING_SIMPLE_ICON_SOURCE_TYPES = Object.values(
@@ -187,6 +205,8 @@ const SOURCE_ICON_BY_INGESTION_TYPE: Record<ApiSourceType, IconComponent> = {
   [CreateSourceDtoTypeEnum.Opensearch]: createSimpleIconComponent(siOpensearch),
   [CreateSourceDtoTypeEnum.Meilisearch]: createSimpleIconComponent(siMeilisearch),
   [CreateSourceDtoTypeEnum.LocalFolder]: Folder,
+  [CreateSourceDtoTypeEnum.Microsoft365]: Microsoft365Icon,
+  [CreateSourceDtoTypeEnum.GoogleWorkspace]: createSimpleIconComponent(siGoogledrive),
 };
 
 const SOURCE_ICON_BY_INGESTION_TYPE_LOWERCASE: Record<string, IconComponent> =

@@ -2355,6 +2355,8 @@ export const JsonSchemaForm = React.forwardRef<
     OPENSEARCH: false,
     MEILISEARCH: false,
     LOCAL_FOLDER: false,
+    MICROSOFT_365: false,
+    GOOGLE_WORKSPACE: false,
   };
   const isTabular =
     assistantSourceType && isIngestionSourceType(assistantSourceType)

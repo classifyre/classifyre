@@ -49,6 +49,8 @@ SOURCE_TYPE_GROUPS: dict[str, set[str]] = {
     "DELTA_LAKE": {"delta-lake"},
     "ICEBERG": {"iceberg"},
     "KAFKA": {"kafka"},
+    "MICROSOFT_365": {"microsoft-graph"},
+    "GOOGLE_WORKSPACE": {"google-workspace"},
 }
 
 
