@@ -31,24 +31,46 @@ class ImageClassificationRunner(BaseRunner):
         self._schema = schema
         self._detector_key = detector_key
         self._detector_name = detector_name
-        ensure_torch("image_classification", ["custom", "detectors"])
-        transformers = require_module(
-            "transformers", "image_classification", ["custom", "detectors"]
-        )
-        self._pil = require_module("PIL.Image", "image_classification", ["custom", "detectors"])
-        model_id = schema.model or _DEFAULT_IMAGE_CLASSIFICATION_MODEL
-        pipeline_kwargs: dict[str, Any] = {
-            "model": model_id,
-            "device": schema.device or "cpu",
-        }
-        if schema.model_revision:
-            pipeline_kwargs["revision"] = schema.model_revision
-        if schema.top_k is not None:
-            pipeline_kwargs["top_k"] = schema.top_k
-        if schema.function_to_apply is not None:
-            pipeline_kwargs["function_to_apply"] = str(schema.function_to_apply)
-        self._pipe: Any = transformers.pipeline("image-classification", **pipeline_kwargs)
-        self._model_id = model_id
+        self._model_id = schema.model or _DEFAULT_IMAGE_CLASSIFICATION_MODEL
+        # Model loading is deferred to first detect() so the parent process
+        # (which only routes when a worker pool is active) never pays the
+        # torch import + model memory cost.
+        self._pipe: Any | None = None
+        self._pil: Any | None = None
+        self._load_error: str | None = None
+
+    def _ensure_pipeline(self) -> Any | None:
+        if self._pipe is not None:
+            return self._pipe
+        if self._load_error is not None:
+            return None
+        schema = self._schema
+        try:
+            ensure_torch("image_classification", ["custom", "detectors"])
+            transformers = require_module(
+                "transformers", "image_classification", ["custom", "detectors"]
+            )
+            self._pil = require_module("PIL.Image", "image_classification", ["custom", "detectors"])
+            pipeline_kwargs: dict[str, Any] = {
+                "model": self._model_id,
+                "device": schema.device or "cpu",
+            }
+            if schema.model_revision:
+                pipeline_kwargs["revision"] = schema.model_revision
+            if schema.top_k is not None:
+                pipeline_kwargs["top_k"] = schema.top_k
+            if schema.function_to_apply is not None:
+                pipeline_kwargs["function_to_apply"] = str(schema.function_to_apply)
+            self._pipe = transformers.pipeline("image-classification", **pipeline_kwargs)
+            return self._pipe
+        except Exception as exc:
+            # Raise on the first failure so the scan records one structured
+            # error; later assets skip quietly via the cached _load_error.
+            self._load_error = str(exc)
+            raise RuntimeError(
+                f"image_classification model '{self._model_id}' failed to load for "
+                f"detector '{self._detector_key}': {exc}"
+            ) from exc
 
     def run(self, text: str) -> None:  # type: ignore[override]  # pragma: no cover
         raise NotImplementedError("ImageClassificationRunner uses detect() directly")
@@ -56,6 +78,10 @@ class ImageClassificationRunner(BaseRunner):
     def detect(self, content: str | bytes, content_type: str) -> list[DetectionResult]:
         if isinstance(content, str):
             logger.warning("image_classification: received string content, expected bytes")
+            return []
+
+        pipe = self._ensure_pipeline()
+        if pipe is None:
             return []
 
         # image/* opens directly; PDFs are rasterised to one image per page.
@@ -69,7 +95,7 @@ class ImageClassificationRunner(BaseRunner):
         results: list[DetectionResult] = []
         for page_index, image in images:
             try:
-                predictions: list[dict[str, Any]] = self._pipe(image) or []
+                predictions: list[dict[str, Any]] = pipe(image) or []
                 for pred in predictions:
                     label: str = pred.get("label", "unknown")
                     score: float = float(pred.get("score", 0.0))

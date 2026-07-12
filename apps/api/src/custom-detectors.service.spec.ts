@@ -256,6 +256,237 @@ describe('CustomDetectorsService', () => {
     expect(entries.map((e) => e.key)).toEqual(['cust_regex']);
   });
 
+  it('rejects an empty detector name on create', async () => {
+    const { service } = createService();
+
+    await expect(
+      service.create({
+        name: '   ',
+        pipelineSchema: {
+          type: 'REGEX',
+          patterns: { x: { pattern: '\\d+' } },
+        },
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('rejects a whitespace-only detector name on update', async () => {
+    const { service, prisma } = createService();
+    prisma.customDetector.findUnique.mockResolvedValue({
+      id: 'det-1',
+      key: 'cust_x',
+      name: 'X',
+      description: null,
+      isActive: true,
+      version: 1,
+      pipelineSchema: { type: 'REGEX', patterns: { x: { pattern: '\\d+' } } },
+      aiProviderConfigId: null,
+    });
+
+    await expect(
+      service.update('det-1', { name: '  \t ' }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('rejects an out-of-range confidence_threshold', async () => {
+    const { service } = createService();
+
+    await expect(
+      service.create({
+        name: 'Bad threshold',
+        pipelineSchema: {
+          type: 'TEXT_CLASSIFICATION',
+          model: 'some/model',
+          confidence_threshold: 1.5,
+        },
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('rejects an out-of-range temperature', async () => {
+    const { service } = createService();
+
+    await expect(
+      service.create({
+        name: 'Bad temperature',
+        aiProviderConfigId: 'ai-1',
+        pipelineSchema: {
+          type: 'LLM',
+          system_prompt: 'Classify.',
+          temperature: 3,
+        },
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('rejects a non-integer top_k', async () => {
+    const { service } = createService();
+
+    await expect(
+      service.create({
+        name: 'Bad top_k',
+        pipelineSchema: {
+          type: 'IMAGE_CLASSIFICATION',
+          top_k: 2.5,
+        },
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('rejects chunk_overlap >= chunk_size', async () => {
+    const { service } = createService();
+
+    await expect(
+      service.create({
+        name: 'Bad chunking',
+        pipelineSchema: {
+          type: 'FEATURE_EXTRACTION',
+          model: 'some/embedding-model',
+          chunk_size: 100,
+          chunk_overlap: 100,
+        },
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('rejects max_tokens less than 1', async () => {
+    const { service } = createService();
+
+    await expect(
+      service.create({
+        name: 'Bad max_tokens',
+        aiProviderConfigId: 'ai-1',
+        pipelineSchema: {
+          type: 'LLM',
+          system_prompt: 'Classify.',
+          max_tokens: 0,
+        },
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('rejects max_findings less than 1', async () => {
+    const { service } = createService();
+
+    await expect(
+      service.create({
+        name: 'Bad max_findings',
+        pipelineSchema: {
+          type: 'GLINER2',
+          entities: { thing: { description: 'a thing', required: false } },
+          max_findings: 0,
+        },
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('rejects a REGEX pattern with invalid syntax', async () => {
+    const { service } = createService();
+
+    await expect(
+      service.create({
+        name: 'Bad regex',
+        pipelineSchema: {
+          type: 'REGEX',
+          patterns: { bad: { pattern: '(unterminated' } },
+        },
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('accepts a REGEX pattern using RE2 named-group syntax', async () => {
+    const { service, prisma } = createService();
+    const pipelineSchema = {
+      type: 'REGEX',
+      patterns: { named: { pattern: '(?P<year>\\d{4})-(?P<month>\\d{2})' } },
+    };
+
+    prisma.customDetector.create.mockResolvedValue({
+      id: 'det-named',
+      key: 'cust_named',
+      name: 'Named groups',
+      description: null,
+      isActive: true,
+      version: 1,
+      pipelineSchema,
+      lastTrainedAt: null,
+      lastTrainingSummary: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      trainingRuns: [],
+      _count: { findings: 0 },
+    });
+
+    await expect(
+      service.create({
+        name: 'Named groups',
+        pipelineSchema,
+      }),
+    ).resolves.toBeDefined();
+  });
+
+  it('does not false-reject a REGEX pattern with Unicode property escapes', async () => {
+    const { service, prisma } = createService();
+    const pipelineSchema = {
+      type: 'REGEX',
+      patterns: { unicode: { pattern: '\\p{L}+' } },
+    };
+
+    prisma.customDetector.create.mockResolvedValue({
+      id: 'det-unicode',
+      key: 'cust_unicode',
+      name: 'Unicode',
+      description: null,
+      isActive: true,
+      version: 1,
+      pipelineSchema,
+      lastTrainedAt: null,
+      lastTrainingSummary: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      trainingRuns: [],
+      _count: { findings: 0 },
+    });
+
+    await expect(
+      service.create({
+        name: 'Unicode',
+        pipelineSchema,
+      }),
+    ).resolves.toBeDefined();
+  });
+
+  it('does not false-reject a REGEX pattern with RE2 inline flags', async () => {
+    const { service, prisma } = createService();
+    const pipelineSchema = {
+      type: 'REGEX',
+      patterns: { inline: { pattern: '(?i)confidential' } },
+    };
+
+    prisma.customDetector.create.mockResolvedValue({
+      id: 'det-inline',
+      key: 'cust_inline',
+      name: 'Inline flags',
+      description: null,
+      isActive: true,
+      version: 1,
+      pipelineSchema,
+      lastTrainedAt: null,
+      lastTrainingSummary: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      trainingRuns: [],
+      _count: { findings: 0 },
+    });
+
+    await expect(
+      service.create({
+        name: 'Inline flags',
+        pipelineSchema,
+      }),
+    ).resolves.toBeDefined();
+  });
+
   it('rejects unknown IDs in assertActiveDetectorIds', async () => {
     const { service, prisma } = createService();
 

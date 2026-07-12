@@ -1,0 +1,52 @@
+name: Desktop Snapshot
+
+# Builds the desktop app from develop / PRs without publishing anything:
+# same pipeline as a release (stage resources, package, sign + notarize when
+# certs are present, smoke test), but the installers stay workflow artifacts
+# (desktop-<platform>) that can be downloaded and tested by hand. The
+# package.json -SNAPSHOT version is kept, so a tested snapshot is clearly
+# distinguishable from a release in the app's Settings.
+#
+# Develop pushes build the full 4-platform matrix (that's what releases cut
+# from, so every platform's snapshot must be provable). PRs build mac-arm64
+# only to keep runner cost sane; use the manual dispatch for other platforms.
+
+on:
+  push:
+    branches: [develop]
+    paths:
+      - 'apps/desktop/**'
+      - '.github/workflows/release-desktop.yml'
+      - '.github/workflows/desktop-snapshot.yml'
+  pull_request:
+    paths:
+      - 'apps/desktop/**'
+      - '.github/workflows/release-desktop.yml'
+      - '.github/workflows/desktop-snapshot.yml'
+  workflow_dispatch:
+    inputs:
+      only:
+        description: 'Platform (mac-arm64 | win-x64 | linux-amd64 | linux-arm64). Empty = all four.'
+        required: false
+        type: string
+        default: 'mac-arm64'
+
+# The reusable workflow declares contents: write for the release upload; that
+# path is disabled here (publish: false) but a caller cannot elevate, only
+# match, what the called workflow requests.
+permissions:
+  contents: write
+
+concurrency:
+  group: desktop-snapshot-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  snapshot:
+    uses: ./.github/workflows/release-desktop.yml
+    with:
+      tag: ''
+      publish: false
+      # dispatch: chosen platform; PR: mac-arm64; develop push: '' = all four.
+      only: ${{ github.event.inputs.only || (github.event_name == 'pull_request' && 'mac-arm64' || '') }}
+    secrets: inherit

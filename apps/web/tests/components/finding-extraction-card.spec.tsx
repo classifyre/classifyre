@@ -28,136 +28,125 @@ function mockExtraction(
   );
 }
 
-function notFound(page: Parameters<Parameters<typeof test>[2]>[0]["page"]) {
-  return page.route(EXTRACTION_URL, (route) =>
-    route.fulfill({ status: 404, body: "" }),
-  );
+function baseExtraction(pipelineResult: Record<string, unknown>) {
+  return {
+    id: "extraction-1",
+    findingId: "find-1",
+    customDetectorId: "det-1",
+    customDetectorKey: "cust_food",
+    sourceId: "source-1",
+    assetId: "asset-1",
+    runnerId: "runner-1",
+    detectorVersion: 1,
+    pipelineResult,
+    extractedAt: new Date().toISOString(),
+    createdAt: new Date().toISOString(),
+  };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Scenario 01 — fields displayed
+// Scenario 01 — entity fields displayed
 // ─────────────────────────────────────────────────────────────────────────────
 
-test("renders extracted string field", async ({ mount, page }) => {
-  await mockExtraction(page, {
-    findingId: "find-1",
-    extractionMethod: "CLASSIFIER_GLINER",
-    extractedData: { cuisine: "Italian" },
-    populatedFields: ["cuisine"],
-    fieldCount: 1,
-    extractedAt: new Date().toISOString(),
-  });
+test("renders extracted entity spans", async ({ mount, page }) => {
+  await mockExtraction(
+    page,
+    baseExtraction({
+      entities: {
+        cuisine: [{ value: "Italian", confidence: 0.92, start: 0, end: 7 }],
+      },
+      classification: {},
+      metadata: { runner: "GLINER2", model: "fastino/gliner2-base-v1" },
+    }),
+  );
 
   const component = await mount(<FindingExtractionCard findingId="find-1" />);
 
   await expect(component.getByText("Extracted Data")).toBeVisible();
   await expect(component.getByText("cuisine")).toBeVisible();
   await expect(component.getByText("Italian")).toBeVisible();
-  await expect(component.getByText("Classifier + GLiNER")).toBeVisible();
+  await expect(component.getByText("92%")).toBeVisible();
+  await expect(component.getByText("GLINER2", { exact: true })).toBeVisible();
 });
 
-test("renders GLiNER method badge", async ({ mount, page }) => {
-  await mockExtraction(page, {
-    findingId: "find-1",
-    extractionMethod: "GLINER",
-    extractedData: { person: "Alice" },
-    populatedFields: ["person"],
-    fieldCount: 1,
-    extractedAt: new Date().toISOString(),
-  });
+test("renders the runner badge from metadata", async ({ mount, page }) => {
+  await mockExtraction(
+    page,
+    baseExtraction({
+      entities: { person: [{ value: "Alice", confidence: 1.0 }] },
+      classification: {},
+      metadata: { runner: "REGEX" },
+    }),
+  );
 
   const component = await mount(<FindingExtractionCard findingId="find-1" />);
-  await expect(component.getByText("GLiNER")).toBeVisible();
+  await expect(component.getByText("REGEX")).toBeVisible();
 });
 
-test("renders Regex method badge", async ({ mount, page }) => {
-  await mockExtraction(page, {
-    findingId: "find-1",
-    extractionMethod: "REGEX",
-    extractedData: { amount: "29.99" },
-    populatedFields: ["amount"],
-    fieldCount: 1,
-    extractedAt: new Date().toISOString(),
-  });
-
-  const component = await mount(<FindingExtractionCard findingId="find-1" />);
-  await expect(component.getByText("Regex")).toBeVisible();
-});
-
-test("renders array field as comma-joined string (scenario 07)", async ({
+test("renders multiple spans for the same entity label", async ({
   mount,
   page,
 }) => {
-  await mockExtraction(page, {
-    findingId: "find-1",
-    extractionMethod: "CLASSIFIER_GLINER",
-    extractedData: { dishes: ["pasta carbonara", "tiramisu"] },
-    populatedFields: ["dishes"],
-    fieldCount: 1,
-    extractedAt: new Date().toISOString(),
-  });
+  await mockExtraction(
+    page,
+    baseExtraction({
+      entities: {
+        dishes: [
+          { value: "pasta carbonara", confidence: 0.8 },
+          { value: "tiramisu", confidence: 0.75 },
+        ],
+      },
+      classification: {},
+      metadata: {},
+    }),
+  );
 
   const component = await mount(<FindingExtractionCard findingId="find-1" />);
-  await expect(component.getByText("pasta carbonara, tiramisu")).toBeVisible();
+  await expect(component.getByText("pasta carbonara")).toBeVisible();
+  await expect(component.getByText("tiramisu")).toBeVisible();
 });
 
-test("renders multiple fields", async ({ mount, page }) => {
-  await mockExtraction(page, {
-    findingId: "find-1",
-    extractionMethod: "CLASSIFIER_GLINER",
-    extractedData: {
-      dish: "risotto",
-      cuisine: "Italian",
-      rating: 4,
-    },
-    populatedFields: ["dish", "cuisine", "rating"],
-    fieldCount: 3,
-    extractedAt: new Date().toISOString(),
-  });
+test("renders classification task outcomes", async ({ mount, page }) => {
+  await mockExtraction(
+    page,
+    baseExtraction({
+      entities: {},
+      classification: {
+        sentiment: { label: "positive", confidence: 0.87 },
+      },
+      metadata: { runner: "LLM", model: "claude-sonnet-4-5" },
+    }),
+  );
 
   const component = await mount(<FindingExtractionCard findingId="find-1" />);
-  await expect(component.getByText("dish")).toBeVisible();
-  await expect(component.getByText("risotto")).toBeVisible();
-  await expect(component.getByText("cuisine")).toBeVisible();
-  await expect(component.getByText("Italian")).toBeVisible();
-  await expect(component.getByText("rating")).toBeVisible();
-  await expect(component.getByText("4")).toBeVisible();
+  await expect(component.getByText("sentiment")).toBeVisible();
+  await expect(component.getByText("positive", { exact: false })).toBeVisible();
+  await expect(component.getByText("87%")).toBeVisible();
+  await expect(component.getByText("Model: claude-sonnet-4-5")).toBeVisible();
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Scenario 02 — empty extractedData hides the card
+// Scenario 02 — empty pipeline result hides the card
 // ─────────────────────────────────────────────────────────────────────────────
 
-test("hides card when all fields are null (scenario 02)", async ({
+test("hides card when entities and classification are both empty (scenario 02)", async ({
   mount,
   page,
 }) => {
-  await mockExtraction(page, {
-    findingId: "find-1",
-    extractionMethod: "REGEX",
-    extractedData: { dish: null, cuisine: "" },
-    populatedFields: [],
-    fieldCount: 0,
-    extractedAt: new Date().toISOString(),
-  });
+  await mockExtraction(
+    page,
+    baseExtraction({ entities: {}, classification: {}, metadata: {} }),
+  );
 
   const component = await mount(<FindingExtractionCard findingId="find-1" />);
-  // Card header should not be visible since no entries pass the filter
   await expect(component.getByText("Extracted Data")).not.toBeVisible();
 });
 
-test("hides card when extractedData is empty object (scenario 02)", async ({
+test("hides card when pipelineResult is empty object (scenario 02)", async ({
   mount,
   page,
 }) => {
-  await mockExtraction(page, {
-    findingId: "find-1",
-    extractionMethod: "REGEX",
-    extractedData: {},
-    populatedFields: [],
-    fieldCount: 0,
-    extractedAt: new Date().toISOString(),
-  });
+  await mockExtraction(page, baseExtraction({}));
 
   const component = await mount(<FindingExtractionCard findingId="find-1" />);
   await expect(component.getByText("Extracted Data")).not.toBeVisible();
@@ -171,7 +160,9 @@ test("renders nothing when API returns 404 (scenario 03)", async ({
   mount,
   page,
 }) => {
-  await notFound(page);
+  await page.route(EXTRACTION_URL, (route) =>
+    route.fulfill({ status: 404, body: "" }),
+  );
 
   const component = await mount(
     <FindingExtractionCard findingId="find-missing" />,
@@ -191,63 +182,4 @@ test("renders nothing when API errors (scenario 03)", async ({
     <FindingExtractionCard findingId="find-error" />,
   );
   await expect(component.getByText("Extracted Data")).not.toBeVisible();
-});
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Scenario 07 — field type filtering
-// ─────────────────────────────────────────────────────────────────────────────
-
-test("filters out null values, shows only populated fields (scenario 07)", async ({
-  mount,
-  page,
-}) => {
-  await mockExtraction(page, {
-    findingId: "find-1",
-    extractionMethod: "GLINER",
-    extractedData: {
-      cuisine: "French",
-      rating: null,
-      source: "",
-    },
-    populatedFields: ["cuisine"],
-    fieldCount: 3,
-    extractedAt: new Date().toISOString(),
-  });
-
-  const component = await mount(<FindingExtractionCard findingId="find-1" />);
-  await expect(component.getByText("cuisine")).toBeVisible();
-  await expect(component.getByText("French")).toBeVisible();
-  // null and empty string fields should not appear
-  await expect(component.getByText("rating")).not.toBeVisible();
-  await expect(component.getByText("source")).not.toBeVisible();
-});
-
-test("renders boolean field value (scenario 07)", async ({ mount, page }) => {
-  await mockExtraction(page, {
-    findingId: "find-1",
-    extractionMethod: "REGEX",
-    extractedData: { is_vegetarian: true },
-    populatedFields: ["is_vegetarian"],
-    fieldCount: 1,
-    extractedAt: new Date().toISOString(),
-  });
-
-  const component = await mount(<FindingExtractionCard findingId="find-1" />);
-  await expect(component.getByText("is_vegetarian")).toBeVisible();
-  await expect(component.getByText("true")).toBeVisible();
-});
-
-test("renders number field value (scenario 07)", async ({ mount, page }) => {
-  await mockExtraction(page, {
-    findingId: "find-1",
-    extractionMethod: "REGEX",
-    extractedData: { price: 29.99 },
-    populatedFields: ["price"],
-    fieldCount: 1,
-    extractedAt: new Date().toISOString(),
-  });
-
-  const component = await mount(<FindingExtractionCard findingId="find-1" />);
-  await expect(component.getByText("price")).toBeVisible();
-  await expect(component.getByText("29.99")).toBeVisible();
 });
