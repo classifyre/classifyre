@@ -13,6 +13,7 @@ import {
     BreadcrumbSeparator,
 } from "@workspace/ui/components/breadcrumb";
 import {NotificationCenter} from "./notification-center";
+import {DesktopNotificationsBridge} from "./desktop-notifications-bridge";
 import {Button} from "@workspace/ui/components/button";
 import {Eye, Settings} from "lucide-react";
 import {usePathname} from "next/navigation";
@@ -360,6 +361,7 @@ export function DashboardLayout({
                             <LanguageSwitcher/>
                             <ThemeToggle/>
                             <NotificationCenter/>
+                            <DesktopNotificationsBridge/>
                             <Button
                                 variant="ghost"
                                 size="icon"

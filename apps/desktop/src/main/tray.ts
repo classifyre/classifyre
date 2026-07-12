@@ -122,6 +122,14 @@ export class AppTray {
           settingsManager.update({ runInBackground: item.checked });
         },
       },
+      {
+        label: 'Desktop Notifications',
+        type: 'checkbox',
+        checked: settingsManager.get().desktopNotifications,
+        click: (item) => {
+          settingsManager.update({ desktopNotifications: item.checked });
+        },
+      },
       { type: 'separator' },
       { label: `Quit Classifyre (${app.getVersion()})`, click: quit },
     ]);
