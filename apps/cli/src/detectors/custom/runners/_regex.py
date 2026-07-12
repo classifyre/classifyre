@@ -18,6 +18,11 @@ from ._base import BaseRunner
 
 logger = logging.getLogger(__name__)
 
+# Hard per-pattern span cap: a pathological pattern on a large document would
+# otherwise materialise millions of spans before the detector-level
+# max_findings cap applies.
+_MAX_SPANS_PER_PATTERN = 1000
+
 
 def _load_regex_engine() -> tuple[Any, bool]:
     """Try to load google-re2, fall back to stdlib re."""
@@ -130,6 +135,15 @@ class RegexRunner(BaseRunner):
                     span["groups"] = match.groups()
 
                 spans.append(span)
+                if len(spans) >= _MAX_SPANS_PER_PATTERN:
+                    logger.warning(
+                        "Pattern '%s' in detector '%s' hit the %d-span cap; "
+                        "remaining matches dropped",
+                        name,
+                        self._detector_key,
+                        _MAX_SPANS_PER_PATTERN,
+                    )
+                    break
             if spans:
                 entities[name] = spans
 

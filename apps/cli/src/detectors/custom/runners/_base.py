@@ -47,6 +47,24 @@ _IMAGE_INPUT_CONTENT_TYPES = [*_IMAGE_CONTENT_TYPES, "application/pdf"]
 
 logger = logging.getLogger(__name__)
 
+# Cap per-label entity spans embedded in each finding's metadata. Every finding
+# carries a copy of the pipeline result (the API builds extraction rows from it),
+# so an uncapped regex with thousands of matches would blow up the scan payload
+# quadratically.
+_MAX_EMBEDDED_SPANS_PER_LABEL = 25
+
+
+def _slim_pipeline_result(result: PipelineResult) -> dict[str, Any]:
+    """model_dump with entity span lists capped for embedding in finding metadata."""
+    dump = result.model_dump()
+    entities = dump.get("entities")
+    if isinstance(entities, dict):
+        for label, spans in entities.items():
+            if isinstance(spans, list) and len(spans) > _MAX_EMBEDDED_SPANS_PER_LABEL:
+                entities[label] = spans[:_MAX_EMBEDDED_SPANS_PER_LABEL]
+                dump.setdefault("metadata", {})[f"truncated_spans:{label}"] = len(spans)
+    return dump
+
 
 def _load_input_images(content: bytes, content_type: str, pil: Any) -> list[tuple[int, Any]]:
     """Return ``(page_index, PIL.Image)`` tuples for an image or renderable file.
@@ -139,6 +157,7 @@ class BaseRunner(ABC):
     def _result_to_findings(self, text: str, result: PipelineResult) -> list[DetectionResult]:
         findings: list[DetectionResult] = []
         runner_type = result.metadata.get("runner", "GLINER2")
+        pipeline_result_dump = _slim_pipeline_result(result)
 
         for label, spans in result.entities.items():
             for span in spans:
@@ -162,7 +181,7 @@ class BaseRunner(ABC):
                 meta: dict[str, Any] = {
                     "runner": runner_type,
                     "entity_label": label,
-                    "pipeline_result": result.model_dump(),
+                    "pipeline_result": pipeline_result_dump,
                 }
                 if "groups" in span:
                     meta["capture_groups"] = span["groups"]
@@ -197,7 +216,7 @@ class BaseRunner(ABC):
                         "runner": runner_type,
                         "task": task,
                         "label": label,
-                        "pipeline_result": result.model_dump(),
+                        "pipeline_result": pipeline_result_dump,
                     },
                 )
             )
