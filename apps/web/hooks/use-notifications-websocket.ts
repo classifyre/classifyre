@@ -34,16 +34,21 @@ const WS_URL = getWebSocketUrl();
 
 export function useNotificationsWebSocket({
   onChange,
+  onCreated,
 }: {
   onChange?: () => void;
+  /** Fires with the full notification payload when a new one is created. */
+  onCreated?: (notification: Record<string, unknown>) => void;
 } = {}) {
   const socketRef = useRef<Socket | null>(null);
   const callbackRef = useRef<(() => void) | undefined>(onChange);
+  const createdRef = useRef<typeof onCreated>(onCreated);
   const [isConnected, setIsConnected] = useState(false);
 
   useEffect(() => {
     callbackRef.current = onChange;
-  }, [onChange]);
+    createdRef.current = onCreated;
+  }, [onChange, onCreated]);
 
   useEffect(() => {
     const socket = io(`${WS_URL}/notifications`, {
@@ -78,7 +83,10 @@ export function useNotificationsWebSocket({
       socket.emit("subscribe:notifications");
     });
 
-    socket.on("notification:created", handleChange);
+    socket.on("notification:created", (notification: Record<string, unknown>) => {
+      createdRef.current?.(notification);
+      handleChange();
+    });
     socket.on("notification:updated", handleChange);
     socket.on("notification:deleted", handleChange);
     socket.on("notifications:changed", handleChange);
