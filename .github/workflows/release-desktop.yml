@@ -415,16 +415,9 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # Both mac jobs produce "Classifyre.dmg"; suffix the platform so the two
-      # DMGs don't overwrite each other in the GitHub release.
-      - name: Rename artifacts with platform suffix
-        if: runner.os == 'macOS'
-        shell: bash
-        run: |
-          find apps/desktop/out -type f -name '*.dmg' | while read -r f; do
-            base="${f%.dmg}"
-            mv "$f" "${base}-${{ matrix.platform }}.dmg"
-          done
+      # The DMG maker already names its output Classifyre-<version>-<arch>.dmg,
+      # so no platform-suffix rename is needed (the old rename produced the
+      # confusing Classifyre-x.y.z-arm64-mac-arm64.dmg double-arch name).
 
       - name: Find artifacts
         id: artifacts

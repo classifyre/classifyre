@@ -79,7 +79,8 @@ export function buildApplicationMenu(deps: MenuDeps): void {
 
   const checkForUpdates: MenuItemConstructorOptions = {
     label: 'Check for Updates…',
-    click: () => void updateChecker.checkForUpdates(),
+    // Interactive: reports back with a dialog even when already up to date.
+    click: () => void updateChecker.checkForUpdates(true),
   };
 
   const workspacesSubmenu: MenuItemConstructorOptions[] = [
