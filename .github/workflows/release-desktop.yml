@@ -438,8 +438,9 @@ jobs:
       # so no platform-suffix rename is needed (the old rename produced the
       # confusing Classifyre-x.y.z-arm64-mac-arm64.dmg double-arch name).
 
-      # Only scan the maker output (out/make). The packaged app trees under
-      # out/ contain the API's full node_modules on win/linux, and a bare
+      # Only scan the maker output (out/classifyre/make — forge.config.ts sets
+      # buildIdentifier 'classifyre'). The packaged app trees under out/
+      # contain the API's full node_modules on win/linux, and a bare
       # out/**/*.zip glob swept npm test fixtures (thread-stream's
       # test-package.zip / ts-commonjs-default-export.zip) into the release —
       # and their duplicate names across platform artifacts broke the upload.
@@ -447,7 +448,7 @@ jobs:
         id: artifacts
         shell: bash
         run: |
-          OUTDIR="apps/desktop/out/make"
+          OUTDIR="apps/desktop/out/classifyre/make"
           echo "Files in make output:"
           if [ ! -d "$OUTDIR" ]; then
             echo "::error::Make output directory not found: $OUTDIR"
@@ -465,10 +466,10 @@ jobs:
         with:
           name: desktop-${{ matrix.platform }}
           path: |
-            apps/desktop/out/make/**/*.dmg
-            apps/desktop/out/make/**/*.deb
-            apps/desktop/out/make/**/*.rpm
-            apps/desktop/out/make/**/*.zip
+            apps/desktop/out/classifyre/make/**/*.dmg
+            apps/desktop/out/classifyre/make/**/*.deb
+            apps/desktop/out/classifyre/make/**/*.rpm
+            apps/desktop/out/classifyre/make/**/*.zip
           if-no-files-found: error
 
   upload-release:

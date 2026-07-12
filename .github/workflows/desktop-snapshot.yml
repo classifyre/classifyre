@@ -7,8 +7,9 @@ name: Desktop Snapshot
 # package.json -SNAPSHOT version is kept, so a tested snapshot is clearly
 # distinguishable from a release in the app's Settings.
 #
-# Defaults to mac-arm64 only (a full 4-platform matrix costs ~2h of runner
-# time); use the manual dispatch to build another platform or all of them.
+# Develop pushes build the full 4-platform matrix (that's what releases cut
+# from, so every platform's snapshot must be provable). PRs build mac-arm64
+# only to keep runner cost sane; use the manual dispatch for other platforms.
 
 on:
   push:
@@ -46,5 +47,6 @@ jobs:
     with:
       tag: ''
       publish: false
-      only: ${{ github.event.inputs.only || 'mac-arm64' }}
+      # dispatch: chosen platform; PR: mac-arm64; develop push: '' = all four.
+      only: ${{ github.event.inputs.only || (github.event_name == 'pull_request' && 'mac-arm64' || '') }}
     secrets: inherit
