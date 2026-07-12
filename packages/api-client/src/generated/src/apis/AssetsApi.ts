@@ -916,6 +916,8 @@ export const SearchAssetsControllerExportAssetsAssetSourceTypeEnum = {
     Opensearch: 'OPENSEARCH',
     Meilisearch: 'MEILISEARCH',
     LocalFolder: 'LOCAL_FOLDER',
+    Microsoft365: 'MICROSOFT_365',
+    GoogleWorkspace: 'GOOGLE_WORKSPACE',
     Custom: 'CUSTOM'
 } as const;
 export type SearchAssetsControllerExportAssetsAssetSourceTypeEnum = typeof SearchAssetsControllerExportAssetsAssetSourceTypeEnum[keyof typeof SearchAssetsControllerExportAssetsAssetSourceTypeEnum];
@@ -1036,6 +1038,8 @@ export const SearchAssetsControllerQueryAssetsAssetSourceTypeEnum = {
     Opensearch: 'OPENSEARCH',
     Meilisearch: 'MEILISEARCH',
     LocalFolder: 'LOCAL_FOLDER',
+    Microsoft365: 'MICROSOFT_365',
+    GoogleWorkspace: 'GOOGLE_WORKSPACE',
     Custom: 'CUSTOM'
 } as const;
 export type SearchAssetsControllerQueryAssetsAssetSourceTypeEnum = typeof SearchAssetsControllerQueryAssetsAssetSourceTypeEnum[keyof typeof SearchAssetsControllerQueryAssetsAssetSourceTypeEnum];
@@ -1156,6 +1160,8 @@ export const SourceAssetsControllerListSourceAssetsSourceTypesEnum = {
     Opensearch: 'OPENSEARCH',
     Meilisearch: 'MEILISEARCH',
     LocalFolder: 'LOCAL_FOLDER',
+    Microsoft365: 'MICROSOFT_365',
+    GoogleWorkspace: 'GOOGLE_WORKSPACE',
     Custom: 'CUSTOM'
 } as const;
 export type SourceAssetsControllerListSourceAssetsSourceTypesEnum = typeof SourceAssetsControllerListSourceAssetsSourceTypesEnum[keyof typeof SourceAssetsControllerListSourceAssetsSourceTypesEnum];

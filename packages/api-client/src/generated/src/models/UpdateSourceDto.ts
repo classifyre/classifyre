@@ -98,7 +98,8 @@ export const UpdateSourceDtoTypeEnum = {
     Opensearch: 'OPENSEARCH',
     Meilisearch: 'MEILISEARCH',
     LocalFolder: 'LOCAL_FOLDER',
-    Microsoft365: 'MICROSOFT_365'
+    Microsoft365: 'MICROSOFT_365',
+    GoogleWorkspace: 'GOOGLE_WORKSPACE'
 } as const;
 export type UpdateSourceDtoTypeEnum = typeof UpdateSourceDtoTypeEnum[keyof typeof UpdateSourceDtoTypeEnum];
 

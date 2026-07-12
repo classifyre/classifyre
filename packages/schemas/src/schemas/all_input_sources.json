@@ -95,6 +95,9 @@
     },
     {
       "$ref": "#/definitions/Microsoft365Input"
+    },
+    {
+      "$ref": "#/definitions/GoogleWorkspaceInput"
     }
   ],
   "x-asset-metadata": {
@@ -124,7 +127,7 @@
       },
       "image": {
         "type": "object",
-        "description": "Image dimensions (png, jpg, gif, webp, …)",
+        "description": "Image dimensions (png, jpg, gif, webp, \u2026)",
         "properties": {
           "image_width": {
             "type": "integer",
@@ -1790,6 +1793,10 @@
             "modified_by": {
               "type": "string",
               "description": "User who last modified the file"
+            },
+            "permissions": {
+              "type": "array",
+              "description": "Sharing permissions on the item: list of {role, grantee_type, grantee} entries (requires include_permissions)"
             }
           },
           "required": [
@@ -1873,6 +1880,95 @@
             "drive_name"
           ]
         }
+      },
+      "GOOGLE_WORKSPACE": {
+        "file": {
+          "use": [
+            "file",
+            "image",
+            "document",
+            "spreadsheet",
+            "text",
+            "json"
+          ],
+          "properties": {
+            "drive_name": {
+              "type": "string",
+              "description": "Shared drive or 'My Drive' display name"
+            },
+            "item_path": {
+              "type": "string",
+              "description": "Best-effort path within the drive (folder names joined by '/')"
+            },
+            "web_url": {
+              "type": "string",
+              "description": "Browser-accessible URL for the item (webViewLink)"
+            },
+            "md5_checksum": {
+              "type": "string",
+              "description": "Drive-reported MD5 checksum of the file content (binary files only)"
+            },
+            "owner": {
+              "type": "string",
+              "description": "Display name or email of the file owner"
+            },
+            "permissions": {
+              "type": "array",
+              "description": "Sharing permissions on the item: list of {role, grantee_type, grantee} entries (requires include_permissions)"
+            },
+            "google_mime_type": {
+              "type": "string",
+              "description": "Original Drive mimeType for Google-native files (e.g. application/vnd.google-apps.document)"
+            },
+            "exported_as": {
+              "type": "string",
+              "description": "Export MIME type used to download a Google-native file, if applicable"
+            }
+          },
+          "required": [
+            "drive_name",
+            "item_path"
+          ]
+        },
+        "image": {
+          "use": [
+            "file"
+          ],
+          "properties": {
+            "source_hash": {
+              "type": "string",
+              "description": "Hash of the parent file asset"
+            },
+            "location": {
+              "type": "string",
+              "description": "Location of the embedded image within the parent"
+            }
+          },
+          "required": [
+            "source_hash",
+            "location"
+          ]
+        },
+        "drive": {
+          "properties": {
+            "drive_id": {
+              "type": "string",
+              "description": "Google Drive ID (shared drive ID, or a synthetic ID for My Drive)"
+            },
+            "drive_name": {
+              "type": "string",
+              "description": "Drive display name"
+            },
+            "drive_type": {
+              "type": "string",
+              "description": "Drive type (my_drive or shared_drive)"
+            }
+          },
+          "required": [
+            "drive_id",
+            "drive_name"
+          ]
+        }
       }
     }
   },
@@ -1910,7 +2006,8 @@
         "OPENSEARCH",
         "MEILISEARCH",
         "LOCAL_FOLDER",
-        "MICROSOFT_365"
+        "MICROSOFT_365",
+        "GOOGLE_WORKSPACE"
       ],
       "description": "Type of the asset or source"
     },
@@ -1955,7 +2052,7 @@
         "LATEST",
         "ALL"
       ],
-      "description": "Sampling strategy. AUTOMATIC (recommended default) incrementally ingests a new slice of not-yet-seen data on every run, remembering its position between runs and wrapping around to re-scan from the start once everything has been covered — eventually ingesting everything at a bounded cost per run. RANDOM samples items randomly. LATEST prioritises the most recently modified/created items. ALL scans every item with no limit."
+      "description": "Sampling strategy. AUTOMATIC (recommended default) incrementally ingests a new slice of not-yet-seen data on every run, remembering its position between runs and wrapping around to re-scan from the start once everything has been covered \u2014 eventually ingesting everything at a bounded cost per run. RANDOM samples items randomly. LATEST prioritises the most recently modified/created items. ALL scans every item with no limit."
     },
     "SamplingConfig": {
       "title": "SamplingConfig",
@@ -4353,7 +4450,7 @@
         "cluster_host": {
           "type": "string",
           "minLength": 1,
-          "description": "Atlas SRV cluster host or full mongodb+srv:// URI (for example, cluster.abc123.mongodb.net or mongodb+srv://cluster.abc123.mongodb.net). If a full URI is supplied, the host is extracted and credentials are discarded — set them in masked fields instead."
+          "description": "Atlas SRV cluster host or full mongodb+srv:// URI (for example, cluster.abc123.mongodb.net or mongodb+srv://cluster.abc123.mongodb.net). If a full URI is supplied, the host is extracted and credentials are discarded \u2014 set them in masked fields instead."
         }
       },
       "required": [
@@ -6827,7 +6924,7 @@
       "properties": {
         "bucket": {
           "type": "string",
-          "description": "Bucket holding the tables — AWS S3, MinIO, Cloudflare R2, Backblaze B2, Garage, and other S3-compatible endpoints"
+          "description": "Bucket holding the tables \u2014 AWS S3, MinIO, Cloudflare R2, Backblaze B2, Garage, and other S3-compatible endpoints"
         }
       },
       "required": [
@@ -6921,7 +7018,7 @@
       "properties": {
         "bucket": {
           "type": "string",
-          "description": "Bucket holding the tables — AWS S3, MinIO, Cloudflare R2, Backblaze B2, Garage, and other S3-compatible endpoints"
+          "description": "Bucket holding the tables \u2014 AWS S3, MinIO, Cloudflare R2, Backblaze B2, Garage, and other S3-compatible endpoints"
         }
       },
       "required": [
@@ -8059,6 +8156,260 @@
             },
             "optional": {
               "$ref": "#/definitions/Microsoft365Optional"
+            },
+            "detectors": {
+              "$ref": "#/definitions/Detectors"
+            },
+            "custom_detectors": {
+              "$ref": "#/definitions/CustomDetectorSelections"
+            },
+            "sampling": {
+              "$ref": "#/definitions/SamplingConfig"
+            },
+            "resources": {
+              "$ref": "#/definitions/ResourceOverrides"
+            }
+          },
+          "required": [
+            "required",
+            "masked",
+            "sampling"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "GoogleWorkspaceRequiredServiceAccount": {
+      "title": "GoogleWorkspaceRequiredServiceAccount",
+      "type": "object",
+      "properties": {
+        "auth_method": {
+          "const": "service_account"
+        },
+        "delegated_subject": {
+          "type": "string",
+          "description": "User email to impersonate via domain-wide delegation (optional)"
+        }
+      },
+      "required": [
+        "auth_method"
+      ],
+      "additionalProperties": false
+    },
+    "GoogleWorkspaceRequiredOAuth": {
+      "title": "GoogleWorkspaceRequiredOAuth",
+      "type": "object",
+      "properties": {
+        "auth_method": {
+          "const": "oauth"
+        },
+        "client_id": {
+          "type": "string",
+          "description": "OAuth 2.0 client ID"
+        }
+      },
+      "required": [
+        "auth_method",
+        "client_id"
+      ],
+      "additionalProperties": false
+    },
+    "GoogleWorkspaceRequired": {
+      "title": "GoogleWorkspaceRequired",
+      "oneOf": [
+        {
+          "$ref": "#/definitions/GoogleWorkspaceRequiredServiceAccount"
+        },
+        {
+          "$ref": "#/definitions/GoogleWorkspaceRequiredOAuth"
+        }
+      ]
+    },
+    "GoogleWorkspaceMaskedServiceAccount": {
+      "title": "GoogleWorkspaceMaskedServiceAccount",
+      "type": "object",
+      "properties": {
+        "service_account_json": {
+          "type": "string",
+          "description": "Full JSON key for the Google service account"
+        }
+      },
+      "required": [
+        "service_account_json"
+      ],
+      "additionalProperties": false
+    },
+    "GoogleWorkspaceMaskedOAuth": {
+      "title": "GoogleWorkspaceMaskedOAuth",
+      "type": "object",
+      "properties": {
+        "client_secret": {
+          "type": "string",
+          "description": "OAuth 2.0 client secret"
+        },
+        "refresh_token": {
+          "type": "string",
+          "description": "OAuth 2.0 refresh token"
+        }
+      },
+      "required": [
+        "client_secret",
+        "refresh_token"
+      ],
+      "additionalProperties": false
+    },
+    "GoogleWorkspaceMasked": {
+      "title": "GoogleWorkspaceMasked",
+      "oneOf": [
+        {
+          "$ref": "#/definitions/GoogleWorkspaceMaskedServiceAccount"
+        },
+        {
+          "$ref": "#/definitions/GoogleWorkspaceMaskedOAuth"
+        }
+      ]
+    },
+    "GoogleWorkspaceOptionalScope": {
+      "title": "GoogleWorkspaceOptionalScope",
+      "type": "object",
+      "description": "Drive/folder selection and content filtering.",
+      "properties": {
+        "drive_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Shared drive IDs to scan (empty = all accessible shared drives)"
+        },
+        "folder_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Only scan these folder IDs recursively (empty = full drives)"
+        },
+        "include_my_drive": {
+          "type": "boolean",
+          "default": true,
+          "description": "Include the authenticated/delegated user's My Drive"
+        },
+        "include_shared_drives": {
+          "type": "boolean",
+          "default": true,
+          "description": "Include shared drives"
+        },
+        "include_file_extensions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Only include files with these extensions (e.g. .pdf, .docx)"
+        },
+        "exclude_file_extensions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Skip files with these extensions"
+        },
+        "include_permissions": {
+          "type": "boolean",
+          "default": false,
+          "description": "Include file sharing permission metadata"
+        }
+      },
+      "additionalProperties": false
+    },
+    "GoogleWorkspaceOptionalConnection": {
+      "title": "GoogleWorkspaceOptionalConnection",
+      "type": "object",
+      "description": "Network and pagination controls for Drive API requests.",
+      "properties": {
+        "page_size": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000,
+          "default": 1000,
+          "description": "Items per page for Drive API list requests"
+        },
+        "max_object_bytes": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 104857600,
+          "description": "Skip files larger than this many bytes (default 100 MB)"
+        },
+        "max_retries": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10,
+          "default": 5,
+          "description": "Maximum retries on transient errors"
+        },
+        "timeout_seconds": {
+          "type": "integer",
+          "minimum": 5,
+          "maximum": 300,
+          "default": 30,
+          "description": "Socket timeout for Drive API operations"
+        }
+      },
+      "additionalProperties": false
+    },
+    "GoogleWorkspaceOptionalExtraction": {
+      "title": "GoogleWorkspaceOptionalExtraction",
+      "type": "object",
+      "description": "Controls which structural assets to emit and how Google-native files are handled.",
+      "properties": {
+        "include_drive_metadata": {
+          "type": "boolean",
+          "default": true,
+          "description": "Emit drive-level assets with metadata"
+        },
+        "export_google_formats": {
+          "type": "boolean",
+          "default": true,
+          "description": "Export Google-native files (Docs/Sheets/Slides) to Office formats for content extraction"
+        }
+      },
+      "additionalProperties": false
+    },
+    "GoogleWorkspaceOptional": {
+      "title": "GoogleWorkspaceOptional",
+      "type": "object",
+      "properties": {
+        "scope": {
+          "$ref": "#/definitions/GoogleWorkspaceOptionalScope"
+        },
+        "connection": {
+          "$ref": "#/definitions/GoogleWorkspaceOptionalConnection"
+        },
+        "extraction": {
+          "$ref": "#/definitions/GoogleWorkspaceOptionalExtraction"
+        }
+      },
+      "additionalProperties": false
+    },
+    "GoogleWorkspaceInput": {
+      "title": "GoogleWorkspaceInput",
+      "label": "Google Workspace",
+      "allOf": [
+        {
+          "$ref": "#/definitions/CoreInput"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "GOOGLE_WORKSPACE"
+            },
+            "required": {
+              "$ref": "#/definitions/GoogleWorkspaceRequired"
+            },
+            "masked": {
+              "$ref": "#/definitions/GoogleWorkspaceMasked"
+            },
+            "optional": {
+              "$ref": "#/definitions/GoogleWorkspaceOptional"
             },
             "detectors": {
               "$ref": "#/definitions/Detectors"

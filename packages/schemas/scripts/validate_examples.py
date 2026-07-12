@@ -40,6 +40,7 @@ TYPE_TO_DEFINITION = {
     "MEILISEARCH": "MeilisearchInput",
     "LOCAL_FOLDER": "LocalFolderInput",
     "MICROSOFT_365": "Microsoft365Input",
+    "GOOGLE_WORKSPACE": "GoogleWorkspaceInput",
 }
 
 SCHEMAS_DIR = Path(__file__).parent.parent / "src" / "schemas"
