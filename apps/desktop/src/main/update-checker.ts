@@ -1,4 +1,4 @@
-import { app, autoUpdater, net, shell } from 'electron';
+import { app, autoUpdater, dialog, net, shell } from 'electron';
 import type { WebContentsView } from 'electron';
 import fs from 'fs';
 import http from 'http';
@@ -119,39 +119,84 @@ export class UpdateChecker {
     this.recheckTimer.unref?.();
   }
 
-  async checkForUpdates(): Promise<void> {
-    if (!app.isPackaged) return;
+  /**
+   * Checks GitHub for a newer release. Background checks stay silent apart
+   * from the tab-bar badge; `interactive` checks (the "Check for Updates…"
+   * menu item) always answer with a dialog — including "you're up to date"
+   * and check failures, which the badge cannot express.
+   */
+  async checkForUpdates(interactive = false): Promise<void> {
+    if (!app.isPackaged) {
+      if (interactive) {
+        void dialog.showMessageBox({
+          type: 'info',
+          title: 'Updates',
+          message: 'Update checks are only available in the packaged app.',
+        });
+      }
+      return;
+    }
 
     this.sendStatus({ status: 'checking' });
+    let result: UpdateStatus;
     try {
       const response = await net.fetch(RELEASES_API, {
         headers: { Accept: 'application/vnd.github+json' },
       });
       if (!response.ok) {
-        this.sendStatus({ status: 'not-available' });
-        return;
-      }
-      const release = (await response.json()) as {
-        tag_name?: string;
-        draft?: boolean;
-        assets?: ReleaseAsset[];
-      };
-      const tag = release.tag_name;
-      if (!tag || release.draft) {
-        this.sendStatus({ status: 'not-available' });
-        return;
-      }
-
-      if (isNewer(tag, app.getVersion())) {
-        this.latestVersion = tag.replace(/^v/, '');
-        this.assets = release.assets ?? [];
-        this.sendStatus({ status: 'available', version: this.latestVersion });
+        result = { status: 'error', message: `GitHub responded with HTTP ${response.status}` };
       } else {
-        this.sendStatus({ status: 'not-available' });
+        const release = (await response.json()) as {
+          tag_name?: string;
+          draft?: boolean;
+          assets?: ReleaseAsset[];
+        };
+        const tag = release.tag_name;
+        if (!tag || release.draft) {
+          result = { status: 'not-available' };
+        } else if (isNewer(tag, app.getVersion())) {
+          this.latestVersion = tag.replace(/^v/, '');
+          this.assets = release.assets ?? [];
+          result = { status: 'available', version: this.latestVersion };
+        } else {
+          result = { status: 'not-available' };
+        }
       }
     } catch (err) {
-      // Offline or rate-limited — stay silent, this is best-effort.
-      this.sendStatus({ status: 'error', message: (err as Error).message });
+      // Offline or rate-limited — badge stays silent, this is best-effort.
+      result = { status: 'error', message: (err as Error).message };
+    }
+
+    this.sendStatus(result);
+    if (interactive) await this.showCheckResultDialog(result);
+  }
+
+  private async showCheckResultDialog(status: UpdateStatus): Promise<void> {
+    if (status.status === 'not-available') {
+      await dialog.showMessageBox({
+        type: 'info',
+        title: 'You’re up to date',
+        message: 'You’re up to date',
+        detail: `Classifyre ${app.getVersion()} is currently the newest version available.`,
+      });
+    } else if (status.status === 'available') {
+      const { response } = await dialog.showMessageBox({
+        type: 'info',
+        title: 'Update available',
+        message: `Classifyre ${status.version} is available`,
+        detail: `You have ${app.getVersion()}. Download the update now?`,
+        buttons: ['Download', 'Later'],
+        defaultId: 0,
+        cancelId: 1,
+      });
+      if (response === 0) void this.downloadUpdate();
+    } else if (status.status === 'error') {
+      await dialog.showMessageBox({
+        type: 'warning',
+        title: 'Update check failed',
+        message: 'Could not check for updates',
+        detail: status.message,
+      });
     }
   }
 

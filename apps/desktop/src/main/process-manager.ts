@@ -1,4 +1,4 @@
-import { spawn, spawnSync, execFileSync, type ChildProcess } from 'child_process';
+import { spawn, execFileSync, type ChildProcess } from 'child_process';
 import { app } from 'electron';
 import path from 'path';
 import fs from 'fs';
@@ -116,15 +116,16 @@ const UV_CACHE_MAX_BYTES = 4 * 1024 ** 3; // 4 GiB
 
 // Recursive directory size with early exit: stops walking as soon as the
 // running total passes `limit`, so an oversized cache is detected without
-// traversing the whole tree. Cross-platform (no `du`). Best-effort.
-function dirSizeExceeds(dir: string, limit: number): boolean {
+// traversing the whole tree. Cross-platform (no `du`). Best-effort. Async so
+// a large cache walk never blocks the Electron main process.
+async function dirSizeExceeds(dir: string, limit: number): Promise<boolean> {
   let total = 0;
   const stack = [dir];
   while (stack.length > 0) {
     const current = stack.pop() as string;
     let entries: fs.Dirent[];
     try {
-      entries = fs.readdirSync(current, { withFileTypes: true });
+      entries = await fs.promises.readdir(current, { withFileTypes: true });
     } catch {
       continue;
     }
@@ -134,7 +135,7 @@ function dirSizeExceeds(dir: string, limit: number): boolean {
         stack.push(full);
       } else if (entry.isFile()) {
         try {
-          total += fs.statSync(full).size;
+          total += (await fs.promises.stat(full)).size;
         } catch {
           continue;
         }
@@ -159,7 +160,7 @@ export class ProcessManager {
   private processes = new Map<string, ManagedProcess>();
   private venvPathOverride: string | null = null;
   private venvPreparation: Promise<void> | null = null;
-  private apiDirCache: string | null = null;
+  private apiDirPromise: Promise<string> | null = null;
 
   // Rewires the bundled Python venv for this machine. Lazy: runs on the first
   // workspace open (covered by the loading indicator) rather than at app
@@ -175,7 +176,7 @@ export class ProcessManager {
         } catch (err) {
           console.error('Failed to prepare Python runtime:', err);
         }
-        this.bustUvCacheIfOversized();
+        await this.bustUvCacheIfOversized();
       })();
     }
     return this.venvPreparation;
@@ -184,7 +185,7 @@ export class ProcessManager {
   // Keep the contained uv cache under its size cap. Runs once per app launch
   // alongside venv prep (which is already covered by the loading indicator).
   // Best-effort: cache maintenance must never block or fail a workspace open.
-  private bustUvCacheIfOversized(): void {
+  private async bustUvCacheIfOversized(): Promise<void> {
     const cacheDir = getUvCacheDir();
     if (!cacheDir) return;
     try {
@@ -192,11 +193,11 @@ export class ProcessManager {
         fs.mkdirSync(cacheDir, { recursive: true });
         return;
       }
-      if (dirSizeExceeds(cacheDir, UV_CACHE_MAX_BYTES)) {
+      if (await dirSizeExceeds(cacheDir, UV_CACHE_MAX_BYTES)) {
         console.log(
           `[uv-cache] ${cacheDir} exceeds ${UV_CACHE_MAX_BYTES} bytes — clearing`,
         );
-        fs.rmSync(cacheDir, { recursive: true, force: true });
+        await fs.promises.rm(cacheDir, { recursive: true, force: true });
         fs.mkdirSync(cacheDir, { recursive: true });
       }
     } catch (err) {
@@ -208,13 +209,24 @@ export class ProcessManager {
   // files made Apple's notary scan take hours) and is unpacked to userData on
   // first workspace open, once per app version. Other platforms bundle the
   // plain resources/api directory.
-  private ensureApiDir(): string {
-    if (this.apiDirCache) return this.apiDirCache;
+  // Single-flight and fully async: the extraction can take tens of seconds and
+  // must never run on the main thread synchronously (it froze the whole app —
+  // macOS flagged it unresponsive during the first workspace open).
+  private ensureApiDir(): Promise<string> {
+    if (!this.apiDirPromise) {
+      this.apiDirPromise = this.extractApiDir().catch((err: unknown) => {
+        // Allow a retry on the next workspace open instead of caching failure.
+        this.apiDirPromise = null;
+        throw err;
+      });
+    }
+    return this.apiDirPromise;
+  }
 
+  private async extractApiDir(): Promise<string> {
     const bundledDir = path.join(process.resourcesPath, 'api');
     const archive = path.join(process.resourcesPath, 'api.tar.gz');
     if (fs.existsSync(bundledDir) || !fs.existsSync(archive)) {
-      this.apiDirCache = bundledDir;
       return bundledDir;
     }
 
@@ -230,9 +242,10 @@ export class ProcessManager {
     const archiveStat = fs.statSync(archive);
     const signature = `${app.getVersion()}:${archiveStat.size}:${Math.round(archiveStat.mtimeMs)}`;
     try {
-      const marker = JSON.parse(fs.readFileSync(markerFile, 'utf-8')) as { signature?: string };
+      const marker = JSON.parse(
+        await fs.promises.readFile(markerFile, 'utf-8'),
+      ) as { signature?: string };
       if (marker.signature === signature && fs.existsSync(extractedDir)) {
-        this.apiDirCache = extractedDir;
         return extractedDir;
       }
     } catch {
@@ -240,24 +253,27 @@ export class ProcessManager {
     }
 
     console.log(`[api-runtime] Extracting bundled API to ${root}…`);
-    fs.rmSync(root, { recursive: true, force: true });
-    fs.mkdirSync(root, { recursive: true });
-    const result = spawnSync('tar', ['-xzf', archive, '-C', root], { stdio: 'inherit' });
-    if (result.status !== 0) {
-      throw new Error(`Failed to extract bundled API (tar exited ${result.status})`);
-    }
-    fs.writeFileSync(markerFile, JSON.stringify({ signature }));
+    await fs.promises.rm(root, { recursive: true, force: true });
+    await fs.promises.mkdir(root, { recursive: true });
+    await new Promise<void>((resolve, reject) => {
+      const child = spawn('tar', ['-xzf', archive, '-C', root], { stdio: 'inherit' });
+      child.on('error', reject);
+      child.on('exit', (code) => {
+        if (code === 0) resolve();
+        else reject(new Error(`Failed to extract bundled API (tar exited ${code})`));
+      });
+    });
+    await fs.promises.writeFile(markerFile, JSON.stringify({ signature }));
     console.log('[api-runtime] Extraction complete');
-    this.apiDirCache = extractedDir;
     return extractedDir;
   }
 
-  private getApiEntryPath(): string {
+  private async getApiEntryPath(): Promise<string> {
     if (app.isPackaged) {
       // Packaged: the whole API is one esbuild bundle at the api-tree root
       // (see apps/desktop/scripts/bundle-api.mjs). Dev still runs the plain
       // tsc output.
-      return path.join(this.ensureApiDir(), 'backend.js');
+      return path.join(await this.ensureApiDir(), 'backend.js');
     }
     return path.join(__dirname, '../../../api/dist/src/main.js');
   }
@@ -279,16 +295,16 @@ export class ProcessManager {
     return path.join(__dirname, '../../../cli/.venv');
   }
 
-  private getPrismaDir(): string {
+  private async getPrismaDir(): Promise<string> {
     if (app.isPackaged) {
       // Staged inside the api tree so `prisma generate` at build time and
       // `prisma migrate deploy` at runtime share one schema location.
-      return path.join(this.ensureApiDir(), 'prisma');
+      return path.join(await this.ensureApiDir(), 'prisma');
     }
     return path.join(__dirname, '../../../api/prisma');
   }
 
-  private getApiDir(): string {
+  private async getApiDir(): Promise<string> {
     if (app.isPackaged) {
       return this.ensureApiDir();
     }
@@ -317,7 +333,7 @@ export class ProcessManager {
 
     await this.prepareVenv();
 
-    const entryPath = this.getApiEntryPath();
+    const entryPath = await this.getApiEntryPath();
     const cliPath = this.getCliPath();
     const venvPath = this.getVenvPath();
 
@@ -403,9 +419,9 @@ export class ProcessManager {
 
   // Locates the Prisma CLI bundled with the API's node_modules; runs offline
   // with Electron's Node — no bun, no npx, no network.
-  private getPrismaCliPath(): string {
+  private async getPrismaCliPath(): Promise<string> {
     const candidates = [
-      path.join(this.getApiDir(), 'node_modules', 'prisma', 'build', 'index.js'),
+      path.join(await this.getApiDir(), 'node_modules', 'prisma', 'build', 'index.js'),
       // Dev fallback: hoisted install at the monorepo root.
       path.join(__dirname, '../../../../node_modules/prisma/build/index.js'),
     ];
@@ -419,9 +435,9 @@ export class ProcessManager {
   }
 
   async runMigrations(databaseUrl: string): Promise<void> {
-    const prismaSchemaPath = path.join(this.getPrismaDir(), 'schema.prisma');
-    const apiDir = this.getApiDir();
-    const prismaCli = this.getPrismaCliPath();
+    const prismaSchemaPath = path.join(await this.getPrismaDir(), 'schema.prisma');
+    const apiDir = await this.getApiDir();
+    const prismaCli = await this.getPrismaCliPath();
 
     console.log(`[migrations] Running in ${apiDir} with schema ${prismaSchemaPath}`);
 

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, WebContentsView, dialog, protocol } from 'electron';
+import { app, autoUpdater, BrowserWindow, WebContentsView, dialog, protocol } from 'electron';
 import path from 'path';
 import { PostgresManager } from './postgres-manager.js';
 import { NamespaceManager } from './namespace-manager.js';
@@ -47,6 +47,17 @@ let runtime: NamespaceRuntime;
 let updateChecker: UpdateChecker;
 let tray: AppTray | null = null;
 let isQuitting = false;
+let shutdownStarted = false;
+
+// Squirrel.Mac's quitAndInstall() closes every window BEFORE any before-quit
+// fires. Without this flag the background-mode close handler intercepts that
+// close and just hides the window, so "Restart to update" silently did nothing
+// but hide the app. Marking quit-in-progress here lets the close proceed;
+// graceful shutdown still runs in before-quit, and Squirrel's ShipIt installs
+// the update once the process actually exits.
+autoUpdater.on('before-quit-for-update', () => {
+  isQuitting = true;
+});
 
 /** Restores the window, recreating it if it was fully closed. */
 function showMainWindow(): void {
@@ -251,9 +262,12 @@ app.on('activate', () => {
 });
 
 app.on('before-quit', (e) => {
-  if (isQuitting) return;
-  e.preventDefault();
+  // isQuitting may already be true (update restart path) — the graceful
+  // shutdown below must still run exactly once, so it has its own flag.
   isQuitting = true;
+  if (shutdownStarted) return;
+  e.preventDefault();
+  shutdownStarted = true;
 
   // If graceful shutdown hangs (e.g. pg_ctl stop blocked on a stuck
   // connection), quit anyway — otherwise the app appears frozen and the user
