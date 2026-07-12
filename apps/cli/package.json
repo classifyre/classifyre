@@ -1,6 +1,6 @@
 {
   "name": "@classifyre/cli",
-  "version": "0.4.48",
+  "version": "0.4.49-SNAPSHOT",
   "private": true,
   "scripts": {
     "build": "uv sync",
