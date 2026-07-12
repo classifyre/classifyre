@@ -506,6 +506,12 @@ export class CustomDetectorsService {
     );
   }
 
+  private validateDetectorName(name: string | undefined): void {
+    if (!name || name.trim().length === 0) {
+      throw new BadRequestException('Detector name must not be empty');
+    }
+  }
+
   private normalizeKey(value: string): string {
     const normalized = value
       .trim()
@@ -592,6 +598,67 @@ export class CustomDetectorsService {
     'OBJECT_DETECTION',
   ]);
 
+  /**
+   * Validate that `field`, if present on `schema`, is a number within the given
+   * bounds. No-op when the field is absent — callers only pass fields that are
+   * meaningful for the pipeline type currently being validated.
+   */
+  private validateNumberRange(
+    schema: Record<string, unknown>,
+    field: string,
+    options: { min?: number; max?: number; integer?: boolean } = {},
+  ): void {
+    const value = schema[field];
+    if (value === undefined || value === null) {
+      return;
+    }
+    if (typeof value !== 'number' || Number.isNaN(value)) {
+      throw new BadRequestException(`${field} must be a number`);
+    }
+    if (options.integer && !Number.isInteger(value)) {
+      throw new BadRequestException(`${field} must be an integer`);
+    }
+    if (options.min !== undefined && value < options.min) {
+      throw new BadRequestException(`${field} must be >= ${options.min}`);
+    }
+    if (options.max !== undefined && value > options.max) {
+      throw new BadRequestException(`${field} must be <= ${options.max}`);
+    }
+  }
+
+  /**
+   * Best-effort compile check for a REGEX pipeline pattern. Translates RE2's
+   * `(?P<name>` named-group syntax to JS's `(?<name>`, then attempts
+   * `new RegExp(...)`. Returns `ok: true` when the pattern uses constructs
+   * (e.g. `\p{...}` Unicode property escapes) that this translation can't
+   * safely validate — we never want to false-reject a pattern that may be
+   * valid RE2 but isn't a 1:1 match for JS regex syntax.
+   */
+  private compileRegexForValidation(pattern: string): {
+    ok: boolean;
+    error?: string;
+  } {
+    const translated = pattern.replace(/\(\?P<([^>]+)>/g, '(?<$1>');
+    // RE2 inline flag groups like `(?i)` / `(?is:...)` are valid RE2 but not
+    // JS regex syntax — skip validation rather than false-reject them.
+    if (/\(\?-?[a-zA-Z]+[):]/.test(translated)) {
+      return { ok: true };
+    }
+    const usesUnicodeProperties = /\\[pP]\{/.test(translated);
+    try {
+      new RegExp(translated, usesUnicodeProperties ? 'u' : undefined);
+      return { ok: true };
+    } catch (error) {
+      if (usesUnicodeProperties) {
+        return { ok: true };
+      }
+      return {
+        ok: false,
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
+  }
+
   private validatePipelineSchema(schema: Record<string, unknown>): void {
     const schemaType = (schema.type as string | undefined) ?? 'GLINER2';
     const validTypes = [
@@ -609,6 +676,36 @@ export class CustomDetectorsService {
       );
     }
 
+    // Numeric range checks apply only to fields the client actually supplied;
+    // each field is only meaningful for a subset of pipeline types, but
+    // checking presence rather than gating on schemaType keeps this simple
+    // and never rejects a field that isn't part of the payload.
+    this.validateNumberRange(schema, 'confidence_threshold', {
+      min: 0,
+      max: 1,
+    });
+    this.validateNumberRange(schema, 'temperature', { min: 0, max: 2 });
+    this.validateNumberRange(schema, 'top_k', { min: 1, integer: true });
+    this.validateNumberRange(schema, 'chunk_size', { min: 1, integer: true });
+    this.validateNumberRange(schema, 'chunk_overlap', {
+      min: 0,
+      integer: true,
+    });
+    this.validateNumberRange(schema, 'max_tokens', { min: 1, integer: true });
+    this.validateNumberRange(schema, 'max_findings', {
+      min: 1,
+      integer: true,
+    });
+    if (
+      typeof schema.chunk_size === 'number' &&
+      typeof schema.chunk_overlap === 'number' &&
+      schema.chunk_overlap >= schema.chunk_size
+    ) {
+      throw new BadRequestException(
+        'chunk_overlap must be smaller than chunk_size',
+      );
+    }
+
     if (schemaType === 'REGEX') {
       const hasPatterns =
         schema.patterns &&
@@ -618,6 +715,24 @@ export class CustomDetectorsService {
         throw new BadRequestException(
           'REGEX pipeline schema must define at least one pattern',
         );
+      }
+      for (const [patternName, rawDef] of Object.entries(
+        schema.patterns as Record<string, unknown>,
+      )) {
+        const def = asRecord(rawDef);
+        if (def.literal === true) {
+          continue;
+        }
+        const patternValue = def.pattern;
+        if (typeof patternValue !== 'string' || patternValue.length === 0) {
+          continue;
+        }
+        const compiled = this.compileRegexForValidation(patternValue);
+        if (!compiled.ok) {
+          throw new BadRequestException(
+            `REGEX pattern '${patternName}' failed to compile: ${compiled.error}`,
+          );
+        }
       }
       return;
     }
@@ -911,6 +1026,7 @@ export class CustomDetectorsService {
   async create(
     dto: CreateCustomDetectorDto,
   ): Promise<CustomDetectorResponseDto> {
+    this.validateDetectorName(dto.name);
     const key = this.normalizeKey(dto.key ?? `cust_${dto.name}`);
     this.validatePipelineSchema(dto.pipelineSchema);
     const aiProviderConfigId = await this.resolveAiProviderConfigId(
@@ -957,6 +1073,9 @@ export class CustomDetectorsService {
       throw new NotFoundException(`Custom detector with ID ${id} not found`);
     }
 
+    if (dto.name !== undefined) {
+      this.validateDetectorName(dto.name);
+    }
     const nextKey = this.normalizeKey(dto.key ?? existing.key);
     const nextName = dto.name ?? existing.name;
     const nextDescription =

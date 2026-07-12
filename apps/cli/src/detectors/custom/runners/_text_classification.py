@@ -33,21 +33,43 @@ class TextClassificationRunner(BaseRunner):
         self._schema = schema
         self._detector_key = detector_key
         self._detector_name = detector_name
-        ensure_torch("text_classification", ["custom", "detectors"])
-        transformers = require_module(
-            "transformers", "text_classification", ["custom", "detectors"]
-        )
-        pipeline_kwargs: dict[str, Any] = {
-            "model": schema.model,
-            "device": schema.device or "cpu",
-        }
-        if schema.model_revision:
-            pipeline_kwargs["revision"] = schema.model_revision
-        if schema.top_k is not None:
-            pipeline_kwargs["top_k"] = schema.top_k
-        if schema.function_to_apply is not None:
-            pipeline_kwargs["function_to_apply"] = str(schema.function_to_apply)
-        self._pipe: Any = transformers.pipeline("text-classification", **pipeline_kwargs)
+        # Model loading is deferred to first detect() so the parent process
+        # (which only routes when a worker pool is active) never pays the
+        # torch import + model memory cost.
+        self._pipe: Any | None = None
+        self._load_error: str | None = None
+
+    def _ensure_pipeline(self) -> Any | None:
+        if self._pipe is not None:
+            return self._pipe
+        if self._load_error is not None:
+            return None
+        schema = self._schema
+        try:
+            ensure_torch("text_classification", ["custom", "detectors"])
+            transformers = require_module(
+                "transformers", "text_classification", ["custom", "detectors"]
+            )
+            pipeline_kwargs: dict[str, Any] = {
+                "model": schema.model,
+                "device": schema.device or "cpu",
+            }
+            if schema.model_revision:
+                pipeline_kwargs["revision"] = schema.model_revision
+            if schema.top_k is not None:
+                pipeline_kwargs["top_k"] = schema.top_k
+            if schema.function_to_apply is not None:
+                pipeline_kwargs["function_to_apply"] = str(schema.function_to_apply)
+            self._pipe = transformers.pipeline("text-classification", **pipeline_kwargs)
+            return self._pipe
+        except Exception as exc:
+            # Raise on the first failure so the scan records one structured
+            # error; later assets skip quietly via the cached _load_error.
+            self._load_error = str(exc)
+            raise RuntimeError(
+                f"text_classification model '{schema.model}' failed to load for "
+                f"detector '{self._detector_key}': {exc}"
+            ) from exc
 
     def run(self, text: str) -> None:  # type: ignore[override]  # pragma: no cover
         raise NotImplementedError("TextClassificationRunner uses detect() directly")
@@ -59,6 +81,9 @@ class TextClassificationRunner(BaseRunner):
             return []
         text = content.strip()
         if not text:
+            return []
+        pipe = self._ensure_pipeline()
+        if pipe is None:
             return []
 
         schema = self._schema
@@ -74,7 +99,7 @@ class TextClassificationRunner(BaseRunner):
                 call_kwargs: dict[str, Any] = {"truncation": True}
                 if max_length is not None:
                     call_kwargs["max_length"] = max_length
-                raw = self._pipe(chunk, **call_kwargs) or []
+                raw = pipe(chunk, **call_kwargs) or []
                 preds: list[dict[str, Any]] = raw[0] if raw and isinstance(raw[0], list) else raw
                 for pred in preds:
                     label: str = pred.get("label", "unknown")

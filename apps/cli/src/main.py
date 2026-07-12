@@ -182,10 +182,14 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
                     from .pipeline.worker_pool import (
                         DetectorWorkerPool,
                         compute_pool_workers,
+                        recipe_has_ml_custom_detectors,
                     )
 
+                    # ML-backed custom detectors load a model copy per worker
+                    # process; budget ~2GB/worker for those recipes instead of 1GB.
                     pool_workers = compute_pool_workers(
                         override=args.max_pool_workers,
+                        per_worker_mb=2048 if recipe_has_ml_custom_detectors(recipe) else 1024,
                     )
                     worker_pool: DetectorWorkerPool | None = None
 
