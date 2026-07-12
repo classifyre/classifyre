@@ -2,8 +2,8 @@ apiVersion: v2
 name: classifyre-core
 description: Production-ready Helm chart for Classifyre — web, api, and Kubernetes CLI jobs
 type: application
-version: 0.4.47-SNAPSHOT
-appVersion: "0.4.47-SNAPSHOT"
+version: 0.4.48-SNAPSHOT
+appVersion: "0.4.48-SNAPSHOT"
 keywords:
   - classifyre
   - nestjs
