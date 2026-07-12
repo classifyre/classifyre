@@ -35,6 +35,24 @@ _worker_init_errors: dict[str, str] = {}
 _worker_pid: int | None = None
 
 
+def _init_worker_threads(threads_per_worker: int) -> None:
+    """Cap BLAS/torch intra-op threads so N workers don't each grab every core.
+
+    Runs as the ProcessPoolExecutor initializer in each worker process. The env
+    vars must be set before numpy/torch import; torch.set_num_threads covers the
+    case where torch is already imported via the forkserver preload.
+    """
+    threads = max(1, threads_per_worker)
+    for var in ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS"):
+        os.environ.setdefault(var, str(threads))
+    try:
+        import torch
+
+        torch.set_num_threads(threads)
+    except Exception:
+        pass
+
+
 class _WorkerResult:
     """Container for results + metadata from a worker process."""
 
@@ -133,12 +151,42 @@ def is_io_bound_detector(detector_name: str) -> bool:
     return detector_name in _IO_BOUND_DETECTORS
 
 
-def compute_pool_workers(override: int | None = None) -> int:
+# Pipeline schema types whose runners load a torch model into every worker
+# process that executes them.
+_ML_PIPELINE_TYPES = frozenset(
+    {
+        "GLINER2",
+        "TEXT_CLASSIFICATION",
+        "IMAGE_CLASSIFICATION",
+        "FEATURE_EXTRACTION",
+        "OBJECT_DETECTION",
+    }
+)
+
+
+def recipe_has_ml_custom_detectors(recipe: dict[str, Any]) -> bool:
+    """True when the recipe configures a custom detector backed by a local ML model."""
+    for item in recipe.get("detectors", []):
+        if not isinstance(item, dict) or not item.get("enabled", True):
+            continue
+        if str(item.get("type", "")).upper() != "CUSTOM":
+            continue
+        config = item.get("config") or {}
+        schema = config.get("pipeline_schema") or {}
+        schema_type = str(schema.get("type", "GLINER2")).upper()
+        if schema_type in _ML_PIPELINE_TYPES:
+            return True
+    return False
+
+
+def compute_pool_workers(override: int | None = None, *, per_worker_mb: int = 1024) -> int:
     """Compute optimal pool size from actual resource limits.
 
     Auto-sizes from cgroup CPU/memory so the pool fits within:
     - CPU cores (cgroup-aware) minus 1 for the main process
-    - Memory / ~1GB per worker (each worker loads ML models)
+    - Memory / *per_worker_mb* per worker (each worker loads its own copy of any
+      configured ML models, so callers pass a larger budget when the recipe has
+      ML-backed custom detectors)
     - Hard cap of 16
 
     When *override* is set, it is used directly (clamped to [1, 16]).
@@ -150,7 +198,7 @@ def compute_pool_workers(override: int | None = None) -> int:
     mem_mb = get_effective_memory_mb()
 
     cpu_budget = max(1, cpus - 1)
-    mem_budget = max(1, (mem_mb - 512) // 1024)
+    mem_budget = max(1, (mem_mb - 512) // max(1, per_worker_mb))
 
     effective = max(1, min(cpu_budget, mem_budget, 16))
 
@@ -180,9 +228,12 @@ class DetectorWorkerPool:
             mp_start_method = "forkserver" if "forkserver" in available else "spawn"
 
         ctx = multiprocessing.get_context(mp_start_method)
+        threads_per_worker = max(1, get_effective_cpu_count() // effective_workers)
         self._pool = ProcessPoolExecutor(
             max_workers=effective_workers,
             mp_context=ctx,
+            initializer=_init_worker_threads,
+            initargs=(threads_per_worker,),
         )
         self._max_workers = effective_workers
         self._mp_start_method = mp_start_method

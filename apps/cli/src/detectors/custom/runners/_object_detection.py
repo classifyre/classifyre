@@ -30,26 +30,51 @@ class ObjectDetectionRunner(BaseRunner):
         self._schema = schema
         self._detector_key = detector_key
         self._detector_name = detector_name
-        ensure_torch("object_detection", ["custom", "detectors"])
-        transformers = require_module("transformers", "object_detection", ["custom", "detectors"])
-        self._pil = require_module("PIL.Image", "object_detection", ["custom", "detectors"])
-        pipeline_kwargs: dict[str, Any] = {
-            "model": schema.model,
-            "device": schema.device or "cpu",
-        }
-        if schema.model_revision:
-            pipeline_kwargs["revision"] = schema.model_revision
-        nms = getattr(schema.nms_threshold, "root", schema.nms_threshold)
-        if nms is not None:
-            pipeline_kwargs["threshold"] = nms
+        # Model loading is deferred to first detect() so the parent process
+        # (which only routes when a worker pool is active) never pays the
+        # torch import + model memory cost.
+        self._pipe: Any | None = None
+        self._pil: Any | None = None
+        self._load_error: str | None = None
+
+    def _ensure_pipeline(self) -> Any | None:
+        if self._pipe is not None:
+            return self._pipe
+        if self._load_error is not None:
+            return None
+        schema = self._schema
         try:
-            self._pipe: Any = transformers.pipeline("object-detection", **pipeline_kwargs)
-        except ImportError as exc:
-            raise MissingDependencyError(
-                "object_detection",
-                ["custom", "detectors"],
-                ["custom", "detectors"],
-                f"ObjectDetectionRunner requires additional dependencies: {exc}",
+            ensure_torch("object_detection", ["custom", "detectors"])
+            transformers = require_module(
+                "transformers", "object_detection", ["custom", "detectors"]
+            )
+            self._pil = require_module("PIL.Image", "object_detection", ["custom", "detectors"])
+            pipeline_kwargs: dict[str, Any] = {
+                "model": schema.model,
+                "device": schema.device or "cpu",
+            }
+            if schema.model_revision:
+                pipeline_kwargs["revision"] = schema.model_revision
+            nms = getattr(schema.nms_threshold, "root", schema.nms_threshold)
+            if nms is not None:
+                pipeline_kwargs["threshold"] = nms
+            try:
+                self._pipe = transformers.pipeline("object-detection", **pipeline_kwargs)
+            except ImportError as exc:
+                raise MissingDependencyError(
+                    "object_detection",
+                    ["custom", "detectors"],
+                    ["custom", "detectors"],
+                    f"ObjectDetectionRunner requires additional dependencies: {exc}",
+                ) from exc
+            return self._pipe
+        except Exception as exc:
+            # Raise on the first failure so the scan records one structured
+            # error; later assets skip quietly via the cached _load_error.
+            self._load_error = str(exc)
+            raise RuntimeError(
+                f"object_detection model '{schema.model}' failed to load for "
+                f"detector '{self._detector_key}': {exc}"
             ) from exc
 
     def run(self, text: str) -> None:  # type: ignore[override]  # pragma: no cover
@@ -58,6 +83,10 @@ class ObjectDetectionRunner(BaseRunner):
     def detect(self, content: str | bytes, content_type: str) -> list[DetectionResult]:
         if isinstance(content, str):
             logger.warning("object_detection: received string content, expected bytes")
+            return []
+
+        pipe = self._ensure_pipeline()
+        if pipe is None:
             return []
 
         # image/* opens directly; PDFs are rasterised to one image per page.
@@ -71,7 +100,7 @@ class ObjectDetectionRunner(BaseRunner):
         results: list[DetectionResult] = []
         for page_index, image in images:
             try:
-                detections: list[dict[str, Any]] = self._pipe(image) or []
+                detections: list[dict[str, Any]] = pipe(image) or []
                 for det in detections:
                     label: str = det.get("label", "unknown")
                     score: float = float(det.get("score", 0.0))

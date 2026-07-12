@@ -10,7 +10,6 @@ import {
   Network,
   ScanSearch,
 } from "lucide-react";
-import { cn } from "@workspace/ui/lib/utils";
 import { useTranslation } from "@/hooks/use-translation";
 
 // ── Detector type cards ────────────────────────────────────────────────────
@@ -43,7 +42,6 @@ function DetectorTypeCard({
 }) {
   const { t } = useTranslation();
   const Icon = DETECTOR_ICONS[kind];
-  const available = true;
   const isVisual = kind === "image_classification" || kind === "object_detection";
 
   const title = t(`detectors.types.${kind}.title`);
@@ -55,25 +53,12 @@ function DetectorTypeCard({
   return (
     <button
       type="button"
-      disabled={!available}
       data-testid={`method-card-${kind}`}
-      onClick={() => available && onSelect(kind)}
-      className={cn(
-        "group relative flex flex-col items-start rounded-[6px] border-2 p-5 text-left transition-all",
-        available
-          ? "border-border bg-background shadow-[4px_4px_0_var(--color-border)] hover:-translate-y-0.5 hover:shadow-[6px_6px_0_var(--color-border)] cursor-pointer"
-          : "border-border bg-muted/30 cursor-not-allowed opacity-60",
-      )}
+      onClick={() => onSelect(kind)}
+      className="group relative flex flex-col items-start rounded-[6px] border-2 border-border bg-background p-5 text-left shadow-[4px_4px_0_var(--color-border)] transition-all hover:-translate-y-0.5 hover:shadow-[6px_6px_0_var(--color-border)] cursor-pointer"
     >
-      {/* Coming soon pill */}
-      {!available && (
-        <span className="absolute right-4 top-4 rounded-[3px] border border-border bg-background px-1.5 py-0.5 text-[10px] font-mono uppercase tracking-[0.08em] text-muted-foreground">
-          {t("detectors.comingSoon")}
-        </span>
-      )}
-
       {/* Visual-detector pill — marks detectors that scan images, not text */}
-      {available && isVisual && (
+      {isVisual && (
         <span
           title={t("detectors.visual.tooltip")}
           className="absolute right-4 top-4 rounded-[3px] border border-border bg-background px-1.5 py-0.5 text-[10px] font-mono uppercase tracking-[0.08em] text-muted-foreground"
@@ -83,14 +68,7 @@ function DetectorTypeCard({
       )}
 
       {/* Icon */}
-      <div
-        className={cn(
-          "mb-4 flex h-9 w-9 items-center justify-center rounded-[4px] border-2",
-          available
-            ? "border-border bg-accent shadow-[2px_2px_0_var(--color-border)] group-hover:shadow-[3px_3px_0_var(--color-border)]"
-            : "border-border bg-muted",
-        )}
-      >
+      <div className="mb-4 flex h-9 w-9 items-center justify-center rounded-[4px] border-2 border-border bg-accent shadow-[2px_2px_0_var(--color-border)] group-hover:shadow-[3px_3px_0_var(--color-border)]">
         <Icon className="h-4 w-4 text-accent-foreground" />
       </div>
 
@@ -114,26 +92,19 @@ function DetectorTypeCard({
         {tags.map((tag) => (
           <span
             key={tag}
-            className={cn(
-              "rounded-[3px] border px-1.5 py-0.5 text-[10px] font-mono",
-              available
-                ? "border-border/30 bg-foreground/5 text-foreground"
-                : "border-border bg-background text-muted-foreground",
-            )}
+            className="rounded-[3px] border border-border/30 bg-foreground/5 px-1.5 py-0.5 text-[10px] font-mono text-foreground"
           >
             {tag}
           </span>
         ))}
       </div>
 
-      {/* Select arrow — only when available */}
-      {available && (
-        <div className="mt-4 self-end">
-          <span className="rounded-[4px] border-2 border-border bg-accent px-3 py-1 text-[11px] font-mono font-bold uppercase tracking-[0.08em] text-accent-foreground shadow-[2px_2px_0_var(--color-border)] group-hover:shadow-[3px_3px_0_var(--color-border)] transition-shadow">
-            {t("detectors.select")}
-          </span>
-        </div>
-      )}
+      {/* Select arrow */}
+      <div className="mt-4 self-end">
+        <span className="rounded-[4px] border-2 border-border bg-accent px-3 py-1 text-[11px] font-mono font-bold uppercase tracking-[0.08em] text-accent-foreground shadow-[2px_2px_0_var(--color-border)] group-hover:shadow-[3px_3px_0_var(--color-border)] transition-shadow">
+          {t("detectors.select")}
+        </span>
+      </div>
     </button>
   );
 }
