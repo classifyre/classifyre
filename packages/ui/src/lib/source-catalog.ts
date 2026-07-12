@@ -285,6 +285,36 @@ export const SOURCE_TYPE_CATALOG_META: Record<string, SourceCatalogMetaBase> = {
     category: "WAREHOUSE_LAKEHOUSE",
     keywords: ["folder", "files", "local", "filesystem", "desktop", "documents"],
   },
+  MICROSOFT_365: {
+    description:
+      "Scan SharePoint sites, OneDrive files, and Teams files via Microsoft Graph API.",
+    icon: CreateSourceDtoTypeEnum.Microsoft365,
+    category: "COLLABORATION",
+    keywords: [
+      "microsoft",
+      "sharepoint",
+      "onedrive",
+      "teams",
+      "office 365",
+      "graph",
+      "m365",
+    ],
+  },
+  GOOGLE_WORKSPACE: {
+    description:
+      "Scan Google Drive files, Docs, Sheets, and Slides across My Drive and shared drives.",
+    icon: CreateSourceDtoTypeEnum.GoogleWorkspace,
+    category: "COLLABORATION",
+    keywords: [
+      "google",
+      "drive",
+      "docs",
+      "sheets",
+      "slides",
+      "workspace",
+      "gdrive",
+    ],
+  },
 };
 
 export function resolveSourceCatalogMeta(

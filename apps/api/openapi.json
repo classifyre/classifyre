@@ -1177,6 +1177,8 @@
                   "OPENSEARCH",
                   "MEILISEARCH",
                   "LOCAL_FOLDER",
+                  "MICROSOFT_365",
+                  "GOOGLE_WORKSPACE",
                   "CUSTOM"
                 ]
               }
@@ -1527,6 +1529,8 @@
                   "OPENSEARCH",
                   "MEILISEARCH",
                   "LOCAL_FOLDER",
+                  "MICROSOFT_365",
+                  "GOOGLE_WORKSPACE",
                   "CUSTOM"
                 ]
               }
@@ -1899,6 +1903,8 @@
                   "OPENSEARCH",
                   "MEILISEARCH",
                   "LOCAL_FOLDER",
+                  "MICROSOFT_365",
+                  "GOOGLE_WORKSPACE",
                   "CUSTOM"
                 ]
               }
@@ -8438,7 +8444,9 @@
               "ELASTICSEARCH",
               "OPENSEARCH",
               "MEILISEARCH",
-              "LOCAL_FOLDER"
+              "LOCAL_FOLDER",
+              "MICROSOFT_365",
+              "GOOGLE_WORKSPACE"
             ],
             "description": "The type of the source",
             "example": "WORDPRESS"
@@ -8630,7 +8638,9 @@
               "ELASTICSEARCH",
               "OPENSEARCH",
               "MEILISEARCH",
-              "LOCAL_FOLDER"
+              "LOCAL_FOLDER",
+              "MICROSOFT_365",
+              "GOOGLE_WORKSPACE"
             ],
             "description": "The type of the source",
             "example": "WORDPRESS"
@@ -8764,6 +8774,8 @@
                 "OPENSEARCH",
                 "MEILISEARCH",
                 "LOCAL_FOLDER",
+                "MICROSOFT_365",
+                "GOOGLE_WORKSPACE",
                 "CUSTOM"
               ]
             }
@@ -9079,6 +9091,8 @@
               "OPENSEARCH",
               "MEILISEARCH",
               "LOCAL_FOLDER",
+              "MICROSOFT_365",
+              "GOOGLE_WORKSPACE",
               "CUSTOM"
             ]
           },
@@ -9223,6 +9237,8 @@
                 "OPENSEARCH",
                 "MEILISEARCH",
                 "LOCAL_FOLDER",
+                "MICROSOFT_365",
+                "GOOGLE_WORKSPACE",
                 "CUSTOM"
               ]
             }
@@ -9996,6 +10012,8 @@
               "OPENSEARCH",
               "MEILISEARCH",
               "LOCAL_FOLDER",
+              "MICROSOFT_365",
+              "GOOGLE_WORKSPACE",
               "CUSTOM"
             ]
           }
@@ -15423,6 +15441,8 @@
                 "OPENSEARCH",
                 "MEILISEARCH",
                 "LOCAL_FOLDER",
+                "MICROSOFT_365",
+                "GOOGLE_WORKSPACE",
                 "CUSTOM"
               ]
             }

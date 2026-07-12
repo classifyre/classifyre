@@ -736,6 +736,8 @@ export const SourceAssetsControllerListSourceAssetsSourceTypesEnum = {
     Opensearch: 'OPENSEARCH',
     Meilisearch: 'MEILISEARCH',
     LocalFolder: 'LOCAL_FOLDER',
+    Microsoft365: 'MICROSOFT_365',
+    GoogleWorkspace: 'GOOGLE_WORKSPACE',
     Custom: 'CUSTOM'
 } as const;
 export type SourceAssetsControllerListSourceAssetsSourceTypesEnum = typeof SourceAssetsControllerListSourceAssetsSourceTypesEnum[keyof typeof SourceAssetsControllerListSourceAssetsSourceTypesEnum];
