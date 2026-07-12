@@ -1175,25 +1175,6 @@
       }
     },
     {
-      "name": "Multi-label Topic Classifier",
-      "description": "Classify documents into multiple topics simultaneously — flag legal/compliance and finance content with elevated severity.",
-      "config": {
-        "custom_detector_key": "topic_classifier",
-        "name": "Multi-label Topic Classifier",
-        "pipeline_schema": {
-          "type": "TEXT_CLASSIFICATION",
-          "model": "your-org/topic-classifier",
-          "device": "cpu",
-          "function_to_apply": "sigmoid",
-          "confidence_threshold": 0.5,
-          "severity_map": [
-            { "pattern": "legal|compliance", "severity": "high" },
-            { "pattern": "finance", "severity": "medium" }
-          ]
-        }
-      }
-    },
-    {
       "name": "NSFW Image Detector",
       "description": "Detect sexually explicit or inappropriate images for content moderation in document pipelines.",
       "config": {
@@ -1209,6 +1190,26 @@
             { "pattern": "nsfw", "severity": "critical" },
             { "pattern": "explicit", "severity": "critical" },
             { "pattern": "suggestive", "severity": "high" },
+            { "pattern": "normal", "severity": "info" }
+          ]
+        }
+      }
+    },
+    {
+      "name": "NSFW Image Detector (ViT-Tiny)",
+      "description": "Compact ViT-tiny NSFW classifier via Marqo/nsfw-image-detection-384 — smaller and faster than the base NSFW detector, well-suited for CPU-only or high-throughput document image screening.",
+      "config": {
+        "custom_detector_key": "nsfw_detector_vit_tiny",
+        "name": "NSFW Image Detector (ViT-Tiny)",
+        "description": "Lightweight ViT-tiny NSFW classifier for content moderation",
+        "pipeline_schema": {
+          "type": "IMAGE_CLASSIFICATION",
+          "model": "Marqo/nsfw-image-detection-384",
+          "device": "cpu",
+          "top_k": 2,
+          "confidence_threshold": 0.7,
+          "severity_map": [
+            { "pattern": "nsfw", "severity": "critical" },
             { "pattern": "normal", "severity": "info" }
           ]
         }
@@ -1389,44 +1390,22 @@
       }
     },
     {
-      "name": "Prompt Injection Guard",
-      "description": "Detect jailbreak and prompt-injection attempts in user-submitted text before it reaches downstream LLM pipelines. Uses Meta Prompt Guard 86M — a lightweight classifier trained on adversarial prompt datasets. Injections are surfaced as critical findings.",
-      "config": {
-        "custom_detector_key": "prompt_injection_guard",
-        "name": "Prompt Injection Guard",
-        "description": "Flag jailbreak and prompt-injection payloads in user-submitted content",
-        "languages": ["en"],
-        "pipeline_schema": {
-          "type": "TEXT_CLASSIFICATION",
-          "model": "meta-llama/Prompt-Guard-86M",
-          "device": "cpu",
-          "confidence_threshold": 0.7,
-          "severity": "info",
-          "severity_map": [
-            { "pattern": "jailbreak", "severity": "critical" },
-            { "pattern": "injection", "severity": "critical" },
-            { "pattern": "benign", "severity": "info" }
-          ]
-        }
-      }
-    },
-    {
       "name": "Toxic Content Detector",
-      "description": "Flag toxic, hateful, or abusive language in user-generated content using a fine-tuned BERT classifier. Suited for moderation queues, forum exports, and internal communication audits where unsafe content must be quarantined before review.",
+      "description": "Flag toxic, hateful, or abusive language in user-generated content using a binary RoBERTa-base toxicity classifier. Suited for moderation queues, forum exports, and internal communication audits where unsafe content must be quarantined before review.",
       "config": {
         "custom_detector_key": "toxic_content_detector",
         "name": "Toxic Content Detector",
-        "description": "Detect toxic and abusive language in user-generated content",
+        "description": "Detect toxic and abusive language in user-generated content using a binary RoBERTa-base toxicity classifier",
         "languages": ["en"],
         "pipeline_schema": {
           "type": "TEXT_CLASSIFICATION",
-          "model": "martin-ha/toxic-comment-model",
+          "model": "s-nlp/roberta_toxicity_classifier",
           "device": "cpu",
           "confidence_threshold": 0.75,
           "severity": "info",
           "severity_map": [
             { "pattern": "toxic", "severity": "high" },
-            { "pattern": "non-toxic", "severity": "info" }
+            { "pattern": "neutral", "severity": "info" }
           ]
         }
       }
@@ -1527,6 +1506,27 @@
         "pipeline_schema": {
           "type": "OBJECT_DETECTION",
           "model": "hustvl/yolos-small",
+          "device": "cpu",
+          "confidence_threshold": 0.5,
+          "top_k": 20,
+          "severity_map": [
+            { "pattern": "knife|weapon|gun|rifle|pistol", "severity": "critical" },
+            { "pattern": "person|human", "severity": "high" },
+            { "pattern": "car|truck|bus|motorcycle", "severity": "medium" }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Tiny Object Detection (YOLOS)",
+      "description": "Ultra-lightweight ViT-based object detector via hustvl/yolos-tiny — ~6M parameters, pre-trained on ImageNet and fine-tuned on COCO 2017. Ideal for CPU-only or desktop deployments where a smaller footprint matters more than top accuracy.",
+      "config": {
+        "custom_detector_key": "yolos_tiny_detector",
+        "name": "Tiny Object Detection (YOLOS)",
+        "description": "Ultra-lightweight vision-transformer object detector for CPU/desktop use",
+        "pipeline_schema": {
+          "type": "OBJECT_DETECTION",
+          "model": "hustvl/yolos-tiny",
           "device": "cpu",
           "confidence_threshold": 0.5,
           "top_k": 20,

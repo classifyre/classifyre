@@ -787,19 +787,35 @@ export type ParseTrainingExamplesResponseDto = {
   skippedReasons?: { missingLabel: number; missingText: number; duplicates: number };
 };
 
+export type PipelineResultEntitySpan = {
+  value: string;
+  confidence: number;
+  start?: number;
+  end?: number;
+  severity?: string;
+};
+
+export type PipelineResultClassificationOutcome = {
+  label: string;
+  confidence: number;
+};
+
+export type PipelineResult = {
+  entities?: Record<string, PipelineResultEntitySpan[]>;
+  classification?: Record<string, PipelineResultClassificationOutcome>;
+  metadata?: Record<string, unknown>;
+};
+
 export type CustomDetectorExtractionDto = {
   id: string;
   findingId: string;
   customDetectorId: string | null;
   customDetectorKey: string;
-  sourceId: string | null;
-  assetId: string | null;
+  sourceId: string;
+  assetId: string;
   runnerId: string | null;
-  extractionMethod: ExtractionMethod;
-  detectorVersion: number | null;
-  fieldCount: number;
-  populatedFields: string[];
-  extractedData: Record<string, unknown>;
+  detectorVersion: number;
+  pipelineResult: PipelineResult;
   extractedAt: string;
   createdAt: string;
 };

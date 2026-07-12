@@ -2,11 +2,7 @@
 
 import * as React from "react";
 import { useEffect, useState } from "react";
-import {
-  api,
-  type CustomDetectorExtractionDto,
-  ExtractionMethodEnum,
-} from "@workspace/api-client";
+import { api, type CustomDetectorExtractionDto } from "@workspace/api-client";
 import {
   Card,
   CardContent,
@@ -15,21 +11,9 @@ import {
   CardTitle,
 } from "@workspace/ui/components/card";
 import { Badge } from "@workspace/ui/components/badge";
-import { EmptyState } from "@workspace/ui/components/empty-state";
-import { Layers } from "lucide-react";
-import { useTranslation } from "@/hooks/use-translation";
 
-const EXTRACTION_METHOD_LABELS: Record<string, string> = {
-  [ExtractionMethodEnum.Regex]: "Regex",
-  [ExtractionMethodEnum.Gliner]: "GLiNER",
-  [ExtractionMethodEnum.ClassifierGliner]: "Classifier + GLiNER",
-};
-
-function renderFieldValue(value: unknown): string {
-  if (value === null || value === undefined) return "—";
-  if (Array.isArray(value)) return value.join(", ");
-  if (typeof value === "object") return JSON.stringify(value);
-  return String(value);
+function formatConfidence(confidence: number): string {
+  return `${Math.round(confidence * 100)}%`;
 }
 
 type Props = {
@@ -37,7 +21,6 @@ type Props = {
 };
 
 export function FindingExtractionCard({ findingId }: Props) {
-  const { t } = useTranslation();
   const [extraction, setExtraction] = useState<
     CustomDetectorExtractionDto | null | undefined
   >(undefined);
@@ -64,15 +47,23 @@ export function FindingExtractionCard({ findingId }: Props) {
   if (extraction === undefined) return null;
   if (extraction === null) return null;
 
-  const entries = Object.entries(extraction.extractedData ?? {}).filter(
-    ([, v]) => v !== null && v !== undefined && v !== "",
+  const pipelineResult = extraction.pipelineResult ?? {};
+  const entityEntries = Object.entries(pipelineResult.entities ?? {}).filter(
+    ([, spans]) => Array.isArray(spans) && spans.length > 0,
   );
+  const classificationEntries = Object.entries(
+    pipelineResult.classification ?? {},
+  ).filter(([, outcome]) => outcome && outcome.label);
 
-  if (entries.length === 0) return null;
+  if (entityEntries.length === 0 && classificationEntries.length === 0) {
+    return null;
+  }
 
-  const methodLabel =
-    EXTRACTION_METHOD_LABELS[extraction.extractionMethod] ??
-    extraction.extractionMethod;
+  const metadata = pipelineResult.metadata ?? {};
+  const runner =
+    typeof metadata.runner === "string" ? metadata.runner : undefined;
+  const model =
+    typeof metadata.model === "string" ? metadata.model : undefined;
 
   return (
     <Card>
@@ -81,38 +72,68 @@ export function FindingExtractionCard({ findingId }: Props) {
           <div>
             <CardTitle>Extracted Data</CardTitle>
             <CardDescription>
-              Structured fields extracted by the custom detector.
+              Structured output from the custom detector pipeline.
             </CardDescription>
           </div>
-          <Badge variant="outline" className="font-mono text-xs">
-            {methodLabel}
-          </Badge>
+          {runner ? (
+            <Badge variant="outline" className="font-mono text-xs">
+              {runner}
+            </Badge>
+          ) : null}
         </div>
       </CardHeader>
-      <CardContent>
-        {entries.length === 0 ? (
-          <EmptyState
-            icon={Layers}
-            title={t("findings.extraction.noFields")}
-            description={t("findings.extraction.noFieldsHint")}
-          />
-        ) : (
+      <CardContent className="grid gap-4">
+        {entityEntries.length > 0 ? (
           <dl className="grid gap-2">
-            {entries.map(([field, value]) => (
+            {entityEntries.map(([label, spans]) => (
               <div
-                key={field}
+                key={label}
                 className="grid grid-cols-[160px_1fr] items-start gap-3 rounded-[4px] border border-border/10 px-3 py-2"
               >
                 <dt className="font-mono text-xs font-medium text-muted-foreground pt-0.5">
-                  {field}
+                  {label}
                 </dt>
-                <dd className="text-sm break-words">
-                  {renderFieldValue(value)}
+                <dd className="flex flex-wrap gap-1.5">
+                  {spans.map((span, index) => (
+                    <Badge
+                      key={`${label}-${index}`}
+                      variant="secondary"
+                      className="font-normal"
+                    >
+                      {span.value}
+                      <span className="ml-1 text-muted-foreground">
+                        {formatConfidence(span.confidence)}
+                      </span>
+                    </Badge>
+                  ))}
                 </dd>
               </div>
             ))}
           </dl>
-        )}
+        ) : null}
+        {classificationEntries.length > 0 ? (
+          <dl className="grid gap-2">
+            {classificationEntries.map(([task, outcome]) => (
+              <div
+                key={task}
+                className="grid grid-cols-[160px_1fr] items-start gap-3 rounded-[4px] border border-border/10 px-3 py-2"
+              >
+                <dt className="font-mono text-xs font-medium text-muted-foreground pt-0.5">
+                  {task}
+                </dt>
+                <dd className="text-sm break-words">
+                  {outcome.label}
+                  <span className="ml-1 text-muted-foreground">
+                    {formatConfidence(outcome.confidence)}
+                  </span>
+                </dd>
+              </div>
+            ))}
+          </dl>
+        ) : null}
+        {model ? (
+          <p className="text-xs text-muted-foreground">Model: {model}</p>
+        ) : null}
       </CardContent>
     </Card>
   );

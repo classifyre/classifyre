@@ -60,20 +60,44 @@ class FeatureExtractionRunner(BaseRunner):
         self._schema = schema
         self._detector_key = detector_key
         self._detector_name = detector_name
-        ensure_torch("feature_extraction", ["custom", "detectors"])
-        transformers = require_module("transformers", "feature_extraction", ["custom", "detectors"])
-        truncation = schema.truncation if schema.truncation is not None else True
-        tokenizer_kwargs: dict[str, Any] = {"truncation": truncation}
-        if schema.max_length is not None:
-            tokenizer_kwargs["max_length"] = schema.max_length
-        pipeline_kwargs: dict[str, Any] = {
-            "model": schema.model,
-            "device": schema.device or "cpu",
-            "tokenizer_kwargs": tokenizer_kwargs,
-        }
-        if schema.model_revision:
-            pipeline_kwargs["revision"] = schema.model_revision
-        self._pipe: Any = transformers.pipeline("feature-extraction", **pipeline_kwargs)
+        # Model loading is deferred to first detect() so the parent process
+        # (which only routes when a worker pool is active) never pays the
+        # torch import + model memory cost.
+        self._pipe: Any | None = None
+        self._load_error: str | None = None
+
+    def _ensure_pipeline(self) -> Any | None:
+        if self._pipe is not None:
+            return self._pipe
+        if self._load_error is not None:
+            return None
+        schema = self._schema
+        try:
+            ensure_torch("feature_extraction", ["custom", "detectors"])
+            transformers = require_module(
+                "transformers", "feature_extraction", ["custom", "detectors"]
+            )
+            truncation = schema.truncation if schema.truncation is not None else True
+            tokenizer_kwargs: dict[str, Any] = {"truncation": truncation}
+            if schema.max_length is not None:
+                tokenizer_kwargs["max_length"] = schema.max_length
+            pipeline_kwargs: dict[str, Any] = {
+                "model": schema.model,
+                "device": schema.device or "cpu",
+                "tokenizer_kwargs": tokenizer_kwargs,
+            }
+            if schema.model_revision:
+                pipeline_kwargs["revision"] = schema.model_revision
+            self._pipe = transformers.pipeline("feature-extraction", **pipeline_kwargs)
+            return self._pipe
+        except Exception as exc:
+            # Raise on the first failure so the scan records one structured
+            # error; later assets skip quietly via the cached _load_error.
+            self._load_error = str(exc)
+            raise RuntimeError(
+                f"feature_extraction model '{schema.model}' failed to load for "
+                f"detector '{self._detector_key}': {exc}"
+            ) from exc
 
     def run(self, text: str) -> None:  # type: ignore[override]  # pragma: no cover
         raise NotImplementedError("FeatureExtractionRunner uses detect() directly")
@@ -86,6 +110,9 @@ class FeatureExtractionRunner(BaseRunner):
         text = content.strip()
         if not text:
             return []
+        pipe = self._ensure_pipeline()
+        if pipe is None:
+            return []
 
         schema = self._schema
         pooling = str(schema.pooling_strategy or "mean")
@@ -96,7 +123,7 @@ class FeatureExtractionRunner(BaseRunner):
         results: list[DetectionResult] = []
         try:
             for chunk, offset in _chunk_text_with_offsets(text, chunk_size, chunk_overlap):
-                raw: list[list[list[float]]] = self._pipe(chunk) or []
+                raw: list[list[list[float]]] = pipe(chunk) or []
                 if not raw or not raw[0]:
                     continue
                 embedding = _pool_hidden(raw[0], pooling, normalize)
