@@ -39,6 +39,8 @@ TYPE_TO_DEFINITION = {
     "OPENSEARCH": "OpenSearchInput",
     "MEILISEARCH": "MeilisearchInput",
     "LOCAL_FOLDER": "LocalFolderInput",
+    "MICROSOFT_365": "Microsoft365Input",
+    "GOOGLE_WORKSPACE": "GoogleWorkspaceInput",
 }
 
 SCHEMAS_DIR = Path(__file__).parent.parent / "src" / "schemas"
