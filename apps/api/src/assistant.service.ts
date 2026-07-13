@@ -96,7 +96,13 @@ const loopTurnJsonSchema: JsonSchema = {
 /** Tolerate common shape drift in the model's turn output. */
 function repairTurn(value: unknown): unknown {
   if (!value || typeof value !== 'object') {
-    return { reply: value == null ? '' : String(value as string | number | boolean) };
+    const reply =
+      typeof value === 'string'
+        ? value
+        : typeof value === 'number' || typeof value === 'boolean'
+          ? String(value)
+          : '';
+    return { reply };
   }
   const v = value as Record<string, unknown>;
   if (v.toolCalls && !Array.isArray(v.toolCalls)) v.toolCalls = [v.toolCalls];
