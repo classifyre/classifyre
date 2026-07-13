@@ -6,7 +6,6 @@ import { ArrowLeft } from "lucide-react";
 import { Button } from "@workspace/ui/components/button";
 import {
   api,
-  type AssistantOperation,
   type AssistantUiAction,
   type StartRunnerDto,
 } from "@workspace/api-client";
@@ -364,12 +363,6 @@ export default function NewSourcePage() {
             detectors: normalizeDetectors(detectors),
             customDetectorIds: selectedCustomDetectorIds,
           },
-          supportedOperations: sourceId
-            ? ([
-                "update_source",
-                "test_source_connection",
-              ] satisfies AssistantOperation[])
-            : (["create_source"] satisfies AssistantOperation[]),
         };
       },
       applyAction: async (action: AssistantUiAction) => {

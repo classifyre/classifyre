@@ -2,12 +2,17 @@ jest.mock('@workspace/schemas/assistant', () => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const z = require('zod/v4');
 
-  const assistantOperationSchema = z.enum([
-    'create_source',
-    'update_source',
-    'test_source_connection',
-    'create_custom_detector',
-    'train_custom_detector',
+  const assistantContextKeySchema = z.enum([
+    'source.create',
+    'source.edit',
+    'detector.create',
+    'detector.edit',
+    'fingerprints.tune',
+    'inquiry.create',
+    'inquiry.manage',
+    'case.create',
+    'case.manage',
+    'app.global',
   ]);
 
   const assistantFieldPatchSchema = z.object({
@@ -16,7 +21,8 @@ jest.mock('@workspace/schemas/assistant', () => {
   });
 
   const assistantPendingConfirmationSchema = z.object({
-    operation: assistantOperationSchema,
+    tool: z.string(),
+    input: z.record(z.string(), z.unknown()),
     title: z.string(),
     detail: z.string(),
   });
@@ -31,6 +37,10 @@ jest.mock('@workspace/schemas/assistant', () => {
     z.object({
       type: z.literal('patch_fields'),
       patches: z.array(assistantFieldPatchSchema),
+    }),
+    z.object({
+      type: z.literal('navigate'),
+      route: z.string(),
     }),
     z.object({
       type: z.literal('sync_source'),
@@ -65,7 +75,7 @@ jest.mock('@workspace/schemas/assistant', () => {
       }),
     ),
     context: z.object({
-      key: z.enum(['source.create', 'source.edit', 'detector.create']),
+      key: assistantContextKeySchema,
       route: z.string(),
       title: z.string(),
       entityId: z.string().nullable().optional(),
@@ -77,11 +87,11 @@ jest.mock('@workspace/schemas/assistant', () => {
         errors: z.array(z.string()),
       }),
       metadata: z.record(z.string(), z.unknown()).optional(),
-      supportedOperations: z.array(assistantOperationSchema),
     }),
     pendingConfirmation: assistantPendingConfirmationSchema
       .nullable()
       .optional(),
+    confirmationDecision: z.enum(['confirm', 'cancel']).nullable().optional(),
   });
 
   const assistantChatResponseSchema = z.object({
@@ -97,35 +107,19 @@ jest.mock('@workspace/schemas/assistant', () => {
     ),
   });
 
+  const contexts: Record<string, { title: string; summary: string }> = {};
+  for (const key of assistantContextKeySchema.options) {
+    contexts[key] = { title: `Assistant ${key}`, summary: `Summary ${key}` };
+  }
+
   return {
-    assistantContexts: {
-      'source.create': {
-        title: 'Source Setup Assistant',
-        summary: 'Create or test a source.',
-        supportedOperations: [
-          'create_source',
-          'update_source',
-          'test_source_connection',
-        ],
-      },
-      'source.edit': {
-        title: 'Source Edit Assistant',
-        summary: 'Update or test a source.',
-        supportedOperations: ['update_source', 'test_source_connection'],
-      },
-      'detector.create': {
-        title: 'Detector Studio Assistant',
-        summary: 'Create or train a detector.',
-        supportedOperations: [
-          'create_custom_detector',
-          'train_custom_detector',
-        ],
-      },
-    },
+    assistantContexts: contexts,
+    assistantContextKeySchema,
     assistantFieldPatchSchema,
-    assistantOperationSchema,
+    assistantUiActionSchema,
     assistantChatRequestSchema,
     assistantChatResponseSchema,
+    assistantPendingConfirmationSchema,
   };
 });
 
@@ -135,430 +129,384 @@ import {
   summarizeSchemaForPrompt,
 } from './assistant.service';
 import { AiClientService } from './ai';
-import { McpToolExecutorService } from './mcp-tool-executor.service';
+import { AssistantMcpService } from './assistant/assistant-mcp.service';
 import { BadRequestException } from '@nestjs/common';
 
 describe('summarizeSchemaForPrompt', () => {
   it('flattens nested objects, arrays of objects, enums, required and secrets', () => {
     const summary = summarizeSchemaForPrompt({
       type: 'object',
-      required: ['name'],
+      required: ['host'],
       properties: {
-        name: { type: 'string', description: 'Display name' },
-        required: {
+        host: { type: 'string', description: 'Server host' },
+        auth: {
           type: 'object',
-          required: ['host'],
+          required: ['auth_mode'],
           properties: {
-            host: { type: 'string', description: 'Database host' },
-            port: { type: 'integer' },
-          },
-        },
-        masked: {
-          type: 'object',
-          properties: {
+            auth_mode: { type: 'string', enum: ['basic', 'oauth'] },
             password: { type: 'string' },
           },
         },
-        optional: {
-          type: 'object',
-          properties: {
-            ssl_mode: { enum: ['disable', 'require', 'verify-full'] },
-            rules: {
-              type: 'array',
-              items: {
-                type: 'object',
-                required: ['id'],
-                properties: {
-                  id: { type: 'string' },
-                  pattern: { type: 'string' },
-                },
-              },
-            },
-          },
-        },
+        tags: { type: 'array', items: { type: 'string' } },
       },
     });
 
-    expect(summary).toContain('name : string (required)');
-    expect(summary).toContain('required.host : string (required)');
-    expect(summary).toContain('required.port : integer');
-    expect(summary).toContain('masked.password : string (secret)');
-    expect(summary).toContain(
-      'optional.ssl_mode : enum[disable|require|verify-full]',
-    );
-    expect(summary).toContain('optional.rules[].id : string (required)');
-    expect(summary).toContain('optional.rules[].pattern : string');
+    expect(summary).toContain('host : string (required) — Server host');
+    expect(summary).toContain('auth.auth_mode : enum[basic|oauth] (required)');
+    expect(summary).toContain('auth.password : string (secret)');
+    expect(summary).toContain('tags : array<string>');
   });
 
   it('returns an empty string when there is no schema or no properties', () => {
     expect(summarizeSchemaForPrompt(null)).toBe('');
-    expect(summarizeSchemaForPrompt(undefined)).toBe('');
-    expect(summarizeSchemaForPrompt({ type: 'object' })).toBe('');
+    expect(summarizeSchemaForPrompt({})).toBe('');
   });
 });
 
 describe('AssistantService', () => {
-  let service: AssistantService;
-
-  const aiClient = {
-    completeJson: jest.fn(),
-    completeText: jest.fn(),
+  const listSourceTypesTool = {
+    name: 'list_source_types',
+    description: 'List source types',
+    inputSchema: { type: 'object', properties: {} },
+    readOnly: true,
+    destructive: false,
   };
-  const mcpToolExecutor = {
-    createSource: jest.fn(),
-    updateSource: jest.fn(),
-    testSourceConnection: jest.fn(),
-    createCustomDetector: jest.fn(),
-    trainCustomDetector: jest.fn(),
+  const validateSourceConfigTool = {
+    name: 'validate_source_config',
+    description: 'Validate a source config',
+    inputSchema: { type: 'object', properties: {} },
+    readOnly: true,
+    destructive: false,
+  };
+  const createSourceTool = {
+    name: 'create_source',
+    description: 'Create a source',
+    inputSchema: { type: 'object', properties: {} },
+    readOnly: false,
+    destructive: false,
+  };
+
+  const allTools = [
+    listSourceTypesTool,
+    validateSourceConfigTool,
+    createSourceTool,
+  ];
+
+  let service: AssistantService;
+  let completeJson: jest.Mock;
+  let callTool: jest.Mock;
+
+  const baseContext = {
+    key: 'source.create' as const,
+    route: '/sources/new',
+    title: 'New source',
+    entityId: null,
+    values: { name: 'Jira Prod' },
+    schema: null,
+    validation: { isValid: false, missingFields: ['host'], errors: [] },
+    metadata: {},
   };
 
   beforeEach(async () => {
+    completeJson = jest.fn();
+    callTool = jest.fn();
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AssistantService,
         {
           provide: AiClientService,
-          useValue: aiClient,
+          useValue: { completeJson },
         },
         {
-          provide: McpToolExecutorService,
-          useValue: mcpToolExecutor,
+          provide: AssistantMcpService,
+          useValue: {
+            listTools: jest.fn().mockResolvedValue(allTools),
+            getTool: jest
+              .fn()
+              .mockImplementation((name: string) =>
+                Promise.resolve(allTools.find((tool) => tool.name === name)),
+              ),
+            callTool,
+          },
         },
       ],
     }).compile();
 
     service = module.get(AssistantService);
-    jest.clearAllMocks();
-    aiClient.completeText.mockResolvedValue({
-      content: '',
-    });
   });
 
-  it('returns local patches and a pending confirmation for source creation', async () => {
-    aiClient.completeJson.mockResolvedValue({
+  it('executes read tools in the loop and returns the final reply', async () => {
+    completeJson
+      .mockResolvedValueOnce({
+        content: {
+          toolCalls: [{ tool: 'list_source_types', input: {} }],
+        },
+        raw: '{"toolCalls":[{"tool":"list_source_types","input":{}}]}',
+      })
+      .mockResolvedValueOnce({
+        content: {
+          reply: 'You can create a JIRA or SHAREPOINT source.',
+          uiActions: [],
+          proposeOperation: null,
+        },
+        raw: '{"reply":"…"}',
+      });
+    callTool.mockResolvedValue({ ok: true, result: { types: ['JIRA'] } });
+
+    const response = await service.respond({
+      messages: [{ role: 'user', content: 'What sources can I create?' }],
+      context: baseContext,
+    });
+
+    expect(callTool).toHaveBeenCalledWith('list_source_types', {});
+    expect(response.reply).toContain('JIRA');
+    expect(response.pendingConfirmation).toBeNull();
+    expect(response.toolCalls).toEqual([
+      expect.objectContaining({ name: 'list_source_types', status: 'success' }),
+    ]);
+  });
+
+  it('rejects mutating tools inside the loop without executing them', async () => {
+    completeJson
+      .mockResolvedValueOnce({
+        content: {
+          toolCalls: [{ tool: 'create_source', input: { name: 'x' } }],
+        },
+        raw: '{}',
+      })
+      .mockResolvedValueOnce({
+        content: {
+          reply: 'I will propose it instead.',
+          proposeOperation: {
+            tool: 'create_source',
+            input: { name: 'x' },
+            title: 'Create source',
+            detail: 'create the source "x"',
+          },
+        },
+        raw: '{}',
+      });
+
+    const response = await service.respond({
+      messages: [{ role: 'user', content: 'create it' }],
+      context: baseContext,
+    });
+
+    expect(callTool).not.toHaveBeenCalled();
+    expect(response.pendingConfirmation).toEqual(
+      expect.objectContaining({
+        tool: 'create_source',
+        input: { name: 'x' },
+      }),
+    );
+    // The observation fed back to the model must explain the confirmation path.
+    const transcript = completeJson.mock.calls[1][0] as Array<{
+      content: string;
+    }>;
+    expect(
+      transcript.some((message) =>
+        message.content.includes('proposeOperation'),
+      ),
+    ).toBe(true);
+  });
+
+  it('collects allowed UI actions and drops disallowed ones', async () => {
+    completeJson.mockResolvedValueOnce({
       content: {
-        assistantMessage: 'I filled in the workspace details.',
-        patches: [
+        reply: 'Patched the host and set up the rest.',
+        uiActions: [
           {
-            path: 'required.workspace',
-            value: 'acme',
+            type: 'patch_fields',
+            patches: [{ path: 'required.host', value: 'jira.example.com' }],
+          },
+          // sync_source is server-built only; the model may not emit it.
+          {
+            type: 'sync_source',
+            sourceId: '3f0c2a4e-8f9f-4a5f-9d3c-2f6a9d8e1b2c',
+            values: {},
           },
         ],
-        requestedOperation: 'create_source',
+        proposeOperation: null,
       },
+      raw: '{}',
     });
 
     const response = await service.respond({
-      messages: [
-        { role: 'user', content: 'Set up an Acme Slack source and save it' },
-      ],
-      context: {
-        key: 'source.create',
-        route: '/sources/new',
-        title: 'Source Setup Assistant',
-        entityId: null,
-        values: {
-          name: 'Acme Slack',
-          type: 'SLACK',
-        },
-        schema: {
-          type: 'object',
-        },
-        validation: {
-          isValid: true,
-          missingFields: [],
-          errors: [],
-        },
-        metadata: {
-          sourceType: 'SLACK',
-          schedule: {
-            enabled: false,
-            cron: '',
-            timezone: 'UTC',
-          },
-          detectors: [],
-          customDetectorIds: [],
-        },
-        supportedOperations: ['create_source'],
-      },
+      messages: [{ role: 'user', content: 'fix the host' }],
+      context: baseContext,
     });
 
     expect(response.actions).toEqual([
-      {
-        type: 'patch_fields',
-        patches: [{ path: 'required.workspace', value: 'acme' }],
-      },
+      expect.objectContaining({ type: 'patch_fields' }),
     ]);
-    expect(response.pendingConfirmation).toMatchObject({
-      operation: 'create_source',
-    });
   });
 
-  it('executes a confirmed source creation through the internal executor', async () => {
-    mcpToolExecutor.createSource.mockResolvedValue({
-      id: '06903ce7-29c2-44ef-87fa-5fc8e8ef126b',
-      name: 'Acme Slack',
-      config: {
-        type: 'SLACK',
-        required: {
-          workspace: 'acme',
-        },
+  it('executes a confirmed operation and appends server-built sync actions', async () => {
+    callTool.mockResolvedValue({
+      ok: true,
+      result: {
+        id: '3f0c2a4e-8f9f-4a5f-9d3c-2f6a9d8e1b2c',
+        name: 'Jira Prod',
+        config: { type: 'JIRA', required: { host: 'jira.example.com' } },
+        scheduleEnabled: false,
       },
-      scheduleEnabled: false,
+    });
+    completeJson.mockResolvedValueOnce({
+      content: { reply: 'Created the source. Run a connection test next?' },
+      raw: '{}',
     });
 
     const response = await service.respond({
-      messages: [
-        { role: 'assistant', content: 'Confirm to create the source.' },
-        { role: 'user', content: 'Confirm' },
-      ],
+      messages: [{ role: 'user', content: 'Confirm' }],
+      context: baseContext,
       pendingConfirmation: {
-        operation: 'create_source',
+        tool: 'create_source',
+        input: { type: 'JIRA', name: 'Jira Prod', config: {} },
         title: 'Create source via MCP',
-        detail: 'create the source "Acme Slack"',
+        detail: 'create the source "Jira Prod"',
       },
-      context: {
-        key: 'source.create',
-        route: '/sources/new',
-        title: 'Source Setup Assistant',
-        entityId: null,
-        values: {
-          name: 'Acme Slack',
-          type: 'SLACK',
-          required: {
-            workspace: 'acme',
-          },
-        },
-        schema: {
-          type: 'object',
-        },
-        validation: {
-          isValid: true,
-          missingFields: [],
-          errors: [],
-        },
-        metadata: {
-          sourceType: 'SLACK',
-          schedule: {
-            enabled: false,
-            cron: '',
-            timezone: 'UTC',
-          },
-          detectors: [],
-          customDetectorIds: [],
-        },
-        supportedOperations: [
-          'create_source',
-          'update_source',
-          'test_source_connection',
-        ],
-      },
+      confirmationDecision: 'confirm',
     });
 
-    expect(mcpToolExecutor.createSource).toHaveBeenCalledWith(
-      expect.objectContaining({
-        type: 'SLACK',
-        name: 'Acme Slack',
+    expect(callTool).toHaveBeenCalledWith('create_source', {
+      type: 'JIRA',
+      name: 'Jira Prod',
+      config: {},
+    });
+    expect(response.actions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ type: 'sync_source' }),
+        expect.objectContaining({ type: 'show_toast', tone: 'success' }),
+      ]),
+    );
+    expect(response.reply).toContain('Created the source');
+  });
+
+  it('feeds execution failures back into the loop for self-correction', async () => {
+    callTool.mockResolvedValue({
+      ok: false,
+      result: 'required.auth_mode: must be equal to one of the allowed values',
+    });
+    completeJson.mockResolvedValueOnce({
+      content: {
+        reply:
+          'The auth mode was invalid — I switched it to "basic". Please confirm again.',
+        uiActions: [
+          {
+            type: 'patch_fields',
+            patches: [{ path: 'required.auth_mode', value: 'basic' }],
+          },
+        ],
+        proposeOperation: {
+          tool: 'create_source',
+          input: { type: 'JIRA', config: { auth_mode: 'basic' } },
+          title: 'Create source via MCP',
+          detail: 'create the source with corrected auth',
+        },
+      },
+      raw: '{}',
+    });
+
+    const response = await service.respond({
+      messages: [{ role: 'user', content: 'Confirm' }],
+      context: baseContext,
+      pendingConfirmation: {
+        tool: 'create_source',
+        input: { type: 'JIRA', config: { auth_mode: 'wrong' } },
+        title: 'Create source via MCP',
+        detail: 'create the source',
+      },
+      confirmationDecision: 'confirm',
+    });
+
+    // The error must reach the model verbatim so it can self-correct.
+    const transcript = completeJson.mock.calls[0][0] as Array<{
+      content: string;
+    }>;
+    expect(
+      transcript.some((message) => message.content.includes('auth_mode')),
+    ).toBe(true);
+    expect(response.actions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ type: 'patch_fields' }),
+      ]),
+    );
+    expect(response.pendingConfirmation).toEqual(
+      expect.objectContaining({ tool: 'create_source' }),
+    );
+    expect(response.toolCalls).toEqual([
+      expect.objectContaining({ name: 'create_source', status: 'error' }),
+    ]);
+  });
+
+  it('cancels a pending operation without executing anything', async () => {
+    const response = await service.respond({
+      messages: [{ role: 'user', content: 'Cancel' }],
+      context: baseContext,
+      pendingConfirmation: {
+        tool: 'create_source',
+        input: {},
+        title: 'Create source via MCP',
+        detail: 'create the source',
+      },
+      confirmationDecision: 'cancel',
+    });
+
+    expect(callTool).not.toHaveBeenCalled();
+    expect(completeJson).not.toHaveBeenCalled();
+    expect(response.pendingConfirmation).toBeNull();
+    expect(response.reply).toContain('Cancelled');
+  });
+
+  it('refuses to confirm tools outside the context allowlist', async () => {
+    await expect(
+      service.respond({
+        messages: [{ role: 'user', content: 'Confirm' }],
+        context: { ...baseContext, key: 'app.global' as const },
+        pendingConfirmation: {
+          tool: 'create_source',
+          input: {},
+          title: 'Create source via MCP',
+          detail: 'create the source',
+        },
+        confirmationDecision: 'confirm',
       }),
-    );
-    expect(response.pendingConfirmation).toBeNull();
-    expect(response.actions).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          type: 'sync_source',
-          sourceId: '06903ce7-29c2-44ef-87fa-5fc8e8ef126b',
-        }),
-      ]),
-    );
-    expect(aiClient.completeText).toHaveBeenCalled();
+    ).rejects.toThrow(BadRequestException);
+    expect(callTool).not.toHaveBeenCalled();
   });
 
-  it('passes the resolved schema field paths into the system prompt', async () => {
-    aiClient.completeJson.mockResolvedValue({
+  it('reports gracefully when the iteration budget is exhausted', async () => {
+    completeJson.mockResolvedValue({
       content: {
-        assistantMessage: 'Filling in the host.',
-        patches: [],
-        requestedOperation: null,
+        toolCalls: [{ tool: 'list_source_types', input: {} }],
       },
+      raw: '{}',
     });
-
-    await service.respond({
-      messages: [{ role: 'user', content: 'set host to db.internal' }],
-      context: {
-        key: 'source.create',
-        route: '/sources/new',
-        title: 'Source Setup Assistant',
-        entityId: null,
-        values: { name: '', type: 'POSTGRESQL' },
-        schema: {
-          type: 'object',
-          properties: {
-            required: {
-              type: 'object',
-              required: ['host'],
-              properties: {
-                host: { type: 'string', description: 'PostgreSQL host' },
-              },
-            },
-          },
-        },
-        validation: {
-          isValid: false,
-          missingFields: ['required.host'],
-          errors: [],
-        },
-        metadata: {
-          sourceType: 'POSTGRESQL',
-          schedule: { enabled: false, cron: '', timezone: 'UTC' },
-          detectors: [],
-          customDetectorIds: [],
-        },
-        supportedOperations: ['create_source'],
-      },
-    });
-
-    const [messages] = aiClient.completeJson.mock.calls[0] as [
-      Array<{ role: string; content: string }>,
-    ];
-    const systemPrompt =
-      messages.find((message) => message.role === 'system')?.content ?? '';
-    expect(systemPrompt).toContain('## Form schema');
-    expect(systemPrompt).toContain('required.host : string (required)');
-  });
-
-  it('omits the schema section from the system prompt when no schema is provided', async () => {
-    aiClient.completeJson.mockResolvedValue({
-      content: {
-        assistantMessage: 'Okay.',
-        patches: [],
-        requestedOperation: null,
-      },
-    });
-
-    await service.respond({
-      messages: [{ role: 'user', content: 'hello' }],
-      context: {
-        key: 'source.create',
-        route: '/sources/new',
-        title: 'Source Setup Assistant',
-        entityId: null,
-        values: { name: '', type: 'SLACK' },
-        schema: null,
-        validation: { isValid: false, missingFields: ['name'], errors: [] },
-        metadata: {
-          sourceType: 'SLACK',
-          schedule: { enabled: false, cron: '', timezone: 'UTC' },
-          detectors: [],
-          customDetectorIds: [],
-        },
-        supportedOperations: ['create_source'],
-      },
-    });
-
-    const [messages] = aiClient.completeJson.mock.calls[0] as [
-      Array<{ role: string; content: string }>,
-    ];
-    const systemPrompt =
-      messages.find((message) => message.role === 'system')?.content ?? '';
-    expect(systemPrompt).not.toContain('## Form schema');
-  });
-
-  it('applies inferred name patch and asks for missing fields when user gives partial intent', async () => {
-    aiClient.completeJson.mockResolvedValue({
-      content: {
-        assistantMessage:
-          "I've set the name to 'MongoDB Atlas'. What's the connection string for your cluster?",
-        patches: [{ path: 'name', value: 'MongoDB Atlas' }],
-        requestedOperation: null,
-      },
-    });
+    callTool.mockResolvedValue({ ok: true, result: { types: [] } });
 
     const response = await service.respond({
-      messages: [{ role: 'user', content: 'create mongodb atlas source' }],
-      context: {
-        key: 'source.create',
-        route: '/sources/new',
-        title: 'Source Setup Assistant',
-        entityId: null,
-        values: { name: '', type: 'MONGODB' },
-        schema: { type: 'object' },
-        validation: {
-          isValid: false,
-          missingFields: ['name', 'required.connection_string'],
-          errors: [],
-        },
-        metadata: {
-          sourceType: 'MONGODB',
-          schedule: { enabled: false, cron: '', timezone: 'UTC' },
-          detectors: [],
-          customDetectorIds: [],
-        },
-        supportedOperations: [
-          'create_source',
-          'update_source',
-          'test_source_connection',
-        ],
-      },
+      messages: [{ role: 'user', content: 'loop forever' }],
+      context: baseContext,
     });
 
-    expect(response.actions).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          type: 'patch_fields',
-          patches: expect.arrayContaining([
-            { path: 'name', value: 'MongoDB Atlas' },
-          ]),
-        }),
-      ]),
-    );
-    expect(response.pendingConfirmation).toBeNull();
-    expect(response.reply).toContain('MongoDB Atlas');
-  });
-
-  it('returns null requestedOperation when operation is not supported in context', async () => {
-    aiClient.completeJson.mockResolvedValue({
-      content: {
-        assistantMessage: 'I can help you update this detector.',
-        patches: [],
-        requestedOperation: null,
-      },
-    });
-
-    const response = await service.respond({
-      messages: [{ role: 'user', content: 'create a new source' }],
-      context: {
-        key: 'detector.create',
-        route: '/detectors/new',
-        title: 'Detector Studio Assistant',
-        entityId: null,
-        values: { name: '', method: 'CLASSIFIER' },
-        schema: { type: 'object' },
-        validation: { isValid: false, missingFields: ['name'], errors: [] },
-        metadata: {},
-        supportedOperations: [
-          'create_custom_detector',
-          'train_custom_detector',
-        ],
-      },
-    });
-
+    expect(response.reply).toContain('ran out of steps');
     expect(response.pendingConfirmation).toBeNull();
   });
 
   it('parses csv upload payload for assistant context', () => {
     const parsed = service.parseUploadedFile(
-      Buffer.from('label,text\nrisk,Some risk\nsafe,Some safe', 'utf8'),
-      'examples.csv',
+      Buffer.from('name,email\nOstap,o@example.com\n', 'utf8'),
+      'people.csv',
     );
-
     expect(parsed.fileType).toBe('csv');
-    expect(parsed.fileName).toBe('examples.csv');
-    expect(parsed.summary).toContain('Parsed');
+    expect(parsed.rowCount).toBe(1);
+    expect(parsed.columns).toEqual(['name', 'email']);
   });
 
   it('rejects unsupported file extension for assistant uploads', () => {
     expect(() =>
-      service.parseUploadedFile(Buffer.from('abc', 'utf8'), 'archive.zip'),
+      service.parseUploadedFile(Buffer.from('data', 'utf8'), 'evil.exe'),
     ).toThrow(BadRequestException);
   });
 });

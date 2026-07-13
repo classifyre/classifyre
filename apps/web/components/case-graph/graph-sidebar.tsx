@@ -11,7 +11,7 @@ import {
   MultiSelectTrigger,
   MultiSelectValue,
 } from "@workspace/ui/components/multi-select";
-import { ACCENT, CROSS_HYP_COLOR, MANUAL_EDGE_COLOR } from "./graph-types";
+import { ACCENT, CROSS_HYP_COLOR, MANUAL_EDGE_COLOR } from "../graph-explorer/graph-types";
 import { useTranslation } from "@/hooks/use-translation";
 
 export function SectionTitle({ children }: { children: React.ReactNode }) {
