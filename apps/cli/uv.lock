@@ -721,7 +721,7 @@ wheels = [
 
 [[package]]
 name = "classifyre-cli"
-version = "0.4.52"
+version = "0.4.53.dev0"
 source = { editable = "." }
 dependencies = [
     { name = "beautifulsoup4" },
@@ -1167,7 +1167,7 @@ youtube = [
 
 [[package]]
 name = "classifyre-schemas"
-version = "0.4.52"
+version = "0.4.53.dev0"
 source = { editable = "../../packages/schemas" }
 dependencies = [
     { name = "fastjsonschema" },
