@@ -526,14 +526,14 @@ export type SearchRunnerAssetsResponseDto = {
 export type AssistantContextKey =
   | "source.create"
   | "source.edit"
-  | "detector.create";
-
-export type AssistantOperation =
-  | "create_source"
-  | "update_source"
-  | "test_source_connection"
-  | "create_custom_detector"
-  | "train_custom_detector";
+  | "detector.create"
+  | "detector.edit"
+  | "fingerprints.tune"
+  | "inquiry.create"
+  | "inquiry.manage"
+  | "case.create"
+  | "case.manage"
+  | "app.global";
 
 export type AssistantChatMessage = {
   role: "user" | "assistant";
@@ -555,11 +555,11 @@ export type AssistantPageContext = {
   schema?: Record<string, unknown> | null;
   validation: AssistantValidationState;
   metadata?: Record<string, unknown>;
-  supportedOperations: AssistantOperation[];
 };
 
 export type AssistantPendingConfirmation = {
-  operation: AssistantOperation;
+  tool: string;
+  input: Record<string, unknown>;
   title: string;
   detail: string;
 };
@@ -579,6 +579,10 @@ export type AssistantUiAction =
   | {
       type: "patch_fields";
       patches: AssistantFieldPatch[];
+    }
+  | {
+      type: "navigate";
+      route: string;
     }
   | {
       type: "sync_source";
@@ -617,6 +621,7 @@ export type AssistantChatRequest = {
   messages: AssistantChatMessage[];
   context: AssistantPageContext;
   pendingConfirmation?: AssistantPendingConfirmation | null;
+  confirmationDecision?: "confirm" | "cancel" | null;
 };
 
 export type AssistantChatResponse = {

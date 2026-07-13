@@ -117,6 +117,13 @@ export const STRENGTH_GRADIENT = `linear-gradient(to right, ${strengthColor(
   0,
 )}, ${strengthColor(0.5)}, ${strengthColor(1)})`;
 
+/** Member count of a cluster pseudo-node (0 for plain nodes). */
+function clusterSize(node: GraphNodeDto): number {
+  return node.type === "cluster"
+    ? ((node as { cluster?: { size?: number } }).cluster?.size ?? 0)
+    : 0;
+}
+
 /** Visual radius used for hit areas, collision and edge endpoint trimming. */
 export function nodeRadius(node: GraphNodeDto): number {
   switch (node.type) {
@@ -124,6 +131,8 @@ export function nodeRadius(node: GraphNodeDto): number {
       return 13;
     case "sandbox":
       return 20;
+    case "cluster":
+      return Math.min(60, Math.max(24, 18 + 4 * Math.sqrt(clusterSize(node))));
     default:
       return 19;
   }
@@ -131,5 +140,6 @@ export function nodeRadius(node: GraphNodeDto): number {
 
 /** Collision radius — larger than the shape so labels keep breathing room. */
 export function collideRadius(node: GraphNodeDto): number {
+  if (node.type === "cluster") return nodeRadius(node) + 34;
   return node.type === "finding" ? 34 : 52;
 }

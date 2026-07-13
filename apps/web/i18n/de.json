@@ -2773,5 +2773,18 @@
     "eventSlackAppTokenMissing": "Kein App-Level-Token gespeichert — Socket Mode kann sich nicht verbinden.",
     "eventSlackAppTokenOk": "App-Token akzeptiert — Socket-Mode-Verbindungen können geöffnet werden.",
     "eventSlackAppTokenRejected": "App-Token (xapp-…) abgelehnt: {{reason}}"
+  },
+  "graphExplorer": {
+    "truncated": "Teilweise",
+    "clusters": "{{count}} Cluster",
+    "collapseAll": "Übersicht",
+    "expandCluster": "Doppelklick zum Aufklappen",
+    "expandFirst": "Cluster zuerst aufklappen",
+    "overviewTitle": "Hotspots",
+    "clusterTitle": "Cluster",
+    "clusterStats": "{{assets}} Assets · {{findings}} Findings",
+    "openCluster": "Hineinzoomen",
+    "linkedClusters": "Verknüpfte Cluster",
+    "members": "Mitglieder"
   }
 }

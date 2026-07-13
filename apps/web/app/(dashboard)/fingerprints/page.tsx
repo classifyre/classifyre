@@ -8,8 +8,13 @@ import {
   TabsList,
   TabsTrigger,
 } from "@workspace/ui/components/tabs";
+import type { AssistantUiAction } from "@workspace/api-client";
 import { FingerprintsGraph } from "@/components/fingerprints-graph";
-import { CorrelationTuningPanel } from "@/components/correlation-tuning-panel";
+import {
+  CorrelationTuningPanel,
+  type CorrelationTuningPanelHandle,
+} from "@/components/correlation-tuning-panel";
+import { useRegisterAssistantBridge } from "@/components/assistant-workflow-provider";
 import { useTranslation } from "@/hooks/use-translation";
 
 export default function FingerprintsPage() {
@@ -17,6 +22,32 @@ export default function FingerprintsPage() {
   const [tab, setTab] = React.useState("graph");
   // Bumped when tuning is saved → tells the graph to wait for recompute + reload.
   const [pendingRecomputeAt, setPendingRecomputeAt] = React.useState<number>();
+  const tuningPanelRef = React.useRef<CorrelationTuningPanelHandle | null>(null);
+
+  const assistantBridge = React.useMemo(
+    () => ({
+      contextKey: "fingerprints.tune" as const,
+      canOpen: true,
+      getContext: () => ({
+        key: "fingerprints.tune" as const,
+        route: "/fingerprints",
+        title: t("fingerprints.tabTune"),
+        entityId: null,
+        values: tuningPanelRef.current?.getValues() ?? {},
+        schema: null,
+        validation: { isValid: true, missingFields: [], errors: [] },
+        metadata: {},
+      }),
+      applyAction: (action: AssistantUiAction) => {
+        if (action.type === "patch_fields") {
+          tuningPanelRef.current?.applyPatches(action.patches);
+        }
+      },
+    }),
+    [t],
+  );
+
+  useRegisterAssistantBridge(assistantBridge);
 
   return (
     <div className="flex h-[calc(100vh-7rem)] flex-col space-y-4">
@@ -60,6 +91,7 @@ export default function FingerprintsPage() {
 
         <TabsContent value="tune" className="mt-4 min-h-0 flex-1 overflow-y-auto">
           <CorrelationTuningPanel
+            ref={tuningPanelRef}
             layout="page"
             onSaved={() => {
               setPendingRecomputeAt(Date.now());
