@@ -54,6 +54,25 @@ export function shortestPath(
   return { nodeKeys, edgeIds };
 }
 
+/** Every node/edge reachable from startKey over the given edges (undirected). */
+export function focusComponent(startKey: string, edges: GraphEdgeDto[]): PathResult {
+  const adj = buildAdjacency(edges);
+  const nodeKeys = new Set([startKey]);
+  const edgeIds = new Set<string>();
+  const queue = [startKey];
+  while (queue.length > 0) {
+    const cur = queue.shift()!;
+    for (const { to, edgeId } of adj.get(cur) ?? []) {
+      edgeIds.add(edgeId);
+      if (!nodeKeys.has(to)) {
+        nodeKeys.add(to);
+        queue.push(to);
+      }
+    }
+  }
+  return { nodeKeys, edgeIds };
+}
+
 /** Bounding box of laid-out nodes (world coordinates), with padding. */
 export function nodesBBox(
   nodes: Iterable<SimNode>,
@@ -74,6 +93,29 @@ export function nodesBBox(
   }
   if (!any) return null;
   return { x: minX - pad, y: minY - pad, w: maxX - minX + pad * 2, h: maxY - minY + pad * 2 };
+}
+
+/**
+ * Evenly spaced ring positions around a center — used to seed an asset's
+ * findings as a tidy fan when the asset is drilled into. The radius grows
+ * with the count so segments keep breathing room.
+ */
+export function fanPositions(
+  center: { x: number; y: number },
+  count: number,
+  baseRadius = 80,
+): Array<{ x: number; y: number }> {
+  if (count <= 0) return [];
+  const radius = Math.max(baseRadius, (count * 40) / (2 * Math.PI));
+  const out: Array<{ x: number; y: number }> = [];
+  for (let i = 0; i < count; i++) {
+    const angle = -Math.PI / 2 + (i / count) * Math.PI * 2;
+    out.push({
+      x: center.x + Math.cos(angle) * radius,
+      y: center.y + Math.sin(angle) * radius,
+    });
+  }
+  return out;
 }
 
 /**

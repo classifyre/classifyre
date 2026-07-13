@@ -131,6 +131,7 @@ function CaseWorkspaceInner() {
   // ── Graph state (rendered by CaseGraphView) ───────────────────────────────
   const [nodes, setNodes] = React.useState<GraphNodeDto[]>([]);
   const [edges, setEdges] = React.useState<GraphEdgeDto[]>([]);
+  const [graphTruncated, setGraphTruncated] = React.useState(false);
   const [graphLoading, setGraphLoading] = React.useState(false);
 
   // ── Loaders ────────────────────────────────────────────────────────────────
@@ -168,6 +169,7 @@ function CaseWorkspaceInner() {
       const g = await api.cases.casesControllerGraph({ id: caseId, depth: 1 });
       setNodes(g.nodes);
       setEdges(g.edges);
+      setGraphTruncated(Boolean(g.truncated));
     } finally {
       setGraphLoading(false);
     }
@@ -565,6 +567,7 @@ function CaseWorkspaceInner() {
                 hypotheses={hypothesisThreads}
                 hypothesisColors={hypothesisColors}
                 evidence={evidence}
+                truncated={graphTruncated}
                 onReload={reloadAll}
                 onMergeExpansion={mergeExpansion}
               />

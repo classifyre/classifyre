@@ -7,8 +7,6 @@ import {
   CROSS_HYP_COLOR,
   MANUAL_EDGE_COLOR,
   SEVERITY_COLORS,
-  strengthColor,
-  contrastText,
   findingCategoryCode,
   keyOf,
   nodeKey,
@@ -18,7 +16,10 @@ import {
   type PathResult,
   type SimNode,
 } from "./graph-types";
+import type { EdgeStyleOverride, NodeBadge, NodeDecorator } from "./explorer-types";
 import { drawAssetIcon, drawFindingIndicator } from "./node-icons";
+import { drawSeverityDonut, severityArcsOf } from "./node-render";
+import { isClusterNode, isMetaEdge } from "./use-clustered-graph";
 import type { useForceLayout } from "./use-force-layout";
 import type { usePanZoom } from "./use-pan-zoom";
 
@@ -27,7 +28,7 @@ const EDGE_HIT_THRESHOLD = 8;
 const LABEL_MAX = 26;
 
 function truncate(s: string, max = LABEL_MAX) {
-  return s.length > max ? s.slice(0, max - 1) + "\u2026" : s;
+  return s.length > max ? s.slice(0, max - 1) + "…" : s;
 }
 
 interface GraphColors {
@@ -66,33 +67,51 @@ function distToSegment(
   return Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy));
 }
 
+/** Badge box geometry, shared by drawing and hit-testing. */
+function badgeRect(
+  badge: NodeBadge,
+  x: number,
+  y: number,
+  r: number,
+): { bx: number; by: number; bw: number; bh: number } {
+  const bw = Math.max(24, 12 + badge.text.length * 6);
+  const bh = 18;
+  const bx = x + r + 4;
+  const by = badge.placement === "tr" ? y - r - 4 - bh : y + r + 4;
+  return { bx, by, bw, bh };
+}
+
 export interface GraphCanvasProps {
   nodes: GraphNodeDto[];
   edges: GraphEdgeDto[];
   layout: ReturnType<typeof useForceLayout>;
   panZoom: ReturnType<typeof usePanZoom>;
-  evidenceKeys: Set<string>;
-  hypothesisColors: Record<string, string>;
-  attachableCounts: Map<string, number>;
-  collapsedCounts: Map<string, number>;
   selection: GraphSelection;
   mode: GraphMode;
   activeNodeKeys: Set<string> | null;
   path: PathResult | null;
-  colorByStrength?: boolean;
+  /** Highlighted node (two-way hover sync with the sidebar). */
+  hoverKey?: string | null;
+  /** Fired when the pointer enters/leaves a node. */
+  onNodeHover?: (node: GraphNodeDto | null) => void;
+  /** Per-node visual extras (rings, dots, badges, fill) supplied by the view. */
+  nodeDecorator?: NodeDecorator;
+  /** Per-edge stroke override (e.g. similarity heat). */
+  edgeStyle?: (edge: GraphEdgeDto) => EdgeStyleOverride | null;
   onNodeClick: (node: GraphNodeDto, shiftKey: boolean) => void;
+  onNodeDoubleClick?: (node: GraphNodeDto) => void;
   onNodeContextMenu: (node: GraphNodeDto, clientX: number, clientY: number) => void;
   onEdgeClick: (edge: GraphEdgeDto) => void;
   onEdgeContextMenu: (edge: GraphEdgeDto, clientX: number, clientY: number) => void;
   onBackgroundClick: () => void;
-  onAttachBadgeClick: (node: GraphNodeDto) => void;
-  onToggleCollapse: (node: GraphNodeDto) => void;
+  onBadgeClick?: (node: GraphNodeDto, badgeId: string) => void;
 }
 
 interface HitTestResult {
-  type: "node" | "edge" | "badge-attach" | "badge-collapse";
+  type: "node" | "edge" | "badge";
   node?: GraphNodeDto;
   edge?: GraphEdgeDto;
+  badgeId?: string;
 }
 
 export function GraphCanvas({
@@ -100,22 +119,21 @@ export function GraphCanvas({
   edges,
   layout,
   panZoom,
-  evidenceKeys,
-  hypothesisColors,
-  attachableCounts,
-  collapsedCounts,
   selection,
   mode,
   activeNodeKeys,
   path,
-  colorByStrength,
+  hoverKey,
+  onNodeHover,
+  nodeDecorator,
+  edgeStyle,
   onNodeClick,
+  onNodeDoubleClick,
   onNodeContextMenu,
   onEdgeClick,
   onEdgeContextMenu,
   onBackgroundClick,
-  onAttachBadgeClick,
-  onToggleCollapse,
+  onBadgeClick,
 }: GraphCanvasProps) {
   const { simNodes, version: layoutVersion, dragStart, dragMove, dragEnd, isPinned } = layout;
   const { elementRef, transformRef, version: pzVersion, screenToWorld, beginPan } = panZoom;
@@ -174,11 +192,35 @@ export function GraphCanvas({
     ctx.translate(t.x, t.y);
     ctx.scale(t.k, t.k);
 
+    // Viewport culling: world-space view rect, inflated by the largest
+    // node + label footprint so partially visible elements still draw.
+    const cullPad = 140;
+    const viewX0 = -t.x / t.k - cullPad;
+    const viewY0 = -t.y / t.k - cullPad;
+    const viewX1 = (displayW - t.x) / t.k + cullPad;
+    const viewY1 = (displayH - t.y) / t.k + cullPad;
+    const inView = (x: number, y: number) =>
+      x >= viewX0 && x <= viewX1 && y >= viewY0 && y <= viewY1;
+
+    // Zoom-based level of detail: fine print only when it is readable.
+    const showLabels = t.k > 0.5;
+    const showDetail = t.k > 0.3;
+
     // Edges
     for (const e of edges) {
       const s = simNodes.get(nodeKey(e.fromType, e.fromId));
       const tt = simNodes.get(nodeKey(e.toType, e.toId));
       if (!s || !tt) continue;
+
+      // Skip edges whose bounding box misses the viewport entirely.
+      if (
+        Math.max(s.x, tt.x) < viewX0 ||
+        Math.min(s.x, tt.x) > viewX1 ||
+        Math.max(s.y, tt.y) < viewY0 ||
+        Math.min(s.y, tt.y) > viewY1
+      ) {
+        continue;
+      }
 
       const isDimmed = path ? !path.edgeIds.has(e.id) : activeNodeKeys !== null
         && !activeNodeKeys.has(nodeKey(e.fromType, e.fromId))
@@ -215,11 +257,6 @@ export function GraphCanvas({
         dash = undefined;
         width = 2.5;
         drawArrow = true;
-      } else if (colorByStrength) {
-        stroke = strengthColor(Number(e.confidence ?? 0));
-        dash = undefined;
-        width = 1.5;
-        drawArrow = false;
       } else if (isCross) {
         stroke = CROSS_HYP_COLOR;
         dash = [6, 4];
@@ -235,6 +272,24 @@ export function GraphCanvas({
         dash = undefined;
         width = 1.5;
         drawArrow = true;
+      }
+
+      // Aggregated cluster↔cluster edges get weight-scaled thickness.
+      if (isMetaEdge(e)) {
+        width = 1.5 + Math.log2(e.meta.linkCount + 1);
+        drawArrow = false;
+      }
+
+      // View-supplied override only applies to the resting style, never to
+      // path/selection emphasis.
+      if (!isOnPath && !isSelected && edgeStyle) {
+        const o = edgeStyle(e);
+        if (o) {
+          stroke = o.stroke ?? stroke;
+          dash = o.dash ?? dash;
+          width = o.width ?? width;
+          drawArrow = o.arrow ?? drawArrow;
+        }
       }
 
       ctx.globalAlpha = isDimmed ? 0.08 : 1;
@@ -263,8 +318,8 @@ export function GraphCanvas({
         ctx.fill();
       }
 
-      // Edge label
-      if (len > 70) {
+      // Edge label — only when the edge is long enough on screen to read.
+      if (showLabels && len * t.k > 70) {
         const midX = (sx + tx) / 2;
         const midY = (sy + ty) / 2;
         let angle = (Math.atan2(dy, dx) * 180) / Math.PI;
@@ -320,18 +375,6 @@ export function GraphCanvas({
       }
     }
 
-    // Max confidence per asset node (for colorByStrength)
-    const maxConfidence = new Map<string, number>();
-    if (colorByStrength) {
-      for (const e of edges) {
-        for (const k of [nodeKey(e.fromType, e.fromId), nodeKey(e.toType, e.toId)]) {
-          const prev = maxConfidence.get(k) ?? 0;
-          const c = Number(e.confidence ?? 0);
-          if (c > prev) maxConfidence.set(k, c);
-        }
-      }
-    }
-
     // Nodes
     for (const n of nodes) {
       const key = keyOf(n);
@@ -340,21 +383,30 @@ export function GraphCanvas({
 
       const x = sim.x;
       const y = sim.y;
+      if (!inView(x, y)) continue;
       const r = nodeRadius(n);
       const isFinding = n.type === "finding";
       const isDimmed = path ? !path.nodeKeys.has(key) : activeNodeKeys !== null && !activeNodeKeys.has(key);
       const selectedNode = selection?.type === "node" && selection.key === key;
-      const isEvidence = evidenceKeys.has(key);
       const pinned = isPinned(key);
       const isConnectSource = connectSourceKey === key;
-      const hypColors = (n.hypothesisIds ?? [])
-        .map((id) => hypothesisColors[id])
-        .filter((c): c is string => Boolean(c));
-      const hasCrossHyp = hypColors.length > 1;
+      const deco = nodeDecorator?.(n) ?? null;
+      const dots = deco?.dots ?? [];
       const ringR = r + 5;
 
       ctx.save();
       ctx.globalAlpha = isDimmed ? 0.12 : 1;
+
+      // Hover ring (sidebar or pointer hover)
+      if (hoverKey === key && !selectedNode) {
+        ctx.beginPath();
+        ctx.arc(x, y, ringR + 3, 0, Math.PI * 2);
+        ctx.strokeStyle = colors.foreground;
+        ctx.globalAlpha = isDimmed ? 0.3 : 0.55;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.globalAlpha = isDimmed ? 0.12 : 1;
+      }
 
       // Selection glow
       if (selectedNode || isConnectSource) {
@@ -369,20 +421,20 @@ export function GraphCanvas({
         ctx.restore();
       }
 
-      // Evidence ring
-      if (isEvidence && !selectedNode) {
+      // Solid decoration ring (evidence, external, …)
+      if (deco?.ringColor && !selectedNode) {
         ctx.beginPath();
         ctx.arc(x, y, ringR, 0, Math.PI * 2);
-        ctx.strokeStyle = ACCENT;
+        ctx.strokeStyle = deco.ringColor;
         ctx.lineWidth = 2.5;
         ctx.stroke();
       }
 
-      // Cross-hypothesis ring
-      if (hasCrossHyp) {
+      // Dashed decoration ring (cross-hypothesis)
+      if (deco?.dashedRingColor) {
         ctx.beginPath();
-        ctx.arc(x, y, ringR + (isEvidence ? 5 : 0), 0, Math.PI * 2);
-        ctx.strokeStyle = CROSS_HYP_COLOR;
+        ctx.arc(x, y, ringR + (deco.ringColor ? 5 : 0), 0, Math.PI * 2);
+        ctx.strokeStyle = deco.dashedRingColor;
         ctx.lineWidth = 2;
         ctx.setLineDash([4, 3]);
         ctx.stroke();
@@ -390,12 +442,40 @@ export function GraphCanvas({
       }
 
       // Node shape
-      if (isFinding) {
-        const fillColor = colorByStrength
-          ? strengthColor(maxConfidence.get(key) ?? 0)
-          : n.severity
+      if (isClusterNode(n)) {
+        const meta = n.cluster;
+        const sevColor = meta.topSeverity ? SEVERITY_COLORS[meta.topSeverity] : undefined;
+
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.fillStyle = colors.card;
+        ctx.strokeStyle = colors.foreground;
+        ctx.lineWidth = 2;
+        ctx.fill();
+        ctx.stroke();
+
+        // Severity mix ring — the "how bad is this neighborhood" signal.
+        drawSeverityDonut(ctx, x, y, r + 3, severityArcsOf({
+          severityCounts: meta.severityCounts,
+          total: Object.values(meta.severityCounts).reduce((a, b) => a + b, 0),
+        }));
+
+        ctx.fillStyle = colors.foreground;
+        ctx.font = `bold ${Math.max(12, Math.round(r * 0.55))}px ${colors.fontMono}`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(String(meta.assetCount || meta.size), x, y - (meta.findingCount > 0 ? 4 : 0));
+        if (meta.findingCount > 0) {
+          ctx.fillStyle = sevColor ?? colors.mutedForeground;
+          ctx.font = `bold 9.5px ${colors.fontMono}`;
+          ctx.fillText(`⚑ ${meta.findingCount}`, x, y + Math.max(10, r * 0.4));
+        }
+      } else if (isFinding) {
+        const fillColor =
+          deco?.fillOverride ??
+          (n.severity
             ? (SEVERITY_COLORS[n.severity.toUpperCase()] ?? SEVERITY_COLORS.INFO!)
-            : SEVERITY_COLORS.INFO!;
+            : SEVERITY_COLORS.INFO!);
         ctx.beginPath();
         ctx.arc(x, y, r, 0, Math.PI * 2);
         ctx.fillStyle = fillColor;
@@ -405,7 +485,7 @@ export function GraphCanvas({
         ctx.stroke();
 
         ctx.fillStyle = "#ffffff";
-        if (colorByStrength) {
+        if (deco?.findingGlyph === "icon") {
           drawFindingIndicator(ctx, n, x, y, r * 1.5);
         } else {
           ctx.font = `bold ${Math.round(r * 0.82)}px ${colors.fontMono}`;
@@ -431,18 +511,23 @@ export function GraphCanvas({
 
         ctx.fillStyle = colors.foreground;
         drawAssetIcon(ctx, n, x, y, (r - 3) * 1.5);
+
+        // Severity donut: the collapsed-findings mix at a glance.
+        if (deco?.severityArcs && deco.severityArcs.length > 0) {
+          drawSeverityDonut(ctx, x, y, r + 1, deco.severityArcs);
+        }
       }
 
-      // Hypothesis membership dots
-      if (hypColors.length > 0) {
-        const dots = hypColors.slice(0, 6);
+      // Membership dots (hypotheses)
+      if (showDetail && dots.length > 0) {
+        const shown = dots.slice(0, 6);
         const dotSpacing = 11;
-        const dotsStartX = x - ((dots.length - 1) * dotSpacing) / 2;
+        const dotsStartX = x - ((shown.length - 1) * dotSpacing) / 2;
         const dotsY = y - (ringR + 8);
-        for (let i = 0; i < dots.length; i++) {
+        for (let i = 0; i < shown.length; i++) {
           ctx.beginPath();
           ctx.arc(dotsStartX + i * dotSpacing, dotsY, 4, 0, Math.PI * 2);
-          ctx.fillStyle = dots[i]!;
+          ctx.fillStyle = shown[i]!;
           ctx.fill();
           ctx.strokeStyle = colors.background;
           ctx.lineWidth = 1.5;
@@ -451,7 +536,7 @@ export function GraphCanvas({
       }
 
       // Pin indicator
-      if (pinned) {
+      if (showDetail && pinned) {
         ctx.beginPath();
         ctx.arc(x + r - 2, y + r - 2, 3.5, 0, Math.PI * 2);
         ctx.fillStyle = colors.foreground;
@@ -463,73 +548,48 @@ export function GraphCanvas({
 
       ctx.restore();
 
-      // Attachable badge (drawn after restore to be on top)
-      const attachableCount = n.type === "asset" ? (attachableCounts.get(n.id) ?? 0) : 0;
-      if (attachableCount > 0) {
-        const bw = attachableCount > 9 ? 30 : 24;
-        const bh = 18;
-        const bx = x + r + 4;
-        const by = y - r - 4 - bh;
+      // Corner badges (drawn after restore to sit on top, undimmed)
+      for (const badge of showDetail ? (deco?.badges ?? []) : []) {
+        const { bx, by, bw, bh } = badgeRect(badge, x, y, r);
         ctx.save();
-        ctx.fillStyle = ACCENT;
-        ctx.strokeStyle = "#0a0a0a";
+        ctx.fillStyle = badge.accent ? ACCENT : colors.card;
+        ctx.strokeStyle = badge.accent ? "#0a0a0a" : colors.foreground;
         ctx.lineWidth = 1.5;
         roundRect(ctx, bx, by, bw, bh, 2);
         ctx.fill();
         ctx.stroke();
-        ctx.fillStyle = "#0a0a0a";
+        ctx.fillStyle = badge.accent ? "#0a0a0a" : colors.foreground;
         ctx.font = `bold 10px ${colors.fontMono}`;
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
-        ctx.fillText(`+${attachableCount}`, bx + bw / 2, by + bh / 2);
+        ctx.fillText(badge.text, bx + bw / 2, by + bh / 2);
         ctx.restore();
       }
 
-      // Collapsed badge
-      const collapsedCount = n.type === "asset" ? (collapsedCounts.get(n.id) ?? 0) : 0;
-      if (collapsedCount > 0) {
-        const bw = collapsedCount > 9 ? 34 : 28;
-        const bh = 18;
-        const bx = x + r + 4;
-        const by = y + r + 4;
+      // Label — clusters keep theirs at any zoom (they ARE the overview);
+      // plain nodes only when readable.
+      if (showLabels || isClusterNode(n)) {
         ctx.save();
-        ctx.fillStyle = colors.card;
-        ctx.strokeStyle = colors.foreground;
-        ctx.lineWidth = 1.5;
-        roundRect(ctx, bx, by, bw, bh, 2);
-        ctx.fill();
-        ctx.stroke();
-        ctx.fillStyle = colors.foreground;
-        ctx.font = `bold 9.5px ${colors.fontMono}`;
+        ctx.font = `10px ${colors.fontMono}`;
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
-        ctx.fillText(`\u25B8${collapsedCount}`, bx + bw / 2, by + bh / 2);
+        const labelY = y + ringR + 14;
+        ctx.strokeStyle = colors.background;
+        ctx.lineWidth = 3;
+        ctx.lineJoin = "round";
+        ctx.globalAlpha = isDimmed ? 0.12 : 1;
+        ctx.strokeText(truncate(n.label), x, labelY);
+        ctx.fillStyle = colors.foreground;
+        ctx.fillText(truncate(n.label), x, labelY);
         ctx.restore();
       }
-
-      // Label
-      ctx.save();
-      ctx.font = `10px ${colors.fontMono}`;
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      const labelY = y + ringR + 14;
-      ctx.strokeStyle = colors.background;
-      ctx.lineWidth = 3;
-      ctx.lineJoin = "round";
-      ctx.strokeText(truncate(n.label), x, labelY);
-      ctx.fillStyle = colors.foreground;
-      ctx.fillText(truncate(n.label), x, labelY);
-      ctx.restore();
     }
 
     ctx.restore(); // world-space transform
   }, [
     nodes, edges, layout, simNodes, elementRef, transformRef,
-    evidenceKeys, hypothesisColors, attachableCounts, collapsedCounts,
-    selection, mode, activeNodeKeys, path, colorByStrength,
-    connectSourceKey, isPinned, dragStart, dragMove, dragEnd,
-    onNodeClick, onNodeContextMenu, onEdgeClick, onEdgeContextMenu,
-    onBackgroundClick, onAttachBadgeClick, onToggleCollapse,
+    selection, mode, activeNodeKeys, path, hoverKey, nodeDecorator, edgeStyle,
+    connectSourceKey, isPinned,
   ]);
 
   // ── Render loop (triggered by layout or panZoom changes) ────────────────
@@ -539,7 +599,7 @@ export function GraphCanvas({
   React.useEffect(() => {
     cancelAnimationFrame(rafRef.current);
     rafRef.current = requestAnimationFrame(() => drawRef.current());
-  }, [layoutVersion, pzVersion]);
+  }, [layoutVersion, pzVersion, draw]);
 
   // ── Canvas ref setup ─────────────────────────────────────────────────────
 
@@ -557,22 +617,23 @@ export function GraphCanvas({
 
   // ── Pointer events (hit-test + drag/click) ──────────────────────────────
 
+  const lastClickRef = React.useRef<{ key: string; time: number }>({ key: "", time: 0 });
+
   // Node drag-vs-click
   const handlePointerDown = React.useCallback(
     (e: React.PointerEvent) => {
       if (e.button !== 0) return;
 
       const w = screenToWorld(e.clientX, e.clientY);
-      const nodeHit = hitTestNode(nodes, simNodes, w.x, w.y, selection, path, activeNodeKeys);
-      const edgeHit = nodeHit ? null : hitTestEdge(edges, simNodes, w.x, w.y, selection, path, activeNodeKeys);
+      const nodeHit = hitTestNode(nodes, simNodes, w.x, w.y, path, activeNodeKeys);
+      const edgeHit = nodeHit ? null : hitTestEdge(edges, simNodes, w.x, w.y, path, activeNodeKeys);
 
       // Badge hits
-      if (!nodeHit && !edgeHit) {
-        const badgeHit = hitTestBadge(nodes, simNodes, w.x, w.y, attachableCounts, collapsedCounts);
-        if (badgeHit) {
+      if (!nodeHit && !edgeHit && nodeDecorator && onBadgeClick) {
+        const badgeHit = hitTestBadge(nodes, simNodes, w.x, w.y, nodeDecorator);
+        if (badgeHit?.node && badgeHit.badgeId) {
           e.stopPropagation();
-          if (badgeHit.type === "badge-attach" && badgeHit.node) onAttachBadgeClick(badgeHit.node);
-          else if (badgeHit.type === "badge-collapse" && badgeHit.node) onToggleCollapse(badgeHit.node);
+          onBadgeClick(badgeHit.node, badgeHit.badgeId);
           return;
         }
       }
@@ -594,8 +655,19 @@ export function GraphCanvas({
         const onUp = () => {
           window.removeEventListener("pointermove", onMove);
           window.removeEventListener("pointerup", onUp);
-          if (dragging) dragEnd(key);
-          else onNodeClick(nodeHit.node!, shiftKey);
+          if (dragging) {
+            dragEnd(key);
+            return;
+          }
+          const now = performance.now();
+          const last = lastClickRef.current;
+          if (onNodeDoubleClick && last.key === key && now - last.time < 350) {
+            lastClickRef.current = { key: "", time: 0 };
+            onNodeDoubleClick(nodeHit.node!);
+          } else {
+            lastClickRef.current = { key, time: now };
+            onNodeClick(nodeHit.node!, shiftKey);
+          }
         };
         window.addEventListener("pointermove", onMove);
         window.addEventListener("pointerup", onUp);
@@ -616,9 +688,9 @@ export function GraphCanvas({
       }
     },
     [
-      nodes, simNodes, screenToWorld, selection, path, activeNodeKeys,
-      attachableCounts, collapsedCounts, dragStart, dragMove, dragEnd,
-      onNodeClick, onEdgeClick, onBackgroundClick, onAttachBadgeClick, onToggleCollapse,
+      nodes, edges, simNodes, screenToWorld, path, activeNodeKeys,
+      nodeDecorator, dragStart, dragMove, dragEnd,
+      onNodeClick, onNodeDoubleClick, onEdgeClick, onBackgroundClick, onBadgeClick,
       beginPan,
     ],
   );
@@ -628,28 +700,38 @@ export function GraphCanvas({
     (e: React.MouseEvent) => {
       e.preventDefault();
       const w = screenToWorld(e.clientX, e.clientY);
-      const nodeHit = hitTestNode(nodes, simNodes, w.x, w.y, selection, path, activeNodeKeys);
+      const nodeHit = hitTestNode(nodes, simNodes, w.x, w.y, path, activeNodeKeys);
       if (nodeHit && nodeHit.node) {
         onNodeContextMenu(nodeHit.node, e.clientX, e.clientY);
         return;
       }
-      const edgeHit = hitTestEdge(edges, simNodes, w.x, w.y, selection, path, activeNodeKeys);
+      const edgeHit = hitTestEdge(edges, simNodes, w.x, w.y, path, activeNodeKeys);
       if (edgeHit && edgeHit.edge) {
         onEdgeContextMenu(edgeHit.edge, e.clientX, e.clientY);
       }
     },
-    [nodes, simNodes, screenToWorld, selection, path, activeNodeKeys, onNodeContextMenu, onEdgeContextMenu, edges],
+    [nodes, simNodes, screenToWorld, path, activeNodeKeys, onNodeContextMenu, onEdgeContextMenu, edges],
   );
 
-  // Rubber-band tracking in connect mode
+  // Rubber-band tracking in connect mode + hover reporting
+  const lastHoverRef = React.useRef<string | null>(null);
   const handlePointerMove = React.useCallback(
     (e: React.PointerEvent) => {
-      if (!connectSourceKey) return;
       const w = screenToWorld(e.clientX, e.clientY);
-      cursorWorldRef.current = w;
-      drawRef.current();
+      if (connectSourceKey) {
+        cursorWorldRef.current = w;
+        drawRef.current();
+      }
+      if (onNodeHover) {
+        const hit = hitTestNode(nodes, simNodes, w.x, w.y, path, activeNodeKeys);
+        const key = hit?.node ? keyOf(hit.node) : null;
+        if (key !== lastHoverRef.current) {
+          lastHoverRef.current = key;
+          onNodeHover(hit?.node ?? null);
+        }
+      }
     },
-    [connectSourceKey, screenToWorld],
+    [connectSourceKey, screenToWorld, onNodeHover, nodes, simNodes, path, activeNodeKeys],
   );
 
   const cursor =
@@ -662,6 +744,12 @@ export function GraphCanvas({
       style={{ cursor }}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
+      onPointerLeave={() => {
+        if (onNodeHover && lastHoverRef.current !== null) {
+          lastHoverRef.current = null;
+          onNodeHover(null);
+        }
+      }}
       onContextMenu={handleContextMenu}
     />
   );
@@ -674,7 +762,6 @@ function hitTestNode(
   simNodes: Map<string, SimNode>,
   wx: number,
   wy: number,
-  selection: GraphSelection,
   path: PathResult | null,
   activeNodeKeys: Set<string> | null,
 ): HitTestResult | null {
@@ -698,7 +785,6 @@ function hitTestEdge(
   simNodes: Map<string, SimNode>,
   wx: number,
   wy: number,
-  selection: GraphSelection,
   path: PathResult | null,
   activeNodeKeys: Set<string> | null,
 ): HitTestResult | null {
@@ -736,37 +822,19 @@ function hitTestBadge(
   simNodes: Map<string, SimNode>,
   wx: number,
   wy: number,
-  attachableCounts: Map<string, number>,
-  collapsedCounts: Map<string, number>,
+  nodeDecorator: NodeDecorator,
 ): HitTestResult | null {
   for (let i = nodeList.length - 1; i >= 0; i--) {
     const n = nodeList[i]!;
-    if (n.type !== "asset") continue;
     const sim = simNodes.get(keyOf(n));
     if (!sim) continue;
+    const badges = nodeDecorator(n)?.badges;
+    if (!badges || badges.length === 0) continue;
     const r = nodeRadius(n);
-    const x = sim.x;
-    const y = sim.y;
-
-    const ac = attachableCounts.get(n.id) ?? 0;
-    if (ac > 0) {
-      const bw = ac > 9 ? 30 : 24;
-      const bh = 18;
-      const bx = x + r + 4;
-      const by = y - r - 4 - bh;
+    for (const badge of badges) {
+      const { bx, by, bw, bh } = badgeRect(badge, sim.x, sim.y, r);
       if (wx >= bx && wx <= bx + bw && wy >= by && wy <= by + bh) {
-        return { type: "badge-attach", node: n };
-      }
-    }
-
-    const cc = collapsedCounts.get(n.id) ?? 0;
-    if (cc > 0) {
-      const bw = cc > 9 ? 34 : 28;
-      const bh = 18;
-      const bx = x + r + 4;
-      const by = y + r + 4;
-      if (wx >= bx && wx <= bx + bw && wy >= by && wy <= by + bh) {
-        return { type: "badge-collapse", node: n };
+        return { type: "badge", node: n, badgeId: badge.id };
       }
     }
   }
@@ -790,7 +858,7 @@ function roundRect(
   ctx.lineTo(x + w, y + h - r);
   ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
   ctx.lineTo(x + r, y + h);
-  ctx.arcTo(x, y + h, x, y + h - r, r);
+  ctx.arcTo(x, y + h, x, y + r, r);
   ctx.lineTo(x, y + r);
   ctx.arcTo(x, y, x + r, y, r);
   ctx.closePath();
