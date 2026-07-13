@@ -24,7 +24,7 @@ import {
 } from "@workspace/ui/components/alert-dialog";
 import { ManualEdgeDialog } from "@/components/manual-edge-dialog";
 import { RenameEdgeDialog } from "@/components/rename-edge-dialog";
-import { GraphCanvas } from "./graph-canvas";
+import { GraphCanvas } from "../graph-explorer/graph-canvas";
 import { GraphToolbar } from "./graph-toolbar";
 import { GraphContextMenu, type ContextMenuState } from "./graph-context-menu";
 import {
@@ -39,16 +39,30 @@ import { EdgeDetailPanel } from "./edge-detail-panel";
 import { AttachFindingsDialog } from "./attach-findings-dialog";
 import { NewHypothesisDialog } from "./new-hypothesis-dialog";
 import { LinkHypothesisDialog, type LinkTarget } from "./link-hypothesis-dialog";
-import { useForceLayout } from "./use-force-layout";
-import { usePanZoom } from "./use-pan-zoom";
-import { nodesBBox, shortestPath } from "./graph-utils";
+import { useForceLayout } from "../graph-explorer/use-force-layout";
+import { usePanZoom } from "../graph-explorer/use-pan-zoom";
+import { useContainerSize } from "../graph-explorer/use-container-size";
+import { fanPositions, nodesBBox, shortestPath } from "../graph-explorer/graph-utils";
+import { useVisibleGraph } from "../graph-explorer/use-visible-graph";
 import {
+  clusterNodeKey,
+  isClusterNode,
+  useClusteredGraph,
+} from "../graph-explorer/use-clustered-graph";
+import { ClusterControls } from "../graph-explorer/cluster-controls";
+import { ClusterDetailPanel, ClusterOverviewPanel } from "../graph-explorer/cluster-panels";
+import { useClusterFocus } from "../graph-explorer/use-cluster-focus";
+import { severityArcsOf } from "../graph-explorer/node-render";
+import {
+  ACCENT,
+  CROSS_HYP_COLOR,
   keyOf,
   nodeKey,
   type GraphMode,
   type GraphSelection,
   type PathResult,
-} from "./graph-types";
+} from "../graph-explorer/graph-types";
+import type { NodeBadge, NodeDecoration } from "../graph-explorer/explorer-types";
 import { useTranslation } from "@/hooks/use-translation";
 
 export interface CaseGraphViewProps {
@@ -59,6 +73,8 @@ export interface CaseGraphViewProps {
   hypotheses: ThreadResponseDto[];
   hypothesisColors: Record<string, string>;
   evidence: CaseEvidenceDto[];
+  /** Server hit its node cap — the graph shown is partial. */
+  truncated?: boolean;
   onReload: () => void;
   onMergeExpansion: (nodes: GraphNodeDto[], edges: GraphEdgeDto[]) => void;
 }
@@ -70,6 +86,7 @@ export function CaseGraphView({
   hypotheses,
   hypothesisColors,
   evidence,
+  truncated,
   onReload,
   onMergeExpansion,
 }: CaseGraphViewProps) {
@@ -115,63 +132,7 @@ export function CaseGraphView({
     return m;
   }, [nodes]);
 
-  /** Attached findings per asset — these are the collapsible ones. */
-  const attachedByAsset = React.useMemo(() => {
-    const m = new Map<string, number>();
-    nodes.forEach((n) => {
-      if (n.type === "finding" && n.caseFindingId && n.assetId) {
-        m.set(n.assetId, (m.get(n.assetId) ?? 0) + 1);
-      }
-    });
-    return m;
-  }, [nodes]);
-
-  // ── Findings collapse/expand (per asset, with a global default) ───────────
-
-  const [findingsVisibleDefault, setFindingsVisibleDefault] = React.useState(true);
-  const [expandOverrides, setExpandOverrides] = React.useState<Map<string, boolean>>(new Map());
-
-  const isAssetExpanded = React.useCallback(
-    (assetId: string) => expandOverrides.get(assetId) ?? findingsVisibleDefault,
-    [expandOverrides, findingsVisibleDefault],
-  );
-  const toggleAssetExpanded = React.useCallback(
-    (assetId: string) =>
-      setExpandOverrides((prev) => {
-        const next = new Map(prev);
-        next.set(assetId, !(prev.get(assetId) ?? findingsVisibleDefault));
-        return next;
-      }),
-    [findingsVisibleDefault],
-  );
-  const toggleFindingsDefault = React.useCallback(() => {
-    setFindingsVisibleDefault((v) => !v);
-    setExpandOverrides(new Map());
-  }, []);
-
-  const visibleNodes = React.useMemo(
-    () =>
-      nodes.filter((n) => {
-        if (n.type !== "finding") return true;
-        if (!n.caseFindingId) return false; // unattached → badge + dialog only
-        return n.assetId ? isAssetExpanded(n.assetId) : true;
-      }),
-    [nodes, isAssetExpanded],
-  );
-
-  const visibleKeys = React.useMemo(
-    () => new Set(visibleNodes.map(keyOf)),
-    [visibleNodes],
-  );
-
-  /** Attached findings hidden because their asset is collapsed. */
-  const collapsedCounts = React.useMemo(() => {
-    const m = new Map<string, number>();
-    attachedByAsset.forEach((count, assetId) => {
-      if (!isAssetExpanded(assetId)) m.set(assetId, count);
-    });
-    return m;
-  }, [attachedByAsset, isAssetExpanded]);
+  // ── Findings collapse/expand (shared hook; collapsed by default) ──────────
 
   const [activeEdgeTypes, setActiveEdgeTypes] = React.useState<Set<string>>(new Set());
 
@@ -183,42 +144,27 @@ export function CaseGraphView({
       .sort((a, b) => a.type.localeCompare(b.type));
   }, [edges]);
 
-  /**
-   * Edges adjusted for visibility: an edge endpoint at a hidden finding
-   * (collapsed asset or unattached) is re-routed to its parent asset so the
-   * relationship stays observable; duplicates produced by the re-routing are
-   * collapsed into one line. Self-loops (asset → its own finding) disappear.
-   */
-  const visibleEdges = React.useMemo(() => {
-    const remap = (type: string, id: string): { type: string; id: string } | null => {
-      const k = nodeKey(type, id);
-      if (visibleKeys.has(k)) return { type, id };
-      if (type !== "finding") return null;
-      const assetId = nodeIndex.get(k)?.assetId;
-      if (assetId && visibleKeys.has(nodeKey("asset", assetId))) return { type: "asset", id: assetId };
-      return null;
-    };
-    const seen = new Set<string>();
-    const out: GraphEdgeDto[] = [];
-    for (const e of edges) {
-      if (activeEdgeTypes.size > 0 && !activeEdgeTypes.has(e.relationType)) continue;
-      const from = remap(e.fromType, e.fromId);
-      const to = remap(e.toType, e.toId);
-      if (!from || !to) continue;
-      if (from.type === to.type && from.id === to.id) continue;
-      const remapped =
-        from.id !== e.fromId || to.id !== e.toId || from.type !== e.fromType || to.type !== e.toType;
-      if (remapped) {
-        const dedupe = `${from.type}:${from.id}|${to.type}:${to.id}|${e.relationType}|${e.origin}`;
-        if (seen.has(dedupe)) continue;
-        seen.add(dedupe);
-        out.push({ ...e, fromType: from.type, fromId: from.id, toType: to.type, toId: to.id });
-      } else {
-        out.push(e);
-      }
-    }
-    return out;
-  }, [edges, activeEdgeTypes, visibleKeys, nodeIndex]);
+  const filteredEdges = React.useMemo(
+    () =>
+      activeEdgeTypes.size > 0
+        ? edges.filter((e) => activeEdgeTypes.has(e.relationType))
+        : edges,
+    [edges, activeEdgeTypes],
+  );
+
+  /** Unattached findings never render — they surface via the +n badge/dialog. */
+  const hideUnattached = React.useCallback((n: GraphNodeDto) => !n.caseFindingId, []);
+
+  const {
+    visibleNodes,
+    visibleEdges,
+    collapsedCounts,
+    assetStats,
+    isAssetExpanded,
+    toggleAssetExpanded,
+    expandedDefault,
+    toggleExpandedDefault,
+  } = useVisibleGraph(nodes, filteredEdges, { hideFinding: hideUnattached });
 
   const hypMemberCounts = React.useMemo(() => {
     const m = new Map<string, number>();
@@ -231,25 +177,16 @@ export function CaseGraphView({
   // ── Layout / viewport ─────────────────────────────────────────────────────
 
   const containerRef = React.useRef<HTMLDivElement>(null);
-  const [size, setSize] = React.useState({ width: 900, height: 600 });
-  React.useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    const obs = new ResizeObserver(() => {
-      const rect = el.getBoundingClientRect();
-      if (rect.width > 0 && rect.height > 0) {
-        setSize((prev) =>
-          Math.abs(prev.width - rect.width) > 1 || Math.abs(prev.height - rect.height) > 1
-            ? { width: rect.width, height: rect.height }
-            : prev,
-        );
-      }
-    });
-    obs.observe(el);
-    return () => obs.disconnect();
-  }, []);
+  const size = useContainerSize(containerRef);
 
-  const layout = useForceLayout(visibleNodes, visibleEdges, size);
+  /** Fan seed positions for findings of a just-expanded asset (consumed once). */
+  const seedOverridesRef = React.useRef(new Map<string, { x: number; y: number }>());
+
+  // ── Community clustering / semantic zoom ──────────────────────────────────
+  const clustered = useClusteredGraph(visibleNodes, visibleEdges, { assetStats });
+  const { renderNodes, renderEdges } = clustered;
+
+  const layout = useForceLayout(renderNodes, renderEdges, size, seedOverridesRef.current);
   const panZoom = usePanZoom();
 
   const zoomToFit = React.useCallback(() => {
@@ -308,6 +245,10 @@ export function CaseGraphView({
     selection?.type === "node" ? (nodeIndex.get(selection.key) ?? null) : null;
   const selectedEdge =
     selection?.type === "edge" ? (edges.find((e) => e.id === selection.id) ?? null) : null;
+  const selectedCluster =
+    selection?.type === "node" && selection.key.startsWith("cluster:")
+      ? (clustered.clusters.get(selection.key.slice("cluster:".length)) ?? null)
+      : null;
 
   // ── Highlighting (dim non-matches; never remove) ──────────────────────────
 
@@ -418,8 +359,14 @@ export function CaseGraphView({
     visibleNodes.forEach((n) => {
       if (matches(n)) s.add(keyOf(n));
     });
+    // A collapsed cluster stays lit when any member matches.
+    clustered.clusters.forEach((meta, cid) => {
+      if (clustered.expandedClusters.has(cid)) return;
+      if (meta.memberKeys.some((k) => s.has(k))) s.add(clusterNodeKey(cid));
+    });
     return s;
   }, [
+    clustered,
     hypothesisFocus,
     searchQuery,
     sourceFilter,
@@ -580,7 +527,7 @@ export function CaseGraphView({
   // ── Mode-aware node clicks ────────────────────────────────────────────────
 
   const computePath = (fromKey: string, toKey: string) => {
-    const result = shortestPath(fromKey, toKey, visibleEdges);
+    const result = shortestPath(fromKey, toKey, renderEdges);
     if (!result) {
       toast.info(t("caseGraph.graphView.noPath"));
       return;
@@ -591,6 +538,12 @@ export function CaseGraphView({
   const handleNodeClick = (node: GraphNodeDto, shiftKey: boolean) => {
     const key = keyOf(node);
     setContextMenu(null);
+
+    // Editing actions target real entities — drill into the cluster first.
+    if (isClusterNode(node) && mode.kind !== "select") {
+      toast.info(t("graphExplorer.expandFirst"));
+      return;
+    }
 
     if (mode.kind === "connect") {
       if (!mode.sourceKey) {
@@ -664,6 +617,78 @@ export function CaseGraphView({
   const attachableCountFor = (node: GraphNodeDto) =>
     node.type === "asset" ? (attachableCounts.get(node.id) ?? 0) : 0;
 
+  /**
+   * Expand/collapse an asset's findings. On expand, seed the findings as a
+   * tidy fan around the asset's current position instead of random scatter.
+   */
+  const expandAssetWithFan = React.useCallback(
+    (assetId: string) => {
+      if (!isAssetExpanded(assetId)) {
+        const center = layout.simNodes.get(nodeKey("asset", assetId));
+        if (center) {
+          const findingKeys = nodes
+            .filter((n) => n.type === "finding" && n.caseFindingId && n.assetId === assetId)
+            .map(keyOf);
+          const positions = fanPositions(center, findingKeys.length);
+          findingKeys.forEach((k, i) => seedOverridesRef.current.set(k, positions[i]!));
+        }
+      }
+      toggleAssetExpanded(assetId);
+    },
+    [isAssetExpanded, toggleAssetExpanded, layout.simNodes, nodes],
+  );
+
+  const clearClusterFocus = React.useCallback(() => {
+    setSelection(null);
+    setPath(null);
+  }, []);
+
+  const { expandCluster, focusCluster } = useClusterFocus({
+    clustered,
+    layout,
+    panZoom,
+    seedOverrides: seedOverridesRef.current,
+    onBeforeExpand: clearClusterFocus,
+  });
+
+  const [hoverKey, setHoverKey] = React.useState<string | null>(null);
+
+  /** Case-specific node visuals: evidence ring, hypothesis dots, attach/collapse badges. */
+  const nodeDecorator = React.useCallback(
+    (n: GraphNodeDto): NodeDecoration | null => {
+      const key = keyOf(n);
+      const hypColors = (n.hypothesisIds ?? [])
+        .map((id) => hypothesisColors[id])
+        .filter((c): c is string => Boolean(c));
+      const badges: NodeBadge[] = [];
+      if (n.type === "asset") {
+        const ac = attachableCounts.get(n.id) ?? 0;
+        if (ac > 0) badges.push({ id: "attach", text: `+${ac}`, placement: "tr", accent: true });
+        const cc = collapsedCounts.get(n.id) ?? 0;
+        if (cc > 0) badges.push({ id: "collapse", text: `▸${cc}`, placement: "br" });
+      }
+      const deco: NodeDecoration = {};
+      if (evidenceKeys.has(key)) deco.ringColor = ACCENT;
+      if (hypColors.length > 1) deco.dashedRingColor = CROSS_HYP_COLOR;
+      if (hypColors.length > 0) deco.dots = hypColors;
+      if (badges.length > 0) deco.badges = badges;
+      if (n.type === "asset" && !isAssetExpanded(n.id)) {
+        const stats = assetStats.get(n.id);
+        if (stats && stats.total > 0) deco.severityArcs = severityArcsOf(stats);
+      }
+      return Object.keys(deco).length > 0 ? deco : null;
+    },
+    [evidenceKeys, hypothesisColors, attachableCounts, collapsedCounts, assetStats, isAssetExpanded],
+  );
+
+  const handleBadgeClick = React.useCallback(
+    (node: GraphNodeDto, badgeId: string) => {
+      if (badgeId === "attach") setAttachAsset(node);
+      else if (badgeId === "collapse") expandAssetWithFan(node.id);
+    },
+    [expandAssetWithFan],
+  );
+
   return (
     <div className="flex h-full flex-col border-2 border-border bg-card">
       <GraphToolbar
@@ -682,26 +707,39 @@ export function CaseGraphView({
         onReload={onReload}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
-        findingsVisible={findingsVisibleDefault}
-        onToggleFindings={toggleFindingsDefault}
+        findingsVisible={expandedDefault}
+        onToggleFindings={toggleExpandedDefault}
+        extras={
+          <>
+            <ClusterControls clustered={clustered} />
+            {truncated && (
+              <span className="border-2 border-border px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
+                {t("graphExplorer.truncated")}
+              </span>
+            )}
+          </>
+        }
       />
 
       <div className="flex min-h-0 flex-1">
         <div ref={containerRef} className="relative min-w-0 flex-1 overflow-hidden">
           <GraphCanvas
-            nodes={visibleNodes}
-            edges={visibleEdges}
+            nodes={renderNodes}
+            edges={renderEdges}
             layout={layout}
             panZoom={panZoom}
-            evidenceKeys={evidenceKeys}
-            hypothesisColors={hypothesisColors}
-            attachableCounts={attachableCounts}
-            collapsedCounts={collapsedCounts}
+            nodeDecorator={nodeDecorator}
             selection={selection}
             mode={mode}
             activeNodeKeys={activeNodeKeys}
             path={path}
             onNodeClick={handleNodeClick}
+            hoverKey={hoverKey}
+            onNodeHover={(n) => setHoverKey(n ? keyOf(n) : null)}
+            onNodeDoubleClick={(node) => {
+              if (isClusterNode(node)) expandCluster(node.cluster);
+              else if (node.type === "asset") expandAssetWithFan(node.id);
+            }}
             onNodeContextMenu={(node, x, y) =>
               setContextMenu({ x, y, target: { kind: "node", node } })
             }
@@ -713,20 +751,29 @@ export function CaseGraphView({
               setContextMenu({ x, y, target: { kind: "edge", edge } })
             }
             onBackgroundClick={handleBackgroundClick}
-            onAttachBadgeClick={(node) => setAttachAsset(node)}
-            onToggleCollapse={(node) => toggleAssetExpanded(node.id)}
+            onBadgeClick={handleBadgeClick}
           />
         </div>
 
         <aside className="w-[300px] shrink-0 overflow-y-auto border-l-2 border-border bg-background p-3">
-          {selectedNode ? (
+          {selectedCluster ? (
+            <ClusterDetailPanel
+              meta={selectedCluster}
+              clusters={clustered.clusters}
+              renderEdges={renderEdges}
+              nodeByKey={(k) => nodeIndex.get(k)}
+              onFocusCluster={focusCluster}
+              hoverKey={hoverKey}
+              onHoverKey={setHoverKey}
+            />
+          ) : selectedNode ? (
             <NodeDetailPanel
               node={selectedNode}
               isEvidence={evidenceKeys.has(keyOf(selectedNode))}
               isPinned={layout.isPinned(keyOf(selectedNode))}
               attachableCount={attachableCountFor(selectedNode)}
               attachedCount={
-                selectedNode.type === "asset" ? (attachedByAsset.get(selectedNode.id) ?? 0) : 0
+                selectedNode.type === "asset" ? (assetStats.get(selectedNode.id)?.total ?? 0) : 0
               }
               isExpandedAsset={selectedNode.type === "asset" && isAssetExpanded(selectedNode.id)}
               hypotheses={hypotheses}
@@ -739,7 +786,7 @@ export function CaseGraphView({
               onLinkHypothesis={() => setLinkHypNode(selectedNode)}
               onConnectFrom={() => setMode({ kind: "connect", sourceKey: keyOf(selectedNode) })}
               onExpand={() => void expandNode(selectedNode)}
-              onToggleCollapse={() => toggleAssetExpanded(selectedNode.id)}
+              onToggleCollapse={() => expandAssetWithFan(selectedNode.id)}
               onAttachFindingsDialog={() => setAttachAsset(selectedNode)}
               onReleasePin={() => layout.releasePin(keyOf(selectedNode))}
               onOpenAsset={() => window.open(`/assets/${selectedNode.id}`, "_blank")}
@@ -756,6 +803,14 @@ export function CaseGraphView({
             />
           ) : (
             <div className="space-y-6">
+              {clustered.hasCollapsedClusters && (
+                <ClusterOverviewPanel
+                  clusters={clustered.clusters}
+                  onFocusCluster={focusCluster}
+                  hoverKey={hoverKey}
+                  onHoverKey={setHoverKey}
+                />
+              )}
               <HypothesisLegend
                 hypotheses={hypotheses}
                 hypothesisColors={hypothesisColors}
@@ -801,9 +856,9 @@ export function CaseGraphView({
           isEvidence={(n) => evidenceKeys.has(keyOf(n))}
           isPinned={(n) => layout.isPinned(keyOf(n))}
           attachableCount={attachableCountFor}
-          attachedCount={(n) => (n.type === "asset" ? (attachedByAsset.get(n.id) ?? 0) : 0)}
+          attachedCount={(n) => (n.type === "asset" ? (assetStats.get(n.id)?.total ?? 0) : 0)}
           isAssetExpanded={(n) => isAssetExpanded(n.id)}
-          onToggleCollapse={(n) => toggleAssetExpanded(n.id)}
+          onToggleCollapse={(n) => expandAssetWithFan(n.id)}
           hypotheses={hypotheses}
           hypothesisColors={hypothesisColors}
           onAddEvidence={(n) => void addEvidence(n)}

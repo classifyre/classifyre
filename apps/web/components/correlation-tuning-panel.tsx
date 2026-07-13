@@ -30,18 +30,31 @@ import {
 } from "@workspace/ui/components/select";
 import { useTranslation } from "@/hooks/use-translation";
 
+export interface CorrelationTuningPanelValues {
+  defaultWeight: number;
+  relatedMin: number;
+  duplicateMin: number;
+  labelWeights: Record<string, number>;
+  exclusions: ExclusionRuleDto[];
+}
+
+export interface CorrelationTuningPanelHandle {
+  getValues: () => CorrelationTuningPanelValues;
+  applyPatches: (patches: Array<{ path: string; value: unknown }>) => void;
+}
+
 /**
  * Correlation tuning form — DB-backed weights, thresholds and exclusion rules.
  * Used both inline (the Fingerprints "Tune" tab) and inside a dialog. Saving
  * schedules a full recompute (a DUPLICATES FINDER run); `onSaved` fires after.
  */
-export function CorrelationTuningPanel({
-  onSaved,
-  layout = "page",
-}: {
-  onSaved?: () => void;
-  layout?: "page" | "dialog";
-}) {
+export const CorrelationTuningPanel = React.forwardRef<
+  CorrelationTuningPanelHandle,
+  {
+    onSaved?: () => void;
+    layout?: "page" | "dialog";
+  }
+>(function CorrelationTuningPanel({ onSaved, layout = "page" }, ref) {
   const { t } = useTranslation();
   const [config, setConfig] = React.useState<CorrelationConfigResponseDto | null>(null);
   const [weights, setWeights] = React.useState<Record<string, number>>({});
@@ -72,6 +85,38 @@ export function CorrelationTuningPanel({
   }, [t]);
 
   React.useEffect(() => reload(), [reload]);
+
+  React.useImperativeHandle(
+    ref,
+    () => ({
+      getValues: () => ({
+        defaultWeight,
+        relatedMin,
+        duplicateMin,
+        labelWeights: weights,
+        exclusions,
+      }),
+      applyPatches: (patches) => {
+        for (const patch of patches) {
+          if (patch.path === "defaultWeight") {
+            setDefaultWeight(Number(patch.value));
+          } else if (patch.path === "relatedMin") {
+            setRelatedMin(Number(patch.value));
+          } else if (patch.path === "duplicateMin") {
+            setDuplicateMin(Number(patch.value));
+          } else if (patch.path === "exclusions") {
+            setExclusions(patch.value as ExclusionRuleDto[]);
+          } else if (patch.path === "labelWeights") {
+            setWeights(patch.value as Record<string, number>);
+          } else if (patch.path.startsWith("labelWeights.")) {
+            const label = patch.path.slice("labelWeights.".length);
+            setWeights((prev) => ({ ...prev, [label]: Number(patch.value) }));
+          }
+        }
+      },
+    }),
+    [defaultWeight, relatedMin, duplicateMin, weights, exclusions],
+  );
 
   const save = async () => {
     setSaving(true);
@@ -324,7 +369,7 @@ export function CorrelationTuningPanel({
       </div>
     </div>
   );
-}
+});
 
 function ContentWrap({
   layout,

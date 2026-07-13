@@ -16,6 +16,7 @@ import { assistantContexts } from "@workspace/schemas/assistant";
 import { AssistantWorkflowPanel, Button } from "@workspace/ui/components";
 import { toast } from "sonner";
 import { Rnd } from "react-rnd";
+import { usePathname, useRouter } from "next/navigation";
 import { useInstanceSettings } from "@/components/instance-settings-provider";
 
 type AssistantAttachment = Extract<
@@ -131,6 +132,8 @@ export function AssistantWorkflowProvider({
   children: React.ReactNode;
 }) {
   const { settings } = useInstanceSettings();
+  const router = useRouter();
+  const pathname = usePathname();
   const [bridge, setBridge] = React.useState<AssistantPageBridge | null>(null);
   const [open, setOpen] = React.useState(false);
   const [messages, setMessages] = React.useState<AssistantTranscriptMessage[]>(
@@ -180,8 +183,10 @@ export function AssistantWorkflowProvider({
 
   // Reset the conversation only when the assistant context actually changes
   // (e.g. navigating from source.create to detector.create). Incidental bridge
-  // re-registration on the same page must NOT slam the panel closed.
-  const contextKey = bridge?.contextKey ?? null;
+  // re-registration on the same page must NOT slam the panel closed. Pages
+  // without a bridge share the "app.global" context, so the conversation
+  // survives navigation between them.
+  const contextKey = bridge?.contextKey ?? "app.global";
   const prevContextKeyRef = React.useRef<string | null>(null);
   React.useEffect(() => {
     if (prevContextKeyRef.current === contextKey) {
@@ -286,6 +291,15 @@ export function AssistantWorkflowProvider({
           continue;
         }
 
+        // Navigation is handled centrally so it works on every page, with or
+        // without a page bridge. Only app-internal paths are accepted.
+        if (action.type === "navigate") {
+          if (action.route.startsWith("/") && !action.route.startsWith("//")) {
+            router.push(action.route);
+          }
+          continue;
+        }
+
         await bridge?.applyAction(action);
       }
 
@@ -301,12 +315,34 @@ export function AssistantWorkflowProvider({
       ]);
       setPendingConfirmation(response.pendingConfirmation);
     },
-    [bridge],
+    [bridge, router],
   );
 
+  // Pages without a bridge still get a context-aware assistant: read-only
+  // tools plus navigation, keyed to the current route.
+  const buildGlobalContext =
+    React.useCallback((): AssistantPageContext => {
+      return {
+        key: "app.global",
+        route: pathname || "/",
+        title:
+          typeof document !== "undefined" && document.title
+            ? document.title
+            : "Classifyre",
+        entityId: null,
+        values: {},
+        schema: null,
+        validation: { isValid: true, missingFields: [], errors: [] },
+        metadata: {},
+      };
+    }, [pathname]);
+
   const sendMessage = React.useCallback(
-    async (content: string) => {
-      if (!bridge || !bridge.canOpen) {
+    async (
+      content: string,
+      confirmationDecision?: "confirm" | "cancel" | null,
+    ) => {
+      if (bridge && !bridge.canOpen) {
         return;
       }
 
@@ -326,7 +362,9 @@ export function AssistantWorkflowProvider({
       setInput("");
 
       try {
-        const context = await bridge.getContext();
+        const context = bridge
+          ? await bridge.getContext()
+          : buildGlobalContext();
         const response = await api.assistantRespond({
           messages: [...messages, nextUserMessage].map(
             ({ role, content: text }) => ({
@@ -334,6 +372,7 @@ export function AssistantWorkflowProvider({
               content: text,
             }),
           ),
+          confirmationDecision: confirmationDecision ?? null,
           context: {
             ...context,
             metadata: {
@@ -376,7 +415,14 @@ export function AssistantWorkflowProvider({
         setSubmitting(false);
       }
     },
-    [bridge, handleResponse, messages, pendingConfirmation, uploadedFiles],
+    [
+      bridge,
+      buildGlobalContext,
+      handleResponse,
+      messages,
+      pendingConfirmation,
+      uploadedFiles,
+    ],
   );
 
   const handleFileUpload = React.useCallback(
@@ -417,10 +463,13 @@ export function AssistantWorkflowProvider({
     [],
   );
 
-  // Single source of truth: the assistant is only "active" when a page bridge is
-  // registered AND the instance has AI enabled AND we're not in read-only demo mode.
+  // Single source of truth: the assistant is active whenever AI is enabled and
+  // we're not in read-only demo mode. Pages with a bridge can veto via canOpen;
+  // pages without a bridge fall back to the global context.
   const active =
-    Boolean(bridge?.canOpen) && settings.aiEnabled && !settings.demoMode;
+    (bridge ? bridge.canOpen : true) &&
+    settings.aiEnabled &&
+    !settings.demoMode;
   const contextValue = React.useMemo<AssistantWorkflowContextValue>(
     () => ({
       active,
@@ -433,11 +482,11 @@ export function AssistantWorkflowProvider({
   );
 
   const contextMeta = React.useMemo(() => {
-    if (!active || !bridge) {
+    if (!active) {
       return null;
     }
 
-    return assistantContexts[bridge.contextKey];
+    return assistantContexts[bridge?.contextKey ?? "app.global"];
   }, [active, bridge]);
   const introMessage =
     contextMeta?.summary?.trim() ||
@@ -538,7 +587,7 @@ export function AssistantWorkflowProvider({
               title={contextMeta?.title ?? "Assistant"}
               messages={messages}
               pendingConfirmation={pendingConfirmation}
-              onConfirm={() => void sendMessage("Confirm")}
+              onConfirm={() => void sendMessage("Confirm", "confirm")}
               onCancelConfirmation={() => {
                 setPendingConfirmation(null);
                 toast("Assistant action cancelled");
@@ -551,7 +600,7 @@ export function AssistantWorkflowProvider({
               submitting={submitting}
               placeholder={
                 active
-                  ? "Describe what should change on this page or which MCP action you want to confirm…"
+                  ? "Ask about your data or describe what to do — I can fill forms, run MCP tools, and navigate for you…"
                   : "Assistant is unavailable for this page."
               }
               uploadedFiles={uploadedFiles.map((file, index) => ({
@@ -564,7 +613,7 @@ export function AssistantWorkflowProvider({
               footerNote={
                 active
                   ? "Patches apply locally first. MCP mutations stay behind confirmation."
-                  : "Open a supported source or detector workflow to activate the assistant."
+                  : "Enable AI in settings to activate the assistant."
               }
               onClose={() => setOpen(false)}
               headerClassName="assistant-drag-handle cursor-grab active:cursor-grabbing select-none"
@@ -584,16 +633,24 @@ function AssistantWorkflowFab() {
   }
 
   return (
-    // Hidden below `md` so it never covers the sticky Save/Test/Run toolbar on
-    // mobile — the header trigger remains available on small screens.
-    <div className="pointer-events-none fixed right-6 bottom-6 z-40 hidden md:block">
+    // Sticky bottom toolbars publish their height as --assistant-fab-offset
+    // (see StickyActionToolbar), so the FAB rides above them instead of
+    // covering Save/Test/Run — which lets it stay visible on mobile too.
+    <div
+      className="pointer-events-none fixed right-4 z-40 md:right-6"
+      style={{
+        bottom:
+          "calc(1rem + env(safe-area-inset-bottom, 0px) + var(--assistant-fab-offset, 0px))",
+      }}
+    >
       <Button
         type="button"
         onClick={() => context.setOpen(true)}
-        className="pointer-events-auto h-14 rounded-[6px] border-2 border-border bg-[var(--color-accent)] px-4 text-[var(--color-accent-foreground)] shadow-[6px_6px_0_var(--color-border)] transition-[transform,color] hover:-translate-y-[1px] hover:text-[var(--color-primary-foreground)]"
+        aria-label="Open assistant"
+        className="pointer-events-auto h-12 w-12 rounded-[6px] border-2 border-border bg-[var(--color-accent)] p-0 text-[var(--color-accent-foreground)] shadow-[6px_6px_0_var(--color-border)] transition-[transform,color] hover:-translate-y-[1px] hover:text-[var(--color-primary-foreground)] md:h-14 md:w-auto md:px-4"
       >
-        <Wand2 className="mr-2 h-4 w-4" />
-        Assistant
+        <Wand2 className="h-4 w-4 md:mr-2" />
+        <span className="hidden md:inline">Assistant</span>
       </Button>
     </div>
   );

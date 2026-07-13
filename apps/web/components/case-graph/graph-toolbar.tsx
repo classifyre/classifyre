@@ -14,7 +14,7 @@ import {
   Search,
   X,
 } from "lucide-react";
-import type { GraphMode, PathResult } from "./graph-types";
+import type { GraphMode, PathResult } from "../graph-explorer/graph-types";
 import { useTranslation } from "@/hooks/use-translation";
 
 function ModeButton({
@@ -87,6 +87,8 @@ export interface GraphToolbarProps {
   onSearchChange: (q: string) => void;
   findingsVisible: boolean;
   onToggleFindings: () => void;
+  /** Extra chips (cluster controls, truncated badge) rendered after the toggles. */
+  extras?: React.ReactNode;
 }
 
 export function GraphToolbar({
@@ -104,6 +106,7 @@ export function GraphToolbar({
   onSearchChange,
   findingsVisible,
   onToggleFindings,
+  extras,
 }: GraphToolbarProps) {
   const { t } = useTranslation();
   return (
@@ -181,6 +184,8 @@ export function GraphToolbar({
         label={t("caseGraph.toolbar.findingsLabel")}
         title={findingsVisible ? t("caseGraph.toolbar.collapseFindings") : t("caseGraph.toolbar.expandFindings")}
       />
+
+      {extras}
 
       {/* Mode hint / path chip */}
       <div className="min-w-0 flex-1 px-1">
