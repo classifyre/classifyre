@@ -2,8 +2,8 @@ import { expect, test } from "@playwright/experimental-ct-react";
 import type { CorrelationGraphResponseDto, GraphEdgeDto, GraphNodeDto } from "@workspace/api-client";
 import { FingerprintsGraph } from "@/components/fingerprints-graph";
 
-const ASSET_COUNT = 50;
-const FINDING_COUNT = 200;
+const ASSET_COUNT = 300;
+const FINDING_COUNT = 1200;
 
 /**
  * Build a dense bipartite graph: `assetCount` assets, each connected to
@@ -68,7 +68,7 @@ function buildLargeGraph(): CorrelationGraphResponseDto {
 }
 
 test.describe("graph performance", () => {
-  test("renders 50 assets + 200 findings at acceptable frame rate", async ({ mount, page }) => {
+  test("renders 300 assets + 1200 findings at acceptable frame rate", async ({ mount, page }) => {
     await page.addStyleTag({
       content: `
         :root {
@@ -150,5 +150,14 @@ test.describe("graph performance", () => {
     });
 
     expect(fps).toBeGreaterThan(15);
+
+    // Clustering must have collapsed the hairball: the toolbar chip lists the
+    // detected communities and the sidebar ranks them as hotspots.
+    await expect(page.getByText(/\d+ clusters/i)).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText(/hotspots/i)).toBeVisible();
+
+    // Drilling into the top hotspot expands it (chip gains the Overview reset).
+    await page.getByText(/hotspots/i).locator("..").locator("button").first().click();
+    await expect(page.getByText(/overview/i).first()).toBeVisible({ timeout: 5_000 });
   });
 });

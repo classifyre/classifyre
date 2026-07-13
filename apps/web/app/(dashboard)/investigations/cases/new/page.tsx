@@ -6,6 +6,7 @@ import { FolderPlus, Loader2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import {
   api,
+  type AssistantUiAction,
   type CreateCaseDto,
   type InquiryMatchDto,
   type InquiryResponseDto,
@@ -33,6 +34,7 @@ import {
 } from "@workspace/ui/components/multi-select";
 import { ArrowLeft } from "lucide-react";
 import { InquiryMatchesTable } from "@/components/inquiry-matches-table";
+import { useRegisterAssistantBridge } from "@/components/assistant-workflow-provider";
 import { useTranslation } from "@/hooks/use-translation";
 
 const SEVERITIES = ["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"] as const;
@@ -74,6 +76,50 @@ function NewCasePageInner() {
   const [severity, setSeverity] = React.useState<string>("MEDIUM");
   const [assignee, setAssignee] = React.useState("");
   const [creating, setCreating] = React.useState(false);
+
+  const assistantBridge = React.useMemo(
+    () => ({
+      contextKey: "case.create" as const,
+      canOpen: true,
+      getContext: () => ({
+        key: "case.create" as const,
+        route: "/investigations/cases/new",
+        title: "Case Builder Assistant",
+        entityId: null,
+        values: {
+          title,
+          description,
+          severity,
+          assignee,
+          inquiryIds: selectedInquiryIds,
+        },
+        schema: null,
+        validation: { isValid: true, missingFields: [], errors: [] },
+        metadata: {},
+      }),
+      applyAction: (action: AssistantUiAction) => {
+        if (action.type !== "patch_fields") return;
+        for (const patch of action.patches) {
+          if (patch.path === "title") {
+            setTitle(String(patch.value ?? ""));
+          } else if (patch.path === "description") {
+            setDescription(String(patch.value ?? ""));
+          } else if (patch.path === "severity") {
+            setSeverity(String(patch.value ?? "MEDIUM"));
+          } else if (patch.path === "assignee") {
+            setAssignee(String(patch.value ?? ""));
+          } else if (patch.path === "inquiryIds") {
+            setSelectedInquiryIds(
+              Array.isArray(patch.value) ? patch.value.map(String) : [],
+            );
+          }
+        }
+      },
+    }),
+    [title, description, severity, assignee, selectedInquiryIds],
+  );
+
+  useRegisterAssistantBridge(assistantBridge);
 
   // Load all inquiries for the picker.
   React.useEffect(() => {

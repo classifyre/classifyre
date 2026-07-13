@@ -28,6 +28,11 @@ export function useForceLayout(
   nodes: GraphNodeDto[],
   edges: GraphEdgeDto[],
   size: { width: number; height: number },
+  /**
+   * One-shot spawn positions for nodes entering the simulation (e.g. a
+   * findings fan around a just-expanded asset). Entries are consumed on use.
+   */
+  seedOverrides?: Map<string, { x: number; y: number }>,
 ): UseForceLayoutResult {
   const simNodesRef = React.useRef<Map<string, SimNode>>(new Map());
   const simEdgesRef = React.useRef<SimEdge[]>([]);
@@ -57,7 +62,9 @@ export function useForceLayout(
         prev.data = n;
         next.set(key, prev);
       } else {
-        const seed = seedPosition(n, edges, prevMap, center);
+        const override = seedOverrides?.get(key);
+        if (override) seedOverrides?.delete(key);
+        const seed = override ?? seedPosition(n, edges, prevMap, center);
         next.set(key, { key, data: n, x: seed.x, y: seed.y });
       }
     }

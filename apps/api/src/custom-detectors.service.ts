@@ -659,7 +659,8 @@ export class CustomDetectorsService {
     }
   }
 
-  private validatePipelineSchema(schema: Record<string, unknown>): void {
+  /** Public so MCP's validate_detector_config tool can dry-run it. */
+  validatePipelineSchema(schema: Record<string, unknown>): void {
     const schemaType = (schema.type as string | undefined) ?? 'GLINER2';
     const validTypes = [
       'GLINER2',

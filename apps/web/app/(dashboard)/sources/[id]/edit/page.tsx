@@ -40,7 +40,6 @@ import {
 import { toast } from "sonner";
 import {
   api,
-  type AssistantOperation,
   type AssistantUiAction,
   type StartRunnerDto,
 } from "@workspace/api-client";
@@ -221,10 +220,6 @@ export default function EditSourcePage() {
             detectors: normalizeDetectors(detectors),
             customDetectorIds: selectedCustomDetectorIds,
           },
-          supportedOperations: [
-            "update_source",
-            "test_source_connection",
-          ] satisfies AssistantOperation[],
         };
       },
       applyAction: async (action: AssistantUiAction) => {

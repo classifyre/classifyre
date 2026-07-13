@@ -75,7 +75,25 @@ export type InquiryFormProps = {
   initial?: InquiryResponseDto;
 };
 
-export function InquiryForm({ mode, inquiryId, initial }: InquiryFormProps) {
+export interface InquiryFormHandle {
+  getValues: () => {
+    title: string;
+    description: string;
+    matchers: {
+      matchAllSources: boolean;
+      sourceIds: string[];
+      detectorTypes: string[];
+      customDetectorKeys: string[];
+      findingTypes: string[];
+      findingTypeRegex: string[];
+      findingValueRegex: string[];
+    };
+  };
+  applyPatches: (patches: Array<{ path: string; value: unknown }>) => void;
+}
+
+export const InquiryForm = React.forwardRef<InquiryFormHandle, InquiryFormProps>(
+  function InquiryForm({ mode, inquiryId, initial }, ref) {
   const router = useRouter();
   const isEdit = mode === "edit";
 
@@ -148,6 +166,37 @@ export function InquiryForm({ mode, inquiryId, initial }: InquiryFormProps) {
     findingTypeRegex: parseList(regexText),
     findingValueRegex: parseList(valueRegexText),
   }), [matchAllSources, selectedSources, selectedDetectors, selectedCustomKeys, selectedTypes, customTypeText, regexText, valueRegexText]);
+
+  React.useImperativeHandle(
+    ref,
+    () => ({
+      getValues: () => ({ title, description, matchers }),
+      applyPatches: (patches) => {
+        for (const patch of patches) {
+          if (patch.path === "title") {
+            setTitle(String(patch.value ?? ""));
+          } else if (patch.path === "description") {
+            setDescription(String(patch.value ?? ""));
+          } else if (patch.path === "matchers.matchAllSources") {
+            setMatchAllSources(Boolean(patch.value));
+          } else if (patch.path === "matchers.sourceIds") {
+            setSelectedSources(new Set(Array.isArray(patch.value) ? patch.value.map(String) : []));
+          } else if (patch.path === "matchers.detectorTypes") {
+            setSelectedDetectors(new Set(Array.isArray(patch.value) ? patch.value.map(String) : []));
+          } else if (patch.path === "matchers.customDetectorKeys") {
+            setSelectedCustomKeys(new Set(Array.isArray(patch.value) ? patch.value.map(String) : []));
+          } else if (patch.path === "matchers.findingTypes") {
+            setSelectedTypes(new Set(Array.isArray(patch.value) ? patch.value.map(String) : []));
+          } else if (patch.path === "matchers.findingTypeRegex") {
+            setRegexText(joinList(Array.isArray(patch.value) ? patch.value.map(String) : []));
+          } else if (patch.path === "matchers.findingValueRegex") {
+            setValueRegexText(joinList(Array.isArray(patch.value) ? patch.value.map(String) : []));
+          }
+        }
+      },
+    }),
+    [title, description, matchers],
+  );
 
   const matchersKey = JSON.stringify(matchers);
   React.useEffect(() => {
@@ -375,4 +424,5 @@ export function InquiryForm({ mode, inquiryId, initial }: InquiryFormProps) {
       </div>
     </div>
   );
-}
+  },
+);

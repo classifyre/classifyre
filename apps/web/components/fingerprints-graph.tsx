@@ -34,23 +34,32 @@ import {
   MultiSelectTrigger,
   MultiSelectValue,
 } from "@workspace/ui/components/multi-select";
-import { GraphCanvas } from "./case-graph/graph-canvas";
-import { useForceLayout } from "./case-graph/use-force-layout";
-import { usePanZoom } from "./case-graph/use-pan-zoom";
-import { nodesBBox } from "./case-graph/graph-utils";
+import { GraphCanvas } from "./graph-explorer/graph-canvas";
+import { useForceLayout } from "./graph-explorer/use-force-layout";
+import { usePanZoom } from "./graph-explorer/use-pan-zoom";
+import { focusComponent, nodesBBox } from "./graph-explorer/graph-utils";
+import { useClusterFocus } from "./graph-explorer/use-cluster-focus";
+import { ClusterDetailPanel, ClusterOverviewPanel } from "./graph-explorer/cluster-panels";
+import { useContainerSize } from "./graph-explorer/use-container-size";
+import {
+  isClusterNode,
+  isMetaEdge,
+  useClusteredGraph,
+} from "./graph-explorer/use-clustered-graph";
+import { ClusterControls } from "./graph-explorer/cluster-controls";
 import {
   keyOf,
   nodeKey,
   STRENGTH_GRADIENT,
+  strengthColor,
   type GraphSelection,
   type PathResult,
-} from "./case-graph/graph-types";
+} from "./graph-explorer/graph-types";
+import type { EdgeStyleOverride, NodeDecoration } from "./graph-explorer/explorer-types";
 import { CorrelationTuningDialog } from "./correlation-tuning-dialog";
 import { FingerprintsCaseDialog } from "./fingerprints-case-dialog";
 import { useTranslation } from "@/hooks/use-translation";
 
-const EMPTY_MAP: Map<string, number> = new Map();
-const EMPTY_SET: Set<string> = new Set();
 const SELECT_MODE = { kind: "select" } as const;
 /** Collapse a group of shared-value nodes when it exceeds this many. */
 const COLLAPSE_THRESHOLD = 5;
@@ -65,38 +74,6 @@ interface BundleDetail {
 }
 
 const pairKey = (a: string, b: string) => (a < b ? `${a}|${b}` : `${b}|${a}`);
-
-/**
- * The connected component (transitive neighbourhood) of a node — "everything
- * connected to this thing". Clicking any node focuses its component; the rest of
- * the graph dims and goes non-interactive, cutting cross-cluster noise.
- */
-function focusComponent(
-  startKey: string,
-  edges: GraphEdgeDto[],
-): PathResult {
-  const adj = new Map<string, Array<{ key: string; edgeId: string }>>();
-  for (const e of edges) {
-    const a = nodeKey(e.fromType, e.fromId);
-    const b = nodeKey(e.toType, e.toId);
-    (adj.get(a) ?? adj.set(a, []).get(a)!).push({ key: b, edgeId: e.id });
-    (adj.get(b) ?? adj.set(b, []).get(b)!).push({ key: a, edgeId: e.id });
-  }
-  const nodeKeys = new Set<string>([startKey]);
-  const edgeIds = new Set<string>();
-  const queue = [startKey];
-  while (queue.length) {
-    const cur = queue.shift()!;
-    for (const { key, edgeId } of adj.get(cur) ?? []) {
-      edgeIds.add(edgeId);
-      if (!nodeKeys.has(key)) {
-        nodeKeys.add(key);
-        queue.push(key);
-      }
-    }
-  }
-  return { nodeKeys, edgeIds };
-}
 
 /**
  * The correlation ("evidence fingerprints") graph. Reuses the case-graph canvas
@@ -515,26 +492,27 @@ export function FingerprintsGraph({
 
   // ── Layout / viewport ──────────────────────────────────────────────────────
   const containerRef = React.useRef<HTMLDivElement>(null);
-  const [size, setSize] = React.useState({ width: 900, height: 600 });
-  React.useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    const obs = new ResizeObserver(() => {
-      const rect = el.getBoundingClientRect();
-      if (rect.width > 0 && rect.height > 0) {
-        setSize((prev) =>
-          Math.abs(prev.width - rect.width) > 1 || Math.abs(prev.height - rect.height) > 1
-            ? { width: rect.width, height: rect.height }
-            : prev,
-        );
-      }
-    });
-    obs.observe(el);
-    return () => obs.disconnect();
-  }, []);
+  const size = useContainerSize(containerRef);
 
-  const layout = useForceLayout(dNodes, dEdges, size);
+  // ── Community clustering / semantic zoom ──────────────────────────────────
+  const clustered = useClusteredGraph(dNodes, dEdges);
+  const { renderNodes, renderEdges } = clustered;
+
+  /** Fan seed positions for members of a just-expanded cluster. */
+  const seedOverridesRef = React.useRef(new Map<string, { x: number; y: number }>());
+
+  const layout = useForceLayout(renderNodes, renderEdges, size, seedOverridesRef.current);
   const panZoom = usePanZoom();
+
+  const { expandCluster, focusCluster } = useClusterFocus({
+    clustered,
+    layout,
+    panZoom,
+    seedOverrides: seedOverridesRef.current,
+    onBeforeExpand: clearFocus,
+  });
+
+  const [hoverKey, setHoverKey] = React.useState<string | null>(null);
 
   const zoomToFit = React.useCallback(() => {
     const bbox = nodesBBox(layout.simNodes.values());
@@ -555,6 +533,12 @@ export function FingerprintsGraph({
 
   const nodeIndex = React.useMemo(() => {
     const m = new Map<string, GraphNodeDto>();
+    renderNodes.forEach((n) => m.set(keyOf(n), n));
+    return m;
+  }, [renderNodes]);
+  /** Raw (pre-clustering) nodes — cluster members are not in renderNodes. */
+  const rawNodeByKey = React.useMemo(() => {
+    const m = new Map<string, GraphNodeDto>();
     dNodes.forEach((n) => m.set(keyOf(n), n));
     return m;
   }, [dNodes]);
@@ -574,18 +558,18 @@ export function FingerprintsGraph({
     (node: GraphNodeDto) => {
       const key = keyOf(node);
       if (path && !path.nodeKeys.has(key)) return; // dimmed → non-clickable
-      setPath(focusComponent(key, dEdges));
+      setPath(focusComponent(key, renderEdges));
       setSelection({ type: "node", key });
     },
-    [path, dEdges],
+    [path, renderEdges],
   );
   const onEdgeClick = React.useCallback(
     (edge: GraphEdgeDto) => {
       if (path && !path.edgeIds.has(edge.id)) return;
-      setPath(focusComponent(nodeKey(edge.fromType, edge.fromId), dEdges));
+      setPath(focusComponent(nodeKey(edge.fromType, edge.fromId), renderEdges));
       setSelection({ type: "edge", id: edge.id });
     },
-    [path, dEdges],
+    [path, renderEdges],
   );
 
   // When a path is focused, case actions pull exactly its assets.
@@ -608,6 +592,42 @@ export function FingerprintsGraph({
         : null;
 
   const showEmpty = !loading && !error && dNodes.length === 0;
+
+  // ── Similarity-heat visuals (was colorByStrength) ─────────────────────────
+  // Finding/bundle nodes are tinted by the strongest similarity edge touching
+  // them; edges carry their own heat color.
+  const maxConfidenceByKey = React.useMemo(() => {
+    const m = new Map<string, number>();
+    for (const e of renderEdges) {
+      const c = Number(e.confidence ?? 0);
+      for (const k of [nodeKey(e.fromType, e.fromId), nodeKey(e.toType, e.toId)]) {
+        if (c > (m.get(k) ?? 0)) m.set(k, c);
+      }
+    }
+    return m;
+  }, [renderEdges]);
+
+  const nodeDecorator = React.useCallback(
+    (n: GraphNodeDto): NodeDecoration | null =>
+      n.type === "finding"
+        ? {
+            fillOverride: strengthColor(maxConfidenceByKey.get(keyOf(n)) ?? 0),
+            findingGlyph: "icon",
+          }
+        : null,
+    [maxConfidenceByKey],
+  );
+
+  const edgeStyle = React.useCallback(
+    (e: GraphEdgeDto): EdgeStyleOverride => ({
+      stroke: strengthColor(Number(e.confidence ?? 0)),
+      dash: [],
+      // Meta (cluster↔cluster) edges keep their weight-scaled width.
+      ...(isMetaEdge(e) ? {} : { width: 1.5 }),
+      arrow: false,
+    }),
+    [],
+  );
 
   return (
     <div className="flex h-full flex-col border-2 border-border bg-card">
@@ -703,6 +723,8 @@ export function FingerprintsGraph({
           </Badge>
         )}
 
+        <ClusterControls clustered={clustered} />
+
         <div className="ml-auto flex items-center gap-1">
           <Button
             variant="outline"
@@ -726,26 +748,26 @@ export function FingerprintsGraph({
         {/* Canvas is always mounted (so pan/zoom binds); states overlay it. */}
         <div ref={containerRef} className="relative min-w-0 flex-1 overflow-hidden">
           <GraphCanvas
-            nodes={dNodes}
-            edges={dEdges}
+            nodes={renderNodes}
+            edges={renderEdges}
             layout={layout}
             panZoom={panZoom}
-            evidenceKeys={EMPTY_SET}
-            hypothesisColors={{}}
-            attachableCounts={EMPTY_MAP}
-            collapsedCounts={EMPTY_MAP}
             selection={selection}
             mode={SELECT_MODE}
             activeNodeKeys={null}
             path={path}
-            colorByStrength
+            nodeDecorator={nodeDecorator}
+            edgeStyle={edgeStyle}
+            hoverKey={hoverKey}
+            onNodeHover={(n) => setHoverKey(n ? keyOf(n) : null)}
             onNodeClick={onNodeClick}
+            onNodeDoubleClick={(node) => {
+              if (isClusterNode(node)) expandCluster(node.cluster);
+            }}
             onNodeContextMenu={onNodeContextMenu}
             onEdgeClick={onEdgeClick}
             onEdgeContextMenu={() => undefined}
             onBackgroundClick={clearFocus}
-            onAttachBadgeClick={() => undefined}
-            onToggleCollapse={() => undefined}
           />
           {(loading || recomputing || error || showEmpty) && (
             <div className="absolute inset-0 flex items-center justify-center bg-card/80 backdrop-blur-sm">
@@ -819,6 +841,16 @@ export function FingerprintsGraph({
                     ))}
                   </div>
                 </div>
+              ) : selectedNode && isClusterNode(selectedNode) ? (
+                <ClusterDetailPanel
+                  meta={selectedNode.cluster}
+                  clusters={clustered.clusters}
+                  renderEdges={renderEdges}
+                  nodeByKey={(k) => rawNodeByKey.get(k)}
+                  onFocusCluster={focusCluster}
+                  hoverKey={hoverKey}
+                  onHoverKey={setHoverKey}
+                />
               ) : selectedNode && selectedNode.type === "asset" ? (
                 <div className="space-y-3">
                   <Badge variant="outline" className="text-[10px] uppercase">
@@ -871,6 +903,14 @@ export function FingerprintsGraph({
             </div>
           ) : (
             <>
+              {clustered.hasCollapsedClusters && (
+                <ClusterOverviewPanel
+                  clusters={clustered.clusters}
+                  onFocusCluster={focusCluster}
+                  hoverKey={hoverKey}
+                  onHoverKey={setHoverKey}
+                />
+              )}
               <div className="space-y-2">
                 <h3 className="font-serif text-sm font-black uppercase tracking-[0.06em]">
                   {t("correlation.fingerprints.actions")}
