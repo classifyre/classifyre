@@ -1,6 +1,6 @@
 {
   "name": "@classifyre/blog",
-  "version": "0.4.52",
+  "version": "0.4.53",
   "type": "module",
   "private": true,
   "scripts": {
@@ -29,7 +29,7 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.2.2",
-    "@types/node": "^25.5.2",
+    "@types/node": "^26.1.1",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@workspace/eslint-config": "workspace:^",

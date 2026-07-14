@@ -14,7 +14,6 @@ from src.utils.validation import validate_input
 def _jira_recipe(
     *,
     strategy: str = "ALL",
-    enable_ocr: bool = False,
     scope: dict[str, Any] | None = None,
     include_scope: bool = True,
     optional_extra: dict[str, Any] | None = None,
@@ -32,7 +31,7 @@ def _jira_recipe(
         },
         "masked": {"api_token": "token"},
         **({"optional": optional} if optional else {}),
-        "sampling": {"strategy": strategy, "enable_ocr": enable_ocr},
+        "sampling": {"strategy": strategy},
     }
 
 
@@ -292,8 +291,8 @@ async def test_jira_fetch_content_for_attachment(monkeypatch: pytest.MonkeyPatch
 
 
 @pytest.mark.asyncio
-async def test_jira_fetch_content_passes_sampling_ocr_flag(monkeypatch: pytest.MonkeyPatch):
-    source = JiraSource(_jira_recipe(enable_ocr=True))
+async def test_jira_fetch_content_parses_image_attachment(monkeypatch: pytest.MonkeyPatch):
+    source = JiraSource(_jira_recipe())
     attachment_url = "https://your-domain.atlassian.net/secure/attachment/att-9/scan.png"
     attachment_hash = source.generate_hash_id(attachment_url)
     source._attachment_url_by_hash[attachment_hash] = attachment_url
@@ -324,8 +323,8 @@ async def test_jira_fetch_content_passes_sampling_ocr_flag(monkeypatch: pytest.M
     assert captured["file_name"]
 
 
-def test_jira_parse_asset_bytes_enables_ocr_from_sampling(monkeypatch: pytest.MonkeyPatch):
-    source = JiraSource(_jira_recipe(enable_ocr=True))
+def test_jira_parse_asset_bytes_has_no_media_feature_flags(monkeypatch: pytest.MonkeyPatch):
+    source = JiraSource(_jira_recipe())
     captured: dict[str, object] = {}
 
     def _parse_bytes(file_bytes: bytes, **kwargs: object) -> ParsedBytes:
@@ -348,7 +347,8 @@ def test_jira_parse_asset_bytes_enables_ocr_from_sampling(monkeypatch: pytest.Mo
         file_name="scan.png",
     )
 
-    assert captured["enable_ocr"] is True
+    assert "enable_ocr" not in captured
+    assert "enable_transcription" not in captured
 
 
 @pytest.mark.asyncio

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from collections.abc import AsyncGenerator
 from datetime import UTC, datetime
-from types import SimpleNamespace
 from typing import Any
 
 import pytest
@@ -424,6 +423,18 @@ class BinarySource(DummySource):
     async def fetch_content_bytes(self, asset_id: str) -> tuple[bytes, str] | None:
         return self._binary_data, self._binary_mime
 
+    def iter_asset_pages(
+        self,
+        file_bytes: bytes,
+        mime_type: str,
+        batch_size: int = 100,
+        include_column_names: bool = True,
+        *,
+        file_name: str = "",
+    ):
+        _ = (file_bytes, mime_type, batch_size, include_column_names, file_name)
+        yield from ()
+
 
 class OcrBinarySource(BinarySource):
     def __init__(
@@ -436,7 +447,6 @@ class OcrBinarySource(BinarySource):
     ) -> None:
         super().__init__(recipe, content, binary_data, binary_mime)
         self._ocr_pages = ocr_pages
-        self.config = SimpleNamespace(sampling=SimpleNamespace(enable_ocr=True))
 
     def iter_asset_pages(
         self,

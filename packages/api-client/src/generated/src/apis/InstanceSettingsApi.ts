@@ -20,6 +20,7 @@ import type {
   McpOverviewResponseDto,
   McpTokenCreatedResponseDto,
   McpTokenResponseDto,
+  McpToolSummaryDto,
   UpdateInstanceSettingsDto,
   UpdateMcpTokenDto,
 } from '../models/index';
@@ -34,6 +35,8 @@ import {
     McpTokenCreatedResponseDtoToJSON,
     McpTokenResponseDtoFromJSON,
     McpTokenResponseDtoToJSON,
+    McpToolSummaryDtoFromJSON,
+    McpToolSummaryDtoToJSON,
     UpdateInstanceSettingsDtoFromJSON,
     UpdateInstanceSettingsDtoToJSON,
     UpdateMcpTokenDtoFromJSON,
@@ -246,6 +249,37 @@ export class InstanceSettingsApi extends runtime.BaseAPI {
      */
     async mcpSettingsControllerGetOverview(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<McpOverviewResponseDto> {
         const response = await this.mcpSettingsControllerGetOverviewRaw(initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Returns every tool exposed by the MCP server — name, description, input parameters, and annotations — introspected directly from the registered tool definitions.
+     * List MCP tools
+     */
+    async mcpSettingsControllerGetToolsRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Array<McpToolSummaryDto>>> {
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/instance-settings/mcp/tools`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => jsonValue.map(McpToolSummaryDtoFromJSON));
+    }
+
+    /**
+     * Returns every tool exposed by the MCP server — name, description, input parameters, and annotations — introspected directly from the registered tool definitions.
+     * List MCP tools
+     */
+    async mcpSettingsControllerGetTools(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Array<McpToolSummaryDto>> {
+        const response = await this.mcpSettingsControllerGetToolsRaw(initOverrides);
         return await response.value();
     }
 

@@ -10,10 +10,12 @@ import {
 import { ApiBody, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { McpOverviewService } from '../mcp-overview.service';
 import { McpTokenService } from '../mcp-token.service';
+import { McpToolsCatalogService } from '../mcp-tools-catalog.service';
 import {
   CreateMcpTokenDto,
   McpTokenCreatedResponseDto,
   McpOverviewResponseDto,
+  McpToolSummaryDto,
   McpTokenResponseDto,
   UpdateMcpTokenDto,
 } from '../dto/mcp-settings.dto';
@@ -24,6 +26,7 @@ export class McpSettingsController {
   constructor(
     private readonly mcpOverviewService: McpOverviewService,
     private readonly mcpTokenService: McpTokenService,
+    private readonly mcpToolsCatalogService: McpToolsCatalogService,
   ) {}
 
   @Get('overview')
@@ -38,6 +41,20 @@ export class McpSettingsController {
   })
   getOverview(): McpOverviewResponseDto {
     return this.mcpOverviewService.getOverview();
+  }
+
+  @Get('tools')
+  @ApiOperation({
+    summary: 'List MCP tools',
+    description:
+      'Returns every tool exposed by the MCP server — name, description, input parameters, and annotations — introspected directly from the registered tool definitions.',
+  })
+  @ApiResponse({
+    status: 200,
+    type: [McpToolSummaryDto],
+  })
+  getTools(): McpToolSummaryDto[] {
+    return this.mcpToolsCatalogService.getTools();
   }
 
   @Get('tokens')

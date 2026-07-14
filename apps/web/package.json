@@ -1,6 +1,6 @@
 {
   "name": "@classifyre/web",
-  "version": "0.4.52",
+  "version": "0.4.53",
   "type": "module",
   "private": true,
   "scripts": {
@@ -54,7 +54,7 @@
     "@types/d3-force": "^3.0.10",
     "@types/jest": "^30.0.0",
     "@types/json-schema": "^7.0.15",
-    "@types/node": "^25.5.2",
+    "@types/node": "^26.1.1",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@workspace/eslint-config": "workspace:^",
