@@ -146,6 +146,8 @@ export * from './McpServerResponseDto';
 export * from './McpServerTestResultDto';
 export * from './McpTokenCreatedResponseDto';
 export * from './McpTokenResponseDto';
+export * from './McpToolParameterDto';
+export * from './McpToolSummaryDto';
 export * from './NotificationListResponseDto';
 export * from './NotificationResponseDto';
 export * from './NotificationsControllerDeleteNotification200Response';

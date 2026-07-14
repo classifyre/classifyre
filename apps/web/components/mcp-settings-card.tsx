@@ -54,6 +54,7 @@ import { formatDate, formatRelative } from "@/lib/date";
 import { useInstanceSettings } from "@/components/instance-settings-provider";
 import { useServerConfig } from "@/components/dashboard-layout";
 import { useTranslation } from "@/hooks/use-translation";
+import { McpToolsCatalog } from "@/components/mcp-tools-catalog";
 
 type RevealState = {
   name: string;
@@ -702,6 +703,8 @@ export function McpSettingsCard() {
               )}
             </section>
           ) : null}
+
+          {!loading ? <McpToolsCatalog enabled={settings.mcpEnabled} /> : null}
         </CardContent>
       </Card>
 

@@ -9,6 +9,7 @@ All URIs are relative to *http://localhost*
 | [**mcpSettingsControllerCreateToken**](InstanceSettingsApi.md#mcpsettingscontrollercreatetoken) | **POST** /instance-settings/mcp/tokens | Create MCP access token |
 | [**mcpSettingsControllerDeleteToken**](InstanceSettingsApi.md#mcpsettingscontrollerdeletetoken) | **DELETE** /instance-settings/mcp/tokens/{id} | Delete MCP access token |
 | [**mcpSettingsControllerGetOverview**](InstanceSettingsApi.md#mcpsettingscontrollergetoverview) | **GET** /instance-settings/mcp/overview | Get MCP server overview |
+| [**mcpSettingsControllerGetTools**](InstanceSettingsApi.md#mcpsettingscontrollergettools) | **GET** /instance-settings/mcp/tools | List MCP tools |
 | [**mcpSettingsControllerListTokens**](InstanceSettingsApi.md#mcpsettingscontrollerlisttokens) | **GET** /instance-settings/mcp/tokens | List MCP access tokens |
 | [**mcpSettingsControllerUpdateToken**](InstanceSettingsApi.md#mcpsettingscontrollerupdatetoken) | **PATCH** /instance-settings/mcp/tokens/{id} | Update MCP access token |
 
@@ -314,6 +315,65 @@ This endpoint does not need any parameter.
 ### Return type
 
 [**McpOverviewResponseDto**](McpOverviewResponseDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## mcpSettingsControllerGetTools
+
+> Array&lt;McpToolSummaryDto&gt; mcpSettingsControllerGetTools()
+
+List MCP tools
+
+Returns every tool exposed by the MCP server — name, description, input parameters, and annotations — introspected directly from the registered tool definitions.
+
+### Example
+
+```ts
+import {
+  Configuration,
+  InstanceSettingsApi,
+} from '@workspace/api-client';
+import type { McpSettingsControllerGetToolsRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new InstanceSettingsApi();
+
+  try {
+    const data = await api.mcpSettingsControllerGetTools();
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+This endpoint does not need any parameter.
+
+### Return type
+
+[**Array&lt;McpToolSummaryDto&gt;**](McpToolSummaryDto.md)
 
 ### Authorization
 
