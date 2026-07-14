@@ -35,15 +35,15 @@
     "@electron-forge/plugin-vite": "^7.8.0",
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.59.1",
-    "@types/node": "^22.0.0",
+    "@types/node": "^26.1.1",
     "@workspace/eslint-config": "workspace:*",
     "@workspace/typescript-config": "workspace:*",
-    "electron": "^35.0.0",
+    "electron": "^43.1.0",
     "esbuild": "^0.28.1",
     "eslint": "^10.5.0",
     "playwright": "^1.59.1",
     "typescript": "5.9.3",
     "typescript-eslint": "^8.61.1",
-    "vite": "^6.3.0"
+    "vite": "^8.1.4"
   }
 }
