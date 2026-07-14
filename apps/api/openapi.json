@@ -3522,6 +3522,32 @@
         ]
       }
     },
+    "/instance-settings/mcp/tools": {
+      "get": {
+        "description": "Returns every tool exposed by the MCP server — name, description, input parameters, and annotations — introspected directly from the registered tool definitions.",
+        "operationId": "McpSettingsController_getTools",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/McpToolSummaryDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "List MCP tools",
+        "tags": [
+          "Instance Settings"
+        ]
+      }
+    },
     "/instance-settings/mcp/tokens": {
       "get": {
         "description": "Lists stored MCP tokens as masked previews. Raw token values are never returned.",
@@ -12210,6 +12236,119 @@
           "bestPractices",
           "capabilityGroups",
           "prompts"
+        ]
+      },
+      "McpToolParameterDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Parameter name as sent in the tool call arguments.",
+            "example": "sourceId"
+          },
+          "type": {
+            "type": "string",
+            "description": "JSON Schema type of the parameter (e.g. string, integer).",
+            "example": "string"
+          },
+          "required": {
+            "type": "boolean",
+            "description": "Whether the parameter is required by the tool.",
+            "example": true
+          },
+          "description": {
+            "type": "string",
+            "description": "Human-readable description sourced from the tool schema.",
+            "example": "Source type id from list_source_types, e.g. POSTGRESQL"
+          },
+          "format": {
+            "type": "string",
+            "description": "Format hint from the schema, when present.",
+            "example": "uuid"
+          },
+          "enumValues": {
+            "description": "Allowed enum values, when the parameter is an enum.",
+            "example": [
+              "PENDING",
+              "RUNNING",
+              "COMPLETED",
+              "ERROR"
+            ],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "name",
+          "type",
+          "required"
+        ]
+      },
+      "McpToolSummaryDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Programmatic tool name used in MCP tools/call requests.",
+            "example": "list_source_runs"
+          },
+          "title": {
+            "type": "string",
+            "description": "Human-friendly title registered with the tool.",
+            "example": "List Source Runs"
+          },
+          "description": {
+            "type": "string",
+            "description": "Tool description registered with the MCP server.",
+            "example": "List runs for a single source."
+          },
+          "groupId": {
+            "type": "string",
+            "description": "Capability group id this tool belongs to.",
+            "example": "runs"
+          },
+          "groupTitle": {
+            "type": "string",
+            "description": "Capability group title this tool belongs to.",
+            "example": "Runs"
+          },
+          "readOnly": {
+            "type": "boolean",
+            "description": "Tool reads state only and never mutates data.",
+            "example": true
+          },
+          "destructive": {
+            "type": "boolean",
+            "description": "Tool may perform destructive changes (delete/stop).",
+            "example": false
+          },
+          "idempotent": {
+            "type": "boolean",
+            "description": "Tool is idempotent — repeat calls have the same effect.",
+            "example": true
+          },
+          "parameters": {
+            "description": "Flattened top-level input parameters, from the real schema.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/McpToolParameterDto"
+            }
+          },
+          "returnsJson": {
+            "type": "boolean",
+            "description": "Whether the tool returns a JSON result payload. All Classifyre tools return structured JSON.",
+            "example": true
+          }
+        },
+        "required": [
+          "name",
+          "readOnly",
+          "destructive",
+          "idempotent",
+          "parameters",
+          "returnsJson"
         ]
       },
       "McpTokenResponseDto": {
