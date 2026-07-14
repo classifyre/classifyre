@@ -105,19 +105,11 @@ _DOCLING_IMAGE_MIME_TYPES = {
 
 _DOCLING_MIME_TYPES = {
     "application/pdf",
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    "text/html",
-    "application/xhtml+xml",
 }
 _DOCLING_EXTENSIONS = {
     ".pdf",
-    ".docx",
     ".pptx",
-    ".xlsx",
-    ".html",
-    ".htm",
     ".png",
     ".jpg",
     ".jpeg",
@@ -433,8 +425,6 @@ def extract_text(
     mime_type: str,
     *,
     file_name: str = "",
-    enable_ocr: bool = False,
-    enable_transcription: bool = False,
 ) -> tuple[str, str | None]:
     """
     Extract plain text from file bytes based on MIME type.
@@ -442,7 +432,7 @@ def extract_text(
     Returns:
         (text_content, error_message_or_None)
     """
-    if enable_ocr and _supports_docling_ocr(mime_type, file_name):
+    if _supports_docling_ocr(mime_type, file_name):
         # PDFs: try cheap native text extraction first.  Only hand off to the
         # heavy docling pipeline when the native path yields too little text,
         # which indicates a scanned or image-only PDF that genuinely needs OCR.
@@ -458,7 +448,9 @@ def extract_text(
                     mime_type,
                 )
                 return cheap_text, cheap_error
-        # Images, DOCX, PPTX, and sparse/scanned PDFs: use docling.
+        # Images, PPTX, and sparse/scanned PDFs: use docling. DOCX/XLSX/HTML
+        # take their inexpensive native text paths; embedded images are emitted
+        # separately as IMAGE assets by sources that materialize containers.
         text, error = _extract_docling_markdown(
             file_bytes,
             mime_type=mime_type,
@@ -469,24 +461,41 @@ def extract_text(
         if error:
             logger.warning("OCR extraction failed for %s: %s", file_name or mime_type, error)
 
-    # Audio / video — transcribe to text via faster-whisper when enabled.
-    if mime_type.startswith(("audio/", "video/")):
-        if enable_transcription:
-            from .transcription import transcribe_media
+    # Media processing is based on detected content type, never source config.
+    if mime_type.startswith("audio/"):
+        from .transcription import transcribe_media
 
-            text, error = transcribe_media(
-                file_bytes,
-                mime_type=mime_type,
-                file_name=file_name,
-            )
-            if text:
-                return text, None
-            if error:
-                logger.warning("Transcription failed for %s: %s", file_name or mime_type, error)
-            return "", error
-        return "", None
+        text, error = transcribe_media(
+            file_bytes,
+            mime_type=mime_type,
+            file_name=file_name,
+        )
+        if error:
+            logger.warning("Transcription failed for %s: %s", file_name or mime_type, error)
+        return text, error
 
-    # Images — no native text extraction (OCR handled above when enabled)
+    if mime_type.startswith("video/"):
+        from .transcription import transcribe_media
+        from .video_processing import extract_video_ocr
+
+        transcript, transcript_error = transcribe_media(
+            file_bytes,
+            mime_type=mime_type,
+            file_name=file_name,
+        )
+        visual_text, visual_error = extract_video_ocr(file_bytes, file_name=file_name)
+        sections: list[str] = []
+        if transcript:
+            sections.append(f"[Transcript]\n{transcript}")
+        if visual_text:
+            sections.append(visual_text)
+        errors = [error for error in (transcript_error, visual_error) if error]
+        for error in errors:
+            logger.warning("Video extraction failed for %s: %s", file_name or mime_type, error)
+        return "\n\n".join(sections), "; ".join(errors) or None
+
+    # Unsupported image formats have no native text path; supported images were
+    # already handled by the automatic OCR branch above.
     if mime_type.startswith("image/"):
         return "", None
 
@@ -619,8 +628,6 @@ def parse_bytes(
     *,
     declared_mime_type: str | None = None,
     file_name: str = "",
-    enable_ocr: bool = False,
-    enable_transcription: bool = False,
 ) -> ParsedBytes:
     """
     Parse in-memory bytes: resolve MIME type and extract raw/text content.
@@ -638,8 +645,6 @@ def parse_bytes(
         file_bytes,
         mime_type,
         file_name=file_name,
-        enable_ocr=enable_ocr,
-        enable_transcription=enable_transcription,
     )
     raw_content = _decode_bytes(file_bytes) if _is_text_like_mime_type(mime_type) else ""
 
@@ -670,8 +675,6 @@ def iter_file_pages(
     include_column_names: bool = True,
     *,
     file_name: str = "",
-    enable_ocr: bool = False,
-    enable_transcription: bool = False,
 ) -> Generator[str, None, None]:
     """
     Iterate over file content in pages of up to batch_size rows or lines.
@@ -679,8 +682,8 @@ def iter_file_pages(
     Parquet / CSV / TSV  → yields batch_size *rows* per page with labelled columns.
     All other extractable types (PDF, DOCX, TXT, JSON, XML, XLSX, …) → extracts the
     full text once via extract_text(), then yields batch_size *lines* per page.
-    Audio/video → transcript lines when enable_transcription is set, else nothing.
-    Non-extractable types (images, unknown binary) → yields nothing.
+    Audio/video → transcript lines; video also yields distinct-frame OCR.
+    Unknown binary types → yield nothing.
 
     New file formats only need to be added to extract_text() — not here.
     """
@@ -690,7 +693,7 @@ def iter_file_pages(
         yield from _iter_parquet_pages(file_bytes, batch_size, include_column_names)
     elif normalized in ("text/csv", "text/tab-separated-values"):
         yield from _iter_csv_pages(file_bytes, include_column_names)
-    elif normalized.startswith(("audio/", "video/")) and enable_transcription:
+    elif normalized.startswith("audio/"):
         # Stream transcript pages directly from the chunked transcription pipeline
         # so the detector receives text as each ~10-min audio chunk completes
         # instead of waiting for the full file and buffering the entire transcript.
@@ -702,13 +705,28 @@ def iter_file_pages(
             file_name=file_name,
             segments_per_page=batch_size,
         )
+    elif normalized.startswith("video/"):
+        from .transcription import iter_transcription_pages
+        from .video_processing import iter_video_ocr_segments
+
+        try:
+            yield from iter_transcription_pages(
+                file_bytes,
+                mime_type=normalized,
+                file_name=file_name,
+                segments_per_page=batch_size,
+            )
+        except Exception as exc:
+            logger.warning("Video transcription failed for %s: %s", file_name or mime_type, exc)
+        try:
+            yield from iter_video_ocr_segments(file_bytes, file_name=file_name)
+        except Exception as exc:
+            logger.warning("Video OCR failed for %s: %s", file_name or mime_type, exc)
     else:
         text, error = extract_text(
             file_bytes,
             normalized,
             file_name=file_name,
-            enable_ocr=enable_ocr,
-            enable_transcription=enable_transcription,
         )
         if error:
             logger.warning("Text extraction error (%s): %s", mime_type, error)
@@ -838,7 +856,7 @@ def _format_tabular_page(
     return "\n".join(lines)
 
 
-def parse_file(file_path: Path, *, enable_ocr: bool = False) -> ParsedFile:
+def parse_file(file_path: Path) -> ParsedFile:
     """
     Parse a local file: detect MIME type and extract text.
 
@@ -855,7 +873,7 @@ def parse_file(file_path: Path, *, enable_ocr: bool = False) -> ParsedFile:
         raise FileNotFoundError(f"File not found: {file_path}")
 
     file_bytes = file_path.read_bytes()
-    parsed = parse_bytes(file_bytes, file_name=file_path.name, enable_ocr=enable_ocr)
+    parsed = parse_bytes(file_bytes, file_name=file_path.name)
 
     encoding: str | None = None
     if not parsed.is_binary and parsed.text_content:
