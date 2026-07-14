@@ -35,7 +35,6 @@
           "summary": "Use optional.transcript for caption languages and optional.connection for proxy/timeout tuning.",
           "suggestions": [
             "Set optional.transcript.languages (example: [\"en\"]) to prefer specific caption languages.",
-            "Enable optional.transcript.skip_transcript for metadata-only scans (no detector content).",
             "Set optional.connection.proxy_url to mitigate rate limiting at scale."
           ]
         },
@@ -1160,8 +1159,7 @@
           "suggestions": [
             "Use LATEST for frequent syncs focused on recently edited pages.",
             "Use RANDOM for broad health checks across the workspace.",
-            "Use ALL only when full workspace scanning is required.",
-            "Enable enable_ocr to extract text from PDF and image files before detection."
+            "Use ALL only when full workspace scanning is required."
           ]
         }
       }

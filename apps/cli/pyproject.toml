@@ -128,6 +128,7 @@ detectors = [
     { include-group = "regex" },
     { include-group = "llm" },
     { include-group = "transcription" },
+    { include-group = "video" },
 ]
 file-processing = [
     "filetype>=1.2.0",
@@ -145,9 +146,16 @@ transcription = [
     # PyAV (no system ffmpeg required) and runs ctranslate2 for inference.
     "faster-whisper>=1.1.0",
 ]
+video = [
+    # Use the server-safe OpenCV 5 wheel. RapidOCR's desktop OpenCV dependency
+    # is excluded below because both distributions install the same cv2 module.
+    "opencv-python-headless>=5.0.0.93,<6.0.0",
+    "rapidocr-onnxruntime>=1.4.0",
+]
 ocr = [
     { include-group = "file-processing" },
     "docling>=2.94.0",
+    "opencv-python-headless>=5.0.0.93,<6.0.0",
     "rapidocr-onnxruntime>=1.4.0",
     # torchvision is a transitive dep of docling-ibm-models, but [tool.uv.sources]
     # index pins only apply to dependencies declared directly in this project.
@@ -407,6 +415,10 @@ markers = [
 
 [tool.uv]
 package = true
+# RapidOCR is the sole requester of opencv-python and works with the headless
+# distribution declared by our video and OCR groups. Installing both would
+# overwrite the same cv2 namespace and add GUI libraries to CPU-only containers.
+exclude-dependencies = ["opencv-python"]
 # Every platform we ship (desktop bundles + CI) must resolve to versions with
 # usable wheels. Without this, uv happily locks versions that are missing a
 # platform — e.g. deltalake 1.6.1 published no win_amd64 wheel, which broke the

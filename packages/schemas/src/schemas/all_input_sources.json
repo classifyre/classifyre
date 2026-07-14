@@ -328,9 +328,22 @@
         },
         "image": {
           "use": [
-            "file"
+            "file",
+            "image"
           ],
           "properties": {
+            "provider": {
+              "type": "string",
+              "description": "Storage provider label"
+            },
+            "object_key": {
+              "type": "string",
+              "description": "Object key/path"
+            },
+            "etag": {
+              "type": "string",
+              "description": "Object entity tag"
+            },
             "source_hash": {
               "type": "string",
               "description": "Hash of the parent object asset"
@@ -340,10 +353,7 @@
               "description": "Location of the embedded image within the parent"
             }
           },
-          "required": [
-            "source_hash",
-            "location"
-          ]
+          "required": []
         },
         "audio": {
           "use": [
@@ -415,7 +425,8 @@
         },
         "image": {
           "use": [
-            "file"
+            "file",
+            "image"
           ],
           "properties": {
             "provider": {
@@ -519,9 +530,22 @@
         },
         "image": {
           "use": [
-            "file"
+            "file",
+            "image"
           ],
           "properties": {
+            "provider": {
+              "type": "string",
+              "description": "Storage provider label"
+            },
+            "object_key": {
+              "type": "string",
+              "description": "Object key/path"
+            },
+            "etag": {
+              "type": "string",
+              "description": "Object entity tag"
+            },
             "source_hash": {
               "type": "string",
               "description": "Hash of the parent object asset"
@@ -531,10 +555,7 @@
               "description": "Location of the embedded image within the parent"
             }
           },
-          "required": [
-            "source_hash",
-            "location"
-          ]
+          "required": []
         },
         "audio": {
           "use": [
@@ -606,9 +627,22 @@
         },
         "image": {
           "use": [
-            "file"
+            "file",
+            "image"
           ],
           "properties": {
+            "provider": {
+              "type": "string",
+              "description": "Storage provider label"
+            },
+            "object_key": {
+              "type": "string",
+              "description": "Object key/path"
+            },
+            "etag": {
+              "type": "string",
+              "description": "Object entity tag"
+            },
             "source_hash": {
               "type": "string",
               "description": "Hash of the parent object asset"
@@ -618,10 +652,7 @@
               "description": "Location of the embedded image within the parent"
             }
           },
-          "required": [
-            "source_hash",
-            "location"
-          ]
+          "required": []
         },
         "audio": {
           "use": [
@@ -2062,16 +2093,6 @@
         "strategy": {
           "$ref": "#/definitions/SamplingStrategy"
         },
-        "enable_ocr": {
-          "type": "boolean",
-          "default": false,
-          "description": "When true, enable OCR/text extraction for supported binary documents and images before routing text-capable detectors."
-        },
-        "enable_transcription": {
-          "type": "boolean",
-          "default": false,
-          "description": "When true, transcribe audio and video files to text (via faster-whisper) before routing text-capable detectors. Slower and requires the transcription dependency."
-        },
         "order_by_column": {
           "type": "string",
           "description": "Column to use for LATEST sampling mode in tabular sources (usually created_at/updated_at). Auto-detected when not set."
@@ -2099,8 +2120,6 @@
       ],
       "default": {
         "strategy": "AUTOMATIC",
-        "enable_ocr": false,
-        "enable_transcription": false,
         "fallback_to_random": true,
         "include_column_names": true,
         "rows_per_page": 100
@@ -2463,11 +2482,6 @@
             "type": "string"
           },
           "description": "Preferred caption language codes in priority order (e.g. [\"en\"]). Empty means accept any available language."
-        },
-        "skip_transcript": {
-          "type": "boolean",
-          "default": false,
-          "description": "When true, skip transcript fetching entirely (metadata-only assets, no detector content)."
         }
       },
       "additionalProperties": false

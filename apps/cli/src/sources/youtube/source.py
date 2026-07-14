@@ -6,10 +6,9 @@ Pipeline:
         -> video ids
         -> youtube-transcript-api (fetch captions)
             -> transcript found -> asset + metadata, transcript is detector content
-            -> no transcript:
-                -> sampling.enable_transcription set -> download audio (yt-dlp) and
-                   transcribe with faster-whisper -> transcript is detector content
-                -> otherwise -> asset + metadata only (no detector content)
+            -> download a bounded-resolution muxed stream
+                -> no captions -> transcribe audio with faster-whisper
+                -> sparse changed-frame OCR with OpenCV + RapidOCR
 
 Both libraries scrape public data and need no API key. ``yt-dlp`` and
 ``youtube-transcript-api`` are optional dependencies (``[youtube]`` group) and
@@ -89,6 +88,9 @@ class YouTubeSource(BaseSource):
         # Transcript text keyed by hash / external_url / video_id so the detector
         # pipeline (which probes both external_url and hash) resolves content.
         self._transcripts: dict[str, str] = {}
+        self._video_id_by_key: dict[str, str] = {}
+        self._assets_by_video_id: dict[str, SingleAssetScanResults] = {}
+        self._media_attempted: set[str] = set()
         self._cookiefile: str | None = None
 
     # ------------------------------------------------------------------
@@ -289,9 +291,8 @@ class YouTubeSource(BaseSource):
 
         Handles the documented failure cases (captions disabled, no captions,
         age-restricted/private, rate limiting) by logging and returning None so
-        the asset is still emitted without detector content. When no captions
-        exist, ``_build_video_asset`` falls back to ``_transcribe_audio`` if the
-        source has ``sampling.enable_transcription`` set.
+        the asset is still emitted. When no captions exist, the downloaded video
+        audio is always transcribed by ``_process_video_media``.
         """
         yt_mod = require_module("youtube_transcript_api", "YouTube", uv_groups=["youtube"])
 
@@ -331,17 +332,16 @@ class YouTubeSource(BaseSource):
             logger.warning("Transcript fetch failed for video %s: %s", video_id, exc)
             return None
 
-    def _download_audio(self, video_id: str, dest_dir: Path) -> Path | None:
-        """Download the best audio-only stream for a video into ``dest_dir``.
-
-        Returns the path to the downloaded file, or None on failure. No yt-dlp
-        post-processing is used, so the raw audio container (.m4a/.webm/…) is
-        written directly — faster-whisper decodes it via bundled PyAV, so no
-        system ffmpeg is required.
-        """
+    def _download_video(self, video_id: str, dest_dir: Path) -> Path | None:
+        """Download one muxed stream, preferring at most 480p to bound CPU/network."""
         opts = self._base_ydl_opts()
         opts["skip_download"] = False
-        opts["format"] = "bestaudio/best"
+        # Requiring both codecs avoids yt-dlp's ffmpeg merge path. Visual OCR only
+        # needs readable text, while the audio track remains suitable for Whisper.
+        opts["format"] = (
+            "best[height<=480][acodec!=none][vcodec!=none]/"
+            "best[acodec!=none][vcodec!=none]"
+        )
         opts["noplaylist"] = True
         opts["outtmpl"] = str(dest_dir / "%(id)s.%(ext)s")
         url = _WATCH_URL.format(video_id=video_id)
@@ -349,45 +349,53 @@ class YouTubeSource(BaseSource):
             with self._ydl_class()(opts) as ydl:
                 ydl.extract_info(url, download=True)
         except Exception as exc:
-            logger.warning("Failed to download audio for video %s: %s", video_id, exc)
+            logger.warning("Failed to download video %s: %s", video_id, exc)
             return None
         files = [p for p in dest_dir.iterdir() if p.is_file()]
         if not files:
-            logger.warning("Audio download produced no file for video %s", video_id)
+            logger.warning("Video download produced no file for video %s", video_id)
             return None
-        # bestaudio yields a single file; pick the largest if a sidecar slipped in.
+        # The selected format yields one file; pick the largest if a sidecar slipped in.
         return max(files, key=lambda p: p.stat().st_size)
 
-    def _transcribe_audio(self, video_id: str) -> _TranscriptResult | None:
-        """Download a video's audio and transcribe it with faster-whisper.
+    def _process_video_media(
+        self,
+        video_id: str,
+        *,
+        transcribe: bool,
+    ) -> tuple[_TranscriptResult | None, str]:
+        """Download once, then transcribe when needed and always OCR changed frames."""
+        from ...utils.transcription import transcribe_media_path
+        from ...utils.video_processing import extract_video_ocr_path
 
-        Used as a fallback when captions are unavailable. Returns None when the
-        download or transcription fails so the asset is still emitted.
-        """
-        from ...utils.transcription import transcribe_media
-
-        with tempfile.TemporaryDirectory(prefix="yt_audio_") as tmp:
-            path = self._download_audio(video_id, Path(tmp))
+        with tempfile.TemporaryDirectory(prefix="yt_video_") as tmp:
+            path = self._download_video(video_id, Path(tmp))
             if path is None:
-                return None
-            text, error = transcribe_media(
-                path.read_bytes(),
-                mime_type="",
-                file_name=path.name,
-            )
-        if error:
-            logger.warning("Whisper transcription failed for video %s: %s", video_id, error)
-            return None
-        if not text:
-            return None
-        logger.info("Transcribed video %s via faster-whisper (%d chars)", video_id, len(text))
-        return _TranscriptResult(
-            text=text,
-            language=None,
-            is_generated=True,
-            available_languages=[],
-            source="whisper",
-        )
+                return None, ""
+            visual_text, visual_error = extract_video_ocr_path(path)
+            if visual_error:
+                logger.warning("Visual OCR failed for YouTube video %s: %s", video_id, visual_error)
+
+            transcript: _TranscriptResult | None = None
+            if transcribe:
+                text, error = transcribe_media_path(
+                    path,
+                    mime_type="video/mp4",
+                )
+                if error:
+                    logger.warning("Whisper transcription failed for video %s: %s", video_id, error)
+                elif text:
+                    logger.info(
+                        "Transcribed video %s via faster-whisper (%d chars)", video_id, len(text)
+                    )
+                    transcript = _TranscriptResult(
+                        text=text,
+                        language=None,
+                        is_generated=True,
+                        available_languages=[],
+                        source="whisper",
+                    )
+            return transcript, visual_text
 
     # ------------------------------------------------------------------
     # Asset construction
@@ -417,18 +425,6 @@ class YouTubeSource(BaseSource):
         else:
             created_at = datetime.now(UTC)
 
-        transcript: _TranscriptResult | None = None
-        if not self._transcript_options().skip_transcript:
-            transcript = self._fetch_transcript(video_id)
-            # No captions: fall back to downloading the audio and transcribing it
-            # with faster-whisper when the source has transcription enabled.
-            if transcript is None and self.transcription_enabled():
-                transcript = self._transcribe_audio(video_id)
-        if transcript is not None:
-            self._transcripts[asset_hash] = transcript.text
-            self._transcripts[external_url] = transcript.text
-            self._transcripts[video_id] = transcript.text
-
         asset_metadata: dict[str, Any] = {
             "video_id": video_id,
             "title": title,
@@ -451,25 +447,17 @@ class YouTubeSource(BaseSource):
         if isinstance(upload_date, str) and upload_date:
             asset_metadata["upload_date"] = upload_date
 
-        asset_metadata["transcript_available"] = transcript is not None
-        if transcript is not None:
-            asset_metadata["transcript_source"] = transcript.source
-            if transcript.language:
-                asset_metadata["transcript_language"] = transcript.language
-            if transcript.is_generated is not None:
-                asset_metadata["transcript_is_generated"] = transcript.is_generated
-            if transcript.available_languages:
-                asset_metadata["caption_tracks"] = transcript.available_languages
+        asset_metadata["transcript_available"] = False
 
         # Checksum must only reflect content changes: view/like counters move on
         # every re-scan and would flip UNCHANGED assets to UPDATED spuriously.
         checksum_data = {
             "video_id": video_id,
             "title": title,
-            "transcript_available": asset_metadata["transcript_available"],
+            "detector_content": "",
         }
 
-        return SingleAssetScanResults(
+        asset = SingleAssetScanResults(
             hash=asset_hash,
             checksum=self.calculate_checksum(checksum_data),
             name=title,
@@ -482,6 +470,58 @@ class YouTubeSource(BaseSource):
             runner_id=self.runner_id,
             **self.metadata_fields("video", asset_metadata),
         )
+        self._assets_by_video_id[video_id] = asset
+        for key in (asset_hash, external_url, video_id):
+            self._video_id_by_key[key] = video_id
+
+        # Direct source usage (tests/local integrations) preserves eager behavior.
+        # The CLI's two-phase runner sets discovery_only and processes lazily in
+        # fetch_content(), bounded by max_concurrent_assets.
+        if not self._discovery_only:
+            self._populate_video_content(video_id)
+        return asset
+
+    def _populate_video_content(self, video_id: str) -> None:
+        if video_id in self._media_attempted:
+            return
+        self._media_attempted.add(video_id)
+
+        asset = self._assets_by_video_id.get(video_id)
+        if asset is None:
+            return
+        transcript = self._fetch_transcript(video_id)
+        media_transcript, visual_text = self._process_video_media(
+            video_id,
+            transcribe=transcript is None,
+        )
+        transcript = transcript or media_transcript
+        content_parts: list[str] = []
+        if transcript is not None:
+            content_parts.append(f"[Transcript]\n{transcript.text}")
+        if visual_text:
+            content_parts.append(visual_text)
+        detector_content = "\n\n".join(content_parts)
+
+        asset.metadata["transcript_available"] = transcript is not None
+        if transcript is not None:
+            asset.metadata["transcript_source"] = transcript.source
+            if transcript.language:
+                asset.metadata["transcript_language"] = transcript.language
+            if transcript.is_generated is not None:
+                asset.metadata["transcript_is_generated"] = transcript.is_generated
+            if transcript.available_languages:
+                asset.metadata["caption_tracks"] = transcript.available_languages
+
+        asset.checksum = self.calculate_checksum(
+            {
+                "video_id": video_id,
+                "title": asset.name,
+                "detector_content": detector_content,
+            }
+        )
+        if detector_content:
+            for key in (asset.hash, asset.external_url, video_id):
+                self._transcripts[key] = detector_content
 
     # ------------------------------------------------------------------
     # BaseSource interface
@@ -527,6 +567,9 @@ class YouTubeSource(BaseSource):
             return
 
         self._transcripts = {}
+        self._video_id_by_key = {}
+        self._assets_by_video_id = {}
+        self._media_attempted = set()
         video_ids = self._resolve_target_video_ids()
         logger.info("Resolved %d YouTube video(s) to extract", len(video_ids))
 
@@ -557,18 +600,28 @@ class YouTubeSource(BaseSource):
         return hash_id(type_value, asset_id)
 
     async def fetch_content(self, asset_id: str) -> tuple[str, str] | None:
-        """Return the cached transcript text for detector scanning.
+        """Lazily process and return transcript plus on-screen text."""
+        video_id = self._video_id_by_key.get(asset_id)
+        if video_id is not None:
+            import asyncio
 
-        Returns ``None`` when no transcript was found, so videos without captions
-        produce an asset + metadata but skip Phase 2 (detectors).
-        """
+            await asyncio.to_thread(self._populate_video_content, video_id)
         text = self._transcripts.get(asset_id)
         if not text:
             return None
         return text, text
 
     def evict_asset_cache(self, asset_hash: str) -> None:
+        video_id = self._video_id_by_key.pop(asset_hash, None)
         self._transcripts.pop(asset_hash, None)
+        if video_id:
+            asset = self._assets_by_video_id.pop(video_id, None)
+            if asset:
+                self._transcripts.pop(asset.external_url, None)
+                self._video_id_by_key.pop(asset.external_url, None)
+            self._transcripts.pop(video_id, None)
+            self._video_id_by_key.pop(video_id, None)
+            self._media_attempted.discard(video_id)
 
     def enrich_finding_location(
         self,
@@ -590,3 +643,6 @@ class YouTubeSource(BaseSource):
                 pass
             self._cookiefile = None
         self._transcripts.clear()
+        self._video_id_by_key.clear()
+        self._assets_by_video_id.clear()
+        self._media_attempted.clear()
