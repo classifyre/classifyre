@@ -7,10 +7,10 @@ concurrent inference to avoid OOM under the worker thread pool.
 
 Long audio files are split into ~10-minute WAV chunks using PyAV (bundled with
 faster-whisper) before transcription.  This bounds the per-chunk decoded audio
-buffer to ~38 MB instead of the ~230 MB required for a full 1-hour file, making
+buffer to ~19 MB instead of the ~115 MB required for a full 1-hour file, making
 the overall peak memory manageable alongside the 1.5 GB model weights.
 
-Transcription is opt-in (per-source ``sampling.enable_transcription``); callers
+Transcription runs whenever parsing discovers audio or video content. Callers
 treat a returned error the same way they treat any other parse failure.
 """
 
@@ -212,30 +212,32 @@ def _whisper_available_mb() -> int:
 
 
 def _split_audio_chunks(
-    file_bytes: bytes,
+    media: bytes | Path,
     chunk_seconds: int = _AUDIO_CHUNK_SECONDS,
-) -> Generator[bytes, None, None]:
-    """Decode audio bytes and yield WAV chunks via PyAV (bundled with faster-whisper).
+) -> Generator[bytes | Path, None, None]:
+    """Decode audio and yield bounded WAV chunks via PyAV.
 
     Streams through the compressed audio frame-by-frame so only
     ``chunk_seconds`` worth of decoded PCM is held in memory at once instead of
-    the full decoded duration.  Falls back to yielding the original bytes when
-    PyAV is unavailable or decoding fails.
+    the full decoded duration. A path source stays on disk even if decoding
+    falls back to direct faster-whisper processing.
     """
     try:
         import av as pyav  # type: ignore[import-untyped]
     except ImportError:
-        yield file_bytes
+        yield media
         return
 
     bytes_per_chunk = _TARGET_SAMPLE_RATE * chunk_seconds * 2  # int16 = 2 bytes/sample
     current: bytearray = bytearray()
+    container: object | None = None
 
     try:
-        container = pyav.open(io.BytesIO(file_bytes), metadata_errors="ignore")
+        source = io.BytesIO(media) if isinstance(media, bytes) else str(media)
+        container = pyav.open(source, metadata_errors="ignore")
         audio_streams = [s for s in container.streams if s.type == "audio"]
         if not audio_streams:
-            yield file_bytes
+            yield media
             return
 
         resampler = pyav.audio.resampler.AudioResampler(
@@ -270,7 +272,102 @@ def _split_audio_chunks(
             type(exc).__name__,
             exc,
         )
-        yield file_bytes
+        yield media
+    finally:
+        if container is not None:
+            container.close()  # type: ignore[attr-defined]
+
+
+def _transcribe_path_pages(
+    model: object,
+    media_path: Path,
+    *,
+    file_name: str,
+    mime_type: str,
+    segments_per_page: int,
+    chunk_index: int,
+) -> Generator[str, None, None]:
+    """Transcribe one on-disk media chunk while holding the inference limit."""
+    cfg = get_whisper_config()
+    with _whisper_inference_sem:
+        segments, _info = model.transcribe(  # type: ignore[attr-defined]
+            str(media_path),
+            beam_size=cfg.beam_size,
+            vad_filter=cfg.vad_filter,
+            word_timestamps=cfg.word_timestamps,
+        )
+        page: list[str] = []
+        total_chars = 0
+        for segment in segments:
+            text = segment.text.strip()
+            if text:
+                page.append(text)
+                total_chars += len(text)
+            if len(page) >= segments_per_page:
+                yield "\n".join(page)
+                page = []
+        if page:
+            yield "\n".join(page)
+    logger.info(
+        "Transcribed chunk %d: %d chars from %s (%s)",
+        chunk_index,
+        total_chars,
+        file_name or mime_type,
+        mime_type,
+    )
+
+
+def _iter_transcription_pages(
+    media: bytes | Path,
+    *,
+    mime_type: str,
+    file_name: str,
+    segments_per_page: int,
+    chunk_seconds: int,
+) -> Generator[str, None, None]:
+    model, error = _get_whisper_model()
+    if error:
+        logger.warning("Whisper model unavailable for %s: %s", file_name or mime_type, error)
+        return
+    if model is None:
+        logger.warning("Whisper model not initialized for %s", file_name or mime_type)
+        return
+
+    suffix = _temp_suffix(file_name, mime_type)
+    for chunk_index, chunk in enumerate(_split_audio_chunks(media, chunk_seconds), 1):
+        try:
+            if isinstance(chunk, Path):
+                yield from _transcribe_path_pages(
+                    model,
+                    chunk,
+                    file_name=file_name,
+                    mime_type=mime_type,
+                    segments_per_page=segments_per_page,
+                    chunk_index=chunk_index,
+                )
+                continue
+
+            is_wav = chunk[:4] == b"RIFF"
+            chunk_suffix = ".wav" if is_wav else suffix
+            with tempfile.TemporaryDirectory(prefix="classifyre-whisper-") as temp_dir:
+                temp_path = Path(temp_dir) / f"chunk{chunk_suffix}"
+                temp_path.write_bytes(chunk)
+                yield from _transcribe_path_pages(
+                    model,
+                    temp_path,
+                    file_name=file_name,
+                    mime_type=mime_type,
+                    segments_per_page=segments_per_page,
+                    chunk_index=chunk_index,
+                )
+        except Exception as exc:
+            logger.warning(
+                "Transcription failed for chunk %d of %s: %s",
+                chunk_index,
+                file_name or mime_type,
+                exc,
+            )
+            raise
 
 
 def iter_transcription_pages(
@@ -292,58 +389,32 @@ def iter_transcription_pages(
     if not file_bytes:
         return
 
-    model, error = _get_whisper_model()
-    if error:
-        logger.warning("Whisper model unavailable for %s: %s", file_name or mime_type, error)
-        return
-    if model is None:
-        logger.warning("Whisper model not initialized for %s", file_name or mime_type)
-        return
+    yield from _iter_transcription_pages(
+        file_bytes,
+        mime_type=mime_type,
+        file_name=file_name,
+        segments_per_page=segments_per_page,
+        chunk_seconds=chunk_seconds,
+    )
 
-    cfg = get_whisper_config()
-    suffix = _temp_suffix(file_name, mime_type)
 
-    for chunk_index, chunk_bytes in enumerate(_split_audio_chunks(file_bytes, chunk_seconds), 1):
-        is_wav = chunk_bytes[:4] == b"RIFF"
-        chunk_suffix = ".wav" if is_wav else suffix
-        try:
-            with tempfile.TemporaryDirectory(prefix="classifyre-whisper-") as temp_dir:
-                temp_path = Path(temp_dir) / f"chunk{chunk_suffix}"
-                temp_path.write_bytes(chunk_bytes)
-                with _whisper_inference_sem:
-                    segments, _info = model.transcribe(  # type: ignore[attr-defined]
-                        str(temp_path),
-                        beam_size=cfg.beam_size,
-                        vad_filter=cfg.vad_filter,
-                        word_timestamps=cfg.word_timestamps,
-                    )
-                    page: list[str] = []
-                    total_chars = 0
-                    for segment in segments:
-                        text = segment.text.strip()
-                        if text:
-                            page.append(text)
-                            total_chars += len(text)
-                        if len(page) >= segments_per_page:
-                            yield "\n".join(page)
-                            page = []
-                    if page:
-                        yield "\n".join(page)
-                logger.info(
-                    "Transcribed chunk %d: %d chars from %s (%s)",
-                    chunk_index,
-                    total_chars,
-                    file_name or mime_type,
-                    mime_type,
-                )
-        except Exception as exc:
-            logger.warning(
-                "Transcription failed for chunk %d of %s: %s",
-                chunk_index,
-                file_name or mime_type,
-                exc,
-            )
-            raise
+def iter_transcription_path_pages(
+    media_path: Path,
+    *,
+    mime_type: str,
+    segments_per_page: int = 50,
+    chunk_seconds: int = _AUDIO_CHUNK_SECONDS,
+) -> Generator[str, None, None]:
+    """Transcribe an on-disk media file without loading the container into RAM."""
+    if not media_path.is_file() or media_path.stat().st_size == 0:
+        return
+    yield from _iter_transcription_pages(
+        media_path,
+        mime_type=mime_type,
+        file_name=media_path.name,
+        segments_per_page=segments_per_page,
+        chunk_seconds=chunk_seconds,
+    )
 
 
 def transcribe_media(
@@ -378,6 +449,38 @@ def transcribe_media(
             "Transcribed %d chars from %s (%s)",
             len(text),
             file_name or mime_type,
+            mime_type,
+        )
+    return text, None
+
+
+def transcribe_media_path(
+    media_path: Path,
+    *,
+    mime_type: str,
+) -> tuple[str, str | None]:
+    """Transcribe media already on disk without buffering the container bytes."""
+    if not media_path.is_file() or media_path.stat().st_size == 0:
+        return "", None
+
+    model, model_error = _get_whisper_model()
+    if model_error:
+        return "", model_error
+    if model is None:
+        return "", "Whisper model not initialized"
+
+    try:
+        pages = list(iter_transcription_path_pages(media_path, mime_type=mime_type))
+    except Exception as exc:
+        logger.warning("Transcription failed for %s: %s", media_path.name, exc)
+        return "", f"Transcription failed: {exc}"
+
+    text = "\n".join(pages)
+    if text:
+        logger.info(
+            "Transcribed %d chars from %s (%s)",
+            len(text),
+            media_path.name,
             mime_type,
         )
     return text, None

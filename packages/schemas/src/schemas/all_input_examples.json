@@ -1809,8 +1809,8 @@
       }
     },
     {
-      "name": "Full workspace crawl with OCR",
-      "description": "Crawl every shared page with OCR enabled to extract text from PDF and image attachments, with PII detection",
+      "name": "Full workspace attachment crawl",
+      "description": "Crawl every shared page and automatically extract text from PDF and image attachments, with PII detection",
       "schedule": {
         "enabled": true,
         "preset": "weekly",
@@ -1832,8 +1832,7 @@
           }
         },
         "sampling": {
-          "strategy": "AUTOMATIC",
-          "enable_ocr": true
+          "strategy": "AUTOMATIC"
         },
         "detectors": [
           {
@@ -1873,8 +1872,7 @@
           }
         },
         "sampling": {
-          "strategy": "AUTOMATIC",
-          "enable_ocr": true
+          "strategy": "AUTOMATIC"
         },
         "detectors": [
           {
@@ -1956,8 +1954,7 @@
           }
         },
         "sampling": {
-          "strategy": "AUTOMATIC",
-          "enable_ocr": true
+          "strategy": "AUTOMATIC"
         },
         "detectors": [
           {
@@ -2755,8 +2752,7 @@
           }
         },
         "sampling": {
-          "strategy": "ALL",
-          "enable_ocr": true
+          "strategy": "ALL"
         },
         "detectors": [
           {

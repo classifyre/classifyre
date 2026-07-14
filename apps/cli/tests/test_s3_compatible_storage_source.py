@@ -13,13 +13,10 @@ def _recipe(
     *,
     strategy: str = "LATEST",
     rows_per_page: int | None = 10,
-    enable_ocr: bool = False,
 ) -> dict:
     sampling: dict[str, object] = {"strategy": strategy}
     if rows_per_page is not None:
         sampling["rows_per_page"] = rows_per_page
-    sampling["enable_ocr"] = enable_ocr
-
     return {
         "type": "S3_COMPATIBLE_STORAGE",
         "required": {"bucket": "documents"},
@@ -131,10 +128,10 @@ async def test_s3_storage_fetch_content_bytes_redownloads_binary_media(monkeypat
     assert await source.fetch_content_bytes(asset_hash) == (jpeg_bytes, "image/jpeg")
 
 
-def test_s3_storage_iter_asset_pages_enables_ocr_from_sampling(
+def test_s3_storage_iter_asset_pages_passes_media_without_feature_flags(
     monkeypatch: pytest.MonkeyPatch,
 ):
-    source = S3CompatibleStorageSource(_recipe(enable_ocr=True))
+    source = S3CompatibleStorageSource(_recipe())
     captured: dict[str, object] = {}
 
     def _iter_file_pages(
@@ -144,16 +141,12 @@ def test_s3_storage_iter_asset_pages_enables_ocr_from_sampling(
         include_column_names: bool = True,
         *,
         file_name: str = "",
-        enable_ocr: bool = False,
-        enable_transcription: bool = False,
     ):
         captured["file_bytes"] = file_bytes
         captured["mime_type"] = mime_type
         captured["batch_size"] = batch_size
         captured["include_column_names"] = include_column_names
         captured["file_name"] = file_name
-        captured["enable_ocr"] = enable_ocr
-        captured["enable_transcription"] = enable_transcription
         yield "ocr page"
 
     monkeypatch.setattr("src.utils.file_parser.iter_file_pages", _iter_file_pages)
@@ -169,7 +162,6 @@ def test_s3_storage_iter_asset_pages_enables_ocr_from_sampling(
     )
 
     assert pages == ["ocr page"]
-    assert captured["enable_ocr"] is True
     assert captured["file_name"] == "scan.pdf"
 
 

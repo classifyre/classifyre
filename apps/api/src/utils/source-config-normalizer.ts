@@ -28,10 +28,6 @@ function asPositiveInteger(value: unknown): number | undefined {
   return intValue > 0 ? intValue : undefined;
 }
 
-function asBoolean(value: unknown): boolean | undefined {
-  return typeof value === 'boolean' ? value : undefined;
-}
-
 function normalizeSamplingStrategy(value: unknown): string | undefined {
   if (typeof value !== 'string') {
     return undefined;
@@ -260,22 +256,21 @@ function normalizeSampling(config: JsonRecord) {
   }
 
   delete sampling.fetch_all_until_first_success;
-
-  const enableOcr =
-    asBoolean(sampling.enable_ocr) ?? asBoolean(optionalSampling?.enable_ocr);
-  if (typeof enableOcr === 'boolean') {
-    sampling.enable_ocr = enableOcr;
-  } else {
-    delete sampling.enable_ocr;
+  delete sampling.enable_ocr;
+  delete sampling.enable_transcription;
+  if (optionalSampling) {
+    delete optionalSampling.enable_ocr;
+    delete optionalSampling.enable_transcription;
   }
 
-  const enableTranscription =
-    asBoolean(sampling.enable_transcription) ??
-    asBoolean(optionalSampling?.enable_transcription);
-  if (typeof enableTranscription === 'boolean') {
-    sampling.enable_transcription = enableTranscription;
-  } else {
-    delete sampling.enable_transcription;
+  const optionalTranscript = optional
+    ? asObject(optional.transcript)
+    : undefined;
+  if (optionalTranscript) {
+    delete optionalTranscript.skip_transcript;
+    if (Object.keys(optionalTranscript).length === 0 && optional) {
+      delete optional.transcript;
+    }
   }
 
   removeUndefinedKeys(sampling);
@@ -292,6 +287,9 @@ function normalizeSampling(config: JsonRecord) {
   }
   if (optionalIngestion && 'limit_total_messages' in optionalIngestion) {
     delete optionalIngestion.limit_total_messages;
+  }
+  if (optional && Object.keys(optional).length === 0) {
+    delete config.optional;
   }
 }
 

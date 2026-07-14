@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
@@ -9,7 +10,11 @@ import pytest
 
 from src import config
 from src.utils import transcription
-from src.utils.transcription import _reset_whisper_singleton, transcribe_media
+from src.utils.transcription import (
+    _reset_whisper_singleton,
+    transcribe_media,
+    transcribe_media_path,
+)
 
 
 @pytest.fixture(autouse=True)
@@ -90,3 +95,23 @@ class TestTranscribeMedia:
         assert text == ""
         assert err is not None
         assert "Transcription failed" in err
+
+    def test_path_input_is_not_loaded_into_memory(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        media_path = tmp_path / "video.mp4"
+        media_path.write_bytes(b"video-bytes")
+        fake = _FakeModel()
+        monkeypatch.setattr(transcription, "_get_whisper_model", lambda: (fake, None))
+
+        def split(media: Any, _chunk_seconds: int) -> Any:
+            assert media == media_path
+            yield media
+
+        monkeypatch.setattr(transcription, "_split_audio_chunks", split)
+
+        text, err = transcribe_media_path(media_path, mime_type="video/mp4")
+
+        assert err is None
+        assert text == "Hello world.\nSecond line."
+        assert fake.calls[0]["path"] == str(media_path)

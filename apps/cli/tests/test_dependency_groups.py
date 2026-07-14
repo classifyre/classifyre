@@ -33,10 +33,12 @@ def test_all_referenced_groups_exist_in_pyproject() -> None:
     referenced: set[str] = set()
     for groups in (*DETECTOR_TYPE_GROUPS.values(), *SOURCE_TYPE_GROUPS.values()):
         referenced |= groups
-    referenced.add("ocr")  # added by recipe_uv_groups when enable_ocr is set
-    referenced.add("transcription")  # added when enable_transcription is set
     missing = sorted(referenced - declared)
     assert not missing, f"Groups not declared in pyproject [dependency-groups]: {missing}"
+
+
+def test_automatic_media_groups_exist_in_pyproject() -> None:
+    assert {"ocr", "transcription", "video"}.issubset(_declared_groups())
 
 
 def test_recipe_groups_source_plus_detectors() -> None:
@@ -51,24 +53,16 @@ def test_recipe_groups_source_plus_detectors() -> None:
     assert recipe_uv_groups(recipe) == {"email", "privacy", "security"}
 
 
-def test_recipe_groups_skips_disabled_and_adds_ocr() -> None:
+def test_recipe_groups_skips_disabled_detectors() -> None:
     recipe = {
         "type": "POSTGRESQL",
         "detectors": [
             {"type": "PII", "enabled": False},
             {"type": "SECRETS", "enabled": True},
         ],
-        "sampling": {"strategy": "ALL", "enable_ocr": True},
+        "sampling": {"strategy": "ALL"},
     }
-    assert recipe_uv_groups(recipe) == {"postgresql", "security", "ocr"}
-
-
-def test_recipe_groups_adds_transcription() -> None:
-    recipe = {
-        "type": "S3_COMPATIBLE_STORAGE",
-        "sampling": {"strategy": "ALL", "enable_transcription": True},
-    }
-    assert recipe_uv_groups(recipe) == {"s3-compatible-storage", "transcription"}
+    assert recipe_uv_groups(recipe) == {"postgresql", "security"}
 
 
 def test_recipe_groups_source_without_driver_is_empty() -> None:
