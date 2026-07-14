@@ -99,12 +99,22 @@ class TestExtractText:
         assert "Alice" in text
         assert err is None
 
-    def test_image_returns_empty(self) -> None:
+    def test_image_without_detected_text_returns_empty(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(
+            "src.utils.file_parser._extract_docling_markdown",
+            lambda *_args, **_kwargs: ("", None),
+        )
         text, err = extract_text(b"\x89PNG\r\n\x1a\n", "image/png")
         assert text == ""
         assert err is None
 
-    def test_audio_returns_empty(self) -> None:
+    def test_audio_without_speech_returns_empty(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(
+            "src.utils.transcription.transcribe_media",
+            lambda *_args, **_kwargs: ("", None),
+        )
         text, err = extract_text(b"\xff\xfbID3", "audio/mpeg")
         assert text == ""
         assert err is None
@@ -169,7 +179,7 @@ class TestExtractText:
         assert "Hello DOCX" in text
         assert err is None
 
-    def test_image_ocr_uses_docling_when_enabled(
+    def test_image_ocr_always_uses_docling(
         self,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
@@ -182,32 +192,12 @@ class TestExtractText:
             b"\x89PNG\r\n\x1a\nfake-image",
             "image/png",
             file_name="receipt.png",
-            enable_ocr=True,
         )
 
         assert text == "Detected from OCR"
         assert err is None
 
-    def test_image_ocr_is_disabled_by_default(
-        self,
-        monkeypatch: pytest.MonkeyPatch,
-    ) -> None:
-        def fail_if_called(*_args, **_kwargs):
-            raise AssertionError("Docling OCR should not run when OCR is disabled")
-
-        monkeypatch.setattr("src.utils.file_parser._extract_docling_markdown", fail_if_called)
-
-        text, err = extract_text(
-            b"\x89PNG\r\n\x1a\nfake-image",
-            "image/png",
-            file_name="receipt.png",
-            enable_ocr=False,
-        )
-
-        assert text == ""
-        assert err is None
-
-    def test_plain_text_does_not_use_ocr_even_when_enabled(
+    def test_plain_text_does_not_use_ocr(
         self,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
@@ -222,13 +212,12 @@ class TestExtractText:
             b"hello plain text",
             "text/plain",
             file_name="notes.txt",
-            enable_ocr=True,
         )
 
         assert "hello plain text" in text
         assert err is None
 
-    def test_markdown_does_not_use_ocr_even_when_enabled(
+    def test_markdown_does_not_use_ocr(
         self,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
@@ -243,13 +232,12 @@ class TestExtractText:
             b"# Heading\nsome content",
             "text/markdown",
             file_name="readme.md",
-            enable_ocr=True,
         )
 
         assert "Heading" in text
         assert err is None
 
-    def test_audio_is_transcribed_when_enabled(
+    def test_audio_is_always_transcribed(
         self,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
@@ -262,13 +250,12 @@ class TestExtractText:
             b"fake-audio-bytes",
             "audio/mpeg",
             file_name="clip.mp3",
-            enable_transcription=True,
         )
 
         assert text == "hello from the recording"
         assert err is None
 
-    def test_video_is_transcribed_when_enabled(
+    def test_video_combines_transcript_and_visual_ocr(
         self,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
@@ -276,34 +263,19 @@ class TestExtractText:
             "src.utils.transcription.transcribe_media",
             lambda *_args, **_kwargs: ("spoken words from video", None),
         )
+        monkeypatch.setattr(
+            "src.utils.video_processing.extract_video_ocr",
+            lambda *_args, **_kwargs: ("[On-screen text 00:00:01]\nSlide title", None),
+        )
 
         text, err = extract_text(
             b"fake-video-bytes",
             "video/mp4",
             file_name="clip.mp4",
-            enable_transcription=True,
         )
 
-        assert text == "spoken words from video"
-        assert err is None
-
-    def test_audio_not_transcribed_when_disabled(
-        self,
-        monkeypatch: pytest.MonkeyPatch,
-    ) -> None:
-        def fail_if_called(*_args: Any, **_kwargs: Any) -> None:
-            raise AssertionError("transcription must not run when disabled")
-
-        monkeypatch.setattr("src.utils.transcription.transcribe_media", fail_if_called)
-
-        text, err = extract_text(
-            b"fake-audio-bytes",
-            "audio/mpeg",
-            file_name="clip.mp3",
-            enable_transcription=False,
-        )
-
-        assert text == ""
+        assert "[Transcript]\nspoken words from video" in text
+        assert "[On-screen text 00:00:01]\nSlide title" in text
         assert err is None
 
     def test_transcription_error_propagates(
@@ -319,7 +291,6 @@ class TestExtractText:
             b"fake-audio-bytes",
             "audio/mpeg",
             file_name="clip.mp3",
-            enable_transcription=True,
         )
 
         assert text == ""
@@ -340,12 +311,12 @@ class TestSupportsDoclingOcr:
     def test_pdf_mime_is_supported(self) -> None:
         assert _supports_docling_ocr("application/pdf", "") is True
 
-    def test_docx_mime_is_supported(self) -> None:
+    def test_docx_uses_native_extraction(self) -> None:
         assert (
             _supports_docling_ocr(
                 "application/vnd.openxmlformats-officedocument.wordprocessingml.document", ""
             )
-            is True
+            is False
         )
 
     def test_plain_text_is_not_supported(self) -> None:
@@ -438,12 +409,8 @@ class TestDoclingConverterSingleton:
         init_count: list[int] = []
         self._install_fake_docling(monkeypatch, init_count)
 
-        text1, _ = extract_text(
-            b"\x89PNG\r\n\x1a\nfake", "image/png", file_name="a.png", enable_ocr=True
-        )
-        text2, _ = extract_text(
-            b"\x89PNG\r\n\x1a\nfake", "image/png", file_name="b.png", enable_ocr=True
-        )
+        text1, _ = extract_text(b"\x89PNG\r\n\x1a\nfake", "image/png", file_name="a.png")
+        text2, _ = extract_text(b"\x89PNG\r\n\x1a\nfake", "image/png", file_name="b.png")
 
         assert text1 == text2 == "ocr output"
         assert len(init_count) == 1, "DocumentConverter() must not be re-instantiated per file"
@@ -474,7 +441,13 @@ class TestParseFile:
         assert "key" in result.text_content
         assert result.is_binary is False
 
-    def test_image_is_binary(self, tmp_path: pytest.TempPathFactory) -> None:
+    def test_image_is_binary(
+        self, tmp_path: pytest.TempPathFactory, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(
+            "src.utils.file_parser._extract_docling_markdown",
+            lambda *_args, **_kwargs: ("", None),
+        )
         p = tmp_path / "img.png"  # type: ignore[operator]
         # Minimal PNG header
         p.write_bytes(b"\x89PNG\r\n\x1a\n" + b"\x00" * 50)  # type: ignore[union-attr]
@@ -500,7 +473,11 @@ class TestParseBytes:
         assert "Alice" in parsed.text_content
         assert "Alice" in parsed.raw_content
 
-    def test_octet_stream_uses_filename_hint(self) -> None:
+    def test_octet_stream_uses_filename_hint(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(
+            "src.utils.file_parser._extract_docling_markdown",
+            lambda *_args, **_kwargs: ("", "invalid test PDF"),
+        )
         parsed = parse_bytes(
             b"%PDF-1.4",
             declared_mime_type="application/octet-stream",
@@ -521,7 +498,6 @@ class TestParseBytes:
             b"\x89PNG\r\n\x1a\nimage-bytes",
             declared_mime_type="image/png",
             file_name="photo.png",
-            enable_ocr=True,
         )
 
         assert parsed.mime_type == "image/png"
@@ -543,7 +519,6 @@ class TestParseBytes:
                 "image/png",
                 batch_size=1,
                 file_name="photo.png",
-                enable_ocr=True,
             )
         )
 

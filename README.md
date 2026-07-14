@@ -26,7 +26,7 @@ It's more than a scanner. Detection is the first step; the value is in turning r
 
 | Capability | What it means | Docs |
 |---|---|---|
-| **Sources** | Connect databases, lakehouses, storage, collaboration tools, and content platforms — no data migration. Choose what to scan and how (sampling, OCR, transcription). | [Sources](https://docs.classifyre.com/sources/) |
+| **Sources** | Connect databases, lakehouses, storage, collaboration tools, and content platforms — no data migration. Choose sampling while image OCR and audio/video transcription run automatically. | [Sources](https://docs.classifyre.com/sources/) |
 | **Detectors** | Ready-made packs (secrets, PII, security) plus custom detectors you build — from a regex to an LLM, across text and images. | [Detectors](https://docs.classifyre.com/detectors/) |
 | **Findings** | Every signal a detector raises, with severity, confidence, and a lifecycle tracked across scans. | [Findings](https://docs.classifyre.com/detectors/findings/) |
 | **Inquiries** | Saved questions that keep surfacing matching findings, scan after scan. | [Inquiries](https://docs.classifyre.com/flow/investigations/inquiry/) |

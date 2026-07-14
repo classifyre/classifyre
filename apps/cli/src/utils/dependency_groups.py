@@ -67,11 +67,4 @@ def recipe_uv_groups(recipe: dict[str, Any]) -> set[str]:
         detector_type = str(detector.get("type", "")).upper()
         groups |= DETECTOR_TYPE_GROUPS.get(detector_type, set())
 
-    sampling = recipe.get("sampling")
-    if isinstance(sampling, dict):
-        if sampling.get("enable_ocr"):
-            groups.add("ocr")
-        if sampling.get("enable_transcription"):
-            groups.add("transcription")
-
     return {group for group in groups if group}

@@ -17,6 +17,15 @@ from src.sources.asset_metadata import resolve_fields
 from src.sources.youtube.source import YouTubeSource, _TranscriptResult
 
 
+@pytest.fixture(autouse=True)
+def _stub_video_processing(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        YouTubeSource,
+        "_process_video_media",
+        lambda *_args, **_kwargs: (None, ""),
+    )
+
+
 def _make_fake_ydl(entries: list[str], captured: list[dict[str, Any]]):
     class FakeYDL:
         def __init__(self, opts: dict[str, Any]):
@@ -164,19 +173,22 @@ async def test_extract_without_transcript_skips_phase2(monkeypatch: pytest.Monke
 
 @pytest.mark.asyncio
 async def test_whisper_fallback_when_no_captions(monkeypatch: pytest.MonkeyPatch) -> None:
-    source = _source({"sampling": {"strategy": "LATEST", "enable_transcription": True}})
+    source = _source()
     monkeypatch.setattr(source, "_list_channel_video_ids", lambda _c, _l: ["vid1"])
     monkeypatch.setattr(source, "_extract_video_info", lambda _v: _video_info("vid1"))
     monkeypatch.setattr(source, "_fetch_transcript", lambda _v: None)
     monkeypatch.setattr(
         source,
-        "_transcribe_audio",
-        lambda _v: _TranscriptResult(
-            text="spoken transcript from audio",
-            language=None,
-            is_generated=True,
-            available_languages=[],
-            source="whisper",
+        "_process_video_media",
+        lambda _v, **_kwargs: (
+            _TranscriptResult(
+                text="spoken transcript from audio",
+                language=None,
+                is_generated=True,
+                available_languages=[],
+                source="whisper",
+            ),
+            "[On-screen text 00:00:02]\nDemo slide",
         ),
     )
 
@@ -189,24 +201,68 @@ async def test_whisper_fallback_when_no_captions(monkeypatch: pytest.MonkeyPatch
     content = await source.fetch_content(asset.hash)
     assert content is not None
     assert "spoken transcript" in content[0]
+    assert "Demo slide" in content[0]
 
 
 @pytest.mark.asyncio
-async def test_no_whisper_fallback_when_transcription_disabled(
+async def test_media_processing_is_always_requested_when_captions_are_missing(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    source = _source()  # enable_transcription not set
+    source = _source()
     monkeypatch.setattr(source, "_list_channel_video_ids", lambda _c, _l: ["vid1"])
     monkeypatch.setattr(source, "_extract_video_info", lambda _v: _video_info("vid1"))
     monkeypatch.setattr(source, "_fetch_transcript", lambda _v: None)
 
-    def fail_if_called(_v: str) -> Any:
-        raise AssertionError("Whisper fallback must not run when transcription is disabled")
+    calls: list[bool] = []
 
-    monkeypatch.setattr(source, "_transcribe_audio", fail_if_called)
+    def process(_video_id: str, *, transcribe: bool) -> tuple[None, str]:
+        calls.append(transcribe)
+        return None, ""
+
+    monkeypatch.setattr(source, "_process_video_media", process)
 
     assets = [a for batch in [b async for b in source.extract_raw()] for a in batch]
     assert assets[0].metadata["transcript_available"] is False
+    assert calls == [True]
+
+
+@pytest.mark.asyncio
+async def test_discovery_defers_media_processing_until_content_fetch(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source = _source()
+    source.set_discovery_only(True)
+    monkeypatch.setattr(source, "_list_channel_video_ids", lambda _c, _l: ["vid1"])
+    monkeypatch.setattr(source, "_extract_video_info", lambda _v: _video_info("vid1"))
+    monkeypatch.setattr(source, "_fetch_transcript", lambda _v: None)
+    calls: list[str] = []
+
+    def process(video_id: str, *, transcribe: bool):
+        calls.append(video_id)
+        assert transcribe is True
+        return (
+            _TranscriptResult(
+                text="lazy transcript",
+                language=None,
+                is_generated=True,
+                source="whisper",
+            ),
+            "[On-screen text 00:00:01]\nLazy slide",
+        )
+
+    monkeypatch.setattr(source, "_process_video_media", process)
+    assets = [asset for batch in [batch async for batch in source.extract_raw()] for asset in batch]
+
+    assert calls == []
+    assert assets[0].metadata["transcript_available"] is False
+
+    content = await source.fetch_content(assets[0].hash)
+
+    assert calls == ["vid1"]
+    assert content is not None
+    assert "lazy transcript" in content[0]
+    assert "Lazy slide" in content[0]
+    assert assets[0].metadata["transcript_available"] is True
 
 
 @pytest.mark.asyncio
