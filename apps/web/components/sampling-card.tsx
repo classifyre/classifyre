@@ -1,12 +1,16 @@
 "use client";
 
 import * as React from "react";
-import { Database, Shuffle, Clock, Infinity, RefreshCw } from "lucide-react";
+import {
+  Database,
+  Shuffle,
+  Clock,
+  Infinity as InfinityIcon,
+  RefreshCw,
+} from "lucide-react";
 import { useTranslation } from "@/hooks/use-translation";
 import { Input } from "@workspace/ui/components/input";
 import { Label } from "@workspace/ui/components/label";
-import { Checkbox } from "@workspace/ui/components/checkbox";
-import { Separator } from "@workspace/ui/components/separator";
 import {
   Accordion,
   AccordionContent,
@@ -21,8 +25,6 @@ export type SamplingStrategy = "AUTOMATIC" | "RANDOM" | "LATEST" | "ALL";
 
 export type SamplingValue = {
   strategy: SamplingStrategy;
-  enable_ocr?: boolean | undefined;
-  enable_transcription?: boolean | undefined;
   order_by_column?: string | undefined;
   fallback_to_random?: boolean | undefined;
   rows_per_page?: number | undefined;
@@ -78,20 +80,12 @@ export function SamplingCard({
       value: "ALL",
       label: t("sources.sampling.strategyAll"),
       hint: t("sources.sampling.hintAll"),
-      Icon: Infinity,
+      Icon: InfinityIcon,
     },
   ];
 
   const handleStrategyChange = (strategy: SamplingStrategy) => {
     onChange({ ...value, strategy });
-  };
-
-  const handleEnableOcrChange = (checked: boolean) => {
-    onChange({ ...value, enable_ocr: checked });
-  };
-
-  const handleEnableTranscriptionChange = (checked: boolean) => {
-    onChange({ ...value, enable_transcription: checked });
   };
 
   const handleOrderByColumnChange = (raw: string) => {
@@ -178,55 +172,6 @@ export function SamplingCard({
           </div>
         </div>
 
-        {/* ── OCR ────────────────────────────────────────────────────────────── */}
-        <Separator className="bg-border/10" />
-        <div className="space-y-2">
-          <div className="flex items-start gap-2 rounded-[4px] border border-border/25 bg-muted/20 px-3 py-2">
-            <Checkbox
-              id="sampling-enable-ocr"
-              checked={value.enable_ocr === true}
-              onCheckedChange={(checked) =>
-                handleEnableOcrChange(checked === true)
-              }
-              disabled={disabled}
-              className="mt-0.5"
-            />
-            <div className="space-y-0.5">
-              <Label
-                htmlFor="sampling-enable-ocr"
-                className="text-[10px] font-mono uppercase tracking-[0.14em] text-foreground"
-              >
-                {t("sources.sampling.enableOcr")}
-              </Label>
-              <p className="text-[10px] text-muted-foreground font-mono">
-                {t("sources.sampling.enableOcrDesc")}
-              </p>
-            </div>
-          </div>
-          <div className="flex items-start gap-2 rounded-[4px] border border-border/25 bg-muted/20 px-3 py-2">
-            <Checkbox
-              id="sampling-enable-transcription"
-              checked={value.enable_transcription === true}
-              onCheckedChange={(checked) =>
-                handleEnableTranscriptionChange(checked === true)
-              }
-              disabled={disabled}
-              className="mt-0.5"
-            />
-            <div className="space-y-0.5">
-              <Label
-                htmlFor="sampling-enable-transcription"
-                className="text-[10px] font-mono uppercase tracking-[0.14em] text-foreground"
-              >
-                {t("sources.sampling.enableTranscription")}
-              </Label>
-              <p className="text-[10px] text-muted-foreground font-mono">
-                {t("sources.sampling.enableTranscriptionDesc")}
-              </p>
-            </div>
-          </div>
-        </div>
-
         {/* ── Advanced ───────────────────────────────────────────────────────── */}
         <Accordion type="multiple">
           <AccordionItem value="advanced" className="border-border/20">
@@ -282,7 +227,8 @@ export function SamplingCard({
 
         {/* ── Strategy hint ──────────────────────────────────────────────────── */}
         <p className="text-[11px] text-muted-foreground font-mono text-center py-1">
-          {value.strategy === "AUTOMATIC" && t("sources.sampling.hintAutomatic2")}
+          {value.strategy === "AUTOMATIC" &&
+            t("sources.sampling.hintAutomatic2")}
           {value.strategy === "RANDOM" && t("sources.sampling.hintRandom2")}
           {value.strategy === "LATEST" && t("sources.sampling.hintLatest2")}
           {value.strategy === "ALL" && t("sources.sampling.hintAll2")}
@@ -296,8 +242,6 @@ export function SamplingCard({
 
 export function defaultSamplingValue(sampling?: {
   strategy?: string;
-  enable_ocr?: boolean;
-  enable_transcription?: boolean;
   order_by_column?: string;
   fallback_to_random?: boolean;
   rows_per_page?: number;
@@ -305,8 +249,6 @@ export function defaultSamplingValue(sampling?: {
 }): SamplingValue {
   return {
     strategy: (sampling?.strategy as SamplingStrategy) ?? "AUTOMATIC",
-    enable_ocr: sampling?.enable_ocr ?? false,
-    enable_transcription: sampling?.enable_transcription ?? false,
     order_by_column: sampling?.order_by_column,
     fallback_to_random: sampling?.fallback_to_random,
     rows_per_page: sampling?.rows_per_page,

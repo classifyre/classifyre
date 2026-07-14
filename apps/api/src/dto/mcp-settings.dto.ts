@@ -127,6 +127,108 @@ export class McpCapabilityGroupDto {
   operations: string[];
 }
 
+export class McpToolParameterDto {
+  @ApiProperty({
+    description: 'Parameter name as sent in the tool call arguments.',
+    example: 'sourceId',
+  })
+  name: string;
+
+  @ApiProperty({
+    description: 'JSON Schema type of the parameter (e.g. string, integer).',
+    example: 'string',
+  })
+  type: string;
+
+  @ApiProperty({
+    description: 'Whether the parameter is required by the tool.',
+    example: true,
+  })
+  required: boolean;
+
+  @ApiPropertyOptional({
+    description: 'Human-readable description sourced from the tool schema.',
+    example: 'Source type id from list_source_types, e.g. POSTGRESQL',
+  })
+  description?: string;
+
+  @ApiPropertyOptional({
+    description: 'Format hint from the schema, when present.',
+    example: 'uuid',
+  })
+  format?: string;
+
+  @ApiPropertyOptional({
+    type: [String],
+    description: 'Allowed enum values, when the parameter is an enum.',
+    example: ['PENDING', 'RUNNING', 'COMPLETED', 'ERROR'],
+  })
+  enumValues?: string[];
+}
+
+export class McpToolSummaryDto {
+  @ApiProperty({
+    description: 'Programmatic tool name used in MCP tools/call requests.',
+    example: 'list_source_runs',
+  })
+  name: string;
+
+  @ApiPropertyOptional({
+    description: 'Human-friendly title registered with the tool.',
+    example: 'List Source Runs',
+  })
+  title?: string;
+
+  @ApiPropertyOptional({
+    description: 'Tool description registered with the MCP server.',
+    example: 'List runs for a single source.',
+  })
+  description?: string;
+
+  @ApiPropertyOptional({
+    description: 'Capability group id this tool belongs to.',
+    example: 'runs',
+  })
+  groupId?: string;
+
+  @ApiPropertyOptional({
+    description: 'Capability group title this tool belongs to.',
+    example: 'Runs',
+  })
+  groupTitle?: string;
+
+  @ApiProperty({
+    description: 'Tool reads state only and never mutates data.',
+    example: true,
+  })
+  readOnly: boolean;
+
+  @ApiProperty({
+    description: 'Tool may perform destructive changes (delete/stop).',
+    example: false,
+  })
+  destructive: boolean;
+
+  @ApiProperty({
+    description: 'Tool is idempotent — repeat calls have the same effect.',
+    example: true,
+  })
+  idempotent: boolean;
+
+  @ApiProperty({
+    type: [McpToolParameterDto],
+    description: 'Flattened top-level input parameters, from the real schema.',
+  })
+  parameters: McpToolParameterDto[];
+
+  @ApiProperty({
+    description:
+      'Whether the tool returns a JSON result payload. All Classifyre tools return structured JSON.',
+    example: true,
+  })
+  returnsJson: boolean;
+}
+
 export class McpPromptSummaryDto {
   @ApiProperty({ example: 'brainstorm_custom_detector' })
   name: string;

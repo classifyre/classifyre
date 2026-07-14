@@ -69,47 +69,47 @@ describe('normalizeSourceConfig sampling', () => {
     ).toBe(false);
   });
 
-  it('preserves enable_ocr from sampling and legacy optional.sampling', () => {
+  it('strips deprecated media processing toggles', () => {
     const normalized = normalizeSourceConfig('POSTGRESQL', {
       type: 'POSTGRESQL',
       required: { host: 'db.local', port: 5432 },
       optional: {
         sampling: {
           enable_ocr: false,
+          enable_transcription: false,
+        },
+        transcript: {
+          languages: ['en'],
+          skip_transcript: true,
         },
       },
       sampling: {
         strategy: 'ALL',
         enable_ocr: true,
-      },
-    });
-
-    expect((normalized.sampling as Record<string, unknown>)?.strategy).toBe(
-      'ALL',
-    );
-    expect((normalized.sampling as Record<string, unknown>)?.enable_ocr).toBe(
-      true,
-    );
-  });
-
-  it('preserves enable_transcription from sampling and legacy optional.sampling', () => {
-    const normalized = normalizeSourceConfig('POSTGRESQL', {
-      type: 'POSTGRESQL',
-      required: { host: 'db.local', port: 5432 },
-      optional: {
-        sampling: {
-          enable_transcription: false,
-        },
-      },
-      sampling: {
-        strategy: 'ALL',
         enable_transcription: true,
       },
     });
 
-    expect(
-      (normalized.sampling as Record<string, unknown>)?.enable_transcription,
-    ).toBe(true);
+    const sampling = normalized.sampling as Record<string, unknown>;
+    const optional = normalized.optional as Record<string, unknown>;
+    const transcript = optional.transcript as Record<string, unknown>;
+    expect(sampling.strategy).toBe('ALL');
+    expect(sampling).not.toHaveProperty('enable_ocr');
+    expect(sampling).not.toHaveProperty('enable_transcription');
+    expect(optional).not.toHaveProperty('sampling');
+    expect(transcript).toEqual({ languages: ['en'] });
+  });
+
+  it('removes empty legacy media option containers', () => {
+    const normalized = normalizeSourceConfig('YOUTUBE', {
+      optional: {
+        transcript: { skip_transcript: false },
+        sampling: { enable_ocr: false, enable_transcription: false },
+      },
+      sampling: { strategy: 'LATEST' },
+    });
+
+    expect(normalized).not.toHaveProperty('optional');
   });
 
   it('strips legacy limit and max_columns from sampling', () => {
