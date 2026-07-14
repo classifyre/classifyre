@@ -11,6 +11,18 @@ import { CustomDetectorsService } from './custom-detectors.service';
 import { CustomDetectorExtractionsService } from './custom-detector-extractions.service';
 import { FindingsService } from './findings.service';
 import { MCP_CAPABILITY_GROUPS, MCP_PROMPTS } from './mcp-catalog';
+import {
+  searchAssetsAssetFilters,
+  searchAssetsFindingFilters,
+  searchAssetsOptions,
+  searchAssetsPage,
+  searchFindingsFilters,
+  searchFindingsPage,
+  searchRunsFilters,
+  searchRunsPage,
+  searchSourcesFilters,
+  searchSourcesPage,
+} from './mcp-tool-schemas';
 import { McpOverviewService } from './mcp-overview.service';
 import { McpToolExecutorService } from './mcp-tool-executor.service';
 import { SchedulerService } from './scheduler/scheduler.service';
@@ -271,8 +283,8 @@ export class McpServerFactoryService {
         title: 'Search Sources',
         description: 'Search and filter sources with latest runner summaries.',
         inputSchema: {
-          filters: jsonObjectSchema.optional(),
-          page: jsonObjectSchema.optional(),
+          filters: searchSourcesFilters.optional(),
+          page: searchSourcesPage.optional(),
         },
         annotations: {
           readOnlyHint: true,
@@ -913,8 +925,8 @@ export class McpServerFactoryService {
         title: 'Search Runs',
         description: 'Search runner history with filters and pagination.',
         inputSchema: {
-          filters: jsonObjectSchema.optional(),
-          page: jsonObjectSchema.optional(),
+          filters: searchRunsFilters.optional(),
+          page: searchRunsPage.optional(),
         },
         annotations: {
           readOnlyHint: true,
@@ -938,10 +950,22 @@ export class McpServerFactoryService {
         inputSchema: {
           sourceId: z.string().uuid(),
           status: z
-            .enum(['PENDING', 'RUNNING', 'COMPLETED', 'ERROR'])
-            .optional(),
-          skip: z.number().int().min(0).optional(),
-          take: z.number().int().min(1).max(200).optional(),
+            .enum(['PENDING', 'RUNNING', 'COMPLETED', 'WARNING', 'ERROR'])
+            .optional()
+            .describe('Filter to runs in this status.'),
+          skip: z
+            .number()
+            .int()
+            .min(0)
+            .optional()
+            .describe('Offset. Defaults to 0.'),
+          take: z
+            .number()
+            .int()
+            .min(1)
+            .max(200)
+            .optional()
+            .describe('Max results (1–200).'),
         },
         annotations: {
           readOnlyHint: true,
@@ -1029,8 +1053,8 @@ export class McpServerFactoryService {
         description:
           'Search findings using filters, text search, and pagination.',
         inputSchema: {
-          filters: jsonObjectSchema.optional(),
-          page: jsonObjectSchema.optional(),
+          filters: searchFindingsFilters.optional(),
+          page: searchFindingsPage.optional(),
         },
         annotations: {
           readOnlyHint: true,
@@ -1154,21 +1178,26 @@ export class McpServerFactoryService {
       'search_assets',
       {
         title: 'Search Assets',
-        description: 'Search assets and nested finding data.',
+        description:
+          'Search assets and their nested findings. Narrow by asset attributes (assets), by the findings attached to each asset (findings), or both.',
         inputSchema: {
-          filters: jsonObjectSchema.optional(),
-          page: jsonObjectSchema.optional(),
+          assets: searchAssetsAssetFilters.optional(),
+          findings: searchAssetsFindingFilters.optional(),
+          page: searchAssetsPage.optional(),
+          options: searchAssetsOptions.optional(),
         },
         annotations: {
           readOnlyHint: true,
           idempotentHint: true,
         },
       },
-      async ({ filters, page }) =>
+      async ({ assets, findings, page, options }) =>
         jsonResult(
           await this.assetService.searchAssets({
-            filters: filters,
-            page: page,
+            assets,
+            findings,
+            page,
+            options,
           } as any),
         ),
     );

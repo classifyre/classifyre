@@ -157,6 +157,8 @@ docs/McpServerResponseDto.md
 docs/McpServerTestResultDto.md
 docs/McpTokenCreatedResponseDto.md
 docs/McpTokenResponseDto.md
+docs/McpToolParameterDto.md
+docs/McpToolSummaryDto.md
 docs/NotificationListResponseDto.md
 docs/NotificationResponseDto.md
 docs/NotificationsApi.md
@@ -439,6 +441,8 @@ src/models/McpServerResponseDto.ts
 src/models/McpServerTestResultDto.ts
 src/models/McpTokenCreatedResponseDto.ts
 src/models/McpTokenResponseDto.ts
+src/models/McpToolParameterDto.ts
+src/models/McpToolSummaryDto.ts
 src/models/NotificationListResponseDto.ts
 src/models/NotificationResponseDto.ts
 src/models/NotificationsControllerDeleteNotification200Response.ts

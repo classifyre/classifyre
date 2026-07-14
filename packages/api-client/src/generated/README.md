@@ -184,6 +184,7 @@ All URIs are relative to *http://localhost*
 *InstanceSettingsApi* | [**mcpSettingsControllerCreateToken**](docs/InstanceSettingsApi.md#mcpsettingscontrollercreatetoken) | **POST** /instance-settings/mcp/tokens | Create MCP access token
 *InstanceSettingsApi* | [**mcpSettingsControllerDeleteToken**](docs/InstanceSettingsApi.md#mcpsettingscontrollerdeletetoken) | **DELETE** /instance-settings/mcp/tokens/{id} | Delete MCP access token
 *InstanceSettingsApi* | [**mcpSettingsControllerGetOverview**](docs/InstanceSettingsApi.md#mcpsettingscontrollergetoverview) | **GET** /instance-settings/mcp/overview | Get MCP server overview
+*InstanceSettingsApi* | [**mcpSettingsControllerGetTools**](docs/InstanceSettingsApi.md#mcpsettingscontrollergettools) | **GET** /instance-settings/mcp/tools | List MCP tools
 *InstanceSettingsApi* | [**mcpSettingsControllerListTokens**](docs/InstanceSettingsApi.md#mcpsettingscontrollerlisttokens) | **GET** /instance-settings/mcp/tokens | List MCP access tokens
 *InstanceSettingsApi* | [**mcpSettingsControllerUpdateToken**](docs/InstanceSettingsApi.md#mcpsettingscontrollerupdatetoken) | **PATCH** /instance-settings/mcp/tokens/{id} | Update MCP access token
 *NotificationsApi* | [**notificationsControllerDeleteNotification**](docs/NotificationsApi.md#notificationscontrollerdeletenotification) | **DELETE** /notifications/{id} | Delete a notification
@@ -380,6 +381,8 @@ All URIs are relative to *http://localhost*
 - [McpServerTestResultDto](docs/McpServerTestResultDto.md)
 - [McpTokenCreatedResponseDto](docs/McpTokenCreatedResponseDto.md)
 - [McpTokenResponseDto](docs/McpTokenResponseDto.md)
+- [McpToolParameterDto](docs/McpToolParameterDto.md)
+- [McpToolSummaryDto](docs/McpToolSummaryDto.md)
 - [NotificationListResponseDto](docs/NotificationListResponseDto.md)
 - [NotificationResponseDto](docs/NotificationResponseDto.md)
 - [NotificationsControllerDeleteNotification200Response](docs/NotificationsControllerDeleteNotification200Response.md)

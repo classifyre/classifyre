@@ -28,6 +28,7 @@ import { AiClientService } from './ai';
 import { McpOverviewService } from './mcp-overview.service';
 import { McpTokenService } from './mcp-token.service';
 import { McpServerFactoryService } from './mcp-server.factory';
+import { McpToolsCatalogService } from './mcp-tools-catalog.service';
 import { McpToolExecutorService } from './mcp-tool-executor.service';
 import { AssistantService } from './assistant.service';
 import { AssistantMcpService } from './assistant/assistant-mcp.service';
@@ -125,6 +126,7 @@ import {
     McpTokenService,
     McpToolExecutorService,
     McpServerFactoryService,
+    McpToolsCatalogService,
     AssistantService,
     AssistantMcpService,
     CaseActivityService,
