@@ -268,6 +268,8 @@ export type {
   McpPromptSummaryDto,
   McpTokenCreatedResponseDto,
   McpTokenResponseDto,
+  McpToolParameterDto,
+  McpToolSummaryDto,
   UpdateInstanceSettingsDto,
   UpdateNotificationImportanceDto,
   SandboxRunDto,
