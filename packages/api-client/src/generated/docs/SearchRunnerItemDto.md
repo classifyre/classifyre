@@ -23,6 +23,7 @@ Name | Type
 `assetsOutOfScope` | number
 `scopeFingerprint` | string
 `totalFindings` | number
+`findingsCreated` | number
 `errorMessage` | string
 `errorDetails` | object
 `jobName` | string
@@ -53,6 +54,7 @@ const example = {
   "assetsOutOfScope": null,
   "scopeFingerprint": null,
   "totalFindings": null,
+  "findingsCreated": null,
   "errorMessage": null,
   "errorDetails": null,
   "jobName": null,

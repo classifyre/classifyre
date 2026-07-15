@@ -325,7 +325,14 @@ model Runner {
   durationMs      Int?         @map("duration_ms")
   assetsCreated   Int          @default(0) @map("assets_created")
   assetsUpdated   Int          @default(0) @map("assets_updated")
+  // Findings currently associated with this run: every finding it created,
+  // re-detected, or resolved. NOT a count of new discoveries — after
+  // reconciliation it is closer to "the source's open set as of this run".
+  // Use findingsCreated for "what did this run actually find that was new".
   totalFindings   Int          @default(0) @map("total_findings")
+  // Findings first seen by this run. Accumulated as batches land, so it is a
+  // true creation count rather than a post-reconciliation snapshot.
+  findingsCreated Int          @default(0) @map("findings_created")
   errorMessage    String?      @map("error_message")
   errorDetails    Json?        @map("error_details")
   jobName         String?      @map("job_name")
@@ -354,6 +361,9 @@ model RunnerAsset {
   runnerId         String            @map("runner_id")
   assetHash        String            @map("asset_hash")
   status           RunnerAssetStatus @default(PENDING)
+  // What this run did to the asset. Null for rows written before this existed,
+  // and for assets discovered but never ingested.
+  changeType       RunnerAssetChangeType? @map("change_type")
   startedAt        DateTime?         @map("started_at")
   completedAt      DateTime?         @map("completed_at")
   errorMessage     String?           @map("error_message") @db.Text
@@ -373,6 +383,7 @@ model RunnerAsset {
 
   @@id([runnerId, assetHash])
   @@index([runnerId, status])
+  @@index([runnerId, changeType])
   @@map("runner_assets")
 }
 
@@ -625,6 +636,21 @@ enum FindingStatus {
 
 enum AssetStatus {
   NEW
+  UPDATED
+  UNCHANGED
+  DELETED
+}
+
+/**
+ * What this run did to an asset — an immutable per-run fact.
+ *
+ * Distinct from AssetStatus, which is the asset's *current* state and is
+ * overwritten by every later run. Counting runs from AssetStatus meant
+ * "assets whose status happens to be NEW right now and were last touched by
+ * this runner", which is not what assetsCreated claims to be.
+ */
+enum RunnerAssetChangeType {
+  CREATED
   UPDATED
   UNCHANGED
   DELETED

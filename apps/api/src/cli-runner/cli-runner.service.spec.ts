@@ -696,7 +696,7 @@ describe('CliRunnerService', () => {
     );
   });
 
-  it('recomputes stats from asset statuses when marking runner completed', async () => {
+  it('recomputes stats from per-run change types when marking runner completed', async () => {
     const { service, prisma, runnerLogStorage } = createService();
     prisma.runner.findUnique.mockResolvedValue({
       id: 'runner-1',
@@ -704,8 +704,8 @@ describe('CliRunnerService', () => {
       startedAt: new Date('2026-02-18T10:00:00.000Z'),
       source: { id: 'source-1', name: 'Source', type: 'WORDPRESS' },
     });
-    prisma.asset.count
-      .mockResolvedValueOnce(3) // NEW
+    prisma.runnerAsset.count
+      .mockResolvedValueOnce(3) // CREATED
       .mockResolvedValueOnce(2) // UPDATED
       .mockResolvedValueOnce(5); // UNCHANGED
     prisma.finding.count.mockResolvedValue(7);

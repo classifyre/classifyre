@@ -162,8 +162,21 @@ export class RunnerDto {
   })
   scopeFingerprint?: string | null;
 
-  @ApiProperty({ default: 0 })
+  @ApiProperty({
+    default: 0,
+    description:
+      'Findings currently associated with this run — created, re-detected, or ' +
+      'resolved by it. NOT a count of new discoveries: after reconciliation it ' +
+      'is closer to the source\'s open set as of this run. Use findingsCreated ' +
+      'for what this run actually found that was new.',
+  })
   totalFindings: number;
+
+  @ApiProperty({
+    default: 0,
+    description: 'Findings first seen by this run.',
+  })
+  findingsCreated: number;
 
   @ApiProperty({ required: false, nullable: true })
   errorMessage?: string | null;

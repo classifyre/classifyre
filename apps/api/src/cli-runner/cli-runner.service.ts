@@ -18,6 +18,7 @@ import {
   AssetType,
   Prisma,
   RunnerExecutionMode,
+  RunnerAssetChangeType,
   RunnerAssetStatus,
   RunnerStatus,
   Source,
@@ -1646,6 +1647,18 @@ export class CliRunnerService implements OnApplicationBootstrap {
     }
   }
 
+  /**
+   * Counters for a finished run, read from per-run facts.
+   *
+   * These used to be counted from `assets.status`, which is the asset's
+   * *current* state and is overwritten by every later run — so assetsCreated
+   * really meant "assets whose status happens to be NEW right now and were last
+   * touched by this runner". Combined with the CLI's two-pass ingest (a stub
+   * pass creates the asset, then the pass carrying findings sees the same
+   * checksum and marks it unchanged), a ten-asset first run reported
+   * "assetsCreated: 0, assetsUnchanged: 10". runner_assets.change_type records
+   * what this run actually did and no later run rewrites it.
+   */
   private async computeRunnerStats(runnerId: string): Promise<{
     assetsCreated: number;
     assetsUpdated: number;
@@ -1654,15 +1667,18 @@ export class CliRunnerService implements OnApplicationBootstrap {
   }> {
     const [assetsCreated, assetsUpdated, assetsUnchanged, totalFindings] =
       await Promise.all([
-        this.prisma.asset.count({
-          where: { runnerId, status: AssetStatus.NEW },
+        this.prisma.runnerAsset.count({
+          where: { runnerId, changeType: RunnerAssetChangeType.CREATED },
         }),
-        this.prisma.asset.count({
-          where: { runnerId, status: AssetStatus.UPDATED },
+        this.prisma.runnerAsset.count({
+          where: { runnerId, changeType: RunnerAssetChangeType.UPDATED },
         }),
-        this.prisma.asset.count({
-          where: { runnerId, status: AssetStatus.UNCHANGED },
+        this.prisma.runnerAsset.count({
+          where: { runnerId, changeType: RunnerAssetChangeType.UNCHANGED },
         }),
+        // Deliberately every finding stamped by this run, matching what
+        // totalFindings has always been. It is NOT a discovery count — see
+        // Runner.findingsCreated, which bulkIngest accumulates as batches land.
         this.prisma.finding.count({ where: { runnerId } }),
       ]);
 
@@ -3378,6 +3394,7 @@ export class CliRunnerService implements OnApplicationBootstrap {
           findings_by_detector: Record<string, number> | null;
           metadata: Prisma.JsonValue;
           detector_outcomes: Prisma.JsonValue;
+          change_type: RunnerAssetChangeType | null;
           created_at: Date;
         }>
       >(
@@ -3399,6 +3416,7 @@ export class CliRunnerService implements OnApplicationBootstrap {
         findingsByDetector: row.findings_by_detector,
         metadata: row.metadata,
         detectorOutcomes: row.detector_outcomes,
+        changeType: row.change_type,
         createdAt: row.created_at,
       }));
     } else {

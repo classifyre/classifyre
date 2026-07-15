@@ -15161,7 +15161,13 @@
           },
           "totalFindings": {
             "type": "number",
-            "default": 0
+            "default": 0,
+            "description": "Findings currently associated with this run — created, re-detected, or resolved by it. NOT a count of new discoveries: after reconciliation it is closer to the source's open set as of this run. Use findingsCreated for what this run actually found that was new."
+          },
+          "findingsCreated": {
+            "type": "number",
+            "default": 0,
+            "description": "Findings first seen by this run."
           },
           "errorMessage": {
             "type": "string",
@@ -15195,7 +15201,8 @@
           "assetsUnchanged",
           "assetsDeleted",
           "assetsOutOfScope",
-          "totalFindings"
+          "totalFindings",
+          "findingsCreated"
         ]
       },
       "CreateExternalRunnerDto": {
@@ -15770,7 +15777,13 @@
           },
           "totalFindings": {
             "type": "number",
-            "default": 0
+            "default": 0,
+            "description": "Findings currently associated with this run — created, re-detected, or resolved by it. NOT a count of new discoveries: after reconciliation it is closer to the source's open set as of this run. Use findingsCreated for what this run actually found that was new."
+          },
+          "findingsCreated": {
+            "type": "number",
+            "default": 0,
+            "description": "Findings first seen by this run."
           },
           "errorMessage": {
             "type": "string",
@@ -15803,7 +15816,8 @@
           "assetsUnchanged",
           "assetsDeleted",
           "assetsOutOfScope",
-          "totalFindings"
+          "totalFindings",
+          "findingsCreated"
         ]
       },
       "SearchRunnersResponseDto": {

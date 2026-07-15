@@ -11,6 +11,7 @@ import {
   AssetStatus,
   DetectorType,
   FindingStatus,
+  RunnerAssetChangeType,
   Severity,
 } from '@prisma/client';
 import { generateDetectionIdentity } from './utils/detection-identity';
@@ -275,6 +276,32 @@ export class AssetService {
     customDetectorKey: string | null,
   ): string {
     return `${assetHash}|${detectorType.toUpperCase()}|${customDetectorKey ?? ''}`;
+  }
+
+  /**
+   * A where-clause matching rows this run may overwrite with `incoming`.
+   *
+   * A run reports the strongest thing it did to an asset: creating it outranks
+   * updating it, which outranks leaving it alone. Nothing-recorded-yet (null)
+   * is always overwritable — and must be matched explicitly, since SQL's
+   * `IN (NULL, …)` never matches a NULL row.
+   */
+  private overwritableChangeType(
+    incoming: Exclude<RunnerAssetChangeType, 'DELETED'>,
+  ): Prisma.RunnerAssetWhereInput {
+    const ORDER = [
+      RunnerAssetChangeType.UNCHANGED,
+      RunnerAssetChangeType.UPDATED,
+      RunnerAssetChangeType.CREATED,
+    ];
+    const rank = ORDER.indexOf(incoming);
+    const weaker = rank <= 0 ? [] : ORDER.slice(0, rank);
+    return {
+      OR: [
+        { changeType: null },
+        ...(weaker.length > 0 ? [{ changeType: { in: weaker } }] : []),
+      ],
+    };
   }
 
   private normalizeBoolean(value: unknown): boolean {
@@ -1360,6 +1387,17 @@ export class AssetService {
       );
     }
 
+    // Accumulated as batches land rather than counted at the end. The CLI sends
+    // many bulkIngest calls per run, and a post-run count cannot distinguish a
+    // finding this run discovered from one it merely re-detected or resolved —
+    // which is exactly why totalFindings never meant "new findings".
+    if (totalFindings > 0) {
+      await this.prisma.runner.update({
+        where: { id: runnerId },
+        data: { findingsCreated: { increment: totalFindings } },
+      });
+    }
+
     if (!finalizeRun) {
       return {
         ingested: assets.length,
@@ -1501,6 +1539,16 @@ export class AssetService {
           await tx.asset.updateMany({
             where: { id: { in: missingAssetIds } },
             data: { status: AssetStatus.DELETED, runnerId },
+          });
+
+          // Retirement is the strongest thing a run can do to an asset, so it
+          // overwrites any earlier change type unconditionally.
+          await tx.runnerAsset.updateMany({
+            where: {
+              runnerId,
+              assetHash: { in: deletableAssets.map((a) => a.hash) },
+            },
+            data: { changeType: RunnerAssetChangeType.DELETED },
           });
         }
 
@@ -1675,6 +1723,13 @@ export class AssetService {
         const assetsToCreate: Prisma.AssetCreateManyInput[] = [];
         const assetsToUpdate: { id: string; data: any }[] = [];
         const assetsUnchanged: string[] = [];
+        // What this run did to each asset, recorded per hash for the
+        // runner_assets rows below. DELETED is excluded: only
+        // finalizeIngestRun can retire an asset, and it does so unconditionally.
+        const changeTypeByHash = new Map<
+          string,
+          Exclude<RunnerAssetChangeType, 'DELETED'>
+        >();
         // Metadata isn't part of the checksum, so an asset whose only change is
         // richer metadata stays UNCHANGED — the bulk updateMany below can't
         // carry per-asset data. Patch those rows individually so asset.metadata
@@ -1722,6 +1777,7 @@ export class AssetService {
 
           if (!existingAsset) {
             // Asset is NEW - prepare for bulk create
+            changeTypeByHash.set(assetHash, RunnerAssetChangeType.CREATED);
             assetsToCreate.push({
               hash: assetHash,
               ...assetData,
@@ -1730,6 +1786,7 @@ export class AssetService {
             });
           } else if (existingAsset.checksum !== String(checksum)) {
             // Asset is UPDATED - prepare for individual update
+            changeTypeByHash.set(assetHash, RunnerAssetChangeType.UPDATED);
             assetsToUpdate.push({
               id: existingAsset.id,
               data: {
@@ -1747,6 +1804,7 @@ export class AssetService {
             });
           } else {
             // Asset is UNCHANGED
+            changeTypeByHash.set(assetHash, RunnerAssetChangeType.UNCHANGED);
             assetsUnchanged.push(existingAsset.id);
             if (metadata !== undefined) {
               unchangedMetadataUpdates.push({ id: existingAsset.id, metadata });
@@ -1811,16 +1869,37 @@ export class AssetService {
         // needs them to decide which findings may be resolved for absence, and
         // it runs as a separate request once every batch has landed.
         for (const asset of batch) {
+          const assetHash = String(asset.hash);
           const metadata = this.normalizeMetadata(asset.metadata);
           const detectorOutcomes = this.normalizeDetectorOutcomes(asset);
-          if (metadata === undefined && detectorOutcomes === undefined) continue;
-          await tx.runnerAsset.updateMany({
-            where: { runnerId, assetHash: String(asset.hash) },
-            data: {
-              ...(metadata !== undefined ? { metadata } : {}),
-              ...(detectorOutcomes !== undefined ? { detectorOutcomes } : {}),
-            },
-          });
+
+          if (metadata !== undefined || detectorOutcomes !== undefined) {
+            await tx.runnerAsset.updateMany({
+              where: { runnerId, assetHash },
+              data: {
+                ...(metadata !== undefined ? { metadata } : {}),
+                ...(detectorOutcomes !== undefined ? { detectorOutcomes } : {}),
+              },
+            });
+          }
+
+          // Recorded separately because it must never be downgraded. The CLI
+          // ingests each asset twice — a stub pass that creates it, then a pass
+          // carrying findings that sees the same checksum and calls it
+          // unchanged — so the second pass would otherwise erase the fact that
+          // this run created the asset. That is why a ten-asset first run
+          // reported "assetsCreated: 0, assetsUnchanged: 10".
+          const changeType = changeTypeByHash.get(assetHash);
+          if (changeType !== undefined) {
+            await tx.runnerAsset.updateMany({
+              where: {
+                runnerId,
+                assetHash,
+                ...this.overwritableChangeType(changeType),
+              },
+              data: { changeType },
+            });
+          }
         }
 
         // When streaming ingestion, stubs are sent before detector results.

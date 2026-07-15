@@ -136,11 +136,17 @@ export interface RunnerDto {
      */
     scopeFingerprint?: string | null;
     /**
-     * 
+     * Findings currently associated with this run — created, re-detected, or resolved by it. NOT a count of new discoveries: after reconciliation it is closer to the source's open set as of this run. Use findingsCreated for what this run actually found that was new.
      * @type {number}
      * @memberof RunnerDto
      */
     totalFindings: number;
+    /**
+     * Findings first seen by this run.
+     * @type {number}
+     * @memberof RunnerDto
+     */
+    findingsCreated: number;
     /**
      * 
      * @type {string}
@@ -225,6 +231,7 @@ export function instanceOfRunnerDto(value: object): value is RunnerDto {
     if (!('assetsDeleted' in value) || value['assetsDeleted'] === undefined) return false;
     if (!('assetsOutOfScope' in value) || value['assetsOutOfScope'] === undefined) return false;
     if (!('totalFindings' in value) || value['totalFindings'] === undefined) return false;
+    if (!('findingsCreated' in value) || value['findingsCreated'] === undefined) return false;
     return true;
 }
 
@@ -257,6 +264,7 @@ export function RunnerDtoFromJSONTyped(json: any, ignoreDiscriminator: boolean):
         'assetsOutOfScope': json['assetsOutOfScope'],
         'scopeFingerprint': json['scopeFingerprint'] == null ? undefined : json['scopeFingerprint'],
         'totalFindings': json['totalFindings'],
+        'findingsCreated': json['findingsCreated'],
         'errorMessage': json['errorMessage'] == null ? undefined : json['errorMessage'],
         'errorDetails': json['errorDetails'] == null ? undefined : json['errorDetails'],
         'jobName': json['jobName'] == null ? undefined : json['jobName'],
@@ -295,6 +303,7 @@ export function RunnerDtoToJSONTyped(value?: RunnerDto | null, ignoreDiscriminat
         'assetsOutOfScope': value['assetsOutOfScope'],
         'scopeFingerprint': value['scopeFingerprint'],
         'totalFindings': value['totalFindings'],
+        'findingsCreated': value['findingsCreated'],
         'errorMessage': value['errorMessage'],
         'errorDetails': value['errorDetails'],
         'jobName': value['jobName'],

@@ -742,6 +742,9 @@ describe('AssetService', () => {
           runner: {
             update: jest.fn().mockResolvedValue({}),
           },
+          runnerAsset: {
+            updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+          },
         };
         return callback(tx);
       };
@@ -809,6 +812,9 @@ describe('AssetService', () => {
           runner: {
             update: jest.fn().mockResolvedValue({}),
           },
+          runnerAsset: {
+            updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+          },
         };
         return callback(tx);
       };
@@ -874,6 +880,9 @@ describe('AssetService', () => {
           runner: {
             update: jest.fn().mockResolvedValue({}),
           },
+          runnerAsset: {
+            updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+          },
         };
         return callback(tx);
       };
@@ -930,6 +939,9 @@ describe('AssetService', () => {
           },
           runner: {
             update: jest.fn().mockResolvedValue({}),
+          },
+          runnerAsset: {
+            updateMany: jest.fn().mockResolvedValue({ count: 1 }),
           },
         };
         return callback(tx);
@@ -1056,6 +1068,9 @@ describe('AssetService', () => {
           runner: {
             update: jest.fn().mockResolvedValue({}),
           },
+          runnerAsset: {
+            updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+          },
         };
         return callback(tx);
       };
@@ -1116,6 +1131,9 @@ describe('AssetService', () => {
           },
           runner: {
             update: jest.fn().mockResolvedValue({}),
+          },
+          runnerAsset: {
+            updateMany: jest.fn().mockResolvedValue({ count: 1 }),
           },
         };
         return callback(tx);
@@ -1203,6 +1221,9 @@ describe('AssetService', () => {
           runner: {
             update: jest.fn().mockResolvedValue({}),
           },
+          runnerAsset: {
+            updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+          },
         };
         return callback(tx);
       };
@@ -1276,6 +1297,9 @@ describe('AssetService', () => {
           },
           runner: {
             update: txRunnerUpdate,
+          },
+          runnerAsset: {
+            updateMany: jest.fn().mockResolvedValue({ count: 1 }),
           },
         };
         return callback(tx);
@@ -1386,6 +1410,9 @@ describe('AssetService', () => {
             },
             runner: {
               update: jest.fn().mockResolvedValue({}),
+            },
+            runnerAsset: {
+              updateMany: jest.fn().mockResolvedValue({ count: 1 }),
             },
           };
           return callback(tx);
@@ -1530,6 +1557,9 @@ describe('AssetService', () => {
               runner: {
                 update: jest.fn().mockResolvedValue({}),
               },
+              runnerAsset: {
+                updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+              },
             };
             return callback(tx);
           },
@@ -1655,6 +1685,9 @@ describe('AssetService', () => {
               update: jest.fn().mockResolvedValue({}),
             },
             runner: { update: runnerTxUpdate },
+            runnerAsset: {
+              updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+            },
           }),
         );
       });
@@ -1835,6 +1868,9 @@ describe('AssetService', () => {
               update: findingUpdate,
             },
             runner: { update: jest.fn().mockResolvedValue({}) },
+            runnerAsset: {
+              updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+            },
           }),
         );
         return service.finalizeIngestRun(sourceId, runnerId, ['seen'], true);
@@ -2062,6 +2098,9 @@ describe('AssetService', () => {
           runner: {
             update: jest.fn().mockResolvedValue({}),
           },
+          runnerAsset: {
+            updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+          },
         };
         return callback(tx);
       };
@@ -2076,6 +2115,165 @@ describe('AssetService', () => {
 
       expect(result.findings).toBe(1);
       expect(findingsCreated).toBe(1);
+    });
+
+    // G-012. Counters were derived from assets.status — the asset's *current*
+    // state — so assetsCreated meant "assets whose status happens to be NEW
+    // right now and were last touched by this runner". The CLI also ingests
+    // each asset twice (a stub pass creates it, then the pass carrying findings
+    // sees the same checksum and calls it unchanged), so on a first run every
+    // asset ended up UNCHANGED: "assetsCreated: 0, assetsUnchanged: 10".
+    describe('per-run change type (G-012)', () => {
+      const asset = (over: Record<string, unknown> = {}) => ({
+        hash: 'asset-1',
+        checksum: 'checksum-1',
+        name: 'Asset 1',
+        external_url: 'https://example.com/1',
+        links: [],
+        asset_type: 'TXT',
+        findings: [],
+        ...over,
+      });
+
+      let runnerAssetUpdateMany: jest.Mock;
+
+      const arrangeTx = () => {
+        runnerAssetUpdateMany = jest.fn().mockResolvedValue({ count: 1 });
+        mockPrismaService.$transaction.mockImplementation((callback: any) =>
+          callback({
+            asset: {
+              createMany: jest.fn().mockResolvedValue({}),
+              update: jest.fn().mockResolvedValue({}),
+              updateMany: jest.fn().mockResolvedValue({}),
+              findMany: jest
+                .fn()
+                .mockResolvedValue([{ id: 'db-asset-1', hash: 'asset-1' }]),
+            },
+            finding: {
+              findMany: jest.fn().mockResolvedValue([]),
+              createMany: jest.fn().mockResolvedValue({}),
+              update: jest.fn().mockResolvedValue({}),
+            },
+            runner: { update: jest.fn().mockResolvedValue({}) },
+            runnerAsset: { updateMany: runnerAssetUpdateMany },
+          }),
+        );
+      };
+
+      /** The changeType write for a hash, if any. */
+      const changeTypeCall = (hash = 'asset-1') =>
+        runnerAssetUpdateMany.mock.calls.find(
+          ([args]: any) =>
+            args?.where?.assetHash === hash && args?.data?.changeType,
+        )?.[0];
+
+      beforeEach(() => arrangeTx());
+
+      it('records CREATED for a newly ingested asset', async () => {
+        mockPrismaService.asset.findMany.mockResolvedValue([]);
+
+        await service.bulkIngest(sourceId, runnerId, [asset()]);
+
+        expect(changeTypeCall()?.data.changeType).toBe('CREATED');
+      });
+
+      it('records UPDATED when the checksum changed', async () => {
+        mockPrismaService.asset.findMany.mockResolvedValue([
+          { id: 'db-asset-1', hash: 'asset-1', checksum: 'old-checksum', links: [] },
+        ]);
+
+        await service.bulkIngest(sourceId, runnerId, [asset()]);
+
+        expect(changeTypeCall()?.data.changeType).toBe('UPDATED');
+      });
+
+      it('records UNCHANGED when the checksum matches', async () => {
+        mockPrismaService.asset.findMany.mockResolvedValue([
+          { id: 'db-asset-1', hash: 'asset-1', checksum: 'checksum-1', links: [] },
+        ]);
+
+        await service.bulkIngest(sourceId, runnerId, [asset()]);
+
+        expect(changeTypeCall()?.data.changeType).toBe('UNCHANGED');
+      });
+
+      it('cannot downgrade an earlier CREATED to UNCHANGED', async () => {
+        // The second pass of the CLI's two-pass ingest. Its UNCHANGED write is
+        // guarded so it only lands where nothing is recorded yet.
+        mockPrismaService.asset.findMany.mockResolvedValue([
+          { id: 'db-asset-1', hash: 'asset-1', checksum: 'checksum-1', links: [] },
+        ]);
+
+        await service.bulkIngest(sourceId, runnerId, [asset()]);
+
+        const where = changeTypeCall()?.where;
+        expect(where.OR).toEqual([{ changeType: null }]);
+      });
+
+      it('lets UPDATED overwrite UNCHANGED but not CREATED', async () => {
+        mockPrismaService.asset.findMany.mockResolvedValue([
+          { id: 'db-asset-1', hash: 'asset-1', checksum: 'old-checksum', links: [] },
+        ]);
+
+        await service.bulkIngest(sourceId, runnerId, [asset()]);
+
+        const where = changeTypeCall()?.where;
+        expect(where.OR).toEqual([
+          { changeType: null },
+          { changeType: { in: ['UNCHANGED'] } },
+        ]);
+      });
+
+      it('lets CREATED overwrite anything weaker', async () => {
+        mockPrismaService.asset.findMany.mockResolvedValue([]);
+
+        await service.bulkIngest(sourceId, runnerId, [asset()]);
+
+        const where = changeTypeCall()?.where;
+        expect(where.OR).toEqual([
+          { changeType: null },
+          { changeType: { in: ['UNCHANGED', 'UPDATED'] } },
+        ]);
+      });
+
+      it('survives the CLI two-pass ingest that caused the bug', async () => {
+        // Pass 1: the stub batch. The asset does not exist yet.
+        mockPrismaService.asset.findMany.mockResolvedValue([]);
+        await service.bulkIngest(sourceId, runnerId, [
+          asset({ findings: [] }),
+        ]);
+        const passOne = changeTypeCall();
+
+        // Pass 2: the same asset with findings. It now exists with an identical
+        // checksum, so it classifies as UNCHANGED — this is the pass that used
+        // to leave every first-run asset looking unchanged.
+        arrangeTx();
+        mockPrismaService.asset.findMany.mockResolvedValue([
+          { id: 'db-asset-1', hash: 'asset-1', checksum: 'checksum-1', links: [] },
+        ]);
+        await service.bulkIngest(sourceId, runnerId, [asset()]);
+        const passTwo = changeTypeCall();
+
+        expect(passOne?.data.changeType).toBe('CREATED');
+        expect(passTwo?.data.changeType).toBe('UNCHANGED');
+        // Pass 2's guard means the DB keeps CREATED: it only writes where
+        // nothing is recorded yet, and pass 1 already recorded CREATED.
+        expect(passTwo?.where.OR).toEqual([{ changeType: null }]);
+      });
+
+      it('matches a null change type explicitly, never via IN', async () => {
+        // SQL's `IN (NULL, 'X')` never matches a NULL row, so folding null into
+        // the IN list would make every first write silently no-op.
+        mockPrismaService.asset.findMany.mockResolvedValue([]);
+
+        await service.bulkIngest(sourceId, runnerId, [asset()]);
+
+        const where = changeTypeCall()?.where;
+        expect(where.OR).toContainEqual({ changeType: null });
+        for (const branch of where.OR) {
+          expect(branch.changeType?.in ?? []).not.toContain(null);
+        }
+      });
     });
   });
 });
