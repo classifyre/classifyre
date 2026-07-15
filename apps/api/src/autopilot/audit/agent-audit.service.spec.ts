@@ -193,18 +193,18 @@ describe('AgentAuditService cancellation is terminal (G-029)', () => {
   it('skip() cannot resurrect a cancelled run', async () => {
     await service.skip('run-1', 'nothing to do');
 
-    expect(statusFilterOf(prisma.agentRun.updateMany.mock.calls.at(-1))).not.toContain(
-      'CANCELLED',
-    );
+    expect(
+      statusFilterOf(prisma.agentRun.updateMany.mock.calls.at(-1)),
+    ).not.toContain('CANCELLED');
     expect(prisma.agentRun.update).not.toHaveBeenCalled();
   });
 
   it('fail() cannot resurrect a cancelled run', async () => {
     await service.fail('run-1', new Error('boom'));
 
-    expect(statusFilterOf(prisma.agentRun.updateMany.mock.calls.at(-1))).not.toContain(
-      'CANCELLED',
-    );
+    expect(
+      statusFilterOf(prisma.agentRun.updateMany.mock.calls.at(-1)),
+    ).not.toContain('CANCELLED');
     expect(prisma.agentRun.update).not.toHaveBeenCalled();
   });
 
@@ -212,16 +212,16 @@ describe('AgentAuditService cancellation is terminal (G-029)', () => {
     // updateMany matches nothing because the row is already CANCELLED.
     prisma.agentRun.updateMany.mockResolvedValue({ count: 0 });
 
-    await expect(service.complete('run-1', '5 applied')).resolves.toBeUndefined();
+    await expect(
+      service.complete('run-1', '5 applied'),
+    ).resolves.toBeUndefined();
   });
 
   it('cancel() still accepts PENDING, RUNNING and FAILED runs', async () => {
     await service.cancel('run-1');
 
-    expect(statusFilterOf(prisma.agentRun.updateMany.mock.calls.at(-1))).toEqual([
-      'PENDING',
-      'RUNNING',
-      'FAILED',
-    ]);
+    expect(
+      statusFilterOf(prisma.agentRun.updateMany.mock.calls.at(-1)),
+    ).toEqual(['PENDING', 'RUNNING', 'FAILED']);
   });
 });

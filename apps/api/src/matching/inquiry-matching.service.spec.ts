@@ -86,7 +86,11 @@ describe('InquiryMatchingService', () => {
     it('does not count re-detected findings created before matchesSeenAt', async () => {
       const seenAt = new Date('2026-07-15T12:00:00Z');
       mockPrisma.inquiry.findMany.mockResolvedValue([
-        inquiry({ findingTypes: ['email'], matchCount: 1, matchesSeenAt: seenAt }),
+        inquiry({
+          findingTypes: ['email'],
+          matchCount: 1,
+          matchesSeenAt: seenAt,
+        }),
       ]);
       // Re-detected by this run, but created long before the operator last
       // looked — /matches calls this 0 new, so the counter must too.
@@ -103,7 +107,11 @@ describe('InquiryMatchingService', () => {
     it('counts findings created after matchesSeenAt', async () => {
       const seenAt = new Date('2026-07-15T12:00:00Z');
       mockPrisma.inquiry.findMany.mockResolvedValue([
-        inquiry({ findingTypes: ['email'], matchCount: 1, matchesSeenAt: seenAt }),
+        inquiry({
+          findingTypes: ['email'],
+          matchCount: 1,
+          matchesSeenAt: seenAt,
+        }),
       ]);
       mockPrisma.finding.findMany.mockResolvedValue([
         finding({ id: 'f1', createdAt: new Date('2026-07-15T09:00:00Z') }),
@@ -125,7 +133,11 @@ describe('InquiryMatchingService', () => {
       // lets every run reconcile against the live set.
       const seenAt = new Date('2026-07-15T12:00:00Z');
       mockPrisma.inquiry.findMany.mockResolvedValue([
-        inquiry({ findingTypes: ['email'], newMatchCount: 99, matchesSeenAt: seenAt }),
+        inquiry({
+          findingTypes: ['email'],
+          newMatchCount: 99,
+          matchesSeenAt: seenAt,
+        }),
       ]);
       mockPrisma.finding.findMany.mockResolvedValue([
         finding({ createdAt: new Date('2026-07-15T13:00:00Z') }),
@@ -152,7 +164,11 @@ describe('InquiryMatchingService', () => {
 
     it('leaves an already-correct inquiry untouched', async () => {
       mockPrisma.inquiry.findMany.mockResolvedValue([
-        inquiry({ findingTypes: ['email'], matchCount: 1, matchesSeenAt: null }),
+        inquiry({
+          findingTypes: ['email'],
+          matchCount: 1,
+          matchesSeenAt: null,
+        }),
       ]);
       mockPrisma.finding.findMany.mockResolvedValue([finding()]);
 
@@ -164,7 +180,11 @@ describe('InquiryMatchingService', () => {
     it('corrects a stale matchCount even with no new findings', async () => {
       // Findings resolved between runs leave the stored count too high.
       mockPrisma.inquiry.findMany.mockResolvedValue([
-        inquiry({ findingTypes: ['email'], matchCount: 8, matchesSeenAt: null }),
+        inquiry({
+          findingTypes: ['email'],
+          matchCount: 8,
+          matchesSeenAt: null,
+        }),
       ]);
       mockPrisma.finding.findMany.mockResolvedValue([finding()]);
 

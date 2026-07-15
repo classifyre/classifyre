@@ -52,7 +52,9 @@ describe('computeScopeFingerprint', () => {
     it('changes when the file-type allowlist changes', () => {
       const narrowed = {
         ...base,
-        optional: { scope: { prefix: 'exports/', include_extensions: ['.csv'] } },
+        optional: {
+          scope: { prefix: 'exports/', include_extensions: ['.csv'] },
+        },
       };
       expect(computeScopeFingerprint('LOCAL_FOLDER', narrowed)).not.toBe(
         computeScopeFingerprint('LOCAL_FOLDER', base),

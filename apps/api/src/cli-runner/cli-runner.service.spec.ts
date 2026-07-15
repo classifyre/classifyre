@@ -844,7 +844,11 @@ describe('CliRunnerService', () => {
         {
           assetHash: 'asset-a',
           detectorOutcomes: [
-            { detector_type: 'PII', custom_detector_key: null, status: 'ERROR' },
+            {
+              detector_type: 'PII',
+              custom_detector_key: null,
+              status: 'ERROR',
+            },
             {
               detector_type: 'CUSTOM',
               custom_detector_key: 'entities_v1',

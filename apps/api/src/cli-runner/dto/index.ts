@@ -167,7 +167,7 @@ export class RunnerDto {
     description:
       'Findings currently associated with this run — created, re-detected, or ' +
       'resolved by it. NOT a count of new discoveries: after reconciliation it ' +
-      'is closer to the source\'s open set as of this run. Use findingsCreated ' +
+      "is closer to the source's open set as of this run. Use findingsCreated " +
       'for what this run actually found that was new.',
   })
   totalFindings: number;

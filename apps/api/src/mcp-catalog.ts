@@ -151,7 +151,7 @@ export const MCP_CAPABILITY_GROUPS: McpCapabilityGroupDto[] = [
     ],
     operations: [
       'Attach evidence and findings to a case',
-      'Pull a saved question\'s current matches into a case',
+      "Pull a saved question's current matches into a case",
       'Track hypotheses and discussion threads with supporting/contradicting links',
       'Close and reopen cases, archiving or reactivating linked questions',
     ],

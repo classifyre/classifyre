@@ -228,7 +228,9 @@ export class AssetService {
       .map((o) => ({
         detector_type: String(o.detector_type).toUpperCase(),
         custom_detector_key:
-          typeof o.custom_detector_key === 'string' ? o.custom_detector_key : null,
+          typeof o.custom_detector_key === 'string'
+            ? o.custom_detector_key
+            : null,
         status: String(o.status).toUpperCase() === 'OK' ? 'OK' : 'ERROR',
         ...(typeof o.error === 'string' ? { error: o.error } : {}),
       }));
@@ -253,16 +255,16 @@ export class AssetService {
       if (!Array.isArray(detectorOutcomes)) continue;
       for (const outcome of detectorOutcomes) {
         if (!outcome || typeof outcome !== 'object') continue;
-        const { detector_type, custom_detector_key, status } = outcome as Record<
-          string,
-          unknown
-        >;
+        const { detector_type, custom_detector_key, status } =
+          outcome as Record<string, unknown>;
         if (status !== 'OK' || typeof detector_type !== 'string') continue;
         manifest.add(
           this.resolutionKey(
             assetHash,
             detector_type,
-            typeof custom_detector_key === 'string' ? custom_detector_key : null,
+            typeof custom_detector_key === 'string'
+              ? custom_detector_key
+              : null,
           ),
         );
       }
@@ -1333,7 +1335,10 @@ export class AssetService {
     const finalizeRun = options?.finalizeRun ?? true;
     const skipFindings = options?.skipFindings ?? false;
     const { source } = await this.assertSourceAndRunner(sourceId, runnerId);
-    const scopeFingerprint = computeScopeFingerprint(source.type, source.config);
+    const scopeFingerprint = computeScopeFingerprint(
+      source.type,
+      source.config,
+    );
 
     // Process in batches to avoid transaction timeout.
     // Each batch runs its own transaction (timeout: 60 s). Keep batches small
@@ -1457,7 +1462,10 @@ export class AssetService {
       return { deleted: 0, outOfScope: 0, resolvedForAbsence: 0 };
     }
 
-    const scopeFingerprint = computeScopeFingerprint(source.type, source.config);
+    const scopeFingerprint = computeScopeFingerprint(
+      source.type,
+      source.config,
+    );
     await this.prisma.runner.update({
       where: { id: runnerId },
       data: { scopeFingerprint },

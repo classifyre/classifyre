@@ -24,7 +24,6 @@ import {
   Source,
   TriggerType,
   Severity,
-  AssetStatus,
 } from '@prisma/client';
 import {
   NotificationEvent,
@@ -1714,17 +1713,17 @@ export class CliRunnerService implements OnApplicationBootstrap {
       if (!Array.isArray(row.detectorOutcomes)) continue;
       for (const outcome of row.detectorOutcomes) {
         if (!outcome || typeof outcome !== 'object') continue;
-        const { status, detector_type, custom_detector_key } = outcome as Record<
-          string,
-          unknown
-        >;
+        const { status, detector_type, custom_detector_key } =
+          outcome as Record<string, unknown>;
         if (status !== 'ERROR') continue;
         failedAssets.add(row.assetHash);
-        labels.add(
+        const detectorLabel =
           typeof custom_detector_key === 'string' && custom_detector_key
             ? custom_detector_key
-            : String(detector_type ?? 'unknown detector'),
-        );
+            : typeof detector_type === 'string' && detector_type
+              ? detector_type
+              : 'unknown detector';
+        labels.add(detectorLabel);
       }
     }
 
@@ -1873,7 +1872,9 @@ export class CliRunnerService implements OnApplicationBootstrap {
 
         const messageParts: string[] = [];
         if (hasAssetErrors) {
-          messageParts.push(`${errorCount} of ${totalCount} assets failed processing`);
+          messageParts.push(
+            `${errorCount} of ${totalCount} assets failed processing`,
+          );
         }
         if (hasDetectorFailures) {
           const detectors = detectorFailures.detectorLabels.join(', ');
@@ -1881,7 +1882,8 @@ export class CliRunnerService implements OnApplicationBootstrap {
             `${detectors} failed on ${detectorFailures.assetCount} of ${totalCount} assets`,
           );
         }
-        const message = messageParts.length > 0 ? messageParts.join('; ') : undefined;
+        const message =
+          messageParts.length > 0 ? messageParts.join('; ') : undefined;
 
         await tx.runner.update({
           where: { id: runnerId },

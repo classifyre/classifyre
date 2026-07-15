@@ -1574,7 +1574,9 @@ describe('AssetService', () => {
             scopeFingerprint: currentScope,
           },
         ]);
-        mockPrismaService.runnerAsset.findMany.mockResolvedValue(cleanPiiOutcome);
+        mockPrismaService.runnerAsset.findMany.mockResolvedValue(
+          cleanPiiOutcome,
+        );
 
         const { findingUpdate, mockImpl } = buildFinalizeTx({
           deletedAssetFindings: [],
@@ -1618,7 +1620,9 @@ describe('AssetService', () => {
             scopeFingerprint: currentScope,
           },
         ]);
-        mockPrismaService.runnerAsset.findMany.mockResolvedValue(cleanPiiOutcome);
+        mockPrismaService.runnerAsset.findMany.mockResolvedValue(
+          cleanPiiOutcome,
+        );
 
         const { findingUpdate, mockImpl } = buildFinalizeTx({
           staleFindings: [manuallyOverriddenFinding],
@@ -2179,7 +2183,12 @@ describe('AssetService', () => {
 
       it('records UPDATED when the checksum changed', async () => {
         mockPrismaService.asset.findMany.mockResolvedValue([
-          { id: 'db-asset-1', hash: 'asset-1', checksum: 'old-checksum', links: [] },
+          {
+            id: 'db-asset-1',
+            hash: 'asset-1',
+            checksum: 'old-checksum',
+            links: [],
+          },
         ]);
 
         await service.bulkIngest(sourceId, runnerId, [asset()]);
@@ -2189,7 +2198,12 @@ describe('AssetService', () => {
 
       it('records UNCHANGED when the checksum matches', async () => {
         mockPrismaService.asset.findMany.mockResolvedValue([
-          { id: 'db-asset-1', hash: 'asset-1', checksum: 'checksum-1', links: [] },
+          {
+            id: 'db-asset-1',
+            hash: 'asset-1',
+            checksum: 'checksum-1',
+            links: [],
+          },
         ]);
 
         await service.bulkIngest(sourceId, runnerId, [asset()]);
@@ -2201,7 +2215,12 @@ describe('AssetService', () => {
         // The second pass of the CLI's two-pass ingest. Its UNCHANGED write is
         // guarded so it only lands where nothing is recorded yet.
         mockPrismaService.asset.findMany.mockResolvedValue([
-          { id: 'db-asset-1', hash: 'asset-1', checksum: 'checksum-1', links: [] },
+          {
+            id: 'db-asset-1',
+            hash: 'asset-1',
+            checksum: 'checksum-1',
+            links: [],
+          },
         ]);
 
         await service.bulkIngest(sourceId, runnerId, [asset()]);
@@ -2212,7 +2231,12 @@ describe('AssetService', () => {
 
       it('lets UPDATED overwrite UNCHANGED but not CREATED', async () => {
         mockPrismaService.asset.findMany.mockResolvedValue([
-          { id: 'db-asset-1', hash: 'asset-1', checksum: 'old-checksum', links: [] },
+          {
+            id: 'db-asset-1',
+            hash: 'asset-1',
+            checksum: 'old-checksum',
+            links: [],
+          },
         ]);
 
         await service.bulkIngest(sourceId, runnerId, [asset()]);
@@ -2239,9 +2263,7 @@ describe('AssetService', () => {
       it('survives the CLI two-pass ingest that caused the bug', async () => {
         // Pass 1: the stub batch. The asset does not exist yet.
         mockPrismaService.asset.findMany.mockResolvedValue([]);
-        await service.bulkIngest(sourceId, runnerId, [
-          asset({ findings: [] }),
-        ]);
+        await service.bulkIngest(sourceId, runnerId, [asset({ findings: [] })]);
         const passOne = changeTypeCall();
 
         // Pass 2: the same asset with findings. It now exists with an identical
@@ -2249,7 +2271,12 @@ describe('AssetService', () => {
         // to leave every first-run asset looking unchanged.
         arrangeTx();
         mockPrismaService.asset.findMany.mockResolvedValue([
-          { id: 'db-asset-1', hash: 'asset-1', checksum: 'checksum-1', links: [] },
+          {
+            id: 'db-asset-1',
+            hash: 'asset-1',
+            checksum: 'checksum-1',
+            links: [],
+          },
         ]);
         await service.bulkIngest(sourceId, runnerId, [asset()]);
         const passTwo = changeTypeCall();

@@ -20,7 +20,7 @@ describe('formatSummary (G-032)', () => {
     ...over,
   });
 
-  it('reports a read-only run as zero applied', async () => {
+  it('reports a read-only run as zero applied', () => {
     const text = formatSummary(summary({ applied: 0, readOk: 11 }));
 
     expect(text).toContain('0 applied');

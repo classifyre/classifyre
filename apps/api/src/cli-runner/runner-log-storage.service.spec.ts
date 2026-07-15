@@ -304,13 +304,21 @@ describe('RunnerLogStorageService level inference (G-031)', () => {
   describe('levels a logger actually emitted', () => {
     // The CLI's own format: main.py basicConfig "%(levelname)s:%(name)s: %(message)s".
     it('reads the CLI logger prefix', () => {
-      expect(levelOf('INFO:src.pipeline.detector_pipeline: Scanning a.pdf')).toBe('INFO');
-      expect(levelOf('ERROR:src.detectors.pii.detector: analyzer failed')).toBe('ERROR');
-      expect(levelOf('WARNING:src.utils.file_parser: empty OCR result')).toBe('WARN');
+      expect(
+        levelOf('INFO:src.pipeline.detector_pipeline: Scanning a.pdf'),
+      ).toBe('INFO');
+      expect(levelOf('ERROR:src.detectors.pii.detector: analyzer failed')).toBe(
+        'ERROR',
+      );
+      expect(levelOf('WARNING:src.utils.file_parser: empty OCR result')).toBe(
+        'WARN',
+      );
     });
 
     it('reads the worker-pool prefix', () => {
-      expect(levelOf('INFO:src.pipeline:[worker-123] Scanning b.pdf')).toBe('INFO');
+      expect(levelOf('INFO:src.pipeline:[worker-123] Scanning b.pdf')).toBe(
+        'INFO',
+      );
     });
 
     it('reads bracketed and dashed prefixes', () => {
@@ -320,8 +328,12 @@ describe('RunnerLogStorageService level inference (G-031)', () => {
     });
 
     it('reads a timestamped format', () => {
-      expect(levelOf('2026-07-15 10:00:00,123 - src.pipeline - INFO - Scanning')).toBe('INFO');
-      expect(levelOf('2026-07-15 10:00:00,123 - src.pipeline - ERROR - boom')).toBe('ERROR');
+      expect(
+        levelOf('2026-07-15 10:00:00,123 - src.pipeline - INFO - Scanning'),
+      ).toBe('INFO');
+      expect(
+        levelOf('2026-07-15 10:00:00,123 - src.pipeline - ERROR - boom'),
+      ).toBe('ERROR');
     });
 
     it('reads structured JSON', () => {
@@ -336,31 +348,43 @@ describe('RunnerLogStorageService level inference (G-031)', () => {
   describe('prose that merely mentions a level', () => {
     it('does not read a level out of the message body', () => {
       expect(levelOf('Scan completed with no error found')).toBe('UNKNOWN');
-      expect(levelOf('Loading model from /opt/models/debug/weights.bin')).toBe('UNKNOWN');
-      expect(levelOf('Retrying after error handling routine finished')).toBe('UNKNOWN');
+      expect(levelOf('Loading model from /opt/models/debug/weights.bin')).toBe(
+        'UNKNOWN',
+      );
+      expect(levelOf('Retrying after error handling routine finished')).toBe(
+        'UNKNOWN',
+      );
     });
 
     it('does not let a mid-message level override the real one', () => {
       // Previously the first level word anywhere won, so this became INFO.
-      expect(levelOf('ERROR:src.detectors: info about the failure')).toBe('ERROR');
+      expect(levelOf('ERROR:src.detectors: info about the failure')).toBe(
+        'ERROR',
+      );
     });
   });
 
   describe('third-party stderr chatter is not an error', () => {
     // These are the lines the corpus run recorded as ERROR.
     it('does not mark model-load progress as ERROR', () => {
-      expect(levelOf('Downloading model.safetensors:  42%|████      | 180M/430M')).toBe('UNKNOWN');
+      expect(
+        levelOf('Downloading model.safetensors:  42%|████      | 180M/430M'),
+      ).toBe('UNKNOWN');
     });
 
     it('does not mark a transformer compatibility notice as ERROR', () => {
       expect(
-        levelOf('Some weights of the model checkpoint were not used when initializing'),
+        levelOf(
+          'Some weights of the model checkpoint were not used when initializing',
+        ),
       ).toBe('UNKNOWN');
     });
 
     it('does not mark an OpenCV/AV duplicate-class warning as ERROR', () => {
       expect(
-        levelOf('objc[1234]: Class AVFFrameReceiver is implemented in both libavdevice'),
+        levelOf(
+          'objc[1234]: Class AVFFrameReceiver is implemented in both libavdevice',
+        ),
       ).toBe('UNKNOWN');
     });
 

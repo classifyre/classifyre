@@ -416,7 +416,9 @@ export class AssistantService {
     if (result.ok) {
       // Deterministic UI sync + attachments come from the server, not the
       // model, so the page state never depends on model compliance.
-      state.actions.push(...buildPostOperationActions(pending.tool, result.result));
+      state.actions.push(
+        ...buildPostOperationActions(pending.tool, result.result),
+      );
       state.messages.push({
         role: 'user',
         content: [
@@ -798,7 +800,7 @@ function buildPostOperationActions(
             typeof record.isActive === 'boolean' ? record.isActive : true,
           config:
             record.config && typeof record.config === 'object'
-              ? (record.config as Record<string, unknown>)
+              ? record.config
               : {},
         },
       },

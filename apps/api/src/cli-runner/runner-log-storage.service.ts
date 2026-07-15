@@ -804,7 +804,8 @@ export class RunnerLogStorageService implements OnModuleInit, OnModuleDestroy {
     if (prefixed !== 'UNKNOWN') return prefixed;
 
     // A Python traceback carries no level token but is unambiguously an error.
-    if (/^\s*Traceback \(most recent call last\)/m.test(message)) return 'ERROR';
+    if (/^\s*Traceback \(most recent call last\)/m.test(message))
+      return 'ERROR';
 
     // Deliberately NOT `stream === 'stderr' ? 'ERROR' : 'UNKNOWN'`. Python's
     // logging writes every level to stderr, and libraries print progress bars
@@ -827,12 +828,17 @@ export class RunnerLogStorageService implements OnModuleInit, OnModuleDestroy {
 
     // The CLI's own format: "INFO:src.pipeline: message" (see main.py's
     // basicConfig), plus the common "[INFO]" / "INFO -" / "INFO:" variants.
-    const leading = message.match(new RegExp(`^\\s*\\[?${LEVEL}\\]?\\s*[:\\-|\\s]`, 'i'));
+    const leading = message.match(
+      new RegExp(`^\\s*\\[?${LEVEL}\\]?\\s*[:\\-|\\s]`, 'i'),
+    );
     if (leading?.[1]) return this.normalizeLevel(leading[1]);
 
     // Timestamped: "2026-07-15 10:00:00,123 - name - INFO - message".
     const timestamped = message.match(
-      new RegExp(`^\\s*\\d{4}-\\d{2}-\\d{2}[T ][\\d:.,]+\\s*[-|]?\\s*[^-|]*[-|]\\s*${LEVEL}\\b`, 'i'),
+      new RegExp(
+        `^\\s*\\d{4}-\\d{2}-\\d{2}[T ][\\d:.,]+\\s*[-|]?\\s*[^-|]*[-|]\\s*${LEVEL}\\b`,
+        'i',
+      ),
     );
     if (timestamped?.[1]) return this.normalizeLevel(timestamped[1]);
 
