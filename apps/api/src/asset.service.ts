@@ -1346,11 +1346,16 @@ export class AssetService {
   ) {
     const finalizeRun = options?.finalizeRun ?? true;
     const skipFindings = options?.skipFindings ?? false;
-    const { source } = await this.assertSourceAndRunner(sourceId, runnerId);
-    const scopeFingerprint = computeScopeFingerprint(
-      source.type,
-      source.config,
+    const { source, runner } = await this.assertSourceAndRunner(
+      sourceId,
+      runnerId,
     );
+    // A run covers the scope that existed when the runner was created. Source
+    // config may change while a long scan is in flight, so deriving this from
+    // the live source can stamp one run with multiple incompatible scopes.
+    const scopeFingerprint =
+      runner.scopeFingerprint ??
+      computeScopeFingerprint(source.type, source.config);
 
     // Process in batches to avoid transaction timeout.
     // Each batch runs its own transaction (timeout: 60 s). Keep batches small
@@ -1467,21 +1472,25 @@ export class AssetService {
     outOfScope: number;
     resolvedForAbsence: number;
   }> {
-    const { source } = await this.assertSourceAndRunner(sourceId, runnerId);
+    const { source, runner } = await this.assertSourceAndRunner(
+      sourceId,
+      runnerId,
+    );
 
     if (!isFullScan) {
       // Sampling means not all assets appear in every run — no deletion logic.
       return { deleted: 0, outOfScope: 0, resolvedForAbsence: 0 };
     }
 
-    const scopeFingerprint = computeScopeFingerprint(
-      source.type,
-      source.config,
-    );
-    await this.prisma.runner.update({
-      where: { id: runnerId },
-      data: { scopeFingerprint },
-    });
+    const scopeFingerprint =
+      runner.scopeFingerprint ??
+      computeScopeFingerprint(source.type, source.config);
+    if (!runner.scopeFingerprint) {
+      await this.prisma.runner.update({
+        where: { id: runnerId },
+        data: { scopeFingerprint },
+      });
+    }
 
     // A full scan that saw nothing is far more likely to be a broken mount, a
     // bad filter, or a credential failure than a source that genuinely emptied.
@@ -1995,7 +2004,7 @@ export class AssetService {
                     if (!raw || typeof raw !== 'object') return null;
                     const filtered = Object.fromEntries(
                       Object.entries(raw as Record<string, unknown>).filter(
-                        ([k]) => k !== 'embedding',
+                        ([k]) => k !== 'embedding' && k !== 'pipeline_result',
                       ),
                     );
                     return Object.keys(filtered).length > 0 ? filtered : null;

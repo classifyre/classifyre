@@ -1,7 +1,8 @@
 import { CliRunnerService } from './cli-runner.service';
 import { MaskedConfigCryptoService } from '../masked-config-crypto.service';
 import * as fs from 'fs/promises';
-import { RunnerExecutionMode, RunnerStatus } from '@prisma/client';
+import { AssetType, RunnerExecutionMode, RunnerStatus } from '@prisma/client';
+import { computeScopeFingerprint } from '../utils/scope-fingerprint';
 
 jest.mock('@kubernetes/client-node', () => ({
   KubeConfig: class {
@@ -518,6 +519,8 @@ describe('CliRunnerService', () => {
     prisma.source.findUnique.mockResolvedValue({
       id: 'source-1',
       runnerStatus: 'COMPLETED',
+      type: AssetType.WORDPRESS,
+      config: { required: { url: 'https://example.test' } },
     });
     prisma.source.updateMany.mockResolvedValue({ count: 1 });
     prisma.runner.create.mockResolvedValue({
@@ -534,6 +537,9 @@ describe('CliRunnerService', () => {
           sourceId: 'source-1',
           status: 'RUNNING',
           triggeredBy: 'cli-user',
+          scopeFingerprint: computeScopeFingerprint(AssetType.WORDPRESS, {
+            required: { url: 'https://example.test' },
+          }),
         }),
       }),
     );
@@ -597,6 +603,7 @@ describe('CliRunnerService', () => {
           id: 'source-1',
           runnerStatus: RunnerStatus.RUNNING,
           currentRunnerId: 'missing-runner',
+          type: AssetType.POSTGRESQL,
           config: encryptedConfig,
         }),
         update: jest.fn().mockResolvedValue({}),
@@ -683,6 +690,10 @@ describe('CliRunnerService', () => {
       data: expect.objectContaining({
         sourceId: 'source-1',
         status: RunnerStatus.PENDING,
+        scopeFingerprint: computeScopeFingerprint(
+          AssetType.POSTGRESQL,
+          encryptedConfig,
+        ),
       }),
     });
     expect(runnerLogStorage.initializeRunner).toHaveBeenCalledWith(

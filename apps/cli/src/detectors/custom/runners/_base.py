@@ -47,10 +47,10 @@ _IMAGE_INPUT_CONTENT_TYPES = [*_IMAGE_CONTENT_TYPES, "application/pdf"]
 
 logger = logging.getLogger(__name__)
 
-# Cap per-label entity spans embedded in each finding's metadata. Every finding
-# carries a copy of the pipeline result (the API builds extraction rows from it),
-# so an uncapped regex with thousands of matches would blow up the scan payload
-# quadratically.
+# Cap per-label entity spans carried through the dedicated extracted_data field.
+# The API moves this into CustomDetectorExtraction and does not persist it in
+# Finding.metadata. It is still repeated in the wire payload until extraction
+# becomes page-scoped, so the cap prevents quadratic request growth.
 _MAX_EMBEDDED_SPANS_PER_LABEL = 25
 
 
@@ -139,6 +139,7 @@ class BaseRunner(ABC):
         matched_content: str,
         location: Location | None,
         metadata: dict[str, Any],
+        extracted_data: dict[str, Any] | None = None,
     ) -> DetectionResult:
         return DetectionResult(
             detector_type=DetectorType.CUSTOM,
@@ -152,6 +153,7 @@ class BaseRunner(ABC):
             custom_detector_name=self._detector_name,
             detected_at=datetime.now(UTC),
             metadata=metadata,
+            extracted_data=extracted_data,
         )
 
     def _result_to_findings(self, text: str, result: PipelineResult) -> list[DetectionResult]:
@@ -185,7 +187,6 @@ class BaseRunner(ABC):
                 meta: dict[str, Any] = {
                     "runner": runner_type,
                     "entity_label": label,
-                    "pipeline_result": pipeline_result_dump,
                 }
                 if "groups" in span:
                     meta["capture_groups"] = span["groups"]
@@ -199,6 +200,7 @@ class BaseRunner(ABC):
                         matched_content=value,
                         location=loc,
                         metadata=meta,
+                        extracted_data=pipeline_result_dump,
                     )
                 )
 
@@ -220,8 +222,8 @@ class BaseRunner(ABC):
                         "runner": runner_type,
                         "task": task,
                         "label": label,
-                        "pipeline_result": pipeline_result_dump,
                     },
+                    extracted_data=pipeline_result_dump,
                 )
             )
 

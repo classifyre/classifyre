@@ -1823,6 +1823,32 @@ describe('AssetService', () => {
         );
       });
 
+      it('uses the runner scope snapshot when source config changes mid-run', async () => {
+        const snapshottedScope = 'a'.repeat(64);
+        mockPrismaService.runner.findUnique.mockResolvedValue({
+          id: runnerId,
+          sourceId,
+          scopeFingerprint: snapshottedScope,
+        });
+        mockPrismaService.asset.findMany.mockResolvedValue([
+          {
+            id: 'deleted-from-original-scope',
+            hash: 'deleted-hash',
+            scopeFingerprint: snapshottedScope,
+          },
+        ]);
+
+        const result = await service.finalizeIngestRun(
+          sourceId,
+          runnerId,
+          ['seen-hash'],
+          true,
+        );
+
+        expect(result).toMatchObject({ deleted: 1, outOfScope: 0 });
+        expect(mockPrismaService.runner.update).not.toHaveBeenCalled();
+      });
+
       it('records the scope it covered on the runner', async () => {
         mockPrismaService.asset.findMany.mockResolvedValue([]);
 

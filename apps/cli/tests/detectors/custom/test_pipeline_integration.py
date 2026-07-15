@@ -115,7 +115,9 @@ async def test_regex_detector_finding_metadata():
     for f in findings:
         assert f.finding_type.startswith("regex:")
         assert f.metadata["runner"] == "REGEX"
-        assert "pipeline_result" in f.metadata
+        assert "pipeline_result" not in f.metadata
+        assert f.extracted_data is not None
+        assert "entities" in f.extracted_data
 
 
 @pytest.mark.asyncio
@@ -165,7 +167,9 @@ async def test_gliner2_detector_metadata():
 
     for f in findings:
         assert f.metadata["runner"] == "GLINER2"
-        assert "pipeline_result" in f.metadata
+        assert "pipeline_result" not in f.metadata
+        assert f.extracted_data is not None
+        assert "entities" in f.extracted_data
 
 
 @pytest.mark.asyncio

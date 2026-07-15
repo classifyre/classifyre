@@ -38,6 +38,7 @@ import { KubernetesCliJobService } from './kubernetes-cli-job.service';
 import { MaskedConfigCryptoService } from '../masked-config-crypto.service';
 import { RunnerLogStorageService } from './runner-log-storage.service';
 import { CustomDetectorsService } from '../custom-detectors.service';
+import { computeScopeFingerprint } from '../utils/scope-fingerprint';
 import {
   SearchRunnersRequestDto,
   SearchRunnersSortBy,
@@ -511,6 +512,10 @@ export class CliRunnerService implements OnApplicationBootstrap {
             triggeredBy,
             status: RunnerStatus.PENDING,
             executionMode,
+            scopeFingerprint: computeScopeFingerprint(
+              source.type,
+              source.config,
+            ),
           },
         });
 
@@ -893,10 +898,8 @@ export class CliRunnerService implements OnApplicationBootstrap {
   async createExternalRunner(sourceId: string, triggeredBy?: string) {
     const { runner, previousSourceState } = await this.prisma.$transaction(
       async (tx) => {
-        const { previousSourceState } = await this.claimSourceForRunnerCreation(
-          tx,
-          sourceId,
-        );
+        const { source, previousSourceState } =
+          await this.claimSourceForRunnerCreation(tx, sourceId);
 
         const runner = await tx.runner.create({
           data: {
@@ -906,6 +909,10 @@ export class CliRunnerService implements OnApplicationBootstrap {
             status: RunnerStatus.RUNNING,
             startedAt: new Date(),
             executionMode: RunnerExecutionMode.EXTERNAL,
+            scopeFingerprint: computeScopeFingerprint(
+              source.type,
+              source.config,
+            ),
           },
         });
 
