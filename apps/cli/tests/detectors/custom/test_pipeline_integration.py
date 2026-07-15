@@ -68,7 +68,7 @@ def _make_gliner2_detector(key: str = "test_gliner2") -> CustomDetector:
             "amount": [{"text": "320€", "confidence": 0.88, "start": 63, "end": 67}],
         }
     }
-    mock_model.classify.return_value = {"label": "refund", "confidence": 0.95}
+    mock_model.classify_text.return_value = {"intent": {"label": "refund", "confidence": 0.95}}
 
     config = CustomDetectorConfig(
         custom_detector_key=key,
@@ -179,7 +179,7 @@ async def test_gliner2_confidence_threshold_filters_low_scores():
             ]
         }
     }
-    mock_model.classify.return_value = {}
+    mock_model.classify_text.return_value = {}
 
     config = CustomDetectorConfig(
         custom_detector_key="threshold_test",

@@ -66,7 +66,14 @@ interface LoopProgress {
    */
   inputTokens?: number;
   outputTokens?: number;
+  /** Mutations performed. Each one has a persisted decision row. */
   applied: number;
+  /**
+   * Successful read tools. Counted separately from `applied` so a run that
+   * only looked around cannot report having changed anything.
+   * Optional: progress persisted before this existed lacks it — default to 0.
+   */
+  readOk?: number;
   skippedObserveOnly: number;
   failed: number;
   createdInquiries: Array<{ id: string; title: string }>;
@@ -204,6 +211,7 @@ export async function runAgentLoop(
   return {
     summary: {
       applied: progress.applied,
+      readOk: progress.readOk ?? 0,
       skippedObserveOnly: progress.skippedObserveOnly,
       failed: progress.failed,
       createdInquiries: progress.createdInquiries,
@@ -246,6 +254,7 @@ function loadProgress(
     inputTokens: 0,
     outputTokens: 0,
     applied: 0,
+    readOk: 0,
     skippedObserveOnly: 0,
     failed: 0,
     createdInquiries: [],
@@ -288,6 +297,9 @@ function tallyResult(
         pushCreated(progress.createdInquiries, result.result);
       if (toolName === 'cases.create')
         pushCreated(progress.createdCases, result.result);
+      break;
+    case 'READ_OK':
+      progress.readOk = (progress.readOk ?? 0) + 1;
       break;
     case 'SKIPPED_OBSERVE_ONLY':
       progress.skippedObserveOnly++;

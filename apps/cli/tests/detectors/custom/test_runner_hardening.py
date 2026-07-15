@@ -46,7 +46,7 @@ def _gliner2_runner(mock_model: MagicMock) -> GLiNER2Runner:
 def test_gliner2_short_text_uses_plain_extract() -> None:
     mock_model = MagicMock()
     mock_model.extract_entities.return_value = {"entities": {}}
-    mock_model.classify.return_value = {"label": "refund", "confidence": 0.9}
+    mock_model.classify_text.return_value = {"intent": {"label": "refund", "confidence": 0.9}}
     runner = _gliner2_runner(mock_model)
 
     runner.run("short text")
@@ -58,7 +58,7 @@ def test_gliner2_short_text_uses_plain_extract() -> None:
 def test_gliner2_long_text_uses_chunked_extract() -> None:
     mock_model = MagicMock()
     mock_model.extract_entities_long.return_value = {"entities": {}}
-    mock_model.classify.return_value = {"label": "refund", "confidence": 0.9}
+    mock_model.classify_text.return_value = {"intent": {"label": "refund", "confidence": 0.9}}
     runner = _gliner2_runner(mock_model)
 
     runner.run("x" * (_LONG_TEXT_CHAR_THRESHOLD + 1))
@@ -68,9 +68,11 @@ def test_gliner2_long_text_uses_chunked_extract() -> None:
 
 
 def test_gliner2_long_text_falls_back_when_long_api_missing() -> None:
-    mock_model = MagicMock(spec=["extract_entities", "classify"])
+    # spec pins the surface to what the real gliner2 class exposes: no
+    # extract_entities_long, and classify_text rather than classify.
+    mock_model = MagicMock(spec=["extract_entities", "classify_text"])
     mock_model.extract_entities.return_value = {"entities": {}}
-    mock_model.classify.return_value = {"label": "refund", "confidence": 0.9}
+    mock_model.classify_text.return_value = {"intent": {"label": "refund", "confidence": 0.9}}
     runner = _gliner2_runner(mock_model)
 
     runner.run("x" * (_LONG_TEXT_CHAR_THRESHOLD + 1))
@@ -81,16 +83,17 @@ def test_gliner2_long_text_falls_back_when_long_api_missing() -> None:
 def test_gliner2_long_text_classification_keeps_max_confidence() -> None:
     mock_model = MagicMock()
     mock_model.extract_entities_long.return_value = {"entities": {}}
-    mock_model.classify.side_effect = [
-        {"label": "question", "confidence": 0.55},
-        {"label": "refund", "confidence": 0.97},
-        {"label": "question", "confidence": 0.61},
+    # classify_text returns results keyed by task name — see gliner2>=1.3.
+    mock_model.classify_text.side_effect = [
+        {"intent": {"label": "question", "confidence": 0.55}},
+        {"intent": {"label": "refund", "confidence": 0.97}},
+        {"intent": {"label": "question", "confidence": 0.61}},
     ] * 10
     runner = _gliner2_runner(mock_model)
 
     result = runner.run("word " * 2000)  # ~10k chars → multiple chunks
 
-    assert mock_model.classify.call_count > 1
+    assert mock_model.classify_text.call_count > 1
     assert result.classification["intent"]["label"] == "refund"
     assert result.classification["intent"]["confidence"] == pytest.approx(0.97)
 

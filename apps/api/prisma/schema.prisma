@@ -361,6 +361,12 @@ model RunnerAsset {
   findingsBySeverity Json? @map("findings_by_severity")
   findingsByDetector Json? @map("findings_by_detector")
   metadata           Json? @map("metadata") @db.JsonB
+  // Per-detector outcome for this asset, as reported by the CLI:
+  // [{ detector_type, custom_detector_key, status: OK|ERROR, error }].
+  // A finding may only be auto-resolved for absence when its detector has an
+  // OK outcome here — a detector that crashed (or never ran) proves nothing
+  // about whether its earlier findings are still present.
+  detectorOutcomes   Json? @map("detector_outcomes") @db.JsonB
   createdAt        DateTime          @default(now()) @map("created_at")
 
   runner Runner @relation(fields: [runnerId], references: [id], onDelete: Cascade)

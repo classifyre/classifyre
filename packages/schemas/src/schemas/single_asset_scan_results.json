@@ -298,6 +298,13 @@
           },
           "type": "array"
         },
+        "detector_outcomes": {
+          "description": "Per-detector outcome for this asset. detectors_run lists what was attempted and cannot distinguish a detector that completed cleanly from one that crashed; this does.",
+          "items": {
+            "$ref": "#/definitions/DetectorOutcome"
+          },
+          "type": "array"
+        },
         "content_size_bytes": {
           "description": "Size of the content that was scanned",
           "type": "integer"
@@ -495,6 +502,60 @@
         "matched_content"
       ],
       "title": "DetectionResult",
+      "type": "object"
+    },
+    "DetectorOutcome": {
+      "description": "Outcome of a single detector on a single asset. A detector that raised is reported with status ERROR: it produced no findings, but that absence is a failure rather than a clean result. Consumers must not treat an ERROR detector's silence as evidence that its previous findings are gone.",
+      "properties": {
+        "detector_type": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/DetectorType"
+            }
+          ],
+          "description": "Detector family that was attempted"
+        },
+        "custom_detector_key": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Stable key of the custom detector when detector_type is CUSTOM. Required to tell two custom detectors apart, since both report detector_type CUSTOM.",
+          "title": "Custom Detector Key"
+        },
+        "status": {
+          "description": "OK means the detector completed; it may still have found nothing. ERROR means it raised and its result is unknown.",
+          "enum": [
+            "OK",
+            "ERROR"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "error": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Failure detail when status is ERROR",
+          "title": "Error"
+        }
+      },
+      "required": [
+        "detector_type",
+        "status"
+      ],
+      "title": "DetectorOutcome",
       "type": "object"
     }
   }

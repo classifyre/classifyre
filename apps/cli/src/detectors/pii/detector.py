@@ -770,6 +770,22 @@ class PIIDetector(BaseDetector):
     def _get_severity_for_entity(self, entity_type: str) -> Severity:
         e = entity_type.upper()
 
+        # An explicit override always wins: a recognizer's severity depends on
+        # the corpus, not on its label. A CREDIT_CARD hit is critical in a
+        # payments export and noise in an OCR'd court transcript.
+        overrides = getattr(self._cfg, "severity_overrides", None) or {}
+        if isinstance(overrides, dict):
+            override = overrides.get(e) or overrides.get(entity_type)
+            if override is not None:
+                try:
+                    return Severity(str(override).lower())
+                except ValueError:
+                    logger.warning(
+                        "Ignoring invalid severity override '%s' for entity %s",
+                        override,
+                        e,
+                    )
+
         # Critical — government IDs, financial account numbers, biometric IDs
         if e in {
             "CREDIT_CARD",
@@ -820,7 +836,12 @@ class PIIDetector(BaseDetector):
         if e in {"PERSON", "LOCATION", "DATE_TIME", "NRP", "URL"}:
             return Severity.medium
 
-        return Severity.high
+        # Unknown entity types — including every custom recognizer and anything
+        # Presidio adds upstream — default to medium rather than high. Severity
+        # is a claim about the label, not about evidence quality, and defaulting
+        # unrecognised labels to HIGH inflated the corpus's severity histogram
+        # without any review having happened.
+        return Severity.medium
 
     # ------------------------------------------------------------------
     # Public API

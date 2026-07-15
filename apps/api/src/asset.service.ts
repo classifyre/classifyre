@@ -209,6 +209,74 @@ export class AssetService {
     return undefined;
   }
 
+  /**
+   * Extract the CLI's per-detector outcomes from an incoming asset payload.
+   *
+   * Returns undefined (rather than an empty array) when the payload carries
+   * none, so an older CLI — or a streaming stub sent before detectors run —
+   * leaves any previously recorded outcomes untouched instead of erasing them.
+   */
+  private normalizeDetectorOutcomes(
+    asset: Record<string, any>,
+  ): Prisma.InputJsonValue | undefined {
+    const outcomes = asset?.scan_stats?.detector_outcomes;
+    if (!Array.isArray(outcomes) || outcomes.length === 0) return undefined;
+
+    const normalized = outcomes
+      .filter((o) => o && typeof o === 'object' && o.detector_type && o.status)
+      .map((o) => ({
+        detector_type: String(o.detector_type).toUpperCase(),
+        custom_detector_key:
+          typeof o.custom_detector_key === 'string' ? o.custom_detector_key : null,
+        status: String(o.status).toUpperCase() === 'OK' ? 'OK' : 'ERROR',
+        ...(typeof o.error === 'string' ? { error: o.error } : {}),
+      }));
+
+    return normalized.length > 0 ? normalized : undefined;
+  }
+
+  /**
+   * Build the set of (detector, asset) pairs this run may resolve findings for.
+   *
+   * Keys are `assetHash|DETECTOR_TYPE|customKey`. Membership means the detector
+   * completed on that asset, so a finding it did not re-report is genuinely
+   * gone. Absence means the detector crashed, never ran, or predates outcome
+   * reporting — in every one of those cases its silence proves nothing and its
+   * findings must be left alone.
+   */
+  private buildResolutionManifest(
+    runnerAssets: { assetHash: string; detectorOutcomes: unknown }[],
+  ): Set<string> {
+    const manifest = new Set<string>();
+    for (const { assetHash, detectorOutcomes } of runnerAssets) {
+      if (!Array.isArray(detectorOutcomes)) continue;
+      for (const outcome of detectorOutcomes) {
+        if (!outcome || typeof outcome !== 'object') continue;
+        const { detector_type, custom_detector_key, status } = outcome as Record<
+          string,
+          unknown
+        >;
+        if (status !== 'OK' || typeof detector_type !== 'string') continue;
+        manifest.add(
+          this.resolutionKey(
+            assetHash,
+            detector_type,
+            typeof custom_detector_key === 'string' ? custom_detector_key : null,
+          ),
+        );
+      }
+    }
+    return manifest;
+  }
+
+  private resolutionKey(
+    assetHash: string,
+    detectorType: string,
+    customDetectorKey: string | null,
+  ): string {
+    return `${assetHash}|${detectorType.toUpperCase()}|${customDetectorKey ?? ''}`;
+  }
+
   private normalizeBoolean(value: unknown): boolean {
     if (typeof value === 'boolean') {
       return value;
@@ -1339,12 +1407,16 @@ export class AssetService {
     runnerId: string,
     seenHashes: string[],
     isFullScan: boolean,
-  ): Promise<{ deleted: number; outOfScope: number }> {
+  ): Promise<{
+    deleted: number;
+    outOfScope: number;
+    resolvedForAbsence: number;
+  }> {
     const { source } = await this.assertSourceAndRunner(sourceId, runnerId);
 
     if (!isFullScan) {
       // Sampling means not all assets appear in every run — no deletion logic.
-      return { deleted: 0, outOfScope: 0 };
+      return { deleted: 0, outOfScope: 0, resolvedForAbsence: 0 };
     }
 
     const scopeFingerprint = computeScopeFingerprint(source.type, source.config);
@@ -1363,7 +1435,7 @@ export class AssetService {
           `${sourceId} with zero assets seen. Skipping retirement — a zero-result ` +
           `scan is treated as a failed scan, not an emptied source.`,
       );
-      return { deleted: 0, outOfScope: 0 };
+      return { deleted: 0, outOfScope: 0, resolvedForAbsence: 0 };
     }
 
     // Full scan (strategy=ALL): every object in the *current* scope was visited,
@@ -1398,15 +1470,15 @@ export class AssetService {
       );
     }
 
-    if (deletableAssets.length === 0) {
-      await this.prisma.runner.update({
-        where: { id: runnerId },
-        data: { assetsDeleted: 0, assetsOutOfScope: outOfScopeAssets.length },
-      });
-      return { deleted: 0, outOfScope: outOfScopeAssets.length };
-    }
-
     const missingAssetIds = deletableAssets.map((a) => a.id);
+
+    // Which (asset, detector) pairs completed cleanly in this run. Only their
+    // findings may be resolved for absence — see buildResolutionManifest.
+    const runnerAssets = await this.prisma.runnerAsset.findMany({
+      where: { runnerId },
+      select: { assetHash: true, detectorOutcomes: true },
+    });
+    const resolutionManifest = this.buildResolutionManifest(runnerAssets);
 
     const hasManualStatusOverride = (finding: any): boolean => {
       const history = Array.isArray(finding.history) ? finding.history : [];
@@ -1420,21 +1492,29 @@ export class AssetService {
         : false;
     };
 
+    let resolvedForAbsence = 0;
+
     await this.prisma.$transaction(
       async (tx) => {
         // Mark assets as DELETED
-        await tx.asset.updateMany({
-          where: { id: { in: missingAssetIds } },
-          data: { status: AssetStatus.DELETED, runnerId },
-        });
+        if (missingAssetIds.length > 0) {
+          await tx.asset.updateMany({
+            where: { id: { in: missingAssetIds } },
+            data: { status: AssetStatus.DELETED, runnerId },
+          });
+        }
 
-        // Resolve open findings on deleted assets
-        const openFindings = await tx.finding.findMany({
-          where: {
-            assetId: { in: missingAssetIds },
-            status: FindingStatus.OPEN,
-          },
-        });
+        // Resolve open findings on deleted assets. The asset itself is gone, so
+        // this needs no detector manifest — nothing can re-detect on it.
+        const openFindings =
+          missingAssetIds.length > 0
+            ? await tx.finding.findMany({
+                where: {
+                  assetId: { in: missingAssetIds },
+                  status: FindingStatus.OPEN,
+                },
+              })
+            : [];
 
         const findingsToResolve = openFindings.filter(
           (f) => !hasManualStatusOverride(f),
@@ -1466,9 +1546,15 @@ export class AssetService {
           });
         }
 
-        // Resolve findings on assets that were scanned but whose findings
-        // were not re-detected. finding.runnerId is updated on create/re-detect,
-        // so a stale runnerId means the finding was absent from this run.
+        // Resolve findings on assets that were scanned but whose findings were
+        // not re-detected. finding.runnerId is updated on create/re-detect, so
+        // a stale runnerId means the finding was absent from this run.
+        //
+        // Absence alone is not enough. It previously was, on the reasoning that
+        // a scanned asset means every detector re-reported — which is false when
+        // a detector crashed, was removed from the config, or never applied to
+        // that content type. The manifest narrows this to detectors that
+        // actually completed on that specific asset.
         const staleFindings = await tx.finding.findMany({
           where: {
             sourceId,
@@ -1479,11 +1565,31 @@ export class AssetService {
               status: { not: AssetStatus.DELETED },
             },
           },
+          include: { asset: { select: { hash: true } } },
         });
 
-        for (const finding of staleFindings.filter(
-          (f) => !hasManualStatusOverride(f),
-        )) {
+        const resolvableStaleFindings = staleFindings.filter((f) => {
+          if (hasManualStatusOverride(f)) return false;
+          return resolutionManifest.has(
+            this.resolutionKey(
+              f.asset.hash,
+              f.detectorType,
+              f.customDetectorKey ?? null,
+            ),
+          );
+        });
+
+        const skipped = staleFindings.length - resolvableStaleFindings.length;
+        if (skipped > 0) {
+          console.warn(
+            `[finalizeIngestRun] Source ${sourceId}: leaving ${skipped} finding(s) ` +
+              `OPEN despite not being re-detected — their detector did not complete ` +
+              `on that asset in this run, so its silence is not evidence of absence.`,
+          );
+        }
+        resolvedForAbsence = resolvableStaleFindings.length;
+
+        for (const finding of resolvableStaleFindings) {
           const currentHistory = Array.isArray(finding.history)
             ? finding.history
             : [];
@@ -1527,6 +1633,7 @@ export class AssetService {
     return {
       deleted: missingAssetIds.length,
       outOfScope: outOfScopeAssets.length,
+      resolvedForAbsence,
     };
   }
 
@@ -1699,12 +1806,20 @@ export class AssetService {
         // Denormalize metadata onto the runner_asset row (keyed by runnerId +
         // assetHash) for convenient display without an Asset join. updateMany
         // no-ops when the row was not (yet) registered for this runner.
+        //
+        // The CLI's per-detector outcomes ride along here: finalizeIngestRun
+        // needs them to decide which findings may be resolved for absence, and
+        // it runs as a separate request once every batch has landed.
         for (const asset of batch) {
           const metadata = this.normalizeMetadata(asset.metadata);
-          if (metadata === undefined) continue;
+          const detectorOutcomes = this.normalizeDetectorOutcomes(asset);
+          if (metadata === undefined && detectorOutcomes === undefined) continue;
           await tx.runnerAsset.updateMany({
             where: { runnerId, assetHash: String(asset.hash) },
-            data: { metadata },
+            data: {
+              ...(metadata !== undefined ? { metadata } : {}),
+              ...(detectorOutcomes !== undefined ? { detectorOutcomes } : {}),
+            },
           });
         }
 

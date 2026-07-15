@@ -799,11 +799,43 @@ export class RunnerLogStorageService implements OnModuleInit, OnModuleDestroy {
         if (normalized !== 'UNKNOWN') return normalized;
       }
     }
-    const match = message.match(
-      /\b(trace|debug|info|warn(?:ing)?|error|fatal|critical)\b/i,
+
+    const prefixed = this.matchLevelPrefix(message);
+    if (prefixed !== 'UNKNOWN') return prefixed;
+
+    // A Python traceback carries no level token but is unambiguously an error.
+    if (/^\s*Traceback \(most recent call last\)/m.test(message)) return 'ERROR';
+
+    // Deliberately NOT `stream === 'stderr' ? 'ERROR' : 'UNKNOWN'`. Python's
+    // logging writes every level to stderr, and libraries print progress bars
+    // and advisory notices there too, so the stream says nothing about
+    // severity. Treating it as ERROR is what buried real failures under model
+    // download progress and OpenCV warnings, making the ERROR count useless.
+    return 'UNKNOWN';
+  }
+
+  /**
+   * Read a level only where a logger would actually put one: at the start of
+   * the line, or in the level field of a common timestamped format.
+   *
+   * The previous free-text scan matched the first level word anywhere in the
+   * message, so "no error found" was an ERROR and a path containing "debug"
+   * was DEBUG.
+   */
+  private matchLevelPrefix(message: string): LogLevel {
+    const LEVEL = '(TRACE|DEBUG|INFO|WARNING|WARN|ERROR|FATAL|CRITICAL)';
+
+    // The CLI's own format: "INFO:src.pipeline: message" (see main.py's
+    // basicConfig), plus the common "[INFO]" / "INFO -" / "INFO:" variants.
+    const leading = message.match(new RegExp(`^\\s*\\[?${LEVEL}\\]?\\s*[:\\-|\\s]`, 'i'));
+    if (leading?.[1]) return this.normalizeLevel(leading[1]);
+
+    // Timestamped: "2026-07-15 10:00:00,123 - name - INFO - message".
+    const timestamped = message.match(
+      new RegExp(`^\\s*\\d{4}-\\d{2}-\\d{2}[T ][\\d:.,]+\\s*[-|]?\\s*[^-|]*[-|]\\s*${LEVEL}\\b`, 'i'),
     );
-    if (match?.[1]) return this.normalizeLevel(match[1]);
-    if (stream === 'stderr') return 'ERROR';
+    if (timestamped?.[1]) return this.normalizeLevel(timestamped[1]);
+
     return 'UNKNOWN';
   }
 

@@ -112,6 +112,18 @@ export interface SearchRunnerItemDto {
      */
     assetsDeleted: number;
     /**
+     * Assets absent from this run but retained because they were ingested under a different source scope. Their findings remain OPEN. A non-zero value means the scope moved and those assets are no longer covered.
+     * @type {number}
+     * @memberof SearchRunnerItemDto
+     */
+    assetsOutOfScope: number;
+    /**
+     * Fingerprint of the scope-determining config this run covered. Runs sharing a fingerprint are directly comparable.
+     * @type {string}
+     * @memberof SearchRunnerItemDto
+     */
+    scopeFingerprint?: string | null;
+    /**
      * 
      * @type {number}
      * @memberof SearchRunnerItemDto
@@ -198,6 +210,7 @@ export function instanceOfSearchRunnerItemDto(value: object): value is SearchRun
     if (!('assetsUpdated' in value) || value['assetsUpdated'] === undefined) return false;
     if (!('assetsUnchanged' in value) || value['assetsUnchanged'] === undefined) return false;
     if (!('assetsDeleted' in value) || value['assetsDeleted'] === undefined) return false;
+    if (!('assetsOutOfScope' in value) || value['assetsOutOfScope'] === undefined) return false;
     if (!('totalFindings' in value) || value['totalFindings'] === undefined) return false;
     return true;
 }
@@ -226,6 +239,8 @@ export function SearchRunnerItemDtoFromJSONTyped(json: any, ignoreDiscriminator:
         'assetsUpdated': json['assetsUpdated'],
         'assetsUnchanged': json['assetsUnchanged'],
         'assetsDeleted': json['assetsDeleted'],
+        'assetsOutOfScope': json['assetsOutOfScope'],
+        'scopeFingerprint': json['scopeFingerprint'] == null ? undefined : json['scopeFingerprint'],
         'totalFindings': json['totalFindings'],
         'errorMessage': json['errorMessage'] == null ? undefined : json['errorMessage'],
         'errorDetails': json['errorDetails'] == null ? undefined : json['errorDetails'],
@@ -260,6 +275,8 @@ export function SearchRunnerItemDtoToJSONTyped(value?: SearchRunnerItemDto | nul
         'assetsUpdated': value['assetsUpdated'],
         'assetsUnchanged': value['assetsUnchanged'],
         'assetsDeleted': value['assetsDeleted'],
+        'assetsOutOfScope': value['assetsOutOfScope'],
+        'scopeFingerprint': value['scopeFingerprint'],
         'totalFindings': value['totalFindings'],
         'errorMessage': value['errorMessage'],
         'errorDetails': value['errorDetails'],

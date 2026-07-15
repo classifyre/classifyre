@@ -15149,6 +15149,16 @@
             "type": "number",
             "default": 0
           },
+          "assetsOutOfScope": {
+            "type": "number",
+            "default": 0,
+            "description": "Assets absent from this run but retained because they were ingested under a different source scope. Their findings remain OPEN. A non-zero value means the scope moved and those assets are no longer covered."
+          },
+          "scopeFingerprint": {
+            "type": "string",
+            "nullable": true,
+            "description": "Fingerprint of the scope-determining config this run covered. Runs sharing a fingerprint are directly comparable."
+          },
           "totalFindings": {
             "type": "number",
             "default": 0
@@ -15184,6 +15194,7 @@
           "assetsUpdated",
           "assetsUnchanged",
           "assetsDeleted",
+          "assetsOutOfScope",
           "totalFindings"
         ]
       },
@@ -15747,6 +15758,16 @@
             "type": "number",
             "default": 0
           },
+          "assetsOutOfScope": {
+            "type": "number",
+            "default": 0,
+            "description": "Assets absent from this run but retained because they were ingested under a different source scope. Their findings remain OPEN. A non-zero value means the scope moved and those assets are no longer covered."
+          },
+          "scopeFingerprint": {
+            "type": "string",
+            "nullable": true,
+            "description": "Fingerprint of the scope-determining config this run covered. Runs sharing a fingerprint are directly comparable."
+          },
           "totalFindings": {
             "type": "number",
             "default": 0
@@ -15781,6 +15802,7 @@
           "assetsUpdated",
           "assetsUnchanged",
           "assetsDeleted",
+          "assetsOutOfScope",
           "totalFindings"
         ]
       },

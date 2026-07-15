@@ -61,10 +61,13 @@ describe('ToolDispatcherService', () => {
     ...overrides,
   });
 
-  it('runs read tools without recording a decision', async () => {
+  // G-032. A read used to report APPLIED — the same outcome as a real
+  // mutation — so run summaries said "11 applied" for runs that persisted zero
+  // decisions and changed nothing.
+  it('runs read tools without recording a decision, and reports READ_OK not APPLIED', async () => {
     const handler = jest.fn().mockResolvedValue([{ a: 1 }]);
     const res = await dispatcher.dispatch(tc, readTool(handler), {}, 'k', 'r');
-    expect(res.outcome).toBe('APPLIED');
+    expect(res.outcome).toBe('READ_OK');
     expect(handler).toHaveBeenCalled();
     expect(mockAudit.recordDecision).not.toHaveBeenCalled();
   });

@@ -394,9 +394,13 @@ export class AutopilotWorker implements OnApplicationBootstrap {
   }
 }
 
-function formatSummary(s: ApplySummary): string {
+export function formatSummary(s: ApplySummary): string {
+  // "applied" counts mutations only. Reads are reported separately rather than
+  // inflating it — a run that read 11 things and changed nothing used to say
+  // "11 applied" while persisting zero decisions.
   const parts = [
     `${s.applied} applied`,
+    `${s.readOk ?? 0} read`,
     `${s.skippedObserveOnly} observe-only`,
     `${s.failed} failed`,
   ];

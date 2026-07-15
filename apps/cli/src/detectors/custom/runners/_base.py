@@ -156,10 +156,14 @@ class BaseRunner(ABC):
 
     def _result_to_findings(self, text: str, result: PipelineResult) -> list[DetectionResult]:
         findings: list[DetectionResult] = []
-        runner_type = result.metadata.get("runner", "GLINER2")
+        # Every field on PipelineResult is optional, and runners return a bare
+        # PipelineResult() when a model fails to load — so none of these may be
+        # dereferenced directly. Doing so turned a handled model-load failure
+        # into an AttributeError from deep inside finding construction.
+        runner_type = (result.metadata or {}).get("runner", "GLINER2")
         pipeline_result_dump = _slim_pipeline_result(result)
 
-        for label, spans in result.entities.items():
+        for label, spans in (result.entities or {}).items():
             for span in spans:
                 confidence = float(span.get("confidence", 0.0))
                 value = str(span.get("value", ""))
@@ -198,7 +202,7 @@ class BaseRunner(ABC):
                     )
                 )
 
-        for task, outcome in result.classification.items():
+        for task, outcome in (result.classification or {}).items():
             label = str(outcome.get("label", ""))
             confidence = float(outcome.get("confidence", 0.0))
             if not label:

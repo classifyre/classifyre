@@ -63,6 +63,9 @@ describe('CliRunnerService', () => {
         count: jest.fn().mockResolvedValue(0),
         findFirst: jest.fn().mockResolvedValue(null),
         updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+        // No recorded detector outcomes by default, so runs stay COMPLETED
+        // unless a test opts into a detector failure.
+        findMany: jest.fn().mockResolvedValue([]),
       },
       $transaction: jest.fn(),
     };
@@ -611,6 +614,10 @@ describe('CliRunnerService', () => {
       },
       runnerAsset: {
         updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+        count: jest.fn().mockResolvedValue(0),
+        // No recorded detector outcomes by default, so runs stay COMPLETED
+        // unless a test opts into a detector failure.
+        findMany: jest.fn().mockResolvedValue([]),
       },
     };
     const prisma = {
@@ -642,6 +649,9 @@ describe('CliRunnerService', () => {
         count: jest.fn().mockResolvedValue(0),
         findFirst: jest.fn().mockResolvedValue(null),
         updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+        // No recorded detector outcomes by default, so runs stay COMPLETED
+        // unless a test opts into a detector failure.
+        findMany: jest.fn().mockResolvedValue([]),
       },
       $transaction: jest.fn(),
     };
@@ -723,6 +733,134 @@ describe('CliRunnerService', () => {
     expect(prisma.source.updateMany).toHaveBeenCalledWith({
       where: { id: 'source-1', currentRunnerId: 'runner-1' },
       data: { runnerStatus: 'COMPLETED', currentRunnerId: null },
+    });
+  });
+
+  // G-014. Run status was derived only from runnerAsset ERROR counts. A
+  // detector crashing on every page never flips an asset to ERROR — the asset
+  // fetched and ingested fine, only the detection failed — so a run in which
+  // PII produced nothing at all still reported COMPLETED with "0 errors".
+  describe('detector failures in run status (G-014)', () => {
+    const arrangeRun = (prisma: any) => {
+      prisma.runner.findUnique.mockResolvedValue({
+        id: 'runner-1',
+        sourceId: 'source-1',
+        startedAt: new Date('2026-02-18T10:00:00.000Z'),
+        source: { id: 'source-1', name: 'Source', type: 'WORDPRESS' },
+      });
+      prisma.asset.count.mockResolvedValue(0);
+      prisma.finding.count.mockResolvedValue(0);
+      prisma.runner.update.mockResolvedValue({});
+      prisma.source.update.mockResolvedValue({});
+    };
+
+    it('marks the run WARNING when a detector failed, despite zero asset errors', async () => {
+      const { service, prisma } = createService();
+      arrangeRun(prisma);
+      prisma.runnerAsset.count.mockResolvedValue(0); // no asset ever errored
+      prisma.runnerAsset.findMany.mockResolvedValue([
+        {
+          assetHash: 'asset-a',
+          detectorOutcomes: [
+            {
+              detector_type: 'PII',
+              custom_detector_key: null,
+              status: 'ERROR',
+              error: "unsupported operand type(s) for -: 'ChunkSize'",
+            },
+          ],
+        },
+      ]);
+
+      await service.updateRunnerStatus('runner-1', RunnerStatus.COMPLETED);
+
+      expect(prisma.runner.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            status: 'WARNING',
+            errorMessage: expect.stringContaining('PII'),
+          }),
+        }),
+      );
+    });
+
+    it('names a failing custom detector by its stable key', async () => {
+      const { service, prisma } = createService();
+      arrangeRun(prisma);
+      prisma.runnerAsset.count.mockResolvedValue(0);
+      prisma.runnerAsset.findMany.mockResolvedValue([
+        {
+          assetHash: 'asset-a',
+          detectorOutcomes: [
+            {
+              detector_type: 'CUSTOM',
+              custom_detector_key: 'entities_v1',
+              status: 'ERROR',
+              error: 'model.classify does not exist',
+            },
+          ],
+        },
+      ]);
+
+      await service.updateRunnerStatus('runner-1', RunnerStatus.COMPLETED);
+
+      expect(prisma.runner.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            status: 'WARNING',
+            errorMessage: expect.stringContaining('entities_v1'),
+          }),
+        }),
+      );
+    });
+
+    it('stays COMPLETED when every detector outcome is OK', async () => {
+      const { service, prisma } = createService();
+      arrangeRun(prisma);
+      prisma.runnerAsset.count.mockResolvedValue(0);
+      prisma.runnerAsset.findMany.mockResolvedValue([
+        {
+          assetHash: 'asset-a',
+          detectorOutcomes: [
+            { detector_type: 'PII', custom_detector_key: null, status: 'OK' },
+          ],
+        },
+      ]);
+
+      await service.updateRunnerStatus('runner-1', RunnerStatus.COMPLETED);
+
+      expect(prisma.runner.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ status: 'COMPLETED' }),
+        }),
+      );
+    });
+
+    it('counts each failing asset once even when several detectors fail on it', async () => {
+      const { service, prisma } = createService();
+      arrangeRun(prisma);
+      prisma.runnerAsset.count.mockResolvedValue(0);
+      prisma.runnerAsset.findMany.mockResolvedValue([
+        {
+          assetHash: 'asset-a',
+          detectorOutcomes: [
+            { detector_type: 'PII', custom_detector_key: null, status: 'ERROR' },
+            {
+              detector_type: 'CUSTOM',
+              custom_detector_key: 'entities_v1',
+              status: 'ERROR',
+            },
+          ],
+        },
+      ]);
+
+      await service.updateRunnerStatus('runner-1', RunnerStatus.COMPLETED);
+
+      const call = prisma.runner.update.mock.calls.at(-1)?.[0];
+      expect(call.data.status).toBe('WARNING');
+      expect(call.data.errorMessage).toContain('1 of');
+      expect(call.data.errorMessage).toContain('PII');
+      expect(call.data.errorMessage).toContain('entities_v1');
     });
   });
 

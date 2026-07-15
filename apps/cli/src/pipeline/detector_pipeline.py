@@ -15,9 +15,11 @@ from ..models.generated_single_asset_scan_results import (
 )
 from ..models.generated_single_asset_scan_results import (
     DetectionResult,
+    DetectorOutcome,
     DetectorType,
     ScanStats,
     SingleAssetScanResults,
+    Status,
 )
 from ..sources.base import BaseSource
 from ..utils.file_parser import resolve_mime_type
@@ -159,6 +161,9 @@ class DetectorPipeline:
         detector_types_run: list[DetectorType] = []
         scan_warnings: list[str] = list(self.init_warnings)
         scan_errors: list[str] = []
+        # Per-asset, per-detector outcomes. Local to this call, so concurrent
+        # assets never share it.
+        outcome_sink: dict[tuple[DetectorType, str | None], DetectorOutcome] = {}
 
         if text_detectors:
             (
@@ -174,6 +179,7 @@ class DetectorPipeline:
                 warn_on_empty_content=should_warn_on_empty_text,
                 on_findings_flushed=on_findings_flushed,
                 findings_flush_size=findings_flush_size,
+                outcome_sink=outcome_sink,
             )
             findings.extend(text_findings)
             scan_warnings.extend(text_warnings)
@@ -194,6 +200,7 @@ class DetectorPipeline:
             ) = await self._run_binary_detectors_for_asset(
                 asset=asset,
                 detectors=binary_detectors,
+                outcome_sink=outcome_sink,
             )
             findings.extend(binary_findings)
             scan_warnings.extend(bin_warnings)
@@ -209,6 +216,7 @@ class DetectorPipeline:
                 content=link_content,
                 content_type="application/x.asset-links",
                 asset_name=asset.name,
+                outcome_sink=outcome_sink,
             )
             findings.extend(link_findings)
             scan_errors.extend(link_errors)
@@ -227,6 +235,7 @@ class DetectorPipeline:
             scanned_at=scan_started,
             duration_ms=scan_duration,
             detectors_run=detector_types_run,
+            detector_outcomes=list(outcome_sink.values()) or None,
             content_size_bytes=content_size,
             findings_count=len(findings),
             warnings=scan_warnings or None,
@@ -259,6 +268,7 @@ class DetectorPipeline:
         warn_on_empty_content: bool = True,
         on_findings_flushed: Callable[[list[DetectionResult]], Awaitable[None]] | None = None,
         findings_flush_size: int = 50,
+        outcome_sink: dict[tuple[DetectorType, str | None], DetectorOutcome] | None = None,
     ) -> tuple[list[DetectionResult], list[DetectorType], int, list[str], list[str]]:
         if on_findings_flushed is not None:
             return await self._run_text_detectors_streaming(
@@ -268,6 +278,7 @@ class DetectorPipeline:
                 warn_on_empty_content=warn_on_empty_content,
                 on_findings_flushed=on_findings_flushed,
                 findings_flush_size=findings_flush_size,
+                outcome_sink=outcome_sink,
             )
         findings: list[DetectionResult] = []
         detector_types_run: list[DetectorType] = []
@@ -291,6 +302,7 @@ class DetectorPipeline:
                 content_type=text_content_type,
                 asset_name=asset.name,
                 page_num=page_num,
+                outcome_sink=outcome_sink,
             )
             elapsed = int((time.monotonic() - t0) * 1000)
             snippet = page_content[:120].replace("\n", "\\n") if page_content else ""
@@ -383,6 +395,7 @@ class DetectorPipeline:
         warn_on_empty_content: bool = True,
         on_findings_flushed: Callable[[list[DetectionResult]], Awaitable[None]],
         findings_flush_size: int = 50,
+        outcome_sink: dict[tuple[DetectorType, str | None], DetectorOutcome] | None = None,
     ) -> tuple[list[DetectionResult], list[DetectorType], int, list[str], list[str]]:
         """Concurrent page processing with periodic flush of accumulated findings."""
         findings: list[DetectionResult] = []
@@ -408,6 +421,7 @@ class DetectorPipeline:
                 content_type=text_content_type,
                 asset_name=asset.name,
                 page_num=page_num,
+                outcome_sink=outcome_sink,
             )
             elapsed = int((time.monotonic() - t0) * 1000)
             snippet = page_content[:120].replace("\n", "\\n") if page_content else ""
@@ -539,6 +553,7 @@ class DetectorPipeline:
         *,
         asset: SingleAssetScanResults,
         detectors: list[BaseDetector],
+        outcome_sink: dict[tuple[DetectorType, str | None], DetectorOutcome] | None = None,
     ) -> tuple[list[DetectionResult], list[DetectorType], list[str], list[str]]:
         """Fetch raw bytes for an asset and run binary/image detectors."""
         warnings: list[str] = []
@@ -577,6 +592,7 @@ class DetectorPipeline:
                 content=raw_bytes,
                 content_type=effective_mime_type,
                 asset_name=asset.name,
+                outcome_sink=outcome_sink,
             )
             for finding in findings:
                 self.content_provider.enrich_finding_location(finding, asset, "")
@@ -596,12 +612,16 @@ class DetectorPipeline:
         content_type: str,
         asset_name: str = "",
         page_num: int | None = None,
+        outcome_sink: dict[tuple[DetectorType, str | None], DetectorOutcome] | None = None,
     ) -> tuple[list[DetectionResult], list[DetectorType], list[str]]:
         """Run all compatible detectors for a single payload.
 
         CPU-bound detectors are routed through the process pool when
         available; I/O-bound detectors (e.g. broken_links) always run
         in the current event loop.
+
+        When `outcome_sink` is provided, each detector's per-payload result is
+        merged into it so the caller can tell a clean scan from a crashed one.
         """
         if not content:
             return [], [], []
@@ -683,7 +703,10 @@ class DetectorPipeline:
                     result,
                 )
                 errors.append(f"{detector_name}: {result}")
+                self._record_outcome(outcome_sink, detector, f"{detector_name}: {result}")
                 continue
+
+            self._record_outcome(outcome_sink, detector, None)
 
             # Pool returns (findings, worker_pid, elapsed_ms); in-process returns list
             worker_pid: int | None = None
@@ -820,6 +843,57 @@ class DetectorPipeline:
             OutputAssetType.BINARY,
             OutputAssetType.OTHER,
         }
+
+    @staticmethod
+    def _detector_identity(detector: BaseDetector) -> tuple[DetectorType, str | None] | None:
+        """Return (type, custom_key) for a detector, or None if unclassifiable.
+
+        The custom key matters: every custom detector reports detector_type
+        CUSTOM, so type alone cannot tell two of them apart.
+        """
+        raw_type = getattr(detector, "detector_type", "")
+        if not raw_type:
+            return None
+        try:
+            detector_type = DetectorType(raw_type.upper())
+        except ValueError:
+            return None
+
+        custom_key = getattr(getattr(detector, "custom_config", None), "custom_detector_key", None)
+        return detector_type, custom_key if isinstance(custom_key, str) else None
+
+    @classmethod
+    def _record_outcome(
+        cls,
+        sink: dict[tuple[DetectorType, str | None], DetectorOutcome] | None,
+        detector: BaseDetector,
+        error: str | None,
+    ) -> None:
+        """Merge one detector's result for one payload into the per-asset sink.
+
+        A detector runs over many payloads (pages, binary, links). It is
+        reported OK only if it completed on all of them: a detector that raised
+        on any page has an unknown result overall, and callers must not read its
+        silence as "found nothing".
+        """
+        if sink is None:
+            return
+        identity = cls._detector_identity(detector)
+        if identity is None:
+            return
+
+        existing = sink.get(identity)
+        if existing is not None and existing.status == Status.ERROR:
+            # Already failed elsewhere; the first failure is the useful one.
+            return
+
+        detector_type, custom_key = identity
+        sink[identity] = DetectorOutcome(
+            detector_type=detector_type,
+            custom_detector_key=custom_key,
+            status=Status.ERROR if error else Status.OK,
+            error=error,
+        )
 
     @staticmethod
     def _merge_detector_types(
