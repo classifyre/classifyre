@@ -24,6 +24,7 @@ Name | Type
 `scopeFingerprint` | string
 `totalFindings` | number
 `findingsCreated` | number
+`assetsWithoutText` | number
 `errorMessage` | string
 `errorDetails` | object
 `jobName` | string
@@ -55,6 +56,7 @@ const example = {
   "scopeFingerprint": null,
   "totalFindings": null,
   "findingsCreated": null,
+  "assetsWithoutText": null,
   "errorMessage": null,
   "errorDetails": null,
   "jobName": null,

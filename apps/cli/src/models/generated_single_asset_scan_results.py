@@ -217,6 +217,10 @@ class ScanStats(BaseModel):
     content_size_bytes: int | None = Field(
         None, description='Size of the content that was scanned'
     )
+    empty_text: bool | None = Field(
+        None,
+        description="True when an asset that should carry text yielded none. Most significant for assets whose text is derived rather than native (OCR'd images and scanned PDFs, transcribed audio/video): empty derived text means the content may have been missed entirely, not that the document is blank. Distinct from an error — nothing failed — so it is reported as coverage, not as a run failure.",
+    )
     findings_count: int | None = Field(
         None, description='Total number of findings detected'
     )

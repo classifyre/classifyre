@@ -1662,29 +1662,39 @@ export class CliRunnerService implements OnApplicationBootstrap {
     assetsCreated: number;
     assetsUpdated: number;
     assetsUnchanged: number;
+    assetsWithoutText: number;
     totalFindings: number;
   }> {
-    const [assetsCreated, assetsUpdated, assetsUnchanged, totalFindings] =
-      await Promise.all([
-        this.prisma.runnerAsset.count({
-          where: { runnerId, changeType: RunnerAssetChangeType.CREATED },
-        }),
-        this.prisma.runnerAsset.count({
-          where: { runnerId, changeType: RunnerAssetChangeType.UPDATED },
-        }),
-        this.prisma.runnerAsset.count({
-          where: { runnerId, changeType: RunnerAssetChangeType.UNCHANGED },
-        }),
-        // Deliberately every finding stamped by this run, matching what
-        // totalFindings has always been. It is NOT a discovery count — see
-        // Runner.findingsCreated, which bulkIngest accumulates as batches land.
-        this.prisma.finding.count({ where: { runnerId } }),
-      ]);
+    const [
+      assetsCreated,
+      assetsUpdated,
+      assetsUnchanged,
+      assetsWithoutText,
+      totalFindings,
+    ] = await Promise.all([
+      this.prisma.runnerAsset.count({
+        where: { runnerId, changeType: RunnerAssetChangeType.CREATED },
+      }),
+      this.prisma.runnerAsset.count({
+        where: { runnerId, changeType: RunnerAssetChangeType.UPDATED },
+      }),
+      this.prisma.runnerAsset.count({
+        where: { runnerId, changeType: RunnerAssetChangeType.UNCHANGED },
+      }),
+      // Coverage, not errors: these assets ingested fine, but OCR or
+      // transcription returned nothing so their content was never scanned.
+      this.prisma.runnerAsset.count({ where: { runnerId, emptyText: true } }),
+      // Deliberately every finding stamped by this run, matching what
+      // totalFindings has always been. It is NOT a discovery count — see
+      // Runner.findingsCreated, which bulkIngest accumulates as batches land.
+      this.prisma.finding.count({ where: { runnerId } }),
+    ]);
 
     return {
       assetsCreated,
       assetsUpdated,
       assetsUnchanged,
+      assetsWithoutText,
       totalFindings,
     };
   }
@@ -1832,8 +1842,13 @@ export class CliRunnerService implements OnApplicationBootstrap {
     }
 
     const durationMs = completedAt.getTime() - runner.startedAt.getTime();
-    const { assetsCreated, assetsUpdated, assetsUnchanged, totalFindings } =
-      await this.computeRunnerStats(runnerId);
+    const {
+      assetsCreated,
+      assetsUpdated,
+      assetsUnchanged,
+      assetsWithoutText,
+      totalFindings,
+    } = await this.computeRunnerStats(runnerId);
 
     const { finalStatus, warningMessage } = await this.prisma.$transaction(
       async (tx) => {
@@ -1894,6 +1909,7 @@ export class CliRunnerService implements OnApplicationBootstrap {
             assetsCreated,
             assetsUpdated,
             assetsUnchanged,
+            assetsWithoutText,
             totalFindings,
             ...(message && { errorMessage: message }),
           },
@@ -3397,6 +3413,7 @@ export class CliRunnerService implements OnApplicationBootstrap {
           metadata: Prisma.JsonValue;
           detector_outcomes: Prisma.JsonValue;
           change_type: RunnerAssetChangeType | null;
+          empty_text: boolean | null;
           created_at: Date;
         }>
       >(
@@ -3419,6 +3436,7 @@ export class CliRunnerService implements OnApplicationBootstrap {
         metadata: row.metadata,
         detectorOutcomes: row.detector_outcomes,
         changeType: row.change_type,
+        emptyText: row.empty_text,
         createdAt: row.created_at,
       }));
     } else {

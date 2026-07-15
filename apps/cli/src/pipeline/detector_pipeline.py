@@ -146,11 +146,14 @@ class DetectorPipeline:
                 "application/x.asset-links",
             )
         ]
-        should_warn_on_empty_text = asset.asset_type in {
-            OutputAssetType.TXT,
-            OutputAssetType.TABLE,
-            OutputAssetType.URL,
-        }
+        # Any asset we resolved a text content type for is expected to yield
+        # text, so warn whenever it yields none. This previously covered only
+        # TXT/TABLE/URL — excluding exactly the types whose text is *derived*
+        # (IMAGE/BINARY via OCR, AUDIO/VIDEO via transcription), which are the
+        # ones where empty output most likely means the content was missed
+        # rather than absent. That is why hundreds of empty OCR results across
+        # the corpus produced no warning and no asset error at all.
+        should_warn_on_empty_text = text_content_type is not None
 
         all_active = text_detectors + binary_detectors + link_detectors
         detector_names = [self._detector_log_label(d) for d in all_active]
@@ -237,6 +240,9 @@ class DetectorPipeline:
             detectors_run=detector_types_run,
             detector_outcomes=list(outcome_sink.values()) or None,
             content_size_bytes=content_size,
+            # Structured rather than left for a consumer to parse out of the
+            # warning strings, so missing-text coverage is queryable.
+            empty_text=should_warn_on_empty_text and content_size == 0,
             findings_count=len(findings),
             warnings=scan_warnings or None,
             errors=scan_errors or None,
@@ -380,7 +386,7 @@ class DetectorPipeline:
             _collect_done()
 
         if content_size == 0 and warn_on_empty_content:
-            msg = f"No content available for asset {asset.name}"
+            msg = self._empty_text_warning(asset)
             logger.warning(msg)
             warnings.append(msg)
 
@@ -502,7 +508,7 @@ class DetectorPipeline:
             await _collect_done_and_flush()
 
         if content_size == 0 and warn_on_empty_content:
-            msg = f"No content available for asset {asset.name}"
+            msg = self._empty_text_warning(asset)
             logger.warning(msg)
             warnings.append(msg)
 
@@ -843,6 +849,28 @@ class DetectorPipeline:
             OutputAssetType.BINARY,
             OutputAssetType.OTHER,
         }
+
+    @staticmethod
+    def _empty_text_warning(asset: SingleAssetScanResults) -> str:
+        """Explain an empty text result in terms of how the text was obtained.
+
+        "No content available" reads as unremarkable for a text file and as a
+        serious coverage gap for a scanned PDF — the operator cannot tell which
+        they are looking at without knowing the extraction path.
+        """
+        derived = {
+            OutputAssetType.IMAGE: "OCR produced no text",
+            OutputAssetType.BINARY: "OCR produced no text",
+            OutputAssetType.AUDIO: "transcription produced no text",
+            OutputAssetType.VIDEO: "transcription/OCR produced no text",
+        }
+        reason = derived.get(asset.asset_type)
+        if reason:
+            return (
+                f"{reason} for asset {asset.name} — its content was not scanned. "
+                f"This is missing coverage, not proof the asset is empty."
+            )
+        return f"No content available for asset {asset.name}"
 
     @staticmethod
     def _detector_identity(detector: BaseDetector) -> tuple[DetectorType, str | None] | None:

@@ -178,6 +178,17 @@ export class RunnerDto {
   })
   findingsCreated: number;
 
+  @ApiProperty({
+    default: 0,
+    description:
+      'Assets that should have carried text but yielded none — typically OCR ' +
+      'or transcription returning empty. These are not errors: the asset ' +
+      'ingested fine, but its content was never read, so any detector result ' +
+      'for it covers nothing. Read alongside assetsUnchanged before trusting a ' +
+      'run: a high value means the corpus is largely unscanned.',
+  })
+  assetsWithoutText: number;
+
   @ApiProperty({ required: false, nullable: true })
   errorMessage?: string | null;
 

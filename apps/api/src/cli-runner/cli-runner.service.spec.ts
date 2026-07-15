@@ -707,7 +707,8 @@ describe('CliRunnerService', () => {
     prisma.runnerAsset.count
       .mockResolvedValueOnce(3) // CREATED
       .mockResolvedValueOnce(2) // UPDATED
-      .mockResolvedValueOnce(5); // UNCHANGED
+      .mockResolvedValueOnce(5) // UNCHANGED
+      .mockResolvedValueOnce(0); // without text
     prisma.finding.count.mockResolvedValue(7);
     prisma.runner.update.mockResolvedValue({});
     prisma.source.update.mockResolvedValue({});

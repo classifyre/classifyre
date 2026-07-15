@@ -136,6 +136,12 @@ export interface SearchRunnerItemDto {
      */
     findingsCreated: number;
     /**
+     * Assets that should have carried text but yielded none — typically OCR or transcription returning empty. These are not errors: the asset ingested fine, but its content was never read, so any detector result for it covers nothing. Read alongside assetsUnchanged before trusting a run: a high value means the corpus is largely unscanned.
+     * @type {number}
+     * @memberof SearchRunnerItemDto
+     */
+    assetsWithoutText: number;
+    /**
      * 
      * @type {string}
      * @memberof SearchRunnerItemDto
@@ -219,6 +225,7 @@ export function instanceOfSearchRunnerItemDto(value: object): value is SearchRun
     if (!('assetsOutOfScope' in value) || value['assetsOutOfScope'] === undefined) return false;
     if (!('totalFindings' in value) || value['totalFindings'] === undefined) return false;
     if (!('findingsCreated' in value) || value['findingsCreated'] === undefined) return false;
+    if (!('assetsWithoutText' in value) || value['assetsWithoutText'] === undefined) return false;
     return true;
 }
 
@@ -250,6 +257,7 @@ export function SearchRunnerItemDtoFromJSONTyped(json: any, ignoreDiscriminator:
         'scopeFingerprint': json['scopeFingerprint'] == null ? undefined : json['scopeFingerprint'],
         'totalFindings': json['totalFindings'],
         'findingsCreated': json['findingsCreated'],
+        'assetsWithoutText': json['assetsWithoutText'],
         'errorMessage': json['errorMessage'] == null ? undefined : json['errorMessage'],
         'errorDetails': json['errorDetails'] == null ? undefined : json['errorDetails'],
         'jobName': json['jobName'] == null ? undefined : json['jobName'],
@@ -287,6 +295,7 @@ export function SearchRunnerItemDtoToJSONTyped(value?: SearchRunnerItemDto | nul
         'scopeFingerprint': value['scopeFingerprint'],
         'totalFindings': value['totalFindings'],
         'findingsCreated': value['findingsCreated'],
+        'assetsWithoutText': value['assetsWithoutText'],
         'errorMessage': value['errorMessage'],
         'errorDetails': value['errorDetails'],
         'jobName': value['jobName'],

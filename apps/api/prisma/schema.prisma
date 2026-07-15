@@ -333,6 +333,11 @@ model Runner {
   // Findings first seen by this run. Accumulated as batches land, so it is a
   // true creation count rather than a post-reconciliation snapshot.
   findingsCreated Int          @default(0) @map("findings_created")
+  // Assets that should have carried text but yielded none — mostly OCR and
+  // transcription returning empty. Not errors: nothing failed, the content was
+  // simply never read. Tracked because a run can otherwise report complete
+  // success while silently covering none of the asset's actual content.
+  assetsWithoutText Int        @default(0) @map("assets_without_text")
   errorMessage    String?      @map("error_message")
   errorDetails    Json?        @map("error_details")
   jobName         String?      @map("job_name")
@@ -377,6 +382,9 @@ model RunnerAsset {
   // OK outcome here — a detector that crashed (or never ran) proves nothing
   // about whether its earlier findings are still present.
   detectorOutcomes   Json? @map("detector_outcomes") @db.JsonB
+  // The asset should have carried text but yielded none (typically OCR or
+  // transcription returning empty). Null for rows written before this existed.
+  emptyText          Boolean? @map("empty_text")
   createdAt        DateTime          @default(now()) @map("created_at")
 
   runner Runner @relation(fields: [runnerId], references: [id], onDelete: Cascade)

@@ -254,3 +254,100 @@ async def test_detector_succeeding_on_all_pages_is_ok() -> None:
     [asset] = await pipeline.process([_asset()])
 
     assert _outcomes_by_type(asset) == {DetectorType.SECRETS: Status.OK}
+
+
+class _NoTextSource(_Source):
+    """Yields no text — an OCR pass that returned nothing."""
+
+    async def fetch_content(self, asset_id: str) -> tuple[str, str] | None:
+        return ("<p>raw</p>", "")
+
+
+def _asset_of(asset_type: AssetType) -> SingleAssetScanResults:
+    now = datetime.now(UTC)
+    return SingleAssetScanResults(
+        hash="1",
+        checksum="checksum",
+        name="scanned.pdf",
+        external_url="urn:test/1",
+        links=[],
+        asset_type=asset_type,
+        created_at=now,
+        updated_at=now,
+    )
+
+
+class TestEmptyTextCoverage:
+    """G-030. OCR/transcription returning nothing produced no asset error, no
+    warning, and no counter: the run reported success while covering none of
+    the asset's content. 718 OCR calls across the first corpus returned empty
+    and every runner still reported zero errors.
+
+    The types whose text is *derived* (IMAGE/BINARY via OCR, AUDIO/VIDEO via
+    transcription) were exactly the ones excluded from the empty-text warning.
+    """
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "asset_type",
+        [AssetType.BINARY, AssetType.IMAGE, AssetType.AUDIO, AssetType.VIDEO],
+    )
+    async def test_derived_text_types_report_empty_text(self, asset_type) -> None:
+        source = _NoTextSource({"type": "DUMMY"}, content="")
+        pipeline = DetectorPipeline(
+            detectors=[_SilentButCleanDetector()], source=source, runner_id="r1"
+        )
+
+        [asset] = await pipeline.process([_asset_of(asset_type)])
+
+        assert asset.scan_stats.empty_text is True
+
+    @pytest.mark.asyncio
+    async def test_native_text_types_still_report_empty_text(self) -> None:
+        source = _NoTextSource({"type": "DUMMY"}, content="")
+        pipeline = DetectorPipeline(
+            detectors=[_SilentButCleanDetector()], source=source, runner_id="r1"
+        )
+
+        [asset] = await pipeline.process([_asset_of(AssetType.TXT)])
+
+        assert asset.scan_stats.empty_text is True
+
+    @pytest.mark.asyncio
+    async def test_asset_with_text_is_not_flagged(self) -> None:
+        source = _Source({"type": "DUMMY"}, content="hello world")
+        pipeline = DetectorPipeline(
+            detectors=[_SilentButCleanDetector()], source=source, runner_id="r1"
+        )
+
+        [asset] = await pipeline.process([_asset_of(AssetType.TXT)])
+
+        assert asset.scan_stats.empty_text is False
+
+    @pytest.mark.asyncio
+    async def test_empty_ocr_warning_names_the_extraction_path(self) -> None:
+        # "No content available" reads as unremarkable; an operator needs to
+        # know OCR ran and produced nothing.
+        source = _NoTextSource({"type": "DUMMY"}, content="")
+        pipeline = DetectorPipeline(
+            detectors=[_SilentButCleanDetector()], source=source, runner_id="r1"
+        )
+
+        [asset] = await pipeline.process([_asset_of(AssetType.BINARY)])
+
+        warnings = asset.scan_stats.warnings or []
+        assert any("OCR produced no text" in w for w in warnings), warnings
+        assert any("missing coverage" in w for w in warnings), warnings
+
+    @pytest.mark.asyncio
+    async def test_empty_text_is_not_reported_as_a_detector_error(self) -> None:
+        # Nothing failed — the content was simply never read. Flagging it as a
+        # detector error would suppress finding reconciliation (G-021).
+        source = _NoTextSource({"type": "DUMMY"}, content="")
+        pipeline = DetectorPipeline(
+            detectors=[_SilentButCleanDetector()], source=source, runner_id="r1"
+        )
+
+        [asset] = await pipeline.process([_asset_of(AssetType.BINARY)])
+
+        assert not (asset.scan_stats.errors or [])

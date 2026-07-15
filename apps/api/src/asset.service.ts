@@ -239,6 +239,18 @@ export class AssetService {
   }
 
   /**
+   * Whether the CLI reported this asset as having yielded no text.
+   *
+   * Undefined (rather than false) when the payload carries no scan_stats — a
+   * streaming stub, or an older CLI — so a stub pass cannot overwrite the real
+   * pass's answer with a guess.
+   */
+  private normalizeEmptyText(asset: Record<string, any>): boolean | undefined {
+    const value = asset?.scan_stats?.empty_text;
+    return typeof value === 'boolean' ? value : undefined;
+  }
+
+  /**
    * Build the set of (detector, asset) pairs this run may resolve findings for.
    *
    * Keys are `assetHash|DETECTOR_TYPE|customKey`. Membership means the detector
@@ -1880,13 +1892,19 @@ export class AssetService {
           const assetHash = String(asset.hash);
           const metadata = this.normalizeMetadata(asset.metadata);
           const detectorOutcomes = this.normalizeDetectorOutcomes(asset);
+          const emptyText = this.normalizeEmptyText(asset);
 
-          if (metadata !== undefined || detectorOutcomes !== undefined) {
+          if (
+            metadata !== undefined ||
+            detectorOutcomes !== undefined ||
+            emptyText !== undefined
+          ) {
             await tx.runnerAsset.updateMany({
               where: { runnerId, assetHash },
               data: {
                 ...(metadata !== undefined ? { metadata } : {}),
                 ...(detectorOutcomes !== undefined ? { detectorOutcomes } : {}),
+                ...(emptyText !== undefined ? { emptyText } : {}),
               },
             });
           }
