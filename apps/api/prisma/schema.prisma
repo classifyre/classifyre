@@ -62,6 +62,12 @@ model Asset {
   lastScannedAt DateTime?   @map("last_scanned_at")
   runnerId      String?     @map("runner_id")
   status        AssetStatus @default(NEW)
+  // Fingerprint of the source scope this asset was last ingested under. An
+  // asset may only be marked DELETED for absence when this matches the current
+  // scope — otherwise its absence means the scope moved, not that the object is
+  // gone. Null for assets ingested before scope fingerprinting existed; they
+  // are treated as out-of-scope (retained) until their next ingest.
+  scopeFingerprint String?  @map("scope_fingerprint") @db.VarChar(64)
   metadata      Json?       @db.JsonB
   runner        Runner?     @relation(fields: [runnerId], references: [id])
   source        Source      @relation(fields: [sourceId], references: [id], onDelete: Cascade)
@@ -79,6 +85,7 @@ model Asset {
   @@index([lastScannedAt])
   @@index([sourceId])
   @@index([status])
+  @@index([sourceId, scopeFingerprint])
   @@unique([sourceId, hash])
   @@map("assets")
 }
@@ -325,6 +332,12 @@ model Runner {
   jobNamespace    String?      @map("job_namespace")
   assetsUnchanged Int          @default(0) @map("assets_unchanged")
   assetsDeleted   Int          @default(0) @map("assets_deleted")
+  // Assets retained despite being absent from this run because the source's
+  // scope moved since they were ingested. They are NOT deleted and their
+  // findings stay OPEN — see AssetService.finalizeIngestRun.
+  assetsOutOfScope Int         @default(0) @map("assets_out_of_scope")
+  // Fingerprint of the scope-determining config this run covered.
+  scopeFingerprint String?     @map("scope_fingerprint") @db.VarChar(64)
   assets          Asset[]
   runnerAssets    RunnerAsset[]
   source          Source       @relation(fields: [sourceId], references: [id], onDelete: Cascade)

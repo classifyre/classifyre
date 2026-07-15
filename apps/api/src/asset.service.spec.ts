@@ -10,6 +10,7 @@ import {
 } from '@prisma/client';
 import { NotFoundException, BadRequestException } from '@nestjs/common';
 import { generateDetectionIdentity } from './utils/detection-identity';
+import { computeScopeFingerprint } from './utils/scope-fingerprint';
 import { HistoryEventType } from './types/finding-history.types';
 import {
   SearchAssetsSortBy,
@@ -1458,6 +1459,14 @@ describe('AssetService', () => {
         history: [],
       };
 
+      // The scope the mocked source resolves to. An asset carrying this was
+      // ingested under the same scope as the run, so its absence is a real
+      // deletion rather than the scope having moved.
+      const currentScope = computeScopeFingerprint(
+        AssetType.WORDPRESS,
+        undefined,
+      );
+
       beforeEach(() => {
         mockPrismaService.source.findUnique.mockResolvedValue({
           id: sourceId,
@@ -1467,6 +1476,7 @@ describe('AssetService', () => {
           id: runnerId,
           sourceId,
         });
+        mockPrismaService.runner.update.mockResolvedValue({});
       });
 
       function buildFinalizeTx(opts: {
@@ -1507,7 +1517,11 @@ describe('AssetService', () => {
 
       it('should resolve stale findings on scanned assets during finalize (isFullScan=true)', async () => {
         mockPrismaService.asset.findMany.mockResolvedValue([
-          { id: 'missing-asset', hash: 'missing-hash' },
+          {
+            id: 'missing-asset',
+            hash: 'missing-hash',
+            scopeFingerprint: currentScope,
+          },
         ]);
 
         const { findingUpdate, mockImpl } = buildFinalizeTx({
@@ -1545,14 +1559,25 @@ describe('AssetService', () => {
           ],
         };
 
-        mockPrismaService.asset.findMany.mockResolvedValue([]);
+        mockPrismaService.asset.findMany.mockResolvedValue([
+          {
+            id: 'missing-asset',
+            hash: 'missing-hash',
+            scopeFingerprint: currentScope,
+          },
+        ]);
 
         const { findingUpdate, mockImpl } = buildFinalizeTx({
           staleFindings: [manuallyOverriddenFinding],
         });
         mockPrismaService.$transaction.mockImplementation(mockImpl);
 
-        await service.finalizeIngestRun(sourceId, runnerId, [], true);
+        await service.finalizeIngestRun(
+          sourceId,
+          runnerId,
+          ['seen-hash-1'],
+          true,
+        );
 
         const resolveCall = findingUpdate.mock.calls.find(
           ([args]: any) => args?.data?.status === FindingStatus.RESOLVED,
@@ -1570,6 +1595,182 @@ describe('AssetService', () => {
 
         expect(result.deleted).toBe(0);
         expect(mockPrismaService.$transaction).not.toHaveBeenCalled();
+      });
+    });
+
+    // G-019. A full scan used to retire every asset absent from the run, which
+    // conflated "the object was deleted from the source" with "the scope moved
+    // away from the object" and with "the scan returned nothing at all".
+    describe('finalizeIngestRun scope safety (G-019)', () => {
+      const currentScope = computeScopeFingerprint(
+        AssetType.WORDPRESS,
+        undefined,
+      );
+
+      beforeEach(() => {
+        mockPrismaService.source.findUnique.mockResolvedValue({
+          id: sourceId,
+          type: AssetType.WORDPRESS,
+        });
+        mockPrismaService.runner.findUnique.mockResolvedValue({
+          id: runnerId,
+          sourceId,
+        });
+        mockPrismaService.runner.update.mockResolvedValue({});
+      });
+
+      it('retires nothing when a full scan reports zero assets seen', async () => {
+        const result = await service.finalizeIngestRun(
+          sourceId,
+          runnerId,
+          [],
+          true,
+        );
+
+        expect(result).toEqual({ deleted: 0, outOfScope: 0 });
+        // The bug: with no seenHashes the `notIn` filter was dropped, so the
+        // query matched every asset in the source. Nothing may even be queried.
+        expect(mockPrismaService.asset.findMany).not.toHaveBeenCalled();
+        expect(mockPrismaService.$transaction).not.toHaveBeenCalled();
+      });
+
+      it('retains, not retires, assets ingested under a different scope', async () => {
+        mockPrismaService.asset.findMany.mockResolvedValue([
+          {
+            id: 'out-of-scope-asset',
+            hash: 'narrowed-away-hash',
+            scopeFingerprint: 'fingerprint-of-a-wider-earlier-scope',
+          },
+        ]);
+
+        const result = await service.finalizeIngestRun(
+          sourceId,
+          runnerId,
+          ['still-in-scope-hash'],
+          true,
+        );
+
+        expect(result).toEqual({ deleted: 0, outOfScope: 1 });
+        // No transaction means no asset was marked DELETED and no finding was
+        // auto-resolved — the investigative state survives a scope change.
+        expect(mockPrismaService.$transaction).not.toHaveBeenCalled();
+        expect(mockPrismaService.runner.update).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: { assetsDeleted: 0, assetsOutOfScope: 1 },
+          }),
+        );
+      });
+
+      it('retains assets predating scope fingerprinting (null fingerprint)', async () => {
+        mockPrismaService.asset.findMany.mockResolvedValue([
+          { id: 'legacy-asset', hash: 'legacy-hash', scopeFingerprint: null },
+        ]);
+
+        const result = await service.finalizeIngestRun(
+          sourceId,
+          runnerId,
+          ['seen-hash'],
+          true,
+        );
+
+        expect(result).toEqual({ deleted: 0, outOfScope: 1 });
+        expect(mockPrismaService.$transaction).not.toHaveBeenCalled();
+      });
+
+      it('still retires an asset genuinely gone from an unchanged scope', async () => {
+        mockPrismaService.asset.findMany.mockResolvedValue([
+          {
+            id: 'genuinely-deleted',
+            hash: 'deleted-hash',
+            scopeFingerprint: currentScope,
+          },
+        ]);
+
+        const assetUpdateMany = jest.fn().mockResolvedValue({});
+        mockPrismaService.$transaction.mockImplementation((callback: any) =>
+          callback({
+            asset: { updateMany: assetUpdateMany },
+            finding: {
+              findMany: jest.fn().mockResolvedValue([]),
+              update: jest.fn().mockResolvedValue({}),
+            },
+            runner: { update: jest.fn().mockResolvedValue({}) },
+          }),
+        );
+
+        const result = await service.finalizeIngestRun(
+          sourceId,
+          runnerId,
+          ['seen-hash'],
+          true,
+        );
+
+        expect(result).toEqual({ deleted: 1, outOfScope: 0 });
+        expect(assetUpdateMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: { id: { in: ['genuinely-deleted'] } },
+            data: { status: AssetStatus.DELETED, runnerId },
+          }),
+        );
+      });
+
+      it('separates genuine deletions from scope moves in the same run', async () => {
+        mockPrismaService.asset.findMany.mockResolvedValue([
+          {
+            id: 'genuinely-deleted',
+            hash: 'deleted-hash',
+            scopeFingerprint: currentScope,
+          },
+          {
+            id: 'out-of-scope-asset',
+            hash: 'narrowed-away-hash',
+            scopeFingerprint: 'older-scope',
+          },
+        ]);
+
+        const assetUpdateMany = jest.fn().mockResolvedValue({});
+        const runnerTxUpdate = jest.fn().mockResolvedValue({});
+        mockPrismaService.$transaction.mockImplementation((callback: any) =>
+          callback({
+            asset: { updateMany: assetUpdateMany },
+            finding: {
+              findMany: jest.fn().mockResolvedValue([]),
+              update: jest.fn().mockResolvedValue({}),
+            },
+            runner: { update: runnerTxUpdate },
+          }),
+        );
+
+        const result = await service.finalizeIngestRun(
+          sourceId,
+          runnerId,
+          ['seen-hash'],
+          true,
+        );
+
+        expect(result).toEqual({ deleted: 1, outOfScope: 1 });
+        // Only the same-scope asset is retired; the out-of-scope one is untouched.
+        expect(assetUpdateMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: { id: { in: ['genuinely-deleted'] } },
+          }),
+        );
+        expect(runnerTxUpdate).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: { assetsDeleted: 1, assetsOutOfScope: 1 },
+          }),
+        );
+      });
+
+      it('records the scope it covered on the runner', async () => {
+        mockPrismaService.asset.findMany.mockResolvedValue([]);
+
+        await service.finalizeIngestRun(sourceId, runnerId, ['seen'], true);
+
+        expect(mockPrismaService.runner.update).toHaveBeenCalledWith({
+          where: { id: runnerId },
+          data: { scopeFingerprint: currentScope },
+        });
       });
     });
 

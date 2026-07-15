@@ -144,6 +144,24 @@ export class RunnerDto {
   @ApiProperty({ default: 0 })
   assetsDeleted: number;
 
+  @ApiProperty({
+    default: 0,
+    description:
+      'Assets absent from this run but retained because they were ingested ' +
+      'under a different source scope. Their findings remain OPEN. A non-zero ' +
+      'value means the scope moved and those assets are no longer covered.',
+  })
+  assetsOutOfScope: number;
+
+  @ApiProperty({
+    required: false,
+    nullable: true,
+    description:
+      'Fingerprint of the scope-determining config this run covered. Runs ' +
+      'sharing a fingerprint are directly comparable.',
+  })
+  scopeFingerprint?: string | null;
+
   @ApiProperty({ default: 0 })
   totalFindings: number;
 

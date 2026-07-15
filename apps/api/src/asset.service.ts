@@ -14,6 +14,7 @@ import {
   Severity,
 } from '@prisma/client';
 import { generateDetectionIdentity } from './utils/detection-identity';
+import { computeScopeFingerprint } from './utils/scope-fingerprint';
 import {
   HistoryEventType,
   type FindingHistoryEntry,
@@ -1237,6 +1238,7 @@ export class AssetService {
     const finalizeRun = options?.finalizeRun ?? true;
     const skipFindings = options?.skipFindings ?? false;
     const { source } = await this.assertSourceAndRunner(sourceId, runnerId);
+    const scopeFingerprint = computeScopeFingerprint(source.type, source.config);
 
     // Process in batches to avoid transaction timeout.
     // Each batch runs its own transaction (timeout: 60 s). Keep batches small
@@ -1274,6 +1276,7 @@ export class AssetService {
         source.type,
         existingAssetsMap,
         skipFindings,
+        scopeFingerprint,
       );
 
       totalCreated += result.created;
@@ -1336,30 +1339,74 @@ export class AssetService {
     runnerId: string,
     seenHashes: string[],
     isFullScan: boolean,
-  ): Promise<{ deleted: number }> {
-    await this.assertSourceAndRunner(sourceId, runnerId);
+  ): Promise<{ deleted: number; outOfScope: number }> {
+    const { source } = await this.assertSourceAndRunner(sourceId, runnerId);
 
     if (!isFullScan) {
       // Sampling means not all assets appear in every run — no deletion logic.
-      return { deleted: 0 };
+      return { deleted: 0, outOfScope: 0 };
     }
 
-    // Full scan (strategy=ALL): every asset in the source was visited.
-    // Assets absent from seenHashes no longer exist in the source → mark DELETED
-    // and auto-resolve their open findings.
+    const scopeFingerprint = computeScopeFingerprint(source.type, source.config);
+    await this.prisma.runner.update({
+      where: { id: runnerId },
+      data: { scopeFingerprint },
+    });
+
+    // A full scan that saw nothing is far more likely to be a broken mount, a
+    // bad filter, or a credential failure than a source that genuinely emptied.
+    // Deleting here would retire every asset in the source, so absence of
+    // evidence is not treated as evidence of absence.
+    if (seenHashes.length === 0) {
+      console.warn(
+        `[finalizeIngestRun] Runner ${runnerId} reported a full scan of source ` +
+          `${sourceId} with zero assets seen. Skipping retirement — a zero-result ` +
+          `scan is treated as a failed scan, not an emptied source.`,
+      );
+      return { deleted: 0, outOfScope: 0 };
+    }
+
+    // Full scan (strategy=ALL): every object in the *current* scope was visited,
+    // so an asset absent from seenHashes is either gone from the source or was
+    // ingested under a scope this run no longer covers. Only the first is a
+    // deletion — see the split below.
     const missingAssets = await this.prisma.asset.findMany({
       where: {
         sourceId,
         status: { not: AssetStatus.DELETED },
-        ...(seenHashes.length > 0 ? { hash: { notIn: seenHashes } } : {}),
+        hash: { notIn: seenHashes },
       },
     });
 
-    if (missingAssets.length === 0) {
-      return { deleted: 0 };
+    // An asset is only comparable to this run if it was last ingested under the
+    // same scope. When the scope moved, absence proves nothing about the object
+    // — it just means we stopped looking there — so the asset and its findings
+    // are retained and reported instead. Assets predating scope fingerprinting
+    // carry null and are retained on the same reasoning.
+    const deletableAssets = missingAssets.filter(
+      (a) => a.scopeFingerprint === scopeFingerprint,
+    );
+    const outOfScopeAssets = missingAssets.filter(
+      (a) => a.scopeFingerprint !== scopeFingerprint,
+    );
+
+    if (outOfScopeAssets.length > 0) {
+      console.warn(
+        `[finalizeIngestRun] Source ${sourceId}: retaining ${outOfScopeAssets.length} ` +
+          `asset(s) absent from this run but ingested under a different scope. ` +
+          `Their findings stay OPEN. Retire them explicitly if intended.`,
+      );
     }
 
-    const missingAssetIds = missingAssets.map((a) => a.id);
+    if (deletableAssets.length === 0) {
+      await this.prisma.runner.update({
+        where: { id: runnerId },
+        data: { assetsDeleted: 0, assetsOutOfScope: outOfScopeAssets.length },
+      });
+      return { deleted: 0, outOfScope: outOfScopeAssets.length };
+    }
+
+    const missingAssetIds = deletableAssets.map((a) => a.id);
 
     const hasManualStatusOverride = (finding: any): boolean => {
       const history = Array.isArray(finding.history) ? finding.history : [];
@@ -1464,7 +1511,10 @@ export class AssetService {
         // Update runner stats with deleted count
         await tx.runner.update({
           where: { id: runnerId },
-          data: { assetsDeleted: missingAssetIds.length },
+          data: {
+            assetsDeleted: missingAssetIds.length,
+            assetsOutOfScope: outOfScopeAssets.length,
+          },
         });
       },
       {
@@ -1474,7 +1524,10 @@ export class AssetService {
       },
     );
 
-    return { deleted: missingAssetIds.length };
+    return {
+      deleted: missingAssetIds.length,
+      outOfScope: outOfScopeAssets.length,
+    };
   }
 
   /**
@@ -1501,6 +1554,7 @@ export class AssetService {
     sourceType: AssetType,
     existingAssetsMap: Map<string, Asset>,
     skipFindings: boolean = false,
+    scopeFingerprint?: string,
   ): Promise<{
     created: number;
     updated: number;
@@ -1554,6 +1608,9 @@ export class AssetService {
             runnerId,
             sourceId,
             lastScannedAt: scannedAt,
+            // Records the scope this asset was seen under, so a later run can
+            // tell "the object is gone" from "we stopped looking there".
+            ...(scopeFingerprint ? { scopeFingerprint } : {}),
           };
 
           if (!existingAsset) {
@@ -1629,6 +1686,7 @@ export class AssetService {
               runnerId,
               status: AssetStatus.UNCHANGED,
               lastScannedAt: scannedAt,
+              ...(scopeFingerprint ? { scopeFingerprint } : {}),
             },
           });
         }
