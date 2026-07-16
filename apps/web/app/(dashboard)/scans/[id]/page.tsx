@@ -3,10 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useRouteId } from "@/lib/use-route-id";
-import {
-  formatDate,
-  formatRelative,
-} from "@/lib/date";
+import { formatDate, formatRelative } from "@/lib/date";
 import {
   AlertCircle,
   ArrowUpRight,
@@ -171,7 +168,13 @@ export default function RunnerDetailPage() {
   );
 
   const fetchLogsFn = useCallback(
-    (params: { cursor?: string; take?: number; search?: string; levels?: string[]; sortOrder?: "asc" | "desc" }) =>
+    (params: {
+      cursor?: string;
+      take?: number;
+      search?: string;
+      levels?: string[];
+      sortOrder?: "asc" | "desc";
+    }) =>
       api.runners.cliRunnerControllerSearchRunnerLogs({
         runnerId,
         searchRunnerLogsBodyDto: {
@@ -236,7 +239,6 @@ export default function RunnerDetailPage() {
     return () => unsubscribeFromRunner(runnerId);
   }, [isConnected, runnerId, subscribeToRunner, unsubscribeFromRunner]);
 
-
   const handleStop = async () => {
     if (!runner) return;
     try {
@@ -290,7 +292,11 @@ export default function RunnerDetailPage() {
     let hasMore = true;
 
     while (hasMore) {
-      const response = await fetchLogsFn({ cursor, take: PAGE, sortOrder: "asc" });
+      const response = await fetchLogsFn({
+        cursor,
+        take: PAGE,
+        sortOrder: "asc",
+      });
       aggregated.push(...(response.entries ?? []));
       hasMore = Boolean(response.hasMore && response.nextCursor);
       cursor = response.nextCursor ?? undefined;
@@ -347,6 +353,14 @@ export default function RunnerDetailPage() {
     return null;
   }
 
+  const textCoverage = runner.textCoverage;
+  const hasStructuredTextCoverage = Boolean(
+    textCoverage &&
+    (textCoverage.empty > 0 ||
+      textCoverage.engineUnavailable > 0 ||
+      textCoverage.zeroFrames > 0 ||
+      textCoverage.failed > 0),
+  );
   const assetsTotal = assetsCharts.totals.totalAssets;
   const progressTotal = assetProgress?.total ?? 0;
   const progressFinished =
@@ -398,7 +412,10 @@ export default function RunnerDetailPage() {
               <Badge variant="outline" className="rounded-[4px]">
                 {t(`triggerTypes.${runner.triggerType}`)}
               </Badge>
-              <span>{t("scans.runTimeline.triggered")} {formatRelative(runner.triggeredAt)}</span>
+              <span>
+                {t("scans.runTimeline.triggered")}{" "}
+                {formatRelative(runner.triggeredAt)}
+              </span>
             </div>
           </div>
         </div>
@@ -463,10 +480,18 @@ export default function RunnerDetailPage() {
 
       <Tabs defaultValue="overview" className="space-y-4">
         <TabsList className="h-auto rounded-[4px] border-2 border-black bg-background p-1">
-          <TabsTrigger value="overview" className="rounded-[3px]" data-testid="tab-overview">
+          <TabsTrigger
+            value="overview"
+            className="rounded-[3px]"
+            data-testid="tab-overview"
+          >
             Overview
           </TabsTrigger>
-          <TabsTrigger value="assets" className="rounded-[3px]" data-testid="tab-assets">
+          <TabsTrigger
+            value="assets"
+            className="rounded-[3px]"
+            data-testid="tab-assets"
+          >
             Assets
             {assetsTotal > 0 && (
               <span className="ml-1.5 rounded-full bg-primary/20 px-2 py-0.5 text-xs font-semibold">
@@ -474,7 +499,11 @@ export default function RunnerDetailPage() {
               </span>
             )}
           </TabsTrigger>
-          <TabsTrigger value="logs" className="rounded-[3px]" data-testid="tab-logs">
+          <TabsTrigger
+            value="logs"
+            className="rounded-[3px]"
+            data-testid="tab-logs"
+          >
             Logs
           </TabsTrigger>
         </TabsList>
@@ -488,37 +517,117 @@ export default function RunnerDetailPage() {
             </Card>
           )}
 
-          {runner.status === "ERROR" && runner.errorMessage && (
-            <Card className="border-destructive/30 bg-destructive/5 rounded-[6px]">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-destructive text-base">
-                  Run failed
-                </CardTitle>
-                <CardDescription className="text-destructive/80">
-                  {runner.errorMessage}
-                </CardDescription>
-              </CardHeader>
-              {runner.errorDetails && (
-                <CardContent>
-                  <pre className="text-xs text-destructive/80 bg-destructive/5 p-2 rounded max-h-64 overflow-auto break-all whitespace-pre-wrap">
-                    {JSON.stringify(runner.errorDetails, null, 2)}
-                  </pre>
-                </CardContent>
-              )}
-            </Card>
+          {(runner.status === "ERROR" || runner.status === "WARNING") &&
+            runner.errorMessage && (
+              <Card
+                className={
+                  runner.status === "ERROR"
+                    ? "border-destructive/30 bg-destructive/5 rounded-[6px]"
+                    : "border-amber-500/40 bg-amber-50 dark:bg-amber-950/20 rounded-[6px]"
+                }
+              >
+                <CardHeader className="pb-2">
+                  <CardTitle
+                    className={
+                      runner.status === "ERROR"
+                        ? "text-destructive text-base"
+                        : "text-amber-800 dark:text-amber-300 text-base"
+                    }
+                  >
+                    {runner.status === "ERROR"
+                      ? t("scans.runFailed")
+                      : t("scans.runWarning")}
+                  </CardTitle>
+                  <CardDescription>{runner.errorMessage}</CardDescription>
+                </CardHeader>
+                {runner.errorDetails && (
+                  <CardContent>
+                    <pre className="text-xs text-destructive/80 bg-destructive/5 p-2 rounded max-h-64 overflow-auto break-all whitespace-pre-wrap">
+                      {JSON.stringify(runner.errorDetails, null, 2)}
+                    </pre>
+                  </CardContent>
+                )}
+              </Card>
+            )}
+
+          {(runner.assetsWithoutText > 0 || runner.assetsOutOfScope > 0) && (
+            <div className="flex gap-3 border-l-4 border-amber-500 bg-amber-50 px-4 py-3 text-sm dark:bg-amber-950/20">
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-700 dark:text-amber-400" />
+              <div className="space-y-1">
+                <p className="font-semibold text-amber-900 dark:text-amber-200">
+                  {t("scans.coverage.title")}
+                </p>
+                {runner.assetsWithoutText > 0 && !hasStructuredTextCoverage && (
+                  <p className="text-amber-900/80 dark:text-amber-200/80">
+                    {t("scans.coverage.withoutText", {
+                      count: runner.assetsWithoutText.toLocaleString(),
+                    })}
+                  </p>
+                )}
+                {(textCoverage?.empty ?? 0) > 0 && (
+                  <p className="text-amber-900/80 dark:text-amber-200/80">
+                    {t("scans.coverage.empty", {
+                      count: (textCoverage?.empty ?? 0).toLocaleString(),
+                    })}
+                  </p>
+                )}
+                {(textCoverage?.engineUnavailable ?? 0) > 0 && (
+                  <p className="text-amber-900/80 dark:text-amber-200/80">
+                    {t("scans.coverage.engineUnavailable", {
+                      count: (
+                        textCoverage?.engineUnavailable ?? 0
+                      ).toLocaleString(),
+                    })}
+                  </p>
+                )}
+                {(textCoverage?.zeroFrames ?? 0) > 0 && (
+                  <p className="text-amber-900/80 dark:text-amber-200/80">
+                    {t("scans.coverage.zeroFrames", {
+                      count: (textCoverage?.zeroFrames ?? 0).toLocaleString(),
+                    })}
+                  </p>
+                )}
+                {(textCoverage?.failed ?? 0) > 0 && (
+                  <p className="text-amber-900/80 dark:text-amber-200/80">
+                    {t("scans.coverage.failed", {
+                      count: (textCoverage?.failed ?? 0).toLocaleString(),
+                    })}
+                  </p>
+                )}
+                {runner.assetsOutOfScope > 0 && (
+                  <p className="text-amber-900/80 dark:text-amber-200/80">
+                    {t("scans.coverage.outOfScope", {
+                      count: runner.assetsOutOfScope.toLocaleString(),
+                    })}
+                  </p>
+                )}
+              </div>
+            </div>
           )}
 
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
             {[
-              { label: t("scans.stats.findings"), value: findingsCharts.totals.total },
+              {
+                label: t("scans.stats.findings"),
+                value: findingsCharts.totals.total,
+              },
               {
                 label: t("scans.stats.criticalHigh"),
                 value:
                   findingsCharts.totals.critical + findingsCharts.totals.high,
               },
-              { label: t("scans.stats.assets"), value: assetsCharts.totals.totalAssets },
-              { label: t("scans.stats.open"), value: findingsCharts.totals.open },
-              { label: t("scans.stats.resolved"), value: findingsCharts.totals.resolved },
+              {
+                label: t("scans.stats.assets"),
+                value: assetsCharts.totals.totalAssets,
+              },
+              {
+                label: t("scans.stats.open"),
+                value: findingsCharts.totals.open,
+              },
+              {
+                label: t("scans.stats.resolved"),
+                value: findingsCharts.totals.resolved,
+              },
             ].map((item) => (
               <Card
                 key={item.label}
@@ -544,7 +653,9 @@ export default function RunnerDetailPage() {
           {progressTotal > 0 && (
             <Card className="border-2 border-black rounded-[6px]">
               <CardHeader className="pb-2">
-                <CardTitle className="text-base">{t("scans.runProgress.title")}</CardTitle>
+                <CardTitle className="text-base">
+                  {t("scans.runProgress.title")}
+                </CardTitle>
                 <CardDescription>
                   {t("scans.runProgress.description")}
                 </CardDescription>
@@ -558,7 +669,9 @@ export default function RunnerDetailPage() {
                     })}
                   </span>
                   <span className="font-medium">
-                    {t("scans.runProgress.complete", { percent: progressPercent })}
+                    {t("scans.runProgress.complete", {
+                      percent: progressPercent,
+                    })}
                   </span>
                 </div>
                 <div className="flex h-3 w-full overflow-hidden rounded-full bg-muted">
@@ -577,24 +690,30 @@ export default function RunnerDetailPage() {
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
                   <span className="inline-flex items-center gap-1.5">
                     <span className="h-2 w-2 rounded-full bg-accent" />
-                    {t("scans.runProgress.processed")}: {(assetProgress?.processed ?? 0).toLocaleString()}
+                    {t("scans.runProgress.processed")}:{" "}
+                    {(assetProgress?.processed ?? 0).toLocaleString()}
                   </span>
                   <span className="inline-flex items-center gap-1.5">
                     <span className="h-2 w-2 rounded-full bg-accent/40" />
-                    {t("scans.runProgress.processing")}: {(assetProgress?.processing ?? 0).toLocaleString()}
+                    {t("scans.runProgress.processing")}:{" "}
+                    {(assetProgress?.processing ?? 0).toLocaleString()}
                   </span>
                   <span className="inline-flex items-center gap-1.5">
                     <span className="h-2 w-2 rounded-full bg-muted-foreground/40" />
-                    {t("scans.runProgress.pending")}: {(assetProgress?.pending ?? 0).toLocaleString()}
+                    {t("scans.runProgress.pending")}:{" "}
+                    {(assetProgress?.pending ?? 0).toLocaleString()}
                   </span>
                   <span className="inline-flex items-center gap-1.5">
                     <span className="h-2 w-2 rounded-full bg-destructive" />
-                    {t("scans.runProgress.errored")}: {(assetProgress?.error ?? 0).toLocaleString()}
+                    {t("scans.runProgress.errored")}:{" "}
+                    {(assetProgress?.error ?? 0).toLocaleString()}
                   </span>
                 </div>
                 {runner.durationMs != null && (
                   <p className="text-xs text-muted-foreground">
-                    {t("scans.runProgress.durationSoFar", { duration: formatDuration(runner.durationMs) })}
+                    {t("scans.runProgress.durationSoFar", {
+                      duration: formatDuration(runner.durationMs),
+                    })}
                   </p>
                 )}
               </CardContent>
@@ -605,35 +724,47 @@ export default function RunnerDetailPage() {
             <Card className="border-2 border-border rounded-[6px]">
               <CardHeader>
                 <CardTitle>{t("scans.runTimeline.title")}</CardTitle>
-                <CardDescription>{t("scans.runTimeline.description")}</CardDescription>
+                <CardDescription>
+                  {t("scans.runTimeline.description")}
+                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-2 text-sm">
                 <div className="flex items-start justify-between gap-3">
-                  <span className="text-muted-foreground">{t("scans.runTimeline.triggered")}</span>
+                  <span className="text-muted-foreground">
+                    {t("scans.runTimeline.triggered")}
+                  </span>
                   <span className="text-right">
                     {formatDate(runner.triggeredAt)}
                   </span>
                 </div>
                 <div className="flex items-start justify-between gap-3">
-                  <span className="text-muted-foreground">{t("scans.runTimeline.started")}</span>
+                  <span className="text-muted-foreground">
+                    {t("scans.runTimeline.started")}
+                  </span>
                   <span className="text-right">
                     {formatDate(runner.startedAt)}
                   </span>
                 </div>
                 <div className="flex items-start justify-between gap-3">
-                  <span className="text-muted-foreground">{t("scans.runTimeline.completed")}</span>
+                  <span className="text-muted-foreground">
+                    {t("scans.runTimeline.completed")}
+                  </span>
                   <span className="text-right">
                     {formatDate(runner.completedAt)}
                   </span>
                 </div>
                 <div className="flex items-start justify-between gap-3">
-                  <span className="text-muted-foreground">{t("scans.runTimeline.duration")}</span>
+                  <span className="text-muted-foreground">
+                    {t("scans.runTimeline.duration")}
+                  </span>
                   <span className="text-right">
                     {formatDuration(runner.durationMs)}
                   </span>
                 </div>
                 <div className="flex items-start justify-between gap-3">
-                  <span className="text-muted-foreground">{t("scans.runTimeline.triggeredBy")}</span>
+                  <span className="text-muted-foreground">
+                    {t("scans.runTimeline.triggeredBy")}
+                  </span>
                   <span className="text-right">
                     {runner.triggeredBy === "pg-boss"
                       ? t("runners.scheduler")
@@ -646,29 +777,81 @@ export default function RunnerDetailPage() {
             <Card className="border-2 border-border rounded-[6px]">
               <CardHeader>
                 <CardTitle>{t("scans.assetDelta.title")}</CardTitle>
-                <CardDescription>{t("scans.assetDelta.description")}</CardDescription>
+                <CardDescription>
+                  {t("scans.assetDelta.description")}
+                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-2 text-sm">
                 <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">{t("scans.assetDelta.created")}</span>
+                  <span className="text-muted-foreground">
+                    {t("scans.assetDelta.created")}
+                  </span>
                   <span className="font-semibold">
                     +{assetsCharts.totals.newAssets.toLocaleString()}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">{t("scans.assetDelta.updated")}</span>
+                  <span className="text-muted-foreground">
+                    {t("scans.assetDelta.updated")}
+                  </span>
                   <span className="font-semibold">
                     ~{assetsCharts.totals.updatedAssets.toLocaleString()}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">{t("scans.assetDelta.unchanged")}</span>
+                  <span className="text-muted-foreground">
+                    {t("scans.assetDelta.unchanged")}
+                  </span>
                   <span className="font-semibold">
                     {assetsCharts.totals.unchangedAssets.toLocaleString()}
                   </span>
                 </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">
+                    {t("scans.assetDelta.deleted")}
+                  </span>
+                  <span
+                    className={
+                      runner.assetsDeleted > 0
+                        ? "font-semibold text-destructive"
+                        : "font-semibold"
+                    }
+                  >
+                    {runner.assetsDeleted.toLocaleString()}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">
+                    {t("scans.assetDelta.withoutText")}
+                  </span>
+                  <span
+                    className={
+                      runner.assetsWithoutText > 0
+                        ? "font-semibold text-amber-700 dark:text-amber-400"
+                        : "font-semibold"
+                    }
+                  >
+                    {runner.assetsWithoutText.toLocaleString()}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">
+                    {t("scans.assetDelta.outOfScope")}
+                  </span>
+                  <span
+                    className={
+                      runner.assetsOutOfScope > 0
+                        ? "font-semibold text-amber-700 dark:text-amber-400"
+                        : "font-semibold"
+                    }
+                  >
+                    {runner.assetsOutOfScope.toLocaleString()}
+                  </span>
+                </div>
                 <div className="pt-1 flex items-center justify-between border-t">
-                  <span className="text-muted-foreground">{t("scans.stats.assets")}</span>
+                  <span className="text-muted-foreground">
+                    {t("scans.stats.assets")}
+                  </span>
                   <span className="font-semibold">
                     {assetsCharts.totals.totalAssets.toLocaleString()}
                   </span>
@@ -716,7 +899,10 @@ export default function RunnerDetailPage() {
         </TabsContent>
 
         <TabsContent value="assets" className="space-y-4">
-          <RunnerAssetsTable runnerId={runner.id} runnerStatus={runner.status} />
+          <RunnerAssetsTable
+            runnerId={runner.id}
+            runnerStatus={runner.status}
+          />
         </TabsContent>
 
         <TabsContent value="logs" className="space-y-4">

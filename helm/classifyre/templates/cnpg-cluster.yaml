@@ -20,4 +20,6 @@ spec:
       owner: {{ .Values.postgres.cnpg.user | quote }}
       secret:
         name: {{ include "classifyre.databaseSecretName" . }}
+      postInitApplicationSQL:
+        - CREATE EXTENSION IF NOT EXISTS vector
 {{- end }}

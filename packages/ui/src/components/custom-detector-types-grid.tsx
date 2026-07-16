@@ -5,7 +5,6 @@ import {
   Bot,
   Brain,
   Image,
-  Network,
   ScanSearch,
   ArrowRight,
 } from "lucide-react";
@@ -21,7 +20,6 @@ type DetectorKind =
   | "llm"
   | "text_classification"
   | "image_classification"
-  | "feature_extraction"
   | "object_detection";
 
 const DETECTOR_ICONS: Record<
@@ -33,13 +31,18 @@ const DETECTOR_ICONS: Record<
   llm: Bot,
   text_classification: Brain,
   image_classification: Image,
-  feature_extraction: Network,
   object_detection: ScanSearch,
 };
 
 const DETECTOR_DATA: Record<
   DetectorKind,
-  { title: string; tagline: string; description: string; tags: string[]; slug: string }
+  {
+    title: string;
+    tagline: string;
+    description: string;
+    tags: string[];
+    slug: string;
+  }
 > = {
   gliner2: {
     title: "GLiNER2 Pipeline",
@@ -81,14 +84,6 @@ const DETECTOR_DATA: Record<
     tags: ["Vision", "NSFW", "Harmful content"],
     slug: "image-classification",
   },
-  feature_extraction: {
-    title: "Feature Extraction",
-    tagline: "Dense vector embeddings",
-    description:
-      "Embed text into dense vectors using any HuggingFace sentence-transformer. Store embeddings as findings for downstream semantic search or clustering.",
-    tags: ["Embeddings", "Pooling", "Vector DB"],
-    slug: "feature-extraction",
-  },
   object_detection: {
     title: "Object Detection",
     tagline: "Locate and label objects in images",
@@ -103,7 +98,6 @@ const GENERAL_KINDS: DetectorKind[] = ["gliner2", "regex", "llm"];
 const TRANSFORMER_KINDS: DetectorKind[] = [
   "text_classification",
   "image_classification",
-  "feature_extraction",
   "object_detection",
 ];
 

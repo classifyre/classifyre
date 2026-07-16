@@ -179,7 +179,6 @@ export const PIPELINE_SCHEMA_DEFINITION_NAMES = {
   llm: "LLMPipelineSchema",
   text_classification: "TextClassificationPipelineSchema",
   image_classification: "ImageClassificationPipelineSchema",
-  feature_extraction: "FeatureExtractionPipelineSchema",
   object_detection: "ObjectDetectionPipelineSchema",
 } as const;
 

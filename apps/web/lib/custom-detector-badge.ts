@@ -11,7 +11,6 @@ export type PipelineSubtype =
   | "LLM"
   | "TEXT_CLASSIFICATION"
   | "IMAGE_CLASSIFICATION"
-  | "FEATURE_EXTRACTION"
   | "OBJECT_DETECTION";
 
 export type DetectorMethod = "RULESET" | "CLASSIFIER" | "ENTITY";
@@ -79,7 +78,10 @@ export function isVisualDetector(
   supportsVision?: boolean | null,
 ): boolean {
   const normalized = pipelineType?.toUpperCase();
-  if (normalized === "IMAGE_CLASSIFICATION" || normalized === "OBJECT_DETECTION") {
+  if (
+    normalized === "IMAGE_CLASSIFICATION" ||
+    normalized === "OBJECT_DETECTION"
+  ) {
     return true;
   }
   if (normalized === "LLM" && supportsVision) {
@@ -104,10 +106,10 @@ export function detectorTypeIconName(
   if (normalizedPipeline === "LLM") return "Bot";
   if (normalizedPipeline === "TEXT_CLASSIFICATION") return "Brain";
   if (normalizedPipeline === "IMAGE_CLASSIFICATION") return "Image";
-  if (normalizedPipeline === "FEATURE_EXTRACTION") return "Network";
   if (normalizedPipeline === "OBJECT_DETECTION") return "ScanSearch";
 
-  if (normalizedMethod === "SECRETS" || normalizedMethod === "CODE_SECURITY") return "Shield";
+  if (normalizedMethod === "SECRETS" || normalizedMethod === "CODE_SECURITY")
+    return "Shield";
   if (normalizedMethod === "PII") return "Shield";
   if (normalizedMethod === "YARA") return "ShieldAlert";
   if (normalizedMethod === "BROKEN_LINKS") return "Link2";

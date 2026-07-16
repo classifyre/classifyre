@@ -4,6 +4,8 @@ import {
   CustomDetectorExtractionDto,
   SearchExtractionsQueryDto,
 } from './dto/custom-detector-extraction.dto';
+import { stableJsonHash } from './utils/stable-json';
+import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class CustomDetectorExtractionsService {
@@ -18,7 +20,8 @@ export class CustomDetectorExtractionsService {
     assetId: string;
     runnerId: string | null;
     detectorVersion: number;
-    pipelineResult: unknown;
+    payload?: { pipelineResult: unknown };
+    pipelineResult?: unknown;
     extractedAt: Date;
     createdAt: Date;
   }): CustomDetectorExtractionDto {
@@ -31,7 +34,8 @@ export class CustomDetectorExtractionsService {
       assetId: row.assetId,
       runnerId: row.runnerId,
       detectorVersion: row.detectorVersion,
-      pipelineResult: row.pipelineResult as Record<string, unknown>,
+      pipelineResult: (row.payload?.pipelineResult ??
+        row.pipelineResult) as Record<string, unknown>,
       extractedAt: row.extractedAt,
       createdAt: row.createdAt,
     };
@@ -42,6 +46,7 @@ export class CustomDetectorExtractionsService {
   ): Promise<CustomDetectorExtractionDto | null> {
     const row = await this.prisma.customDetectorExtraction.findUnique({
       where: { findingId },
+      include: { payload: true },
     });
     return row ? this.toDto(row) : null;
   }
@@ -70,6 +75,7 @@ export class CustomDetectorExtractionsService {
     const [items, total] = await Promise.all([
       this.prisma.customDetectorExtraction.findMany({
         where,
+        include: { payload: true },
         orderBy: { extractedAt: 'desc' },
         take,
         skip,
@@ -131,8 +137,43 @@ export class CustomDetectorExtractionsService {
     // When called from within a transaction, pass the transaction client so the
     // extraction row is inserted in the same transaction as its parent finding —
     // otherwise the finding is still uncommitted and the FK constraint fails (P2003).
-    client: Pick<PrismaService, 'customDetectorExtraction'> = this.prisma,
+    client: Pick<
+      PrismaService,
+      'customDetectorExtraction' | 'extractionPayload'
+    > = this.prisma,
   ): Promise<void> {
+    if (!(client as any).extractionPayload) {
+      await (client.customDetectorExtraction.upsert as any)({
+        where: { findingId: data.findingId },
+        create: { ...data },
+        update: {
+          detectorVersion: data.detectorVersion,
+          pipelineResult: data.pipelineResult,
+          extractedAt: data.extractedAt,
+        },
+      });
+      return;
+    }
+    const existingPayload = await client.extractionPayload.findFirst({
+      where: {
+        pipelineResult: {
+          equals: data.pipelineResult as Prisma.InputJsonValue,
+        },
+      },
+      select: { contentHash: true },
+    });
+    const payloadHash =
+      existingPayload?.contentHash ?? stableJsonHash(data.pipelineResult);
+    if (!existingPayload) {
+      await client.extractionPayload.upsert({
+        where: { contentHash: payloadHash },
+        create: {
+          contentHash: payloadHash,
+          pipelineResult: data.pipelineResult as Prisma.InputJsonValue,
+        },
+        update: {},
+      });
+    }
     await (client.customDetectorExtraction.upsert as any)({
       where: { findingId: data.findingId },
       create: {
@@ -143,12 +184,12 @@ export class CustomDetectorExtractionsService {
         assetId: data.assetId,
         runnerId: data.runnerId,
         detectorVersion: data.detectorVersion,
-        pipelineResult: data.pipelineResult,
+        payloadHash,
         extractedAt: data.extractedAt,
       },
       update: {
         detectorVersion: data.detectorVersion,
-        pipelineResult: data.pipelineResult,
+        payloadHash,
         extractedAt: data.extractedAt,
       },
     });

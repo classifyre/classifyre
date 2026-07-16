@@ -36,6 +36,7 @@ import { CorrelationService } from './correlation/correlation.service';
 import { PgBossService } from './scheduler/pg-boss.service';
 import { CORRELATION_QUEUE } from './correlation/correlation.constants';
 import { CaseThreadKind } from '@prisma/client';
+import { EmbeddingService } from './embedding/embedding.service';
 
 const jsonObjectSchema = z.record(z.string(), z.unknown());
 
@@ -123,6 +124,7 @@ export class McpServerFactoryService {
     private readonly caseActivityService: CaseActivityService,
     private readonly correlationService: CorrelationService,
     private readonly pgBossService: PgBossService,
+    private readonly embeddingService: EmbeddingService,
   ) {}
 
   createServer(): McpServer {
@@ -561,7 +563,7 @@ export class McpServerFactoryService {
       {
         title: 'Create Custom Detector',
         description:
-          'Create a custom detector. The pipeline_schema.type selects the engine: GLINER2 (default), REGEX, LLM (AI), TEXT_CLASSIFICATION, IMAGE_CLASSIFICATION, FEATURE_EXTRACTION, or OBJECT_DETECTION. GLiNER2 needs at least one entity or classification task. LLM detectors require aiProviderConfigId and a system_prompt.',
+          'Create a custom detector. The pipeline_schema.type selects the engine: GLINER2 (default), REGEX, LLM (AI), TEXT_CLASSIFICATION, IMAGE_CLASSIFICATION, or OBJECT_DETECTION. GLiNER2 needs at least one entity or classification task. LLM detectors require aiProviderConfigId and a system_prompt.',
         inputSchema: {
           key: z.string().optional(),
           name: z.string(),
@@ -1053,18 +1055,83 @@ export class McpServerFactoryService {
         inputSchema: {
           filters: searchFindingsFilters.optional(),
           page: searchFindingsPage.optional(),
+          semantic_query: z
+            .string()
+            .max(500)
+            .optional()
+            .describe(
+              'Natural-language query. Uses hybrid lexical + semantic ranking and returns score reasons.',
+            ),
+          semantic_mode: z
+            .enum(['hybrid', 'vector', 'off'])
+            .optional()
+            .describe('Semantic ranking mode. Defaults to hybrid.'),
+          ranking: z
+            .enum(['importance', 'newest', 'severity'])
+            .optional()
+            .describe(
+              'Corpus browsing order when semantic_query is omitted. Defaults to importance.',
+            ),
         },
         annotations: {
           readOnlyHint: true,
           idempotentHint: true,
         },
       },
-      async ({ filters, page }) =>
+      async ({ filters, page, semantic_query, semantic_mode, ranking }) =>
         jsonResult(
           await this.findingsService.searchFindings({
             filters: filters,
             page: page,
+            semantic: semantic_query
+              ? { query: semantic_query, mode: semantic_mode ?? 'hybrid' }
+              : undefined,
+            ranking: { sort: ranking ?? 'importance' },
           } as any),
+        ),
+    );
+
+    server.registerTool(
+      'find_similar_findings',
+      {
+        title: 'Find Similar Findings',
+        description:
+          'Return semantic neighbours for one finding, including similarity, duplicate/noise signals, and ranking explanations.',
+        inputSchema: {
+          findingId: z.string().uuid(),
+          limit: z.number().int().min(1).max(100).optional(),
+        },
+        annotations: { readOnlyHint: true, idempotentHint: true },
+      },
+      async ({ findingId, limit }) =>
+        jsonResult(
+          await this.embeddingService.similarFindings(findingId, limit ?? 20),
+        ),
+    );
+
+    server.registerTool(
+      'find_boilerplate_clusters',
+      {
+        title: 'Find Boilerplate Clusters',
+        description:
+          'Find repeated or near-duplicate finding groups in a source, ordered by cluster size. Use this to separate bulk boilerplate from distinctive evidence.',
+        inputSchema: {
+          sourceId: z.string().uuid(),
+          threshold: z.number().min(0.8).max(1).optional(),
+          limit: z.number().int().min(1).max(100).optional(),
+        },
+        annotations: {
+          readOnlyHint: true,
+          idempotentHint: true,
+        },
+      },
+      async ({ sourceId, threshold, limit }) =>
+        jsonResult(
+          await this.embeddingService.boilerplateClusters(
+            sourceId,
+            threshold ?? 0.95,
+            limit ?? 50,
+          ),
         ),
     );
 
@@ -1183,19 +1250,41 @@ export class McpServerFactoryService {
           findings: searchAssetsFindingFilters.optional(),
           page: searchAssetsPage.optional(),
           options: searchAssetsOptions.optional(),
+          semantic_query: z
+            .string()
+            .min(1)
+            .max(500)
+            .optional()
+            .describe('Meaning-based query over extracted asset text chunks.'),
+          semantic_mode: z
+            .enum(['off', 'hybrid', 'vector'])
+            .optional()
+            .describe(
+              'Hybrid combines asset-name and semantic rank. Defaults to hybrid.',
+            ),
         },
         annotations: {
           readOnlyHint: true,
           idempotentHint: true,
         },
       },
-      async ({ assets, findings, page, options }) =>
+      async ({
+        assets,
+        findings,
+        page,
+        options,
+        semantic_query,
+        semantic_mode,
+      }) =>
         jsonResult(
           await this.assetService.searchAssets({
             assets,
             findings,
             page,
             options,
+            semantic: semantic_query
+              ? { query: semantic_query, mode: semantic_mode ?? 'hybrid' }
+              : undefined,
           } as any),
         ),
     );

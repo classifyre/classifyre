@@ -2,7 +2,7 @@
 
 Documents the `metadata` JSONB field on the `Finding` model — what each detector produces, how it flows through the system, and how to query it.
 
-Last updated: 2026-05-09.
+Last updated: 2026-07-15.
 
 ---
 
@@ -22,7 +22,9 @@ CLI Detector → DetectionResult.metadata
 
 **Storage rules:**
 
-- The `embedding` key (produced by `FEATURE_EXTRACTION`) is stripped before persistence — embedding vectors are too large for a metadata column (~6 KB per 768-dim vector). The remaining keys (`dimension`, `model`, `pooling_strategy`, `normalized`) are preserved.
+- Any legacy `embedding` key is stripped before persistence. Vectors are stored
+  in the content-addressed semantic store and linked through
+  `Finding.embedContentHash`; they are never finding metadata.
 - All other metadata keys are stored as-is.
 - The column is nullable. Findings created before this feature was added have `metadata = NULL`.
 
@@ -89,22 +91,6 @@ CLI Detector → DetectionResult.metadata
 | `score` | `number` | Model prediction confidence |
 
 **Source file:** `apps/cli/src/detectors/content/text_classification_detector.py`
-
----
-
-### FEATURE_EXTRACTION
-
-| Key | Type | Description |
-|---|---|---|
-| `embedding` | `float[]` | Dense vector (stripped before DB persistence) |
-| `dimension` | `integer` | Vector dimensionality (e.g. `768`, `384`) |
-| `pooling_strategy` | `string` | One of: `mean`, `cls`, `max`, `none` |
-| `normalized` | `boolean` | Whether L2 normalization was applied |
-| `model` | `string` | HuggingFace model ID (e.g. `BAAI/bge-base-en-v1.5`) |
-
-> **Note:** The `embedding` key is stripped during ingestion. Only `dimension`, `pooling_strategy`, `normalized`, and `model` are persisted to the database.
-
-**Source file:** `apps/cli/src/detectors/content/feature_extraction_detector.py`
 
 ---
 

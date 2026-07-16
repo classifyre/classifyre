@@ -10,6 +10,8 @@ import {
 } from "@/lib/date";
 import {
   ArrowUpRight,
+  BrainCircuit,
+  ListFilter,
   Filter,
   Loader2,
   Search,
@@ -85,6 +87,31 @@ type FilterDraft = {
   severity: SeverityValue[];
   customDetectorKeys: string[];
 };
+
+type RankingReason = {
+  code: string;
+  label: string;
+  impact: "up" | "down" | "neutral";
+};
+
+type RankedFinding = FindingResponseDto & {
+  ranking?: {
+    importance: number | null;
+    quality: number | null;
+    similarCount: number;
+    duplicateGroupHash: string | null;
+    reasons: RankingReason[];
+    coverage: "analyzed" | "pending";
+    semanticSimilarity?: number;
+  };
+};
+
+type RankedFindingsResponse = Omit<SearchFindingsResponseDto, "findings"> & {
+  findings: RankedFinding[];
+};
+
+type SearchMode = "hybrid" | "off";
+type RankingMode = "importance" | "newest" | "severity";
 
 // Selection is either explicit IDs or a filter snapshot (select-all mode).
 export type FindingSelectionIds = {
@@ -162,11 +189,15 @@ function buildRequest({
   skip,
   limit,
   lockedFilters,
+  searchMode,
+  rankingMode,
 }: {
   draft: FilterDraft;
   skip: number;
   limit: number;
   lockedFilters?: SearchFindingsRequestDto["filters"];
+  searchMode: SearchMode;
+  rankingMode: RankingMode;
 }): SearchFindingsRequestDto {
   const filters: SearchFindingsRequestDto["filters"] = {
     ...(lockedFilters ?? {}),
@@ -203,6 +234,11 @@ function buildRequest({
   return {
     filters,
     page: { skip, limit },
+    semantic:
+      searchMode === "hybrid" && draft.search.trim()
+        ? { query: draft.search.trim(), mode: "hybrid" }
+        : undefined,
+    ranking: { sort: rankingMode },
   };
 }
 
@@ -266,11 +302,10 @@ export function FindingsTable({
   const router = useRouter();
   const { searchParams, setParams } = useUrlParams();
 
-  const [searchInput, setSearchInput] = useState(
-    () =>
-      disableUrlSync
-        ? DEFAULT_DRAFT.search
-        : (searchParams.get("q") ?? DEFAULT_DRAFT.search),
+  const [searchInput, setSearchInput] = useState(() =>
+    disableUrlSync
+      ? DEFAULT_DRAFT.search
+      : (searchParams.get("q") ?? DEFAULT_DRAFT.search),
   );
   const [draft, setDraft] = useState<FilterDraft>(() => ({
     search: disableUrlSync
@@ -282,7 +317,9 @@ export function FindingsTable({
     statuses: disableUrlSync
       ? DEFAULT_DRAFT.statuses
       : (searchParams.getAll("status") as FilterDraft["statuses"]),
-    sourceIds: disableUrlSync ? DEFAULT_DRAFT.sourceIds : searchParams.getAll("source"),
+    sourceIds: disableUrlSync
+      ? DEFAULT_DRAFT.sourceIds
+      : searchParams.getAll("source"),
     customDetectorKeys: disableUrlSync
       ? DEFAULT_DRAFT.customDetectorKeys
       : searchParams.getAll("customDetector"),
@@ -299,12 +336,14 @@ export function FindingsTable({
   }, [severities]);
   const [pageSize, setPageSize] = useState(String(PAGE_SIZE_OPTIONS[0]));
   const [page, setPage] = useState(1);
+  const [searchMode, setSearchMode] = useState<SearchMode>("hybrid");
+  const [rankingMode, setRankingMode] = useState<RankingMode>("importance");
 
   const [sources, setSources] = useState<SourceListItem[]>([]);
   const [customDetectorOptions, setCustomDetectorOptions] = useState<
     Array<{ key: string; name: string; count: number }>
   >([]);
-  const [data, setData] = useState<SearchFindingsResponseDto | null>(null);
+  const [data, setData] = useState<RankedFindingsResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isFilterLoading, setIsFilterLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -411,6 +450,8 @@ export function FindingsTable({
               SearchFindingsFiltersInputDtoDetectorTypeEnum.Custom,
             ],
           },
+          searchMode: "off",
+          rankingMode,
         });
         const options =
           await api.assets.searchAssetsControllerSearchFindingsCustomDetectors({
@@ -435,13 +476,13 @@ export function FindingsTable({
     return () => {
       active = false;
     };
-  }, [draft, lockedFilters]);
+  }, [draft, lockedFilters, rankingMode]);
 
   // ── Reset page on filter/size change ─────────────────────────────────────
 
   useEffect(() => {
     setPage(1);
-  }, [draft, pageSize]);
+  }, [draft, pageSize, searchMode, rankingMode]);
 
   // ── Fetch findings ────────────────────────────────────────────────────────
 
@@ -458,10 +499,12 @@ export function FindingsTable({
             skip,
             limit: resolvedPageSize,
             lockedFilters,
+            searchMode,
+            rankingMode,
           }),
         });
         if (!active) return;
-        setData(response);
+        setData(response as RankedFindingsResponse);
       } catch (loadError) {
         if (!active) return;
         console.error("Failed to load findings:", loadError);
@@ -479,7 +522,7 @@ export function FindingsTable({
     return () => {
       active = false;
     };
-  }, [draft, page, resolvedPageSize, lockedFilters]);
+  }, [draft, page, resolvedPageSize, lockedFilters, searchMode, rankingMode]);
 
   // ── Selection helpers ─────────────────────────────────────────────────────
 
@@ -501,8 +544,10 @@ export function FindingsTable({
         skip: 0,
         limit: 1,
         lockedFilters,
+        searchMode,
+        rankingMode,
       }).filters,
-    [draft, lockedFilters],
+    [draft, lockedFilters, searchMode, rankingMode],
   );
 
   useEffect(() => {
@@ -568,10 +613,25 @@ export function FindingsTable({
   // ── Derived ───────────────────────────────────────────────────────────────
 
   // Apply client-side exclusion (already-attached findings in dialog mode)
-  const findings =
+  const visibleFindings =
     excludedFindingIds && excludedFindingIds.length > 0
       ? currentFindings.filter((f) => !excludedFindingIds.includes(f.id))
       : currentFindings;
+  const duplicateGroups = new Set<string>();
+  const findings = visibleFindings.filter((finding) => {
+    const group = finding.ranking?.duplicateGroupHash;
+    if (!group) return true;
+    if (duplicateGroups.has(group)) return false;
+    duplicateGroups.add(group);
+    return true;
+  });
+  const analyzedCount = findings.filter(
+    (finding) => finding.ranking?.coverage === "analyzed",
+  ).length;
+  const groupedCount = findings.reduce(
+    (total, finding) => total + (finding.ranking?.similarCount ?? 0),
+    0,
+  );
   const total = data?.total ?? 0;
   const hasRows = findings.length > 0;
   const showInitialLoading = isLoading && data === null;
@@ -641,6 +701,56 @@ export function FindingsTable({
             className="h-9 pl-9 border-2 border-border rounded-[4px]"
           />
         </div>
+
+        <div className="flex h-9 overflow-hidden rounded-[4px] border-2 border-border">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                type="button"
+                variant={searchMode === "hybrid" ? "default" : "ghost"}
+                size="sm"
+                className="h-full rounded-none px-2.5"
+                onClick={() => setSearchMode("hybrid")}
+              >
+                <BrainCircuit className="h-3.5 w-3.5" />
+                Semantic
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              Hybrid semantic and exact text ranking
+            </TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                type="button"
+                variant={searchMode === "off" ? "default" : "ghost"}
+                size="sm"
+                className="h-full rounded-none border-l border-border px-2.5"
+                onClick={() => setSearchMode("off")}
+              >
+                <Search className="h-3.5 w-3.5" />
+                Exact
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Exact field and full-text matching</TooltipContent>
+          </Tooltip>
+        </div>
+
+        <Select
+          value={rankingMode}
+          onValueChange={(value) => setRankingMode(value as RankingMode)}
+        >
+          <SelectTrigger className="h-9 w-[170px] rounded-[4px] border-2 border-border">
+            <ListFilter className="h-3.5 w-3.5" />
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="importance">Importance</SelectItem>
+            <SelectItem value="newest">Newest</SelectItem>
+            <SelectItem value="severity">Severity</SelectItem>
+          </SelectContent>
+        </Select>
 
         <MultiSelect
           values={draft.severity}
@@ -804,12 +914,32 @@ export function FindingsTable({
             entityLabel="findings"
             buildQuery={() =>
               filtersToSearchParams({
-                ...(buildRequest({ draft, skip: 0, limit: 0, lockedFilters })
-                  .filters ?? {}),
+                ...(buildRequest({
+                  draft,
+                  skip: 0,
+                  limit: 0,
+                  lockedFilters,
+                  searchMode,
+                  rankingMode,
+                }).filters ?? {}),
               })
             }
           />
         </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-3 font-mono text-[11px] text-muted-foreground">
+        <span>
+          {analyzedCount}/{findings.length} visible results ranked
+        </span>
+        {groupedCount > 0 && (
+          <span>
+            +{groupedCount.toLocaleString()} identical findings grouped
+          </span>
+        )}
+        {searchMode === "hybrid" && draft.search && (
+          <span>Hybrid semantic ranking active</span>
+        )}
       </div>
 
       {/* ── Selection banner ── */}
@@ -817,10 +947,16 @@ export function FindingsTable({
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-[4px] border-2 border-accent/30 bg-background px-4 py-2.5">
           <span className="font-mono text-xs text-accent">
             {isAllSelected
-              ? t("findings.selection.allSelected", { count: selectionCount.toLocaleString() })
+              ? t("findings.selection.allSelected", {
+                  count: selectionCount.toLocaleString(),
+                })
               : selectionCount !== 1
-                ? t("findings.selection.selectedPlural", { count: selectionCount.toLocaleString() })
-                : t("findings.selection.selected", { count: selectionCount.toLocaleString() })}
+                ? t("findings.selection.selectedPlural", {
+                    count: selectionCount.toLocaleString(),
+                  })
+                : t("findings.selection.selected", {
+                    count: selectionCount.toLocaleString(),
+                  })}
           </span>
 
           {onBulkUpdate && (
@@ -830,8 +966,12 @@ export function FindingsTable({
               className="ml-auto bg-accent text-accent-foreground hover:bg-accent/90 font-mono text-xs uppercase tracking-[0.08em] font-bold rounded-[4px] border-0"
             >
               {selectionCount !== 1
-                ? t("findings.bulkUpdate.updateFindings", { count: selectionCount.toLocaleString() })
-                : t("findings.bulkUpdate.updateFinding", { count: selectionCount.toLocaleString() })}
+                ? t("findings.bulkUpdate.updateFindings", {
+                    count: selectionCount.toLocaleString(),
+                  })
+                : t("findings.bulkUpdate.updateFinding", {
+                    count: selectionCount.toLocaleString(),
+                  })}
             </Button>
           )}
         </div>
@@ -881,6 +1021,18 @@ export function FindingsTable({
                         {headerChecked || headerIndeterminate
                           ? "Deselect all"
                           : `Select all ${currentTotal.toLocaleString()} matching current filters`}
+                      </TooltipContent>
+                    </Tooltip>
+                  </TableHead>
+                  <TableHead className="bg-white/95 dark:bg-card/95">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="cursor-default text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+                          Importance
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        Evidence rank, separate from detector severity
                       </TooltipContent>
                     </Tooltip>
                   </TableHead>
@@ -1026,6 +1178,60 @@ export function FindingsTable({
                         </TableCell>
 
                         <TableCell>
+                          {finding.ranking?.importance != null ? (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <div className="min-w-[150px] cursor-default space-y-1.5">
+                                  <div className="flex items-center justify-between gap-2">
+                                    <span className="font-mono text-xs font-semibold">
+                                      {Math.round(
+                                        finding.ranking.importance * 100,
+                                      )}
+                                    </span>
+                                    {finding.ranking.similarCount > 0 && (
+                                      <Badge
+                                        variant="outline"
+                                        className="rounded-[3px] px-1.5 py-0 text-[10px]"
+                                      >
+                                        +{finding.ranking.similarCount} similar
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  <div className="h-1.5 overflow-hidden rounded-[2px] bg-muted">
+                                    <div
+                                      className="h-full bg-accent"
+                                      style={{
+                                        width: `${Math.round(finding.ranking.importance * 100)}%`,
+                                      }}
+                                    />
+                                  </div>
+                                  <span className="block truncate text-[10px] text-muted-foreground">
+                                    {finding.ranking.reasons[0]?.label ??
+                                      "Ranked evidence"}
+                                  </span>
+                                </div>
+                              </TooltipTrigger>
+                              <TooltipContent className="max-w-[320px] space-y-1">
+                                {finding.ranking.reasons.map((reason) => (
+                                  <div key={reason.code}>
+                                    {reason.impact === "up"
+                                      ? "+"
+                                      : reason.impact === "down"
+                                        ? "-"
+                                        : "·"}{" "}
+                                    {reason.label}
+                                  </div>
+                                ))}
+                              </TooltipContent>
+                            </Tooltip>
+                          ) : (
+                            <span className="font-mono text-[10px] text-muted-foreground">
+                              Pending
+                            </span>
+                          )}
+                        </TableCell>
+
+                        <TableCell>
                           <Button
                             variant="ghost"
                             size="sm"
@@ -1129,12 +1335,18 @@ export function FindingsTable({
                                   {finding.matchedContent}
                                 </span>
                               </TooltipTrigger>
-                              <TooltipContent side="top" sideOffset={6} className="max-w-[360px] break-all font-mono">
+                              <TooltipContent
+                                side="top"
+                                sideOffset={6}
+                                className="max-w-[360px] break-all font-mono"
+                              >
                                 {finding.matchedContent}
                               </TooltipContent>
                             </Tooltip>
                           ) : (
-                            <span className="text-xs text-muted-foreground">—</span>
+                            <span className="text-xs text-muted-foreground">
+                              —
+                            </span>
                           )}
                         </TableCell>
 
@@ -1149,7 +1361,9 @@ export function FindingsTable({
                                 | "info"
                             }
                           >
-                            {t(`findings.severityLabels.${finding.severity.toUpperCase()}` as TranslationKey)}
+                            {t(
+                              `findings.severityLabels.${finding.severity.toUpperCase()}` as TranslationKey,
+                            )}
                           </SeverityBadge>
                         </TableCell>
 
@@ -1157,7 +1371,9 @@ export function FindingsTable({
                           <StatusBadge
                             status={toFindingStatusBadgeValue(finding.status)}
                           >
-                            {t(`findings.statusLabels.${finding.status}` as TranslationKey)}
+                            {t(
+                              `findings.statusLabels.${finding.status}` as TranslationKey,
+                            )}
                           </StatusBadge>
                         </TableCell>
 
@@ -1314,7 +1530,9 @@ export function FindingsTable({
                   <Fragment key={`page-group-${pageNumber}`}>
                     {showEllipsis && (
                       <PaginationItem>
-                        <PaginationEllipsis label={t("common.pagination.morePages")} />
+                        <PaginationEllipsis
+                          label={t("common.pagination.morePages")}
+                        />
                       </PaginationItem>
                     )}
                     <PaginationItem>

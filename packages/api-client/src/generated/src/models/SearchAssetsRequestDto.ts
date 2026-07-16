@@ -41,6 +41,13 @@ import {
     SearchAssetsFiltersDtoToJSON,
     SearchAssetsFiltersDtoToJSONTyped,
 } from './SearchAssetsFiltersDto';
+import type { SemanticFindingsSearchDto } from './SemanticFindingsSearchDto';
+import {
+    SemanticFindingsSearchDtoFromJSON,
+    SemanticFindingsSearchDtoFromJSONTyped,
+    SemanticFindingsSearchDtoToJSON,
+    SemanticFindingsSearchDtoToJSONTyped,
+} from './SemanticFindingsSearchDto';
 
 /**
  * 
@@ -72,6 +79,12 @@ export interface SearchAssetsRequestDto {
      * @memberof SearchAssetsRequestDto
      */
     options?: SearchAssetsOptionsDto;
+    /**
+     * 
+     * @type {SemanticFindingsSearchDto}
+     * @memberof SearchAssetsRequestDto
+     */
+    semantic?: SemanticFindingsSearchDto;
 }
 
 /**
@@ -95,6 +108,7 @@ export function SearchAssetsRequestDtoFromJSONTyped(json: any, ignoreDiscriminat
         'findings': json['findings'] == null ? undefined : SearchFindingsFiltersDtoFromJSON(json['findings']),
         'page': json['page'] == null ? undefined : SearchAssetsPageDtoFromJSON(json['page']),
         'options': json['options'] == null ? undefined : SearchAssetsOptionsDtoFromJSON(json['options']),
+        'semantic': json['semantic'] == null ? undefined : SemanticFindingsSearchDtoFromJSON(json['semantic']),
     };
 }
 
@@ -113,6 +127,7 @@ export function SearchAssetsRequestDtoToJSONTyped(value?: SearchAssetsRequestDto
         'findings': SearchFindingsFiltersDtoToJSON(value['findings']),
         'page': SearchAssetsPageDtoToJSON(value['page']),
         'options': SearchAssetsOptionsDtoToJSON(value['options']),
+        'semantic': SemanticFindingsSearchDtoToJSON(value['semantic']),
     };
 }
 

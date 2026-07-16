@@ -37,6 +37,8 @@ Name | Type
 `updatedAt` | Date
 `asset` | [AssetResponseDto](AssetResponseDto.md)
 `source` | [SourceResponseDto](SourceResponseDto.md)
+`evidenceAnalysis` | [FindingEvidenceAnalysisDto](FindingEvidenceAnalysisDto.md)
+`ranking` | [FindingSearchRankingDto](FindingSearchRankingDto.md)
 
 ## Example
 
@@ -76,6 +78,8 @@ const example = {
   "updatedAt": null,
   "asset": null,
   "source": null,
+  "evidenceAnalysis": null,
+  "ranking": null,
 } satisfies FindingResponseDto
 
 console.log(example)

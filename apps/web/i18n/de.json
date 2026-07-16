@@ -1135,12 +1135,6 @@
         "description": "Klassifiziere Bilder mit jedem HuggingFace Vision-Modell. Nützlich für NSFW-Erkennung, Filterung schädlicher Inhalte und benutzerdefinierte Bildkategorisierung.",
         "tags": "Vision, NSFW, Schädliche Inhalte"
       },
-      "feature_extraction": {
-        "title": "Feature-Extraktion",
-        "tagline": "Dichte Vektor-Einbettungen",
-        "description": "Bette Text mit jedem HuggingFace Sentence-Transformer in dichte Vektoren ein. Speichere Einbettungen als Befunde für nachgelagerte semantische Suche oder Clustering.",
-        "tags": "Einbettungen, Pooling, Vektor-DB"
-      },
       "object_detection": {
         "title": "Objekterkennung",
         "tagline": "Objekte in Bildern lokalisieren und labeln",
@@ -1203,6 +1197,7 @@
       }
     },
     "runFailed": "Ausführung fehlgeschlagen",
+    "runWarning": "Ausführung mit unvollständiger Abdeckung abgeschlossen",
     "showJobOutput": "Jobausgabe anzeigen",
     "updatingOverview": "Übersicht wird aktualisiert...",
     "totalRuns": "Ausführungen gesamt",
@@ -1264,7 +1259,19 @@
       "description": "Von dieser Ausführung erzeugte Änderungen",
       "created": "Erstellt",
       "updated": "Aktualisiert",
-      "unchanged": "Unverändert"
+      "unchanged": "Unverändert",
+      "deleted": "Gelöscht",
+      "withoutText": "Text nicht gescannt",
+      "outOfScope": "Außerhalb des Umfangs beibehalten"
+    },
+    "coverage": {
+      "title": "Abdeckung muss geprüft werden",
+      "withoutText": "{{count}} Assets lieferten keinen Text; ihr Inhalt wurde von den Detektoren nicht geprüft.",
+      "empty": "Bei {{count}} Assets wurde die Textextraktion abgeschlossen, aber kein für Detektoren sichtbarer Text erzeugt.",
+      "engineUnavailable": "{{count}} Assets konnten nicht gelesen werden, weil eine Text- oder OCR-Engine nicht verfügbar war.",
+      "zeroFrames": "Bei {{count}} Videos wurden null Frames dekodiert; die visuelle OCR prüfte daher keinen Inhalt.",
+      "failed": "Bei {{count}} Assets trat ein anderer Fehler bei der Textextraktion auf.",
+      "outOfScope": "{{count}} Assets wurden wegen eines geänderten Scan-Umfangs beibehalten; ihr Fehlen wurde nicht als Löschung behandelt."
     },
     "sourceContext": {
       "title": "Quellkontext",
@@ -1407,6 +1414,17 @@
     "searchTriggerTypes": "Auslösertypen suchen...",
     "noTriggerTypesFound": "Keine Auslösertypen gefunden",
     "updating": "Wird aktualisiert",
+    "delta": {
+      "created": "Neu",
+      "updated": "Aktualisiert",
+      "unchanged": "Gleich",
+      "deleted": "Gelöscht",
+      "withoutText": "Text nicht gescannt",
+      "outOfScope": "Außerhalb des Umfangs",
+      "findingsNew": "Neu",
+      "findingsKept": "Beibehalten",
+      "findingsResolved": "Behoben"
+    },
     "status": {
       "completed": "Abgeschlossen",
       "warning": "Warnung",

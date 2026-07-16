@@ -63,24 +63,41 @@ export default function CustomDetectorDetailsPage() {
   const [isTraining, setIsTraining] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [detector, setDetector] = useState<DetectorWithPipeline | null>(
-    null,
-  );
+  const [detector, setDetector] = useState<DetectorWithPipeline | null>(null);
   const [history, setHistory] = useState<CustomDetectorTrainingRunDto[]>([]);
 
   const load = useCallback(async () => {
     try {
       setIsLoading(true);
-      const detectorPayload = await api.getCustomDetector(detectorId) as DetectorWithPipeline;
+      const detectorPayload = (await api.getCustomDetector(
+        detectorId,
+      )) as DetectorWithPipeline;
       setDetector(detectorPayload);
 
       // Pipeline detectors get training history (except REGEX/transformer which have no training); legacy detectors skip it for RULESET.
-      const isPipeline = Boolean(detectorPayload.pipelineSchema && Object.keys(detectorPayload.pipelineSchema).length > 0);
-      const loadedType = (detectorPayload.pipelineSchema as Record<string, unknown>)?.type as string | undefined;
+      const isPipeline = Boolean(
+        detectorPayload.pipelineSchema &&
+        Object.keys(detectorPayload.pipelineSchema).length > 0,
+      );
+      const loadedType = (
+        detectorPayload.pipelineSchema as Record<string, unknown>
+      )?.type as string | undefined;
       const isRegex = isPipeline && loadedType === "REGEX";
       const isLlm = isPipeline && loadedType === "LLM";
-      const isTransformer = isPipeline && !!loadedType && ["TEXT_CLASSIFICATION", "IMAGE_CLASSIFICATION", "FEATURE_EXTRACTION", "OBJECT_DETECTION"].includes(loadedType);
-      if (!isRegex && !isLlm && !isTransformer && (isPipeline || detectorPayload.method !== "RULESET")) {
+      const isTransformer =
+        isPipeline &&
+        !!loadedType &&
+        [
+          "TEXT_CLASSIFICATION",
+          "IMAGE_CLASSIFICATION",
+          "OBJECT_DETECTION",
+        ].includes(loadedType);
+      if (
+        !isRegex &&
+        !isLlm &&
+        !isTransformer &&
+        (isPipeline || detectorPayload.method !== "RULESET")
+      ) {
         const historyPayload = await api.listCustomDetectorTrainingHistory(
           detectorId,
           50,
@@ -200,19 +217,26 @@ export default function CustomDetectorDetailsPage() {
   const TRANSFORMER_PIPELINE_TYPES = new Set<string>([
     "TEXT_CLASSIFICATION",
     "IMAGE_CLASSIFICATION",
-    "FEATURE_EXTRACTION",
     "OBJECT_DETECTION",
   ]);
 
   const sourcesUsing = detector.sourcesUsing ?? [];
   // Pipeline detectors (GLiNER2 / REGEX / LLM / transformer) carry pipelineSchema instead of config.
-  const isPipelineDetector = Boolean(detector.pipelineSchema && Object.keys(detector.pipelineSchema).length > 0);
-  const pipelineSchemaType = (detector.pipelineSchema as Record<string, unknown>)?.type as string | undefined;
+  const isPipelineDetector = Boolean(
+    detector.pipelineSchema && Object.keys(detector.pipelineSchema).length > 0,
+  );
+  const pipelineSchemaType = (
+    detector.pipelineSchema as Record<string, unknown>
+  )?.type as string | undefined;
   const isRegexPipeline = isPipelineDetector && pipelineSchemaType === "REGEX";
   const isLLMPipeline = isPipelineDetector && pipelineSchemaType === "LLM";
-  const isTransformerPipeline = isPipelineDetector && !!pipelineSchemaType && TRANSFORMER_PIPELINE_TYPES.has(pipelineSchemaType);
+  const isTransformerPipeline =
+    isPipelineDetector &&
+    !!pipelineSchemaType &&
+    TRANSFORMER_PIPELINE_TYPES.has(pipelineSchemaType);
   // Detectors that have no model-training step (regex / LLM / transformer).
-  const isNonTrainable = isRegexPipeline || isLLMPipeline || isTransformerPipeline;
+  const isNonTrainable =
+    isRegexPipeline || isLLMPipeline || isTransformerPipeline;
 
   return (
     <div className="space-y-6">
@@ -226,18 +250,19 @@ export default function CustomDetectorDetailsPage() {
           {t("detectors.backToCustom")}
         </Button>
         <div className="flex items-center gap-2">
-          {!isNonTrainable && (isPipelineDetector || detector.method !== "RULESET") && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleTrain}
-              disabled={isTraining}
-              data-testid="btn-train-detector"
-            >
-              <Play className="h-4 w-4" />
-              {isTraining ? t("common.training") : t("detectors.trainNow")}
-            </Button>
-          )}
+          {!isNonTrainable &&
+            (isPipelineDetector || detector.method !== "RULESET") && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleTrain}
+                disabled={isTraining}
+                data-testid="btn-train-detector"
+              >
+                <Play className="h-4 w-4" />
+                {isTraining ? t("common.training") : t("detectors.trainNow")}
+              </Button>
+            )}
           <Button
             size="sm"
             className="rounded-[4px] border-2 border-border bg-destructive text-white shadow-[3px_3px_0_var(--color-border)] hover:bg-destructive/90"
@@ -256,7 +281,9 @@ export default function CustomDetectorDetailsPage() {
             <div>
               <div className="flex items-center gap-2">
                 <CardTitle>{detector.name}</CardTitle>
-                {isVisualDetector(pipelineSchemaType) ? <VisualScanBadge /> : null}
+                {isVisualDetector(pipelineSchemaType) ? (
+                  <VisualScanBadge />
+                ) : null}
               </div>
               <CardDescription className="font-mono text-xs">
                 {detector.key}
@@ -265,7 +292,7 @@ export default function CustomDetectorDetailsPage() {
           </div>
         </CardHeader>
         <CardContent
-          className={`grid gap-3 ${(!isNonTrainable && (isPipelineDetector || detector.method !== "RULESET")) ? "md:grid-cols-3" : "md:grid-cols-2"}`}
+          className={`grid gap-3 ${!isNonTrainable && (isPipelineDetector || detector.method !== "RULESET") ? "md:grid-cols-3" : "md:grid-cols-2"}`}
         >
           <div className="rounded-[4px] border border-border/20 p-3">
             <p className="text-xs text-muted-foreground mb-1">
@@ -298,18 +325,19 @@ export default function CustomDetectorDetailsPage() {
               {detector.sourcesWithFindingsCount}
             </p>
           </div>
-          {!isNonTrainable && (isPipelineDetector || detector.method !== "RULESET") && (
-            <div className="rounded-[4px] border border-border/20 p-3">
-              <p className="text-xs text-muted-foreground">
-                {t("detectors.lastTrained")}
-              </p>
-              <p className="text-sm font-medium">
-                {detector.lastTrainedAt
-                  ? formatDate(detector.lastTrainedAt)
-                  : t("detectors.never")}
-              </p>
-            </div>
-          )}
+          {!isNonTrainable &&
+            (isPipelineDetector || detector.method !== "RULESET") && (
+              <div className="rounded-[4px] border border-border/20 p-3">
+                <p className="text-xs text-muted-foreground">
+                  {t("detectors.lastTrained")}
+                </p>
+                <p className="text-sm font-medium">
+                  {detector.lastTrainedAt
+                    ? formatDate(detector.lastTrainedAt)
+                    : t("detectors.never")}
+                </p>
+              </div>
+            )}
         </CardContent>
       </Card>
 
@@ -339,7 +367,11 @@ export default function CustomDetectorDetailsPage() {
                 toast.success(t("detectors.saved"));
                 await load();
               } catch (error) {
-                toast.error(error instanceof Error ? error.message : t("detectors.failedToSave"));
+                toast.error(
+                  error instanceof Error
+                    ? error.message
+                    : t("detectors.failedToSave"),
+                );
               } finally {
                 setIsSaving(false);
               }
@@ -368,7 +400,11 @@ export default function CustomDetectorDetailsPage() {
                 toast.success(t("detectors.saved"));
                 await load();
               } catch (error) {
-                toast.error(error instanceof Error ? error.message : t("detectors.failedToSave"));
+                toast.error(
+                  error instanceof Error
+                    ? error.message
+                    : t("detectors.failedToSave"),
+                );
               } finally {
                 setIsSaving(false);
               }
@@ -400,7 +436,11 @@ export default function CustomDetectorDetailsPage() {
                 toast.success(t("detectors.saved"));
                 await load();
               } catch (error) {
-                toast.error(error instanceof Error ? error.message : t("detectors.failedToSave"));
+                toast.error(
+                  error instanceof Error
+                    ? error.message
+                    : t("detectors.failedToSave"),
+                );
               } finally {
                 setIsSaving(false);
               }
@@ -429,7 +469,11 @@ export default function CustomDetectorDetailsPage() {
                 toast.success(t("detectors.saved"));
                 await load();
               } catch (error) {
-                toast.error(error instanceof Error ? error.message : t("detectors.failedToSave"));
+                toast.error(
+                  error instanceof Error
+                    ? error.message
+                    : t("detectors.failedToSave"),
+                );
               } finally {
                 setIsSaving(false);
               }
@@ -463,19 +507,22 @@ export default function CustomDetectorDetailsPage() {
         </section>
       )}
 
-      {!isNonTrainable && (isPipelineDetector || detector.method !== "RULESET") && (
-        <section data-testid="training-history-section" className="space-y-4">
-          <div>
-            <h2 className="font-serif text-2xl font-black uppercase tracking-[0.06em]">
-              {t("detectors.trainingHistoryTab")}
-            </h2>
-            <p className="text-sm text-muted-foreground">
-              {t("detectors.findingsCount", { count: detector.findingsCount })}
-            </p>
-          </div>
-          <CustomDetectorTrainingHistoryTable history={history} />
-        </section>
-      )}
+      {!isNonTrainable &&
+        (isPipelineDetector || detector.method !== "RULESET") && (
+          <section data-testid="training-history-section" className="space-y-4">
+            <div>
+              <h2 className="font-serif text-2xl font-black uppercase tracking-[0.06em]">
+                {t("detectors.trainingHistoryTab")}
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                {t("detectors.findingsCount", {
+                  count: detector.findingsCount,
+                })}
+              </p>
+            </div>
+            <CustomDetectorTrainingHistoryTable history={history} />
+          </section>
+        )}
 
       <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <DialogContent>

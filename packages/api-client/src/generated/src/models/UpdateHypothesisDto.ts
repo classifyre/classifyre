@@ -14,25 +14,25 @@
 
 import { mapValues } from '../runtime';
 /**
- * 
+ *
  * @export
  * @interface UpdateHypothesisDto
  */
 export interface UpdateHypothesisDto {
     /**
-     * 
+     *
      * @type {string}
      * @memberof UpdateHypothesisDto
      */
     statement?: string;
     /**
-     * 
+     *
      * @type {string}
      * @memberof UpdateHypothesisDto
      */
     status?: UpdateHypothesisDtoStatusEnum;
     /**
-     * 
+     *
      * @type {number}
      * @memberof UpdateHypothesisDto
      */
@@ -74,7 +74,7 @@ export function UpdateHypothesisDtoFromJSONTyped(json: any, ignoreDiscriminator:
         return json;
     }
     return {
-        
+
         'statement': json['statement'] == null ? undefined : json['statement'],
         'status': json['status'] == null ? undefined : json['status'],
         'confidence': json['confidence'] == null ? undefined : json['confidence'],
@@ -92,7 +92,7 @@ export function UpdateHypothesisDtoToJSONTyped(value?: UpdateHypothesisDto | nul
     }
 
     return {
-        
+
         'statement': value['statement'],
         'status': value['status'],
         'confidence': value['confidence'],

@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { RunnerAssetStatus } from '@prisma/client';
+import { RunnerAssetStatus, TextExtractionStatus } from '@prisma/client';
 import { AssetListItemDto } from './asset-list-item.dto';
 
 export class RunnerAssetItemDto {
@@ -20,6 +20,9 @@ export class RunnerAssetItemDto {
 
   @ApiPropertyOptional({ nullable: true })
   errorMessage: string | null;
+
+  @ApiPropertyOptional({ enum: TextExtractionStatus, nullable: true })
+  textExtractionStatus: TextExtractionStatus | null;
 
   @ApiProperty()
   createdAt: Date;
