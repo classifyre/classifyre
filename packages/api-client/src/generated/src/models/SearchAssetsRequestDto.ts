@@ -50,37 +50,37 @@ import {
 } from './SemanticFindingsSearchDto';
 
 /**
- *
+ * 
  * @export
  * @interface SearchAssetsRequestDto
  */
 export interface SearchAssetsRequestDto {
     /**
-     *
+     * 
      * @type {SearchAssetsFiltersDto}
      * @memberof SearchAssetsRequestDto
      */
     assets?: SearchAssetsFiltersDto;
     /**
-     *
+     * 
      * @type {SearchFindingsFiltersDto}
      * @memberof SearchAssetsRequestDto
      */
     findings?: SearchFindingsFiltersDto;
     /**
-     *
+     * 
      * @type {SearchAssetsPageDto}
      * @memberof SearchAssetsRequestDto
      */
     page?: SearchAssetsPageDto;
     /**
-     *
+     * 
      * @type {SearchAssetsOptionsDto}
      * @memberof SearchAssetsRequestDto
      */
     options?: SearchAssetsOptionsDto;
     /**
-     *
+     * 
      * @type {SemanticFindingsSearchDto}
      * @memberof SearchAssetsRequestDto
      */
@@ -103,7 +103,7 @@ export function SearchAssetsRequestDtoFromJSONTyped(json: any, ignoreDiscriminat
         return json;
     }
     return {
-
+        
         'assets': json['assets'] == null ? undefined : SearchAssetsFiltersDtoFromJSON(json['assets']),
         'findings': json['findings'] == null ? undefined : SearchFindingsFiltersDtoFromJSON(json['findings']),
         'page': json['page'] == null ? undefined : SearchAssetsPageDtoFromJSON(json['page']),
@@ -122,7 +122,7 @@ export function SearchAssetsRequestDtoToJSONTyped(value?: SearchAssetsRequestDto
     }
 
     return {
-
+        
         'assets': SearchAssetsFiltersDtoToJSON(value['assets']),
         'findings': SearchFindingsFiltersDtoToJSON(value['findings']),
         'page': SearchAssetsPageDtoToJSON(value['page']),

@@ -29,103 +29,103 @@ import {
 } from './TextCoverageDto';
 
 /**
- *
+ * 
  * @export
  * @interface RunnerDto
  */
 export interface RunnerDto {
     /**
-     *
+     * 
      * @type {string}
      * @memberof RunnerDto
      */
     id: string;
     /**
-     *
+     * 
      * @type {string}
      * @memberof RunnerDto
      */
     sourceId: string;
     /**
-     *
+     * 
      * @type {string}
      * @memberof RunnerDto
      */
     triggeredBy?: string | null;
     /**
-     *
+     * 
      * @type {Date}
      * @memberof RunnerDto
      */
     triggeredAt: Date;
     /**
-     *
+     * 
      * @type {string}
      * @memberof RunnerDto
      */
     triggerType: RunnerDtoTriggerTypeEnum;
     /**
-     *
+     * 
      * @type {string}
      * @memberof RunnerDto
      */
     status: RunnerDtoStatusEnum;
     /**
-     *
+     * 
      * @type {string}
      * @memberof RunnerDto
      */
     executionMode?: RunnerDtoExecutionModeEnum | null;
     /**
-     *
+     * 
      * @type {Date}
      * @memberof RunnerDto
      */
     startedAt?: Date | null;
     /**
-     *
+     * 
      * @type {Date}
      * @memberof RunnerDto
      */
     completedAt?: Date | null;
     /**
-     *
+     * 
      * @type {number}
      * @memberof RunnerDto
      */
     durationMs?: number | null;
     /**
-     *
+     * 
      * @type {object}
      * @memberof RunnerDto
      */
     recipe: object;
     /**
-     *
+     * 
      * @type {object}
      * @memberof RunnerDto
      */
     detectors?: object | null;
     /**
-     *
+     * 
      * @type {number}
      * @memberof RunnerDto
      */
     assetsCreated: number;
     /**
-     *
+     * 
      * @type {number}
      * @memberof RunnerDto
      */
     assetsUpdated: number;
     /**
-     *
+     * 
      * @type {number}
      * @memberof RunnerDto
      */
     assetsUnchanged: number;
     /**
-     *
+     * 
      * @type {number}
      * @memberof RunnerDto
      */
@@ -173,37 +173,37 @@ export interface RunnerDto {
      */
     assetsWithoutText: number;
     /**
-     *
+     * 
      * @type {TextCoverageDto}
      * @memberof RunnerDto
      */
     textCoverage?: TextCoverageDto | null;
     /**
-     *
+     * 
      * @type {string}
      * @memberof RunnerDto
      */
     errorMessage?: string | null;
     /**
-     *
+     * 
      * @type {object}
      * @memberof RunnerDto
      */
     errorDetails?: object | null;
     /**
-     *
+     * 
      * @type {string}
      * @memberof RunnerDto
      */
     jobName?: string | null;
     /**
-     *
+     * 
      * @type {string}
      * @memberof RunnerDto
      */
     jobNamespace?: string | null;
     /**
-     *
+     * 
      * @type {SourceInfoDto}
      * @memberof RunnerDto
      */
@@ -278,7 +278,7 @@ export function RunnerDtoFromJSONTyped(json: any, ignoreDiscriminator: boolean):
         return json;
     }
     return {
-
+        
         'id': json['id'],
         'sourceId': json['sourceId'],
         'triggeredBy': json['triggeredBy'] == null ? undefined : json['triggeredBy'],
@@ -321,7 +321,7 @@ export function RunnerDtoToJSONTyped(value?: RunnerDto | null, ignoreDiscriminat
     }
 
     return {
-
+        
         'id': value['id'],
         'sourceId': value['sourceId'],
         'triggeredBy': value['triggeredBy'],

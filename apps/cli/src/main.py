@@ -319,10 +319,10 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
                                 )
                                 payload = _asset_to_payload(result)
                                 await sink.emit_batch([payload], skip_findings=False)
-                                if hasattr(sink, "emit_embeddings"):
-                                    artifact = pipeline.take_embedding_artifact(asset_hash)
+                                if hasattr(sink, "emit_text_chunks"):
+                                    artifact = pipeline.take_text_artifact(asset_hash)
                                     if artifact is not None:
-                                        await sink.emit_embeddings(asset_hash, artifact)
+                                        await sink.emit_text_chunks(asset_hash, artifact)
 
                                 if hasattr(sink, "update_asset_status"):
                                     f_total, f_by_sev, f_by_det = _compute_findings_counts(
@@ -520,7 +520,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Classifyre Metadata Extraction CLI")
     parser.add_argument(
         "command",
-        choices=["test", "extract", "discover", "sandbox", "train", "embed"],
+        choices=["test", "extract", "discover", "sandbox", "train"],
         help="Command to run",
     )
     parser.add_argument(
@@ -601,8 +601,6 @@ def main() -> None:
         default=None,
         help="Max assets processed concurrently in Phase 2. Controls DB connection usage. Defaults to pool_workers*2 (env: CLASSIFYRE_MAX_CONCURRENT_ASSETS)",
     )
-    parser.add_argument("--embed-server-host", default="127.0.0.1")
-    parser.add_argument("--embed-server-port", type=int, default=8011)
 
     args = parser.parse_args()
 
@@ -640,12 +638,6 @@ def main() -> None:
             logger.error("train requires --pipeline-schema, --examples, and --output-dir")
             sys.exit(1)
         run_train_command(args)
-        return
-
-    if args.command == "embed":
-        from .embedding_server import serve_embedding_model
-
-        serve_embedding_model(args.embed_server_host, args.embed_server_port)
         return
 
     if not args.recipe:

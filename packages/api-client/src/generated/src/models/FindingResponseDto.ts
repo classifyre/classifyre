@@ -57,43 +57,43 @@ import {
 } from './FindingHistoryEntryDto';
 
 /**
- *
+ * 
  * @export
  * @interface FindingResponseDto
  */
 export interface FindingResponseDto {
     /**
-     *
+     * 
      * @type {string}
      * @memberof FindingResponseDto
      */
     id: string;
     /**
-     *
+     * 
      * @type {string}
      * @memberof FindingResponseDto
      */
     detectionIdentity: string;
     /**
-     *
+     * 
      * @type {string}
      * @memberof FindingResponseDto
      */
     assetId: string;
     /**
-     *
+     * 
      * @type {string}
      * @memberof FindingResponseDto
      */
     sourceId: string;
     /**
-     *
+     * 
      * @type {string}
      * @memberof FindingResponseDto
      */
     runnerId?: string;
     /**
-     *
+     * 
      * @type {string}
      * @memberof FindingResponseDto
      */
@@ -117,19 +117,19 @@ export interface FindingResponseDto {
      */
     customDetectorName?: string;
     /**
-     *
+     * 
      * @type {string}
      * @memberof FindingResponseDto
      */
     findingType: string;
     /**
-     *
+     * 
      * @type {string}
      * @memberof FindingResponseDto
      */
     category: string;
     /**
-     *
+     * 
      * @type {string}
      * @memberof FindingResponseDto
      */
@@ -141,31 +141,31 @@ export interface FindingResponseDto {
      */
     confidence: number;
     /**
-     *
+     * 
      * @type {string}
      * @memberof FindingResponseDto
      */
     matchedContent: string;
     /**
-     *
+     * 
      * @type {string}
      * @memberof FindingResponseDto
      */
     redactedContent?: string;
     /**
-     *
+     * 
      * @type {string}
      * @memberof FindingResponseDto
      */
     contextBefore?: string;
     /**
-     *
+     * 
      * @type {string}
      * @memberof FindingResponseDto
      */
     contextAfter?: string;
     /**
-     *
+     * 
      * @type {FindingLocationDto}
      * @memberof FindingResponseDto
      */
@@ -177,85 +177,85 @@ export interface FindingResponseDto {
      */
     metadata?: { [key: string]: any; };
     /**
-     *
+     * 
      * @type {string}
      * @memberof FindingResponseDto
      */
     status: FindingResponseDtoStatusEnum;
     /**
-     *
+     * 
      * @type {string}
      * @memberof FindingResponseDto
      */
     resolutionReason?: string;
     /**
-     *
+     * 
      * @type {string}
      * @memberof FindingResponseDto
      */
     comment?: string;
     /**
-     *
+     * 
      * @type {Array<FindingHistoryEntryDto>}
      * @memberof FindingResponseDto
      */
     history?: Array<FindingHistoryEntryDto>;
     /**
-     *
+     * 
      * @type {Date}
      * @memberof FindingResponseDto
      */
     detectedAt: Date;
     /**
-     *
+     * 
      * @type {Date}
      * @memberof FindingResponseDto
      */
     firstDetectedAt?: Date;
     /**
-     *
+     * 
      * @type {Date}
      * @memberof FindingResponseDto
      */
     lastDetectedAt?: Date;
     /**
-     *
+     * 
      * @type {Date}
      * @memberof FindingResponseDto
      */
     resolvedAt?: Date;
     /**
-     *
+     * 
      * @type {Date}
      * @memberof FindingResponseDto
      */
     createdAt: Date;
     /**
-     *
+     * 
      * @type {Date}
      * @memberof FindingResponseDto
      */
     updatedAt: Date;
     /**
-     *
+     * 
      * @type {AssetResponseDto}
      * @memberof FindingResponseDto
      */
     asset?: AssetResponseDto;
     /**
-     *
+     * 
      * @type {SourceResponseDto}
      * @memberof FindingResponseDto
      */
     source?: SourceResponseDto;
     /**
-     *
+     * 
      * @type {FindingEvidenceAnalysisDto}
      * @memberof FindingResponseDto
      */
     evidenceAnalysis?: FindingEvidenceAnalysisDto | null;
     /**
-     *
+     * 
      * @type {FindingSearchRankingDto}
      * @memberof FindingResponseDto
      */
@@ -330,7 +330,7 @@ export function FindingResponseDtoFromJSONTyped(json: any, ignoreDiscriminator: 
         return json;
     }
     return {
-
+        
         'id': json['id'],
         'detectionIdentity': json['detectionIdentity'],
         'assetId': json['assetId'],
@@ -377,7 +377,7 @@ export function FindingResponseDtoToJSONTyped(value?: FindingResponseDto | null,
     }
 
     return {
-
+        
         'id': value['id'],
         'detectionIdentity': value['detectionIdentity'],
         'assetId': value['assetId'],

@@ -172,9 +172,58 @@ spec:
             {{- end }}
             - name: SANDBOX_TEMP_DIR
               value: {{ .Values.api.sandbox.tempDir | quote }}
+            - name: EMBEDDING_ENABLED
+              value: {{ .Values.api.embedding.enabled | quote }}
             {{- if .Values.api.embedding.enabled }}
-            - name: EMBEDDING_SERVER_URL
-              value: {{ printf "http://127.0.0.1:%v" .Values.api.embedding.port | quote }}
+            - name: EMBEDDING_PROVIDER
+              value: {{ .Values.api.embedding.provider | quote }}
+            - name: EMBEDDING_MODEL
+              value: {{ .Values.api.embedding.model | quote }}
+            - name: EMBEDDING_MODEL_REVISION
+              value: {{ .Values.api.embedding.revision | quote }}
+            - name: EMBEDDING_DIMENSIONS
+              value: {{ .Values.api.embedding.dimensions | quote }}
+            - name: EMBEDDING_POOLING
+              value: {{ .Values.api.embedding.pooling | quote }}
+            - name: EMBEDDING_NORMALIZE
+              value: {{ .Values.api.embedding.normalize | quote }}
+            - name: EMBEDDING_DTYPE
+              value: {{ .Values.api.embedding.dtype | quote }}
+            - name: EMBEDDING_DEVICE
+              value: {{ .Values.api.embedding.device | quote }}
+            - name: EMBEDDING_ALLOW_REMOTE_MODELS
+              value: {{ .Values.api.embedding.allowRemoteModels | quote }}
+            {{- with .Values.api.embedding.localModelPath }}
+            - name: EMBEDDING_LOCAL_MODEL_PATH
+              value: {{ . | quote }}
+            {{- end }}
+            - name: EMBEDDING_CACHE_DIR
+              value: {{ .Values.api.embedding.cacheDir | quote }}
+            - name: EMBEDDING_BATCH_SIZE
+              value: {{ .Values.api.embedding.batchSize | quote }}
+            - name: EMBEDDING_RETRY_SECONDS
+              value: {{ .Values.api.embedding.retrySeconds | quote }}
+            - name: EMBEDDING_WORKER_CONCURRENCY
+              value: {{ .Values.api.embedding.workerConcurrency | quote }}
+            - name: EMBEDDING_MAX_PARALLEL_CALLS
+              value: {{ .Values.api.embedding.maxParallelCalls | quote }}
+            - name: EMBEDDING_HNSW_M
+              value: {{ .Values.api.embedding.hnsw.m | quote }}
+            - name: EMBEDDING_HNSW_EF_CONSTRUCTION
+              value: {{ .Values.api.embedding.hnsw.efConstruction | quote }}
+            - name: EMBEDDING_HNSW_EF_SEARCH
+              value: {{ .Values.api.embedding.hnsw.efSearch | quote }}
+            {{- with .Values.api.embedding.external.baseUrl }}
+            - name: EMBEDDING_BASE_URL
+              value: {{ . | quote }}
+            {{- end }}
+            {{- with .Values.api.embedding.external.existingSecret }}
+            - name: EMBEDDING_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ . }}
+                  key: {{ $.Values.api.embedding.external.apiKeyKey }}
+            {{- end }}
             {{- end }}
             {{- range $key, $value := .Values.api.env }}
             - name: {{ $key }}
@@ -246,6 +295,10 @@ spec:
             {{- /* Dedicated emptyDir for sandbox temp files — ephemeral, no external storage needed. */}}
             - name: sandbox-temp
               mountPath: {{ .Values.api.sandbox.tempDir | quote }}
+            {{- if .Values.api.embedding.enabled }}
+            - name: embedding-cache
+              mountPath: {{ .Values.api.embedding.cacheDir | quote }}
+            {{- end }}
             {{- if .Values.api.cliJobs.enabled }}
             - name: cli-job-template
               mountPath: /etc/classifyre/cli-job-template
@@ -295,44 +348,19 @@ spec:
           lifecycle:
             {{- toYaml . | nindent 12 }}
           {{- end }}
-        {{- if .Values.api.embedding.enabled }}
-        - name: embedding
-          image: {{ .Values.api.embedding.image.repository }}:{{ .Values.api.embedding.image.tag | default .Chart.AppVersion }}
-          imagePullPolicy: {{ .Values.api.embedding.image.pullPolicy }}
-          command:
-            - /app/apps/cli/.venv/bin/python
-          args:
-            - -m
-            - src.main
-            - embed
-            - --embed-server-host
-            - 127.0.0.1
-            - --embed-server-port
-            - {{ .Values.api.embedding.port | quote }}
-          ports:
-            - name: embedding
-              containerPort: {{ .Values.api.embedding.port }}
-          readinessProbe:
-            httpGet:
-              path: /health
-              port: embedding
-            periodSeconds: 5
-            failureThreshold: 12
-          securityContext:
-            allowPrivilegeEscalation: false
-            capabilities:
-              drop: ["ALL"]
-          {{- with .Values.api.embedding.resources }}
-          resources:
-            {{- toYaml . | nindent 12 }}
-          {{- end }}
-        {{- end }}
       volumes:
         - name: sandbox-temp
           emptyDir:
             {{- if .Values.api.sandbox.tempSizeLimit }}
             sizeLimit: {{ .Values.api.sandbox.tempSizeLimit | quote }}
             {{- end }}
+        {{- if .Values.api.embedding.enabled }}
+        - name: embedding-cache
+          emptyDir:
+            {{- with .Values.api.embedding.cacheSizeLimit }}
+            sizeLimit: {{ . | quote }}
+            {{- end }}
+        {{- end }}
         {{- if .Values.api.cliJobs.enabled }}
         - name: cli-job-template
           configMap:

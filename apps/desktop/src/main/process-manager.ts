@@ -164,8 +164,6 @@ interface ManagedProcess {
 
 export class ProcessManager {
   private processes = new Map<string, ManagedProcess>();
-  private embeddingProcess: ManagedProcess | null = null;
-  private embeddingStart: Promise<number> | null = null;
   private venvPathOverride: string | null = null;
   private venvPreparation: Promise<void> | null = null;
   private apiDirPromise: Promise<string> | null = null;
@@ -345,8 +343,6 @@ export class ProcessManager {
     }
 
     await this.prepareVenv();
-    const embeddingPort = await this.startEmbeddingServer();
-
     const entryPath = await this.getApiEntryPath();
     const cliPath = this.getCliPath();
     const venvPath = this.getVenvPath();
@@ -392,11 +388,14 @@ export class ProcessManager {
         // Persist scan logs on the local filesystem (desktop has no S3).
         // The storage service enforces per-run and total-size caps itself.
         RUNNER_LOG_DIR: getRunnerLogDir(namespaceId),
-        EMBEDDING_SERVER_URL: `http://127.0.0.1:${embeddingPort}`,
-        HF_HOME: app.isPackaged
-          ? path.join(process.resourcesPath, "models", "huggingface")
-          : path.join(this.getCliPath(), ".cache", "huggingface"),
-        ...(app.isPackaged ? { HF_HUB_OFFLINE: "1" } : {}),
+        EMBEDDING_CACHE_DIR: app.isPackaged
+          ? path.join(process.resourcesPath, "models", "transformers")
+          : path.join(app.getPath("userData"), "transformers-cache"),
+        ...(app.isPackaged
+          ? {
+              EMBEDDING_ALLOW_REMOTE_MODELS: "false",
+            }
+          : {}),
         CORS_ORIGIN: "*",
         NODE_ENV: app.isPackaged ? "production" : "development",
         ...(options.maxParallelScans && options.maxParallelScans > 0
@@ -441,106 +440,6 @@ export class ProcessManager {
       await this.stopApi(namespaceId);
       throw err;
     }
-  }
-
-  private startEmbeddingServer(): Promise<number> {
-    if (!this.embeddingStart) {
-      this.embeddingStart = this.doStartEmbeddingServer().catch(
-        (error: unknown) => {
-          this.embeddingStart = null;
-          throw error;
-        },
-      );
-    }
-    return this.embeddingStart;
-  }
-
-  private async doStartEmbeddingServer(): Promise<number> {
-    if (this.embeddingProcess) return this.embeddingProcess.port;
-    const port = await getAvailablePort(8011);
-    const venvPath = this.getVenvPath();
-    const python = path.join(
-      venvPath,
-      process.platform === "win32" ? "Scripts/python.exe" : "bin/python",
-    );
-    const cliPath = this.getCliPath();
-    const child = spawn(
-      python,
-      ["-m", "src.main", "embed", "--embed-server-port", String(port)],
-      {
-        cwd: cliPath,
-        env: {
-          ...getBaseEnv(),
-          HF_HOME: app.isPackaged
-            ? path.join(process.resourcesPath, "models", "huggingface")
-            : path.join(cliPath, ".cache", "huggingface"),
-          ...(app.isPackaged ? { HF_HUB_OFFLINE: "1" } : {}),
-        },
-        stdio: ["ignore", "pipe", "pipe"],
-      },
-    );
-    child.stdout?.on("data", (data: Buffer) =>
-      process.stderr.write(`[EMBED] ${data}`),
-    );
-    child.stderr?.on("data", (data: Buffer) =>
-      process.stderr.write(`[EMBED] ${data}`),
-    );
-    const spawnFailed = new Promise<never>((_, reject) => {
-      child.once("error", (error) => {
-        process.stderr.write(`[EMBED] process error: ${error.message}\n`);
-        reject(
-          new Error(`Failed to launch the embedding server: ${error.message}`),
-        );
-      });
-    });
-    spawnFailed.catch(() => {});
-    this.embeddingProcess = { child, port };
-    child.on("exit", () => {
-      this.embeddingProcess = null;
-      this.embeddingStart = null;
-    });
-    try {
-      await Promise.race([this.waitForEmbeddingReady(port), spawnFailed]);
-      return port;
-    } catch (error) {
-      this.embeddingProcess = null;
-      if (child.pid) {
-        await new Promise<void>((resolve) =>
-          treeKill(child.pid as number, "SIGTERM", () => resolve()),
-        );
-      }
-      throw error;
-    }
-  }
-
-  private waitForEmbeddingReady(
-    port: number,
-    timeoutMs = 180_000,
-  ): Promise<void> {
-    const started = Date.now();
-    return new Promise((resolve, reject) => {
-      const check = () => {
-        if (Date.now() - started > timeoutMs) {
-          reject(
-            new Error(
-              `Embedding server on port ${port} not ready after ${timeoutMs}ms`,
-            ),
-          );
-          return;
-        }
-        const request = http.get(
-          `http://127.0.0.1:${port}/health`,
-          (response) => {
-            response.resume();
-            if (response.statusCode === 200) resolve();
-            else setTimeout(check, 500);
-          },
-        );
-        request.on("error", () => setTimeout(check, 500));
-        request.setTimeout(2000, () => request.destroy());
-      };
-      check();
-    });
   }
 
   // Locates the Prisma CLI bundled with the API's node_modules; runs offline
@@ -689,14 +588,6 @@ export class ProcessManager {
   async stopAll(): Promise<void> {
     const ids = [...this.processes.keys()];
     await Promise.all(ids.map((id) => this.stopApi(id)));
-    const embedding = this.embeddingProcess;
-    this.embeddingProcess = null;
-    this.embeddingStart = null;
-    if (embedding?.child.pid) {
-      await new Promise<void>((resolve) =>
-        treeKill(embedding.child.pid as number, "SIGTERM", () => resolve()),
-      );
-    }
   }
 
   getPort(namespaceId: string): number | undefined {

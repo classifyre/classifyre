@@ -104,8 +104,6 @@ docs/DeleteRunnerResponseDto.md
 docs/DiscoveryRecentRunDto.md
 docs/DiscoveryRunSourceDto.md
 docs/EdgeDetailDto.md
-docs/EmbeddingSpaceDto.md
-docs/EmbeddingVectorDto.md
 docs/EmbeddingsApi.md
 docs/EvidenceEntityDto.md
 docs/ExclusionRuleDto.md
@@ -167,7 +165,6 @@ docs/McpTokenCreatedResponseDto.md
 docs/McpTokenResponseDto.md
 docs/McpToolParameterDto.md
 docs/McpToolSummaryDto.md
-docs/MissingEmbeddingsDto.md
 docs/NotificationListResponseDto.md
 docs/NotificationResponseDto.md
 docs/NotificationsApi.md
@@ -182,7 +179,6 @@ docs/PreviewResponseDto.md
 docs/PullFromInquiryDto.md
 docs/PullFromInquiryResponseDto.md
 docs/PutAssetChunksDto.md
-docs/PutEmbeddingVectorsDto.md
 docs/RebuildEdgesResponseDto.md
 docs/RecomputeCorrelationResponseDto.md
 docs/RegisterDiscoveredAssetsDto.md
@@ -408,8 +404,6 @@ src/models/DeleteRunnerResponseDto.ts
 src/models/DiscoveryRecentRunDto.ts
 src/models/DiscoveryRunSourceDto.ts
 src/models/EdgeDetailDto.ts
-src/models/EmbeddingSpaceDto.ts
-src/models/EmbeddingVectorDto.ts
 src/models/EvidenceEntityDto.ts
 src/models/ExclusionRuleDto.ts
 src/models/ExpandGraphDto.ts
@@ -465,7 +459,6 @@ src/models/McpTokenCreatedResponseDto.ts
 src/models/McpTokenResponseDto.ts
 src/models/McpToolParameterDto.ts
 src/models/McpToolSummaryDto.ts
-src/models/MissingEmbeddingsDto.ts
 src/models/NotificationListResponseDto.ts
 src/models/NotificationResponseDto.ts
 src/models/NotificationsControllerDeleteNotification200Response.ts
@@ -479,7 +472,6 @@ src/models/PreviewResponseDto.ts
 src/models/PullFromInquiryDto.ts
 src/models/PullFromInquiryResponseDto.ts
 src/models/PutAssetChunksDto.ts
-src/models/PutEmbeddingVectorsDto.ts
 src/models/RebuildEdgesResponseDto.ts
 src/models/RecomputeCorrelationResponseDto.ts
 src/models/RegisterDiscoveredAssetsDto.ts

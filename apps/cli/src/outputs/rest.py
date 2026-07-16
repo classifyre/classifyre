@@ -10,13 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry  # type: ignore[import-untyped]
 
-from ..pipeline.embedder import (
-    MODEL_DIM,
-    MODEL_NAME,
-    MODEL_REVISION,
-    EmbeddingArtifact,
-    local_embedder,
-)
+from ..pipeline.text_artifact import TextArtifact
 from .base import OutputRuntimeContext, OutputType
 
 logger = logging.getLogger(__name__)
@@ -230,41 +224,9 @@ class RestOutputSink:
                 payload.model_dump(mode="json", by_alias=True),
             )
 
-    async def emit_embeddings(self, asset_hash: str, artifact: EmbeddingArtifact) -> None:
-        """Negotiate hashes, encode only misses, then store chunk provenance."""
+    async def emit_text_chunks(self, asset_hash: str, artifact: TextArtifact) -> None:
+        """Send extracted text provenance; the API embeds it asynchronously."""
         source_id = self._require_source_id()
-        hashes = list(artifact.contents)
-        if hashes:
-            missing_response = self._request_json(
-                "POST",
-                f"/sources/{source_id}/embeddings/missing",
-                {
-                    "space": {
-                        "model": MODEL_NAME,
-                        "revision": MODEL_REVISION,
-                        "dim": MODEL_DIM,
-                        "pooling": "mean",
-                        "normalized": True,
-                    },
-                    "contentHashes": hashes,
-                },
-            )
-            space_id = str(missing_response["spaceId"])
-            missing = [str(value) for value in missing_response.get("missing", [])]
-            for index in range(0, len(missing), 200):
-                batch_hashes = missing[index : index + 200]
-                vectors = local_embedder.encode([artifact.contents[value] for value in batch_hashes])
-                self._request_json(
-                    "POST",
-                    f"/sources/{source_id}/embeddings/vectors",
-                    {
-                        "spaceId": space_id,
-                        "items": [
-                            {"contentHash": digest, "vector": vector}
-                            for digest, vector in zip(batch_hashes, vectors, strict=True)
-                        ],
-                    },
-                )
         self._request_json(
             "POST",
             f"/sources/{source_id}/embeddings/chunks",

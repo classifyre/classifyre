@@ -14,13 +14,13 @@
 
 import { mapValues } from '../runtime';
 /**
- *
+ * 
  * @export
  * @interface FindingsRankingDto
  */
 export interface FindingsRankingDto {
     /**
-     *
+     * 
      * @type {string}
      * @memberof FindingsRankingDto
      */
@@ -55,7 +55,7 @@ export function FindingsRankingDtoFromJSONTyped(json: any, ignoreDiscriminator: 
         return json;
     }
     return {
-
+        
         'sort': json['sort'] == null ? undefined : json['sort'],
     };
 }
@@ -70,7 +70,7 @@ export function FindingsRankingDtoToJSONTyped(value?: FindingsRankingDto | null,
     }
 
     return {
-
+        
         'sort': value['sort'],
     };
 }

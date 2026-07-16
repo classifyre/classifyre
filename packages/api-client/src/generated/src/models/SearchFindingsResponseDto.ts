@@ -29,37 +29,37 @@ import {
 } from './FindingResponseDto';
 
 /**
- *
+ * 
  * @export
  * @interface SearchFindingsResponseDto
  */
 export interface SearchFindingsResponseDto {
     /**
-     *
+     * 
      * @type {Array<FindingResponseDto>}
      * @memberof SearchFindingsResponseDto
      */
     findings: Array<FindingResponseDto>;
     /**
-     *
+     * 
      * @type {number}
      * @memberof SearchFindingsResponseDto
      */
     total: number;
     /**
-     *
+     * 
      * @type {number}
      * @memberof SearchFindingsResponseDto
      */
     skip: number;
     /**
-     *
+     * 
      * @type {number}
      * @memberof SearchFindingsResponseDto
      */
     limit: number;
     /**
-     *
+     * 
      * @type {SearchFindingsRankingMetadataDto}
      * @memberof SearchFindingsResponseDto
      */
@@ -86,7 +86,7 @@ export function SearchFindingsResponseDtoFromJSONTyped(json: any, ignoreDiscrimi
         return json;
     }
     return {
-
+        
         'findings': ((json['findings'] as Array<any>).map(FindingResponseDtoFromJSON)),
         'total': json['total'],
         'skip': json['skip'],
@@ -105,7 +105,7 @@ export function SearchFindingsResponseDtoToJSONTyped(value?: SearchFindingsRespo
     }
 
     return {
-
+        
         'findings': ((value['findings'] as Array<any>).map(FindingResponseDtoToJSON)),
         'total': value['total'],
         'skip': value['skip'],
