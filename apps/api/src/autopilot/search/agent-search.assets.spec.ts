@@ -7,7 +7,7 @@ describe('AgentSearchService — asset observation (cold start)', () => {
   let service: AgentSearchService;
 
   const mockPrisma = {
-    asset: { findMany: jest.fn() },
+    asset: { findMany: jest.fn(), count: jest.fn() },
     finding: { count: jest.fn(), findMany: jest.fn(), groupBy: jest.fn() },
     customDetector: { findMany: jest.fn() },
     customDetectorFeedback: { groupBy: jest.fn() },
@@ -78,6 +78,7 @@ describe('AgentSearchService — asset observation (cold start)', () => {
         { assetType: 'file', sourceType: 'S3', metadata: null },
       ]);
       mockPrisma.finding.count.mockResolvedValue(0);
+      mockPrisma.asset.count.mockResolvedValue(3);
 
       const profile = await service.assetMetadataProfile('src-1', null);
       expect(profile.scope).toBe('source');
@@ -92,8 +93,139 @@ describe('AgentSearchService — asset observation (cold start)', () => {
     it('reports instance scope when neither source nor runner is given', async () => {
       mockPrisma.asset.findMany.mockResolvedValue([]);
       mockPrisma.finding.count.mockResolvedValue(0);
+      mockPrisma.asset.count.mockResolvedValue(0);
       const profile = await service.assetMetadataProfile(null, null);
       expect(profile.scope).toBe('instance');
+    });
+
+    // G-026. asset.runnerId names the LAST runner to touch an asset, so once a
+    // newer run re-stamps them, a runner-scoped profile returns zero — which
+    // reads exactly like an empty source. A CONFIG run reviewing a superseded
+    // runner took it as one: it wrote a false "0 assets and 0 findings" memory
+    // for a source holding 13 assets and 3,239 findings, and triggered a
+    // pointless rescan.
+    describe('a superseded runner cannot look like an empty source (G-026)', () => {
+      /** The reported shape: runner 07fb… reviewed after run e2c… re-stamped every asset. */
+      const arrangeSupersededRunner = () => {
+        mockPrisma.asset.findMany.mockResolvedValue([]); // nothing still points at this runner
+        mockPrisma.finding.count
+          .mockResolvedValueOnce(0) // scoped to the stale runner
+          .mockResolvedValueOnce(3239); // the source's live open findings
+        mockPrisma.asset.count
+          .mockResolvedValueOnce(0) // scoped to the stale runner
+          .mockResolvedValueOnce(13); // the source's live active assets
+      };
+
+      it('still reports the source totals when the runner scope is empty', async () => {
+        arrangeSupersededRunner();
+
+        const profile = await service.assetMetadataProfile(
+          'src-1',
+          'runner-stale',
+        );
+
+        expect(profile.scope).toBe('runner');
+        expect(profile.totalAssets).toBe(0);
+        // The fact that makes "the source is empty" impossible to conclude.
+        expect(profile.sourceTotals).toEqual({
+          activeAssets: 13,
+          openFindings: 3239,
+        });
+      });
+
+      it('flags the runner as superseded', async () => {
+        arrangeSupersededRunner();
+
+        const profile = await service.assetMetadataProfile(
+          'src-1',
+          'runner-stale',
+        );
+
+        expect(profile.runnerSuperseded).toBe(true);
+      });
+
+      it('does not flag a current runner as superseded', async () => {
+        mockPrisma.asset.findMany.mockResolvedValue([
+          { assetType: 'file', sourceType: 'LOCAL_FOLDER', metadata: null },
+        ]);
+        mockPrisma.finding.count
+          .mockResolvedValueOnce(3239)
+          .mockResolvedValueOnce(3239);
+        mockPrisma.asset.count
+          .mockResolvedValueOnce(13)
+          .mockResolvedValueOnce(13);
+
+        const profile = await service.assetMetadataProfile(
+          'src-1',
+          'runner-current',
+        );
+
+        expect(profile.runnerSuperseded).toBe(false);
+        expect(profile.totalAssets).toBe(13);
+      });
+
+      it('flags partial supersession when a later run touched only some assets', async () => {
+        mockPrisma.asset.findMany.mockResolvedValue([
+          { assetType: 'file', sourceType: 'LOCAL_FOLDER', metadata: null },
+        ]);
+        mockPrisma.finding.count
+          .mockResolvedValueOnce(10)
+          .mockResolvedValueOnce(50);
+        mockPrisma.asset.count
+          .mockResolvedValueOnce(4)
+          .mockResolvedValueOnce(13);
+
+        const profile = await service.assetMetadataProfile(
+          'src-1',
+          'runner-partial',
+        );
+
+        expect(profile.runnerSuperseded).toBe(true);
+        expect(profile.totalAssets).toBe(4);
+        expect(profile.sourceTotals?.activeAssets).toBe(13);
+      });
+
+      it('reports a genuinely empty source as empty, not superseded', async () => {
+        // The cold-start case the profile exists to serve must still work.
+        mockPrisma.asset.findMany.mockResolvedValue([]);
+        mockPrisma.finding.count
+          .mockResolvedValueOnce(0)
+          .mockResolvedValueOnce(0);
+        mockPrisma.asset.count
+          .mockResolvedValueOnce(0)
+          .mockResolvedValueOnce(0);
+
+        const profile = await service.assetMetadataProfile('src-1', 'runner-1');
+
+        expect(profile.totalAssets).toBe(0);
+        expect(profile.sourceTotals).toEqual({
+          activeAssets: 0,
+          openFindings: 0,
+        });
+        expect(profile.runnerSuperseded).toBe(false);
+      });
+
+      it('counts the real scope, not the capped sample', async () => {
+        // totalAssets was rows.length — the sample — so any scope larger than
+        // ASSET_PROFILE_SCAN_LIMIT under-reported itself.
+        mockPrisma.asset.findMany.mockResolvedValue(
+          Array.from({ length: 3 }, () => ({
+            assetType: 'file',
+            sourceType: 'LOCAL_FOLDER',
+            metadata: null,
+          })),
+        );
+        mockPrisma.finding.count
+          .mockResolvedValueOnce(1)
+          .mockResolvedValueOnce(1);
+        mockPrisma.asset.count
+          .mockResolvedValueOnce(3144)
+          .mockResolvedValueOnce(3144);
+
+        const profile = await service.assetMetadataProfile('src-1', null);
+
+        expect(profile.totalAssets).toBe(3144);
+      });
     });
   });
 
