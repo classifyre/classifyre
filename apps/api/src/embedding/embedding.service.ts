@@ -29,6 +29,16 @@ type BoilerplateClusterRow = {
   meanImportance: number;
 };
 
+// Outlier/quality adjustments need at least this many same-type neighbours to
+// mean anything; below it the neighbourhood signal is treated as unavailable.
+const MIN_NEIGHBORHOOD = 5;
+// "Semantically unusual" must be rare to mean anything. On MiniLM over diverse
+// evidence text the corpus-median outlier strength is ~0.3, so the reason/bonus
+// bar sits at the top decile (~0.55) rather than the old 0.35, which flagged
+// half the corpus.
+const OUTLIER_BONUS_THRESHOLD = 0.55;
+const RECALIBRATE_BATCH_SIZE = 500;
+
 @Injectable()
 export class EmbeddingService implements OnApplicationBootstrap {
   private readonly logger = new Logger(EmbeddingService.name);
@@ -247,6 +257,43 @@ export class EmbeddingService implements OnApplicationBootstrap {
     return { created, received: items.length };
   }
 
+  /**
+   * Re-run evidence analysis and neighbourhood calibration for every finding
+   * that has an embedding hash. Insert-time calibration is order-dependent —
+   * the first vectors stored see a nearly empty space — so this pass must run
+   * once the space is stable (after a backfill or scan drains the queue) to
+   * make importance scores corpus-relative instead of insert-order-relative.
+   */
+  async recalibrateSpace(spaceId?: string): Promise<{ analyzed: number }> {
+    const resolvedSpaceId = spaceId ?? (await this.activeSpace()).id;
+    let cursor: string | undefined;
+    let analyzed = 0;
+    do {
+      const findings = await this.prisma.finding.findMany({
+        where: { embedContentHash: { not: null } },
+        ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+        orderBy: { id: 'asc' },
+        take: RECALIBRATE_BATCH_SIZE,
+        select: { id: true, embedContentHash: true },
+      });
+      if (!findings.length) break;
+      const hashes = [
+        ...new Set(
+          findings.map((finding) => finding.embedContentHash as string),
+        ),
+      ];
+      await this.analysis.analyzeHashes(resolvedSpaceId, hashes);
+      await this.calibrateNeighborhood(resolvedSpaceId, hashes);
+      analyzed += findings.length;
+      cursor = findings.at(-1)?.id;
+      await new Promise((resolve) => setImmediate(resolve));
+    } while (cursor);
+    this.logger.log(
+      `Recalibrated evidence analyses for ${analyzed} findings in space ${resolvedSpaceId}`,
+    );
+    return { analyzed };
+  }
+
   private async calibrateNeighborhood(
     spaceId: string,
     contentHashes: string[],
@@ -308,17 +355,28 @@ export class EmbeddingService implements OnApplicationBootstrap {
         const meanSimilarity =
           neighbors.reduce((sum, neighbor) => sum + neighbor.score, 0) /
           neighbors.length;
-        const semanticOutlier = Math.max(0, Math.min(1, 1 - meanSimilarity));
         const nearDuplicates = neighbors.filter(
           (neighbor) => neighbor.score >= 0.95,
         );
+        // A sparse neighbourhood (fewer than MIN_NEIGHBORHOOD same-type
+        // vectors in the space) says nothing about how unusual the evidence
+        // is — the first vectors analyzed would otherwise all read as extreme
+        // outliers and keep that bonus forever.
+        const neighborhoodReliable = neighbors.length >= MIN_NEIGHBORHOOD;
+        const semanticOutlier = neighborhoodReliable
+          ? Math.max(0, Math.min(1, 1 - meanSimilarity))
+          : 0;
         const textQuality = analysis.qualityScore;
-        const qualityScore = Math.max(
-          0,
-          Math.min(1, textQuality * 0.8 + meanSimilarity * 0.2),
-        );
-        const outlierAdjustment =
-          textQuality >= 0.55 ? semanticOutlier * 0.12 : -semanticOutlier * 0.2;
+        const qualityScore = neighborhoodReliable
+          ? Math.max(0, Math.min(1, textQuality * 0.8 + meanSimilarity * 0.2))
+          : textQuality;
+        const outlierAdjustment = !neighborhoodReliable
+          ? 0
+          : textQuality < 0.55
+            ? -semanticOutlier * 0.2
+            : semanticOutlier >= OUTLIER_BONUS_THRESHOLD
+              ? semanticOutlier * 0.12
+              : 0;
         const duplicatePenalty = Math.min(0.15, nearDuplicates.length * 0.025);
         const importanceScore = Math.max(
           0,
@@ -338,23 +396,29 @@ export class EmbeddingService implements OnApplicationBootstrap {
           });
         }
         reasons.push(
-          textQuality < 0.55 && semanticOutlier > 0.45
+          !neighborhoodReliable
             ? {
-                code: 'isolated_ocr',
-                label: 'Isolated low-quality text; possible OCR noise',
-                impact: 'down',
+                code: 'insufficient_neighborhood',
+                label: 'Too few comparable findings for semantic analysis',
+                impact: 'neutral',
               }
-            : semanticOutlier > 0.35
+            : textQuality < 0.55 && semanticOutlier > 0.45
               ? {
-                  code: 'semantic_outlier',
-                  label: 'Semantically unusual for its neighbours',
-                  impact: 'up',
+                  code: 'isolated_ocr',
+                  label: 'Isolated low-quality text; possible OCR noise',
+                  impact: 'down',
                 }
-              : {
-                  code: 'semantic_support',
-                  label: 'Consistent with its semantic neighbours',
-                  impact: 'neutral',
-                },
+              : semanticOutlier >= OUTLIER_BONUS_THRESHOLD
+                ? {
+                    code: 'semantic_outlier',
+                    label: 'Semantically unusual for its neighbours',
+                    impact: 'up',
+                  }
+                : {
+                    code: 'semantic_support',
+                    label: 'Consistent with its semantic neighbours',
+                    impact: 'neutral',
+                  },
         );
         await this.prisma.findingEvidenceAnalysis.update({
           where: { findingId },

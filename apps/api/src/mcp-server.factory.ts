@@ -74,17 +74,77 @@ type McpServerCompat = Omit<McpServer, 'registerTool' | 'registerPrompt'> & {
   ): unknown;
 };
 
+// Every tool result shares one serialized-size budget so a broad search can
+// never flood the client agent's context window. Oversized payloads shrink by
+// capping arrays/strings progressively, with an explicit truncation notice
+// telling the agent to narrow the query instead of silently losing rows.
+const MAX_RESULT_CHARS = 30_000;
+const TRUNCATION_NOTICE =
+  'Result truncated to fit the response budget. Narrow the query (filters, smaller take/limit, pagination cursor) to see the rest.';
+
+function capValue(value: unknown, arrayCap: number, stringCap: number): unknown {
+  if (Array.isArray(value)) {
+    const capped = value
+      .slice(0, arrayCap)
+      .map((item) => capValue(item, arrayCap, stringCap));
+    if (value.length > arrayCap) {
+      capped.push(`… ${value.length - arrayCap} more items truncated`);
+    }
+    return capped;
+  }
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>).map(([key, entry]) => [
+        key,
+        capValue(entry, arrayCap, stringCap),
+      ]),
+    );
+  }
+  if (typeof value === 'string' && value.length > stringCap) {
+    return `${value.slice(0, stringCap)}…`;
+  }
+  return value;
+}
+
 function jsonResult(payload: unknown) {
+  let bounded = payload;
+  let truncated = false;
+  let text = JSON.stringify(payload, null, 2);
+  for (const [arrayCap, stringCap] of [
+    [100, 4000],
+    [40, 2000],
+    [15, 800],
+    [5, 400],
+  ] as const) {
+    if (text.length <= MAX_RESULT_CHARS) break;
+    bounded = capValue(payload, arrayCap, stringCap);
+    truncated = true;
+    text = JSON.stringify(bounded, null, 2);
+  }
+  if (text.length > MAX_RESULT_CHARS) {
+    truncated = true;
+    text = `${text.slice(0, MAX_RESULT_CHARS)}\n… hard-truncated`;
+  }
+  if (truncated) {
+    text = `NOTE: ${TRUNCATION_NOTICE}\n${text}`;
+  }
+
   const structuredContent =
-    payload && typeof payload === 'object' && !Array.isArray(payload)
-      ? (payload as Record<string, unknown>)
-      : { result: payload };
+    bounded && typeof bounded === 'object' && !Array.isArray(bounded)
+      ? ({
+          ...(bounded as Record<string, unknown>),
+          ...(truncated ? { _truncated: TRUNCATION_NOTICE } : {}),
+        } as Record<string, unknown>)
+      : {
+          result: bounded,
+          ...(truncated ? { _truncated: TRUNCATION_NOTICE } : {}),
+        };
 
   return {
     content: [
       {
         type: 'text' as const,
-        text: JSON.stringify(payload, null, 2),
+        text,
       },
     ],
     structuredContent,
@@ -104,6 +164,49 @@ function errorMessageLines(error: unknown): string[] {
 function normalizeTemplateParam(value: string | string[]): string {
   return Array.isArray(value) ? (value[0] ?? '') : value;
 }
+
+const INVESTIGATION_GUIDE = `# Running an investigation with Classifyre
+
+This is the intended end-to-end loop. Individual tools describe themselves; this
+resource explains how they compose.
+
+## Ground rules (from real first-use failures)
+1. **Severity is not importance.** Detector severity describes the pattern that
+   matched, not evidentiary value. A CRITICAL credit-card hit on repeated digits
+   is usually OCR noise. Rank and triage by \`ranking.importance\` and its
+   \`reasons\`, never by severity alone.
+2. **Similarity is not proof.** Semantic neighbours and duplicate clusters are
+   retrieval aids. Before claiming a connection, verify against the source text
+   (get_asset / get_finding context).
+3. **Coverage before conclusions.** A source with empty text extraction looks
+   healthy while missing content. Check run text coverage (get_run) before
+   concluding "nothing found".
+4. **Unverified memory is a hypothesis.** Agent-written summaries and profiles
+   must be re-checked against live state before being treated as fact.
+
+## The loop
+1. **Survey coverage** — search_sources, get_run / get_run_logs: did scans
+   complete, and did text extraction actually produce text (textCoverage)?
+2. **Triage ranked evidence** — search_findings with ranking=importance (the
+   default): read each row's ranking.reasons. Strong: cross_document_recurrence,
+   readable unique evidence. Weak: ocr_fragment, duplicate_group, common_value.
+   Use find_boilerplate_clusters per source to identify repeated noise wholesale,
+   and explain_finding on anything you intend to act on.
+3. **Explore hypotheses** — search_findings with semantic_query (hybrid mode)
+   for meaning-based retrieval; find_similar_findings to expand a confirmed lead
+   across sources; get_value_occurrences for exact value recurrence.
+4. **Monitor with inquiries** — create_inquiry with matchers for the evidence
+   class you care about; list_inquiry_matches to review; rematch_inquiry after
+   new scans. Archive noisy inquiries instead of letting them accumulate matches.
+5. **Build a case** — create_case (or pull_case_from_inquiry), attach verified
+   findings (attach_case_findings), add evidence and hypotheses as threads
+   (create_case_thread), and link support/contradiction per thread entry
+   (link_case_thread_support). The case graph (get_case_graph) and timeline
+   (get_case_timeline) show structure and history.
+6. **Conclude honestly** — close_case with a conclusion the evidence actually
+   supports. An empty or speculative case should be closed as such, not
+   escalated.
+`;
 
 @Injectable()
 export class McpServerFactoryService {
@@ -166,6 +269,25 @@ export class McpServerFactoryService {
               null,
               2,
             ),
+          },
+        ],
+      }),
+    );
+
+    server.registerResource(
+      'classifyre-investigation-guide',
+      'classifyre://investigation-guide',
+      {
+        title: 'How to run an investigation with Classifyre',
+        description:
+          'End-to-end workflow narrative for agents: coverage → ranked findings → inquiries → cases → threads → conclusion, with the evidence-judgment ground rules.',
+        mimeType: 'text/markdown',
+      },
+      () => ({
+        contents: [
+          {
+            uri: 'classifyre://investigation-guide',
+            text: INVESTIGATION_GUIDE,
           },
         ],
       }),
@@ -1154,6 +1276,81 @@ export class McpServerFactoryService {
           throw new NotFoundException(`Finding with ID ${id} not found`);
         }
         return jsonResult(finding);
+      },
+    );
+
+    server.registerTool(
+      'explain_finding',
+      {
+        title: 'Explain Finding',
+        description:
+          'One-call evidence explanation for a finding: importance/quality ranking with its reasons and raw signals, duplicate-group size, top semantic neighbours, and the detector severity/confidence kept as a separate axis. Use before escalating or attaching a finding as case evidence. Similarity and importance are triage signals, not proof.',
+        inputSchema: {
+          id: z.string().uuid(),
+        },
+        annotations: {
+          readOnlyHint: true,
+          idempotentHint: true,
+        },
+      },
+      async ({ id }) => {
+        const finding = await this.findingsService.findOne(id);
+        if (!finding) {
+          throw new NotFoundException(`Finding with ID ${id} not found`);
+        }
+        const analysis = finding.evidenceAnalysis;
+        const [duplicateGroupSize, similar] = await Promise.all([
+          analysis?.duplicateGroupHash
+            ? this.findingsService.countDuplicateGroup(
+                analysis.duplicateGroupHash,
+              )
+            : Promise.resolve(1),
+          this.embeddingService
+            .similarFindings(id, 5)
+            .catch(() => [] as never[]),
+        ]);
+        return jsonResult({
+          findingId: finding.id,
+          findingType: finding.findingType,
+          matchedContent: finding.matchedContent,
+          asset: finding.asset,
+          source: finding.source,
+          detector: {
+            severity: finding.severity,
+            confidence: Number(finding.confidence),
+            note: 'Detector severity/confidence describe the pattern match, not investigative importance.',
+          },
+          ranking: analysis
+            ? {
+                importance: analysis.importanceScore,
+                quality: analysis.qualityScore,
+                semanticOutlier: analysis.semanticOutlier,
+                similarCount: analysis.similarCount,
+                duplicateGroupSize,
+                reasons: analysis.reasons,
+                signals: analysis.signals,
+                coverage: 'analyzed',
+              }
+            : {
+                coverage:
+                  'pending — importance is not yet computed for this finding; do not read that as unimportant',
+              },
+          similarFindings: (
+            similar as Array<{
+              id: string;
+              matchedContent: string;
+              similarity: number;
+              sourceId: string;
+              assetId: string;
+            }>
+          ).map((neighbor) => ({
+            findingId: neighbor.id,
+            value: neighbor.matchedContent,
+            similarity: neighbor.similarity,
+            sourceId: neighbor.sourceId,
+            assetId: neighbor.assetId,
+          })),
+        });
       },
     );
 

@@ -30,6 +30,30 @@ const OBSERVE_TOOLS = [
 const KNOWLEDGE_TOOLS = ['memory.write'];
 
 /**
+ * Semantic evidence tools: corpus-relative importance ranking with reasons,
+ * meaning-based retrieval, neighbour expansion and boilerplate triage. The
+ * judgment layer that separates leads from noise — severity is not importance.
+ */
+const SEMANTIC_TOOLS = [
+  'findings.ranked',
+  'findings.semantic_search',
+  'findings.similar',
+  'findings.explain',
+  'findings.boilerplate',
+];
+
+const TRIAGE_DOCTRINE = [
+  '\nTRIAGE DOCTRINE: detector severity is NOT importance — a CRITICAL label on a repeated-digit',
+  'or OCR-looking value is usually a false positive. Start from findings.ranked (evidence importance',
+  'with reasons), not raw severity. Before treating any finding as significant, call findings.explain',
+  'and read its reasons: cross_document_recurrence and readable unique evidence are strong; ocr_fragment,',
+  'common_value, duplicate_group and near_duplicate are weak. Use findings.boilerplate to identify',
+  'repeated-noise clusters and never build an investigation on them. findings.similar and',
+  'findings.semantic_search expand a confirmed lead across the corpus — similarity is a lead to verify,',
+  'never proof of a connection.',
+].join(' ');
+
+/**
  * Raw-asset observation. The cold-start signal: when a source has produced no
  * findings, these expose the ingested assets' kinds and metadata shape so a
  * mission can reason about what to detect from the data itself.
@@ -82,6 +106,9 @@ export const INQUIRY_MISSION: Mission = {
     '\nYour mission: review the new/open findings and keep the set of inquiries healthy.',
     'Avoid duplicates — prefer enriching an existing inquiry over creating a near-duplicate.',
     'Do not recreate intentionally archived inquiries. Use memory.search to recall precedents.',
+    TRIAGE_DOCTRINE,
+    '\nAim inquiries at what findings.ranked says matters: high-importance recurring evidence,',
+    'not high-severity noise. An inquiry that would match a boilerplate cluster is a bad inquiry.',
     '\nWIND DOWN: if an inquiry is matching only false positives/noise or its topic is resolved,',
     'inquiries.archive it with a clear reason AND memory.write a DECISION_PRECEDENT recording why,',
     'so it is not recreated. RECURRENCE: when an archived topic genuinely reappears (check',
@@ -90,6 +117,7 @@ export const INQUIRY_MISSION: Mission = {
   ].join('\n'),
   allowedTools: [
     ...OBSERVE_TOOLS,
+    ...SEMANTIC_TOOLS,
     ...INVESTIGATION_INQUIRY_TOOLS,
     ...KNOWLEDGE_TOOLS,
   ],
@@ -103,6 +131,10 @@ export const CASE_MISSION: Mission = {
     '\nYour mission: build and maintain investigation cases from inquiries with new matches.',
     'Create a case only when a coherent investigation is warranted; otherwise enrich an open case',
     'with hypotheses, evidence, attached findings, notes and links. Be conservative and specific.',
+    TRIAGE_DOCTRINE,
+    '\nBefore cases.attach_findings, findings.explain each candidate — attach evidence, not noise.',
+    'When a case has confirmed evidence, findings.similar on it may surface related material across',
+    'sources worth attaching; verify each against its ranking reasons first.',
     '\nWIND DOWN: review each open case against its thread/findings. If it no longer holds up —',
     'false-positive findings, refuted hypotheses, or the issue is resolved — cases.close it with a',
     'clear conclusion explaining why (this also archives its linked inquiries). Close only when the',
@@ -112,6 +144,7 @@ export const CASE_MISSION: Mission = {
   ].join('\n'),
   allowedTools: [
     ...OBSERVE_TOOLS,
+    ...SEMANTIC_TOOLS,
     ...INVESTIGATION_CASE_TOOLS,
     ...KNOWLEDGE_TOOLS,
   ],
@@ -264,7 +297,9 @@ export const ESCALATION_MISSION: Mission = {
     '\n1. SURVEY: call cases.list. Focus on CRITICAL and HIGH severity cases; also consider a MEDIUM',
     'case whose evidence/findings show it is escalating. Use cases.detail to confirm a case is real',
     'and substantiated (hypotheses, evidence, attached findings) before alerting — do not cry wolf',
-    'over an empty or speculative case.',
+    'over an empty or speculative case. Severity labels alone are not substantiation: findings.explain',
+    'the strongest attached findings — a case whose evidence is all ocr_fragment/duplicate_group/',
+    'common_value reasons does not clear the bar, whatever its severity says.',
     '\n2. DEDUPE: call alerts.recent AND memory.search (key prefix "escalation:") to see which cases',
     'you have already escalated. Never alert the same case twice unless its severity has risen since',
     '(e.g. HIGH → CRITICAL) — then send a fresh alert noting the change.',
@@ -280,6 +315,8 @@ export const ESCALATION_MISSION: Mission = {
     'cases.closed',
     'cases.detail',
     'findings.search',
+    'findings.ranked',
+    'findings.explain',
     'memory.search',
     'system_brief.get',
     'alerts.recent',

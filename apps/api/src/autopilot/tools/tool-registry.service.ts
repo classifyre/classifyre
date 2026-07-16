@@ -6,6 +6,7 @@ import { ConfigToolset } from './config/config.toolset';
 import { DetectorToolset } from './detector/detector.toolset';
 import { FingerprintsToolset } from './fingerprints/fingerprints.toolset';
 import { AlertToolset } from './alert/alert.toolset';
+import { SemanticToolset } from './semantic/semantic.toolset';
 import type { Tool } from './tool.types';
 
 /** A provider that contributes a set of statically-defined tools. */
@@ -33,6 +34,7 @@ export class ToolRegistry {
     private readonly detector: DetectorToolset,
     private readonly fingerprints: FingerprintsToolset,
     private readonly alert: AlertToolset,
+    private readonly semantic: SemanticToolset,
   ) {
     this.loadStatic([
       this.observe,
@@ -42,6 +44,7 @@ export class ToolRegistry {
       this.detector,
       this.fingerprints,
       this.alert,
+      this.semantic,
     ]);
   }
 

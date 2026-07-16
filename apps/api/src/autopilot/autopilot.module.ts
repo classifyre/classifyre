@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
+import { EmbeddingModule } from '../embedding/embedding.module';
 import { MaskedConfigCryptoService } from '../masked-config-crypto.service';
 import { AiProviderConfigService } from '../ai-provider-config.service';
 import { AiClientService } from '../ai';
@@ -12,6 +13,7 @@ import { CaseActivityService } from '../case-activity.service';
 import { GraphService } from '../graph.service';
 import { AgentMemoryService } from './memory/agent-memory.service';
 import { AgentSearchService } from './search/agent-search.service';
+import { AgentSemanticService } from './search/agent-semantic.service';
 import { AgentAuditService } from './audit/agent-audit.service';
 import { AgentLoggerService } from './audit/agent-logger.service';
 import { DecisionApplierService } from './decision-applier.service';
@@ -26,6 +28,7 @@ import { ConfigToolset } from './tools/config/config.toolset';
 import { DetectorToolset } from './tools/detector/detector.toolset';
 import { FingerprintsToolset } from './tools/fingerprints/fingerprints.toolset';
 import { AlertToolset } from './tools/alert/alert.toolset';
+import { SemanticToolset } from './tools/semantic/semantic.toolset';
 import { NotificationsService } from '../notifications.service';
 import { ToolRegistry } from './tools/tool-registry.service';
 import { ToolDispatcherService } from './tools/tool-dispatcher.service';
@@ -46,7 +49,7 @@ import { AutopilotController } from './autopilot.controller';
  * full audit trail (AgentRun / AgentDecision) and DB-backed memory.
  */
 @Module({
-  imports: [MatchingModule, CorrelationModule, CliRunnerModule],
+  imports: [MatchingModule, CorrelationModule, CliRunnerModule, EmbeddingModule],
   controllers: [AutopilotController, McpServersController],
   providers: [
     PrismaService,
@@ -60,6 +63,7 @@ import { AutopilotController } from './autopilot.controller';
     CasesService,
     AgentMemoryService,
     AgentSearchService,
+    AgentSemanticService,
     AgentAuditService,
     AgentLoggerService,
     DecisionApplierService,
@@ -73,6 +77,7 @@ import { AutopilotController } from './autopilot.controller';
     DetectorToolset,
     FingerprintsToolset,
     AlertToolset,
+    SemanticToolset,
     NotificationsService,
     ToolRegistry,
     ToolDispatcherService,
