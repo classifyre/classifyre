@@ -60,3 +60,11 @@ export class SimilarFindingsQueryDto {
   @Max(100)
   limit = 20;
 }
+
+export class EmbeddingReindexResponseDto {
+  @ApiProperty()
+  started!: boolean;
+
+  @ApiProperty()
+  spaceId!: string;
+}

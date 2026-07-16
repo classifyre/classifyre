@@ -1,7 +1,17 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  Post,
+  Query,
+} from '@nestjs/common';
+import { ApiAcceptedResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { EmbeddingService } from './embedding.service';
 import {
+  EmbeddingReindexResponseDto,
   PutAssetChunksDto,
   SimilarFindingsQueryDto,
 } from './dto/embedding.dto';
@@ -19,6 +29,17 @@ export class EmbeddingController {
   @ApiOperation({ summary: 'Get semantic storage and search capability' })
   status() {
     return { ...this.embeddings.status(), ...this.queue.status() };
+  }
+
+  @Post('embeddings/reindex')
+  @HttpCode(HttpStatus.ACCEPTED)
+  @ApiOperation({
+    summary:
+      'Reconcile stored findings and asset chunks into the configured embedding space',
+  })
+  @ApiAcceptedResponse({ type: EmbeddingReindexResponseDto })
+  reindex(): EmbeddingReindexResponseDto {
+    return this.queue.requestBackfill();
   }
 
   @Post('sources/:sourceId/embeddings/chunks')

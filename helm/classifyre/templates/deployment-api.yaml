@@ -205,6 +205,8 @@ spec:
               value: {{ .Values.api.embedding.batchSize | quote }}
             - name: EMBEDDING_RETRY_SECONDS
               value: {{ .Values.api.embedding.retrySeconds | quote }}
+            - name: EMBEDDING_AUTO_BACKFILL
+              value: {{ .Values.api.embedding.autoBackfill | quote }}
             - name: EMBEDDING_WORKER_CONCURRENCY
               value: {{ .Values.api.embedding.workerConcurrency | quote }}
             - name: EMBEDDING_MAX_PARALLEL_CALLS

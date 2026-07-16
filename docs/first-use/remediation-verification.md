@@ -40,7 +40,13 @@ noisy examples.
 
 Finding text is backfilled asynchronously from stored finding context. Asset
 chunks still populate on each source's next scan because historical extracted
-asset text was never persisted.
+asset text was never persisted. Startup reconciliation is non-blocking and
+hash-skips vectors already present in the configured space. Changing the model
+space creates a dedicated pg-boss queue and automatically rebuilds all stored
+content without mixing vectors from old and new pods during a rolling rollout.
+Operators can also trigger the same reconciliation with
+`POST /embeddings/reindex` and inspect its state through
+`GET /embeddings/status`.
 
 ## Step 0 Measurements
 
@@ -55,14 +61,14 @@ The first-use desktop database was measured without changing corpus state:
 
 Fresh-database migration verification passed on the required deployment shape:
 
-- `pgvector/pgvector:0.8.2-pg18-bookworm`: all 126 migrations applied, including
+- `pgvector/pgvector:0.8.5-pg18-bookworm`: all 126 migrations applied, including
   the dimensionless vector column and content-addressed extraction payloads;
-- the desktop staging script compiled pgvector 0.8.2 against the bundled
+- the desktop staging script compiles pgvector 0.8.5 against the bundled
   PostgreSQL 18 runtime and a fresh embedded instance accepted
-  `CREATE EXTENSION vector`; the staged server reported vector 0.8.2 and
+  `CREATE EXTENSION vector`; the staged server reported vector 0.8.5 and
   returned cosine distance `1` for orthogonal vectors;
 - Helm renders no embedding sidecar. Embedded PostgreSQL uses
-  `pgvector/pgvector:0.8.2-pg18-bookworm`; CloudNativePG uses its `standard`
+  `pgvector/pgvector:0.8.5-pg18-bookworm`; CloudNativePG uses its `standard`
   image, which includes pgvector.
 - removing pgvector from the verification database made the API exit with code
   1 and an operator-facing error that names `CREATE EXTENSION vector`, pending
@@ -85,6 +91,9 @@ Transformers.js MiniLM model returned one normalized 384-dimensional vector.
   model-cache behavior;
 - `batchSize`, `retrySeconds`, and `workerConcurrency`: persistent pg-boss
   ingestion/backfill throughput across all API replicas;
+- `autoBackfill`: reconcile existing findings and stored asset chunks into the
+  configured space after startup; enabled by default and content-addressed, so
+  unchanged deployments scan for gaps but do not rerun inference;
 - `maxParallelCalls`, `external.baseUrl`, `external.existingSecret`, and
   `external.apiKeyKey`: external OpenAI-compatible provider behavior;
 - `hnsw.m`, `hnsw.efConstruction`, and `hnsw.efSearch`: pgvector index build
@@ -148,9 +157,11 @@ confidence, or raw cosine distance.
 
 - API: focused embedding, ranking, extraction, finding, and asset suites pass;
   the final embedding/extraction rerun covered 25 focused tests. Nest build and
-  typecheck pass. A PostgreSQL 18 + pgvector 0.8.2 container accepted the
+  typecheck pass. A PostgreSQL 18 + pgvector 0.8.5 container accepted the
   complete migration chain, created the per-space HNSW index, and registered
-  the persistent embedding worker.
+  the persistent embedding worker. A fresh-database startup also verified
+  automatic reconciliation, the space-specific queue, status reporting, and
+  the manual `202 Accepted` reindex trigger.
 - CLI: the detector pipeline suite passes (18 tests). It now emits text chunks
   and has no embedding model, vector upload, or embedding-server command.
 - Schemas: 81/81 examples validate; generated detector models, OpenAPI, and the

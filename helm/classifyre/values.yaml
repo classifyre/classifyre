@@ -60,6 +60,9 @@ api:
     cacheSizeLimit: 2Gi
     batchSize: 32
     retrySeconds: 30
+    # -- Reconcile all stored findings and asset chunks into the configured
+    # -- embedding space on API startup. Existing vectors are hash-skipped.
+    autoBackfill: true
     # -- Maximum embedding batches processed concurrently across all API replicas.
     workerConcurrency: 1
     maxParallelCalls: 2

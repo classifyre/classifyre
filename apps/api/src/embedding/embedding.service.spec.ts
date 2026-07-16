@@ -45,11 +45,7 @@ describe('EmbeddingService', () => {
     version: jest.fn(),
   };
   const analysis = { analyzeHashes: jest.fn() };
-  const service = new EmbeddingService(
-    prisma as never,
-    capability as never,
-    analysis as never,
-  );
+  let service: EmbeddingService;
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -57,8 +53,26 @@ describe('EmbeddingService', () => {
     capability.hasVector.mockReturnValue(false);
     capability.version.mockReturnValue('0.8.2');
     prisma.embeddingSpace.findUnique.mockResolvedValue(activeSpace);
+    prisma.$transaction.mockImplementation(
+      (callback: (tx: typeof prisma) => unknown) => callback(prisma),
+    );
+    prisma.$executeRaw.mockResolvedValue(0);
     prisma.finding.findMany.mockResolvedValue([]);
     prisma.$queryRaw.mockResolvedValue([]);
+    service = new EmbeddingService(
+      prisma as never,
+      capability as never,
+      analysis as never,
+    );
+  });
+
+  it('serializes configured-space activation before reading the space', async () => {
+    await service.configuredSpace();
+
+    expect(prisma.$executeRaw).toHaveBeenCalled();
+    expect(prisma.$executeRaw.mock.invocationCallOrder[0]).toBeLessThan(
+      prisma.embeddingSpace.findUnique.mock.invocationCallOrder[0],
+    );
   });
 
   it('returns only unknown hashes from content-address negotiation', async () => {
@@ -132,6 +146,7 @@ describe('EmbeddingService', () => {
       provider: 'transformers-js',
       model: 'Xenova/all-MiniLM-L6-v2',
       dimensions: 384,
+      spaceId: undefined,
     });
   });
 });

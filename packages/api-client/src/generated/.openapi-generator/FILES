@@ -104,6 +104,7 @@ docs/DeleteRunnerResponseDto.md
 docs/DiscoveryRecentRunDto.md
 docs/DiscoveryRunSourceDto.md
 docs/EdgeDetailDto.md
+docs/EmbeddingReindexResponseDto.md
 docs/EmbeddingsApi.md
 docs/EvidenceEntityDto.md
 docs/ExclusionRuleDto.md
@@ -404,6 +405,7 @@ src/models/DeleteRunnerResponseDto.ts
 src/models/DiscoveryRecentRunDto.ts
 src/models/DiscoveryRunSourceDto.ts
 src/models/EdgeDetailDto.ts
+src/models/EmbeddingReindexResponseDto.ts
 src/models/EvidenceEntityDto.ts
 src/models/ExclusionRuleDto.ts
 src/models/ExpandGraphDto.ts

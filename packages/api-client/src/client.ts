@@ -42,6 +42,7 @@ export { AutopilotApi } from "./generated/src/apis/AutopilotApi";
 export { CorrelationApi } from "./generated/src/apis/CorrelationApi";
 export { ChatBotsApi } from "./generated/src/apis/ChatBotsApi";
 export { EmbeddingsApi } from "./generated/src/apis/EmbeddingsApi";
+export type { EmbeddingReindexResponseDto } from "./generated/src/models";
 export type {
   ChatBotResponseDto,
   ChatBotDiagnosticsDto,

@@ -33,6 +33,8 @@ type BoilerplateClusterRow = {
 export class EmbeddingService implements OnApplicationBootstrap {
   private readonly logger = new Logger(EmbeddingService.name);
   private readonly config: EmbeddingConfigService;
+  private configuredSpacePromise?: ReturnType<EmbeddingService['ensureSpace']>;
+  private configuredSpaceId?: string;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -45,7 +47,7 @@ export class EmbeddingService implements OnApplicationBootstrap {
 
   async onApplicationBootstrap(): Promise<void> {
     await this.capability.ensureReady();
-    await this.ensureSpace(this.config.space());
+    await this.configuredSpace();
   }
 
   status() {
@@ -57,7 +59,20 @@ export class EmbeddingService implements OnApplicationBootstrap {
       provider: this.config.provider,
       model: this.config.model,
       dimensions: this.config.dimensions,
+      spaceId: this.configuredSpaceId,
     };
+  }
+
+  configuredSpace() {
+    if (!this.configuredSpacePromise) {
+      this.configuredSpacePromise = this.ensureSpace(this.config.space()).then(
+        (space) => {
+          this.configuredSpaceId = space.id;
+          return space;
+        },
+      );
+    }
+    return this.configuredSpacePromise;
   }
 
   async ensureSpace(
@@ -66,47 +81,52 @@ export class EmbeddingService implements OnApplicationBootstrap {
     },
   ) {
     const provider = input.provider ?? this.config.provider;
-    const existing = await this.prisma.embeddingSpace.findUnique({
-      where: {
-        provider_model_revision_dim_pooling_normalized: {
-          provider,
-          model: input.model,
-          revision: input.revision,
-          dim: input.dim,
-          pooling: input.pooling,
-          normalized: input.normalized,
+    const space = await this.prisma.$transaction(async (tx) => {
+      // All replicas in a rollout serialize space creation/activation. Without
+      // this lock, two new pods can race the unique key or leave two spaces
+      // active after interleaved updateMany/create transactions.
+      await tx.$executeRaw`
+        SELECT pg_advisory_xact_lock(
+          hashtext('classifyre.embedding-space-activation')
+        )
+      `;
+      const existing = await tx.embeddingSpace.findUnique({
+        where: {
+          provider_model_revision_dim_pooling_normalized: {
+            provider,
+            model: input.model,
+            revision: input.revision,
+            dim: input.dim,
+            pooling: input.pooling,
+            normalized: input.normalized,
+          },
         },
-      },
-    });
-    if (existing) {
-      if (!existing.isActive) {
-        await this.prisma.$transaction([
-          this.prisma.embeddingSpace.updateMany({ data: { isActive: false } }),
-          this.prisma.embeddingSpace.update({
+      });
+      if (existing) {
+        if (!existing.isActive) {
+          await tx.embeddingSpace.updateMany({ data: { isActive: false } });
+          return tx.embeddingSpace.update({
             where: { id: existing.id },
             data: { isActive: true },
-          }),
-        ]);
+          });
+        }
+        return existing;
       }
-      await this.ensureHnswIndex(existing.id, existing.dim);
-      return { ...existing, isActive: true };
-    }
-    const created = await this.prisma.$transaction(async (tx) => {
+
       await tx.embeddingSpace.updateMany({ data: { isActive: false } });
       return tx.embeddingSpace.create({
         data: { ...input, provider, isActive: true },
       });
     });
-    await this.ensureHnswIndex(created.id, created.dim);
-    return created;
+    await this.ensureHnswIndex(space.id, space.dim);
+    return space;
   }
 
   private async activeSpace() {
-    return (
-      (await this.prisma.embeddingSpace.findFirst({
-        where: { isActive: true },
-      })) ?? (await this.ensureSpace(this.config.space()))
-    );
+    // Bind every operation in this process to the model it booted with.
+    // During a rolling deployment, an older pod must never start reading or
+    // writing the newer pod's globally active coordinate space.
+    return this.configuredSpace();
   }
 
   private async ensureHnswIndex(spaceId: string, dim: number): Promise<void> {
@@ -128,11 +148,11 @@ export class EmbeddingService implements OnApplicationBootstrap {
     );
   }
 
-  async missingHashes(hashes: string[]) {
-    const space = await this.activeSpace();
+  async missingHashes(hashes: string[], spaceId?: string) {
+    const resolvedSpaceId = spaceId ?? (await this.activeSpace()).id;
     const uniqueHashes = [...new Set(hashes)];
     const present = await this.prisma.contentEmbedding.findMany({
-      where: { spaceId: space.id, contentHash: { in: uniqueHashes } },
+      where: { spaceId: resolvedSpaceId, contentHash: { in: uniqueHashes } },
       select: { contentHash: true },
     });
     const presentSet = new Set(present.map((item) => item.contentHash));
