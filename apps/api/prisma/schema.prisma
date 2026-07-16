@@ -1566,6 +1566,12 @@ model AgentMemory {
   refType   String?         @map("ref_type")
   refId     String?         @map("ref_id")
   weight    Int             @default(1)
+  // Provenance: agent-authored memory is a hypothesis until verified against
+  // real system state; operator-authored memory is authoritative. Refreshing
+  // content clears verification — the new claim has not been checked yet.
+  origin     AgentMemoryOrigin @default(AGENT)
+  verifiedAt DateTime?         @map("verified_at")
+  verifiedBy String?           @map("verified_by")
   createdAt DateTime        @default(now()) @map("created_at")
   updatedAt DateTime        @updatedAt @map("updated_at")
 
@@ -1573,6 +1579,46 @@ model AgentMemory {
   @@index([kind])
   @@index([tags], type: Gin)
   @@map("agent_memories")
+}
+
+enum AgentMemoryOrigin {
+  AGENT
+  OPERATOR
+}
+
+// ── Investigation glossary ───────────────────────────────────────────────────
+// Shared vocabulary between investigators and agents: canonical terms with
+// aliases and entity typing. Operators curate it in the UI; agents may propose
+// terms (origin AGENT, unverified) and both consume it through MCP/missions.
+
+enum GlossaryEntityType {
+  PERSON
+  ORGANIZATION
+  LOCATION
+  REFERENCE
+  TERM
+  OTHER
+}
+
+model GlossaryTerm {
+  id         String             @id @default(uuid())
+  term       String             @unique
+  aliases    String[]           @default([])
+  entityType GlossaryEntityType @default(TERM) @map("entity_type")
+  notes      String?            @db.Text
+  refType    String?            @map("ref_type")
+  refId      String?            @map("ref_id")
+  origin     AgentMemoryOrigin  @default(OPERATOR)
+  verifiedAt DateTime?          @map("verified_at")
+  verifiedBy String?            @map("verified_by")
+  // Content hash of "term + aliases + notes" in the shared embedding store,
+  // so glossary lookups can resolve semantically (alias/nearest-term match).
+  embedContentHash String? @map("embed_content_hash")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  @@index([entityType])
+  @@map("glossary_terms")
 }
 
 // ── Chat gateway (Telegram / Slack bots) ─────────────────────────────────────

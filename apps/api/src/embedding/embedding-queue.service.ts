@@ -9,8 +9,13 @@ import { EmbeddingProviderService } from './embedding-provider.service';
 import { EmbeddingService } from './embedding.service';
 
 const EMBEDDING_QUEUE_PREFIX = 'semantic-embeddings';
+const RECALIBRATE_QUEUE_PREFIX = 'semantic-recalibrate';
 const EMBEDDING_GROUP = 'embedding-inference';
 const INSERT_BATCH_SIZE = 500;
+// Insert-time analysis is order-dependent (early vectors see a sparse space),
+// so a full recalibration pass runs once the inference queue drains. The delay
+// batches bursts of scans into one pass; singletonKey collapses repeat requests.
+const RECALIBRATE_DELAY_SECONDS = 120;
 
 type QueuedContent = { hash: string; text: string };
 type EmbeddingJob = QueuedContent & { spaceId: string };
@@ -22,11 +27,15 @@ export class EmbeddingQueueService implements OnApplicationBootstrap {
   private workerRegistered = false;
   private recoveryTimer?: NodeJS.Timeout;
   private queueName?: string;
+  private recalibrateQueueName?: string;
   private spaceId?: string;
   private backfillPromise?: Promise<void>;
   private backfillStartedAt?: string;
   private backfillCompletedAt?: string;
   private backfillError?: string;
+  private recalibrationRunning = false;
+  private lastRecalibratedAt?: string;
+  private lastRecalibrationError?: string;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -53,6 +62,13 @@ export class EmbeddingQueueService implements OnApplicationBootstrap {
         groupConcurrency: this.config.workerConcurrency,
       },
       (jobs) => this.handle(jobs),
+    );
+    this.recalibrateQueueName = `${RECALIBRATE_QUEUE_PREFIX}-${space.id}`;
+    await boss.createQueue(this.recalibrateQueueName, { policy: 'exclusive' });
+    await boss.work(
+      this.recalibrateQueueName,
+      { batchSize: 1, localConcurrency: 1 },
+      () => this.handleRecalibration(),
     );
     this.workerRegistered = true;
     this.logger.log(
@@ -88,7 +104,64 @@ export class EmbeddingQueueService implements OnApplicationBootstrap {
       backfillStartedAt: this.backfillStartedAt,
       backfillCompletedAt: this.backfillCompletedAt,
       backfillError: this.backfillError,
+      recalibrationRunning: this.recalibrationRunning,
+      lastRecalibratedAt: this.lastRecalibratedAt,
+      lastRecalibrationError: this.lastRecalibrationError,
     };
+  }
+
+  scheduleRecalibration(): void {
+    if (!this.config.enabled) return;
+    void this.persistRecalibration().catch((error) => {
+      this.logger.error(
+        `Failed to schedule embedding recalibration: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    });
+  }
+
+  private async persistRecalibration(): Promise<void> {
+    if (!this.recalibrateQueueName || !this.spaceId) return;
+    const boss = await this.pgBoss.getBossAsync();
+    await boss.send(
+      this.recalibrateQueueName,
+      { spaceId: this.spaceId },
+      {
+        singletonKey: this.spaceId,
+        startAfter: RECALIBRATE_DELAY_SECONDS,
+        retryLimit: 3,
+        retryDelay: this.config.retrySeconds,
+        expireInSeconds: 3600,
+        retentionSeconds: 86400,
+      },
+    );
+  }
+
+  private async handleRecalibration(): Promise<void> {
+    if (!this.queueName || !this.spaceId) return;
+    const boss = await this.pgBoss.getBossAsync();
+    const stats = await boss.getQueueStats(this.queueName);
+    const pending =
+      stats.queuedCount + stats.activeCount + stats.deferredCount;
+    if (pending > 0) {
+      // Inference is still draining; push the pass back until the space is
+      // stable so scores are computed against the full neighbourhood.
+      await this.persistRecalibration();
+      return;
+    }
+    this.recalibrationRunning = true;
+    this.lastRecalibrationError = undefined;
+    try {
+      await this.embeddings.recalibrateSpace(this.spaceId);
+      this.lastRecalibratedAt = new Date().toISOString();
+    } catch (error) {
+      this.lastRecalibrationError =
+        error instanceof Error ? error.message : String(error);
+      throw error;
+    } finally {
+      this.recalibrationRunning = false;
+    }
   }
 
   requestBackfill() {
@@ -174,6 +247,7 @@ export class EmbeddingQueueService implements OnApplicationBootstrap {
         vector: vectors[index],
       })),
     });
+    this.scheduleRecalibration();
   }
 
   private scheduleRecovery(): void {
@@ -189,6 +263,7 @@ export class EmbeddingQueueService implements OnApplicationBootstrap {
       await this.backfillFindings();
       await this.backfillAssetChunks();
       this.backfillCompletedAt = new Date().toISOString();
+      this.scheduleRecalibration();
       this.logger.log(
         `Embedding reconciliation queued for space ${this.spaceId}`,
       );

@@ -5,6 +5,8 @@ describe('EmbeddingQueueService', () => {
     createQueue: jest.fn(),
     work: jest.fn(),
     insert: jest.fn(),
+    send: jest.fn(),
+    getQueueStats: jest.fn(),
   };
   const prisma = {
     finding: { findMany: jest.fn(), update: jest.fn() },
@@ -24,6 +26,7 @@ describe('EmbeddingQueueService', () => {
     configuredSpace: jest.fn(),
     missingHashes: jest.fn(),
     putVectors: jest.fn(),
+    recalibrateSpace: jest.fn(),
   };
   const pgBoss = { getBossAsync: jest.fn() };
   const capability = { ensureReady: jest.fn() };
@@ -51,6 +54,14 @@ describe('EmbeddingQueueService', () => {
     prisma.assetChunk.findMany.mockResolvedValue([]);
     embeddings.missingHashes.mockResolvedValue([]);
     embeddings.putVectors.mockResolvedValue({ created: 0, received: 0 });
+    embeddings.recalibrateSpace.mockResolvedValue({ analyzed: 0 });
+    boss.send.mockResolvedValue('job-id');
+    boss.getQueueStats.mockResolvedValue({
+      queuedCount: 0,
+      activeCount: 0,
+      deferredCount: 0,
+      totalCount: 0,
+    });
   });
 
   it('probes pgvector before registering the persistent distributed worker', async () => {
@@ -157,5 +168,68 @@ describe('EmbeddingQueueService', () => {
 
     expect(provider.embedMany).not.toHaveBeenCalled();
     expect(embeddings.putVectors).not.toHaveBeenCalled();
+  });
+
+  it('schedules a debounced recalibration after new vectors are stored', async () => {
+    await service.onApplicationBootstrap();
+    const handler = boss.work.mock.calls[0][2] as (
+      jobs: Array<{
+        data: { spaceId: string; hash: string; text: string };
+      }>,
+    ) => Promise<void>;
+    embeddings.missingHashes.mockResolvedValue(['b'.repeat(64)]);
+    provider.embedMany.mockResolvedValue([[1, 0, 0]]);
+
+    await handler([
+      {
+        data: {
+          spaceId: '9c85727f-8b6f-4de0-aee6-08a96b57f79b',
+          hash: 'b'.repeat(64),
+          text: 'needs embedding',
+        },
+      },
+    ]);
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(boss.send).toHaveBeenCalledWith(
+      'semantic-recalibrate-9c85727f-8b6f-4de0-aee6-08a96b57f79b',
+      { spaceId: '9c85727f-8b6f-4de0-aee6-08a96b57f79b' },
+      expect.objectContaining({
+        singletonKey: '9c85727f-8b6f-4de0-aee6-08a96b57f79b',
+        startAfter: expect.any(Number),
+      }),
+    );
+  });
+
+  it('defers recalibration while inference jobs are still pending', async () => {
+    await service.onApplicationBootstrap();
+    const recalibrate = boss.work.mock.calls[1][2] as () => Promise<void>;
+    boss.getQueueStats.mockResolvedValue({
+      queuedCount: 3,
+      activeCount: 1,
+      deferredCount: 0,
+      totalCount: 4,
+    });
+
+    await recalibrate();
+
+    expect(embeddings.recalibrateSpace).not.toHaveBeenCalled();
+    expect(boss.send).toHaveBeenCalledWith(
+      'semantic-recalibrate-9c85727f-8b6f-4de0-aee6-08a96b57f79b',
+      expect.anything(),
+      expect.anything(),
+    );
+  });
+
+  it('recalibrates the whole space once the inference queue drains', async () => {
+    await service.onApplicationBootstrap();
+    const recalibrate = boss.work.mock.calls[1][2] as () => Promise<void>;
+
+    await recalibrate();
+
+    expect(embeddings.recalibrateSpace).toHaveBeenCalledWith(
+      '9c85727f-8b6f-4de0-aee6-08a96b57f79b',
+    );
+    expect(service.status().lastRecalibratedAt).toBeDefined();
   });
 });

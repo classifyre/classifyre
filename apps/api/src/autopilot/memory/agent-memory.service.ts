@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { AgentMemoryKind, Prisma } from '@prisma/client';
+import { AgentMemoryKind, AgentMemoryOrigin, Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma.service';
 import { MAX_RECALLED_MEMORIES } from '../autopilot.constants';
 import type { MemoryWrite, RecalledMemory } from '../autopilot.types';
@@ -48,9 +48,16 @@ export class AgentMemoryService {
     const tsQuery = safeTerms.join(' | ');
     try {
       const rows = await this.prisma.$queryRaw<
-        Array<{ kind: string; key: string; content: string; weight: number }>
+        Array<{
+          kind: string;
+          key: string;
+          content: string;
+          weight: number;
+          origin: string;
+          verified_at: Date | null;
+        }>
       >`
-        SELECT kind::text, key, content, weight
+        SELECT kind::text, key, content, weight, origin::text, verified_at
         FROM agent_memories
         WHERE kind::text IN (${Prisma.join(kinds.map(String))})
           AND (
@@ -66,6 +73,8 @@ export class AgentMemoryService {
         key: r.key,
         content: r.content,
         weight: Number(r.weight),
+        origin: r.origin,
+        verified: r.verified_at !== null,
       }));
     } catch (error) {
       // Recall is best-effort: a malformed tsquery must never break a cycle.
@@ -83,6 +92,8 @@ export class AgentMemoryService {
   async writeMany(
     writes: MemoryWrite[],
     ref?: { refType: string; refId: string },
+    origin: 'AGENT' | 'OPERATOR' = 'AGENT',
+    author?: string,
   ): Promise<number> {
     let written = 0;
     for (const w of writes) {
@@ -93,6 +104,11 @@ export class AgentMemoryService {
         .map((t) => t.trim().toLowerCase())
         .filter(Boolean)
         .slice(0, 10);
+      // Provenance: operator writes are authoritative; agent writes stay
+      // unverified until explicitly checked against real state. A content
+      // refresh clears any previous verification — the new claim is unchecked.
+      const verified = origin === 'OPERATOR' || w.verified === true;
+      const verifiedBy = verified ? (author ?? origin.toLowerCase()) : null;
       // One atomic statement rather than findUnique-then-update/create. The
       // read-then-write raced: two agents writing the same (kind, key) both saw
       // the same row and the last writer clobbered the other's content and
@@ -100,7 +116,7 @@ export class AgentMemoryService {
       // kind_key unique constraint outright. Tags are merged in SQL so a
       // concurrent write cannot lose entries.
       await this.prisma.$executeRaw`
-        INSERT INTO agent_memories (id, kind, key, content, tags, weight, ref_type, ref_id, created_at, updated_at)
+        INSERT INTO agent_memories (id, kind, key, content, tags, weight, ref_type, ref_id, origin, verified_at, verified_by, created_at, updated_at)
         VALUES (
           gen_random_uuid()::text,
           ${kind}::"AgentMemoryKind",
@@ -110,6 +126,9 @@ export class AgentMemoryService {
           1,
           ${ref?.refType ?? null},
           ${ref?.refId ?? null},
+          ${origin}::"AgentMemoryOrigin",
+          ${verified ? new Date() : null},
+          ${verifiedBy},
           now(),
           now()
         )
@@ -121,6 +140,13 @@ export class AgentMemoryService {
           weight = agent_memories.weight + 1,
           ref_type = COALESCE(EXCLUDED.ref_type, agent_memories.ref_type),
           ref_id = COALESCE(EXCLUDED.ref_id, agent_memories.ref_id),
+          -- An operator row never downgrades to agent origin.
+          origin = CASE
+            WHEN agent_memories.origin = 'OPERATOR' THEN agent_memories.origin
+            ELSE EXCLUDED.origin
+          END,
+          verified_at = EXCLUDED.verified_at,
+          verified_by = EXCLUDED.verified_by,
           updated_at = now()
       `;
       written++;
@@ -139,6 +165,8 @@ export class AgentMemoryService {
       content: string;
       tags: string[];
       weight: number;
+      origin: string;
+      verified: boolean;
       updatedAt: Date;
     }>
   > {
@@ -153,6 +181,8 @@ export class AgentMemoryService {
       content: r.content,
       tags: r.tags,
       weight: r.weight,
+      origin: String(r.origin),
+      verified: r.verifiedAt !== null,
       updatedAt: r.updatedAt,
     }));
   }
@@ -205,14 +235,18 @@ export class AgentMemoryService {
           ],
         },
       });
-      await this.writeMany([
-        {
-          kind: 'DECISION_PRECEDENT',
-          key: `deleted-${entityType}-${entityId}`,
-          content: `The operator deleted ${entityType} "${title}". Do not recreate this ${entityType} or its topic unless the operator explicitly asks for it.`,
-          tags: ['operator-deletion', entityType],
-        },
-      ]);
+      await this.writeMany(
+        [
+          {
+            kind: 'DECISION_PRECEDENT',
+            key: `deleted-${entityType}-${entityId}`,
+            content: `The operator deleted ${entityType} "${title}". Do not recreate this ${entityType} or its topic unless the operator explicitly asks for it.`,
+            tags: ['operator-deletion', entityType],
+          },
+        ],
+        undefined,
+        'OPERATOR',
+      );
     } catch (error) {
       this.logger.warn(
         `Failed to sync agent memory after ${entityType} deletion: ${error instanceof Error ? error.message : String(error)}`,
@@ -225,12 +259,16 @@ export class AgentMemoryService {
     key: string;
     content: string;
     weight: number;
+    origin: AgentMemoryOrigin;
+    verifiedAt: Date | null;
   }): RecalledMemory {
     return {
       kind: String(r.kind),
       key: r.key,
       content: r.content,
       weight: r.weight,
+      origin: String(r.origin),
+      verified: r.verifiedAt !== null,
     };
   }
 }

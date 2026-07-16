@@ -6,6 +6,7 @@ import { ConfigToolset } from './config/config.toolset';
 import { DetectorToolset } from './detector/detector.toolset';
 import { FingerprintsToolset } from './fingerprints/fingerprints.toolset';
 import { AlertToolset } from './alert/alert.toolset';
+import { SemanticToolset } from './semantic/semantic.toolset';
 import {
   INQUIRY_MISSION,
   CASE_MISSION,
@@ -27,6 +28,7 @@ import type { CustomDetectorTestsService } from '../../custom-detector-tests.ser
 import type { CliRunnerService } from '../../cli-runner/cli-runner.service';
 import type { CorrelationService } from '../../correlation/correlation.service';
 import type { DuplicatesFinderAgentService } from '../../correlation/duplicates-finder-agent.service';
+import type { AgentSemanticService } from '../search/agent-semantic.service';
 
 describe('ToolRegistry', () => {
   // list() does not touch deps; safe to pass empty stubs.
@@ -54,6 +56,7 @@ describe('ToolRegistry', () => {
       {} as DecisionApplierService,
     ),
     new AlertToolset({} as PrismaService, {} as NotificationsService),
+    new SemanticToolset({} as AgentSemanticService),
   );
 
   it('registers observe, investigation, knowledge and config tools', () => {
