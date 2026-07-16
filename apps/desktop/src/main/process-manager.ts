@@ -8,7 +8,6 @@ import crypto from "crypto";
 import treeKill from "tree-kill";
 import { ensurePythonRuntime } from "./python-env.js";
 import { getLogFilePath } from "./logger.js";
-import { getAvailablePort } from "./port-manager.js";
 
 // In dev mode we inherit the developer's login-shell PATH so locally installed
 // tooling (uv, java, node) is visible. In packaged mode we never touch the

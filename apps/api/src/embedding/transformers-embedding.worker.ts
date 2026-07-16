@@ -37,7 +37,7 @@ async function extractorFor(config: WorkerRequest['config']) {
   return extractorPromise;
 }
 
-parentPort?.on('message', async (request: WorkerRequest) => {
+async function handleRequest(request: WorkerRequest): Promise<void> {
   try {
     const extractor = await extractorFor(request.config);
     const tensor = await extractor(request.texts, {
@@ -51,4 +51,8 @@ parentPort?.on('message', async (request: WorkerRequest) => {
       error: error instanceof Error ? error.message : String(error),
     });
   }
+}
+
+parentPort?.on('message', (request: WorkerRequest) => {
+  void handleRequest(request);
 });
