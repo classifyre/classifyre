@@ -191,8 +191,30 @@ export interface AssetSampleSummary {
  */
 export interface AssetMetadataProfile {
   scope: 'runner' | 'source' | 'instance';
+  /**
+   * Assets in the requested scope. When scope is 'runner' this is the assets
+   * that runner *last touched* — not the source's contents, and not even the
+   * assets that run processed, since any later run re-stamps them.
+   */
   totalAssets: number;
   hasFindings: boolean;
+  /**
+   * The source's live totals, independent of the runner scope. Present whenever
+   * a sourceId is known.
+   *
+   * Exists because scope='runner' silently answers a different question than
+   * the one agents ask. A CONFIG run reviewing a superseded runner saw
+   * totalAssets: 0, concluded the source was empty, and wrote a false "0 assets
+   * and 0 findings" memory while the source in fact held 13 assets and 3,239
+   * findings. No agent may conclude a source is empty without reading this.
+   */
+  sourceTotals: { activeAssets: number; openFindings: number } | null;
+  /**
+   * The source holds assets this runner did not last touch, so the runner-scoped
+   * view is partial or stale. When totalAssets is 0 and this is true, the runner
+   * has been fully superseded and its scope says nothing about the source.
+   */
+  runnerSuperseded: boolean;
   assetTypes: Array<{ type: string; count: number }>;
   sourceTypes: Array<{ type: string; count: number }>;
   commonMetadataKeys: Array<{ type: string; count: number }>;
