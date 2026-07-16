@@ -1,7 +1,13 @@
 "use client";
 
 import * as React from "react";
-import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type RefObject,
+} from "react";
 import { Plus, Trash2 } from "lucide-react";
 import {
   Badge,
@@ -25,7 +31,6 @@ import { useTranslation } from "@/hooks/use-translation";
 export type TransformerPipelineType =
   | "TEXT_CLASSIFICATION"
   | "IMAGE_CLASSIFICATION"
-  | "FEATURE_EXTRACTION"
   | "OBJECT_DETECTION";
 
 type TransformerStepId = "identity" | "model" | "severity";
@@ -51,18 +56,19 @@ interface TransformerFormState {
   chunkSize: string;
   chunkOverlap: string;
   maxLength: string;
-  poolingStrategy: string;
-  normalizeEmbeddings: boolean;
-  truncation: boolean;
-  batchSize: string;
   nmsThreshold: string;
   minBoxArea: string;
   severityRules: SeverityRule[];
 }
 
 const DEVICE_OPTIONS = ["cpu", "cuda", "mps", "cuda:0", "cuda:1"];
-const SEVERITY_LEVELS: SeverityLevel[] = ["critical", "high", "medium", "low", "info"];
-const POOLING_OPTIONS = ["mean", "cls", "max", "none"];
+const SEVERITY_LEVELS: SeverityLevel[] = [
+  "critical",
+  "high",
+  "medium",
+  "low",
+  "info",
+];
 const FUNCTION_TO_APPLY_OPTIONS = ["sigmoid", "softmax", "none"];
 
 // ── Props ──────────────────────────────────────────────────────────────────
@@ -115,7 +121,6 @@ function defaultModelPlaceholder(type: TransformerPipelineType): string {
     return "e.g. mrm8488/bert-tiny-finetuned-sms-spam-detection";
   if (type === "IMAGE_CLASSIFICATION")
     return "e.g. Falconsai/nsfw_image_detection (leave blank for ViT default)";
-  if (type === "FEATURE_EXTRACTION") return "e.g. BAAI/bge-base-en-v1.5";
   return "e.g. facebook/detr-resnet-50";
 }
 
@@ -132,7 +137,8 @@ function buildPipelineSchema(
   if (s.device && s.device !== "cpu") base.device = s.device;
 
   if (type === "TEXT_CLASSIFICATION") {
-    if (s.confidenceThreshold) base.confidence_threshold = parseFloat(s.confidenceThreshold);
+    if (s.confidenceThreshold)
+      base.confidence_threshold = parseFloat(s.confidenceThreshold);
     if (s.topK) base.top_k = parseInt(s.topK, 10);
     if (s.functionToApply && s.functionToApply !== "none")
       base.function_to_apply = s.functionToApply;
@@ -142,25 +148,16 @@ function buildPipelineSchema(
   }
 
   if (type === "IMAGE_CLASSIFICATION") {
-    if (s.confidenceThreshold) base.confidence_threshold = parseFloat(s.confidenceThreshold);
+    if (s.confidenceThreshold)
+      base.confidence_threshold = parseFloat(s.confidenceThreshold);
     if (s.topK) base.top_k = parseInt(s.topK, 10);
     if (s.functionToApply && s.functionToApply !== "none")
       base.function_to_apply = s.functionToApply;
   }
 
-  if (type === "FEATURE_EXTRACTION") {
-    if (s.poolingStrategy && s.poolingStrategy !== "mean")
-      base.pooling_strategy = s.poolingStrategy;
-    base.normalize_embeddings = s.normalizeEmbeddings;
-    base.truncation = s.truncation;
-    if (s.maxLength) base.max_length = parseInt(s.maxLength, 10);
-    if (s.batchSize) base.batch_size = parseInt(s.batchSize, 10);
-    if (s.chunkSize) base.chunk_size = parseInt(s.chunkSize, 10);
-    if (s.chunkOverlap) base.chunk_overlap = parseInt(s.chunkOverlap, 10);
-  }
-
   if (type === "OBJECT_DETECTION") {
-    if (s.confidenceThreshold) base.confidence_threshold = parseFloat(s.confidenceThreshold);
+    if (s.confidenceThreshold)
+      base.confidence_threshold = parseFloat(s.confidenceThreshold);
     if (s.topK) base.top_k = parseInt(s.topK, 10);
     if (s.nmsThreshold) base.nms_threshold = parseFloat(s.nmsThreshold);
     if (s.minBoxArea) base.min_box_area = parseInt(s.minBoxArea, 10);
@@ -175,7 +172,9 @@ function buildPipelineSchema(
   return base;
 }
 
-function initFromSchema(schema: Record<string, unknown> | undefined): Partial<TransformerFormState> {
+function initFromSchema(
+  schema: Record<string, unknown> | undefined,
+): Partial<TransformerFormState> {
   if (!schema) return {};
   const r = schema as Record<string, unknown>;
   const rules = Array.isArray(r.severity_map)
@@ -185,16 +184,14 @@ function initFromSchema(schema: Record<string, unknown> | undefined): Partial<Tr
     model: typeof r.model === "string" ? r.model : "",
     modelRevision: typeof r.model_revision === "string" ? r.model_revision : "",
     device: typeof r.device === "string" ? r.device : "cpu",
-    confidenceThreshold: r.confidence_threshold != null ? String(r.confidence_threshold) : "",
+    confidenceThreshold:
+      r.confidence_threshold != null ? String(r.confidence_threshold) : "",
     topK: r.top_k != null ? String(r.top_k) : "",
-    functionToApply: typeof r.function_to_apply === "string" ? r.function_to_apply : "",
+    functionToApply:
+      typeof r.function_to_apply === "string" ? r.function_to_apply : "",
     chunkSize: r.chunk_size != null ? String(r.chunk_size) : "",
     chunkOverlap: r.chunk_overlap != null ? String(r.chunk_overlap) : "",
     maxLength: r.max_length != null ? String(r.max_length) : "",
-    poolingStrategy: typeof r.pooling_strategy === "string" ? r.pooling_strategy : "mean",
-    normalizeEmbeddings: r.normalize_embeddings !== false,
-    truncation: r.truncation !== false,
-    batchSize: r.batch_size != null ? String(r.batch_size) : "",
     nmsThreshold: r.nms_threshold != null ? String(r.nms_threshold) : "",
     minBoxArea: r.min_box_area != null ? String(r.min_box_area) : "",
     severityRules: rules,
@@ -206,22 +203,29 @@ function initFromSchema(schema: Record<string, unknown> | undefined): Partial<Tr
 export const TransformerDetectorEditor = React.forwardRef<
   TransformerDetectorEditorHandle,
   TransformerDetectorEditorProps
->(function TransformerDetectorEditor({
-  pipelineType,
-  mode,
-  submitLabel,
-  isSubmitting,
-  initialName = "",
-  initialKey = "",
-  initialDescription = "",
-  initialIsActive = true,
-  initialPipelineSchema,
-  embedded,
-  onSubmit,
-}, ref) {
+>(function TransformerDetectorEditor(
+  {
+    pipelineType,
+    mode,
+    submitLabel,
+    isSubmitting,
+    initialName = "",
+    initialKey = "",
+    initialDescription = "",
+    initialIsActive = true,
+    initialPipelineSchema,
+    embedded,
+    onSubmit,
+  },
+  ref,
+) {
   const { t } = useTranslation();
 
-  const steps: Array<{ id: TransformerStepId; title: string; description: string }> = [
+  const steps: Array<{
+    id: TransformerStepId;
+    title: string;
+    description: string;
+  }> = [
     {
       id: "identity",
       title: t("detectors.transformer.stepIdentity"),
@@ -258,10 +262,6 @@ export const TransformerDetectorEditor = React.forwardRef<
     chunkSize: schemaDefaults.chunkSize ?? "",
     chunkOverlap: schemaDefaults.chunkOverlap ?? "",
     maxLength: schemaDefaults.maxLength ?? "",
-    poolingStrategy: schemaDefaults.poolingStrategy ?? "mean",
-    normalizeEmbeddings: schemaDefaults.normalizeEmbeddings ?? true,
-    truncation: schemaDefaults.truncation ?? true,
-    batchSize: schemaDefaults.batchSize ?? "",
     nmsThreshold: schemaDefaults.nmsThreshold ?? "",
     minBoxArea: schemaDefaults.minBoxArea ?? "",
     severityRules: schemaDefaults.severityRules ?? [],
@@ -273,7 +273,10 @@ export const TransformerDetectorEditor = React.forwardRef<
   const identityRef = useRef<HTMLDivElement>(null);
   const modelRef = useRef<HTMLDivElement>(null);
   const severityRef = useRef<HTMLDivElement>(null);
-  const sectionRefs: Record<TransformerStepId, RefObject<HTMLDivElement | null>> = {
+  const sectionRefs: Record<
+    TransformerStepId,
+    RefObject<HTMLDivElement | null>
+  > = {
     identity: identityRef,
     model: modelRef,
     severity: severityRef,
@@ -283,7 +286,10 @@ export const TransformerDetectorEditor = React.forwardRef<
     const stepIds = steps.map((s) => s.id);
     const elements = stepIds
       .map((id) => ({ id, el: sectionRefs[id].current }))
-      .filter((x): x is { id: TransformerStepId; el: HTMLDivElement } => x.el !== null);
+      .filter(
+        (x): x is { id: TransformerStepId; el: HTMLDivElement } =>
+          x.el !== null,
+      );
 
     const observer = new IntersectionObserver(
       (entries) => {
@@ -298,12 +304,15 @@ export const TransformerDetectorEditor = React.forwardRef<
     );
     for (const { el } of elements) observer.observe(el);
     return () => observer.disconnect();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pipelineType]);
 
   const scrollToSection = useCallback((id: TransformerStepId) => {
-    sectionRefs[id].current?.scrollIntoView({ behavior: "smooth", block: "start" });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    sectionRefs[id].current?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function patch(delta: Partial<TransformerFormState>) {
@@ -340,7 +349,6 @@ export const TransformerDetectorEditor = React.forwardRef<
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_200px]">
       {/* ── Left: all sections ── */}
       <div className="space-y-6 min-w-0">
-
         {/* ── Section: identity ── */}
         <div ref={identityRef} id="section-identity">
           <Card className="p-6 space-y-4 border-2 border-border shadow-[4px_4px_0_var(--color-border)]">
@@ -349,7 +357,9 @@ export const TransformerDetectorEditor = React.forwardRef<
             </h2>
 
             <div className="space-y-1.5">
-              <Label htmlFor="tx-name">{t("detectors.transformer.name")} *</Label>
+              <Label htmlFor="tx-name">
+                {t("detectors.transformer.name")} *
+              </Label>
               <Input
                 id="tx-name"
                 value={form.name}
@@ -364,7 +374,9 @@ export const TransformerDetectorEditor = React.forwardRef<
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="tx-key">{t("detectors.transformer.keyLabel")}</Label>
+              <Label htmlFor="tx-key">
+                {t("detectors.transformer.keyLabel")}
+              </Label>
               <Input
                 id="tx-key"
                 value={form.key}
@@ -378,7 +390,9 @@ export const TransformerDetectorEditor = React.forwardRef<
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="tx-description">{t("detectors.transformer.descriptionLabel")}</Label>
+              <Label htmlFor="tx-description">
+                {t("detectors.transformer.descriptionLabel")}
+              </Label>
               <Textarea
                 id="tx-description"
                 value={form.description}
@@ -394,7 +408,9 @@ export const TransformerDetectorEditor = React.forwardRef<
                 checked={form.isActive}
                 onCheckedChange={(v) => patch({ isActive: v })}
               />
-              <Label htmlFor="tx-active">{t("detectors.transformer.activeLabel")}</Label>
+              <Label htmlFor="tx-active">
+                {t("detectors.transformer.activeLabel")}
+              </Label>
             </div>
           </Card>
         </div>
@@ -437,19 +453,28 @@ export const TransformerDetectorEditor = React.forwardRef<
                   id="tx-revision"
                   value={form.modelRevision}
                   onChange={(e) => patch({ modelRevision: e.target.value })}
-                  placeholder={t("detectors.transformer.modelRevisionPlaceholder")}
+                  placeholder={t(
+                    "detectors.transformer.modelRevisionPlaceholder",
+                  )}
                   className="font-mono text-sm"
                 />
               </div>
               <div className="space-y-1.5">
                 <Label>{t("detectors.transformer.deviceLabel")}</Label>
-                <Select value={form.device} onValueChange={(v) => patch({ device: v })}>
+                <Select
+                  value={form.device}
+                  onValueChange={(v) => patch({ device: v })}
+                >
                   <SelectTrigger className="font-mono text-sm">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     {DEVICE_OPTIONS.map((d) => (
-                      <SelectItem key={d} value={d} className="font-mono text-sm">
+                      <SelectItem
+                        key={d}
+                        value={d}
+                        className="font-mono text-sm"
+                      >
                         {d}
                       </SelectItem>
                     ))}
@@ -474,12 +499,18 @@ export const TransformerDetectorEditor = React.forwardRef<
                       max="1"
                       step="0.05"
                       value={form.confidenceThreshold}
-                      onChange={(e) => patch({ confidenceThreshold: e.target.value })}
-                      placeholder={pipelineType === "TEXT_CLASSIFICATION" ? "0.7" : "0.0"}
+                      onChange={(e) =>
+                        patch({ confidenceThreshold: e.target.value })
+                      }
+                      placeholder={
+                        pipelineType === "TEXT_CLASSIFICATION" ? "0.7" : "0.0"
+                      }
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <Label htmlFor="tx-topk">{t("detectors.transformer.topK")}</Label>
+                    <Label htmlFor="tx-topk">
+                      {t("detectors.transformer.topK")}
+                    </Label>
                     <Input
                       id="tx-topk"
                       type="number"
@@ -494,11 +525,15 @@ export const TransformerDetectorEditor = React.forwardRef<
                   <Label>{t("detectors.transformer.scoreNormalization")}</Label>
                   <Select
                     value={form.functionToApply || "default"}
-                    onValueChange={(v) => patch({ functionToApply: v === "default" ? "" : v })}
+                    onValueChange={(v) =>
+                      patch({ functionToApply: v === "default" ? "" : v })
+                    }
                   >
                     <SelectTrigger className="font-mono text-sm">
                       <SelectValue
-                        placeholder={t("detectors.transformer.scoreNormalizationDefault")}
+                        placeholder={t(
+                          "detectors.transformer.scoreNormalizationDefault",
+                        )}
                       />
                     </SelectTrigger>
                     <SelectContent>
@@ -506,7 +541,11 @@ export const TransformerDetectorEditor = React.forwardRef<
                         {t("detectors.transformer.scoreNormalizationDefault")}
                       </SelectItem>
                       {FUNCTION_TO_APPLY_OPTIONS.map((o) => (
-                        <SelectItem key={o} value={o} className="font-mono text-sm">
+                        <SelectItem
+                          key={o}
+                          value={o}
+                          className="font-mono text-sm"
+                        >
                           {o}
                         </SelectItem>
                       ))}
@@ -520,7 +559,9 @@ export const TransformerDetectorEditor = React.forwardRef<
             {pipelineType === "TEXT_CLASSIFICATION" && (
               <div className="grid grid-cols-3 gap-4">
                 <div className="space-y-1.5">
-                  <Label htmlFor="tx-chunk">{t("detectors.transformer.chunkSize")}</Label>
+                  <Label htmlFor="tx-chunk">
+                    {t("detectors.transformer.chunkSize")}
+                  </Label>
                   <Input
                     id="tx-chunk"
                     type="number"
@@ -531,7 +572,9 @@ export const TransformerDetectorEditor = React.forwardRef<
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="tx-overlap">{t("detectors.transformer.chunkOverlap")}</Label>
+                  <Label htmlFor="tx-overlap">
+                    {t("detectors.transformer.chunkOverlap")}
+                  </Label>
                   <Input
                     id="tx-overlap"
                     type="number"
@@ -542,116 +585,30 @@ export const TransformerDetectorEditor = React.forwardRef<
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="tx-maxlen">{t("detectors.transformer.maxTokenLength")}</Label>
+                  <Label htmlFor="tx-maxlen">
+                    {t("detectors.transformer.maxTokenLength")}
+                  </Label>
                   <Input
                     id="tx-maxlen"
                     type="number"
                     min="1"
                     value={form.maxLength}
                     onChange={(e) => patch({ maxLength: e.target.value })}
-                    placeholder={t("detectors.transformer.maxTokenLengthDefault")}
+                    placeholder={t(
+                      "detectors.transformer.maxTokenLengthDefault",
+                    )}
                   />
                 </div>
               </div>
-            )}
-
-            {/* Feature extraction fields */}
-            {pipelineType === "FEATURE_EXTRACTION" && (
-              <>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <Label>{t("detectors.transformer.poolingStrategy")}</Label>
-                    <Select
-                      value={form.poolingStrategy}
-                      onValueChange={(v) => patch({ poolingStrategy: v })}
-                    >
-                      <SelectTrigger className="font-mono text-sm">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {POOLING_OPTIONS.map((p) => (
-                          <SelectItem key={p} value={p} className="font-mono text-sm">
-                            {p}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="fe-batch">{t("detectors.transformer.batchSize")}</Label>
-                    <Input
-                      id="fe-batch"
-                      type="number"
-                      min="1"
-                      value={form.batchSize}
-                      onChange={(e) => patch({ batchSize: e.target.value })}
-                      placeholder="8"
-                    />
-                  </div>
-                </div>
-                <div className="flex items-center gap-6">
-                  <div className="flex items-center gap-2">
-                    <Switch
-                      id="fe-normalize"
-                      checked={form.normalizeEmbeddings}
-                      onCheckedChange={(v) => patch({ normalizeEmbeddings: v })}
-                    />
-                    <Label htmlFor="fe-normalize">
-                      {t("detectors.transformer.normalizeEmbeddings")}
-                    </Label>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Switch
-                      id="fe-trunc"
-                      checked={form.truncation}
-                      onCheckedChange={(v) => patch({ truncation: v })}
-                    />
-                    <Label htmlFor="fe-trunc">{t("detectors.transformer.truncation")}</Label>
-                  </div>
-                </div>
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="space-y-1.5">
-                    <Label htmlFor="fe-maxlen">{t("detectors.transformer.maxTokenLength")}</Label>
-                    <Input
-                      id="fe-maxlen"
-                      type="number"
-                      min="1"
-                      value={form.maxLength}
-                      onChange={(e) => patch({ maxLength: e.target.value })}
-                      placeholder={t("detectors.transformer.maxTokenLengthDefault")}
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="fe-chunk">{t("detectors.transformer.chunkSize")}</Label>
-                    <Input
-                      id="fe-chunk"
-                      type="number"
-                      min="1"
-                      value={form.chunkSize}
-                      onChange={(e) => patch({ chunkSize: e.target.value })}
-                      placeholder={t("detectors.transformer.chunkSizeNoChunking")}
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="fe-overlap">{t("detectors.transformer.chunkOverlap")}</Label>
-                    <Input
-                      id="fe-overlap"
-                      type="number"
-                      min="0"
-                      value={form.chunkOverlap}
-                      onChange={(e) => patch({ chunkOverlap: e.target.value })}
-                      placeholder="0"
-                    />
-                  </div>
-                </div>
-              </>
             )}
 
             {/* Object detection fields */}
             {pipelineType === "OBJECT_DETECTION" && (
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <Label htmlFor="od-conf">{t("detectors.transformer.confidenceThreshold")}</Label>
+                  <Label htmlFor="od-conf">
+                    {t("detectors.transformer.confidenceThreshold")}
+                  </Label>
                   <Input
                     id="od-conf"
                     type="number"
@@ -659,12 +616,16 @@ export const TransformerDetectorEditor = React.forwardRef<
                     max="1"
                     step="0.05"
                     value={form.confidenceThreshold}
-                    onChange={(e) => patch({ confidenceThreshold: e.target.value })}
+                    onChange={(e) =>
+                      patch({ confidenceThreshold: e.target.value })
+                    }
                     placeholder="0.5"
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="od-topk">{t("detectors.transformer.topK")}</Label>
+                  <Label htmlFor="od-topk">
+                    {t("detectors.transformer.topK")}
+                  </Label>
                   <Input
                     id="od-topk"
                     type="number"
@@ -675,7 +636,9 @@ export const TransformerDetectorEditor = React.forwardRef<
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="od-nms">{t("detectors.transformer.nmsThreshold")}</Label>
+                  <Label htmlFor="od-nms">
+                    {t("detectors.transformer.nmsThreshold")}
+                  </Label>
                   <Input
                     id="od-nms"
                     type="number"
@@ -688,7 +651,9 @@ export const TransformerDetectorEditor = React.forwardRef<
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="od-box">{t("detectors.transformer.minBoxArea")}</Label>
+                  <Label htmlFor="od-box">
+                    {t("detectors.transformer.minBoxArea")}
+                  </Label>
                   <Input
                     id="od-box"
                     type="number"
@@ -737,7 +702,10 @@ export const TransformerDetectorEditor = React.forwardRef<
                     value={rule.severity}
                     onValueChange={(v) => {
                       const rules = [...form.severityRules];
-                      rules[idx] = { ...rules[idx]!, severity: v as SeverityLevel };
+                      rules[idx] = {
+                        ...rules[idx]!,
+                        severity: v as SeverityLevel,
+                      };
                       patch({ severityRules: rules });
                     }}
                   >
@@ -746,7 +714,11 @@ export const TransformerDetectorEditor = React.forwardRef<
                     </SelectTrigger>
                     <SelectContent>
                       {SEVERITY_LEVELS.map((s) => (
-                        <SelectItem key={s} value={s} className="font-mono text-sm">
+                        <SelectItem
+                          key={s}
+                          value={s}
+                          className="font-mono text-sm"
+                        >
                           {s}
                         </SelectItem>
                       ))}
@@ -757,7 +729,11 @@ export const TransformerDetectorEditor = React.forwardRef<
                     size="icon"
                     aria-label={t("detectors.transformer.removeRule")}
                     onClick={() =>
-                      patch({ severityRules: form.severityRules.filter((_, i) => i !== idx) })
+                      patch({
+                        severityRules: form.severityRules.filter(
+                          (_, i) => i !== idx,
+                        ),
+                      })
                     }
                   >
                     <Trash2 className="h-4 w-4 text-muted-foreground" />

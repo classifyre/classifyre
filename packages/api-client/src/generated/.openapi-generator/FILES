@@ -28,6 +28,7 @@ docs/AiCompleteResponseDto.md
 docs/AiMessageDto.md
 docs/AiProviderConfigResponseDto.md
 docs/AiProviderConfigTestResultDto.md
+docs/AssetChunkDto.md
 docs/AssetFindingDetectorCountDto.md
 docs/AssetFindingSeverityCountDto.md
 docs/AssetFindingStatusCountDto.md
@@ -103,13 +104,18 @@ docs/DeleteRunnerResponseDto.md
 docs/DiscoveryRecentRunDto.md
 docs/DiscoveryRunSourceDto.md
 docs/EdgeDetailDto.md
+docs/EmbeddingReindexResponseDto.md
+docs/EmbeddingsApi.md
 docs/EvidenceEntityDto.md
 docs/ExclusionRuleDto.md
 docs/ExpandGraphDto.md
 docs/FinalizeIngestRunDto.md
+docs/FindingEvidenceAnalysisDto.md
 docs/FindingHistoryEntryDto.md
 docs/FindingLocationDto.md
+docs/FindingRankReasonDto.md
 docs/FindingResponseDto.md
+docs/FindingSearchRankingDto.md
 docs/FindingsApi.md
 docs/FindingsBySeverityDto.md
 docs/FindingsChartsTimelineBucketDto.md
@@ -121,6 +127,7 @@ docs/FindingsDiscoverySeverityBreakdownDto.md
 docs/FindingsDiscoveryStatusBreakdownDto.md
 docs/FindingsDiscoveryTopAssetDto.md
 docs/FindingsDiscoveryTotalsDto.md
+docs/FindingsRankingDto.md
 docs/GraphApi.md
 docs/GraphEdgeDto.md
 docs/GraphNodeDto.md
@@ -172,6 +179,7 @@ docs/PreviewInquiryDto.md
 docs/PreviewResponseDto.md
 docs/PullFromInquiryDto.md
 docs/PullFromInquiryResponseDto.md
+docs/PutAssetChunksDto.md
 docs/RebuildEdgesResponseDto.md
 docs/RecomputeCorrelationResponseDto.md
 docs/RegisterDiscoveredAssetsDto.md
@@ -213,6 +221,7 @@ docs/SearchFindingsCustomDetectorOptionDto.md
 docs/SearchFindingsFiltersDto.md
 docs/SearchFindingsFiltersInputDto.md
 docs/SearchFindingsPageDto.md
+docs/SearchFindingsRankingMetadataDto.md
 docs/SearchFindingsRequestDto.md
 docs/SearchFindingsResponseDto.md
 docs/SearchRunnerItemDto.md
@@ -234,6 +243,7 @@ docs/SearchSourcesPageDto.md
 docs/SearchSourcesRequestDto.md
 docs/SearchSourcesResponseDto.md
 docs/SearchSourcesTotalsDto.md
+docs/SemanticFindingsSearchDto.md
 docs/SourceAssetsControllerBulkIngest201Response.md
 docs/SourceInfoDto.md
 docs/SourceResponseDto.md
@@ -243,6 +253,7 @@ docs/SourcesControllerUpdateStatusRequest.md
 docs/StartRunnerDto.md
 docs/StopRunnerResponseDto.md
 docs/TestConnectionResponseDto.md
+docs/TextCoverageDto.md
 docs/ThreadEntriesResponseDto.md
 docs/ThreadEntryDto.md
 docs/ThreadResponseDto.md
@@ -289,6 +300,7 @@ src/apis/CorrelationApi.ts
 src/apis/CustomDetectorExtractionsApi.ts
 src/apis/CustomDetectorTestsApi.ts
 src/apis/CustomDetectorsApi.ts
+src/apis/EmbeddingsApi.ts
 src/apis/FindingsApi.ts
 src/apis/GraphApi.ts
 src/apis/HealthApi.ts
@@ -326,6 +338,7 @@ src/models/AiCompleteResponseDto.ts
 src/models/AiMessageDto.ts
 src/models/AiProviderConfigResponseDto.ts
 src/models/AiProviderConfigTestResultDto.ts
+src/models/AssetChunkDto.ts
 src/models/AssetFindingDetectorCountDto.ts
 src/models/AssetFindingSeverityCountDto.ts
 src/models/AssetFindingStatusCountDto.ts
@@ -392,13 +405,17 @@ src/models/DeleteRunnerResponseDto.ts
 src/models/DiscoveryRecentRunDto.ts
 src/models/DiscoveryRunSourceDto.ts
 src/models/EdgeDetailDto.ts
+src/models/EmbeddingReindexResponseDto.ts
 src/models/EvidenceEntityDto.ts
 src/models/ExclusionRuleDto.ts
 src/models/ExpandGraphDto.ts
 src/models/FinalizeIngestRunDto.ts
+src/models/FindingEvidenceAnalysisDto.ts
 src/models/FindingHistoryEntryDto.ts
 src/models/FindingLocationDto.ts
+src/models/FindingRankReasonDto.ts
 src/models/FindingResponseDto.ts
+src/models/FindingSearchRankingDto.ts
 src/models/FindingsBySeverityDto.ts
 src/models/FindingsChartsTimelineBucketDto.ts
 src/models/FindingsChartsTopAssetDto.ts
@@ -409,6 +426,7 @@ src/models/FindingsDiscoverySeverityBreakdownDto.ts
 src/models/FindingsDiscoveryStatusBreakdownDto.ts
 src/models/FindingsDiscoveryTopAssetDto.ts
 src/models/FindingsDiscoveryTotalsDto.ts
+src/models/FindingsRankingDto.ts
 src/models/GraphEdgeDto.ts
 src/models/GraphNodeDto.ts
 src/models/GraphResponseDto.ts
@@ -455,6 +473,7 @@ src/models/PreviewInquiryDto.ts
 src/models/PreviewResponseDto.ts
 src/models/PullFromInquiryDto.ts
 src/models/PullFromInquiryResponseDto.ts
+src/models/PutAssetChunksDto.ts
 src/models/RebuildEdgesResponseDto.ts
 src/models/RecomputeCorrelationResponseDto.ts
 src/models/RegisterDiscoveredAssetsDto.ts
@@ -494,6 +513,7 @@ src/models/SearchFindingsCustomDetectorOptionDto.ts
 src/models/SearchFindingsFiltersDto.ts
 src/models/SearchFindingsFiltersInputDto.ts
 src/models/SearchFindingsPageDto.ts
+src/models/SearchFindingsRankingMetadataDto.ts
 src/models/SearchFindingsRequestDto.ts
 src/models/SearchFindingsResponseDto.ts
 src/models/SearchRunnerItemDto.ts
@@ -515,6 +535,7 @@ src/models/SearchSourcesPageDto.ts
 src/models/SearchSourcesRequestDto.ts
 src/models/SearchSourcesResponseDto.ts
 src/models/SearchSourcesTotalsDto.ts
+src/models/SemanticFindingsSearchDto.ts
 src/models/SourceAssetsControllerBulkIngest201Response.ts
 src/models/SourceInfoDto.ts
 src/models/SourceResponseDto.ts
@@ -523,6 +544,7 @@ src/models/SourcesControllerUpdateStatusRequest.ts
 src/models/StartRunnerDto.ts
 src/models/StopRunnerResponseDto.ts
 src/models/TestConnectionResponseDto.ts
+src/models/TextCoverageDto.ts
 src/models/ThreadEntriesResponseDto.ts
 src/models/ThreadEntryDto.ts
 src/models/ThreadResponseDto.ts

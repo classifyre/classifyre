@@ -10,6 +10,7 @@ Name | Type
 `findings` | [SearchFindingsFiltersDto](SearchFindingsFiltersDto.md)
 `page` | [SearchAssetsPageDto](SearchAssetsPageDto.md)
 `options` | [SearchAssetsOptionsDto](SearchAssetsOptionsDto.md)
+`semantic` | [SemanticFindingsSearchDto](SemanticFindingsSearchDto.md)
 
 ## Example
 
@@ -22,6 +23,7 @@ const example = {
   "findings": null,
   "page": null,
   "options": null,
+  "semantic": null,
 } satisfies SearchAssetsRequestDto
 
 console.log(example)

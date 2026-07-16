@@ -15,10 +15,13 @@ import { McpServerFactoryService } from './mcp-server.factory';
 import { McpTokenService } from './mcp-token.service';
 import { InstanceSettingsService } from './instance-settings.service';
 import { PrismaExceptionFilter } from './filters/prisma-exception.filter';
+import { applyPendingDatabaseMigrations } from './database-migrations';
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
   const port = process.env.PORT ?? 8000;
+
+  await applyPendingDatabaseMigrations();
 
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule,
@@ -175,4 +178,9 @@ async function bootstrap() {
     `MCP endpoint available at: http://localhost:${port}/mcp (also /api/mcp)`,
   );
 }
-void bootstrap();
+void bootstrap().catch((error: unknown) => {
+  const logger = new Logger('Bootstrap');
+  const message = error instanceof Error ? error.message : String(error);
+  logger.error(message);
+  process.exitCode = 1;
+});

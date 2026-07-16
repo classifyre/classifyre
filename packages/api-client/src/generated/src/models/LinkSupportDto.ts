@@ -14,7 +14,7 @@
 
 import { mapValues } from '../runtime';
 /**
- * 
+ *
  * @export
  * @interface LinkSupportDto
  */
@@ -32,19 +32,19 @@ export interface LinkSupportDto {
      */
     targetId: string;
     /**
-     * 
+     *
      * @type {string}
      * @memberof LinkSupportDto
      */
     stance?: LinkSupportDtoStanceEnum;
     /**
-     * 
+     *
      * @type {number}
      * @memberof LinkSupportDto
      */
     weight?: number;
     /**
-     * 
+     *
      * @type {string}
      * @memberof LinkSupportDto
      */
@@ -90,7 +90,7 @@ export function LinkSupportDtoFromJSONTyped(json: any, ignoreDiscriminator: bool
         return json;
     }
     return {
-        
+
         'targetType': json['targetType'],
         'targetId': json['targetId'],
         'stance': json['stance'] == null ? undefined : json['stance'],
@@ -109,7 +109,7 @@ export function LinkSupportDtoToJSONTyped(value?: LinkSupportDto | null, ignoreD
     }
 
     return {
-        
+
         'targetType': value['targetType'],
         'targetId': value['targetId'],
         'stance': value['stance'],

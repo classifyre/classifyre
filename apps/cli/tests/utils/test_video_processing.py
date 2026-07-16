@@ -44,6 +44,7 @@ def test_changed_frame_ocr_is_timestamped_and_deduplicated(
     second_bgr = np.repeat(second[:, :, None], 3, axis=2)
 
     monkeypatch.setattr(video_processing, "_get_cv2", _array_cv2)
+    monkeypatch.setattr(video_processing, "_get_rapidocr_engine", lambda: (object(), None))
     monkeypatch.setattr(
         video_processing,
         "_iter_sampled_frames",
@@ -139,3 +140,47 @@ def test_path_ocr_reuses_existing_video(
     assert error is None
     assert text.endswith("Slide")
     assert seen == [video_path]
+
+
+def test_video_ocr_probes_engine_before_decoding(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    video_path = tmp_path / "video.mp4"
+    video_path.write_bytes(b"video")
+    decoded = False
+    fake_cv2 = object()
+
+    def frames(_path: Path) -> Any:
+        nonlocal decoded
+        decoded = True
+        yield
+
+    monkeypatch.setattr(video_processing, "_get_cv2", lambda: fake_cv2)
+    monkeypatch.setattr(
+        video_processing,
+        "_get_rapidocr_engine",
+        lambda: (None, "RapidOCR dependency missing"),
+    )
+    monkeypatch.setattr(video_processing, "_iter_sampled_frames", frames)
+
+    text, error = video_processing.extract_video_ocr_path(video_path)
+
+    assert text == ""
+    assert error == "Video OCR failed: Video OCR engine unavailable: RapidOCR dependency missing"
+    assert decoded is False
+
+
+def test_video_ocr_reports_zero_decoded_frames(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    video_path = tmp_path / "video.mp4"
+    video_path.write_bytes(b"video")
+    fake_cv2 = object()
+    monkeypatch.setattr(video_processing, "_get_cv2", lambda: fake_cv2)
+    monkeypatch.setattr(video_processing, "_get_rapidocr_engine", lambda: (object(), None))
+    monkeypatch.setattr(video_processing, "_iter_sampled_frames", lambda _path: iter(()))
+
+    text, error = video_processing.extract_video_ocr_path(video_path)
+
+    assert text == ""
+    assert error == "Video OCR failed: Video OCR decoded zero frames"

@@ -15,6 +15,7 @@ import {
 } from 'class-validator';
 import { DetectorType, FindingStatus, Severity } from '@prisma/client';
 import { QueryAssetsDto } from './query-assets.dto';
+import { SemanticFindingsSearchDto } from './search-findings-request.dto';
 
 export class SearchAssetsFiltersDto extends OmitType(QueryAssetsDto, [
   'skip',
@@ -220,4 +221,10 @@ export class SearchAssetsRequestDto {
   @ValidateNested()
   @Type(() => SearchAssetsOptionsDto)
   options?: SearchAssetsOptionsDto;
+
+  @ApiPropertyOptional({ type: SemanticFindingsSearchDto })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => SemanticFindingsSearchDto)
+  semantic?: SemanticFindingsSearchDto;
 }

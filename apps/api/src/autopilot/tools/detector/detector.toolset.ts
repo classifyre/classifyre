@@ -12,7 +12,7 @@ const PIPELINE_REQUIREMENTS = [
   'REGEX → patterns{<name>:{pattern,...}} (≥1 pattern)',
   'GLINER2 → entities{<label>:{description}} and/or classification{<task>:{labels[]}}',
   'LLM → system_prompt + labels[] (and an aiProviderConfigId; never provider_runtime)',
-  'TEXT_CLASSIFICATION / IMAGE_CLASSIFICATION / FEATURE_EXTRACTION / OBJECT_DETECTION → model (HuggingFace id; IMAGE_CLASSIFICATION has a default)',
+  'TEXT_CLASSIFICATION / IMAGE_CLASSIFICATION / OBJECT_DETECTION → model (HuggingFace id; IMAGE_CLASSIFICATION has a default)',
 ].join('; ');
 
 /** Pipeline engines the agent may author, used for the examples filter enum. */
@@ -22,7 +22,6 @@ const PIPELINE_TYPES = [
   'LLM',
   'TEXT_CLASSIFICATION',
   'IMAGE_CLASSIFICATION',
-  'FEATURE_EXTRACTION',
   'OBJECT_DETECTION',
 ];
 

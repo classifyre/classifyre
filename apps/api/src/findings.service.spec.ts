@@ -3,6 +3,8 @@ import { FindingsService } from './findings.service';
 import { PrismaService } from './prisma.service';
 import { FindingStatus, Severity } from '@prisma/client';
 import { HistoryEventType } from './types/finding-history.types';
+import { EmbeddingService } from './embedding/embedding.service';
+import { QueryEmbeddingService } from './embedding/query-embedding.service';
 
 describe('FindingsService', () => {
   let service: FindingsService;
@@ -29,6 +31,14 @@ describe('FindingsService', () => {
         {
           provide: PrismaService,
           useValue: mockPrismaService,
+        },
+        {
+          provide: EmbeddingService,
+          useValue: { semanticFindingIds: jest.fn() },
+        },
+        {
+          provide: QueryEmbeddingService,
+          useValue: { embed: jest.fn(), embedIfAvailable: jest.fn() },
         },
       ],
     }).compile();

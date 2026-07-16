@@ -223,6 +223,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
     MAX_CONCURRENT_RUNNERS=1 \
     UV_LINK_MODE=copy \
     UV_CACHE_DIR=/cache/uv \
+    HF_HOME=/app/models/huggingface \
     CLASSIFYRE_CLI_AUTO_INSTALL_OPTIONAL_DEPS=1
 
 RUN set -eux; \
@@ -248,6 +249,7 @@ RUN set -eux; \
       caddy \
       nodejs \
       postgresql-${PG_MAJOR} \
+      postgresql-${PG_MAJOR}-pgvector \
       postgresql-client-${PG_MAJOR}; \
     rm -rf /var/lib/apt/lists/*
 
@@ -389,6 +391,8 @@ exec env \
   CLI_PATH="${CLI_PATH:-/app/apps/cli}" \
   PORT="${API_PORT:-8000}" \
   DATABASE_URL="${DATABASE_URL}" \
+  CLASSIFYRE_AUTO_MIGRATE="false" \
+  EMBEDDING_CACHE_DIR="/tmp/classifyre-transformers" \
   CLASSIFYRE_MASKED_CONFIG_KEY="${CLASSIFYRE_MASKED_CONFIG_KEY}" \
   node /app/api/dist/src/main.js
 SH

@@ -41,6 +41,8 @@ export { ThreadsApi } from "./generated/src/apis/ThreadsApi";
 export { AutopilotApi } from "./generated/src/apis/AutopilotApi";
 export { CorrelationApi } from "./generated/src/apis/CorrelationApi";
 export { ChatBotsApi } from "./generated/src/apis/ChatBotsApi";
+export { EmbeddingsApi } from "./generated/src/apis/EmbeddingsApi";
+export type { EmbeddingReindexResponseDto } from "./generated/src/models";
 export type {
   ChatBotResponseDto,
   ChatBotDiagnosticsDto,
@@ -212,6 +214,7 @@ export type {
   RunnerLogsResponseDto,
   SearchRunnerLogsBodyDto,
   SourceInfoDto,
+  TextCoverageDto,
   StopRunnerResponseDto,
   StartRunnerDto,
   SearchAssetFindingDto,
@@ -233,6 +236,12 @@ export type {
   FindingsDiscoveryTopAssetDto,
   FindingsDiscoveryTotalsDto,
   SearchFindingsRequestDto,
+  SemanticFindingsSearchDto,
+  FindingsRankingDto,
+  FindingRankReasonDto,
+  FindingEvidenceAnalysisDto,
+  FindingSearchRankingDto,
+  SearchFindingsRankingMetadataDto,
   SearchFindingsResponseDto,
   SearchFindingsChartsRequestDto,
   SearchFindingsChartsResponseDto,
@@ -389,7 +398,12 @@ export type SearchAssetsChartsRequestInputDto =
 export type SearchFindingsChartsRequestInputDto =
   GeneratedSearchFindingsChartsRequestDto;
 
-export type SearchRunnersStatus = "PENDING" | "RUNNING" | "COMPLETED" | "WARNING" | "ERROR";
+export type SearchRunnersStatus =
+  | "PENDING"
+  | "RUNNING"
+  | "COMPLETED"
+  | "WARNING"
+  | "ERROR";
 export type SearchRunnersTriggerType =
   | "MANUAL"
   | "SCHEDULED"
@@ -509,6 +523,14 @@ export type RunnerAssetItemDto = {
   startedAt: string | null;
   completedAt: string | null;
   errorMessage: string | null;
+  textExtractionStatus:
+    | "NOT_APPLICABLE"
+    | "EXTRACTED"
+    | "EMPTY"
+    | "ENGINE_UNAVAILABLE"
+    | "ZERO_FRAMES"
+    | "FAILED"
+    | null;
   createdAt: string;
   findingsTotal: number | null;
   findingsBySeverity: Record<string, number> | null;
@@ -791,7 +813,11 @@ export type ParseTrainingExamplesResponseDto = {
   availableColumns?: string[];
   detectedLabelColumn?: string;
   detectedTextColumn?: string;
-  skippedReasons?: { missingLabel: number; missingText: number; duplicates: number };
+  skippedReasons?: {
+    missingLabel: number;
+    missingText: number;
+    duplicates: number;
+  };
 };
 
 export type PipelineResultEntitySpan = {
@@ -927,6 +953,7 @@ import { ThreadsApi } from "./generated/src/apis/ThreadsApi";
 import { AutopilotApi } from "./generated/src/apis/AutopilotApi";
 import { CorrelationApi } from "./generated/src/apis/CorrelationApi";
 import { ChatBotsApi } from "./generated/src/apis/ChatBotsApi";
+import { EmbeddingsApi } from "./generated/src/apis/EmbeddingsApi";
 
 // Determine the correct base URL
 // In browser: use relative path /api which is proxied by Next.js
@@ -989,6 +1016,7 @@ class ApiClient {
   public autopilot: AutopilotApi;
   public correlation: CorrelationApi;
   public chatBots: ChatBotsApi;
+  public embeddings: EmbeddingsApi;
 
   constructor(baseUrl?: string) {
     this.config = createConfiguration(baseUrl);
@@ -1010,6 +1038,7 @@ class ApiClient {
     this.autopilot = new AutopilotApi(this.config);
     this.correlation = new CorrelationApi(this.config);
     this.chatBots = new ChatBotsApi(this.config);
+    this.embeddings = new EmbeddingsApi(this.config);
   }
 
   async searchAssets(
@@ -1548,14 +1577,18 @@ class ApiClient {
     return (await response.json()) as { deleted: true };
   }
 
-  async listTrainingExamples(detectorId: string): Promise<TrainingExampleDto[]> {
+  async listTrainingExamples(
+    detectorId: string,
+  ): Promise<TrainingExampleDto[]> {
     const basePath = this.config.basePath.replace(/\/$/, "");
     const response = await fetch(
       `${basePath}/custom-detectors/${detectorId}/training-examples`,
     );
     if (!response.ok) {
       const message = await response.text();
-      throw new Error(`training-examples GET failed (${response.status}): ${message}`);
+      throw new Error(
+        `training-examples GET failed (${response.status}): ${message}`,
+      );
     }
     return (await response.json()) as TrainingExampleDto[];
   }
@@ -1576,7 +1609,9 @@ class ApiClient {
     );
     if (!response.ok) {
       const message = await response.text();
-      throw new Error(`training-examples POST failed (${response.status}): ${message}`);
+      throw new Error(
+        `training-examples POST failed (${response.status}): ${message}`,
+      );
     }
     return (await response.json()) as { saved: number };
   }
@@ -1592,12 +1627,16 @@ class ApiClient {
     );
     if (!response.ok) {
       const message = await response.text();
-      throw new Error(`training-example DELETE failed (${response.status}): ${message}`);
+      throw new Error(
+        `training-example DELETE failed (${response.status}): ${message}`,
+      );
     }
     return (await response.json()) as { deleted: true };
   }
 
-  async clearTrainingExamples(detectorId: string): Promise<{ deleted: number }> {
+  async clearTrainingExamples(
+    detectorId: string,
+  ): Promise<{ deleted: number }> {
     const basePath = this.config.basePath.replace(/\/$/, "");
     const response = await fetch(
       `${basePath}/custom-detectors/${detectorId}/training-examples`,
@@ -1605,7 +1644,9 @@ class ApiClient {
     );
     if (!response.ok) {
       const message = await response.text();
-      throw new Error(`training-examples DELETE failed (${response.status}): ${message}`);
+      throw new Error(
+        `training-examples DELETE failed (${response.status}): ${message}`,
+      );
     }
     return (await response.json()) as { deleted: number };
   }

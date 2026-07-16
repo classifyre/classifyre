@@ -14,7 +14,6 @@ from ._base import (
     _resolve_pipeline_severity,
 )
 from ._factory import create_runner
-from ._feature_extraction import FeatureExtractionRunner, _chunk_text_with_offsets, _pool_hidden
 from ._gliner2 import (
     GLiNER2Runner,
     _apply_classification_validation,
@@ -35,7 +34,6 @@ __all__ = [
     "_IMAGE_CONTENT_TYPES",
     "_TEXT_CONTENT_TYPES",
     "BaseRunner",
-    "FeatureExtractionRunner",
     "GLiNER2Runner",
     "ImageClassificationRunner",
     "LLMRunner",
@@ -45,12 +43,10 @@ __all__ = [
     "_apply_classification_validation",
     "_apply_entity_validation",
     "_chunk_text",
-    "_chunk_text_with_offsets",
     "_load_regex_engine",
     "_normalise_classification_output",
     "_normalise_entity_output",
     "_normalise_span",
-    "_pool_hidden",
     "_resolve_pipeline_severity",
     "create_runner",
 ]

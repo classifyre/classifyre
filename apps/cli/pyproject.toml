@@ -83,7 +83,6 @@ content = [
 ]
 quality = [
     "datasketch>=1.10.0",
-    "sentence-transformers>=5.5.0",
     "textstat>=0.7.13",
     "transformers>=4.50.0,<6.0.0",
     "torch>=2.12.0",
@@ -101,7 +100,6 @@ custom = [
     "datasets>=4.8.5",
     "scikit-learn>=1.7.2",
     "gliner2>=1.3.1",
-    "sentence-transformers>=5.5.0",
     # Direct declaration so the [tool.uv.sources] cpu-index pin applies (timm
     # pulls torchvision transitively; see the ocr group note).
     "torchvision>=0.27.0",
