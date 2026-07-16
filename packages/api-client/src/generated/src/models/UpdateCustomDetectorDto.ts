@@ -14,7 +14,7 @@
 
 import { mapValues } from '../runtime';
 /**
- *
+ * 
  * @export
  * @interface UpdateCustomDetectorDto
  */
@@ -73,7 +73,7 @@ export function UpdateCustomDetectorDtoFromJSONTyped(json: any, ignoreDiscrimina
         return json;
     }
     return {
-
+        
         'name': json['name'] == null ? undefined : json['name'],
         'key': json['key'] == null ? undefined : json['key'],
         'description': json['description'] == null ? undefined : json['description'],
@@ -93,7 +93,7 @@ export function UpdateCustomDetectorDtoToJSONTyped(value?: UpdateCustomDetectorD
     }
 
     return {
-
+        
         'name': value['name'],
         'key': value['key'],
         'description': value['description'],

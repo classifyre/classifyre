@@ -1,18 +1,19 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException,
+  OnApplicationBootstrap,
 } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
+import { FindingStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
 import { UnionFind } from '../utils/union-find';
 import { EmbeddingCapabilityService } from './embedding-capability.service';
 import { EmbeddingAnalysisService } from './embedding-analysis.service';
-import {
-  EmbeddingSpaceDto,
-  PutAssetChunksDto,
-  PutEmbeddingVectorsDto,
-} from './dto/embedding.dto';
+import { PutAssetChunksDto } from './dto/embedding.dto';
+import { EmbeddingConfigService } from './embedding-config.service';
+import { embeddingContentHash } from './embedding-text';
 
 type SimilarityRow = { id: string; score: number };
 type NeighborhoodRow = {
@@ -29,39 +30,54 @@ type BoilerplateClusterRow = {
 };
 
 @Injectable()
-export class EmbeddingService {
+export class EmbeddingService implements OnApplicationBootstrap {
+  private readonly logger = new Logger(EmbeddingService.name);
+  private readonly config: EmbeddingConfigService;
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly capability: EmbeddingCapabilityService,
     private readonly analysis: EmbeddingAnalysisService,
-  ) {}
+    config?: EmbeddingConfigService,
+  ) {
+    this.config = config ?? new EmbeddingConfigService();
+  }
+
+  async onApplicationBootstrap(): Promise<void> {
+    await this.capability.ensureReady();
+    await this.ensureSpace(this.config.space());
+  }
 
   status() {
     return {
-      enabled: true,
-      pgvector: this.capability.hasVector(),
-      searchStrategy: this.capability.hasVector()
-        ? 'hnsw-with-exact-fallback'
-        : 'exact-cosine',
+      enabled: this.config.enabled,
+      pgvector: true,
+      pgvectorVersion: this.capability.version(),
+      searchStrategy: 'per-space-hnsw',
+      provider: this.config.provider,
+      model: this.config.model,
+      dimensions: this.config.dimensions,
     };
   }
 
-  async ensureSpace(input: EmbeddingSpaceDto) {
+  async ensureSpace(
+    input: Omit<ReturnType<EmbeddingConfigService['space']>, 'provider'> & {
+      provider?: ReturnType<EmbeddingConfigService['space']>['provider'];
+    },
+  ) {
+    const provider = input.provider ?? this.config.provider;
     const existing = await this.prisma.embeddingSpace.findUnique({
       where: {
-        model_revision_pooling_normalized: {
+        provider_model_revision_dim_pooling_normalized: {
+          provider,
           model: input.model,
           revision: input.revision,
+          dim: input.dim,
           pooling: input.pooling,
           normalized: input.normalized,
         },
       },
     });
-    if (existing && existing.dim !== input.dim) {
-      throw new BadRequestException(
-        `Embedding space dimension changed from ${existing.dim} to ${input.dim}; use a new revision`,
-      );
-    }
     if (existing) {
       if (!existing.isActive) {
         await this.prisma.$transaction([
@@ -72,59 +88,109 @@ export class EmbeddingService {
           }),
         ]);
       }
+      await this.ensureHnswIndex(existing.id, existing.dim);
       return { ...existing, isActive: true };
     }
-    return this.prisma.$transaction(async (tx) => {
+    const created = await this.prisma.$transaction(async (tx) => {
       await tx.embeddingSpace.updateMany({ data: { isActive: false } });
-      return tx.embeddingSpace.create({ data: { ...input, isActive: true } });
+      return tx.embeddingSpace.create({
+        data: { ...input, provider, isActive: true },
+      });
     });
+    await this.ensureHnswIndex(created.id, created.dim);
+    return created;
   }
 
-  async missing(spaceInput: EmbeddingSpaceDto, hashes: string[]) {
-    const space = await this.ensureSpace(spaceInput);
+  private async activeSpace() {
+    return (
+      (await this.prisma.embeddingSpace.findFirst({
+        where: { isActive: true },
+      })) ?? (await this.ensureSpace(this.config.space()))
+    );
+  }
+
+  private async ensureHnswIndex(spaceId: string, dim: number): Promise<void> {
+    if (!/^[0-9a-f-]{36}$/i.test(spaceId)) {
+      throw new Error(`Invalid embedding space id ${spaceId}`);
+    }
+    const indexName = `content_embeddings_${spaceId.replaceAll('-', '')}_hnsw`;
+    await this.prisma.$executeRaw(
+      Prisma.raw(
+        `CREATE INDEX IF NOT EXISTS "${indexName}"
+         ON "content_embeddings"
+         USING hnsw (("vec"::public.vector(${dim})) public.vector_cosine_ops)
+         WITH (m = ${this.config.hnswM}, ef_construction = ${this.config.hnswEfConstruction})
+         WHERE "space_id" = '${spaceId}'`,
+      ),
+    );
+    this.logger.log(
+      `Embedding space ${spaceId} ready (${this.config.provider}:${this.config.model}, ${dim} dimensions)`,
+    );
+  }
+
+  async missingHashes(hashes: string[]) {
+    const space = await this.activeSpace();
     const uniqueHashes = [...new Set(hashes)];
     const present = await this.prisma.contentEmbedding.findMany({
       where: { spaceId: space.id, contentHash: { in: uniqueHashes } },
       select: { contentHash: true },
     });
     const presentSet = new Set(present.map((item) => item.contentHash));
-    if (presentSet.size) {
-      const reusedFindings = await this.prisma.finding.findMany({
-        where: { embedContentHash: { in: [...presentSet] } },
-        select: { embedContentHash: true },
-      });
-      const reusedFindingHashes = [
-        ...new Set(
-          reusedFindings.flatMap((finding) =>
-            finding.embedContentHash ? [finding.embedContentHash] : [],
-          ),
-        ),
-      ];
-      if (reusedFindingHashes.length) {
-        await this.analysis.analyzeHashes(space.id, reusedFindingHashes);
-        await this.calibrateNeighborhood(space.id, reusedFindingHashes);
-      }
-    }
+    return uniqueHashes.filter((hash) => !presentSet.has(hash));
+  }
+
+  async missing(
+    spaceInput: Omit<
+      ReturnType<EmbeddingConfigService['space']>,
+      'provider'
+    > & {
+      provider?: ReturnType<EmbeddingConfigService['space']>['provider'];
+    },
+    hashes: string[],
+  ) {
+    const space = await this.ensureSpace({
+      ...spaceInput,
+      provider: spaceInput.provider ?? this.config.provider,
+    });
+    const present = await this.prisma.contentEmbedding.findMany({
+      where: {
+        spaceId: space.id,
+        contentHash: { in: [...new Set(hashes)] },
+      },
+      select: { contentHash: true },
+    });
+    const presentSet = new Set(present.map((item) => item.contentHash));
     return {
       spaceId: space.id,
-      missing: uniqueHashes.filter((hash) => !presentSet.has(hash)),
+      missing: [...new Set(hashes)].filter((hash) => !presentSet.has(hash)),
     };
   }
 
-  async putVectors(dto: PutEmbeddingVectorsDto) {
-    const space = await this.prisma.embeddingSpace.findUnique({
-      where: { id: dto.spaceId },
-    });
-    if (!space)
-      throw new NotFoundException(`Embedding space ${dto.spaceId} not found`);
-    const invalid = dto.items.find((item) => item.vector.length !== space.dim);
+  async putVectors(
+    input:
+      | Array<{ contentHash: string; vector: number[] }>
+      | {
+          spaceId: string;
+          items: Array<{ contentHash: string; vector: number[] }>;
+        },
+  ) {
+    const items = Array.isArray(input) ? input : input.items;
+    const space = Array.isArray(input)
+      ? await this.activeSpace()
+      : await this.prisma.embeddingSpace.findUnique({
+          where: { id: input.spaceId },
+        });
+    if (!space) {
+      throw new NotFoundException(`Embedding space not found`);
+    }
+    const invalid = items.find((item) => item.vector.length !== space.dim);
     if (invalid) {
       throw new BadRequestException(
         `Vector ${invalid.contentHash} has ${invalid.vector.length} dimensions; expected ${space.dim}`,
       );
     }
     if (space.normalized) {
-      const unnormalized = dto.items.find((item) => {
+      const unnormalized = items.find((item) => {
         const norm = Math.sqrt(
           item.vector.reduce((sum, value) => sum + value * value, 0),
         );
@@ -137,34 +203,28 @@ export class EmbeddingService {
       }
     }
 
-    const created = await this.prisma.contentEmbedding.createMany({
-      data: dto.items.map((item) => ({
-        id: randomUUID(),
-        spaceId: dto.spaceId,
-        contentHash: item.contentHash,
-        vecF8: item.vector,
-      })),
-      skipDuplicates: true,
-    });
-    if (this.capability.hasVector() && dto.items.length) {
-      const hashes = dto.items.map((item) => item.contentHash);
-      await this.prisma.$executeRaw`
-        UPDATE content_embeddings
-        SET vec = (vec_f8::real[])::public.vector
-        WHERE space_id = ${dto.spaceId}
-          AND content_hash = ANY(${hashes}::text[])
-          AND vec IS NULL
+    let created = 0;
+    for (const item of items) {
+      created += await this.prisma.$executeRaw`
+        INSERT INTO content_embeddings (id, space_id, content_hash, vec)
+        VALUES (
+          ${randomUUID()},
+          ${space.id},
+          ${item.contentHash},
+          ${JSON.stringify(item.vector)}::public.vector
+        )
+        ON CONFLICT (space_id, content_hash) DO NOTHING
       `;
     }
     await this.analysis.analyzeHashes(
-      dto.spaceId,
-      dto.items.map((item) => item.contentHash),
+      space.id,
+      items.map((item) => item.contentHash),
     );
     await this.calibrateNeighborhood(
-      dto.spaceId,
-      dto.items.map((item) => item.contentHash),
+      space.id,
+      items.map((item) => item.contentHash),
     );
-    return { created: created.count, received: dto.items.length };
+    return { created, received: items.length };
   }
 
   private async calibrateNeighborhood(
@@ -172,8 +232,7 @@ export class EmbeddingService {
     contentHashes: string[],
   ) {
     if (!contentHashes.length) return;
-    const rows = this.capability.hasVector()
-      ? await this.prisma.$queryRaw<NeighborhoodRow[]>`
+    const rows = await this.prisma.$queryRaw<NeighborhoodRow[]>`
       SELECT target.id AS "findingId", target.embed_content_hash AS "targetHash",
         neighbor.content_hash AS "neighborHash",
         1 - (target_embedding.vec <=> neighbor.vec) AS score
@@ -193,35 +252,6 @@ export class EmbeddingService {
               AND neighbor_finding.finding_type = target.finding_type
           )
         ORDER BY candidate.vec <=> target_embedding.vec
-        LIMIT 10
-      ) neighbor
-      WHERE target.embed_content_hash = ANY(${contentHashes}::text[])
-    `
-      : await this.prisma.$queryRaw<NeighborhoodRow[]>`
-      SELECT target.id AS "findingId", target.embed_content_hash AS "targetHash",
-        neighbor.content_hash AS "neighborHash", neighbor.score
-      FROM findings target
-      JOIN content_embeddings target_embedding
-        ON target_embedding.content_hash = target.embed_content_hash
-       AND target_embedding.space_id = ${spaceId}
-      CROSS JOIN LATERAL (
-        SELECT sampled.content_hash,
-          (SELECT SUM(pair.a * pair.b)
-           FROM unnest(sampled.vec_f8, target_embedding.vec_f8) AS pair(a, b)) AS score
-        FROM (
-          SELECT candidate.content_hash, candidate.vec_f8
-          FROM content_embeddings candidate
-          WHERE candidate.space_id = ${spaceId}
-            AND candidate.content_hash != target.embed_content_hash
-            AND EXISTS (
-              SELECT 1 FROM findings neighbor_finding
-              WHERE neighbor_finding.embed_content_hash = candidate.content_hash
-                AND neighbor_finding.finding_type = target.finding_type
-            )
-          ORDER BY candidate.content_hash
-          LIMIT 1000
-        ) sampled
-        ORDER BY score DESC
         LIMIT 10
       ) neighbor
       WHERE target.embed_content_hash = ANY(${contentHashes}::text[])
@@ -357,11 +387,15 @@ export class EmbeddingService {
       throw new NotFoundException(
         `Asset ${dto.assetHash} not found in source ${sourceId}`,
       );
+    const chunks = dto.chunks.map((chunk) => ({
+      ...chunk,
+      contentHash: embeddingContentHash(chunk.text),
+    }));
     await this.prisma.$transaction(async (tx) => {
       await tx.assetChunk.deleteMany({ where: { assetId: asset.id } });
-      if (dto.chunks.length) {
+      if (chunks.length) {
         await tx.assetChunk.createMany({
-          data: dto.chunks.map((chunk) => ({
+          data: chunks.map((chunk) => ({
             id: randomUUID(),
             assetId: asset.id,
             sourceId,
@@ -370,52 +404,73 @@ export class EmbeddingService {
         });
       }
     });
-    return { stored: dto.chunks.length };
+    return {
+      stored: chunks.length,
+      contents: chunks.map((chunk) => ({
+        hash: chunk.contentHash,
+        text: chunk.text,
+      })),
+    };
   }
 
   private async rowsForVector(
     vector: number[],
     limit: number,
     sourceIds?: string[],
+    statuses?: FindingStatus[],
+    includeResolved = false,
   ) {
-    const space = await this.prisma.embeddingSpace.findFirst({
-      where: { isActive: true },
-    });
-    if (!space) return [];
+    const space = await this.activeSpace();
+    if (vector.length !== space.dim) {
+      throw new BadRequestException(
+        `Query vector has ${vector.length} dimensions; active space requires ${space.dim}`,
+      );
+    }
     const sourceFilter = sourceIds?.length ? sourceIds : null;
-    if (this.capability.hasVector() && !sourceFilter) {
-      return this.prisma.$queryRaw<SimilarityRow[]>`
-        SELECT f.id, 1 - (ce.vec <=> ${JSON.stringify(vector)}::public.vector) AS score
+    const statusFilter = statuses?.length ? statuses : null;
+    const dim = Prisma.raw(String(space.dim));
+    const queryVector = JSON.stringify(vector);
+    const statusScope = statusFilter
+      ? Prisma.sql`AND f.status = ANY(${statusFilter}::"FindingStatus"[])`
+      : includeResolved
+        ? Prisma.empty
+        : Prisma.sql`AND f.status <> ${FindingStatus.RESOLVED}::"FindingStatus"`;
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw(
+        Prisma.raw(`SET LOCAL hnsw.ef_search = ${this.config.hnswEfSearch}`),
+      );
+      await tx.$executeRaw`SET LOCAL hnsw.iterative_scan = strict_order`;
+      return tx.$queryRaw<SimilarityRow[]>(Prisma.sql`
+        SELECT f.id, 1 - (
+          ce.vec::public.vector(${dim}) <=>
+          ${queryVector}::public.vector(${dim})
+        ) AS score
         FROM content_embeddings ce
         JOIN findings f ON f.embed_content_hash = ce.content_hash
         WHERE ce.space_id = ${space.id}
-          AND ce.vec IS NOT NULL
           AND (${sourceFilter}::text[] IS NULL OR f.source_id = ANY(${sourceFilter}::text[]))
-          AND f.status != 'RESOLVED'
-        ORDER BY ce.vec <=> ${JSON.stringify(vector)}::public.vector
+          ${statusScope}
+        ORDER BY ce.vec::public.vector(${dim}) <=>
+          ${queryVector}::public.vector(${dim})
         LIMIT ${limit}
-      `;
-    }
-    return this.prisma.$queryRaw<SimilarityRow[]>`
-      SELECT f.id,
-        (SELECT SUM(pair.a * pair.b)
-         FROM unnest(ce.vec_f8, ${vector}::float8[]) AS pair(a, b)) AS score
-      FROM content_embeddings ce
-      JOIN findings f ON f.embed_content_hash = ce.content_hash
-      WHERE ce.space_id = ${space.id}
-        AND (${sourceFilter}::text[] IS NULL OR f.source_id = ANY(${sourceFilter}::text[]))
-        AND f.status != 'RESOLVED'
-      ORDER BY score DESC
-      LIMIT ${limit}
-    `;
+      `);
+    });
   }
 
   async semanticFindingIds(
     queryVector: number[],
     limit: number,
     sourceIds?: string[],
+    statuses?: FindingStatus[],
+    includeResolved = false,
   ) {
-    return this.rowsForVector(queryVector, limit, sourceIds);
+    return this.rowsForVector(
+      queryVector,
+      limit,
+      sourceIds,
+      statuses,
+      includeResolved,
+    );
   }
 
   async semanticAssetIds(
@@ -423,22 +478,33 @@ export class EmbeddingService {
     limit: number,
     sourceId?: string,
   ) {
-    const space = await this.prisma.embeddingSpace.findFirst({
-      where: { isActive: true },
-    });
-    if (!space) return [];
+    const space = await this.activeSpace();
+    if (queryVector.length !== space.dim) {
+      throw new BadRequestException(
+        `Query vector has ${queryVector.length} dimensions; active space requires ${space.dim}`,
+      );
+    }
     const candidateLimit = Math.max(limit * 5, 200);
-    if (this.capability.hasVector() && !sourceId) {
-      return this.prisma.$queryRaw<SimilarityRow[]>`
+    const dim = Prisma.raw(String(space.dim));
+    const vector = JSON.stringify(queryVector);
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw(
+        Prisma.raw(`SET LOCAL hnsw.ef_search = ${this.config.hnswEfSearch}`),
+      );
+      await tx.$executeRaw`SET LOCAL hnsw.iterative_scan = strict_order`;
+      return tx.$queryRaw<SimilarityRow[]>(Prisma.sql`
         WITH ranked_chunks AS (
           SELECT ac.asset_id AS id,
-            1 - (ce.vec <=> ${JSON.stringify(queryVector)}::public.vector) AS score
+            1 - (
+              ce.vec::public.vector(${dim}) <=>
+              ${vector}::public.vector(${dim})
+            ) AS score
           FROM content_embeddings ce
           JOIN asset_chunks ac ON ac.content_hash = ce.content_hash
           WHERE ce.space_id = ${space.id}
-            AND ce.vec IS NOT NULL
             AND (${sourceId ?? null}::text IS NULL OR ac.source_id = ${sourceId ?? null})
-          ORDER BY ce.vec <=> ${JSON.stringify(queryVector)}::public.vector
+          ORDER BY ce.vec::public.vector(${dim}) <=>
+            ${vector}::public.vector(${dim})
           LIMIT ${candidateLimit}
         )
         SELECT id, MAX(score) AS score
@@ -446,20 +512,8 @@ export class EmbeddingService {
         GROUP BY id
         ORDER BY score DESC
         LIMIT ${limit}
-      `;
-    }
-    return this.prisma.$queryRaw<SimilarityRow[]>`
-      SELECT ac.asset_id AS id,
-        MAX((SELECT SUM(pair.a * pair.b)
-             FROM unnest(ce.vec_f8, ${queryVector}::float8[]) AS pair(a, b))) AS score
-      FROM content_embeddings ce
-      JOIN asset_chunks ac ON ac.content_hash = ce.content_hash
-      WHERE ce.space_id = ${space.id}
-        AND (${sourceId ?? null}::text IS NULL OR ac.source_id = ${sourceId ?? null})
-      GROUP BY ac.asset_id
-      ORDER BY score DESC
-      LIMIT ${limit}
-    `;
+      `);
+    });
   }
 
   async similarFindings(findingId: string, limit: number) {
@@ -470,22 +524,20 @@ export class EmbeddingService {
     if (!finding?.embedContentHash) {
       throw new NotFoundException(`Finding ${findingId} has no embedding`);
     }
-    const space = await this.prisma.embeddingSpace.findFirst({
-      where: { isActive: true },
-    });
-    if (!space) throw new NotFoundException('No active embedding space');
-    const embedding = await this.prisma.contentEmbedding.findUnique({
-      where: {
-        spaceId_contentHash: {
-          spaceId: space.id,
-          contentHash: finding.embedContentHash,
-        },
-      },
-      select: { vecF8: true },
-    });
-    if (!embedding)
+    const space = await this.activeSpace();
+    const vectors = await this.prisma.$queryRaw<Array<{ vector: string }>>`
+      SELECT vec::text AS vector
+      FROM content_embeddings
+      WHERE space_id = ${space.id}
+        AND content_hash = ${finding.embedContentHash}
+      LIMIT 1
+    `;
+    if (!vectors[0])
       throw new NotFoundException(`Finding ${findingId} has no stored vector`);
-    const rows = (await this.rowsForVector(embedding.vecF8, limit + 1))
+    const vector = JSON.parse(vectors[0].vector) as number[];
+    const rows = (
+      await this.rowsForVector(vector, limit + 1, undefined, undefined, true)
+    )
       .filter((row) => row.id !== findingId)
       .slice(0, limit);
     const ids = rows.map((row) => row.id);

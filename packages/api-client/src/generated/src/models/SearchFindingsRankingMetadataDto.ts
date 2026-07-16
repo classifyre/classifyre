@@ -14,25 +14,25 @@
 
 import { mapValues } from '../runtime';
 /**
- *
+ * 
  * @export
  * @interface SearchFindingsRankingMetadataDto
  */
 export interface SearchFindingsRankingMetadataDto {
     /**
-     *
+     * 
      * @type {string}
      * @memberof SearchFindingsRankingMetadataDto
      */
     mode?: string;
     /**
-     *
+     * 
      * @type {string}
      * @memberof SearchFindingsRankingMetadataDto
      */
     query?: string;
     /**
-     *
+     * 
      * @type {boolean}
      * @memberof SearchFindingsRankingMetadataDto
      */
@@ -55,7 +55,7 @@ export function SearchFindingsRankingMetadataDtoFromJSONTyped(json: any, ignoreD
         return json;
     }
     return {
-
+        
         'mode': json['mode'] == null ? undefined : json['mode'],
         'query': json['query'] == null ? undefined : json['query'],
         'explained': json['explained'] == null ? undefined : json['explained'],
@@ -72,7 +72,7 @@ export function SearchFindingsRankingMetadataDtoToJSONTyped(value?: SearchFindin
     }
 
     return {
-
+        
         'mode': value['mode'],
         'query': value['query'],
         'explained': value['explained'],

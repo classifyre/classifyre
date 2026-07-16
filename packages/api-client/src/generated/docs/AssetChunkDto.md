@@ -11,7 +11,6 @@ Name | Type
 `charOffset` | number
 `charLength` | number
 `text` | string
-`contentHash` | string
 
 ## Example
 
@@ -25,7 +24,6 @@ const example = {
   "charOffset": null,
   "charLength": null,
   "text": null,
-  "contentHash": null,
 } satisfies AssetChunkDto
 
 console.log(example)

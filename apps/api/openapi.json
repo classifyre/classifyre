@@ -5967,74 +5967,6 @@
         ]
       }
     },
-    "/sources/{sourceId}/embeddings/missing": {
-      "post": {
-        "operationId": "EmbeddingController_missing",
-        "parameters": [
-          {
-            "name": "sourceId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/MissingEmbeddingsDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "summary": "Negotiate missing content-addressed embeddings",
-        "tags": [
-          "embeddings"
-        ]
-      }
-    },
-    "/sources/{sourceId}/embeddings/vectors": {
-      "post": {
-        "operationId": "EmbeddingController_vectors",
-        "parameters": [
-          {
-            "name": "sourceId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/PutEmbeddingVectorsDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "summary": "Store normalized embedding vectors",
-        "tags": [
-          "embeddings"
-        ]
-      }
-    },
     "/sources/{sourceId}/embeddings/chunks": {
       "post": {
         "operationId": "EmbeddingController_chunks",
@@ -15394,94 +15326,6 @@
           "reply"
         ]
       },
-      "EmbeddingSpaceDto": {
-        "type": "object",
-        "properties": {
-          "model": {
-            "type": "string",
-            "default": "sentence-transformers/all-MiniLM-L6-v2"
-          },
-          "revision": {
-            "type": "string",
-            "default": "main"
-          },
-          "dim": {
-            "type": "number",
-            "default": 384
-          },
-          "pooling": {
-            "type": "string",
-            "default": "mean"
-          },
-          "normalized": {
-            "type": "boolean",
-            "default": true
-          }
-        },
-        "required": [
-          "model",
-          "revision",
-          "dim",
-          "pooling",
-          "normalized"
-        ]
-      },
-      "MissingEmbeddingsDto": {
-        "type": "object",
-        "properties": {
-          "space": {
-            "$ref": "#/components/schemas/EmbeddingSpaceDto"
-          },
-          "contentHashes": {
-            "maxItems": 10000,
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          }
-        },
-        "required": [
-          "space",
-          "contentHashes"
-        ]
-      },
-      "EmbeddingVectorDto": {
-        "type": "object",
-        "properties": {
-          "contentHash": {
-            "type": "string"
-          },
-          "vector": {
-            "type": "array",
-            "items": {
-              "type": "number"
-            }
-          }
-        },
-        "required": [
-          "contentHash",
-          "vector"
-        ]
-      },
-      "PutEmbeddingVectorsDto": {
-        "type": "object",
-        "properties": {
-          "spaceId": {
-            "type": "string"
-          },
-          "items": {
-            "maxItems": 250,
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/EmbeddingVectorDto"
-            }
-          }
-        },
-        "required": [
-          "spaceId",
-          "items"
-        ]
-      },
       "AssetChunkDto": {
         "type": "object",
         "properties": {
@@ -15499,17 +15343,13 @@
           },
           "text": {
             "type": "string"
-          },
-          "contentHash": {
-            "type": "string"
           }
         },
         "required": [
           "ordinal",
           "charOffset",
           "charLength",
-          "text",
-          "contentHash"
+          "text"
         ]
       },
       "PutAssetChunksDto": {

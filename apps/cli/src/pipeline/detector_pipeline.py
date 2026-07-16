@@ -25,7 +25,7 @@ from ..models.generated_single_asset_scan_results import (
 from ..sources.base import BaseSource
 from ..utils.file_parser import TextExtractionCoverageError, resolve_mime_type
 from .content_provider import ContentProvider
-from .embedder import EmbeddingArtifact
+from .text_artifact import TextArtifact
 from .worker_pool import DetectorWorkerPool, is_io_bound_detector
 
 logger = logging.getLogger(__name__)
@@ -69,12 +69,12 @@ class DetectorPipeline:
 
             self.content_provider = ParsedContentProvider(source)
         self.init_warnings: list[str] = []
-        self._embedding_artifacts: dict[str, EmbeddingArtifact] = {}
+        self._text_artifacts: dict[str, TextArtifact] = {}
         self._text_extraction_errors: dict[str, list[str]] = {}
         self._text_extraction_statuses: dict[str, TextExtractionStatus] = {}
 
-    def take_embedding_artifact(self, asset_hash: str) -> EmbeddingArtifact | None:
-        return self._embedding_artifacts.pop(asset_hash, None)
+    def take_text_artifact(self, asset_hash: str) -> TextArtifact | None:
+        return self._text_artifacts.pop(asset_hash, None)
 
     def _register_detector_info(self, detector: BaseDetector, info: _DetectorInfo) -> None:
         self._detector_info[id(detector)] = info
@@ -171,8 +171,8 @@ class DetectorPipeline:
         # Per-asset, per-detector outcomes. Local to this call, so concurrent
         # assets never share it.
         outcome_sink: dict[tuple[DetectorType, str | None], DetectorOutcome] = {}
-        artifact = EmbeddingArtifact()
-        self._embedding_artifacts[str(asset.hash)] = artifact
+        artifact = TextArtifact()
+        self._text_artifacts[str(asset.hash)] = artifact
 
         if text_content_type:
             (
@@ -241,8 +241,6 @@ class DetectorPipeline:
         scan_duration = int((datetime.now(UTC) - scan_started).total_seconds() * 1000)
 
         asset.findings = findings
-        for finding in findings:
-            artifact.add_finding(finding)
         asset.scan_stats = ScanStats(
             scanned_at=scan_started,
             duration_ms=scan_duration,
@@ -373,7 +371,7 @@ class DetectorPipeline:
         async for text_content in self._iter_text_content_pages(asset):
             page_index += 1
             content_size += len(text_content)
-            self._embedding_artifacts[str(asset.hash)].add_page(text_content, page_index)
+            self._text_artifacts[str(asset.hash)].add_page(text_content, page_index)
 
             if not text_content:
                 continue
@@ -504,7 +502,7 @@ class DetectorPipeline:
         async for text_content in self._iter_text_content_pages(asset):
             page_index += 1
             content_size += len(text_content)
-            self._embedding_artifacts[str(asset.hash)].add_page(text_content, page_index)
+            self._text_artifacts[str(asset.hash)].add_page(text_content, page_index)
 
             if not text_content:
                 continue

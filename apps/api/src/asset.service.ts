@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  Optional,
 } from '@nestjs/common';
 import { PrismaService } from './prisma.service';
 import {
@@ -28,9 +29,13 @@ import {
 import { SearchAssetsChartsRequestDto } from './dto/search-assets-charts-request.dto';
 import { SearchAssetsChartsResponseDto } from './dto/search-assets-charts-response.dto';
 import { CustomDetectorExtractionsService } from './custom-detector-extractions.service';
-import { embeddingContentHash } from './embedding/embedding-text';
+import {
+  embeddingContentHash,
+  normalizeEmbeddingText,
+} from './embedding/embedding-text';
 import { EmbeddingService } from './embedding/embedding.service';
 import { QueryEmbeddingService } from './embedding/query-embedding.service';
+import { EmbeddingQueueService } from './embedding/embedding-queue.service';
 import { SemanticSearchMode } from './dto/search-findings-request.dto';
 
 const findingForAssetSelect = {
@@ -144,6 +149,7 @@ export class AssetService {
     private readonly customDetectorExtractionsService: CustomDetectorExtractionsService,
     private readonly embeddings: EmbeddingService,
     private readonly queryEmbeddings: QueryEmbeddingService,
+    @Optional() private readonly embeddingQueue?: EmbeddingQueueService,
   ) {}
 
   private async assertSourceAndRunner(sourceId: string, runnerId: string) {
@@ -1837,7 +1843,7 @@ export class AssetService {
     return merged;
   }
 
-  private processBatch(
+  private async processBatch(
     batch: Record<string, any>[],
     sourceId: string,
     runnerId: string,
@@ -1851,7 +1857,19 @@ export class AssetService {
     unchanged: number;
     findings: number;
   }> {
-    return this.prisma.$transaction(
+    const embeddingContents = batch.flatMap((asset) =>
+      (Array.isArray(asset.findings) ? asset.findings : []).flatMap(
+        (finding: Record<string, unknown>) => {
+          const text = normalizeEmbeddingText(
+            finding.context_before as string | undefined,
+            finding.matched_content as string | undefined,
+            finding.context_after as string | undefined,
+          );
+          return text ? [{ hash: embeddingContentHash(text), text }] : [];
+        },
+      ),
+    );
+    const result = await this.prisma.$transaction(
       async (tx) => {
         const scannedAt = new Date();
         // Categorize assets for bulk operations
@@ -2414,5 +2432,7 @@ export class AssetService {
         maxWait: 10000,
       },
     );
+    this.embeddingQueue?.enqueue(embeddingContents);
+    return result;
   }
 }

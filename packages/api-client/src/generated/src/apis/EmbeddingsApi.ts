@@ -15,17 +15,11 @@
 
 import * as runtime from '../runtime';
 import type {
-  MissingEmbeddingsDto,
   PutAssetChunksDto,
-  PutEmbeddingVectorsDto,
 } from '../models/index';
 import {
-    MissingEmbeddingsDtoFromJSON,
-    MissingEmbeddingsDtoToJSON,
     PutAssetChunksDtoFromJSON,
     PutAssetChunksDtoToJSON,
-    PutEmbeddingVectorsDtoFromJSON,
-    PutEmbeddingVectorsDtoToJSON,
 } from '../models/index';
 
 export interface EmbeddingControllerChunksRequest {
@@ -33,19 +27,9 @@ export interface EmbeddingControllerChunksRequest {
     putAssetChunksDto: PutAssetChunksDto;
 }
 
-export interface EmbeddingControllerMissingRequest {
-    sourceId: string;
-    missingEmbeddingsDto: MissingEmbeddingsDto;
-}
-
 export interface EmbeddingControllerSimilarRequest {
     findingId: string;
     limit?: object;
-}
-
-export interface EmbeddingControllerVectorsRequest {
-    sourceId: string;
-    putEmbeddingVectorsDto: PutEmbeddingVectorsDto;
 }
 
 /**
@@ -97,52 +81,6 @@ export class EmbeddingsApi extends runtime.BaseAPI {
      */
     async embeddingControllerChunks(requestParameters: EmbeddingControllerChunksRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
         await this.embeddingControllerChunksRaw(requestParameters, initOverrides);
-    }
-
-    /**
-     * Negotiate missing content-addressed embeddings
-     */
-    async embeddingControllerMissingRaw(requestParameters: EmbeddingControllerMissingRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
-        if (requestParameters['sourceId'] == null) {
-            throw new runtime.RequiredError(
-                'sourceId',
-                'Required parameter "sourceId" was null or undefined when calling embeddingControllerMissing().'
-            );
-        }
-
-        if (requestParameters['missingEmbeddingsDto'] == null) {
-            throw new runtime.RequiredError(
-                'missingEmbeddingsDto',
-                'Required parameter "missingEmbeddingsDto" was null or undefined when calling embeddingControllerMissing().'
-            );
-        }
-
-        const queryParameters: any = {};
-
-        const headerParameters: runtime.HTTPHeaders = {};
-
-        headerParameters['Content-Type'] = 'application/json';
-
-
-        let urlPath = `/sources/{sourceId}/embeddings/missing`;
-        urlPath = urlPath.replace(`{${"sourceId"}}`, encodeURIComponent(String(requestParameters['sourceId'])));
-
-        const response = await this.request({
-            path: urlPath,
-            method: 'POST',
-            headers: headerParameters,
-            query: queryParameters,
-            body: MissingEmbeddingsDtoToJSON(requestParameters['missingEmbeddingsDto']),
-        }, initOverrides);
-
-        return new runtime.VoidApiResponse(response);
-    }
-
-    /**
-     * Negotiate missing content-addressed embeddings
-     */
-    async embeddingControllerMissing(requestParameters: EmbeddingControllerMissingRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
-        await this.embeddingControllerMissingRaw(requestParameters, initOverrides);
     }
 
     /**
@@ -211,52 +149,6 @@ export class EmbeddingsApi extends runtime.BaseAPI {
      */
     async embeddingControllerStatus(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
         await this.embeddingControllerStatusRaw(initOverrides);
-    }
-
-    /**
-     * Store normalized embedding vectors
-     */
-    async embeddingControllerVectorsRaw(requestParameters: EmbeddingControllerVectorsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
-        if (requestParameters['sourceId'] == null) {
-            throw new runtime.RequiredError(
-                'sourceId',
-                'Required parameter "sourceId" was null or undefined when calling embeddingControllerVectors().'
-            );
-        }
-
-        if (requestParameters['putEmbeddingVectorsDto'] == null) {
-            throw new runtime.RequiredError(
-                'putEmbeddingVectorsDto',
-                'Required parameter "putEmbeddingVectorsDto" was null or undefined when calling embeddingControllerVectors().'
-            );
-        }
-
-        const queryParameters: any = {};
-
-        const headerParameters: runtime.HTTPHeaders = {};
-
-        headerParameters['Content-Type'] = 'application/json';
-
-
-        let urlPath = `/sources/{sourceId}/embeddings/vectors`;
-        urlPath = urlPath.replace(`{${"sourceId"}}`, encodeURIComponent(String(requestParameters['sourceId'])));
-
-        const response = await this.request({
-            path: urlPath,
-            method: 'POST',
-            headers: headerParameters,
-            query: queryParameters,
-            body: PutEmbeddingVectorsDtoToJSON(requestParameters['putEmbeddingVectorsDto']),
-        }, initOverrides);
-
-        return new runtime.VoidApiResponse(response);
-    }
-
-    /**
-     * Store normalized embedding vectors
-     */
-    async embeddingControllerVectors(requestParameters: EmbeddingControllerVectorsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
-        await this.embeddingControllerVectorsRaw(requestParameters, initOverrides);
     }
 
 }

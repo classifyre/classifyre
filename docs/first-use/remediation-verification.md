@@ -1,6 +1,6 @@
 # Post-First-Use Remediation Verification
 
-Verified against `fix/polishing` on 2026-07-15.
+Verified against `feat/semantics` on 2026-07-16.
 
 ## Verdict
 
@@ -25,22 +25,22 @@ noisy examples.
 
 ## Implementation Status
 
-| Area | Status | Verification |
-| --- | --- | --- |
-| Store correctness | Implemented | Scope fingerprints and zero-result protection prevent false deletion. Finding reconciliation is detector-scoped. Runner changes and finding deltas use per-run state. Database-backed e2e tests reproduce scope narrowing, a zero-result full scan, detector addition, and hand-computed terminal counters. Unit regressions cover PII, GLiNER, log severity, inquiry counters, and autopilot terminal/accounting bugs. |
-| Operational truth | Implemented | Runner UI separates created, retained, and resolved findings plus created, updated, unchanged, deleted, and out-of-scope assets. Detector failures produce `WARNING`. Text coverage distinguishes `EXTRACTED`, legitimate `EMPTY`, `ENGINE_UNAVAILABLE`, `ZERO_FRAMES`, `FAILED`, and `NOT_APPLICABLE`, and scan detail renders those states explicitly. Source transport failures remain fatal. |
-| Vector store | Implemented | Content-addressed spaces, vectors, chunks, and evidence analyses. pgvector uses a 384-dimensional vector mirror plus HNSW. Plain PostgreSQL and selective source filters use normalized `float8[]` exact cosine, avoiding HNSW post-filter recall loss. |
-| Intrinsic embeddings | Implemented | Every text-bearing ingestion path chunks and hashes content, negotiates missing hashes, uploads bounded vector batches, and links finding context hashes. No detector is required. Reused vectors re-run analysis for newly attached findings instead of leaving them pending. |
-| Ranking and noise analysis | Implemented, calibration pending | Importance and quality are separate from severity. Exact/near repetition, local coherence, OCR-like quality, context, confidence, and semantic outlier signals produce persisted reasons. Duplicate rows are grouped in the findings workflow. A database e2e proves exact duplicates, near duplicates, outlier explanation, and similar-evidence retrieval. |
-| Semantic search | Implemented | Findings and assets support exact, hybrid, and vector modes. Hybrid combines lexical and semantic ranks with RRF and degrades to lexical when the query embedder is unavailable. |
-| MCP | Implemented | Search tools accept semantic mode and return explanations. `find_similar_findings` and `find_boilerplate_clusters` are available. Tool descriptions warn that similarity is not proof. |
-| Ranking UI | Implemented | Importance is the default finding sort. Rows show score, quality, reasons, and similar count; detail has evidence-ranking explanation; semantic/exact controls are explicit. |
-| FEATURE_EXTRACTION | Retired | Embeddings are infrastructure rather than a user-authored detector. Schema, CLI, API, web, MCP, docs, and generated clients no longer expose the detector type. Historical migrations retain the old enum name as expected. |
-| Sandbox consolidation | Deliberately excluded | Sandbox remains unchanged, per the implementation scope for this branch. |
+| Area                       | Status                           | Verification                                                                                                                                                                                                                                                                                                                                                                                                            |
+| -------------------------- | -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Store correctness          | Implemented                      | Scope fingerprints and zero-result protection prevent false deletion. Finding reconciliation is detector-scoped. Runner changes and finding deltas use per-run state. Database-backed e2e tests reproduce scope narrowing, a zero-result full scan, detector addition, and hand-computed terminal counters. Unit regressions cover PII, GLiNER, log severity, inquiry counters, and autopilot terminal/accounting bugs. |
+| Operational truth          | Implemented                      | Runner UI separates created, retained, and resolved findings plus created, updated, unchanged, deleted, and out-of-scope assets. Detector failures produce `WARNING`. Text coverage distinguishes `EXTRACTED`, legitimate `EMPTY`, `ENGINE_UNAVAILABLE`, `ZERO_FRAMES`, `FAILED`, and `NOT_APPLICABLE`, and scan detail renders those states explicitly. Source transport failures remain fatal.                        |
+| Vector store               | Implemented                      | Content-addressed spaces, vectors, chunks, and evidence analyses. pgvector is mandatory. A dimensionless `vector` column permits model switching, while each embedding space gets a dimension-cast partial HNSW index. The API fails startup with an actionable error when the extension or vector column is absent.                                                                                                    |
+| Intrinsic embeddings       | Implemented                      | The CLI sends extracted text chunks only. The API hashes content and places missing work on a persistent pg-boss queue, so requests do not wait for inference and HPA replicas do not repeat the same content-hash job. Local inference runs in an API-owned Node worker with Transformers.js; an optional OpenAI-compatible provider uses the same storage and ranking path. No detector or Python embedding process is required. |
+| Ranking and noise analysis | Implemented, calibration pending | Importance and quality are separate from severity. Exact/near repetition, local coherence, OCR-like quality, context, confidence, and semantic outlier signals produce persisted reasons. Duplicate rows are grouped in the findings workflow. A database e2e proves exact duplicates, near duplicates, outlier explanation, and similar-evidence retrieval.                                                            |
+| Semantic search            | Implemented                      | Findings and assets support exact, hybrid, and vector modes. Hybrid combines lexical and semantic ranks with RRF and degrades to lexical when the query embedder is unavailable.                                                                                                                                                                                                                                        |
+| MCP                        | Implemented                      | Search tools accept semantic mode and return explanations. `find_similar_findings` and `find_boilerplate_clusters` are available. Tool descriptions warn that similarity is not proof.                                                                                                                                                                                                                                  |
+| Ranking UI                 | Implemented                      | Importance is the default finding sort. Rows show score, quality, reasons, and similar count; detail has evidence-ranking explanation; semantic/exact controls are explicit.                                                                                                                                                                                                                                            |
+| FEATURE_EXTRACTION         | Retired                          | Embeddings are infrastructure rather than a user-authored detector. Schema, CLI, API, web, MCP, docs, and generated clients no longer expose the detector type. Historical migrations retain the old enum name as expected.                                                                                                                                                                                             |
+| Sandbox consolidation      | Deliberately excluded            | Sandbox remains unchanged, per the implementation scope for this branch.                                                                                                                                                                                                                                                                                                                                                |
 
-There is no backfill or legacy-vector migration in this branch because there is
-no production or compatibility data to preserve. Asset chunks and finding
-vectors are populated by new scans.
+Finding text is backfilled asynchronously from stored finding context. Asset
+chunks still populate on each source's next scan because historical extracted
+asset text was never persisted.
 
 ## Step 0 Measurements
 
@@ -50,26 +50,49 @@ The first-use desktop database was measured without changing corpus state:
   context, a 34.8% content-address collapse;
 - the plan's estimate of roughly 35,000 unique finding vectors was low by about
   10,000;
-- a raw exact scan of 44,981 rows at 384 dimensions took 2.19 seconds for a
-  top-100 result on the embedded database.
+- this collapse still sizes the API backfill and avoids redundant local or
+  provider calls.
 
-The fallback therefore remains a correctness path, not an ANN substitute at
-large unfiltered cardinalities. Asset search prefilters through chunk/source
-joins. Further fallback tuning should be driven by the corpus rerun rather than
-an invented threshold.
+Fresh-database migration verification passed on the required deployment shape:
 
-Fresh-database migration verification passed on both deployment shapes:
-
-- `pgvector/pgvector:0.8.2-pg18-bookworm`: vector 0.8.2, `vector(384)` mirror,
-  and `content_embeddings_vec_hnsw_idx` present;
-- `postgres:18-bookworm`: migration succeeds without the extension or vector
-  column and keeps `float8[]` storage;
+- `pgvector/pgvector:0.8.2-pg18-bookworm`: all 126 migrations applied, including
+  the dimensionless vector column and content-addressed extraction payloads;
 - the desktop staging script compiled pgvector 0.8.2 against the bundled
   PostgreSQL 18 runtime and a fresh embedded instance accepted
   `CREATE EXTENSION vector`; the staged server reported vector 0.8.2 and
   returned cosine distance `1` for orthogonal vectors;
-- Helm renders an embedding sidecar and pgvector-capable PostgreSQL for both
-  the embedded and CloudNativePG configurations.
+- Helm renders no embedding sidecar. Embedded PostgreSQL uses
+  `pgvector/pgvector:0.8.2-pg18-bookworm`; CloudNativePG uses its `standard`
+  image, which includes pgvector.
+- removing pgvector from the verification database made the API exit with code
+  1 and an operator-facing error that names `CREATE EXTENSION vector`, pending
+  migrations, Helm defaults, and the external PostgreSQL requirement.
+
+Local inference was exercised through the compiled API worker. The pinned
+Transformers.js MiniLM model returned one normalized 384-dimensional vector.
+
+## Helm Embedding Configuration
+
+`api.embedding` now controls the API-owned embedding subsystem:
+
+- `provider`: `transformers-js` for local ONNX inference or
+  `openai-compatible` for an external embeddings endpoint;
+- `model`, `revision`, `dimensions`, `pooling`, and `normalize`: define the
+  immutable vector space. Changing any of them activates a new space while old
+  vectors remain available for validation;
+- `dtype`, `device`, `allowRemoteModels`, `localModelPath`, `cacheDir`, and
+  `cacheSizeLimit`: local Transformers.js runtime, mounted model roots, and
+  model-cache behavior;
+- `batchSize`, `retrySeconds`, and `workerConcurrency`: persistent pg-boss
+  ingestion/backfill throughput across all API replicas;
+- `maxParallelCalls`, `external.baseUrl`, `external.existingSecret`, and
+  `external.apiKeyKey`: external OpenAI-compatible provider behavior;
+- `hnsw.m`, `hnsw.efConstruction`, and `hnsw.efSearch`: pgvector index build
+  and query recall/performance tradeoffs.
+
+Setting `api.embedding.enabled=false` stops generation and semantic query
+embedding, but pgvector remains a mandatory database capability and startup
+still fails when it is absent.
 
 ## Implemented Judgment Contract
 
@@ -123,18 +146,20 @@ confidence, or raw cosine distance.
 
 ## Verification Completed
 
-- API: 555 tests passed; 17 database-backed versioning/remediation e2e tests
-  passed; Nest build and typecheck passed. The semantic e2e runs HNSW and forced
-  exact cosine over the same 384-dimensional fixture and verifies equivalent
-  top ordering, explanations, clusters, and vector-reuse reanalysis.
-- CLI: 957 tests passed, 31 skipped, and 1 expected failure. Intrinsic embedding,
-  OCR, content-fetch error semantics, and detector retirement are covered.
+- API: focused embedding, ranking, extraction, finding, and asset suites pass;
+  the final embedding/extraction rerun covered 25 focused tests. Nest build and
+  typecheck pass. A PostgreSQL 18 + pgvector 0.8.2 container accepted the
+  complete migration chain, created the per-space HNSW index, and registered
+  the persistent embedding worker.
+- CLI: the detector pipeline suite passes (18 tests). It now emits text chunks
+  and has no embedding model, vector upload, or embedding-server command.
 - Schemas: 81/81 examples validate; generated detector models, OpenAPI, and the
   TypeScript API client were regenerated, and the client typechecks.
-- Desktop: pgvector staging and extension creation passed on the embedded
-  PostgreSQL runtime; the resident query embedding process is lifecycle-managed.
-- Helm: lint and rendered-manifest checks passed for embedded PostgreSQL and
-  CloudNativePG modes.
+- Desktop: pgvector staging remains mandatory. The model is cached during
+  packaging and copied as a Forge resource; workspace opening no longer waits
+  for a Python embedding process.
+- Helm: lint passes and the embedded rendered manifest contains API embedding
+  configuration, a model cache volume, and no sidecar.
 - Web: changed-file lint and translation parity pass. Desktop and mobile
   Playwright captures verify that semantic mode, importance ordering, coverage,
   and evidence rows are visible without overlap. Full repository typecheck is
@@ -154,7 +179,7 @@ first-use corpus demonstrates all of the following:
 - repeated-digit credit-card and OCR artifacts are downranked despite severity;
 - generic dates, Bates numbers, and boilerplate are grouped or downranked;
 - every top-50 result has at least one concrete reason and coverage state;
-- pgvector and fallback produce materially equivalent ordering on a controlled
+- selective-filter HNSW recall is checked against exact queries on a controlled
   fixture;
 - analyst review measures top-50 precision before and after ranking.
 

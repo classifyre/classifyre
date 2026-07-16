@@ -22,61 +22,61 @@ import {
 } from './FindingRankReasonDto';
 
 /**
- *
+ * 
  * @export
  * @interface FindingEvidenceAnalysisDto
  */
 export interface FindingEvidenceAnalysisDto {
     /**
-     *
+     * 
      * @type {string}
      * @memberof FindingEvidenceAnalysisDto
      */
     spaceId: string;
     /**
-     *
+     * 
      * @type {number}
      * @memberof FindingEvidenceAnalysisDto
      */
     importanceScore: number;
     /**
-     *
+     * 
      * @type {number}
      * @memberof FindingEvidenceAnalysisDto
      */
     qualityScore: number;
     /**
-     *
+     * 
      * @type {number}
      * @memberof FindingEvidenceAnalysisDto
      */
     semanticOutlier: number;
     /**
-     *
+     * 
      * @type {number}
      * @memberof FindingEvidenceAnalysisDto
      */
     similarCount: number;
     /**
-     *
+     * 
      * @type {string}
      * @memberof FindingEvidenceAnalysisDto
      */
     duplicateGroupHash?: string;
     /**
-     *
+     * 
      * @type {Array<FindingRankReasonDto>}
      * @memberof FindingEvidenceAnalysisDto
      */
     reasons: Array<FindingRankReasonDto>;
     /**
-     *
+     * 
      * @type {{ [key: string]: any; }}
      * @memberof FindingEvidenceAnalysisDto
      */
     signals: { [key: string]: any; };
     /**
-     *
+     * 
      * @type {Date}
      * @memberof FindingEvidenceAnalysisDto
      */
@@ -107,7 +107,7 @@ export function FindingEvidenceAnalysisDtoFromJSONTyped(json: any, ignoreDiscrim
         return json;
     }
     return {
-
+        
         'spaceId': json['spaceId'],
         'importanceScore': json['importanceScore'],
         'qualityScore': json['qualityScore'],
@@ -130,7 +130,7 @@ export function FindingEvidenceAnalysisDtoToJSONTyped(value?: FindingEvidenceAna
     }
 
     return {
-
+        
         'spaceId': value['spaceId'],
         'importanceScore': value['importanceScore'],
         'qualityScore': value['qualityScore'],

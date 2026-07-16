@@ -2,45 +2,34 @@ import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { EmbeddingService } from './embedding.service';
 import {
-  MissingEmbeddingsDto,
   PutAssetChunksDto,
-  PutEmbeddingVectorsDto,
   SimilarFindingsQueryDto,
 } from './dto/embedding.dto';
+import { EmbeddingQueueService } from './embedding-queue.service';
 
 @ApiTags('embeddings')
 @Controller()
 export class EmbeddingController {
-  constructor(private readonly embeddings: EmbeddingService) {}
+  constructor(
+    private readonly embeddings: EmbeddingService,
+    private readonly queue: EmbeddingQueueService,
+  ) {}
 
   @Get('embeddings/status')
   @ApiOperation({ summary: 'Get semantic storage and search capability' })
   status() {
-    return this.embeddings.status();
-  }
-
-  @Post('sources/:sourceId/embeddings/missing')
-  @ApiOperation({ summary: 'Negotiate missing content-addressed embeddings' })
-  missing(
-    @Param('sourceId') _sourceId: string,
-    @Body() dto: MissingEmbeddingsDto,
-  ) {
-    return this.embeddings.missing(dto.space, dto.contentHashes);
-  }
-
-  @Post('sources/:sourceId/embeddings/vectors')
-  @ApiOperation({ summary: 'Store normalized embedding vectors' })
-  vectors(
-    @Param('sourceId') _sourceId: string,
-    @Body() dto: PutEmbeddingVectorsDto,
-  ) {
-    return this.embeddings.putVectors(dto);
+    return { ...this.embeddings.status(), ...this.queue.status() };
   }
 
   @Post('sources/:sourceId/embeddings/chunks')
   @ApiOperation({ summary: 'Store asset chunk-to-content mappings' })
-  chunks(@Param('sourceId') sourceId: string, @Body() dto: PutAssetChunksDto) {
-    return this.embeddings.putChunks(sourceId, dto);
+  async chunks(
+    @Param('sourceId') sourceId: string,
+    @Body() dto: PutAssetChunksDto,
+  ) {
+    const result = await this.embeddings.putChunks(sourceId, dto);
+    this.queue.enqueue(result.contents);
+    return { stored: result.stored, queued: result.contents.length };
   }
 
   @Get('findings/:findingId/similar')

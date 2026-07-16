@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { PrismaService } from './prisma.service';
 import { CreateFindingDto } from './dto/create-finding.dto';
 import { UpdateFindingDto } from './dto/update-finding.dto';
@@ -21,9 +21,13 @@ import {
 } from './dto/search-findings-request.dto';
 import { SearchFindingsChartsRequestDto } from './dto/search-findings-charts-request.dto';
 import { SearchFindingsChartsResponseDto } from './dto/search-findings-charts-response.dto';
-import { embeddingContentHash } from './embedding/embedding-text';
+import {
+  embeddingContentHash,
+  normalizeEmbeddingText,
+} from './embedding/embedding-text';
 import { EmbeddingService } from './embedding/embedding.service';
 import { QueryEmbeddingService } from './embedding/query-embedding.service';
+import { EmbeddingQueueService } from './embedding/embedding-queue.service';
 
 @Injectable()
 export class FindingsService {
@@ -31,6 +35,7 @@ export class FindingsService {
     private readonly prisma: PrismaService,
     private readonly embeddings: EmbeddingService,
     private readonly queryEmbeddings: QueryEmbeddingService,
+    @Optional() private readonly embeddingQueue?: EmbeddingQueueService,
   ) {}
 
   private readonly searchFindingSelect = {
@@ -386,17 +391,19 @@ export class FindingsService {
 
     const now = new Date();
 
-    return this.prisma.finding.create({
+    const text = normalizeEmbeddingText(
+      createDto.contextBefore,
+      createDto.matchedContent,
+      createDto.contextAfter,
+    );
+    const contentHash = embeddingContentHash(text);
+    const finding = await this.prisma.finding.create({
       data: {
         ...rest,
         customDetectorId,
         customDetectorName,
         detectionIdentity,
-        embedContentHash: embeddingContentHash(
-          createDto.contextBefore,
-          createDto.matchedContent,
-          createDto.contextAfter,
-        ),
+        embedContentHash: contentHash,
         location: location ? (location as any) : undefined,
         metadata: metadata ? (metadata as any) : undefined,
         firstDetectedAt: now,
@@ -414,6 +421,8 @@ export class FindingsService {
         ] as any,
       },
     });
+    this.embeddingQueue?.enqueue([{ hash: contentHash, text }]);
+    return finding;
   }
 
   async searchFindings(params: SearchFindingsRequestDto) {
@@ -441,8 +450,17 @@ export class FindingsService {
           ? await this.queryEmbeddings.embed(query)
           : await this.queryEmbeddings.embedIfAvailable(query);
       const sourceIds = this.normalizeFilterValues(filters.sourceId);
+      const statuses = this.normalizeFilterValues(filters.status).map((value) =>
+        value.toUpperCase(),
+      ) as FindingStatus[];
       const semanticRows = vector
-        ? await this.embeddings.semanticFindingIds(vector, 200, sourceIds)
+        ? await this.embeddings.semanticFindingIds(
+            vector,
+            200,
+            sourceIds,
+            statuses,
+            filters.includeResolved ?? false,
+          )
         : [];
       const lexicalWhere = await this.buildSearchFindingsWhere({
         ...filters,

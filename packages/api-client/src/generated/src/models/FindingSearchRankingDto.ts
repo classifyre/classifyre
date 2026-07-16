@@ -22,55 +22,55 @@ import {
 } from './FindingRankReasonDto';
 
 /**
- *
+ * 
  * @export
  * @interface FindingSearchRankingDto
  */
 export interface FindingSearchRankingDto {
     /**
-     *
+     * 
      * @type {number}
      * @memberof FindingSearchRankingDto
      */
     importance?: number | null;
     /**
-     *
+     * 
      * @type {number}
      * @memberof FindingSearchRankingDto
      */
     quality?: number | null;
     /**
-     *
+     * 
      * @type {number}
      * @memberof FindingSearchRankingDto
      */
     similarCount: number;
     /**
-     *
+     * 
      * @type {string}
      * @memberof FindingSearchRankingDto
      */
     duplicateGroupHash?: string | null;
     /**
-     *
+     * 
      * @type {Array<FindingRankReasonDto>}
      * @memberof FindingSearchRankingDto
      */
     reasons: Array<FindingRankReasonDto>;
     /**
-     *
+     * 
      * @type {string}
      * @memberof FindingSearchRankingDto
      */
     coverage: FindingSearchRankingDtoCoverageEnum;
     /**
-     *
+     * 
      * @type {number}
      * @memberof FindingSearchRankingDto
      */
     reciprocalRank?: number;
     /**
-     *
+     * 
      * @type {number}
      * @memberof FindingSearchRankingDto
      */
@@ -107,7 +107,7 @@ export function FindingSearchRankingDtoFromJSONTyped(json: any, ignoreDiscrimina
         return json;
     }
     return {
-
+        
         'importance': json['importance'] == null ? undefined : json['importance'],
         'quality': json['quality'] == null ? undefined : json['quality'],
         'similarCount': json['similarCount'],
@@ -129,7 +129,7 @@ export function FindingSearchRankingDtoToJSONTyped(value?: FindingSearchRankingD
     }
 
     return {
-
+        
         'importance': value['importance'],
         'quality': value['quality'],
         'similarCount': value['similarCount'],

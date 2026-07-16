@@ -43,31 +43,31 @@ import {
 } from './SearchFindingsPageDto';
 
 /**
- *
+ * 
  * @export
  * @interface SearchFindingsRequestDto
  */
 export interface SearchFindingsRequestDto {
     /**
-     *
+     * 
      * @type {SearchFindingsFiltersInputDto}
      * @memberof SearchFindingsRequestDto
      */
     filters?: SearchFindingsFiltersInputDto;
     /**
-     *
+     * 
      * @type {SearchFindingsPageDto}
      * @memberof SearchFindingsRequestDto
      */
     page?: SearchFindingsPageDto;
     /**
-     *
+     * 
      * @type {SemanticFindingsSearchDto}
      * @memberof SearchFindingsRequestDto
      */
     semantic?: SemanticFindingsSearchDto;
     /**
-     *
+     * 
      * @type {FindingsRankingDto}
      * @memberof SearchFindingsRequestDto
      */
@@ -90,7 +90,7 @@ export function SearchFindingsRequestDtoFromJSONTyped(json: any, ignoreDiscrimin
         return json;
     }
     return {
-
+        
         'filters': json['filters'] == null ? undefined : SearchFindingsFiltersInputDtoFromJSON(json['filters']),
         'page': json['page'] == null ? undefined : SearchFindingsPageDtoFromJSON(json['page']),
         'semantic': json['semantic'] == null ? undefined : SemanticFindingsSearchDtoFromJSON(json['semantic']),
@@ -108,7 +108,7 @@ export function SearchFindingsRequestDtoToJSONTyped(value?: SearchFindingsReques
     }
 
     return {
-
+        
         'filters': SearchFindingsFiltersInputDtoToJSON(value['filters']),
         'page': SearchFindingsPageDtoToJSON(value['page']),
         'semantic': SemanticFindingsSearchDtoToJSON(value['semantic']),

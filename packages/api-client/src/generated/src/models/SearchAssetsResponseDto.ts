@@ -22,31 +22,31 @@ import {
 } from './SearchAssetItemDto';
 
 /**
- *
+ * 
  * @export
  * @interface SearchAssetsResponseDto
  */
 export interface SearchAssetsResponseDto {
     /**
-     *
+     * 
      * @type {Array<SearchAssetItemDto>}
      * @memberof SearchAssetsResponseDto
      */
     items: Array<SearchAssetItemDto>;
     /**
-     *
+     * 
      * @type {number}
      * @memberof SearchAssetsResponseDto
      */
     total: number;
     /**
-     *
+     * 
      * @type {number}
      * @memberof SearchAssetsResponseDto
      */
     skip: number;
     /**
-     *
+     * 
      * @type {number}
      * @memberof SearchAssetsResponseDto
      */
@@ -79,7 +79,7 @@ export function SearchAssetsResponseDtoFromJSONTyped(json: any, ignoreDiscrimina
         return json;
     }
     return {
-
+        
         'items': ((json['items'] as Array<any>).map(SearchAssetItemDtoFromJSON)),
         'total': json['total'],
         'skip': json['skip'],
@@ -98,7 +98,7 @@ export function SearchAssetsResponseDtoToJSONTyped(value?: SearchAssetsResponseD
     }
 
     return {
-
+        
         'items': ((value['items'] as Array<any>).map(SearchAssetItemDtoToJSON)),
         'total': value['total'],
         'skip': value['skip'],

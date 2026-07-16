@@ -162,6 +162,7 @@ model Finding {
 // create a new space so old and new embeddings can coexist during validation.
 model EmbeddingSpace {
   id         String   @id @default(uuid())
+  provider   String
   model      String
   revision   String
   dim        Int
@@ -173,19 +174,17 @@ model EmbeddingSpace {
   embeddings ContentEmbedding[]
   analyses   FindingEvidenceAnalysis[]
 
-  @@unique([model, revision, pooling, normalized])
+  @@unique([provider, model, revision, dim, pooling, normalized])
   @@index([isActive])
   @@map("embedding_spaces")
 }
 
-// `vecF8` is the portable source of truth. The migration conditionally adds a
-// `vec vector(384)` mirror and HNSW index when pgvector is available.
 model ContentEmbedding {
-  id          String   @id @default(uuid())
-  spaceId     String   @map("space_id")
-  contentHash String   @map("content_hash") @db.VarChar(64)
-  vecF8       Float[]  @map("vec_f8")
-  createdAt   DateTime @default(now()) @map("created_at")
+  id          String                @id @default(uuid())
+  spaceId     String                @map("space_id")
+  contentHash String                @map("content_hash") @db.VarChar(64)
+  vec         Unsupported("vector")
+  createdAt   DateTime              @default(now()) @map("created_at")
 
   space EmbeddingSpace @relation(fields: [spaceId], references: [id], onDelete: Cascade)
 
@@ -249,23 +248,37 @@ model CustomDetectorExtraction {
   assetId           String  @map("asset_id")
   runnerId          String? @map("runner_id")
 
-  detectorVersion Int  @default(1) @map("detector_version")
-  pipelineResult  Json @map("pipeline_result") @db.JsonB
+  detectorVersion Int    @default(1) @map("detector_version")
+  payloadHash     String @map("payload_hash") @db.VarChar(64)
 
   extractedAt DateTime @map("extracted_at")
   createdAt   DateTime @default(now()) @map("created_at")
 
-  finding        Finding         @relation(fields: [findingId], references: [id], onDelete: Cascade)
-  source         Source          @relation(fields: [sourceId], references: [id], onDelete: Cascade)
-  asset          Asset           @relation(fields: [assetId], references: [id], onDelete: Cascade)
-  customDetector CustomDetector? @relation(fields: [customDetectorId], references: [id], onDelete: SetNull)
+  finding        Finding           @relation(fields: [findingId], references: [id], onDelete: Cascade)
+  source         Source            @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  asset          Asset             @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  customDetector CustomDetector?   @relation(fields: [customDetectorId], references: [id], onDelete: SetNull)
+  payload        ExtractionPayload @relation(fields: [payloadHash], references: [contentHash], onDelete: Restrict)
 
   @@index([customDetectorKey])
   @@index([customDetectorId])
   @@index([sourceId])
   @@index([assetId])
   @@index([runnerId])
+  @@index([payloadHash])
   @@map("custom_detector_extractions")
+}
+
+// Custom detector runners attach the same page-level pipeline result to every
+// finding on that page. Store the JSON once and reference it by content hash.
+model ExtractionPayload {
+  contentHash    String   @id @map("content_hash") @db.VarChar(64)
+  pipelineResult Json     @map("pipeline_result") @db.JsonB
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  extractions CustomDetectorExtraction[]
+
+  @@map("extraction_payloads")
 }
 
 model CustomDetectorFeedback {

@@ -22,19 +22,19 @@ import {
 } from './AssetChunkDto';
 
 /**
- *
+ * 
  * @export
  * @interface PutAssetChunksDto
  */
 export interface PutAssetChunksDto {
     /**
-     *
+     * 
      * @type {string}
      * @memberof PutAssetChunksDto
      */
     assetHash: string;
     /**
-     *
+     * 
      * @type {Array<AssetChunkDto>}
      * @memberof PutAssetChunksDto
      */
@@ -59,7 +59,7 @@ export function PutAssetChunksDtoFromJSONTyped(json: any, ignoreDiscriminator: b
         return json;
     }
     return {
-
+        
         'assetHash': json['assetHash'],
         'chunks': ((json['chunks'] as Array<any>).map(AssetChunkDtoFromJSON)),
     };
@@ -75,7 +75,7 @@ export function PutAssetChunksDtoToJSONTyped(value?: PutAssetChunksDto | null, i
     }
 
     return {
-
+        
         'assetHash': value['assetHash'],
         'chunks': ((value['chunks'] as Array<any>).map(AssetChunkDtoToJSON)),
     };

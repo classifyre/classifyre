@@ -1,7 +1,7 @@
 """Pipeline for processing assets through detectors.
 
-Exports are lazy so lightweight embedding clients do not import the detector
-and source graph (which itself uses the REST output types).
+Exports are lazy so lightweight callers do not import the detector and source
+graph (which itself uses the REST output types).
 """
 
 from typing import Any

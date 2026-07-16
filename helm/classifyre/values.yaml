@@ -38,20 +38,41 @@ api:
     pullPolicy: IfNotPresent
 
   embedding:
-    # -- Keep the local sentence-transformer resident beside each API replica.
+    # -- Enable semantic embedding generation inside the API process.
     enabled: true
-    port: 8011
-    image:
-      repository: classifyre/cli
-      tag: ""
-      pullPolicy: IfNotPresent
-    resources:
-      requests:
-        cpu: 250m
-        memory: 512Mi
-      limits:
-        cpu: "1"
-        memory: 1Gi
+    # -- Embedding provider: transformers-js or openai-compatible.
+    provider: transformers-js
+    # -- Hugging Face model id or external provider model id.
+    model: Xenova/all-MiniLM-L6-v2
+    # -- Immutable model revision. Change it to create a new embedding space.
+    revision: 751bff37182d3f1213fa05d7196b954e230abad9
+    # -- Output dimensions. pgvector HNSW supports vector dimensions up to 2000.
+    dimensions: 384
+    pooling: mean
+    normalize: true
+    # -- Transformers.js ONNX precision and execution device.
+    dtype: q8
+    device: cpu
+    allowRemoteModels: true
+    # -- Optional local Transformers.js model root mounted into the API pod.
+    localModelPath: ""
+    cacheDir: /var/cache/classifyre/transformers
+    cacheSizeLimit: 2Gi
+    batchSize: 32
+    retrySeconds: 30
+    # -- Maximum embedding batches processed concurrently across all API replicas.
+    workerConcurrency: 1
+    maxParallelCalls: 2
+    hnsw:
+      m: 16
+      efConstruction: 64
+      efSearch: 100
+    external:
+      # -- Base URL for an OpenAI-compatible embeddings API.
+      baseUrl: ""
+      # -- Existing secret containing the provider API key.
+      existingSecret: ""
+      apiKeyKey: api-key
 
   # -- Optional API container command override.
   command: []

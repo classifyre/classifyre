@@ -3,7 +3,8 @@ import { EmbeddingService } from './embedding.service';
 
 describe('EmbeddingService', () => {
   const activeSpace = {
-    id: 'space-1',
+    id: '9c85727f-8b6f-4de0-aee6-08a96b57f79b',
+    provider: 'transformers-js',
     model: 'sentence-transformers/all-MiniLM-L6-v2',
     revision: 'revision-1',
     dim: 3,
@@ -38,7 +39,11 @@ describe('EmbeddingService', () => {
     $queryRaw: jest.fn(),
     $executeRaw: jest.fn(),
   };
-  const capability = { hasVector: jest.fn() };
+  const capability = {
+    ensureReady: jest.fn(),
+    hasVector: jest.fn(),
+    version: jest.fn(),
+  };
   const analysis = { analyzeHashes: jest.fn() };
   const service = new EmbeddingService(
     prisma as never,
@@ -48,7 +53,9 @@ describe('EmbeddingService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    capability.ensureReady.mockResolvedValue(undefined);
     capability.hasVector.mockReturnValue(false);
+    capability.version.mockReturnValue('0.8.2');
     prisma.embeddingSpace.findUnique.mockResolvedValue(activeSpace);
     prisma.finding.findMany.mockResolvedValue([]);
     prisma.$queryRaw.mockResolvedValue([]);
@@ -76,16 +83,12 @@ describe('EmbeddingService', () => {
     });
   });
 
-  it('reanalyzes findings that reuse an already stored vector', async () => {
+  it('does not request a vector that is already content-addressed', async () => {
     const reusedHash = 'a'.repeat(64);
     prisma.contentEmbedding.findMany.mockResolvedValue([
       { contentHash: reusedHash },
     ]);
-    prisma.finding.findMany.mockResolvedValue([
-      { embedContentHash: reusedHash },
-    ]);
-
-    await service.missing(
+    const result = await service.missing(
       {
         model: activeSpace.model,
         revision: activeSpace.revision,
@@ -96,9 +99,8 @@ describe('EmbeddingService', () => {
       [reusedHash],
     );
 
-    expect(analysis.analyzeHashes).toHaveBeenCalledWith(activeSpace.id, [
-      reusedHash,
-    ]);
+    expect(result.missing).toEqual([]);
+    expect(analysis.analyzeHashes).not.toHaveBeenCalled();
   });
 
   it('rejects a vector from the wrong coordinate space dimension', async () => {
@@ -121,11 +123,15 @@ describe('EmbeddingService', () => {
     ).rejects.toThrow('is not normalized');
   });
 
-  it('reports the exact-cosine fallback as an active capability', () => {
+  it('reports mandatory pgvector and the configured provider', () => {
     expect(service.status()).toEqual({
       enabled: true,
-      pgvector: false,
-      searchStrategy: 'exact-cosine',
+      pgvector: true,
+      pgvectorVersion: '0.8.2',
+      searchStrategy: 'per-space-hnsw',
+      provider: 'transformers-js',
+      model: 'Xenova/all-MiniLM-L6-v2',
+      dimensions: 384,
     });
   });
 });

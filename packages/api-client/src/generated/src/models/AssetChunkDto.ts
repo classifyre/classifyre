@@ -14,47 +14,41 @@
 
 import { mapValues } from '../runtime';
 /**
- *
+ * 
  * @export
  * @interface AssetChunkDto
  */
 export interface AssetChunkDto {
     /**
-     *
+     * 
      * @type {number}
      * @memberof AssetChunkDto
      */
     ordinal: number;
     /**
-     *
+     * 
      * @type {number}
      * @memberof AssetChunkDto
      */
     page?: number;
     /**
-     *
+     * 
      * @type {number}
      * @memberof AssetChunkDto
      */
     charOffset: number;
     /**
-     *
+     * 
      * @type {number}
      * @memberof AssetChunkDto
      */
     charLength: number;
     /**
-     *
+     * 
      * @type {string}
      * @memberof AssetChunkDto
      */
     text: string;
-    /**
-     *
-     * @type {string}
-     * @memberof AssetChunkDto
-     */
-    contentHash: string;
 }
 
 /**
@@ -65,7 +59,6 @@ export function instanceOfAssetChunkDto(value: object): value is AssetChunkDto {
     if (!('charOffset' in value) || value['charOffset'] === undefined) return false;
     if (!('charLength' in value) || value['charLength'] === undefined) return false;
     if (!('text' in value) || value['text'] === undefined) return false;
-    if (!('contentHash' in value) || value['contentHash'] === undefined) return false;
     return true;
 }
 
@@ -78,13 +71,12 @@ export function AssetChunkDtoFromJSONTyped(json: any, ignoreDiscriminator: boole
         return json;
     }
     return {
-
+        
         'ordinal': json['ordinal'],
         'page': json['page'] == null ? undefined : json['page'],
         'charOffset': json['charOffset'],
         'charLength': json['charLength'],
         'text': json['text'],
-        'contentHash': json['contentHash'],
     };
 }
 
@@ -98,13 +90,12 @@ export function AssetChunkDtoToJSONTyped(value?: AssetChunkDto | null, ignoreDis
     }
 
     return {
-
+        
         'ordinal': value['ordinal'],
         'page': value['page'],
         'charOffset': value['charOffset'],
         'charLength': value['charLength'],
         'text': value['text'],
-        'contentHash': value['contentHash'],
     };
 }
 

@@ -48,6 +48,9 @@ import { EmbeddingCapabilityService } from './embedding/embedding-capability.ser
 import { EmbeddingAnalysisService } from './embedding/embedding-analysis.service';
 import { EmbeddingService } from './embedding/embedding.service';
 import { QueryEmbeddingService } from './embedding/query-embedding.service';
+import { EmbeddingConfigService } from './embedding/embedding-config.service';
+import { EmbeddingProviderService } from './embedding/embedding-provider.service';
+import { EmbeddingQueueService } from './embedding/embedding-queue.service';
 
 // Import organized controllers
 import {
@@ -149,9 +152,12 @@ import {
     ChatAgentService,
     ChatGatewayService,
     ChatBotsService,
+    EmbeddingConfigService,
     EmbeddingCapabilityService,
     EmbeddingAnalysisService,
     EmbeddingService,
+    EmbeddingProviderService,
+    EmbeddingQueueService,
     QueryEmbeddingService,
   ],
 })

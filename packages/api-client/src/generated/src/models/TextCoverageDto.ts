@@ -14,49 +14,49 @@
 
 import { mapValues } from '../runtime';
 /**
- *
+ * 
  * @export
  * @interface TextCoverageDto
  */
 export interface TextCoverageDto {
     /**
-     *
+     * 
      * @type {number}
      * @memberof TextCoverageDto
      */
     extracted: number;
     /**
-     *
+     * 
      * @type {number}
      * @memberof TextCoverageDto
      */
     empty: number;
     /**
-     *
+     * 
      * @type {number}
      * @memberof TextCoverageDto
      */
     engineUnavailable: number;
     /**
-     *
+     * 
      * @type {number}
      * @memberof TextCoverageDto
      */
     zeroFrames: number;
     /**
-     *
+     * 
      * @type {number}
      * @memberof TextCoverageDto
      */
     failed: number;
     /**
-     *
+     * 
      * @type {number}
      * @memberof TextCoverageDto
      */
     notApplicable: number;
     /**
-     *
+     * 
      * @type {number}
      * @memberof TextCoverageDto
      */
@@ -86,7 +86,7 @@ export function TextCoverageDtoFromJSONTyped(json: any, ignoreDiscriminator: boo
         return json;
     }
     return {
-
+        
         'extracted': json['extracted'],
         'empty': json['empty'],
         'engineUnavailable': json['engineUnavailable'],
@@ -107,7 +107,7 @@ export function TextCoverageDtoToJSONTyped(value?: TextCoverageDto | null, ignor
     }
 
     return {
-
+        
         'extracted': value['extracted'],
         'empty': value['empty'],
         'engineUnavailable': value['engineUnavailable'],

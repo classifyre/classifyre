@@ -14,7 +14,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // 'api' is a directory on Linux/Windows but a single api.tar.gz on macOS
 // (65k loose node_modules files made Apple's notary scan take hours); the
 // existsSync filter below picks whichever the staging script produced.
-const allResources = ['api', 'api.tar.gz', 'web', 'pg', 'venv', 'python', 'pyapp'];
+const allResources = ['api', 'api.tar.gz', 'web', 'pg', 'venv', 'python', 'pyapp', 'models'];
 const extraResource = allResources
   .map((name) => path.resolve(__dirname, 'resources', name))
   .filter((abs) => fs.existsSync(abs));
@@ -80,6 +80,7 @@ function findMissingStagedResources(): string[] {
     ['venv'],
     ['python'],
     ['pyapp'],
+    ['models'],
     ['api', 'api.tar.gz'], // directory on Linux/Windows, tarball on macOS
   ];
   return required

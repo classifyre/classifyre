@@ -36,43 +36,43 @@ import {
 } from './FindingLocationDto';
 
 /**
- *
+ * 
  * @export
  * @interface SearchAssetFindingDto
  */
 export interface SearchAssetFindingDto {
     /**
-     *
+     * 
      * @type {string}
      * @memberof SearchAssetFindingDto
      */
     id: string;
     /**
-     *
+     * 
      * @type {string}
      * @memberof SearchAssetFindingDto
      */
     detectionIdentity: string;
     /**
-     *
+     * 
      * @type {string}
      * @memberof SearchAssetFindingDto
      */
     assetId: string;
     /**
-     *
+     * 
      * @type {string}
      * @memberof SearchAssetFindingDto
      */
     sourceId: string;
     /**
-     *
+     * 
      * @type {string}
      * @memberof SearchAssetFindingDto
      */
     runnerId?: string;
     /**
-     *
+     * 
      * @type {string}
      * @memberof SearchAssetFindingDto
      */
@@ -96,19 +96,19 @@ export interface SearchAssetFindingDto {
      */
     customDetectorName?: string;
     /**
-     *
+     * 
      * @type {string}
      * @memberof SearchAssetFindingDto
      */
     findingType: string;
     /**
-     *
+     * 
      * @type {string}
      * @memberof SearchAssetFindingDto
      */
     category: string;
     /**
-     *
+     * 
      * @type {string}
      * @memberof SearchAssetFindingDto
      */
@@ -120,31 +120,31 @@ export interface SearchAssetFindingDto {
      */
     confidence: number;
     /**
-     *
+     * 
      * @type {string}
      * @memberof SearchAssetFindingDto
      */
     matchedContent: string;
     /**
-     *
+     * 
      * @type {string}
      * @memberof SearchAssetFindingDto
      */
     redactedContent?: string;
     /**
-     *
+     * 
      * @type {string}
      * @memberof SearchAssetFindingDto
      */
     contextBefore?: string;
     /**
-     *
+     * 
      * @type {string}
      * @memberof SearchAssetFindingDto
      */
     contextAfter?: string;
     /**
-     *
+     * 
      * @type {FindingLocationDto}
      * @memberof SearchAssetFindingDto
      */
@@ -156,67 +156,67 @@ export interface SearchAssetFindingDto {
      */
     metadata?: { [key: string]: any; };
     /**
-     *
+     * 
      * @type {string}
      * @memberof SearchAssetFindingDto
      */
     status: SearchAssetFindingDtoStatusEnum;
     /**
-     *
+     * 
      * @type {string}
      * @memberof SearchAssetFindingDto
      */
     resolutionReason?: string;
     /**
-     *
+     * 
      * @type {string}
      * @memberof SearchAssetFindingDto
      */
     comment?: string;
     /**
-     *
+     * 
      * @type {Date}
      * @memberof SearchAssetFindingDto
      */
     detectedAt: Date;
     /**
-     *
+     * 
      * @type {Date}
      * @memberof SearchAssetFindingDto
      */
     firstDetectedAt?: Date;
     /**
-     *
+     * 
      * @type {Date}
      * @memberof SearchAssetFindingDto
      */
     lastDetectedAt?: Date;
     /**
-     *
+     * 
      * @type {Date}
      * @memberof SearchAssetFindingDto
      */
     resolvedAt?: Date;
     /**
-     *
+     * 
      * @type {Date}
      * @memberof SearchAssetFindingDto
      */
     createdAt: Date;
     /**
-     *
+     * 
      * @type {Date}
      * @memberof SearchAssetFindingDto
      */
     updatedAt: Date;
     /**
-     *
+     * 
      * @type {FindingEvidenceAnalysisDto}
      * @memberof SearchAssetFindingDto
      */
     evidenceAnalysis?: FindingEvidenceAnalysisDto | null;
     /**
-     *
+     * 
      * @type {FindingSearchRankingDto}
      * @memberof SearchAssetFindingDto
      */
@@ -291,7 +291,7 @@ export function SearchAssetFindingDtoFromJSONTyped(json: any, ignoreDiscriminato
         return json;
     }
     return {
-
+        
         'id': json['id'],
         'detectionIdentity': json['detectionIdentity'],
         'assetId': json['assetId'],
@@ -335,7 +335,7 @@ export function SearchAssetFindingDtoToJSONTyped(value?: SearchAssetFindingDto |
     }
 
     return {
-
+        
         'id': value['id'],
         'detectionIdentity': value['detectionIdentity'],
         'assetId': value['assetId'],

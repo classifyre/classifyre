@@ -14,25 +14,25 @@
 
 import { mapValues } from '../runtime';
 /**
- *
+ * 
  * @export
  * @interface FindingRankReasonDto
  */
 export interface FindingRankReasonDto {
     /**
-     *
+     * 
      * @type {string}
      * @memberof FindingRankReasonDto
      */
     code: string;
     /**
-     *
+     * 
      * @type {string}
      * @memberof FindingRankReasonDto
      */
     label: string;
     /**
-     *
+     * 
      * @type {string}
      * @memberof FindingRankReasonDto
      */
@@ -70,7 +70,7 @@ export function FindingRankReasonDtoFromJSONTyped(json: any, ignoreDiscriminator
         return json;
     }
     return {
-
+        
         'code': json['code'],
         'label': json['label'],
         'impact': json['impact'],
@@ -87,7 +87,7 @@ export function FindingRankReasonDtoToJSONTyped(value?: FindingRankReasonDto | n
     }
 
     return {
-
+        
         'code': value['code'],
         'label': value['label'],
         'impact': value['impact'],

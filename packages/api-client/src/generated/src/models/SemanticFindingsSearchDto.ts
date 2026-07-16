@@ -14,7 +14,7 @@
 
 import { mapValues } from '../runtime';
 /**
- *
+ * 
  * @export
  * @interface SemanticFindingsSearchDto
  */
@@ -26,7 +26,7 @@ export interface SemanticFindingsSearchDto {
      */
     query?: string;
     /**
-     *
+     * 
      * @type {string}
      * @memberof SemanticFindingsSearchDto
      */
@@ -61,7 +61,7 @@ export function SemanticFindingsSearchDtoFromJSONTyped(json: any, ignoreDiscrimi
         return json;
     }
     return {
-
+        
         'query': json['query'] == null ? undefined : json['query'],
         'mode': json['mode'] == null ? undefined : json['mode'],
     };
@@ -77,7 +77,7 @@ export function SemanticFindingsSearchDtoToJSONTyped(value?: SemanticFindingsSea
     }
 
     return {
-
+        
         'query': value['query'],
         'mode': value['mode'],
     };

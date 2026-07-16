@@ -153,10 +153,8 @@ All URIs are relative to *http://localhost*
 *CustomDetectorsApi* | [**customDetectorsControllerTrainingHistory**](docs/CustomDetectorsApi.md#customdetectorscontrollertraininghistory) | **GET** /custom-detectors/{id}/training-history | List training history for custom detector
 *CustomDetectorsApi* | [**customDetectorsControllerUpdate**](docs/CustomDetectorsApi.md#customdetectorscontrollerupdate) | **PATCH** /custom-detectors/{id} | Update custom detector
 *EmbeddingsApi* | [**embeddingControllerChunks**](docs/EmbeddingsApi.md#embeddingcontrollerchunks) | **POST** /sources/{sourceId}/embeddings/chunks | Store asset chunk-to-content mappings
-*EmbeddingsApi* | [**embeddingControllerMissing**](docs/EmbeddingsApi.md#embeddingcontrollermissing) | **POST** /sources/{sourceId}/embeddings/missing | Negotiate missing content-addressed embeddings
 *EmbeddingsApi* | [**embeddingControllerSimilar**](docs/EmbeddingsApi.md#embeddingcontrollersimilar) | **GET** /findings/{findingId}/similar | Find semantically similar findings with ranking evidence
 *EmbeddingsApi* | [**embeddingControllerStatus**](docs/EmbeddingsApi.md#embeddingcontrollerstatus) | **GET** /embeddings/status | Get semantic storage and search capability
-*EmbeddingsApi* | [**embeddingControllerVectors**](docs/EmbeddingsApi.md#embeddingcontrollervectors) | **POST** /sources/{sourceId}/embeddings/vectors | Store normalized embedding vectors
 *FindingsApi* | [**findingsControllerBulkUpdate**](docs/FindingsApi.md#findingscontrollerbulkupdate) | **POST** /findings/bulk-update | Bulk update findings
 *FindingsApi* | [**findingsControllerCreate**](docs/FindingsApi.md#findingscontrollercreate) | **POST** /findings/create | Create a new finding
 *FindingsApi* | [**findingsControllerFindOne**](docs/FindingsApi.md#findingscontrollerfindone) | **GET** /findings/{id} | Get a finding by ID
@@ -338,8 +336,6 @@ All URIs are relative to *http://localhost*
 - [DiscoveryRecentRunDto](docs/DiscoveryRecentRunDto.md)
 - [DiscoveryRunSourceDto](docs/DiscoveryRunSourceDto.md)
 - [EdgeDetailDto](docs/EdgeDetailDto.md)
-- [EmbeddingSpaceDto](docs/EmbeddingSpaceDto.md)
-- [EmbeddingVectorDto](docs/EmbeddingVectorDto.md)
 - [EvidenceEntityDto](docs/EvidenceEntityDto.md)
 - [ExclusionRuleDto](docs/ExclusionRuleDto.md)
 - [ExpandGraphDto](docs/ExpandGraphDto.md)
@@ -395,7 +391,6 @@ All URIs are relative to *http://localhost*
 - [McpTokenResponseDto](docs/McpTokenResponseDto.md)
 - [McpToolParameterDto](docs/McpToolParameterDto.md)
 - [McpToolSummaryDto](docs/McpToolSummaryDto.md)
-- [MissingEmbeddingsDto](docs/MissingEmbeddingsDto.md)
 - [NotificationListResponseDto](docs/NotificationListResponseDto.md)
 - [NotificationResponseDto](docs/NotificationResponseDto.md)
 - [NotificationsControllerDeleteNotification200Response](docs/NotificationsControllerDeleteNotification200Response.md)
@@ -409,7 +404,6 @@ All URIs are relative to *http://localhost*
 - [PullFromInquiryDto](docs/PullFromInquiryDto.md)
 - [PullFromInquiryResponseDto](docs/PullFromInquiryResponseDto.md)
 - [PutAssetChunksDto](docs/PutAssetChunksDto.md)
-- [PutEmbeddingVectorsDto](docs/PutEmbeddingVectorsDto.md)
 - [RebuildEdgesResponseDto](docs/RebuildEdgesResponseDto.md)
 - [RecomputeCorrelationResponseDto](docs/RecomputeCorrelationResponseDto.md)
 - [RegisterDiscoveredAssetsDto](docs/RegisterDiscoveredAssetsDto.md)

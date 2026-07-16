@@ -29,91 +29,91 @@ import {
 } from './TextCoverageDto';
 
 /**
- *
+ * 
  * @export
  * @interface SearchRunnerItemDto
  */
 export interface SearchRunnerItemDto {
     /**
-     *
+     * 
      * @type {string}
      * @memberof SearchRunnerItemDto
      */
     id: string;
     /**
-     *
+     * 
      * @type {string}
      * @memberof SearchRunnerItemDto
      */
     sourceId: string;
     /**
-     *
+     * 
      * @type {string}
      * @memberof SearchRunnerItemDto
      */
     triggeredBy?: string | null;
     /**
-     *
+     * 
      * @type {Date}
      * @memberof SearchRunnerItemDto
      */
     triggeredAt: Date;
     /**
-     *
+     * 
      * @type {string}
      * @memberof SearchRunnerItemDto
      */
     triggerType: SearchRunnerItemDtoTriggerTypeEnum;
     /**
-     *
+     * 
      * @type {string}
      * @memberof SearchRunnerItemDto
      */
     status: SearchRunnerItemDtoStatusEnum;
     /**
-     *
+     * 
      * @type {string}
      * @memberof SearchRunnerItemDto
      */
     executionMode?: SearchRunnerItemDtoExecutionModeEnum | null;
     /**
-     *
+     * 
      * @type {Date}
      * @memberof SearchRunnerItemDto
      */
     startedAt?: Date | null;
     /**
-     *
+     * 
      * @type {Date}
      * @memberof SearchRunnerItemDto
      */
     completedAt?: Date | null;
     /**
-     *
+     * 
      * @type {number}
      * @memberof SearchRunnerItemDto
      */
     durationMs?: number | null;
     /**
-     *
+     * 
      * @type {number}
      * @memberof SearchRunnerItemDto
      */
     assetsCreated: number;
     /**
-     *
+     * 
      * @type {number}
      * @memberof SearchRunnerItemDto
      */
     assetsUpdated: number;
     /**
-     *
+     * 
      * @type {number}
      * @memberof SearchRunnerItemDto
      */
     assetsUnchanged: number;
     /**
-     *
+     * 
      * @type {number}
      * @memberof SearchRunnerItemDto
      */
@@ -161,37 +161,37 @@ export interface SearchRunnerItemDto {
      */
     assetsWithoutText: number;
     /**
-     *
+     * 
      * @type {TextCoverageDto}
      * @memberof SearchRunnerItemDto
      */
     textCoverage?: TextCoverageDto | null;
     /**
-     *
+     * 
      * @type {string}
      * @memberof SearchRunnerItemDto
      */
     errorMessage?: string | null;
     /**
-     *
+     * 
      * @type {object}
      * @memberof SearchRunnerItemDto
      */
     errorDetails?: object | null;
     /**
-     *
+     * 
      * @type {string}
      * @memberof SearchRunnerItemDto
      */
     jobName?: string | null;
     /**
-     *
+     * 
      * @type {string}
      * @memberof SearchRunnerItemDto
      */
     jobNamespace?: string | null;
     /**
-     *
+     * 
      * @type {SourceInfoDto}
      * @memberof SearchRunnerItemDto
      */
@@ -265,7 +265,7 @@ export function SearchRunnerItemDtoFromJSONTyped(json: any, ignoreDiscriminator:
         return json;
     }
     return {
-
+        
         'id': json['id'],
         'sourceId': json['sourceId'],
         'triggeredBy': json['triggeredBy'] == null ? undefined : json['triggeredBy'],
@@ -306,7 +306,7 @@ export function SearchRunnerItemDtoToJSONTyped(value?: SearchRunnerItemDto | nul
     }
 
     return {
-
+        
         'id': value['id'],
         'sourceId': value['sourceId'],
         'triggeredBy': value['triggeredBy'],

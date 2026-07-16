@@ -1,20 +1,10 @@
--- Embeddings remain usable on PostgreSQL installations without pgvector. The
--- extension-backed column is installed when the server exposes the extension.
-DO $$
-BEGIN
-  IF EXISTS (SELECT 1 FROM pg_available_extensions WHERE name = 'vector')
-     AND NOT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'vector') THEN
-    BEGIN
-      CREATE EXTENSION vector WITH SCHEMA public;
-    EXCEPTION WHEN insufficient_privilege THEN
-      RAISE NOTICE 'pgvector is available but this database user cannot install it; using float8[] cosine fallback';
-    END;
-  END IF;
-END
-$$;
+-- Semantic storage requires pgvector. If the server package is missing or the
+-- migration user cannot install extensions, migration deployment must fail.
+CREATE EXTENSION IF NOT EXISTS vector WITH SCHEMA public;
 
 CREATE TABLE "embedding_spaces" (
   "id" TEXT NOT NULL,
+  "provider" TEXT NOT NULL,
   "model" TEXT NOT NULL,
   "revision" TEXT NOT NULL,
   "dim" INTEGER NOT NULL,
@@ -29,7 +19,9 @@ CREATE TABLE "content_embeddings" (
   "id" TEXT NOT NULL,
   "space_id" TEXT NOT NULL,
   "content_hash" VARCHAR(64) NOT NULL,
-  "vec_f8" DOUBLE PRECISION[] NOT NULL,
+  -- Untyped vector permits multiple model dimensions in one table. Each
+  -- embedding space receives its own dimension-cast partial HNSW index.
+  "vec" public.vector NOT NULL,
   "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT "content_embeddings_pkey" PRIMARY KEY ("id")
 );
@@ -67,8 +59,8 @@ ALTER TABLE "findings" ADD COLUMN "embed_content_hash" VARCHAR(64);
 ALTER TABLE "runners" ADD COLUMN "findings_resolved" INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE "runners" ADD COLUMN "findings_retained" INTEGER NOT NULL DEFAULT 0;
 
-CREATE UNIQUE INDEX "embedding_spaces_model_revision_pooling_normalized_key"
-  ON "embedding_spaces"("model", "revision", "pooling", "normalized");
+CREATE UNIQUE INDEX "embedding_spaces_provider_model_revision_dim_pooling_normalized_key"
+  ON "embedding_spaces"("provider", "model", "revision", "dim", "pooling", "normalized");
 CREATE INDEX "embedding_spaces_is_active_idx" ON "embedding_spaces"("is_active");
 CREATE UNIQUE INDEX "content_embeddings_space_id_content_hash_key"
   ON "content_embeddings"("space_id", "content_hash");
@@ -94,13 +86,3 @@ ALTER TABLE "finding_evidence_analyses" ADD CONSTRAINT "finding_evidence_analyse
   FOREIGN KEY ("finding_id") REFERENCES "findings"("id") ON DELETE CASCADE;
 ALTER TABLE "finding_evidence_analyses" ADD CONSTRAINT "finding_evidence_analyses_space_id_fkey"
   FOREIGN KEY ("space_id") REFERENCES "embedding_spaces"("id") ON DELETE CASCADE;
-
-DO $$
-BEGIN
-  IF EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'vector') THEN
-    ALTER TABLE "content_embeddings" ADD COLUMN "vec" public.vector(384);
-    CREATE INDEX "content_embeddings_vec_hnsw_idx"
-      ON "content_embeddings" USING hnsw ("vec" public.vector_cosine_ops);
-  END IF;
-END
-$$;

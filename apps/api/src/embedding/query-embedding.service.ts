@@ -1,44 +1,30 @@
 import { Injectable, ServiceUnavailableException } from '@nestjs/common';
+import { EmbeddingProviderService } from './embedding-provider.service';
+import { EmbeddingConfigService } from './embedding-config.service';
 
 @Injectable()
 export class QueryEmbeddingService {
-  private readonly baseUrl = process.env.EMBEDDING_SERVER_URL?.replace(
-    /\/$/,
-    '',
-  );
+  constructor(
+    private readonly provider?: EmbeddingProviderService,
+    private readonly config: EmbeddingConfigService = new EmbeddingConfigService(),
+  ) {}
 
   async embed(text: string): Promise<number[]> {
-    if (!this.baseUrl) {
+    if (!this.config.enabled) {
       throw new ServiceUnavailableException(
-        'Semantic query embedding is unavailable; EMBEDDING_SERVER_URL is not configured',
+        'Semantic query embedding is disabled by EMBEDDING_ENABLED=false',
       );
     }
-    let response: Response;
     try {
-      response = await fetch(`${this.baseUrl}/embed`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ texts: [text] }),
-        signal: AbortSignal.timeout(30_000),
-      });
+      if (!this.provider) throw new Error('embedding provider is unavailable');
+      const vector = (await this.provider.embedMany([text]))[0];
+      if (!vector?.length) throw new Error('provider returned no vector');
+      return vector;
     } catch (error) {
       throw new ServiceUnavailableException(
         `Semantic query embedding failed: ${error instanceof Error ? error.message : String(error)}`,
       );
     }
-    if (!response.ok) {
-      throw new ServiceUnavailableException(
-        `Semantic query embedding failed with HTTP ${response.status}`,
-      );
-    }
-    const payload = (await response.json()) as { vectors?: number[][] };
-    const vector = payload.vectors?.[0];
-    if (!vector?.length) {
-      throw new ServiceUnavailableException(
-        'Embedding server returned no vector',
-      );
-    }
-    return vector;
   }
 
   async embedIfAvailable(text: string): Promise<number[] | null> {
