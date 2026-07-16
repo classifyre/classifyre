@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { AssetStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma.service';
 import { InquiryMatchingService } from '../../matching/inquiry-matching.service';
 import {
@@ -265,6 +265,13 @@ export class AgentSearchService {
    * the most common metadata fields, plus whether any finding exists yet. The
    * CONFIG and DETECTOR_AUTHOR missions read this to bootstrap detection on a
    * source that has produced no findings.
+   *
+   * Always reports the source's live totals alongside the requested scope.
+   * `asset.runnerId` names the *last* runner to touch an asset, so a
+   * runner-scoped query against a superseded runner returns zero — which reads
+   * exactly like an empty source, and was taken as one: a CONFIG run wrote a
+   * false "0 assets and 0 findings" memory for a source holding 13 assets and
+   * 3,239 findings, and triggered a pointless rescan off the back of it.
    */
   async assetMetadataProfile(
     sourceId: string | null,
@@ -281,16 +288,22 @@ export class AgentSearchService {
         ? 'source'
         : 'instance';
 
-    const [rows, findingCount] = await Promise.all([
-      this.prisma.asset.findMany({
-        where,
-        select: { assetType: true, sourceType: true, metadata: true },
-        take: ASSET_PROFILE_SCAN_LIMIT,
-      }),
-      this.prisma.finding.count({
-        where: runnerId ? { runnerId } : sourceId ? { sourceId } : {},
-      }),
-    ]);
+    const [rows, findingCount, scopedAssetCount, sourceTotals] =
+      await Promise.all([
+        this.prisma.asset.findMany({
+          where,
+          select: { assetType: true, sourceType: true, metadata: true },
+          take: ASSET_PROFILE_SCAN_LIMIT,
+        }),
+        this.prisma.finding.count({
+          where: runnerId ? { runnerId } : sourceId ? { sourceId } : {},
+        }),
+        // A real count. totalAssets used to be rows.length — the sample size —
+        // so any scope larger than ASSET_PROFILE_SCAN_LIMIT under-reported
+        // itself and read as a smaller corpus than it is.
+        this.prisma.asset.count({ where }),
+        sourceId ? this.liveSourceTotals(sourceId) : Promise.resolve(null),
+      ]);
 
     const assetTypes = new Map<string, number>();
     const sourceTypes = new Map<string, number>();
@@ -311,8 +324,13 @@ export class AgentSearchService {
 
     return {
       scope,
-      totalAssets: rows.length,
+      totalAssets: scopedAssetCount,
       hasFindings: findingCount > 0,
+      sourceTotals,
+      runnerSuperseded:
+        runnerId != null &&
+        sourceTotals != null &&
+        sourceTotals.activeAssets > scopedAssetCount,
       assetTypes: topBuckets(assetTypes, MAX_ASSET_TYPE_BUCKETS),
       sourceTypes: topBuckets(sourceTypes, MAX_ASSET_TYPE_BUCKETS),
       commonMetadataKeys: topBuckets(
@@ -320,6 +338,24 @@ export class AgentSearchService {
         MAX_ASSET_METADATA_KEY_BUCKETS,
       ),
     };
+  }
+
+  /**
+   * The source's live state, independent of any runner. Deleted assets and
+   * resolved findings are excluded: this answers "what does the source hold
+   * right now", which is the question an agent is really asking when it reaches
+   * for an asset profile.
+   */
+  private async liveSourceTotals(
+    sourceId: string,
+  ): Promise<{ activeAssets: number; openFindings: number }> {
+    const [activeAssets, openFindings] = await Promise.all([
+      this.prisma.asset.count({
+        where: { sourceId, status: { not: AssetStatus.DELETED } },
+      }),
+      this.prisma.finding.count({ where: { sourceId, status: 'OPEN' } }),
+    ]);
+    return { activeAssets, openFindings };
   }
 
   /** All ACTIVE inquiries (capped) as compact summaries for dedupe/enrichment. */
