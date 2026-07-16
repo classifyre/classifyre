@@ -6,6 +6,7 @@ import { formatDate, formatRelative, formatShortUTC } from "@/lib/date";
 import {
   ArrowDown,
   ArrowUp,
+  BrainCircuit,
   ChevronsUpDown,
   ChevronDown,
   ChevronRight,
@@ -107,6 +108,8 @@ type SortDraft = {
   by: SearchAssetsSortBy;
   order: SearchAssetsSortOrder;
 };
+
+type SearchMode = "hybrid" | "off";
 
 const PAGE_SIZE_OPTIONS = [20, 50, 100];
 const ALL = "ALL";
@@ -238,6 +241,7 @@ function buildRequest({
   limit,
   scope,
   assetStatuses,
+  searchMode,
 }: {
   draft: FilterDraft;
   sort: SortDraft;
@@ -245,9 +249,10 @@ function buildRequest({
   limit: number;
   scope?: AssetsTableScope;
   assetStatuses: AssetStatusFilterValue[];
+  searchMode: SearchMode;
 }): SearchAssetsRequestInputDto {
   const assetsFilters: NonNullable<SearchAssetsRequestInputDto["assets"]> = {
-    search: draft.search.trim() || undefined,
+    search: searchMode === "off" ? draft.search.trim() || undefined : undefined,
     sourceId:
       scope?.sourceId || (draft.sourceId !== ALL ? draft.sourceId : undefined),
     runnerId: scope?.runnerId,
@@ -283,6 +288,10 @@ function buildRequest({
       excludeFindings: false,
       includeAssetsWithoutFindings: !hasActiveFindingFilters,
     },
+    semantic:
+      searchMode === "hybrid" && draft.search.trim()
+        ? { query: draft.search.trim(), mode: "hybrid" }
+        : undefined,
   };
 }
 
@@ -403,16 +412,25 @@ function FindingsSubTable({
             </TableCell>
             <TableCell>
               <SeverityBadge
-                severity={finding.severity.toLowerCase() as "critical" | "high" | "medium" | "low" | "info"}
+                severity={
+                  finding.severity.toLowerCase() as
+                    | "critical"
+                    | "high"
+                    | "medium"
+                    | "low"
+                    | "info"
+                }
               >
-                {t(`findings.severityLabels.${finding.severity.toUpperCase()}` as TranslationKey)}
+                {t(
+                  `findings.severityLabels.${finding.severity.toUpperCase()}` as TranslationKey,
+                )}
               </SeverityBadge>
             </TableCell>
-<TableCell>
-                            <StatusBadge status={toStatusBadgeValue(finding.status)}>
-                              {t(`findings.statusLabels.${finding.status}` as TranslationKey)}
-                            </StatusBadge>
-                          </TableCell>
+            <TableCell>
+              <StatusBadge status={toStatusBadgeValue(finding.status)}>
+                {t(`findings.statusLabels.${finding.status}` as TranslationKey)}
+              </StatusBadge>
+            </TableCell>
             <TableCell>
               <div className="text-xs group-hover:underline group-focus-visible:underline">
                 {formatDate(finding.detectedAt)}
@@ -479,6 +497,7 @@ export function AssetsTable({
   );
   const [pageSize, setPageSize] = useState(String(initialPageSize));
   const [page, setPage] = useState(1);
+  const [searchMode, setSearchMode] = useState<SearchMode>("hybrid");
   const [expandedAssetId, setExpandedAssetId] = useState<string | null>(null);
 
   const [sources, setSources] = useState<SourceListItem[]>([]);
@@ -569,7 +588,7 @@ export function AssetsTable({
 
   useEffect(() => {
     setPage(1);
-  }, [draft, pageSize, sortBy, sortOrder]);
+  }, [draft, pageSize, sortBy, sortOrder, searchMode]);
 
   useEffect(() => {
     let active = true;
@@ -593,6 +612,7 @@ export function AssetsTable({
             runnerId: scopedRunnerId,
           },
           assetStatuses,
+          searchMode,
         });
 
         const response = await api.searchAssets(request);
@@ -634,6 +654,7 @@ export function AssetsTable({
     assetStatuses,
     sortBy,
     sortOrder,
+    searchMode,
   ]);
 
   const items = data?.items ?? [];
@@ -712,6 +733,41 @@ export function AssetsTable({
             placeholder={t("assets.search")}
             className="h-9 pl-9 border-2 border-border rounded-[4px]"
           />
+        </div>
+
+        <div className="flex h-9 overflow-hidden rounded-[4px] border-2 border-border">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                type="button"
+                variant={searchMode === "hybrid" ? "default" : "ghost"}
+                size="sm"
+                className="h-full rounded-none px-2.5"
+                onClick={() => setSearchMode("hybrid")}
+              >
+                <BrainCircuit className="h-3.5 w-3.5" />
+                Semantic
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              Hybrid extracted-text and filename ranking
+            </TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                type="button"
+                variant={searchMode === "off" ? "default" : "ghost"}
+                size="sm"
+                className="h-full rounded-none border-l border-border px-2.5"
+                onClick={() => setSearchMode("off")}
+              >
+                <Search className="h-3.5 w-3.5" />
+                Exact
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Exact asset-name matching</TooltipContent>
+          </Tooltip>
         </div>
 
         {!scopedSourceId && (
@@ -855,6 +911,7 @@ export function AssetsTable({
                 limit: 0,
                 scope,
                 assetStatuses,
+                searchMode: "off",
               });
               return filtersToSearchParams({
                 asset_search: request.assets?.search,
@@ -897,10 +954,16 @@ export function AssetsTable({
                 <TableRow>
                   <TableHead className="w-8 bg-white/95 dark:bg-card/95" />
                   <TableHead className="bg-white/95 dark:bg-card/95">
-                    {renderSortableHead(t("assets.columns.asset"), SearchAssetsSortByEnum.Name)}
+                    {renderSortableHead(
+                      t("assets.columns.asset"),
+                      SearchAssetsSortByEnum.Name,
+                    )}
                   </TableHead>
                   <TableHead className="bg-white/95 dark:bg-card/95">
-                    {renderSortableHead(t("common.source"), SearchAssetsSortByEnum.SourceId)}
+                    {renderSortableHead(
+                      t("common.source"),
+                      SearchAssetsSortByEnum.SourceId,
+                    )}
                   </TableHead>
                   <TableHead className="bg-white/95 dark:bg-card/95">
                     <Tooltip>
@@ -915,10 +978,16 @@ export function AssetsTable({
                     </Tooltip>
                   </TableHead>
                   <TableHead className="bg-white/95 dark:bg-card/95">
-                    {renderSortableHead(t("assets.columns.assetType"), SearchAssetsSortByEnum.AssetType)}
+                    {renderSortableHead(
+                      t("assets.columns.assetType"),
+                      SearchAssetsSortByEnum.AssetType,
+                    )}
                   </TableHead>
                   <TableHead className="bg-white/95 dark:bg-card/95">
-                    {renderSortableHead(t("common.status"), SearchAssetsSortByEnum.Status)}
+                    {renderSortableHead(
+                      t("common.status"),
+                      SearchAssetsSortByEnum.Status,
+                    )}
                   </TableHead>
                   <TableHead className="bg-white/95 dark:bg-card/95">
                     <Tooltip>
@@ -969,10 +1038,16 @@ export function AssetsTable({
                     </Tooltip>
                   </TableHead>
                   <TableHead className="bg-white/95 dark:bg-card/95">
-                    {renderSortableHead(t("assets.columns.lastScanned"), SearchAssetsSortByEnum.LastScannedAt)}
+                    {renderSortableHead(
+                      t("assets.columns.lastScanned"),
+                      SearchAssetsSortByEnum.LastScannedAt,
+                    )}
                   </TableHead>
                   <TableHead className="bg-white/95 dark:bg-card/95">
-                    {renderSortableHead(t("common.updated"), SearchAssetsSortByEnum.UpdatedAt)}
+                    {renderSortableHead(
+                      t("common.updated"),
+                      SearchAssetsSortByEnum.UpdatedAt,
+                    )}
                   </TableHead>
                 </TableRow>
               </TableHeader>
@@ -1078,7 +1153,9 @@ export function AssetsTable({
                           <Badge
                             variant={statusVariant[asset.status] || "outline"}
                           >
-                            {t(`sources.asset${asset.status.charAt(0) + asset.status.slice(1).toLowerCase()}` as TranslationKey)}
+                            {t(
+                              `sources.asset${asset.status.charAt(0) + asset.status.slice(1).toLowerCase()}` as TranslationKey,
+                            )}
                           </Badge>
                         </TableCell>
 
@@ -1112,7 +1189,9 @@ export function AssetsTable({
                                     | "info"
                                 }
                               >
-                                {t(`findings.severityLabels.${highestSeverity.toUpperCase()}` as TranslationKey)}
+                                {t(
+                                  `findings.severityLabels.${highestSeverity.toUpperCase()}` as TranslationKey,
+                                )}
                               </SeverityBadge>
                               <span className="text-xs text-muted-foreground">
                                 {totalFindings}
@@ -1137,7 +1216,9 @@ export function AssetsTable({
                                   key={entry.status}
                                   status={toStatusBadgeValue(entry.status)}
                                 >
-                                  {t(`findings.statusLabels.${entry.status}` as TranslationKey)}{" "}
+                                  {t(
+                                    `findings.statusLabels.${entry.status}` as TranslationKey,
+                                  )}{" "}
                                   · {entry.count}
                                 </StatusBadge>
                               ))}
@@ -1217,10 +1298,12 @@ export function AssetsTable({
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-t pt-3">
         <div className="flex items-center gap-2">
-          <span className="text-xs text-muted-foreground">{t("common.rowsPerPage")}</span>
+          <span className="text-xs text-muted-foreground">
+            {t("common.rowsPerPage")}
+          </span>
           <Select value={pageSize} onValueChange={setPageSize}>
-<SelectTrigger className="h-8 w-[130px] border-2 border-border rounded-[4px]">
-                <SelectValue placeholder={t("common.rowsPerPage")} />
+            <SelectTrigger className="h-8 w-[130px] border-2 border-border rounded-[4px]">
+              <SelectValue placeholder={t("common.rowsPerPage")} />
             </SelectTrigger>
             <SelectContent>
               {PAGE_SIZE_OPTIONS.map((size) => (
@@ -1259,7 +1342,9 @@ export function AssetsTable({
                   <Fragment key={`page-group-${pageNumber}`}>
                     {showEllipsis && (
                       <PaginationItem>
-                        <PaginationEllipsis label={t("common.pagination.morePages")} />
+                        <PaginationEllipsis
+                          label={t("common.pagination.morePages")}
+                        />
                       </PaginationItem>
                     )}
 

@@ -31,26 +31,27 @@ export interface DetectorCreatorFormProps {
 type TransformerDetectorKind =
   | "text_classification"
   | "image_classification"
-  | "feature_extraction"
   | "object_detection";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-function kindToPipelineType(kind: TransformerDetectorKind): TransformerPipelineType {
+function kindToPipelineType(
+  kind: TransformerDetectorKind,
+): TransformerPipelineType {
   const map: Record<TransformerDetectorKind, TransformerPipelineType> = {
     text_classification: "TEXT_CLASSIFICATION",
     image_classification: "IMAGE_CLASSIFICATION",
-    feature_extraction: "FEATURE_EXTRACTION",
     object_detection: "OBJECT_DETECTION",
   };
   return map[kind];
 }
 
-function isTransformerKind(kind: DetectorKind | null): kind is TransformerDetectorKind {
+function isTransformerKind(
+  kind: DetectorKind | null,
+): kind is TransformerDetectorKind {
   return [
     "text_classification",
     "image_classification",
-    "feature_extraction",
     "object_detection",
   ].includes(kind ?? "");
 }
@@ -65,7 +66,9 @@ export function DetectorCreatorForm({
   const { t } = useTranslation();
   const [selectedKind, setSelectedKind] = useState<DetectorKind | null>(null);
   const [examplePhaseComplete, setExamplePhaseComplete] = useState(false);
-  const [chosenExample, setChosenExample] = useState<DetectorExample | null>(null);
+  const [chosenExample, setChosenExample] = useState<DetectorExample | null>(
+    null,
+  );
   const [isSaving, setIsSaving] = useState(false);
 
   const handleCreate = async (payload: {
@@ -115,31 +118,35 @@ export function DetectorCreatorForm({
     }
   };
 
-  const backLabel = isTransformerKind(selectedKind) && examplePhaseComplete
-    ? t("detectors.chooseTemplate")
-    : selectedKind
-    ? t("detectors.selectType")
-    : t("detectors.backToCatalog");
+  const backLabel =
+    isTransformerKind(selectedKind) && examplePhaseComplete
+      ? t("detectors.chooseTemplate")
+      : selectedKind
+        ? t("detectors.selectType")
+        : t("detectors.backToCatalog");
 
-  const subtitle = isTransformerKind(selectedKind) && !examplePhaseComplete
-    ? t("detectors.chooseTemplateDesc")
-    : selectedKind === "gliner2"
-    ? "Build a GLiNER2 pipeline detector. Define entities to extract and classification tasks — all run in a single model pass."
-    : selectedKind === "regex"
-    ? "Build a regex pattern detector. Define precise pattern-matching rules — fast, deterministic, zero ML overhead."
-    : selectedKind === "llm"
-    ? "Build an AI detector. Write a prompt, define labels and extraction fields, and a configured LLM provider classifies and extracts from content."
-    : isTransformerKind(selectedKind)
-    ? (() => {
-        const labels: Record<TransformerDetectorKind, string> = {
-          text_classification: "Run a HuggingFace text-classification model. Map predicted labels to severity levels.",
-          image_classification: "Classify images with any HuggingFace vision model. Useful for NSFW, harmful content, and custom labelling.",
-          feature_extraction: "Embed text into dense vectors using a HuggingFace sentence-transformer. Findings store the resulting embedding.",
-          object_detection: "Detect and locate objects in images with any HuggingFace object-detection model.",
-        };
-        return labels[selectedKind as TransformerDetectorKind];
-      })()
-    : t("detectors.selectTypeDesc");
+  const subtitle =
+    isTransformerKind(selectedKind) && !examplePhaseComplete
+      ? t("detectors.chooseTemplateDesc")
+      : selectedKind === "gliner2"
+        ? "Build a GLiNER2 pipeline detector. Define entities to extract and classification tasks — all run in a single model pass."
+        : selectedKind === "regex"
+          ? "Build a regex pattern detector. Define precise pattern-matching rules — fast, deterministic, zero ML overhead."
+          : selectedKind === "llm"
+            ? "Build an AI detector. Write a prompt, define labels and extraction fields, and a configured LLM provider classifies and extracts from content."
+            : isTransformerKind(selectedKind)
+              ? (() => {
+                  const labels: Record<TransformerDetectorKind, string> = {
+                    text_classification:
+                      "Run a HuggingFace text-classification model. Map predicted labels to severity levels.",
+                    image_classification:
+                      "Classify images with any HuggingFace vision model. Useful for NSFW, harmful content, and custom labelling.",
+                    object_detection:
+                      "Detect and locate objects in images with any HuggingFace object-detection model.",
+                  };
+                  return labels[selectedKind as TransformerDetectorKind];
+                })()
+              : t("detectors.selectTypeDesc");
 
   return (
     <div className="space-y-6">
@@ -166,9 +173,7 @@ export function DetectorCreatorForm({
       )}
 
       {/* Phase 1: type selector */}
-      {!selectedKind && (
-        <DetectorTypeSelector onSelect={handleSelectKind} />
-      )}
+      {!selectedKind && <DetectorTypeSelector onSelect={handleSelectKind} />}
 
       {/* Phase 2a (transformer): example/blank selection */}
       {isTransformerKind(selectedKind) && !examplePhaseComplete && (
@@ -192,12 +197,26 @@ export function DetectorCreatorForm({
           mode="create"
           submitLabel={t("detectors.create")}
           isSubmitting={isSaving}
-          initialName={chosenExample ? String((chosenExample.config as Record<string, unknown>)?.name ?? "") : ""}
-          initialKey={chosenExample ? String((chosenExample.config as Record<string, unknown>)?.custom_detector_key ?? "") : ""}
+          initialName={
+            chosenExample
+              ? String(
+                  (chosenExample.config as Record<string, unknown>)?.name ?? "",
+                )
+              : ""
+          }
+          initialKey={
+            chosenExample
+              ? String(
+                  (chosenExample.config as Record<string, unknown>)
+                    ?.custom_detector_key ?? "",
+                )
+              : ""
+          }
           initialDescription={chosenExample?.description ?? ""}
           initialPipelineSchema={
             chosenExample
-              ? (chosenExample.config as Record<string, unknown>)?.pipeline_schema as Record<string, unknown>
+              ? ((chosenExample.config as Record<string, unknown>)
+                  ?.pipeline_schema as Record<string, unknown>)
               : undefined
           }
           onSubmit={handleCreate}

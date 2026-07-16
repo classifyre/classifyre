@@ -50,13 +50,11 @@ def test_catalog_phase2_detectors_are_active_with_safe_models() -> None:
     catalog = _load_detector_catalog()
     by_type = {entry["detector_type"]: entry for entry in catalog}
 
-    # Transformer detectors (TEXT_CLASSIFICATION, IMAGE_CLASSIFICATION, FEATURE_EXTRACTION,
-    # OBJECT_DETECTION) are now custom detectors configured via pipeline_schema, not
+    # Transformer detectors are custom detectors configured via pipeline_schema, not
     # standalone catalog entries.
     for transformer_type in (
         "TEXT_CLASSIFICATION",
         "IMAGE_CLASSIFICATION",
-        "FEATURE_EXTRACTION",
         "OBJECT_DETECTION",
     ):
         assert transformer_type not in by_type, (

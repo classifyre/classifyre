@@ -43,6 +43,11 @@ import { ChatBotsService } from './chat-gateway/chat-bots.service';
 import { ChatGatewayService } from './chat-gateway/chat-gateway.service';
 import { ChatHarnessToolset } from './chat-gateway/chat-harness.toolset';
 import { ChatSessionService } from './chat-gateway/chat-session.service';
+import { EmbeddingController } from './embedding/embedding.controller';
+import { EmbeddingCapabilityService } from './embedding/embedding-capability.service';
+import { EmbeddingAnalysisService } from './embedding/embedding-analysis.service';
+import { EmbeddingService } from './embedding/embedding.service';
+import { QueryEmbeddingService } from './embedding/query-embedding.service';
 
 // Import organized controllers
 import {
@@ -104,6 +109,7 @@ import {
     CaseThreadsController,
     GraphController,
     ChatBotsController,
+    EmbeddingController,
   ],
   providers: [
     { provide: APP_GUARD, useClass: DemoModeGuard },
@@ -143,6 +149,10 @@ import {
     ChatAgentService,
     ChatGatewayService,
     ChatBotsService,
+    EmbeddingCapabilityService,
+    EmbeddingAnalysisService,
+    EmbeddingService,
+    QueryEmbeddingService,
   ],
 })
 export class AppModule {}

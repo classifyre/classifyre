@@ -171,6 +171,46 @@ export class SearchFindingsPageDto {
   limit?: number = 50;
 }
 
+export enum SemanticSearchMode {
+  OFF = 'off',
+  HYBRID = 'hybrid',
+  VECTOR = 'vector',
+}
+
+export class SemanticFindingsSearchDto {
+  @ApiPropertyOptional({
+    description: 'Natural-language evidence query',
+    maxLength: 500,
+  })
+  @IsString()
+  @MaxLength(500)
+  query!: string;
+
+  @ApiPropertyOptional({
+    enum: SemanticSearchMode,
+    default: SemanticSearchMode.HYBRID,
+  })
+  @IsOptional()
+  @IsEnum(SemanticSearchMode)
+  mode: SemanticSearchMode = SemanticSearchMode.HYBRID;
+}
+
+export enum FindingsRankingSort {
+  IMPORTANCE = 'importance',
+  NEWEST = 'newest',
+  SEVERITY = 'severity',
+}
+
+export class FindingsRankingDto {
+  @ApiPropertyOptional({
+    enum: FindingsRankingSort,
+    default: FindingsRankingSort.IMPORTANCE,
+  })
+  @IsOptional()
+  @IsEnum(FindingsRankingSort)
+  sort: FindingsRankingSort = FindingsRankingSort.IMPORTANCE;
+}
+
 export class SearchFindingsRequestDto {
   @ApiPropertyOptional({ type: SearchFindingsFiltersInputDto })
   @IsOptional()
@@ -183,4 +223,16 @@ export class SearchFindingsRequestDto {
   @ValidateNested()
   @Type(() => SearchFindingsPageDto)
   page?: SearchFindingsPageDto;
+
+  @ApiPropertyOptional({ type: SemanticFindingsSearchDto })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => SemanticFindingsSearchDto)
+  semantic?: SemanticFindingsSearchDto;
+
+  @ApiPropertyOptional({ type: FindingsRankingDto })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => FindingsRankingDto)
+  ranking?: FindingsRankingDto;
 }

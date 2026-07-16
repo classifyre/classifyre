@@ -172,6 +172,10 @@ spec:
             {{- end }}
             - name: SANDBOX_TEMP_DIR
               value: {{ .Values.api.sandbox.tempDir | quote }}
+            {{- if .Values.api.embedding.enabled }}
+            - name: EMBEDDING_SERVER_URL
+              value: {{ printf "http://127.0.0.1:%v" .Values.api.embedding.port | quote }}
+            {{- end }}
             {{- range $key, $value := .Values.api.env }}
             - name: {{ $key }}
               value: {{ $value | quote }}
@@ -291,6 +295,38 @@ spec:
           lifecycle:
             {{- toYaml . | nindent 12 }}
           {{- end }}
+        {{- if .Values.api.embedding.enabled }}
+        - name: embedding
+          image: {{ .Values.api.embedding.image.repository }}:{{ .Values.api.embedding.image.tag | default .Chart.AppVersion }}
+          imagePullPolicy: {{ .Values.api.embedding.image.pullPolicy }}
+          command:
+            - /app/apps/cli/.venv/bin/python
+          args:
+            - -m
+            - src.main
+            - embed
+            - --embed-server-host
+            - 127.0.0.1
+            - --embed-server-port
+            - {{ .Values.api.embedding.port | quote }}
+          ports:
+            - name: embedding
+              containerPort: {{ .Values.api.embedding.port }}
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: embedding
+            periodSeconds: 5
+            failureThreshold: 12
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          {{- with .Values.api.embedding.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+        {{- end }}
       volumes:
         - name: sandbox-temp
           emptyDir:

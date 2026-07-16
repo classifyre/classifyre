@@ -1,49 +1,52 @@
-import { spawn, execFileSync, type ChildProcess } from 'child_process';
-import { app } from 'electron';
-import path from 'path';
-import fs from 'fs';
-import http from 'http';
-import os from 'os';
-import crypto from 'crypto';
-import treeKill from 'tree-kill';
-import { ensurePythonRuntime } from './python-env.js';
-import { getLogFilePath } from './logger.js';
+import { spawn, execFileSync, type ChildProcess } from "child_process";
+import { app } from "electron";
+import path from "path";
+import fs from "fs";
+import http from "http";
+import os from "os";
+import crypto from "crypto";
+import treeKill from "tree-kill";
+import { ensurePythonRuntime } from "./python-env.js";
+import { getLogFilePath } from "./logger.js";
+import { getAvailablePort } from "./port-manager.js";
 
 // In dev mode we inherit the developer's login-shell PATH so locally installed
 // tooling (uv, java, node) is visible. In packaged mode we never touch the
 // user's shell: everything the app needs is bundled, and the PATH is built
 // from the bundled resources plus standard system directories only.
 function getDevShellPath(): string {
-  const shells = ['/bin/zsh', '/bin/bash'];
+  const shells = ["/bin/zsh", "/bin/bash"];
   for (const shell of shells) {
     try {
       if (!fs.existsSync(shell)) continue;
-      const raw = execFileSync(shell, ['-lc', 'echo $PATH'], {
-        encoding: 'utf-8',
+      const raw = execFileSync(shell, ["-lc", "echo $PATH"], {
+        encoding: "utf-8",
         timeout: 5000,
       }).trim();
       if (raw) return raw;
-    } catch { /* fall through */ }
+    } catch {
+      /* fall through */
+    }
   }
 
   const home = os.homedir();
   return [
     `${home}/.bun/bin`,
     `${home}/.local/bin`,
-    '/opt/homebrew/bin',
-    '/usr/local/bin',
-    '/usr/bin',
-    '/bin',
-    '/usr/sbin',
-    '/sbin',
-  ].join(':');
+    "/opt/homebrew/bin",
+    "/usr/local/bin",
+    "/usr/bin",
+    "/bin",
+    "/usr/sbin",
+    "/sbin",
+  ].join(":");
 }
 
 function getSystemPath(): string {
-  if (process.platform === 'win32') {
-    return process.env['PATH'] ?? '';
+  if (process.platform === "win32") {
+    return process.env["PATH"] ?? "";
   }
-  return ['/usr/bin', '/bin', '/usr/sbin', '/sbin'].join(':');
+  return ["/usr/bin", "/bin", "/usr/sbin", "/sbin"].join(":");
 }
 
 let cachedEnv: Record<string, string> | null = null;
@@ -56,9 +59,12 @@ function getBaseEnv(): Record<string, string> {
       PATH: getSystemPath(),
     } as Record<string, string>;
     // The packaged app must not run child processes as Node accidentally.
-    delete cachedEnv['ELECTRON_RUN_AS_NODE'];
+    delete cachedEnv["ELECTRON_RUN_AS_NODE"];
   } else {
-    cachedEnv = { ...process.env, PATH: getDevShellPath() } as Record<string, string>;
+    cachedEnv = { ...process.env, PATH: getDevShellPath() } as Record<
+      string,
+      string
+    >;
   }
   return cachedEnv;
 }
@@ -72,9 +78,9 @@ let cachedMaskedConfigKey: string | null = null;
 
 function getMaskedConfigKey(): string {
   if (cachedMaskedConfigKey) return cachedMaskedConfigKey;
-  const keyFile = path.join(app.getPath('userData'), 'masked-config.key');
+  const keyFile = path.join(app.getPath("userData"), "masked-config.key");
   try {
-    const existing = fs.readFileSync(keyFile, 'utf-8').trim();
+    const existing = fs.readFileSync(keyFile, "utf-8").trim();
     if (existing) {
       cachedMaskedConfigKey = existing;
       return existing;
@@ -82,7 +88,7 @@ function getMaskedConfigKey(): string {
   } catch {
     // first run — generate below
   }
-  const key = `base64:${crypto.randomBytes(32).toString('base64')}`;
+  const key = `base64:${crypto.randomBytes(32).toString("base64")}`;
   fs.mkdirSync(path.dirname(keyFile), { recursive: true });
   fs.writeFileSync(keyFile, `${key}\n`, { mode: 0o600 });
   cachedMaskedConfigKey = key;
@@ -97,15 +103,15 @@ function getMaskedConfigKey(): string {
 // size-capped by us. Dev keeps uv's global cache for fast iteration.
 function getUvCacheDir(): string | null {
   if (!app.isPackaged) return null;
-  return path.join(app.getPath('userData'), 'uv-cache');
+  return path.join(app.getPath("userData"), "uv-cache");
 }
 
 // Scan (runner) logs are persisted as NDJSON files per run, namespaced so
 // separate workspaces never mix logs. Sits under CLASSIFYRE_DATA_DIR/userData
 // alongside the Postgres data so uninstall/reset wipes it too.
 function getRunnerLogDir(namespaceId: string): string {
-  const base = process.env['CLASSIFYRE_DATA_DIR'] || app.getPath('userData');
-  return path.join(base, 'runner-logs', namespaceId);
+  const base = process.env["CLASSIFYRE_DATA_DIR"] || app.getPath("userData");
+  return path.join(base, "runner-logs", namespaceId);
 }
 
 // Hard cap for the contained uv cache. Once exceeded we wipe it (equivalent to
@@ -158,6 +164,8 @@ interface ManagedProcess {
 
 export class ProcessManager {
   private processes = new Map<string, ManagedProcess>();
+  private embeddingProcess: ManagedProcess | null = null;
+  private embeddingStart: Promise<number> | null = null;
   private venvPathOverride: string | null = null;
   private venvPreparation: Promise<void> | null = null;
   private apiDirPromise: Promise<string> | null = null;
@@ -174,7 +182,7 @@ export class ProcessManager {
           const venvPath = await ensurePythonRuntime();
           if (venvPath) this.venvPathOverride = venvPath;
         } catch (err) {
-          console.error('Failed to prepare Python runtime:', err);
+          console.error("Failed to prepare Python runtime:", err);
         }
         await this.bustUvCacheIfOversized();
       })();
@@ -201,7 +209,7 @@ export class ProcessManager {
         fs.mkdirSync(cacheDir, { recursive: true });
       }
     } catch (err) {
-      console.error('Failed to maintain uv cache:', err);
+      console.error("Failed to maintain uv cache:", err);
     }
   }
 
@@ -224,15 +232,15 @@ export class ProcessManager {
   }
 
   private async extractApiDir(): Promise<string> {
-    const bundledDir = path.join(process.resourcesPath, 'api');
-    const archive = path.join(process.resourcesPath, 'api.tar.gz');
+    const bundledDir = path.join(process.resourcesPath, "api");
+    const archive = path.join(process.resourcesPath, "api.tar.gz");
     if (fs.existsSync(bundledDir) || !fs.existsSync(archive)) {
       return bundledDir;
     }
 
-    const root = path.join(app.getPath('userData'), 'api-runtime');
-    const markerFile = path.join(root, 'version.json');
-    const extractedDir = path.join(root, 'api');
+    const root = path.join(app.getPath("userData"), "api-runtime");
+    const markerFile = path.join(root, "version.json");
+    const extractedDir = path.join(root, "api");
 
     // Re-extract whenever the bundled archive changes, not just when the app
     // version string changes. Gating purely on app.getVersion() leaves a stale
@@ -243,7 +251,7 @@ export class ProcessManager {
     const signature = `${app.getVersion()}:${archiveStat.size}:${Math.round(archiveStat.mtimeMs)}`;
     try {
       const marker = JSON.parse(
-        await fs.promises.readFile(markerFile, 'utf-8'),
+        await fs.promises.readFile(markerFile, "utf-8"),
       ) as { signature?: string };
       if (marker.signature === signature && fs.existsSync(extractedDir)) {
         return extractedDir;
@@ -256,15 +264,20 @@ export class ProcessManager {
     await fs.promises.rm(root, { recursive: true, force: true });
     await fs.promises.mkdir(root, { recursive: true });
     await new Promise<void>((resolve, reject) => {
-      const child = spawn('tar', ['-xzf', archive, '-C', root], { stdio: 'inherit' });
-      child.on('error', reject);
-      child.on('exit', (code) => {
+      const child = spawn("tar", ["-xzf", archive, "-C", root], {
+        stdio: "inherit",
+      });
+      child.on("error", reject);
+      child.on("exit", (code) => {
         if (code === 0) resolve();
-        else reject(new Error(`Failed to extract bundled API (tar exited ${code})`));
+        else
+          reject(
+            new Error(`Failed to extract bundled API (tar exited ${code})`),
+          );
       });
     });
     await fs.promises.writeFile(markerFile, JSON.stringify({ signature }));
-    console.log('[api-runtime] Extraction complete');
+    console.log("[api-runtime] Extraction complete");
     return extractedDir;
   }
 
@@ -273,42 +286,42 @@ export class ProcessManager {
       // Packaged: the whole API is one esbuild bundle at the api-tree root
       // (see apps/desktop/scripts/bundle-api.mjs). Dev still runs the plain
       // tsc output.
-      return path.join(await this.ensureApiDir(), 'backend.js');
+      return path.join(await this.ensureApiDir(), "backend.js");
     }
-    return path.join(__dirname, '../../../api/dist/src/main.js');
+    return path.join(__dirname, "../../../api/dist/src/main.js");
   }
 
   private getCliPath(): string {
     if (app.isPackaged) {
       // pyapp mirrors the monorepo layout (apps/cli + packages/schemas) so the
       // CLI pyproject's relative editable dep stays valid for runtime uv sync.
-      return path.join(process.resourcesPath, 'pyapp', 'apps', 'cli');
+      return path.join(process.resourcesPath, "pyapp", "apps", "cli");
     }
-    return path.join(__dirname, '../../../cli');
+    return path.join(__dirname, "../../../cli");
   }
 
   private getVenvPath(): string {
     if (this.venvPathOverride) return this.venvPathOverride;
     if (app.isPackaged) {
-      return path.join(process.resourcesPath, 'venv');
+      return path.join(process.resourcesPath, "venv");
     }
-    return path.join(__dirname, '../../../cli/.venv');
+    return path.join(__dirname, "../../../cli/.venv");
   }
 
   private async getPrismaDir(): Promise<string> {
     if (app.isPackaged) {
       // Staged inside the api tree so `prisma generate` at build time and
       // `prisma migrate deploy` at runtime share one schema location.
-      return path.join(await this.ensureApiDir(), 'prisma');
+      return path.join(await this.ensureApiDir(), "prisma");
     }
-    return path.join(__dirname, '../../../api/prisma');
+    return path.join(__dirname, "../../../api/prisma");
   }
 
   private async getApiDir(): Promise<string> {
     if (app.isPackaged) {
       return this.ensureApiDir();
     }
-    return path.join(__dirname, '../../../api');
+    return path.join(__dirname, "../../../api");
   }
 
   // Runs a script with Electron's embedded Node.js so the packaged app never
@@ -317,7 +330,7 @@ export class ProcessManager {
     return {
       ...getBaseEnv(),
       ...extra,
-      ELECTRON_RUN_AS_NODE: '1',
+      ELECTRON_RUN_AS_NODE: "1",
     };
   }
 
@@ -332,6 +345,7 @@ export class ProcessManager {
     }
 
     await this.prepareVenv();
+    const embeddingPort = await this.startEmbeddingServer();
 
     const entryPath = await this.getApiEntryPath();
     const cliPath = this.getCliPath();
@@ -339,24 +353,29 @@ export class ProcessManager {
 
     const baseEnv = getBaseEnv();
 
-    const venvBin = path.join(venvPath, process.platform === 'win32' ? 'Scripts' : 'bin');
+    const venvBin = path.join(
+      venvPath,
+      process.platform === "win32" ? "Scripts" : "bin",
+    );
     const pathWithVenv = fs.existsSync(venvBin)
-      ? `${venvBin}${path.delimiter}${baseEnv['PATH'] ?? ''}`
-      : baseEnv['PATH'] ?? '';
+      ? `${venvBin}${path.delimiter}${baseEnv["PATH"] ?? ""}`
+      : (baseEnv["PATH"] ?? "");
 
     const nodeArgs: string[] = [];
     if (options.memoryLimitMb && options.memoryLimitMb > 0) {
-      nodeArgs.push(`--max-old-space-size=${Math.floor(options.memoryLimitMb)}`);
+      nodeArgs.push(
+        `--max-old-space-size=${Math.floor(options.memoryLimitMb)}`,
+      );
     }
 
     const child = spawn(process.execPath, [...nodeArgs, entryPath], {
       env: {
         ...baseEnv,
         PATH: pathWithVenv,
-        ELECTRON_RUN_AS_NODE: '1',
+        ELECTRON_RUN_AS_NODE: "1",
         PORT: String(port),
         DATABASE_URL: databaseUrl,
-        ENVIRONMENT: 'desktop',
+        ENVIRONMENT: "desktop",
         CLI_PATH: cliPath,
         VENV_PATH: venvPath,
         // Pin uv's project environment to the (possibly relocated) venv so
@@ -373,24 +392,29 @@ export class ProcessManager {
         // Persist scan logs on the local filesystem (desktop has no S3).
         // The storage service enforces per-run and total-size caps itself.
         RUNNER_LOG_DIR: getRunnerLogDir(namespaceId),
-        CORS_ORIGIN: '*',
-        NODE_ENV: app.isPackaged ? 'production' : 'development',
+        EMBEDDING_SERVER_URL: `http://127.0.0.1:${embeddingPort}`,
+        HF_HOME: app.isPackaged
+          ? path.join(process.resourcesPath, "models", "huggingface")
+          : path.join(this.getCliPath(), ".cache", "huggingface"),
+        ...(app.isPackaged ? { HF_HUB_OFFLINE: "1" } : {}),
+        CORS_ORIGIN: "*",
+        NODE_ENV: app.isPackaged ? "production" : "development",
         ...(options.maxParallelScans && options.maxParallelScans > 0
           ? { MAX_PARALLEL_SCANS: String(Math.floor(options.maxParallelScans)) }
           : {}),
       },
-      stdio: ['ignore', 'pipe', 'pipe'],
+      stdio: ["ignore", "pipe", "pipe"],
     });
 
-    child.stdout?.on('data', (data: Buffer) => {
+    child.stdout?.on("data", (data: Buffer) => {
       process.stderr.write(`[API:${namespaceId}] ${data.toString().trim()}\n`);
     });
 
-    child.stderr?.on('data', (data: Buffer) => {
+    child.stderr?.on("data", (data: Buffer) => {
       process.stderr.write(`[API:${namespaceId}] ${data.toString().trim()}\n`);
     });
 
-    child.on('exit', (code) => {
+    child.on("exit", (code) => {
       process.stderr.write(`[API:${namespaceId}] exited with code ${code}\n`);
       this.processes.delete(namespaceId);
     });
@@ -400,8 +424,10 @@ export class ProcessManager {
     // exception in the main process and crashes the whole app. Surface it as a
     // failed workspace open instead, without waiting out the ready timeout.
     const spawnFailed = new Promise<never>((_, reject) => {
-      child.on('error', (err) => {
-        process.stderr.write(`[API:${namespaceId}] process error: ${err.message}\n`);
+      child.on("error", (err) => {
+        process.stderr.write(
+          `[API:${namespaceId}] process error: ${err.message}\n`,
+        );
         reject(new Error(`Failed to launch the API process: ${err.message}`));
       });
     });
@@ -417,52 +443,163 @@ export class ProcessManager {
     }
   }
 
+  private startEmbeddingServer(): Promise<number> {
+    if (!this.embeddingStart) {
+      this.embeddingStart = this.doStartEmbeddingServer().catch(
+        (error: unknown) => {
+          this.embeddingStart = null;
+          throw error;
+        },
+      );
+    }
+    return this.embeddingStart;
+  }
+
+  private async doStartEmbeddingServer(): Promise<number> {
+    if (this.embeddingProcess) return this.embeddingProcess.port;
+    const port = await getAvailablePort(8011);
+    const venvPath = this.getVenvPath();
+    const python = path.join(
+      venvPath,
+      process.platform === "win32" ? "Scripts/python.exe" : "bin/python",
+    );
+    const cliPath = this.getCliPath();
+    const child = spawn(
+      python,
+      ["-m", "src.main", "embed", "--embed-server-port", String(port)],
+      {
+        cwd: cliPath,
+        env: {
+          ...getBaseEnv(),
+          HF_HOME: app.isPackaged
+            ? path.join(process.resourcesPath, "models", "huggingface")
+            : path.join(cliPath, ".cache", "huggingface"),
+          ...(app.isPackaged ? { HF_HUB_OFFLINE: "1" } : {}),
+        },
+        stdio: ["ignore", "pipe", "pipe"],
+      },
+    );
+    child.stdout?.on("data", (data: Buffer) =>
+      process.stderr.write(`[EMBED] ${data}`),
+    );
+    child.stderr?.on("data", (data: Buffer) =>
+      process.stderr.write(`[EMBED] ${data}`),
+    );
+    const spawnFailed = new Promise<never>((_, reject) => {
+      child.once("error", (error) => {
+        process.stderr.write(`[EMBED] process error: ${error.message}\n`);
+        reject(
+          new Error(`Failed to launch the embedding server: ${error.message}`),
+        );
+      });
+    });
+    spawnFailed.catch(() => {});
+    this.embeddingProcess = { child, port };
+    child.on("exit", () => {
+      this.embeddingProcess = null;
+      this.embeddingStart = null;
+    });
+    try {
+      await Promise.race([this.waitForEmbeddingReady(port), spawnFailed]);
+      return port;
+    } catch (error) {
+      this.embeddingProcess = null;
+      if (child.pid) {
+        await new Promise<void>((resolve) =>
+          treeKill(child.pid as number, "SIGTERM", () => resolve()),
+        );
+      }
+      throw error;
+    }
+  }
+
+  private waitForEmbeddingReady(
+    port: number,
+    timeoutMs = 180_000,
+  ): Promise<void> {
+    const started = Date.now();
+    return new Promise((resolve, reject) => {
+      const check = () => {
+        if (Date.now() - started > timeoutMs) {
+          reject(
+            new Error(
+              `Embedding server on port ${port} not ready after ${timeoutMs}ms`,
+            ),
+          );
+          return;
+        }
+        const request = http.get(
+          `http://127.0.0.1:${port}/health`,
+          (response) => {
+            response.resume();
+            if (response.statusCode === 200) resolve();
+            else setTimeout(check, 500);
+          },
+        );
+        request.on("error", () => setTimeout(check, 500));
+        request.setTimeout(2000, () => request.destroy());
+      };
+      check();
+    });
+  }
+
   // Locates the Prisma CLI bundled with the API's node_modules; runs offline
   // with Electron's Node — no bun, no npx, no network.
   private async getPrismaCliPath(): Promise<string> {
     const candidates = [
-      path.join(await this.getApiDir(), 'node_modules', 'prisma', 'build', 'index.js'),
+      path.join(
+        await this.getApiDir(),
+        "node_modules",
+        "prisma",
+        "build",
+        "index.js",
+      ),
       // Dev fallback: hoisted install at the monorepo root.
-      path.join(__dirname, '../../../../node_modules/prisma/build/index.js'),
+      path.join(__dirname, "../../../../node_modules/prisma/build/index.js"),
     ];
     for (const candidate of candidates) {
       if (fs.existsSync(candidate)) return candidate;
     }
     throw new Error(
-      `Prisma CLI not found (looked in: ${candidates.join(', ')}). ` +
-        'The desktop bundle must include api/node_modules/prisma.',
+      `Prisma CLI not found (looked in: ${candidates.join(", ")}). ` +
+        "The desktop bundle must include api/node_modules/prisma.",
     );
   }
 
   async runMigrations(databaseUrl: string): Promise<void> {
-    const prismaSchemaPath = path.join(await this.getPrismaDir(), 'schema.prisma');
+    const prismaSchemaPath = path.join(
+      await this.getPrismaDir(),
+      "schema.prisma",
+    );
     const apiDir = await this.getApiDir();
     const prismaCli = await this.getPrismaCliPath();
 
-    console.log(`[migrations] Running in ${apiDir} with schema ${prismaSchemaPath}`);
+    console.log(
+      `[migrations] Running in ${apiDir} with schema ${prismaSchemaPath}`,
+    );
 
     return new Promise((resolve, reject) => {
       const child = spawn(
         process.execPath,
-        [prismaCli, 'migrate', 'deploy', '--schema', prismaSchemaPath],
+        [prismaCli, "migrate", "deploy", "--schema", prismaSchemaPath],
         {
           cwd: apiDir,
           env: this.nodeSpawnEnv({
             DATABASE_URL: databaseUrl,
             // Prisma CLI must not try to download engines at runtime.
-            PRISMA_CLI_TELEMETRY_INFORMATION: 'disabled',
-            CHECKPOINT_DISABLE: '1',
+            PRISMA_CLI_TELEMETRY_INFORMATION: "disabled",
+            CHECKPOINT_DISABLE: "1",
           }),
-          stdio: ['ignore', 'pipe', 'pipe'],
+          stdio: ["ignore", "pipe", "pipe"],
         },
       );
 
-      let stderr = '';
-      child.stderr?.on('data', (data: Buffer) => {
+      let stderr = "";
+      child.stderr?.on("data", (data: Buffer) => {
         stderr += data.toString();
       });
 
-      child.on('exit', (code) => {
+      child.on("exit", (code) => {
         if (code === 0) {
           resolve();
         } else {
@@ -470,7 +607,7 @@ export class ProcessManager {
         }
       });
 
-      child.on('error', reject);
+      child.on("error", reject);
     });
   }
 
@@ -493,25 +630,22 @@ export class ProcessManager {
           reject(
             new Error(
               `API on port ${port} not ready after ${timeoutMs}ms` +
-                (logFile ? ` — see log for details: ${logFile}` : ''),
+                (logFile ? ` — see log for details: ${logFile}` : ""),
             ),
           );
           return;
         }
 
-        const req = http.get(
-          `http://127.0.0.1:${port}/`,
-          (res) => {
-            if (res.statusCode === 200) {
-              resolve();
-            } else {
-              setTimeout(check, intervalMs);
-            }
-            res.resume();
-          },
-        );
+        const req = http.get(`http://127.0.0.1:${port}/`, (res) => {
+          if (res.statusCode === 200) {
+            resolve();
+          } else {
+            setTimeout(check, intervalMs);
+          }
+          res.resume();
+        });
 
-        req.on('error', () => {
+        req.on("error", () => {
           setTimeout(check, intervalMs);
         });
 
@@ -540,21 +674,29 @@ export class ProcessManager {
       }
 
       const forceKillTimer = setTimeout(() => {
-        treeKill(pid, 'SIGKILL', () => resolve());
+        treeKill(pid, "SIGKILL", () => resolve());
       }, 5000);
 
-      child.on('exit', () => {
+      child.on("exit", () => {
         clearTimeout(forceKillTimer);
         resolve();
       });
 
-      treeKill(pid, 'SIGTERM');
+      treeKill(pid, "SIGTERM");
     });
   }
 
   async stopAll(): Promise<void> {
     const ids = [...this.processes.keys()];
     await Promise.all(ids.map((id) => this.stopApi(id)));
+    const embedding = this.embeddingProcess;
+    this.embeddingProcess = null;
+    this.embeddingStart = null;
+    if (embedding?.child.pid) {
+      await new Promise<void>((resolve) =>
+        treeKill(embedding.child.pid as number, "SIGTERM", () => resolve()),
+      );
+    }
   }
 
   getPort(namespaceId: string): number | undefined {

@@ -14,31 +14,31 @@
 
 import { mapValues } from '../runtime';
 /**
- * 
+ *
  * @export
  * @interface CreateHypothesisDto
  */
 export interface CreateHypothesisDto {
     /**
-     * 
+     *
      * @type {string}
      * @memberof CreateHypothesisDto
      */
     statement: string;
     /**
-     * 
+     *
      * @type {string}
      * @memberof CreateHypothesisDto
      */
     status?: CreateHypothesisDtoStatusEnum;
     /**
-     * 
+     *
      * @type {number}
      * @memberof CreateHypothesisDto
      */
     confidence?: number;
     /**
-     * 
+     *
      * @type {string}
      * @memberof CreateHypothesisDto
      */
@@ -75,7 +75,7 @@ export function CreateHypothesisDtoFromJSONTyped(json: any, ignoreDiscriminator:
         return json;
     }
     return {
-        
+
         'statement': json['statement'],
         'status': json['status'] == null ? undefined : json['status'],
         'confidence': json['confidence'] == null ? undefined : json['confidence'],
@@ -93,7 +93,7 @@ export function CreateHypothesisDtoToJSONTyped(value?: CreateHypothesisDto | nul
     }
 
     return {
-        
+
         'statement': value['statement'],
         'status': value['status'],
         'confidence': value['confidence'],

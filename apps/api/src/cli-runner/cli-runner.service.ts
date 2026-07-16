@@ -24,6 +24,8 @@ import {
   Source,
   TriggerType,
   Severity,
+  FindingStatus,
+  TextExtractionStatus,
 } from '@prisma/client';
 import {
   NotificationEvent,
@@ -55,6 +57,16 @@ import { SearchRunnersAssetsResponseDto } from '../dto/search-runners-assets-res
 type SourceRunSnapshot = {
   runnerStatus: RunnerStatus | null;
   currentRunnerId: string | null;
+};
+
+type TextCoverageStats = {
+  extracted: number;
+  empty: number;
+  engineUnavailable: number;
+  zeroFrames: number;
+  failed: number;
+  notApplicable: number;
+  unknown: number;
 };
 
 type ActiveExecutionRecord = {
@@ -1665,19 +1677,29 @@ export class CliRunnerService implements OnApplicationBootstrap {
    * "assetsCreated: 0, assetsUnchanged: 10". runner_assets.change_type records
    * what this run actually did and no later run rewrites it.
    */
-  private async computeRunnerStats(runnerId: string): Promise<{
+  private async computeRunnerStats(
+    runnerId: string,
+    findingsCreated: number,
+  ): Promise<{
     assetsCreated: number;
     assetsUpdated: number;
     assetsUnchanged: number;
+    assetsDeleted: number;
     assetsWithoutText: number;
     totalFindings: number;
+    findingsCreated: number;
+    findingsResolved: number;
+    findingsRetained: number;
+    textCoverage: TextCoverageStats;
   }> {
     const [
       assetsCreated,
       assetsUpdated,
       assetsUnchanged,
+      assetsDeleted,
       assetsWithoutText,
       totalFindings,
+      textCoverageRows,
     ] = await Promise.all([
       this.prisma.runnerAsset.count({
         where: { runnerId, changeType: RunnerAssetChangeType.CREATED },
@@ -1688,6 +1710,9 @@ export class CliRunnerService implements OnApplicationBootstrap {
       this.prisma.runnerAsset.count({
         where: { runnerId, changeType: RunnerAssetChangeType.UNCHANGED },
       }),
+      this.prisma.runnerAsset.count({
+        where: { runnerId, changeType: RunnerAssetChangeType.DELETED },
+      }),
       // Coverage, not errors: these assets ingested fine, but OCR or
       // transcription returned nothing so their content was never scanned.
       this.prisma.runnerAsset.count({ where: { runnerId, emptyText: true } }),
@@ -1695,14 +1720,67 @@ export class CliRunnerService implements OnApplicationBootstrap {
       // totalFindings has always been. It is NOT a discovery count — see
       // Runner.findingsCreated, which bulkIngest accumulates as batches land.
       this.prisma.finding.count({ where: { runnerId } }),
+      this.prisma.runnerAsset.groupBy({
+        by: ['textExtractionStatus'],
+        where: { runnerId },
+        _count: { _all: true },
+      }),
     ]);
+
+    const textCoverage: TextCoverageStats = {
+      extracted: 0,
+      empty: 0,
+      engineUnavailable: 0,
+      zeroFrames: 0,
+      failed: 0,
+      notApplicable: 0,
+      unknown: 0,
+    };
+    for (const row of textCoverageRows) {
+      const count = row._count._all;
+      switch (row.textExtractionStatus) {
+        case TextExtractionStatus.EXTRACTED:
+          textCoverage.extracted += count;
+          break;
+        case TextExtractionStatus.EMPTY:
+          textCoverage.empty += count;
+          break;
+        case TextExtractionStatus.ENGINE_UNAVAILABLE:
+          textCoverage.engineUnavailable += count;
+          break;
+        case TextExtractionStatus.ZERO_FRAMES:
+          textCoverage.zeroFrames += count;
+          break;
+        case TextExtractionStatus.FAILED:
+          textCoverage.failed += count;
+          break;
+        case TextExtractionStatus.NOT_APPLICABLE:
+          textCoverage.notApplicable += count;
+          break;
+        default:
+          textCoverage.unknown += count;
+      }
+    }
+
+    const findingsResolved = await this.prisma.finding.count({
+      where: { runnerId, status: FindingStatus.RESOLVED },
+    });
+    const findingsRetained = Math.max(
+      0,
+      totalFindings - findingsCreated - findingsResolved,
+    );
 
     return {
       assetsCreated,
       assetsUpdated,
       assetsUnchanged,
+      assetsDeleted,
       assetsWithoutText,
       totalFindings,
+      findingsCreated,
+      findingsResolved,
+      findingsRetained,
+      textCoverage,
     };
   }
 
@@ -1853,9 +1931,13 @@ export class CliRunnerService implements OnApplicationBootstrap {
       assetsCreated,
       assetsUpdated,
       assetsUnchanged,
+      assetsDeleted,
       assetsWithoutText,
       totalFindings,
-    } = await this.computeRunnerStats(runnerId);
+      findingsResolved,
+      findingsRetained,
+      textCoverage,
+    } = await this.computeRunnerStats(runnerId, runner.findingsCreated ?? 0);
 
     const { finalStatus, warningMessage } = await this.prisma.$transaction(
       async (tx) => {
@@ -1887,8 +1969,13 @@ export class CliRunnerService implements OnApplicationBootstrap {
 
         const hasAssetErrors = errorCount > 0;
         const hasDetectorFailures = detectorFailures.assetCount > 0;
+        const extractionFailureCount =
+          textCoverage.engineUnavailable +
+          textCoverage.zeroFrames +
+          textCoverage.failed;
+        const hasExtractionFailures = extractionFailureCount > 0;
         const status =
-          hasAssetErrors || hasDetectorFailures
+          hasAssetErrors || hasDetectorFailures || hasExtractionFailures
             ? RunnerStatus.WARNING
             : RunnerStatus.COMPLETED;
 
@@ -1904,6 +1991,13 @@ export class CliRunnerService implements OnApplicationBootstrap {
             `${detectors} failed on ${detectorFailures.assetCount} of ${totalCount} assets`,
           );
         }
+        if (hasExtractionFailures) {
+          messageParts.push(
+            `${extractionFailureCount} assets had incomplete text extraction ` +
+              `(${textCoverage.engineUnavailable} engine unavailable, ` +
+              `${textCoverage.zeroFrames} zero-frame video, ${textCoverage.failed} other failures)`,
+          );
+        }
         const message =
           messageParts.length > 0 ? messageParts.join('; ') : undefined;
 
@@ -1916,8 +2010,12 @@ export class CliRunnerService implements OnApplicationBootstrap {
             assetsCreated,
             assetsUpdated,
             assetsUnchanged,
+            assetsDeleted,
             assetsWithoutText,
             totalFindings,
+            findingsResolved,
+            findingsRetained,
+            textCoverage,
             ...(message && { errorMessage: message }),
           },
         });
@@ -3014,6 +3112,21 @@ export class CliRunnerService implements OnApplicationBootstrap {
     return Math.trunc(numericValue);
   }
 
+  private normalizeTextCoverage(value: unknown): TextCoverageStats | null {
+    if (!value || typeof value !== 'object' || Array.isArray(value))
+      return null;
+    const source = value as Record<string, unknown>;
+    return {
+      extracted: this.toInt(source.extracted),
+      empty: this.toInt(source.empty),
+      engineUnavailable: this.toInt(source.engineUnavailable),
+      zeroFrames: this.toInt(source.zeroFrames),
+      failed: this.toInt(source.failed),
+      notApplicable: this.toInt(source.notApplicable),
+      unknown: this.toInt(source.unknown),
+    };
+  }
+
   private formatDateKey(date: Date): string {
     const year = date.getUTCFullYear();
     const month = String(date.getUTCMonth() + 1).padStart(2, '0');
@@ -3053,6 +3166,7 @@ export class CliRunnerService implements OnApplicationBootstrap {
 
     const normalizedItems = items.map((item) => ({
       ...item,
+      textCoverage: this.normalizeTextCoverage(item.textCoverage),
       errorDetails:
         item.errorDetails &&
         typeof item.errorDetails === 'object' &&
@@ -3421,6 +3535,7 @@ export class CliRunnerService implements OnApplicationBootstrap {
           detector_outcomes: Prisma.JsonValue;
           change_type: RunnerAssetChangeType | null;
           empty_text: boolean | null;
+          text_extraction_status: TextExtractionStatus | null;
           created_at: Date;
         }>
       >(
@@ -3444,6 +3559,7 @@ export class CliRunnerService implements OnApplicationBootstrap {
         detectorOutcomes: row.detector_outcomes,
         changeType: row.change_type,
         emptyText: row.empty_text,
+        textExtractionStatus: row.text_extraction_status,
         createdAt: row.created_at,
       }));
     } else {
@@ -3511,6 +3627,7 @@ export class CliRunnerService implements OnApplicationBootstrap {
         startedAt: ra.startedAt,
         completedAt: ra.completedAt,
         errorMessage: ra.errorMessage,
+        textExtractionStatus: ra.textExtractionStatus,
         createdAt: ra.createdAt,
         findingsTotal: ra.findingsTotal ?? null,
         findingsBySeverity:

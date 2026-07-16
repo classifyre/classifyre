@@ -34,6 +34,8 @@ Name | Type
 `resolvedAt` | Date
 `createdAt` | Date
 `updatedAt` | Date
+`evidenceAnalysis` | [FindingEvidenceAnalysisDto](FindingEvidenceAnalysisDto.md)
+`ranking` | [FindingSearchRankingDto](FindingSearchRankingDto.md)
 
 ## Example
 
@@ -70,6 +72,8 @@ const example = {
   "resolvedAt": null,
   "createdAt": null,
   "updatedAt": null,
+  "evidenceAnalysis": null,
+  "ranking": null,
 } satisfies SearchAssetFindingDto
 
 console.log(example)

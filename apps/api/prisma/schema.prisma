@@ -7,38 +7,39 @@ datasource db {
 }
 
 model Source {
-  id                  String         @id @default(uuid())
-  name                String
-  description         String?        @db.Text
-  type                AssetType
-  config              Json
-  runnerStatus        RunnerStatus?  @default(PENDING) @map("runner_status")
-  consecutiveFailures Int            @default(0) @map("consecutive_failures")
-  lastRunStatus       RunnerStatus?  @map("last_run_status")
-  lastRunAt           DateTime?      @map("last_run_at")
-  lastErrorMessage    String?        @map("last_error_message")
-  createdAt           DateTime       @default(now()) @map("created_at")
-  updatedAt           DateTime       @updatedAt @map("updated_at")
-  currentRunnerId     String?        @map("current_runner_id")
-  scheduleEnabled     Boolean        @default(false) @map("schedule_enabled")
-  scheduleCron        String?        @map("schedule_cron")
-  scheduleTimezone    String?        @default("UTC") @map("schedule_timezone")
-  scheduleNextAt      DateTime?      @map("schedule_next_at")
+  id                         String                      @id @default(uuid())
+  name                       String
+  description                String?                     @db.Text
+  type                       AssetType
+  config                     Json
+  runnerStatus               RunnerStatus?               @default(PENDING) @map("runner_status")
+  consecutiveFailures        Int                         @default(0) @map("consecutive_failures")
+  lastRunStatus              RunnerStatus?               @map("last_run_status")
+  lastRunAt                  DateTime?                   @map("last_run_at")
+  lastErrorMessage           String?                     @map("last_error_message")
+  createdAt                  DateTime                    @default(now()) @map("created_at")
+  updatedAt                  DateTime                    @updatedAt @map("updated_at")
+  currentRunnerId            String?                     @map("current_runner_id")
+  scheduleEnabled            Boolean                     @default(false) @map("schedule_enabled")
+  scheduleCron               String?                     @map("schedule_cron")
+  scheduleTimezone           String?                     @default("UTC") @map("schedule_timezone")
+  scheduleNextAt             DateTime?                   @map("schedule_next_at")
   // Opaque, source-defined cursor for AUTOMATIC sampling. Persisted at the end
   // of each run and injected into the next run so extraction picks up where it
   // left off (incremental ingestion). The API never interprets its contents.
-  samplingCursor      Json?          @map("sampling_cursor") @db.JsonB
+  samplingCursor             Json?                       @map("sampling_cursor") @db.JsonB
   // Per-source autopilot management mode; overrides the instance config flag
   // unless INHERIT. OBSERVE_ONLY blocks the config-tuning agent from changing
   // this source's config.
-  aiMode              AiManagementMode @default(INHERIT) @map("ai_mode")
-  assets          Asset[]
-  findings        Finding[]
-  customDetectorFeedback CustomDetectorFeedback[]
+  aiMode                     AiManagementMode            @default(INHERIT) @map("ai_mode")
+  assets                     Asset[]
+  findings                   Finding[]
+  customDetectorFeedback     CustomDetectorFeedback[]
   customDetectorTrainingRuns CustomDetectorTrainingRun[]
-  runners         Runner[]
-  notifications   Notification[]
-  customDetectorExtractions CustomDetectorExtraction[]
+  runners                    Runner[]
+  notifications              Notification[]
+  customDetectorExtractions  CustomDetectorExtraction[]
+  assetChunks                AssetChunk[]
 
   @@index([currentRunnerId])
   @@index([scheduleEnabled])
@@ -46,37 +47,39 @@ model Source {
 }
 
 model Asset {
-  id            String      @id @default(uuid())
-  hash          String
-  checksum      String
-  name          String
-  externalUrl   String      @map("external_url")
-  links         Json        @default("[]") @db.JsonB
+  id                        String                     @id @default(uuid())
+  hash                      String
+  checksum                  String
+  name                      String
+  externalUrl               String                     @map("external_url")
+  links                     Json                       @default("[]") @db.JsonB
   // Catalog asset kind (file, image, page, comment, table, ...) — free-form
   // string, not the AssetContentType enum (which is kept for SandboxRun).
-  assetType     String      @map("asset_type")
-  sourceType    AssetType   @map("source_type")
-  createdAt     DateTime    @default(now()) @map("created_at")
-  updatedAt     DateTime    @updatedAt @map("updated_at")
-  sourceId      String      @map("source_id")
-  lastScannedAt DateTime?   @map("last_scanned_at")
-  runnerId      String?     @map("runner_id")
-  status        AssetStatus @default(NEW)
+  assetType                 String                     @map("asset_type")
+  sourceType                AssetType                  @map("source_type")
+  createdAt                 DateTime                   @default(now()) @map("created_at")
+  updatedAt                 DateTime                   @updatedAt @map("updated_at")
+  sourceId                  String                     @map("source_id")
+  lastScannedAt             DateTime?                  @map("last_scanned_at")
+  runnerId                  String?                    @map("runner_id")
+  status                    AssetStatus                @default(NEW)
   // Fingerprint of the source scope this asset was last ingested under. An
   // asset may only be marked DELETED for absence when this matches the current
   // scope — otherwise its absence means the scope moved, not that the object is
   // gone. Null for assets ingested before scope fingerprinting existed; they
   // are treated as out-of-scope (retained) until their next ingest.
-  scopeFingerprint String?  @map("scope_fingerprint") @db.VarChar(64)
-  metadata      Json?       @db.JsonB
-  runner        Runner?     @relation(fields: [runnerId], references: [id])
-  source        Source      @relation(fields: [sourceId], references: [id], onDelete: Cascade)
-  findings      Finding[]
+  scopeFingerprint          String?                    @map("scope_fingerprint") @db.VarChar(64)
+  metadata                  Json?                      @db.JsonB
+  runner                    Runner?                    @relation(fields: [runnerId], references: [id])
+  source                    Source                     @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  findings                  Finding[]
   customDetectorExtractions CustomDetectorExtraction[]
-  correlationValues AssetCorrelationValue[]
-  signature         AssetSignature?
-  clusterMember     AssetClusterMember?
+  correlationValues         AssetCorrelationValue[]
+  signature                 AssetSignature?
+  clusterMember             AssetClusterMember?
+  chunks                    AssetChunk[]
 
+  @@unique([sourceId, hash])
   @@index([hash])
   @@index([sourceType])
   @@index([assetType])
@@ -86,51 +89,55 @@ model Asset {
   @@index([sourceId])
   @@index([status])
   @@index([sourceId, scopeFingerprint])
-  @@unique([sourceId, hash])
   @@map("assets")
 }
 
 model Finding {
-  id                String        @id @default(uuid())
-  detectionIdentity String        @unique @map("detection_identity") @db.VarChar(64)
+  id                String @id @default(uuid())
+  detectionIdentity String @unique @map("detection_identity") @db.VarChar(64)
 
-  assetId           String        @map("asset_id")
-  sourceId          String        @map("source_id")
-  runnerId          String?       @map("runner_id")
-  detectorType      DetectorType  @map("detector_type")
-  findingType       String        @map("finding_type")
-  category          String
-  severity          Severity
-  confidence        Decimal       @db.Decimal(3, 2)
-  matchedContent    String        @map("matched_content") @db.Text
-  redactedContent   String?       @map("redacted_content") @db.Text
-  contextBefore     String?       @map("context_before") @db.Text
-  contextAfter      String?       @map("context_after") @db.Text
-  location          Json?         @db.JsonB
-  metadata          Json?         @db.JsonB
-  customDetectorId  String?       @map("custom_detector_id")
-  customDetectorKey String?       @map("custom_detector_key")
+  assetId            String       @map("asset_id")
+  sourceId           String       @map("source_id")
+  runnerId           String?      @map("runner_id")
+  detectorType       DetectorType @map("detector_type")
+  findingType        String       @map("finding_type")
+  category           String
+  severity           Severity
+  confidence         Decimal      @db.Decimal(3, 2)
+  matchedContent     String       @map("matched_content") @db.Text
+  redactedContent    String?      @map("redacted_content") @db.Text
+  contextBefore      String?      @map("context_before") @db.Text
+  contextAfter       String?      @map("context_after") @db.Text
+  location           Json?        @db.JsonB
+  metadata           Json?        @db.JsonB
+  customDetectorId   String?      @map("custom_detector_id")
+  customDetectorKey  String?      @map("custom_detector_key")
   customDetectorName String?      @map("custom_detector_name")
+  // Hash of the normalized matched content plus surrounding context used by
+  // the intrinsic embedding pipeline. The vector itself is content-addressed
+  // in ContentEmbedding so repeated evidence is stored only once.
+  embedContentHash   String?      @map("embed_content_hash") @db.VarChar(64)
 
-  status            FindingStatus @default(OPEN)
-  resolutionReason  String?       @map("resolution_reason") @db.Text
-  comment           String?       @db.Text
+  status           FindingStatus @default(OPEN)
+  resolutionReason String?       @map("resolution_reason") @db.Text
+  comment          String?       @db.Text
 
-  history           Json          @default("[]") @db.JsonB
+  history Json @default("[]") @db.JsonB
 
-  detectedAt        DateTime      @map("detected_at")
-  firstDetectedAt   DateTime?     @map("first_detected_at")
-  lastDetectedAt    DateTime?     @map("last_detected_at")
-  resolvedAt        DateTime?     @map("resolved_at")
-  createdAt         DateTime      @default(now()) @map("created_at")
-  updatedAt         DateTime      @updatedAt @map("updated_at")
+  detectedAt      DateTime  @map("detected_at")
+  firstDetectedAt DateTime? @map("first_detected_at")
+  lastDetectedAt  DateTime? @map("last_detected_at")
+  resolvedAt      DateTime? @map("resolved_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
 
-  asset  Asset  @relation(fields: [assetId], references: [id], onDelete: Cascade)
-  source Source @relation(fields: [sourceId], references: [id], onDelete: Cascade)
-  customDetector CustomDetector? @relation(fields: [customDetectorId], references: [id], onDelete: SetNull)
+  asset                  Asset                     @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  source                 Source                    @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  customDetector         CustomDetector?           @relation(fields: [customDetectorId], references: [id], onDelete: SetNull)
   customDetectorFeedback CustomDetectorFeedback[]
-  notifications Notification[]
-  extraction CustomDetectorExtraction?
+  notifications          Notification[]
+  extraction             CustomDetectorExtraction?
+  evidenceAnalysis       FindingEvidenceAnalysis?
 
   @@index([assetId])
   @@index([sourceId])
@@ -145,26 +152,108 @@ model Finding {
   @@index([firstDetectedAt])
   @@index([lastDetectedAt])
   @@index([resolvedAt])
+  @@index([embedContentHash])
   @@index([assetId, lastDetectedAt(sort: Desc)])
   @@index([assetId, status, severity, detectorType, findingType])
   @@map("findings")
 }
 
+// A model revision is an immutable vector coordinate system. Model changes
+// create a new space so old and new embeddings can coexist during validation.
+model EmbeddingSpace {
+  id         String   @id @default(uuid())
+  model      String
+  revision   String
+  dim        Int
+  pooling    String
+  normalized Boolean  @default(true)
+  isActive   Boolean  @default(false) @map("is_active")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  embeddings ContentEmbedding[]
+  analyses   FindingEvidenceAnalysis[]
+
+  @@unique([model, revision, pooling, normalized])
+  @@index([isActive])
+  @@map("embedding_spaces")
+}
+
+// `vecF8` is the portable source of truth. The migration conditionally adds a
+// `vec vector(384)` mirror and HNSW index when pgvector is available.
+model ContentEmbedding {
+  id          String   @id @default(uuid())
+  spaceId     String   @map("space_id")
+  contentHash String   @map("content_hash") @db.VarChar(64)
+  vecF8       Float[]  @map("vec_f8")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  space EmbeddingSpace @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+
+  @@unique([spaceId, contentHash])
+  @@index([contentHash])
+  @@map("content_embeddings")
+}
+
+model AssetChunk {
+  id          String   @id @default(uuid())
+  assetId     String   @map("asset_id")
+  sourceId    String   @map("source_id")
+  ordinal     Int
+  page        Int?
+  charOffset  Int      @map("char_offset")
+  charLength  Int      @map("char_length")
+  text        String   @db.Text
+  contentHash String   @map("content_hash") @db.VarChar(64)
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  asset  Asset  @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  source Source @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+
+  @@unique([assetId, ordinal])
+  @@index([sourceId])
+  @@index([contentHash])
+  @@map("asset_chunks")
+}
+
+// Ranking is deliberately separate from detector severity. The reasons and
+// signals are persisted so every score shown in the UI or MCP is explainable.
+model FindingEvidenceAnalysis {
+  findingId          String   @id @map("finding_id")
+  spaceId            String   @map("space_id")
+  importanceScore    Float    @default(0) @map("importance_score")
+  qualityScore       Float    @default(0) @map("quality_score")
+  semanticOutlier    Float    @default(0) @map("semantic_outlier")
+  similarCount       Int      @default(0) @map("similar_count")
+  duplicateGroupHash String?  @map("duplicate_group_hash") @db.VarChar(64)
+  reasons            Json     @default("[]") @db.JsonB
+  signals            Json     @default("{}") @db.JsonB
+  analyzedAt         DateTime @default(now()) @map("analyzed_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  finding Finding        @relation(fields: [findingId], references: [id], onDelete: Cascade)
+  space   EmbeddingSpace @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+
+  @@index([importanceScore(sort: Desc)])
+  @@index([qualityScore(sort: Desc)])
+  @@index([duplicateGroupHash])
+  @@map("finding_evidence_analyses")
+}
+
 model CustomDetectorExtraction {
-  id                String   @id @default(uuid())
+  id String @id @default(uuid())
 
-  findingId         String   @unique @map("finding_id")
-  customDetectorId  String?  @map("custom_detector_id")
-  customDetectorKey String   @map("custom_detector_key")
-  sourceId          String   @map("source_id")
-  assetId           String   @map("asset_id")
-  runnerId          String?  @map("runner_id")
+  findingId         String  @unique @map("finding_id")
+  customDetectorId  String? @map("custom_detector_id")
+  customDetectorKey String  @map("custom_detector_key")
+  sourceId          String  @map("source_id")
+  assetId           String  @map("asset_id")
+  runnerId          String? @map("runner_id")
 
-  detectorVersion   Int      @default(1) @map("detector_version")
-  pipelineResult    Json     @db.JsonB @map("pipeline_result")
+  detectorVersion Int  @default(1) @map("detector_version")
+  pipelineResult  Json @map("pipeline_result") @db.JsonB
 
-  extractedAt       DateTime @map("extracted_at")
-  createdAt         DateTime @default(now()) @map("created_at")
+  extractedAt DateTime @map("extracted_at")
+  createdAt   DateTime @default(now()) @map("created_at")
 
   finding        Finding         @relation(fields: [findingId], references: [id], onDelete: Cascade)
   source         Source          @relation(fields: [sourceId], references: [id], onDelete: Cascade)
@@ -180,22 +269,22 @@ model CustomDetectorExtraction {
 }
 
 model CustomDetectorFeedback {
-  id                 String       @id @default(uuid())
-  customDetectorId   String?      @map("custom_detector_id")
-  sourceId           String       @map("source_id")
-  customDetectorKey  String       @map("custom_detector_key")
-  customDetectorName String?      @map("custom_detector_name")
-  findingId          String?      @map("finding_id")
-  findingType        String?      @map("finding_type")
+  id                 String        @id @default(uuid())
+  customDetectorId   String?       @map("custom_detector_id")
+  sourceId           String        @map("source_id")
+  customDetectorKey  String        @map("custom_detector_key")
+  customDetectorName String?       @map("custom_detector_name")
+  findingId          String?       @map("finding_id")
+  findingType        String?       @map("finding_type")
   label              String?
-  matchedContent     String       @map("matched_content") @db.Text
+  matchedContent     String        @map("matched_content") @db.Text
   status             FindingStatus
-  createdAt          DateTime     @default(now()) @map("created_at")
-  updatedAt          DateTime     @updatedAt @map("updated_at")
+  createdAt          DateTime      @default(now()) @map("created_at")
+  updatedAt          DateTime      @updatedAt @map("updated_at")
 
   customDetector CustomDetector? @relation(fields: [customDetectorId], references: [id], onDelete: SetNull)
-  source  Source  @relation(fields: [sourceId], references: [id], onDelete: Cascade)
-  finding Finding? @relation(fields: [findingId], references: [id], onDelete: SetNull)
+  source         Source          @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  finding        Finding?        @relation(fields: [findingId], references: [id], onDelete: SetNull)
 
   @@index([customDetectorId])
   @@index([sourceId, customDetectorKey])
@@ -205,29 +294,29 @@ model CustomDetectorFeedback {
 }
 
 model CustomDetector {
-  id                  String                      @id @default(uuid())
-  key                 String                      @unique
+  id                  String           @id @default(uuid())
+  key                 String           @unique
   name                String
-  description         String?                     @db.Text
-  pipelineSchema      Json                        @map("pipeline_schema") @db.JsonB
-  isActive            Boolean                     @default(true) @map("is_active")
-  version             Int                         @default(1)
+  description         String?          @db.Text
+  pipelineSchema      Json             @map("pipeline_schema") @db.JsonB
+  isActive            Boolean          @default(true) @map("is_active")
+  version             Int              @default(1)
   // Per-detector autopilot management mode (overrides the instance detector
   // flag unless INHERIT). OBSERVE_ONLY blocks the detector-authoring agent.
-  aiMode              AiManagementMode            @default(INHERIT) @map("ai_mode")
-  lastTrainedAt       DateTime?                   @map("last_trained_at")
-  lastTrainingSummary Json?                       @map("last_training_summary") @db.JsonB
-  aiProviderConfigId  String?                     @map("ai_provider_config_id")
-  createdAt           DateTime                    @default(now()) @map("created_at")
-  updatedAt           DateTime                    @updatedAt @map("updated_at")
+  aiMode              AiManagementMode @default(INHERIT) @map("ai_mode")
+  lastTrainedAt       DateTime?        @map("last_trained_at")
+  lastTrainingSummary Json?            @map("last_training_summary") @db.JsonB
+  aiProviderConfigId  String?          @map("ai_provider_config_id")
+  createdAt           DateTime         @default(now()) @map("created_at")
+  updatedAt           DateTime         @updatedAt @map("updated_at")
 
-  aiProviderConfig    AiProviderConfig?           @relation(fields: [aiProviderConfigId], references: [id], onDelete: Restrict)
-  findings            Finding[]
-  feedback            CustomDetectorFeedback[]
-  trainingRuns        CustomDetectorTrainingRun[]
-  trainingExamples    CustomDetectorTrainingExample[]
-  extractions         CustomDetectorExtraction[]
-  testScenarios       CustomDetectorTestScenario[]
+  aiProviderConfig AiProviderConfig?               @relation(fields: [aiProviderConfigId], references: [id], onDelete: Restrict)
+  findings         Finding[]
+  feedback         CustomDetectorFeedback[]
+  trainingRuns     CustomDetectorTrainingRun[]
+  trainingExamples CustomDetectorTrainingExample[]
+  extractions      CustomDetectorExtraction[]
+  testScenarios    CustomDetectorTestScenario[]
 
   @@index([isActive])
   @@index([aiProviderConfigId])
@@ -269,8 +358,8 @@ model CustomDetectorTrainingRun {
   createdAt         DateTime                     @default(now()) @map("created_at")
   updatedAt         DateTime                     @updatedAt @map("updated_at")
 
-  customDetector    CustomDetector               @relation(fields: [customDetectorId], references: [id], onDelete: Cascade)
-  source            Source?                      @relation(fields: [sourceId], references: [id], onDelete: SetNull)
+  customDetector CustomDetector @relation(fields: [customDetectorId], references: [id], onDelete: Cascade)
+  source         Source?        @relation(fields: [sourceId], references: [id], onDelete: SetNull)
 
   @@index([customDetectorId, createdAt(sort: Desc)])
   @@index([sourceId])
@@ -279,15 +368,15 @@ model CustomDetectorTrainingRun {
 }
 
 model CustomDetectorTestScenario {
-  id              String   @id @default(uuid())
-  detectorId      String   @map("detector_id")
-  detector        CustomDetector @relation(fields: [detectorId], references: [id], onDelete: Cascade)
+  id              String                     @id @default(uuid())
+  detectorId      String                     @map("detector_id")
+  detector        CustomDetector             @relation(fields: [detectorId], references: [id], onDelete: Cascade)
   name            String
-  description     String?  @db.Text
-  inputText       String   @map("input_text") @db.Text
-  expectedOutcome Json     @map("expected_outcome") @db.JsonB
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
+  description     String?                    @db.Text
+  inputText       String                     @map("input_text") @db.Text
+  expectedOutcome Json                       @map("expected_outcome") @db.JsonB
+  createdAt       DateTime                   @default(now()) @map("created_at")
+  updatedAt       DateTime                   @updatedAt @map("updated_at")
   results         CustomDetectorTestResult[]
 
   @@index([detectorId])
@@ -295,17 +384,17 @@ model CustomDetectorTestScenario {
 }
 
 model CustomDetectorTestResult {
-  id              String            @id @default(uuid())
-  scenarioId      String            @map("scenario_id")
+  id              String                     @id @default(uuid())
+  scenarioId      String                     @map("scenario_id")
   scenario        CustomDetectorTestScenario @relation(fields: [scenarioId], references: [id], onDelete: Cascade)
-  detectorId      String            @map("detector_id")
+  detectorId      String                     @map("detector_id")
   status          TestResultStatus
-  actualOutput    Json              @map("actual_output") @db.JsonB
-  errorMessage    String?           @map("error_message") @db.Text
-  durationMs      Int?              @map("duration_ms")
-  detectorVersion Int               @map("detector_version")
-  triggeredBy     TestTrigger       @map("triggered_by")
-  createdAt       DateTime          @default(now()) @map("created_at")
+  actualOutput    Json                       @map("actual_output") @db.JsonB
+  errorMessage    String?                    @map("error_message") @db.Text
+  durationMs      Int?                       @map("duration_ms")
+  detectorVersion Int                        @map("detector_version")
+  triggeredBy     TestTrigger                @map("triggered_by")
+  createdAt       DateTime                   @default(now()) @map("created_at")
 
   @@index([scenarioId, createdAt(sort: Desc)])
   @@index([detectorId, createdAt(sort: Desc)])
@@ -313,47 +402,52 @@ model CustomDetectorTestResult {
 }
 
 model Runner {
-  id              String       @id @default(uuid())
-  sourceId        String       @map("source_id")
-  triggeredAt     DateTime     @default(now()) @map("triggered_at")
-  triggeredBy     String?      @map("triggered_by")
-  triggerType     TriggerType  @default(MANUAL) @map("trigger_type")
-  executionMode   RunnerExecutionMode? @map("execution_mode")
-  status          RunnerStatus @default(PENDING)
-  startedAt       DateTime?    @map("started_at")
-  completedAt     DateTime?    @map("completed_at")
-  durationMs      Int?         @map("duration_ms")
-  assetsCreated   Int          @default(0) @map("assets_created")
-  assetsUpdated   Int          @default(0) @map("assets_updated")
+  id                String               @id @default(uuid())
+  sourceId          String               @map("source_id")
+  triggeredAt       DateTime             @default(now()) @map("triggered_at")
+  triggeredBy       String?              @map("triggered_by")
+  triggerType       TriggerType          @default(MANUAL) @map("trigger_type")
+  executionMode     RunnerExecutionMode? @map("execution_mode")
+  status            RunnerStatus         @default(PENDING)
+  startedAt         DateTime?            @map("started_at")
+  completedAt       DateTime?            @map("completed_at")
+  durationMs        Int?                 @map("duration_ms")
+  assetsCreated     Int                  @default(0) @map("assets_created")
+  assetsUpdated     Int                  @default(0) @map("assets_updated")
   // Findings currently associated with this run: every finding it created,
   // re-detected, or resolved. NOT a count of new discoveries — after
   // reconciliation it is closer to "the source's open set as of this run".
   // Use findingsCreated for "what did this run actually find that was new".
-  totalFindings   Int          @default(0) @map("total_findings")
+  totalFindings     Int                  @default(0) @map("total_findings")
   // Findings first seen by this run. Accumulated as batches land, so it is a
   // true creation count rather than a post-reconciliation snapshot.
-  findingsCreated Int          @default(0) @map("findings_created")
+  findingsCreated   Int                  @default(0) @map("findings_created")
+  findingsResolved  Int                  @default(0) @map("findings_resolved")
+  findingsRetained  Int                  @default(0) @map("findings_retained")
   // Assets that should have carried text but yielded none — mostly OCR and
   // transcription returning empty. Not errors: nothing failed, the content was
   // simply never read. Tracked because a run can otherwise report complete
   // success while silently covering none of the asset's actual content.
-  assetsWithoutText Int        @default(0) @map("assets_without_text")
-  errorMessage    String?      @map("error_message")
-  errorDetails    Json?        @map("error_details")
-  jobName         String?      @map("job_name")
-  jobNamespace    String?      @map("job_namespace")
-  assetsUnchanged Int          @default(0) @map("assets_unchanged")
-  assetsDeleted   Int          @default(0) @map("assets_deleted")
+  assetsWithoutText Int                  @default(0) @map("assets_without_text")
+  // Aggregate of runner_assets.text_extraction_status. Kept as JSON so new
+  // coverage states can be added without widening the runner table again.
+  textCoverage      Json?                @map("text_coverage") @db.JsonB
+  errorMessage      String?              @map("error_message")
+  errorDetails      Json?                @map("error_details")
+  jobName           String?              @map("job_name")
+  jobNamespace      String?              @map("job_namespace")
+  assetsUnchanged   Int                  @default(0) @map("assets_unchanged")
+  assetsDeleted     Int                  @default(0) @map("assets_deleted")
   // Assets retained despite being absent from this run because the source's
   // scope moved since they were ingested. They are NOT deleted and their
   // findings stay OPEN — see AssetService.finalizeIngestRun.
-  assetsOutOfScope Int         @default(0) @map("assets_out_of_scope")
+  assetsOutOfScope  Int                  @default(0) @map("assets_out_of_scope")
   // Fingerprint of the scope-determining config this run covered.
-  scopeFingerprint String?     @map("scope_fingerprint") @db.VarChar(64)
-  assets          Asset[]
-  runnerAssets    RunnerAsset[]
-  source          Source       @relation(fields: [sourceId], references: [id], onDelete: Cascade)
-  notifications   Notification[]
+  scopeFingerprint  String?              @map("scope_fingerprint") @db.VarChar(64)
+  assets            Asset[]
+  runnerAssets      RunnerAsset[]
+  source            Source               @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  notifications     Notification[]
 
   @@index([sourceId])
   @@index([executionMode])
@@ -363,60 +457,65 @@ model Runner {
 }
 
 model RunnerAsset {
-  runnerId         String            @map("runner_id")
-  assetHash        String            @map("asset_hash")
-  status           RunnerAssetStatus @default(PENDING)
+  runnerId             String                 @map("runner_id")
+  assetHash            String                 @map("asset_hash")
+  status               RunnerAssetStatus      @default(PENDING)
   // What this run did to the asset. Null for rows written before this existed,
   // and for assets discovered but never ingested.
-  changeType       RunnerAssetChangeType? @map("change_type")
-  startedAt        DateTime?         @map("started_at")
-  completedAt      DateTime?         @map("completed_at")
-  errorMessage     String?           @map("error_message") @db.Text
-  findingsTotal      Int?  @map("findings_total")
-  findingsBySeverity Json? @map("findings_by_severity")
-  findingsByDetector Json? @map("findings_by_detector")
-  metadata           Json? @map("metadata") @db.JsonB
+  changeType           RunnerAssetChangeType? @map("change_type")
+  startedAt            DateTime?              @map("started_at")
+  completedAt          DateTime?              @map("completed_at")
+  errorMessage         String?                @map("error_message") @db.Text
+  findingsTotal        Int?                   @map("findings_total")
+  findingsBySeverity   Json?                  @map("findings_by_severity")
+  findingsByDetector   Json?                  @map("findings_by_detector")
+  metadata             Json?                  @map("metadata") @db.JsonB
   // Per-detector outcome for this asset, as reported by the CLI:
   // [{ detector_type, custom_detector_key, status: OK|ERROR, error }].
   // A finding may only be auto-resolved for absence when its detector has an
   // OK outcome here — a detector that crashed (or never ran) proves nothing
   // about whether its earlier findings are still present.
-  detectorOutcomes   Json? @map("detector_outcomes") @db.JsonB
+  detectorOutcomes     Json?                  @map("detector_outcomes") @db.JsonB
   // The asset should have carried text but yielded none (typically OCR or
   // transcription returning empty). Null for rows written before this existed.
-  emptyText          Boolean? @map("empty_text")
-  createdAt        DateTime          @default(now()) @map("created_at")
+  emptyText            Boolean?               @map("empty_text")
+  // Structured outcome from the CLI text/OCR/transcription path. Unlike
+  // emptyText, this distinguishes a genuinely empty result from missing
+  // engines, zero decoded video frames, and other extraction failures.
+  textExtractionStatus TextExtractionStatus?  @map("text_extraction_status")
+  createdAt            DateTime               @default(now()) @map("created_at")
 
   runner Runner @relation(fields: [runnerId], references: [id], onDelete: Cascade)
 
   @@id([runnerId, assetHash])
   @@index([runnerId, status])
   @@index([runnerId, changeType])
+  @@index([runnerId, textExtractionStatus])
   @@map("runner_assets")
 }
 
 model Notification {
-  id           String           @id @default(uuid())
-  type         NotificationType
-  event        String?
-  severity     Severity         @default(INFO)
-  title        String
-  message      String
-  actionUrl    String?          @map("action_url")
-  sourceId     String?          @map("source_id")
-  runnerId     String?          @map("runner_id")
-  findingId    String?          @map("finding_id")
-  triggeredBy  String?          @map("triggered_by")
-  isRead       Boolean          @default(false) @map("is_read")
-  readAt       DateTime?        @map("read_at")
-  isImportant  Boolean          @default(false) @map("is_important")
-  metadata     Json?            @db.JsonB
-  createdAt    DateTime         @default(now()) @map("created_at")
-  updatedAt    DateTime         @updatedAt @map("updated_at")
+  id          String           @id @default(uuid())
+  type        NotificationType
+  event       String?
+  severity    Severity         @default(INFO)
+  title       String
+  message     String
+  actionUrl   String?          @map("action_url")
+  sourceId    String?          @map("source_id")
+  runnerId    String?          @map("runner_id")
+  findingId   String?          @map("finding_id")
+  triggeredBy String?          @map("triggered_by")
+  isRead      Boolean          @default(false) @map("is_read")
+  readAt      DateTime?        @map("read_at")
+  isImportant Boolean          @default(false) @map("is_important")
+  metadata    Json?            @db.JsonB
+  createdAt   DateTime         @default(now()) @map("created_at")
+  updatedAt   DateTime         @updatedAt @map("updated_at")
 
-  source    Source?  @relation(fields: [sourceId], references: [id], onDelete: SetNull)
-  runner    Runner?  @relation(fields: [runnerId], references: [id], onDelete: SetNull)
-  finding   Finding? @relation(fields: [findingId], references: [id], onDelete: SetNull)
+  source  Source?  @relation(fields: [sourceId], references: [id], onDelete: SetNull)
+  runner  Runner?  @relation(fields: [runnerId], references: [id], onDelete: SetNull)
+  finding Finding? @relation(fields: [findingId], references: [id], onDelete: SetNull)
 
   @@index([type])
   @@index([event])
@@ -431,39 +530,39 @@ model Notification {
 }
 
 model InstanceSettings {
-  id         Int              @id @default(1)
-  aiEnabled  Boolean          @default(true) @map("ai_enabled")
-  mcpEnabled Boolean          @default(true) @map("mcp_enabled")
-  language   InstanceLanguage @default(AUTOMATIC)
-  timezone   String           @default("AUTOMATIC")
-  timeFormat InstanceTimeFormat @default(AUTOMATIC) @map("time_format")
-  aiProviderConfigId String?  @map("ai_provider_config_id")
+  id                 Int                @id @default(1)
+  aiEnabled          Boolean            @default(true) @map("ai_enabled")
+  mcpEnabled         Boolean            @default(true) @map("mcp_enabled")
+  language           InstanceLanguage   @default(AUTOMATIC)
+  timezone           String             @default("AUTOMATIC")
+  timeFormat         InstanceTimeFormat @default(AUTOMATIC) @map("time_format")
+  aiProviderConfigId String?            @map("ai_provider_config_id")
 
   hfTokenEnc String? @map("hf_token_enc")
 
   // Investigation autopilot — instance-wide defaults. Per-entity aiMode on
   // Inquiry/Case overrides these when not INHERIT.
-  autopilotInquiryEnabled    Boolean @default(false) @map("autopilot_inquiry_enabled")
-  autopilotInquiryDesired    String? @db.Text @map("autopilot_inquiry_desired")
-  autopilotInquirySearchable String? @db.Text @map("autopilot_inquiry_searchable")
-  autopilotCaseEnabled       Boolean @default(false) @map("autopilot_case_enabled")
-  autopilotCaseGuidance      String? @db.Text @map("autopilot_case_guidance")
+  autopilotInquiryEnabled     Boolean @default(false) @map("autopilot_inquiry_enabled")
+  autopilotInquiryDesired     String? @map("autopilot_inquiry_desired") @db.Text
+  autopilotInquirySearchable  String? @map("autopilot_inquiry_searchable") @db.Text
+  autopilotCaseEnabled        Boolean @default(false) @map("autopilot_case_enabled")
+  autopilotCaseGuidance       String? @map("autopilot_case_guidance") @db.Text
   // Config-tuning agent: may change editable source config (detectors,
   // sampling, optional, resources) — never base connection. Opt-in.
-  autopilotConfigEnabled     Boolean @default(false) @map("autopilot_config_enabled")
-  autopilotConfigGuidance    String? @db.Text @map("autopilot_config_guidance")
+  autopilotConfigEnabled      Boolean @default(false) @map("autopilot_config_enabled")
+  autopilotConfigGuidance     String? @map("autopilot_config_guidance") @db.Text
   // Detector-authoring agent: may create/train custom detectors. Opt-in.
-  autopilotDetectorEnabled   Boolean @default(false) @map("autopilot_detector_enabled")
-  autopilotDetectorGuidance  String? @db.Text @map("autopilot_detector_guidance")
+  autopilotDetectorEnabled    Boolean @default(false) @map("autopilot_detector_enabled")
+  autopilotDetectorGuidance   String? @map("autopilot_detector_guidance") @db.Text
   // Escalation agent: reviews open cases and raises operator notifications for
   // high-severity ones so the harness can run unattended. Opt-in.
   autopilotEscalationEnabled  Boolean @default(false) @map("autopilot_escalation_enabled")
-  autopilotEscalationGuidance String? @db.Text @map("autopilot_escalation_guidance")
+  autopilotEscalationGuidance String? @map("autopilot_escalation_guidance") @db.Text
   // Allow the harness to call tools from connected external MCP servers. Opt-in.
-  autopilotMcpEnabled        Boolean @default(false) @map("autopilot_mcp_enabled")
+  autopilotMcpEnabled         Boolean @default(false) @map("autopilot_mcp_enabled")
 
-  createdAt  DateTime         @default(now()) @map("created_at")
-  updatedAt  DateTime         @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   aiProviderConfig AiProviderConfig? @relation(fields: [aiProviderConfigId], references: [id], onDelete: SetNull)
 
@@ -471,20 +570,20 @@ model InstanceSettings {
 }
 
 model AiProviderConfig {
-  id          String         @id @default(uuid())
-  name        String
-  provider    AiProviderType @default(CLAUDE)
-  model       String         @default("")
-  apiKeyEnc   String?        @map("api_key_enc")
-  baseUrl     String?        @map("base_url")
-  contextSize Int?           @map("context_size")
-  supportsVision Boolean     @default(false) @map("supports_vision")
+  id                String         @id @default(uuid())
+  name              String
+  provider          AiProviderType @default(CLAUDE)
+  model             String         @default("")
+  apiKeyEnc         String?        @map("api_key_enc")
+  baseUrl           String?        @map("base_url")
+  contextSize       Int?           @map("context_size")
+  supportsVision    Boolean        @default(false) @map("supports_vision")
   // Optional pricing in USD per 1M tokens — enables cost estimates on
   // autopilot runs and the harness usage charts. Null = unknown/not billed.
-  inputCostPerMTok  Decimal? @map("input_cost_per_mtok") @db.Decimal(10, 4)
-  outputCostPerMTok Decimal? @map("output_cost_per_mtok") @db.Decimal(10, 4)
-  createdAt   DateTime       @default(now()) @map("created_at")
-  updatedAt   DateTime       @updatedAt @map("updated_at")
+  inputCostPerMTok  Decimal?       @map("input_cost_per_mtok") @db.Decimal(10, 4)
+  outputCostPerMTok Decimal?       @map("output_cost_per_mtok") @db.Decimal(10, 4)
+  createdAt         DateTime       @default(now()) @map("created_at")
+  updatedAt         DateTime       @updatedAt @map("updated_at")
 
   instanceSettings InstanceSettings[]
   customDetectors  CustomDetector[]
@@ -499,14 +598,14 @@ enum AiProviderType {
 }
 
 model McpAccessToken {
-  id          String    @id
-  name        String
-  tokenHash   String    @unique @map("token_hash")
-  tokenPreview String   @map("token_preview")
-  lastUsedAt  DateTime? @map("last_used_at")
-  revokedAt   DateTime? @map("revoked_at")
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
+  id           String    @id
+  name         String
+  tokenHash    String    @unique @map("token_hash")
+  tokenPreview String    @map("token_preview")
+  lastUsedAt   DateTime? @map("last_used_at")
+  revokedAt    DateTime? @map("revoked_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
 
   @@index([revokedAt])
   @@index([lastUsedAt])
@@ -651,7 +750,6 @@ enum AssetStatus {
 
 /**
  * What this run did to an asset — an immutable per-run fact.
- *
  * Distinct from AssetStatus, which is the asset's *current* state and is
  * overwritten by every later run. Counting runs from AssetStatus meant
  * "assets whose status happens to be NEW right now and were last touched by
@@ -669,6 +767,15 @@ enum RunnerAssetStatus {
   PROCESSING
   PROCESSED
   ERROR
+}
+
+enum TextExtractionStatus {
+  NOT_APPLICABLE
+  EXTRACTED
+  EMPTY
+  ENGINE_UNAVAILABLE
+  ZERO_FRAMES
+  FAILED
 }
 
 enum AssetContentType {
@@ -715,7 +822,6 @@ model SandboxRun {
   @@index([contentHash])
   @@map("sandbox_runs")
 }
-
 
 // ─── INVESTIGATIONS (CASES / GRAPH) ──────────────────────────────
 
@@ -920,13 +1026,13 @@ model CorrelationConfig {
 // (work_mem / on-disk temp files), never in the API process's heap. Rows are
 // scoped by run_id and deleted once that run's edges have been written.
 model CorrelationPairStaging {
-  id            BigInt  @id @default(autoincrement())
-  runId         String  @map("run_id")
-  aId           String  @map("a_id")
-  bId           String  @map("b_id")
-  sharedCount   Int     @map("shared_count")
+  id             BigInt  @id @default(autoincrement())
+  runId          String  @map("run_id")
+  aId            String  @map("a_id")
+  bId            String  @map("b_id")
+  sharedCount    Int     @map("shared_count")
   weightedShared Decimal @map("weighted_shared") @db.Decimal(12, 4)
-  sharedByLabel Json    @map("shared_by_label") @db.JsonB
+  sharedByLabel  Json    @map("shared_by_label") @db.JsonB
 
   @@index([runId, id])
   @@map("correlation_pair_staging")
@@ -941,17 +1047,17 @@ enum InquiryStatus {
 // may link one or more questions (saved queries) that guide which findings are
 // relevant; evidence is pulled from those queries' matches or added manually.
 model Case {
-  id          String     @id @default(uuid())
+  id          String           @id @default(uuid())
   title       String
-  description String?    @db.Text
-  status      CaseStatus @default(OPEN)
-  severity    Severity   @default(MEDIUM)
+  description String?          @db.Text
+  status      CaseStatus       @default(OPEN)
+  severity    Severity         @default(MEDIUM)
   assignee    String?
-  createdBy   String?    @map("created_by")
+  createdBy   String?          @map("created_by")
   aiMode      AiManagementMode @default(INHERIT) @map("ai_mode")
-  conclusion  String?    @db.Text
-  createdAt   DateTime   @default(now()) @map("created_at")
-  updatedAt   DateTime   @updatedAt @map("updated_at")
+  conclusion  String?          @db.Text
+  createdAt   DateTime         @default(now()) @map("created_at")
+  updatedAt   DateTime         @updatedAt @map("updated_at")
 
   evidence     CaseEvidence[]
   findings     CaseFinding[]
@@ -974,11 +1080,11 @@ model Case {
 // matches) AND type matches, where an empty list for a dimension means "any".
 // findingTypeRegex is evaluated in the app (findingType is dynamic for CUSTOM).
 model Inquiry {
-  id          String         @id @default(uuid())
+  id          String           @id @default(uuid())
   title       String
-  description String?        @db.Text
-  status      InquiryStatus @default(ACTIVE)
-  createdBy   String?        @map("created_by")
+  description String?          @db.Text
+  status      InquiryStatus    @default(ACTIVE)
+  createdBy   String?          @map("created_by")
   aiMode      AiManagementMode @default(INHERIT) @map("ai_mode")
 
   matchAllSources    Boolean        @default(false) @map("match_all_sources")
@@ -1043,17 +1149,17 @@ model CaseEvidence {
 // Inferred observation anchored to case evidence. No FK to findings; findingId is a
 // plain reference. Denormalized snapshots survive deletion of the finding row.
 model CaseFinding {
-  id             String   @id @default(uuid())
-  caseId         String   @map("case_id")
-  caseEvidenceId String   @map("case_evidence_id")
-  findingId      String   @map("finding_id")
-  label          String
-  severity       String?
-  detectorType         String?  @map("detector_type")
-  customDetectorName   String?  @map("custom_detector_name")
-  matchedContent       String?  @map("matched_content") @db.Text
-  note                 String?  @db.Text
-  createdAt      DateTime @default(now()) @map("created_at")
+  id                 String   @id @default(uuid())
+  caseId             String   @map("case_id")
+  caseEvidenceId     String   @map("case_evidence_id")
+  findingId          String   @map("finding_id")
+  label              String
+  severity           String?
+  detectorType       String?  @map("detector_type")
+  customDetectorName String?  @map("custom_detector_name")
+  matchedContent     String?  @map("matched_content") @db.Text
+  note               String?  @db.Text
+  createdAt          DateTime @default(now()) @map("created_at")
 
   investigation Case         @relation(fields: [caseId], references: [id], onDelete: Cascade)
   caseEvidence  CaseEvidence @relation(fields: [caseEvidenceId], references: [id], onDelete: Cascade)
@@ -1063,7 +1169,6 @@ model CaseFinding {
   @@index([caseEvidenceId])
   @@map("case_findings")
 }
-
 
 model CaseNote {
   id        String   @id @default(uuid())
@@ -1080,17 +1185,17 @@ model CaseNote {
 
 // Thread container: hypothesis thread (replaces Hypothesis) or custom discussion thread.
 model CaseThread {
-  id         String          @id @default(uuid())
-  caseId     String          @map("case_id")
-  kind       CaseThreadKind  @default(HYPOTHESIS)
+  id         String            @id @default(uuid())
+  caseId     String            @map("case_id")
+  kind       CaseThreadKind    @default(HYPOTHESIS)
   title      String
   // Hypothesis-only denormalized current state (for graph/quick queries)
   status     HypothesisStatus? @default(PROPOSED)
-  confidence Decimal?         @db.Decimal(3, 2)
+  confidence Decimal?          @db.Decimal(3, 2)
   color      String?
-  createdBy  String?          @map("created_by")
-  createdAt  DateTime         @default(now()) @map("created_at")
-  updatedAt  DateTime         @updatedAt @map("updated_at")
+  createdBy  String?           @map("created_by")
+  createdAt  DateTime          @default(now()) @map("created_at")
+  updatedAt  DateTime          @updatedAt @map("updated_at")
 
   investigation Case                @relation(fields: [caseId], references: [id], onDelete: Cascade)
   entries       CaseThreadEntry[]
@@ -1141,12 +1246,12 @@ model CaseThreadSupport {
 
 // Append-only case event log — the unified timeline.
 model CaseActivity {
-  id           String          @id @default(uuid())
-  caseId       String          @map("case_id")
+  id           String           @id @default(uuid())
+  caseId       String           @map("case_id")
   activityType CaseActivityType @map("activity_type")
   actor        String?
-  payload      Json?           @db.JsonB
-  createdAt    DateTime        @default(now()) @map("created_at")
+  payload      Json?            @db.JsonB
+  createdAt    DateTime         @default(now()) @map("created_at")
 
   investigation Case @relation(fields: [caseId], references: [id], onDelete: Cascade)
 
@@ -1343,34 +1448,34 @@ model AgentSystemBrief {
 // stepState make the pipeline resumable across pg-boss redeliveries without
 // repeating LLM calls whose validated output is already stored.
 model AgentRun {
-  id          String         @id @default(uuid())
-  agentKind   AgentKind      @map("agent_kind")
-  status      AgentRunStatus @default(PENDING)
-  sourceId    String?        @map("source_id")
-  runnerId    String?        @map("runner_id")
+  id           String         @id @default(uuid())
+  agentKind    AgentKind      @map("agent_kind")
+  status       AgentRunStatus @default(PENDING)
+  sourceId     String?        @map("source_id")
+  runnerId     String?        @map("runner_id")
   // Case this run is focused on (case-targeted manual runs) — lets the case
   // workspace show "AI is working here" and surface the results.
-  caseId      String?        @map("case_id")
-  trigger     String         @default("scan_completed")
+  caseId       String?        @map("case_id")
+  trigger      String         @default("scan_completed")
   // Operator instruction for manually triggered cycles ("steer" runs).
-  instruction String?        @db.Text
+  instruction  String?        @db.Text
   // Stable identity of the cycle that produced this run — used to resume the
   // right run on pg-boss redelivery (scan: source:runner, manual: uuid).
-  cycleKey    String?        @map("cycle_key")
-  currentStep String?        @map("current_step")
-  stepState   Json?          @db.JsonB @map("step_state")
-  attempts    Int            @default(0)
-  error       String?        @db.Text
-  summary     String?        @db.Text
+  cycleKey     String?        @map("cycle_key")
+  currentStep  String?        @map("current_step")
+  stepState    Json?          @map("step_state") @db.JsonB
+  attempts     Int            @default(0)
+  error        String?        @db.Text
+  summary      String?        @db.Text
   // LLM token consumption of this run (all iterations/attempts summed) and the
   // estimated cost derived from the provider's configured per-MTok prices at
   // the time the tokens were recorded. costUsd stays null when no pricing set.
-  inputTokens  Int           @default(0) @map("input_tokens")
-  outputTokens Int           @default(0) @map("output_tokens")
-  costUsd      Decimal?      @map("cost_usd") @db.Decimal(14, 6)
-  startedAt   DateTime?      @map("started_at")
-  finishedAt  DateTime?      @map("finished_at")
-  createdAt   DateTime       @default(now()) @map("created_at")
+  inputTokens  Int            @default(0) @map("input_tokens")
+  outputTokens Int            @default(0) @map("output_tokens")
+  costUsd      Decimal?       @map("cost_usd") @db.Decimal(14, 6)
+  startedAt    DateTime?      @map("started_at")
+  finishedAt   DateTime?      @map("finished_at")
+  createdAt    DateTime       @default(now()) @map("created_at")
 
   decisions AgentDecision[]
   logs      AgentLog[]
@@ -1473,27 +1578,27 @@ enum ChatMessageRole {
 }
 
 model ChatBot {
-  id       String       @id @default(uuid())
-  platform ChatPlatform
-  name     String
-  enabled  Boolean      @default(false)
+  id                   String       @id @default(uuid())
+  platform             ChatPlatform
+  name                 String
+  enabled              Boolean      @default(false)
   // Bot credentials, AES-GCM encrypted (MaskedConfigCryptoService).
-  botTokenEnc String  @map("bot_token_enc")
+  botTokenEnc          String       @map("bot_token_enc")
   // Slack Socket Mode app-level token (xapp-…); unused for Telegram.
-  appTokenEnc String? @map("app_token_enc")
+  appTokenEnc          String?      @map("app_token_enc")
   // MCP capability group ids the bot may use (mcp-catalog.ts); empty = all.
-  capabilityGroups String[] @default([]) @map("capability_groups")
+  capabilityGroups     String[]     @default([]) @map("capability_groups")
   // AgentKinds the bot may steer via autopilot tools; empty = all.
-  agentKinds String[] @default([]) @map("agent_kinds")
+  agentKinds           String[]     @default([]) @map("agent_kinds")
   // When false every mutating tool resolves OBSERVE_ONLY (read-only bot).
-  allowMutations Boolean @default(true) @map("allow_mutations")
+  allowMutations       Boolean      @default(true) @map("allow_mutations")
   // Connector status, mirrored by ChatGatewayService.
-  lastError       String?   @db.Text @map("last_error")
-  lastConnectedAt DateTime? @map("last_connected_at")
+  lastError            String?      @map("last_error") @db.Text
+  lastConnectedAt      DateTime?    @map("last_connected_at")
   // Telegram getUpdates offset — survives restarts without replaying messages.
-  telegramLastUpdateId BigInt?  @map("telegram_last_update_id")
-  createdAt            DateTime @default(now()) @map("created_at")
-  updatedAt            DateTime @updatedAt @map("updated_at")
+  telegramLastUpdateId BigInt?      @map("telegram_last_update_id")
+  createdAt            DateTime     @default(now()) @map("created_at")
+  updatedAt            DateTime     @updatedAt @map("updated_at")
 
   sessions ChatSession[]
 
@@ -1501,11 +1606,11 @@ model ChatBot {
 }
 
 model ChatSession {
-  id    String @id @default(uuid())
-  botId String @map("bot_id")
+  id               String    @id @default(uuid())
+  botId            String    @map("bot_id")
   // Platform conversation identity: Telegram chat id, Slack "channel:thread_ts".
-  externalChatKey String  @map("external_chat_key")
-  title           String?
+  externalChatKey  String    @map("external_chat_key")
+  title            String?
   // Compacted summary of history older than the sliding window.
   summary          String    @default("") @db.Text
   summarizedUpToAt DateTime? @map("summarized_up_to_at")
@@ -1521,18 +1626,18 @@ model ChatSession {
 }
 
 model ChatMessage {
-  id        String          @id @default(uuid())
-  sessionId String          @map("session_id")
-  role      ChatMessageRole
-  content   String          @db.Text
+  id                String          @id @default(uuid())
+  sessionId         String          @map("session_id")
+  role              ChatMessageRole
+  content           String          @db.Text
   // Compact record of tool activity behind an assistant reply (UI/debugging).
-  toolCalls Json? @map("tool_calls") @db.JsonB
+  toolCalls         Json?           @map("tool_calls") @db.JsonB
   // AgentRun that produced this reply — links to token usage and decisions.
-  agentRunId String? @map("agent_run_id")
+  agentRunId        String?         @map("agent_run_id")
   // Platform message id, deduped on connector redelivery.
-  externalMessageId String?  @map("external_message_id")
-  externalUserId    String?  @map("external_user_id")
-  createdAt         DateTime @default(now()) @map("created_at")
+  externalMessageId String?         @map("external_message_id")
+  externalUserId    String?         @map("external_user_id")
+  createdAt         DateTime        @default(now()) @map("created_at")
 
   session ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 

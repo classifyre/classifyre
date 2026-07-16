@@ -594,7 +594,6 @@ export class CustomDetectorsService {
   private static readonly TRANSFORMER_PIPELINE_TYPES = new Set([
     'TEXT_CLASSIFICATION',
     'IMAGE_CLASSIFICATION',
-    'FEATURE_EXTRACTION',
     'OBJECT_DETECTION',
   ]);
 
@@ -668,7 +667,6 @@ export class CustomDetectorsService {
       'LLM',
       'TEXT_CLASSIFICATION',
       'IMAGE_CLASSIFICATION',
-      'FEATURE_EXTRACTION',
       'OBJECT_DETECTION',
     ];
     if (!validTypes.includes(schemaType)) {
@@ -1197,7 +1195,7 @@ export class CustomDetectorsService {
 
   /**
    * Worked custom-detector example templates (name, description, full config).
-   * Pass `type` (REGEX | GLINER2 | LLM | *_CLASSIFICATION | FEATURE_EXTRACTION |
+   * Pass `type` (REGEX | GLINER2 | LLM | *_CLASSIFICATION |
    * OBJECT_DETECTION) to return only the examples for that pipeline engine.
    */
   listExamples(type?: string): CustomDetectorExampleDto[] {
@@ -1238,10 +1236,6 @@ export class CustomDetectorsService {
     [
       'OBJECT_DETECTION',
       'locate objects inside images — weapons, people, logos',
-    ],
-    [
-      'FEATURE_EXTRACTION',
-      'embeddings for similarity / clustering / retrieval',
     ],
     [
       'LLM',

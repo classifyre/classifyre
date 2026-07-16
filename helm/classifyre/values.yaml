@@ -37,6 +37,22 @@ api:
     # -- API image pull policy.
     pullPolicy: IfNotPresent
 
+  embedding:
+    # -- Keep the local sentence-transformer resident beside each API replica.
+    enabled: true
+    port: 8011
+    image:
+      repository: classifyre/cli
+      tag: ""
+      pullPolicy: IfNotPresent
+    resources:
+      requests:
+        cpu: 250m
+        memory: 512Mi
+      limits:
+        cpu: "1"
+        memory: 1Gi
+
   # -- Optional API container command override.
   command: []
   # -- Optional API container args override.
@@ -618,9 +634,9 @@ postgres:
       annotations: {}
     image:
       # -- Embedded Postgres image repository.
-      repository: postgres
+      repository: pgvector/pgvector
       # -- Embedded Postgres image tag.
-      tag: "18"
+      tag: "0.8.2-pg18-bookworm"
       # -- Embedded Postgres image pull policy.
       pullPolicy: IfNotPresent
     # -- Embedded Postgres service and container port.
@@ -708,7 +724,7 @@ postgres:
     # -- Number of CNPG instances.
     instances: 3
     # -- CNPG Postgres image.
-    imageName: ghcr.io/cloudnative-pg/postgresql:17
+    imageName: ghcr.io/cloudnative-pg/postgresql:18-standard-trixie
     # -- Database bootstrapped by CNPG.
     database: classifyre
     # -- Owner user bootstrapped by CNPG.

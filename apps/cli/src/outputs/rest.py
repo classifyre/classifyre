@@ -10,6 +10,13 @@ from pydantic import BaseModel, ConfigDict, Field
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry  # type: ignore[import-untyped]
 
+from ..pipeline.embedder import (
+    MODEL_DIM,
+    MODEL_NAME,
+    MODEL_REVISION,
+    EmbeddingArtifact,
+    local_embedder,
+)
 from .base import OutputRuntimeContext, OutputType
 
 logger = logging.getLogger(__name__)
@@ -222,6 +229,47 @@ class RestOutputSink:
                 f"/sources/{source_id}/assets/bulk",
                 payload.model_dump(mode="json", by_alias=True),
             )
+
+    async def emit_embeddings(self, asset_hash: str, artifact: EmbeddingArtifact) -> None:
+        """Negotiate hashes, encode only misses, then store chunk provenance."""
+        source_id = self._require_source_id()
+        hashes = list(artifact.contents)
+        if hashes:
+            missing_response = self._request_json(
+                "POST",
+                f"/sources/{source_id}/embeddings/missing",
+                {
+                    "space": {
+                        "model": MODEL_NAME,
+                        "revision": MODEL_REVISION,
+                        "dim": MODEL_DIM,
+                        "pooling": "mean",
+                        "normalized": True,
+                    },
+                    "contentHashes": hashes,
+                },
+            )
+            space_id = str(missing_response["spaceId"])
+            missing = [str(value) for value in missing_response.get("missing", [])]
+            for index in range(0, len(missing), 200):
+                batch_hashes = missing[index : index + 200]
+                vectors = local_embedder.encode([artifact.contents[value] for value in batch_hashes])
+                self._request_json(
+                    "POST",
+                    f"/sources/{source_id}/embeddings/vectors",
+                    {
+                        "spaceId": space_id,
+                        "items": [
+                            {"contentHash": digest, "vector": vector}
+                            for digest, vector in zip(batch_hashes, vectors, strict=True)
+                        ],
+                    },
+                )
+        self._request_json(
+            "POST",
+            f"/sources/{source_id}/embeddings/chunks",
+            {"assetHash": asset_hash, "chunks": artifact.chunks},
+        )
 
     def _split_by_size(self, assets: list[dict[str, Any]]) -> list[list[dict[str, Any]]]:
         """Split assets into chunks that each stay under _MAX_BATCH_BYTES."""

@@ -91,6 +91,29 @@ export class SourceInfoDto {
   type: string;
 }
 
+export class TextCoverageDto {
+  @ApiProperty({ default: 0 })
+  extracted: number;
+
+  @ApiProperty({ default: 0 })
+  empty: number;
+
+  @ApiProperty({ default: 0 })
+  engineUnavailable: number;
+
+  @ApiProperty({ default: 0 })
+  zeroFrames: number;
+
+  @ApiProperty({ default: 0 })
+  failed: number;
+
+  @ApiProperty({ default: 0 })
+  notApplicable: number;
+
+  @ApiProperty({ default: 0 })
+  unknown: number;
+}
+
 export class RunnerDto {
   @ApiProperty()
   id: string;
@@ -180,6 +203,19 @@ export class RunnerDto {
 
   @ApiProperty({
     default: 0,
+    description: 'Previously open findings resolved by this run.',
+  })
+  findingsResolved: number;
+
+  @ApiProperty({
+    default: 0,
+    description:
+      'Previously known findings re-detected and retained as current by this run.',
+  })
+  findingsRetained: number;
+
+  @ApiProperty({
+    default: 0,
     description:
       'Assets that should have carried text but yielded none — typically OCR ' +
       'or transcription returning empty. These are not errors: the asset ' +
@@ -188,6 +224,9 @@ export class RunnerDto {
       'run: a high value means the corpus is largely unscanned.',
   })
   assetsWithoutText: number;
+
+  @ApiProperty({ type: TextCoverageDto, required: false, nullable: true })
+  textCoverage?: TextCoverageDto | null;
 
   @ApiProperty({ required: false, nullable: true })
   errorMessage?: string | null;

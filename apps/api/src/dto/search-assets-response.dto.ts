@@ -1,4 +1,4 @@
-import { ApiProperty, OmitType } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional, OmitType } from '@nestjs/swagger';
 import { AssetListItemDto } from './asset-list-item.dto';
 import { FindingResponseDto } from './finding-response.dto';
 
@@ -28,4 +28,14 @@ export class SearchAssetsResponseDto {
 
   @ApiProperty()
   limit: number;
+
+  @ApiPropertyOptional({
+    description:
+      'Present when results were ordered by semantic or hybrid relevance',
+  })
+  ranking?: {
+    mode: string;
+    query: string;
+    explained: boolean;
+  };
 }

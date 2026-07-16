@@ -14,7 +14,7 @@
 
 import { mapValues } from '../runtime';
 /**
- * 
+ *
  * @export
  * @interface CreateCustomDetectorDto
  */
@@ -50,7 +50,7 @@ export interface CreateCustomDetectorDto {
      */
     aiProviderConfigId?: string;
     /**
-     * Pipeline schema defining the detector behaviour (type: GLINER2 | REGEX | LLM | TEXT_CLASSIFICATION | IMAGE_CLASSIFICATION | FEATURE_EXTRACTION | OBJECT_DETECTION)
+     * Pipeline schema defining the detector behaviour (type: GLINER2 | REGEX | LLM | TEXT_CLASSIFICATION | IMAGE_CLASSIFICATION | OBJECT_DETECTION)
      * @type {object}
      * @memberof CreateCustomDetectorDto
      */
@@ -75,7 +75,7 @@ export function CreateCustomDetectorDtoFromJSONTyped(json: any, ignoreDiscrimina
         return json;
     }
     return {
-        
+
         'name': json['name'],
         'key': json['key'] == null ? undefined : json['key'],
         'description': json['description'] == null ? undefined : json['description'],
@@ -95,7 +95,7 @@ export function CreateCustomDetectorDtoToJSONTyped(value?: CreateCustomDetectorD
     }
 
     return {
-        
+
         'name': value['name'],
         'key': value['key'],
         'description': value['description'],

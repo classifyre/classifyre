@@ -22,35 +22,41 @@ import {
 } from './SearchAssetItemDto';
 
 /**
- * 
+ *
  * @export
  * @interface SearchAssetsResponseDto
  */
 export interface SearchAssetsResponseDto {
     /**
-     * 
+     *
      * @type {Array<SearchAssetItemDto>}
      * @memberof SearchAssetsResponseDto
      */
     items: Array<SearchAssetItemDto>;
     /**
-     * 
+     *
      * @type {number}
      * @memberof SearchAssetsResponseDto
      */
     total: number;
     /**
-     * 
+     *
      * @type {number}
      * @memberof SearchAssetsResponseDto
      */
     skip: number;
     /**
-     * 
+     *
      * @type {number}
      * @memberof SearchAssetsResponseDto
      */
     limit: number;
+    /**
+     * Present when results were ordered by semantic or hybrid relevance
+     * @type {object}
+     * @memberof SearchAssetsResponseDto
+     */
+    ranking?: object;
 }
 
 /**
@@ -73,11 +79,12 @@ export function SearchAssetsResponseDtoFromJSONTyped(json: any, ignoreDiscrimina
         return json;
     }
     return {
-        
+
         'items': ((json['items'] as Array<any>).map(SearchAssetItemDtoFromJSON)),
         'total': json['total'],
         'skip': json['skip'],
         'limit': json['limit'],
+        'ranking': json['ranking'] == null ? undefined : json['ranking'],
     };
 }
 
@@ -91,11 +98,12 @@ export function SearchAssetsResponseDtoToJSONTyped(value?: SearchAssetsResponseD
     }
 
     return {
-        
+
         'items': ((value['items'] as Array<any>).map(SearchAssetItemDtoToJSON)),
         'total': value['total'],
         'skip': value['skip'],
         'limit': value['limit'],
+        'ranking': value['ranking'],
     };
 }
 

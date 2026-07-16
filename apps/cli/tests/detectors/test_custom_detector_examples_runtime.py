@@ -12,7 +12,6 @@ from src.detectors.custom.detector import CustomDetector
 from src.detectors.custom.runners import GLiNER2Runner, RegexRunner
 from src.models.generated_detectors import (
     CustomDetectorConfig,
-    FeatureExtractionPipelineSchema,
     ImageClassificationPipelineSchema,
     ObjectDetectionPipelineSchema,
     TextClassificationPipelineSchema,
@@ -21,7 +20,6 @@ from src.models.generated_detectors import (
 _TRANSFORMER_SCHEMA_TYPES = (
     TextClassificationPipelineSchema,
     ImageClassificationPipelineSchema,
-    FeatureExtractionPipelineSchema,
     ObjectDetectionPipelineSchema,
 )
 

@@ -158,7 +158,6 @@ _ML_PIPELINE_TYPES = frozenset(
         "GLINER2",
         "TEXT_CLASSIFICATION",
         "IMAGE_CLASSIFICATION",
-        "FEATURE_EXTRACTION",
         "OBJECT_DETECTION",
     }
 )

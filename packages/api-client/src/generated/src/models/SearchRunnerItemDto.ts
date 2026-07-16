@@ -20,93 +20,100 @@ import {
     SourceInfoDtoToJSON,
     SourceInfoDtoToJSONTyped,
 } from './SourceInfoDto';
+import type { TextCoverageDto } from './TextCoverageDto';
+import {
+    TextCoverageDtoFromJSON,
+    TextCoverageDtoFromJSONTyped,
+    TextCoverageDtoToJSON,
+    TextCoverageDtoToJSONTyped,
+} from './TextCoverageDto';
 
 /**
- * 
+ *
  * @export
  * @interface SearchRunnerItemDto
  */
 export interface SearchRunnerItemDto {
     /**
-     * 
+     *
      * @type {string}
      * @memberof SearchRunnerItemDto
      */
     id: string;
     /**
-     * 
+     *
      * @type {string}
      * @memberof SearchRunnerItemDto
      */
     sourceId: string;
     /**
-     * 
+     *
      * @type {string}
      * @memberof SearchRunnerItemDto
      */
     triggeredBy?: string | null;
     /**
-     * 
+     *
      * @type {Date}
      * @memberof SearchRunnerItemDto
      */
     triggeredAt: Date;
     /**
-     * 
+     *
      * @type {string}
      * @memberof SearchRunnerItemDto
      */
     triggerType: SearchRunnerItemDtoTriggerTypeEnum;
     /**
-     * 
+     *
      * @type {string}
      * @memberof SearchRunnerItemDto
      */
     status: SearchRunnerItemDtoStatusEnum;
     /**
-     * 
+     *
      * @type {string}
      * @memberof SearchRunnerItemDto
      */
     executionMode?: SearchRunnerItemDtoExecutionModeEnum | null;
     /**
-     * 
+     *
      * @type {Date}
      * @memberof SearchRunnerItemDto
      */
     startedAt?: Date | null;
     /**
-     * 
+     *
      * @type {Date}
      * @memberof SearchRunnerItemDto
      */
     completedAt?: Date | null;
     /**
-     * 
+     *
      * @type {number}
      * @memberof SearchRunnerItemDto
      */
     durationMs?: number | null;
     /**
-     * 
+     *
      * @type {number}
      * @memberof SearchRunnerItemDto
      */
     assetsCreated: number;
     /**
-     * 
+     *
      * @type {number}
      * @memberof SearchRunnerItemDto
      */
     assetsUpdated: number;
     /**
-     * 
+     *
      * @type {number}
      * @memberof SearchRunnerItemDto
      */
     assetsUnchanged: number;
     /**
-     * 
+     *
      * @type {number}
      * @memberof SearchRunnerItemDto
      */
@@ -136,37 +143,55 @@ export interface SearchRunnerItemDto {
      */
     findingsCreated: number;
     /**
+     * Previously open findings resolved by this run.
+     * @type {number}
+     * @memberof SearchRunnerItemDto
+     */
+    findingsResolved: number;
+    /**
+     * Previously known findings re-detected and retained as current by this run.
+     * @type {number}
+     * @memberof SearchRunnerItemDto
+     */
+    findingsRetained: number;
+    /**
      * Assets that should have carried text but yielded none — typically OCR or transcription returning empty. These are not errors: the asset ingested fine, but its content was never read, so any detector result for it covers nothing. Read alongside assetsUnchanged before trusting a run: a high value means the corpus is largely unscanned.
      * @type {number}
      * @memberof SearchRunnerItemDto
      */
     assetsWithoutText: number;
     /**
-     * 
+     *
+     * @type {TextCoverageDto}
+     * @memberof SearchRunnerItemDto
+     */
+    textCoverage?: TextCoverageDto | null;
+    /**
+     *
      * @type {string}
      * @memberof SearchRunnerItemDto
      */
     errorMessage?: string | null;
     /**
-     * 
+     *
      * @type {object}
      * @memberof SearchRunnerItemDto
      */
     errorDetails?: object | null;
     /**
-     * 
+     *
      * @type {string}
      * @memberof SearchRunnerItemDto
      */
     jobName?: string | null;
     /**
-     * 
+     *
      * @type {string}
      * @memberof SearchRunnerItemDto
      */
     jobNamespace?: string | null;
     /**
-     * 
+     *
      * @type {SourceInfoDto}
      * @memberof SearchRunnerItemDto
      */
@@ -225,6 +250,8 @@ export function instanceOfSearchRunnerItemDto(value: object): value is SearchRun
     if (!('assetsOutOfScope' in value) || value['assetsOutOfScope'] === undefined) return false;
     if (!('totalFindings' in value) || value['totalFindings'] === undefined) return false;
     if (!('findingsCreated' in value) || value['findingsCreated'] === undefined) return false;
+    if (!('findingsResolved' in value) || value['findingsResolved'] === undefined) return false;
+    if (!('findingsRetained' in value) || value['findingsRetained'] === undefined) return false;
     if (!('assetsWithoutText' in value) || value['assetsWithoutText'] === undefined) return false;
     return true;
 }
@@ -238,7 +265,7 @@ export function SearchRunnerItemDtoFromJSONTyped(json: any, ignoreDiscriminator:
         return json;
     }
     return {
-        
+
         'id': json['id'],
         'sourceId': json['sourceId'],
         'triggeredBy': json['triggeredBy'] == null ? undefined : json['triggeredBy'],
@@ -257,7 +284,10 @@ export function SearchRunnerItemDtoFromJSONTyped(json: any, ignoreDiscriminator:
         'scopeFingerprint': json['scopeFingerprint'] == null ? undefined : json['scopeFingerprint'],
         'totalFindings': json['totalFindings'],
         'findingsCreated': json['findingsCreated'],
+        'findingsResolved': json['findingsResolved'],
+        'findingsRetained': json['findingsRetained'],
         'assetsWithoutText': json['assetsWithoutText'],
+        'textCoverage': json['textCoverage'] == null ? undefined : TextCoverageDtoFromJSON(json['textCoverage']),
         'errorMessage': json['errorMessage'] == null ? undefined : json['errorMessage'],
         'errorDetails': json['errorDetails'] == null ? undefined : json['errorDetails'],
         'jobName': json['jobName'] == null ? undefined : json['jobName'],
@@ -276,7 +306,7 @@ export function SearchRunnerItemDtoToJSONTyped(value?: SearchRunnerItemDto | nul
     }
 
     return {
-        
+
         'id': value['id'],
         'sourceId': value['sourceId'],
         'triggeredBy': value['triggeredBy'],
@@ -295,7 +325,10 @@ export function SearchRunnerItemDtoToJSONTyped(value?: SearchRunnerItemDto | nul
         'scopeFingerprint': value['scopeFingerprint'],
         'totalFindings': value['totalFindings'],
         'findingsCreated': value['findingsCreated'],
+        'findingsResolved': value['findingsResolved'],
+        'findingsRetained': value['findingsRetained'],
         'assetsWithoutText': value['assetsWithoutText'],
+        'textCoverage': TextCoverageDtoToJSON(value['textCoverage']),
         'errorMessage': value['errorMessage'],
         'errorDetails': value['errorDetails'],
         'jobName': value['jobName'],
