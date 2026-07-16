@@ -174,9 +174,23 @@ export class AgentAuditService {
     });
   }
 
+  /**
+   * Statuses a finished in-flight step may write over.
+   *
+   * CANCELLED is absent deliberately: an operator's stop is terminal. These
+   * were unguarded updates, so a run cancelled mid-step was flipped back to
+   * COMPLETED the moment the step returned — one observed run reported
+   * CANCELLED, then finalized as COMPLETED with "Cancelled by the operator"
+   * still in its error field.
+   */
+  private static readonly OVERWRITABLE = [
+    AgentRunStatus.PENDING,
+    AgentRunStatus.RUNNING,
+  ];
+
   async complete(runId: string, summary: string): Promise<void> {
-    await this.prisma.agentRun.update({
-      where: { id: runId },
+    await this.prisma.agentRun.updateMany({
+      where: { id: runId, status: { in: AgentAuditService.OVERWRITABLE } },
       data: {
         status: AgentRunStatus.COMPLETED,
         summary,
@@ -187,15 +201,15 @@ export class AgentAuditService {
   }
 
   async skip(runId: string, summary: string): Promise<void> {
-    await this.prisma.agentRun.update({
-      where: { id: runId },
+    await this.prisma.agentRun.updateMany({
+      where: { id: runId, status: { in: AgentAuditService.OVERWRITABLE } },
       data: { status: AgentRunStatus.SKIPPED, summary, finishedAt: new Date() },
     });
   }
 
   async fail(runId: string, error: unknown): Promise<void> {
-    await this.prisma.agentRun.update({
-      where: { id: runId },
+    await this.prisma.agentRun.updateMany({
+      where: { id: runId, status: { in: AgentAuditService.OVERWRITABLE } },
       data: {
         status: AgentRunStatus.FAILED,
         error: error instanceof Error ? error.message : String(error),

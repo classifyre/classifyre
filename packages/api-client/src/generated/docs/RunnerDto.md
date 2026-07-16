@@ -22,7 +22,11 @@ Name | Type
 `assetsUpdated` | number
 `assetsUnchanged` | number
 `assetsDeleted` | number
+`assetsOutOfScope` | number
+`scopeFingerprint` | string
 `totalFindings` | number
+`findingsCreated` | number
+`assetsWithoutText` | number
 `errorMessage` | string
 `errorDetails` | object
 `jobName` | string
@@ -52,7 +56,11 @@ const example = {
   "assetsUpdated": null,
   "assetsUnchanged": null,
   "assetsDeleted": null,
+  "assetsOutOfScope": null,
+  "scopeFingerprint": null,
   "totalFindings": null,
+  "findingsCreated": null,
+  "assetsWithoutText": null,
   "errorMessage": null,
   "errorDetails": null,
   "jobName": null,

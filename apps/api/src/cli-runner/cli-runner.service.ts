@@ -18,12 +18,12 @@ import {
   AssetType,
   Prisma,
   RunnerExecutionMode,
+  RunnerAssetChangeType,
   RunnerAssetStatus,
   RunnerStatus,
   Source,
   TriggerType,
   Severity,
-  AssetStatus,
 } from '@prisma/client';
 import {
   NotificationEvent,
@@ -38,6 +38,7 @@ import { KubernetesCliJobService } from './kubernetes-cli-job.service';
 import { MaskedConfigCryptoService } from '../masked-config-crypto.service';
 import { RunnerLogStorageService } from './runner-log-storage.service';
 import { CustomDetectorsService } from '../custom-detectors.service';
+import { computeScopeFingerprint } from '../utils/scope-fingerprint';
 import {
   SearchRunnersRequestDto,
   SearchRunnersSortBy,
@@ -511,6 +512,10 @@ export class CliRunnerService implements OnApplicationBootstrap {
             triggeredBy,
             status: RunnerStatus.PENDING,
             executionMode,
+            scopeFingerprint: computeScopeFingerprint(
+              source.type,
+              source.config,
+            ),
           },
         });
 
@@ -893,10 +898,8 @@ export class CliRunnerService implements OnApplicationBootstrap {
   async createExternalRunner(sourceId: string, triggeredBy?: string) {
     const { runner, previousSourceState } = await this.prisma.$transaction(
       async (tx) => {
-        const { previousSourceState } = await this.claimSourceForRunnerCreation(
-          tx,
-          sourceId,
-        );
+        const { source, previousSourceState } =
+          await this.claimSourceForRunnerCreation(tx, sourceId);
 
         const runner = await tx.runner.create({
           data: {
@@ -906,6 +909,10 @@ export class CliRunnerService implements OnApplicationBootstrap {
             status: RunnerStatus.RUNNING,
             startedAt: new Date(),
             executionMode: RunnerExecutionMode.EXTERNAL,
+            scopeFingerprint: computeScopeFingerprint(
+              source.type,
+              source.config,
+            ),
           },
         });
 
@@ -1646,31 +1653,100 @@ export class CliRunnerService implements OnApplicationBootstrap {
     }
   }
 
+  /**
+   * Counters for a finished run, read from per-run facts.
+   *
+   * These used to be counted from `assets.status`, which is the asset's
+   * *current* state and is overwritten by every later run — so assetsCreated
+   * really meant "assets whose status happens to be NEW right now and were last
+   * touched by this runner". Combined with the CLI's two-pass ingest (a stub
+   * pass creates the asset, then the pass carrying findings sees the same
+   * checksum and marks it unchanged), a ten-asset first run reported
+   * "assetsCreated: 0, assetsUnchanged: 10". runner_assets.change_type records
+   * what this run actually did and no later run rewrites it.
+   */
   private async computeRunnerStats(runnerId: string): Promise<{
     assetsCreated: number;
     assetsUpdated: number;
     assetsUnchanged: number;
+    assetsWithoutText: number;
     totalFindings: number;
   }> {
-    const [assetsCreated, assetsUpdated, assetsUnchanged, totalFindings] =
-      await Promise.all([
-        this.prisma.asset.count({
-          where: { runnerId, status: AssetStatus.NEW },
-        }),
-        this.prisma.asset.count({
-          where: { runnerId, status: AssetStatus.UPDATED },
-        }),
-        this.prisma.asset.count({
-          where: { runnerId, status: AssetStatus.UNCHANGED },
-        }),
-        this.prisma.finding.count({ where: { runnerId } }),
-      ]);
+    const [
+      assetsCreated,
+      assetsUpdated,
+      assetsUnchanged,
+      assetsWithoutText,
+      totalFindings,
+    ] = await Promise.all([
+      this.prisma.runnerAsset.count({
+        where: { runnerId, changeType: RunnerAssetChangeType.CREATED },
+      }),
+      this.prisma.runnerAsset.count({
+        where: { runnerId, changeType: RunnerAssetChangeType.UPDATED },
+      }),
+      this.prisma.runnerAsset.count({
+        where: { runnerId, changeType: RunnerAssetChangeType.UNCHANGED },
+      }),
+      // Coverage, not errors: these assets ingested fine, but OCR or
+      // transcription returned nothing so their content was never scanned.
+      this.prisma.runnerAsset.count({ where: { runnerId, emptyText: true } }),
+      // Deliberately every finding stamped by this run, matching what
+      // totalFindings has always been. It is NOT a discovery count — see
+      // Runner.findingsCreated, which bulkIngest accumulates as batches land.
+      this.prisma.finding.count({ where: { runnerId } }),
+    ]);
 
     return {
       assetsCreated,
       assetsUpdated,
       assetsUnchanged,
+      assetsWithoutText,
       totalFindings,
+    };
+  }
+
+  /**
+   * Count assets on which at least one detector failed, and name the detectors.
+   *
+   * Reads the per-detector outcomes the CLI reports for each asset. A detector
+   * that raised produced no findings, which is invisible to every other signal
+   * in the run: the asset ingests fine, no asset error is recorded, and the
+   * absence of findings looks exactly like a clean scan.
+   */
+  private async summarizeDetectorFailures(
+    tx: Prisma.TransactionClient,
+    runnerId: string,
+  ): Promise<{ assetCount: number; detectorLabels: string[] }> {
+    const rows = await tx.runnerAsset.findMany({
+      where: { runnerId, detectorOutcomes: { not: Prisma.DbNull } },
+      select: { assetHash: true, detectorOutcomes: true },
+    });
+
+    const failedAssets = new Set<string>();
+    const labels = new Set<string>();
+
+    for (const row of rows) {
+      if (!Array.isArray(row.detectorOutcomes)) continue;
+      for (const outcome of row.detectorOutcomes) {
+        if (!outcome || typeof outcome !== 'object') continue;
+        const { status, detector_type, custom_detector_key } =
+          outcome as Record<string, unknown>;
+        if (status !== 'ERROR') continue;
+        failedAssets.add(row.assetHash);
+        const detectorLabel =
+          typeof custom_detector_key === 'string' && custom_detector_key
+            ? custom_detector_key
+            : typeof detector_type === 'string' && detector_type
+              ? detector_type
+              : 'unknown detector';
+        labels.add(detectorLabel);
+      }
+    }
+
+    return {
+      assetCount: failedAssets.size,
+      detectorLabels: [...labels].sort(),
     };
   }
 
@@ -1773,8 +1849,13 @@ export class CliRunnerService implements OnApplicationBootstrap {
     }
 
     const durationMs = completedAt.getTime() - runner.startedAt.getTime();
-    const { assetsCreated, assetsUpdated, assetsUnchanged, totalFindings } =
-      await this.computeRunnerStats(runnerId);
+    const {
+      assetsCreated,
+      assetsUpdated,
+      assetsUnchanged,
+      assetsWithoutText,
+      totalFindings,
+    } = await this.computeRunnerStats(runnerId);
 
     const { finalStatus, warningMessage } = await this.prisma.$transaction(
       async (tx) => {
@@ -1792,20 +1873,39 @@ export class CliRunnerService implements OnApplicationBootstrap {
           },
         });
 
-        const [errorCount, totalCount] = await Promise.all([
+        const [errorCount, totalCount, detectorFailures] = await Promise.all([
           tx.runnerAsset.count({
             where: { runnerId, status: RunnerAssetStatus.ERROR },
           }),
           tx.runnerAsset.count({ where: { runnerId } }),
+          // An asset can be fetched and ingested perfectly while a detector
+          // crashes on every page of it: the asset never reaches status ERROR,
+          // so asset errors alone cannot see a wholly failed detector. That is
+          // how a run with zero PII output reported "COMPLETED, 0 errors".
+          this.summarizeDetectorFailures(tx, runnerId),
         ]);
 
-        const hasErrors = errorCount > 0;
-        const status = hasErrors
-          ? RunnerStatus.WARNING
-          : RunnerStatus.COMPLETED;
-        const message = hasErrors
-          ? `${errorCount} of ${totalCount} assets failed processing`
-          : undefined;
+        const hasAssetErrors = errorCount > 0;
+        const hasDetectorFailures = detectorFailures.assetCount > 0;
+        const status =
+          hasAssetErrors || hasDetectorFailures
+            ? RunnerStatus.WARNING
+            : RunnerStatus.COMPLETED;
+
+        const messageParts: string[] = [];
+        if (hasAssetErrors) {
+          messageParts.push(
+            `${errorCount} of ${totalCount} assets failed processing`,
+          );
+        }
+        if (hasDetectorFailures) {
+          const detectors = detectorFailures.detectorLabels.join(', ');
+          messageParts.push(
+            `${detectors} failed on ${detectorFailures.assetCount} of ${totalCount} assets`,
+          );
+        }
+        const message =
+          messageParts.length > 0 ? messageParts.join('; ') : undefined;
 
         await tx.runner.update({
           where: { id: runnerId },
@@ -1816,6 +1916,7 @@ export class CliRunnerService implements OnApplicationBootstrap {
             assetsCreated,
             assetsUpdated,
             assetsUnchanged,
+            assetsWithoutText,
             totalFindings,
             ...(message && { errorMessage: message }),
           },
@@ -3317,6 +3418,9 @@ export class CliRunnerService implements OnApplicationBootstrap {
           findings_by_severity: Record<string, number> | null;
           findings_by_detector: Record<string, number> | null;
           metadata: Prisma.JsonValue;
+          detector_outcomes: Prisma.JsonValue;
+          change_type: RunnerAssetChangeType | null;
+          empty_text: boolean | null;
           created_at: Date;
         }>
       >(
@@ -3337,6 +3441,9 @@ export class CliRunnerService implements OnApplicationBootstrap {
         findingsBySeverity: row.findings_by_severity,
         findingsByDetector: row.findings_by_detector,
         metadata: row.metadata,
+        detectorOutcomes: row.detector_outcomes,
+        changeType: row.change_type,
+        emptyText: row.empty_text,
         createdAt: row.created_at,
       }));
     } else {

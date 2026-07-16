@@ -12,18 +12,12 @@ import { SystemBriefService } from './harness/system-brief.service';
 import { ToolRegistry } from './tools/tool-registry.service';
 import { AgentConfigService } from './harness/agent-config.service';
 import { McpClientService } from './mcp-client/mcp-client.service';
-import { AUTOPILOT_QUEUE } from './autopilot.constants';
+import { AUTOPILOT_QUEUE, PIPELINE_KINDS } from './autopilot.constants';
 import { CORRELATION_QUEUE } from '../correlation/correlation.constants';
 import type { AutopilotJob } from './autopilot.types';
 
 /** Agents that run in canonical order as one chained cycle on the autopilot queue. */
-const PIPELINE_KINDS = [
-  AgentKind.INQUIRY,
-  AgentKind.CASE,
-  AgentKind.CONFIG,
-  AgentKind.DETECTOR_AUTHOR,
-  AgentKind.ESCALATION,
-] as const;
+
 import {
   AgentActivityItemDto,
   AgentActivityListResponseDto,
