@@ -1,6 +1,6 @@
 {
   "name": "@workspace/schemas",
-  "version": "0.4.54",
+  "version": "0.4.55-SNAPSHOT",
   "private": true,
   "type": "module",
   "exports": {
