@@ -8,8 +8,9 @@ name: Desktop Snapshot
 # distinguishable from a release in the app's Settings.
 #
 # Develop pushes build the full 4-platform matrix (that's what releases cut
-# from, so every platform's snapshot must be provable). PRs build mac-arm64
-# only to keep runner cost sane; use the manual dispatch for other platforms.
+# from, so every platform's snapshot must be provable). PRs build the three
+# primary targets: mac-arm64, win-x64, and linux-amd64. Linux ARM64 remains
+# covered on develop and can also be selected with manual dispatch.
 
 on:
   push:
@@ -26,7 +27,7 @@ on:
   workflow_dispatch:
     inputs:
       only:
-        description: 'Platform (mac-arm64 | win-x64 | linux-amd64 | linux-arm64). Empty = all four.'
+        description: 'Comma-separated platforms (mac-arm64 | win-x64 | linux-amd64 | linux-arm64). Empty = all four.'
         required: false
         type: string
         default: 'mac-arm64'
@@ -47,6 +48,6 @@ jobs:
     with:
       tag: ''
       publish: false
-      # dispatch: chosen platform; PR: mac-arm64; develop push: '' = all four.
-      only: ${{ github.event.inputs.only || (github.event_name == 'pull_request' && 'mac-arm64' || '') }}
+      # dispatch: chosen platforms; PR: primary three; develop push: all four.
+      only: ${{ github.event.inputs.only || (github.event_name == 'pull_request' && 'mac-arm64,win-x64,linux-amd64' || '') }}
     secrets: inherit
