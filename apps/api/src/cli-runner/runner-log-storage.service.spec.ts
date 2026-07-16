@@ -291,3 +291,118 @@ describe('RunnerLogStorageService (local filesystem backend)', () => {
     await service.onModuleDestroy();
   });
 });
+
+// G-031. Level was inferred by scanning the whole message for the first level
+// word, then defaulting anything on stderr to ERROR. Python logs every level
+// to stderr and libraries print progress there, so real failures were buried
+// under model-download chatter and OpenCV notices — the ERROR count could not
+// be trusted, by an operator or by automation.
+describe('RunnerLogStorageService level inference (G-031)', () => {
+  const levelOf = (message: string, stream: 'stdout' | 'stderr' = 'stderr') =>
+    (new RunnerLogStorageService() as any).inferLevel(stream, message);
+
+  describe('levels a logger actually emitted', () => {
+    // The CLI's own format: main.py basicConfig "%(levelname)s:%(name)s: %(message)s".
+    it('reads the CLI logger prefix', () => {
+      expect(
+        levelOf('INFO:src.pipeline.detector_pipeline: Scanning a.pdf'),
+      ).toBe('INFO');
+      expect(levelOf('ERROR:src.detectors.pii.detector: analyzer failed')).toBe(
+        'ERROR',
+      );
+      expect(levelOf('WARNING:src.utils.file_parser: empty OCR result')).toBe(
+        'WARN',
+      );
+    });
+
+    it('reads the worker-pool prefix', () => {
+      expect(levelOf('INFO:src.pipeline:[worker-123] Scanning b.pdf')).toBe(
+        'INFO',
+      );
+    });
+
+    it('reads bracketed and dashed prefixes', () => {
+      expect(levelOf('[ERROR] something broke')).toBe('ERROR');
+      expect(levelOf('WARN - deprecated flag')).toBe('WARN');
+      expect(levelOf('CRITICAL: disk full')).toBe('FATAL');
+    });
+
+    it('reads a timestamped format', () => {
+      expect(
+        levelOf('2026-07-15 10:00:00,123 - src.pipeline - INFO - Scanning'),
+      ).toBe('INFO');
+      expect(
+        levelOf('2026-07-15 10:00:00,123 - src.pipeline - ERROR - boom'),
+      ).toBe('ERROR');
+    });
+
+    it('reads structured JSON', () => {
+      expect(levelOf('{"level":"warning","message":"slow"}')).toBe('WARN');
+    });
+
+    it('is case insensitive', () => {
+      expect(levelOf('info:src.pipeline: hello')).toBe('INFO');
+    });
+  });
+
+  describe('prose that merely mentions a level', () => {
+    it('does not read a level out of the message body', () => {
+      expect(levelOf('Scan completed with no error found')).toBe('UNKNOWN');
+      expect(levelOf('Loading model from /opt/models/debug/weights.bin')).toBe(
+        'UNKNOWN',
+      );
+      expect(levelOf('Retrying after error handling routine finished')).toBe(
+        'UNKNOWN',
+      );
+    });
+
+    it('does not let a mid-message level override the real one', () => {
+      // Previously the first level word anywhere won, so this became INFO.
+      expect(levelOf('ERROR:src.detectors: info about the failure')).toBe(
+        'ERROR',
+      );
+    });
+  });
+
+  describe('third-party stderr chatter is not an error', () => {
+    // These are the lines the corpus run recorded as ERROR.
+    it('does not mark model-load progress as ERROR', () => {
+      expect(
+        levelOf('Downloading model.safetensors:  42%|████      | 180M/430M'),
+      ).toBe('UNKNOWN');
+    });
+
+    it('does not mark a transformer compatibility notice as ERROR', () => {
+      expect(
+        levelOf(
+          'Some weights of the model checkpoint were not used when initializing',
+        ),
+      ).toBe('UNKNOWN');
+    });
+
+    it('does not mark an OpenCV/AV duplicate-class warning as ERROR', () => {
+      expect(
+        levelOf(
+          'objc[1234]: Class AVFFrameReceiver is implemented in both libavdevice',
+        ),
+      ).toBe('UNKNOWN');
+    });
+
+    it('treats plain stdout and stderr chatter identically', () => {
+      const message = 'some library output with no level';
+      expect(levelOf(message, 'stderr')).toBe(levelOf(message, 'stdout'));
+    });
+  });
+
+  describe('genuine failures still surface', () => {
+    it('marks a Python traceback as ERROR even without a level token', () => {
+      const traceback = [
+        'Traceback (most recent call last):',
+        '  File "/app/src/main.py", line 42, in <module>',
+        "TypeError: unsupported operand type(s) for -: 'ChunkSize' and 'ChunkOverlap'",
+      ].join('\n');
+
+      expect(levelOf(traceback)).toBe('ERROR');
+    });
+  });
+});

@@ -81,10 +81,23 @@ export interface Tool<I = Record<string, unknown>, O = unknown> {
   handler(input: I, tc: ToolContext): Promise<O>;
 }
 
-/** Outcome of one dispatched tool call, returned to the agent loop. */
+/**
+ * Outcome of one dispatched tool call, returned to the agent loop.
+ *
+ * APPLIED means a mutation was performed and a decision row recorded. READ_OK
+ * means a read tool returned successfully and nothing changed. They are
+ * distinct because run summaries report "N applied": counting reads as applied
+ * produced summaries like "11 applied" for runs whose persisted decisionCount
+ * was 0, which is how the logs stopped being trustworthy.
+ */
 export interface ToolCallResult {
   tool: string;
-  outcome: 'APPLIED' | 'SKIPPED_OBSERVE_ONLY' | 'FAILED' | 'DEDUPED';
+  outcome:
+    | 'APPLIED'
+    | 'READ_OK'
+    | 'SKIPPED_OBSERVE_ONLY'
+    | 'FAILED'
+    | 'DEDUPED';
   /** JSON-serializable observation (handler result, or an error description). */
   result: unknown;
 }

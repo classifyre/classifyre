@@ -22,7 +22,10 @@ type SeverityLiteral = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'INFO';
 
 /** Aggregated outcome of a harness run, formatted by the worker. */
 export interface ApplySummary {
+  /** Mutations performed, each with a persisted decision row. */
   applied: number;
+  /** Successful reads. Never folded into `applied` — reads change nothing. */
+  readOk?: number;
   skippedObserveOnly: number;
   failed: number;
   createdInquiries: Array<{ id: string; title: string }>;

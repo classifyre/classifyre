@@ -93,24 +93,36 @@ export class AgentMemoryService {
         .map((t) => t.trim().toLowerCase())
         .filter(Boolean)
         .slice(0, 10);
-      const existing = await this.prisma.agentMemory.findUnique({
-        where: { kind_key: { kind, key } },
-      });
-      if (existing) {
-        await this.prisma.agentMemory.update({
-          where: { id: existing.id },
-          data: {
-            content: w.content.trim(),
-            tags: [...new Set([...existing.tags, ...tags])],
-            weight: { increment: 1 },
-            ...(ref ?? {}),
-          },
-        });
-      } else {
-        await this.prisma.agentMemory.create({
-          data: { kind, key, content: w.content.trim(), tags, ...(ref ?? {}) },
-        });
-      }
+      // One atomic statement rather than findUnique-then-update/create. The
+      // read-then-write raced: two agents writing the same (kind, key) both saw
+      // the same row and the last writer clobbered the other's content and
+      // dropped its tags, and the findUnique→create path could collide on the
+      // kind_key unique constraint outright. Tags are merged in SQL so a
+      // concurrent write cannot lose entries.
+      await this.prisma.$executeRaw`
+        INSERT INTO agent_memories (id, kind, key, content, tags, weight, ref_type, ref_id, created_at, updated_at)
+        VALUES (
+          gen_random_uuid()::text,
+          ${kind}::"AgentMemoryKind",
+          ${key},
+          ${w.content.trim()},
+          ${tags}::text[],
+          1,
+          ${ref?.refType ?? null},
+          ${ref?.refId ?? null},
+          now(),
+          now()
+        )
+        ON CONFLICT (kind, key) DO UPDATE SET
+          content = EXCLUDED.content,
+          tags = ARRAY(
+            SELECT DISTINCT unnest(agent_memories.tags || EXCLUDED.tags)
+          ),
+          weight = agent_memories.weight + 1,
+          ref_type = COALESCE(EXCLUDED.ref_type, agent_memories.ref_type),
+          ref_id = COALESCE(EXCLUDED.ref_id, agent_memories.ref_id),
+          updated_at = now()
+      `;
       written++;
     }
     return written;

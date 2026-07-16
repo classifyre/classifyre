@@ -73,7 +73,7 @@ async def test_gliner2_example_sarcasm_uses_classification(custom_examples: list
 
     mock_model = MagicMock()
     mock_model.extract_entities.return_value = {"entities": {}}
-    mock_model.classify.return_value = {"label": "sarcastic", "confidence": 0.91}
+    mock_model.classify_text.return_value = {"tone": {"label": "sarcastic", "confidence": 0.91}}
     detector._runner._model = mock_model
 
     findings = await detector.detect("Great, another perfectly smooth deployment rollback...")
@@ -106,7 +106,7 @@ async def test_gliner2_example_vendor_extractor_emits_entity_findings(custom_exa
             ]
         }
     }
-    mock_model.classify.return_value = {}
+    mock_model.classify_text.return_value = {}
     detector._runner._model = mock_model
 
     findings = await detector.detect("Contract signed with Acme Lieferant GmbH for annual support.")
@@ -150,7 +150,7 @@ async def test_gliner2_example_all_examples_load_and_detect(custom_examples: lis
         if isinstance(detector._runner, GLiNER2Runner):
             mock_model = MagicMock()
             mock_model.extract_entities.return_value = {"entities": {}}
-            mock_model.classify.return_value = {}
+            mock_model.classify_text.return_value = {}
             detector._runner._model = mock_model
 
         findings = await detector.detect("Sample text for smoke test.")

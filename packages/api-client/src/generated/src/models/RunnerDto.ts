@@ -124,11 +124,35 @@ export interface RunnerDto {
      */
     assetsDeleted: number;
     /**
-     * 
+     * Assets absent from this run but retained because they were ingested under a different source scope. Their findings remain OPEN. A non-zero value means the scope moved and those assets are no longer covered.
+     * @type {number}
+     * @memberof RunnerDto
+     */
+    assetsOutOfScope: number;
+    /**
+     * Fingerprint of the scope-determining config this run covered. Runs sharing a fingerprint are directly comparable.
+     * @type {string}
+     * @memberof RunnerDto
+     */
+    scopeFingerprint?: string | null;
+    /**
+     * Findings currently associated with this run — created, re-detected, or resolved by it. NOT a count of new discoveries: after reconciliation it is closer to the source's open set as of this run. Use findingsCreated for what this run actually found that was new.
      * @type {number}
      * @memberof RunnerDto
      */
     totalFindings: number;
+    /**
+     * Findings first seen by this run.
+     * @type {number}
+     * @memberof RunnerDto
+     */
+    findingsCreated: number;
+    /**
+     * Assets that should have carried text but yielded none — typically OCR or transcription returning empty. These are not errors: the asset ingested fine, but its content was never read, so any detector result for it covers nothing. Read alongside assetsUnchanged before trusting a run: a high value means the corpus is largely unscanned.
+     * @type {number}
+     * @memberof RunnerDto
+     */
+    assetsWithoutText: number;
     /**
      * 
      * @type {string}
@@ -211,7 +235,10 @@ export function instanceOfRunnerDto(value: object): value is RunnerDto {
     if (!('assetsUpdated' in value) || value['assetsUpdated'] === undefined) return false;
     if (!('assetsUnchanged' in value) || value['assetsUnchanged'] === undefined) return false;
     if (!('assetsDeleted' in value) || value['assetsDeleted'] === undefined) return false;
+    if (!('assetsOutOfScope' in value) || value['assetsOutOfScope'] === undefined) return false;
     if (!('totalFindings' in value) || value['totalFindings'] === undefined) return false;
+    if (!('findingsCreated' in value) || value['findingsCreated'] === undefined) return false;
+    if (!('assetsWithoutText' in value) || value['assetsWithoutText'] === undefined) return false;
     return true;
 }
 
@@ -241,7 +268,11 @@ export function RunnerDtoFromJSONTyped(json: any, ignoreDiscriminator: boolean):
         'assetsUpdated': json['assetsUpdated'],
         'assetsUnchanged': json['assetsUnchanged'],
         'assetsDeleted': json['assetsDeleted'],
+        'assetsOutOfScope': json['assetsOutOfScope'],
+        'scopeFingerprint': json['scopeFingerprint'] == null ? undefined : json['scopeFingerprint'],
         'totalFindings': json['totalFindings'],
+        'findingsCreated': json['findingsCreated'],
+        'assetsWithoutText': json['assetsWithoutText'],
         'errorMessage': json['errorMessage'] == null ? undefined : json['errorMessage'],
         'errorDetails': json['errorDetails'] == null ? undefined : json['errorDetails'],
         'jobName': json['jobName'] == null ? undefined : json['jobName'],
@@ -277,7 +308,11 @@ export function RunnerDtoToJSONTyped(value?: RunnerDto | null, ignoreDiscriminat
         'assetsUpdated': value['assetsUpdated'],
         'assetsUnchanged': value['assetsUnchanged'],
         'assetsDeleted': value['assetsDeleted'],
+        'assetsOutOfScope': value['assetsOutOfScope'],
+        'scopeFingerprint': value['scopeFingerprint'],
         'totalFindings': value['totalFindings'],
+        'findingsCreated': value['findingsCreated'],
+        'assetsWithoutText': value['assetsWithoutText'],
         'errorMessage': value['errorMessage'],
         'errorDetails': value['errorDetails'],
         'jobName': value['jobName'],

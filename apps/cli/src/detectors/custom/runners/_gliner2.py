@@ -80,23 +80,41 @@ class GLiNER2Runner(BaseRunner):
         raw_entities: dict[str, list[dict[str, object]]] = {}
         raw_classification: dict[str, dict[str, object]] = {}
 
-        try:
-            if entity_schema:
+        # Entity extraction and each classification task are isolated. They used
+        # to share one try/except, so a classification failure discarded the
+        # entities already extracted in the same run and returned an empty
+        # result — the whole detector went silent because of one broken task.
+        if entity_schema:
+            try:
                 raw = self._extract_entities(model, text, entity_schema)
                 raw_entities = _normalise_entity_output(raw, text)
+            except Exception as exc:  # pragma: no cover - runtime specific
+                logger.error(
+                    "GLiNER2 entity extraction failed for detector '%s': %s",
+                    self._detector_key,
+                    exc,
+                )
 
-            for task_name, labels in classification_tasks.items():
+        for task_name, labels in classification_tasks.items():
+            try:
                 setfit = self._get_setfit_model(task_name)
                 if setfit is not None:
                     raw_cls: Any = self._run_setfit(setfit, task_name, text)
                 else:
-                    raw_cls = self._classify_chunked(model, text, labels)
+                    raw_cls = self._classify_chunked(model, text, task_name, labels)
                 raw_classification[task_name] = _normalise_classification_output(raw_cls)
+            except Exception as exc:  # pragma: no cover - runtime specific
+                logger.error(
+                    "GLiNER2 classification task '%s' failed for detector '%s': %s",
+                    task_name,
+                    self._detector_key,
+                    exc,
+                )
 
-        except Exception as exc:  # pragma: no cover - runtime specific
-            logger.error("GLiNER2 pipeline failed for detector '%s': %s", self._detector_key, exc)
-            return PipelineResult()
-
+        # No early return for an empty result: "ran and found nothing" is a
+        # legitimate outcome and must still produce a well-formed result with
+        # metadata. Failures are reported by the logs above and by the runner's
+        # detector outcome, not by an anonymous empty return.
         validation = self._schema.validation or PipelineValidationConfig()
         filtered_entities = _apply_entity_validation(raw_entities, validation, self._schema)
         filtered_classification = _apply_classification_validation(raw_classification, validation)
@@ -138,15 +156,46 @@ class GLiNER2Runner(BaseRunner):
                 )
         return model.extract_entities(text, entity_schema, **kwargs)
 
-    def _classify_chunked(self, model: Any, text: str, labels: list[str]) -> dict[str, object]:
+    def _classify_once(self, model: Any, text: str, task_name: str, labels: list[str]) -> Any:
+        """Run one classification task against whichever API the runtime exposes.
+
+        gliner2>=1.3 exposes `classify_text(text, tasks: dict, ...)`, where tasks
+        maps a task name to its labels and the result is keyed by that name.
+        Mirrors the defensive probing in _extract_entities rather than assuming
+        a method exists.
+        """
+        classify_text = getattr(model, "classify_text", None)
+        if classify_text is not None:
+            raw = classify_text(
+                text,
+                {task_name: list(labels)},
+                threshold=0.0,
+                include_confidence=True,
+            )
+            # classify_text returns {task_name: <result>}; unwrap to the result.
+            if isinstance(raw, dict) and task_name in raw:
+                return raw[task_name]
+            return raw
+
+        legacy_classify = getattr(model, "classify", None)
+        if legacy_classify is None:
+            raise AttributeError(
+                f"GLiNER2 model exposes neither 'classify_text' nor 'classify'; "
+                f"cannot run classification task '{task_name}'"
+            )
+        return legacy_classify(text, labels, threshold=0.0)
+
+    def _classify_chunked(
+        self, model: Any, text: str, task_name: str, labels: list[str]
+    ) -> dict[str, object]:
         """Classify text, chunking long inputs and keeping the max-confidence label."""
         chunks = _chunk_text(text, _CLS_CHUNK_SIZE, _CLS_CHUNK_OVERLAP)[:_MAX_CLS_CHUNKS]
-        if len(chunks) == 1:
-            return _normalise_classification_output(model.classify(text, labels, threshold=0.0))
 
         best: dict[str, object] = {}
         for chunk in chunks:
-            outcome = _normalise_classification_output(model.classify(chunk, labels, threshold=0.0))
+            outcome = _normalise_classification_output(
+                self._classify_once(model, chunk, task_name, labels)
+            )
             if outcome and float(outcome.get("confidence", 0.0)) > float(
                 best.get("confidence", -1.0)
             ):
@@ -312,14 +361,31 @@ def _normalise_span(span: Any, text: str) -> dict[str, object] | None:
     return {"value": value, "confidence": round(confidence, 4), "start": start, "end": end}
 
 
+def _confidence_of(item: Any) -> float:
+    """Read a confidence from either key the runtime may use.
+
+    gliner2's formatter emits {"label", "confidence"} for multi-label results.
+    Reading only "score" silently yields 0.0 for every label, which the
+    validation threshold then filters away — classification would appear to run
+    cleanly and produce nothing.
+    """
+    if not isinstance(item, dict):
+        return 0.0
+    value = item.get("confidence", item.get("score", 0.0))
+    try:
+        return float(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return 0.0
+
+
 def _normalise_classification_output(raw: Any) -> dict[str, object]:
     if isinstance(raw, dict):
         label = raw.get("label", "")
-        confidence = float(raw.get("confidence", raw.get("score", 0.0)))
+        confidence = _confidence_of(raw)
     elif isinstance(raw, (list, tuple)) and raw:
-        best = max(raw, key=lambda x: x.get("score", 0.0) if isinstance(x, dict) else 0.0)
+        best = max(raw, key=_confidence_of)
         label = best.get("label", "") if isinstance(best, dict) else str(best)
-        confidence = float(best.get("score", 0.0)) if isinstance(best, dict) else 1.0
+        confidence = _confidence_of(best) if isinstance(best, dict) else 1.0
     else:
         return {}
 

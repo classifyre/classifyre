@@ -144,8 +144,50 @@ export class RunnerDto {
   @ApiProperty({ default: 0 })
   assetsDeleted: number;
 
-  @ApiProperty({ default: 0 })
+  @ApiProperty({
+    default: 0,
+    description:
+      'Assets absent from this run but retained because they were ingested ' +
+      'under a different source scope. Their findings remain OPEN. A non-zero ' +
+      'value means the scope moved and those assets are no longer covered.',
+  })
+  assetsOutOfScope: number;
+
+  @ApiProperty({
+    required: false,
+    nullable: true,
+    description:
+      'Fingerprint of the scope-determining config this run covered. Runs ' +
+      'sharing a fingerprint are directly comparable.',
+  })
+  scopeFingerprint?: string | null;
+
+  @ApiProperty({
+    default: 0,
+    description:
+      'Findings currently associated with this run — created, re-detected, or ' +
+      'resolved by it. NOT a count of new discoveries: after reconciliation it ' +
+      "is closer to the source's open set as of this run. Use findingsCreated " +
+      'for what this run actually found that was new.',
+  })
   totalFindings: number;
+
+  @ApiProperty({
+    default: 0,
+    description: 'Findings first seen by this run.',
+  })
+  findingsCreated: number;
+
+  @ApiProperty({
+    default: 0,
+    description:
+      'Assets that should have carried text but yielded none — typically OCR ' +
+      'or transcription returning empty. These are not errors: the asset ' +
+      'ingested fine, but its content was never read, so any detector result ' +
+      'for it covers nothing. Read alongside assetsUnchanged before trusting a ' +
+      'run: a high value means the corpus is largely unscanned.',
+  })
+  assetsWithoutText: number;
 
   @ApiProperty({ required: false, nullable: true })
   errorMessage?: string | null;

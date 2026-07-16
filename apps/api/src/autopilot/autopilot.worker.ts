@@ -15,6 +15,7 @@ import {
   AUTOPILOT_DREAM_CRON,
   AUTOPILOT_QUEUE,
   AUTOPILOT_RETRY_AFTER_SECONDS,
+  PIPELINE_KINDS,
 } from './autopilot.constants';
 import type { AgentContext, AutopilotJob } from './autopilot.types';
 
@@ -159,15 +160,24 @@ export class AutopilotWorker implements OnApplicationBootstrap {
       this.logger.debug('AI disabled — skipping autopilot cycle');
       return;
     }
-    // Scan cycles respect the instance flags as master switches. Manual runs
-    // are explicit operator intent and always execute (per-entity
+    // Scan cycles respect the instance flags as master switches. Only a manual
+    // run is explicit operator intent and may override them (per-entity
     // OBSERVE_ONLY is still enforced by the decision applier).
-    if (
-      !cycle.manual &&
-      !cycle.only &&
-      !settings.autopilotInquiryEnabled &&
-      !settings.autopilotCaseEnabled
-    ) {
+    //
+    // `cycle.only` used to bypass this too, on the reading that a targeted run
+    // is deliberate. It is not: rerunRun re-enqueues a *scan*-triggered run
+    // with agentKinds set and manual unset, so a queued cycle member kept
+    // executing after its agent had been disabled — which is why disabling the
+    // agents did not stop the cycle and each member had to be cancelled by hand.
+    //
+    // Decided with the same per-agent rule used below, so the gate cannot
+    // disagree with what it gates. It used to test only the inquiry and case
+    // flags, which meant enabling *just* the escalation agent skipped the whole
+    // cycle and that agent never ran.
+    const enabledAgents = await Promise.all(
+      PIPELINE_KINDS.map((kind) => this.agentEnabled(kind, cycle)),
+    );
+    if (!enabledAgents.some(Boolean)) {
       this.logger.debug(
         `Autopilot disabled — skipping cycle for source ${cycle.sourceId}`,
       );
@@ -204,14 +214,7 @@ export class AutopilotWorker implements OnApplicationBootstrap {
     // An explicit agent set ("only") is operator intent: run exactly those
     // pipeline agents (in canonical order) and skip the rest without a SKIPPED
     // record.
-    const inquiryEnabled = cycle.only
-      ? cycle.only.includes(AgentKind.INQUIRY)
-      : cycle.manual || settings.autopilotInquiryEnabled;
-    const caseEnabled = cycle.only
-      ? cycle.only.includes(AgentKind.CASE)
-      : cycle.manual || settings.autopilotCaseEnabled;
-
-    if (inquiryEnabled) {
+    if (await this.agentEnabled(AgentKind.INQUIRY, cycle)) {
       await this.runAgent(AgentKind.INQUIRY, settings, cycle, sourceName);
     } else if (!cycle.only) {
       await this.audit.recordSkippedRun(
@@ -222,7 +225,7 @@ export class AutopilotWorker implements OnApplicationBootstrap {
       );
     }
 
-    if (caseEnabled) {
+    if (await this.agentEnabled(AgentKind.CASE, cycle)) {
       await this.runAgent(AgentKind.CASE, settings, cycle, sourceName);
     } else if (!cycle.only) {
       await this.audit.recordSkippedRun(
@@ -236,19 +239,13 @@ export class AutopilotWorker implements OnApplicationBootstrap {
     // Config-tuning agent — opt-in, off by default. Runs after the
     // investigation agents (it reacts to the finding landscape they observed).
     // Skipped silently when disabled (no SKIPPED-run noise on every scan).
-    const configEnabled = cycle.only
-      ? cycle.only.includes(AgentKind.CONFIG)
-      : settings.autopilotConfigEnabled;
-    if (configEnabled) {
+    if (await this.agentEnabled(AgentKind.CONFIG, cycle)) {
       await this.runAgent(AgentKind.CONFIG, settings, cycle, sourceName);
     }
 
     // Detector-authoring agent — opt-in, off by default. Runs last so it can
     // react to what the config agent left unaddressed.
-    const detectorEnabled = cycle.only
-      ? cycle.only.includes(AgentKind.DETECTOR_AUTHOR)
-      : settings.autopilotDetectorEnabled;
-    if (detectorEnabled) {
+    if (await this.agentEnabled(AgentKind.DETECTOR_AUTHOR, cycle)) {
       await this.runAgent(
         AgentKind.DETECTOR_AUTHOR,
         settings,
@@ -260,11 +257,52 @@ export class AutopilotWorker implements OnApplicationBootstrap {
     // Escalation agent — opt-in, off by default. Runs last, once every case
     // mutation for this cycle has settled, so it alerts operators on the final
     // state of the open high-severity cases.
-    const escalationEnabled = cycle.only
-      ? cycle.only.includes(AgentKind.ESCALATION)
-      : settings.autopilotEscalationEnabled;
-    if (escalationEnabled) {
+    if (await this.agentEnabled(AgentKind.ESCALATION, cycle)) {
       await this.runAgent(AgentKind.ESCALATION, settings, cycle, sourceName);
+    }
+  }
+
+  /**
+   * Whether an agent may run, decided against the *current* settings.
+   *
+   * Re-read per agent rather than once per cycle. A cycle runs five agents
+   * sequentially over many minutes, and the flags used to be captured once at
+   * the top — so an operator disabling an agent mid-cycle watched it start
+   * anyway, and had to cancel each member by hand as it launched.
+   *
+   * `cycle.only` narrows which agents run; it does not authorise them. It used
+   * to replace the flag check outright, which meant any job carrying agentKinds
+   * ran every named agent regardless of the switches — including reruns of
+   * scan-triggered runs, which set agentKinds but not `manual`.
+   */
+  private async agentEnabled(
+    kind: AgentKind,
+    cycle: CycleInput,
+  ): Promise<boolean> {
+    if (cycle.only && !cycle.only.includes(kind)) return false;
+
+    const settings = await this.prisma.instanceSettings.findUnique({
+      where: { id: INSTANCE_SETTINGS_ID },
+    });
+    if (!settings?.aiEnabled) return false;
+
+    // Explicit operator intent overrides the master switches; the decision
+    // applier still enforces per-entity OBSERVE_ONLY.
+    if (cycle.manual) return true;
+
+    switch (kind) {
+      case AgentKind.INQUIRY:
+        return settings.autopilotInquiryEnabled;
+      case AgentKind.CASE:
+        return settings.autopilotCaseEnabled;
+      case AgentKind.CONFIG:
+        return settings.autopilotConfigEnabled;
+      case AgentKind.DETECTOR_AUTHOR:
+        return settings.autopilotDetectorEnabled;
+      case AgentKind.ESCALATION:
+        return settings.autopilotEscalationEnabled;
+      default:
+        return false;
     }
   }
 
@@ -294,19 +332,19 @@ export class AutopilotWorker implements OnApplicationBootstrap {
       cycle.instruction ? { instruction: cycle.instruction } : undefined,
     );
 
-    // Manual runs and targeted reruns override the instance flags (explicit
-    // operator intent); the applier still enforces per-entity OBSERVE_ONLY.
-    const effectiveSettings: InstanceSettings =
-      cycle.manual || cycle.only
-        ? {
-            ...settings,
-            autopilotInquiryEnabled: true,
-            autopilotCaseEnabled: true,
-            autopilotConfigEnabled: true,
-            autopilotDetectorEnabled: true,
-            autopilotEscalationEnabled: true,
-          }
-        : settings;
+    // Only manual runs override the instance flags (explicit operator intent);
+    // the applier still enforces per-entity OBSERVE_ONLY. A targeted rerun is
+    // not on its own operator intent — see the master-switch check above.
+    const effectiveSettings: InstanceSettings = cycle.manual
+      ? {
+          ...settings,
+          autopilotInquiryEnabled: true,
+          autopilotCaseEnabled: true,
+          autopilotConfigEnabled: true,
+          autopilotDetectorEnabled: true,
+          autopilotEscalationEnabled: true,
+        }
+      : settings;
 
     const ctx: AgentContext = {
       run,
@@ -394,9 +432,13 @@ export class AutopilotWorker implements OnApplicationBootstrap {
   }
 }
 
-function formatSummary(s: ApplySummary): string {
+export function formatSummary(s: ApplySummary): string {
+  // "applied" counts mutations only. Reads are reported separately rather than
+  // inflating it — a run that read 11 things and changed nothing used to say
+  // "11 applied" while persisting zero decisions.
   const parts = [
     `${s.applied} applied`,
+    `${s.readOk ?? 0} read`,
     `${s.skippedObserveOnly} observe-only`,
     `${s.failed} failed`,
   ];

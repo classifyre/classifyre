@@ -87,31 +87,6 @@ class Location(BaseModel):
     end: int | None = Field(None, description='End offset (0-indexed)')
 
 
-class ScanStats(BaseModel):
-    """
-    Statistics about detector scan for an asset
-    """
-
-    scanned_at: AwareDatetime = Field(
-        ..., description='Timestamp when the scan started'
-    )
-    duration_ms: int = Field(..., description='Duration of the scan in milliseconds')
-    detectors_run: list[DetectorType] = Field(
-        ..., description='List of detector types that were run'
-    )
-    content_size_bytes: int | None = Field(
-        None, description='Size of the content that was scanned'
-    )
-    findings_count: int | None = Field(
-        None, description='Total number of findings detected'
-    )
-    warnings: list[str] | None = Field(
-        None,
-        description='Non-fatal issues during scan (e.g. content truncation, empty content)',
-    )
-    errors: list[str] | None = Field(None, description='Detector errors during scan')
-
-
 class DetectionResult(BaseModel):
     """
     Result from detector scan
@@ -189,6 +164,71 @@ class DetectionResult(BaseModel):
         description='Which extraction strategy was used: REGEX, GLINER, CLASSIFIER_GLINER',
         title='Extraction Method',
     )
+
+
+class Status(StrEnum):
+    """
+    OK means the detector completed; it may still have found nothing. ERROR means it raised and its result is unknown.
+    """
+
+    OK = 'OK'
+    ERROR = 'ERROR'
+
+
+class DetectorOutcome(BaseModel):
+    """
+    Outcome of a single detector on a single asset. A detector that raised is reported with status ERROR: it produced no findings, but that absence is a failure rather than a clean result. Consumers must not treat an ERROR detector's silence as evidence that its previous findings are gone.
+    """
+
+    detector_type: DetectorType = Field(
+        ..., description='Detector family that was attempted'
+    )
+    custom_detector_key: str | None = Field(
+        None,
+        description='Stable key of the custom detector when detector_type is CUSTOM. Required to tell two custom detectors apart, since both report detector_type CUSTOM.',
+        title='Custom Detector Key',
+    )
+    status: Status = Field(
+        ...,
+        description='OK means the detector completed; it may still have found nothing. ERROR means it raised and its result is unknown.',
+        title='Status',
+    )
+    error: str | None = Field(
+        None, description='Failure detail when status is ERROR', title='Error'
+    )
+
+
+class ScanStats(BaseModel):
+    """
+    Statistics about detector scan for an asset
+    """
+
+    scanned_at: AwareDatetime = Field(
+        ..., description='Timestamp when the scan started'
+    )
+    duration_ms: int = Field(..., description='Duration of the scan in milliseconds')
+    detectors_run: list[DetectorType] = Field(
+        ..., description='List of detector types that were run'
+    )
+    detector_outcomes: list[DetectorOutcome] | None = Field(
+        None,
+        description='Per-detector outcome for this asset. detectors_run lists what was attempted and cannot distinguish a detector that completed cleanly from one that crashed; this does.',
+    )
+    content_size_bytes: int | None = Field(
+        None, description='Size of the content that was scanned'
+    )
+    empty_text: bool | None = Field(
+        None,
+        description="True when an asset that should carry text yielded none. Most significant for assets whose text is derived rather than native (OCR'd images and scanned PDFs, transcribed audio/video): empty derived text means the content may have been missed entirely, not that the document is blank. Distinct from an error — nothing failed — so it is reported as coverage, not as a run failure.",
+    )
+    findings_count: int | None = Field(
+        None, description='Total number of findings detected'
+    )
+    warnings: list[str] | None = Field(
+        None,
+        description='Non-fatal issues during scan (e.g. content truncation, empty content)',
+    )
+    errors: list[str] | None = Field(None, description='Detector errors during scan')
 
 
 class SingleAssetScanResults(BaseModel):
