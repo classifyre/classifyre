@@ -31,6 +31,7 @@ export class EmbeddingCapabilityService implements OnApplicationBootstrap {
       Array<{
         version: string | null;
         columnType: string | null;
+        columnIsVector: boolean | null;
       }>
     >`
       SELECT
@@ -41,7 +42,22 @@ export class EmbeddingCapabilityService implements OnApplicationBootstrap {
           WHERE attribute.attrelid = to_regclass('content_embeddings')
             AND attribute.attname = 'vec'
             AND NOT attribute.attisdropped
-        ) AS "columnType"
+        ) AS "columnType",
+        (
+          SELECT attribute.atttypid = vector_type.oid
+          FROM pg_attribute attribute
+          CROSS JOIN LATERAL (
+            SELECT type.oid
+            FROM pg_type type
+            JOIN pg_extension extension
+              ON extension.extname = 'vector'
+             AND extension.extnamespace = type.typnamespace
+            WHERE type.typname = 'vector'
+          ) vector_type
+          WHERE attribute.attrelid = to_regclass('content_embeddings')
+            AND attribute.attname = 'vec'
+            AND NOT attribute.attisdropped
+        ) AS "columnIsVector"
     `;
     const result = rows[0];
     if (!result?.version) {
@@ -49,9 +65,9 @@ export class EmbeddingCapabilityService implements OnApplicationBootstrap {
         'Classifyre cannot start because the PostgreSQL pgvector extension is not installed. Install the pgvector server package for this PostgreSQL version, connect as a database administrator, run `CREATE EXTENSION vector WITH SCHEMA public;`, and rerun the Classifyre migrations. Helm users should use the chart defaults (`pgvector/pgvector` for embedded PostgreSQL or the CloudNativePG `standard` image). External PostgreSQL must provide pgvector 0.8 or newer.',
       );
     }
-    if (result.columnType !== 'vector') {
+    if (!result.columnIsVector) {
       throw new Error(
-        `Classifyre detected pgvector ${result.version}, but content_embeddings.vec is missing or has the wrong type (${result.columnType ?? 'missing'}). Run the pending Classifyre database migrations before starting the API.`,
+        `Classifyre detected pgvector ${result.version}, but content_embeddings.vec is missing or has the wrong type (${result.columnType ?? 'missing'}). The API normally applies pending migrations before this check; verify that DATABASE_URL points to the intended database and that the Prisma migration history is consistent with its schema.`,
       );
     }
     this.vectorVersion = result.version;

@@ -391,6 +391,7 @@ exec env \
   CLI_PATH="${CLI_PATH:-/app/apps/cli}" \
   PORT="${API_PORT:-8000}" \
   DATABASE_URL="${DATABASE_URL}" \
+  CLASSIFYRE_AUTO_MIGRATE="false" \
   EMBEDDING_CACHE_DIR="/tmp/classifyre-transformers" \
   CLASSIFYRE_MASKED_CONFIG_KEY="${CLASSIFYRE_MASKED_CONFIG_KEY}" \
   node /app/api/dist/src/main.js

@@ -163,6 +163,8 @@ spec:
                 secretKeyRef:
                   name: {{ include "classifyre.apiMaskedConfigSecretName" . }}
                   key: {{ include "classifyre.apiMaskedConfigSecretKey" . }}
+            - name: CLASSIFYRE_AUTO_MIGRATE
+              value: {{ ternary "false" "true" .Values.api.migration.enabled | quote }}
             {{- if and (eq .Values.postgres.mode "external") .Values.postgres.external.existingSecret .Values.postgres.external.existingSecretUrlKey }}
             - name: DATABASE_URL
               valueFrom:

@@ -269,7 +269,8 @@ api:
     minAvailable: 1
 
   migration:
-    # -- Run database migrations as an API init container.
+    # -- Run database migrations as an API init container. When disabled, the
+    # -- API applies pending migrations itself before NestJS startup.
     enabled: true
     # -- Migration command/script.
     script: npx prisma migrate deploy --schema /app/api/prisma/schema.prisma
@@ -657,7 +658,7 @@ postgres:
       # -- Embedded Postgres image repository.
       repository: pgvector/pgvector
       # -- Embedded Postgres image tag.
-      tag: "0.8.2-pg18-bookworm"
+      tag: "0.8.5-pg18-bookworm"
       # -- Embedded Postgres image pull policy.
       pullPolicy: IfNotPresent
     # -- Embedded Postgres service and container port.

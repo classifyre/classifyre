@@ -371,6 +371,10 @@ export class ProcessManager {
         ELECTRON_RUN_AS_NODE: "1",
         PORT: String(port),
         DATABASE_URL: databaseUrl,
+        // NamespaceRuntime has already completed migrate deploy before this
+        // process is spawned. Keep the API's standalone migration fallback off
+        // here so every workspace open does not invoke Prisma twice.
+        CLASSIFYRE_AUTO_MIGRATE: "false",
         ENVIRONMENT: "desktop",
         CLI_PATH: cliPath,
         VENV_PATH: venvPath,

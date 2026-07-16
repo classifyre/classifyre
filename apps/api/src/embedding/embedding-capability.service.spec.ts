@@ -9,7 +9,9 @@ describe('EmbeddingCapabilityService', () => {
   });
 
   it('fails startup with an actionable error when pgvector is missing', async () => {
-    prisma.$queryRaw.mockResolvedValue([{ version: null, columnType: null }]);
+    prisma.$queryRaw.mockResolvedValue([
+      { version: null, columnType: null, columnIsVector: null },
+    ]);
 
     await expect(service.onApplicationBootstrap()).rejects.toThrow(
       'Classifyre cannot start because the PostgreSQL pgvector extension is not installed',
@@ -21,7 +23,7 @@ describe('EmbeddingCapabilityService', () => {
 
   it('fails startup when the vector schema migration is missing', async () => {
     prisma.$queryRaw.mockResolvedValue([
-      { version: '0.8.2', columnType: null },
+      { version: '0.8.2', columnType: null, columnIsVector: null },
     ]);
 
     await expect(service.onApplicationBootstrap()).rejects.toThrow(
@@ -29,9 +31,13 @@ describe('EmbeddingCapabilityService', () => {
     );
   });
 
-  it('records the installed pgvector version after a successful probe', async () => {
+  it('accepts a schema-qualified pgvector column type', async () => {
     prisma.$queryRaw.mockResolvedValue([
-      { version: '0.8.2', columnType: 'vector' },
+      {
+        version: '0.8.2',
+        columnType: 'public.vector',
+        columnIsVector: true,
+      },
     ]);
 
     await service.onApplicationBootstrap();
