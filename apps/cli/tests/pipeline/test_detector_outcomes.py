@@ -26,9 +26,14 @@ from src.models.generated_single_asset_scan_results import (
     Location,
     SingleAssetScanResults,
     Status,
+    TextExtractionStatus,
 )
 from src.pipeline.detector_pipeline import DetectorPipeline
 from src.sources.base import BaseSource
+from src.utils.file_parser import (
+    TextExtractionCoverageCode,
+    TextExtractionCoverageError,
+)
 
 
 class _Source(BaseSource):
@@ -263,6 +268,16 @@ class _NoTextSource(_Source):
         return ("<p>raw</p>", "")
 
 
+class _CoverageFailureSource(_Source):
+    def __init__(self, code: TextExtractionCoverageCode) -> None:
+        super().__init__({"type": "DUMMY"}, content="")
+        self.code = code
+
+    async def fetch_content_pages(self, asset_id: str):
+        raise TextExtractionCoverageError(f"coverage failed for {asset_id}", code=self.code)
+        yield  # pragma: no cover - keeps this an async generator
+
+
 def _asset_of(asset_type: AssetType) -> SingleAssetScanResults:
     now = datetime.now(UTC)
     return SingleAssetScanResults(
@@ -301,6 +316,7 @@ class TestEmptyTextCoverage:
         [asset] = await pipeline.process([_asset_of(asset_type)])
 
         assert asset.scan_stats.empty_text is True
+        assert asset.scan_stats.text_extraction_status == TextExtractionStatus.EMPTY
 
     @pytest.mark.asyncio
     async def test_native_text_types_still_report_empty_text(self) -> None:
@@ -323,6 +339,35 @@ class TestEmptyTextCoverage:
         [asset] = await pipeline.process([_asset_of(AssetType.TXT)])
 
         assert asset.scan_stats.empty_text is False
+        assert asset.scan_stats.text_extraction_status == TextExtractionStatus.EXTRACTED
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        ("code", "expected"),
+        [
+            (
+                TextExtractionCoverageCode.ENGINE_UNAVAILABLE,
+                TextExtractionStatus.ENGINE_UNAVAILABLE,
+            ),
+            (
+                TextExtractionCoverageCode.ZERO_FRAMES,
+                TextExtractionStatus.ZERO_FRAMES,
+            ),
+            (TextExtractionCoverageCode.FAILED, TextExtractionStatus.FAILED),
+        ],
+    )
+    async def test_extraction_failures_are_structured(self, code, expected) -> None:
+        pipeline = DetectorPipeline(
+            detectors=[_SilentButCleanDetector()],
+            source=_CoverageFailureSource(code),
+            runner_id="r1",
+        )
+
+        [asset] = await pipeline.process([_asset_of(AssetType.VIDEO)])
+
+        assert asset.scan_stats.text_extraction_status == expected
+        assert asset.scan_stats.empty_text is True
+        assert asset.scan_stats.errors
 
     @pytest.mark.asyncio
     async def test_empty_ocr_warning_names_the_extraction_path(self) -> None:

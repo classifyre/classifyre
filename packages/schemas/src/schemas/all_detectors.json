@@ -2003,70 +2003,6 @@
       },
       "additionalProperties": false
     },
-    "FeatureExtractionPipelineSchema": {
-      "title": "FeatureExtractionPipelineSchema",
-      "type": "object",
-      "description": "Feature extraction (embedding) pipeline using a HuggingFace model. Runs a single encoder; create multiple custom detectors to run multiple embedding models.",
-      "properties": {
-        "type": {
-          "type": "string",
-          "enum": ["FEATURE_EXTRACTION"],
-          "default": "FEATURE_EXTRACTION"
-        },
-        "model": {
-          "type": "string",
-          "description": "HuggingFace hub ID (e.g. 'BAAI/bge-base-en-v1.5', 'sentence-transformers/all-MiniLM-L6-v2') or absolute local directory path."
-        },
-        "model_revision": {
-          "anyOf": [{ "type": "string" }, { "type": "null" }],
-          "default": null,
-          "description": "Git branch, tag, or commit hash when fetching from the HuggingFace hub."
-        },
-        "device": {
-          "anyOf": [{ "type": "string" }, { "type": "null" }],
-          "default": "cpu",
-          "description": "Inference device: 'cpu' (default), 'cuda', 'mps', or a CUDA device string like 'cuda:0'."
-        },
-        "pooling_strategy": {
-          "type": "string",
-          "enum": ["mean", "cls", "max", "none"],
-          "default": "mean",
-          "description": "How to aggregate per-token hidden states into a single embedding vector."
-        },
-        "normalize_embeddings": {
-          "type": "boolean",
-          "default": true,
-          "description": "L2-normalise the final embedding vector. Recommended for cosine-similarity workloads."
-        },
-        "truncation": {
-          "type": "boolean",
-          "default": true,
-          "description": "Truncate input to the model's maximum sequence length."
-        },
-        "max_length": {
-          "anyOf": [{ "type": "integer" }, { "type": "null" }],
-          "default": null,
-          "description": "Override the tokenizer's default maximum sequence length."
-        },
-        "batch_size": {
-          "type": "integer",
-          "default": 8,
-          "description": "Number of texts to encode in a single forward pass."
-        },
-        "chunk_size": {
-          "anyOf": [{ "type": "integer", "minimum": 1 }, { "type": "null" }],
-          "default": null,
-          "description": "Split text into chunks of this many characters before embedding. Each chunk produces its own finding."
-        },
-        "chunk_overlap": {
-          "anyOf": [{ "type": "integer", "minimum": 0 }, { "type": "null" }],
-          "default": 0,
-          "description": "Character overlap between consecutive chunks."
-        }
-      },
-      "required": ["model"],
-      "additionalProperties": false
-    },
     "ObjectDetectionPipelineSchema": {
       "title": "ObjectDetectionPipelineSchema",
       "type": "object",
@@ -2148,9 +2084,6 @@
         },
         {
           "$ref": "#/definitions/ImageClassificationPipelineSchema"
-        },
-        {
-          "$ref": "#/definitions/FeatureExtractionPipelineSchema"
         },
         {
           "$ref": "#/definitions/ObjectDetectionPipelineSchema"

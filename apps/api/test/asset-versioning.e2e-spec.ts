@@ -3,6 +3,8 @@ import { INestApplication } from '@nestjs/common';
 import { PrismaService } from '../src/prisma.service';
 import { AssetService } from '../src/asset.service';
 import { CustomDetectorExtractionsService } from '../src/custom-detector-extractions.service';
+import { EmbeddingService } from '../src/embedding/embedding.service';
+import { QueryEmbeddingService } from '../src/embedding/query-embedding.service';
 import {
   AssetStatus,
   AssetType,
@@ -30,6 +32,8 @@ describe('Asset Versioning (e2e)', () => {
           provide: CustomDetectorExtractionsService,
           useValue: mockCustomDetectorExtractionsService,
         },
+        { provide: EmbeddingService, useValue: {} },
+        { provide: QueryEmbeddingService, useValue: {} },
       ],
     }).compile();
 
@@ -348,6 +352,13 @@ describe('Asset Versioning (e2e)', () => {
     expect(findings[0].matchedContent).toBe('test1@example.com');
 
     // Second run with different findings
+    await prisma.runnerAsset.create({
+      data: {
+        runnerId: runnerId2,
+        assetHash: 'asset-1',
+        status: 'PROCESSED',
+      },
+    });
     const secondRunAssets = [
       {
         hash: 'asset-1',
@@ -356,6 +367,9 @@ describe('Asset Versioning (e2e)', () => {
         external_url: 'https://example.com/asset-1',
         links: [],
         asset_type: 'HTML',
+        scan_stats: {
+          detector_outcomes: [{ detector_type: 'PII', status: 'OK' }],
+        },
         findings: [
           {
             detector_type: 'PII',
@@ -371,6 +385,12 @@ describe('Asset Versioning (e2e)', () => {
     ];
 
     await assetService.bulkIngest(sourceId, runnerId2, secondRunAssets);
+    await assetService.finalizeIngestRun(
+      sourceId,
+      runnerId2,
+      ['asset-1'],
+      true,
+    );
 
     // Verify both findings exist (old one retained as RESOLVED, new one OPEN)
     findings = await prisma.finding.findMany({
@@ -647,7 +667,7 @@ describe('Asset Versioning (e2e)', () => {
     await prisma.source.delete({ where: { id: fullScanSource.id } });
   });
 
-  it('should auto-resolve open findings on assets deleted by full scan', async () => {
+  it('should preserve assets and findings when a full scan returns zero results', async () => {
     // Create source with sampling strategy ALL
     const fullScanSource = await prisma.source.create({
       data: {
@@ -714,13 +734,13 @@ describe('Asset Versioning (e2e)', () => {
     const assetAfter = await prisma.asset.findFirst({
       where: { hash: 'asset-with-finding', sourceId: fullScanSource.id },
     });
-    expect(assetAfter?.status).toBe(AssetStatus.DELETED);
+    expect(assetAfter?.status).not.toBe(AssetStatus.DELETED);
 
     const findingAfter = await prisma.finding.findFirst({
       where: { sourceId: fullScanSource.id },
     });
-    expect(findingAfter?.status).toBe('RESOLVED');
-    expect(findingAfter?.resolutionReason).toContain('Asset deleted');
+    expect(findingAfter?.status).toBe('OPEN');
+    expect(findingAfter?.resolutionReason).toBeNull();
 
     // Cleanup
     await prisma.finding.deleteMany({ where: { sourceId: fullScanSource.id } });

@@ -1135,12 +1135,6 @@
         "description": "Classify images with any HuggingFace vision model. Useful for NSFW detection, harmful content filtering, and custom image category labelling.",
         "tags": "Vision, NSFW, Harmful content"
       },
-      "feature_extraction": {
-        "title": "Feature Extraction",
-        "tagline": "Dense vector embeddings",
-        "description": "Embed text into dense vectors using any HuggingFace sentence-transformer. Store embeddings as findings for downstream semantic search or clustering.",
-        "tags": "Embeddings, Pooling, Vector DB"
-      },
       "object_detection": {
         "title": "Object Detection",
         "tagline": "Locate and label objects in images",
@@ -1203,6 +1197,7 @@
       }
     },
     "runFailed": "Run failed",
+    "runWarning": "Run completed with incomplete coverage",
     "showJobOutput": "Show job output",
     "updatingOverview": "Updating overview...",
     "totalRuns": "Total Runs",
@@ -1264,7 +1259,19 @@
       "description": "Changes produced by this run",
       "created": "Created",
       "updated": "Updated",
-      "unchanged": "Unchanged"
+      "unchanged": "Unchanged",
+      "deleted": "Deleted",
+      "withoutText": "Text not scanned",
+      "outOfScope": "Retained outside scope"
+    },
+    "coverage": {
+      "title": "Coverage needs review",
+      "withoutText": "{{count}} assets produced no text, so detectors did not inspect their content.",
+      "empty": "{{count}} assets completed text extraction but produced no detector-visible text.",
+      "engineUnavailable": "{{count}} assets could not be read because a text or OCR engine was unavailable.",
+      "zeroFrames": "{{count}} videos decoded zero frames, so visual OCR inspected no content.",
+      "failed": "{{count}} assets had another text extraction failure.",
+      "outOfScope": "{{count}} assets were retained because the scan scope changed; absence was not treated as deletion."
     },
     "sourceContext": {
       "title": "Source Context",
@@ -1407,6 +1414,17 @@
     "searchTriggerTypes": "Search trigger types...",
     "noTriggerTypesFound": "No trigger types found",
     "updating": "Updating",
+    "delta": {
+      "created": "New",
+      "updated": "Updated",
+      "unchanged": "Same",
+      "deleted": "Deleted",
+      "withoutText": "Unscanned text",
+      "outOfScope": "Out of scope",
+      "findingsNew": "New",
+      "findingsKept": "Kept",
+      "findingsResolved": "Resolved"
+    },
     "status": {
       "completed": "Completed",
       "warning": "Warning",

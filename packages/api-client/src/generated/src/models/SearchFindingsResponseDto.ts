@@ -13,6 +13,13 @@
  */
 
 import { mapValues } from '../runtime';
+import type { SearchFindingsRankingMetadataDto } from './SearchFindingsRankingMetadataDto';
+import {
+    SearchFindingsRankingMetadataDtoFromJSON,
+    SearchFindingsRankingMetadataDtoFromJSONTyped,
+    SearchFindingsRankingMetadataDtoToJSON,
+    SearchFindingsRankingMetadataDtoToJSONTyped,
+} from './SearchFindingsRankingMetadataDto';
 import type { FindingResponseDto } from './FindingResponseDto';
 import {
     FindingResponseDtoFromJSON,
@@ -51,6 +58,12 @@ export interface SearchFindingsResponseDto {
      * @memberof SearchFindingsResponseDto
      */
     limit: number;
+    /**
+     * 
+     * @type {SearchFindingsRankingMetadataDto}
+     * @memberof SearchFindingsResponseDto
+     */
+    ranking?: SearchFindingsRankingMetadataDto;
 }
 
 /**
@@ -78,6 +91,7 @@ export function SearchFindingsResponseDtoFromJSONTyped(json: any, ignoreDiscrimi
         'total': json['total'],
         'skip': json['skip'],
         'limit': json['limit'],
+        'ranking': json['ranking'] == null ? undefined : SearchFindingsRankingMetadataDtoFromJSON(json['ranking']),
     };
 }
 
@@ -96,6 +110,7 @@ export function SearchFindingsResponseDtoToJSONTyped(value?: SearchFindingsRespo
         'total': value['total'],
         'skip': value['skip'],
         'limit': value['limit'],
+        'ranking': SearchFindingsRankingMetadataDtoToJSON(value['ranking']),
     };
 }
 

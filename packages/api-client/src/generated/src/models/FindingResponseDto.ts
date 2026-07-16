@@ -13,6 +13,20 @@
  */
 
 import { mapValues } from '../runtime';
+import type { FindingEvidenceAnalysisDto } from './FindingEvidenceAnalysisDto';
+import {
+    FindingEvidenceAnalysisDtoFromJSON,
+    FindingEvidenceAnalysisDtoFromJSONTyped,
+    FindingEvidenceAnalysisDtoToJSON,
+    FindingEvidenceAnalysisDtoToJSONTyped,
+} from './FindingEvidenceAnalysisDto';
+import type { FindingSearchRankingDto } from './FindingSearchRankingDto';
+import {
+    FindingSearchRankingDtoFromJSON,
+    FindingSearchRankingDtoFromJSONTyped,
+    FindingSearchRankingDtoToJSON,
+    FindingSearchRankingDtoToJSONTyped,
+} from './FindingSearchRankingDto';
 import type { FindingLocationDto } from './FindingLocationDto';
 import {
     FindingLocationDtoFromJSON,
@@ -234,6 +248,18 @@ export interface FindingResponseDto {
      * @memberof FindingResponseDto
      */
     source?: SourceResponseDto;
+    /**
+     * 
+     * @type {FindingEvidenceAnalysisDto}
+     * @memberof FindingResponseDto
+     */
+    evidenceAnalysis?: FindingEvidenceAnalysisDto | null;
+    /**
+     * 
+     * @type {FindingSearchRankingDto}
+     * @memberof FindingResponseDto
+     */
+    ranking?: FindingSearchRankingDto;
 }
 
 
@@ -336,6 +362,8 @@ export function FindingResponseDtoFromJSONTyped(json: any, ignoreDiscriminator: 
         'updatedAt': (new Date(json['updatedAt'])),
         'asset': json['asset'] == null ? undefined : AssetResponseDtoFromJSON(json['asset']),
         'source': json['source'] == null ? undefined : SourceResponseDtoFromJSON(json['source']),
+        'evidenceAnalysis': json['evidenceAnalysis'] == null ? undefined : FindingEvidenceAnalysisDtoFromJSON(json['evidenceAnalysis']),
+        'ranking': json['ranking'] == null ? undefined : FindingSearchRankingDtoFromJSON(json['ranking']),
     };
 }
 
@@ -381,6 +409,8 @@ export function FindingResponseDtoToJSONTyped(value?: FindingResponseDto | null,
         'updatedAt': value['updatedAt'].toISOString(),
         'asset': AssetResponseDtoToJSON(value['asset']),
         'source': SourceResponseDtoToJSON(value['source']),
+        'evidenceAnalysis': FindingEvidenceAnalysisDtoToJSON(value['evidenceAnalysis']),
+        'ranking': FindingSearchRankingDtoToJSON(value['ranking']),
     };
 }
 

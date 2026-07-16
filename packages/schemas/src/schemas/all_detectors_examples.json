@@ -1231,55 +1231,6 @@
       }
     },
     {
-      "name": "Semantic Embeddings (BGE)",
-      "description": "Produce normalized sentence embeddings with BAAI/bge-base for semantic search and RAG pipelines.",
-      "config": {
-        "custom_detector_key": "bge_base_embedder",
-        "name": "Semantic Embeddings (BGE — Balanced)",
-        "pipeline_schema": {
-          "type": "FEATURE_EXTRACTION",
-          "model": "BAAI/bge-base-en-v1.5",
-          "device": "cpu",
-          "pooling_strategy": "mean",
-          "normalize_embeddings": true,
-          "truncation": true
-        }
-      }
-    },
-    {
-      "name": "Lightweight Embeddings (MiniLM)",
-      "description": "Fast, small embeddings via MiniLM — ideal for CPU inference and high-throughput pipelines.",
-      "config": {
-        "custom_detector_key": "minilm_embedder",
-        "name": "Lightweight Embeddings (MiniLM)",
-        "pipeline_schema": {
-          "type": "FEATURE_EXTRACTION",
-          "model": "sentence-transformers/all-MiniLM-L6-v2",
-          "device": "cpu",
-          "pooling_strategy": "mean",
-          "normalize_embeddings": true,
-          "truncation": true,
-          "batch_size": 32
-        }
-      }
-    },
-    {
-      "name": "Multilingual Embeddings (E5)",
-      "description": "Multilingual embeddings using E5 — for enterprise content in multiple languages.",
-      "config": {
-        "custom_detector_key": "e5_multilingual_embedder",
-        "name": "Multilingual Embeddings (E5)",
-        "pipeline_schema": {
-          "type": "FEATURE_EXTRACTION",
-          "model": "intfloat/multilingual-e5-large",
-          "device": "cpu",
-          "pooling_strategy": "mean",
-          "normalize_embeddings": true,
-          "truncation": true
-        }
-      }
-    },
-    {
       "name": "General Object Detection (DETR)",
       "description": "Detect common objects in images using DETR — useful for automated document image categorization.",
       "config": {
@@ -1407,44 +1358,6 @@
             { "pattern": "toxic", "severity": "high" },
             { "pattern": "neutral", "severity": "info" }
           ]
-        }
-      }
-    },
-    {
-      "name": "High-Quality Embeddings (MPNet)",
-      "description": "Dense sentence embeddings via sentence-transformers/all-mpnet-base-v2 — 768-dimensional vectors optimized for semantic similarity and document retrieval. Stronger than MiniLM at the cost of higher latency; recommended for production RAG indexes.",
-      "config": {
-        "custom_detector_key": "mpnet_embedder",
-        "name": "High-Quality Embeddings (MPNet)",
-        "description": "768-dimensional sentence embeddings for semantic search and RAG",
-        "languages": ["en"],
-        "pipeline_schema": {
-          "type": "FEATURE_EXTRACTION",
-          "model": "sentence-transformers/all-mpnet-base-v2",
-          "device": "cpu",
-          "pooling_strategy": "mean",
-          "normalize_embeddings": true,
-          "truncation": true,
-          "batch_size": 16
-        }
-      }
-    },
-    {
-      "name": "Retrieval Embeddings (GTE Large)",
-      "description": "High-ranking general-text embeddings via thenlper/gte-large — consistently top-performing on the MTEB retrieval benchmark. Use for semantic search over large document corpora where recall quality matters more than latency.",
-      "config": {
-        "custom_detector_key": "gte_large_embedder",
-        "name": "Retrieval Embeddings (GTE Large)",
-        "description": "MTEB top-performing embeddings for retrieval and re-ranking",
-        "languages": ["en"],
-        "pipeline_schema": {
-          "type": "FEATURE_EXTRACTION",
-          "model": "thenlper/gte-large",
-          "device": "cpu",
-          "pooling_strategy": "mean",
-          "normalize_embeddings": true,
-          "truncation": true,
-          "batch_size": 8
         }
       }
     },

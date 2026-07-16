@@ -13,10 +13,10 @@ you define yourself. Each thing a detector flags becomes a **finding**.
 
 There are two kinds, and they work side by side:
 
-| | What it is | Best for |
-|---|---|---|
-| **Pre-built detectors** | Curated, ready-to-use packs that ship with Classifyre | Common, universal signals — turn them on and go |
-| **Custom detectors** | Detectors *you* build, from a simple rule to an AI model | Signals specific to your team, domain, or policy |
+|                         | What it is                                               | Best for                                         |
+| ----------------------- | -------------------------------------------------------- | ------------------------------------------------ |
+| **Pre-built detectors** | Curated, ready-to-use packs that ship with Classifyre    | Common, universal signals — turn them on and go  |
+| **Custom detectors**    | Detectors _you_ build, from a simple rule to an AI model | Signals specific to your team, domain, or policy |
 
 ```mermaid
 graph LR
@@ -49,12 +49,12 @@ can triage and investigate.
 
 ## Start here
 
-| Page | What you'll learn |
-|---|---|
-| **[How Detectors Work](/detectors/how-it-works/)** | How detectors run, how they're matched to content, and how you switch them on per source. |
-| **[Findings & Results](/detectors/findings/)** | What a detector produces — every field of a finding, severity levels, confidence, and the status lifecycle. |
-| **[Pre-built Detectors](/detectors/pre-built/)** | The ready-made packs and their configuration. |
-| **[Custom Detectors](/detectors/custom-detectors/)** | Build your own — from a regex to an LLM, across text and images. |
+| Page                                                 | What you'll learn                                                                                           |
+| ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| **[How Detectors Work](/detectors/how-it-works/)**   | How detectors run, how they're matched to content, and how you switch them on per source.                   |
+| **[Findings & Results](/detectors/findings/)**       | What a detector produces — every field of a finding, severity levels, confidence, and the status lifecycle. |
+| **[Pre-built Detectors](/detectors/pre-built/)**     | The ready-made packs and their configuration.                                                               |
+| **[Custom Detectors](/detectors/custom-detectors/)** | Build your own — from a regex to an LLM, across text and images.                                            |
 
 ---
 
@@ -80,15 +80,17 @@ When a signal is specific to you, build a **custom detector**. The same framewor
 spans the whole spectrum — from a zero-overhead pattern rule to a full AI model,
 across both text and images:
 
-| Engine | Modality | Best for |
-|---|---|---|
-| **Regex** | Text | Codes, IDs, structured patterns — exact and instant |
-| **GLiNER2** | Text | Entity extraction with no labelled training data |
-| **AI Detector (LLM)** | Text | Nuanced classification and structured extraction |
-| **Text Classification** | Text | Spam, toxicity, sentiment, topic labels |
-| **Image Classification** | Image | NSFW, moderation, custom image categories |
-| **Feature Extraction** | Text | Embeddings for semantic search and clustering |
-| **Object Detection** | Image | Locating objects, label-based severity |
+| Engine                   | Modality | Best for                                            |
+| ------------------------ | -------- | --------------------------------------------------- |
+| **Regex**                | Text     | Codes, IDs, structured patterns — exact and instant |
+| **GLiNER2**              | Text     | Entity extraction with no labelled training data    |
+| **AI Detector (LLM)**    | Text     | Nuanced classification and structured extraction    |
+| **Text Classification**  | Text     | Spam, toxicity, sentiment, topic labels             |
+| **Image Classification** | Image    | NSFW, moderation, custom image categories           |
+| **Object Detection**     | Image    | Locating objects, label-based severity              |
+
+Semantic embeddings are created automatically during ingestion. They power
+importance ranking and semantic search and do not need a custom detector.
 
 See **[Custom Detectors](/detectors/custom-detectors/)** to pick an engine and
 build one. The [Detector agent](/flow/investigations/autopilot/agents/) can even

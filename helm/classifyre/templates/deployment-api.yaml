@@ -163,6 +163,8 @@ spec:
                 secretKeyRef:
                   name: {{ include "classifyre.apiMaskedConfigSecretName" . }}
                   key: {{ include "classifyre.apiMaskedConfigSecretKey" . }}
+            - name: CLASSIFYRE_AUTO_MIGRATE
+              value: {{ ternary "false" "true" .Values.api.migration.enabled | quote }}
             {{- if and (eq .Values.postgres.mode "external") .Values.postgres.external.existingSecret .Values.postgres.external.existingSecretUrlKey }}
             - name: DATABASE_URL
               valueFrom:
@@ -172,6 +174,61 @@ spec:
             {{- end }}
             - name: SANDBOX_TEMP_DIR
               value: {{ .Values.api.sandbox.tempDir | quote }}
+            - name: EMBEDDING_ENABLED
+              value: {{ .Values.api.embedding.enabled | quote }}
+            {{- if .Values.api.embedding.enabled }}
+            - name: EMBEDDING_PROVIDER
+              value: {{ .Values.api.embedding.provider | quote }}
+            - name: EMBEDDING_MODEL
+              value: {{ .Values.api.embedding.model | quote }}
+            - name: EMBEDDING_MODEL_REVISION
+              value: {{ .Values.api.embedding.revision | quote }}
+            - name: EMBEDDING_DIMENSIONS
+              value: {{ .Values.api.embedding.dimensions | quote }}
+            - name: EMBEDDING_POOLING
+              value: {{ .Values.api.embedding.pooling | quote }}
+            - name: EMBEDDING_NORMALIZE
+              value: {{ .Values.api.embedding.normalize | quote }}
+            - name: EMBEDDING_DTYPE
+              value: {{ .Values.api.embedding.dtype | quote }}
+            - name: EMBEDDING_DEVICE
+              value: {{ .Values.api.embedding.device | quote }}
+            - name: EMBEDDING_ALLOW_REMOTE_MODELS
+              value: {{ .Values.api.embedding.allowRemoteModels | quote }}
+            {{- with .Values.api.embedding.localModelPath }}
+            - name: EMBEDDING_LOCAL_MODEL_PATH
+              value: {{ . | quote }}
+            {{- end }}
+            - name: EMBEDDING_CACHE_DIR
+              value: {{ .Values.api.embedding.cacheDir | quote }}
+            - name: EMBEDDING_BATCH_SIZE
+              value: {{ .Values.api.embedding.batchSize | quote }}
+            - name: EMBEDDING_RETRY_SECONDS
+              value: {{ .Values.api.embedding.retrySeconds | quote }}
+            - name: EMBEDDING_AUTO_BACKFILL
+              value: {{ .Values.api.embedding.autoBackfill | quote }}
+            - name: EMBEDDING_WORKER_CONCURRENCY
+              value: {{ .Values.api.embedding.workerConcurrency | quote }}
+            - name: EMBEDDING_MAX_PARALLEL_CALLS
+              value: {{ .Values.api.embedding.maxParallelCalls | quote }}
+            - name: EMBEDDING_HNSW_M
+              value: {{ .Values.api.embedding.hnsw.m | quote }}
+            - name: EMBEDDING_HNSW_EF_CONSTRUCTION
+              value: {{ .Values.api.embedding.hnsw.efConstruction | quote }}
+            - name: EMBEDDING_HNSW_EF_SEARCH
+              value: {{ .Values.api.embedding.hnsw.efSearch | quote }}
+            {{- with .Values.api.embedding.external.baseUrl }}
+            - name: EMBEDDING_BASE_URL
+              value: {{ . | quote }}
+            {{- end }}
+            {{- with .Values.api.embedding.external.existingSecret }}
+            - name: EMBEDDING_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ . }}
+                  key: {{ $.Values.api.embedding.external.apiKeyKey }}
+            {{- end }}
+            {{- end }}
             {{- range $key, $value := .Values.api.env }}
             - name: {{ $key }}
               value: {{ $value | quote }}
@@ -242,6 +299,10 @@ spec:
             {{- /* Dedicated emptyDir for sandbox temp files — ephemeral, no external storage needed. */}}
             - name: sandbox-temp
               mountPath: {{ .Values.api.sandbox.tempDir | quote }}
+            {{- if .Values.api.embedding.enabled }}
+            - name: embedding-cache
+              mountPath: {{ .Values.api.embedding.cacheDir | quote }}
+            {{- end }}
             {{- if .Values.api.cliJobs.enabled }}
             - name: cli-job-template
               mountPath: /etc/classifyre/cli-job-template
@@ -297,6 +358,13 @@ spec:
             {{- if .Values.api.sandbox.tempSizeLimit }}
             sizeLimit: {{ .Values.api.sandbox.tempSizeLimit | quote }}
             {{- end }}
+        {{- if .Values.api.embedding.enabled }}
+        - name: embedding-cache
+          emptyDir:
+            {{- with .Values.api.embedding.cacheSizeLimit }}
+            sizeLimit: {{ . | quote }}
+            {{- end }}
+        {{- end }}
         {{- if .Values.api.cliJobs.enabled }}
         - name: cli-job-template
           configMap:

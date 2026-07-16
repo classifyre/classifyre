@@ -14,7 +14,7 @@
 
 import { mapValues } from '../runtime';
 /**
- * 
+ *
  * @export
  * @interface OpenCaseDto
  */
@@ -32,7 +32,7 @@ export interface OpenCaseDto {
      */
     title?: string;
     /**
-     * 
+     *
      * @type {string}
      * @memberof OpenCaseDto
      */
@@ -69,7 +69,7 @@ export function OpenCaseDtoFromJSONTyped(json: any, ignoreDiscriminator: boolean
         return json;
     }
     return {
-        
+
         'caseId': json['caseId'] == null ? undefined : json['caseId'],
         'title': json['title'] == null ? undefined : json['title'],
         'severity': json['severity'] == null ? undefined : json['severity'],
@@ -86,7 +86,7 @@ export function OpenCaseDtoToJSONTyped(value?: OpenCaseDto | null, ignoreDiscrim
     }
 
     return {
-        
+
         'caseId': value['caseId'],
         'title': value['title'],
         'severity': value['severity'],

@@ -7,10 +7,32 @@ import tempfile
 import threading
 from collections.abc import Generator
 from dataclasses import dataclass
+from enum import StrEnum
 from pathlib import Path
 from urllib.parse import urlsplit
 
 logger = logging.getLogger(__name__)
+
+
+class TextExtractionCoverageCode(StrEnum):
+    """Machine-readable reason detector-visible text could not be produced."""
+
+    ENGINE_UNAVAILABLE = "ENGINE_UNAVAILABLE"
+    ZERO_FRAMES = "ZERO_FRAMES"
+    FAILED = "FAILED"
+
+
+class TextExtractionCoverageError(RuntimeError):
+    """Extraction failed after source content was fetched successfully."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        code: TextExtractionCoverageCode = TextExtractionCoverageCode.FAILED,
+    ) -> None:
+        super().__init__(message)
+        self.code = code
 
 
 @dataclass
@@ -432,6 +454,7 @@ def extract_text(
     Returns:
         (text_content, error_message_or_None)
     """
+    ocr_error: str | None = None
     if _supports_docling_ocr(mime_type, file_name):
         # PDFs: try cheap native text extraction first.  Only hand off to the
         # heavy docling pipeline when the native path yields too little text,
@@ -460,6 +483,7 @@ def extract_text(
             return text, None
         if error:
             logger.warning("OCR extraction failed for %s: %s", file_name or mime_type, error)
+            ocr_error = error
 
     # Media processing is based on detected content type, never source config.
     if mime_type.startswith("audio/"):
@@ -497,11 +521,12 @@ def extract_text(
     # Unsupported image formats have no native text path; supported images were
     # already handled by the automatic OCR branch above.
     if mime_type.startswith("image/"):
-        return "", None
+        return "", ocr_error
 
     # PDF
     if mime_type == "application/pdf":
-        return _extract_pdf_text(file_bytes)
+        native_text, native_error = _extract_pdf_text(file_bytes)
+        return native_text, native_error or ocr_error
 
     # DOCX
     if mime_type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
@@ -576,7 +601,7 @@ def extract_text(
             return "", f"Parquet extraction failed: {e}"
 
     # Unknown / binary
-    return "", None
+    return "", ocr_error
 
 
 def _decode_bytes(file_bytes: bytes) -> str:
@@ -707,7 +732,11 @@ def iter_file_pages(
         )
     elif normalized.startswith("video/"):
         from .transcription import iter_transcription_pages
-        from .video_processing import iter_video_ocr_segments
+        from .video_processing import (
+            VideoOCREngineUnavailableError,
+            VideoOCRZeroFramesError,
+            iter_video_ocr_segments,
+        )
 
         try:
             yield from iter_transcription_pages(
@@ -721,7 +750,15 @@ def iter_file_pages(
         try:
             yield from iter_video_ocr_segments(file_bytes, file_name=file_name)
         except Exception as exc:
-            logger.warning("Video OCR failed for %s: %s", file_name or mime_type, exc)
+            code = TextExtractionCoverageCode.FAILED
+            if isinstance(exc, VideoOCREngineUnavailableError):
+                code = TextExtractionCoverageCode.ENGINE_UNAVAILABLE
+            elif isinstance(exc, VideoOCRZeroFramesError):
+                code = TextExtractionCoverageCode.ZERO_FRAMES
+            raise TextExtractionCoverageError(
+                f"Video OCR coverage failed for {file_name or mime_type}: {exc}",
+                code=code,
+            ) from exc
     else:
         text, error = extract_text(
             file_bytes,
@@ -730,6 +767,17 @@ def iter_file_pages(
         )
         if error:
             logger.warning("Text extraction error (%s): %s", mime_type, error)
+            if not text:
+                normalized_error = error.casefold()
+                unavailable = "unavailable" in normalized_error or "dependency" in normalized_error
+                raise TextExtractionCoverageError(
+                    f"Text extraction coverage failed for {file_name or mime_type}: {error}",
+                    code=(
+                        TextExtractionCoverageCode.ENGINE_UNAVAILABLE
+                        if unavailable
+                        else TextExtractionCoverageCode.FAILED
+                    ),
+                )
         if text:
             yield from _iter_text_lines(text, batch_size)
 

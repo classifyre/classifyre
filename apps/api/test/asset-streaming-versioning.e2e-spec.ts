@@ -3,6 +3,8 @@ import { INestApplication } from '@nestjs/common';
 import { PrismaService } from '../src/prisma.service';
 import { AssetService } from '../src/asset.service';
 import { CustomDetectorExtractionsService } from '../src/custom-detector-extractions.service';
+import { EmbeddingService } from '../src/embedding/embedding.service';
+import { QueryEmbeddingService } from '../src/embedding/query-embedding.service';
 import {
   AssetStatus,
   AssetType,
@@ -53,6 +55,8 @@ describe('Asset Streaming Versioning (e2e)', () => {
           provide: CustomDetectorExtractionsService,
           useValue: mockCustomDetectorExtractionsService,
         },
+        { provide: EmbeddingService, useValue: {} },
+        { provide: QueryEmbeddingService, useValue: {} },
       ],
     }).compile();
 

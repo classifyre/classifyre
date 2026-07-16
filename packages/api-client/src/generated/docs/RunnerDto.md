@@ -26,7 +26,10 @@ Name | Type
 `scopeFingerprint` | string
 `totalFindings` | number
 `findingsCreated` | number
+`findingsResolved` | number
+`findingsRetained` | number
 `assetsWithoutText` | number
+`textCoverage` | [TextCoverageDto](TextCoverageDto.md)
 `errorMessage` | string
 `errorDetails` | object
 `jobName` | string
@@ -60,7 +63,10 @@ const example = {
   "scopeFingerprint": null,
   "totalFindings": null,
   "findingsCreated": null,
+  "findingsResolved": null,
+  "findingsRetained": null,
   "assetsWithoutText": null,
+  "textCoverage": null,
   "errorMessage": null,
   "errorDetails": null,
   "jobName": null,

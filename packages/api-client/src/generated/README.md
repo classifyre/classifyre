@@ -152,6 +152,10 @@ All URIs are relative to *http://localhost*
 *CustomDetectorsApi* | [**customDetectorsControllerTrainingExamplesStats**](docs/CustomDetectorsApi.md#customdetectorscontrollertrainingexamplesstats) | **GET** /custom-detectors/{id}/training-examples/stats | Get training example counts grouped by label
 *CustomDetectorsApi* | [**customDetectorsControllerTrainingHistory**](docs/CustomDetectorsApi.md#customdetectorscontrollertraininghistory) | **GET** /custom-detectors/{id}/training-history | List training history for custom detector
 *CustomDetectorsApi* | [**customDetectorsControllerUpdate**](docs/CustomDetectorsApi.md#customdetectorscontrollerupdate) | **PATCH** /custom-detectors/{id} | Update custom detector
+*EmbeddingsApi* | [**embeddingControllerChunks**](docs/EmbeddingsApi.md#embeddingcontrollerchunks) | **POST** /sources/{sourceId}/embeddings/chunks | Store asset chunk-to-content mappings
+*EmbeddingsApi* | [**embeddingControllerReindex**](docs/EmbeddingsApi.md#embeddingcontrollerreindex) | **POST** /embeddings/reindex | Reconcile stored findings and asset chunks into the configured embedding space
+*EmbeddingsApi* | [**embeddingControllerSimilar**](docs/EmbeddingsApi.md#embeddingcontrollersimilar) | **GET** /findings/{findingId}/similar | Find semantically similar findings with ranking evidence
+*EmbeddingsApi* | [**embeddingControllerStatus**](docs/EmbeddingsApi.md#embeddingcontrollerstatus) | **GET** /embeddings/status | Get semantic storage and search capability
 *FindingsApi* | [**findingsControllerBulkUpdate**](docs/FindingsApi.md#findingscontrollerbulkupdate) | **POST** /findings/bulk-update | Bulk update findings
 *FindingsApi* | [**findingsControllerCreate**](docs/FindingsApi.md#findingscontrollercreate) | **POST** /findings/create | Create a new finding
 *FindingsApi* | [**findingsControllerFindOne**](docs/FindingsApi.md#findingscontrollerfindone) | **GET** /findings/{id} | Get a finding by ID
@@ -266,6 +270,7 @@ All URIs are relative to *http://localhost*
 - [AiMessageDto](docs/AiMessageDto.md)
 - [AiProviderConfigResponseDto](docs/AiProviderConfigResponseDto.md)
 - [AiProviderConfigTestResultDto](docs/AiProviderConfigTestResultDto.md)
+- [AssetChunkDto](docs/AssetChunkDto.md)
 - [AssetFindingDetectorCountDto](docs/AssetFindingDetectorCountDto.md)
 - [AssetFindingSeverityCountDto](docs/AssetFindingSeverityCountDto.md)
 - [AssetFindingStatusCountDto](docs/AssetFindingStatusCountDto.md)
@@ -332,13 +337,17 @@ All URIs are relative to *http://localhost*
 - [DiscoveryRecentRunDto](docs/DiscoveryRecentRunDto.md)
 - [DiscoveryRunSourceDto](docs/DiscoveryRunSourceDto.md)
 - [EdgeDetailDto](docs/EdgeDetailDto.md)
+- [EmbeddingReindexResponseDto](docs/EmbeddingReindexResponseDto.md)
 - [EvidenceEntityDto](docs/EvidenceEntityDto.md)
 - [ExclusionRuleDto](docs/ExclusionRuleDto.md)
 - [ExpandGraphDto](docs/ExpandGraphDto.md)
 - [FinalizeIngestRunDto](docs/FinalizeIngestRunDto.md)
+- [FindingEvidenceAnalysisDto](docs/FindingEvidenceAnalysisDto.md)
 - [FindingHistoryEntryDto](docs/FindingHistoryEntryDto.md)
 - [FindingLocationDto](docs/FindingLocationDto.md)
+- [FindingRankReasonDto](docs/FindingRankReasonDto.md)
 - [FindingResponseDto](docs/FindingResponseDto.md)
+- [FindingSearchRankingDto](docs/FindingSearchRankingDto.md)
 - [FindingsBySeverityDto](docs/FindingsBySeverityDto.md)
 - [FindingsChartsTimelineBucketDto](docs/FindingsChartsTimelineBucketDto.md)
 - [FindingsChartsTopAssetDto](docs/FindingsChartsTopAssetDto.md)
@@ -349,6 +358,7 @@ All URIs are relative to *http://localhost*
 - [FindingsDiscoveryStatusBreakdownDto](docs/FindingsDiscoveryStatusBreakdownDto.md)
 - [FindingsDiscoveryTopAssetDto](docs/FindingsDiscoveryTopAssetDto.md)
 - [FindingsDiscoveryTotalsDto](docs/FindingsDiscoveryTotalsDto.md)
+- [FindingsRankingDto](docs/FindingsRankingDto.md)
 - [GraphEdgeDto](docs/GraphEdgeDto.md)
 - [GraphNodeDto](docs/GraphNodeDto.md)
 - [GraphResponseDto](docs/GraphResponseDto.md)
@@ -395,6 +405,7 @@ All URIs are relative to *http://localhost*
 - [PreviewResponseDto](docs/PreviewResponseDto.md)
 - [PullFromInquiryDto](docs/PullFromInquiryDto.md)
 - [PullFromInquiryResponseDto](docs/PullFromInquiryResponseDto.md)
+- [PutAssetChunksDto](docs/PutAssetChunksDto.md)
 - [RebuildEdgesResponseDto](docs/RebuildEdgesResponseDto.md)
 - [RecomputeCorrelationResponseDto](docs/RecomputeCorrelationResponseDto.md)
 - [RegisterDiscoveredAssetsDto](docs/RegisterDiscoveredAssetsDto.md)
@@ -434,6 +445,7 @@ All URIs are relative to *http://localhost*
 - [SearchFindingsFiltersDto](docs/SearchFindingsFiltersDto.md)
 - [SearchFindingsFiltersInputDto](docs/SearchFindingsFiltersInputDto.md)
 - [SearchFindingsPageDto](docs/SearchFindingsPageDto.md)
+- [SearchFindingsRankingMetadataDto](docs/SearchFindingsRankingMetadataDto.md)
 - [SearchFindingsRequestDto](docs/SearchFindingsRequestDto.md)
 - [SearchFindingsResponseDto](docs/SearchFindingsResponseDto.md)
 - [SearchRunnerItemDto](docs/SearchRunnerItemDto.md)
@@ -455,6 +467,7 @@ All URIs are relative to *http://localhost*
 - [SearchSourcesRequestDto](docs/SearchSourcesRequestDto.md)
 - [SearchSourcesResponseDto](docs/SearchSourcesResponseDto.md)
 - [SearchSourcesTotalsDto](docs/SearchSourcesTotalsDto.md)
+- [SemanticFindingsSearchDto](docs/SemanticFindingsSearchDto.md)
 - [SourceAssetsControllerBulkIngest201Response](docs/SourceAssetsControllerBulkIngest201Response.md)
 - [SourceInfoDto](docs/SourceInfoDto.md)
 - [SourceResponseDto](docs/SourceResponseDto.md)
@@ -463,6 +476,7 @@ All URIs are relative to *http://localhost*
 - [StartRunnerDto](docs/StartRunnerDto.md)
 - [StopRunnerResponseDto](docs/StopRunnerResponseDto.md)
 - [TestConnectionResponseDto](docs/TestConnectionResponseDto.md)
+- [TextCoverageDto](docs/TextCoverageDto.md)
 - [ThreadEntriesResponseDto](docs/ThreadEntriesResponseDto.md)
 - [ThreadEntryDto](docs/ThreadEntryDto.md)
 - [ThreadResponseDto](docs/ThreadResponseDto.md)

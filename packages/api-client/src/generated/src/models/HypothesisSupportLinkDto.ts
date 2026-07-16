@@ -14,43 +14,43 @@
 
 import { mapValues } from '../runtime';
 /**
- * 
+ *
  * @export
  * @interface HypothesisSupportLinkDto
  */
 export interface HypothesisSupportLinkDto {
     /**
-     * 
+     *
      * @type {string}
      * @memberof HypothesisSupportLinkDto
      */
     id: string;
     /**
-     * 
+     *
      * @type {string}
      * @memberof HypothesisSupportLinkDto
      */
     targetType: HypothesisSupportLinkDtoTargetTypeEnum;
     /**
-     * 
+     *
      * @type {string}
      * @memberof HypothesisSupportLinkDto
      */
     targetId: string;
     /**
-     * 
+     *
      * @type {string}
      * @memberof HypothesisSupportLinkDto
      */
     stance: HypothesisSupportLinkDtoStanceEnum;
     /**
-     * 
+     *
      * @type {number}
      * @memberof HypothesisSupportLinkDto
      */
     weight?: number;
     /**
-     * 
+     *
      * @type {string}
      * @memberof HypothesisSupportLinkDto
      */
@@ -105,7 +105,7 @@ export function HypothesisSupportLinkDtoFromJSONTyped(json: any, ignoreDiscrimin
         return json;
     }
     return {
-        
+
         'id': json['id'],
         'targetType': json['targetType'],
         'targetId': json['targetId'],
@@ -126,7 +126,7 @@ export function HypothesisSupportLinkDtoToJSONTyped(value?: HypothesisSupportLin
     }
 
     return {
-        
+
         'id': value['id'],
         'targetType': value['targetType'],
         'targetId': value['targetId'],

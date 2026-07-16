@@ -1,9 +1,9 @@
-import { app } from 'electron';
-import path from 'path';
-import fs from 'fs';
-import os from 'os';
-import { pathToFileURL } from 'url';
-import { getAvailablePort } from './port-manager.js';
+import { app } from "electron";
+import path from "path";
+import fs from "fs";
+import os from "os";
+import { pathToFileURL } from "url";
+import { getAvailablePort } from "./port-manager.js";
 
 // In a packaged app, `embedded-postgres` lives in a self-contained npm tree
 // staged at resources/pg/node_modules (the Forge Vite plugin ships nothing
@@ -11,20 +11,24 @@ import { getAvailablePort } from './port-manager.js';
 // app.asar). In dev, the regular workspace install resolves it.
 function stagedPgNodeModules(): string | null {
   if (!app.isPackaged) return null;
-  const dir = path.join(process.resourcesPath, 'pg', 'node_modules');
+  const dir = path.join(process.resourcesPath, "pg", "node_modules");
   return fs.existsSync(dir) ? dir : null;
 }
 
 async function loadEmbeddedPostgres(): Promise<new (config: object) => object> {
   const staged = stagedPgNodeModules();
   if (staged) {
-    const entry = path.join(staged, 'embedded-postgres', 'dist', 'index.js');
-    const mod = (await import(/* @vite-ignore */ pathToFileURL(entry).href)) as {
+    const entry = path.join(staged, "embedded-postgres", "dist", "index.js");
+    const mod = (await import(
+      /* @vite-ignore */ pathToFileURL(entry).href
+    )) as {
       default: new (config: object) => object;
     };
     return mod.default;
   }
-  const mod = (await import('embedded-postgres')) as { default: new (config: object) => object };
+  const mod = (await import("embedded-postgres")) as {
+    default: new (config: object) => object;
+  };
   return mod.default;
 }
 
@@ -41,33 +45,40 @@ async function loadEmbeddedPostgres(): Promise<new (config: object) => object> {
 // (its native/lib next to native/bin). In dev, resolve it with a bare import —
 // bun links the platform-matching package where the workspace install put it.
 async function ensureBundledLibsOnLoaderPath(): Promise<void> {
-  if (process.platform !== 'linux') return;
+  if (process.platform !== "linux") return;
   const spec =
-    process.arch === 'arm64'
-      ? '@embedded-postgres/linux-arm64'
-      : process.arch === 'x64'
-        ? '@embedded-postgres/linux-x64'
+    process.arch === "arm64"
+      ? "@embedded-postgres/linux-arm64"
+      : process.arch === "x64"
+        ? "@embedded-postgres/linux-x64"
         : null;
   if (!spec) return;
   let libDir: string;
   const staged = stagedPgNodeModules();
   if (staged) {
-    libDir = path.join(staged, spec, 'native', 'lib');
+    libDir = path.join(staged, spec, "native", "lib");
   } else {
     try {
-      const mod = (await import(/* @vite-ignore */ spec)) as { initdb?: string };
+      const mod = (await import(/* @vite-ignore */ spec)) as {
+        initdb?: string;
+      };
       if (!mod.initdb) {
         console.warn(`Platform PG package ${spec} exposed no initdb path`);
         return;
       }
-      libDir = path.join(path.dirname(mod.initdb), '..', 'lib');
+      libDir = path.join(path.dirname(mod.initdb), "..", "lib");
     } catch (err) {
-      console.warn('Could not locate bundled PG libs for LD_LIBRARY_PATH:', err);
+      console.warn(
+        "Could not locate bundled PG libs for LD_LIBRARY_PATH:",
+        err,
+      );
       return;
     }
   }
   if (!fs.existsSync(libDir)) {
-    console.warn(`Bundled PG lib dir not found, skipping LD_LIBRARY_PATH: ${libDir}`);
+    console.warn(
+      `Bundled PG lib dir not found, skipping LD_LIBRARY_PATH: ${libDir}`,
+    );
     return;
   }
 
@@ -79,7 +90,9 @@ async function ensureBundledLibsOnLoaderPath(): Promise<void> {
   // may be read-only inside the packaged app) and put it first on the path.
   const dirs = [libDir];
   try {
-    const shimDir = fs.mkdtempSync(path.join(os.tmpdir(), 'classifyre-pglibs-'));
+    const shimDir = fs.mkdtempSync(
+      path.join(os.tmpdir(), "classifyre-pglibs-"),
+    );
     for (const entry of fs.readdirSync(libDir)) {
       const soname = entry.match(/^(.+\.so\.\d+)\.\d+$/)?.[1];
       if (!soname) continue;
@@ -91,12 +104,16 @@ async function ensureBundledLibsOnLoaderPath(): Promise<void> {
     }
     dirs.unshift(shimDir);
   } catch (err) {
-    console.warn('Could not build PG lib SONAME shim (continuing):', err);
+    console.warn("Could not build PG lib SONAME shim (continuing):", err);
   }
 
-  const existing = process.env['LD_LIBRARY_PATH'];
-  process.env['LD_LIBRARY_PATH'] = [...dirs, existing].filter(Boolean).join(path.delimiter);
-  console.log(`Set LD_LIBRARY_PATH for bundled PostgreSQL libs: ${process.env['LD_LIBRARY_PATH']}`);
+  const existing = process.env["LD_LIBRARY_PATH"];
+  process.env["LD_LIBRARY_PATH"] = [...dirs, existing]
+    .filter(Boolean)
+    .join(path.delimiter);
+  console.log(
+    `Set LD_LIBRARY_PATH for bundled PostgreSQL libs: ${process.env["LD_LIBRARY_PATH"]}`,
+  );
 }
 
 type EmbeddedPostgresInstance = {
@@ -119,8 +136,8 @@ export class PostgresManager {
   private startPromise: Promise<void> | null = null;
 
   constructor(preferredPort?: number) {
-    const base = process.env['CLASSIFYRE_DATA_DIR'] || app.getPath('userData');
-    this.dataDir = path.join(base, 'pgdata');
+    const base = process.env["CLASSIFYRE_DATA_DIR"] || app.getPath("userData");
+    this.dataDir = path.join(base, "pgdata");
     if (preferredPort) this.preferredPort = preferredPort;
   }
 
@@ -150,13 +167,13 @@ export class PostgresManager {
     const EmbeddedPostgres = await loadEmbeddedPostgres();
     this.pg = new EmbeddedPostgres({
       databaseDir: this.dataDir,
-      user: 'classifyre',
-      password: 'classifyre',
+      user: "classifyre",
+      password: "classifyre",
       port: this.port,
       persistent: true,
     }) as unknown as EmbeddedPostgresInstance;
 
-    const pgVersionFile = path.join(this.dataDir, 'PG_VERSION');
+    const pgVersionFile = path.join(this.dataDir, "PG_VERSION");
     if (!fs.existsSync(pgVersionFile)) {
       await this.pg.initialise();
     }
@@ -166,7 +183,7 @@ export class PostgresManager {
   }
 
   private async ensureDatabase(): Promise<void> {
-    if (!this.pg) throw new Error('PostgreSQL not started');
+    if (!this.pg) throw new Error("PostgreSQL not started");
 
     const client = this.pg.getPgClient();
     await client.connect();
@@ -175,21 +192,39 @@ export class PostgresManager {
         "SELECT 1 FROM pg_database WHERE datname = 'classifyre'",
       );
       if ((result.rows as unknown[]).length === 0) {
-        await client.query('CREATE DATABASE classifyre');
+        await client.query("CREATE DATABASE classifyre");
       }
     } finally {
       await client.end();
     }
+
+    // The desktop bundle carries pgvector's extension files alongside the
+    // embedded PostgreSQL runtime. Install it once in the shared database;
+    // individual workspace schemas then use the public.vector type.
+    const appClient = this.pg.getPgClient("classifyre");
+    await appClient.connect();
+    try {
+      await appClient.query(
+        "CREATE EXTENSION IF NOT EXISTS vector WITH SCHEMA public",
+      );
+    } catch (error) {
+      throw new Error(
+        `The bundled PostgreSQL runtime is missing pgvector: ${error instanceof Error ? error.message : String(error)}`,
+        { cause: error },
+      );
+    } finally {
+      await appClient.end();
+    }
   }
 
   async createSchema(schemaName: string): Promise<void> {
-    if (!this.pg) throw new Error('PostgreSQL not started');
+    if (!this.pg) throw new Error("PostgreSQL not started");
     if (!/^[a-z0-9_]+$/.test(schemaName)) {
       throw new Error(`Invalid schema name: ${schemaName}`);
     }
 
     // Schemas live in the app database, not the default `postgres` database.
-    const client = this.pg.getPgClient('classifyre');
+    const client = this.pg.getPgClient("classifyre");
     await client.connect();
     try {
       await client.query(`CREATE SCHEMA IF NOT EXISTS "${schemaName}"`);
@@ -199,12 +234,12 @@ export class PostgresManager {
   }
 
   async dropSchema(schemaName: string): Promise<void> {
-    if (!this.pg) throw new Error('PostgreSQL not started');
+    if (!this.pg) throw new Error("PostgreSQL not started");
     if (!/^[a-z0-9_]+$/.test(schemaName)) {
       throw new Error(`Invalid schema name: ${schemaName}`);
     }
 
-    const client = this.pg.getPgClient('classifyre');
+    const client = this.pg.getPgClient("classifyre");
     await client.connect();
     try {
       await client.query(`DROP SCHEMA IF EXISTS "${schemaName}" CASCADE`);
@@ -245,7 +280,7 @@ export class PostgresManager {
     } catch (err) {
       // Best-effort, but an unclean stop can leave a stale postmaster.pid that
       // blocks the next launch — it must be visible in main.log.
-      console.error('Embedded PostgreSQL shutdown failed:', err);
+      console.error("Embedded PostgreSQL shutdown failed:", err);
     }
     this.running = false;
     this.pg = null;

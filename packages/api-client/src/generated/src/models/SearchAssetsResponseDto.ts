@@ -51,6 +51,12 @@ export interface SearchAssetsResponseDto {
      * @memberof SearchAssetsResponseDto
      */
     limit: number;
+    /**
+     * Present when results were ordered by semantic or hybrid relevance
+     * @type {object}
+     * @memberof SearchAssetsResponseDto
+     */
+    ranking?: object;
 }
 
 /**
@@ -78,6 +84,7 @@ export function SearchAssetsResponseDtoFromJSONTyped(json: any, ignoreDiscrimina
         'total': json['total'],
         'skip': json['skip'],
         'limit': json['limit'],
+        'ranking': json['ranking'] == null ? undefined : json['ranking'],
     };
 }
 
@@ -96,6 +103,7 @@ export function SearchAssetsResponseDtoToJSONTyped(value?: SearchAssetsResponseD
         'total': value['total'],
         'skip': value['skip'],
         'limit': value['limit'],
+        'ranking': value['ranking'],
     };
 }
 

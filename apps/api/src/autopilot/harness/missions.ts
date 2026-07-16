@@ -207,7 +207,6 @@ export const DETECTOR_AUTHOR_MISSION: Mission = {
     '     sentiment, toxicity, language, prompt-injection); copy a candidate model id from the registry.',
     '   • IMAGE_CLASSIFICATION / OBJECT_DETECTION — image assets (NSFW, scene/category, or locating',
     '     objects like weapons/people/logos).',
-    '   • FEATURE_EXTRACTION — embeddings for similarity / clustering / retrieval.',
     '   • LLM — only for nuanced judgement no smaller model captures (needs an aiProviderConfigId;',
     '     never include provider_runtime).',
     '3. SHAPE: call detector.examples (pass `type` to get just that engine, with candidate model ids)',

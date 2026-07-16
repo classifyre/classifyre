@@ -10,6 +10,10 @@ describe('CustomDetectorExtractionsService', () => {
         count: jest.fn(),
         upsert: jest.fn(),
       },
+      extractionPayload: {
+        findFirst: jest.fn().mockResolvedValue(null),
+        upsert: jest.fn(),
+      },
       customDetector: {
         findUnique: jest.fn(),
       },
@@ -30,10 +34,12 @@ describe('CustomDetectorExtractionsService', () => {
     assetId: 'asset-1',
     runnerId: 'run-1',
     detectorVersion: 1,
-    pipelineResult: {
-      entities: [{ label: 'dish', text: 'pasta carbonara', score: 0.9 }],
-      classification: {},
-      metadata: { runner: 'GLINER2' },
+    payload: {
+      pipelineResult: {
+        entities: [{ label: 'dish', text: 'pasta carbonara', score: 0.9 }],
+        classification: {},
+        metadata: { runner: 'GLINER2' },
+      },
     },
     extractedAt: new Date('2026-03-08T12:00:00Z'),
     createdAt: new Date('2026-03-08T12:00:00Z'),
@@ -49,7 +55,9 @@ describe('CustomDetectorExtractionsService', () => {
 
     expect(result).not.toBeNull();
     expect(result!.findingId).toBe('find-1');
-    expect(result!.pipelineResult).toEqual(mockExtraction.pipelineResult);
+    expect(result!.pipelineResult).toEqual(
+      mockExtraction.payload.pipelineResult,
+    );
   });
 
   it('getByFinding returns null when not found', async () => {
@@ -150,7 +158,7 @@ describe('CustomDetectorExtractionsService', () => {
     expect(result.coverageRate).toBe(0);
   });
 
-  it('createFromIngestion upserts with pipelineResult', async () => {
+  it('content-addresses pipelineResult before linking the finding', async () => {
     const { service, prisma } = createService();
     prisma.customDetectorExtraction.upsert.mockResolvedValue({});
     const pipelineResult = {
@@ -171,8 +179,10 @@ describe('CustomDetectorExtractionsService', () => {
       extractedAt: new Date(),
     });
 
+    const payloadCall = prisma.extractionPayload.upsert.mock.calls[0][0];
     const upsertCall = prisma.customDetectorExtraction.upsert.mock.calls[0][0];
-    expect(upsertCall.create.pipelineResult).toEqual(pipelineResult);
+    expect(payloadCall.create.pipelineResult).toEqual(pipelineResult);
+    expect(upsertCall.create.payloadHash).toBe(payloadCall.create.contentHash);
     expect(upsertCall.create.findingId).toBe('find-2');
   });
 
@@ -180,6 +190,10 @@ describe('CustomDetectorExtractionsService', () => {
     const { service, prisma } = createService();
     const tx = {
       customDetectorExtraction: { upsert: jest.fn().mockResolvedValue({}) },
+      extractionPayload: {
+        findFirst: jest.fn().mockResolvedValue(null),
+        upsert: jest.fn().mockResolvedValue({}),
+      },
     };
 
     await service.createFromIngestion(
@@ -200,6 +214,33 @@ describe('CustomDetectorExtractionsService', () => {
     // The transaction client receives the upsert so the FK to the just-created
     // finding resolves; the global prisma client is not used.
     expect(tx.customDetectorExtraction.upsert).toHaveBeenCalledTimes(1);
+    expect(tx.extractionPayload.upsert).toHaveBeenCalledTimes(1);
     expect(prisma.customDetectorExtraction.upsert).not.toHaveBeenCalled();
+  });
+
+  it('reuses a semantically equal payload created by the data migration', async () => {
+    const { service, prisma } = createService();
+    prisma.extractionPayload.findFirst.mockResolvedValue({
+      contentHash: 'migrated-hash',
+    });
+    prisma.customDetectorExtraction.upsert.mockResolvedValue({});
+
+    await service.createFromIngestion({
+      findingId: 'find-migrated',
+      customDetectorId: 'det-1',
+      customDetectorKey: 'entities',
+      sourceId: 'src-1',
+      assetId: 'asset-1',
+      runnerId: null,
+      detectorVersion: 1,
+      pipelineResult: { entities: [{ text: 'same page' }] },
+      extractedAt: new Date(),
+    });
+
+    expect(prisma.extractionPayload.upsert).not.toHaveBeenCalled();
+    expect(
+      prisma.customDetectorExtraction.upsert.mock.calls[0][0].create
+        .payloadHash,
+    ).toBe('migrated-hash');
   });
 });

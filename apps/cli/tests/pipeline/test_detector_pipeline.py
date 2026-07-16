@@ -55,7 +55,7 @@ class PagedSource(NoFetchSource):
             yield (f"<p>raw-{index}</p>", page)
 
 
-class HashResolvingSource(NoFetchSource):
+class HashResolvingSource(DummySource):
     def __init__(
         self,
         recipe: dict[str, Any],
@@ -277,7 +277,8 @@ async def test_pipeline_allows_text_plain_detectors_for_table_assets() -> None:
 
 @pytest.mark.asyncio
 async def test_pipeline_runs_broken_links_detector_on_asset_links() -> None:
-    source = NoFetchSource({"type": "DUMMY"}, content="")
+    # Intrinsic embeddings fetch text even for a link-only detector recipe.
+    source = DummySource({"type": "DUMMY"}, content="")
     link_detector = LinkRecordingDetector()
     pipeline = DetectorPipeline(
         detectors=[link_detector],

@@ -37,6 +37,46 @@ api:
     # -- API image pull policy.
     pullPolicy: IfNotPresent
 
+  embedding:
+    # -- Enable semantic embedding generation inside the API process.
+    enabled: true
+    # -- Embedding provider: transformers-js or openai-compatible.
+    provider: transformers-js
+    # -- Hugging Face model id or external provider model id.
+    model: Xenova/all-MiniLM-L6-v2
+    # -- Immutable model revision. Change it to create a new embedding space.
+    revision: 751bff37182d3f1213fa05d7196b954e230abad9
+    # -- Output dimensions. pgvector HNSW supports vector dimensions up to 2000.
+    dimensions: 384
+    pooling: mean
+    normalize: true
+    # -- Transformers.js ONNX precision and execution device.
+    dtype: q8
+    device: cpu
+    allowRemoteModels: true
+    # -- Optional local Transformers.js model root mounted into the API pod.
+    localModelPath: ""
+    cacheDir: /var/cache/classifyre/transformers
+    cacheSizeLimit: 2Gi
+    batchSize: 32
+    retrySeconds: 30
+    # -- Reconcile all stored findings and asset chunks into the configured
+    # -- embedding space on API startup. Existing vectors are hash-skipped.
+    autoBackfill: true
+    # -- Maximum embedding batches processed concurrently across all API replicas.
+    workerConcurrency: 1
+    maxParallelCalls: 2
+    hnsw:
+      m: 16
+      efConstruction: 64
+      efSearch: 100
+    external:
+      # -- Base URL for an OpenAI-compatible embeddings API.
+      baseUrl: ""
+      # -- Existing secret containing the provider API key.
+      existingSecret: ""
+      apiKeyKey: api-key
+
   # -- Optional API container command override.
   command: []
   # -- Optional API container args override.
@@ -232,7 +272,8 @@ api:
     minAvailable: 1
 
   migration:
-    # -- Run database migrations as an API init container.
+    # -- Run database migrations as an API init container. When disabled, the
+    # -- API applies pending migrations itself before NestJS startup.
     enabled: true
     # -- Migration command/script.
     script: npx prisma migrate deploy --schema /app/api/prisma/schema.prisma
@@ -618,9 +659,9 @@ postgres:
       annotations: {}
     image:
       # -- Embedded Postgres image repository.
-      repository: postgres
+      repository: pgvector/pgvector
       # -- Embedded Postgres image tag.
-      tag: "18"
+      tag: "0.8.5-pg18-bookworm"
       # -- Embedded Postgres image pull policy.
       pullPolicy: IfNotPresent
     # -- Embedded Postgres service and container port.
@@ -708,7 +749,7 @@ postgres:
     # -- Number of CNPG instances.
     instances: 3
     # -- CNPG Postgres image.
-    imageName: ghcr.io/cloudnative-pg/postgresql:17
+    imageName: ghcr.io/cloudnative-pg/postgresql:18-standard-trixie
     # -- Database bootstrapped by CNPG.
     database: classifyre
     # -- Owner user bootstrapped by CNPG.

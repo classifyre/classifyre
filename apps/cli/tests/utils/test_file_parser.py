@@ -10,6 +10,8 @@ import pytest
 
 from src.utils.file_parser import (
     ParsedFile,
+    TextExtractionCoverageCode,
+    TextExtractionCoverageError,
     _get_docling_converter,
     _reset_docling_singleton,
     _supports_docling_ocr,
@@ -109,6 +111,25 @@ class TestExtractText:
         text, err = extract_text(b"\x89PNG\r\n\x1a\n", "image/png")
         assert text == ""
         assert err is None
+
+    def test_docling_unavailable_is_structured_coverage_failure(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(
+            "src.utils.file_parser._extract_docling_markdown",
+            lambda *_args, **_kwargs: ("", "Docling converter unavailable"),
+        )
+
+        with pytest.raises(TextExtractionCoverageError) as error:
+            list(
+                iter_file_pages(
+                    b"\x89PNG\r\n\x1a\n",
+                    "image/png",
+                    file_name="receipt.png",
+                )
+            )
+
+        assert error.value.code == TextExtractionCoverageCode.ENGINE_UNAVAILABLE
 
     def test_audio_without_speech_returns_empty(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr(

@@ -3,6 +3,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { DetectorType, EdgeOrigin, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
 import type { GraphEdgeDto, GraphNodeDto } from '../dto/graph.dto';
+import { UnionFind } from '../utils/union-find';
 import {
   DEFAULT_LABEL_WEIGHT,
   DUPLICATE_MIN,
@@ -1898,36 +1899,6 @@ function round2(n: number): number {
 /** Clamp + round to fit Decimal(3,2) in [0,1]. */
 function roundConfidence(n: number): number {
   return Math.min(1, Math.max(0, round2(n)));
-}
-
-/** Minimal union-find over a fixed set of string ids. */
-class UnionFind {
-  private parent = new Map<string, string>();
-  constructor(ids: string[]) {
-    for (const id of ids) this.parent.set(id, id);
-  }
-  find(id: string): string {
-    let root = id;
-    while (this.parent.get(root) !== root) root = this.parent.get(root)!;
-    // Path compression.
-    let cur = id;
-    while (this.parent.get(cur) !== root) {
-      const next = this.parent.get(cur)!;
-      this.parent.set(cur, root);
-      cur = next;
-    }
-    return root;
-  }
-  union(a: string, b: string): void {
-    if (!this.parent.has(a)) this.parent.set(a, a);
-    if (!this.parent.has(b)) this.parent.set(b, b);
-    const ra = this.find(a);
-    const rb = this.find(b);
-    if (ra !== rb) this.parent.set(ra, rb);
-  }
-  ids(): IterableIterator<string> {
-    return this.parent.keys();
-  }
 }
 
 /** Split an array into fixed-size chunks (bounds IN-query parameter counts). */

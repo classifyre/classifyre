@@ -13,6 +13,20 @@
  */
 
 import { mapValues } from '../runtime';
+import type { FindingEvidenceAnalysisDto } from './FindingEvidenceAnalysisDto';
+import {
+    FindingEvidenceAnalysisDtoFromJSON,
+    FindingEvidenceAnalysisDtoFromJSONTyped,
+    FindingEvidenceAnalysisDtoToJSON,
+    FindingEvidenceAnalysisDtoToJSONTyped,
+} from './FindingEvidenceAnalysisDto';
+import type { FindingSearchRankingDto } from './FindingSearchRankingDto';
+import {
+    FindingSearchRankingDtoFromJSON,
+    FindingSearchRankingDtoFromJSONTyped,
+    FindingSearchRankingDtoToJSON,
+    FindingSearchRankingDtoToJSONTyped,
+} from './FindingSearchRankingDto';
 import type { FindingLocationDto } from './FindingLocationDto';
 import {
     FindingLocationDtoFromJSON,
@@ -195,6 +209,18 @@ export interface SearchAssetFindingDto {
      * @memberof SearchAssetFindingDto
      */
     updatedAt: Date;
+    /**
+     * 
+     * @type {FindingEvidenceAnalysisDto}
+     * @memberof SearchAssetFindingDto
+     */
+    evidenceAnalysis?: FindingEvidenceAnalysisDto | null;
+    /**
+     * 
+     * @type {FindingSearchRankingDto}
+     * @memberof SearchAssetFindingDto
+     */
+    ranking?: FindingSearchRankingDto;
 }
 
 
@@ -294,6 +320,8 @@ export function SearchAssetFindingDtoFromJSONTyped(json: any, ignoreDiscriminato
         'resolvedAt': json['resolvedAt'] == null ? undefined : (new Date(json['resolvedAt'])),
         'createdAt': (new Date(json['createdAt'])),
         'updatedAt': (new Date(json['updatedAt'])),
+        'evidenceAnalysis': json['evidenceAnalysis'] == null ? undefined : FindingEvidenceAnalysisDtoFromJSON(json['evidenceAnalysis']),
+        'ranking': json['ranking'] == null ? undefined : FindingSearchRankingDtoFromJSON(json['ranking']),
     };
 }
 
@@ -336,6 +364,8 @@ export function SearchAssetFindingDtoToJSONTyped(value?: SearchAssetFindingDto |
         'resolvedAt': value['resolvedAt'] == null ? value['resolvedAt'] : value['resolvedAt'].toISOString(),
         'createdAt': value['createdAt'].toISOString(),
         'updatedAt': value['updatedAt'].toISOString(),
+        'evidenceAnalysis': FindingEvidenceAnalysisDtoToJSON(value['evidenceAnalysis']),
+        'ranking': FindingSearchRankingDtoToJSON(value['ranking']),
     };
 }
 

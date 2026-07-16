@@ -4,34 +4,34 @@ on:
   workflow_call:
     inputs:
       tag:
-        description: 'Release tag (e.g. v0.4.25). Empty = snapshot build: keeps the -SNAPSHOT package.json version and skips the release upload.'
+        description: "Release tag (e.g. v0.4.25). Empty = snapshot build: keeps the -SNAPSHOT package.json version and skips the release upload."
         required: false
         type: string
-        default: ''
+        default: ""
       publish:
-        description: 'Upload distributables to the GitHub Release (requires tag)'
+        description: "Upload distributables to the GitHub Release (requires tag)"
         required: false
         type: boolean
         default: true
       only:
-        description: 'Optional: build a single platform (mac-arm64 | win-x64 | linux-amd64 | linux-arm64)'
+        description: "Optional: comma-separated platforms (mac-arm64 | win-x64 | linux-amd64 | linux-arm64)"
         required: false
         type: string
-        default: ''
+        default: ""
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Release tag (e.g. v0.4.25)'
+        description: "Release tag (e.g. v0.4.25)"
         required: true
         type: string
       only:
-        description: 'Optional: build a single platform (mac-arm64 | win-x64 | linux-amd64 | linux-arm64). Saves runner time when retrying one failed platform.'
+        description: "Optional: comma-separated platforms (mac-arm64 | win-x64 | linux-amd64 | linux-arm64). Saves runner time when retrying failed platforms."
         required: false
         type: string
-        default: ''
+        default: ""
 
 env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 permissions:
   contents: write
@@ -44,7 +44,7 @@ concurrency:
 
 jobs:
   # Computes the build matrix. The optional `only` input (workflow_dispatch)
-  # narrows a retry to a single platform — rebuilding all four to retry one
+  # narrows a retry to one or more platforms — rebuilding all four to retry one
   # failed mac notarization wastes ~45 runner-minutes per attempt. The
   # release-triggered path (workflow_call, no `only`) builds everything.
   # (A job-level `if` can't see the matrix context, hence this planning job.)
@@ -70,7 +70,15 @@ jobs:
             {"os":"ubuntu-24.04-arm","platform":"linux-arm64"}
           ]'
           if [ -n "${ONLY:-}" ]; then
-            MATRIX=$(echo "$ALL" | jq -c --arg p "$ONLY" '[.[] | select(.platform == $p)]')
+            MATRIX=$(echo "$ALL" | jq -c --arg requested "$ONLY" '
+              ($requested | split(",") | map(gsub("^\\s+|\\s+$"; "")) | unique) as $wanted
+              | [.[] | select(.platform as $platform | $wanted | index($platform))]
+            ')
+            REQUESTED_COUNT=$(echo "$ONLY" | tr ',' '\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | sort -u | sed '/^$/d' | wc -l)
+            if [ "$(echo "$MATRIX" | jq length)" -ne "$REQUESTED_COUNT" ]; then
+              echo "::error::Unknown platform in '$ONLY' (expected mac-arm64 | win-x64 | linux-amd64 | linux-arm64)"
+              exit 1
+            fi
           else
             MATRIX=$(echo "$ALL" | jq -c .)
           fi
@@ -138,7 +146,40 @@ jobs:
 
       - name: Install Linux packaging tools
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y rpm
+        shell: bash
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y rpm curl ca-certificates gnupg
+          sudo install -d /usr/share/postgresql-common/pgdg
+          curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc -o "$RUNNER_TEMP/postgresql.asc"
+          sudo gpg --batch --yes --dearmor \
+            --output /usr/share/postgresql-common/pgdg/apt.postgresql.org.gpg \
+            "$RUNNER_TEMP/postgresql.asc"
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.gpg] https://apt.postgresql.org/pub/repos/apt $(. /etc/os-release && echo $VERSION_CODENAME)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
+          sudo apt-get update
+          sudo apt-get install -y postgresql-server-dev-18
+          echo "PG_CONFIG=/usr/lib/postgresql/18/bin/pg_config" >> "$GITHUB_ENV"
+
+      - name: Install PostgreSQL 18 development files (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install postgresql@18
+          echo "PG_CONFIG=$(brew --prefix postgresql@18)/bin/pg_config" >> "$GITHUB_ENV"
+
+      - name: Install PostgreSQL 18 development files (Windows)
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: |
+          choco install postgresql18 --no-progress -y
+          "PGROOT=C:\Program Files\PostgreSQL\18" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Configure MSVC build tools (Windows)
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1.13.0
+        with:
+          arch: x64
 
       # --- macOS code signing & notarization (skipped when secrets are absent,
       # e.g. fork PRs; the ad-hoc fallback below keeps those builds bootable).

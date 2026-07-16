@@ -27,6 +27,18 @@ _MIN_OCR_CONFIDENCE = 0.5
 _RECENT_HASHES = 256
 
 
+class VideoOCRError(RuntimeError):
+    """Base error for a video OCR coverage failure."""
+
+
+class VideoOCREngineUnavailableError(VideoOCRError):
+    """The video OCR engine or one of its runtime dependencies is unavailable."""
+
+
+class VideoOCRZeroFramesError(VideoOCRError):
+    """The decoder opened the input but produced no frames to inspect."""
+
+
 class _RapidOcrState:
     def __init__(self) -> None:
         self.engine: object = None
@@ -77,9 +89,7 @@ def _get_rapidocr_engine() -> tuple[object, str | None]:
             ):
                 _rapidocr_state.install_retry_remaining -= 1
                 _rapidocr_state.attempted = False
-                logger.warning(
-                    "Video OCR dependency install failed; will retry once: %s", exc
-                )
+                logger.warning("Video OCR dependency install failed; will retry once: %s", exc)
             else:
                 _rapidocr_state.error = str(exc)
     return _rapidocr_state.engine, _rapidocr_state.error
@@ -219,18 +229,26 @@ def _format_timestamp(seconds: float) -> str:
 
 def iter_video_ocr_path(video_path: Path) -> Generator[str, None, None]:
     """Yield timestamped OCR from a video already materialized on disk."""
-    cv2 = _get_cv2()
+    try:
+        cv2 = _get_cv2()
+    except Exception as exc:
+        raise VideoOCREngineUnavailableError(f"Video OCR engine unavailable: {exc}") from exc
+    engine, engine_error = _get_rapidocr_engine()
+    if engine_error:
+        raise VideoOCREngineUnavailableError(f"Video OCR engine unavailable: {engine_error}")
+    if engine is None:
+        raise VideoOCREngineUnavailableError("Video OCR engine unavailable")
     previous_gray: Any = None
     last_candidate_at = -_HEARTBEAT_SECONDS
     recent_hashes: deque[int] = deque(maxlen=_RECENT_HASHES)
     seen_text: set[str] = set()
+    decoded_frames = 0
 
     for timestamp, frame in _iter_sampled_frames(video_path):
+        decoded_frames += 1
         gray = _small_grayscale(frame, cv2)
         change_score = (
-            float("inf")
-            if previous_gray is None
-            else _difference_score(previous_gray, gray, cv2)
+            float("inf") if previous_gray is None else _difference_score(previous_gray, gray, cv2)
         )
         previous_gray = gray
         frame_changed = change_score >= _CHANGE_THRESHOLD
@@ -253,6 +271,9 @@ def iter_video_ocr_path(video_path: Path) -> Generator[str, None, None]:
             continue
         seen_text.add(normalized)
         yield f"[On-screen text {_format_timestamp(timestamp)}]\n{text}"
+
+    if decoded_frames == 0:
+        raise VideoOCRZeroFramesError("Video OCR decoded zero frames")
 
 
 def iter_video_ocr_segments(

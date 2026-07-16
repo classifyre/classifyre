@@ -41,7 +41,6 @@ export interface DetectorEditorFormProps {
 const TRANSFORMER_PIPELINE_TYPES = new Set<string>([
   "TEXT_CLASSIFICATION",
   "IMAGE_CLASSIFICATION",
-  "FEATURE_EXTRACTION",
   "OBJECT_DETECTION",
 ]);
 
@@ -63,12 +62,15 @@ export const DetectorEditorForm = React.forwardRef<
   const isPipelineDetector = Boolean(
     detector.pipelineSchema && Object.keys(detector.pipelineSchema).length > 0,
   );
-  const pipelineSchemaType = (detector.pipelineSchema as Record<string, unknown>)
-    ?.type as string | undefined;
+  const pipelineSchemaType = (
+    detector.pipelineSchema as Record<string, unknown>
+  )?.type as string | undefined;
   const isRegexPipeline = isPipelineDetector && pipelineSchemaType === "REGEX";
   const isLLMPipeline = isPipelineDetector && pipelineSchemaType === "LLM";
   const isTransformerPipeline =
-    isPipelineDetector && !!pipelineSchemaType && TRANSFORMER_PIPELINE_TYPES.has(pipelineSchemaType);
+    isPipelineDetector &&
+    !!pipelineSchemaType &&
+    TRANSFORMER_PIPELINE_TYPES.has(pipelineSchemaType);
 
   const handleSave = useCallback(
     async (payload: {
@@ -182,7 +184,8 @@ export const DetectorEditorForm = React.forwardRef<
         initialDescription={detector.description ?? ""}
         initialIsActive={detector.isActive}
         initialAiProviderConfigId={
-          (detector as { aiProviderConfigId?: string | null }).aiProviderConfigId ?? null
+          (detector as { aiProviderConfigId?: string | null })
+            .aiProviderConfigId ?? null
         }
         onSubmit={async (payload) => {
           await handleSave({

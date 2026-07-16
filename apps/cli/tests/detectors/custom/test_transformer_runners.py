@@ -2,18 +2,16 @@
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
 from src.detectors.custom.runners import (
-    FeatureExtractionRunner,
     ImageClassificationRunner,
     ObjectDetectionRunner,
     TextClassificationRunner,
 )
 from src.models.generated_detectors import (
-    FeatureExtractionPipelineSchema,
     ImageClassificationPipelineSchema,
     ObjectDetectionPipelineSchema,
     PipelineSeverityRule,
@@ -170,65 +168,6 @@ def test_image_classification_supported_types() -> None:
     assert "text/plain" not in types
 
 
-# ── FeatureExtractionRunner ───────────────────────────────────────────────────
-
-
-def _make_feature_runner(
-    hidden_states: list,
-    model: str = "stub/bge-model",
-    pooling_strategy: str = "mean",
-    normalize: bool = True,
-) -> FeatureExtractionRunner:
-    schema = FeatureExtractionPipelineSchema(
-        type="FEATURE_EXTRACTION",
-        model=model,
-        pooling_strategy=pooling_strategy,  # type: ignore[arg-type]
-        normalize_embeddings=normalize,
-    )
-    runner = FeatureExtractionRunner.__new__(FeatureExtractionRunner)
-    runner._schema = schema
-    runner._detector_key = "embedder"
-    runner._detector_name = "Semantic Embedder"
-    runner._pipe = MagicMock(return_value=hidden_states)
-    return runner
-
-
-@pytest.mark.asyncio
-async def test_feature_extraction_runner_emits_embedding_finding() -> None:
-    hidden = [[[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]]]  # (1, 2tokens, 3dim)
-    runner = _make_feature_runner(hidden)
-    stub_embedding = [0.25, 0.35, 0.45]
-    with patch(
-        "src.detectors.custom.runners._feature_extraction._pool_hidden",
-        return_value=stub_embedding,
-    ):
-        findings = runner.detect("hello world", "text/plain")
-    assert len(findings) == 1
-    f = findings[0]
-    assert f.finding_type == "embedding"
-    assert f.detector_type == DetectorType.CUSTOM
-    assert "embedding" in (f.metadata or {})
-    assert (f.metadata or {}).get("dimension") == 3
-
-
-@pytest.mark.asyncio
-async def test_feature_extraction_runner_skips_image() -> None:
-    runner = _make_feature_runner([[[0.1, 0.2]]])
-    assert runner.detect(b"\x89PNG", "image/png") == []
-
-
-@pytest.mark.asyncio
-async def test_feature_extraction_runner_skips_empty() -> None:
-    runner = _make_feature_runner([[[0.1, 0.2]]])
-    assert runner.detect("", "text/plain") == []
-
-
-def test_feature_extraction_run_raises_not_implemented() -> None:
-    runner = _make_feature_runner([])
-    with pytest.raises(NotImplementedError):
-        runner.run("text")
-
-
 # ── ObjectDetectionRunner ─────────────────────────────────────────────────────
 
 
@@ -313,13 +252,6 @@ def test_text_classification_schema_requires_model() -> None:
 
     with pytest.raises(ValidationError):
         TextClassificationPipelineSchema(type="TEXT_CLASSIFICATION")  # type: ignore[call-arg]
-
-
-def test_feature_extraction_schema_requires_model() -> None:
-    from pydantic import ValidationError
-
-    with pytest.raises(ValidationError):
-        FeatureExtractionPipelineSchema(type="FEATURE_EXTRACTION")  # type: ignore[call-arg]
 
 
 def test_object_detection_schema_requires_model() -> None:
