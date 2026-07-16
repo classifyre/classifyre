@@ -46,7 +46,10 @@ export class AssistantMcpService implements OnModuleDestroy {
     const server = this.mcpServerFactory.createServer();
     const [clientTransport, serverTransport] =
       InMemoryTransport.createLinkedPair();
-    const client = new Client({ name: 'classifyre-assistant', version: '1.0.0' });
+    const client = new Client({
+      name: 'classifyre-assistant',
+      version: '1.0.0',
+    });
     await server.connect(serverTransport);
     await client.connect(clientTransport);
     this.logger.log('Assistant connected to in-process MCP server');
@@ -79,7 +82,7 @@ export class AssistantMcpService implements OnModuleDestroy {
         tools.push({
           name: tool.name,
           description: tool.description ?? '',
-          inputSchema: (tool.inputSchema ?? {}) as Record<string, unknown>,
+          inputSchema: tool.inputSchema ?? {},
           readOnly: tool.annotations?.readOnlyHint === true,
           destructive: tool.annotations?.destructiveHint === true,
         });

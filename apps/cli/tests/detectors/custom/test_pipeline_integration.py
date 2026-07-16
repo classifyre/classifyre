@@ -68,7 +68,7 @@ def _make_gliner2_detector(key: str = "test_gliner2") -> CustomDetector:
             "amount": [{"text": "320€", "confidence": 0.88, "start": 63, "end": 67}],
         }
     }
-    mock_model.classify.return_value = {"label": "refund", "confidence": 0.95}
+    mock_model.classify_text.return_value = {"intent": {"label": "refund", "confidence": 0.95}}
 
     config = CustomDetectorConfig(
         custom_detector_key=key,
@@ -115,7 +115,9 @@ async def test_regex_detector_finding_metadata():
     for f in findings:
         assert f.finding_type.startswith("regex:")
         assert f.metadata["runner"] == "REGEX"
-        assert "pipeline_result" in f.metadata
+        assert "pipeline_result" not in f.metadata
+        assert f.extracted_data is not None
+        assert "entities" in f.extracted_data
 
 
 @pytest.mark.asyncio
@@ -165,7 +167,9 @@ async def test_gliner2_detector_metadata():
 
     for f in findings:
         assert f.metadata["runner"] == "GLINER2"
-        assert "pipeline_result" in f.metadata
+        assert "pipeline_result" not in f.metadata
+        assert f.extracted_data is not None
+        assert "entities" in f.extracted_data
 
 
 @pytest.mark.asyncio
@@ -179,7 +183,7 @@ async def test_gliner2_confidence_threshold_filters_low_scores():
             ]
         }
     }
-    mock_model.classify.return_value = {}
+    mock_model.classify_text.return_value = {}
 
     config = CustomDetectorConfig(
         custom_detector_key="threshold_test",

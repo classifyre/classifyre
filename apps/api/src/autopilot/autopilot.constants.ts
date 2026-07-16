@@ -1,3 +1,5 @@
+import { AgentKind } from '@prisma/client';
+
 /** pg-boss queue carrying "a source finished ingesting" jobs to the autopilot. */
 export const AUTOPILOT_QUEUE = 'autopilot.cycle';
 
@@ -62,3 +64,20 @@ export const MIN_FEEDBACK_FOR_PRECISION = 5;
 export const NOISY_FALSE_POSITIVE_RATE = 0.5;
 /** At/below this dismissal rate (with enough samples) a detector is "clean". */
 export const CLEAN_FALSE_POSITIVE_RATE = 0.2;
+
+/**
+ * The scan-cycle agents, in the order a cycle runs them. Each reacts to what
+ * the previous ones observed, so the order is meaningful, not cosmetic.
+ *
+ * Shared by the trigger endpoint and the worker so "which agents make up a
+ * cycle" has exactly one definition — the worker's own list used to be
+ * implicit in a chain of per-agent flag checks, which is how the cycle gate
+ * came to test only two of the five.
+ */
+export const PIPELINE_KINDS = [
+  AgentKind.INQUIRY,
+  AgentKind.CASE,
+  AgentKind.CONFIG,
+  AgentKind.DETECTOR_AUTHOR,
+  AgentKind.ESCALATION,
+] as const;

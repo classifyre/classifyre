@@ -2,10 +2,7 @@ import { Injectable } from '@nestjs/common';
 import * as z from 'zod';
 import { MCP_CAPABILITY_GROUPS } from './mcp-catalog';
 import { McpServerFactoryService } from './mcp-server.factory';
-import {
-  McpToolParameterDto,
-  McpToolSummaryDto,
-} from './dto/mcp-settings.dto';
+import { McpToolParameterDto, McpToolSummaryDto } from './dto/mcp-settings.dto';
 
 /** Shape of the SDK's private tool registry entry we introspect. */
 interface RegisteredToolLike {
@@ -143,7 +140,8 @@ export class McpToolsCatalogService {
         required: required.has(key),
         description: prop.description,
         format: prop.format,
-        enumValues: enumValues && enumValues.length > 0 ? enumValues : undefined,
+        enumValues:
+          enumValues && enumValues.length > 0 ? enumValues : undefined,
       };
 
       const nested =

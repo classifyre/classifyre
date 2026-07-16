@@ -5,11 +5,13 @@ import { CustomDetectorExtractionsService } from './custom-detector-extractions.
 import {
   AssetStatus,
   AssetType,
+  DetectorType,
   FindingStatus,
   Severity,
 } from '@prisma/client';
 import { NotFoundException, BadRequestException } from '@nestjs/common';
 import { generateDetectionIdentity } from './utils/detection-identity';
+import { computeScopeFingerprint } from './utils/scope-fingerprint';
 import { HistoryEventType } from './types/finding-history.types';
 import {
   SearchAssetsSortBy,
@@ -42,6 +44,10 @@ describe('AssetService', () => {
       createMany: jest.fn(),
       update: jest.fn(),
     },
+    runnerAsset: {
+      findMany: jest.fn(),
+      updateMany: jest.fn(),
+    },
     $transaction: jest.fn(),
     $queryRaw: jest.fn(),
   };
@@ -68,6 +74,9 @@ describe('AssetService', () => {
     service = module.get<AssetService>(AssetService);
 
     jest.clearAllMocks();
+    // Default: no per-detector outcomes recorded, so nothing is resolvable for
+    // absence. Tests that exercise resolution opt in explicitly.
+    mockPrismaService.runnerAsset.findMany.mockResolvedValue([]);
   });
 
   it('should be defined', () => {
@@ -733,6 +742,9 @@ describe('AssetService', () => {
           runner: {
             update: jest.fn().mockResolvedValue({}),
           },
+          runnerAsset: {
+            updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+          },
         };
         return callback(tx);
       };
@@ -800,6 +812,9 @@ describe('AssetService', () => {
           runner: {
             update: jest.fn().mockResolvedValue({}),
           },
+          runnerAsset: {
+            updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+          },
         };
         return callback(tx);
       };
@@ -865,6 +880,9 @@ describe('AssetService', () => {
           runner: {
             update: jest.fn().mockResolvedValue({}),
           },
+          runnerAsset: {
+            updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+          },
         };
         return callback(tx);
       };
@@ -921,6 +939,9 @@ describe('AssetService', () => {
           },
           runner: {
             update: jest.fn().mockResolvedValue({}),
+          },
+          runnerAsset: {
+            updateMany: jest.fn().mockResolvedValue({ count: 1 }),
           },
         };
         return callback(tx);
@@ -1047,6 +1068,9 @@ describe('AssetService', () => {
           runner: {
             update: jest.fn().mockResolvedValue({}),
           },
+          runnerAsset: {
+            updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+          },
         };
         return callback(tx);
       };
@@ -1107,6 +1131,9 @@ describe('AssetService', () => {
           },
           runner: {
             update: jest.fn().mockResolvedValue({}),
+          },
+          runnerAsset: {
+            updateMany: jest.fn().mockResolvedValue({ count: 1 }),
           },
         };
         return callback(tx);
@@ -1194,6 +1221,9 @@ describe('AssetService', () => {
           runner: {
             update: jest.fn().mockResolvedValue({}),
           },
+          runnerAsset: {
+            updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+          },
         };
         return callback(tx);
       };
@@ -1267,6 +1297,9 @@ describe('AssetService', () => {
           },
           runner: {
             update: txRunnerUpdate,
+          },
+          runnerAsset: {
+            updateMany: jest.fn().mockResolvedValue({ count: 1 }),
           },
         };
         return callback(tx);
@@ -1378,6 +1411,9 @@ describe('AssetService', () => {
             runner: {
               update: jest.fn().mockResolvedValue({}),
             },
+            runnerAsset: {
+              updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+            },
           };
           return callback(tx);
         };
@@ -1456,7 +1492,28 @@ describe('AssetService', () => {
         runnerId: 'old-runner',
         status: FindingStatus.OPEN,
         history: [],
+        detectorType: DetectorType.PII,
+        customDetectorKey: null,
+        asset: { hash: 'scanned-hash' },
       };
+
+      /** PII completed cleanly on the scanned asset, so its silence is real. */
+      const cleanPiiOutcome = [
+        {
+          assetHash: 'scanned-hash',
+          detectorOutcomes: [
+            { detector_type: 'PII', custom_detector_key: null, status: 'OK' },
+          ],
+        },
+      ];
+
+      // The scope the mocked source resolves to. An asset carrying this was
+      // ingested under the same scope as the run, so its absence is a real
+      // deletion rather than the scope having moved.
+      const currentScope = computeScopeFingerprint(
+        AssetType.WORDPRESS,
+        undefined,
+      );
 
       beforeEach(() => {
         mockPrismaService.source.findUnique.mockResolvedValue({
@@ -1467,6 +1524,7 @@ describe('AssetService', () => {
           id: runnerId,
           sourceId,
         });
+        mockPrismaService.runner.update.mockResolvedValue({});
       });
 
       function buildFinalizeTx(opts: {
@@ -1499,6 +1557,9 @@ describe('AssetService', () => {
               runner: {
                 update: jest.fn().mockResolvedValue({}),
               },
+              runnerAsset: {
+                updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+              },
             };
             return callback(tx);
           },
@@ -1507,8 +1568,15 @@ describe('AssetService', () => {
 
       it('should resolve stale findings on scanned assets during finalize (isFullScan=true)', async () => {
         mockPrismaService.asset.findMany.mockResolvedValue([
-          { id: 'missing-asset', hash: 'missing-hash' },
+          {
+            id: 'missing-asset',
+            hash: 'missing-hash',
+            scopeFingerprint: currentScope,
+          },
         ]);
+        mockPrismaService.runnerAsset.findMany.mockResolvedValue(
+          cleanPiiOutcome,
+        );
 
         const { findingUpdate, mockImpl } = buildFinalizeTx({
           deletedAssetFindings: [],
@@ -1545,14 +1613,28 @@ describe('AssetService', () => {
           ],
         };
 
-        mockPrismaService.asset.findMany.mockResolvedValue([]);
+        mockPrismaService.asset.findMany.mockResolvedValue([
+          {
+            id: 'missing-asset',
+            hash: 'missing-hash',
+            scopeFingerprint: currentScope,
+          },
+        ]);
+        mockPrismaService.runnerAsset.findMany.mockResolvedValue(
+          cleanPiiOutcome,
+        );
 
         const { findingUpdate, mockImpl } = buildFinalizeTx({
           staleFindings: [manuallyOverriddenFinding],
         });
         mockPrismaService.$transaction.mockImplementation(mockImpl);
 
-        await service.finalizeIngestRun(sourceId, runnerId, [], true);
+        await service.finalizeIngestRun(
+          sourceId,
+          runnerId,
+          ['seen-hash-1'],
+          true,
+        );
 
         const resolveCall = findingUpdate.mock.calls.find(
           ([args]: any) => args?.data?.status === FindingStatus.RESOLVED,
@@ -1570,6 +1652,428 @@ describe('AssetService', () => {
 
         expect(result.deleted).toBe(0);
         expect(mockPrismaService.$transaction).not.toHaveBeenCalled();
+      });
+    });
+
+    // G-019. A full scan used to retire every asset absent from the run, which
+    // conflated "the object was deleted from the source" with "the scope moved
+    // away from the object" and with "the scan returned nothing at all".
+    describe('finalizeIngestRun scope safety (G-019)', () => {
+      const currentScope = computeScopeFingerprint(
+        AssetType.WORDPRESS,
+        undefined,
+      );
+
+      let assetUpdateMany: jest.Mock;
+      let runnerTxUpdate: jest.Mock;
+
+      beforeEach(() => {
+        mockPrismaService.source.findUnique.mockResolvedValue({
+          id: sourceId,
+          type: AssetType.WORDPRESS,
+        });
+        mockPrismaService.runner.findUnique.mockResolvedValue({
+          id: runnerId,
+          sourceId,
+        });
+        mockPrismaService.runner.update.mockResolvedValue({});
+        mockPrismaService.runnerAsset.findMany.mockResolvedValue([]);
+
+        assetUpdateMany = jest.fn().mockResolvedValue({});
+        runnerTxUpdate = jest.fn().mockResolvedValue({});
+        mockPrismaService.$transaction.mockImplementation((callback: any) =>
+          callback({
+            asset: { updateMany: assetUpdateMany },
+            finding: {
+              findMany: jest.fn().mockResolvedValue([]),
+              update: jest.fn().mockResolvedValue({}),
+            },
+            runner: { update: runnerTxUpdate },
+            runnerAsset: {
+              updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+            },
+          }),
+        );
+      });
+
+      it('retires nothing when a full scan reports zero assets seen', async () => {
+        const result = await service.finalizeIngestRun(
+          sourceId,
+          runnerId,
+          [],
+          true,
+        );
+
+        expect(result).toEqual({
+          deleted: 0,
+          outOfScope: 0,
+          resolvedForAbsence: 0,
+        });
+        // The bug: with no seenHashes the `notIn` filter was dropped, so the
+        // query matched every asset in the source. Nothing may even be queried.
+        expect(mockPrismaService.asset.findMany).not.toHaveBeenCalled();
+        expect(mockPrismaService.$transaction).not.toHaveBeenCalled();
+      });
+
+      it('retains, not retires, assets ingested under a different scope', async () => {
+        mockPrismaService.asset.findMany.mockResolvedValue([
+          {
+            id: 'out-of-scope-asset',
+            hash: 'narrowed-away-hash',
+            scopeFingerprint: 'fingerprint-of-a-wider-earlier-scope',
+          },
+        ]);
+
+        const result = await service.finalizeIngestRun(
+          sourceId,
+          runnerId,
+          ['still-in-scope-hash'],
+          true,
+        );
+
+        expect(result).toMatchObject({ deleted: 0, outOfScope: 1 });
+        // The investigative state survives a scope change: nothing is retired.
+        expect(assetUpdateMany).not.toHaveBeenCalled();
+        expect(runnerTxUpdate).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({
+              assetsDeleted: 0,
+              assetsOutOfScope: 1,
+            }),
+          }),
+        );
+      });
+
+      it('retains assets predating scope fingerprinting (null fingerprint)', async () => {
+        mockPrismaService.asset.findMany.mockResolvedValue([
+          { id: 'legacy-asset', hash: 'legacy-hash', scopeFingerprint: null },
+        ]);
+
+        const result = await service.finalizeIngestRun(
+          sourceId,
+          runnerId,
+          ['seen-hash'],
+          true,
+        );
+
+        expect(result).toMatchObject({ deleted: 0, outOfScope: 1 });
+        expect(assetUpdateMany).not.toHaveBeenCalled();
+      });
+
+      it('still retires an asset genuinely gone from an unchanged scope', async () => {
+        mockPrismaService.asset.findMany.mockResolvedValue([
+          {
+            id: 'genuinely-deleted',
+            hash: 'deleted-hash',
+            scopeFingerprint: currentScope,
+          },
+        ]);
+
+        const result = await service.finalizeIngestRun(
+          sourceId,
+          runnerId,
+          ['seen-hash'],
+          true,
+        );
+
+        expect(result).toMatchObject({ deleted: 1, outOfScope: 0 });
+        expect(assetUpdateMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: { id: { in: ['genuinely-deleted'] } },
+            data: { status: AssetStatus.DELETED, runnerId },
+          }),
+        );
+      });
+
+      it('separates genuine deletions from scope moves in the same run', async () => {
+        mockPrismaService.asset.findMany.mockResolvedValue([
+          {
+            id: 'genuinely-deleted',
+            hash: 'deleted-hash',
+            scopeFingerprint: currentScope,
+          },
+          {
+            id: 'out-of-scope-asset',
+            hash: 'narrowed-away-hash',
+            scopeFingerprint: 'older-scope',
+          },
+        ]);
+
+        const result = await service.finalizeIngestRun(
+          sourceId,
+          runnerId,
+          ['seen-hash'],
+          true,
+        );
+
+        expect(result).toMatchObject({ deleted: 1, outOfScope: 1 });
+        // Only the same-scope asset is retired; the out-of-scope one is untouched.
+        expect(assetUpdateMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: { id: { in: ['genuinely-deleted'] } },
+          }),
+        );
+        expect(runnerTxUpdate).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({
+              assetsDeleted: 1,
+              assetsOutOfScope: 1,
+            }),
+          }),
+        );
+      });
+
+      it('uses the runner scope snapshot when source config changes mid-run', async () => {
+        const snapshottedScope = 'a'.repeat(64);
+        mockPrismaService.runner.findUnique.mockResolvedValue({
+          id: runnerId,
+          sourceId,
+          scopeFingerprint: snapshottedScope,
+        });
+        mockPrismaService.asset.findMany.mockResolvedValue([
+          {
+            id: 'deleted-from-original-scope',
+            hash: 'deleted-hash',
+            scopeFingerprint: snapshottedScope,
+          },
+        ]);
+
+        const result = await service.finalizeIngestRun(
+          sourceId,
+          runnerId,
+          ['seen-hash'],
+          true,
+        );
+
+        expect(result).toMatchObject({ deleted: 1, outOfScope: 0 });
+        expect(mockPrismaService.runner.update).not.toHaveBeenCalled();
+      });
+
+      it('records the scope it covered on the runner', async () => {
+        mockPrismaService.asset.findMany.mockResolvedValue([]);
+
+        await service.finalizeIngestRun(sourceId, runnerId, ['seen'], true);
+
+        expect(mockPrismaService.runner.update).toHaveBeenCalledWith({
+          where: { id: runnerId },
+          data: { scopeFingerprint: currentScope },
+        });
+      });
+    });
+
+    // G-021. Resolution used to key on runnerId staleness alone, so a detector
+    // that crashed — or one that was never run — had its silence read as "the
+    // finding is gone", auto-resolving live evidence.
+    describe('finalizeIngestRun detector-scoped resolution (G-021)', () => {
+      const currentScope = computeScopeFingerprint(
+        AssetType.WORDPRESS,
+        undefined,
+      );
+
+      const findingFrom = (
+        overrides: Partial<Record<string, any>> = {},
+      ): Record<string, any> => ({
+        id: 'finding-1',
+        sourceId,
+        assetId: 'asset-1',
+        runnerId: 'old-runner',
+        status: FindingStatus.OPEN,
+        history: [],
+        detectorType: DetectorType.PII,
+        customDetectorKey: null,
+        asset: { hash: 'scanned-hash' },
+        ...overrides,
+      });
+
+      let findingUpdate: jest.Mock;
+
+      const runFinalize = (staleFindings: Record<string, any>[]) => {
+        findingUpdate = jest.fn().mockResolvedValue({});
+        mockPrismaService.asset.findMany.mockResolvedValue([]);
+        mockPrismaService.$transaction.mockImplementation((callback: any) =>
+          callback({
+            asset: { updateMany: jest.fn().mockResolvedValue({}) },
+            finding: {
+              findMany: jest.fn().mockResolvedValue(staleFindings),
+              update: findingUpdate,
+            },
+            runner: { update: jest.fn().mockResolvedValue({}) },
+            runnerAsset: {
+              updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+            },
+          }),
+        );
+        return service.finalizeIngestRun(sourceId, runnerId, ['seen'], true);
+      };
+
+      beforeEach(() => {
+        mockPrismaService.source.findUnique.mockResolvedValue({
+          id: sourceId,
+          type: AssetType.WORDPRESS,
+        });
+        mockPrismaService.runner.findUnique.mockResolvedValue({
+          id: runnerId,
+          sourceId,
+          scopeFingerprint: currentScope,
+        });
+        mockPrismaService.runner.update.mockResolvedValue({});
+      });
+
+      it('resolves a finding whose detector completed cleanly', async () => {
+        mockPrismaService.runnerAsset.findMany.mockResolvedValue([
+          {
+            assetHash: 'scanned-hash',
+            detectorOutcomes: [
+              { detector_type: 'PII', custom_detector_key: null, status: 'OK' },
+            ],
+          },
+        ]);
+
+        const result = await runFinalize([findingFrom()]);
+
+        expect(result.resolvedForAbsence).toBe(1);
+        expect(findingUpdate).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: { id: 'finding-1' },
+            data: expect.objectContaining({ status: FindingStatus.RESOLVED }),
+          }),
+        );
+      });
+
+      it('does NOT resolve a finding whose detector crashed', async () => {
+        // The G-011 shape: PII raised on every page, emitted nothing, and its
+        // prior findings were resolved as "no longer present".
+        mockPrismaService.runnerAsset.findMany.mockResolvedValue([
+          {
+            assetHash: 'scanned-hash',
+            detectorOutcomes: [
+              {
+                detector_type: 'PII',
+                custom_detector_key: null,
+                status: 'ERROR',
+                error: "unsupported operand type(s) for -: 'ChunkSize'",
+              },
+            ],
+          },
+        ]);
+
+        const result = await runFinalize([findingFrom()]);
+
+        expect(result.resolvedForAbsence).toBe(0);
+        expect(findingUpdate).not.toHaveBeenCalled();
+      });
+
+      it('does NOT resolve findings of a detector that did not run at all', async () => {
+        // Removing a detector from the config must not retroactively resolve
+        // the evidence it already found.
+        mockPrismaService.runnerAsset.findMany.mockResolvedValue([
+          {
+            assetHash: 'scanned-hash',
+            detectorOutcomes: [
+              {
+                detector_type: 'CUSTOM',
+                custom_detector_key: 'entities_v1',
+                status: 'OK',
+              },
+            ],
+          },
+        ]);
+
+        const result = await runFinalize([findingFrom()]);
+
+        expect(result.resolvedForAbsence).toBe(0);
+        expect(findingUpdate).not.toHaveBeenCalled();
+      });
+
+      // The exact reported failure: adding a second custom detector resolved
+      // the first one's findings. Both report detector_type CUSTOM, so only the
+      // custom_detector_key can tell them apart.
+      it('does NOT resolve one custom detector because another one ran', async () => {
+        mockPrismaService.runnerAsset.findMany.mockResolvedValue([
+          {
+            assetHash: 'scanned-hash',
+            detectorOutcomes: [
+              {
+                detector_type: 'CUSTOM',
+                custom_detector_key: 'entities_v1',
+                status: 'OK',
+              },
+            ],
+          },
+        ]);
+
+        const result = await runFinalize([
+          findingFrom({
+            id: 'identifier-finding',
+            detectorType: DetectorType.CUSTOM,
+            customDetectorKey: 'identifiers_v1',
+          }),
+        ]);
+
+        expect(result.resolvedForAbsence).toBe(0);
+        expect(findingUpdate).not.toHaveBeenCalled();
+      });
+
+      it('resolves the custom detector that did run, in the same batch', async () => {
+        mockPrismaService.runnerAsset.findMany.mockResolvedValue([
+          {
+            assetHash: 'scanned-hash',
+            detectorOutcomes: [
+              {
+                detector_type: 'CUSTOM',
+                custom_detector_key: 'entities_v1',
+                status: 'OK',
+              },
+            ],
+          },
+        ]);
+
+        const result = await runFinalize([
+          findingFrom({
+            id: 'entities-finding',
+            detectorType: DetectorType.CUSTOM,
+            customDetectorKey: 'entities_v1',
+          }),
+          findingFrom({
+            id: 'identifier-finding',
+            detectorType: DetectorType.CUSTOM,
+            customDetectorKey: 'identifiers_v1',
+          }),
+        ]);
+
+        expect(result.resolvedForAbsence).toBe(1);
+        expect(findingUpdate).toHaveBeenCalledTimes(1);
+        expect(findingUpdate).toHaveBeenCalledWith(
+          expect.objectContaining({ where: { id: 'entities-finding' } }),
+        );
+      });
+
+      it('does NOT resolve when an outcome belongs to a different asset', async () => {
+        mockPrismaService.runnerAsset.findMany.mockResolvedValue([
+          {
+            assetHash: 'some-other-asset',
+            detectorOutcomes: [
+              { detector_type: 'PII', custom_detector_key: null, status: 'OK' },
+            ],
+          },
+        ]);
+
+        const result = await runFinalize([findingFrom()]);
+
+        expect(result.resolvedForAbsence).toBe(0);
+        expect(findingUpdate).not.toHaveBeenCalled();
+      });
+
+      it('does NOT resolve for assets scanned by a CLI that reports no outcomes', async () => {
+        // Legacy rows carry null. Conservative until the asset is rescanned.
+        mockPrismaService.runnerAsset.findMany.mockResolvedValue([
+          { assetHash: 'scanned-hash', detectorOutcomes: null },
+        ]);
+
+        const result = await runFinalize([findingFrom()]);
+
+        expect(result.resolvedForAbsence).toBe(0);
+        expect(findingUpdate).not.toHaveBeenCalled();
       });
     });
 
@@ -1624,6 +2128,9 @@ describe('AssetService', () => {
           runner: {
             update: jest.fn().mockResolvedValue({}),
           },
+          runnerAsset: {
+            updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+          },
         };
         return callback(tx);
       };
@@ -1638,6 +2145,188 @@ describe('AssetService', () => {
 
       expect(result.findings).toBe(1);
       expect(findingsCreated).toBe(1);
+    });
+
+    // G-012. Counters were derived from assets.status — the asset's *current*
+    // state — so assetsCreated meant "assets whose status happens to be NEW
+    // right now and were last touched by this runner". The CLI also ingests
+    // each asset twice (a stub pass creates it, then the pass carrying findings
+    // sees the same checksum and calls it unchanged), so on a first run every
+    // asset ended up UNCHANGED: "assetsCreated: 0, assetsUnchanged: 10".
+    describe('per-run change type (G-012)', () => {
+      const asset = (over: Record<string, unknown> = {}) => ({
+        hash: 'asset-1',
+        checksum: 'checksum-1',
+        name: 'Asset 1',
+        external_url: 'https://example.com/1',
+        links: [],
+        asset_type: 'TXT',
+        findings: [],
+        ...over,
+      });
+
+      let runnerAssetUpdateMany: jest.Mock;
+
+      const arrangeTx = () => {
+        runnerAssetUpdateMany = jest.fn().mockResolvedValue({ count: 1 });
+        mockPrismaService.$transaction.mockImplementation((callback: any) =>
+          callback({
+            asset: {
+              createMany: jest.fn().mockResolvedValue({}),
+              update: jest.fn().mockResolvedValue({}),
+              updateMany: jest.fn().mockResolvedValue({}),
+              findMany: jest
+                .fn()
+                .mockResolvedValue([{ id: 'db-asset-1', hash: 'asset-1' }]),
+            },
+            finding: {
+              findMany: jest.fn().mockResolvedValue([]),
+              createMany: jest.fn().mockResolvedValue({}),
+              update: jest.fn().mockResolvedValue({}),
+            },
+            runner: { update: jest.fn().mockResolvedValue({}) },
+            runnerAsset: { updateMany: runnerAssetUpdateMany },
+          }),
+        );
+      };
+
+      /** The changeType write for a hash, if any. */
+      const changeTypeCall = (hash = 'asset-1') =>
+        runnerAssetUpdateMany.mock.calls.find(
+          ([args]: any) =>
+            args?.where?.assetHash === hash && args?.data?.changeType,
+        )?.[0];
+
+      beforeEach(() => arrangeTx());
+
+      it('records CREATED for a newly ingested asset', async () => {
+        mockPrismaService.asset.findMany.mockResolvedValue([]);
+
+        await service.bulkIngest(sourceId, runnerId, [asset()]);
+
+        expect(changeTypeCall()?.data.changeType).toBe('CREATED');
+      });
+
+      it('records UPDATED when the checksum changed', async () => {
+        mockPrismaService.asset.findMany.mockResolvedValue([
+          {
+            id: 'db-asset-1',
+            hash: 'asset-1',
+            checksum: 'old-checksum',
+            links: [],
+          },
+        ]);
+
+        await service.bulkIngest(sourceId, runnerId, [asset()]);
+
+        expect(changeTypeCall()?.data.changeType).toBe('UPDATED');
+      });
+
+      it('records UNCHANGED when the checksum matches', async () => {
+        mockPrismaService.asset.findMany.mockResolvedValue([
+          {
+            id: 'db-asset-1',
+            hash: 'asset-1',
+            checksum: 'checksum-1',
+            links: [],
+          },
+        ]);
+
+        await service.bulkIngest(sourceId, runnerId, [asset()]);
+
+        expect(changeTypeCall()?.data.changeType).toBe('UNCHANGED');
+      });
+
+      it('cannot downgrade an earlier CREATED to UNCHANGED', async () => {
+        // The second pass of the CLI's two-pass ingest. Its UNCHANGED write is
+        // guarded so it only lands where nothing is recorded yet.
+        mockPrismaService.asset.findMany.mockResolvedValue([
+          {
+            id: 'db-asset-1',
+            hash: 'asset-1',
+            checksum: 'checksum-1',
+            links: [],
+          },
+        ]);
+
+        await service.bulkIngest(sourceId, runnerId, [asset()]);
+
+        const where = changeTypeCall()?.where;
+        expect(where.OR).toEqual([{ changeType: null }]);
+      });
+
+      it('lets UPDATED overwrite UNCHANGED but not CREATED', async () => {
+        mockPrismaService.asset.findMany.mockResolvedValue([
+          {
+            id: 'db-asset-1',
+            hash: 'asset-1',
+            checksum: 'old-checksum',
+            links: [],
+          },
+        ]);
+
+        await service.bulkIngest(sourceId, runnerId, [asset()]);
+
+        const where = changeTypeCall()?.where;
+        expect(where.OR).toEqual([
+          { changeType: null },
+          { changeType: { in: ['UNCHANGED'] } },
+        ]);
+      });
+
+      it('lets CREATED overwrite anything weaker', async () => {
+        mockPrismaService.asset.findMany.mockResolvedValue([]);
+
+        await service.bulkIngest(sourceId, runnerId, [asset()]);
+
+        const where = changeTypeCall()?.where;
+        expect(where.OR).toEqual([
+          { changeType: null },
+          { changeType: { in: ['UNCHANGED', 'UPDATED'] } },
+        ]);
+      });
+
+      it('survives the CLI two-pass ingest that caused the bug', async () => {
+        // Pass 1: the stub batch. The asset does not exist yet.
+        mockPrismaService.asset.findMany.mockResolvedValue([]);
+        await service.bulkIngest(sourceId, runnerId, [asset({ findings: [] })]);
+        const passOne = changeTypeCall();
+
+        // Pass 2: the same asset with findings. It now exists with an identical
+        // checksum, so it classifies as UNCHANGED — this is the pass that used
+        // to leave every first-run asset looking unchanged.
+        arrangeTx();
+        mockPrismaService.asset.findMany.mockResolvedValue([
+          {
+            id: 'db-asset-1',
+            hash: 'asset-1',
+            checksum: 'checksum-1',
+            links: [],
+          },
+        ]);
+        await service.bulkIngest(sourceId, runnerId, [asset()]);
+        const passTwo = changeTypeCall();
+
+        expect(passOne?.data.changeType).toBe('CREATED');
+        expect(passTwo?.data.changeType).toBe('UNCHANGED');
+        // Pass 2's guard means the DB keeps CREATED: it only writes where
+        // nothing is recorded yet, and pass 1 already recorded CREATED.
+        expect(passTwo?.where.OR).toEqual([{ changeType: null }]);
+      });
+
+      it('matches a null change type explicitly, never via IN', async () => {
+        // SQL's `IN (NULL, 'X')` never matches a NULL row, so folding null into
+        // the IN list would make every first write silently no-op.
+        mockPrismaService.asset.findMany.mockResolvedValue([]);
+
+        await service.bulkIngest(sourceId, runnerId, [asset()]);
+
+        const where = changeTypeCall()?.where;
+        expect(where.OR).toContainEqual({ changeType: null });
+        for (const branch of where.OR) {
+          expect(branch.changeType?.in ?? []).not.toContain(null);
+        }
+      });
     });
   });
 });
