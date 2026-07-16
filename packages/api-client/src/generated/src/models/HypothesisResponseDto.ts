@@ -22,43 +22,43 @@ import {
 } from './HypothesisSupportLinkDto';
 
 /**
- * 
+ *
  * @export
  * @interface HypothesisResponseDto
  */
 export interface HypothesisResponseDto {
     /**
-     * 
+     *
      * @type {string}
      * @memberof HypothesisResponseDto
      */
     id: string;
     /**
-     * 
+     *
      * @type {string}
      * @memberof HypothesisResponseDto
      */
     caseId: string;
     /**
-     * 
+     *
      * @type {string}
      * @memberof HypothesisResponseDto
      */
     statement: string;
     /**
-     * 
+     *
      * @type {string}
      * @memberof HypothesisResponseDto
      */
     status: HypothesisResponseDtoStatusEnum;
     /**
-     * 
+     *
      * @type {number}
      * @memberof HypothesisResponseDto
      */
     confidence?: number;
     /**
-     * 
+     *
      * @type {string}
      * @memberof HypothesisResponseDto
      */
@@ -76,13 +76,13 @@ export interface HypothesisResponseDto {
      */
     contradictingCount: number;
     /**
-     * 
+     *
      * @type {Date}
      * @memberof HypothesisResponseDto
      */
     createdAt: Date;
     /**
-     * 
+     *
      * @type {Date}
      * @memberof HypothesisResponseDto
      */
@@ -94,7 +94,7 @@ export interface HypothesisResponseDto {
      */
     color?: string | null;
     /**
-     * 
+     *
      * @type {Array<HypothesisSupportLinkDto>}
      * @memberof HypothesisResponseDto
      */
@@ -139,7 +139,7 @@ export function HypothesisResponseDtoFromJSONTyped(json: any, ignoreDiscriminato
         return json;
     }
     return {
-        
+
         'id': json['id'],
         'caseId': json['caseId'],
         'statement': json['statement'],
@@ -165,7 +165,7 @@ export function HypothesisResponseDtoToJSONTyped(value?: HypothesisResponseDto |
     }
 
     return {
-        
+
         'id': value['id'],
         'caseId': value['caseId'],
         'statement': value['statement'],

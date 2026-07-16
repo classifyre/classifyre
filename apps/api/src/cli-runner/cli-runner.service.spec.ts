@@ -62,6 +62,7 @@ describe('CliRunnerService', () => {
       },
       runnerAsset: {
         count: jest.fn().mockResolvedValue(0),
+        groupBy: jest.fn().mockResolvedValue([]),
         findFirst: jest.fn().mockResolvedValue(null),
         updateMany: jest.fn().mockResolvedValue({ count: 0 }),
         // No recorded detector outcomes by default, so runs stay COMPLETED
@@ -719,6 +720,7 @@ describe('CliRunnerService', () => {
       .mockResolvedValueOnce(3) // CREATED
       .mockResolvedValueOnce(2) // UPDATED
       .mockResolvedValueOnce(5) // UNCHANGED
+      .mockResolvedValueOnce(1) // DELETED
       .mockResolvedValueOnce(0); // without text
     prisma.finding.count.mockResolvedValue(7);
     prisma.runner.update.mockResolvedValue({});
@@ -738,6 +740,7 @@ describe('CliRunnerService', () => {
           assetsCreated: 3,
           assetsUpdated: 2,
           assetsUnchanged: 5,
+          assetsDeleted: 1,
           totalFindings: 7,
         }),
       }),
@@ -844,6 +847,34 @@ describe('CliRunnerService', () => {
       expect(prisma.runner.update).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({ status: 'COMPLETED' }),
+        }),
+      );
+    });
+
+    it('marks the run WARNING and persists structured text coverage when OCR is unavailable', async () => {
+      const { service, prisma } = createService();
+      arrangeRun(prisma);
+      prisma.runnerAsset.count.mockResolvedValue(0);
+      prisma.runnerAsset.groupBy.mockResolvedValue([
+        {
+          textExtractionStatus: 'ENGINE_UNAVAILABLE',
+          _count: { _all: 2 },
+        },
+        { textExtractionStatus: 'EMPTY', _count: { _all: 1 } },
+      ]);
+
+      await service.updateRunnerStatus('runner-1', RunnerStatus.COMPLETED);
+
+      expect(prisma.runner.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            status: 'WARNING',
+            errorMessage: expect.stringContaining('2 engine unavailable'),
+            textCoverage: expect.objectContaining({
+              engineUnavailable: 2,
+              empty: 1,
+            }),
+          }),
         }),
       );
     });

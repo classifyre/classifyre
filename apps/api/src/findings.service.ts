@@ -14,13 +14,24 @@ import { DetectorType, FindingStatus, Prisma, Severity } from '@prisma/client';
 import { HistoryEventType } from './types/finding-history.types';
 import { generateDetectionIdentity } from './utils/detection-identity';
 import { QueryFindingsDiscoveryDto } from './dto/query-findings-discovery.dto';
-import { SearchFindingsRequestDto } from './dto/search-findings-request.dto';
+import {
+  FindingsRankingSort,
+  SearchFindingsRequestDto,
+  SemanticSearchMode,
+} from './dto/search-findings-request.dto';
 import { SearchFindingsChartsRequestDto } from './dto/search-findings-charts-request.dto';
 import { SearchFindingsChartsResponseDto } from './dto/search-findings-charts-response.dto';
+import { embeddingContentHash } from './embedding/embedding-text';
+import { EmbeddingService } from './embedding/embedding.service';
+import { QueryEmbeddingService } from './embedding/query-embedding.service';
 
 @Injectable()
 export class FindingsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly embeddings: EmbeddingService,
+    private readonly queryEmbeddings: QueryEmbeddingService,
+  ) {}
 
   private readonly searchFindingSelect = {
     id: true,
@@ -67,6 +78,18 @@ export class FindingsService {
         id: true,
         name: true,
         type: true,
+      },
+    },
+    evidenceAnalysis: {
+      select: {
+        importanceScore: true,
+        qualityScore: true,
+        semanticOutlier: true,
+        similarCount: true,
+        duplicateGroupHash: true,
+        reasons: true,
+        signals: true,
+        analyzedAt: true,
       },
     },
   } satisfies Prisma.FindingSelect;
@@ -369,6 +392,11 @@ export class FindingsService {
         customDetectorId,
         customDetectorName,
         detectionIdentity,
+        embedContentHash: embeddingContentHash(
+          createDto.contextBefore,
+          createDto.matchedContent,
+          createDto.contextAfter,
+        ),
         location: location ? (location as any) : undefined,
         metadata: metadata ? (metadata as any) : undefined,
         firstDetectedAt: now,
@@ -398,7 +426,91 @@ export class FindingsService {
       typeof page.limit === 'number' ? page.limit : Number(page.limit ?? 50);
     const skip = Number.isFinite(rawSkip) ? Math.max(0, rawSkip) : 0;
     const limit = Number.isFinite(rawLimit) ? Math.max(1, rawLimit) : 50;
-    const where = await this.buildSearchFindingsWhere(filters);
+    const semantic = params?.semantic;
+    const semanticEnabled =
+      Boolean(semantic?.query?.trim()) &&
+      semantic?.mode !== SemanticSearchMode.OFF;
+    const where = await this.buildSearchFindingsWhere(
+      semanticEnabled ? { ...filters, search: undefined } : filters,
+    );
+
+    if (semanticEnabled) {
+      const query = semantic?.query.trim() as string;
+      const vector =
+        semantic?.mode === SemanticSearchMode.VECTOR
+          ? await this.queryEmbeddings.embed(query)
+          : await this.queryEmbeddings.embedIfAvailable(query);
+      const sourceIds = this.normalizeFilterValues(filters.sourceId);
+      const semanticRows = vector
+        ? await this.embeddings.semanticFindingIds(vector, 200, sourceIds)
+        : [];
+      const lexicalWhere = await this.buildSearchFindingsWhere({
+        ...filters,
+        search: query,
+      });
+      const lexical =
+        semantic?.mode === SemanticSearchMode.VECTOR
+          ? []
+          : await this.prisma.finding.findMany({
+              where: lexicalWhere,
+              select: { id: true },
+              take: 200,
+              orderBy: [{ lastDetectedAt: 'desc' }, { createdAt: 'desc' }],
+            });
+      const rrf = new Map<string, { score: number; semantic?: number }>();
+      semanticRows.forEach((row, index) => {
+        rrf.set(row.id, {
+          score: 1 / (60 + index + 1),
+          semantic: Number(row.score),
+        });
+      });
+      lexical.forEach((row, index) => {
+        const current = rrf.get(row.id) ?? { score: 0 };
+        current.score += 1 / (60 + index + 1);
+        rrf.set(row.id, current);
+      });
+      const ranked = [...rrf.entries()].sort(
+        (left, right) => right[1].score - left[1].score,
+      );
+      const candidateIds = ranked.map(([id]) => id);
+      const permitted = await this.prisma.finding.findMany({
+        where: { AND: [where, { id: { in: candidateIds } }] },
+        select: { id: true },
+      });
+      const permittedSet = new Set(permitted.map((item) => item.id));
+      const filteredRanked = ranked.filter(([id]) => permittedSet.has(id));
+      const pageRanked = filteredRanked.slice(skip, skip + limit);
+      const findings = await this.prisma.finding.findMany({
+        where: { id: { in: pageRanked.map(([id]) => id) } },
+        select: this.searchFindingSelect,
+      });
+      const findingById = new Map(
+        findings.map((finding) => [finding.id, finding]),
+      );
+      return {
+        findings: pageRanked.flatMap(([id, rank]) => {
+          const finding = findingById.get(id);
+          return finding
+            ? [
+                this.normalizeSearchFinding(finding, {
+                  reciprocalRank: rank.score,
+                  semanticSimilarity: rank.semantic,
+                }),
+              ]
+            : [];
+        }),
+        total: filteredRanked.length,
+        skip,
+        limit,
+        ranking: {
+          mode: vector
+            ? (semantic?.mode ?? SemanticSearchMode.HYBRID)
+            : 'lexical-fallback',
+          query,
+          explained: true,
+        },
+      };
+    }
 
     const [findings, total] = await this.prisma.$transaction([
       this.prisma.finding.findMany({
@@ -406,30 +518,55 @@ export class FindingsService {
         select: this.searchFindingSelect,
         skip,
         take: limit,
-        orderBy: [
-          { severity: 'asc' },
-          { lastDetectedAt: 'desc' },
-          { detectedAt: 'desc' },
-          { createdAt: 'desc' },
-        ],
+        orderBy:
+          params?.ranking?.sort === FindingsRankingSort.NEWEST
+            ? [
+                { lastDetectedAt: 'desc' },
+                { detectedAt: 'desc' },
+                { createdAt: 'desc' },
+              ]
+            : params?.ranking?.sort === FindingsRankingSort.SEVERITY
+              ? [{ severity: 'asc' }, { lastDetectedAt: 'desc' }]
+              : [
+                  { evidenceAnalysis: { importanceScore: 'desc' } },
+                  { lastDetectedAt: 'desc' },
+                ],
       }),
       this.prisma.finding.count({ where }),
     ]);
 
     return {
-      findings: findings.map((finding) => ({
-        ...finding,
-        confidence: Number(finding.confidence),
-        asset: finding.asset
-          ? {
-              ...finding.asset,
-              type: finding.asset.assetType,
-            }
-          : finding.asset,
-      })),
+      findings: findings.map((finding) => this.normalizeSearchFinding(finding)),
       total,
       skip,
       limit,
+      ranking: {
+        mode: params?.ranking?.sort ?? FindingsRankingSort.IMPORTANCE,
+        explained: true,
+      },
+    };
+  }
+
+  private normalizeSearchFinding(
+    finding: any,
+    queryRanking?: { reciprocalRank: number; semanticSimilarity?: number },
+  ) {
+    return {
+      ...finding,
+      confidence: Number(finding.confidence),
+      asset: finding.asset
+        ? { ...finding.asset, type: finding.asset.assetType }
+        : finding.asset,
+      ranking: {
+        importance: finding.evidenceAnalysis?.importanceScore ?? null,
+        quality: finding.evidenceAnalysis?.qualityScore ?? null,
+        similarCount: finding.evidenceAnalysis?.similarCount ?? 0,
+        duplicateGroupHash:
+          finding.evidenceAnalysis?.duplicateGroupHash ?? null,
+        reasons: finding.evidenceAnalysis?.reasons ?? [],
+        coverage: finding.evidenceAnalysis ? 'analyzed' : 'pending',
+        ...queryRanking,
+      },
     };
   }
 
@@ -704,6 +841,7 @@ export class FindingsService {
             sourceType: true,
           },
         },
+        evidenceAnalysis: true,
       },
     });
   }

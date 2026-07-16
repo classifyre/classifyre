@@ -122,9 +122,11 @@ COPY apps/cli /app/apps/cli
 COPY packages/schemas /app/packages/schemas
 WORKDIR /app/apps/cli
 ENV UV_LINK_MODE=copy \
-    UV_PYTHON_PREFERENCE=only-system
+    UV_PYTHON_PREFERENCE=only-system \
+    HF_HOME=/app/models/huggingface
 RUN uv venv --python /usr/local/bin/python3 .venv \
-    && uv sync --locked --no-dev
+    && uv sync --locked --no-dev \
+    && .venv/bin/python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2', revision='1110a243fdf4706b3f48f1d95db1a4f5529b4d41', device='cpu')"
 
 # ── web-final: standalone Next.js server ──────────────────────────────────────
 FROM node:${NODE_VERSION}-bookworm-slim AS web-final
@@ -176,10 +178,13 @@ COPY --from=cli-builder /app/apps/cli/src /app/apps/cli/src
 COPY --from=cli-builder /app/apps/cli/pyproject.toml /app/apps/cli/pyproject.toml
 COPY --from=cli-builder /app/apps/cli/uv.lock /app/apps/cli/uv.lock
 COPY --from=cli-builder /app/apps/cli/README.md /app/apps/cli/README.md
+COPY --from=cli-builder /app/models /app/models
 COPY --from=cli-builder /app/packages/schemas /app/packages/schemas
 COPY --from=api-builder /repo/packages/schemas/node_modules /app/packages/schemas/node_modules
 ENV UV_LINK_MODE=copy \
     UV_CACHE_DIR=/cache/uv \
+    HF_HOME=/app/models/huggingface \
+    HF_HUB_OFFLINE=1 \
     CLASSIFYRE_CLI_AUTO_INSTALL_OPTIONAL_DEPS=1 \
     PATH="/app/apps/cli/.venv/bin:${PATH}"
 # libgl1 + libglib2.0-0 required by opencv-python (pulled in by rapidocr-onnxruntime for docling OCR).
@@ -223,6 +228,8 @@ ENV DEBIAN_FRONTEND=noninteractive \
     MAX_CONCURRENT_RUNNERS=1 \
     UV_LINK_MODE=copy \
     UV_CACHE_DIR=/cache/uv \
+    HF_HOME=/app/models/huggingface \
+    HF_HUB_OFFLINE=1 \
     CLASSIFYRE_CLI_AUTO_INSTALL_OPTIONAL_DEPS=1
 
 RUN set -eux; \
@@ -248,6 +255,7 @@ RUN set -eux; \
       caddy \
       nodejs \
       postgresql-${PG_MAJOR} \
+      postgresql-${PG_MAJOR}-pgvector \
       postgresql-client-${PG_MAJOR}; \
     rm -rf /var/lib/apt/lists/*
 
@@ -285,6 +293,7 @@ COPY --from=cli-builder /app/apps/cli/src /app/apps/cli/src
 COPY --from=cli-builder /app/apps/cli/pyproject.toml /app/apps/cli/pyproject.toml
 COPY --from=cli-builder /app/apps/cli/uv.lock /app/apps/cli/uv.lock
 COPY --from=cli-builder /app/apps/cli/README.md /app/apps/cli/README.md
+COPY --from=cli-builder /app/models /app/models
 COPY --from=cli-builder /app/packages/schemas /app/packages/schemas
 COPY --from=api-builder /repo/packages/schemas/node_modules /app/packages/schemas/node_modules
 
@@ -301,6 +310,7 @@ set -eux
 
 mkdir -p \
   /etc/s6-overlay/s6-rc.d/postgresql/dependencies.d \
+  /etc/s6-overlay/s6-rc.d/embedding/dependencies.d \
   /etc/s6-overlay/s6-rc.d/api/dependencies.d \
   /etc/s6-overlay/s6-rc.d/web/dependencies.d \
   /etc/s6-overlay/s6-rc.d/caddy/dependencies.d \
@@ -331,6 +341,15 @@ exec s6-setuidgid postgres /usr/lib/postgresql/"${PG_MAJOR}"/bin/postgres \
   -c "unix_socket_directories=/tmp"
 SH
 chmod +x /etc/s6-overlay/s6-rc.d/postgresql/run
+
+echo "longrun" > /etc/s6-overlay/s6-rc.d/embedding/type
+cat > /etc/s6-overlay/s6-rc.d/embedding/run <<'SH'
+#!/command/with-contenv sh
+set -eu
+cd "${CLI_PATH:-/app/apps/cli}"
+exec .venv/bin/python -m src.main embed --embed-server-host 127.0.0.1 --embed-server-port 8011
+SH
+chmod +x /etc/s6-overlay/s6-rc.d/embedding/run
 
 echo "longrun" > /etc/s6-overlay/s6-rc.d/api/type
 cat > /etc/s6-overlay/s6-rc.d/api/run <<'SH'
@@ -389,11 +408,13 @@ exec env \
   CLI_PATH="${CLI_PATH:-/app/apps/cli}" \
   PORT="${API_PORT:-8000}" \
   DATABASE_URL="${DATABASE_URL}" \
+  EMBEDDING_SERVER_URL="http://127.0.0.1:8011" \
   CLASSIFYRE_MASKED_CONFIG_KEY="${CLASSIFYRE_MASKED_CONFIG_KEY}" \
   node /app/api/dist/src/main.js
 SH
 chmod +x /etc/s6-overlay/s6-rc.d/api/run
 touch /etc/s6-overlay/s6-rc.d/api/dependencies.d/postgresql
+touch /etc/s6-overlay/s6-rc.d/api/dependencies.d/embedding
 
 echo "longrun" > /etc/s6-overlay/s6-rc.d/web/type
 cat > /etc/s6-overlay/s6-rc.d/web/run <<'SH'
@@ -421,6 +442,7 @@ chmod +x /etc/s6-overlay/s6-rc.d/caddy/run
 touch /etc/s6-overlay/s6-rc.d/caddy/dependencies.d/web
 
 touch /etc/s6-overlay/s6-rc.d/user/contents.d/postgresql
+touch /etc/s6-overlay/s6-rc.d/user/contents.d/embedding
 touch /etc/s6-overlay/s6-rc.d/user/contents.d/api
 touch /etc/s6-overlay/s6-rc.d/user/contents.d/web
 touch /etc/s6-overlay/s6-rc.d/user/contents.d/caddy

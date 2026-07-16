@@ -5952,6 +5952,161 @@
         ]
       }
     },
+    "/embeddings/status": {
+      "get": {
+        "operationId": "EmbeddingController_status",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Get semantic storage and search capability",
+        "tags": [
+          "embeddings"
+        ]
+      }
+    },
+    "/sources/{sourceId}/embeddings/missing": {
+      "post": {
+        "operationId": "EmbeddingController_missing",
+        "parameters": [
+          {
+            "name": "sourceId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MissingEmbeddingsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Negotiate missing content-addressed embeddings",
+        "tags": [
+          "embeddings"
+        ]
+      }
+    },
+    "/sources/{sourceId}/embeddings/vectors": {
+      "post": {
+        "operationId": "EmbeddingController_vectors",
+        "parameters": [
+          {
+            "name": "sourceId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PutEmbeddingVectorsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Store normalized embedding vectors",
+        "tags": [
+          "embeddings"
+        ]
+      }
+    },
+    "/sources/{sourceId}/embeddings/chunks": {
+      "post": {
+        "operationId": "EmbeddingController_chunks",
+        "parameters": [
+          {
+            "name": "sourceId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PutAssetChunksDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Store asset chunk-to-content mappings",
+        "tags": [
+          "embeddings"
+        ]
+      }
+    },
+    "/findings/{findingId}/similar": {
+      "get": {
+        "operationId": "EmbeddingController_similar",
+        "parameters": [
+          {
+            "name": "findingId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 100,
+              "default": 20,
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Object"
+                }
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Find semantically similar findings with ranking evidence",
+        "tags": [
+          "embeddings"
+        ]
+      }
+    },
     "/sources/{sourceId}/run": {
       "post": {
         "operationId": "CliRunnerController_startRunner",
@@ -9409,6 +9564,25 @@
           }
         }
       },
+      "SemanticFindingsSearchDto": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "Natural-language evidence query",
+            "maxLength": 500
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "off",
+              "hybrid",
+              "vector"
+            ],
+            "default": "hybrid"
+          }
+        }
+      },
       "SearchAssetsRequestDto": {
         "type": "object",
         "properties": {
@@ -9423,6 +9597,9 @@
           },
           "options": {
             "$ref": "#/components/schemas/SearchAssetsOptionsDto"
+          },
+          "semantic": {
+            "$ref": "#/components/schemas/SemanticFindingsSearchDto"
           }
         }
       },
@@ -9456,6 +9633,133 @@
         },
         "required": [
           "path"
+        ]
+      },
+      "FindingRankReasonDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "impact": {
+            "type": "string",
+            "enum": [
+              "up",
+              "down",
+              "neutral"
+            ]
+          }
+        },
+        "required": [
+          "code",
+          "label",
+          "impact"
+        ]
+      },
+      "FindingEvidenceAnalysisDto": {
+        "type": "object",
+        "properties": {
+          "spaceId": {
+            "type": "string"
+          },
+          "importanceScore": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "qualityScore": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "semanticOutlier": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "similarCount": {
+            "type": "number"
+          },
+          "duplicateGroupHash": {
+            "type": "string"
+          },
+          "reasons": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FindingRankReasonDto"
+            }
+          },
+          "signals": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "analyzedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "spaceId",
+          "importanceScore",
+          "qualityScore",
+          "semanticOutlier",
+          "similarCount",
+          "reasons",
+          "signals",
+          "analyzedAt"
+        ]
+      },
+      "FindingSearchRankingDto": {
+        "type": "object",
+        "properties": {
+          "importance": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "nullable": true
+          },
+          "quality": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "nullable": true
+          },
+          "similarCount": {
+            "type": "number"
+          },
+          "duplicateGroupHash": {
+            "type": "string",
+            "nullable": true
+          },
+          "reasons": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FindingRankReasonDto"
+            }
+          },
+          "coverage": {
+            "type": "string",
+            "enum": [
+              "analyzed",
+              "pending"
+            ]
+          },
+          "reciprocalRank": {
+            "type": "number"
+          },
+          "semanticSimilarity": {
+            "type": "number",
+            "minimum": -1,
+            "maximum": 1
+          }
+        },
+        "required": [
+          "similarCount",
+          "reasons",
+          "coverage"
         ]
       },
       "SearchAssetFindingDto": {
@@ -9577,6 +9881,18 @@
           "updatedAt": {
             "format": "date-time",
             "type": "string"
+          },
+          "evidenceAnalysis": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/FindingEvidenceAnalysisDto"
+              }
+            ]
+          },
+          "ranking": {
+            "$ref": "#/components/schemas/FindingSearchRankingDto"
           }
         },
         "required": [
@@ -9631,6 +9947,10 @@
           },
           "limit": {
             "type": "number"
+          },
+          "ranking": {
+            "type": "object",
+            "description": "Present when results were ordered by semantic or hybrid relevance"
           }
         },
         "required": [
@@ -9909,6 +10229,20 @@
           }
         }
       },
+      "FindingsRankingDto": {
+        "type": "object",
+        "properties": {
+          "sort": {
+            "type": "string",
+            "enum": [
+              "importance",
+              "newest",
+              "severity"
+            ],
+            "default": "importance"
+          }
+        }
+      },
       "SearchFindingsRequestDto": {
         "type": "object",
         "properties": {
@@ -9917,6 +10251,12 @@
           },
           "page": {
             "$ref": "#/components/schemas/SearchFindingsPageDto"
+          },
+          "semantic": {
+            "$ref": "#/components/schemas/SemanticFindingsSearchDto"
+          },
+          "ranking": {
+            "$ref": "#/components/schemas/FindingsRankingDto"
           }
         }
       },
@@ -10185,6 +10525,18 @@
           },
           "source": {
             "$ref": "#/components/schemas/SourceResponseDto"
+          },
+          "evidenceAnalysis": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/FindingEvidenceAnalysisDto"
+              }
+            ]
+          },
+          "ranking": {
+            "$ref": "#/components/schemas/FindingSearchRankingDto"
           }
         },
         "required": [
@@ -10204,6 +10556,20 @@
           "updatedAt"
         ]
       },
+      "SearchFindingsRankingMetadataDto": {
+        "type": "object",
+        "properties": {
+          "mode": {
+            "type": "string"
+          },
+          "query": {
+            "type": "string"
+          },
+          "explained": {
+            "type": "boolean"
+          }
+        }
+      },
       "SearchFindingsResponseDto": {
         "type": "object",
         "properties": {
@@ -10221,6 +10587,9 @@
           },
           "limit": {
             "type": "number"
+          },
+          "ranking": {
+            "$ref": "#/components/schemas/SearchFindingsRankingMetadataDto"
           }
         },
         "required": [
@@ -10746,7 +11115,7 @@
           },
           "pipelineSchema": {
             "type": "object",
-            "description": "Pipeline schema defining the detector behaviour (type: GLINER2 | REGEX | LLM | TEXT_CLASSIFICATION | IMAGE_CLASSIFICATION | FEATURE_EXTRACTION | OBJECT_DETECTION)"
+            "description": "Pipeline schema defining the detector behaviour (type: GLINER2 | REGEX | LLM | TEXT_CLASSIFICATION | IMAGE_CLASSIFICATION | OBJECT_DETECTION)"
           }
         },
         "required": [
@@ -10895,7 +11264,7 @@
           },
           "pipelineSchema": {
             "type": "object",
-            "description": "Pipeline schema defining the detector behaviour (type: GLINER2 | REGEX | LLM | TEXT_CLASSIFICATION | IMAGE_CLASSIFICATION | FEATURE_EXTRACTION | OBJECT_DETECTION)"
+            "description": "Pipeline schema defining the detector behaviour (type: GLINER2 | REGEX | LLM | TEXT_CLASSIFICATION | IMAGE_CLASSIFICATION | OBJECT_DETECTION)"
           }
         }
       },
@@ -15025,6 +15394,147 @@
           "reply"
         ]
       },
+      "EmbeddingSpaceDto": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string",
+            "default": "sentence-transformers/all-MiniLM-L6-v2"
+          },
+          "revision": {
+            "type": "string",
+            "default": "main"
+          },
+          "dim": {
+            "type": "number",
+            "default": 384
+          },
+          "pooling": {
+            "type": "string",
+            "default": "mean"
+          },
+          "normalized": {
+            "type": "boolean",
+            "default": true
+          }
+        },
+        "required": [
+          "model",
+          "revision",
+          "dim",
+          "pooling",
+          "normalized"
+        ]
+      },
+      "MissingEmbeddingsDto": {
+        "type": "object",
+        "properties": {
+          "space": {
+            "$ref": "#/components/schemas/EmbeddingSpaceDto"
+          },
+          "contentHashes": {
+            "maxItems": 10000,
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "space",
+          "contentHashes"
+        ]
+      },
+      "EmbeddingVectorDto": {
+        "type": "object",
+        "properties": {
+          "contentHash": {
+            "type": "string"
+          },
+          "vector": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          }
+        },
+        "required": [
+          "contentHash",
+          "vector"
+        ]
+      },
+      "PutEmbeddingVectorsDto": {
+        "type": "object",
+        "properties": {
+          "spaceId": {
+            "type": "string"
+          },
+          "items": {
+            "maxItems": 250,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EmbeddingVectorDto"
+            }
+          }
+        },
+        "required": [
+          "spaceId",
+          "items"
+        ]
+      },
+      "AssetChunkDto": {
+        "type": "object",
+        "properties": {
+          "ordinal": {
+            "type": "number"
+          },
+          "page": {
+            "type": "number"
+          },
+          "charOffset": {
+            "type": "number"
+          },
+          "charLength": {
+            "type": "number"
+          },
+          "text": {
+            "type": "string"
+          },
+          "contentHash": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "ordinal",
+          "charOffset",
+          "charLength",
+          "text",
+          "contentHash"
+        ]
+      },
+      "PutAssetChunksDto": {
+        "type": "object",
+        "properties": {
+          "assetHash": {
+            "type": "string"
+          },
+          "chunks": {
+            "maxItems": 5000,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AssetChunkDto"
+            }
+          }
+        },
+        "required": [
+          "assetHash",
+          "chunks"
+        ]
+      },
+      "Object": {
+        "type": "object",
+        "properties": {}
+      },
       "StartRunnerDto": {
         "type": "object",
         "properties": {
@@ -15045,6 +15555,48 @@
         },
         "required": [
           "triggerType"
+        ]
+      },
+      "TextCoverageDto": {
+        "type": "object",
+        "properties": {
+          "extracted": {
+            "type": "number",
+            "default": 0
+          },
+          "empty": {
+            "type": "number",
+            "default": 0
+          },
+          "engineUnavailable": {
+            "type": "number",
+            "default": 0
+          },
+          "zeroFrames": {
+            "type": "number",
+            "default": 0
+          },
+          "failed": {
+            "type": "number",
+            "default": 0
+          },
+          "notApplicable": {
+            "type": "number",
+            "default": 0
+          },
+          "unknown": {
+            "type": "number",
+            "default": 0
+          }
+        },
+        "required": [
+          "extracted",
+          "empty",
+          "engineUnavailable",
+          "zeroFrames",
+          "failed",
+          "notApplicable",
+          "unknown"
         ]
       },
       "SourceInfoDto": {
@@ -15169,10 +15721,29 @@
             "default": 0,
             "description": "Findings first seen by this run."
           },
+          "findingsResolved": {
+            "type": "number",
+            "default": 0,
+            "description": "Previously open findings resolved by this run."
+          },
+          "findingsRetained": {
+            "type": "number",
+            "default": 0,
+            "description": "Previously known findings re-detected and retained as current by this run."
+          },
           "assetsWithoutText": {
             "type": "number",
             "default": 0,
             "description": "Assets that should have carried text but yielded none — typically OCR or transcription returning empty. These are not errors: the asset ingested fine, but its content was never read, so any detector result for it covers nothing. Read alongside assetsUnchanged before trusting a run: a high value means the corpus is largely unscanned."
+          },
+          "textCoverage": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TextCoverageDto"
+              }
+            ]
           },
           "errorMessage": {
             "type": "string",
@@ -15208,6 +15779,8 @@
           "assetsOutOfScope",
           "totalFindings",
           "findingsCreated",
+          "findingsResolved",
+          "findingsRetained",
           "assetsWithoutText"
         ]
       },
@@ -15791,10 +16364,29 @@
             "default": 0,
             "description": "Findings first seen by this run."
           },
+          "findingsResolved": {
+            "type": "number",
+            "default": 0,
+            "description": "Previously open findings resolved by this run."
+          },
+          "findingsRetained": {
+            "type": "number",
+            "default": 0,
+            "description": "Previously known findings re-detected and retained as current by this run."
+          },
           "assetsWithoutText": {
             "type": "number",
             "default": 0,
             "description": "Assets that should have carried text but yielded none — typically OCR or transcription returning empty. These are not errors: the asset ingested fine, but its content was never read, so any detector result for it covers nothing. Read alongside assetsUnchanged before trusting a run: a high value means the corpus is largely unscanned."
+          },
+          "textCoverage": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TextCoverageDto"
+              }
+            ]
           },
           "errorMessage": {
             "type": "string",
@@ -15829,6 +16421,8 @@
           "assetsOutOfScope",
           "totalFindings",
           "findingsCreated",
+          "findingsResolved",
+          "findingsRetained",
           "assetsWithoutText"
         ]
       },
@@ -16109,6 +16703,18 @@
           },
           "errorMessage": {
             "type": "string",
+            "nullable": true
+          },
+          "textExtractionStatus": {
+            "type": "string",
+            "enum": [
+              "NOT_APPLICABLE",
+              "EXTRACTED",
+              "EMPTY",
+              "ENGINE_UNAVAILABLE",
+              "ZERO_FRAMES",
+              "FAILED"
+            ],
             "nullable": true
           },
           "createdAt": {

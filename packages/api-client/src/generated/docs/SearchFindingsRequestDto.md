@@ -8,6 +8,8 @@ Name | Type
 ------------ | -------------
 `filters` | [SearchFindingsFiltersInputDto](SearchFindingsFiltersInputDto.md)
 `page` | [SearchFindingsPageDto](SearchFindingsPageDto.md)
+`semantic` | [SemanticFindingsSearchDto](SemanticFindingsSearchDto.md)
+`ranking` | [FindingsRankingDto](FindingsRankingDto.md)
 
 ## Example
 
@@ -18,6 +20,8 @@ import type { SearchFindingsRequestDto } from '@workspace/api-client'
 const example = {
   "filters": null,
   "page": null,
+  "semantic": null,
+  "ranking": null,
 } satisfies SearchFindingsRequestDto
 
 console.log(example)

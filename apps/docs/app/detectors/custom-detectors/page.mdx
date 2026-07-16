@@ -4,12 +4,23 @@ title: Custom Detectors
 description: Build detectors in your own language — choose the right method for every signal type.
 ---
 
-import { CustomDetectorTypesGrid } from "@workspace/ui/components"
-import { Badge, Card, CardContent, CardHeader, CardTitle, CardDescription, Separator } from "@workspace/ui/components"
+import { CustomDetectorTypesGrid } from "@workspace/ui/components";
+import {
+  Badge,
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  Separator,
+} from "@workspace/ui/components";
 
 # Custom Detectors
 
-<Badge variant="secondary" className="rounded-[4px] border-2 border-border bg-accent px-2 py-1 font-mono text-[10px] uppercase tracking-[0.16em] text-accent-foreground">
+<Badge
+  variant="secondary"
+  className="rounded-[4px] border-2 border-border bg-accent px-2 py-1 font-mono text-[10px] uppercase tracking-[0.16em] text-accent-foreground"
+>
   Custom Detectors
 </Badge>
 
@@ -21,21 +32,23 @@ Each custom detector runs one of seven detection engines. This page describes ea
 
 ## Detection methods
 
-<CustomDetectorTypesGrid hrefBase="/detectors/custom-detectors/" variant="reference" />
+<CustomDetectorTypesGrid
+  hrefBase="/detectors/custom-detectors/"
+  variant="reference"
+/>
 
 <Separator className="my-8" />
 
 ## Quick comparison
 
-| Method | Modality | ML required | Best for |
-|---|---|---|---|
-| **GLiNER2** | Text | Pretrained (zero-shot) | Entity extraction without labelled data |
-| **Regex** | Text | No | Codes, IDs, structured patterns |
-| **AI Detector** | Text | LLM (via provider) | Nuanced classification, structured extraction |
-| **Text Classification** | Text | Fine-tuned HF model | Spam, toxicity, sentiment, topic labels |
-| **Image Classification** | Image | Fine-tuned HF model | NSFW, content moderation, custom image categories |
-| **Feature Extraction** | Text | Embedding model | Semantic search, clustering, vector storage |
-| **Object Detection** | Image | Object-detection HF model | Bounding-box localisation, label-based severity |
+| Method                   | Modality | ML required               | Best for                                          |
+| ------------------------ | -------- | ------------------------- | ------------------------------------------------- |
+| **GLiNER2**              | Text     | Pretrained (zero-shot)    | Entity extraction without labelled data           |
+| **Regex**                | Text     | No                        | Codes, IDs, structured patterns                   |
+| **AI Detector**          | Text     | LLM (via provider)        | Nuanced classification, structured extraction     |
+| **Text Classification**  | Text     | Fine-tuned HF model       | Spam, toxicity, sentiment, topic labels           |
+| **Image Classification** | Image    | Fine-tuned HF model       | NSFW, content moderation, custom image categories |
+| **Object Detection**     | Image    | Object-detection HF model | Bounding-box localisation, label-based severity   |
 
 ## When to use which method
 
@@ -47,6 +60,7 @@ Each custom detector runs one of seven detection engines. This page describes ea
 
 **Use Text or Image Classification** when you have a specific HuggingFace model already suited to your task. You get full control over the model checkpoint, device, and confidence threshold.
 
-**Use Feature Extraction** when the output is an embedding rather than a label — useful for downstream semantic search or clustering pipelines.
-
 **Use Object Detection** when you need to locate objects in images with bounding boxes and map specific labels to severity levels.
+
+Classifyre creates semantic embeddings automatically during ingestion; they are
+infrastructure rather than detector findings.

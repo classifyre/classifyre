@@ -333,22 +333,6 @@ describe('CustomDetectorsService', () => {
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 
-  it('rejects chunk_overlap >= chunk_size', async () => {
-    const { service } = createService();
-
-    await expect(
-      service.create({
-        name: 'Bad chunking',
-        pipelineSchema: {
-          type: 'FEATURE_EXTRACTION',
-          model: 'some/embedding-model',
-          chunk_size: 100,
-          chunk_overlap: 100,
-        },
-      }),
-    ).rejects.toBeInstanceOf(BadRequestException);
-  });
-
   it('rejects max_tokens less than 1', async () => {
     const { service } = createService();
 
@@ -847,7 +831,6 @@ describe('CustomDetectorsService', () => {
         'TEXT_CLASSIFICATION',
         'IMAGE_CLASSIFICATION',
         'OBJECT_DETECTION',
-        'FEATURE_EXTRACTION',
         'LLM',
       ]) {
         expect(registry).toContain(type);

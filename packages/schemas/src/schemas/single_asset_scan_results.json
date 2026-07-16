@@ -313,6 +313,18 @@
           "description": "True when an asset that should carry text yielded none. Most significant for assets whose text is derived rather than native (OCR'd images and scanned PDFs, transcribed audio/video): empty derived text means the content may have been missed entirely, not that the document is blank. Distinct from an error — nothing failed — so it is reported as coverage, not as a run failure.",
           "type": "boolean"
         },
+        "text_extraction_status": {
+          "description": "Structured text coverage outcome. EXTRACTED means detector-visible text was produced. EMPTY means extraction completed without an error but yielded no text. ENGINE_UNAVAILABLE, ZERO_FRAMES, and FAILED are incomplete coverage states and must not be treated as an empty document.",
+          "enum": [
+            "NOT_APPLICABLE",
+            "EXTRACTED",
+            "EMPTY",
+            "ENGINE_UNAVAILABLE",
+            "ZERO_FRAMES",
+            "FAILED"
+          ],
+          "type": "string"
+        },
         "findings_count": {
           "description": "Total number of findings detected",
           "type": "integer"

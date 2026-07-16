@@ -22,67 +22,73 @@ import {
 } from './AssetListItemDto';
 
 /**
- * 
+ *
  * @export
  * @interface RunnerAssetItemDto
  */
 export interface RunnerAssetItemDto {
     /**
-     * 
+     *
      * @type {string}
      * @memberof RunnerAssetItemDto
      */
     runnerId: string;
     /**
-     * 
+     *
      * @type {string}
      * @memberof RunnerAssetItemDto
      */
     assetHash: string;
     /**
-     * 
+     *
      * @type {string}
      * @memberof RunnerAssetItemDto
      */
     status: RunnerAssetItemDtoStatusEnum;
     /**
-     * 
+     *
      * @type {Date}
      * @memberof RunnerAssetItemDto
      */
     startedAt?: Date | null;
     /**
-     * 
+     *
      * @type {Date}
      * @memberof RunnerAssetItemDto
      */
     completedAt?: Date | null;
     /**
-     * 
+     *
      * @type {string}
      * @memberof RunnerAssetItemDto
      */
     errorMessage?: string | null;
     /**
-     * 
+     *
+     * @type {string}
+     * @memberof RunnerAssetItemDto
+     */
+    textExtractionStatus?: RunnerAssetItemDtoTextExtractionStatusEnum | null;
+    /**
+     *
      * @type {Date}
      * @memberof RunnerAssetItemDto
      */
     createdAt: Date;
     /**
-     * 
+     *
      * @type {number}
      * @memberof RunnerAssetItemDto
      */
     findingsTotal?: number | null;
     /**
-     * 
+     *
      * @type {object}
      * @memberof RunnerAssetItemDto
      */
     findingsBySeverity?: object | null;
     /**
-     * 
+     *
      * @type {object}
      * @memberof RunnerAssetItemDto
      */
@@ -94,7 +100,7 @@ export interface RunnerAssetItemDto {
      */
     metadata?: { [key: string]: any; } | null;
     /**
-     * 
+     *
      * @type {AssetListItemDto}
      * @memberof RunnerAssetItemDto
      */
@@ -112,6 +118,19 @@ export const RunnerAssetItemDtoStatusEnum = {
     Error: 'ERROR'
 } as const;
 export type RunnerAssetItemDtoStatusEnum = typeof RunnerAssetItemDtoStatusEnum[keyof typeof RunnerAssetItemDtoStatusEnum];
+
+/**
+ * @export
+ */
+export const RunnerAssetItemDtoTextExtractionStatusEnum = {
+    NotApplicable: 'NOT_APPLICABLE',
+    Extracted: 'EXTRACTED',
+    Empty: 'EMPTY',
+    EngineUnavailable: 'ENGINE_UNAVAILABLE',
+    ZeroFrames: 'ZERO_FRAMES',
+    Failed: 'FAILED'
+} as const;
+export type RunnerAssetItemDtoTextExtractionStatusEnum = typeof RunnerAssetItemDtoTextExtractionStatusEnum[keyof typeof RunnerAssetItemDtoTextExtractionStatusEnum];
 
 
 /**
@@ -134,13 +153,14 @@ export function RunnerAssetItemDtoFromJSONTyped(json: any, ignoreDiscriminator: 
         return json;
     }
     return {
-        
+
         'runnerId': json['runnerId'],
         'assetHash': json['assetHash'],
         'status': json['status'],
         'startedAt': json['startedAt'] == null ? undefined : (new Date(json['startedAt'])),
         'completedAt': json['completedAt'] == null ? undefined : (new Date(json['completedAt'])),
         'errorMessage': json['errorMessage'] == null ? undefined : json['errorMessage'],
+        'textExtractionStatus': json['textExtractionStatus'] == null ? undefined : json['textExtractionStatus'],
         'createdAt': (new Date(json['createdAt'])),
         'findingsTotal': json['findingsTotal'] == null ? undefined : json['findingsTotal'],
         'findingsBySeverity': json['findingsBySeverity'] == null ? undefined : json['findingsBySeverity'],
@@ -160,13 +180,14 @@ export function RunnerAssetItemDtoToJSONTyped(value?: RunnerAssetItemDto | null,
     }
 
     return {
-        
+
         'runnerId': value['runnerId'],
         'assetHash': value['assetHash'],
         'status': value['status'],
         'startedAt': value['startedAt'] == null ? value['startedAt'] : value['startedAt'].toISOString(),
         'completedAt': value['completedAt'] == null ? value['completedAt'] : value['completedAt'].toISOString(),
         'errorMessage': value['errorMessage'],
+        'textExtractionStatus': value['textExtractionStatus'],
         'createdAt': value['createdAt'].toISOString(),
         'findingsTotal': value['findingsTotal'],
         'findingsBySeverity': value['findingsBySeverity'],

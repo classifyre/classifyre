@@ -4,34 +4,34 @@ on:
   workflow_call:
     inputs:
       tag:
-        description: 'Release tag (e.g. v0.4.25). Empty = snapshot build: keeps the -SNAPSHOT package.json version and skips the release upload.'
+        description: "Release tag (e.g. v0.4.25). Empty = snapshot build: keeps the -SNAPSHOT package.json version and skips the release upload."
         required: false
         type: string
-        default: ''
+        default: ""
       publish:
-        description: 'Upload distributables to the GitHub Release (requires tag)'
+        description: "Upload distributables to the GitHub Release (requires tag)"
         required: false
         type: boolean
         default: true
       only:
-        description: 'Optional: build a single platform (mac-arm64 | win-x64 | linux-amd64 | linux-arm64)'
+        description: "Optional: build a single platform (mac-arm64 | win-x64 | linux-amd64 | linux-arm64)"
         required: false
         type: string
-        default: ''
+        default: ""
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Release tag (e.g. v0.4.25)'
+        description: "Release tag (e.g. v0.4.25)"
         required: true
         type: string
       only:
-        description: 'Optional: build a single platform (mac-arm64 | win-x64 | linux-amd64 | linux-arm64). Saves runner time when retrying one failed platform.'
+        description: "Optional: build a single platform (mac-arm64 | win-x64 | linux-amd64 | linux-arm64). Saves runner time when retrying one failed platform."
         required: false
         type: string
-        default: ''
+        default: ""
 
 env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 permissions:
   contents: write
@@ -138,7 +138,29 @@ jobs:
 
       - name: Install Linux packaging tools
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y rpm
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y rpm curl ca-certificates gnupg
+          sudo install -d /usr/share/postgresql-common/pgdg
+          curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo gpg --dearmor -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.gpg
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.gpg] https://apt.postgresql.org/pub/repos/apt $(. /etc/os-release && echo $VERSION_CODENAME)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
+          sudo apt-get update
+          sudo apt-get install -y postgresql-server-dev-18
+          echo "PG_CONFIG=/usr/lib/postgresql/18/bin/pg_config" >> "$GITHUB_ENV"
+
+      - name: Install PostgreSQL 18 development files (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install postgresql@18
+          echo "PG_CONFIG=$(brew --prefix postgresql@18)/bin/pg_config" >> "$GITHUB_ENV"
+
+      - name: Install PostgreSQL 18 development files (Windows)
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: |
+          choco install postgresql18 --no-progress -y
+          "PGROOT=C:\Program Files\PostgreSQL\18" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       # --- macOS code signing & notarization (skipped when secrets are absent,
       # e.g. fork PRs; the ad-hoc fallback below keeps those builds bootable).

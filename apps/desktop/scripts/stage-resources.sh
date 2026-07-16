@@ -182,6 +182,9 @@ node -e "
     .catch((err) => { console.error('Staged embedded-postgres tree is broken:', err); process.exit(1); });
 "
 
+echo "=== Stage pgvector extension ==="
+bash "$SCRIPT_DIR/stage-pgvector.sh" "$RESOURCES/pg"
+
 # --- Web static export --------------------------------------------------------
 if [ ! -d "$MONOREPO_ROOT/apps/web/out" ]; then
   echo "apps/web/out missing — run without SKIP_APP_BUILD or build web first" >&2
@@ -241,6 +244,15 @@ if [ "${SKIP_PYTHON:-0}" != "1" ]; then
   # UV_PROJECT_ENVIRONMENT redirects the sync target — `uv sync --python`
   # alone only selects the interpreter version and would sync .venv instead.
   UV_PROJECT_ENVIRONMENT=.venv-desktop uv sync --frozen --no-dev
+
+  echo "=== Preload intrinsic embedding model ==="
+  if [ "$IS_WINDOWS" = "1" ]; then
+    VENV_PY="$MONOREPO_ROOT/apps/cli/.venv-desktop/Scripts/python.exe"
+  else
+    VENV_PY="$MONOREPO_ROOT/apps/cli/.venv-desktop/bin/python"
+  fi
+  HF_HOME="$RESOURCES/models/huggingface" "$VENV_PY" -c \
+    "from sentence_transformers import SentenceTransformer; SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2', revision='1110a243fdf4706b3f48f1d95db1a4f5529b4d41', device='cpu')"
 
   # Bundle the uv binary inside the venv so it lands on PATH at runtime: the API
   # spawns the CLI via `uv run`, and optional groups self-install via `uv sync`.

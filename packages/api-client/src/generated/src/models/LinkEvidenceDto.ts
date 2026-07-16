@@ -14,7 +14,7 @@
 
 import { mapValues } from '../runtime';
 /**
- * 
+ *
  * @export
  * @interface LinkEvidenceDto
  */
@@ -26,19 +26,19 @@ export interface LinkEvidenceDto {
      */
     caseEvidenceId: string;
     /**
-     * 
+     *
      * @type {string}
      * @memberof LinkEvidenceDto
      */
     stance?: LinkEvidenceDtoStanceEnum;
     /**
-     * 
+     *
      * @type {number}
      * @memberof LinkEvidenceDto
      */
     weight?: number;
     /**
-     * 
+     *
      * @type {string}
      * @memberof LinkEvidenceDto
      */
@@ -74,7 +74,7 @@ export function LinkEvidenceDtoFromJSONTyped(json: any, ignoreDiscriminator: boo
         return json;
     }
     return {
-        
+
         'caseEvidenceId': json['caseEvidenceId'],
         'stance': json['stance'] == null ? undefined : json['stance'],
         'weight': json['weight'] == null ? undefined : json['weight'],
@@ -92,7 +92,7 @@ export function LinkEvidenceDtoToJSONTyped(value?: LinkEvidenceDto | null, ignor
     }
 
     return {
-        
+
         'caseEvidenceId': value['caseEvidenceId'],
         'stance': value['stance'],
         'weight': value['weight'],

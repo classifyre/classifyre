@@ -57,7 +57,7 @@ export class CreateCustomDetectorDto {
 
   @ApiProperty({
     description:
-      'Pipeline schema defining the detector behaviour (type: GLINER2 | REGEX | LLM | TEXT_CLASSIFICATION | IMAGE_CLASSIFICATION | FEATURE_EXTRACTION | OBJECT_DETECTION)',
+      'Pipeline schema defining the detector behaviour (type: GLINER2 | REGEX | LLM | TEXT_CLASSIFICATION | IMAGE_CLASSIFICATION | OBJECT_DETECTION)',
   })
   @IsObject()
   pipelineSchema: Record<string, unknown>;

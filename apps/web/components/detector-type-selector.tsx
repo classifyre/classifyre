@@ -1,15 +1,7 @@
 "use client";
 
 import * as React from "react";
-import {
-  Layers,
-  Regex,
-  Bot,
-  Brain,
-  Image,
-  Network,
-  ScanSearch,
-} from "lucide-react";
+import { Layers, Regex, Bot, Brain, Image, ScanSearch } from "lucide-react";
 import { useTranslation } from "@/hooks/use-translation";
 
 // ── Detector type cards ────────────────────────────────────────────────────
@@ -20,16 +12,17 @@ export type DetectorKind =
   | "llm"
   | "text_classification"
   | "image_classification"
-  | "feature_extraction"
   | "object_detection";
 
-const DETECTOR_ICONS: Record<DetectorKind, React.ComponentType<{ className?: string }>> = {
+const DETECTOR_ICONS: Record<
+  DetectorKind,
+  React.ComponentType<{ className?: string }>
+> = {
   gliner2: Layers,
   regex: Regex,
   llm: Bot,
   text_classification: Brain,
   image_classification: Image,
-  feature_extraction: Network,
   object_detection: ScanSearch,
 };
 
@@ -42,13 +35,17 @@ function DetectorTypeCard({
 }) {
   const { t } = useTranslation();
   const Icon = DETECTOR_ICONS[kind];
-  const isVisual = kind === "image_classification" || kind === "object_detection";
+  const isVisual =
+    kind === "image_classification" || kind === "object_detection";
 
   const title = t(`detectors.types.${kind}.title`);
   const tagline = t(`detectors.types.${kind}.tagline`);
   const description = t(`detectors.types.${kind}.description`);
   const tagsRaw = t(`detectors.types.${kind}.tags`);
-  const tags = tagsRaw === `detectors.types.${kind}.tags` ? [] : tagsRaw.split(",").map((s) => s.trim());
+  const tags =
+    tagsRaw === `detectors.types.${kind}.tags`
+      ? []
+      : tagsRaw.split(",").map((s) => s.trim());
 
   return (
     <button
@@ -119,7 +116,6 @@ export function DetectorTypeSelector({
   const transformerIds: DetectorKind[] = [
     "text_classification",
     "image_classification",
-    "feature_extraction",
     "object_detection",
   ];
 

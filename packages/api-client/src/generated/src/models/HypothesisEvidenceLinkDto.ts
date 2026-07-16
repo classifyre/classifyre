@@ -14,37 +14,37 @@
 
 import { mapValues } from '../runtime';
 /**
- * 
+ *
  * @export
  * @interface HypothesisEvidenceLinkDto
  */
 export interface HypothesisEvidenceLinkDto {
     /**
-     * 
+     *
      * @type {string}
      * @memberof HypothesisEvidenceLinkDto
      */
     id: string;
     /**
-     * 
+     *
      * @type {string}
      * @memberof HypothesisEvidenceLinkDto
      */
     caseEvidenceId: string;
     /**
-     * 
+     *
      * @type {string}
      * @memberof HypothesisEvidenceLinkDto
      */
     stance: HypothesisEvidenceLinkDtoStanceEnum;
     /**
-     * 
+     *
      * @type {number}
      * @memberof HypothesisEvidenceLinkDto
      */
     weight?: number;
     /**
-     * 
+     *
      * @type {string}
      * @memberof HypothesisEvidenceLinkDto
      */
@@ -88,7 +88,7 @@ export function HypothesisEvidenceLinkDtoFromJSONTyped(json: any, ignoreDiscrimi
         return json;
     }
     return {
-        
+
         'id': json['id'],
         'caseEvidenceId': json['caseEvidenceId'],
         'stance': json['stance'],
@@ -108,7 +108,7 @@ export function HypothesisEvidenceLinkDtoToJSONTyped(value?: HypothesisEvidenceL
     }
 
     return {
-        
+
         'id': value['id'],
         'caseEvidenceId': value['caseEvidenceId'],
         'stance': value['stance'],

@@ -264,7 +264,7 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
                     logger.info("Phase 1 complete: %d assets discovered", total_assets)
 
                     # --- Phase 2: Processing ---
-                    if has_detectors and all_stubs:
+                    if all_stubs:
                         import asyncio as _asyncio
 
                         processed_count = 0
@@ -319,6 +319,10 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
                                 )
                                 payload = _asset_to_payload(result)
                                 await sink.emit_batch([payload], skip_findings=False)
+                                if hasattr(sink, "emit_embeddings"):
+                                    artifact = pipeline.take_embedding_artifact(asset_hash)
+                                    if artifact is not None:
+                                        await sink.emit_embeddings(asset_hash, artifact)
 
                                 if hasattr(sink, "update_asset_status"):
                                     f_total, f_by_sev, f_by_det = _compute_findings_counts(
@@ -352,22 +356,6 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
                             "Phase 2 complete: %d processed, %d errors",
                             processed_count,
                             error_count,
-                        )
-                    elif all_stubs and hasattr(sink, "update_asset_status"):
-                        # No detectors configured: mark discovered assets as PROCESSED
-                        import asyncio as _asyncio
-
-                        async def _mark_processed(asset: Any) -> None:
-                            asset_hash = getattr(asset, "hash", None) or ""
-                            await sink.update_asset_status(
-                                asset_hash, "PROCESSED", findings_total=0
-                            )
-
-                        tasks = [_asyncio.create_task(_mark_processed(a)) for a in all_stubs]
-                        await _asyncio.gather(*tasks, return_exceptions=True)
-                        logger.info(
-                            "Phase 2 skipped (no detectors): %d assets marked processed",
-                            len(all_stubs),
                         )
 
                     # Persist the advanced AUTOMATIC sampling cursor (no-op for
@@ -532,7 +520,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Classifyre Metadata Extraction CLI")
     parser.add_argument(
         "command",
-        choices=["test", "extract", "discover", "sandbox", "train"],
+        choices=["test", "extract", "discover", "sandbox", "train", "embed"],
         help="Command to run",
     )
     parser.add_argument(
@@ -613,6 +601,8 @@ def main() -> None:
         default=None,
         help="Max assets processed concurrently in Phase 2. Controls DB connection usage. Defaults to pool_workers*2 (env: CLASSIFYRE_MAX_CONCURRENT_ASSETS)",
     )
+    parser.add_argument("--embed-server-host", default="127.0.0.1")
+    parser.add_argument("--embed-server-port", type=int, default=8011)
 
     args = parser.parse_args()
 
@@ -650,6 +640,12 @@ def main() -> None:
             logger.error("train requires --pipeline-schema, --examples, and --output-dir")
             sys.exit(1)
         run_train_command(args)
+        return
+
+    if args.command == "embed":
+        from .embedding_server import serve_embedding_model
+
+        serve_embedding_model(args.embed_server_host, args.embed_server_port)
         return
 
     if not args.recipe:

@@ -13,6 +13,7 @@ import {
 import { toast } from "sonner";
 import {
   Activity,
+  BrainCircuit,
   Clock,
   Layers,
   PanelRightClose,
@@ -67,6 +68,21 @@ import { useTranslation } from "@/hooks/use-translation";
 type FindingHistoryEntry = NonNullable<FindingResponseDto["history"]>[number];
 type DetectorType = FindingResponseDto["detectorType"];
 type HistoryEventType = FindingHistoryEntry["eventType"];
+type EvidenceReason = {
+  code: string;
+  label: string;
+  impact: "up" | "down" | "neutral";
+};
+type RankedFindingDetail = FindingResponseDto & {
+  evidenceAnalysis?: {
+    importanceScore: number;
+    qualityScore: number;
+    semanticOutlier: number;
+    similarCount: number;
+    reasons: EvidenceReason[];
+    signals: Record<string, number>;
+  } | null;
+};
 
 const detectorLabels: Partial<Record<DetectorType, string>> = {
   SECRETS: "Secrets",
@@ -162,7 +178,7 @@ export default function FindingDetailPage() {
   const { t } = useTranslation();
   const findingId = useRouteId();
 
-  const [finding, setFinding] = useState<FindingResponseDto | null>(null);
+  const [finding, setFinding] = useState<RankedFindingDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(true);
@@ -177,7 +193,7 @@ export default function FindingDetailPage() {
         const response = await api.findings.findingsControllerFindOne({
           id: findingId,
         });
-        setFinding(response || null);
+        setFinding((response as RankedFindingDetail) || null);
         setDrawerOpen(true);
       } catch (err) {
         console.error("Failed to fetch finding:", err);
@@ -204,7 +220,7 @@ export default function FindingDetailPage() {
       const updated = await api.findings.findingsControllerFindOne({
         id: finding.id,
       });
-      setFinding(updated);
+      setFinding(updated as RankedFindingDetail);
       toast.success(t("findings.updated"));
     } catch (err) {
       console.error("Failed to update finding:", err);
@@ -404,6 +420,84 @@ export default function FindingDetailPage() {
               {t("findings.detail.trackedAcrossRuns")}
             </p>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card className="rounded-[6px] border-2">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <BrainCircuit className="h-4 w-4" />
+            Evidence ranking
+          </CardTitle>
+          <CardDescription>
+            Importance and evidence quality are evaluated separately from{" "}
+            {finding.severity.toLowerCase()} severity.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {finding.evidenceAnalysis ? (
+            <div className="grid gap-5 md:grid-cols-[180px_180px_1fr]">
+              <div>
+                <div className="font-mono text-[10px] uppercase text-muted-foreground">
+                  Importance
+                </div>
+                <div className="mt-1 text-2xl font-semibold">
+                  {Math.round(finding.evidenceAnalysis.importanceScore * 100)}
+                </div>
+                <Progress
+                  value={finding.evidenceAnalysis.importanceScore * 100}
+                  className="mt-2"
+                />
+              </div>
+              <div>
+                <div className="font-mono text-[10px] uppercase text-muted-foreground">
+                  Evidence quality
+                </div>
+                <div className="mt-1 text-2xl font-semibold">
+                  {Math.round(finding.evidenceAnalysis.qualityScore * 100)}
+                </div>
+                <Progress
+                  value={finding.evidenceAnalysis.qualityScore * 100}
+                  className="mt-2"
+                />
+              </div>
+              <div className="space-y-2">
+                {finding.evidenceAnalysis.reasons.map((reason) => (
+                  <div
+                    key={reason.code}
+                    className="flex items-center gap-2 text-sm"
+                  >
+                    <span
+                      className={cn(
+                        "w-4 font-mono font-semibold",
+                        reason.impact === "up" && "text-emerald-600",
+                        reason.impact === "down" && "text-destructive",
+                        reason.impact === "neutral" && "text-muted-foreground",
+                      )}
+                    >
+                      {reason.impact === "up"
+                        ? "+"
+                        : reason.impact === "down"
+                          ? "-"
+                          : "·"}
+                    </span>
+                    <span>{reason.label}</span>
+                  </div>
+                ))}
+                {finding.evidenceAnalysis.similarCount > 0 && (
+                  <Badge variant="outline" className="rounded-[3px]">
+                    1 shown + {finding.evidenceAnalysis.similarCount} identical
+                    findings
+                  </Badge>
+                )}
+              </div>
+            </div>
+          ) : (
+            <p className="font-mono text-xs text-muted-foreground">
+              Ranking pending until this source completes an embedding-enabled
+              scan.
+            </p>
+          )}
         </CardContent>
       </Card>
 

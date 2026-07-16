@@ -20,10 +20,12 @@ from ..models.generated_single_asset_scan_results import (
     ScanStats,
     SingleAssetScanResults,
     Status,
+    TextExtractionStatus,
 )
 from ..sources.base import BaseSource
-from ..utils.file_parser import resolve_mime_type
+from ..utils.file_parser import TextExtractionCoverageError, resolve_mime_type
 from .content_provider import ContentProvider
+from .embedder import EmbeddingArtifact
 from .worker_pool import DetectorWorkerPool, is_io_bound_detector
 
 logger = logging.getLogger(__name__)
@@ -67,6 +69,12 @@ class DetectorPipeline:
 
             self.content_provider = ParsedContentProvider(source)
         self.init_warnings: list[str] = []
+        self._embedding_artifacts: dict[str, EmbeddingArtifact] = {}
+        self._text_extraction_errors: dict[str, list[str]] = {}
+        self._text_extraction_statuses: dict[str, TextExtractionStatus] = {}
+
+    def take_embedding_artifact(self, asset_hash: str) -> EmbeddingArtifact | None:
+        return self._embedding_artifacts.pop(asset_hash, None)
 
     def _register_detector_info(self, detector: BaseDetector, info: _DetectorInfo) -> None:
         self._detector_info[id(detector)] = info
@@ -105,10 +113,6 @@ class DetectorPipeline:
         findings_flush_size: int = 50,
     ) -> SingleAssetScanResults:
         """Process a single asset through detectors."""
-        if not self.detectors:
-            asset.findings = []
-            return asset
-
         scan_started = datetime.now(UTC)
         text_content_type = self._text_content_type_for_asset(asset.asset_type)
         link_content = self._build_links_payload(asset.links)
@@ -167,8 +171,10 @@ class DetectorPipeline:
         # Per-asset, per-detector outcomes. Local to this call, so concurrent
         # assets never share it.
         outcome_sink: dict[tuple[DetectorType, str | None], DetectorOutcome] = {}
+        artifact = EmbeddingArtifact()
+        self._embedding_artifacts[str(asset.hash)] = artifact
 
-        if text_detectors:
+        if text_content_type:
             (
                 text_findings,
                 text_detector_types_run,
@@ -187,6 +193,7 @@ class DetectorPipeline:
             findings.extend(text_findings)
             scan_warnings.extend(text_warnings)
             scan_errors.extend(text_errors)
+            scan_errors.extend(self._text_extraction_errors.pop(str(asset.hash), []))
             detector_types_run = self._merge_detector_types(
                 detector_types_run,
                 text_detector_types_run,
@@ -234,6 +241,8 @@ class DetectorPipeline:
         scan_duration = int((datetime.now(UTC) - scan_started).total_seconds() * 1000)
 
         asset.findings = findings
+        for finding in findings:
+            artifact.add_finding(finding)
         asset.scan_stats = ScanStats(
             scanned_at=scan_started,
             duration_ms=scan_duration,
@@ -243,6 +252,16 @@ class DetectorPipeline:
             # Structured rather than left for a consumer to parse out of the
             # warning strings, so missing-text coverage is queryable.
             empty_text=should_warn_on_empty_text and content_size == 0,
+            text_extraction_status=self._text_extraction_statuses.pop(
+                str(asset.hash),
+                (
+                    TextExtractionStatus.EXTRACTED
+                    if text_content_type and content_size > 0
+                    else TextExtractionStatus.EMPTY
+                    if text_content_type
+                    else TextExtractionStatus.NOT_APPLICABLE
+                ),
+            ),
             findings_count=len(findings),
             warnings=scan_warnings or None,
             errors=scan_errors or None,
@@ -354,6 +373,7 @@ class DetectorPipeline:
         async for text_content in self._iter_text_content_pages(asset):
             page_index += 1
             content_size += len(text_content)
+            self._embedding_artifacts[str(asset.hash)].add_page(text_content, page_index)
 
             if not text_content:
                 continue
@@ -484,6 +504,7 @@ class DetectorPipeline:
         async for text_content in self._iter_text_content_pages(asset):
             page_index += 1
             content_size += len(text_content)
+            self._embedding_artifacts[str(asset.hash)].add_page(text_content, page_index)
 
             if not text_content:
                 continue
@@ -535,11 +556,23 @@ class DetectorPipeline:
 
         for candidate_id in candidate_ids:
             saw_candidate_content = False
-            async for text_content in self.content_provider.fetch_text_pages(candidate_id):
-                if not text_content:
-                    continue
-                saw_candidate_content = True
-                yield text_content
+            try:
+                async for text_content in self.content_provider.fetch_text_pages(candidate_id):
+                    if not text_content:
+                        continue
+                    saw_candidate_content = True
+                    yield text_content
+            except TextExtractionCoverageError as exc:
+                # Text extraction failure must not discard independent link or
+                # binary detector results. The structured empty-text coverage
+                # signal still records that this asset was not embedded.
+                message = f"Text extraction failed for {candidate_id}: {exc}"
+                logger.warning(message)
+                self._text_extraction_errors.setdefault(str(asset.hash), []).append(message)
+                self._text_extraction_statuses[str(asset.hash)] = TextExtractionStatus(
+                    exc.code.value
+                )
+                return
 
             if saw_candidate_content:
                 return
