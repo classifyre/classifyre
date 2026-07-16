@@ -460,6 +460,10 @@ class PIIDetectorConfig(DetectorConfig):
         None,
         description='Presidio entity types to detect. When null, all supported entities are enabled. Use PIIEnabledPattern values (e.g. EMAIL_ADDRESS, US_SSN, CREDIT_CARD).',
     )
+    severity_overrides: dict[str, Severity] | None = Field(
+        None,
+        description='Per-entity severity overrides, keyed by Presidio entity type (e.g. {"CREDIT_CARD": "medium"}). Severity describes the label, not evidence quality: a recognizer that fires on OCR artifacts in one corpus may be genuinely critical in another. Overrides win over the built-in defaults.',
+    )
     language: str | None = Field(
         'en', description='BCP-47 language code for NER models (e.g. en, de, es)'
     )

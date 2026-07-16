@@ -34,6 +34,9 @@ const FINDING_SELECT = {
   findingType: true,
   severity: true,
   matchedContent: true,
+  // Newness is decided by createdAt vs the inquiry's matchesSeenAt, so every
+  // path that counts matches needs it — not just the one that renders them.
+  createdAt: true,
 } as const;
 
 const PREVIEW_CAP = 50;
@@ -84,52 +87,64 @@ export class InquiryMatchingService implements OnApplicationBootstrap {
   }
 
   /**
-   * After a source run finishes: count new findings from this run that match each
-   * ACTIVE inquiry, increment newMatchCount by that delta, and refresh matchCount
-   * (total OPEN findings across all runs).
+   * Count an inquiry's live matches the same way `getLiveMatches` does.
+   *
+   * Both the stored counters and the /matches endpoint go through here, so they
+   * cannot disagree about what a match is or what makes one "new". They used to
+   * apply different rules: newMatchCount incremented by every finding *this run
+   * touched* — including ones merely re-detected, whose createdAt is old — while
+   * /matches counted only findings created since matchesSeenAt. A re-scan that
+   * re-detected 15 existing findings reported "15 new" next to "0 new".
+   */
+  private async computeMatchCounts(
+    m: InquiryMatchers,
+    seenAt: Date | null,
+  ): Promise<{ total: number; newCount: number }> {
+    const matches = await this.candidateFindings(m, false);
+    const newCount = seenAt
+      ? matches.filter((f) => (f.createdAt ?? new Date(0)) > seenAt).length
+      : 0;
+    return { total: matches.length, newCount };
+  }
+
+  /**
+   * After a source run finishes, refresh each ACTIVE inquiry's counters from
+   * the live match set.
    */
   async processSourceCompletion(
     sourceId: string,
-    runnerId: string | null,
+    _runnerId: string | null,
   ): Promise<{ landed: number }> {
     const inquiries = await this.prisma.inquiry.findMany({
       where: {
         status: 'ACTIVE',
         OR: [{ matchAllSources: true }, { sourceIds: { has: sourceId } }],
       },
-      select: { ...this.matcherSelect, matchCount: true },
+      select: {
+        ...this.matcherSelect,
+        matchCount: true,
+        newMatchCount: true,
+        matchesSeenAt: true,
+      },
     });
     if (inquiries.length === 0) return { landed: 0 };
 
-    // Findings specifically from this run (the "new" ones).
-    const runFindings = (await this.prisma.finding.findMany({
-      where: runnerId
-        ? { runnerId, status: 'OPEN' }
-        : { sourceId, status: 'OPEN' },
-      select: FINDING_SELECT,
-    })) as FindingRow[];
-
     let landed = 0;
     for (const q of inquiries) {
-      const matcher = new CompiledMatcher(q);
+      const { total, newCount } = await this.computeMatchCounts(
+        q,
+        q.matchesSeenAt,
+      );
 
-      // Count hits from this run's findings (the "new" delta).
-      const newHits = runFindings.filter((f) => matcher.matches(f)).length;
-
-      // Recompute total matchCount across all sources/runs.
-      const allMatches = await this.candidateFindings(q, false);
-      const newTotal = allMatches.length;
-
-      if (newHits > 0 || newTotal !== q.matchCount) {
+      // Assigned, never incremented: an accumulator drifts permanently once any
+      // run miscounts, and cannot be reconciled against the live set.
+      if (total !== q.matchCount || newCount !== q.newMatchCount) {
         await this.prisma.inquiry.update({
           where: { id: q.id },
-          data: {
-            matchCount: newTotal,
-            ...(newHits > 0 ? { newMatchCount: { increment: newHits } } : {}),
-          },
+          data: { matchCount: total, newMatchCount: newCount },
         });
-        landed += newHits;
       }
+      landed += newCount;
     }
 
     if (landed > 0)
@@ -151,6 +166,8 @@ export class InquiryMatchingService implements OnApplicationBootstrap {
     });
     if (!q) return { landed: 0 };
     const matches = await this.candidateFindings(q, false);
+    // newMatchCount resets to 0 because a rematch *is* the fresh baseline; the
+    // next run recomputes it against matchesSeenAt like everything else.
     await this.prisma.inquiry.update({
       where: { id: inquiryId },
       data: { matchCount: matches.length, newMatchCount: 0 },
@@ -304,7 +321,6 @@ export class InquiryMatchingService implements OnApplicationBootstrap {
       select: withAsset
         ? {
             ...FINDING_SELECT,
-            createdAt: true,
             asset: { select: { name: true, sourceType: true } },
           }
         : FINDING_SELECT,

@@ -464,7 +464,7 @@ export class McpServerFactoryService {
         return jsonResult(
           await this.cliRunnerService.startRun(
             sourceId,
-            triggerType as any,
+            triggerType,
             triggeredBy,
           ),
         );
@@ -788,8 +788,8 @@ export class McpServerFactoryService {
       ({ pipelineSchema }) => {
         const errors: string[] = [];
         const detectorType =
-          typeof (pipelineSchema as Record<string, unknown>).type === 'string'
-            ? ((pipelineSchema as Record<string, unknown>).type as string)
+          typeof pipelineSchema.type === 'string'
+            ? pipelineSchema.type
             : 'GLINER2';
         try {
           this.validationService.validateDetectorConfig(
@@ -800,9 +800,7 @@ export class McpServerFactoryService {
           errors.push(...errorMessageLines(error));
         }
         try {
-          this.customDetectorsService.validatePipelineSchema(
-            pipelineSchema as Record<string, unknown>,
-          );
+          this.customDetectorsService.validatePipelineSchema(pipelineSchema);
         } catch (error) {
           errors.push(...errorMessageLines(error));
         }
@@ -1116,7 +1114,7 @@ export class McpServerFactoryService {
       },
       async ({ id, ...rest }) => {
         this.mcpToolExecutor.assertNotDemoMode();
-        return jsonResult(await this.findingsService.update(id, rest as any));
+        return jsonResult(await this.findingsService.update(id, rest));
       },
     );
 
@@ -1144,7 +1142,7 @@ export class McpServerFactoryService {
       },
       async (args) => {
         this.mcpToolExecutor.assertNotDemoMode();
-        return jsonResult(await this.findingsService.bulkUpdate(args as any));
+        return jsonResult(await this.findingsService.bulkUpdate(args));
       },
     );
 
@@ -1338,7 +1336,8 @@ export class McpServerFactoryService {
           idempotentHint: true,
         },
       },
-      async (query) => jsonResult(await this.inquiriesService.list(query as any)),
+      async (query) =>
+        jsonResult(await this.inquiriesService.list(query as any)),
     );
 
     server.registerTool(
@@ -1404,9 +1403,7 @@ export class McpServerFactoryService {
       },
       async ({ id, ...rest }) => {
         this.mcpToolExecutor.assertNotDemoMode();
-        return jsonResult(
-          await this.inquiriesService.update(id, rest as any),
-        );
+        return jsonResult(await this.inquiriesService.update(id, rest));
       },
     );
 
@@ -1452,9 +1449,7 @@ export class McpServerFactoryService {
         },
       },
       async ({ id, ...query }) =>
-        jsonResult(
-          await this.inquiriesService.listMatches(id, query as any),
-        ),
+        jsonResult(await this.inquiriesService.listMatches(id, query as any)),
     );
 
     server.registerTool(
@@ -1491,7 +1486,8 @@ export class McpServerFactoryService {
           idempotentHint: true,
         },
       },
-      async (dto) => jsonResult(await this.inquiriesService.preview(dto as any)),
+      async (dto) =>
+        jsonResult(await this.inquiriesService.preview(dto as any)),
     );
 
     server.registerTool(
@@ -1568,7 +1564,8 @@ export class McpServerFactoryService {
       'create_case',
       {
         title: 'Create Case',
-        description: 'Create an investigation case, optionally linking questions.',
+        description:
+          'Create an investigation case, optionally linking questions.',
         inputSchema: {
           title: z.string().max(300),
           description: z.string().optional(),
@@ -1616,7 +1613,7 @@ export class McpServerFactoryService {
       },
       async ({ id, ...rest }) => {
         this.mcpToolExecutor.assertNotDemoMode();
-        return jsonResult(await this.casesService.update(id, rest as any));
+        return jsonResult(await this.casesService.update(id, rest));
       },
     );
 
@@ -1638,7 +1635,7 @@ export class McpServerFactoryService {
       },
       async ({ id, ...rest }) => {
         this.mcpToolExecutor.assertNotDemoMode();
-        return jsonResult(await this.casesService.close(id, rest as any));
+        return jsonResult(await this.casesService.close(id, rest));
       },
     );
 
@@ -1683,9 +1680,7 @@ export class McpServerFactoryService {
       },
       async ({ id, ...rest }) => {
         this.mcpToolExecutor.assertNotDemoMode();
-        return jsonResult(
-          await this.casesService.addEvidence(id, rest as any),
-        );
+        return jsonResult(await this.casesService.addEvidence(id, rest));
       },
     );
 
@@ -1707,9 +1702,7 @@ export class McpServerFactoryService {
       },
       async ({ id, ...rest }) => {
         this.mcpToolExecutor.assertNotDemoMode();
-        return jsonResult(
-          await this.casesService.attachFindings(id, rest as any),
-        );
+        return jsonResult(await this.casesService.attachFindings(id, rest));
       },
     );
 
@@ -1734,9 +1727,7 @@ export class McpServerFactoryService {
       },
       async ({ id, ...rest }) => {
         this.mcpToolExecutor.assertNotDemoMode();
-        return jsonResult(
-          await this.casesService.pullFromInquiry(id, rest as any),
-        );
+        return jsonResult(await this.casesService.pullFromInquiry(id, rest));
       },
     );
 
@@ -1857,7 +1848,7 @@ export class McpServerFactoryService {
           await this.caseThreadsService.create(caseId, {
             kind: kind ?? CaseThreadKind.HYPOTHESIS,
             ...rest,
-          } as any),
+          }),
         );
       },
     );
@@ -1870,7 +1861,12 @@ export class McpServerFactoryService {
           'Add a note, statement revision, or status entry to a thread.',
         inputSchema: {
           threadId: z.string().uuid(),
-          entryType: z.enum(['NOTE', 'STATEMENT', 'STATUS_CHANGE', 'CONFIDENCE_CHANGE']),
+          entryType: z.enum([
+            'NOTE',
+            'STATEMENT',
+            'STATUS_CHANGE',
+            'CONFIDENCE_CHANGE',
+          ]),
           body: z.string().optional(),
           author: z.string().optional(),
         },
@@ -1882,7 +1878,7 @@ export class McpServerFactoryService {
       async ({ threadId, ...rest }) => {
         this.mcpToolExecutor.assertNotDemoMode();
         return jsonResult(
-          await this.caseThreadsService.addEntry(threadId, rest as any),
+          await this.caseThreadsService.addEntry(threadId, rest),
         );
       },
     );
@@ -1909,7 +1905,7 @@ export class McpServerFactoryService {
       async ({ threadId, ...rest }) => {
         this.mcpToolExecutor.assertNotDemoMode();
         return jsonResult(
-          await this.caseThreadsService.linkSupport(threadId, rest as any),
+          await this.caseThreadsService.linkSupport(threadId, rest),
         );
       },
     );
@@ -1981,7 +1977,7 @@ export class McpServerFactoryService {
       },
       async (dto) => {
         this.mcpToolExecutor.assertNotDemoMode();
-        const config = await this.correlationService.saveConfig(dto as any);
+        const config = await this.correlationService.saveConfig(dto);
         await scheduleRecompute();
         return jsonResult({
           config,
@@ -2041,7 +2037,8 @@ export class McpServerFactoryService {
         await scheduleRecompute();
         return jsonResult({
           config,
-          status: 'Exclusion removed; a background recompute has been scheduled.',
+          status:
+            'Exclusion removed; a background recompute has been scheduled.',
         });
       },
     );

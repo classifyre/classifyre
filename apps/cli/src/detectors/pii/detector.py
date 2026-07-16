@@ -20,6 +20,19 @@ logger = logging.getLogger(__name__)
 _PRESIDIO_LOG_FILTER_INSTALLED = False
 
 
+def _unwrap_int(value: Any) -> int | None:
+    """Unwrap a generated RootModel[int] config field to a plain int.
+
+    Numeric fields with constraints (chunk_size, chunk_overlap, max_length) are
+    generated as RootModel[int] wrappers. A wrapper instance is truthy and is
+    not an int, so `if not value` never short-circuits and any arithmetic or
+    comparison against it raises TypeError. Both failure modes are silent: the
+    detector fails per page while the run still reports success.
+    """
+    unwrapped = getattr(value, "root", value)
+    return unwrapped if isinstance(unwrapped, int) else None
+
+
 class _PresidioNoiseFilter(logging.Filter):
     """Suppresses noisy but harmless Presidio initialization warnings."""
 
@@ -342,7 +355,7 @@ class PIIDetector(BaseDetector):
             logger.warning("spaCy model '%s' not found; using default NLP engine", cfg_model)
             return None
 
-        spacy_max_length: int | None = getattr(self._cfg, "max_length", None)
+        spacy_max_length = _unwrap_int(getattr(self._cfg, "max_length", None))
         if spacy_max_length is not None:
             nlp.max_length = spacy_max_length
             logger.debug("Set spaCy nlp.max_length = %d", spacy_max_length)
@@ -757,6 +770,22 @@ class PIIDetector(BaseDetector):
     def _get_severity_for_entity(self, entity_type: str) -> Severity:
         e = entity_type.upper()
 
+        # An explicit override always wins: a recognizer's severity depends on
+        # the corpus, not on its label. A CREDIT_CARD hit is critical in a
+        # payments export and noise in an OCR'd court transcript.
+        overrides = getattr(self._cfg, "severity_overrides", None) or {}
+        if isinstance(overrides, dict):
+            override = overrides.get(e) or overrides.get(entity_type)
+            if override is not None:
+                try:
+                    return Severity(str(override).lower())
+                except ValueError:
+                    logger.warning(
+                        "Ignoring invalid severity override '%s' for entity %s",
+                        override,
+                        e,
+                    )
+
         # Critical — government IDs, financial account numbers, biometric IDs
         if e in {
             "CREDIT_CARD",
@@ -807,7 +836,12 @@ class PIIDetector(BaseDetector):
         if e in {"PERSON", "LOCATION", "DATE_TIME", "NRP", "URL"}:
             return Severity.medium
 
-        return Severity.high
+        # Unknown entity types — including every custom recognizer and anything
+        # Presidio adds upstream — default to medium rather than high. Severity
+        # is a claim about the label, not about evidence quality, and defaulting
+        # unrecognised labels to HIGH inflated the corpus's severity histogram
+        # without any review having happened.
+        return Severity.medium
 
     # ------------------------------------------------------------------
     # Public API
@@ -827,10 +861,10 @@ class PIIDetector(BaseDetector):
 
     def _chunk_text(self, text: str) -> list[tuple[str, int]]:
         """Return (chunk, offset) pairs. When chunk_size is null returns the full text at offset 0."""
-        chunk_size: int | None = getattr(self._cfg, "chunk_size", None)
+        chunk_size = _unwrap_int(getattr(self._cfg, "chunk_size", None))
         if not chunk_size:
             return [(text, 0)]
-        overlap: int = getattr(self._cfg, "chunk_overlap", None) or 0
+        overlap = _unwrap_int(getattr(self._cfg, "chunk_overlap", None)) or 0
         step = max(1, chunk_size - overlap)
         return [(text[i : i + chunk_size], i) for i in range(0, len(text), step)]
 

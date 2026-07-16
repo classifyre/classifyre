@@ -140,9 +140,11 @@ export class ToolDispatcherService {
     }
 
     // 4b. Read tool — run and return; technical log only, no decision row.
+    // Reported as READ_OK, not APPLIED: nothing was mutated, and the run
+    // summary must not present a read as work done.
     try {
       const result = await tool.handler(input, tc);
-      return { tool: tool.name, outcome: 'APPLIED', result };
+      return { tool: tool.name, outcome: 'READ_OK', result };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       await this.log.technical(

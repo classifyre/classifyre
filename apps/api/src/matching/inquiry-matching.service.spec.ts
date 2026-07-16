@@ -22,6 +22,8 @@ describe('InquiryMatchingService', () => {
     findingTypeRegex: [],
     findingValueRegex: [],
     matchCount: 0,
+    newMatchCount: 0,
+    matchesSeenAt: null,
     ...over,
   });
 
@@ -45,59 +47,155 @@ describe('InquiryMatchingService', () => {
     expect(mockPrisma.finding.findMany).not.toHaveBeenCalled();
   });
 
-  it('increments newMatchCount by hits from the run and refreshes matchCount', async () => {
+  const finding = (over: Record<string, unknown> = {}) => ({
+    id: 'f1',
+    assetId: 'a1',
+    sourceId: 's1',
+    detectorType: 'PII',
+    customDetectorKey: null,
+    findingType: 'email',
+    severity: 'HIGH',
+    matchedContent: 'a@b.com',
+    createdAt: new Date('2026-07-15T10:00:00Z'),
+    ...over,
+  });
+
+  it('refreshes matchCount from the live match set and filters non-matches', async () => {
     mockPrisma.inquiry.findMany.mockResolvedValue([
       inquiry({ findingTypes: ['email'] }),
     ]);
-    // First call: run's new findings. Second call: all OPEN findings for matchCount recompute.
-    mockPrisma.finding.findMany
-      .mockResolvedValueOnce([
-        {
-          id: 'f1',
-          assetId: 'a1',
-          sourceId: 's1',
-          detectorType: 'PII',
-          customDetectorKey: null,
-          findingType: 'email',
-          severity: 'HIGH',
-          matchedContent: 'a@b.com',
-        },
-        {
-          id: 'f2',
-          assetId: 'a1',
-          sourceId: 's1',
-          detectorType: 'PII',
-          customDetectorKey: null,
-          findingType: 'ssn',
-          severity: 'HIGH',
-          matchedContent: '...',
-        },
-      ])
-      .mockResolvedValueOnce([
-        {
-          id: 'f1',
-          assetId: 'a1',
-          sourceId: 's1',
-          detectorType: 'PII',
-          customDetectorKey: null,
-          findingType: 'email',
-          severity: 'HIGH',
-          matchedContent: 'a@b.com',
-        },
-      ]);
+    mockPrisma.finding.findMany.mockResolvedValue([
+      finding({ id: 'f1', findingType: 'email' }),
+      finding({ id: 'f2', findingType: 'ssn' }), // does not match the inquiry
+    ]);
 
-    const result = await service.processSourceCompletion('s1', 'run-1');
+    await service.processSourceCompletion('s1', 'run-1');
 
-    expect(result.landed).toBe(1);
     expect(mockPrisma.inquiry.update).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: 'q1' },
-        data: expect.objectContaining({
-          matchCount: 1,
-          newMatchCount: { increment: 1 },
-        }),
+        data: expect.objectContaining({ matchCount: 1 }),
       }),
     );
+  });
+
+  // G-033. newMatchCount used to increment by every finding the run touched,
+  // including ones merely re-detected, while /matches derived "new" from
+  // createdAt > matchesSeenAt. The counters contradicted the endpoint.
+  describe('newMatchCount agrees with the /matches definition (G-033)', () => {
+    it('does not count re-detected findings created before matchesSeenAt', async () => {
+      const seenAt = new Date('2026-07-15T12:00:00Z');
+      mockPrisma.inquiry.findMany.mockResolvedValue([
+        inquiry({
+          findingTypes: ['email'],
+          matchCount: 1,
+          matchesSeenAt: seenAt,
+        }),
+      ]);
+      // Re-detected by this run, but created long before the operator last
+      // looked — /matches calls this 0 new, so the counter must too.
+      mockPrisma.finding.findMany.mockResolvedValue([
+        finding({ createdAt: new Date('2026-07-15T09:00:00Z') }),
+      ]);
+
+      const result = await service.processSourceCompletion('s1', 'run-1');
+
+      expect(result.landed).toBe(0);
+      expect(mockPrisma.inquiry.update).not.toHaveBeenCalled();
+    });
+
+    it('counts findings created after matchesSeenAt', async () => {
+      const seenAt = new Date('2026-07-15T12:00:00Z');
+      mockPrisma.inquiry.findMany.mockResolvedValue([
+        inquiry({
+          findingTypes: ['email'],
+          matchCount: 1,
+          matchesSeenAt: seenAt,
+        }),
+      ]);
+      mockPrisma.finding.findMany.mockResolvedValue([
+        finding({ id: 'f1', createdAt: new Date('2026-07-15T09:00:00Z') }),
+        finding({ id: 'f2', createdAt: new Date('2026-07-15T13:00:00Z') }),
+      ]);
+
+      const result = await service.processSourceCompletion('s1', 'run-1');
+
+      expect(result.landed).toBe(1);
+      expect(mockPrisma.inquiry.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ matchCount: 2, newMatchCount: 1 }),
+        }),
+      );
+    });
+
+    it('assigns newMatchCount rather than incrementing it', async () => {
+      // An accumulator drifts permanently once any run miscounts; assignment
+      // lets every run reconcile against the live set.
+      const seenAt = new Date('2026-07-15T12:00:00Z');
+      mockPrisma.inquiry.findMany.mockResolvedValue([
+        inquiry({
+          findingTypes: ['email'],
+          newMatchCount: 99,
+          matchesSeenAt: seenAt,
+        }),
+      ]);
+      mockPrisma.finding.findMany.mockResolvedValue([
+        finding({ createdAt: new Date('2026-07-15T13:00:00Z') }),
+      ]);
+
+      await service.processSourceCompletion('s1', 'run-1');
+
+      const data = mockPrisma.inquiry.update.mock.calls.at(-1)?.[0]?.data;
+      expect(data.newMatchCount).toBe(1);
+      expect(data).not.toHaveProperty('newMatchCount.increment');
+    });
+
+    it('reports zero new when the inquiry has never been seen', async () => {
+      mockPrisma.inquiry.findMany.mockResolvedValue([
+        inquiry({ findingTypes: ['email'], matchesSeenAt: null }),
+      ]);
+      mockPrisma.finding.findMany.mockResolvedValue([finding()]);
+
+      const result = await service.processSourceCompletion('s1', 'run-1');
+
+      // Matches the endpoint: isNew is false when matchesSeenAt is null.
+      expect(result.landed).toBe(0);
+    });
+
+    it('leaves an already-correct inquiry untouched', async () => {
+      mockPrisma.inquiry.findMany.mockResolvedValue([
+        inquiry({
+          findingTypes: ['email'],
+          matchCount: 1,
+          matchesSeenAt: null,
+        }),
+      ]);
+      mockPrisma.finding.findMany.mockResolvedValue([finding()]);
+
+      await service.processSourceCompletion('s1', 'run-1');
+
+      expect(mockPrisma.inquiry.update).not.toHaveBeenCalled();
+    });
+
+    it('corrects a stale matchCount even with no new findings', async () => {
+      // Findings resolved between runs leave the stored count too high.
+      mockPrisma.inquiry.findMany.mockResolvedValue([
+        inquiry({
+          findingTypes: ['email'],
+          matchCount: 8,
+          matchesSeenAt: null,
+        }),
+      ]);
+      mockPrisma.finding.findMany.mockResolvedValue([finding()]);
+
+      await service.processSourceCompletion('s1', 'run-1');
+
+      expect(mockPrisma.inquiry.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ matchCount: 1, newMatchCount: 0 }),
+        }),
+      );
+    });
   });
 
   it('resets newMatchCount to 0 on rematch', async () => {

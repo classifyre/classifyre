@@ -107,7 +107,9 @@ async def test_invoice_regex_extraction():
         assert f.finding_type.startswith("regex:"), f"Unexpected finding_type: {f.finding_type}"
         assert f.custom_detector_key == "invoice_extractor"
         assert f.metadata["runner"] == "REGEX"
-        result_dump = f.metadata["pipeline_result"]
+        assert "pipeline_result" not in f.metadata
+        result_dump = f.extracted_data
+        assert result_dump is not None
         assert "entities" in result_dump
         assert "classification" in result_dump
         assert "metadata" in result_dump

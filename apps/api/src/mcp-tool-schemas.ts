@@ -41,10 +41,7 @@ const assetStatusEnum = z.enum(['NEW', 'UPDATED', 'UNCHANGED', 'DELETED']);
 const sortOrderEnum = z.enum(['ASC', 'DESC']);
 
 const isoDate = (context: string) =>
-  z
-    .string()
-    .optional()
-    .describe(`ISO-8601 timestamp. ${context}`);
+  z.string().optional().describe(`ISO-8601 timestamp. ${context}`);
 
 // ── Findings ────────────────────────────────────────────────────────────────
 
@@ -103,8 +100,12 @@ export const searchFindingsFilters = z
       .boolean()
       .optional()
       .describe('Include RESOLVED and IGNORED findings. Defaults to false.'),
-    firstDetectedAfter: isoDate('Only findings first detected at or after this.'),
-    lastDetectedBefore: isoDate('Only findings last detected at or before this.'),
+    firstDetectedAfter: isoDate(
+      'Only findings first detected at or after this.',
+    ),
+    lastDetectedBefore: isoDate(
+      'Only findings last detected at or before this.',
+    ),
   })
   .describe('Finding filters. Omit entirely to match all findings.');
 
@@ -240,7 +241,10 @@ export const searchAssetsAssetFilters = z
       .string()
       .optional()
       .describe('Filter by asset name (case-insensitive contains).'),
-    sourceId: z.string().optional().describe('Restrict to a single source UUID.'),
+    sourceId: z
+      .string()
+      .optional()
+      .describe('Restrict to a single source UUID.'),
     runnerId: z.string().optional().describe('Restrict to a single run UUID.'),
     status: z
       .array(assetStatusEnum)
@@ -286,7 +290,9 @@ export const searchAssetsFindingFilters = z
     includeResolved: z
       .boolean()
       .optional()
-      .describe('Include RESOLVED/IGNORED findings when matching. Default false.'),
+      .describe(
+        'Include RESOLVED/IGNORED findings when matching. Default false.',
+      ),
   })
   .describe(
     'Finding-level filters — narrow assets by the findings attached to them. Omit to ignore findings when filtering.',
