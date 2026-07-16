@@ -5,7 +5,7 @@ set -euo pipefail
 # extension runtime into the embedded-postgres package. PGVECTOR_SOURCE_DIR can
 # point at a pre-fetched checkout for offline/reproducible builds.
 PG_STAGE="${1:?usage: stage-pgvector.sh <staged-pg-dir>}"
-PGVECTOR_VERSION="${PGVECTOR_VERSION:-0.8.2}"
+PGVECTOR_VERSION="${PGVECTOR_VERSION:-0.8.5}"
 
 NATIVE_ROOT="$(find "$PG_STAGE/node_modules/@embedded-postgres" -type f \( -name postgres -o -name postgres.exe \) -path '*/native/bin/*' -print -quit | sed -E 's#/bin/postgres(\.exe)?$##')"
 [ -n "$NATIVE_ROOT" ] || { echo "Could not locate staged embedded PostgreSQL native root" >&2; exit 1; }

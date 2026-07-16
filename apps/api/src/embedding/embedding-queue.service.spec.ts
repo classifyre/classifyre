@@ -15,11 +15,13 @@ describe('EmbeddingQueueService', () => {
     batchSize: 32,
     workerConcurrency: 1,
     retrySeconds: 30,
+    autoBackfill: false,
     provider: 'transformers-js',
     model: 'Xenova/all-MiniLM-L6-v2',
   };
   const provider = { embedMany: jest.fn() };
   const embeddings = {
+    configuredSpace: jest.fn(),
     missingHashes: jest.fn(),
     putVectors: jest.fn(),
   };
@@ -42,6 +44,9 @@ describe('EmbeddingQueueService', () => {
     boss.createQueue.mockResolvedValue(undefined);
     boss.work.mockResolvedValue(undefined);
     boss.insert.mockResolvedValue([]);
+    embeddings.configuredSpace.mockResolvedValue({
+      id: '9c85727f-8b6f-4de0-aee6-08a96b57f79b',
+    });
     prisma.finding.findMany.mockResolvedValue([]);
     prisma.assetChunk.findMany.mockResolvedValue([]);
     embeddings.missingHashes.mockResolvedValue([]);
@@ -52,11 +57,12 @@ describe('EmbeddingQueueService', () => {
     await service.onApplicationBootstrap();
 
     expect(capability.ensureReady).toHaveBeenCalledTimes(1);
-    expect(boss.createQueue).toHaveBeenCalledWith('semantic-embeddings', {
-      policy: 'exclusive',
-    });
+    expect(boss.createQueue).toHaveBeenCalledWith(
+      'semantic-embeddings-9c85727f-8b6f-4de0-aee6-08a96b57f79b',
+      { policy: 'exclusive' },
+    );
     expect(boss.work).toHaveBeenCalledWith(
-      'semantic-embeddings',
+      'semantic-embeddings-9c85727f-8b6f-4de0-aee6-08a96b57f79b',
       expect.objectContaining({
         batchSize: 32,
         localConcurrency: 1,
@@ -70,37 +76,86 @@ describe('EmbeddingQueueService', () => {
   });
 
   it('persists one deduplicated job per content hash', async () => {
+    await service.onApplicationBootstrap();
     service.enqueue([
       { hash: 'a'.repeat(64), text: '  repeated   text ' },
       { hash: 'a'.repeat(64), text: 'repeated text' },
     ]);
     await new Promise((resolve) => setImmediate(resolve));
 
-    expect(boss.insert).toHaveBeenCalledWith('semantic-embeddings', [
-      expect.objectContaining({
-        data: { hash: 'a'.repeat(64), text: 'repeated text' },
-        singletonKey: 'a'.repeat(64),
-        group: { id: 'embedding-inference' },
-      }),
-    ]);
+    expect(boss.insert).toHaveBeenCalledWith(
+      'semantic-embeddings-9c85727f-8b6f-4de0-aee6-08a96b57f79b',
+      [
+        expect.objectContaining({
+          data: {
+            spaceId: '9c85727f-8b6f-4de0-aee6-08a96b57f79b',
+            hash: 'a'.repeat(64),
+            text: 'repeated text',
+          },
+          singletonKey: 'a'.repeat(64),
+          group: { id: 'embedding-inference' },
+        }),
+      ],
+    );
   });
 
   it('batches missing jobs through the provider and content-addressed store', async () => {
     await service.onApplicationBootstrap();
     const handler = boss.work.mock.calls[0][2] as (
-      jobs: Array<{ data: { hash: string; text: string } }>,
+      jobs: Array<{
+        data: { spaceId: string; hash: string; text: string };
+      }>,
     ) => Promise<void>;
     embeddings.missingHashes.mockResolvedValue(['b'.repeat(64)]);
     provider.embedMany.mockResolvedValue([[1, 0, 0]]);
 
     await handler([
-      { data: { hash: 'a'.repeat(64), text: 'already stored' } },
-      { data: { hash: 'b'.repeat(64), text: 'needs embedding' } },
+      {
+        data: {
+          spaceId: '9c85727f-8b6f-4de0-aee6-08a96b57f79b',
+          hash: 'a'.repeat(64),
+          text: 'already stored',
+        },
+      },
+      {
+        data: {
+          spaceId: '9c85727f-8b6f-4de0-aee6-08a96b57f79b',
+          hash: 'b'.repeat(64),
+          text: 'needs embedding',
+        },
+      },
     ]);
 
     expect(provider.embedMany).toHaveBeenCalledWith(['needs embedding']);
-    expect(embeddings.putVectors).toHaveBeenCalledWith([
-      { contentHash: 'b'.repeat(64), vector: [1, 0, 0] },
+    expect(embeddings.missingHashes).toHaveBeenCalledWith(
+      ['a'.repeat(64), 'b'.repeat(64)],
+      '9c85727f-8b6f-4de0-aee6-08a96b57f79b',
+    );
+    expect(embeddings.putVectors).toHaveBeenCalledWith({
+      spaceId: '9c85727f-8b6f-4de0-aee6-08a96b57f79b',
+      items: [{ contentHash: 'b'.repeat(64), vector: [1, 0, 0] }],
+    });
+  });
+
+  it('ignores jobs from another model space', async () => {
+    await service.onApplicationBootstrap();
+    const handler = boss.work.mock.calls[0][2] as (
+      jobs: Array<{
+        data: { spaceId: string; hash: string; text: string };
+      }>,
+    ) => Promise<void>;
+
+    await handler([
+      {
+        data: {
+          spaceId: '3e4e92c3-f845-4d89-9f51-d88f8654d307',
+          hash: 'c'.repeat(64),
+          text: 'wrong coordinate space',
+        },
+      },
     ]);
+
+    expect(provider.embedMany).not.toHaveBeenCalled();
+    expect(embeddings.putVectors).not.toHaveBeenCalled();
   });
 });

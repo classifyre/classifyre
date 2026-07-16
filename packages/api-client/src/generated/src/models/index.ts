@@ -93,6 +93,7 @@ export * from './DeleteRunnerResponseDto';
 export * from './DiscoveryRecentRunDto';
 export * from './DiscoveryRunSourceDto';
 export * from './EdgeDetailDto';
+export * from './EmbeddingReindexResponseDto';
 export * from './EvidenceEntityDto';
 export * from './ExclusionRuleDto';
 export * from './ExpandGraphDto';

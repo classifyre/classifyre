@@ -5967,6 +5967,28 @@
         ]
       }
     },
+    "/embeddings/reindex": {
+      "post": {
+        "operationId": "EmbeddingController_reindex",
+        "parameters": [],
+        "responses": {
+          "202": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmbeddingReindexResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Reconcile stored findings and asset chunks into the configured embedding space",
+        "tags": [
+          "embeddings"
+        ]
+      }
+    },
     "/sources/{sourceId}/embeddings/chunks": {
       "post": {
         "operationId": "EmbeddingController_chunks",
@@ -15324,6 +15346,21 @@
         },
         "required": [
           "reply"
+        ]
+      },
+      "EmbeddingReindexResponseDto": {
+        "type": "object",
+        "properties": {
+          "started": {
+            "type": "boolean"
+          },
+          "spaceId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "started",
+          "spaceId"
         ]
       },
       "AssetChunkDto": {

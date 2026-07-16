@@ -39,6 +39,7 @@ export class EmbeddingConfigService {
     32,
   );
   readonly retrySeconds = integerEnv('EMBEDDING_RETRY_SECONDS', 30, 1, 3600);
+  readonly autoBackfill = booleanEnv('EMBEDDING_AUTO_BACKFILL', true);
 
   readonly dtype = process.env.EMBEDDING_DTYPE ?? 'q8';
   readonly device = process.env.EMBEDDING_DEVICE ?? 'cpu';

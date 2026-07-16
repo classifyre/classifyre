@@ -15,9 +15,12 @@
 
 import * as runtime from '../runtime';
 import type {
+  EmbeddingReindexResponseDto,
   PutAssetChunksDto,
 } from '../models/index';
 import {
+    EmbeddingReindexResponseDtoFromJSON,
+    EmbeddingReindexResponseDtoToJSON,
     PutAssetChunksDtoFromJSON,
     PutAssetChunksDtoToJSON,
 } from '../models/index';
@@ -81,6 +84,35 @@ export class EmbeddingsApi extends runtime.BaseAPI {
      */
     async embeddingControllerChunks(requestParameters: EmbeddingControllerChunksRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
         await this.embeddingControllerChunksRaw(requestParameters, initOverrides);
+    }
+
+    /**
+     * Reconcile stored findings and asset chunks into the configured embedding space
+     */
+    async embeddingControllerReindexRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<EmbeddingReindexResponseDto>> {
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/embeddings/reindex`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => EmbeddingReindexResponseDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Reconcile stored findings and asset chunks into the configured embedding space
+     */
+    async embeddingControllerReindex(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<EmbeddingReindexResponseDto> {
+        const response = await this.embeddingControllerReindexRaw(initOverrides);
+        return await response.value();
     }
 
     /**
