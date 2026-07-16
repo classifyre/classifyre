@@ -598,7 +598,8 @@ export function RunnersTable({
                         <RunnerStatusBadge
                           status={runner.status}
                           className="font-medium"
-                        />                      </TableCell>
+                        />{" "}
+                      </TableCell>
                       <TableCell className="py-2">
                         <div className="flex items-center gap-1.5 text-sm">
                           {runner.triggerType === "SCHEDULED" && (
@@ -626,10 +627,69 @@ export function RunnersTable({
                           : "—"}
                       </TableCell>
                       <TableCell className="py-2">
-                        {totalAssets.toLocaleString()}
+                        <div className="space-y-0.5 font-mono text-[11px]">
+                          <div className="font-sans text-sm font-medium">
+                            {totalAssets.toLocaleString()}
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">
+                              {t("runners.delta.created")}
+                            </span>{" "}
+                            {runner.assetsCreated.toLocaleString()}
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">
+                              {t("runners.delta.updated")}
+                            </span>{" "}
+                            {runner.assetsUpdated.toLocaleString()}
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">
+                              {t("runners.delta.unchanged")}
+                            </span>{" "}
+                            {runner.assetsUnchanged.toLocaleString()}
+                          </div>
+                          {runner.assetsDeleted > 0 && (
+                            <div className="text-destructive">
+                              {t("runners.delta.deleted")}{" "}
+                              {runner.assetsDeleted.toLocaleString()}
+                            </div>
+                          )}
+                          {runner.assetsWithoutText > 0 && (
+                            <div className="font-sans text-amber-700 dark:text-amber-400">
+                              {t("runners.delta.withoutText")}{" "}
+                              {runner.assetsWithoutText.toLocaleString()}
+                            </div>
+                          )}
+                          {runner.assetsOutOfScope > 0 && (
+                            <div className="font-sans text-amber-700 dark:text-amber-400">
+                              {t("runners.delta.outOfScope")}{" "}
+                              {runner.assetsOutOfScope.toLocaleString()}
+                            </div>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell className="py-2">
-                        {(runner.totalFindings ?? 0).toLocaleString()}
+                        <div className="space-y-0.5 font-mono text-[11px]">
+                          <div>
+                            <span className="text-muted-foreground">
+                              {t("runners.delta.findingsNew")}
+                            </span>{" "}
+                            {runner.findingsCreated.toLocaleString()}
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">
+                              {t("runners.delta.findingsKept")}
+                            </span>{" "}
+                            {runner.findingsRetained.toLocaleString()}
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">
+                              {t("runners.delta.findingsResolved")}
+                            </span>{" "}
+                            {runner.findingsResolved.toLocaleString()}
+                          </div>
+                        </div>
                       </TableCell>
                     </TableRow>
                   );
@@ -682,7 +742,9 @@ export function RunnersTable({
                   <Fragment key={`page-group-${pageNumber}`}>
                     {showEllipsis && (
                       <PaginationItem key={`ellipsis-${pageNumber}`}>
-                        <PaginationEllipsis label={t("common.pagination.morePages")} />
+                        <PaginationEllipsis
+                          label={t("common.pagination.morePages")}
+                        />
                       </PaginationItem>
                     )}
                     <PaginationItem key={`page-${pageNumber}`}>

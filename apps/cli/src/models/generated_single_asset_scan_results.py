@@ -87,6 +87,19 @@ class Location(BaseModel):
     end: int | None = Field(None, description='End offset (0-indexed)')
 
 
+class TextExtractionStatus(StrEnum):
+    """
+    Structured text coverage outcome. EXTRACTED means detector-visible text was produced. EMPTY means extraction completed without an error but yielded no text. ENGINE_UNAVAILABLE, ZERO_FRAMES, and FAILED are incomplete coverage states and must not be treated as an empty document.
+    """
+
+    NOT_APPLICABLE = 'NOT_APPLICABLE'
+    EXTRACTED = 'EXTRACTED'
+    EMPTY = 'EMPTY'
+    ENGINE_UNAVAILABLE = 'ENGINE_UNAVAILABLE'
+    ZERO_FRAMES = 'ZERO_FRAMES'
+    FAILED = 'FAILED'
+
+
 class DetectionResult(BaseModel):
     """
     Result from detector scan
@@ -220,6 +233,10 @@ class ScanStats(BaseModel):
     empty_text: bool | None = Field(
         None,
         description="True when an asset that should carry text yielded none. Most significant for assets whose text is derived rather than native (OCR'd images and scanned PDFs, transcribed audio/video): empty derived text means the content may have been missed entirely, not that the document is blank. Distinct from an error — nothing failed — so it is reported as coverage, not as a run failure.",
+    )
+    text_extraction_status: TextExtractionStatus | None = Field(
+        None,
+        description='Structured text coverage outcome. EXTRACTED means detector-visible text was produced. EMPTY means extraction completed without an error but yielded no text. ENGINE_UNAVAILABLE, ZERO_FRAMES, and FAILED are incomplete coverage states and must not be treated as an empty document.',
     )
     findings_count: int | None = Field(
         None, description='Total number of findings detected'

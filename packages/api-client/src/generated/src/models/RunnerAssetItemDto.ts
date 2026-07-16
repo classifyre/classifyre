@@ -65,6 +65,12 @@ export interface RunnerAssetItemDto {
     errorMessage?: string | null;
     /**
      * 
+     * @type {string}
+     * @memberof RunnerAssetItemDto
+     */
+    textExtractionStatus?: RunnerAssetItemDtoTextExtractionStatusEnum | null;
+    /**
+     * 
      * @type {Date}
      * @memberof RunnerAssetItemDto
      */
@@ -113,6 +119,19 @@ export const RunnerAssetItemDtoStatusEnum = {
 } as const;
 export type RunnerAssetItemDtoStatusEnum = typeof RunnerAssetItemDtoStatusEnum[keyof typeof RunnerAssetItemDtoStatusEnum];
 
+/**
+ * @export
+ */
+export const RunnerAssetItemDtoTextExtractionStatusEnum = {
+    NotApplicable: 'NOT_APPLICABLE',
+    Extracted: 'EXTRACTED',
+    Empty: 'EMPTY',
+    EngineUnavailable: 'ENGINE_UNAVAILABLE',
+    ZeroFrames: 'ZERO_FRAMES',
+    Failed: 'FAILED'
+} as const;
+export type RunnerAssetItemDtoTextExtractionStatusEnum = typeof RunnerAssetItemDtoTextExtractionStatusEnum[keyof typeof RunnerAssetItemDtoTextExtractionStatusEnum];
+
 
 /**
  * Check if a given object implements the RunnerAssetItemDto interface.
@@ -141,6 +160,7 @@ export function RunnerAssetItemDtoFromJSONTyped(json: any, ignoreDiscriminator: 
         'startedAt': json['startedAt'] == null ? undefined : (new Date(json['startedAt'])),
         'completedAt': json['completedAt'] == null ? undefined : (new Date(json['completedAt'])),
         'errorMessage': json['errorMessage'] == null ? undefined : json['errorMessage'],
+        'textExtractionStatus': json['textExtractionStatus'] == null ? undefined : json['textExtractionStatus'],
         'createdAt': (new Date(json['createdAt'])),
         'findingsTotal': json['findingsTotal'] == null ? undefined : json['findingsTotal'],
         'findingsBySeverity': json['findingsBySeverity'] == null ? undefined : json['findingsBySeverity'],
@@ -167,6 +187,7 @@ export function RunnerAssetItemDtoToJSONTyped(value?: RunnerAssetItemDto | null,
         'startedAt': value['startedAt'] == null ? value['startedAt'] : value['startedAt'].toISOString(),
         'completedAt': value['completedAt'] == null ? value['completedAt'] : value['completedAt'].toISOString(),
         'errorMessage': value['errorMessage'],
+        'textExtractionStatus': value['textExtractionStatus'],
         'createdAt': value['createdAt'].toISOString(),
         'findingsTotal': value['findingsTotal'],
         'findingsBySeverity': value['findingsBySeverity'],

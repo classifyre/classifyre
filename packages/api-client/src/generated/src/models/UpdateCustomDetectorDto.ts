@@ -50,7 +50,7 @@ export interface UpdateCustomDetectorDto {
      */
     aiProviderConfigId?: string;
     /**
-     * Pipeline schema defining the detector behaviour (type: GLINER2 | REGEX | LLM | TEXT_CLASSIFICATION | IMAGE_CLASSIFICATION | FEATURE_EXTRACTION | OBJECT_DETECTION)
+     * Pipeline schema defining the detector behaviour (type: GLINER2 | REGEX | LLM | TEXT_CLASSIFICATION | IMAGE_CLASSIFICATION | OBJECT_DETECTION)
      * @type {object}
      * @memberof UpdateCustomDetectorDto
      */

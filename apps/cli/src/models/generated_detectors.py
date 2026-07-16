@@ -1255,78 +1255,6 @@ class ImageClassificationPipelineSchema(BaseModel):
 
 
 class Type7(StrEnum):
-    FEATURE_EXTRACTION = 'FEATURE_EXTRACTION'
-
-
-class PoolingStrategy(StrEnum):
-    """
-    How to aggregate per-token hidden states into a single embedding vector.
-    """
-
-    mean = 'mean'
-    cls = 'cls'
-    max = 'max'
-    none = 'none'
-
-
-class ChunkSize2(RootModel[int]):
-    root: int = Field(
-        None,
-        description='Split text into chunks of this many characters before embedding. Each chunk produces its own finding.',
-        ge=1,
-    )
-
-
-class FeatureExtractionPipelineSchema(BaseModel):
-    """
-    Feature extraction (embedding) pipeline using a HuggingFace model. Runs a single encoder; create multiple custom detectors to run multiple embedding models.
-    """
-
-    model_config = ConfigDict(
-        extra='forbid',
-    )
-    type: Literal['FEATURE_EXTRACTION']
-    model: str = Field(
-        ...,
-        description="HuggingFace hub ID (e.g. 'BAAI/bge-base-en-v1.5', 'sentence-transformers/all-MiniLM-L6-v2') or absolute local directory path.",
-    )
-    model_revision: str | None = Field(
-        None,
-        description='Git branch, tag, or commit hash when fetching from the HuggingFace hub.',
-    )
-    device: str | None = Field(
-        'cpu',
-        description="Inference device: 'cpu' (default), 'cuda', 'mps', or a CUDA device string like 'cuda:0'.",
-    )
-    pooling_strategy: PoolingStrategy | None = Field(
-        'mean',
-        description='How to aggregate per-token hidden states into a single embedding vector.',
-    )
-    normalize_embeddings: bool | None = Field(
-        True,
-        description='L2-normalise the final embedding vector. Recommended for cosine-similarity workloads.',
-    )
-    truncation: bool | None = Field(
-        True, description="Truncate input to the model's maximum sequence length."
-    )
-    max_length: int | None = Field(
-        None, description="Override the tokenizer's default maximum sequence length."
-    )
-    batch_size: int | None = Field(
-        8, description='Number of texts to encode in a single forward pass.'
-    )
-    chunk_size: ChunkSize2 | None = Field(
-        None,
-        description='Split text into chunks of this many characters before embedding. Each chunk produces its own finding.',
-    )
-    chunk_overlap: ChunkOverlap1 | None = Field(
-        0,
-        description='Character overlap between consecutive chunks.',
-        validate_default=True,
-    )
-
-
-class Type8(StrEnum):
     OBJECT_DETECTION = 'OBJECT_DETECTION'
 
 
@@ -1407,7 +1335,6 @@ class CustomDetectorConfig(DetectorConfig):
         | LLMPipelineSchema
         | TextClassificationPipelineSchema
         | ImageClassificationPipelineSchema
-        | FeatureExtractionPipelineSchema
         | ObjectDetectionPipelineSchema
         | None
     ) = Field(None, discriminator='type', title='AnyPipelineSchema')

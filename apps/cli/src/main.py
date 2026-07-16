@@ -264,7 +264,7 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
                     logger.info("Phase 1 complete: %d assets discovered", total_assets)
 
                     # --- Phase 2: Processing ---
-                    if has_detectors and all_stubs:
+                    if all_stubs:
                         import asyncio as _asyncio
 
                         processed_count = 0
@@ -319,6 +319,10 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
                                 )
                                 payload = _asset_to_payload(result)
                                 await sink.emit_batch([payload], skip_findings=False)
+                                if hasattr(sink, "emit_text_chunks"):
+                                    artifact = pipeline.take_text_artifact(asset_hash)
+                                    if artifact is not None:
+                                        await sink.emit_text_chunks(asset_hash, artifact)
 
                                 if hasattr(sink, "update_asset_status"):
                                     f_total, f_by_sev, f_by_det = _compute_findings_counts(
@@ -352,22 +356,6 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
                             "Phase 2 complete: %d processed, %d errors",
                             processed_count,
                             error_count,
-                        )
-                    elif all_stubs and hasattr(sink, "update_asset_status"):
-                        # No detectors configured: mark discovered assets as PROCESSED
-                        import asyncio as _asyncio
-
-                        async def _mark_processed(asset: Any) -> None:
-                            asset_hash = getattr(asset, "hash", None) or ""
-                            await sink.update_asset_status(
-                                asset_hash, "PROCESSED", findings_total=0
-                            )
-
-                        tasks = [_asyncio.create_task(_mark_processed(a)) for a in all_stubs]
-                        await _asyncio.gather(*tasks, return_exceptions=True)
-                        logger.info(
-                            "Phase 2 skipped (no detectors): %d assets marked processed",
-                            len(all_stubs),
                         )
 
                     # Persist the advanced AUTOMATIC sampling cursor (no-op for

@@ -2,6 +2,8 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { AssetService } from './asset.service';
 import { PrismaService } from './prisma.service';
 import { CustomDetectorExtractionsService } from './custom-detector-extractions.service';
+import { EmbeddingService } from './embedding/embedding.service';
+import { QueryEmbeddingService } from './embedding/query-embedding.service';
 import {
   AssetStatus,
   AssetType,
@@ -17,6 +19,7 @@ import {
   SearchAssetsSortBy,
   SearchAssetsSortOrder,
 } from './dto/search-assets-request.dto';
+import { SemanticSearchMode } from './dto/search-findings-request.dto';
 
 describe('AssetService', () => {
   let service: AssetService;
@@ -56,6 +59,15 @@ describe('AssetService', () => {
     createFromIngestion: jest.fn(),
   };
 
+  const mockEmbeddingService = {
+    semanticAssetIds: jest.fn(),
+  };
+
+  const mockQueryEmbeddingService = {
+    embed: jest.fn(),
+    embedIfAvailable: jest.fn(),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -68,6 +80,8 @@ describe('AssetService', () => {
           provide: CustomDetectorExtractionsService,
           useValue: mockCustomDetectorExtractionsService,
         },
+        { provide: EmbeddingService, useValue: mockEmbeddingService },
+        { provide: QueryEmbeddingService, useValue: mockQueryEmbeddingService },
       ],
     }).compile();
 
@@ -84,6 +98,96 @@ describe('AssetService', () => {
   });
 
   describe('searchAssets', () => {
+    it('ranks asset chunks semantically while preserving asset filters', async () => {
+      const now = new Date();
+      const asset = {
+        id: 'asset-semantic',
+        hash: 'hash-semantic',
+        checksum: 'checksum-semantic',
+        name: 'Unrelated filename.pdf',
+        externalUrl: null,
+        links: [],
+        metadata: null,
+        assetType: 'file',
+        sourceType: AssetType.LOCAL_FOLDER,
+        sourceId: 'source-1',
+        runnerId: 'runner-1',
+        status: AssetStatus.NEW,
+        lastScannedAt: now,
+        createdAt: now,
+        updatedAt: now,
+      };
+      mockQueryEmbeddingService.embed.mockResolvedValue([1, 0]);
+      mockEmbeddingService.semanticAssetIds.mockResolvedValue([
+        { id: asset.id, score: 0.91 },
+      ]);
+      mockPrismaService.asset.findMany
+        .mockResolvedValueOnce([{ id: asset.id }])
+        .mockResolvedValueOnce([asset]);
+      mockPrismaService.finding.findMany.mockResolvedValue([]);
+
+      const result = await service.searchAssets({
+        assets: { sourceId: 'source-1', search: 'meaning not filename' },
+        semantic: {
+          query: 'meaning not filename',
+          mode: SemanticSearchMode.VECTOR,
+        },
+        options: { includeAssetsWithoutFindings: true },
+      });
+
+      expect(mockEmbeddingService.semanticAssetIds).toHaveBeenCalledWith(
+        [1, 0],
+        200,
+        'source-1',
+      );
+      expect(result.items[0]?.asset.id).toBe(asset.id);
+      expect(result.ranking).toEqual({
+        mode: SemanticSearchMode.VECTOR,
+        query: 'meaning not filename',
+        explained: true,
+      });
+    });
+
+    it('falls back to lexical ranking when hybrid query embedding is unavailable', async () => {
+      const now = new Date();
+      const asset = {
+        id: 'asset-lexical',
+        hash: 'hash-lexical',
+        checksum: 'checksum-lexical',
+        name: 'docket reference.pdf',
+        externalUrl: null,
+        links: [],
+        metadata: null,
+        assetType: 'file',
+        sourceType: AssetType.LOCAL_FOLDER,
+        sourceId: 'source-1',
+        runnerId: 'runner-1',
+        status: AssetStatus.NEW,
+        lastScannedAt: now,
+        createdAt: now,
+        updatedAt: now,
+      };
+      mockQueryEmbeddingService.embedIfAvailable.mockResolvedValue(null);
+      mockPrismaService.asset.findMany
+        .mockResolvedValueOnce([{ id: asset.id }])
+        .mockResolvedValueOnce([{ id: asset.id }])
+        .mockResolvedValueOnce([asset]);
+      mockPrismaService.finding.findMany.mockResolvedValue([]);
+
+      const result = await service.searchAssets({
+        assets: { sourceId: 'source-1' },
+        semantic: {
+          query: 'docket reference',
+          mode: SemanticSearchMode.HYBRID,
+        },
+        options: { includeAssetsWithoutFindings: true },
+      });
+
+      expect(mockEmbeddingService.semanticAssetIds).not.toHaveBeenCalled();
+      expect(result.items[0]?.asset.id).toBe(asset.id);
+      expect(result.ranking?.mode).toBe('lexical-fallback');
+    });
+
     it('should return paginated assets with matching findings', async () => {
       const now = new Date();
       const assets = [

@@ -10,6 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry  # type: ignore[import-untyped]
 
+from ..pipeline.text_artifact import TextArtifact
 from .base import OutputRuntimeContext, OutputType
 
 logger = logging.getLogger(__name__)
@@ -222,6 +223,15 @@ class RestOutputSink:
                 f"/sources/{source_id}/assets/bulk",
                 payload.model_dump(mode="json", by_alias=True),
             )
+
+    async def emit_text_chunks(self, asset_hash: str, artifact: TextArtifact) -> None:
+        """Send extracted text provenance; the API embeds it asynchronously."""
+        source_id = self._require_source_id()
+        self._request_json(
+            "POST",
+            f"/sources/{source_id}/embeddings/chunks",
+            {"assetHash": asset_hash, "chunks": artifact.chunks},
+        )
 
     def _split_by_size(self, assets: list[dict[str, Any]]) -> list[list[dict[str, Any]]]:
         """Split assets into chunks that each stay under _MAX_BATCH_BYTES."""

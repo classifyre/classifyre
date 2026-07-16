@@ -115,6 +115,72 @@ export class SourceResponseDto {
   type: AssetType;
 }
 
+export class FindingRankReasonDto {
+  @ApiProperty()
+  code: string;
+
+  @ApiProperty()
+  label: string;
+
+  @ApiProperty({ enum: ['up', 'down', 'neutral'] })
+  impact: 'up' | 'down' | 'neutral';
+}
+
+export class FindingEvidenceAnalysisDto {
+  @ApiProperty()
+  spaceId: string;
+
+  @ApiProperty({ minimum: 0, maximum: 1 })
+  importanceScore: number;
+
+  @ApiProperty({ minimum: 0, maximum: 1 })
+  qualityScore: number;
+
+  @ApiProperty({ minimum: 0, maximum: 1 })
+  semanticOutlier: number;
+
+  @ApiProperty()
+  similarCount: number;
+
+  @ApiPropertyOptional()
+  duplicateGroupHash?: string;
+
+  @ApiProperty({ type: [FindingRankReasonDto] })
+  reasons: FindingRankReasonDto[];
+
+  @ApiProperty({ type: 'object', additionalProperties: true })
+  signals: Record<string, number>;
+
+  @ApiProperty()
+  analyzedAt: Date;
+}
+
+export class FindingSearchRankingDto {
+  @ApiPropertyOptional({ minimum: 0, maximum: 1, nullable: true })
+  importance?: number | null;
+
+  @ApiPropertyOptional({ minimum: 0, maximum: 1, nullable: true })
+  quality?: number | null;
+
+  @ApiProperty()
+  similarCount: number;
+
+  @ApiPropertyOptional({ nullable: true })
+  duplicateGroupHash?: string | null;
+
+  @ApiProperty({ type: [FindingRankReasonDto] })
+  reasons: FindingRankReasonDto[];
+
+  @ApiProperty({ enum: ['analyzed', 'pending'] })
+  coverage: 'analyzed' | 'pending';
+
+  @ApiPropertyOptional()
+  reciprocalRank?: number;
+
+  @ApiPropertyOptional({ minimum: -1, maximum: 1 })
+  semanticSimilarity?: number;
+}
+
 export class FindingResponseDto {
   @ApiProperty()
   id: string;
@@ -218,6 +284,12 @@ export class FindingResponseDto {
 
   @ApiPropertyOptional({ type: SourceResponseDto })
   source?: SourceResponseDto;
+
+  @ApiPropertyOptional({ type: FindingEvidenceAnalysisDto, nullable: true })
+  evidenceAnalysis?: FindingEvidenceAnalysisDto | null;
+
+  @ApiPropertyOptional({ type: FindingSearchRankingDto })
+  ranking?: FindingSearchRankingDto;
 }
 
 export class FindingListResponseDto {

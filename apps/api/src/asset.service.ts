@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  Optional,
 } from '@nestjs/common';
 import { PrismaService } from './prisma.service';
 import {
@@ -13,6 +14,7 @@ import {
   FindingStatus,
   RunnerAssetChangeType,
   Severity,
+  TextExtractionStatus,
 } from '@prisma/client';
 import { generateDetectionIdentity } from './utils/detection-identity';
 import { computeScopeFingerprint } from './utils/scope-fingerprint';
@@ -27,6 +29,14 @@ import {
 import { SearchAssetsChartsRequestDto } from './dto/search-assets-charts-request.dto';
 import { SearchAssetsChartsResponseDto } from './dto/search-assets-charts-response.dto';
 import { CustomDetectorExtractionsService } from './custom-detector-extractions.service';
+import {
+  embeddingContentHash,
+  normalizeEmbeddingText,
+} from './embedding/embedding-text';
+import { EmbeddingService } from './embedding/embedding.service';
+import { QueryEmbeddingService } from './embedding/query-embedding.service';
+import { EmbeddingQueueService } from './embedding/embedding-queue.service';
+import { SemanticSearchMode } from './dto/search-findings-request.dto';
 
 const findingForAssetSelect = {
   id: true,
@@ -137,6 +147,9 @@ export class AssetService {
   constructor(
     private prisma: PrismaService,
     private readonly customDetectorExtractionsService: CustomDetectorExtractionsService,
+    private readonly embeddings: EmbeddingService,
+    private readonly queryEmbeddings: QueryEmbeddingService,
+    @Optional() private readonly embeddingQueue?: EmbeddingQueueService,
   ) {}
 
   private async assertSourceAndRunner(sourceId: string, runnerId: string) {
@@ -248,6 +261,24 @@ export class AssetService {
   private normalizeEmptyText(asset: Record<string, any>): boolean | undefined {
     const value = asset?.scan_stats?.empty_text;
     return typeof value === 'boolean' ? value : undefined;
+  }
+
+  private normalizeTextExtractionStatus(
+    asset: Record<string, any>,
+  ): TextExtractionStatus | undefined {
+    const value = asset?.scan_stats?.text_extraction_status;
+    const allowed = new Set([
+      'NOT_APPLICABLE',
+      'EXTRACTED',
+      'EMPTY',
+      'ENGINE_UNAVAILABLE',
+      'ZERO_FRAMES',
+      'FAILED',
+    ]);
+    const normalized = typeof value === 'string' ? value.toUpperCase() : '';
+    return allowed.has(normalized)
+      ? (normalized as TextExtractionStatus)
+      : undefined;
   }
 
   /**
@@ -835,11 +866,16 @@ export class AssetService {
     total: number;
     skip: number;
     limit: number;
+    ranking?: { mode: string; query: string; explained: boolean };
   }> {
     const assetFilters = params.assets ?? {};
     const findingFilters = params.findings ?? {};
     const page = params.page ?? {};
     const options = params.options ?? {};
+    const semantic = params.semantic;
+    const semanticEnabled =
+      Boolean(semantic?.query?.trim()) &&
+      semantic?.mode !== SemanticSearchMode.OFF;
 
     const skip = page.skip ?? 0;
     const limit = page.limit ?? 50;
@@ -877,7 +913,7 @@ export class AssetService {
     const where: Prisma.AssetWhereInput = {};
     const orderBy = this.buildSearchAssetsOrderBy({ sortBy, sortOrder });
 
-    if (typeof search === 'string' && search.trim()) {
+    if (!semanticEnabled && typeof search === 'string' && search.trim()) {
       where.name = {
         contains: search.trim(),
         mode: 'insensitive',
@@ -941,15 +977,88 @@ export class AssetService {
       where.findings = { some: findingWhere };
     }
 
-    const [assets, total] = await this.prisma.$transaction([
-      this.prisma.asset.findMany({
-        where,
-        skip: safeSkip,
-        take: safeLimit,
-        orderBy,
-      }),
-      this.prisma.asset.count({ where }),
-    ]);
+    let assets: Asset[];
+    let total: number;
+    let ranking:
+      | { mode: string; query: string; explained: boolean }
+      | undefined;
+    if (semanticEnabled) {
+      const query = semantic?.query.trim() as string;
+      const vector =
+        semantic?.mode === SemanticSearchMode.VECTOR
+          ? await this.queryEmbeddings.embed(query)
+          : await this.queryEmbeddings.embedIfAvailable(query);
+      const semanticRows = vector
+        ? await this.embeddings.semanticAssetIds(
+            vector,
+            200,
+            typeof sourceId === 'string' && sourceId.trim()
+              ? sourceId.trim()
+              : undefined,
+          )
+        : [];
+      const lexical =
+        semantic?.mode === SemanticSearchMode.VECTOR
+          ? []
+          : await this.prisma.asset.findMany({
+              where: {
+                AND: [
+                  where,
+                  { name: { contains: query, mode: 'insensitive' } },
+                ],
+              },
+              select: { id: true },
+              take: 200,
+              orderBy,
+            });
+      const rrf = new Map<string, number>();
+      semanticRows.forEach((row, index) => {
+        rrf.set(row.id, 1 / (60 + index + 1));
+      });
+      lexical.forEach((row, index) => {
+        rrf.set(row.id, (rrf.get(row.id) ?? 0) + 1 / (60 + index + 1));
+      });
+      const ranked = [...rrf.entries()].sort(
+        (left, right) => right[1] - left[1],
+      );
+      const permitted = ranked.length
+        ? await this.prisma.asset.findMany({
+            where: { AND: [where, { id: { in: ranked.map(([id]) => id) } }] },
+            select: { id: true },
+          })
+        : [];
+      const permittedSet = new Set(permitted.map((item) => item.id));
+      const filteredRanked = ranked.filter(([id]) => permittedSet.has(id));
+      const pageIds = filteredRanked
+        .slice(safeSkip, safeSkip + safeLimit)
+        .map(([id]) => id);
+      const unordered = pageIds.length
+        ? await this.prisma.asset.findMany({ where: { id: { in: pageIds } } })
+        : [];
+      const byId = new Map(unordered.map((asset) => [asset.id, asset]));
+      assets = pageIds.flatMap((id) => {
+        const asset = byId.get(id);
+        return asset ? [asset] : [];
+      });
+      total = filteredRanked.length;
+      ranking = {
+        mode: vector
+          ? (semantic?.mode ?? SemanticSearchMode.HYBRID)
+          : 'lexical-fallback',
+        query,
+        explained: true,
+      };
+    } else {
+      [assets, total] = await this.prisma.$transaction([
+        this.prisma.asset.findMany({
+          where,
+          skip: safeSkip,
+          take: safeLimit,
+          orderBy,
+        }),
+        this.prisma.asset.count({ where }),
+      ]);
+    }
 
     if (assets.length === 0) {
       return {
@@ -957,6 +1066,7 @@ export class AssetService {
         total,
         skip: safeSkip,
         limit: safeLimit,
+        ranking,
       };
     }
 
@@ -973,6 +1083,7 @@ export class AssetService {
         total,
         skip: safeSkip,
         limit: safeLimit,
+        ranking,
       };
     }
 
@@ -1038,6 +1149,7 @@ export class AssetService {
       total,
       skip: safeSkip,
       limit: safeLimit,
+      ranking,
     };
   }
 
@@ -1731,7 +1843,7 @@ export class AssetService {
     return merged;
   }
 
-  private processBatch(
+  private async processBatch(
     batch: Record<string, any>[],
     sourceId: string,
     runnerId: string,
@@ -1745,7 +1857,19 @@ export class AssetService {
     unchanged: number;
     findings: number;
   }> {
-    return this.prisma.$transaction(
+    const embeddingContents = batch.flatMap((asset) =>
+      (Array.isArray(asset.findings) ? asset.findings : []).flatMap(
+        (finding: Record<string, unknown>) => {
+          const text = normalizeEmbeddingText(
+            finding.context_before as string | undefined,
+            finding.matched_content as string | undefined,
+            finding.context_after as string | undefined,
+          );
+          return text ? [{ hash: embeddingContentHash(text), text }] : [];
+        },
+      ),
+    );
+    const result = await this.prisma.$transaction(
       async (tx) => {
         const scannedAt = new Date();
         // Categorize assets for bulk operations
@@ -1902,11 +2026,14 @@ export class AssetService {
           const metadata = this.normalizeMetadata(asset.metadata);
           const detectorOutcomes = this.normalizeDetectorOutcomes(asset);
           const emptyText = this.normalizeEmptyText(asset);
+          const textExtractionStatus =
+            this.normalizeTextExtractionStatus(asset);
 
           if (
             metadata !== undefined ||
             detectorOutcomes !== undefined ||
-            emptyText !== undefined
+            emptyText !== undefined ||
+            textExtractionStatus !== undefined
           ) {
             await tx.runnerAsset.updateMany({
               where: { runnerId, assetHash },
@@ -1914,6 +2041,9 @@ export class AssetService {
                 ...(metadata !== undefined ? { metadata } : {}),
                 ...(detectorOutcomes !== undefined ? { detectorOutcomes } : {}),
                 ...(emptyText !== undefined ? { emptyText } : {}),
+                ...(textExtractionStatus !== undefined
+                  ? { textExtractionStatus }
+                  : {}),
               },
             });
           }
@@ -1998,6 +2128,11 @@ export class AssetService {
                   redactedContent: finding.redacted_content || null,
                   contextBefore: finding.context_before || null,
                   contextAfter: finding.context_after || null,
+                  embedContentHash: embeddingContentHash(
+                    finding.context_before,
+                    finding.matched_content,
+                    finding.context_after,
+                  ),
                   location: finding.location || null,
                   metadata: (() => {
                     const raw = finding.metadata;
@@ -2177,6 +2312,7 @@ export class AssetService {
                   redactedContent: detection.redactedContent,
                   contextBefore: detection.contextBefore,
                   contextAfter: detection.contextAfter,
+                  embedContentHash: detection.embedContentHash,
                   location: detection.location,
                   metadata: detection.metadata,
                   customDetectorId: detection.customDetectorId,
@@ -2215,6 +2351,7 @@ export class AssetService {
                   // Update context and location in case they changed
                   contextBefore: detection.contextBefore,
                   contextAfter: detection.contextAfter,
+                  embedContentHash: detection.embedContentHash,
                   location: detection.location,
                   metadata: detection.metadata,
                   customDetectorId: detection.customDetectorId,
@@ -2295,5 +2432,7 @@ export class AssetService {
         maxWait: 10000,
       },
     );
+    this.embeddingQueue?.enqueue(embeddingContents);
+    return result;
   }
 }

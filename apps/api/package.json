@@ -1,6 +1,6 @@
 {
   "name": "@classifyre/api",
-  "version": "0.4.55",
+  "version": "0.4.56",
   "description": "",
   "author": "",
   "private": true,
@@ -27,12 +27,14 @@
     "test:i18n": "jest src/i18n/i18n-keys.spec.ts --no-coverage"
   },
   "dependencies": {
+    "@ai-sdk/openai-compatible": "^3.0.11",
     "@anthropic-ai/sdk": "^0.111.0",
     "@aws-sdk/client-s3": "^3.1032.0",
     "@fastify/multipart": "^10.0.0",
     "@fastify/static": "^9.3.0",
     "@fastify/under-pressure": "^9.0.3",
     "@google/genai": "^2.6.0",
+    "@huggingface/transformers": "^4.2.0",
     "@kubernetes/client-node": "^1.4.0",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@nestjs/common": "^11.1.18",
@@ -56,6 +58,7 @@
     "@slack/socket-mode": "^2.0.7",
     "@slack/web-api": "^7.18.0",
     "@workspace/schemas": "workspace:*",
+    "ai": "^7.0.29",
     "ajv": "^8.18.0",
     "ajv-formats": "^3.0.1",
     "class-transformer": "^0.5.1",

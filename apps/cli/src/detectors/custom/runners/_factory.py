@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from ....models.generated_detectors import (
-    FeatureExtractionPipelineSchema,
     GLiNER2PipelineSchema,
     ImageClassificationPipelineSchema,
     LLMPipelineSchema,
@@ -12,7 +11,6 @@ from ....models.generated_detectors import (
     TextClassificationPipelineSchema,
 )
 from ._base import BaseRunner
-from ._feature_extraction import FeatureExtractionRunner
 from ._gliner2 import GLiNER2Runner
 from ._image_classification import ImageClassificationRunner
 from ._llm import LLMRunner
@@ -28,7 +26,6 @@ def create_runner(
         | LLMPipelineSchema
         | TextClassificationPipelineSchema
         | ImageClassificationPipelineSchema
-        | FeatureExtractionPipelineSchema
         | ObjectDetectionPipelineSchema
     ),
     detector_key: str = "",
@@ -39,8 +36,6 @@ def create_runner(
         return TextClassificationRunner(schema, detector_key, detector_name)
     if isinstance(schema, ImageClassificationPipelineSchema):
         return ImageClassificationRunner(schema, detector_key, detector_name)
-    if isinstance(schema, FeatureExtractionPipelineSchema):
-        return FeatureExtractionRunner(schema, detector_key, detector_name)
     if isinstance(schema, ObjectDetectionPipelineSchema):
         return ObjectDetectionRunner(schema, detector_key, detector_name)
     if isinstance(schema, RegexPipelineSchema):

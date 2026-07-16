@@ -12,6 +12,7 @@ Name | Type
 `startedAt` | Date
 `completedAt` | Date
 `errorMessage` | string
+`textExtractionStatus` | string
 `createdAt` | Date
 `findingsTotal` | number
 `findingsBySeverity` | object
@@ -32,6 +33,7 @@ const example = {
   "startedAt": null,
   "completedAt": null,
   "errorMessage": null,
+  "textExtractionStatus": null,
   "createdAt": null,
   "findingsTotal": null,
   "findingsBySeverity": null,

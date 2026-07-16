@@ -10,6 +10,7 @@ Name | Type
 `total` | number
 `skip` | number
 `limit` | number
+`ranking` | object
 
 ## Example
 
@@ -22,6 +23,7 @@ const example = {
   "total": null,
   "skip": null,
   "limit": null,
+  "ranking": null,
 } satisfies SearchAssetsResponseDto
 
 console.log(example)
