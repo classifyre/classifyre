@@ -74,6 +74,15 @@ export const SourceForm = React.forwardRef<SourceFormHandle, SourceFormProps>(
         ...restProperties
       } = schema.properties || {};
 
+      const sourceProperties =
+        sourceType === "SANDBOX"
+          ? Object.fromEntries(
+              Object.entries(restProperties).filter(
+                ([key]) => !["required", "masked", "optional"].includes(key),
+              ),
+            )
+          : restProperties;
+
       return {
         ...schema,
         properties: {
@@ -90,17 +99,27 @@ export const SourceForm = React.forwardRef<SourceFormHandle, SourceFormProps>(
             maxLength: 500,
             ...(existingDescription as JSONSchema7 | undefined),
           },
-          ...restProperties,
+          ...sourceProperties,
         },
         required: Array.from(
-          new Set(["name", ...(schema.required || [])]),
+          new Set([
+            "name",
+            ...(schema.required || []).filter(
+              (key) =>
+                sourceType !== "SANDBOX" ||
+                !["required", "masked", "optional"].includes(key),
+            ),
+          ]),
         ) as string[],
       };
-    }, [schema, t]);
+    }, [schema, sourceType, t]);
 
     const formDefaultValues = React.useMemo(
       () => ({
         type: sourceType,
+        ...(sourceType === "SANDBOX"
+          ? { required: {}, masked: {}, optional: {} }
+          : {}),
         ...(defaultValues || {}),
       }),
       [sourceType, defaultValues],
@@ -121,6 +140,9 @@ export const SourceForm = React.forwardRef<SourceFormHandle, SourceFormProps>(
       onSubmit({
         ...data,
         type: sourceType,
+        ...(sourceType === "SANDBOX"
+          ? { required: {}, masked: {}, optional: {} }
+          : {}),
         ...(detectorPayload.length > 0 ? { detectors: detectorPayload } : {}),
       });
     };
@@ -144,6 +166,9 @@ export const SourceForm = React.forwardRef<SourceFormHandle, SourceFormProps>(
       onTest({
         ...data,
         type: sourceType,
+        ...(sourceType === "SANDBOX"
+          ? { required: {}, masked: {}, optional: {} }
+          : {}),
         ...(detectorPayload.length > 0 ? { detectors: detectorPayload } : {}),
       });
     };

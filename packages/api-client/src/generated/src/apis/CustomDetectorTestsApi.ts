@@ -24,6 +24,11 @@ export interface CustomDetectorTestsControllerDeleteRequest {
     scenarioId: string;
 }
 
+export interface CustomDetectorTestsControllerInputRequest {
+    detectorId: string;
+    scenarioId: string;
+}
+
 export interface CustomDetectorTestsControllerListRequest {
     detectorId: string;
 }
@@ -112,6 +117,48 @@ export class CustomDetectorTestsApi extends runtime.BaseAPI {
      */
     async customDetectorTestsControllerDelete(requestParameters: CustomDetectorTestsControllerDeleteRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
         await this.customDetectorTestsControllerDeleteRaw(requestParameters, initOverrides);
+    }
+
+    /**
+     */
+    async customDetectorTestsControllerInputRaw(requestParameters: CustomDetectorTestsControllerInputRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
+        if (requestParameters['detectorId'] == null) {
+            throw new runtime.RequiredError(
+                'detectorId',
+                'Required parameter "detectorId" was null or undefined when calling customDetectorTestsControllerInput().'
+            );
+        }
+
+        if (requestParameters['scenarioId'] == null) {
+            throw new runtime.RequiredError(
+                'scenarioId',
+                'Required parameter "scenarioId" was null or undefined when calling customDetectorTestsControllerInput().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/custom-detectors/{detectorId}/test-scenarios/{scenarioId}/input`;
+        urlPath = urlPath.replace(`{${"detectorId"}}`, encodeURIComponent(String(requestParameters['detectorId'])));
+        urlPath = urlPath.replace(`{${"scenarioId"}}`, encodeURIComponent(String(requestParameters['scenarioId'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.VoidApiResponse(response);
+    }
+
+    /**
+     */
+    async customDetectorTestsControllerInput(requestParameters: CustomDetectorTestsControllerInputRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
+        await this.customDetectorTestsControllerInputRaw(requestParameters, initOverrides);
     }
 
     /**

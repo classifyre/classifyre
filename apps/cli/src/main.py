@@ -131,6 +131,10 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
     source_id = args.source_id or os.environ.get("SOURCE_ID")
     if source_id:
         os.environ["SOURCE_ID"] = source_id
+    if getattr(args, "output_rest_url", None):
+        # Sources such as SANDBOX use the same managed-job API base URL as the
+        # REST output sink to list and stream their input content.
+        os.environ["CLASSIFYRE_OUTPUT_REST_URL"] = args.output_rest_url
 
     try:
         try:
@@ -461,13 +465,13 @@ def run_train_command(args: argparse.Namespace) -> None:
     print(json.dumps(result.to_dict()))
 
 
-def run_sandbox_command(args: argparse.Namespace) -> None:
-    """Execute the sandbox command: parse file + run detectors."""
-    from .sandbox import SandboxRunner
+def run_evaluate_file_command(args: argparse.Namespace) -> None:
+    """Evaluate detector configs against one ephemeral local file."""
+    from .file_evaluation import FileEvaluationRunner
 
     file_path_str: str | None = args.recipe
     if not file_path_str:
-        logger.error("sandbox command requires a file path as the first argument")
+        logger.error("evaluate-file requires a file path as the first argument")
         sys.exit(1)
 
     file_path = Path(file_path_str)
@@ -492,7 +496,7 @@ def run_sandbox_command(args: argparse.Namespace) -> None:
             sys.exit(1)
 
     try:
-        runner = SandboxRunner(detectors)
+        runner = FileEvaluationRunner(detectors)
         parsed, findings = runner.run(file_path)
         if parsed.parse_error:
             logger.warning("File parse warning: %s", parsed.parse_error)
@@ -504,7 +508,7 @@ def run_sandbox_command(args: argparse.Namespace) -> None:
             output["parse_error"] = parsed.parse_error
         print(json.dumps(_sanitize_for_json(output), ensure_ascii=False))
     except Exception as e:
-        logger.error("Sandbox run failed: %s", e, exc_info=True)
+        logger.error("File evaluation failed: %s", e, exc_info=True)
         sys.exit(1)
 
 
@@ -520,14 +524,14 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Classifyre Metadata Extraction CLI")
     parser.add_argument(
         "command",
-        choices=["test", "extract", "discover", "sandbox", "train"],
+        choices=["test", "extract", "discover", "evaluate-file", "train"],
         help="Command to run",
     )
     parser.add_argument(
         "recipe",
         nargs="?",
         default=None,
-        help="Path to recipe JSON (or file path for sandbox command)",
+        help="Path to recipe JSON (or file path for evaluate-file)",
     )
     parser.add_argument("--debug", action="store_true", help="Enable debug logging")
     parser.add_argument(
@@ -565,7 +569,7 @@ def main() -> None:
     parser.add_argument(
         "--detectors-file",
         default=None,
-        help="Path to JSON file with detector configs (sandbox command only)",
+        help="Path to JSON file with detector configs (evaluate-file only)",
     )
     # train-command arguments
     parser.add_argument(
@@ -629,8 +633,8 @@ def main() -> None:
     if args.debug:
         logging.getLogger().setLevel(logging.DEBUG)
 
-    if args.command == "sandbox":
-        run_sandbox_command(args)
+    if args.command == "evaluate-file":
+        run_evaluate_file_command(args)
         return
 
     if args.command == "train":

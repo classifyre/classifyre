@@ -4,6 +4,7 @@ export {
   SourcesController,
   SearchSourcesController,
 } from './sources.controller';
+export { SourceFilesController } from './source-files.controller';
 export {
   AssetsController,
   SearchAssetsController,

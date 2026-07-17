@@ -10,8 +10,8 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-// Content category (AssetContentType: TXT/IMAGE/VIDEO/...) → icon. Used by the
-// sandbox runs table, where contentType is still the content-category enum.
+// Content category (TXT/IMAGE/VIDEO/...) → icon. Used by the
+// callers where contentType is still the content-category enum.
 const contentTypeIconMap: Record<string, LucideIcon> = {
   TXT: FileText,
   IMAGE: Image,

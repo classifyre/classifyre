@@ -46,6 +46,11 @@ import {
 } from "@/lib/assistant-form-utils";
 import { sanitizeTemplateConfig } from "@/lib/template-example-sanitizer";
 import { useTranslation } from "@/hooks/use-translation";
+import {
+  UploadedFiles,
+  type UploadedFileMetadata,
+} from "@/components/uploaded-files";
+import { deleteSourceFile, uploadSourceFile } from "@/lib/source-files-api";
 
 const normalizeDetectors = (detectors: DetectorConfigInput[]) =>
   detectors
@@ -77,6 +82,13 @@ export default function NewSourcePage() {
     DetectorConfigInput[]
   >([]);
   const [sourceId, setSourceId] = useState<string | null>(null);
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedFileMetadata[]>(
+    [],
+  );
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [pendingRemovalIds, setPendingRemovalIds] = useState<Set<string>>(
+    new Set(),
+  );
   const [isSavingConfig, setIsSavingConfig] = useState(false);
   const [isTestingConfig, setIsTestingConfig] = useState(false);
   const [schedule, setSchedule] = useState<ScheduleValue>(
@@ -121,6 +133,9 @@ export default function NewSourcePage() {
     }
     setSchedule(defaultScheduleValue(example.schedule));
     setSourceId(null);
+    setUploadedFiles([]);
+    setPendingFiles([]);
+    setPendingRemovalIds(new Set());
     setShowExamples(false);
   };
 
@@ -132,6 +147,9 @@ export default function NewSourcePage() {
     setDetectorDefaults([]);
     setSchedule(defaultScheduleValue());
     setSourceId(null);
+    setUploadedFiles([]);
+    setPendingFiles([]);
+    setPendingRemovalIds(new Set());
   };
 
   const resetSourceFlowState = () => {
@@ -142,12 +160,80 @@ export default function NewSourcePage() {
     setDetectorDefaults([]);
     setSchedule(defaultScheduleValue());
     setSourceId(null);
+    setUploadedFiles([]);
+    setPendingFiles([]);
+    setPendingRemovalIds(new Set());
   };
 
   const handleSelectSourceType = (type: SourceType) => {
     if (selectedSourceType === type) return;
     setSelectedSourceType(type);
     resetSourceFlowState();
+    if (type === "SANDBOX") {
+      setShowExamples(false);
+    }
+  };
+
+  const persistSandboxFiles = async (
+    savedId: string,
+    newlyCreated: boolean,
+  ) => {
+    if (selectedSourceType !== "SANDBOX") return true;
+
+    const retained = uploadedFiles.filter(
+      (file) => !pendingRemovalIds.has(file.id),
+    );
+    const results = await Promise.allSettled(
+      pendingFiles.map((file) => uploadSourceFile(savedId, file)),
+    );
+    const additions = results
+      .filter(
+        (result): result is PromiseFulfilledResult<UploadedFileMetadata> =>
+          result.status === "fulfilled",
+      )
+      .map((result) => result.value);
+    const uploadFailures = results.length - additions.length;
+
+    if (retained.length + additions.length === 0) {
+      if (newlyCreated) {
+        await api.sources
+          .sourcesControllerDeleteSource({ id: savedId })
+          .catch(() => undefined);
+      }
+      toast.error(
+        "No files could be uploaded. The Sandbox source was not saved.",
+      );
+      return false;
+    }
+
+    // Additions are durable before removals, so an edit cannot transiently
+    // leave the source empty and trigger the API's final-file protection.
+    const deletionResults = await Promise.allSettled(
+      [...pendingRemovalIds].map((fileId) => deleteSourceFile(savedId, fileId)),
+    );
+    const removalIds = [...pendingRemovalIds];
+    const failedDeletionIds = new Set<string>(
+      deletionResults.flatMap((result, index) =>
+        result.status === "rejected" ? [removalIds[index]!] : [],
+      ),
+    );
+
+    setUploadedFiles([
+      ...uploadedFiles.filter(
+        (file) =>
+          !pendingRemovalIds.has(file.id) || failedDeletionIds.has(file.id),
+      ),
+      ...additions,
+    ]);
+    setPendingFiles(
+      pendingFiles.filter((_, index) => results[index]?.status === "rejected"),
+    );
+    setPendingRemovalIds(failedDeletionIds);
+    if (uploadFailures > 0)
+      toast.error(`${uploadFailures} file(s) failed to upload.`);
+    if (failedDeletionIds.size > 0)
+      toast.error(`${failedDeletionIds.size} file(s) could not be removed.`);
+    return true;
   };
 
   const saveSourceConfig = async (data: Record<string, unknown>) => {
@@ -193,6 +279,16 @@ export default function NewSourcePage() {
           }
         : { scheduleEnabled: false };
 
+    if (
+      selectedSourceType === "SANDBOX" &&
+      uploadedFiles.filter((file) => !pendingRemovalIds.has(file.id)).length +
+        pendingFiles.length ===
+        0
+    ) {
+      toast.error("Add at least one file before saving this Sandbox source.");
+      return null;
+    }
+
     if (sourceId) {
       const updated = await api.sources.sourcesControllerUpdateSource({
         id: sourceId,
@@ -203,7 +299,8 @@ export default function NewSourcePage() {
           ...scheduleFields,
         },
       });
-      return updated?.id || sourceId;
+      const savedId = updated?.id || sourceId;
+      return (await persistSandboxFiles(savedId, false)) ? savedId : null;
     }
 
     const createPayload = {
@@ -217,7 +314,9 @@ export default function NewSourcePage() {
     const created = await api.sources.sourcesControllerCreateSource({
       createSourceDto: createPayload,
     });
-    return created?.id || null;
+    const savedId = created?.id || null;
+    if (!savedId) return null;
+    return (await persistSandboxFiles(savedId, true)) ? savedId : null;
   };
 
   const persistSource = async (data: Record<string, unknown>) => {
@@ -469,6 +568,11 @@ export default function NewSourcePage() {
           selectedCustomDetectorIds={selectedCustomDetectorIds}
           onCustomDetectorsChange={setSelectedCustomDetectorIds}
           onScheduleChange={setSchedule}
+          uploadedFiles={uploadedFiles}
+          pendingFiles={pendingFiles}
+          pendingRemovalIds={pendingRemovalIds}
+          onPendingFilesChange={setPendingFiles}
+          onPendingRemovalIdsChange={setPendingRemovalIds}
         />
       )}
 
@@ -502,6 +606,11 @@ function SourceStepperContent({
   selectedCustomDetectorIds,
   onCustomDetectorsChange,
   onScheduleChange,
+  uploadedFiles,
+  pendingFiles,
+  pendingRemovalIds,
+  onPendingFilesChange,
+  onPendingRemovalIdsChange,
 }: {
   selectedSourceType: SourceType;
   formDefaultValues: Record<string, unknown> | undefined;
@@ -517,6 +626,11 @@ function SourceStepperContent({
   selectedCustomDetectorIds: string[];
   onCustomDetectorsChange: (ids: string[]) => void;
   onScheduleChange: (schedule: ScheduleValue) => void;
+  uploadedFiles: UploadedFileMetadata[];
+  pendingFiles: File[];
+  pendingRemovalIds: Set<string>;
+  onPendingFilesChange: (files: File[]) => void;
+  onPendingRemovalIdsChange: (ids: Set<string>) => void;
 }) {
   const { t } = useTranslation();
   const configRef = useRef<HTMLDivElement>(null);
@@ -533,9 +647,13 @@ function SourceStepperContent({
     const els = [
       { id: "config" as SourceStepId, el: configRef.current },
       { id: "detectors" as SourceStepId, el: detectorsRef.current },
-    ].filter((x): x is { id: SourceStepId; el: HTMLDivElement } => x.el !== null);
+    ].filter(
+      (x): x is { id: SourceStepId; el: HTMLDivElement } => x.el !== null,
+    );
 
-    const map = new Map<Element, SourceStepId>(els.map(({ id, el }) => [el, id]));
+    const map = new Map<Element, SourceStepId>(
+      els.map(({ id, el }) => [el, id]),
+    );
 
     const observer = new IntersectionObserver(
       (entries) => {
@@ -560,16 +678,26 @@ function SourceStepperContent({
   };
 
   const scanConfigRef = useRef<SourceScanConfigHandle>(null);
+  const hasRequiredFiles =
+    selectedSourceType !== "SANDBOX" ||
+    uploadedFiles.filter((file) => !pendingRemovalIds.has(file.id)).length +
+      pendingFiles.length >
+      0;
 
   const withValidFormData = async (
     handler: (data: Record<string, unknown>) => void | Promise<void>,
   ) => {
+    if (!hasRequiredFiles) {
+      toast.error("Add at least one file before continuing.");
+      scrollToSection("config");
+      return;
+    }
     const validation = await sourceFormRef.current?.validate();
     if (!validation?.isValid) {
-      console.warn(
-        "[SourcesNew] Validation failed",
-        { missingFields: validation?.missingFields, errors: validation?.errors },
-      );
+      console.warn("[SourcesNew] Validation failed", {
+        missingFields: validation?.missingFields,
+        errors: validation?.errors,
+      });
       toast.error(t("sources.new.incompleteSettings"));
       scrollToSection("config");
       return;
@@ -607,6 +735,18 @@ function SourceStepperContent({
               schedule={schedule}
               onScheduleChange={onScheduleChange}
             />
+            {selectedSourceType === "SANDBOX" && (
+              <div className="mt-6">
+                <UploadedFiles
+                  existingFiles={uploadedFiles}
+                  pendingFiles={pendingFiles}
+                  pendingRemovalIds={pendingRemovalIds}
+                  onPendingFilesChange={onPendingFilesChange}
+                  onPendingRemovalIdsChange={onPendingRemovalIdsChange}
+                  disabled={isSavingConfig || isTestingConfig}
+                />
+              </div>
+            )}
           </section>
 
           <section ref={detectorsRef}>
@@ -638,6 +778,7 @@ function SourceStepperContent({
             testLabel={t("sources.edit.testSource")}
             saveAndRunLabel={t("sources.edit.saveAndScan")}
             isBusy={isSavingConfig || isTestingConfig}
+            disabled={!hasRequiredFiles}
             saveAndRunTestId="btn-save-and-scan"
             className="mt-0"
           />
@@ -652,7 +793,6 @@ function SourceStepperContent({
           />
         </aside>
       </div>
-
     </div>
   );
 }

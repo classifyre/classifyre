@@ -96,7 +96,6 @@
       "properties": {
         "enabled": { "type": "boolean" },
         "bucket": { "type": "string" },
-        "sandboxBucket": { "type": "string" },
         "logPrefix": { "type": "string" },
         "region": { "type": "string" },
         "endpoint": { "type": "string" },

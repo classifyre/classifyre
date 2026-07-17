@@ -83,6 +83,20 @@ export class CustomDetectorTestsService {
     });
   }
 
+  async getScenarioInput(
+    detectorId: string,
+    scenarioId: string,
+  ): Promise<string> {
+    const scenario = await this.prisma.customDetectorTestScenario.findFirst({
+      where: { id: scenarioId, detectorId },
+      select: { inputText: true },
+    });
+    if (!scenario) {
+      throw new NotFoundException(`Test scenario ${scenarioId} not found`);
+    }
+    return scenario.inputText;
+  }
+
   // ── Run ───────────────────────────────────────────────────────────────────
 
   async runScenarios(
@@ -169,6 +183,7 @@ export class CustomDetectorTestsService {
           pipelineSchema: detector.pipelineSchema as Record<string, unknown>,
         },
         scenario.inputText,
+        { detectorId: detector.id, scenarioId: scenario.id },
       );
 
       const expected = scenario.expectedOutcome as Record<string, unknown>;
@@ -217,6 +232,7 @@ export class CustomDetectorTestsService {
       pipelineSchema: Record<string, unknown>;
     },
     inputText: string,
+    scenario?: { detectorId: string; scenarioId: string },
   ): Promise<Record<string, unknown>> {
     const runId = `test-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
@@ -232,41 +248,25 @@ export class CustomDetectorTestsService {
 
     let stdout: string;
 
-    if (this.kubernetesCliJobService?.isEnabled()) {
-      // K8s mode: stage the test text as a transient sandbox run so it travels
-      // through the SAME per-job volume transport as real sandbox files (the
-      // job's init-container downloads it from /sandbox/runs/:id/input). The
-      // staging row is deleted as soon as the job finishes. No base64 inline.
-      const textBuffer = Buffer.from(inputText, 'utf8');
-      const staged = await this.prisma.sandboxRun.create({
-        data: {
-          fileName: `detector-test-${runId}.txt`,
-          fileType: '',
-          fileExtension: '.txt',
-          fileSizeBytes: textBuffer.length,
-          detectors: [detectorEntry] as any,
-          status: 'RUNNING',
-          inputData: new Uint8Array(textBuffer),
-        },
-        select: { id: true },
+    if (this.kubernetesCliJobService?.isEnabled() && scenario) {
+      const baseUrl = (
+        process.env.CLASSIFYRE_INTERNAL_API_URL ||
+        process.env.CLASSIFYRE_OUTPUT_REST_URL ||
+        'http://127.0.0.1:8000'
+      ).replace(/\/$/, '');
+      const inputUrl = `${baseUrl}/custom-detectors/${encodeURIComponent(scenario.detectorId)}/test-scenarios/${encodeURIComponent(scenario.scenarioId)}/input`;
+      const result = await this.kubernetesCliJobService.runFileEvaluationJob({
+        evaluationId: scenario.scenarioId,
+        inputUrl,
+        fileExtension: '.txt',
+        detectors: [detectorEntry],
       });
-      try {
-        const result = await this.kubernetesCliJobService.runSandboxJob({
-          runId: staged.id,
-          fileExtension: '.txt',
-          detectors: [detectorEntry],
-        });
-        if (result.exitCode !== 0) {
-          throw new Error(
-            `CLI exited with code ${result.exitCode}: ${result.output}`,
-          );
-        }
-        stdout = result.output;
-      } finally {
-        await this.prisma.sandboxRun
-          .delete({ where: { id: staged.id } })
-          .catch(() => undefined);
+      if (result.exitCode !== 0) {
+        throw new Error(
+          `CLI exited with code ${result.exitCode}: ${result.output}`,
+        );
       }
+      stdout = result.output;
     } else {
       // Local mode: write temp files and run CLI subprocess directly.
       const tmpDir = process.env.TEMP_DIR || os.tmpdir();
@@ -294,7 +294,7 @@ export class CustomDetectorTestsService {
         const command =
           `cd ${shellEscape(cliPath)} && ` +
           `uv run --locked --no-dev --python ${shellEscape(venvPython)} ` +
-          `python -m src.main sandbox ${shellEscape(textFile)} --detectors-file ${shellEscape(detectorsFile)}`;
+          `python -m src.main evaluate-file ${shellEscape(textFile)} --detectors-file ${shellEscape(detectorsFile)}`;
 
         // Allow up to 3 min: first run installs optional dep groups + loads
         // the model into memory, which can take 90–120 s on a cold start.

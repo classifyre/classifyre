@@ -106,6 +106,7 @@ export const SearchAssetsFiltersDtoSourceTypesEnum = {
     LocalFolder: 'LOCAL_FOLDER',
     Microsoft365: 'MICROSOFT_365',
     GoogleWorkspace: 'GOOGLE_WORKSPACE',
+    Sandbox: 'SANDBOX',
     Custom: 'CUSTOM'
 } as const;
 export type SearchAssetsFiltersDtoSourceTypesEnum = typeof SearchAssetsFiltersDtoSourceTypesEnum[keyof typeof SearchAssetsFiltersDtoSourceTypesEnum];
