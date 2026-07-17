@@ -44,7 +44,10 @@ describe('EmbeddingService', () => {
     hasVector: jest.fn(),
     version: jest.fn(),
   };
-  const analysis = { analyzeHashes: jest.fn() };
+  const analysis = {
+    analyzeHashes: jest.fn(),
+    valueRecurrenceSnapshot: jest.fn(),
+  };
   let service: EmbeddingService;
 
   beforeEach(() => {
@@ -59,6 +62,7 @@ describe('EmbeddingService', () => {
     prisma.$executeRaw.mockResolvedValue(0);
     prisma.finding.findMany.mockResolvedValue([]);
     prisma.$queryRaw.mockResolvedValue([]);
+    analysis.valueRecurrenceSnapshot.mockResolvedValue(new Map());
     service = new EmbeddingService(
       prisma as never,
       capability as never,
@@ -148,5 +152,37 @@ describe('EmbeddingService', () => {
       dimensions: 384,
       spaceId: undefined,
     });
+  });
+
+  it('reuses one recurrence snapshot across every recalibration batch', async () => {
+    const first = Array.from({ length: 500 }, (_, index) => ({
+      id: `finding-${String(index).padStart(3, '0')}`,
+      embedContentHash: `hash-${index}`,
+    }));
+    const second = [{ id: 'finding-500', embedContentHash: 'hash-500' }];
+    prisma.finding.findMany
+      .mockResolvedValueOnce(first)
+      .mockResolvedValueOnce(second)
+      .mockResolvedValueOnce([]);
+    const snapshot = new Map([['shared value', { assets: 2, sources: 1 }]]);
+    analysis.valueRecurrenceSnapshot.mockResolvedValue(snapshot);
+    prisma.embeddingSpace.update.mockResolvedValue(activeSpace);
+
+    await service.recalibrateSpace(activeSpace.id);
+
+    expect(analysis.valueRecurrenceSnapshot).toHaveBeenCalledTimes(1);
+    expect(analysis.analyzeHashes).toHaveBeenCalledTimes(2);
+    expect(analysis.analyzeHashes).toHaveBeenNthCalledWith(
+      1,
+      activeSpace.id,
+      expect.any(Array),
+      snapshot,
+    );
+    expect(analysis.analyzeHashes).toHaveBeenNthCalledWith(
+      2,
+      activeSpace.id,
+      ['hash-500'],
+      snapshot,
+    );
   });
 });

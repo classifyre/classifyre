@@ -11,6 +11,7 @@ describe('EmbeddingQueueService', () => {
   const prisma = {
     finding: { findMany: jest.fn(), update: jest.fn() },
     assetChunk: { findMany: jest.fn() },
+    glossaryTerm: { findMany: jest.fn(), update: jest.fn() },
     embeddingSpace: { findUnique: jest.fn() },
   };
   const config = {
@@ -53,6 +54,7 @@ describe('EmbeddingQueueService', () => {
     });
     prisma.finding.findMany.mockResolvedValue([]);
     prisma.assetChunk.findMany.mockResolvedValue([]);
+    prisma.glossaryTerm.findMany.mockResolvedValue([]);
     embeddings.missingHashes.mockResolvedValue([]);
     embeddings.putVectors.mockResolvedValue({ created: 0, received: 0 });
     embeddings.recalibrateSpace.mockResolvedValue({ analyzed: 0 });
@@ -233,5 +235,44 @@ describe('EmbeddingQueueService', () => {
       '9c85727f-8b6f-4de0-aee6-08a96b57f79b',
     );
     expect((await service.status()).lastRecalibratedAt).toBeDefined();
+  });
+
+  it('backfills existing glossary terms into the active embedding space', async () => {
+    await service.onApplicationBootstrap();
+    prisma.glossaryTerm.findMany
+      .mockResolvedValueOnce([
+        {
+          id: 'term-1',
+          term: 'Jane Doe',
+          aliases: ['J. Doe'],
+          notes: 'Person of interest',
+          embedContentHash: null,
+        },
+      ])
+      .mockResolvedValueOnce([]);
+    embeddings.missingHashes.mockImplementation((hashes) =>
+      Promise.resolve(hashes),
+    );
+
+    service.requestBackfill();
+    await new Promise((resolve) => setImmediate(resolve));
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(prisma.glossaryTerm.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'term-1' },
+        data: { embedContentHash: expect.any(String) },
+      }),
+    );
+    expect(boss.insert).toHaveBeenCalledWith(
+      'semantic-embeddings-9c85727f-8b6f-4de0-aee6-08a96b57f79b',
+      expect.arrayContaining([
+        expect.objectContaining({
+          data: expect.objectContaining({
+            text: 'Jane Doe J. Doe Person of interest',
+          }),
+        }),
+      ]),
+    );
   });
 });

@@ -285,6 +285,7 @@ export class EmbeddingQueueService implements OnApplicationBootstrap {
     try {
       await this.backfillFindings();
       await this.backfillAssetChunks();
+      await this.backfillGlossaryTerms();
       this.backfillCompletedAt = new Date().toISOString();
       this.scheduleRecalibration();
       this.logger.log(
@@ -371,6 +372,53 @@ export class EmbeddingQueueService implements OnApplicationBootstrap {
         })),
       );
       cursor = chunks.at(-1)?.id;
+      await new Promise((resolve) => setImmediate(resolve));
+    } while (cursor);
+  }
+
+  private async backfillGlossaryTerms(): Promise<void> {
+    let cursor: string | undefined;
+    do {
+      const terms = await this.prisma.glossaryTerm.findMany({
+        ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+        orderBy: { id: 'asc' },
+        take: INSERT_BATCH_SIZE,
+        select: {
+          id: true,
+          term: true,
+          aliases: true,
+          notes: true,
+          embedContentHash: true,
+        },
+      });
+      if (!terms.length) break;
+      const contents = terms.map((term) => {
+        const text = normalizeEmbeddingText(
+          term.term,
+          ...term.aliases,
+          term.notes,
+        );
+        const hash = embeddingContentHash(text);
+        return {
+          id: term.id,
+          hash,
+          text,
+          needsHash: term.embedContentHash !== hash,
+        };
+      });
+      await Promise.all(
+        contents
+          .filter((content) => content.needsHash)
+          .map((content) =>
+            this.prisma.glossaryTerm.update({
+              where: { id: content.id },
+              data: { embedContentHash: content.hash },
+              select: { id: true },
+            }),
+          ),
+      );
+      await this.persistMissing(contents);
+      cursor = terms.at(-1)?.id;
       await new Promise((resolve) => setImmediate(resolve));
     } while (cursor);
   }

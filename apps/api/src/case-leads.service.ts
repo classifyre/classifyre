@@ -1,4 +1,9 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import {
   CaseActivityType,
   CaseLead,
@@ -6,11 +11,11 @@ import {
   CaseLeadStatus,
 } from '@prisma/client';
 import { PrismaService } from './prisma.service';
-import { CasesService } from './cases.service';
 import { CaseActivityService } from './case-activity.service';
 import { EmbeddingService } from './embedding/embedding.service';
 import { InquiryMatchingService } from './matching/inquiry-matching.service';
 import { AgentMemoryService } from './autopilot/memory/agent-memory.service';
+import { GraphService } from './graph.service';
 
 const MAX_SEED_FINDINGS = 10;
 const NEIGHBORS_PER_SEED = 5;
@@ -31,11 +36,11 @@ export class CaseLeadsService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly cases: CasesService,
     private readonly activity: CaseActivityService,
     private readonly embeddings: EmbeddingService,
     private readonly matching: InquiryMatchingService,
     private readonly agentMemory: AgentMemoryService,
+    private readonly graph: GraphService,
   ) {}
 
   async list(caseId: string, status?: CaseLeadStatus) {
@@ -167,6 +172,7 @@ export class CaseLeadsService {
       }
       for (const neighbor of neighbors) {
         if (known.has(neighbor.id) || candidates.has(neighbor.id)) continue;
+        if (String(neighbor.status) !== 'OPEN') continue;
         if (neighbor.similarity < MIN_NEIGHBOR_SIMILARITY) continue;
         candidates.set(neighbor.id, {
           findingId: neighbor.id,
@@ -222,50 +228,162 @@ export class CaseLeadsService {
     reviewedBy = 'user',
     reason?: string,
   ) {
-    const lead = await this.prisma.caseLead.findUnique({
-      where: { id: leadId },
-    });
-    if (!lead || lead.caseId !== caseId) {
-      throw new NotFoundException(`Lead ${leadId} not found in case ${caseId}`);
+    if (action !== 'ACCEPT' && action !== 'DISMISS') {
+      throw new BadRequestException('action must be ACCEPT or DISMISS');
     }
-    if (lead.status !== 'PROPOSED') {
-      return { updated: false, status: lead.status };
-    }
-    if (action === 'ACCEPT') {
-      await this.cases.attachFindings(caseId, {
-        findingIds: [lead.findingId],
-        addedBy: reviewedBy,
+    const result = await this.prisma.$transaction(async (tx) => {
+      const lead = await tx.caseLead.findUnique({ where: { id: leadId } });
+      if (!lead || lead.caseId !== caseId) {
+        throw new NotFoundException(
+          `Lead ${leadId} not found in case ${caseId}`,
+        );
+      }
+      if (lead.status !== 'PROPOSED') {
+        return {
+          updated: false as const,
+          status: lead.status,
+          lead,
+          assetId: null,
+        };
+      }
+
+      let assetId: string | null = null;
+      if (action === 'ACCEPT') {
+        const finding = await tx.finding.findUnique({
+          where: { id: lead.findingId },
+          select: {
+            id: true,
+            assetId: true,
+            findingType: true,
+            severity: true,
+            detectorType: true,
+            customDetectorName: true,
+            matchedContent: true,
+            asset: {
+              select: { name: true, assetType: true, sourceType: true },
+            },
+          },
+        });
+        if (!finding) {
+          throw new BadRequestException(
+            `Lead ${leadId} is stale because finding ${lead.findingId} no longer exists`,
+          );
+        }
+        assetId = finding.assetId;
+        const claimed = await tx.caseLead.updateMany({
+          where: { id: leadId, caseId, status: 'PROPOSED' },
+          data: { status: 'ACCEPTED', reviewedBy, reviewedAt: new Date() },
+        });
+        if (claimed.count === 0) {
+          const current = await tx.caseLead.findUniqueOrThrow({
+            where: { id: leadId },
+          });
+          return {
+            updated: false as const,
+            status: current.status,
+            lead: current,
+            assetId: null,
+          };
+        }
+        const evidence = await tx.caseEvidence.upsert({
+          where: {
+            caseId_entityType_entityId: {
+              caseId,
+              entityType: 'asset',
+              entityId: finding.assetId,
+            },
+          },
+          create: {
+            caseId,
+            entityType: 'asset',
+            entityId: finding.assetId,
+            label: finding.asset?.name ?? null,
+            assetType: finding.asset?.assetType ?? null,
+            sourceType: finding.asset ? String(finding.asset.sourceType) : null,
+            addedBy: reviewedBy,
+          },
+          update: {},
+          select: { id: true },
+        });
+        await tx.caseFinding.createMany({
+          data: [
+            {
+              caseId,
+              caseEvidenceId: evidence.id,
+              findingId: finding.id,
+              label: finding.findingType,
+              severity: String(finding.severity),
+              detectorType: String(finding.detectorType),
+              customDetectorName: finding.customDetectorName ?? null,
+              matchedContent: finding.matchedContent,
+            },
+          ],
+          skipDuplicates: true,
+        });
+        await this.activity.record(
+          caseId,
+          CaseActivityType.LEAD_ACCEPTED,
+          { leadId, findingId: lead.findingId, label: lead.title },
+          reviewedBy,
+          tx,
+        );
+        return {
+          updated: true as const,
+          status: CaseLeadStatus.ACCEPTED,
+          lead,
+          assetId,
+        };
+      }
+
+      const claimed = await tx.caseLead.updateMany({
+        where: { id: leadId, caseId, status: 'PROPOSED' },
+        data: { status: 'DISMISSED', reviewedBy, reviewedAt: new Date() },
       });
-      const updated = await this.prisma.caseLead.update({
-        where: { id: leadId },
-        data: { status: 'ACCEPTED', reviewedBy, reviewedAt: new Date() },
-      });
+      if (claimed.count === 0) {
+        const current = await tx.caseLead.findUniqueOrThrow({
+          where: { id: leadId },
+        });
+        return {
+          updated: false as const,
+          status: current.status,
+          lead: current,
+          assetId: null,
+        };
+      }
       await this.activity.record(
         caseId,
-        CaseActivityType.LEAD_ACCEPTED,
-        { leadId, findingId: lead.findingId, label: lead.title },
+        CaseActivityType.LEAD_DISMISSED,
+        { leadId, findingId: lead.findingId, label: lead.title, reason },
         reviewedBy,
+        tx,
       );
-      return { updated: true, status: updated.status };
-    }
-    const updated = await this.prisma.caseLead.update({
-      where: { id: leadId },
-      data: { status: 'DISMISSED', reviewedBy, reviewedAt: new Date() },
+      return {
+        updated: true as const,
+        status: CaseLeadStatus.DISMISSED,
+        lead,
+        assetId: null,
+      };
     });
-    await this.activity.record(
-      caseId,
-      CaseActivityType.LEAD_DISMISSED,
-      { leadId, findingId: lead.findingId, label: lead.title, reason },
-      reviewedBy,
-    );
+
+    if (
+      result.updated &&
+      result.status === CaseLeadStatus.ACCEPTED &&
+      result.assetId
+    ) {
+      await this.graph.inferEdgesForAsset(result.assetId);
+      return { updated: true, status: result.status };
+    }
+    if (!result.updated || result.status !== CaseLeadStatus.DISMISSED) {
+      return { updated: result.updated, status: result.status };
+    }
     // Teach the agents: this candidate was reviewed and rejected for this case.
     await this.agentMemory
       .writeMany(
         [
           {
             kind: 'DECISION_PRECEDENT',
-            key: `dismissed-lead-${caseId}-${lead.findingId}`,
-            content: `Lead "${lead.title}" was dismissed for case ${caseId}${reason ? `: ${reason}` : ''}. Do not re-propose this finding for this case.`,
+            key: `dismissed-lead-${caseId}-${result.lead.findingId}`,
+            content: `Lead "${result.lead.title}" was dismissed for case ${caseId}${reason ? `: ${reason}` : ''}. Do not re-propose this finding for this case.`,
             tags: ['lead-dismissal'],
           },
         ],
@@ -280,7 +398,7 @@ export class CaseLeadsService {
           }`,
         ),
       );
-    return { updated: true, status: updated.status };
+    return { updated: true, status: result.status };
   }
 
   private async ensureCase(caseId: string) {

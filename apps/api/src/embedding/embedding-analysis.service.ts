@@ -14,6 +14,8 @@ type ValueRecurrenceRow = {
   sourceCount: bigint | number;
 };
 
+export type ValueRecurrence = Map<string, { assets: number; sources: number }>;
+
 // Findings whose evidence text falls below this quality are treated as likely
 // OCR noise: their importance is scaled down proportionally instead of only
 // losing the 30% quality term, so junk lands near the bottom of the ranking.
@@ -74,9 +76,7 @@ export class EmbeddingAnalysisService {
     return value.toLowerCase().replace(/\s+/g, ' ').trim();
   }
 
-  private async valueRecurrence(
-    values: string[],
-  ): Promise<Map<string, { assets: number; sources: number }>> {
+  private async valueRecurrence(values: string[]): Promise<ValueRecurrence> {
     const unique = [
       ...new Set(
         values.filter((value) => value.length >= MIN_RECURRENCE_VALUE_LENGTH),
@@ -84,12 +84,35 @@ export class EmbeddingAnalysisService {
     ];
     if (!unique.length) return new Map();
     const rows = await this.prisma.$queryRaw<ValueRecurrenceRow[]>`
-      SELECT lower(regexp_replace(matched_content, '\\s+', ' ', 'g')) AS "normalizedValue",
+      SELECT lower(btrim(regexp_replace(matched_content, '\\s+', ' ', 'g'))) AS "normalizedValue",
         count(DISTINCT asset_id) AS "assetCount",
         count(DISTINCT source_id) AS "sourceCount"
       FROM findings
-      WHERE lower(regexp_replace(matched_content, '\\s+', ' ', 'g')) = ANY(${unique}::text[])
+      WHERE lower(btrim(regexp_replace(matched_content, '\\s+', ' ', 'g'))) = ANY(${unique}::text[])
       GROUP BY 1
+    `;
+    return new Map(
+      rows.map((row) => [
+        row.normalizedValue,
+        { assets: Number(row.assetCount), sources: Number(row.sourceCount) },
+      ]),
+    );
+  }
+
+  /**
+   * Compute corpus-wide recurrence once for a full recalibration. Passing this
+   * snapshot into every analysis batch avoids rescanning the findings table
+   * once per 500 rows.
+   */
+  async valueRecurrenceSnapshot(): Promise<ValueRecurrence> {
+    const rows = await this.prisma.$queryRaw<ValueRecurrenceRow[]>`
+      SELECT lower(btrim(regexp_replace(matched_content, '\\s+', ' ', 'g'))) AS "normalizedValue",
+        count(DISTINCT asset_id) AS "assetCount",
+        count(DISTINCT source_id) AS "sourceCount"
+      FROM findings
+      WHERE length(lower(btrim(regexp_replace(matched_content, '\\s+', ' ', 'g')))) >= ${MIN_RECURRENCE_VALUE_LENGTH}
+      GROUP BY 1
+      HAVING count(DISTINCT asset_id) >= 2
     `;
     return new Map(
       rows.map((row) => [
@@ -128,7 +151,11 @@ export class EmbeddingAnalysisService {
     ];
   }
 
-  async analyzeHashes(spaceId: string, contentHashes: string[]): Promise<void> {
+  async analyzeHashes(
+    spaceId: string,
+    contentHashes: string[],
+    recurrenceSnapshot?: ValueRecurrence,
+  ): Promise<void> {
     if (!contentHashes.length) return;
     const findings = await this.prisma.finding.findMany({
       where: { embedContentHash: { in: contentHashes } },
@@ -151,9 +178,11 @@ export class EmbeddingAnalysisService {
         );
       }
     }
-    const recurrence = await this.valueRecurrence(
-      findings.map((finding) => this.normalizeValue(finding.matchedContent)),
-    );
+    const recurrence =
+      recurrenceSnapshot ??
+      (await this.valueRecurrence(
+        findings.map((finding) => this.normalizeValue(finding.matchedContent)),
+      ));
 
     await Promise.all(
       findings.map(async (finding) => {

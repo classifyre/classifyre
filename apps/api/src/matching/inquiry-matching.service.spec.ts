@@ -253,4 +253,40 @@ describe('InquiryMatchingService', () => {
     });
     expect(mockPrisma.inquiry.update).not.toHaveBeenCalled();
   });
+
+  it('keeps importance ordering when paginating live matches', async () => {
+    mockPrisma.inquiry.findUnique.mockResolvedValue(
+      inquiry({ findingTypes: ['email'] }),
+    );
+    mockPrisma.finding.findMany.mockResolvedValue([
+      finding({
+        id: 'recent-low',
+        createdAt: new Date('2026-07-17T12:00:00Z'),
+        asset: { name: 'recent.csv', sourceType: 'S3' },
+        evidenceAnalysis: {
+          importanceScore: 0.2,
+          qualityScore: 1,
+          similarCount: 0,
+          duplicateGroupHash: null,
+          reasons: [],
+        },
+      }),
+      finding({
+        id: 'older-high',
+        createdAt: new Date('2026-07-16T12:00:00Z'),
+        asset: { name: 'older.csv', sourceType: 'S3' },
+        evidenceAnalysis: {
+          importanceScore: 0.9,
+          qualityScore: 1,
+          similarCount: 0,
+          duplicateGroupHash: null,
+          reasons: [],
+        },
+      }),
+    ]);
+
+    const result = await service.getLiveMatches('q1', { limit: 1 });
+
+    expect(result.items[0].findingId).toBe('older-high');
+  });
 });

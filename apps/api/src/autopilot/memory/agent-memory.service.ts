@@ -115,7 +115,7 @@ export class AgentMemoryService {
       // dropped its tags, and the findUnique→create path could collide on the
       // kind_key unique constraint outright. Tags are merged in SQL so a
       // concurrent write cannot lose entries.
-      await this.prisma.$executeRaw`
+      const changed = await this.prisma.$executeRaw`
         INSERT INTO agent_memories (id, kind, key, content, tags, weight, ref_type, ref_id, origin, verified_at, verified_by, created_at, updated_at)
         VALUES (
           gen_random_uuid()::text,
@@ -148,8 +148,12 @@ export class AgentMemoryService {
           verified_at = EXCLUDED.verified_at,
           verified_by = EXCLUDED.verified_by,
           updated_at = now()
+        -- Agent hypotheses must never replace operator-authored directives.
+        -- The no-op also preserves their verification metadata and weight.
+        WHERE EXCLUDED.origin = 'OPERATOR'
+           OR agent_memories.origin <> 'OPERATOR'
       `;
-      written++;
+      if (changed > 0) written++;
     }
     return written;
   }

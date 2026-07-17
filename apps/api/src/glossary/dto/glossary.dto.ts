@@ -57,6 +57,13 @@ export class LookupGlossaryQueryDto {
 }
 
 export class UpsertGlossaryTermDto {
+  @ApiPropertyOptional({
+    description: 'Existing row ID when editing or renaming',
+  })
+  @IsOptional()
+  @IsString()
+  id?: string;
+
   @ApiProperty()
   @IsString()
   @MaxLength(200)

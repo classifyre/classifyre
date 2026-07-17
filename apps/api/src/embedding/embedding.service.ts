@@ -289,6 +289,7 @@ export class EmbeddingService implements OnApplicationBootstrap {
    */
   async recalibrateSpace(spaceId?: string): Promise<{ analyzed: number }> {
     const resolvedSpaceId = spaceId ?? (await this.activeSpace()).id;
+    const recurrence = await this.analysis.valueRecurrenceSnapshot();
     let cursor: string | undefined;
     let analyzed = 0;
     do {
@@ -305,7 +306,7 @@ export class EmbeddingService implements OnApplicationBootstrap {
           findings.map((finding) => finding.embedContentHash as string),
         ),
       ];
-      await this.analysis.analyzeHashes(resolvedSpaceId, hashes);
+      await this.analysis.analyzeHashes(resolvedSpaceId, hashes, recurrence);
       await this.calibrateNeighborhood(resolvedSpaceId, hashes);
       analyzed += findings.length;
       cursor = findings.at(-1)?.id;
