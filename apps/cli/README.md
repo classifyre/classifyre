@@ -37,7 +37,7 @@ Commands:
 - `test` - test source connection.
 - `discover` - discover source resources.
 - `extract` - run extraction and emit batched output.
-- `sandbox` - run sandbox parsing/detectors for a local file.
+- `evaluate-file` - internally evaluate detectors against one local file.
 
 ## Extract Output Model
 
@@ -61,7 +61,7 @@ Default behavior:
 Global/common:
 
 - `--debug` - enable debug logging.
-- `--detectors-file <path>` - sandbox only.
+- `--detectors-file <path>` - file evaluation only.
 
 Extract output options:
 

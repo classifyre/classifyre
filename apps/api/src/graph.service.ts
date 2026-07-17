@@ -448,9 +448,8 @@ export class GraphService {
   /**
    * Build the question graph. The question's own records (question_evidence +
    * question_findings) are the source of truth: their denormalized snapshots make
-   * every linked node survive deletion of the underlying asset/finding, and let
-   * sandbox evidence — which has no asset/finding rows — appear as first-class
-   * nodes. The live edge neighbourhood of real assets is layered on top for
+   * every linked node survive deletion of the underlying asset/finding. The
+   * live edge neighbourhood of real assets is layered on top for
    * relationships and unlinked findings.
    */
   async caseGraph(caseId: string, depth = 1): Promise<GraphResponseDto> {

@@ -58,7 +58,8 @@ export const SOURCE_CATEGORY_META: Record<
   },
   SOCIAL_MEDIA: {
     label: "Social Media",
-    description: "Social and video platforms with public posts and transcripts.",
+    description:
+      "Social and video platforms with public posts and transcripts.",
   },
   COLLABORATION: {
     label: "Collaboration",
@@ -88,6 +89,13 @@ export const SOURCE_CATEGORY_ORDER: SourceCatalogCategory[] = [
 ];
 
 export const SOURCE_TYPE_CATALOG_META: Record<string, SourceCatalogMetaBase> = {
+  SANDBOX: {
+    description:
+      "Upload files directly and scan them through the standard source lifecycle.",
+    icon: CreateSourceDtoTypeEnum.Sandbox,
+    category: "WAREHOUSE_LAKEHOUSE",
+    keywords: ["upload", "files", "documents", "ad hoc", "sandbox"],
+  },
   WORDPRESS: {
     description: "Connect to WordPress to scan posts and pages.",
     icon: CreateSourceDtoTypeEnum.Wordpress,
@@ -227,14 +235,28 @@ export const SOURCE_TYPE_CATALOG_META: Record<string, SourceCatalogMetaBase> = {
       "Scan IMAP mailboxes (Gmail, Outlook/M365, and more) for messages and attachments.",
     icon: CreateSourceDtoTypeEnum.Email,
     category: "COLLABORATION",
-    keywords: ["imap", "gmail", "outlook", "mailbox", "messages", "attachments"],
+    keywords: [
+      "imap",
+      "gmail",
+      "outlook",
+      "mailbox",
+      "messages",
+      "attachments",
+    ],
   },
   YOUTUBE: {
     description:
       "Scan YouTube channels and videos, fetching metadata and transcripts for detection.",
     icon: CreateSourceDtoTypeEnum.Youtube,
     category: "SOCIAL_MEDIA",
-    keywords: ["video", "social media", "ugc", "captions", "transcript", "channel"],
+    keywords: [
+      "video",
+      "social media",
+      "ugc",
+      "captions",
+      "transcript",
+      "channel",
+    ],
   },
   DELTA_LAKE: {
     description:
@@ -251,8 +273,7 @@ export const SOURCE_TYPE_CATALOG_META: Record<string, SourceCatalogMetaBase> = {
     keywords: ["lakehouse", "iceberg", "snapshots", "tables", "s3"],
   },
   KAFKA: {
-    description:
-      "Discover Kafka topics and sample messages for detection.",
+    description: "Discover Kafka topics and sample messages for detection.",
     icon: CreateSourceDtoTypeEnum.Kafka,
     category: "STREAMING",
     keywords: ["kafka", "streaming", "events", "topics", "messages", "broker"],
@@ -283,7 +304,14 @@ export const SOURCE_TYPE_CATALOG_META: Record<string, SourceCatalogMetaBase> = {
       "Scan a folder on this computer for documents, spreadsheets, and images.",
     icon: CreateSourceDtoTypeEnum.LocalFolder,
     category: "WAREHOUSE_LAKEHOUSE",
-    keywords: ["folder", "files", "local", "filesystem", "desktop", "documents"],
+    keywords: [
+      "folder",
+      "files",
+      "local",
+      "filesystem",
+      "desktop",
+      "documents",
+    ],
   },
   MICROSOFT_365: {
     description:

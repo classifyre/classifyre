@@ -15,7 +15,7 @@ import { InstanceSettingsService } from '../instance-settings.service';
 
 type KubernetesModule = typeof import('@kubernetes/client-node');
 
-type CliJobMode = 'extract' | 'test' | 'sandbox';
+type CliJobMode = 'extract' | 'test' | 'evaluation';
 type JobCleanupPolicy = 'none' | 'failed' | 'always';
 
 interface CliJobResult {
@@ -83,32 +83,32 @@ export class KubernetesCliJobService {
   async runTestJob(
     sourceId: string,
     recipe: Record<string, unknown>,
+    outputRestUrl?: string,
   ): Promise<CliJobResult> {
     return this.runJob({
       sourceId,
       recipe,
       mode: 'test',
+      outputRestUrl,
     });
   }
 
-  async runSandboxJob(params: {
-    runId: string;
+  async runFileEvaluationJob(params: {
+    evaluationId: string;
+    inputUrl: string;
     fileExtension: string;
     detectors: unknown[];
   }): Promise<CliJobResult> {
-    // The input file is always transported via the per-job volume: an
-    // init-container downloads it from the API (GET /sandbox/runs/:id/input)
-    // into an emptyDir that dies with the job. Never inlined, never via S3.
-    // Callers that don't have a persisted SandboxRun row must create one first.
     return this.runJob({
-      sourceId: params.runId,
-      mode: 'sandbox',
-      sandboxFileExt: params.fileExtension,
-      sandboxDetectorsB64: Buffer.from(
+      sourceId: params.evaluationId,
+      mode: 'evaluation',
+      evaluationInputUrl: params.inputUrl,
+      evaluationFileExt: params.fileExtension,
+      evaluationDetectorsB64: Buffer.from(
         JSON.stringify(params.detectors),
         'utf8',
       ).toString('base64'),
-      jobTrackingKey: params.runId,
+      jobTrackingKey: params.evaluationId,
     });
   }
 
@@ -117,10 +117,6 @@ export class KubernetesCliJobService {
     persistedRef?: Partial<JobRef>,
   ): Promise<void> {
     await this.stopTrackedJob(runnerId, persistedRef);
-  }
-
-  async stopSandboxJob(runId: string): Promise<void> {
-    await this.stopTrackedJob(runId);
   }
 
   private async stopTrackedJob(
@@ -225,8 +221,9 @@ export class KubernetesCliJobService {
     outputRestUrl?: string;
     hasSuccessfulRuns?: boolean;
     samplingCursorB64?: string;
-    sandboxFileExt?: string;
-    sandboxDetectorsB64?: string;
+    evaluationInputUrl?: string;
+    evaluationFileExt?: string;
+    evaluationDetectorsB64?: string;
     jobTrackingKey?: string;
     onLogChunk?: CliJobLogHandler;
     onJobCreated?: CliJobCreatedHandler;
@@ -407,8 +404,9 @@ export class KubernetesCliJobService {
       outputRestUrl?: string;
       hasSuccessfulRuns?: boolean;
       samplingCursorB64?: string;
-      sandboxFileExt?: string;
-      sandboxDetectorsB64?: string;
+      evaluationInputUrl?: string;
+      evaluationFileExt?: string;
+      evaluationDetectorsB64?: string;
     },
   ): Promise<V1Job> {
     const job = JSON.parse(JSON.stringify(template)) as V1Job;
@@ -500,16 +498,22 @@ export class KubernetesCliJobService {
         value: params.samplingCursorB64,
       });
     }
-    if (params.sandboxFileExt !== undefined) {
-      envMap.set('SANDBOX_FILE_EXT', {
-        name: 'SANDBOX_FILE_EXT',
-        value: params.sandboxFileExt,
+    if (params.evaluationInputUrl) {
+      envMap.set('EVALUATION_INPUT_URL', {
+        name: 'EVALUATION_INPUT_URL',
+        value: params.evaluationInputUrl,
       });
     }
-    if (params.sandboxDetectorsB64) {
-      envMap.set('SANDBOX_DETECTORS_B64', {
-        name: 'SANDBOX_DETECTORS_B64',
-        value: params.sandboxDetectorsB64,
+    if (params.evaluationFileExt !== undefined) {
+      envMap.set('EVALUATION_FILE_EXT', {
+        name: 'EVALUATION_FILE_EXT',
+        value: params.evaluationFileExt,
+      });
+    }
+    if (params.evaluationDetectorsB64) {
+      envMap.set('EVALUATION_DETECTORS_B64', {
+        name: 'EVALUATION_DETECTORS_B64',
+        value: params.evaluationDetectorsB64,
       });
     }
 
@@ -537,9 +541,8 @@ export class KubernetesCliJobService {
     container.command = ['/bin/sh', '-lc'];
     container.args = [this.buildJobCommand(params.mode, workDir)];
 
-    // Sandbox jobs always receive their input file via the per-job volume.
-    if (params.mode === 'sandbox') {
-      this.attachSandboxInputVolume(jobAny, container, envMap);
+    if (params.mode === 'evaluation') {
+      this.attachEvaluationInputVolume(jobAny, container, envMap);
     }
 
     // Apply per-source resource overrides from recipe
@@ -664,15 +667,18 @@ export class KubernetesCliJobService {
       ].join(' ');
     } else if (mode === 'test') {
       prelude.push('printf "%s" "$RECIPE_B64" | base64 -d > /tmp/recipe.json');
+      prelude.push(
+        'export CLASSIFYRE_OUTPUT_REST_URL="${CLASSIFYRE_OUTPUT_REST_URL:-http://127.0.0.1:8000}"',
+      );
       command = '"$PYTHON_BIN" -m src.main test /tmp/recipe.json';
     } else {
-      // sandbox: the input file is placed at /sandbox-input/input<ext> by the
-      // init-container (downloaded from the API). Only detectors travel as env.
+      // File evaluation: an init-container streams the ephemeral input from
+      // the API into an emptyDir shared with the CLI container.
       prelude.push(
-        'printf "%s" "$SANDBOX_DETECTORS_B64" | base64 -d > /tmp/sandbox-detectors.json',
+        'printf "%s" "$EVALUATION_DETECTORS_B64" | base64 -d > /tmp/evaluation-detectors.json',
       );
       command =
-        '"$PYTHON_BIN" -m src.main sandbox "/sandbox-input/input${SANDBOX_FILE_EXT:-}" --detectors-file /tmp/sandbox-detectors.json';
+        '"$PYTHON_BIN" -m src.main evaluate-file "/evaluation-input/input${EVALUATION_FILE_EXT:-}" --detectors-file /tmp/evaluation-detectors.json';
     }
 
     return [
@@ -684,64 +690,60 @@ export class KubernetesCliJobService {
   }
 
   /**
-   * Wire up the sandbox input-file transport: a per-job `emptyDir` volume that an
+   * Wire up the file-evaluation input transport: a per-job `emptyDir` volume that an
    * init-container populates by downloading the file from the API over the
    * cluster network. The volume (and the file) die with the job pod — no S3, no
    * oversized base64 env var, no shared persistent storage.
    */
-  private attachSandboxInputVolume(
+  private attachEvaluationInputVolume(
     jobAny: any,
     container: V1Container,
     envMap: Map<string, V1EnvVar>,
   ): void {
-    const mountPath = '/sandbox-input';
+    const mountPath = '/evaluation-input';
     const podSpec = jobAny.spec.template.spec;
 
     podSpec.volumes = [
       ...(podSpec.volumes || []),
-      { name: 'sandbox-input', emptyDir: {} },
+      { name: 'evaluation-input', emptyDir: {} },
     ];
     container.volumeMounts = [
       ...(container.volumeMounts || []),
-      { name: 'sandbox-input', mountPath },
+      { name: 'evaluation-input', mountPath },
     ];
 
     const initEnv: V1EnvVar[] = [
       {
-        name: 'CLASSIFYRE_OUTPUT_REST_URL',
-        value: envMap.get('CLASSIFYRE_OUTPUT_REST_URL')?.value || '',
+        name: 'EVALUATION_INPUT_URL',
+        value: envMap.get('EVALUATION_INPUT_URL')?.value || '',
       },
-      { name: 'SOURCE_ID', value: envMap.get('SOURCE_ID')?.value || '' },
       {
-        name: 'SANDBOX_FILE_EXT',
-        value: envMap.get('SANDBOX_FILE_EXT')?.value || '',
+        name: 'EVALUATION_FILE_EXT',
+        value: envMap.get('EVALUATION_FILE_EXT')?.value || '',
       },
     ];
 
     const initContainer: V1Container = {
-      name: 'sandbox-input-fetch',
+      name: 'evaluation-input-fetch',
       image: container.image,
       imagePullPolicy: container.imagePullPolicy,
       ...(container.securityContext
         ? { securityContext: container.securityContext }
         : {}),
       env: initEnv,
-      volumeMounts: [{ name: 'sandbox-input', mountPath }],
+      volumeMounts: [{ name: 'evaluation-input', mountPath }],
       command: ['/bin/sh', '-lc'],
-      args: [this.buildSandboxFetchCommand(mountPath)],
+      args: [this.buildEvaluationFetchCommand(mountPath)],
     };
 
     podSpec.initContainers = [...(podSpec.initContainers || []), initContainer];
   }
 
-  /** Shell+python script the init-container runs to fetch the sandbox file. */
-  private buildSandboxFetchCommand(mountPath: string): string {
+  private buildEvaluationFetchCommand(mountPath: string): string {
     const py = [
       'import os,sys,time,urllib.request',
-      "base=os.environ.get('CLASSIFYRE_OUTPUT_REST_URL','').rstrip('/')",
-      "rid=os.environ.get('SOURCE_ID','')",
-      "ext=os.environ.get('SANDBOX_FILE_EXT','')",
-      'url=f"{base}/sandbox/runs/{rid}/input"',
+      "url=os.environ.get('EVALUATION_INPUT_URL','')",
+      "ext=os.environ.get('EVALUATION_FILE_EXT','')",
       `dst=f"${mountPath}/input"+ext`,
       'last=None',
       'for attempt in range(30):',
@@ -751,10 +753,10 @@ export class KubernetesCliJobService {
       '                chunk=r.read(1048576)',
       '                if not chunk: break',
       '                f.write(chunk)',
-      '        print(f"sandbox input downloaded to {dst}", flush=True); sys.exit(0)',
+      '        print(f"evaluation input downloaded to {dst}", flush=True); sys.exit(0)',
       '    except Exception as e:',
       '        last=e; print(f"attempt {attempt+1} failed: {e}", flush=True); time.sleep(2)',
-      'print(f"failed to download sandbox input from {url}: {last}", file=sys.stderr); sys.exit(1)',
+      'print(f"failed to download evaluation input from {url}: {last}", file=sys.stderr); sys.exit(1)',
     ].join('\n');
     // Heredoc keeps the python source free of shell interpolation.
     return `set -eu; python3 - <<'PYEOF'\n${py}\nPYEOF`;

@@ -49,6 +49,15 @@ import {
 } from "@/lib/assistant-form-utils";
 import { extractApiErrorMessage } from "@/lib/extract-api-error-message";
 import { useTranslation } from "@/hooks/use-translation";
+import {
+  UploadedFiles,
+  type UploadedFileMetadata,
+} from "@/components/uploaded-files";
+import {
+  deleteSourceFile,
+  listSourceFiles,
+  uploadSourceFile,
+} from "@/lib/source-files-api";
 
 const normalizeDetectors = (detectors: DetectorConfigInput[]) =>
   detectors
@@ -85,6 +94,13 @@ export default function EditSourcePage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSavingConfig, setIsSavingConfig] = useState(false);
   const [isTestingConfig, setIsTestingConfig] = useState(false);
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedFileMetadata[]>(
+    [],
+  );
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [pendingRemovalIds, setPendingRemovalIds] = useState<Set<string>>(
+    new Set(),
+  );
   const [testConnectionDialog, setTestConnectionDialog] = useState<{
     open: boolean;
     status: TestConnectionStatus;
@@ -112,6 +128,9 @@ export default function EditSourcePage() {
           type: (data.type as SourceType) || "WORDPRESS",
           config: data.config as Record<string, unknown> | undefined,
         });
+        if (data.type === "SANDBOX") {
+          setUploadedFiles(await listSourceFiles(sourceId));
+        }
         // Read schedule fields from source response
         if (data.scheduleEnabled) {
           setSchedule({
@@ -289,11 +308,73 @@ export default function EditSourcePage() {
 
   useRegisterAssistantBridge(assistantBridge);
 
+  const persistSandboxFiles = async () => {
+    if (source?.type !== "SANDBOX") return true;
+    const retained = uploadedFiles.filter(
+      (file) => !pendingRemovalIds.has(file.id),
+    );
+    const uploadResults = await Promise.allSettled(
+      pendingFiles.map((file) => uploadSourceFile(sourceId, file)),
+    );
+    const additions = uploadResults
+      .filter(
+        (result): result is PromiseFulfilledResult<UploadedFileMetadata> =>
+          result.status === "fulfilled",
+      )
+      .map((result) => result.value);
+    if (retained.length + additions.length === 0) {
+      toast.error("A Sandbox source must contain at least one file.");
+      return false;
+    }
+
+    const removalIds = [...pendingRemovalIds];
+    const deletionResults = await Promise.allSettled(
+      removalIds.map((fileId) => deleteSourceFile(sourceId, fileId)),
+    );
+    const failedDeletionIds = new Set(
+      removalIds.filter(
+        (_, index) => deletionResults[index]?.status === "rejected",
+      ),
+    );
+    setUploadedFiles([
+      ...uploadedFiles.filter(
+        (file) =>
+          !pendingRemovalIds.has(file.id) || failedDeletionIds.has(file.id),
+      ),
+      ...additions,
+    ]);
+    setPendingFiles(
+      pendingFiles.filter(
+        (_, index) => uploadResults[index]?.status === "rejected",
+      ),
+    );
+    setPendingRemovalIds(failedDeletionIds);
+
+    const uploadFailures = uploadResults.filter(
+      (result) => result.status === "rejected",
+    ).length;
+    if (uploadFailures > 0)
+      toast.error(`${uploadFailures} file(s) failed to upload.`);
+    if (failedDeletionIds.size > 0)
+      toast.error(`${failedDeletionIds.size} file(s) could not be removed.`);
+    return true;
+  };
+
   const persistSource = async (data: Record<string, unknown>) => {
     if (!source) return;
 
     try {
       setIsSavingConfig(true);
+
+      if (
+        source.type === "SANDBOX" &&
+        uploadedFiles.filter((file) => !pendingRemovalIds.has(file.id)).length +
+          pendingFiles.length ===
+          0
+      ) {
+        toast.error("A Sandbox source must contain at least one file.");
+        return false;
+      }
 
       const {
         name,
@@ -325,11 +406,14 @@ export default function EditSourcePage() {
         id: sourceId,
         updateSourceDto: {
           name: name ? String(name) : undefined,
-          description: typeof description === "string" ? description : undefined,
+          description:
+            typeof description === "string" ? description : undefined,
           config,
           ...scheduleFields,
         },
       });
+
+      if (!(await persistSandboxFiles())) return false;
 
       if (updated) {
         setSource({
@@ -495,6 +579,11 @@ export default function EditSourcePage() {
         selectedCustomDetectorIds={selectedCustomDetectorIds}
         onCustomDetectorsChange={setSelectedCustomDetectorIds}
         onScheduleChange={setSchedule}
+        uploadedFiles={uploadedFiles}
+        pendingFiles={pendingFiles}
+        pendingRemovalIds={pendingRemovalIds}
+        onPendingFilesChange={setPendingFiles}
+        onPendingRemovalIdsChange={setPendingRemovalIds}
       />
 
       <TestConnectionDialog
@@ -528,6 +617,11 @@ function SourceEditStepperContent({
   selectedCustomDetectorIds,
   onCustomDetectorsChange,
   onScheduleChange,
+  uploadedFiles,
+  pendingFiles,
+  pendingRemovalIds,
+  onPendingFilesChange,
+  onPendingRemovalIdsChange,
 }: {
   sourceType: SourceType;
   sourceId: string;
@@ -544,6 +638,11 @@ function SourceEditStepperContent({
   selectedCustomDetectorIds: string[];
   onCustomDetectorsChange: (ids: string[]) => void;
   onScheduleChange: (schedule: ScheduleValue) => void;
+  uploadedFiles: UploadedFileMetadata[];
+  pendingFiles: File[];
+  pendingRemovalIds: Set<string>;
+  onPendingFilesChange: (files: File[]) => void;
+  onPendingRemovalIdsChange: (ids: Set<string>) => void;
 }) {
   const { t } = useTranslation();
   const configRef = useRef<HTMLDivElement>(null);
@@ -560,9 +659,13 @@ function SourceEditStepperContent({
     const els = [
       { id: "config" as SourceStepId, el: configRef.current },
       { id: "detectors" as SourceStepId, el: detectorsRef.current },
-    ].filter((x): x is { id: SourceStepId; el: HTMLDivElement } => x.el !== null);
+    ].filter(
+      (x): x is { id: SourceStepId; el: HTMLDivElement } => x.el !== null,
+    );
 
-    const map = new Map<Element, SourceStepId>(els.map(({ id, el }) => [el, id]));
+    const map = new Map<Element, SourceStepId>(
+      els.map(({ id, el }) => [el, id]),
+    );
 
     const observer = new IntersectionObserver(
       (entries) => {
@@ -587,13 +690,23 @@ function SourceEditStepperContent({
   };
 
   const scanConfigRef = useRef<SourceScanConfigHandle>(null);
+  const hasRequiredFiles =
+    sourceType !== "SANDBOX" ||
+    uploadedFiles.filter((file) => !pendingRemovalIds.has(file.id)).length +
+      pendingFiles.length >
+      0;
 
   const withValidFormData = async (
     handler: (data: Record<string, unknown>) => void | Promise<void>,
   ) => {
+    if (!hasRequiredFiles) {
+      toast.error("Add at least one file before continuing.");
+      scrollToSection("config");
+      return;
+    }
     const validation = await sourceFormRef.current?.validate();
     if (!validation?.isValid) {
-      const errorMsg = validation?.errors?.length 
+      const errorMsg = validation?.errors?.length
         ? `${t("sources.new.incompleteSettings")}: ${validation.errors.slice(0, 3).join(", ")}`
         : t("sources.new.incompleteSettings");
       toast.error(errorMsg);
@@ -643,6 +756,18 @@ function SourceEditStepperContent({
                   schedule={schedule}
                   onScheduleChange={onScheduleChange}
                 />
+                {sourceType === "SANDBOX" && (
+                  <div className="mt-6">
+                    <UploadedFiles
+                      existingFiles={uploadedFiles}
+                      pendingFiles={pendingFiles}
+                      pendingRemovalIds={pendingRemovalIds}
+                      onPendingFilesChange={onPendingFilesChange}
+                      onPendingRemovalIdsChange={onPendingRemovalIdsChange}
+                      disabled={isSavingConfig || isTestingConfig}
+                    />
+                  </div>
+                )}
               </CardContent>
             </Card>
           </section>
@@ -676,6 +801,7 @@ function SourceEditStepperContent({
             testLabel={t("sources.edit.testSource")}
             saveAndRunLabel={t("sources.edit.saveAndScan")}
             isBusy={isSavingConfig || isTestingConfig}
+            disabled={!hasRequiredFiles}
             className="mt-0"
           />
         </div>
@@ -689,7 +815,6 @@ function SourceEditStepperContent({
           />
         </aside>
       </div>
-
     </div>
   );
 }

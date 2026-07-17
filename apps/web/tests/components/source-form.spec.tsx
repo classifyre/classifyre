@@ -166,3 +166,30 @@ test("rows per page only appears for tabular full scans", async ({ mount }) => {
   await component.getByRole("button", { name: /advanced/i }).click();
   await expect(component.getByText(/rows per page/i)).toHaveCount(1);
 });
+
+test("sandbox submits standard empty config sections", async ({ mount }) => {
+  let submitted: Record<string, unknown> | null = null;
+  const component = await mount(
+    <SourceForm
+      sourceType="SANDBOX"
+      mode="create"
+      defaultValues={{
+        name: "uploaded-files",
+        sampling: { strategy: "ALL" },
+      }}
+      onSubmit={(data) => {
+        submitted = data;
+      }}
+      showCancel={false}
+    />,
+  );
+
+  await component.getByRole("button", { name: /create source/i }).click();
+
+  expect(submitted).toMatchObject({
+    type: "SANDBOX",
+    required: {},
+    masked: {},
+    optional: {},
+  });
+});

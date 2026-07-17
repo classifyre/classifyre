@@ -4,7 +4,6 @@ sidebarTitle: Overview
 description: Deployment models and infrastructure setup options for the Classifyre platform.
 ---
 
-
 # Deployment Models
 
 Classifyre supports two primary deployment pathways depending on your environment: a development-oriented **Docker All-in-One** setup, or a production-ready **Kubernetes Helm Chart**.
@@ -67,14 +66,18 @@ graph TD
 ## Deployment Modes
 
 ### 1. Docker All-in-One (Development / Demo)
+
 Designed for local evaluation, software exploration, sales demos, and offline testing.
+
 - **Bundled Image:** The `classifyre/all-in-one` image packages PostgreSQL, the API, the Web UI, and a Caddy reverse proxy into a single container.
 - **Process Supervisor:** Manages boot ordering and process health inside the container via `s6-overlay`.
 - **CLI Execution:** The API spawns CLI processes locally using child process spawning.
 - **Learn More:** Check out the [Docker Deployment Guide](/deployment/docker).
 
 ### 2. Kubernetes (Production)
+
 Our recommended setup for production workloads, designed for high availability, durability, and horizontal scale.
+
 - **Orchestration:** Deployed using the official Classifyre Helm Chart.
 - **Scalability:** The API and Web UI run as standard, horizontally autoscalable Kubernetes deployments.
 - **Database & Storage:** You specify your own production-grade PostgreSQL instance (e.g., AWS RDS) and S3 bucket endpoint.
@@ -123,6 +126,7 @@ graph TD
 These primary services form the core of the application:
 
 #### 1. Web UI (Frontend)
+
 - **Role:** The user-facing frontend.
 - **Responsibilities:**
   - Configuring and managing data sources.
@@ -131,6 +135,7 @@ These primary services form the core of the application:
   - Triggering scans manually or defining automated schedules.
 
 #### 2. API and Orchestrator
+
 - **Role:** The control plane and orchestrator.
 - **Responsibilities:**
   - Exposing the APIs that power the Web UI.
@@ -140,6 +145,7 @@ These primary services form the core of the application:
   - Fetching run artifacts and logs from storage.
 
 #### 3. CLI Runner
+
 - **Role:** The ephemeral execution worker where extraction and detection happen.
 - **Responsibilities:**
   - Ingesting documents from target external sources.
@@ -153,7 +159,7 @@ Classifyre relies on standard external components for persistence, storage, and
 ingestion. You can bring your own instances of each:
 
 - **[PostgreSQL Database](/deployment/database/):** Stores all system metadata, configurations, schedules, logs, and findings. Classifyre supports **embedded** database pods for quick evaluations or **external** instances (such as AWS RDS, GCP Cloud SQL, or CloudNativePG) for production.
-- **[S3 Object Storage](/deployment/storage/):** An **external** and **optional** component used to persist long-term runner execution logs and developer sandbox uploads. If disabled, logs are streamed live but not saved.
+- **[S3 Object Storage](/deployment/storage/):** An **external** and **optional** component used to persist long-term runner execution logs. If disabled, logs are streamed live but not saved.
 - **[External Data Sources](/sources/):** The target systems containing unstructured data (e.g., AWS S3, Confluence, Slack, Google Drive) that Classifyre scans to identify security and compliance findings.
 
 ---

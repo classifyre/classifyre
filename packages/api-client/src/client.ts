@@ -30,13 +30,11 @@ export { HealthApi } from "./generated/src/apis/HealthApi";
 export { RunnersApi } from "./generated/src/apis/RunnersApi";
 export { FindingsApi } from "./generated/src/apis/FindingsApi";
 export { NotificationsApi } from "./generated/src/apis/NotificationsApi";
-export { SandboxApi } from "./generated/src/apis/SandboxApi";
 export { InstanceSettingsApi } from "./generated/src/apis/InstanceSettingsApi";
 export { AIProviderConfigsApi } from "./generated/src/apis/AIProviderConfigsApi";
 export { CasesApi } from "./generated/src/apis/CasesApi";
 export { InquiriesApi } from "./generated/src/apis/InquiriesApi";
 export { GraphApi } from "./generated/src/apis/GraphApi";
-export { HypothesesApi } from "./generated/src/apis/HypothesesApi";
 export { ThreadsApi } from "./generated/src/apis/ThreadsApi";
 export { AutopilotApi } from "./generated/src/apis/AutopilotApi";
 export { CorrelationApi } from "./generated/src/apis/CorrelationApi";
@@ -142,11 +140,6 @@ export type {
   PreviewInquiryDto,
   PreviewResponseDto,
   MatchOptionsResponseDto,
-  CreateHypothesisDto,
-  UpdateHypothesisDto,
-  HypothesisResponseDto,
-  HypothesisSupportLinkDto,
-  LinkSupportDto,
   CreateThreadDto,
   UpdateThreadDto,
   ThreadResponseDto,
@@ -192,14 +185,6 @@ export {
   InquiriesControllerListStatusEnum,
   InquiriesControllerListMatchesSeverityEnum,
 } from "./generated/src/apis/InquiriesApi";
-export {
-  SandboxControllerListRunsContentTypeEnum,
-  SandboxControllerListRunsDetectorTypeEnum,
-  SandboxControllerListRunsSortByEnum,
-  SandboxControllerListRunsSortOrderEnum,
-  SandboxControllerListRunsStatusEnum,
-} from "./generated/src/apis/SandboxApi";
-
 export { TriggerAutopilotDtoAgentKindsEnum } from "./generated/src/models/TriggerAutopilotDto";
 export {
   AutopilotControllerListActivityAgentKindEnum,
@@ -305,8 +290,6 @@ export type {
   McpToolSummaryDto,
   UpdateInstanceSettingsDto,
   UpdateNotificationImportanceDto,
-  SandboxRunDto,
-  SandboxRunListResponseDto,
   // Asset list types used by web app directly
   AssetListItemDto,
   // Correlation / duplicate detection
@@ -350,8 +333,6 @@ export {
   AiProviderConfigResponseDtoProviderEnum,
   CreateAiProviderConfigDtoProviderEnum,
   UpdateAiProviderConfigDtoProviderEnum,
-  SandboxRunDtoContentTypeEnum,
-  SandboxRunDtoStatusEnum,
   RunnerLogEntryDtoLevelEnum,
   // Finding enums used by web components
   FindingResponseDtoDetectorTypeEnum,
@@ -966,13 +947,11 @@ import { HealthApi } from "./generated/src/apis/HealthApi";
 import { RunnersApi } from "./generated/src/apis/RunnersApi";
 import { FindingsApi } from "./generated/src/apis/FindingsApi";
 import { NotificationsApi } from "./generated/src/apis/NotificationsApi";
-import { SandboxApi } from "./generated/src/apis/SandboxApi";
 import { InstanceSettingsApi } from "./generated/src/apis/InstanceSettingsApi";
 import { AIProviderConfigsApi } from "./generated/src/apis/AIProviderConfigsApi";
 import { CasesApi } from "./generated/src/apis/CasesApi";
 import { InquiriesApi } from "./generated/src/apis/InquiriesApi";
 import { GraphApi } from "./generated/src/apis/GraphApi";
-import { HypothesesApi } from "./generated/src/apis/HypothesesApi";
 import { ThreadsApi } from "./generated/src/apis/ThreadsApi";
 import { AutopilotApi } from "./generated/src/apis/AutopilotApi";
 import { CorrelationApi } from "./generated/src/apis/CorrelationApi";
@@ -1030,13 +1009,11 @@ class ApiClient {
   public runners: RunnersApi;
   public findings: FindingsApi;
   public notifications: NotificationsApi;
-  public sandbox: SandboxApi;
   public instanceSettings: InstanceSettingsApi;
   public aiProviderConfigs: AIProviderConfigsApi;
   public cases: CasesApi;
   public inquiries: InquiriesApi;
   public graph: GraphApi;
-  public hypotheses: HypothesesApi;
   public threads: ThreadsApi;
   public autopilot: AutopilotApi;
   public correlation: CorrelationApi;
@@ -1053,13 +1030,11 @@ class ApiClient {
     this.runners = new RunnersApi(this.config);
     this.findings = new FindingsApi(this.config);
     this.notifications = new NotificationsApi(this.config);
-    this.sandbox = new SandboxApi(this.config);
     this.instanceSettings = new InstanceSettingsApi(this.config);
     this.aiProviderConfigs = new AIProviderConfigsApi(this.config);
     this.cases = new CasesApi(this.config);
     this.inquiries = new InquiriesApi(this.config);
     this.graph = new GraphApi(this.config);
-    this.hypotheses = new HypothesesApi(this.config);
     this.threads = new ThreadsApi(this.config);
     this.autopilot = new AutopilotApi(this.config);
     this.correlation = new CorrelationApi(this.config);
