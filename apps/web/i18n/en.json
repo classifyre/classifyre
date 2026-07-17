@@ -266,6 +266,22 @@
       "descriptionLabel": "Description",
       "descriptionHelp": "Optional. Add notes about what this source is for."
     },
+    "uploadedFiles": {
+      "title": "Uploaded files",
+      "dropPrompt": "Drop files here or choose files",
+      "maximumSize": "Maximum 50 MiB per file",
+      "chooseFiles": "Choose files",
+      "tooLarge": "{{count}} file(s) exceed the 50 MiB limit.",
+      "keepOne": "A Sandbox source must keep at least one file.",
+      "required": "At least one file is required.",
+      "pending": "pending upload",
+      "remove": "Remove {{name}}",
+      "allUploadsFailed": "No files could be uploaded. The Sandbox source was not saved.",
+      "uploadFailures": "{{count}} file(s) failed to upload.",
+      "deletionFailures": "{{count}} file(s) could not be removed.",
+      "requiredBeforeSave": "Add at least one file before saving this Sandbox source.",
+      "requiredBeforeContinue": "Add at least one file before continuing."
+    },
     "totalSources": "Total Sources",
     "connectedSources": "Connected sources",
     "healthy": "Healthy",

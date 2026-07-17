@@ -266,6 +266,22 @@
       "descriptionLabel": "Beschreibung",
       "descriptionHelp": "Optional. Fügen Sie Notizen hinzu, wofür diese Quelle dient."
     },
+    "uploadedFiles": {
+      "title": "Hochgeladene Dateien",
+      "dropPrompt": "Dateien hier ablegen oder auswählen",
+      "maximumSize": "Maximal 50 MiB pro Datei",
+      "chooseFiles": "Dateien auswählen",
+      "tooLarge": "Zu große Dateien: {{count}}. Das Limit beträgt 50 MiB pro Datei.",
+      "keepOne": "Eine Sandbox-Quelle muss mindestens eine Datei behalten.",
+      "required": "Mindestens eine Datei ist erforderlich.",
+      "pending": "Upload ausstehend",
+      "remove": "{{name}} entfernen",
+      "allUploadsFailed": "Es konnten keine Dateien hochgeladen werden. Die Sandbox-Quelle wurde nicht gespeichert.",
+      "uploadFailures": "Fehlgeschlagene Datei-Uploads: {{count}}.",
+      "deletionFailures": "Dateien konnten nicht entfernt werden: {{count}}.",
+      "requiredBeforeSave": "Fügen Sie vor dem Speichern dieser Sandbox-Quelle mindestens eine Datei hinzu.",
+      "requiredBeforeContinue": "Fügen Sie mindestens eine Datei hinzu, bevor Sie fortfahren."
+    },
     "totalSources": "Quellen gesamt",
     "connectedSources": "Verbundene Quellen",
     "healthy": "Fehlerfrei",

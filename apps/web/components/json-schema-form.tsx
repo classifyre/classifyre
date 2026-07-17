@@ -2146,6 +2146,7 @@ export interface JsonSchemaFormProps {
   schedule?: ScheduleValue;
   onScheduleChange?: (value: ScheduleValue) => void;
   showActions?: boolean;
+  afterNameContent?: React.ReactNode;
 }
 
 export interface JsonSchemaFormHandle {
@@ -2219,6 +2220,7 @@ export const JsonSchemaForm = React.forwardRef<
     schedule,
     onScheduleChange,
     showActions = true,
+    afterNameContent,
   },
   ref,
 ) {
@@ -2533,6 +2535,8 @@ export const JsonSchemaForm = React.forwardRef<
               </AiAssistedCard>
             );
           })()}
+
+        {afterNameContent}
 
         {hasCoupledAuth && requiredBlock && maskedBlock && (
           <AiAssistedCard
