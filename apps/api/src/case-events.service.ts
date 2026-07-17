@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import {
   CaseActivityType,
   CaseEvent,
@@ -8,7 +12,7 @@ import { PrismaService } from './prisma.service';
 import { CaseActivityService } from './case-activity.service';
 
 export type CaseEventInput = {
-  occurredAt: Date;
+  occurredAt: Date | string;
   precision?: CaseEventPrecision;
   title: string;
   description?: string;
@@ -50,7 +54,7 @@ export class CaseEventsService {
     const event = await this.prisma.caseEvent.create({
       data: {
         caseId,
-        occurredAt: input.occurredAt,
+        occurredAt: this.toDate(input.occurredAt),
         precision: input.precision ?? 'DAY',
         title: input.title,
         description: input.description ?? null,
@@ -82,7 +86,9 @@ export class CaseEventsService {
     const event = await this.prisma.caseEvent.update({
       where: { id: existing.id },
       data: {
-        ...(input.occurredAt ? { occurredAt: input.occurredAt } : {}),
+        ...(input.occurredAt !== undefined
+          ? { occurredAt: this.toDate(input.occurredAt) }
+          : {}),
         ...(input.precision ? { precision: input.precision } : {}),
         ...(input.title ? { title: input.title } : {}),
         ...(input.description !== undefined
@@ -130,6 +136,14 @@ export class CaseEventsService {
       );
     }
     return event;
+  }
+
+  private toDate(value: Date | string): Date {
+    const date = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      throw new BadRequestException('occurredAt must be a valid timestamp');
+    }
+    return date;
   }
 
   private async ensureCase(caseId: string) {

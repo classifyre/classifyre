@@ -53,6 +53,7 @@ export class GlossaryController {
   @ApiOkResponse({ type: UpsertGlossaryTermResponseDto })
   upsert(@Body() dto: UpsertGlossaryTermDto) {
     return this.glossary.upsert({
+      id: dto.id,
       term: dto.term,
       aliases: dto.aliases,
       entityType: dto.entityType,

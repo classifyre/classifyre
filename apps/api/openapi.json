@@ -16222,6 +16222,10 @@
       "UpsertGlossaryTermDto": {
         "type": "object",
         "properties": {
+          "id": {
+            "type": "string",
+            "description": "Existing row ID when editing or renaming"
+          },
           "term": {
             "type": "string"
           },

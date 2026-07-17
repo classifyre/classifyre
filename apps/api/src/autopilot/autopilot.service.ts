@@ -397,8 +397,17 @@ export class AutopilotService {
         key,
         content: dto.content.trim(),
         tags: dto.tags ?? [],
+        origin: 'OPERATOR',
+        verifiedAt: new Date(),
+        verifiedBy: 'operator',
       },
-      update: { content: dto.content.trim(), tags: dto.tags ?? [] },
+      update: {
+        content: dto.content.trim(),
+        tags: dto.tags ?? [],
+        origin: 'OPERATOR',
+        verifiedAt: new Date(),
+        verifiedBy: 'operator',
+      },
     });
     return this.mapMemory(row);
   }
@@ -417,6 +426,9 @@ export class AutopilotService {
         content: dto.content?.trim(),
         tags: dto.tags,
         weight: dto.weight,
+        origin: 'OPERATOR',
+        verifiedAt: new Date(),
+        verifiedBy: 'operator',
       },
     });
     return this.mapMemory(row);

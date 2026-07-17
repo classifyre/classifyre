@@ -244,6 +244,7 @@ export default function GlossaryPage() {
       );
       await upsertGlossaryTerm({
         upsertGlossaryTermDto: {
+          id: editingTerm?.id,
           term: trimmedTerm,
           aliases,
           entityType: form.entityType,

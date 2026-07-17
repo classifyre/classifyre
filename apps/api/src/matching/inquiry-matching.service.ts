@@ -269,8 +269,6 @@ export class InquiryMatchingService implements OnApplicationBootstrap {
     const newCount = matches.filter((m) => m.isNew).length;
     if (onlyNew) matches = matches.filter((m) => m.isNew);
 
-    matches.sort((a, b) => b.matchedAt.getTime() - a.matchedAt.getTime());
-
     return {
       items: matches.slice(skip, skip + limit),
       total: matches.length,

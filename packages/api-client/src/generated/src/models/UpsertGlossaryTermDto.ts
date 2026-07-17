@@ -20,6 +20,12 @@ import { mapValues } from '../runtime';
  */
 export interface UpsertGlossaryTermDto {
     /**
+     * Existing row ID when editing or renaming
+     * @type {string}
+     * @memberof UpsertGlossaryTermDto
+     */
+    id?: string;
+    /**
      * 
      * @type {string}
      * @memberof UpsertGlossaryTermDto
@@ -95,7 +101,7 @@ export function UpsertGlossaryTermDtoFromJSONTyped(json: any, ignoreDiscriminato
         return json;
     }
     return {
-        
+        'id': json['id'] == null ? undefined : json['id'],
         'term': json['term'],
         'aliases': json['aliases'] == null ? undefined : json['aliases'],
         'entityType': json['entityType'] == null ? undefined : json['entityType'],
@@ -116,7 +122,7 @@ export function UpsertGlossaryTermDtoToJSONTyped(value?: UpsertGlossaryTermDto |
     }
 
     return {
-        
+        'id': value['id'],
         'term': value['term'],
         'aliases': value['aliases'],
         'entityType': value['entityType'],
@@ -126,4 +132,3 @@ export function UpsertGlossaryTermDtoToJSONTyped(value?: UpsertGlossaryTermDto |
         'author': value['author'],
     };
 }
-

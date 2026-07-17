@@ -76,33 +76,44 @@ export class AgentSemanticService {
         where: { ...where, evidenceAnalysis: { isNot: null } },
       }),
     ]);
-    const rows = await this.prisma.finding.findMany({
-      where: { ...where, evidenceAnalysis: { isNot: null } },
-      include: { evidenceAnalysis: true },
-      orderBy: { evidenceAnalysis: { importanceScore: 'desc' } },
-      take: Math.min(limit, MAX_RANKED_FINDINGS) * 3,
-    });
+    const requested = Math.min(limit, MAX_RANKED_FINDINGS);
+    const pageSize = Math.max(requested * 3, 25);
     const seenGroups = new Set<string>();
     const findings: CompactRankedFinding[] = [];
-    for (const row of rows) {
-      const group = row.evidenceAnalysis?.duplicateGroupHash;
-      if (group) {
-        if (seenGroups.has(group)) continue;
-        seenGroups.add(group);
-      }
-      findings.push({
-        findingId: row.id,
-        assetId: row.assetId,
-        findingType: row.findingType,
-        severity: String(row.severity),
-        status: String(row.status),
-        value: truncate(row.matchedContent, MAX_SAMPLE_VALUE_LENGTH),
-        importance: this.round(row.evidenceAnalysis?.importanceScore ?? null),
-        quality: this.round(row.evidenceAnalysis?.qualityScore ?? null),
-        similarCount: row.evidenceAnalysis?.similarCount ?? 0,
-        reasons: this.reasonCodes(row.evidenceAnalysis?.reasons),
+    let skip = 0;
+    while (findings.length < requested) {
+      const rows = await this.prisma.finding.findMany({
+        where: { ...where, evidenceAnalysis: { isNot: null } },
+        include: { evidenceAnalysis: true },
+        orderBy: [
+          { evidenceAnalysis: { importanceScore: 'desc' } },
+          { id: 'asc' },
+        ],
+        skip,
+        take: pageSize,
       });
-      if (findings.length >= Math.min(limit, MAX_RANKED_FINDINGS)) break;
+      for (const row of rows) {
+        const group = row.evidenceAnalysis?.duplicateGroupHash;
+        if (group) {
+          if (seenGroups.has(group)) continue;
+          seenGroups.add(group);
+        }
+        findings.push({
+          findingId: row.id,
+          assetId: row.assetId,
+          findingType: row.findingType,
+          severity: String(row.severity),
+          status: String(row.status),
+          value: truncate(row.matchedContent, MAX_SAMPLE_VALUE_LENGTH),
+          importance: this.round(row.evidenceAnalysis?.importanceScore ?? null),
+          quality: this.round(row.evidenceAnalysis?.qualityScore ?? null),
+          similarCount: row.evidenceAnalysis?.similarCount ?? 0,
+          reasons: this.reasonCodes(row.evidenceAnalysis?.reasons),
+        });
+        if (findings.length >= requested) break;
+      }
+      skip += rows.length;
+      if (rows.length < pageSize) break;
     }
     return {
       coverage:

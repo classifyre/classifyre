@@ -4,6 +4,7 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
+import { createHash } from 'node:crypto';
 import { GlossaryEntityType, GlossaryTerm, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
 import { EmbeddingQueueService } from '../embedding/embedding-queue.service';
@@ -12,6 +13,7 @@ import { QueryEmbeddingService } from '../embedding/query-embedding.service';
 import { embeddingContentHash } from '../embedding/embedding-text';
 
 export type GlossaryUpsertInput = {
+  id?: string;
   term: string;
   aliases?: string[];
   entityType?: GlossaryEntityType;
@@ -110,6 +112,20 @@ export class GlossaryService {
     );
   }
 
+  private deletionKey(term: string): string {
+    const normalized = term.trim().toLowerCase().replace(/\s+/g, ' ');
+    const slug = normalized
+      .trim()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '')
+      .slice(0, 160);
+    const digest = createHash('sha256')
+      .update(normalized)
+      .digest('hex')
+      .slice(0, 12);
+    return `deleted-glossary-${slug || 'term'}-${digest}`;
+  }
+
   async upsert(input: GlossaryUpsertInput) {
     const term = input.term.trim();
     if (!term) throw new NotFoundException('Glossary term cannot be empty');
@@ -118,14 +134,40 @@ export class GlossaryService {
         `"${term}" looks like a machine identifier, not vocabulary. Glossary terms are real-world names as a human writes them ("Jane Doe", "Project Aurora", "NHS number"). Observations and summaries belong in memory.write, not the glossary.`,
       );
     }
+    if (input.origin === 'AGENT') {
+      const deleted = await this.prisma.agentMemory.findUnique({
+        where: {
+          kind_key: {
+            kind: 'DECISION_PRECEDENT',
+            key: this.deletionKey(term),
+          },
+        },
+        select: { id: true },
+      });
+      if (deleted) {
+        throw new BadRequestException(
+          `"${term}" was deleted by an operator and cannot be re-proposed`,
+        );
+      }
+    }
     const aliases = [
       ...new Set(
         (input.aliases ?? []).map((alias) => alias.trim()).filter(Boolean),
       ),
     ].slice(0, 50);
-    const existing = await this.prisma.glossaryTerm.findFirst({
+    const edited = input.id
+      ? await this.prisma.glossaryTerm.findUnique({ where: { id: input.id } })
+      : null;
+    if (input.id && !edited) {
+      throw new NotFoundException(`Glossary term ${input.id} not found`);
+    }
+    const matchingTerm = await this.prisma.glossaryTerm.findFirst({
       where: { term: { equals: term, mode: 'insensitive' } },
     });
+    if (edited && matchingTerm && matchingTerm.id !== edited.id) {
+      throw new BadRequestException(`Glossary term "${term}" already exists`);
+    }
+    const existing = edited ?? matchingTerm;
 
     // An agent proposal never overwrites operator-owned vocabulary: it may
     // only contribute aliases the operator can review.
@@ -165,10 +207,24 @@ export class GlossaryService {
           where: { id: existing.id },
           data: {
             ...data,
-            aliases: [...new Set([...existing.aliases, ...aliases])],
+            term,
+            // Operator edits are authoritative and may intentionally remove a
+            // stale alias. Agent proposals are handled by the merge-only path.
+            aliases:
+              input.origin === 'OPERATOR'
+                ? aliases
+                : [...new Set([...existing.aliases, ...aliases])],
           },
         })
       : await this.prisma.glossaryTerm.create({ data: { term, ...data } });
+    if (input.origin === 'OPERATOR') {
+      await this.prisma.agentMemory.deleteMany({
+        where: {
+          kind: 'DECISION_PRECEDENT',
+          key: this.deletionKey(term),
+        },
+      });
+    }
     await this.enqueueEmbedding(saved);
     return { ...this.toDto(saved), merged: false };
   }
@@ -211,9 +267,31 @@ export class GlossaryService {
   }
 
   async remove(id: string) {
-    const result = await this.prisma.glossaryTerm.deleteMany({ where: { id } });
-    if (!result.count)
-      throw new NotFoundException(`Glossary term ${id} not found`);
+    await this.prisma.$transaction(async (tx) => {
+      const existing = await tx.glossaryTerm.findUnique({ where: { id } });
+      if (!existing)
+        throw new NotFoundException(`Glossary term ${id} not found`);
+      const key = this.deletionKey(existing.term);
+      await tx.agentMemory.upsert({
+        where: { kind_key: { kind: 'DECISION_PRECEDENT', key } },
+        create: {
+          kind: 'DECISION_PRECEDENT',
+          key,
+          content: `Operator deleted glossary term "${existing.term}". Do not re-propose it.`,
+          tags: ['glossary-deletion'],
+          origin: 'OPERATOR',
+          verifiedAt: new Date(),
+          verifiedBy: 'operator',
+        },
+        update: {
+          content: `Operator deleted glossary term "${existing.term}". Do not re-propose it.`,
+          origin: 'OPERATOR',
+          verifiedAt: new Date(),
+          verifiedBy: 'operator',
+        },
+      });
+      await tx.glossaryTerm.delete({ where: { id } });
+    });
     return { deleted: true, id };
   }
 
@@ -221,16 +299,26 @@ export class GlossaryService {
    * Resolve a name/alias to glossary terms: exact and alias matches first,
    * then semantic nearest terms when a query embedding is available.
    */
-  async lookup(query: string, limitInput: unknown = 10): Promise<GlossaryLookupHit[]> {
+  async lookup(
+    query: string,
+    limitInput: unknown = 10,
+  ): Promise<GlossaryLookupHit[]> {
     const limit = this.toInt(limitInput, 10, 50) || 10;
     const trimmed = query.trim();
     if (!trimmed) return [];
+    const aliasRows = await this.prisma.$queryRaw<Array<{ id: string }>>`
+      SELECT DISTINCT gt.id
+      FROM glossary_terms gt
+      CROSS JOIN LATERAL unnest(gt.aliases) AS alias
+      WHERE lower(alias) = lower(${trimmed})
+      LIMIT ${limit}
+    `;
     const lexical = await this.prisma.glossaryTerm.findMany({
       where: {
         OR: [
           { term: { equals: trimmed, mode: 'insensitive' } },
           { term: { contains: trimmed, mode: 'insensitive' } },
-          { aliases: { has: trimmed } },
+          { id: { in: aliasRows.map((row) => row.id) } },
         ],
       },
       take: limit,
