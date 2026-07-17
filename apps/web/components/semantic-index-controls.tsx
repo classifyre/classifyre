@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { toast } from "sonner";
-import { AlertTriangle, Layers3, RefreshCw, Sparkles } from "lucide-react";
+import { AlertTriangle, Clock, Layers3, RefreshCw, Sparkles } from "lucide-react";
 import { api, type EmbeddingStatusResponseDto } from "@workspace/api-client";
 import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
@@ -17,10 +17,11 @@ function fetchStatus(): Promise<EmbeddingStatusResponseDto> {
 }
 
 /**
- * Semantic index health + controls for the Tune panel: what model/space is
- * configured, whether a reindex or recalibration pass is running, and
- * buttons to kick each one off. Near-duplicate detection and evidence
- * ranking both depend on this index being current.
+ * Semantic index health + controls: whether a reindex is running, a
+ * recalculation pass is scheduled (queued/debounced) or running, when the
+ * last recalculation happened, and buttons to kick each one off.
+ * Near-duplicate detection and evidence ranking both depend on this index
+ * being current.
  */
 export function SemanticIndexControls() {
   const { t } = useTranslation();
@@ -42,7 +43,9 @@ export function SemanticIndexControls() {
 
   React.useEffect(() => refresh(), [refresh]);
 
-  const busy = Boolean(status?.backfillRunning || status?.recalibrationRunning);
+  const busy = Boolean(
+    status?.backfillRunning || status?.recalibrationScheduled || status?.recalibrationRunning,
+  );
   React.useEffect(() => {
     if (!busy) return;
     const id = setInterval(refresh, POLL_MS);
@@ -77,6 +80,12 @@ export function SemanticIndexControls() {
     }
   };
 
+  const idle =
+    status &&
+    !status.backfillRunning &&
+    !status.recalibrationScheduled &&
+    !status.recalibrationRunning;
+
   return (
     <div className="space-y-3 rounded-[4px] border border-border bg-muted/30 p-3">
       <h3 className="flex items-center gap-1.5 font-serif text-sm font-black uppercase tracking-[0.06em]">
@@ -90,21 +99,6 @@ export function SemanticIndexControls() {
         <Spinner size="sm" label={t("correlation.semanticIndex.title")} />
       ) : (
         <div className="space-y-1.5 text-xs">
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-muted-foreground">{t("correlation.semanticIndex.model")}</span>
-            <span className="max-w-[220px] truncate font-mono" title={status.model ?? undefined}>
-              {status.model ?? "—"}
-            </span>
-          </div>
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-muted-foreground">{t("correlation.semanticIndex.space")}</span>
-            <span
-              className="max-w-[220px] truncate font-mono"
-              title={status.spaceId ?? undefined}
-            >
-              {status.spaceId ? `${status.spaceId.slice(0, 12)}…` : "—"}
-            </span>
-          </div>
           <div className="flex items-center justify-between gap-2">
             <span className="text-muted-foreground">
               {t("correlation.semanticIndex.lastRecalibrated", {
@@ -121,13 +115,19 @@ export function SemanticIndexControls() {
                 {t("correlation.semanticIndex.statusBackfillRunning")}
               </Badge>
             )}
+            {status.recalibrationScheduled && !status.recalibrationRunning && (
+              <Badge variant="outline" className="gap-1 text-[10px] uppercase">
+                <Clock className="h-3 w-3" />
+                {t("correlation.semanticIndex.statusRecalibrationScheduled")}
+              </Badge>
+            )}
             {status.recalibrationRunning && (
               <Badge variant="outline" className="gap-1 text-[10px] uppercase">
                 <Sparkles className="h-3 w-3" />
                 {t("correlation.semanticIndex.statusRecalibrationRunning")}
               </Badge>
             )}
-            {!status.backfillRunning && !status.recalibrationRunning && (
+            {idle && (
               <Badge variant="outline" className="text-[10px] uppercase">
                 {t("correlation.semanticIndex.statusIdle")}
               </Badge>
@@ -165,13 +165,18 @@ export function SemanticIndexControls() {
           <p className="text-[11px] text-muted-foreground">
             {t("correlation.semanticIndex.reindexDesc")}
           </p>
+          <p className="text-[11px] text-muted-foreground">
+            {t("correlation.semanticIndex.reindexChainNote")}
+          </p>
         </div>
         <div className="space-y-1">
           <Button
             size="sm"
             variant="outline"
             className="w-full"
-            disabled={recalibrating || status?.recalibrationRunning}
+            disabled={
+              recalibrating || status?.recalibrationScheduled || status?.recalibrationRunning
+            }
             onClick={() => void recalibrate()}
           >
             <Sparkles className="mr-1.5 h-3.5 w-3.5" />

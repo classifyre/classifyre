@@ -32,12 +32,20 @@ const LIMIT = 100;
  * sources uses the same endpoint's `sourceIds` filter. Clusters spanning more
  * than one source are flagged — the same content circulating across systems
  * is usually more interesting than boilerplate repeated within one source.
+ * Clicking a cluster focuses its assets on the graph (gray-out mechanic);
+ * clicking it again clears the focus.
  */
 export function BoilerplateClusters({
   onGoToTune,
+  onFocusCluster,
+  focusedClusterKey,
 }: {
-  /** Switch the workspace sidebar to the Tune panel's semantic index section. */
+  /** Switch the workspace view to the Tune settings' semantic index section. */
   onGoToTune?: () => void;
+  /** Toggle graph focus on this cluster's assets (null clears). */
+  onFocusCluster?: (cluster: { key: string; assetIds: string[] } | null) => void;
+  /** groupHash of the cluster currently focused on the graph, if any. */
+  focusedClusterKey?: string | null;
 }) {
   const { t } = useTranslation();
   const [sources, setSources] = React.useState<SourceOption[]>([]);
@@ -122,6 +130,11 @@ export function BoilerplateClusters({
       <p className="text-xs text-muted-foreground">
         {t("correlation.nearDuplicates.caption")}
       </p>
+      {onFocusCluster && (
+        <p className="text-[11px] text-muted-foreground">
+          {t("correlation.nearDuplicates.focusHint")}
+        </p>
+      )}
 
       <MultiSelect values={sourceIds} onValuesChange={setSourceIds}>
         <MultiSelectTrigger
@@ -169,53 +182,74 @@ export function BoilerplateClusters({
           />
         ) : (
           <ul className="space-y-2">
-            {clusters.map((c) => (
-              <li
-                key={c.groupHash}
-                className="flex flex-wrap items-center gap-3 rounded-[4px] border-2 border-border bg-background px-3 py-2"
-              >
-                <div className="min-w-0 flex-1 space-y-0.5">
-                  <p className="text-sm font-medium">
-                    {t("correlation.nearDuplicates.findingsCount", {
-                      count: String(c.findingCount),
-                    })}
-                  </p>
-                  <p className="truncate font-mono text-[10px] text-muted-foreground">
-                    {c.groupHash}
-                  </p>
-                  {c.sourceCount > 1 && (
-                    <div className="flex flex-wrap items-center gap-1 pt-0.5">
-                      <Badge
-                        variant="outline"
-                        className="border-amber-600/50 bg-amber-500/10 text-[10px] uppercase text-amber-700 dark:border-amber-400/40 dark:text-amber-400"
-                      >
-                        {t("correlation.nearDuplicates.spansSources", {
-                          count: String(c.sourceCount),
+            {clusters.map((c) => {
+              const isFocused = focusedClusterKey === c.groupHash;
+              return (
+                <li
+                  key={c.groupHash}
+                  className={`rounded-[4px] border-2 bg-background ${
+                    isFocused ? "border-foreground" : "border-border"
+                  }`}
+                >
+                  {/* Click = toggle graph focus on this cluster's assets. */}
+                  <button
+                    type="button"
+                    onClick={() =>
+                      onFocusCluster?.(
+                        isFocused ? null : { key: c.groupHash, assetIds: c.assetIds },
+                      )
+                    }
+                    className="flex w-full flex-wrap items-center gap-3 px-3 py-2 text-left hover:bg-muted/50"
+                  >
+                    <div className="min-w-0 flex-1 space-y-0.5">
+                      <p className="text-sm font-medium">
+                        {t("correlation.nearDuplicates.findingsCount", {
+                          count: String(c.findingCount),
                         })}
-                      </Badge>
-                      <span
-                        className="max-w-[220px] truncate text-[10px] text-muted-foreground"
-                        title={c.sourceIds.map((id) => sourceNameById.get(id) ?? id).join(", ")}
+                      </p>
+                      <p className="truncate font-mono text-[10px] text-muted-foreground">
+                        {c.groupHash}
+                      </p>
+                      {c.sourceCount > 1 && (
+                        <div className="flex flex-wrap items-center gap-1 pt-0.5">
+                          <Badge
+                            variant="outline"
+                            className="border-amber-600/50 bg-amber-500/10 text-[10px] uppercase text-amber-700 dark:border-amber-400/40 dark:text-amber-400"
+                          >
+                            {t("correlation.nearDuplicates.spansSources", {
+                              count: String(c.sourceCount),
+                            })}
+                          </Badge>
+                          <span
+                            className="max-w-[220px] truncate text-[10px] text-muted-foreground"
+                            title={c.sourceIds.map((id) => sourceNameById.get(id) ?? id).join(", ")}
+                          >
+                            {c.sourceIds.map((id) => sourceNameById.get(id) ?? id).join(", ")}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                    <Badge variant="outline" className="shrink-0 text-[10px]">
+                      {t("correlation.nearDuplicates.meanImportance", {
+                        count: c.meanImportance.toFixed(2),
+                      })}
+                    </Badge>
+                  </button>
+                  {c.findingIds[0] && (
+                    <div className="flex items-center justify-end border-t border-border/60 px-3 py-1.5">
+                      <a
+                        href={`/findings/${c.findingIds[0]}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-[11px] text-muted-foreground underline-offset-2 hover:underline"
                       >
-                        {c.sourceIds.map((id) => sourceNameById.get(id) ?? id).join(", ")}
-                      </span>
+                        {t("correlation.nearDuplicates.reviewFindings")}
+                      </a>
                     </div>
                   )}
-                </div>
-                <Badge variant="outline" className="shrink-0 text-[10px]">
-                  {t("correlation.nearDuplicates.meanImportance", {
-                    count: c.meanImportance.toFixed(2),
-                  })}
-                </Badge>
-                {c.findingIds[0] && (
-                  <Button size="sm" variant="outline" asChild className="shrink-0">
-                    <a href={`/findings/${c.findingIds[0]}`} target="_blank" rel="noreferrer">
-                      {t("correlation.nearDuplicates.reviewFindings")}
-                    </a>
-                  </Button>
-                )}
-              </li>
-            ))}
+                </li>
+              );
+            })}
           </ul>
         )}
       </div>

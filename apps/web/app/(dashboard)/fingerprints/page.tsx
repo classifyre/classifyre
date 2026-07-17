@@ -8,7 +8,6 @@ import {
   Link2,
   PanelRightClose,
   PanelRightOpen,
-  SlidersHorizontal,
 } from "lucide-react";
 import { api, type AssetSimilarityDto, type GraphEdgeDto, type GraphNodeDto } from "@workspace/api-client";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@workspace/ui/components/tabs";
@@ -16,6 +15,7 @@ import { Button } from "@workspace/ui/components/button";
 import type { AssistantUiAction } from "@workspace/api-client";
 import {
   FingerprintsGraph,
+  type FingerprintsFocus,
   type FingerprintsGraphData,
   type FingerprintsRailState,
 } from "@/components/fingerprints-graph";
@@ -29,7 +29,7 @@ import {
 import { useRegisterAssistantBridge } from "@/components/assistant-workflow-provider";
 import { useTranslation } from "@/hooks/use-translation";
 
-type SidebarMode = "connections" | "nearDuplicates" | "tune";
+type SidebarMode = "connections" | "nearDuplicates";
 
 const EMPTY_GRAPH_DATA: FingerprintsGraphData = {
   nodes: [],
@@ -42,12 +42,17 @@ export default function FingerprintsPage() {
   const { t } = useTranslation();
   const [sidebarMode, setSidebarMode] = React.useState<SidebarMode>("connections");
   const [sidebarCollapsed, setSidebarCollapsed] = React.useState(false);
+  // "tune" swaps the canvas area for the settings view; the graph component
+  // stays mounted (hidden) so its layout survives the round-trip.
+  const [view, setView] = React.useState<"graph" | "tune">("graph");
   // Bumped when tuning is saved → tells the graph to wait for recompute + reload.
   const [pendingRecomputeAt, setPendingRecomputeAt] = React.useState<number>();
-  // Set from a connection row click — the graph filters to exactly this pair.
-  const [focusPair, setFocusPair] = React.useState<[string, string] | undefined>();
+  // ── The one unified focus object. Every sidebar interaction (connection row,
+  //    near-duplicate cluster, sidebar filters) funnels into this; the graph
+  //    dims everything outside `assetIds` (gray-out, never hides). ──────────
+  const [focus, setFocus] = React.useState<FingerprintsFocus | undefined>();
   // Selection detail pushed up from the graph (node/edge/bundle click) — takes
-  // over the sidebar in place of the Connections/Near-duplicates/Tune panels.
+  // over the sidebar in place of the Connections/Near-duplicates panels.
   const [rail, setRail] = React.useState<FingerprintsRailState | null>(null);
   const tuningPanelRef = React.useRef<CorrelationTuningPanelHandle | null>(null);
 
@@ -88,14 +93,55 @@ export default function FingerprintsPage() {
 
   React.useEffect(() => loadGraph(), [loadGraph]);
 
-  const goToTune = React.useCallback(() => {
-    setSidebarMode("tune");
-    setSidebarCollapsed(false);
-  }, []);
+  const goToTune = React.useCallback(() => setView("tune"), []);
 
-  const handleFocusPair = React.useCallback((assetIds: [string, string]) => {
-    setFocusPair(assetIds);
-  }, []);
+  const clearFocus = React.useCallback(() => setFocus(undefined), []);
+
+  const handleFocusPair = React.useCallback(
+    (assetIds: [string, string]) => {
+      setFocus({
+        kind: "pair",
+        assetIds,
+        label: t("correlation.fingerprints.pairFocused"),
+        key: [...assetIds].sort().join("|"),
+      });
+    },
+    [t],
+  );
+
+  const handleFocusCluster = React.useCallback(
+    (cluster: { key: string; assetIds: string[] } | null) => {
+      setFocus(
+        cluster
+          ? {
+              kind: "cluster",
+              assetIds: cluster.assetIds,
+              label: t("correlation.fingerprints.clusterFocused"),
+              key: cluster.key,
+            }
+          : undefined,
+      );
+    },
+    [t],
+  );
+
+  // Sidebar dropdown filters → filter-focus; clearing them only releases a
+  // filter-focus (never a pair/cluster focus the operator set afterwards).
+  const handleFilterFocus = React.useCallback(
+    (assetIds: string[] | null) => {
+      setFocus((prev) => {
+        if (assetIds) {
+          return {
+            kind: "filter",
+            assetIds,
+            label: t("correlation.fingerprints.filterFocused"),
+          };
+        }
+        return prev?.kind === "filter" ? undefined : prev;
+      });
+    },
+    [t],
+  );
 
   const assistantBridge = React.useMemo(
     () => ({
@@ -139,8 +185,8 @@ export default function FingerprintsPage() {
       </div>
 
       <div className="flex min-h-0 flex-1 gap-3">
-        {/* ── The graph: always-visible central canvas ── */}
-        <div className="min-w-0 flex-1">
+        {/* ── The graph: central canvas (kept mounted while tuning) ── */}
+        <div className={view === "tune" ? "hidden" : "min-w-0 flex-1"}>
           <FingerprintsGraph
             graphData={graphData}
             graphLoading={graphLoading}
@@ -148,12 +194,37 @@ export default function FingerprintsPage() {
             onReloadGraph={loadGraph}
             externalRail
             onRailStateChange={setRail}
-            focusPair={focusPair}
-            onExitFocusPair={() => setFocusPair(undefined)}
+            focus={focus}
+            onExitFocus={clearFocus}
             onTune={goToTune}
             pendingRecomputeAt={pendingRecomputeAt}
           />
         </div>
+
+        {/* ── Tune: full settings view in place of the canvas ── */}
+        {view === "tune" && (
+          <div className="flex min-w-0 flex-1 flex-col border-2 border-border bg-card">
+            <div className="flex items-center justify-between gap-3 border-b-2 border-border px-4 py-3">
+              <h2 className="font-serif text-lg font-black uppercase tracking-[0.06em]">
+                {t("fingerprints.tabTune")}
+              </h2>
+              <Button variant="outline" size="sm" onClick={() => setView("graph")}>
+                <ArrowLeft className="mr-1.5 h-3.5 w-3.5" />
+                {t("fingerprints.backToGraph")}
+              </Button>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto p-4">
+              <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
+                <CorrelationTuningPanel
+                  ref={tuningPanelRef}
+                  layout="page"
+                  onSaved={() => setPendingRecomputeAt(Date.now())}
+                />
+                <SemanticIndexControls />
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* ── Dynamic right sidebar ── */}
         {sidebarCollapsed ? (
@@ -202,10 +273,6 @@ export default function FingerprintsPage() {
                       <Copy className="h-3.5 w-3.5" />
                       {t("fingerprints.tabNearDuplicates")}
                     </TabsTrigger>
-                    <TabsTrigger value="tune" className="flex-1 gap-1.5 rounded-[3px] text-xs">
-                      <SlidersHorizontal className="h-3.5 w-3.5" />
-                      {t("fingerprints.tabTune")}
-                    </TabsTrigger>
                   </TabsList>
                 )}
               </div>
@@ -238,18 +305,19 @@ export default function FingerprintsPage() {
                   error={graphError}
                   onReload={loadGraph}
                   onFocusPair={handleFocusPair}
-                  focusedPair={focusPair}
+                  focusedPair={
+                    focus?.kind === "pair" && focus.assetIds.length === 2
+                      ? (focus.assetIds as [string, string])
+                      : undefined
+                  }
+                  onFilterFocus={handleFilterFocus}
                 />
               </TabsContent>
               <TabsContent value="nearDuplicates" className="mt-0">
-                <BoilerplateClusters onGoToTune={goToTune} />
-              </TabsContent>
-              <TabsContent value="tune" className="mt-0 space-y-4">
-                <SemanticIndexControls />
-                <CorrelationTuningPanel
-                  ref={tuningPanelRef}
-                  layout="dialog"
-                  onSaved={() => setPendingRecomputeAt(Date.now())}
+                <BoilerplateClusters
+                  onGoToTune={goToTune}
+                  onFocusCluster={handleFocusCluster}
+                  focusedClusterKey={focus?.kind === "cluster" ? focus.key : undefined}
                 />
               </TabsContent>
             </div>

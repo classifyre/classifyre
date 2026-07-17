@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import {
   Ban,
   Fingerprint,
+  FolderPlus,
   Globe,
   Info,
   Maximize2,
@@ -95,6 +96,21 @@ export interface FingerprintsRailState {
   onBack: () => void;
 }
 
+/**
+ * Unified external focus: sidebar interactions (connection row, near-duplicate
+ * cluster, sidebar filters) all funnel into this one object. The focused
+ * subset stays full colour; everything else is dimmed via the same mechanic
+ * as the click-to-focus component "path" — nothing is removed from the graph.
+ */
+export interface FingerprintsFocus {
+  kind: "pair" | "cluster" | "filter";
+  assetIds: string[];
+  /** Text shown in the floating "Focused" pill. */
+  label: string;
+  /** Stable identity (pair key / cluster hash) for sidebar row-highlight sync. */
+  key?: string;
+}
+
 const pairKey = (a: string, b: string) => (a < b ? `${a}|${b}` : `${b}|${a}`);
 
 /**
@@ -115,8 +131,8 @@ export function FingerprintsGraph({
   onReloadGraph,
   externalRail = false,
   onRailStateChange,
-  focusPair,
-  onExitFocusPair,
+  focus,
+  onExitFocus,
 }: {
   assetId?: string;
   /** Scope to a source's clusters; external assets get a show/hide toggle. */
@@ -134,10 +150,10 @@ export function FingerprintsGraph({
   /** When true, suppress the built-in right rail and report its content via `onRailStateChange` instead. */
   externalRail?: boolean;
   onRailStateChange?: (state: FingerprintsRailState) => void;
-  /** Show only these two assets, their shared-value nodes, and the connecting edges. */
-  focusPair?: [string, string];
-  /** Clear `focusPair` — invoked from the floating pill's Reset and from a background click. */
-  onExitFocusPair?: () => void;
+  /** Externally-driven focus: the subset keeps full colour, the rest dims. */
+  focus?: FingerprintsFocus;
+  /** Clear `focus` — invoked from the floating pill's Reset and from a background click. */
+  onExitFocus?: () => void;
 }) {
   const { t } = useTranslation();
   const externallyManaged = graphData !== undefined;
@@ -349,41 +365,6 @@ export function FingerprintsGraph({
       nodes.filter((n) => n.type === "asset").map((n) => [n.id, n]),
     );
 
-    // Pair-focus mode: short-circuit every other filter and show only the two
-    // assets plus the shared-value nodes that connect them.
-    if (focusPair) {
-      const [a, b] = focusPair;
-      const valuesOfA = new Set(
-        edges.filter((e) => e.fromId === a && e.toType === "finding").map((e) => e.toId),
-      );
-      const valuesOfB = new Set(
-        edges.filter((e) => e.fromId === b && e.toType === "finding").map((e) => e.toId),
-      );
-      const shared = [...valuesOfA].filter((v) => valuesOfB.has(v));
-      const outNodes: GraphNodeDto[] = [];
-      const nodeA = assetById.get(a);
-      const nodeB = assetById.get(b);
-      if (nodeA) outNodes.push(nodeA);
-      if (nodeB) outNodes.push(nodeB);
-      const outEdges: GraphEdgeDto[] = [];
-      for (const vId of shared) {
-        const vn = valueById.get(vId);
-        if (vn) outNodes.push(vn);
-        for (const e of edges) {
-          if (e.toId === vId && (e.fromId === a || e.fromId === b)) outEdges.push(e);
-        }
-      }
-      return {
-        dNodes: outNodes,
-        dEdges: outEdges,
-        bundleDetails: new Map<string, BundleDetail>(),
-        visibleAssetIds: [nodeA, nodeB].filter(Boolean).map((n) => n!.id),
-        unconnectedCount: 0,
-        valueCount: shared.length,
-        externalAssetCount: 0,
-      };
-    }
-
     // 1) hard filters: source (assets), label (values), and (source-scoped)
     //    external assets unless "show external" is on.
     const srcSet = new Set(sourceFilter);
@@ -582,7 +563,6 @@ export function FingerprintsGraph({
     minSimilarity,
     simByPair,
     showExternal,
-    focusPair,
     t,
   ]);
 
@@ -620,6 +600,74 @@ export function FingerprintsGraph({
   );
   const { renderNodes, renderEdges } = clustered;
 
+  const focusSignature = focus ? `${focus.kind}|${focus.assetIds.join(",")}` : "";
+
+  // A sidebar-driven pair/cluster focus must be guaranteed visible: reset the
+  // toolbar filters, then let them compose *within* the focused (dimmed) view.
+  React.useEffect(() => {
+    if (!focus || focus.kind === "filter") return;
+    setSearch("");
+    setSourceFilter([]);
+    setLabelFilter([]);
+    setMinSimilarity(0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusSignature]);
+
+  // External focus → the same dim mechanic as the click-to-focus "path":
+  // focused assets (or the clusters containing them), the shared-value nodes
+  // that connect at least two of them, and the edges in between stay lit.
+  const focusPath = React.useMemo((): PathResult | null => {
+    if (!focus || focus.assetIds.length === 0) return null;
+    const focusIds = new Set(focus.assetIds);
+    const litKeys = new Set<string>();
+    for (const n of renderNodes) {
+      if (n.type === "asset" && focusIds.has(n.id)) {
+        litKeys.add(keyOf(n));
+      } else if (
+        isClusterNode(n) &&
+        n.cluster.memberKeys.some(
+          (k) => k.startsWith("asset:") && focusIds.has(k.slice("asset:".length)),
+        )
+      ) {
+        litKeys.add(keyOf(n));
+      }
+    }
+    if (litKeys.size === 0) return null;
+    const minShared = Math.min(2, litKeys.size);
+    const typeByKey = new Map(renderNodes.map((n) => [keyOf(n), n.type]));
+    // For every non-lit endpoint, collect its distinct lit neighbours.
+    const litNeighbors = new Map<string, Set<string>>();
+    for (const e of renderEdges) {
+      const fk = nodeKey(e.fromType, e.fromId);
+      const tk = nodeKey(e.toType, e.toId);
+      if (litKeys.has(fk) && !litKeys.has(tk))
+        (litNeighbors.get(tk) ?? litNeighbors.set(tk, new Set()).get(tk)!).add(fk);
+      if (litKeys.has(tk) && !litKeys.has(fk))
+        (litNeighbors.get(fk) ?? litNeighbors.set(fk, new Set()).get(fk)!).add(tk);
+    }
+    const nodeKeys = new Set(litKeys);
+    for (const [k, ns] of litNeighbors) {
+      if (ns.size >= minShared && typeByKey.get(k) === "finding") nodeKeys.add(k);
+    }
+    const edgeIds = new Set<string>();
+    for (const e of renderEdges) {
+      if (nodeKeys.has(nodeKey(e.fromType, e.fromId)) && nodeKeys.has(nodeKey(e.toType, e.toId)))
+        edgeIds.add(e.id);
+    }
+    return { nodeKeys, edgeIds };
+  }, [focus, renderNodes, renderEdges]);
+
+  // Click-focus composes with the external focus: a component focus started
+  // inside a focused subset never un-dims anything outside it.
+  const effectivePath = React.useMemo((): PathResult | null => {
+    if (!path) return focusPath;
+    if (!focusPath) return path;
+    return {
+      nodeKeys: new Set([...path.nodeKeys].filter((k) => focusPath.nodeKeys.has(k))),
+      edgeIds: new Set([...path.edgeIds].filter((id) => focusPath.edgeIds.has(id))),
+    };
+  }, [path, focusPath]);
+
   /** Fan seed positions for members of a just-expanded cluster. */
   const seedOverridesRef = React.useRef(new Map<string, { x: number; y: number }>());
 
@@ -642,10 +690,9 @@ export function FingerprintsGraph({
   }, [layout.simNodes, panZoom]);
 
   const didFit = React.useRef(false);
-  const focusPairSignature = focusPair ? focusPair.join("|") : "";
   React.useEffect(() => {
     didFit.current = false;
-  }, [assetId, focusPairSignature]);
+  }, [assetId]);
   React.useEffect(() => {
     if (didFit.current || dNodes.length === 0) return;
     layout.onSettle(() => {
@@ -653,6 +700,21 @@ export function FingerprintsGraph({
       zoomToFit();
     });
   }, [layout, zoomToFit, dNodes.length]);
+
+  // On a new external focus, bring the lit subset into view — immediately
+  // (positions are usually settled) and again after any re-layout settles
+  // (e.g. when the focus also reset the toolbar filters).
+  React.useEffect(() => {
+    if (!focusPath) return;
+    const fitFocus = () => {
+      const lit = [...layout.simNodes.values()].filter((sn) => focusPath.nodeKeys.has(sn.key));
+      const bbox = nodesBBox(lit);
+      if (bbox) panZoom.fitBBox(bbox);
+    };
+    fitFocus();
+    layout.onSettle(fitFocus);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusSignature]);
 
   const nodeIndex = React.useMemo(() => {
     const m = new Map<string, GraphNodeDto>();
@@ -674,40 +736,45 @@ export function FingerprintsGraph({
   // (its node keys may no longer exist → would dim everything).
   React.useEffect(() => {
     clearFocus();
-  }, [nodes, search, sourceFilter, labelFilter, minSimilarity, showExternal, focusPair, clearFocus]);
+  }, [nodes, search, sourceFilter, labelFilter, minSimilarity, showExternal, focusSignature, clearFocus]);
 
   // ── Click = focus this node's component (path); greyed nodes are inert ───────
   const onNodeClick = React.useCallback(
     (node: GraphNodeDto) => {
       const key = keyOf(node);
-      if (path && !path.nodeKeys.has(key)) return; // dimmed → non-clickable
+      if (effectivePath && !effectivePath.nodeKeys.has(key)) return; // dimmed → non-clickable
       setPath(focusComponent(key, renderEdges));
       setSelection({ type: "node", key });
     },
-    [path, renderEdges],
+    [effectivePath, renderEdges],
   );
   const onEdgeClick = React.useCallback(
     (edge: GraphEdgeDto) => {
-      if (path && !path.edgeIds.has(edge.id)) return;
+      if (effectivePath && !effectivePath.edgeIds.has(edge.id)) return;
       setPath(focusComponent(nodeKey(edge.fromType, edge.fromId), renderEdges));
       setSelection({ type: "edge", id: edge.id });
     },
-    [path, renderEdges],
+    [effectivePath, renderEdges],
   );
   const onBackgroundClick = React.useCallback(() => {
     clearFocus();
-    if (focusPair) onExitFocusPair?.();
-  }, [clearFocus, focusPair, onExitFocusPair]);
+    if (focus) onExitFocus?.();
+  }, [clearFocus, focus, onExitFocus]);
 
-  // When a path is focused, case actions pull exactly its assets.
+  // Case actions pull exactly the focused subset when one exists:
+  // component-click focus > external focus > everything visible after filters.
   const targetAssetIds = React.useMemo(() => {
-    if (!path) return visibleAssetIds;
-    const ids: string[] = [];
-    for (const key of path.nodeKeys) {
-      if (key.startsWith("asset:")) ids.push(key.slice("asset:".length));
+    if (path && effectivePath) {
+      const ids: string[] = [];
+      for (const key of effectivePath.nodeKeys) {
+        if (key.startsWith("asset:")) ids.push(key.slice("asset:".length));
+      }
+      return ids;
     }
-    return ids;
-  }, [path, visibleAssetIds]);
+    if (focus) return focus.assetIds;
+    return visibleAssetIds;
+  }, [path, effectivePath, focus, visibleAssetIds]);
+  const focusActive = Boolean(effectivePath);
 
   const selectedNode =
     selection?.type === "node" ? (nodeIndex.get(selection.key) ?? null) : null;
@@ -779,9 +846,6 @@ export function FingerprintsGraph({
         onHoverKey={setHoverKey}
         focusCluster={focusCluster}
         assetLabel={assetLabel}
-        targetAssetIds={targetAssetIds}
-        onClearFocus={clearFocus}
-        onUseInCase={useInCase}
       />
     ),
     [
@@ -793,9 +857,6 @@ export function FingerprintsGraph({
       hoverKey,
       focusCluster,
       assetLabel,
-      targetAssetIds,
-      clearFocus,
-      useInCase,
     ],
   );
   const overviewFooter = React.useMemo(
@@ -808,10 +869,9 @@ export function FingerprintsGraph({
         visibleAssetIds={visibleAssetIds}
         unconnectedCount={unconnectedCount}
         valueCount={valueCount}
-        onUseInCase={useInCase}
       />
     ),
-    [clustered, focusCluster, hoverKey, visibleAssetIds, unconnectedCount, valueCount, useInCase],
+    [clustered, focusCluster, hoverKey, visibleAssetIds, unconnectedCount, valueCount],
   );
 
   // Push the rail snapshot up only when the selection itself changes — not
@@ -944,6 +1004,17 @@ export function FingerprintsGraph({
             </Popover>
           )}
           <Button
+            size="sm"
+            className="h-8"
+            disabled={targetAssetIds.length === 0}
+            onClick={useInCase}
+          >
+            <FolderPlus className="mr-1.5 h-3.5 w-3.5" />
+            {focusActive
+              ? t("correlation.fingerprints.useFocusedInCase")
+              : t("correlation.fingerprints.useVisibleInCase")}
+          </Button>
+          <Button
             variant="outline"
             size="sm"
             className="h-8"
@@ -972,7 +1043,7 @@ export function FingerprintsGraph({
             selection={selection}
             mode={SELECT_MODE}
             activeNodeKeys={null}
-            path={path}
+            path={effectivePath}
             nodeDecorator={nodeDecorator}
             edgeStyle={edgeStyle}
             hoverKey={hoverKey}
@@ -986,16 +1057,16 @@ export function FingerprintsGraph({
             onEdgeContextMenu={() => undefined}
             onBackgroundClick={onBackgroundClick}
           />
-          {focusPair && (
+          {focus && (
             <div className="absolute left-3 top-3 z-10 flex items-center gap-2 rounded-[4px] border-2 border-foreground bg-background px-3 py-1.5 text-xs shadow-[3px_3px_0_#000]">
               <span className="font-mono font-semibold uppercase tracking-wide">
-                {t("correlation.fingerprints.pairFocused")}
+                {focus.label}
               </span>
               <Button
                 size="sm"
                 variant="ghost"
                 className="h-6 px-1.5 text-xs"
-                onClick={() => onExitFocusPair?.()}
+                onClick={() => onExitFocus?.()}
               >
                 <X className="mr-1 h-3 w-3" />
                 {t("correlation.fingerprints.resetView")}
@@ -1083,6 +1154,7 @@ export function FingerprintsGraph({
           open={caseOpen}
           onOpenChange={setCaseOpen}
           assetIds={targetAssetIds}
+          assetLabel={assetLabel}
         />
       )}
     </div>
