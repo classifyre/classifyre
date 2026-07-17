@@ -64,6 +64,8 @@ export type {
   SimilarFindingSourceDto,
   SimilarFindingEvidenceAnalysisDto,
   BoilerplateClusterDto,
+  EmbeddingRecalibrateResponseDto,
+  EmbeddingStatusResponseDto,
 } from "./generated/src/models";
 export type {
   ChatBotResponseDto,

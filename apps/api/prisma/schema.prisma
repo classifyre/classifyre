@@ -161,15 +161,16 @@ model Finding {
 // A model revision is an immutable vector coordinate system. Model changes
 // create a new space so old and new embeddings can coexist during validation.
 model EmbeddingSpace {
-  id         String   @id @default(uuid())
-  provider   String
-  model      String
-  revision   String
-  dim        Int
-  pooling    String
-  normalized Boolean  @default(true)
-  isActive   Boolean  @default(false) @map("is_active")
-  createdAt  DateTime @default(now()) @map("created_at")
+  id                 String    @id @default(uuid())
+  provider           String
+  model              String
+  revision           String
+  dim                Int
+  pooling            String
+  normalized         Boolean   @default(true)
+  isActive           Boolean   @default(false) @map("is_active")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  lastRecalibratedAt DateTime? @map("last_recalibrated_at")
 
   embeddings ContentEmbedding[]
   analyses   FindingEvidenceAnalysis[]

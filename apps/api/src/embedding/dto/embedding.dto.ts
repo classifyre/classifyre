@@ -78,6 +78,86 @@ export class BoilerplateClustersQueryDto {
   limit = 50;
 }
 
+export class GlobalBoilerplateClustersQueryDto extends BoilerplateClustersQueryDto {
+  @ApiPropertyOptional({
+    type: [String],
+    description:
+      'Restrict clusters to findings from these sources; omit for the whole corpus',
+  })
+  @IsOptional()
+  sourceIds?: string[] | string;
+}
+
+export class EmbeddingRecalibrateResponseDto {
+  @ApiProperty()
+  scheduled!: boolean;
+}
+
+export class EmbeddingStatusResponseDto {
+  @ApiProperty()
+  enabled!: boolean;
+
+  @ApiProperty()
+  pgvector!: boolean;
+
+  @ApiPropertyOptional({ nullable: true })
+  pgvectorVersion?: string | null;
+
+  @ApiProperty()
+  searchStrategy!: string;
+
+  @ApiProperty()
+  provider!: string;
+
+  @ApiProperty()
+  model!: string;
+
+  @ApiProperty()
+  dimensions!: number;
+
+  @ApiPropertyOptional({ nullable: true })
+  spaceId?: string | null;
+
+  @ApiProperty()
+  persistentQueue!: boolean;
+
+  @ApiProperty()
+  pendingQueueWrites!: number;
+
+  @ApiProperty()
+  workerRegistered!: boolean;
+
+  @ApiProperty()
+  autoBackfill!: boolean;
+
+  @ApiProperty()
+  backfillRunning!: boolean;
+
+  @ApiPropertyOptional({ nullable: true })
+  backfillStartedAt?: string | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  backfillCompletedAt?: string | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  backfillError?: string | null;
+
+  @ApiProperty({
+    description:
+      'A recalibration pass is queued (debounced) but not yet running',
+  })
+  recalibrationScheduled!: boolean;
+
+  @ApiProperty()
+  recalibrationRunning!: boolean;
+
+  @ApiPropertyOptional({ nullable: true })
+  lastRecalibratedAt?: string | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  lastRecalibrationError?: string | null;
+}
+
 export class EmbeddingReindexResponseDto {
   @ApiProperty()
   started!: boolean;
@@ -172,6 +252,20 @@ export class BoilerplateClusterDto {
 
   @ApiProperty()
   meanImportance!: number;
+
+  @ApiProperty({
+    description: 'Distinct sources the cluster spans (>1 = cross-source)',
+  })
+  sourceCount!: number;
+
+  @ApiProperty({ type: [String] })
+  sourceIds!: string[];
+
+  @ApiProperty({
+    type: [String],
+    description: 'Assets containing the clustered findings (up to 50)',
+  })
+  assetIds!: string[];
 
   @ApiProperty()
   threshold!: number;

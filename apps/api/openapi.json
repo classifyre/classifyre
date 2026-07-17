@@ -8915,7 +8915,14 @@
         "parameters": [],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmbeddingStatusResponseDto"
+                }
+              }
+            }
           }
         },
         "summary": "Get semantic storage and search capability",
@@ -9023,6 +9030,95 @@
           }
         },
         "summary": "Find semantically similar findings with ranking evidence",
+        "tags": [
+          "embeddings"
+        ]
+      }
+    },
+    "/embeddings/boilerplate-clusters": {
+      "get": {
+        "operationId": "EmbeddingController_boilerplateGlobal",
+        "parameters": [
+          {
+            "name": "threshold",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 0.8,
+              "maximum": 1,
+              "default": 0.95,
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Object"
+                }
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 100,
+              "default": 50,
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Object"
+                }
+              ]
+            }
+          },
+          {
+            "name": "sourceIds",
+            "required": false,
+            "in": "query",
+            "description": "Restrict clusters to findings from these sources; omit for the whole corpus",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BoilerplateClusterDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Near-duplicate finding clusters across the corpus, optionally filtered to specific sources",
+        "tags": [
+          "embeddings"
+        ]
+      }
+    },
+    "/embeddings/recalibrate": {
+      "post": {
+        "operationId": "EmbeddingController_recalibrate",
+        "parameters": [],
+        "responses": {
+          "202": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmbeddingRecalibrateResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Schedule a full evidence-ranking recalibration pass (importance scores, outliers, near-duplicate groups)",
         "tags": [
           "embeddings"
         ]
@@ -19780,6 +19876,94 @@
           "assets"
         ]
       },
+      "EmbeddingStatusResponseDto": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "pgvector": {
+            "type": "boolean"
+          },
+          "pgvectorVersion": {
+            "type": "string",
+            "nullable": true
+          },
+          "searchStrategy": {
+            "type": "string"
+          },
+          "provider": {
+            "type": "string"
+          },
+          "model": {
+            "type": "string"
+          },
+          "dimensions": {
+            "type": "number"
+          },
+          "spaceId": {
+            "type": "string",
+            "nullable": true
+          },
+          "persistentQueue": {
+            "type": "boolean"
+          },
+          "pendingQueueWrites": {
+            "type": "number"
+          },
+          "workerRegistered": {
+            "type": "boolean"
+          },
+          "autoBackfill": {
+            "type": "boolean"
+          },
+          "backfillRunning": {
+            "type": "boolean"
+          },
+          "backfillStartedAt": {
+            "type": "string",
+            "nullable": true
+          },
+          "backfillCompletedAt": {
+            "type": "string",
+            "nullable": true
+          },
+          "backfillError": {
+            "type": "string",
+            "nullable": true
+          },
+          "recalibrationScheduled": {
+            "type": "boolean",
+            "description": "A recalibration pass is queued (debounced) but not yet running"
+          },
+          "recalibrationRunning": {
+            "type": "boolean"
+          },
+          "lastRecalibratedAt": {
+            "type": "string",
+            "nullable": true
+          },
+          "lastRecalibrationError": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "enabled",
+          "pgvector",
+          "searchStrategy",
+          "provider",
+          "model",
+          "dimensions",
+          "persistentQueue",
+          "pendingQueueWrites",
+          "workerRegistered",
+          "autoBackfill",
+          "backfillRunning",
+          "recalibrationScheduled",
+          "recalibrationRunning"
+        ]
+      },
       "EmbeddingReindexResponseDto": {
         "type": "object",
         "properties": {
@@ -19995,6 +20179,23 @@
           "meanImportance": {
             "type": "number"
           },
+          "sourceCount": {
+            "type": "number",
+            "description": "Distinct sources the cluster spans (>1 = cross-source)"
+          },
+          "sourceIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "assetIds": {
+            "description": "Assets containing the clustered findings (up to 50)",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
           "threshold": {
             "type": "number"
           }
@@ -20004,7 +20205,21 @@
           "findingCount",
           "findingIds",
           "meanImportance",
+          "sourceCount",
+          "sourceIds",
+          "assetIds",
           "threshold"
+        ]
+      },
+      "EmbeddingRecalibrateResponseDto": {
+        "type": "object",
+        "properties": {
+          "scheduled": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "scheduled"
         ]
       }
     }

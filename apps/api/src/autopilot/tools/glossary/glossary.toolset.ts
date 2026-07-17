@@ -37,7 +37,7 @@ export class GlossaryToolset {
       {
         name: 'glossary.propose',
         description:
-          'Propose a glossary term (canonical name + aliases + entity type) discovered during investigation. Proposals are UNVERIFIED until an operator confirms them and never overwrite operator-curated terms — at most your aliases are merged. Never re-propose a term an operator removed.',
+          'Propose a SHARED VOCABULARY term for the operator-facing glossary: the canonical spelling of a real-world person, organization, location, project codename, document reference, or recurring domain jargon found in the corpus (e.g. term "Jane Doe" aliases ["J. Doe", "Doe, Jane"]; term "Project Aurora"). Write the term the way a human would say it — never snake_case slugs, ids, or hashes. This is NOT a place for observations, per-source summaries, or investigation state; those belong in memory.write. Proposals are UNVERIFIED until an operator confirms them and never overwrite operator-curated terms — at most your aliases are merged. Never re-propose a term an operator removed.',
         inputSchema: {
           type: 'object',
           properties: {

@@ -54,6 +54,15 @@ const TRIAGE_DOCTRINE = [
   'never proof of a connection.',
 ].join(' ');
 
+const GLOSSARY_DOCTRINE = [
+  '\nGLOSSARY: the glossary is the operator-facing shared vocabulary — canonical real-world names',
+  '(people, organizations, locations, project codenames, document references, recurring jargon)',
+  'written the way a human says them, with aliases for variant spellings. glossary.propose ONLY such',
+  'terms; observations, per-source summaries and investigation state go to memory.write instead.',
+  'Bad: "aws_supabase_pii_consolidated". Good: term "Aurora Holdings Ltd" aliases ["Aurora Holdings",',
+  '"AHL"]. Use glossary.lookup before treating two spellings as different entities.',
+].join(' ');
+
 /**
  * Raw-asset observation. The cold-start signal: when a source has produced no
  * findings, these expose the ingested assets' kinds and metadata shape so a
@@ -114,6 +123,7 @@ export const INQUIRY_MISSION: Mission = {
     'Avoid duplicates — prefer enriching an existing inquiry over creating a near-duplicate.',
     'Do not recreate intentionally archived inquiries. Use memory.search to recall precedents.',
     TRIAGE_DOCTRINE,
+    GLOSSARY_DOCTRINE,
     '\nAim inquiries at what findings.ranked says matters: high-importance recurring evidence,',
     'not high-severity noise. An inquiry that would match a boilerplate cluster is a bad inquiry.',
     '\nWIND DOWN: if an inquiry is matching only false positives/noise or its topic is resolved,',
@@ -139,6 +149,7 @@ export const CASE_MISSION: Mission = {
     'Create a case only when a coherent investigation is warranted; otherwise enrich an open case',
     'with hypotheses, evidence, attached findings, notes and links. Be conservative and specific.',
     TRIAGE_DOCTRINE,
+    GLOSSARY_DOCTRINE,
     '\nLEADS vs EVIDENCE: cases.attach_findings is ONLY for findings you verified against source',
     'evidence this cycle. For everything else that MIGHT belong — semantic neighbours, unreviewed',
     'high-importance matches — cases.propose_lead with a specific rationale, so a human reviews it.',

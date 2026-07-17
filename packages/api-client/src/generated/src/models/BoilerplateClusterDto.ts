@@ -44,6 +44,24 @@ export interface BoilerplateClusterDto {
      */
     meanImportance: number;
     /**
+     * Distinct sources the cluster spans (>1 = cross-source)
+     * @type {number}
+     * @memberof BoilerplateClusterDto
+     */
+    sourceCount: number;
+    /**
+     * 
+     * @type {Array<string>}
+     * @memberof BoilerplateClusterDto
+     */
+    sourceIds: Array<string>;
+    /**
+     * Assets containing the clustered findings (up to 50)
+     * @type {Array<string>}
+     * @memberof BoilerplateClusterDto
+     */
+    assetIds: Array<string>;
+    /**
      * 
      * @type {number}
      * @memberof BoilerplateClusterDto
@@ -59,6 +77,9 @@ export function instanceOfBoilerplateClusterDto(value: object): value is Boilerp
     if (!('findingCount' in value) || value['findingCount'] === undefined) return false;
     if (!('findingIds' in value) || value['findingIds'] === undefined) return false;
     if (!('meanImportance' in value) || value['meanImportance'] === undefined) return false;
+    if (!('sourceCount' in value) || value['sourceCount'] === undefined) return false;
+    if (!('sourceIds' in value) || value['sourceIds'] === undefined) return false;
+    if (!('assetIds' in value) || value['assetIds'] === undefined) return false;
     if (!('threshold' in value) || value['threshold'] === undefined) return false;
     return true;
 }
@@ -77,6 +98,9 @@ export function BoilerplateClusterDtoFromJSONTyped(json: any, ignoreDiscriminato
         'findingCount': json['findingCount'],
         'findingIds': json['findingIds'],
         'meanImportance': json['meanImportance'],
+        'sourceCount': json['sourceCount'],
+        'sourceIds': json['sourceIds'],
+        'assetIds': json['assetIds'],
         'threshold': json['threshold'],
     };
 }
@@ -96,6 +120,9 @@ export function BoilerplateClusterDtoToJSONTyped(value?: BoilerplateClusterDto |
         'findingCount': value['findingCount'],
         'findingIds': value['findingIds'],
         'meanImportance': value['meanImportance'],
+        'sourceCount': value['sourceCount'],
+        'sourceIds': value['sourceIds'],
+        'assetIds': value['assetIds'],
         'threshold': value['threshold'],
     };
 }

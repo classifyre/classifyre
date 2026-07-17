@@ -4,15 +4,14 @@ import * as React from "react";
 import { toast } from "sonner";
 import {
   Ban,
-  ExternalLink,
   Fingerprint,
-  FolderPlus,
   Globe,
-  Layers,
+  Info,
   Maximize2,
   RotateCw,
   Search,
   SlidersHorizontal,
+  X,
 } from "lucide-react";
 import {
   api,
@@ -24,6 +23,11 @@ import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
 import { EmptyState } from "@workspace/ui/components/empty-state";
 import { Input } from "@workspace/ui/components/input";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@workspace/ui/components/popover";
 import { Slider } from "@workspace/ui/components/slider";
 import { Spinner } from "@workspace/ui/components/spinner";
 import {
@@ -39,7 +43,6 @@ import { useForceLayout } from "./graph-explorer/use-force-layout";
 import { usePanZoom } from "./graph-explorer/use-pan-zoom";
 import { focusComponent, nodesBBox } from "./graph-explorer/graph-utils";
 import { useClusterFocus } from "./graph-explorer/use-cluster-focus";
-import { ClusterDetailPanel, ClusterOverviewPanel } from "./graph-explorer/cluster-panels";
 import { useContainerSize } from "./graph-explorer/use-container-size";
 import {
   isClusterNode,
@@ -50,14 +53,17 @@ import { ClusterControls } from "./graph-explorer/cluster-controls";
 import {
   keyOf,
   nodeKey,
-  STRENGTH_GRADIENT,
-  strengthColor,
   type GraphSelection,
   type PathResult,
+  strengthColor,
 } from "./graph-explorer/graph-types";
 import type { EdgeStyleOverride, NodeDecoration } from "./graph-explorer/explorer-types";
 import { CorrelationTuningDialog } from "./correlation-tuning-dialog";
 import { FingerprintsCaseDialog } from "./fingerprints-case-dialog";
+import {
+  FingerprintsGraphOverviewFooter,
+  FingerprintsGraphSelectionRail,
+} from "./fingerprints-graph-rail";
 import { useTranslation } from "@/hooks/use-translation";
 
 const SELECT_MODE = { kind: "select" } as const;
@@ -66,11 +72,27 @@ const COLLAPSE_THRESHOLD = 5;
 const BUNDLE_NODE_PREFIX = "bundle-node:";
 const BUNDLE_EDGE_PREFIX = "bundle-edge:";
 
-interface BundleDetail {
+export interface BundleDetail {
   assetIds: string[];
   values: Array<{ label: string; value: string }>;
   /** Pairwise weighted match % (only for 2-asset bundles). */
   matchPercent?: number;
+}
+
+/** Raw graph payload, shared between the graph and its sibling panels (e.g. Connections). */
+export interface FingerprintsGraphData {
+  nodes: GraphNodeDto[];
+  edges: GraphEdgeDto[];
+  similarities: AssetSimilarityDto[];
+  truncated: boolean;
+}
+
+/** Snapshot pushed up when `externalRail` is set, so a host page can render the rail itself. */
+export interface FingerprintsRailState {
+  selection: GraphSelection;
+  selectionRail: React.ReactNode;
+  /** Deselect (back affordance) — clears the graph's node/edge/bundle selection. */
+  onBack: () => void;
 }
 
 const pairKey = (a: string, b: string) => (a < b ? `${a}|${b}` : `${b}|${a}`);
@@ -87,6 +109,14 @@ export function FingerprintsGraph({
   sourceId,
   onTune,
   pendingRecomputeAt,
+  graphData,
+  graphLoading,
+  graphError,
+  onReloadGraph,
+  externalRail = false,
+  onRailStateChange,
+  focusPair,
+  onExitFocusPair,
 }: {
   assetId?: string;
   /** Scope to a source's clusters; external assets get a show/hide toggle. */
@@ -95,15 +125,37 @@ export function FingerprintsGraph({
   onTune?: () => void;
   /** Bump (e.g. timestamp) to make the graph wait for a recompute + reload. */
   pendingRecomputeAt?: number;
+  /** Externally-fetched graph payload (shared with sibling panels). Falls back to an internal fetch when omitted. */
+  graphData?: FingerprintsGraphData;
+  graphLoading?: boolean;
+  graphError?: string | null;
+  /** Called instead of the internal fetch when `graphData` is externally managed. */
+  onReloadGraph?: () => void;
+  /** When true, suppress the built-in right rail and report its content via `onRailStateChange` instead. */
+  externalRail?: boolean;
+  onRailStateChange?: (state: FingerprintsRailState) => void;
+  /** Show only these two assets, their shared-value nodes, and the connecting edges. */
+  focusPair?: [string, string];
+  /** Clear `focusPair` — invoked from the floating pill's Reset and from a background click. */
+  onExitFocusPair?: () => void;
 }) {
   const { t } = useTranslation();
-  const [nodes, setNodes] = React.useState<GraphNodeDto[]>([]);
-  const [edges, setEdges] = React.useState<GraphEdgeDto[]>([]);
-  const [similarities, setSimilarities] = React.useState<AssetSimilarityDto[]>([]);
-  const [truncated, setTruncated] = React.useState(false);
-  const [loading, setLoading] = React.useState(true);
+  const externallyManaged = graphData !== undefined;
+  const [fetchedNodes, setFetchedNodes] = React.useState<GraphNodeDto[]>([]);
+  const [fetchedEdges, setFetchedEdges] = React.useState<GraphEdgeDto[]>([]);
+  const [fetchedSimilarities, setFetchedSimilarities] = React.useState<AssetSimilarityDto[]>([]);
+  const [fetchedTruncated, setFetchedTruncated] = React.useState(false);
+  const [fetchLoading, setFetchLoading] = React.useState(true);
+  const [fetchError, setFetchError] = React.useState<string | null>(null);
+
+  const nodes = externallyManaged ? graphData.nodes : fetchedNodes;
+  const edges = externallyManaged ? graphData.edges : fetchedEdges;
+  const similarities = externallyManaged ? graphData.similarities : fetchedSimilarities;
+  const truncated = externallyManaged ? graphData.truncated : fetchedTruncated;
+  const loading = externallyManaged ? (graphLoading ?? false) : fetchLoading;
+  const error = externallyManaged ? (graphError ?? null) : fetchError;
+
   const [recomputing, setRecomputing] = React.useState(false);
-  const [error, setError] = React.useState<string | null>(null);
   const [search, setSearch] = React.useState("");
   const [sourceFilter, setSourceFilter] = React.useState<string[]>([]);
   const [labelFilter, setLabelFilter] = React.useState<string[]>([]);
@@ -142,34 +194,42 @@ export function FingerprintsGraph({
   );
 
   const load = React.useCallback(() => {
+    if (externallyManaged) {
+      onReloadGraph?.();
+      return () => undefined;
+    }
     let active = true;
-    setLoading(true);
-    setError(null);
+    setFetchLoading(true);
+    setFetchError(null);
     const req = assetId ? { assetId } : sourceId ? { sourceId } : {};
     api.correlation
       .correlationControllerGraph(req)
       .then((g) => {
         if (!active) return;
-        setNodes(g.nodes ?? []);
-        setEdges(g.edges ?? []);
-        setSimilarities(g.similarities ?? []);
-        setTruncated(Boolean(g.truncated));
+        setFetchedNodes(g.nodes ?? []);
+        setFetchedEdges(g.edges ?? []);
+        setFetchedSimilarities(g.similarities ?? []);
+        setFetchedTruncated(Boolean(g.truncated));
       })
       .catch((e: unknown) => {
         if (active)
-          setError(
+          setFetchError(
             e instanceof Error ? e.message : t("correlation.fingerprints.loadFailed"),
           );
       })
       .finally(() => {
-        if (active) setLoading(false);
+        if (active) setFetchLoading(false);
       });
     return () => {
       active = false;
     };
-  }, [assetId, sourceId, t]);
+  }, [externallyManaged, onReloadGraph, assetId, sourceId, t]);
 
-  React.useEffect(() => load(), [load]);
+  React.useEffect(() => {
+    if (externallyManaged) return;
+    return load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [externallyManaged, assetId, sourceId]);
 
   /**
    * After a config/exclusion change the recompute runs as a background
@@ -288,6 +348,41 @@ export function FingerprintsGraph({
     const assetById = new Map(
       nodes.filter((n) => n.type === "asset").map((n) => [n.id, n]),
     );
+
+    // Pair-focus mode: short-circuit every other filter and show only the two
+    // assets plus the shared-value nodes that connect them.
+    if (focusPair) {
+      const [a, b] = focusPair;
+      const valuesOfA = new Set(
+        edges.filter((e) => e.fromId === a && e.toType === "finding").map((e) => e.toId),
+      );
+      const valuesOfB = new Set(
+        edges.filter((e) => e.fromId === b && e.toType === "finding").map((e) => e.toId),
+      );
+      const shared = [...valuesOfA].filter((v) => valuesOfB.has(v));
+      const outNodes: GraphNodeDto[] = [];
+      const nodeA = assetById.get(a);
+      const nodeB = assetById.get(b);
+      if (nodeA) outNodes.push(nodeA);
+      if (nodeB) outNodes.push(nodeB);
+      const outEdges: GraphEdgeDto[] = [];
+      for (const vId of shared) {
+        const vn = valueById.get(vId);
+        if (vn) outNodes.push(vn);
+        for (const e of edges) {
+          if (e.toId === vId && (e.fromId === a || e.fromId === b)) outEdges.push(e);
+        }
+      }
+      return {
+        dNodes: outNodes,
+        dEdges: outEdges,
+        bundleDetails: new Map<string, BundleDetail>(),
+        visibleAssetIds: [nodeA, nodeB].filter(Boolean).map((n) => n!.id),
+        unconnectedCount: 0,
+        valueCount: shared.length,
+        externalAssetCount: 0,
+      };
+    }
 
     // 1) hard filters: source (assets), label (values), and (source-scoped)
     //    external assets unless "show external" is on.
@@ -487,6 +582,7 @@ export function FingerprintsGraph({
     minSimilarity,
     simByPair,
     showExternal,
+    focusPair,
     t,
   ]);
 
@@ -495,7 +591,33 @@ export function FingerprintsGraph({
   const size = useContainerSize(containerRef);
 
   // ── Community clustering / semantic zoom ──────────────────────────────────
-  const clustered = useClusteredGraph(dNodes, dEdges);
+  // `useClusteredGraph` returns a fresh object literal on every call even
+  // when its individually-memoized fields haven't changed; re-wrap it so
+  // `clustered`'s identity is stable across no-op renders. Several
+  // downstream callbacks (useClusterFocus, the lifted rail content) depend
+  // on `clustered` directly — an unstable identity there previously caused
+  // an effect→setState→render loop once the rail state started being
+  // pushed to the host page.
+  const clusteredUnstable = useClusteredGraph(dNodes, dEdges);
+  const clustered = React.useMemo(
+    () => clusteredUnstable,
+    // Deliberately excluding `clusteredUnstable` itself: its wrapping object
+    // literal is unstable every render even when every field below is
+    // unchanged.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [
+      clusteredUnstable.renderNodes,
+      clusteredUnstable.renderEdges,
+      clusteredUnstable.clusters,
+      clusteredUnstable.clusterOfNode,
+      clusteredUnstable.expandedClusters,
+      clusteredUnstable.hasCollapsedClusters,
+      clusteredUnstable.expandCluster,
+      clusteredUnstable.collapseCluster,
+      clusteredUnstable.collapseAll,
+      clusteredUnstable.expandAllClusters,
+    ],
+  );
   const { renderNodes, renderEdges } = clustered;
 
   /** Fan seed positions for members of a just-expanded cluster. */
@@ -520,9 +642,10 @@ export function FingerprintsGraph({
   }, [layout.simNodes, panZoom]);
 
   const didFit = React.useRef(false);
+  const focusPairSignature = focusPair ? focusPair.join("|") : "";
   React.useEffect(() => {
     didFit.current = false;
-  }, [assetId]);
+  }, [assetId, focusPairSignature]);
   React.useEffect(() => {
     if (didFit.current || dNodes.length === 0) return;
     layout.onSettle(() => {
@@ -551,7 +674,7 @@ export function FingerprintsGraph({
   // (its node keys may no longer exist → would dim everything).
   React.useEffect(() => {
     clearFocus();
-  }, [nodes, search, sourceFilter, labelFilter, minSimilarity, showExternal, clearFocus]);
+  }, [nodes, search, sourceFilter, labelFilter, minSimilarity, showExternal, focusPair, clearFocus]);
 
   // ── Click = focus this node's component (path); greyed nodes are inert ───────
   const onNodeClick = React.useCallback(
@@ -571,6 +694,10 @@ export function FingerprintsGraph({
     },
     [path, renderEdges],
   );
+  const onBackgroundClick = React.useCallback(() => {
+    clearFocus();
+    if (focusPair) onExitFocusPair?.();
+  }, [clearFocus, focusPair, onExitFocusPair]);
 
   // When a path is focused, case actions pull exactly its assets.
   const targetAssetIds = React.useMemo(() => {
@@ -628,6 +755,79 @@ export function FingerprintsGraph({
     }),
     [],
   );
+
+  const useInCase = React.useCallback(() => setCaseOpen(true), []);
+  const rawNodeByKeyGetter = React.useCallback(
+    (k: string) => rawNodeByKey.get(k),
+    [rawNodeByKey],
+  );
+
+  // ── Rail content: rendered inline by default, lifted to the host page when
+  //    `externalRail` is set (the workspace-style Fingerprints page). Memoized
+  //    so its identity is stable across no-op renders — `externalRail` mode
+  //    pushes this to the host page in an effect, and an unstable identity
+  //    there would re-trigger that effect (and the host's setState) forever. ─
+  const selectionRail = React.useMemo(
+    () => (
+      <FingerprintsGraphSelectionRail
+        selection={selection}
+        selectedNode={selectedNode}
+        selectedDetail={selectedDetail}
+        clustered={clustered}
+        rawNodeByKey={rawNodeByKeyGetter}
+        hoverKey={hoverKey}
+        onHoverKey={setHoverKey}
+        focusCluster={focusCluster}
+        assetLabel={assetLabel}
+        targetAssetIds={targetAssetIds}
+        onClearFocus={clearFocus}
+        onUseInCase={useInCase}
+      />
+    ),
+    [
+      selection,
+      selectedNode,
+      selectedDetail,
+      clustered,
+      rawNodeByKeyGetter,
+      hoverKey,
+      focusCluster,
+      assetLabel,
+      targetAssetIds,
+      clearFocus,
+      useInCase,
+    ],
+  );
+  const overviewFooter = React.useMemo(
+    () => (
+      <FingerprintsGraphOverviewFooter
+        clustered={clustered}
+        focusCluster={focusCluster}
+        hoverKey={hoverKey}
+        onHoverKey={setHoverKey}
+        visibleAssetIds={visibleAssetIds}
+        unconnectedCount={unconnectedCount}
+        valueCount={valueCount}
+        onUseInCase={useInCase}
+      />
+    ),
+    [clustered, focusCluster, hoverKey, visibleAssetIds, unconnectedCount, valueCount, useInCase],
+  );
+
+  // Push the rail snapshot up only when the selection itself changes — not
+  // on `selectionRail`'s identity. `selectionRail` is memoized, but chasing
+  // every transitive dependency (clustered/focusCluster/layout are also
+  // consumed by the always-ticking force simulation) to guarantee its
+  // reference never churns is fragile; gating on `selection` (a plain,
+  // user-driven state value) is the one dependency guaranteed not to
+  // change on its own, so this can never loop. The trade-off: sidebar-only
+  // hover highlighting inside the selection panel may lag the canvas by
+  // one selection cycle — the canvas itself is unaffected.
+  React.useEffect(() => {
+    if (!externalRail) return;
+    onRailStateChange?.({ selection, selectionRail, onBack: clearFocus });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [externalRail, selection]);
 
   return (
     <div className="flex h-full flex-col border-2 border-border bg-card">
@@ -726,6 +926,23 @@ export function FingerprintsGraph({
         <ClusterControls clustered={clustered} />
 
         <div className="ml-auto flex items-center gap-1">
+          {externalRail && (
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8"
+                  aria-label={t("correlation.fingerprints.legend")}
+                >
+                  <Info className="h-4 w-4" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="end" className="max-h-[70vh] w-80 space-y-4 overflow-y-auto">
+                {overviewFooter}
+              </PopoverContent>
+            </Popover>
+          )}
           <Button
             variant="outline"
             size="sm"
@@ -767,8 +984,24 @@ export function FingerprintsGraph({
             onNodeContextMenu={onNodeContextMenu}
             onEdgeClick={onEdgeClick}
             onEdgeContextMenu={() => undefined}
-            onBackgroundClick={clearFocus}
+            onBackgroundClick={onBackgroundClick}
           />
+          {focusPair && (
+            <div className="absolute left-3 top-3 z-10 flex items-center gap-2 rounded-[4px] border-2 border-foreground bg-background px-3 py-1.5 text-xs shadow-[3px_3px_0_#000]">
+              <span className="font-mono font-semibold uppercase tracking-wide">
+                {t("correlation.fingerprints.pairFocused")}
+              </span>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-6 px-1.5 text-xs"
+                onClick={() => onExitFocusPair?.()}
+              >
+                <X className="mr-1 h-3 w-3" />
+                {t("correlation.fingerprints.resetView")}
+              </Button>
+            </div>
+          )}
           {(loading || recomputing || error || showEmpty) && (
             <div className="absolute inset-0 flex items-center justify-center bg-card/80 backdrop-blur-sm">
               {recomputing ? (
@@ -793,191 +1026,12 @@ export function FingerprintsGraph({
           )}
         </div>
 
-        {/* ── Detail / actions rail ── */}
-        <aside className="w-[260px] shrink-0 space-y-4 overflow-y-auto border-l-2 border-border bg-background p-3">
-          {selection ? (
-            <div className="space-y-4">
-              {selectedDetail ? (
-                <div className="space-y-3">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Badge variant="outline" className="text-[10px] uppercase">
-                      {t("correlation.fingerprints.bundleTitle", {
-                        count: String(selectedDetail.values.length),
-                      })}
-                    </Badge>
-                    {selectedDetail.matchPercent != null && (
-                      <Badge className="text-[10px]">
-                        {t("correlation.fingerprints.matchPercent", {
-                          count: String(selectedDetail.matchPercent),
-                        })}
-                      </Badge>
-                    )}
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    {t("correlation.fingerprints.bundleBetween")}
-                  </p>
-                  <div className="flex flex-wrap gap-1">
-                    {selectedDetail.assetIds.map((id) => (
-                      <a key={id} href={`/assets/${id}`} target="_blank" rel="noreferrer">
-                        <Badge variant="secondary" className="max-w-[220px] truncate">
-                          {assetLabel(id)}
-                        </Badge>
-                      </a>
-                    ))}
-                  </div>
-                  <div className="max-h-[40vh] space-y-1 overflow-y-auto border-t border-border/60 pt-2">
-                    {selectedDetail.values.map((v, i) => (
-                      <div
-                        key={`${v.value}-${i}`}
-                        className="flex items-center gap-2 rounded-[3px] px-1.5 py-1 text-xs"
-                      >
-                        <span className="shrink-0 font-mono text-[9px] uppercase text-muted-foreground">
-                          {v.label}
-                        </span>
-                        <span className="truncate font-mono" title={v.value}>
-                          {v.value}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ) : selectedNode && isClusterNode(selectedNode) ? (
-                <ClusterDetailPanel
-                  meta={selectedNode.cluster}
-                  clusters={clustered.clusters}
-                  renderEdges={renderEdges}
-                  nodeByKey={(k) => rawNodeByKey.get(k)}
-                  onFocusCluster={focusCluster}
-                  hoverKey={hoverKey}
-                  onHoverKey={setHoverKey}
-                />
-              ) : selectedNode && selectedNode.type === "asset" ? (
-                <div className="space-y-3">
-                  <Badge variant="outline" className="text-[10px] uppercase">
-                    {t("correlation.fingerprints.asset")}
-                  </Badge>
-                  <p className="break-words font-mono text-sm font-semibold">
-                    {selectedNode.label}
-                  </p>
-                  <Button size="sm" variant="outline" asChild className="w-full">
-                    <a href={`/assets/${selectedNode.id}`} target="_blank" rel="noreferrer">
-                      <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
-                      {t("correlation.fingerprints.openAsset")}
-                    </a>
-                  </Button>
-                </div>
-              ) : selectedNode ? (
-                <div className="space-y-3">
-                  <Badge variant="outline" className="text-[10px] uppercase">
-                    {t("correlation.fingerprints.sharedValue")}
-                  </Badge>
-                  <p className="break-words font-mono text-sm font-semibold">
-                    {selectedNode.label}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {t("correlation.fingerprints.sharedValueHint")}
-                  </p>
-                </div>
-              ) : null}
-
-              {/* Focused-path actions: pull exactly the connected assets. */}
-              <div className="space-y-2 border-t border-border/60 pt-3">
-                <p className="text-xs text-muted-foreground">
-                  {t("correlation.fingerprints.focusedHint", {
-                    count: String(targetAssetIds.length),
-                  })}
-                </p>
-                <Button
-                  size="sm"
-                  className="w-full"
-                  disabled={targetAssetIds.length === 0}
-                  onClick={() => setCaseOpen(true)}
-                >
-                  <FolderPlus className="mr-1.5 h-3.5 w-3.5" />
-                  {t("correlation.fingerprints.useInCase")}
-                </Button>
-                <Button size="sm" variant="ghost" className="w-full" onClick={clearFocus}>
-                  {t("correlation.fingerprints.clearFocus")}
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <>
-              {clustered.hasCollapsedClusters && (
-                <ClusterOverviewPanel
-                  clusters={clustered.clusters}
-                  onFocusCluster={focusCluster}
-                  hoverKey={hoverKey}
-                  onHoverKey={setHoverKey}
-                />
-              )}
-              <div className="space-y-2">
-                <h3 className="font-serif text-sm font-black uppercase tracking-[0.06em]">
-                  {t("correlation.fingerprints.actions")}
-                </h3>
-                <p className="text-xs text-muted-foreground">
-                  {t("correlation.fingerprints.actionsHint", {
-                    count: String(visibleAssetIds.length),
-                  })}
-                </p>
-                <Button
-                  size="sm"
-                  className="w-full"
-                  disabled={visibleAssetIds.length === 0}
-                  onClick={() => setCaseOpen(true)}
-                >
-                  <FolderPlus className="mr-1.5 h-3.5 w-3.5" />
-                  {t("correlation.fingerprints.useInCase")}
-                </Button>
-                <p className="text-[11px] text-muted-foreground">
-                  {t("correlation.fingerprints.focusHelp")}
-                </p>
-                <p className="text-[11px] text-muted-foreground">
-                  {t("correlation.fingerprints.excludeHelp")}
-                </p>
-              </div>
-
-              <div className="space-y-2 border-t border-border/60 pt-3">
-                <h3 className="font-serif text-sm font-black uppercase tracking-[0.06em]">
-                  {t("correlation.fingerprints.legend")}
-                </h3>
-                <ul className="space-y-2 text-xs">
-                  <li className="flex items-center gap-2">
-                    <span className="inline-block h-3 w-3 rounded-full border border-border bg-muted" />
-                    {t("correlation.fingerprints.legendAsset", {
-                      count: String(visibleAssetIds.length),
-                    })}
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <span className="inline-block h-2.5 w-2.5 rounded-full bg-foreground/70" />
-                    {t("correlation.fingerprints.legendValue", { count: String(valueCount) })}
-                  </li>
-                </ul>
-                <div className="space-y-1 pt-1">
-                  <div className="flex items-center justify-between text-[10px] uppercase tracking-wide text-muted-foreground">
-                    <span>{t("correlation.fingerprints.strengthWeak")}</span>
-                    <span>{t("correlation.fingerprints.strengthStrong")}</span>
-                  </div>
-                  <div
-                    className="h-2 w-full rounded-full"
-                    style={{ background: STRENGTH_GRADIENT }}
-                  />
-                  <p className="text-[10px] text-muted-foreground">
-                    {t("correlation.fingerprints.strengthHint")}
-                  </p>
-                </div>
-                {unconnectedCount > 0 && (
-                  <p className="flex items-start gap-1.5 pt-1 text-[11px] text-muted-foreground">
-                    <Layers className="mt-0.5 h-3 w-3 shrink-0" />
-                    {t("correlation.fingerprints.unconnected", {
-                      count: String(unconnectedCount),
-                    })}
-                  </p>
-                )}
-              </div>
-            </>
-          )}
-        </aside>
+        {/* ── Detail / actions rail (self-contained embeds only) ── */}
+        {!externalRail && (
+          <aside className="w-[260px] shrink-0 space-y-4 overflow-y-auto border-l-2 border-border bg-background p-3">
+            {selection ? selectionRail : overviewFooter}
+          </aside>
+        )}
       </div>
 
       {/* Right-click quick-exclude menu */}

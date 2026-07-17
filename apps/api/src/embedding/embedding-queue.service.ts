@@ -91,7 +91,30 @@ export class EmbeddingQueueService implements OnApplicationBootstrap {
     });
   }
 
-  status() {
+  async status() {
+    // A recalibration pass is deliberately debounced (RECALIBRATE_DELAY_SECONDS),
+    // so "scheduled but not yet running" is the state operators actually see
+    // right after reindexing — surface it instead of looking idle.
+    let recalibrationScheduled = false;
+    if (this.recalibrateQueueName) {
+      try {
+        const boss = await this.pgBoss.getBossAsync();
+        const stats = await boss.getQueueStats(this.recalibrateQueueName);
+        recalibrationScheduled =
+          stats.queuedCount + stats.activeCount + stats.deferredCount > 0;
+      } catch {
+        // pg-boss not ready; report unscheduled rather than failing status.
+      }
+    }
+    let lastRecalibratedAt = this.lastRecalibratedAt;
+    if (this.spaceId) {
+      const space = await this.prisma.embeddingSpace.findUnique({
+        where: { id: this.spaceId },
+        select: { lastRecalibratedAt: true },
+      });
+      lastRecalibratedAt =
+        space?.lastRecalibratedAt?.toISOString() ?? lastRecalibratedAt;
+    }
     return {
       persistentQueue: true,
       pendingQueueWrites: this.pendingWrites,
@@ -104,8 +127,9 @@ export class EmbeddingQueueService implements OnApplicationBootstrap {
       backfillStartedAt: this.backfillStartedAt,
       backfillCompletedAt: this.backfillCompletedAt,
       backfillError: this.backfillError,
+      recalibrationScheduled,
       recalibrationRunning: this.recalibrationRunning,
-      lastRecalibratedAt: this.lastRecalibratedAt,
+      lastRecalibratedAt,
       lastRecalibrationError: this.lastRecalibrationError,
     };
   }

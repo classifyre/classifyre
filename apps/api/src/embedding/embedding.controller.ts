@@ -18,7 +18,10 @@ import { EmbeddingService } from './embedding.service';
 import {
   BoilerplateClusterDto,
   BoilerplateClustersQueryDto,
+  EmbeddingRecalibrateResponseDto,
   EmbeddingReindexResponseDto,
+  EmbeddingStatusResponseDto,
+  GlobalBoilerplateClustersQueryDto,
   PutAssetChunksDto,
   SimilarFindingDto,
   SimilarFindingsQueryDto,
@@ -35,8 +38,9 @@ export class EmbeddingController {
 
   @Get('embeddings/status')
   @ApiOperation({ summary: 'Get semantic storage and search capability' })
-  status() {
-    return { ...this.embeddings.status(), ...this.queue.status() };
+  @ApiOkResponse({ type: EmbeddingStatusResponseDto })
+  async status() {
+    return { ...this.embeddings.status(), ...(await this.queue.status()) };
   }
 
   @Post('embeddings/reindex')
@@ -73,6 +77,35 @@ export class EmbeddingController {
     return this.embeddings.similarFindings(findingId, query.limit);
   }
 
+  @Get('embeddings/boilerplate-clusters')
+  @ApiOperation({
+    summary:
+      'Near-duplicate finding clusters across the corpus, optionally filtered to specific sources',
+  })
+  @ApiOkResponse({ type: [BoilerplateClusterDto] })
+  boilerplateGlobal(@Query() query: GlobalBoilerplateClustersQueryDto) {
+    return this.embeddings.boilerplateClusters({
+      sourceIds:
+        typeof query.sourceIds === 'string'
+          ? [query.sourceIds]
+          : query.sourceIds,
+      threshold: query.threshold,
+      limit: query.limit,
+    });
+  }
+
+  @Post('embeddings/recalibrate')
+  @HttpCode(HttpStatus.ACCEPTED)
+  @ApiOperation({
+    summary:
+      'Schedule a full evidence-ranking recalibration pass (importance scores, outliers, near-duplicate groups)',
+  })
+  @ApiAcceptedResponse({ type: EmbeddingRecalibrateResponseDto })
+  recalibrate(): EmbeddingRecalibrateResponseDto {
+    this.queue.scheduleRecalibration();
+    return { scheduled: true };
+  }
+
   @Get('sources/:sourceId/boilerplate-clusters')
   @ApiOperation({
     summary:
@@ -83,10 +116,10 @@ export class EmbeddingController {
     @Param('sourceId') sourceId: string,
     @Query() query: BoilerplateClustersQueryDto,
   ) {
-    return this.embeddings.boilerplateClusters(
-      sourceId,
-      query.threshold,
-      query.limit,
-    );
+    return this.embeddings.boilerplateClusters({
+      sourceIds: [sourceId],
+      threshold: query.threshold,
+      limit: query.limit,
+    });
   }
 }

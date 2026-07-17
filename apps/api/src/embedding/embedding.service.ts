@@ -27,6 +27,9 @@ type BoilerplateClusterRow = {
   findingCount: bigint | number;
   findingIds: string[];
   meanImportance: number;
+  sourceCount: bigint | number;
+  sourceIds: string[];
+  assetIds: string[];
 };
 
 // Outlier/quality adjustments need at least this many same-type neighbours to
@@ -308,6 +311,11 @@ export class EmbeddingService implements OnApplicationBootstrap {
       cursor = findings.at(-1)?.id;
       await new Promise((resolve) => setImmediate(resolve));
     } while (cursor);
+    await this.prisma.embeddingSpace.update({
+      where: { id: resolvedSpaceId },
+      data: { lastRecalibratedAt: new Date() },
+      select: { id: true },
+    });
     this.logger.log(
       `Recalibrated evidence analyses for ${analyzed} findings in space ${resolvedSpaceId}`,
     );
@@ -627,7 +635,16 @@ export class EmbeddingService implements OnApplicationBootstrap {
     });
   }
 
-  async similarFindings(findingId: string, limit: number) {
+  // Query params arrive as strings (no global ValidationPipe); coerce before
+  // they reach arithmetic or SQL.
+  private toNumber(value: unknown, fallback: number, min: number, max: number) {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) return fallback;
+    return Math.min(Math.max(parsed, min), max);
+  }
+
+  async similarFindings(findingId: string, limitInput: number) {
+    const limit = Math.trunc(this.toNumber(limitInput, 20, 1, 100));
     const finding = await this.prisma.finding.findUnique({
       where: { id: findingId },
       select: { embedContentHash: true, sourceId: true },
@@ -671,16 +688,38 @@ export class EmbeddingService implements OnApplicationBootstrap {
     });
   }
 
-  async boilerplateClusters(sourceId: string, threshold = 0.95, limit = 50) {
-    const rows = await this.prisma.$queryRaw<BoilerplateClusterRow[]>`
+  /**
+   * Near-duplicate finding clusters. Group hashes are precomputed during
+   * neighbourhood calibration across the WHOLE space, so clusters naturally
+   * span sources; `sourceIds` only filters which findings are counted.
+   * Omit it to see duplicates across the entire corpus.
+   */
+  async boilerplateClusters(options: {
+    sourceIds?: string[];
+    threshold?: number;
+    limit?: number;
+  }) {
+    const threshold = this.toNumber(options.threshold, 0.95, 0.8, 1);
+    const limit = Math.trunc(this.toNumber(options.limit, 50, 1, 200));
+    const sourceIds = (options.sourceIds ?? []).filter(
+      (id) => typeof id === 'string' && id.length > 0,
+    );
+    const sourceFilter = sourceIds.length
+      ? Prisma.sql`AND finding.source_id IN (${Prisma.join(sourceIds)})`
+      : Prisma.empty;
+    const rows = await this.prisma.$queryRaw<BoilerplateClusterRow[]>(
+      Prisma.sql`
       SELECT analysis.duplicate_group_hash AS "groupHash",
         COUNT(*) AS "findingCount",
         (ARRAY_AGG(finding.id ORDER BY analysis.importance_score DESC))[1:10] AS "findingIds",
-        AVG(analysis.importance_score) AS "meanImportance"
+        AVG(analysis.importance_score) AS "meanImportance",
+        COUNT(DISTINCT finding.source_id) AS "sourceCount",
+        (ARRAY_AGG(DISTINCT finding.source_id))[1:10] AS "sourceIds",
+        (ARRAY_AGG(DISTINCT finding.asset_id))[1:50] AS "assetIds"
       FROM finding_evidence_analyses analysis
       JOIN findings finding ON finding.id = analysis.finding_id
-      WHERE finding.source_id = ${sourceId}
-        AND analysis.duplicate_group_hash IS NOT NULL
+      WHERE analysis.duplicate_group_hash IS NOT NULL
+        ${sourceFilter}
         AND COALESCE(
           (analysis.signals->>'duplicateSimilarity')::double precision,
           0
@@ -689,11 +728,13 @@ export class EmbeddingService implements OnApplicationBootstrap {
       HAVING COUNT(*) > 1
       ORDER BY COUNT(*) DESC, AVG(analysis.importance_score) DESC
       LIMIT ${limit}
-    `;
+    `,
+    );
     return rows.map((row) => ({
       ...row,
       findingCount: Number(row.findingCount),
       meanImportance: Number(row.meanImportance),
+      sourceCount: Number(row.sourceCount),
       threshold,
     }));
   }
