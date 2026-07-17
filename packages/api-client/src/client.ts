@@ -42,7 +42,29 @@ export { AutopilotApi } from "./generated/src/apis/AutopilotApi";
 export { CorrelationApi } from "./generated/src/apis/CorrelationApi";
 export { ChatBotsApi } from "./generated/src/apis/ChatBotsApi";
 export { EmbeddingsApi } from "./generated/src/apis/EmbeddingsApi";
-export type { EmbeddingReindexResponseDto } from "./generated/src/models";
+export { GlossaryApi } from "./generated/src/apis/GlossaryApi";
+export type {
+  EmbeddingReindexResponseDto,
+  UpsertGlossaryTermDto,
+  VerifyGlossaryTermDto,
+  GlossaryTermDto,
+  GlossaryListResponseDto,
+  GlossaryLookupHitDto,
+  UpsertGlossaryTermResponseDto,
+  DeleteGlossaryTermResponseDto,
+  CaseLeadDto,
+  ProposeCaseLeadDto,
+  ReviewCaseLeadDto,
+  GenerateCaseLeadsResponseDto,
+  CaseEventDto,
+  CreateCaseEventDto,
+  UpdateCaseEventDto,
+  SimilarFindingDto,
+  SimilarFindingAssetDto,
+  SimilarFindingSourceDto,
+  SimilarFindingEvidenceAnalysisDto,
+  BoilerplateClusterDto,
+} from "./generated/src/models";
 export type {
   ChatBotResponseDto,
   ChatBotDiagnosticsDto,
@@ -954,6 +976,7 @@ import { AutopilotApi } from "./generated/src/apis/AutopilotApi";
 import { CorrelationApi } from "./generated/src/apis/CorrelationApi";
 import { ChatBotsApi } from "./generated/src/apis/ChatBotsApi";
 import { EmbeddingsApi } from "./generated/src/apis/EmbeddingsApi";
+import { GlossaryApi } from "./generated/src/apis/GlossaryApi";
 
 // Determine the correct base URL
 // In browser: use relative path /api which is proxied by Next.js
@@ -1017,6 +1040,7 @@ class ApiClient {
   public correlation: CorrelationApi;
   public chatBots: ChatBotsApi;
   public embeddings: EmbeddingsApi;
+  public glossary: GlossaryApi;
 
   constructor(baseUrl?: string) {
     this.config = createConfiguration(baseUrl);
@@ -1039,6 +1063,7 @@ class ApiClient {
     this.correlation = new CorrelationApi(this.config);
     this.chatBots = new ChatBotsApi(this.config);
     this.embeddings = new EmbeddingsApi(this.config);
+    this.glossary = new GlossaryApi(this.config);
   }
 
   async searchAssets(

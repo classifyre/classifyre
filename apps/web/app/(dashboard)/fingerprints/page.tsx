@@ -8,8 +8,11 @@ import {
   TabsList,
   TabsTrigger,
 } from "@workspace/ui/components/tabs";
+import { Button } from "@workspace/ui/components/button";
 import type { AssistantUiAction } from "@workspace/api-client";
 import { FingerprintsGraph } from "@/components/fingerprints-graph";
+import { FingerprintsConnections } from "@/components/fingerprints-connections";
+import { BoilerplateClusters } from "@/components/boilerplate-clusters";
 import {
   CorrelationTuningPanel,
   type CorrelationTuningPanelHandle,
@@ -19,10 +22,22 @@ import { useTranslation } from "@/hooks/use-translation";
 
 export default function FingerprintsPage() {
   const { t } = useTranslation();
-  const [tab, setTab] = React.useState("graph");
+  const [tab, setTab] = React.useState("connections");
   // Bumped when tuning is saved → tells the graph to wait for recompute + reload.
   const [pendingRecomputeAt, setPendingRecomputeAt] = React.useState<number>();
+  // Set from a connection row's "View in graph" action — reuses the graph's
+  // existing `assetId` scoping prop as a best-effort focus (no graph-internal
+  // changes) so the pair's shared cluster shows instead of the whole graph.
+  const [focusAssetId, setFocusAssetId] = React.useState<string | undefined>();
   const tuningPanelRef = React.useRef<CorrelationTuningPanelHandle | null>(null);
+
+  const handleViewInGraph = React.useCallback(
+    (assetIds: [string, string]) => {
+      setFocusAssetId(assetIds[0]);
+      setTab("graph");
+    },
+    [],
+  );
 
   const assistantBridge = React.useMemo(
     () => ({
@@ -69,24 +84,60 @@ export default function FingerprintsPage() {
         className="flex min-h-0 flex-1 flex-col"
       >
         <TabsList className="h-auto w-fit rounded-[4px] border-2 border-border bg-background p-1">
+          <TabsTrigger value="connections" className="rounded-[3px]">
+            {t("fingerprints.tabConnections")}
+          </TabsTrigger>
           <TabsTrigger value="graph" className="rounded-[3px]">
             {t("fingerprints.tabGraph")}
+          </TabsTrigger>
+          <TabsTrigger value="near-duplicates" className="rounded-[3px]">
+            {t("fingerprints.tabNearDuplicates")}
           </TabsTrigger>
           <TabsTrigger value="tune" className="rounded-[3px]">
             {t("fingerprints.tabTune")}
           </TabsTrigger>
         </TabsList>
 
+        <TabsContent
+          value="connections"
+          className="mt-4 flex min-h-0 flex-1 flex-col"
+        >
+          <FingerprintsConnections onViewInGraph={handleViewInGraph} />
+        </TabsContent>
+
         {/* Keep the graph mounted across tab switches (preserves layout/zoom). */}
         <TabsContent
           value="graph"
           forceMount
-          className="mt-4 min-h-0 flex-1 data-[state=inactive]:hidden"
+          className="mt-4 flex min-h-0 flex-1 flex-col data-[state=inactive]:hidden"
         >
-          <FingerprintsGraph
-            onTune={() => setTab("tune")}
-            pendingRecomputeAt={pendingRecomputeAt}
-          />
+          {focusAssetId && (
+            <div className="mb-2 flex shrink-0 items-center gap-2 border-2 border-border bg-background px-3 py-1.5 text-xs text-muted-foreground">
+              <span>{t("correlation.fingerprints.focusedFromConnection")}</span>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="ml-auto h-6 px-2 text-xs"
+                onClick={() => setFocusAssetId(undefined)}
+              >
+                {t("correlation.fingerprints.showFullGraph")}
+              </Button>
+            </div>
+          )}
+          <div className="min-h-0 flex-1">
+            <FingerprintsGraph
+              assetId={focusAssetId}
+              onTune={() => setTab("tune")}
+              pendingRecomputeAt={pendingRecomputeAt}
+            />
+          </div>
+        </TabsContent>
+
+        <TabsContent
+          value="near-duplicates"
+          className="mt-4 flex min-h-0 flex-1 flex-col"
+        >
+          <BoilerplateClusters />
         </TabsContent>
 
         <TabsContent value="tune" className="mt-4 min-h-0 flex-1 overflow-y-auto">

@@ -18,11 +18,68 @@
     "detectors": "Custom Detectors",
     "investigations": "Investigations",
     "fingerprints": "Fingerprints",
+    "glossary": "Glossary",
     "scans": "Scans",
     "sandbox": "Sandbox",
     "operations": "Operations",
     "settings": "Settings",
     "harness": "Harness AI"
+  },
+  "glossary": {
+    "title": "Glossary",
+    "description": "A shared vocabulary of terms, aliases, and entities recognized across investigations — agent proposals appear here for operator review.",
+    "addTerm": "Add term",
+    "editTerm": "Edit term",
+    "searchPlaceholder": "Search terms, aliases, or notes…",
+    "entityTypeFilter": "Entity type",
+    "allTypes": "All types",
+    "entityTypes": {
+      "PERSON": "Person",
+      "ORGANIZATION": "Organization",
+      "LOCATION": "Location",
+      "REFERENCE": "Reference",
+      "TERM": "Term",
+      "OTHER": "Other"
+    },
+    "columns": {
+      "term": "Term",
+      "aliases": "Aliases",
+      "type": "Type",
+      "verification": "Origin",
+      "notes": "Notes",
+      "actions": "Actions"
+    },
+    "unverifiedAgent": "Unverified · agent",
+    "verified": "Verified",
+    "verify": "Verify",
+    "edit": "Edit",
+    "delete": "Delete",
+    "noValue": "—",
+    "noTerms": "No glossary terms found",
+    "noTermsHint": "Adjust the filters or add a new term.",
+    "loading": "Loading glossary…",
+    "updating": "Updating glossary…",
+    "form": {
+      "termLabel": "Term",
+      "termPlaceholder": "e.g. Acme Corp",
+      "aliasesLabel": "Aliases",
+      "aliasesPlaceholder": "Comma-separated, e.g. Acme, Acme Corporation",
+      "aliasesHelp": "Alternative names, nicknames, or transliterations, separated by commas.",
+      "entityTypeLabel": "Entity type",
+      "notesLabel": "Notes",
+      "notesPlaceholder": "Optional context for this term"
+    },
+    "save": "Save",
+    "saving": "Saving…",
+    "termRequired": "Term is required",
+    "saved": "Glossary term saved",
+    "saveFailed": "Failed to save glossary term",
+    "verifySuccess": "Term verified",
+    "verifyFailed": "Failed to verify term",
+    "deleted": "Glossary term deleted",
+    "deleteFailed": "Failed to delete glossary term",
+    "deleteConfirmTitle": "Delete glossary term?",
+    "deleteConfirmDescription": "This action cannot be undone."
   },
   "common": {
     "duration": {
@@ -304,7 +361,11 @@
       "tabFindings": "Findings",
       "tabAssets": "Assets",
       "runSummaryLine": "{{findings}} findings · {{assets}} assets scanned",
-      "tabFingerprints": "Fingerprints"
+      "tabFingerprints": "Fingerprints",
+      "textCoverage": "Text Coverage",
+      "textCoverageValue": "{{pct}}% extracted",
+      "lowTextCoverageBadge": "Low text coverage ({{pct}}%)",
+      "lowTextCoverageTooltip": "Some assets produced no extractable text; findings may be incomplete."
     },
     "edit": {
       "loading": "Loading source configuration...",
@@ -541,7 +602,15 @@
       "tryAgain": "Check the finding and try again.",
       "backToDiscovery": "Back to Discovery",
       "goBack": "Go back",
-      "loading": "Loading finding details..."
+      "loading": "Loading finding details...",
+      "similarFindings": {
+        "title": "Similar findings",
+        "desc": "Findings whose content is semantically close to this one.",
+        "loading": "Loading similar findings…",
+        "similarity": "Similarity",
+        "importance": "Importance",
+        "viewFinding": "View finding"
+      }
     },
     "statusLabels": {
       "OPEN": "Open",
@@ -1917,7 +1986,10 @@
       "runAI": "Run AI",
       "reopen": "Reopen",
       "reviewMatches": "Review matches",
-      "newMatchesBanner": "{{count}} new match appeared in the linked inquiries since last review."
+      "newMatchesBanner": "{{count}} new match appeared in the linked inquiries since last review.",
+      "tabExplore": "Explore",
+      "timelineChronology": "Chronology",
+      "timelineActivity": "Activity"
     },
     "addEvidence": {
       "backToCase": "Back to case",
@@ -2379,7 +2451,9 @@
       "strengthHint": "Link colour = similarity strength between assets.",
       "excludeHelp": "Right-click a value to exclude noise (e.g. \"null\").",
       "recomputing": "Recomputing…",
-      "external": "External ({{count}})"
+      "external": "External ({{count}})",
+      "focusedFromConnection": "Focused view from a connection.",
+      "showFullGraph": "Show full graph"
     },
     "exclude": {
       "value": "Exclude this value",
@@ -2446,11 +2520,39 @@
       "noneDesc": "This value doesn't appear on any other asset.",
       "loadFailed": "Failed to load occurrences",
       "foundIn": "Found in {{count}} asset(s)"
+    },
+    "connections": {
+      "title": "Top connections",
+      "loadFailed": "Failed to load connections",
+      "empty": "No connections yet",
+      "emptyDesc": "Asset pairs show up here once they share at least one value (emails, phones, identifiers…).",
+      "matchPercent": "{{count}}% match",
+      "noScore": "Not scored",
+      "sharedCount": "{{count}} shared value(s)",
+      "showingTopN": "Showing top {{count}} of {{total}} connections",
+      "viewInGraph": "View in graph",
+      "fanOut": "on {{count}} assets total"
+    },
+    "nearDuplicates": {
+      "title": "Near-duplicate findings",
+      "caption": "Repeated boilerplate content — usually noise, review before trusting any single instance.",
+      "sourcePlaceholder": "Select a source…",
+      "selectSourceTitle": "Pick a source",
+      "selectSourceHint": "Choose a source to check for repeated boilerplate content.",
+      "loadFailed": "Failed to load near-duplicate clusters",
+      "retry": "Retry",
+      "empty": "No near-duplicate clusters",
+      "emptyDesc": "No repeated boilerplate content found for this source at the current threshold.",
+      "findingsCount": "{{count}} near-identical findings",
+      "meanImportance": "Mean importance {{count}}",
+      "reviewFindings": "Review findings"
     }
   },
   "fingerprints": {
     "subtitle": "Deterministic correlation across all sources — assets bound by the findings they share.",
+    "tabConnections": "Connections",
     "tabGraph": "Fingerprints",
+    "tabNearDuplicates": "Near-duplicates",
     "tabTune": "Tune correlation"
   },
   "links": {

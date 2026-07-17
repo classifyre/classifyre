@@ -16,6 +16,7 @@ import {
   AiManagementMode,
   Severity,
 } from '@prisma/client';
+import { FindingSearchRankingDto } from './finding-response.dto';
 
 /** Matcher fields shared by create/update/preview — what findings a query selects. */
 export class InquiryMatchersDto {
@@ -276,6 +277,13 @@ export class InquiryMatchDto {
 
   @ApiProperty({ description: 'Appeared since the question was last viewed' })
   isNew!: boolean;
+
+  @ApiPropertyOptional({
+    type: () => FindingSearchRankingDto,
+    description:
+      'Evidence ranking (importance, quality, reasons) when the finding has been analyzed',
+  })
+  ranking?: FindingSearchRankingDto;
 }
 
 export class QueryInquiryMatchesDto {

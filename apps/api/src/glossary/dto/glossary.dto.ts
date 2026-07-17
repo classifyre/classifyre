@@ -90,16 +90,88 @@ export class UpsertGlossaryTermDto {
   refId?: string;
 
   @ApiPropertyOptional({
-    description: 'Operator identity recorded as verifiedBy. Defaults to "operator".',
+    description:
+      'Operator identity recorded as verifiedBy. Defaults to "operator".',
   })
   @IsOptional()
   @IsString()
   author?: string;
 }
 
+export class GlossaryTermDto {
+  @ApiProperty()
+  id!: string;
+
+  @ApiProperty()
+  term!: string;
+
+  @ApiProperty({ type: [String] })
+  aliases!: string[];
+
+  @ApiProperty({ enum: GlossaryEntityType })
+  entityType!: GlossaryEntityType;
+
+  @ApiPropertyOptional({ nullable: true })
+  notes?: string | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  refType?: string | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  refId?: string | null;
+
+  @ApiProperty({ description: 'AGENT proposals are unverified hypotheses' })
+  origin!: string;
+
+  @ApiProperty()
+  verified!: boolean;
+
+  @ApiPropertyOptional({ nullable: true })
+  verifiedBy?: string | null;
+
+  @ApiProperty()
+  createdAt!: Date;
+
+  @ApiProperty()
+  updatedAt!: Date;
+}
+
+export class UpsertGlossaryTermResponseDto extends GlossaryTermDto {
+  @ApiPropertyOptional({
+    description:
+      'True when an agent proposal only merged aliases into an operator-owned term',
+  })
+  merged?: boolean;
+}
+
+export class GlossaryListResponseDto {
+  @ApiProperty({ type: [GlossaryTermDto] })
+  terms!: GlossaryTermDto[];
+
+  @ApiProperty()
+  total!: number;
+}
+
+export class GlossaryLookupHitDto extends GlossaryTermDto {
+  @ApiProperty({ enum: ['exact', 'alias', 'semantic'] })
+  matchType!: 'exact' | 'alias' | 'semantic';
+
+  @ApiPropertyOptional({ minimum: -1, maximum: 1 })
+  similarity?: number;
+}
+
+export class DeleteGlossaryTermResponseDto {
+  @ApiProperty()
+  deleted!: boolean;
+
+  @ApiProperty()
+  id!: string;
+}
+
 export class VerifyGlossaryTermDto {
   @ApiPropertyOptional({
-    description: 'Operator identity recorded as verifiedBy. Defaults to "operator".',
+    description:
+      'Operator identity recorded as verifiedBy. Defaults to "operator".',
   })
   @IsOptional()
   @IsString()

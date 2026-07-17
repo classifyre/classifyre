@@ -29,6 +29,11 @@ import { DetectorToolset } from './tools/detector/detector.toolset';
 import { FingerprintsToolset } from './tools/fingerprints/fingerprints.toolset';
 import { AlertToolset } from './tools/alert/alert.toolset';
 import { SemanticToolset } from './tools/semantic/semantic.toolset';
+import { GlossaryToolset } from './tools/glossary/glossary.toolset';
+import { GlossaryService } from '../glossary/glossary.service';
+import { CaseLeadsToolset } from './tools/leads/case-leads.toolset';
+import { CaseLeadsService } from '../case-leads.service';
+import { CaseEventsService } from '../case-events.service';
 import { NotificationsService } from '../notifications.service';
 import { ToolRegistry } from './tools/tool-registry.service';
 import { ToolDispatcherService } from './tools/tool-dispatcher.service';
@@ -78,6 +83,11 @@ import { AutopilotController } from './autopilot.controller';
     FingerprintsToolset,
     AlertToolset,
     SemanticToolset,
+    GlossaryService,
+    GlossaryToolset,
+    CaseLeadsService,
+    CaseEventsService,
+    CaseLeadsToolset,
     NotificationsService,
     ToolRegistry,
     ToolDispatcherService,

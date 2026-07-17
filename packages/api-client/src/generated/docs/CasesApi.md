@@ -4,6 +4,14 @@ All URIs are relative to *http://localhost*
 
 | Method | HTTP request | Description |
 |------------- | ------------- | -------------|
+| [**caseEventsControllerCreate**](CasesApi.md#caseeventscontrollercreate) | **POST** /cases/{caseId}/events | Add a dated event to the case chronology |
+| [**caseEventsControllerList**](CasesApi.md#caseeventscontrollerlist) | **GET** /cases/{caseId}/events | List the case chronology (real-world events, ordered by date) |
+| [**caseEventsControllerRemove**](CasesApi.md#caseeventscontrollerremove) | **DELETE** /cases/{caseId}/events/{eventId} | Remove a chronology event |
+| [**caseEventsControllerUpdate**](CasesApi.md#caseeventscontrollerupdate) | **PATCH** /cases/{caseId}/events/{eventId} | Update (and implicitly verify) a chronology event |
+| [**caseLeadsControllerGenerate**](CasesApi.md#caseleadscontrollergenerate) | **POST** /cases/{caseId}/leads/generate | Generate leads from case evidence (semantic neighbours + linked-inquiry matches) |
+| [**caseLeadsControllerList**](CasesApi.md#caseleadscontrollerlist) | **GET** /cases/{caseId}/leads | List leads (exploration candidates) for a case |
+| [**caseLeadsControllerPropose**](CasesApi.md#caseleadscontrollerpropose) | **POST** /cases/{caseId}/leads | Propose a finding as a lead for this case |
+| [**caseLeadsControllerReview**](CasesApi.md#caseleadscontrollerreview) | **POST** /cases/{caseId}/leads/{leadId}/review | Accept a lead into evidence, or dismiss it |
 | [**caseTimelineControllerGetTimeline**](CasesApi.md#casetimelinecontrollergettimeline) | **GET** /cases/{caseId}/timeline | Paginated unified case activity feed (newest first) |
 | [**casesControllerAddEvidence**](CasesApi.md#casescontrolleraddevidence) | **POST** /cases/{id}/evidence | Attach an asset as evidence |
 | [**casesControllerAddFinding**](CasesApi.md#casescontrolleraddfinding) | **POST** /cases/{id}/evidence/{evidenceId}/findings | Attach a finding to a piece of evidence |
@@ -23,6 +31,550 @@ All URIs are relative to *http://localhost*
 | [**casesControllerUnlinkInquiry**](CasesApi.md#casescontrollerunlinkinquiry) | **DELETE** /cases/{id}/inquiries/{inquiryId} | Unlink an inquiry from a case (the inquiry is untouched) |
 | [**casesControllerUpdate**](CasesApi.md#casescontrollerupdate) | **PATCH** /cases/{id} | Update a case |
 
+
+
+## caseEventsControllerCreate
+
+> CaseEventDto caseEventsControllerCreate(caseId, createCaseEventDto)
+
+Add a dated event to the case chronology
+
+### Example
+
+```ts
+import {
+  Configuration,
+  CasesApi,
+} from '@workspace/api-client';
+import type { CaseEventsControllerCreateRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new CasesApi();
+
+  const body = {
+    // string
+    caseId: caseId_example,
+    // CreateCaseEventDto
+    createCaseEventDto: ...,
+  } satisfies CaseEventsControllerCreateRequest;
+
+  try {
+    const data = await api.caseEventsControllerCreate(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **caseId** | `string` |  | [Defaults to `undefined`] |
+| **createCaseEventDto** | [CreateCaseEventDto](CreateCaseEventDto.md) |  | |
+
+### Return type
+
+[**CaseEventDto**](CaseEventDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: `application/json`
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## caseEventsControllerList
+
+> Array&lt;CaseEventDto&gt; caseEventsControllerList(caseId)
+
+List the case chronology (real-world events, ordered by date)
+
+### Example
+
+```ts
+import {
+  Configuration,
+  CasesApi,
+} from '@workspace/api-client';
+import type { CaseEventsControllerListRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new CasesApi();
+
+  const body = {
+    // string
+    caseId: caseId_example,
+  } satisfies CaseEventsControllerListRequest;
+
+  try {
+    const data = await api.caseEventsControllerList(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **caseId** | `string` |  | [Defaults to `undefined`] |
+
+### Return type
+
+[**Array&lt;CaseEventDto&gt;**](CaseEventDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## caseEventsControllerRemove
+
+> caseEventsControllerRemove(caseId, eventId)
+
+Remove a chronology event
+
+### Example
+
+```ts
+import {
+  Configuration,
+  CasesApi,
+} from '@workspace/api-client';
+import type { CaseEventsControllerRemoveRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new CasesApi();
+
+  const body = {
+    // string
+    caseId: caseId_example,
+    // string
+    eventId: eventId_example,
+  } satisfies CaseEventsControllerRemoveRequest;
+
+  try {
+    const data = await api.caseEventsControllerRemove(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **caseId** | `string` |  | [Defaults to `undefined`] |
+| **eventId** | `string` |  | [Defaults to `undefined`] |
+
+### Return type
+
+`void` (Empty response body)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: Not defined
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## caseEventsControllerUpdate
+
+> CaseEventDto caseEventsControllerUpdate(caseId, eventId, updateCaseEventDto)
+
+Update (and implicitly verify) a chronology event
+
+### Example
+
+```ts
+import {
+  Configuration,
+  CasesApi,
+} from '@workspace/api-client';
+import type { CaseEventsControllerUpdateRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new CasesApi();
+
+  const body = {
+    // string
+    caseId: caseId_example,
+    // string
+    eventId: eventId_example,
+    // UpdateCaseEventDto
+    updateCaseEventDto: ...,
+  } satisfies CaseEventsControllerUpdateRequest;
+
+  try {
+    const data = await api.caseEventsControllerUpdate(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **caseId** | `string` |  | [Defaults to `undefined`] |
+| **eventId** | `string` |  | [Defaults to `undefined`] |
+| **updateCaseEventDto** | [UpdateCaseEventDto](UpdateCaseEventDto.md) |  | |
+
+### Return type
+
+[**CaseEventDto**](CaseEventDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: `application/json`
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## caseLeadsControllerGenerate
+
+> GenerateCaseLeadsResponseDto caseLeadsControllerGenerate(caseId)
+
+Generate leads from case evidence (semantic neighbours + linked-inquiry matches)
+
+### Example
+
+```ts
+import {
+  Configuration,
+  CasesApi,
+} from '@workspace/api-client';
+import type { CaseLeadsControllerGenerateRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new CasesApi();
+
+  const body = {
+    // string
+    caseId: caseId_example,
+  } satisfies CaseLeadsControllerGenerateRequest;
+
+  try {
+    const data = await api.caseLeadsControllerGenerate(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **caseId** | `string` |  | [Defaults to `undefined`] |
+
+### Return type
+
+[**GenerateCaseLeadsResponseDto**](GenerateCaseLeadsResponseDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## caseLeadsControllerList
+
+> Array&lt;CaseLeadDto&gt; caseLeadsControllerList(caseId, status)
+
+List leads (exploration candidates) for a case
+
+### Example
+
+```ts
+import {
+  Configuration,
+  CasesApi,
+} from '@workspace/api-client';
+import type { CaseLeadsControllerListRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new CasesApi();
+
+  const body = {
+    // string
+    caseId: caseId_example,
+    // 'PROPOSED' | 'ACCEPTED' | 'DISMISSED' (optional)
+    status: status_example,
+  } satisfies CaseLeadsControllerListRequest;
+
+  try {
+    const data = await api.caseLeadsControllerList(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **caseId** | `string` |  | [Defaults to `undefined`] |
+| **status** | `PROPOSED`, `ACCEPTED`, `DISMISSED` |  | [Optional] [Defaults to `undefined`] [Enum: PROPOSED, ACCEPTED, DISMISSED] |
+
+### Return type
+
+[**Array&lt;CaseLeadDto&gt;**](CaseLeadDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## caseLeadsControllerPropose
+
+> caseLeadsControllerPropose(caseId, proposeCaseLeadDto)
+
+Propose a finding as a lead for this case
+
+### Example
+
+```ts
+import {
+  Configuration,
+  CasesApi,
+} from '@workspace/api-client';
+import type { CaseLeadsControllerProposeRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new CasesApi();
+
+  const body = {
+    // string
+    caseId: caseId_example,
+    // ProposeCaseLeadDto
+    proposeCaseLeadDto: ...,
+  } satisfies CaseLeadsControllerProposeRequest;
+
+  try {
+    const data = await api.caseLeadsControllerPropose(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **caseId** | `string` |  | [Defaults to `undefined`] |
+| **proposeCaseLeadDto** | [ProposeCaseLeadDto](ProposeCaseLeadDto.md) |  | |
+
+### Return type
+
+`void` (Empty response body)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: `application/json`
+- **Accept**: Not defined
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **201** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## caseLeadsControllerReview
+
+> caseLeadsControllerReview(caseId, leadId, reviewCaseLeadDto)
+
+Accept a lead into evidence, or dismiss it
+
+### Example
+
+```ts
+import {
+  Configuration,
+  CasesApi,
+} from '@workspace/api-client';
+import type { CaseLeadsControllerReviewRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new CasesApi();
+
+  const body = {
+    // string
+    caseId: caseId_example,
+    // string
+    leadId: leadId_example,
+    // ReviewCaseLeadDto
+    reviewCaseLeadDto: ...,
+  } satisfies CaseLeadsControllerReviewRequest;
+
+  try {
+    const data = await api.caseLeadsControllerReview(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **caseId** | `string` |  | [Defaults to `undefined`] |
+| **leadId** | `string` |  | [Defaults to `undefined`] |
+| **reviewCaseLeadDto** | [ReviewCaseLeadDto](ReviewCaseLeadDto.md) |  | |
+
+### Return type
+
+`void` (Empty response body)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: `application/json`
+- **Accept**: Not defined
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **201** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
 
 
 ## caseTimelineControllerGetTimeline

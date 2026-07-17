@@ -15,15 +15,27 @@
 
 import * as runtime from '../runtime';
 import type {
+  BoilerplateClusterDto,
   EmbeddingReindexResponseDto,
   PutAssetChunksDto,
+  SimilarFindingDto,
 } from '../models/index';
 import {
+    BoilerplateClusterDtoFromJSON,
+    BoilerplateClusterDtoToJSON,
     EmbeddingReindexResponseDtoFromJSON,
     EmbeddingReindexResponseDtoToJSON,
     PutAssetChunksDtoFromJSON,
     PutAssetChunksDtoToJSON,
+    SimilarFindingDtoFromJSON,
+    SimilarFindingDtoToJSON,
 } from '../models/index';
+
+export interface EmbeddingControllerBoilerplateRequest {
+    sourceId: string;
+    threshold?: object;
+    limit?: object;
+}
 
 export interface EmbeddingControllerChunksRequest {
     sourceId: string;
@@ -39,6 +51,51 @@ export interface EmbeddingControllerSimilarRequest {
  * 
  */
 export class EmbeddingsApi extends runtime.BaseAPI {
+
+    /**
+     * Near-duplicate finding clusters in a source (repeated boilerplate)
+     */
+    async embeddingControllerBoilerplateRaw(requestParameters: EmbeddingControllerBoilerplateRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Array<BoilerplateClusterDto>>> {
+        if (requestParameters['sourceId'] == null) {
+            throw new runtime.RequiredError(
+                'sourceId',
+                'Required parameter "sourceId" was null or undefined when calling embeddingControllerBoilerplate().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        if (requestParameters['threshold'] != null) {
+            queryParameters['threshold'] = requestParameters['threshold'];
+        }
+
+        if (requestParameters['limit'] != null) {
+            queryParameters['limit'] = requestParameters['limit'];
+        }
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/sources/{sourceId}/boilerplate-clusters`;
+        urlPath = urlPath.replace(`{${"sourceId"}}`, encodeURIComponent(String(requestParameters['sourceId'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => jsonValue.map(BoilerplateClusterDtoFromJSON));
+    }
+
+    /**
+     * Near-duplicate finding clusters in a source (repeated boilerplate)
+     */
+    async embeddingControllerBoilerplate(requestParameters: EmbeddingControllerBoilerplateRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Array<BoilerplateClusterDto>> {
+        const response = await this.embeddingControllerBoilerplateRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
 
     /**
      * Store asset chunk-to-content mappings
@@ -118,7 +175,7 @@ export class EmbeddingsApi extends runtime.BaseAPI {
     /**
      * Find semantically similar findings with ranking evidence
      */
-    async embeddingControllerSimilarRaw(requestParameters: EmbeddingControllerSimilarRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
+    async embeddingControllerSimilarRaw(requestParameters: EmbeddingControllerSimilarRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Array<SimilarFindingDto>>> {
         if (requestParameters['findingId'] == null) {
             throw new runtime.RequiredError(
                 'findingId',
@@ -145,14 +202,15 @@ export class EmbeddingsApi extends runtime.BaseAPI {
             query: queryParameters,
         }, initOverrides);
 
-        return new runtime.VoidApiResponse(response);
+        return new runtime.JSONApiResponse(response, (jsonValue) => jsonValue.map(SimilarFindingDtoFromJSON));
     }
 
     /**
      * Find semantically similar findings with ranking evidence
      */
-    async embeddingControllerSimilar(requestParameters: EmbeddingControllerSimilarRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
-        await this.embeddingControllerSimilarRaw(requestParameters, initOverrides);
+    async embeddingControllerSimilar(requestParameters: EmbeddingControllerSimilarRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Array<SimilarFindingDto>> {
+        const response = await this.embeddingControllerSimilarRaw(requestParameters, initOverrides);
+        return await response.value();
     }
 
     /**

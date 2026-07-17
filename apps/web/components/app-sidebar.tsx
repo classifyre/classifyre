@@ -28,6 +28,7 @@ import {
   FlaskConical,
   Search,
   Fingerprint,
+  BookOpen,
   ScanSearch,
   Terminal,
   Settings,
@@ -47,6 +48,7 @@ export function AppSidebar() {
     { title: t("nav.detectors"), href: "/detectors", icon: FlaskConical },
     { title: t("nav.investigations"), href: "/investigations", icon: Search },
     { title: t("nav.fingerprints"), href: "/fingerprints", icon: Fingerprint },
+    { title: t("nav.glossary"), href: "/glossary", icon: BookOpen },
   ];
 
   const operationsNavigation: { title: string; href: string; icon: LucideIcon }[] = [

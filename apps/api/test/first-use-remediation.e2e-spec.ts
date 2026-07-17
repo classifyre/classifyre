@@ -16,6 +16,7 @@ import { AssetService } from '../src/asset.service';
 import { CliRunnerService } from '../src/cli-runner/cli-runner.service';
 import { CustomDetectorExtractionsService } from '../src/custom-detector-extractions.service';
 import { EmbeddingAnalysisService } from '../src/embedding/embedding-analysis.service';
+import { EmbeddingConfigService } from '../src/embedding/embedding-config.service';
 import { EmbeddingService } from '../src/embedding/embedding.service';
 import { QueryEmbeddingService } from '../src/embedding/query-embedding.service';
 import { MaskedConfigCryptoService } from '../src/masked-config-crypto.service';
@@ -456,19 +457,33 @@ describe('Post-first-use store remediation (e2e)', () => {
       ),
     );
     const analysis = new EmbeddingAnalysisService(prisma);
+    // Pin the configured space to the test's own space: without this, active
+    // space resolution follows EMBEDDING_* env defaults, and on a database
+    // that already holds real vectors the semantic queries would search the
+    // production space instead of the fixtures below.
+    const revision = `revision-${Date.now()}`;
+    const previousModel = process.env.EMBEDDING_MODEL;
+    const previousRevision = process.env.EMBEDDING_MODEL_REVISION;
+    process.env.EMBEDDING_MODEL = 'first-use-e2e-model';
+    process.env.EMBEDDING_MODEL_REVISION = revision;
+    const testConfig = new EmbeddingConfigService();
+    process.env.EMBEDDING_MODEL = previousModel;
+    process.env.EMBEDDING_MODEL_REVISION = previousRevision;
     const pgvector = new EmbeddingService(
       prisma,
       { hasVector: () => true } as never,
       analysis,
+      testConfig,
     );
     const exact = new EmbeddingService(
       prisma,
       { hasVector: () => false } as never,
       analysis,
+      testConfig,
     );
     const space = await pgvector.ensureSpace({
       model: 'first-use-e2e-model',
-      revision: `revision-${Date.now()}`,
+      revision,
       dim: 384,
       pooling: 'mean',
       normalized: true,
