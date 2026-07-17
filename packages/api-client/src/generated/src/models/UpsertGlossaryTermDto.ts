@@ -101,6 +101,7 @@ export function UpsertGlossaryTermDtoFromJSONTyped(json: any, ignoreDiscriminato
         return json;
     }
     return {
+        
         'id': json['id'] == null ? undefined : json['id'],
         'term': json['term'],
         'aliases': json['aliases'] == null ? undefined : json['aliases'],
@@ -122,6 +123,7 @@ export function UpsertGlossaryTermDtoToJSONTyped(value?: UpsertGlossaryTermDto |
     }
 
     return {
+        
         'id': value['id'],
         'term': value['term'],
         'aliases': value['aliases'],
@@ -132,3 +134,4 @@ export function UpsertGlossaryTermDtoToJSONTyped(value?: UpsertGlossaryTermDto |
         'author': value['author'],
     };
 }
+

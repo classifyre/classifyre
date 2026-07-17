@@ -6,6 +6,7 @@
 
 Name | Type
 ------------ | -------------
+`id` | string
 `term` | string
 `aliases` | Array&lt;string&gt;
 `entityType` | string
@@ -21,6 +22,7 @@ import type { UpsertGlossaryTermDto } from '@workspace/api-client'
 
 // TODO: Update the object below with actual values
 const example = {
+  "id": null,
   "term": null,
   "aliases": null,
   "entityType": null,
