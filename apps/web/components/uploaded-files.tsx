@@ -11,6 +11,7 @@ import {
 } from "@workspace/ui/components/card";
 import { cn } from "@workspace/ui/lib/utils";
 import { toast } from "sonner";
+import { useTranslation } from "@/hooks/use-translation";
 
 export const MAX_UPLOADED_FILE_BYTES = 50 * 1024 * 1024;
 
@@ -55,6 +56,7 @@ export function UploadedFiles({
   onPendingRemovalIdsChange: (ids: Set<string>) => void;
   disabled?: boolean;
 }) {
+  const { t } = useTranslation();
   const [dragging, setDragging] = useState(false);
   const dragDepth = useRef(0);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -65,7 +67,9 @@ export function UploadedFiles({
         (file) => file.size > MAX_UPLOADED_FILE_BYTES,
       );
       if (oversized.length > 0) {
-        toast.error(`${oversized.length} file(s) exceed the 50 MiB limit.`);
+        toast.error(
+          t("sources.uploadedFiles.tooLarge", { count: oversized.length }),
+        );
       }
       const next = new Map(
         pendingFiles.map((file) => [pendingFileKey(file), file]),
@@ -76,7 +80,7 @@ export function UploadedFiles({
       }
       onPendingFilesChange([...next.values()]);
     },
-    [onPendingFilesChange, pendingFiles],
+    [onPendingFilesChange, pendingFiles, t],
   );
 
   const visibleExisting = existingFiles.filter(
@@ -88,10 +92,49 @@ export function UploadedFiles({
     <Card className="rounded-[6px] border-2 border-border shadow-[4px_4px_0_var(--color-border)]">
       <CardHeader>
         <CardTitle className="uppercase tracking-[0.06em]">
-          Uploaded files
+          {t("sources.uploadedFiles.title")}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
+        {resultingCount > 0 && (
+          <div className="space-y-2" data-testid="uploaded-files-list">
+            {visibleExisting.map((file) => (
+              <FileRow
+                key={file.id}
+                name={file.fileName}
+                size={file.fileSizeBytes}
+                onRemove={() => {
+                  if (resultingCount <= 1) {
+                    toast.error(t("sources.uploadedFiles.keepOne"));
+                    return;
+                  }
+                  onPendingRemovalIdsChange(
+                    new Set([...pendingRemovalIds, file.id]),
+                  );
+                }}
+                disabled={disabled}
+              />
+            ))}
+            {pendingFiles.map((file) => (
+              <FileRow
+                key={pendingFileKey(file)}
+                name={file.name}
+                size={file.size}
+                pending
+                onRemove={() =>
+                  onPendingFilesChange(
+                    pendingFiles.filter(
+                      (candidate) =>
+                        pendingFileKey(candidate) !== pendingFileKey(file),
+                    ),
+                  )
+                }
+                disabled={disabled}
+              />
+            ))}
+          </div>
+        )}
+
         <div
           data-testid="uploaded-files-dropzone"
           className={cn(
@@ -119,10 +162,10 @@ export function UploadedFiles({
         >
           <UploadCloud className="mx-auto mb-3 h-8 w-8" />
           <p className="text-sm font-semibold">
-            Drop files here or choose files
+            {t("sources.uploadedFiles.dropPrompt")}
           </p>
           <p className="mt-1 text-xs text-muted-foreground">
-            Maximum 50 MiB per file
+            {t("sources.uploadedFiles.maximumSize")}
           </p>
           <input
             ref={inputRef}
@@ -140,51 +183,18 @@ export function UploadedFiles({
             className="mt-4"
             onClick={() => inputRef.current?.click()}
           >
-            Choose files
+            {t("sources.uploadedFiles.chooseFiles")}
           </Button>
         </div>
 
-        <div className="space-y-2" data-testid="uploaded-files-list">
-          {visibleExisting.map((file) => (
-            <FileRow
-              key={file.id}
-              name={file.fileName}
-              size={file.fileSizeBytes}
-              onRemove={() => {
-                if (resultingCount <= 1) {
-                  toast.error("A Sandbox source must keep at least one file.");
-                  return;
-                }
-                onPendingRemovalIdsChange(
-                  new Set([...pendingRemovalIds, file.id]),
-                );
-              }}
-              disabled={disabled}
-            />
-          ))}
-          {pendingFiles.map((file) => (
-            <FileRow
-              key={pendingFileKey(file)}
-              name={file.name}
-              size={file.size}
-              pending
-              onRemove={() =>
-                onPendingFilesChange(
-                  pendingFiles.filter(
-                    (candidate) =>
-                      pendingFileKey(candidate) !== pendingFileKey(file),
-                  ),
-                )
-              }
-              disabled={disabled}
-            />
-          ))}
-          {resultingCount === 0 && (
-            <p className="py-2 text-sm text-muted-foreground">
-              At least one file is required.
-            </p>
-          )}
-        </div>
+        {resultingCount === 0 && (
+          <p
+            className="py-2 text-sm text-muted-foreground"
+            data-testid="uploaded-files-list"
+          >
+            {t("sources.uploadedFiles.required")}
+          </p>
+        )}
       </CardContent>
     </Card>
   );
@@ -203,6 +213,8 @@ function FileRow({
   onRemove: () => void;
   disabled?: boolean;
 }) {
+  const { t } = useTranslation();
+
   return (
     <div className="flex items-center gap-3 rounded-[4px] border-2 border-border px-3 py-2">
       <FileText className="h-4 w-4 shrink-0" />
@@ -210,7 +222,7 @@ function FileRow({
         <p className="truncate text-sm font-medium">{name}</p>
         <p className="text-xs text-muted-foreground">
           {formatFileSize(size)}
-          {pending ? " · pending upload" : ""}
+          {pending ? ` · ${t("sources.uploadedFiles.pending")}` : ""}
         </p>
       </div>
       <Button
@@ -219,7 +231,7 @@ function FileRow({
         size="icon"
         disabled={disabled}
         onClick={onRemove}
-        aria-label={`Remove ${name}`}
+        aria-label={t("sources.uploadedFiles.remove", { name })}
       >
         <X className="h-4 w-4" />
       </Button>

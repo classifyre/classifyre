@@ -200,9 +200,7 @@ export default function NewSourcePage() {
           .sourcesControllerDeleteSource({ id: savedId })
           .catch(() => undefined);
       }
-      toast.error(
-        "No files could be uploaded. The Sandbox source was not saved.",
-      );
+      toast.error(t("sources.uploadedFiles.allUploadsFailed"));
       return false;
     }
 
@@ -230,9 +228,15 @@ export default function NewSourcePage() {
     );
     setPendingRemovalIds(failedDeletionIds);
     if (uploadFailures > 0)
-      toast.error(`${uploadFailures} file(s) failed to upload.`);
+      toast.error(
+        t("sources.uploadedFiles.uploadFailures", { count: uploadFailures }),
+      );
     if (failedDeletionIds.size > 0)
-      toast.error(`${failedDeletionIds.size} file(s) could not be removed.`);
+      toast.error(
+        t("sources.uploadedFiles.deletionFailures", {
+          count: failedDeletionIds.size,
+        }),
+      );
     return true;
   };
 
@@ -285,7 +289,7 @@ export default function NewSourcePage() {
         pendingFiles.length ===
         0
     ) {
-      toast.error("Add at least one file before saving this Sandbox source.");
+      toast.error(t("sources.uploadedFiles.requiredBeforeSave"));
       return null;
     }
 
@@ -688,7 +692,7 @@ function SourceStepperContent({
     handler: (data: Record<string, unknown>) => void | Promise<void>,
   ) => {
     if (!hasRequiredFiles) {
-      toast.error("Add at least one file before continuing.");
+      toast.error(t("sources.uploadedFiles.requiredBeforeContinue"));
       scrollToSection("config");
       return;
     }
@@ -734,19 +738,19 @@ function SourceStepperContent({
               showActions={false}
               schedule={schedule}
               onScheduleChange={onScheduleChange}
+              afterNameContent={
+                selectedSourceType === "SANDBOX" ? (
+                  <UploadedFiles
+                    existingFiles={uploadedFiles}
+                    pendingFiles={pendingFiles}
+                    pendingRemovalIds={pendingRemovalIds}
+                    onPendingFilesChange={onPendingFilesChange}
+                    onPendingRemovalIdsChange={onPendingRemovalIdsChange}
+                    disabled={isSavingConfig || isTestingConfig}
+                  />
+                ) : undefined
+              }
             />
-            {selectedSourceType === "SANDBOX" && (
-              <div className="mt-6">
-                <UploadedFiles
-                  existingFiles={uploadedFiles}
-                  pendingFiles={pendingFiles}
-                  pendingRemovalIds={pendingRemovalIds}
-                  onPendingFilesChange={onPendingFilesChange}
-                  onPendingRemovalIdsChange={onPendingRemovalIdsChange}
-                  disabled={isSavingConfig || isTestingConfig}
-                />
-              </div>
-            )}
           </section>
 
           <section ref={detectorsRef}>

@@ -193,3 +193,39 @@ test("sandbox submits standard empty config sections", async ({ mount }) => {
     optional: {},
   });
 });
+
+test("sandbox renders uploaded files immediately after the source name section", async ({
+  mount,
+}) => {
+  const component = await mount(
+    <SourceForm
+      sourceType="SANDBOX"
+      mode="create"
+      defaultValues={{ sampling: { strategy: "ALL" } }}
+      onSubmit={() => {}}
+      showCancel={false}
+      afterNameContent={<div data-testid="uploaded-files-slot" />}
+    />,
+  );
+
+  const order = await component
+    .getByTestId("uploaded-files-slot")
+    .evaluate((slot) => {
+      const name = document.querySelector('[name="name"]');
+      const sampling = document.querySelector(
+        '[data-testid="sampling-strategy-ALL"]',
+      );
+      return {
+        followsName: Boolean(
+          name?.compareDocumentPosition(slot) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+        ),
+        precedesSampling: Boolean(
+          slot.compareDocumentPosition(sampling) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+        ),
+      };
+    });
+
+  expect(order).toEqual({ followsName: true, precedesSampling: true });
+});

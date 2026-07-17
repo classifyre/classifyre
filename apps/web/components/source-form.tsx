@@ -26,6 +26,7 @@ interface SourceFormProps {
   schedule?: ScheduleValue;
   onScheduleChange?: (value: ScheduleValue) => void;
   showActions?: boolean;
+  afterNameContent?: React.ReactNode;
 }
 
 export interface SourceFormHandle extends JsonSchemaFormHandle {
@@ -50,6 +51,7 @@ export const SourceForm = React.forwardRef<SourceFormHandle, SourceFormProps>(
       schedule,
       onScheduleChange,
       showActions = true,
+      afterNameContent,
     },
     ref,
   ) {
@@ -214,6 +216,7 @@ export const SourceForm = React.forwardRef<SourceFormHandle, SourceFormProps>(
         schedule={schedule}
         onScheduleChange={onScheduleChange}
         showActions={showActions}
+        afterNameContent={afterNameContent}
       />
     );
   },
