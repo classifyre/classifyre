@@ -104,13 +104,14 @@ export class SemanticToolset {
       {
         name: 'findings.boilerplate',
         description:
-          'Near-duplicate boilerplate clusters in a source (repeated headers, form text, OCR artifacts). These are noise to skip or bulk-triage — never present a boilerplate cluster as an investigative pattern.',
+          'Near-duplicate boilerplate clusters (repeated headers, form text, OCR artifacts). Usually noise to skip or bulk-triage — never present a boilerplate cluster as an investigative pattern. Exception: a cluster with sourceCount > 1 means the same content circulates across sources, which may be worth a look. Omit sourceId to scan the whole corpus.',
         inputSchema: {
           type: 'object',
           properties: {
             sourceId: {
               type: 'string',
-              description: 'Optional source id; defaults to the run scope.',
+              description:
+                'Optional source id; defaults to the run scope, or the whole corpus when neither is set.',
             },
             threshold: {
               type: 'number',
@@ -123,13 +124,8 @@ export class SemanticToolset {
         handler: async (input, tc) => {
           const sourceId =
             (input.sourceId as string | undefined) ?? tc.ctx.sourceId;
-          if (!sourceId) {
-            return {
-              error: 'sourceId is required outside a source-scoped run',
-            };
-          }
           return this.semantic.boilerplateClusters(
-            sourceId,
+            sourceId ?? undefined,
             typeof input.threshold === 'number' ? input.threshold : undefined,
           );
         },

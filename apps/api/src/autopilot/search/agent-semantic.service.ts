@@ -223,13 +223,17 @@ export class AgentSemanticService {
     };
   }
 
-  /** Near-duplicate boilerplate clusters in a source — noise to skip, not leads. */
-  async boilerplateClusters(sourceId: string, threshold = 0.95) {
-    const clusters = await this.embeddings.boilerplateClusters(
-      sourceId,
+  /**
+   * Near-duplicate boilerplate clusters — usually noise to skip, but a
+   * cluster spanning several sources (sourceCount > 1) means the same content
+   * circulates between systems and may itself be a lead.
+   */
+  async boilerplateClusters(sourceId?: string, threshold = 0.95) {
+    const clusters = await this.embeddings.boilerplateClusters({
+      sourceIds: sourceId ? [sourceId] : undefined,
       threshold,
-      MAX_BOILERPLATE_CLUSTERS,
-    );
+      limit: MAX_BOILERPLATE_CLUSTERS,
+    });
     if (!clusters.length) return { clusters: [] };
     const sampleIds = clusters
       .map((cluster) => cluster.findingIds[0])
@@ -245,6 +249,7 @@ export class AgentSemanticService {
         return {
           groupHash: cluster.groupHash,
           findingCount: cluster.findingCount,
+          sourceCount: cluster.sourceCount,
           meanImportance: this.round(cluster.meanImportance),
           sampleFindingId: cluster.findingIds[0],
           sampleType: sample?.findingType,

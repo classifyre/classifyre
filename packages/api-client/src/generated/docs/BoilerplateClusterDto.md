@@ -10,6 +10,9 @@ Name | Type
 `findingCount` | number
 `findingIds` | Array&lt;string&gt;
 `meanImportance` | number
+`sourceCount` | number
+`sourceIds` | Array&lt;string&gt;
+`assetIds` | Array&lt;string&gt;
 `threshold` | number
 
 ## Example
@@ -23,6 +26,9 @@ const example = {
   "findingCount": null,
   "findingIds": null,
   "meanImportance": null,
+  "sourceCount": null,
+  "sourceIds": null,
+  "assetIds": null,
   "threshold": null,
 } satisfies BoilerplateClusterDto
 

@@ -1,4 +1,9 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { GlossaryEntityType, GlossaryTerm, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
 import { EmbeddingQueueService } from '../embedding/embedding-queue.service';
@@ -40,6 +45,14 @@ export type GlossaryLookupHit = {
 export class GlossaryService {
   private readonly logger = new Logger(GlossaryService.name);
 
+  // Query params arrive as strings (no global ValidationPipe), so numeric
+  // inputs must be coerced here before they reach Prisma.
+  private toInt(value: unknown, fallback: number, max: number): number {
+    const parsed = Math.trunc(Number(value));
+    if (!Number.isFinite(parsed) || parsed < 0) return fallback;
+    return Math.min(parsed, max);
+  }
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly queue: EmbeddingQueueService,
@@ -79,17 +92,32 @@ export class GlossaryService {
       this.prisma.glossaryTerm.findMany({
         where,
         orderBy: { term: 'asc' },
-        take: Math.min(params.take ?? 25, 200),
-        skip: params.skip ?? 0,
+        take: this.toInt(params.take ?? 25, 25, 200),
+        skip: this.toInt(params.skip ?? 0, 0, Number.MAX_SAFE_INTEGER),
       }),
       this.prisma.glossaryTerm.count({ where }),
     ]);
     return { terms: terms.map((term) => this.toDto(term)), total };
   }
 
+  // Machine-style identifiers (snake/kebab slugs, uuid fragments, long hex)
+  // are memory keys, not vocabulary. Rejecting them at the boundary keeps the
+  // operator-facing glossary human and teaches agents in-run.
+  private looksLikeMachineSlug(term: string): boolean {
+    return (
+      /^[a-z0-9]+([_-][a-z0-9]+)+$/.test(term) ||
+      /[0-9a-f]{8,}/i.test(term.replace(/\s/g, ''))
+    );
+  }
+
   async upsert(input: GlossaryUpsertInput) {
     const term = input.term.trim();
     if (!term) throw new NotFoundException('Glossary term cannot be empty');
+    if (input.origin === 'AGENT' && this.looksLikeMachineSlug(term)) {
+      throw new BadRequestException(
+        `"${term}" looks like a machine identifier, not vocabulary. Glossary terms are real-world names as a human writes them ("Jane Doe", "Project Aurora", "NHS number"). Observations and summaries belong in memory.write, not the glossary.`,
+      );
+    }
     const aliases = [
       ...new Set(
         (input.aliases ?? []).map((alias) => alias.trim()).filter(Boolean),
@@ -193,7 +221,8 @@ export class GlossaryService {
    * Resolve a name/alias to glossary terms: exact and alias matches first,
    * then semantic nearest terms when a query embedding is available.
    */
-  async lookup(query: string, limit = 10): Promise<GlossaryLookupHit[]> {
+  async lookup(query: string, limitInput: unknown = 10): Promise<GlossaryLookupHit[]> {
+    const limit = this.toInt(limitInput, 10, 50) || 10;
     const trimmed = query.trim();
     if (!trimmed) return [];
     const lexical = await this.prisma.glossaryTerm.findMany({

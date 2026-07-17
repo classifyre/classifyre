@@ -16,15 +16,21 @@
 import * as runtime from '../runtime';
 import type {
   BoilerplateClusterDto,
+  EmbeddingRecalibrateResponseDto,
   EmbeddingReindexResponseDto,
+  EmbeddingStatusResponseDto,
   PutAssetChunksDto,
   SimilarFindingDto,
 } from '../models/index';
 import {
     BoilerplateClusterDtoFromJSON,
     BoilerplateClusterDtoToJSON,
+    EmbeddingRecalibrateResponseDtoFromJSON,
+    EmbeddingRecalibrateResponseDtoToJSON,
     EmbeddingReindexResponseDtoFromJSON,
     EmbeddingReindexResponseDtoToJSON,
+    EmbeddingStatusResponseDtoFromJSON,
+    EmbeddingStatusResponseDtoToJSON,
     PutAssetChunksDtoFromJSON,
     PutAssetChunksDtoToJSON,
     SimilarFindingDtoFromJSON,
@@ -35,6 +41,12 @@ export interface EmbeddingControllerBoilerplateRequest {
     sourceId: string;
     threshold?: object;
     limit?: object;
+}
+
+export interface EmbeddingControllerBoilerplateGlobalRequest {
+    threshold?: object;
+    limit?: object;
+    sourceIds?: Array<string>;
 }
 
 export interface EmbeddingControllerChunksRequest {
@@ -98,6 +110,47 @@ export class EmbeddingsApi extends runtime.BaseAPI {
     }
 
     /**
+     * Near-duplicate finding clusters across the corpus, optionally filtered to specific sources
+     */
+    async embeddingControllerBoilerplateGlobalRaw(requestParameters: EmbeddingControllerBoilerplateGlobalRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Array<BoilerplateClusterDto>>> {
+        const queryParameters: any = {};
+
+        if (requestParameters['threshold'] != null) {
+            queryParameters['threshold'] = requestParameters['threshold'];
+        }
+
+        if (requestParameters['limit'] != null) {
+            queryParameters['limit'] = requestParameters['limit'];
+        }
+
+        if (requestParameters['sourceIds'] != null) {
+            queryParameters['sourceIds'] = requestParameters['sourceIds'];
+        }
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/embeddings/boilerplate-clusters`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => jsonValue.map(BoilerplateClusterDtoFromJSON));
+    }
+
+    /**
+     * Near-duplicate finding clusters across the corpus, optionally filtered to specific sources
+     */
+    async embeddingControllerBoilerplateGlobal(requestParameters: EmbeddingControllerBoilerplateGlobalRequest = {}, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Array<BoilerplateClusterDto>> {
+        const response = await this.embeddingControllerBoilerplateGlobalRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
      * Store asset chunk-to-content mappings
      */
     async embeddingControllerChunksRaw(requestParameters: EmbeddingControllerChunksRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
@@ -141,6 +194,35 @@ export class EmbeddingsApi extends runtime.BaseAPI {
      */
     async embeddingControllerChunks(requestParameters: EmbeddingControllerChunksRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
         await this.embeddingControllerChunksRaw(requestParameters, initOverrides);
+    }
+
+    /**
+     * Schedule a full evidence-ranking recalibration pass (importance scores, outliers, near-duplicate groups)
+     */
+    async embeddingControllerRecalibrateRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<EmbeddingRecalibrateResponseDto>> {
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/embeddings/recalibrate`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => EmbeddingRecalibrateResponseDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Schedule a full evidence-ranking recalibration pass (importance scores, outliers, near-duplicate groups)
+     */
+    async embeddingControllerRecalibrate(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<EmbeddingRecalibrateResponseDto> {
+        const response = await this.embeddingControllerRecalibrateRaw(initOverrides);
+        return await response.value();
     }
 
     /**
@@ -216,7 +298,7 @@ export class EmbeddingsApi extends runtime.BaseAPI {
     /**
      * Get semantic storage and search capability
      */
-    async embeddingControllerStatusRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
+    async embeddingControllerStatusRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<EmbeddingStatusResponseDto>> {
         const queryParameters: any = {};
 
         const headerParameters: runtime.HTTPHeaders = {};
@@ -231,14 +313,15 @@ export class EmbeddingsApi extends runtime.BaseAPI {
             query: queryParameters,
         }, initOverrides);
 
-        return new runtime.VoidApiResponse(response);
+        return new runtime.JSONApiResponse(response, (jsonValue) => EmbeddingStatusResponseDtoFromJSON(jsonValue));
     }
 
     /**
      * Get semantic storage and search capability
      */
-    async embeddingControllerStatus(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
-        await this.embeddingControllerStatusRaw(initOverrides);
+    async embeddingControllerStatus(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<EmbeddingStatusResponseDto> {
+        const response = await this.embeddingControllerStatusRaw(initOverrides);
+        return await response.value();
     }
 
 }

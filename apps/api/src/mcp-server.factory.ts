@@ -1483,24 +1483,24 @@ export class McpServerFactoryService {
       {
         title: 'Find Boilerplate Clusters',
         description:
-          'Find repeated or near-duplicate finding groups in a source, ordered by cluster size. Use this to separate bulk boilerplate from distinctive evidence.',
+          'Find repeated or near-duplicate finding groups, ordered by cluster size. Omit sourceIds to scan the whole corpus — clusters spanning multiple sources (sourceCount > 1) are the same content circulating between systems, which can itself be a lead. Use this to separate bulk boilerplate from distinctive evidence.',
         inputSchema: {
-          sourceId: z.string().uuid(),
+          sourceIds: z.array(z.string().uuid()).optional(),
           threshold: z.number().min(0.8).max(1).optional(),
-          limit: z.number().int().min(1).max(100).optional(),
+          limit: z.number().int().min(1).max(200).optional(),
         },
         annotations: {
           readOnlyHint: true,
           idempotentHint: true,
         },
       },
-      async ({ sourceId, threshold, limit }) =>
+      async ({ sourceIds, threshold, limit }) =>
         jsonResult(
-          await this.embeddingService.boilerplateClusters(
-            sourceId,
-            threshold ?? 0.95,
-            limit ?? 50,
-          ),
+          await this.embeddingService.boilerplateClusters({
+            sourceIds,
+            threshold,
+            limit,
+          }),
         ),
     );
 

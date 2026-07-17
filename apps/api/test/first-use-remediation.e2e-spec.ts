@@ -536,7 +536,9 @@ describe('Post-first-use store remediation (e2e)', () => {
         expect.objectContaining({ code: 'semantic_outlier', impact: 'up' }),
       ]),
     );
-    expect(await pgvector.boilerplateClusters(source.id)).toEqual(
+    expect(
+      await pgvector.boilerplateClusters({ sourceIds: [source.id] }),
+    ).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
           groupHash: hashes[0],

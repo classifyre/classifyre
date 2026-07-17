@@ -11,6 +11,7 @@ describe('EmbeddingQueueService', () => {
   const prisma = {
     finding: { findMany: jest.fn(), update: jest.fn() },
     assetChunk: { findMany: jest.fn() },
+    embeddingSpace: { findUnique: jest.fn() },
   };
   const config = {
     enabled: true,
@@ -56,6 +57,7 @@ describe('EmbeddingQueueService', () => {
     embeddings.putVectors.mockResolvedValue({ created: 0, received: 0 });
     embeddings.recalibrateSpace.mockResolvedValue({ analyzed: 0 });
     boss.send.mockResolvedValue('job-id');
+    prisma.embeddingSpace.findUnique.mockResolvedValue(null);
     boss.getQueueStats.mockResolvedValue({
       queuedCount: 0,
       activeCount: 0,
@@ -230,6 +232,6 @@ describe('EmbeddingQueueService', () => {
     expect(embeddings.recalibrateSpace).toHaveBeenCalledWith(
       '9c85727f-8b6f-4de0-aee6-08a96b57f79b',
     );
-    expect(service.status().lastRecalibratedAt).toBeDefined();
+    expect((await service.status()).lastRecalibratedAt).toBeDefined();
   });
 });

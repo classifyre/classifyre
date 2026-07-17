@@ -2453,7 +2453,9 @@
       "recomputing": "Recomputing…",
       "external": "External ({{count}})",
       "focusedFromConnection": "Focused view from a connection.",
-      "showFullGraph": "Show full graph"
+      "showFullGraph": "Show full graph",
+      "pairFocused": "Focused on this connection",
+      "resetView": "Reset"
     },
     "exclude": {
       "value": "Exclude this value",
@@ -2531,7 +2533,11 @@
       "sharedCount": "{{count}} shared value(s)",
       "showingTopN": "Showing top {{count}} of {{total}} connections",
       "viewInGraph": "View in graph",
-      "fanOut": "on {{count}} assets total"
+      "fanOut": "on {{count}} assets total",
+      "searchPlaceholder": "Search assets or shared values…",
+      "showMore": "Show {{count}} more",
+      "countSummary": "{{shown}} of {{total}} connections",
+      "noMatches": "No connections match your search"
     },
     "nearDuplicates": {
       "title": "Near-duplicate findings",
@@ -2543,9 +2549,34 @@
       "retry": "Retry",
       "empty": "No near-duplicate clusters",
       "emptyDesc": "No repeated boilerplate content found for this source at the current threshold.",
+      "emptyTuneHint": "Near-duplicate groups are computed by the semantic ranking pass. If this looks empty unexpectedly, reindex or recalculate it from the Tune panel.",
       "findingsCount": "{{count}} near-identical findings",
       "meanImportance": "Mean importance {{count}}",
-      "reviewFindings": "Review findings"
+      "reviewFindings": "Review findings",
+      "scopeAllSources": "All sources",
+      "spansSources": "Spans {{count}} sources",
+      "goToTune": "Open Tune → Semantic index"
+    },
+    "semanticIndex": {
+      "title": "Semantic index",
+      "model": "Model",
+      "space": "Space",
+      "loadFailed": "Failed to load semantic index status",
+      "statusBackfillRunning": "Reindexing…",
+      "statusRecalibrationRunning": "Recalculating…",
+      "statusIdle": "Idle",
+      "lastRecalibrated": "Last recalculated: {{when}}",
+      "neverRecalibrated": "never",
+      "backfillError": "Last reindex error: {{error}}",
+      "recalibrationError": "Last recalculation error: {{error}}",
+      "reindexButton": "Reindex embeddings",
+      "reindexDesc": "Re-embeds findings and content that changed since the last pass, keeping semantic search and near-duplicate detection current.",
+      "recalibrateButton": "Recalculate ranking & near-duplicates",
+      "recalibrateDesc": "Recomputes importance scores, outliers, and near-duplicate groups across the corpus using the current embeddings.",
+      "reindexStarted": "Reindex started",
+      "reindexFailed": "Failed to start reindex",
+      "recalibrateStarted": "Recalculation scheduled",
+      "recalibrateFailed": "Failed to schedule recalculation"
     }
   },
   "fingerprints": {
@@ -2553,7 +2584,9 @@
     "tabConnections": "Connections",
     "tabGraph": "Fingerprints",
     "tabNearDuplicates": "Near-duplicates",
-    "tabTune": "Tune correlation"
+    "tabTune": "Tune correlation",
+    "collapseSidebar": "Collapse sidebar",
+    "expandSidebar": "Expand sidebar"
   },
   "links": {
     "title": "Asset links",

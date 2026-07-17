@@ -7,20 +7,18 @@ import {
   ExternalLink,
   Link2,
   RotateCw,
+  Search,
 } from "lucide-react";
-import {
-  api,
-  type GraphEdgeDto,
-  type GraphNodeDto,
-} from "@workspace/api-client";
+import type { AssetSimilarityDto, GraphEdgeDto, GraphNodeDto } from "@workspace/api-client";
 import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
 import { EmptyState } from "@workspace/ui/components/empty-state";
+import { Input } from "@workspace/ui/components/input";
 import { Spinner } from "@workspace/ui/components/spinner";
 import { useTranslation } from "@/hooks/use-translation";
 
-/** Cap the ranked list so a huge correlation graph doesn't render 1000s of rows. */
-const MAX_ROWS = 50;
+/** Rows rendered per "show more" batch. */
+const BATCH_SIZE = 50;
 
 const pairKey = (a: string, b: string) => (a < b ? `${a}|${b}` : `${b}|${a}`);
 
@@ -47,55 +45,38 @@ interface ConnectionRow {
 /**
  * Ranked "top connections" list — one row per asset pair, derived from the
  * same GET /correlation/graph payload the graph view uses (nodes/edges +
- * similarities). Shared-value groups are decomposed into every pairwise
- * combination of their member assets so bundles of 3+ assets still surface
- * each underlying pair, not just exact 2-asset bundles.
+ * similarities), passed down from the page so both panels always agree.
+ * Shared-value groups are decomposed into every pairwise combination of
+ * their member assets so bundles of 3+ assets still surface each underlying
+ * pair, not just exact 2-asset bundles.
  */
 export function FingerprintsConnections({
-  onViewInGraph,
+  nodes,
+  edges,
+  similarities,
+  loading,
+  error,
+  onReload,
+  onFocusPair,
+  focusedPair,
 }: {
-  /** Switch to the Graph tab focused on this asset pair (best-effort). */
-  onViewInGraph?: (assetIds: [string, string]) => void;
+  nodes: GraphNodeDto[];
+  edges: GraphEdgeDto[];
+  similarities: AssetSimilarityDto[];
+  loading: boolean;
+  error: string | null;
+  onReload: () => void;
+  /** Focus this pair on the graph canvas. */
+  onFocusPair?: (assetIds: [string, string]) => void;
+  /** The pair currently focused on the graph, if any — highlights its row. */
+  focusedPair?: [string, string];
 }) {
   const { t } = useTranslation();
-  const [nodes, setNodes] = React.useState<GraphNodeDto[]>([]);
-  const [edges, setEdges] = React.useState<GraphEdgeDto[]>([]);
-  const [similarities, setSimilarities] = React.useState<
-    { fromId: string; toId: string; weighted: number }[]
-  >([]);
-  const [loading, setLoading] = React.useState(true);
-  const [error, setError] = React.useState<string | null>(null);
   const [expanded, setExpanded] = React.useState<Set<string>>(new Set());
+  const [search, setSearch] = React.useState("");
+  const [visibleCount, setVisibleCount] = React.useState(BATCH_SIZE);
 
-  const load = React.useCallback(() => {
-    let active = true;
-    setLoading(true);
-    setError(null);
-    api.correlation
-      .correlationControllerGraph({})
-      .then((g) => {
-        if (!active) return;
-        setNodes(g.nodes ?? []);
-        setEdges(g.edges ?? []);
-        setSimilarities(g.similarities ?? []);
-      })
-      .catch((e: unknown) => {
-        if (active)
-          setError(
-            e instanceof Error ? e.message : t("correlation.connections.loadFailed"),
-          );
-      })
-      .finally(() => {
-        if (active) setLoading(false);
-      });
-    return () => {
-      active = false;
-    };
-  }, [t]);
-
-  React.useEffect(() => load(), [load]);
-
-  const { rows, totalCount } = React.useMemo(() => {
+  const { rows } = React.useMemo(() => {
     const assetById = new Map(
       nodes.filter((n) => n.type === "asset").map((n) => [n.id, n]),
     );
@@ -173,53 +154,80 @@ export function FingerprintsConnections({
       return y.sharedValues.length - x.sharedValues.length;
     });
 
-    return { rows: built.slice(0, MAX_ROWS), totalCount: built.length };
+    return { rows: built };
   }, [nodes, edges, similarities]);
 
-  const toggle = React.useCallback((key: string) => {
-    setExpanded((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
+  const filteredRows = React.useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return rows;
+    return rows.filter((row) => {
+      if (row.assetA.label.toLowerCase().includes(q)) return true;
+      if (row.assetB.label.toLowerCase().includes(q)) return true;
+      return row.sharedValues.some((v) => v.value.toLowerCase().includes(q));
     });
-  }, []);
+  }, [rows, search]);
+
+  // Reset the visible window whenever the filtered set changes shape.
+  React.useEffect(() => {
+    setVisibleCount(BATCH_SIZE);
+  }, [search]);
+
+  const visibleRows = filteredRows.slice(0, visibleCount);
+  const hasMore = filteredRows.length > visibleRows.length;
+
+  // Row click both expands/collapses the detail and focuses the pair on the
+  // graph; the explicit "View in graph" button just re-focuses without
+  // toggling collapse state.
+  const focusRow = React.useCallback(
+    (row: ConnectionRow) => {
+      onFocusPair?.([row.assetA.id, row.assetB.id]);
+      setExpanded((prev) => {
+        const next = new Set(prev);
+        if (next.has(row.key)) next.delete(row.key);
+        else next.add(row.key);
+        return next;
+      });
+    },
+    [onFocusPair],
+  );
+
+  const refocusRow = React.useCallback(
+    (row: ConnectionRow) => onFocusPair?.([row.assetA.id, row.assetB.id]),
+    [onFocusPair],
+  );
 
   const showEmpty = !loading && !error && rows.length === 0;
-  const truncatedNote = totalCount > MAX_ROWS;
+  const showNoMatches = !loading && !error && rows.length > 0 && filteredRows.length === 0;
 
   return (
-    <div className="flex h-full flex-col border-2 border-border bg-card">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b-2 border-border px-3 py-2">
+    <div className="flex flex-col gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <Link2 className="h-4 w-4 text-muted-foreground" />
           <h3 className="font-serif text-sm font-black uppercase tracking-[0.06em]">
             {t("correlation.connections.title")}
           </h3>
         </div>
-        <div className="flex items-center gap-2">
-          {truncatedNote && (
-            <Badge variant="outline" className="text-[10px] uppercase">
-              {t("correlation.connections.showingTopN", {
-                count: String(MAX_ROWS),
-                total: String(totalCount),
-              })}
-            </Badge>
-          )}
-          <Button
-            variant="outline"
-            size="icon"
-            className="h-8 w-8"
-            onClick={load}
-          >
-            <RotateCw className="h-4 w-4" />
-          </Button>
-        </div>
+        <Button variant="outline" size="icon" className="h-8 w-8" onClick={onReload}>
+          <RotateCw className="h-4 w-4" />
+        </Button>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto p-3">
+      {rows.length > 0 && (
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder={t("correlation.connections.searchPlaceholder")}
+            className="h-8 pl-7 text-sm"
+          />
+        </div>
+      )}
+
+      <div>
         {loading ? (
-          <div className="flex h-full items-center justify-center">
+          <div className="flex items-center justify-center py-12">
             <Spinner size="lg" label={t("correlation.fingerprints.title")} />
           </div>
         ) : error ? (
@@ -227,7 +235,7 @@ export function FingerprintsConnections({
             icon={Link2}
             title={t("correlation.connections.loadFailed")}
             description={error}
-            action={{ label: t("correlation.fingerprints.retry"), onClick: load }}
+            action={{ label: t("correlation.fingerprints.retry"), onClick: onReload }}
           />
         ) : showEmpty ? (
           <EmptyState
@@ -235,113 +243,141 @@ export function FingerprintsConnections({
             title={t("correlation.connections.empty")}
             description={t("correlation.connections.emptyDesc")}
           />
+        ) : showNoMatches ? (
+          <EmptyState icon={Search} title={t("correlation.connections.noMatches")} description="" />
         ) : (
-          <ul className="space-y-2">
-            {rows.map((row) => (
-              <li
-                key={row.key}
-                className="rounded-[4px] border-2 border-border bg-background"
-              >
-                <button
-                  type="button"
-                  onClick={() => toggle(row.key)}
-                  className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-muted/50"
-                >
-                  {expanded.has(row.key) ? (
-                    <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                  ) : (
-                    <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                  )}
-                  <span className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5 text-sm">
-                    <span className="max-w-[220px] truncate font-medium" title={row.assetA.label}>
-                      {row.assetA.label}
-                    </span>
-                    <span className="text-muted-foreground">↔</span>
-                    <span className="max-w-[220px] truncate font-medium" title={row.assetB.label}>
-                      {row.assetB.label}
-                    </span>
-                  </span>
-                  <Badge
-                    variant={row.matchPercent != null ? "default" : "outline"}
-                    className="shrink-0 text-[10px]"
+          <>
+            <ul className="space-y-2">
+              {visibleRows.map((row) => {
+                const isFocused =
+                  focusedPair &&
+                  ((focusedPair[0] === row.assetA.id && focusedPair[1] === row.assetB.id) ||
+                    (focusedPair[0] === row.assetB.id && focusedPair[1] === row.assetA.id));
+                return (
+                  <li
+                    key={row.key}
+                    className={`rounded-[4px] border-2 bg-background ${
+                      isFocused ? "border-foreground" : "border-border"
+                    }`}
                   >
-                    {row.matchPercent != null
-                      ? t("correlation.connections.matchPercent", {
-                          count: String(row.matchPercent),
-                        })
-                      : t("correlation.connections.noScore")}
-                  </Badge>
-                  <Badge variant="secondary" className="shrink-0 text-[10px]">
-                    {t("correlation.connections.sharedCount", {
-                      count: String(row.sharedValues.length),
-                    })}
-                  </Badge>
-                </button>
-
-                {expanded.has(row.key) && (
-                  <div className="space-y-2 border-t border-border/60 px-3 py-2">
-                    <ul className="max-h-[30vh] space-y-1 overflow-y-auto">
-                      {row.sharedValues.map((v) => (
-                        <li
-                          key={v.id}
-                          className="flex items-center gap-2 rounded-[3px] px-1.5 py-1 text-xs"
-                        >
-                          <span className="shrink-0 font-mono text-[9px] uppercase text-muted-foreground">
-                            {v.label}
-                          </span>
-                          <span
-                            className="min-w-0 flex-1 truncate font-mono"
-                            title={v.value}
-                          >
-                            {v.value}
-                          </span>
-                          {v.fanOut > 2 && (
-                            <span className="shrink-0 text-[10px] text-muted-foreground">
-                              {t("correlation.connections.fanOut", {
-                                count: String(v.fanOut),
-                              })}
-                            </span>
-                          )}
-                        </li>
-                      ))}
-                    </ul>
-                    <div className="flex items-center gap-2 pt-1">
-                      <a
-                        href={`/assets/${row.assetA.id}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-[11px] text-muted-foreground underline-offset-2 hover:underline"
-                      >
-                        {row.assetA.label}
-                      </a>
-                      <span className="text-[11px] text-muted-foreground">·</span>
-                      <a
-                        href={`/assets/${row.assetB.id}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-[11px] text-muted-foreground underline-offset-2 hover:underline"
-                      >
-                        {row.assetB.label}
-                      </a>
-                      {onViewInGraph && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="ml-auto h-7 text-xs"
-                          onClick={() =>
-                            onViewInGraph([row.assetA.id, row.assetB.id])
-                          }
-                        >
-                          <ExternalLink className="mr-1.5 h-3 w-3" />
-                          {t("correlation.connections.viewInGraph")}
-                        </Button>
+                    <button
+                      type="button"
+                      onClick={() => focusRow(row)}
+                      className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-muted/50"
+                    >
+                      {expanded.has(row.key) ? (
+                        <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                      ) : (
+                        <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                       )}
-                    </div>
-                  </div>
-                )}
-              </li>
-            ))}
-          </ul>
+                      <span className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5 text-sm">
+                        <span className="max-w-[140px] truncate font-medium" title={row.assetA.label}>
+                          {row.assetA.label}
+                        </span>
+                        <span className="text-muted-foreground">↔</span>
+                        <span className="max-w-[140px] truncate font-medium" title={row.assetB.label}>
+                          {row.assetB.label}
+                        </span>
+                      </span>
+                      <Badge
+                        variant={row.matchPercent != null ? "default" : "outline"}
+                        className="shrink-0 text-[10px]"
+                      >
+                        {row.matchPercent != null
+                          ? t("correlation.connections.matchPercent", {
+                              count: String(row.matchPercent),
+                            })
+                          : t("correlation.connections.noScore")}
+                      </Badge>
+                    </button>
+
+                    {expanded.has(row.key) && (
+                      <div className="space-y-2 border-t border-border/60 px-3 py-2">
+                        <Badge variant="secondary" className="text-[10px]">
+                          {t("correlation.connections.sharedCount", {
+                            count: String(row.sharedValues.length),
+                          })}
+                        </Badge>
+                        <ul className="max-h-[30vh] space-y-1 overflow-y-auto">
+                          {row.sharedValues.map((v) => (
+                            <li
+                              key={v.id}
+                              className="flex items-center gap-2 rounded-[3px] px-1.5 py-1 text-xs"
+                            >
+                              <span className="shrink-0 font-mono text-[9px] uppercase text-muted-foreground">
+                                {v.label}
+                              </span>
+                              <span
+                                className="min-w-0 flex-1 truncate font-mono"
+                                title={v.value}
+                              >
+                                {v.value}
+                              </span>
+                              {v.fanOut > 2 && (
+                                <span className="shrink-0 text-[10px] text-muted-foreground">
+                                  {t("correlation.connections.fanOut", {
+                                    count: String(v.fanOut),
+                                  })}
+                                </span>
+                              )}
+                            </li>
+                          ))}
+                        </ul>
+                        <div className="flex items-center gap-2 pt-1">
+                          <a
+                            href={`/assets/${row.assetA.id}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-[11px] text-muted-foreground underline-offset-2 hover:underline"
+                          >
+                            {row.assetA.label}
+                          </a>
+                          <span className="text-[11px] text-muted-foreground">·</span>
+                          <a
+                            href={`/assets/${row.assetB.id}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-[11px] text-muted-foreground underline-offset-2 hover:underline"
+                          >
+                            {row.assetB.label}
+                          </a>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="ml-auto h-7 text-xs"
+                            onClick={() => refocusRow(row)}
+                          >
+                            <ExternalLink className="mr-1.5 h-3 w-3" />
+                            {t("correlation.connections.viewInGraph")}
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+            <div className="flex items-center justify-between gap-2 pt-3 text-[11px] text-muted-foreground">
+              <span>
+                {t("correlation.connections.countSummary", {
+                  shown: String(visibleRows.length),
+                  total: String(filteredRows.length),
+                })}
+              </span>
+              {hasMore && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 text-xs"
+                  onClick={() => setVisibleCount((c) => c + BATCH_SIZE)}
+                >
+                  {t("correlation.connections.showMore", {
+                    count: String(Math.min(BATCH_SIZE, filteredRows.length - visibleRows.length)),
+                  })}
+                </Button>
+              )}
+            </div>
+          </>
         )}
       </div>
     </div>

@@ -7,7 +7,6 @@ import type { MemoryWrite } from '../../autopilot.types';
 import type { Tool } from '../tool.types';
 
 const MEMORY_KINDS = [
-  'GLOSSARY',
   'DECISION_PRECEDENT',
   'ENTITY_MAP',
   'SOURCE_PROFILE',
@@ -33,7 +32,7 @@ export class KnowledgeToolset {
       {
         name: 'memory.write',
         description:
-          'Record a long-lived memory the agent should recall in future cycles (glossary term, decision precedent, entity map, source profile, detector insight, or sacred operator directive). Memories you write are UNVERIFIED hypotheses by default; set verified=true ONLY when you checked the claim against real system state this cycle (e.g. inspected the actual findings). Never mark a summary of state you did not directly observe as verified.',
+          'Record a long-lived memory the agent should recall in future cycles (decision precedent, entity map, source profile, detector insight, or sacred operator directive). NOT for vocabulary: real-world names, organizations, codenames and jargon belong in glossary.propose, never here. Memories you write are UNVERIFIED hypotheses by default; set verified=true ONLY when you checked the claim against real system state this cycle (e.g. inspected the actual findings). Never mark a summary of state you did not directly observe as verified.',
         inputSchema: {
           type: 'object',
           properties: {
