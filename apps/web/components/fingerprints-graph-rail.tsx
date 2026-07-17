@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { ExternalLink, FolderPlus, Layers } from "lucide-react";
+import { ExternalLink, Layers } from "lucide-react";
 import type { GraphNodeDto } from "@workspace/api-client";
 import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
@@ -37,9 +37,6 @@ export function FingerprintsGraphSelectionRail({
   onHoverKey,
   focusCluster,
   assetLabel,
-  targetAssetIds,
-  onClearFocus,
-  onUseInCase,
 }: {
   selection: GraphSelection;
   selectedNode: GraphNodeDto | null;
@@ -50,9 +47,6 @@ export function FingerprintsGraphSelectionRail({
   onHoverKey: (key: string | null) => void;
   focusCluster: (meta: ClusterMeta) => void;
   assetLabel: (id: string) => string;
-  targetAssetIds: string[];
-  onClearFocus: () => void;
-  onUseInCase: () => void;
 }) {
   const { t } = useTranslation();
   if (!selection) return null;
@@ -141,36 +135,14 @@ export function FingerprintsGraphSelectionRail({
           </p>
         </div>
       ) : null}
-
-      {/* Focused-path actions: pull exactly the connected assets. */}
-      <div className="space-y-2 border-t border-border/60 pt-3">
-        <p className="text-xs text-muted-foreground">
-          {t("correlation.fingerprints.focusedHint", {
-            count: String(targetAssetIds.length),
-          })}
-        </p>
-        <Button
-          size="sm"
-          className="w-full"
-          disabled={targetAssetIds.length === 0}
-          onClick={onUseInCase}
-        >
-          <FolderPlus className="mr-1.5 h-3.5 w-3.5" />
-          {t("correlation.fingerprints.useInCase")}
-        </Button>
-        <Button size="sm" variant="ghost" className="w-full" onClick={onClearFocus}>
-          {t("correlation.fingerprints.clearFocus")}
-        </Button>
-      </div>
     </div>
   );
 }
 
 /**
- * "Nothing selected" content: cluster hotspots, whole-graph case actions and
- * the colour legend. Shown as a persistent footer under whichever workspace
- * panel (Connections / Near-duplicates / Tune) is active, so the graph's
- * visual language stays explained without needing a dedicated tab.
+ * "Nothing selected" content: cluster hotspots and the colour legend. Case
+ * actions live on the graph toolbar ("Use focused/visible in case") — one
+ * clear path instead of parallel rail buttons.
  */
 export function FingerprintsGraphOverviewFooter({
   clustered,
@@ -180,7 +152,6 @@ export function FingerprintsGraphOverviewFooter({
   visibleAssetIds,
   unconnectedCount,
   valueCount,
-  onUseInCase,
 }: {
   clustered: ClusteredGraph;
   focusCluster: (meta: ClusterMeta) => void;
@@ -189,7 +160,6 @@ export function FingerprintsGraphOverviewFooter({
   visibleAssetIds: string[];
   unconnectedCount: number;
   valueCount: number;
-  onUseInCase: () => void;
 }) {
   const { t } = useTranslation();
   return (
@@ -203,23 +173,6 @@ export function FingerprintsGraphOverviewFooter({
         />
       )}
       <div className="space-y-2">
-        <h3 className="font-serif text-sm font-black uppercase tracking-[0.06em]">
-          {t("correlation.fingerprints.actions")}
-        </h3>
-        <p className="text-xs text-muted-foreground">
-          {t("correlation.fingerprints.actionsHint", {
-            count: String(visibleAssetIds.length),
-          })}
-        </p>
-        <Button
-          size="sm"
-          className="w-full"
-          disabled={visibleAssetIds.length === 0}
-          onClick={onUseInCase}
-        >
-          <FolderPlus className="mr-1.5 h-3.5 w-3.5" />
-          {t("correlation.fingerprints.useInCase")}
-        </Button>
         <p className="text-[11px] text-muted-foreground">
           {t("correlation.fingerprints.focusHelp")}
         </p>

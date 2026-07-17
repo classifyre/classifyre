@@ -2,9 +2,9 @@
 
 import * as React from "react";
 import {
+  ArrowDownWideNarrow,
   ChevronDown,
   ChevronRight,
-  ExternalLink,
   Link2,
   RotateCw,
   Search,
@@ -15,10 +15,21 @@ import { Button } from "@workspace/ui/components/button";
 import { EmptyState } from "@workspace/ui/components/empty-state";
 import { Input } from "@workspace/ui/components/input";
 import { Spinner } from "@workspace/ui/components/spinner";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@workspace/ui/components/select";
 import { useTranslation } from "@/hooks/use-translation";
 
 /** Rows rendered per "show more" batch. */
 const BATCH_SIZE = 50;
+/** Sentinel for the "All" option (Radix Select forbids empty item values). */
+const ALL = "__all__";
+
+type SortKey = "strongest" | "mostShared" | "name";
 
 const pairKey = (a: string, b: string) => (a < b ? `${a}|${b}` : `${b}|${a}`);
 
@@ -34,8 +45,8 @@ interface SharedValueDetail {
 
 interface ConnectionRow {
   key: string;
-  assetA: { id: string; label: string };
-  assetB: { id: string; label: string };
+  assetA: { id: string; label: string; sourceType?: string };
+  assetB: { id: string; label: string; sourceType?: string };
   /** Weighted match % (0-100), or null when the pair never cleared the
    *  "related" similarity threshold — they only share values found here. */
   matchPercent: number | null;
@@ -59,6 +70,7 @@ export function FingerprintsConnections({
   onReload,
   onFocusPair,
   focusedPair,
+  onFilterFocus,
 }: {
   nodes: GraphNodeDto[];
   edges: GraphEdgeDto[];
@@ -70,10 +82,16 @@ export function FingerprintsConnections({
   onFocusPair?: (assetIds: [string, string]) => void;
   /** The pair currently focused on the graph, if any — highlights its row. */
   focusedPair?: [string, string];
+  /** Sidebar dropdown filters → graph dim: the assets of every matching pair,
+   *  or null when both dropdowns are back on "All". */
+  onFilterFocus?: (assetIds: string[] | null) => void;
 }) {
   const { t } = useTranslation();
   const [expanded, setExpanded] = React.useState<Set<string>>(new Set());
   const [search, setSearch] = React.useState("");
+  const [sourceSel, setSourceSel] = React.useState<string>(ALL);
+  const [typeSel, setTypeSel] = React.useState<string>(ALL);
+  const [sort, setSort] = React.useState<SortKey>("strongest");
   const [visibleCount, setVisibleCount] = React.useState(BATCH_SIZE);
 
   const { rows } = React.useMemo(() => {
@@ -136,10 +154,12 @@ export function FingerprintsConnections({
     for (const [key, entry] of pairs) {
       const [aId, bId] = entry.assetIds;
       const weighted = simByPair.get(key);
+      const nodeA = assetById.get(aId);
+      const nodeB = assetById.get(bId);
       built.push({
         key,
-        assetA: { id: aId, label: assetById.get(aId)?.label ?? aId },
-        assetB: { id: bId, label: assetById.get(bId)?.label ?? bId },
+        assetA: { id: aId, label: nodeA?.label ?? aId, sourceType: nodeA?.sourceType },
+        assetB: { id: bId, label: nodeB?.label ?? bId, sourceType: nodeB?.sourceType },
         matchPercent: weighted != null ? Math.round(weighted * 100) : null,
         sharedValues: [...entry.values.values()].sort(
           (x, y) => x.fanOut - y.fanOut || x.label.localeCompare(y.label),
@@ -147,37 +167,99 @@ export function FingerprintsConnections({
       });
     }
 
-    built.sort((x, y) => {
-      const mx = x.matchPercent ?? -1;
-      const my = y.matchPercent ?? -1;
-      if (my !== mx) return my - mx;
-      return y.sharedValues.length - x.sharedValues.length;
-    });
-
     return { rows: built };
   }, [nodes, edges, similarities]);
 
+  // ── Dynamic filter options, derived from ALL rows (not just visible) ──────
+  const sourceOptions = React.useMemo(() => {
+    const set = new Set<string>();
+    for (const row of rows) {
+      if (row.assetA.sourceType) set.add(row.assetA.sourceType);
+      if (row.assetB.sourceType) set.add(row.assetB.sourceType);
+    }
+    return [...set].sort((a, b) => a.localeCompare(b));
+  }, [rows]);
+
+  const valueTypeOptions = React.useMemo(() => {
+    const set = new Set<string>();
+    for (const row of rows) {
+      for (const v of row.sharedValues) if (v.label) set.add(v.label);
+    }
+    return [...set].sort((a, b) => a.localeCompare(b));
+  }, [rows]);
+
+  // Dropdown filters (drive both the list and the graph dim).
+  const dropdownRows = React.useMemo(() => {
+    return rows.filter((row) => {
+      if (
+        sourceSel !== ALL &&
+        row.assetA.sourceType !== sourceSel &&
+        row.assetB.sourceType !== sourceSel
+      ) {
+        return false;
+      }
+      if (typeSel !== ALL && !row.sharedValues.some((v) => v.label === typeSel)) return false;
+      return true;
+    });
+  }, [rows, sourceSel, typeSel]);
+
+  // Reflect the dropdown filters on the graph: dim everything that isn't part
+  // of a matching pair. Signature-gated so re-derived-but-identical id lists
+  // (e.g. after a graph reload) don't re-push the same focus.
+  const filterFocusIds = React.useMemo(() => {
+    if (sourceSel === ALL && typeSel === ALL) return null;
+    const ids = new Set<string>();
+    for (const row of dropdownRows) {
+      ids.add(row.assetA.id);
+      ids.add(row.assetB.id);
+    }
+    return [...ids].sort();
+  }, [dropdownRows, sourceSel, typeSel]);
+  const filterFocusSignature = filterFocusIds ? filterFocusIds.join(",") : "";
+  React.useEffect(() => {
+    onFilterFocus?.(filterFocusIds);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterFocusSignature]);
+
   const filteredRows = React.useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return rows;
-    return rows.filter((row) => {
-      if (row.assetA.label.toLowerCase().includes(q)) return true;
-      if (row.assetB.label.toLowerCase().includes(q)) return true;
-      return row.sharedValues.some((v) => v.value.toLowerCase().includes(q));
-    });
-  }, [rows, search]);
+    const searched = !q
+      ? dropdownRows
+      : dropdownRows.filter((row) => {
+          if (row.assetA.label.toLowerCase().includes(q)) return true;
+          if (row.assetB.label.toLowerCase().includes(q)) return true;
+          return row.sharedValues.some((v) => v.value.toLowerCase().includes(q));
+        });
+    const sorted = [...searched];
+    if (sort === "mostShared") {
+      sorted.sort(
+        (x, y) =>
+          y.sharedValues.length - x.sharedValues.length ||
+          (y.matchPercent ?? -1) - (x.matchPercent ?? -1),
+      );
+    } else if (sort === "name") {
+      sorted.sort((x, y) => x.assetA.label.localeCompare(y.assetA.label));
+    } else {
+      sorted.sort((x, y) => {
+        const mx = x.matchPercent ?? -1;
+        const my = y.matchPercent ?? -1;
+        if (my !== mx) return my - mx;
+        return y.sharedValues.length - x.sharedValues.length;
+      });
+    }
+    return sorted;
+  }, [dropdownRows, search, sort]);
 
   // Reset the visible window whenever the filtered set changes shape.
   React.useEffect(() => {
     setVisibleCount(BATCH_SIZE);
-  }, [search]);
+  }, [search, sourceSel, typeSel, sort]);
 
   const visibleRows = filteredRows.slice(0, visibleCount);
   const hasMore = filteredRows.length > visibleRows.length;
 
-  // Row click both expands/collapses the detail and focuses the pair on the
-  // graph; the explicit "View in graph" button just re-focuses without
-  // toggling collapse state.
+  // Row click focuses the pair on the graph (which also resets the graph's
+  // toolbar filters so the pair is guaranteed visible) and toggles the detail.
   const focusRow = React.useCallback(
     (row: ConnectionRow) => {
       onFocusPair?.([row.assetA.id, row.assetB.id]);
@@ -188,11 +270,6 @@ export function FingerprintsConnections({
         return next;
       });
     },
-    [onFocusPair],
-  );
-
-  const refocusRow = React.useCallback(
-    (row: ConnectionRow) => onFocusPair?.([row.assetA.id, row.assetB.id]),
     [onFocusPair],
   );
 
@@ -214,14 +291,74 @@ export function FingerprintsConnections({
       </div>
 
       {rows.length > 0 && (
-        <div className="relative">
-          <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder={t("correlation.connections.searchPlaceholder")}
-            className="h-8 pl-7 text-sm"
-          />
+        <div className="space-y-2">
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder={t("correlation.connections.searchPlaceholder")}
+              className="h-8 pl-7 text-sm"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <Select value={sourceSel} onValueChange={setSourceSel}>
+              <SelectTrigger
+                className="h-8 w-full rounded-[2px] border-2 text-xs"
+                aria-label={t("correlation.connections.filterSource")}
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ALL}>
+                  {t("correlation.connections.filterSourceAll")}
+                </SelectItem>
+                {sourceOptions.map((s) => (
+                  <SelectItem key={s} value={s}>
+                    <span className="font-mono text-xs uppercase">{s}</span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={typeSel} onValueChange={setTypeSel}>
+              <SelectTrigger
+                className="h-8 w-full rounded-[2px] border-2 text-xs"
+                aria-label={t("correlation.connections.filterValueType")}
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ALL}>
+                  {t("correlation.connections.filterValueTypeAll")}
+                </SelectItem>
+                {valueTypeOptions.map((v) => (
+                  <SelectItem key={v} value={v}>
+                    <span className="font-mono text-xs uppercase">{v}</span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex items-center gap-2">
+            <ArrowDownWideNarrow className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+            <Select value={sort} onValueChange={(v) => setSort(v as SortKey)}>
+              <SelectTrigger
+                className="h-8 flex-1 rounded-[2px] border-2 text-xs"
+                aria-label={t("correlation.connections.sortLabel")}
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="strongest">
+                  {t("correlation.connections.sortStrongest")}
+                </SelectItem>
+                <SelectItem value="mostShared">
+                  {t("correlation.connections.sortMostShared")}
+                </SelectItem>
+                <SelectItem value="name">{t("correlation.connections.sortName")}</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
       )}
 
@@ -270,12 +407,12 @@ export function FingerprintsConnections({
                       ) : (
                         <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                       )}
-                      <span className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5 text-sm">
-                        <span className="max-w-[140px] truncate font-medium" title={row.assetA.label}>
+                      {/* The two assets as a vertical list — no overlap at any width. */}
+                      <span className="flex min-w-0 flex-1 flex-col gap-0.5 text-sm">
+                        <span className="truncate font-medium" title={row.assetA.label}>
                           {row.assetA.label}
                         </span>
-                        <span className="text-muted-foreground">↔</span>
-                        <span className="max-w-[140px] truncate font-medium" title={row.assetB.label}>
+                        <span className="truncate font-medium" title={row.assetB.label}>
                           {row.assetB.label}
                         </span>
                       </span>
@@ -341,15 +478,6 @@ export function FingerprintsConnections({
                           >
                             {row.assetB.label}
                           </a>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="ml-auto h-7 text-xs"
-                            onClick={() => refocusRow(row)}
-                          >
-                            <ExternalLink className="mr-1.5 h-3 w-3" />
-                            {t("correlation.connections.viewInGraph")}
-                          </Button>
                         </div>
                       </div>
                     )}
