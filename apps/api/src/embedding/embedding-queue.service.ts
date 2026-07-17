@@ -134,25 +134,28 @@ export class EmbeddingQueueService implements OnApplicationBootstrap {
     };
   }
 
-  scheduleRecalibration(): void {
-    if (!this.config.enabled) return;
-    void this.persistRecalibration().catch((error) => {
+  async scheduleRecalibration(): Promise<boolean> {
+    if (!this.config.enabled) return false;
+    try {
+      return await this.persistRecalibration();
+    } catch (error) {
       this.logger.error(
         `Failed to schedule embedding recalibration: ${
           error instanceof Error ? error.message : String(error)
         }`,
       );
-    });
+      return false;
+    }
   }
 
-  private async persistRecalibration(): Promise<void> {
-    if (!this.recalibrateQueueName || !this.spaceId) return;
+  private async persistRecalibration(singleton = true): Promise<boolean> {
+    if (!this.recalibrateQueueName || !this.spaceId) return false;
     const boss = await this.pgBoss.getBossAsync();
-    await boss.send(
+    const jobId = await boss.send(
       this.recalibrateQueueName,
       { spaceId: this.spaceId },
       {
-        singletonKey: this.spaceId,
+        ...(singleton ? { singletonKey: this.spaceId } : {}),
         startAfter: RECALIBRATE_DELAY_SECONDS,
         retryLimit: 3,
         retryDelay: this.config.retrySeconds,
@@ -160,6 +163,7 @@ export class EmbeddingQueueService implements OnApplicationBootstrap {
         retentionSeconds: 86400,
       },
     );
+    return jobId !== null;
   }
 
   private async handleRecalibration(): Promise<void> {
@@ -170,7 +174,11 @@ export class EmbeddingQueueService implements OnApplicationBootstrap {
     if (pending > 0) {
       // Inference is still draining; push the pass back until the space is
       // stable so scores are computed against the full neighbourhood.
-      await this.persistRecalibration();
+      // The active job owns the singleton key until this handler returns, so
+      // another singleton send would be rejected. This worker is serial and
+      // only the active job takes this path, making one non-singleton deferred
+      // successor both reliable and duplicate-safe.
+      await this.persistRecalibration(false);
       return;
     }
     this.recalibrationRunning = true;
@@ -270,7 +278,7 @@ export class EmbeddingQueueService implements OnApplicationBootstrap {
         vector: vectors[index],
       })),
     });
-    this.scheduleRecalibration();
+    void this.scheduleRecalibration();
   }
 
   private scheduleRecovery(): void {
@@ -287,7 +295,7 @@ export class EmbeddingQueueService implements OnApplicationBootstrap {
       await this.backfillAssetChunks();
       await this.backfillGlossaryTerms();
       this.backfillCompletedAt = new Date().toISOString();
-      this.scheduleRecalibration();
+      void this.scheduleRecalibration();
       this.logger.log(
         `Embedding reconciliation queued for space ${this.spaceId}`,
       );

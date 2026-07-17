@@ -34,6 +34,7 @@ describe('GlossaryService', () => {
     id: 'term-1',
     term: 'Little St. James',
     aliases: ['LSJ'],
+    proposedAliases: [],
     entityType: 'LOCATION',
     notes: null,
     refType: null,
@@ -103,7 +104,7 @@ describe('GlossaryService', () => {
     );
   });
 
-  it('agent upsert never overwrites an operator term — aliases merge only', async () => {
+  it('keeps agent aliases for an operator term unverified and out of lookup', async () => {
     prisma.glossaryTerm.findFirst.mockResolvedValue({ ...baseTerm });
 
     const result = await service.upsert({
@@ -116,17 +117,22 @@ describe('GlossaryService', () => {
     expect(result.merged).toBe(true);
     expect(prisma.glossaryTerm.update).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: { aliases: ['LSJ', 'the island'] },
+        data: { proposedAliases: ['the island'] },
       }),
     );
     // Content fields must be untouched.
     const updateData = prisma.glossaryTerm.update.mock.calls[0][0].data;
     expect(updateData.notes).toBeUndefined();
     expect(updateData.origin).toBeUndefined();
+    expect(updateData.aliases).toBeUndefined();
+    expect(queue.enqueue).not.toHaveBeenCalled();
   });
 
   it('operator edits replace aliases and can rename the selected row', async () => {
-    prisma.glossaryTerm.findUnique.mockResolvedValue({ ...baseTerm });
+    prisma.glossaryTerm.findUnique.mockResolvedValue({
+      ...baseTerm,
+      proposedAliases: ['The Island'],
+    });
     prisma.glossaryTerm.findFirst.mockResolvedValue(null);
 
     await service.upsert({
@@ -142,6 +148,7 @@ describe('GlossaryService', () => {
         data: expect.objectContaining({
           term: 'Little Saint James',
           aliases: ['The Island'],
+          proposedAliases: [],
         }),
       }),
     );

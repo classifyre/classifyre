@@ -169,22 +169,27 @@ export class GlossaryService {
     }
     const existing = edited ?? matchingTerm;
 
-    // An agent proposal never overwrites operator-owned vocabulary: it may
-    // only contribute aliases the operator can review.
+    // Agent aliases for operator vocabulary stay in a separate pending list.
+    // They are deliberately excluded from lexical and semantic lookup until
+    // an operator accepts them by saving the term.
     if (
       existing &&
       existing.origin === 'OPERATOR' &&
       input.origin === 'AGENT'
     ) {
-      const mergedAliases = [...new Set([...existing.aliases, ...aliases])];
+      const proposedAliases = [
+        ...new Set([
+          ...existing.proposedAliases,
+          ...aliases.filter((alias) => !existing.aliases.includes(alias)),
+        ]),
+      ];
       const updated =
-        mergedAliases.length === existing.aliases.length
+        proposedAliases.length === existing.proposedAliases.length
           ? existing
           : await this.prisma.glossaryTerm.update({
               where: { id: existing.id },
-              data: { aliases: mergedAliases },
+              data: { proposedAliases },
             });
-      await this.enqueueEmbedding(updated);
       return { ...this.toDto(updated), merged: true };
     }
 
@@ -214,6 +219,7 @@ export class GlossaryService {
               input.origin === 'OPERATOR'
                 ? aliases
                 : [...new Set([...existing.aliases, ...aliases])],
+            ...(input.origin === 'OPERATOR' ? { proposedAliases: [] } : {}),
           },
         })
       : await this.prisma.glossaryTerm.create({ data: { term, ...data } });
@@ -403,6 +409,7 @@ export class GlossaryService {
       id: term.id,
       term: term.term,
       aliases: term.aliases,
+      proposedAliases: term.proposedAliases,
       entityType: term.entityType,
       notes: term.notes,
       refType: term.refType,

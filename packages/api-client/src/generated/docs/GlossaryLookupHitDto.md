@@ -9,6 +9,7 @@ Name | Type
 `id` | string
 `term` | string
 `aliases` | Array&lt;string&gt;
+`proposedAliases` | Array&lt;string&gt;
 `entityType` | string
 `notes` | string
 `refType` | string
@@ -31,6 +32,7 @@ const example = {
   "id": null,
   "term": null,
   "aliases": null,
+  "proposedAliases": null,
   "entityType": null,
   "notes": null,
   "refType": null,

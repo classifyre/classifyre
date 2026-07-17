@@ -1692,6 +1692,8 @@ model GlossaryTerm {
   id         String             @id @default(uuid())
   term       String             @unique
   aliases    String[]           @default([])
+  // Agent-suggested aliases stay out of lookup until an operator accepts them.
+  proposedAliases String[]      @default([]) @map("proposed_aliases")
   entityType GlossaryEntityType @default(TERM) @map("entity_type")
   notes      String?            @db.Text
   refType    String?            @map("ref_type")

@@ -71,6 +71,11 @@ export class CaseLeadsService {
     });
     if (!finding)
       throw new NotFoundException(`Finding ${input.findingId} not found`);
+    if (String(finding.status) !== 'OPEN') {
+      throw new BadRequestException(
+        `Finding ${input.findingId} has already been reviewed and cannot be proposed`,
+      );
+    }
     const alreadyEvidence = await this.prisma.caseFinding.findUnique({
       where: { caseId_findingId: { caseId, findingId: input.findingId } },
     });

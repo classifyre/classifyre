@@ -223,6 +223,29 @@ describe('EmbeddingQueueService', () => {
       expect.anything(),
       expect.anything(),
     );
+    expect(boss.send.mock.calls.at(-1)?.[2]).not.toHaveProperty('singletonKey');
+  });
+
+  it('reports whether recalibration was actually scheduled', async () => {
+    await service.onApplicationBootstrap();
+    expect(await service.scheduleRecalibration()).toBe(true);
+
+    boss.send.mockResolvedValueOnce(null);
+    expect(await service.scheduleRecalibration()).toBe(false);
+  });
+
+  it('reports an uninitialized queue as unscheduled', async () => {
+    const uninitialized = new EmbeddingQueueService(
+      prisma as never,
+      config as never,
+      provider as never,
+      embeddings as never,
+      pgBoss as never,
+      capability as never,
+    );
+
+    expect(await uninitialized.scheduleRecalibration()).toBe(false);
+    expect(boss.send).not.toHaveBeenCalled();
   });
 
   it('recalibrates the whole space once the inference queue drains', async () => {
