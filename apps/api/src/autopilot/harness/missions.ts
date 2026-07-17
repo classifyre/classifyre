@@ -23,11 +23,12 @@ const OBSERVE_TOOLS = [
   'cases.detail',
   'duplicates.summary',
   'memory.search',
+  'glossary.lookup',
   'system_brief.get',
 ];
 
 /** Learning tools available to every mission. */
-const KNOWLEDGE_TOOLS = ['memory.write'];
+const KNOWLEDGE_TOOLS = ['memory.write', 'glossary.propose'];
 
 /**
  * Semantic evidence tools: corpus-relative importance ranking with reasons,
@@ -89,6 +90,12 @@ const INVESTIGATION_CASE_TOOLS = [
   'fingerprints.value_occurrences',
   'fingerprints.recompute_asset',
   'cases.from_cluster',
+  // Lead triage + chronology: propose, don't silently mutate evidence.
+  'cases.list_leads',
+  'cases.propose_lead',
+  'cases.generate_leads',
+  'cases.list_events',
+  'cases.propose_event',
 ];
 
 const DOMAIN_PRIMER = [
@@ -132,9 +139,14 @@ export const CASE_MISSION: Mission = {
     'Create a case only when a coherent investigation is warranted; otherwise enrich an open case',
     'with hypotheses, evidence, attached findings, notes and links. Be conservative and specific.',
     TRIAGE_DOCTRINE,
-    '\nBefore cases.attach_findings, findings.explain each candidate — attach evidence, not noise.',
-    'When a case has confirmed evidence, findings.similar on it may surface related material across',
-    'sources worth attaching; verify each against its ranking reasons first.',
+    '\nLEADS vs EVIDENCE: cases.attach_findings is ONLY for findings you verified against source',
+    'evidence this cycle. For everything else that MIGHT belong — semantic neighbours, unreviewed',
+    'high-importance matches — cases.propose_lead with a specific rationale, so a human reviews it.',
+    'Check cases.list_leads first and never re-propose a DISMISSED finding. cases.generate_leads',
+    'gives a deterministic starting queue for a case with attached evidence.',
+    '\nCHRONOLOGY: when attached evidence states a dated real-world event (a flight, a filing, a',
+    'payment), cases.propose_event with the date, precision, cited findingIds and honest confidence.',
+    'Your events stay unverified until an operator confirms them — never fabricate dates.',
     '\nWIND DOWN: review each open case against its thread/findings. If it no longer holds up —',
     'false-positive findings, refuted hypotheses, or the issue is resolved — cases.close it with a',
     'clear conclusion explaining why (this also archives its linked inquiries). Close only when the',

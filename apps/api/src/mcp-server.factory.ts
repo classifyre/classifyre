@@ -37,6 +37,9 @@ import { PgBossService } from './scheduler/pg-boss.service';
 import { CORRELATION_QUEUE } from './correlation/correlation.constants';
 import { CaseThreadKind } from '@prisma/client';
 import { EmbeddingService } from './embedding/embedding.service';
+import { GlossaryService } from './glossary/glossary.service';
+import { CaseLeadsService } from './case-leads.service';
+import { CaseEventsService } from './case-events.service';
 
 const jsonObjectSchema = z.record(z.string(), z.unknown());
 
@@ -228,6 +231,9 @@ export class McpServerFactoryService {
     private readonly correlationService: CorrelationService,
     private readonly pgBossService: PgBossService,
     private readonly embeddingService: EmbeddingService,
+    private readonly glossaryService: GlossaryService,
+    private readonly caseLeadsService: CaseLeadsService,
+    private readonly caseEventsService: CaseEventsService,
   ) {}
 
   createServer(): McpServer {
@@ -248,7 +254,248 @@ export class McpServerFactoryService {
     this.registerInquiryTools(srv);
     this.registerCaseTools(srv);
     this.registerCorrelationTools(srv);
+    this.registerGlossaryTools(srv);
+    this.registerCaseLeadTools(srv);
     return server;
+  }
+
+  private registerCaseLeadTools(server: McpServerCompat) {
+    server.registerTool(
+      'list_case_leads',
+      {
+        title: 'List Case Leads',
+        description:
+          'List a case\'s lead queue: ranked exploration candidates (semantic neighbours, high-importance inquiry matches, agent proposals) awaiting accept/dismiss review, plus reviewed history.',
+        inputSchema: {
+          caseId: z.string().uuid(),
+          status: z.enum(['PROPOSED', 'ACCEPTED', 'DISMISSED']).optional(),
+        },
+        annotations: { readOnlyHint: true, idempotentHint: true },
+      },
+      async ({ caseId, status }) =>
+        jsonResult(await this.caseLeadsService.list(caseId, status)),
+    );
+
+    server.registerTool(
+      'propose_case_lead',
+      {
+        title: 'Propose Case Lead',
+        description:
+          'Propose a finding as a lead for a case (instead of attaching it as evidence directly). Leads are reviewed by a human; a dismissed lead is never re-proposed.',
+        inputSchema: {
+          caseId: z.string().uuid(),
+          findingId: z.string().uuid(),
+          rationale: z.string().min(1).max(2000),
+        },
+        annotations: { readOnlyHint: false, destructiveHint: false },
+      },
+      async ({ caseId, findingId, rationale }) => {
+        this.mcpToolExecutor.assertNotDemoMode();
+        return jsonResult(
+          await this.caseLeadsService.propose(caseId, {
+            findingId,
+            rationale,
+            origin: 'MANUAL',
+            proposedBy: 'mcp',
+          }),
+        );
+      },
+    );
+
+    server.registerTool(
+      'generate_case_leads',
+      {
+        title: 'Generate Case Leads',
+        description:
+          'Generate leads for a case from its own evidence: semantic neighbours of attached findings plus high-importance matches of linked inquiries. Bounded and idempotent (existing/dismissed leads are skipped).',
+        inputSchema: { caseId: z.string().uuid() },
+        annotations: { readOnlyHint: false, destructiveHint: false },
+      },
+      async ({ caseId }) => {
+        this.mcpToolExecutor.assertNotDemoMode();
+        return jsonResult(await this.caseLeadsService.generate(caseId, 'mcp'));
+      },
+    );
+
+    server.registerTool(
+      'review_case_lead',
+      {
+        title: 'Review Case Lead',
+        description:
+          'Accept a lead into case evidence (via the normal attach flow) or dismiss it. Dismissals are remembered as precedents so agents stop re-proposing the finding.',
+        inputSchema: {
+          caseId: z.string().uuid(),
+          leadId: z.string().uuid(),
+          action: z.enum(['ACCEPT', 'DISMISS']),
+          reason: z.string().max(1000).optional(),
+        },
+        annotations: { readOnlyHint: false, destructiveHint: false },
+      },
+      async ({ caseId, leadId, action, reason }) => {
+        this.mcpToolExecutor.assertNotDemoMode();
+        return jsonResult(
+          await this.caseLeadsService.review(
+            caseId,
+            leadId,
+            action,
+            'mcp',
+            reason,
+          ),
+        );
+      },
+    );
+
+    server.registerTool(
+      'list_case_events',
+      {
+        title: 'List Case Events',
+        description:
+          'List the case chronology: dated real-world events reconstructed from evidence, ordered by date. Distinct from get_case_timeline (the app activity/audit log).',
+        inputSchema: { caseId: z.string().uuid() },
+        annotations: { readOnlyHint: true, idempotentHint: true },
+      },
+      async ({ caseId }) =>
+        jsonResult(await this.caseEventsService.list(caseId)),
+    );
+
+    server.registerTool(
+      'create_case_event',
+      {
+        title: 'Create Case Event',
+        description:
+          'Add a dated real-world event to the case chronology. Cite the findingIds/evidenceIds the date came from; unsupported dates do not belong in a chronology.',
+        inputSchema: {
+          caseId: z.string().uuid(),
+          occurredAt: z.string().describe('ISO date or datetime'),
+          precision: z.enum(['DAY', 'MONTH', 'YEAR']).optional(),
+          title: z.string().min(1).max(300),
+          description: z.string().max(4000).optional(),
+          confidence: z.number().min(0).max(1).optional(),
+          findingIds: z.array(z.string()).optional(),
+          evidenceIds: z.array(z.string()).optional(),
+        },
+        annotations: { readOnlyHint: false, destructiveHint: false },
+      },
+      async ({ caseId, occurredAt, ...rest }) => {
+        this.mcpToolExecutor.assertNotDemoMode();
+        const when = new Date(occurredAt);
+        if (Number.isNaN(when.getTime())) {
+          throw new NotFoundException(`Invalid occurredAt: ${occurredAt}`);
+        }
+        return jsonResult(
+          await this.caseEventsService.create(
+            caseId,
+            { ...rest, occurredAt: when },
+            'mcp',
+            'OPERATOR',
+          ),
+        );
+      },
+    );
+
+    server.registerTool(
+      'delete_case_event',
+      {
+        title: 'Delete Case Event',
+        description: 'Remove an event from the case chronology.',
+        inputSchema: {
+          caseId: z.string().uuid(),
+          eventId: z.string().uuid(),
+        },
+        annotations: { readOnlyHint: false, destructiveHint: true },
+      },
+      async ({ caseId, eventId }) => {
+        this.mcpToolExecutor.assertNotDemoMode();
+        return jsonResult(
+          await this.caseEventsService.remove(caseId, eventId, 'mcp'),
+        );
+      },
+    );
+  }
+
+  private registerGlossaryTools(server: McpServerCompat) {
+    server.registerTool(
+      'list_glossary_terms',
+      {
+        title: 'List Glossary Terms',
+        description:
+          'List the shared investigation glossary: canonical terms, aliases, entity types and verification state. The vocabulary investigators and agents share.',
+        inputSchema: {
+          query: z.string().optional(),
+          entityType: z
+            .enum([
+              'PERSON',
+              'ORGANIZATION',
+              'LOCATION',
+              'REFERENCE',
+              'TERM',
+              'OTHER',
+            ])
+            .optional(),
+          take: z.number().int().min(1).max(200).optional(),
+          skip: z.number().int().min(0).optional(),
+        },
+        annotations: { readOnlyHint: true, idempotentHint: true },
+      },
+      async ({ query, entityType, take, skip }) =>
+        jsonResult(
+          await this.glossaryService.list({ query, entityType, take, skip }),
+        ),
+    );
+
+    server.registerTool(
+      'lookup_glossary',
+      {
+        title: 'Lookup Glossary',
+        description:
+          'Resolve a name, alias or concept against the glossary (exact, alias and semantic matching). Use before treating two spellings as separate entities.',
+        inputSchema: {
+          query: z.string().min(1).max(200),
+          limit: z.number().int().min(1).max(50).optional(),
+        },
+        annotations: { readOnlyHint: true, idempotentHint: true },
+      },
+      async ({ query, limit }) =>
+        jsonResult(await this.glossaryService.lookup(query, limit ?? 10)),
+    );
+
+    server.registerTool(
+      'upsert_glossary_term',
+      {
+        title: 'Upsert Glossary Term',
+        description:
+          'Create or update a glossary term (canonical name, aliases, entity type, notes). Terms written through MCP are operator-curated and verified.',
+        inputSchema: {
+          term: z.string().min(1).max(200),
+          aliases: z.array(z.string()).max(50).optional(),
+          entityType: z
+            .enum([
+              'PERSON',
+              'ORGANIZATION',
+              'LOCATION',
+              'REFERENCE',
+              'TERM',
+              'OTHER',
+            ])
+            .optional(),
+          notes: z.string().optional(),
+        },
+        annotations: { readOnlyHint: false, destructiveHint: false },
+      },
+      async ({ term, aliases, entityType, notes }) => {
+        this.mcpToolExecutor.assertNotDemoMode();
+        return jsonResult(
+          await this.glossaryService.upsert({
+            term,
+            aliases,
+            entityType,
+            notes,
+            origin: 'OPERATOR',
+            author: 'mcp',
+          }),
+        );
+      },
+    );
   }
 
   private registerResources(server: McpServerCompat) {

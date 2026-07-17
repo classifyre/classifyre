@@ -176,9 +176,13 @@ export class EmbeddingAnalysisService {
         const testValue = isKnownTestValue(finding.matchedContent);
         const repeatedDigits =
           !testValue && isRepeatedDigitPattern(finding.matchedContent);
+        // Recurrence is a lead only when the value reappears in DIFFERENT
+        // contexts: the same value inside identical context windows is a
+        // copied template/fixture, already handled as a duplicate group.
         const crossDocumentLead =
           !testValue &&
           !repeatedDigits &&
+          similarCount === 0 &&
           crossAssetCount >= 2 &&
           crossAssetCount <= RECURRENCE_HUB_CAP;
         const commonValue = crossAssetCount > RECURRENCE_HUB_CAP;
@@ -286,6 +290,7 @@ export class EmbeddingAnalysisService {
               detectorConfidence: Number(finding.confidence),
               crossAssetCount,
               crossSourceCount,
+              valueLength: normalizedValue.length,
               ...(similarCount > 0 ? { duplicateSimilarity: 1 } : {}),
             },
           },
@@ -302,6 +307,7 @@ export class EmbeddingAnalysisService {
               detectorConfidence: Number(finding.confidence),
               crossAssetCount,
               crossSourceCount,
+              valueLength: normalizedValue.length,
               ...(similarCount > 0 ? { duplicateSimilarity: 1 } : {}),
             },
             analyzedAt: new Date(),

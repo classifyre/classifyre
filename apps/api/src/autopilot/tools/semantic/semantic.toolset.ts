@@ -60,7 +60,7 @@ export class SemanticToolset {
         sideEffect: 'read',
         handler: async (input, tc) =>
           this.semantic.semanticSearch(
-            String(input.query ?? ''),
+            typeof input.query === 'string' ? input.query : '',
             (input.sourceId as string | undefined) ?? tc.ctx.sourceId ?? null,
             typeof input.limit === 'number' ? input.limit : undefined,
           ),
@@ -81,7 +81,7 @@ export class SemanticToolset {
         sideEffect: 'read',
         handler: async (input) =>
           this.semantic.similarFindings(
-            String(input.findingId ?? ''),
+            typeof input.findingId === 'string' ? input.findingId : '',
             typeof input.limit === 'number' ? input.limit : undefined,
           ),
       },
@@ -97,7 +97,9 @@ export class SemanticToolset {
         },
         sideEffect: 'read',
         handler: async (input) =>
-          this.semantic.explainFinding(String(input.findingId ?? '')),
+          this.semantic.explainFinding(
+            typeof input.findingId === 'string' ? input.findingId : '',
+          ),
       },
       {
         name: 'findings.boilerplate',
@@ -122,7 +124,9 @@ export class SemanticToolset {
           const sourceId =
             (input.sourceId as string | undefined) ?? tc.ctx.sourceId;
           if (!sourceId) {
-            return { error: 'sourceId is required outside a source-scoped run' };
+            return {
+              error: 'sourceId is required outside a source-scoped run',
+            };
           }
           return this.semantic.boilerplateClusters(
             sourceId,

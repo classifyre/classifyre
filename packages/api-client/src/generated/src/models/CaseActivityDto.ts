@@ -81,7 +81,13 @@ export const CaseActivityDtoActivityTypeEnum = {
     ThreadConfidenceChanged: 'THREAD_CONFIDENCE_CHANGED',
     SupportLinked: 'SUPPORT_LINKED',
     SupportUnlinked: 'SUPPORT_UNLINKED',
-    SupportUpdated: 'SUPPORT_UPDATED'
+    SupportUpdated: 'SUPPORT_UPDATED',
+    LeadProposed: 'LEAD_PROPOSED',
+    LeadAccepted: 'LEAD_ACCEPTED',
+    LeadDismissed: 'LEAD_DISMISSED',
+    EventAdded: 'EVENT_ADDED',
+    EventUpdated: 'EVENT_UPDATED',
+    EventRemoved: 'EVENT_REMOVED'
 } as const;
 export type CaseActivityDtoActivityTypeEnum = typeof CaseActivityDtoActivityTypeEnum[keyof typeof CaseActivityDtoActivityTypeEnum];
 

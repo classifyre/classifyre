@@ -118,10 +118,7 @@ export class AgentSemanticService {
     query: string,
     sourceId: string | null,
     limit = MAX_SEMANTIC_RESULTS,
-  ): Promise<
-    | { unavailable: string }
-    | { findings: CompactRankedFinding[] }
-  > {
+  ): Promise<{ unavailable: string } | { findings: CompactRankedFinding[] }> {
     let vector: number[];
     try {
       vector = await this.queryEmbedding.embed(query);
@@ -182,9 +179,7 @@ export class AgentSemanticService {
       status: String(row.status),
       value: truncate(row.matchedContent, MAX_SAMPLE_VALUE_LENGTH),
       similarity: this.round(row.similarity),
-      importance: this.round(
-        row.evidenceAnalysis?.importanceScore ?? null,
-      ),
+      importance: this.round(row.evidenceAnalysis?.importanceScore ?? null),
       reasons: this.reasonCodes(row.evidenceAnalysis?.reasons),
     }));
   }

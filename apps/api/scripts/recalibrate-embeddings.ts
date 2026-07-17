@@ -28,7 +28,7 @@ async function main() {
     }
     const analysis = new EmbeddingAnalysisService(prisma);
     const capability = {
-      ensureReady: async () => undefined,
+      ensureReady: () => Promise.resolve(undefined),
       hasVector: () => true,
       version: () => 'external',
     };

@@ -190,6 +190,26 @@ export class EmbeddingService implements OnApplicationBootstrap {
       select: { contentHash: true },
     });
     const presentSet = new Set(present.map((item) => item.contentHash));
+    // Self-heal: a vector that is already stored but whose finding lost its
+    // evidence analysis (manual deletion, partial failure) is re-analyzed as
+    // part of negotiation, so scans repair ranking coverage as they run.
+    if (presentSet.size) {
+      const unanalyzed = await this.prisma.finding.findMany({
+        where: {
+          embedContentHash: { in: [...presentSet] },
+          evidenceAnalysis: null,
+        },
+        select: { embedContentHash: true },
+        distinct: ['embedContentHash'],
+      });
+      const healHashes = unanalyzed
+        .map((row) => row.embedContentHash)
+        .filter((hash): hash is string => hash !== null);
+      if (healHashes.length) {
+        await this.analysis.analyzeHashes(space.id, healHashes);
+        await this.calibrateNeighborhood(space.id, healHashes);
+      }
+    }
     return {
       spaceId: space.id,
       missing: [...new Set(hashes)].filter((hash) => !presentSet.has(hash)),
@@ -370,11 +390,18 @@ export class EmbeddingService implements OnApplicationBootstrap {
         const qualityScore = neighborhoodReliable
           ? Math.max(0, Math.min(1, textQuality * 0.8 + meanSimilarity * 0.2))
           : textQuality;
+        // A tiny matched value ("LOCH", "=") is weak evidence however unusual
+        // its embedding looks; the outlier bonus needs substance to reward.
+        const valueLength = Number(
+          (analysis.signals as Record<string, unknown> | null)?.[
+            'valueLength'
+          ] ?? Number.MAX_SAFE_INTEGER,
+        );
         const outlierAdjustment = !neighborhoodReliable
           ? 0
           : textQuality < 0.55
             ? -semanticOutlier * 0.2
-            : semanticOutlier >= OUTLIER_BONUS_THRESHOLD
+            : semanticOutlier >= OUTLIER_BONUS_THRESHOLD && valueLength >= 5
               ? semanticOutlier * 0.12
               : 0;
         const duplicatePenalty = Math.min(0.15, nearDuplicates.length * 0.025);

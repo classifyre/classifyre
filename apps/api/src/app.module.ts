@@ -44,6 +44,12 @@ import { ChatGatewayService } from './chat-gateway/chat-gateway.service';
 import { ChatHarnessToolset } from './chat-gateway/chat-harness.toolset';
 import { ChatSessionService } from './chat-gateway/chat-session.service';
 import { EmbeddingModule } from './embedding/embedding.module';
+import { GlossaryController } from './glossary/glossary.controller';
+import { GlossaryService } from './glossary/glossary.service';
+import { CaseLeadsController } from './controllers/case-leads.controller';
+import { CaseEventsController } from './controllers/case-events.controller';
+import { CaseLeadsService } from './case-leads.service';
+import { CaseEventsService } from './case-events.service';
 
 // Import organized controllers
 import {
@@ -106,6 +112,9 @@ import {
     CaseThreadsController,
     GraphController,
     ChatBotsController,
+    GlossaryController,
+    CaseLeadsController,
+    CaseEventsController,
   ],
   providers: [
     { provide: APP_GUARD, useClass: DemoModeGuard },
@@ -145,6 +154,9 @@ import {
     ChatAgentService,
     ChatGatewayService,
     ChatBotsService,
+    GlossaryService,
+    CaseLeadsService,
+    CaseEventsService,
   ],
 })
 export class AppModule {}

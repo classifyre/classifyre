@@ -142,8 +142,7 @@ export class EmbeddingQueueService implements OnApplicationBootstrap {
     if (!this.queueName || !this.spaceId) return;
     const boss = await this.pgBoss.getBossAsync();
     const stats = await boss.getQueueStats(this.queueName);
-    const pending =
-      stats.queuedCount + stats.activeCount + stats.deferredCount;
+    const pending = stats.queuedCount + stats.activeCount + stats.deferredCount;
     if (pending > 0) {
       // Inference is still draining; push the pass back until the space is
       // stable so scores are computed against the full neighbourhood.

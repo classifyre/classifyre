@@ -891,6 +891,12 @@ enum CaseActivityType {
   SUPPORT_LINKED
   SUPPORT_UNLINKED
   SUPPORT_UPDATED
+  LEAD_PROPOSED
+  LEAD_ACCEPTED
+  LEAD_DISMISSED
+  EVENT_ADDED
+  EVENT_UPDATED
+  EVENT_REMOVED
 }
 
 enum EvidenceStance {
@@ -1078,11 +1084,92 @@ model Case {
   inquiryLinks CaseInquiry[]
   threads      CaseThread[]
   activities   CaseActivity[]
+  leads        CaseLead[]
+  events       CaseEvent[]
 
   @@index([status])
   @@index([severity])
   @@index([createdAt])
   @@map("cases")
+}
+
+// ── Case leads (exploration triage) ─────────────────────────────────────────
+// Ranked candidates that MIGHT belong in a case: semantic neighbours of
+// accepted evidence, high-importance inquiry matches, autopilot proposals, or
+// manual bookmarks. A lead is not evidence — accepting one creates the
+// CaseEvidence/CaseFinding through the normal attach flow; dismissing one is
+// remembered so agents stop re-proposing it.
+
+enum CaseLeadOrigin {
+  SEMANTIC_NEIGHBOR
+  INQUIRY
+  AUTOPILOT
+  MANUAL
+}
+
+enum CaseLeadStatus {
+  PROPOSED
+  ACCEPTED
+  DISMISSED
+}
+
+model CaseLead {
+  id        String         @id @default(uuid())
+  caseId    String         @map("case_id")
+  findingId String         @map("finding_id")
+  assetId   String?        @map("asset_id")
+  origin    CaseLeadOrigin
+  status    CaseLeadStatus @default(PROPOSED)
+  rationale String         @db.Text
+  // Snapshots at proposal time (findings may be reconciled later).
+  title      String
+  importance Float?
+  similarity Float?
+  proposedBy String    @map("proposed_by")
+  reviewedBy String?   @map("reviewed_by")
+  reviewedAt DateTime? @map("reviewed_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+
+  investigation Case @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@unique([caseId, findingId])
+  @@index([caseId, status])
+  @@map("case_leads")
+}
+
+// ── Case events (real-world chronology) ─────────────────────────────────────
+// Dated events extracted from evidence or entered by the investigator — the
+// investigation's chronology, distinct from CaseActivity (the audit trail of
+// who did what in the app).
+
+enum CaseEventPrecision {
+  DAY
+  MONTH
+  YEAR
+}
+
+model CaseEvent {
+  id          String             @id @default(uuid())
+  caseId      String             @map("case_id")
+  occurredAt  DateTime           @map("occurred_at")
+  precision   CaseEventPrecision @default(DAY)
+  title       String
+  description String?            @db.Text
+  confidence  Float?
+  origin      AgentMemoryOrigin  @default(OPERATOR)
+  verifiedAt  DateTime?          @map("verified_at")
+  verifiedBy  String?            @map("verified_by")
+  findingIds  String[]           @default([]) @map("finding_ids")
+  evidenceIds String[]           @default([]) @map("evidence_ids")
+  createdBy   String             @map("created_by")
+  createdAt   DateTime           @default(now()) @map("created_at")
+  updatedAt   DateTime           @updatedAt @map("updated_at")
+
+  investigation Case @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@index([caseId, occurredAt])
+  @@map("case_events")
 }
 
 // A saved query / monitor. It does NOT persist evidence — it only defines matchers

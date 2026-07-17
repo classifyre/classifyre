@@ -8,11 +8,19 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
-import { ApiAcceptedResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  ApiAcceptedResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiTags,
+} from '@nestjs/swagger';
 import { EmbeddingService } from './embedding.service';
 import {
+  BoilerplateClusterDto,
+  BoilerplateClustersQueryDto,
   EmbeddingReindexResponseDto,
   PutAssetChunksDto,
+  SimilarFindingDto,
   SimilarFindingsQueryDto,
 } from './dto/embedding.dto';
 import { EmbeddingQueueService } from './embedding-queue.service';
@@ -57,10 +65,28 @@ export class EmbeddingController {
   @ApiOperation({
     summary: 'Find semantically similar findings with ranking evidence',
   })
+  @ApiOkResponse({ type: [SimilarFindingDto] })
   similar(
     @Param('findingId') findingId: string,
     @Query() query: SimilarFindingsQueryDto,
   ) {
     return this.embeddings.similarFindings(findingId, query.limit);
+  }
+
+  @Get('sources/:sourceId/boilerplate-clusters')
+  @ApiOperation({
+    summary:
+      'Near-duplicate finding clusters in a source (repeated boilerplate)',
+  })
+  @ApiOkResponse({ type: [BoilerplateClusterDto] })
+  boilerplate(
+    @Param('sourceId') sourceId: string,
+    @Query() query: BoilerplateClustersQueryDto,
+  ) {
+    return this.embeddings.boilerplateClusters(
+      sourceId,
+      query.threshold,
+      query.limit,
+    );
   }
 }
