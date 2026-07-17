@@ -57,6 +57,7 @@ describe('CaseLeadsService', () => {
     prisma.caseLead.updateMany.mockResolvedValue({ count: 1 });
     prisma.finding.findUnique.mockResolvedValue({
       id: 'finding-1',
+      status: 'OPEN',
       assetId: 'asset-1',
       findingType: 'email',
       severity: 'HIGH',
@@ -68,6 +69,24 @@ describe('CaseLeadsService', () => {
     prisma.caseEvidence.upsert.mockResolvedValue({ id: 'evidence-1' });
     prisma.caseFinding.createMany.mockResolvedValue({ count: 1 });
     graph.inferEdgesForAsset.mockResolvedValue(undefined);
+  });
+
+  it('rejects a reviewed finding in direct proposal paths', async () => {
+    prisma.finding.findUnique.mockResolvedValue({
+      id: 'finding-1',
+      status: 'FALSE_POSITIVE',
+      assetId: 'asset-1',
+      evidenceAnalysis: null,
+    });
+
+    await expect(
+      service.propose('case-1', {
+        findingId: 'finding-1',
+        rationale: 'candidate',
+        origin: 'MANUAL',
+        proposedBy: 'analyst',
+      }),
+    ).rejects.toThrow('has already been reviewed');
   });
 
   it('claims acceptance and attaches evidence in one transaction', async () => {

@@ -210,7 +210,7 @@ export default function GlossaryPage() {
     setEditingTerm(term);
     setForm({
       term: term.term,
-      aliasesInput: term.aliases.join(", "),
+      aliasesInput: [...term.aliases, ...term.proposedAliases].join(", "),
       entityType: term.entityType,
       notes: term.notes ?? "",
     });
@@ -427,7 +427,8 @@ export default function GlossaryPage() {
 
                       {/* Aliases */}
                       <TableCell className="max-w-[260px] py-3">
-                        {term.aliases.length > 0 ? (
+                        {term.aliases.length > 0 ||
+                        term.proposedAliases.length > 0 ? (
                           <div className="flex flex-wrap gap-1">
                             {term.aliases.map((alias) => (
                               <Badge
@@ -436,6 +437,15 @@ export default function GlossaryPage() {
                                 className="rounded-[4px] text-[11px]"
                               >
                                 {alias}
+                              </Badge>
+                            ))}
+                            {term.proposedAliases.map((alias) => (
+                              <Badge
+                                key={`proposed-${alias}`}
+                                variant="outline"
+                                className="rounded-[4px] border-amber-500/30 bg-amber-50 text-[11px] text-amber-700 dark:bg-amber-950/30 dark:text-amber-400"
+                              >
+                                {alias} · {t("glossary.suggested")}
                               </Badge>
                             ))}
                           </div>

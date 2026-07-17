@@ -38,6 +38,12 @@ export interface GlossaryLookupHitDto {
      */
     aliases: Array<string>;
     /**
+     * Unverified aliases suggested by agents for operator review
+     * @type {Array<string>}
+     * @memberof GlossaryLookupHitDto
+     */
+    proposedAliases: Array<string>;
+    /**
      * 
      * @type {string}
      * @memberof GlossaryLookupHitDto
@@ -137,6 +143,7 @@ export function instanceOfGlossaryLookupHitDto(value: object): value is Glossary
     if (!('id' in value) || value['id'] === undefined) return false;
     if (!('term' in value) || value['term'] === undefined) return false;
     if (!('aliases' in value) || value['aliases'] === undefined) return false;
+    if (!('proposedAliases' in value) || value['proposedAliases'] === undefined) return false;
     if (!('entityType' in value) || value['entityType'] === undefined) return false;
     if (!('origin' in value) || value['origin'] === undefined) return false;
     if (!('verified' in value) || value['verified'] === undefined) return false;
@@ -159,6 +166,7 @@ export function GlossaryLookupHitDtoFromJSONTyped(json: any, ignoreDiscriminator
         'id': json['id'],
         'term': json['term'],
         'aliases': json['aliases'],
+        'proposedAliases': json['proposedAliases'],
         'entityType': json['entityType'],
         'notes': json['notes'] == null ? undefined : json['notes'],
         'refType': json['refType'] == null ? undefined : json['refType'],
@@ -187,6 +195,7 @@ export function GlossaryLookupHitDtoToJSONTyped(value?: GlossaryLookupHitDto | n
         'id': value['id'],
         'term': value['term'],
         'aliases': value['aliases'],
+        'proposedAliases': value['proposedAliases'],
         'entityType': value['entityType'],
         'notes': value['notes'],
         'refType': value['refType'],

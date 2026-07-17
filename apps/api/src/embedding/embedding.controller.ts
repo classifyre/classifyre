@@ -101,9 +101,8 @@ export class EmbeddingController {
       'Schedule a full evidence-ranking recalibration pass (importance scores, outliers, near-duplicate groups)',
   })
   @ApiAcceptedResponse({ type: EmbeddingRecalibrateResponseDto })
-  recalibrate(): EmbeddingRecalibrateResponseDto {
-    this.queue.scheduleRecalibration();
-    return { scheduled: true };
+  async recalibrate(): Promise<EmbeddingRecalibrateResponseDto> {
+    return { scheduled: await this.queue.scheduleRecalibration() };
   }
 
   @Get('sources/:sourceId/boilerplate-clusters')

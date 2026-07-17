@@ -115,6 +115,12 @@ export class GlossaryTermDto {
   @ApiProperty({ type: [String] })
   aliases!: string[];
 
+  @ApiProperty({
+    type: [String],
+    description: 'Unverified aliases suggested by agents for operator review',
+  })
+  proposedAliases!: string[];
+
   @ApiProperty({ enum: GlossaryEntityType })
   entityType!: GlossaryEntityType;
 
@@ -146,7 +152,7 @@ export class GlossaryTermDto {
 export class UpsertGlossaryTermResponseDto extends GlossaryTermDto {
   @ApiPropertyOptional({
     description:
-      'True when an agent proposal only merged aliases into an operator-owned term',
+      'True when an agent alias proposal was stored for an operator-owned term',
   })
   merged?: boolean;
 }

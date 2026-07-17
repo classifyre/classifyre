@@ -51,6 +51,7 @@
     },
     "unverifiedAgent": "Unverified · agent",
     "verified": "Verified",
+    "suggested": "suggested",
     "verify": "Verify",
     "edit": "Edit",
     "delete": "Delete",
