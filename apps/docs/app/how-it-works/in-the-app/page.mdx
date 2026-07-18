@@ -1,0 +1,142 @@
+---
+title: A Tour of the App
+description: Every screen in the Classifyre app, what it's for, and where to learn more — Discovery, Sources, Scans, Assets, Findings, Fingerprints, Investigations, Glossary, and beyond.
+---
+
+# A Tour of the App
+
+Classifyre's left-hand navigation is organised around one journey: **connect
+systems, scan them, review what was found, and investigate what matters**. This
+page walks through every screen in that order — what it shows, what you do
+there, and where the deeper documentation lives.
+
+---
+
+## Discovery
+
+**Your at-a-glance overview.** Discovery is the landing dashboard: total
+findings over the last 7, 30, or 90 days, broken down by severity and status,
+plus the assets carrying the most risk and the most recent scan runs. Use it to
+answer *"how are we doing?"* in ten seconds, then click any number to jump
+straight to the filtered detail view behind it.
+
+> Severity counts, status counts, and top assets are all clickable — Discovery
+> is a launchpad, not just a report.
+
+## Sources
+
+**The systems you've connected.** Each source is a connection to something you
+already run — SharePoint, Confluence, Jira, a database, a file share, a local
+folder. Here you add new sources, test their connection, choose which detectors
+run on them, and set scan schedules.
+
+Learn more: **[Sources](/sources/)** — including the full
+[catalog of source types](/sources/) and
+[configuration fields](/sources/configuration/).
+
+## Scans
+
+**Every run, past and present.** A scan is one pass over a source. This screen
+shows run history and live progress, counts by status (running, queued,
+completed, failed), and trends over time. You can also start a scan manually
+with the scan wizard.
+
+Learn more: **[Scans](/flow/)** — the journey of a scan, its phases, and what
+repeat scans do.
+
+## Assets
+
+**Everything your scans have found.** Every document, page, file, or record a
+scan registers becomes an asset with metadata — owner, location, when it last
+changed. The Assets screen is the inventory: filter by new, updated, or
+unchanged, and see which assets carry the most findings.
+
+Learn more: **[Assets & Metadata](/sources/assets-and-metadata/)**.
+
+## Findings
+
+**The signals worth acting on.** Whenever a detector spots something — a leaked
+secret, personal data, a policy violation — it raises a finding with a severity
+and a confidence. This screen is where you triage: filter by severity, source,
+or status, and resolve, ignore, or mark false positive in bulk. Your decisions
+stick across future scans.
+
+Learn more: **[Findings & Results](/detectors/findings/)** and
+**[Detectors](/detectors/)**.
+
+## Fingerprints
+
+**The same thing, seen everywhere.** Fingerprints link assets that share
+concrete values — an email address, an ID, a name — and cluster near-duplicate
+content. The graph view shows how records connect across systems; a cluster can
+be turned into a case in one click.
+
+Learn more: **[Fingerprints](/investigations/fingerprints/)** and the
+plain-English
+[Connections & Fingerprints](/how-it-works/connections-and-fingerprints/).
+
+## Investigations
+
+**Where findings become answers.** Two tools live here: **inquiries** — saved
+questions that keep watching for matching findings — and **cases** — structured
+workspaces where you collect evidence, weigh hypotheses, build a timeline, and
+write a conclusion.
+
+Learn more: **[Investigations](/investigations/)**,
+**[Inquiry](/investigations/inquiry/)**, and
+**[Cases](/investigations/cases/)**.
+
+## Glossary
+
+**Your shared vocabulary.** The glossary holds the people, organisations,
+locations, and terms that matter to your organisation, with their aliases. It
+keeps humans and AI agents talking about the same entities — and when the
+autopilot proposes a new term or alias, you review and verify it here.
+
+Learn more: **[Glossary & Shared Vocabulary](/how-it-works/glossary/)**.
+
+## Harness
+
+**Mission control for the AI autopilot.** The harness shows everything the
+autopilot does: a live activity timeline, per-run flight recordings with the
+reasoning behind each decision, token usage, the agents and tools available,
+and what the system has learned. It's also where you configure how much
+autonomy the autopilot gets.
+
+Learn more: **[Autopilot](/investigations/autopilot/)** and its
+[flight recorder](/investigations/autopilot/flight-recorder/) and
+[steering](/investigations/autopilot/steering/) pages.
+
+## Sandbox
+
+**A safe place to experiment.** Sandbox runs scans in isolation, without
+touching your real findings — useful for trying out a new source configuration
+or detector before turning it on for real.
+
+## Notifications
+
+**The events worth telling you about.** Failed scans, sudden spikes or drops in
+findings, recoveries, and first-scan completions land here (and in the bell at
+the top right). Filter by severity or type, mark items important, and jump
+straight to the affected scan or finding.
+
+Learn more: **[Notifications](/notifications/)**.
+
+## Settings
+
+**Instance-wide configuration.** Language and timezone, the AI assistant
+toggle, AI provider credentials (OpenAI-compatible, Claude, Gemini), and the
+MCP server that lets your own tools query Classifyre.
+
+Learn more: **[Settings](/settings/)**,
+**[AI Providers](/settings/ai-providers/)**, and
+**[MCP Server](/settings/mcp-server/)**.
+
+---
+
+## Where to next
+
+- Follow the data end to end in
+  **[From Documents to Findings](/how-it-works/documents-to-findings/)**.
+- See how the results get worked in **[Investigations](/investigations/)**.
+- Ready to connect something? Start with the **[source catalog](/sources/)**.
