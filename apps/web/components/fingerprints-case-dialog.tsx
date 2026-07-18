@@ -13,6 +13,7 @@ import {
   DialogTitle,
 } from "@workspace/ui/components/dialog";
 import { Button } from "@workspace/ui/components/button";
+import { Checkbox } from "@workspace/ui/components/checkbox";
 import { Input } from "@workspace/ui/components/input";
 import { Label } from "@workspace/ui/components/label";
 import { Textarea } from "@workspace/ui/components/textarea";
@@ -36,17 +37,22 @@ const SEVERITIES = ["LOW", "MEDIUM", "HIGH", "CRITICAL"] as const;
 
 /**
  * Create a case (or add to an existing one) from the assets currently visible
- * in the fingerprints graph. Adds them as evidence and optionally attaches their
- * findings — handled server-side and logged as a DUPLICATES run.
+ * in the fingerprints graph. A noise-filter checklist (all checked by default)
+ * lets the operator drop irrelevant assets before attaching. Adds them as
+ * evidence and optionally attaches their findings — handled server-side and
+ * logged as a DUPLICATES run.
  */
 export function FingerprintsCaseDialog({
   open,
   onOpenChange,
   assetIds,
+  assetLabel,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   assetIds: string[];
+  /** Resolve an asset id to its display name for the noise-filter checklist. */
+  assetLabel?: (id: string) => string;
 }) {
   const { t } = useTranslation();
   const router = useRouter();
@@ -58,6 +64,8 @@ export function FingerprintsCaseDialog({
   const [cases, setCases] = React.useState<CaseResponseDto[]>([]);
   const [caseId, setCaseId] = React.useState("");
   const [busy, setBusy] = React.useState(false);
+  // Noise filter: which of the target assets actually get attached.
+  const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set());
 
   React.useEffect(() => {
     if (!open) return;
@@ -67,11 +75,26 @@ export function FingerprintsCaseDialog({
     setSeverity("MEDIUM");
     setAttachFindings(true);
     setCaseId("");
+    setSelectedIds(new Set(assetIds));
     api.cases
       .casesControllerList({})
       .then((r) => setCases(r.items ?? []))
       .catch(() => setCases([]));
-  }, [open]);
+  }, [open, assetIds]);
+
+  const chosenIds = React.useMemo(
+    () => assetIds.filter((id) => selectedIds.has(id)),
+    [assetIds, selectedIds],
+  );
+
+  const toggleAsset = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   const submit = async () => {
     if (mode === "new" && !title.trim()) {
@@ -86,7 +109,7 @@ export function FingerprintsCaseDialog({
     try {
       const res = await api.correlation.correlationControllerCaseAction({
         caseActionRequestDto: {
-          assetIds,
+          assetIds: chosenIds,
           attachFindings,
           ...(mode === "existing"
             ? { caseId }
@@ -114,9 +137,37 @@ export function FingerprintsCaseDialog({
         <DialogHeader>
           <DialogTitle>{t("correlation.caseAction.title")}</DialogTitle>
           <DialogDescription>
-            {t("correlation.caseAction.desc", { count: String(assetIds.length) })}
+            {t("correlation.caseAction.desc", { count: String(chosenIds.length) })}
           </DialogDescription>
         </DialogHeader>
+
+        {/* Noise filter: uncheck assets that shouldn't land in the case. */}
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between">
+            <Label>{t("correlation.caseAction.assetChecklist")}</Label>
+            <span className="text-[11px] text-muted-foreground">
+              {t("correlation.caseAction.assetChecklistCount", {
+                selected: String(chosenIds.length),
+                total: String(assetIds.length),
+              })}
+            </span>
+          </div>
+          <ul className="max-h-44 space-y-0.5 overflow-y-auto rounded-[4px] border border-border/60 p-1.5">
+            {assetIds.map((id) => (
+              <li key={id}>
+                <label className="flex cursor-pointer items-center gap-2 rounded-[3px] px-1.5 py-1 text-xs hover:bg-muted/50">
+                  <Checkbox
+                    checked={selectedIds.has(id)}
+                    onCheckedChange={() => toggleAsset(id)}
+                  />
+                  <span className="min-w-0 flex-1 truncate" title={assetLabel?.(id) ?? id}>
+                    {assetLabel?.(id) ?? id}
+                  </span>
+                </label>
+              </li>
+            ))}
+          </ul>
+        </div>
 
         <Tabs value={mode} onValueChange={(v) => setMode(v as "new" | "existing")}>
           <TabsList className="w-full">
@@ -192,7 +243,7 @@ export function FingerprintsCaseDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>
             {t("common.cancel")}
           </Button>
-          <Button onClick={submit} disabled={busy || assetIds.length === 0}>
+          <Button onClick={submit} disabled={busy || chosenIds.length === 0}>
             {busy ? t("correlation.caseAction.working") : t("correlation.caseAction.submit")}
           </Button>
         </DialogFooter>

@@ -112,7 +112,15 @@ export function InquiryMatchesTable({
                 </span>
               </TableHead>
             )}
-            {["Finding", "Severity", "Asset", "Source", "Matched content", "Matched"].map(
+            {[
+              "Importance",
+              "Finding",
+              "Severity",
+              "Asset",
+              "Source",
+              "Matched content",
+              "Matched",
+            ].map(
               (h) => (
                 <TableHead key={h} className="bg-white/95 dark:bg-card/95">
                   <span className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
@@ -128,6 +136,9 @@ export function InquiryMatchesTable({
             const inCase = inCaseFindingIds?.has(m.findingId) ?? false;
             const isSelected = selectable && selected!.has(m.findingId);
             const SourceTypeIcon = getSourceIcon(m.sourceType);
+            const leadReason =
+              m.ranking?.reasons.find((reason) => reason.impact !== "neutral") ??
+              m.ranking?.reasons[0];
             return (
               <TableRow
                 key={m.findingId}
@@ -154,6 +165,53 @@ export function InquiryMatchesTable({
                     </div>
                   </TableCell>
                 )}
+                <TableCell>
+                  {m.ranking?.importance != null ? (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="min-w-[130px] cursor-default space-y-1.5">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-mono text-xs font-semibold">
+                              {Math.round(m.ranking.importance * 100)}
+                            </span>
+                            {m.ranking.similarCount > 0 && (
+                              <Badge
+                                variant="outline"
+                                className="rounded-[3px] px-1.5 py-0 text-[10px]"
+                              >
+                                +{m.ranking.similarCount} similar
+                              </Badge>
+                            )}
+                          </div>
+                          <div className="h-1.5 overflow-hidden rounded-[2px] bg-muted">
+                            <div
+                              className="h-full bg-accent"
+                              style={{
+                                width: `${Math.round(m.ranking.importance * 100)}%`,
+                              }}
+                            />
+                          </div>
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-[320px] space-y-1">
+                        {m.ranking.reasons.map((reason) => (
+                          <div key={reason.code}>
+                            {reason.impact === "up"
+                              ? "+"
+                              : reason.impact === "down"
+                                ? "-"
+                                : "·"}{" "}
+                            {reason.label}
+                          </div>
+                        ))}
+                      </TooltipContent>
+                    </Tooltip>
+                  ) : (
+                    <span className="font-mono text-[10px] text-muted-foreground">
+                      Pending
+                    </span>
+                  )}
+                </TableCell>
                 <TableCell className="max-w-[300px]">
                   <div className="flex items-center gap-2">
                     <button
@@ -221,6 +279,11 @@ export function InquiryMatchesTable({
                     </Tooltip>
                   ) : (
                     <span className="text-xs text-muted-foreground">—</span>
+                  )}
+                  {leadReason && (
+                    <span className="mt-1 block max-w-[200px] truncate text-[10px] text-muted-foreground">
+                      {leadReason.label}
+                    </span>
                   )}
                 </TableCell>
                 <TableCell>
