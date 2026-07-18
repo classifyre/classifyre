@@ -13,15 +13,60 @@ export interface Namespace {
   lastOpenedAt: string;
   /** Fixed API port; undefined = allocate dynamically on open. */
   apiPort?: number;
-  /** Advanced: cap on concurrent scans (passed to the API as MAX_PARALLEL_SCANS). */
+  /** Advanced: cap on concurrent scans (passed to the API as MAX_CONCURRENT_RUNNERS). */
   maxParallelScans?: number;
   /** Advanced: Node heap limit for the API process, in MB. */
   memoryLimitMb?: number;
+  /** Custom environment variables injected into this workspace's API process. */
+  env?: Record<string, string>;
 }
 
 export type NamespaceUpdate = Partial<
-  Pick<Namespace, 'name' | 'remoteUrl' | 'apiPort' | 'maxParallelScans' | 'memoryLimitMb'>
+  Pick<Namespace, 'name' | 'remoteUrl' | 'apiPort' | 'maxParallelScans' | 'memoryLimitMb' | 'env'>
 >;
+
+// Env vars the desktop app itself manages (ports, paths, secrets, process
+// wiring). Letting a workspace override these would break or hijack the
+// runtime, so they are rejected at save time — everything else (EMBEDDING_*,
+// runner limits, feature flags…) is fair game and wins over the defaults.
+export const RESERVED_ENV_KEYS = new Set([
+  'PORT',
+  'DATABASE_URL',
+  'PATH',
+  'NODE_ENV',
+  'ENVIRONMENT',
+  'ELECTRON_RUN_AS_NODE',
+  'CLASSIFYRE_AUTO_MIGRATE',
+  'CLASSIFYRE_MASKED_CONFIG_KEY',
+  'CLI_PATH',
+  'VENV_PATH',
+  'UV_PROJECT_ENVIRONMENT',
+  'UV_CACHE_DIR',
+  'RUNNER_LOG_DIR',
+  'CORS_ORIGIN',
+]);
+
+const ENV_KEY_PATTERN = /^[A-Za-z_][A-Za-z0-9_]{0,63}$/;
+const ENV_MAX_VARS = 50;
+const ENV_MAX_VALUE_LENGTH = 4096;
+
+export function validateCustomEnv(env: Record<string, string>): void {
+  const entries = Object.entries(env);
+  if (entries.length > ENV_MAX_VARS) {
+    throw new Error(`Too many environment variables (max ${ENV_MAX_VARS})`);
+  }
+  for (const [key, value] of entries) {
+    if (!ENV_KEY_PATTERN.test(key)) {
+      throw new Error(`Invalid environment variable name: "${key}"`);
+    }
+    if (RESERVED_ENV_KEYS.has(key.toUpperCase())) {
+      throw new Error(`"${key}" is managed by the app and cannot be overridden`);
+    }
+    if (typeof value !== 'string' || value.length > ENV_MAX_VALUE_LENGTH) {
+      throw new Error(`Value for "${key}" must be a string of at most ${ENV_MAX_VALUE_LENGTH} characters`);
+    }
+  }
+}
 
 // A remote workspace is a full Classifyre server the app renders in a trusted
 // tab, so plaintext HTTP would let a network attacker rewrite the page and
@@ -129,6 +174,15 @@ export class NamespaceManager {
     if (patch.remoteUrl !== undefined && ns.type === 'remote') {
       assertValidRemoteUrl(patch.remoteUrl);
       ns.remoteUrl = patch.remoteUrl;
+    }
+    if ('env' in patch) {
+      const env = patch.env;
+      if (env === undefined || env === null || Object.keys(env).length === 0) {
+        delete ns.env;
+      } else {
+        validateCustomEnv(env);
+        ns.env = { ...env };
+      }
     }
     for (const key of ['apiPort', 'maxParallelScans', 'memoryLimitMb'] as const) {
       if (!(key in patch)) continue;

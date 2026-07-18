@@ -77,8 +77,8 @@ async function main(): Promise<void> {
       { timeout: 30_000 },
     );
     await selector.evaluate(() => {
+      // Opens the create dialog (or re-opens it in local mode on first run).
       (document.getElementById('new-workspace-btn') as HTMLButtonElement).click();
-      (document.getElementById('choose-local') as HTMLButtonElement).click();
       const input = document.getElementById('new-name') as HTMLInputElement;
       input.value = 'smoketest';
       input.dispatchEvent(new Event('input', { bubbles: true }));
