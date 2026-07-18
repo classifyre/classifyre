@@ -157,16 +157,15 @@ test('namespace selector shows with Classifyre branding', async () => {
   // Logo is visible
   await selector.locator('.logo img').waitFor({ state: 'visible', timeout: 5_000 });
 
-  // Empty state shows the create chooser inline
-  await selector.locator('#choose-local').waitFor({ state: 'visible', timeout: 5_000 });
+  // Empty state auto-opens the create dialog (local mode preselected)
+  await selector.locator('#segment-local').waitFor({ state: 'visible', timeout: 5_000 });
 });
 
 test('can create a workspace', async () => {
   const selector = await findSelectorPage();
 
-  await selector.locator('#choose-local').waitFor({ state: 'visible', timeout: 10_000 });
-  await selector.click('#choose-local');
-  await selector.locator('#new-name').waitFor({ state: 'visible', timeout: 5_000 });
+  // First run: the create dialog is already open with Local selected.
+  await selector.locator('#new-name').waitFor({ state: 'visible', timeout: 10_000 });
   await selector.fill('#new-name', 'E2E Test Workspace');
   await selector.click('#create-btn');
 
@@ -175,16 +174,13 @@ test('can create a workspace', async () => {
 });
 
 test('can open workspace and see web UI with sidebar', async () => {
-  const selector = await findSelectorPage();
-
-  // The whole card is clickable and opens the workspace.
-  const card = selector.locator('.namespace-item').first();
-  await card.waitFor({ state: 'visible', timeout: 5_000 });
-  await card.click();
-
-  // In the tabbed architecture, a new WebContentsView is created for the namespace.
-  // Playwright sees it as a new "window". Wait for it.
-  const namespaceWindow = await electronApp.waitForEvent('window', { timeout: 90_000 });
+  // "Create & open" boots the workspace right after creation — wait for the
+  // namespace WebContentsView (Playwright surfaces it as a window) instead of
+  // clicking the card, which is busy showing open progress.
+  const namespaceWindow = await waitForPage(
+    (url) => url.startsWith('http://localhost:3000') || url.startsWith('app://'),
+    180_000,
+  );
 
   await namespaceWindow.waitForLoadState('networkidle', { timeout: 60_000 });
 

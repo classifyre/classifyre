@@ -8,6 +8,20 @@ import crypto from "crypto";
 import treeKill from "tree-kill";
 import { ensurePythonRuntime } from "./python-env.js";
 import { getLogFilePath } from "./logger.js";
+import { RESERVED_ENV_KEYS } from "./namespace-manager.js";
+
+function sanitizeCustomEnv(
+  env: Record<string, string> | undefined,
+): Record<string, string> {
+  if (!env) return {};
+  const out: Record<string, string> = {};
+  for (const [key, value] of Object.entries(env)) {
+    if (RESERVED_ENV_KEYS.has(key.toUpperCase())) continue;
+    if (typeof value !== "string") continue;
+    out[key] = value;
+  }
+  return out;
+}
 
 // In dev mode we inherit the developer's login-shell PATH so locally installed
 // tooling (uv, java, node) is visible. In packaged mode we never touch the
@@ -154,6 +168,8 @@ async function dirSizeExceeds(dir: string, limit: number): Promise<boolean> {
 export interface ApiRuntimeOptions {
   maxParallelScans?: number;
   memoryLimitMb?: number;
+  /** Custom env vars (already validated against RESERVED_ENV_KEYS at save time). */
+  env?: Record<string, string>;
 }
 
 interface ManagedProcess {
@@ -402,8 +418,20 @@ export class ProcessManager {
         CORS_ORIGIN: "*",
         NODE_ENV: app.isPackaged ? "production" : "development",
         ...(options.maxParallelScans && options.maxParallelScans > 0
-          ? { MAX_PARALLEL_SCANS: String(Math.floor(options.maxParallelScans)) }
+          ? {
+              // MAX_CONCURRENT_RUNNERS is the name the API actually reads;
+              // MAX_PARALLEL_SCANS is kept for older bundled API builds.
+              MAX_PARALLEL_SCANS: String(Math.floor(options.maxParallelScans)),
+              MAX_CONCURRENT_RUNNERS: String(
+                Math.floor(options.maxParallelScans),
+              ),
+            }
           : {}),
+        // Workspace-level custom env (embedding model, runner limits, feature
+        // flags…). Spread last so user overrides win over the tunable defaults
+        // above; keys that would break the runtime are rejected at save time
+        // and defensively stripped here (namespaces.json is hand-editable).
+        ...sanitizeCustomEnv(options.env),
       },
       stdio: ["ignore", "pipe", "pipe"],
     });

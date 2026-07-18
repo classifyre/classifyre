@@ -27,12 +27,20 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('namespace:delete', id),
   updateNamespace: (id: string, patch: Record<string, unknown>) =>
     ipcRenderer.invoke('namespace:update', id, patch),
-  openNamespace: (id: string) =>
-    ipcRenderer.invoke('namespace:open', id),
+  openNamespace: (id: string, options?: { activate?: boolean }) =>
+    ipcRenderer.invoke('namespace:open', id, options),
   closeNamespace: (id: string) =>
     ipcRenderer.invoke('namespace:close', id),
   isNamespaceOpen: (id: string) =>
     ipcRenderer.invoke('namespace:is-open', id),
+  getNamespaceThumbnail: (id: string) =>
+    ipcRenderer.invoke('namespace:thumbnail', id),
+  // Real open-lifecycle progress (db → schema → migrate → api → interface →
+  // done/error), including opens started from the tray, menu, or session
+  // restore — the selector cards animate from these instead of guessing.
+  onOpenProgress: (cb: (data: { namespaceId: string; stage: string }) => void) => {
+    ipcRenderer.on('namespace:open-progress', (_event, data) => cb(data));
+  },
 
   // Tab operations
   switchTab: (id: string) => ipcRenderer.invoke('tab:switch', id),

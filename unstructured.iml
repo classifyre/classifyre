@@ -16,6 +16,7 @@
       <excludeFolder url="file://$MODULE_DIR$/packages/schemas/.venv" />
       <excludeFolder url="file://$MODULE_DIR$/.claude/worktrees/hopeful-cohen/apps/cli/.venv" />
       <excludeFolder url="file://$MODULE_DIR$/.claude/worktrees/hopeful-cohen/packages/schemas/.venv" />
+      <excludeFolder url="file://$MODULE_DIR$/.claude/worktrees/code-review-workflow-580237/apps/cli/.venv" />
     </content>
     <orderEntry type="sourceFolder" forTests="false" />
   </component>
