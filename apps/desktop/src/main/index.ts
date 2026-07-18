@@ -8,6 +8,7 @@ import { registerIpcHandlers } from './ipc-handlers.js';
 import { registerNotificationHandlers } from './notification-service.js';
 import { registerAppProtocol } from './protocol-handler.js';
 import { SettingsManager } from './settings-manager.js';
+import { SessionStore } from './session-store.js';
 import { UpdateChecker } from './update-checker.js';
 import { initFileLogging } from './logger.js';
 import { buildApplicationMenu } from './menu.js';
@@ -45,6 +46,7 @@ let namespaceManager: NamespaceManager;
 let settingsManager: SettingsManager;
 let processManager: ProcessManager;
 let runtime: NamespaceRuntime;
+let sessionStore: SessionStore;
 let updateChecker: UpdateChecker;
 let tray: AppTray | null = null;
 let isQuitting = false;
@@ -164,8 +166,15 @@ function createMainWindow(): BrowserWindow {
 
   // Without background mode a closed window means "stop": tear down the
   // running workspaces so a recreated window doesn't hold destroyed views.
+  // The session snapshot from before the close survives (saves suppressed
+  // during teardown), so the next launch restores what was open.
   win.on('closed', () => {
-    if (!isQuitting) void runtime.closeAll();
+    if (isQuitting) return;
+    sessionStore.suppress();
+    void runtime
+      .closeAll()
+      .catch((err) => console.error('Teardown after window close failed:', err))
+      .finally(() => sessionStore.resume());
   });
 
   return win;
@@ -195,6 +204,7 @@ app.on('ready', async () => {
   }
 
   settingsManager = new SettingsManager();
+  sessionStore = new SessionStore();
   pg = new PostgresManager(settingsManager.get().postgresPort);
   namespaceManager = new NamespaceManager();
   processManager = new ProcessManager();
@@ -205,6 +215,16 @@ app.on('ready', async () => {
     isDev,
     getPreloadPath(),
   );
+
+  // Snapshot the previous session before the state-change hook below starts
+  // rewriting it, then keep it continuously up to date.
+  const previousSession = sessionStore.load();
+  runtime.onStateChange(() => {
+    sessionStore.save({
+      openIds: [...runtime.getRunning().keys()],
+      activeTabId: runtime.getActiveTabId(),
+    });
+  });
 
   updateChecker = new UpdateChecker();
   registerIpcHandlers(runtime, namespaceManager, settingsManager, updateChecker, pg);
@@ -250,6 +270,31 @@ app.on('ready', async () => {
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
+
+  // Bring last session back: reopen every workspace that was running when the
+  // app was last closed, then land on the tab the user was looking at.
+  // Sequential on purpose — concurrent first opens would race Prisma's
+  // database-level migration advisory lock. Selector cards animate each open
+  // via the namespace:open-progress events.
+  const restoreIds = previousSession.openIds.filter((id) => namespaceManager.get(id));
+  if (restoreIds.length > 0) {
+    void (async () => {
+      for (const id of restoreIds) {
+        try {
+          // Background start: don't flip through tabs while restoring.
+          await runtime.open(id, { activate: false });
+        } catch (err) {
+          console.error(`[session-restore] failed to reopen workspace ${id}:`, err);
+        }
+      }
+      const { activeTabId } = previousSession;
+      if (activeTabId === '__selector__') {
+        runtime.showSelector();
+      } else if (activeTabId && runtime.isOpen(activeTabId)) {
+        runtime.switchToTab(activeTabId);
+      }
+    })();
+  }
 });
 
 app.on('second-instance', () => {
@@ -286,6 +331,9 @@ app.on('before-quit', (e) => {
   }, 30_000);
 
   tray?.destroy();
+  // Teardown closes every workspace — keep the pre-quit snapshot so the next
+  // launch restores the session instead of starting empty.
+  sessionStore?.suppress();
   Promise.resolve()
     .then(() => runtime?.closeAll())
     .then(() => pg?.stop())

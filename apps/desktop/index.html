@@ -7,108 +7,160 @@
   <link rel="stylesheet" href="src/renderer/namespace-selector/styles.css" />
 </head>
 <body>
-  <div class="container">
-    <header>
-      <div class="logo">
-        <img src="src/renderer/namespace-selector/clasifyre_icon.png" alt="Classifyre" />
+  <div class="board">
+    <header class="board-header">
+      <div class="brand">
+        <div class="logo">
+          <img src="src/renderer/namespace-selector/clasifyre_icon.png" alt="Classifyre" />
+        </div>
+        <div class="brand-text">
+          <h1>Classifyre</h1>
+          <p class="subtitle">Case files &amp; investigations</p>
+        </div>
       </div>
-      <h1>Classifyre</h1>
-      <p class="subtitle">Select a workspace or create a new one</p>
+      <!-- Kept id: smoke tests key off new-workspace-section/new-workspace-btn. -->
+      <div id="new-workspace-section" class="header-actions hidden">
+        <button id="new-workspace-btn" class="btn btn-outline">＋ New workspace</button>
+      </div>
     </header>
 
-    <div id="namespace-list" class="namespace-list">
-      <div class="loading">Loading workspaces…</div>
+    <div id="namespace-list" class="namespace-grid">
+      <div class="loading">Opening the filing cabinet…</div>
     </div>
 
-    <div id="new-workspace-section" class="new-workspace-section hidden">
-      <button id="new-workspace-btn" class="btn btn-primary btn-wide">＋ New workspace</button>
-
-      <div id="create-chooser" class="create-panel hidden">
-        <button class="choice-card" id="choose-local">
-          <span class="choice-title">Create local</span>
-          <span class="choice-desc">Runs fully on this computer with its own database</span>
-        </button>
-        <button class="choice-card" id="choose-remote">
-          <span class="choice-title">Connect to remote</span>
-          <span class="choice-desc">Open an existing Classifyre server by URL</span>
-        </button>
-        <button class="btn btn-ghost" id="create-cancel">Cancel</button>
-      </div>
-
-      <div id="create-local-form" class="create-panel hidden">
-        <div class="create-section">
-          <input type="text" id="new-name" placeholder="Workspace name" maxlength="64" autocomplete="off" />
-          <button id="create-btn" class="btn btn-primary">Create</button>
-        </div>
-        <button class="btn btn-ghost" id="local-back">Back</button>
-      </div>
-
-      <div id="create-remote-form" class="create-panel hidden">
-        <div class="create-section">
-          <input type="url" id="remote-url" placeholder="Remote URL (e.g. https://demo.classifyre.com)" autocomplete="off" />
-          <button id="connect-btn" class="btn btn-primary">Connect</button>
-        </div>
-        <button class="btn btn-ghost" id="remote-back">Back</button>
-      </div>
+    <div id="empty-state" class="empty-state hidden">
+      <div class="empty-badge">Case № 001</div>
+      <h2>Every investigation starts with an empty desk</h2>
+      <p>Create a workspace — a private case file with its own database — or connect to a remote Classifyre server.</p>
     </div>
+  </div>
 
-    <div id="settings-overlay" class="modal-overlay hidden">
-      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="settings-title">
-        <div class="modal-header">
-          <div class="modal-title" id="settings-title">Workspace settings</div>
-          <button class="modal-close" id="settings-close" aria-label="Close">×</button>
+  <!-- ============ New-workspace dialog ============ -->
+  <div id="create-overlay" class="modal-overlay hidden">
+    <div class="modal modal-narrow" role="dialog" aria-modal="true" aria-labelledby="create-title">
+      <div class="modal-header">
+        <div class="modal-title" id="create-title">New workspace</div>
+        <button class="modal-close" id="create-close" aria-label="Close">×</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="segmented" role="tablist" aria-label="Workspace type">
+          <button class="segment active" id="segment-local" role="tab" aria-selected="true">
+            <span class="segment-title">Local</span>
+            <span class="segment-desc">Own database on this machine</span>
+          </button>
+          <button class="segment" id="segment-remote" role="tab" aria-selected="false">
+            <span class="segment-title">Remote</span>
+            <span class="segment-desc">Existing Classifyre server</span>
+          </button>
         </div>
 
-        <div class="modal-body">
+        <div id="create-local-fields">
           <label class="field">
-            <span class="field-label">Name</span>
-            <input type="text" id="settings-name" maxlength="64" autocomplete="off" />
+            <span class="field-label">Case name</span>
+            <input type="text" id="new-name" placeholder="e.g. Operation Nightingale" maxlength="64" autocomplete="off" />
           </label>
-
-          <label class="field" id="settings-remote-url-field">
-            <span class="field-label">Remote URL</span>
-            <input type="url" id="settings-remote-url" autocomplete="off" />
-          </label>
-
-          <div id="settings-local-fields">
-            <label class="field">
-              <span class="field-label">API port</span>
-              <input type="number" id="settings-api-port" min="1024" max="65535" placeholder="auto" />
-              <span class="field-hint">Fixed port for the backend API — set one if an MCP server or other tool needs a stable URL. Leave empty for automatic.</span>
-            </label>
-
-            <details class="advanced">
-              <summary>Advanced</summary>
-              <label class="field">
-                <span class="field-label">Max parallel scans</span>
-                <input type="number" id="settings-max-scans" min="1" max="64" placeholder="default" />
-              </label>
-              <label class="field">
-                <span class="field-label">API memory limit (MB)</span>
-                <input type="number" id="settings-memory" min="256" max="32768" step="256" placeholder="default" />
-              </label>
-            </details>
-          </div>
-
-          <div class="global-section" id="settings-global-section">
-            <div class="global-heading">Application (all workspaces)</div>
-            <label class="field">
-              <span class="field-label">Database port</span>
-              <input type="number" id="settings-db-port" min="1024" max="65535" />
-              <span class="field-hint">Preferred port for the embedded database. If busy, the next free port is used automatically. Applies after restarting the app.</span>
-            </label>
-          </div>
-
-          <div class="settings-error hidden" id="settings-error"></div>
-          <div class="settings-hint hidden" id="settings-restart-hint">This workspace is open — changes apply the next time it starts.</div>
         </div>
 
-        <div class="modal-footer">
-          <button class="btn btn-danger" id="settings-delete">Delete workspace</button>
-          <div class="modal-footer-right">
-            <button class="btn btn-ghost" id="settings-cancel">Cancel</button>
-            <button class="btn btn-primary" id="settings-save">Save</button>
+        <div id="create-remote-fields" class="hidden">
+          <label class="field">
+            <span class="field-label">Server URL</span>
+            <input type="url" id="remote-url" placeholder="https://demo.classifyre.com" autocomplete="off" />
+            <span class="field-hint">https:// required (http:// only for localhost)</span>
+          </label>
+        </div>
+
+        <div class="settings-error hidden" id="create-error"></div>
+      </div>
+
+      <div class="modal-footer modal-footer-end">
+        <button class="btn btn-ghost" id="create-cancel">Cancel</button>
+        <button class="btn btn-primary" id="create-btn">Create &amp; open</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ Workspace settings dialog ============ -->
+  <div id="settings-overlay" class="modal-overlay hidden">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+      <div class="modal-header">
+        <div class="modal-title" id="settings-title">Workspace settings</div>
+        <button class="modal-close" id="settings-close" aria-label="Close">×</button>
+      </div>
+
+      <div class="modal-body">
+        <label class="field">
+          <span class="field-label">Name</span>
+          <input type="text" id="settings-name" maxlength="64" autocomplete="off" />
+        </label>
+
+        <label class="field hidden" id="settings-remote-url-field">
+          <span class="field-label">Remote URL</span>
+          <input type="url" id="settings-remote-url" autocomplete="off" />
+        </label>
+
+        <div id="settings-local-fields">
+          <label class="field">
+            <span class="field-label">API port</span>
+            <input type="number" id="settings-api-port" min="1024" max="65535" placeholder="auto" />
+            <span class="field-hint">Fixed port for the backend API — set one if an MCP server or other tool needs a stable URL. Leave empty for automatic.</span>
+          </label>
+
+          <div class="env-section">
+            <div class="env-heading">
+              <span class="field-label">Environment variables</span>
+              <button class="btn btn-ghost btn-small" id="env-add">＋ Add variable</button>
+            </div>
+            <span class="field-hint">Injected into this workspace's backend — tune the embedding model, runner limits, feature flags. Reserved runtime variables are rejected.</span>
+            <div id="env-rows" class="env-rows"></div>
+            <datalist id="env-suggestions">
+              <option value="EMBEDDING_PROVIDER">transformers-js (local) or openai-compatible</option>
+              <option value="EMBEDDING_MODEL">Embedding model id, e.g. Xenova/all-MiniLM-L6-v2</option>
+              <option value="EMBEDDING_MODEL_REVISION">Pinned model revision</option>
+              <option value="EMBEDDING_DIMENSIONS">Vector dimensions (1–2000)</option>
+              <option value="EMBEDDING_BASE_URL">OpenAI-compatible embeddings endpoint</option>
+              <option value="EMBEDDING_API_KEY">API key for the remote embedding provider</option>
+              <option value="EMBEDDING_BATCH_SIZE">Embedding batch size (1–256)</option>
+              <option value="EMBEDDING_ALLOW_REMOTE_MODELS">true / false — allow model downloads</option>
+              <option value="MAX_CONCURRENT_RUNNERS">Cap on concurrent scans (0 = unlimited)</option>
+              <option value="MAX_RUNNERS_PER_SOURCE">Completed runs kept per source</option>
+              <option value="RUNNER_RETENTION_DAYS">Days of scan history to keep</option>
+              <option value="RUNNER_LOG_MAX_MB_PER_RUN">Max log size per scan run (MB)</option>
+              <option value="DEMO_MODE">true — make workspace read-only</option>
+            </datalist>
           </div>
+
+          <details class="advanced">
+            <summary>Advanced</summary>
+            <label class="field">
+              <span class="field-label">Max parallel scans</span>
+              <input type="number" id="settings-max-scans" min="1" max="64" placeholder="default" />
+            </label>
+            <label class="field">
+              <span class="field-label">API memory limit (MB)</span>
+              <input type="number" id="settings-memory" min="256" max="32768" step="256" placeholder="default" />
+            </label>
+          </details>
+        </div>
+
+        <div class="global-section" id="settings-global-section">
+          <div class="global-heading">Application (all workspaces)</div>
+          <label class="field">
+            <span class="field-label">Database port</span>
+            <input type="number" id="settings-db-port" min="1024" max="65535" />
+            <span class="field-hint">Preferred port for the embedded database. If busy, the next free port is used automatically. Applies after restarting the app.</span>
+          </label>
+        </div>
+
+        <div class="settings-error hidden" id="settings-error"></div>
+        <div class="settings-hint hidden" id="settings-restart-hint">This workspace is running — saving will restart it so the changes apply.</div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-danger" id="settings-delete">Delete workspace</button>
+        <div class="modal-footer-right">
+          <button class="btn btn-ghost" id="settings-cancel">Cancel</button>
+          <button class="btn btn-primary" id="settings-save">Save</button>
         </div>
       </div>
     </div>

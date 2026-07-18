@@ -4,8 +4,12 @@ import { PostgresManager } from './postgres-manager.js';
 import { ProcessManager } from './process-manager.js';
 import { NamespaceManager, assertValidRemoteUrl, type Namespace } from './namespace-manager.js';
 import { getAvailablePort } from './port-manager.js';
+import { captureViewThumbnail } from './thumbnails.js';
 
 const TAB_BAR_HEIGHT = 44;
+
+/** Lifecycle stages of a workspace open, streamed to the selector page. */
+export type OpenStage = 'db' | 'schema' | 'migrate' | 'api' | 'interface' | 'done' | 'error';
 
 interface RunningNamespace {
   namespace: Namespace;
@@ -42,29 +46,52 @@ export class NamespaceRuntime {
     this.selectorView = view;
   }
 
-  async open(namespaceId: string): Promise<RunningNamespace> {
+  /**
+   * Starts a namespace (idempotent). `activate: false` powers it on in the
+   * background — tab appears, processes run — without leaving the current tab;
+   * used by the selector's power switch and session restore.
+   */
+  async open(namespaceId: string, options: { activate?: boolean } = {}): Promise<RunningNamespace> {
+    const activate = options.activate !== false;
     const existing = this.running.get(namespaceId);
     if (existing) {
-      this.switchToTab(namespaceId);
+      if (activate) this.switchToTab(namespaceId);
       return existing;
     }
 
     const ns = this.namespaceManager.get(namespaceId);
     if (!ns) throw new Error(`Namespace ${namespaceId} not found`);
 
+    try {
+      return await this.doOpen(namespaceId, ns, activate);
+    } catch (err) {
+      this.emitOpenProgress(namespaceId, 'error');
+      throw err;
+    }
+  }
+
+  private async doOpen(
+    namespaceId: string,
+    ns: Namespace,
+    activate: boolean,
+  ): Promise<RunningNamespace> {
     let apiPort = 0;
     let view: WebContentsView;
     let loaded: Promise<void>;
 
     if (ns.type === 'remote' && ns.remoteUrl) {
+      this.emitOpenProgress(namespaceId, 'interface');
       ({ view, loaded } = this.createRemoteView(ns));
     } else {
       if (!this.pg.isRunning()) {
+        this.emitOpenProgress(namespaceId, 'db');
         await this.pg.start();
       }
 
+      this.emitOpenProgress(namespaceId, 'schema');
       await this.pg.createSchema(ns.schemaName);
       const databaseUrl = this.pg.getConnectionString(ns.schemaName);
+      this.emitOpenProgress(namespaceId, 'migrate');
       await this.processManager.runMigrations(databaseUrl);
 
       if (ns.apiPort) {
@@ -81,11 +108,14 @@ export class NamespaceRuntime {
       } else {
         apiPort = await getAvailablePort();
       }
+      this.emitOpenProgress(namespaceId, 'api');
       await this.processManager.startApi(namespaceId, apiPort, databaseUrl, {
         maxParallelScans: ns.maxParallelScans,
         memoryLimitMb: ns.memoryLimitMb,
+        env: ns.env,
       });
 
+      this.emitOpenProgress(namespaceId, 'interface');
       ({ view, loaded } = this.createNamespaceView(ns, apiPort));
     }
 
@@ -109,10 +139,21 @@ export class NamespaceRuntime {
     const entry: RunningNamespace = { namespace: ns, apiPort, view };
     this.running.set(namespaceId, entry);
 
-    this.switchToTab(namespaceId);
+    this.emitOpenProgress(namespaceId, 'done');
+    if (activate) this.switchToTab(namespaceId);
     this.notifyTabBar();
 
     return entry;
+  }
+
+  /**
+   * Streams open-lifecycle stages to the selector page so its cards can show
+   * real progress (instead of timer-driven guesses) — including for opens
+   * initiated from the tray, menu, or session restore.
+   */
+  private emitOpenProgress(namespaceId: string, stage: OpenStage): void {
+    if (!this.selectorView || this.selectorView.webContents.isDestroyed()) return;
+    this.selectorView.webContents.send('namespace:open-progress', { namespaceId, stage });
   }
 
   /** Registers a listener fired whenever tabs/running state changes. */
@@ -299,6 +340,12 @@ export class NamespaceRuntime {
 
   switchToTab(tabId: string): void {
     console.log(`[runtime] switchToTab: ${tabId}, running tabs: ${[...this.running.keys()].join(', ')}`);
+    // Snapshot the tab being left while its view is still painted — this is
+    // what the selector cards show as the workspace thumbnail.
+    if (this.activeTabId && this.activeTabId !== tabId) {
+      const leaving = this.running.get(this.activeTabId);
+      if (leaving) void captureViewThumbnail(this.activeTabId, leaving.view);
+    }
     this.activeTabId = tabId;
     // After the window is destroyed (background-off close path) the views are
     // gone too — only the bookkeeping above should happen.
@@ -328,6 +375,12 @@ export class NamespaceRuntime {
   async close(namespaceId: string): Promise<void> {
     const entry = this.running.get(namespaceId);
     if (!entry) return;
+
+    // Snapshot before teardown so a stopped workspace still shows its last
+    // state on the selector card. Only the active view is reliably painted.
+    if (this.activeTabId === namespaceId) {
+      await captureViewThumbnail(namespaceId, entry.view);
+    }
 
     this.running.delete(namespaceId);
 
