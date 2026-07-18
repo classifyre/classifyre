@@ -12,23 +12,23 @@
 # on the develop branch and will not exist on Docker Hub.
 api:
   image:
-    tag: "0.4.8"  # <REQUIRED> pin to a released tag
+    tag: "0.4.8" # <REQUIRED> pin to a released tag
 
   maskedConfigEncryption:
     # Pre-create: kubectl create secret generic classifyre-api-secrets \
     #   --from-literal=CLASSIFYRE_MASKED_CONFIG_KEY=$(openssl rand -hex 16) -n <namespace>
-    existingSecret: classifyre-api-secrets  # <REQUIRED>
+    existingSecret: classifyre-api-secrets # <REQUIRED>
     secretKey: CLASSIFYRE_MASKED_CONFIG_KEY
 
   cliJobs:
     image:
-      tag: "0.4.8"  # <REQUIRED> pin to a released tag
+      tag: "0.4.8" # <REQUIRED> pin to a released tag
     enabled: true
     cleanupPolicy: always
 
 frontend:
   image:
-    tag: "0.4.8"  # <REQUIRED> pin to a released tag
+    tag: "0.4.8" # <REQUIRED> pin to a released tag
 
   service:
     type: ClusterIP
@@ -36,7 +36,7 @@ frontend:
 ingress:
   enabled: true
   className: nginx
-  host: classifyre.example.com  # <REQUIRED>
+  host: classifyre.example.com # <REQUIRED>
   tls:
     - hosts:
         - classifyre.example.com
@@ -46,39 +46,36 @@ ingress:
 # Use mode=cnpg (CloudNativePG) or mode=external for production.
 # mode=embedded has no HA, no backups, and data is lost if the pod is rescheduled.
 postgres:
-  mode: external  # <REQUIRED> cnpg or external for production
+  mode: external # <REQUIRED> cnpg or external for production
   connection:
     sslMode: require
   external:
-    host: postgres.example.internal  # <REQUIRED>
+    host: postgres.example.internal # <REQUIRED>
     port: 5432
     database: classifyre
     username: classifyre
     # Pre-create: kubectl create secret generic classifyre-db \
     #   --from-literal=password=<your-password> -n <namespace>
-    existingSecret: classifyre-db  # <REQUIRED>
+    existingSecret: classifyre-db # <REQUIRED>
     existingSecretPasswordKey: password
 
 # ── Object Storage (S3-compatible) ───────────────────────────────────────────
-# REQUIRED for production: without S3, runner logs are not persisted and
-# sandbox uploads are lost on pod restart.
+# REQUIRED for production if runner logs must be persisted.
 # Pre-create: kubectl create secret generic classifyre-s3-credentials \
 #   --from-literal=access-key-id=<id> --from-literal=secret-access-key=<secret> -n <namespace>
 #
 # Option A — AWS S3:
 objectStorage:
-  enabled: true  # <REQUIRED>
-  bucket: classifyre-logs       # <REQUIRED> create this bucket first
-  sandboxBucket: classifyre-sandbox  # <REQUIRED> create this bucket first
-  region: us-east-1             # <REQUIRED>
+  enabled: true # <REQUIRED>
+  bucket: classifyre-logs # <REQUIRED> create this bucket first
+  region: us-east-1 # <REQUIRED>
   forcePathStyle: false
-  existingSecret: classifyre-s3-credentials  # <REQUIRED>
+  existingSecret: classifyre-s3-credentials # <REQUIRED>
 #
 # Option B — Backblaze B2 (uncomment and remove Option A above):
 # objectStorage:
 #   enabled: true
 #   bucket: classifyre-logs
-#   sandboxBucket: classifyre-sandbox
 #   endpoint: "https://s3.us-west-004.backblazeb2.com"
 #   region: us-west-004
 #   existingSecret: classifyre-s3-credentials
@@ -87,7 +84,6 @@ objectStorage:
 # objectStorage:
 #   enabled: true
 #   bucket: classifyre-logs
-#   sandboxBucket: classifyre-sandbox
 #   endpoint: "http://minio.minio-ns.svc.cluster.local:9000"
 #   forcePathStyle: true
 #   existingSecret: classifyre-s3-credentials

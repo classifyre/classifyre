@@ -133,10 +133,13 @@ export class SourceService {
     const encryptedConfig = this.maskedConfigCryptoService.encryptMaskedConfig(
       normalizedIncomingConfig,
     );
-    const existingSource = await this.findExistingSourceByConfig(
-      assetType,
-      normalizedIncomingConfig,
-    );
+    const existingSource =
+      assetType === AssetType.SANDBOX
+        ? null
+        : await this.findExistingSourceByConfig(
+            assetType,
+            normalizedIncomingConfig,
+          );
 
     if (existingSource) {
       return existingSource;

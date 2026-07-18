@@ -33,6 +33,7 @@ import { TestConnectionResponseDto } from '../dto/test-connection-response.dto';
 import { SearchSourcesRequestDto } from '../dto/search-sources-request.dto';
 import { SearchSourcesResponseDto } from '../dto/search-sources-response.dto';
 import { AllowInDemoMode } from '../demo-mode.decorator';
+import { SourceFilesService } from '../source-files.service';
 
 @Controller('sources')
 @ApiTags('Sources')
@@ -43,6 +44,7 @@ export class SourcesController {
     private readonly customDetectorsService: CustomDetectorsService,
     private readonly cliRunnerService: CliRunnerService,
     private readonly schedulerService: SchedulerService,
+    private readonly sourceFilesService: SourceFilesService,
   ) {}
 
   @Post()
@@ -688,6 +690,7 @@ export class SourcesController {
   async testConnection(
     @Param('id') id: string,
   ): Promise<TestConnectionResponseDto> {
+    await this.sourceFilesService.assertHasFiles(id);
     const result = await this.cliRunnerService.testConnection(id);
     return result as TestConnectionResponseDto;
   }
@@ -714,6 +717,7 @@ export class SourcesController {
     if (!source) {
       throw new NotFoundException(`Source with ID ${id} not found`);
     }
+    await this.sourceFilesService.assertHasFiles(id);
     await this.cliRunnerService.startRun(id);
 
     const updatedSource = await this.sourceService.source({ id });

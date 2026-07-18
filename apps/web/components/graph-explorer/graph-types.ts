@@ -42,7 +42,9 @@ export interface PathResult {
 import { FINDING_SEVERITY_COLOR_BY_ENUM } from "@workspace/ui/lib/finding-severity";
 
 /** Severity → fill color, shared with the findings table badges. */
-export const SEVERITY_COLORS: Record<string, string> = { ...FINDING_SEVERITY_COLOR_BY_ENUM };
+export const SEVERITY_COLORS: Record<string, string> = {
+  ...FINDING_SEVERITY_COLOR_BY_ENUM,
+};
 
 /** Black or white text for legibility on a given hex fill. */
 export function contrastText(hex: string): string {
@@ -65,7 +67,9 @@ export function contrastText(hex: string): string {
 export function findingCategoryCode(node: GraphNodeDto): string {
   const custom = node.customDetectorName?.trim();
   const name =
-    node.detectorType?.toUpperCase() === "CUSTOM" && custom ? custom : (node.detectorType ?? "");
+    node.detectorType?.toUpperCase() === "CUSTOM" && custom
+      ? custom
+      : (node.detectorType ?? "");
   const words = name.split(/[\s_-]+/).filter(Boolean);
   if (words.length === 0) return "?";
   if (words.length === 1) {
@@ -129,8 +133,6 @@ export function nodeRadius(node: GraphNodeDto): number {
   switch (node.type) {
     case "finding":
       return 13;
-    case "sandbox":
-      return 20;
     case "cluster":
       return Math.min(60, Math.max(24, 18 + 4 * Math.sqrt(clusterSize(node))));
     default:

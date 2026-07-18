@@ -9,17 +9,14 @@
  *  3. Upload the normalized fortune_500 training CSV → verify examples staged
  *  4. Save the detector → redirect to detail page
  *  5. Trigger training from the detail page → wait for SUCCEEDED run
- *  6. Sandbox scan: upload a text snippet about Fortune 500 companies
- *     with the custom detector enabled → verify COMPLETED + findings appear
- *     with data-detector-type="CUSTOM"
- *  7. Cleanup: delete the detector
+ *  6. Cleanup: delete the detector
  *
  * Selectors: data-testid attributes only.
  * Fixture: apps/e2e/assets/fortune_500.csv (raw Fortune 500 data — normalized here)
  */
 
 import * as path from "path";
-import { test, expect, type Page, type Locator } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
 
 // ── Paths ──────────────────────────────────────────────────────────────────────
 
@@ -38,69 +35,19 @@ const FORTUNE_500_TRAINING_CSV = path.resolve(
   "../assets/fortune_500_training.csv",
 );
 
-// ── Sandbox fixture text ───────────────────────────────────────────────────────
-
-/**
- * Short text mentioning several Fortune 500 companies with revenue/rank
- * figures that the GLiNER2 detector should find as entities.
- */
-const FORTUNE_SCAN_TEXT = `
-Fortune 500 Executive Summary — Q4 Analysis
-
-Walmart topped the Fortune 500 for the third consecutive year, reporting revenues
-of $485,873 million with a workforce exceeding 2,300,000 employees worldwide.
-
-Berkshire Hathaway ranked second on the list, generating $223,604 million in revenues,
-a 6.1% increase over the prior period driven by insurance and railroad divisions.
-
-Apple, ranked third, saw revenues of $215,639 million despite a 7.7% decline linked
-to a slowdown in iPhone demand across key international markets.
-
-Exxon Mobil fell to fourth place with $205,004 million in revenues as energy prices
-normalised following the prior year's commodity surge.
-
-McKesson rounded out the top five at $192,487 million, benefiting from strong
-pharmaceutical distribution demand and a 6.2% revenue uplift.
-`.trim();
-
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
 function uniqueSuffix(): string {
   return Date.now().toString(36);
 }
 
-async function waitForToast(page: Page, pattern: string | RegExp): Promise<void> {
+async function waitForToast(
+  page: Page,
+  pattern: string | RegExp,
+): Promise<void> {
   await expect(
     page.locator("[data-sonner-toaster] li").filter({ hasText: pattern }),
   ).toBeVisible({ timeout: 30_000 });
-}
-
-async function waitForRunTerminal(page: Page, fileName: string): Promise<string> {
-  const row = page
-    .locator('[data-testid="sandbox-run-row"]')
-    .filter({ hasText: fileName })
-    .first();
-
-  await expect(row).toBeVisible({ timeout: 30_000 });
-
-  const statusBadge = row.locator('[data-testid="run-status-badge"]');
-  await expect(statusBadge).toHaveAttribute(
-    "data-status",
-    /^(COMPLETED|ERROR)$/,
-    { timeout: 300_000 },
-  );
-  return (await statusBadge.getAttribute("data-status")) ?? "UNKNOWN";
-}
-
-async function expandRunRow(page: Page, fileName: string): Promise<Locator> {
-  const row = page
-    .locator('[data-testid="sandbox-run-row"]')
-    .filter({ hasText: fileName })
-    .first();
-  await row.click();
-  const detail = page.locator('[data-testid="findings-detail"]').first();
-  await expect(detail).toBeVisible({ timeout: 10_000 });
-  return detail;
 }
 
 // ── Suite ──────────────────────────────────────────────────────────────────────
@@ -138,11 +85,15 @@ test.describe("GLiNER2 Pipeline Detector — Fortune 500 NER", () => {
     await page.goto("/detectors/new");
 
     // Select GLiNER2 type
-    await expect(page.locator('[data-testid="method-card-gliner2"]')).toBeVisible({ timeout: 10_000 });
+    await expect(
+      page.locator('[data-testid="method-card-gliner2"]'),
+    ).toBeVisible({ timeout: 10_000 });
     await page.locator('[data-testid="method-card-gliner2"]').click();
 
     // Editor should appear
-    await expect(page.locator('[data-testid="gliner2-name"]')).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('[data-testid="gliner2-name"]')).toBeVisible({
+      timeout: 10_000,
+    });
 
     // Fill identity
     await page.locator('[data-testid="gliner2-name"]').fill(detectorName);
@@ -151,17 +102,30 @@ test.describe("GLiNER2 Pipeline Detector — Fortune 500 NER", () => {
     // ── Add entities ──────────────────────────────────────────────────────────
 
     const entities = [
-      { label: "company_name", description: "Name of a company, e.g. Walmart or Apple" },
-      { label: "revenue", description: "Annual revenue figure, e.g. $485,873 million" },
-      { label: "rank", description: "Fortune 500 ranking position, e.g. #1 or ranked 3rd" },
+      {
+        label: "company_name",
+        description: "Name of a company, e.g. Walmart or Apple",
+      },
+      {
+        label: "revenue",
+        description: "Annual revenue figure, e.g. $485,873 million",
+      },
+      {
+        label: "rank",
+        description: "Fortune 500 ranking position, e.g. #1 or ranked 3rd",
+      },
     ];
 
     for (const entity of entities) {
-      await page.locator('[data-testid="gliner2-entity-label-input"]').fill(entity.label);
+      await page
+        .locator('[data-testid="gliner2-entity-label-input"]')
+        .fill(entity.label);
       await page.locator('[data-testid="gliner2-add-entity-btn"]').click();
 
       // Description field should appear after adding
-      const descInput = page.locator(`[data-testid="gliner2-entity-desc-${entity.label}"]`);
+      const descInput = page.locator(
+        `[data-testid="gliner2-entity-desc-${entity.label}"]`,
+      );
       await expect(descInput).toBeVisible({ timeout: 5_000 });
       await descInput.fill(entity.description);
     }
@@ -173,23 +137,31 @@ test.describe("GLiNER2 Pipeline Detector — Fortune 500 NER", () => {
 
     // Click the Training nav step to scroll into view
     await page.evaluate(() => {
-      const el = document.querySelector('[data-testid="gliner2-training-file-input"]');
+      const el = document.querySelector(
+        '[data-testid="gliner2-training-file-input"]',
+      );
       el?.scrollIntoView({ behavior: "instant", block: "center" });
     });
 
-    await page.locator('[data-testid="gliner2-training-file-input"]').setInputFiles(
-      FORTUNE_500_TRAINING_CSV,
-    );
+    await page
+      .locator('[data-testid="gliner2-training-file-input"]')
+      .setInputFiles(FORTUNE_500_TRAINING_CSV);
 
     // Parse result appears inline (no toast) — wait for it
-    await expect(page.locator('[data-testid="gliner2-parse-result"]')).toBeVisible({ timeout: 30_000 });
+    await expect(
+      page.locator('[data-testid="gliner2-parse-result"]'),
+    ).toBeVisible({ timeout: 30_000 });
 
     // Staged examples list must also appear
-    await expect(page.locator('[data-testid="gliner2-staged-examples"]')).toBeVisible({ timeout: 10_000 });
+    await expect(
+      page.locator('[data-testid="gliner2-staged-examples"]'),
+    ).toBeVisible({ timeout: 10_000 });
 
     // ── Save the detector ─────────────────────────────────────────────────────
 
-    await expect(page.locator('[data-testid="gliner2-submit-btn"]')).not.toBeDisabled({ timeout: 10_000 });
+    await expect(
+      page.locator('[data-testid="gliner2-submit-btn"]'),
+    ).not.toBeDisabled({ timeout: 10_000 });
     await page.locator('[data-testid="gliner2-submit-btn"]').click();
 
     // Toast: detector created
@@ -204,18 +176,27 @@ test.describe("GLiNER2 Pipeline Detector — Fortune 500 NER", () => {
 
   // ── 2. Train from detail page ──────────────────────────────────────────────
 
-  test("triggers training and waits for a terminal training run", async ({ page }) => {
-    expect(detectorId, "Detector must have been created by previous test").not.toBeNull();
+  test("triggers training and waits for a terminal training run", async ({
+    page,
+  }) => {
+    expect(
+      detectorId,
+      "Detector must have been created by previous test",
+    ).not.toBeNull();
 
     await page.goto(`/detectors/${detectorId}`);
     // The detail page fetches training history async — give it extra time to settle.
-    await expect(page.locator('[data-testid="btn-train-detector"]')).toBeVisible({ timeout: 60_000 });
+    await expect(
+      page.locator('[data-testid="btn-train-detector"]'),
+    ).toBeVisible({ timeout: 60_000 });
 
     await page.locator('[data-testid="btn-train-detector"]').click();
     // Training is async — the API returns immediately with RUNNING status.
     await waitForToast(page, /training|trainingsausführung/i);
 
-    await expect(page.locator('[data-testid="training-history-section"]')).toBeVisible();
+    await expect(
+      page.locator('[data-testid="training-history-section"]'),
+    ).toBeVisible();
 
     // Reload periodically until a terminal status appears (SUCCEEDED or FAILED).
     // GLiNER2 fine-tuning on CPU can take several minutes.
@@ -226,95 +207,26 @@ test.describe("GLiNER2 Pipeline Detector — Fortune 500 NER", () => {
     }).toPass({ timeout: 300_000, intervals: [10_000, 15_000, 20_000] });
 
     const finalStatus = await row.getAttribute("data-status");
-    expect(finalStatus, "Training run must complete without unexpected state").toMatch(/^(SUCCEEDED|FAILED)$/);
+    expect(
+      finalStatus,
+      "Training run must complete without unexpected state",
+    ).toMatch(/^(SUCCEEDED|FAILED)$/);
   });
 
-  // ── 3. Sandbox scan with custom detector ──────────────────────────────────
-
-  test("runs a sandbox scan using the custom GLiNER2 detector and finds entities", async ({
-    page,
-  }) => {
-    expect(detectorId, "Detector must exist").not.toBeNull();
-
-    const fileName = `fortune500-scan-${Date.now()}.txt`;
-
-    // Go to sandbox new scan
-    await page.goto("/sandbox/new");
-    await expect(page.locator('[data-testid="file-upload-area"]')).toBeVisible();
-
-    // Upload the Fortune 500 text snippet
-    await page.locator('[data-testid="file-input"]').setInputFiles({
-      name: fileName,
-      mimeType: "text/plain",
-      buffer: Buffer.from(FORTUNE_SCAN_TEXT, "utf-8"),
-    });
-
-    await expect(page.locator('[data-testid="file-list"]')).toBeVisible({ timeout: 5_000 });
-
-    // Enable the custom GLiNER2 detector by its key
-    const customToggle = page.locator(`[data-testid="toggle-custom-detector-${detectorKey}"]`);
-    await expect(customToggle).toBeVisible({ timeout: 15_000 });
-
-    const isChecked = await customToggle.getAttribute("data-state");
-    if (isChecked !== "checked" && isChecked !== "on") {
-      await customToggle.click();
-    }
-
-    // Run the scan
-    await expect(page.locator('[data-testid="btn-run-sandbox"]')).not.toBeDisabled({ timeout: 5_000 });
-    await page.locator('[data-testid="btn-run-sandbox"]').click();
-    await page.waitForURL(/\/sandbox$/, { timeout: 15_000 });
-
-    // Wait for completion
-    const status = await waitForRunTerminal(page, fileName);
-    expect(status, "Scan must complete without error").toBe("COMPLETED");
-
-    // Findings count must be > 0 (GLiNER2 should extract entities zero-shot even without training)
-    const row = page
-      .locator('[data-testid="sandbox-run-row"]')
-      .filter({ hasText: fileName })
-      .first();
-
-    const countBadge = row.locator('[data-testid="run-findings-count"]');
-    await expect(countBadge).toBeVisible();
-    const count = Number(await countBadge.getAttribute("data-count"));
-    expect(count, "Expected at least one entity finding from GLiNER2").toBeGreaterThan(0);
-
-    // Expand and verify at least one CUSTOM finding
-    const detail = await expandRunRow(page, fileName);
-    const findingRows = detail.locator('[data-testid="finding-row"]');
-    await expect(findingRows.first()).toBeVisible({ timeout: 10_000 });
-
-    const allRows = await findingRows.all();
-    const detectorTypes = await Promise.all(
-      allRows.map((r) => r.getAttribute("data-detector-type")),
-    );
-    expect(
-      detectorTypes.some((t) => t === "CUSTOM"),
-      `Expected at least one CUSTOM finding. Got: ${detectorTypes.join(", ")}`,
-    ).toBe(true);
-
-    // At least one entity from our defined labels should appear
-    const findingTypes = await Promise.all(
-      allRows.map((r) => r.getAttribute("data-finding-type")),
-    );
-    const knownLabels = ["entity:company_name", "entity:revenue", "entity:rank"];
-    expect(
-      findingTypes.some((ft) => knownLabels.includes(ft ?? "")),
-      `Expected entity:company_name, entity:revenue, or entity:rank. Got: ${findingTypes.join(", ")}`,
-    ).toBe(true);
-  });
-
-  // ── 4. Delete detector ─────────────────────────────────────────────────────
+  // ── 3. Delete detector ─────────────────────────────────────────────────────
 
   test("deletes the detector and redirects to the list", async ({ page }) => {
     expect(detectorId, "Detector must exist").not.toBeNull();
 
     await page.goto(`/detectors/${detectorId}`);
-    await expect(page.locator('[data-testid="btn-delete-detector"]')).toBeVisible({ timeout: 60_000 });
+    await expect(
+      page.locator('[data-testid="btn-delete-detector"]'),
+    ).toBeVisible({ timeout: 60_000 });
 
     await page.locator('[data-testid="btn-delete-detector"]').click();
-    await expect(page.locator('[data-testid="btn-delete-detector-confirm"]')).toBeVisible({ timeout: 10_000 });
+    await expect(
+      page.locator('[data-testid="btn-delete-detector-confirm"]'),
+    ).toBeVisible({ timeout: 10_000 });
     await page.locator('[data-testid="btn-delete-detector-confirm"]').click();
 
     await page.waitForURL(/\/detectors$/, { timeout: 20_000 });

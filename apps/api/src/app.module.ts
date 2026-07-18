@@ -5,6 +5,7 @@ import { PrismaService } from './prisma.service';
 import { DemoModeService } from './demo-mode.service';
 import { DemoModeGuard } from './demo-mode.guard';
 import { SourceService } from './source.service';
+import { SourceFilesService } from './source-files.service';
 import { AssetService } from './asset.service';
 import { FindingsService } from './findings.service';
 import { NotificationsService } from './notifications.service';
@@ -14,7 +15,6 @@ import { CustomDetectorExtractionsService } from './custom-detector-extractions.
 import { CustomDetectorTestsService } from './custom-detector-tests.service';
 import { CliRunnerModule } from './cli-runner/cli-runner.module';
 import { WebSocketModule } from './websocket/websocket.module';
-import { SandboxModule } from './sandbox/sandbox.module';
 import { SchedulerModule } from './scheduler/scheduler.module';
 import { MatchingModule } from './matching/matching.module';
 import { AutopilotModule } from './autopilot/autopilot.module';
@@ -55,6 +55,7 @@ import { CaseEventsService } from './case-events.service';
 import {
   HealthController,
   SourcesController,
+  SourceFilesController,
   SearchSourcesController,
   AssetsController,
   SearchAssetsController,
@@ -81,7 +82,6 @@ import {
   imports: [
     CliRunnerModule,
     WebSocketModule,
-    SandboxModule,
     SchedulerModule,
     MatchingModule,
     AutopilotModule,
@@ -92,6 +92,7 @@ import {
   controllers: [
     HealthController,
     SourcesController,
+    SourceFilesController,
     SearchSourcesController,
     AssetsController,
     SearchAssetsController,
@@ -122,6 +123,7 @@ import {
     DemoModeService,
     PrismaService,
     SourceService,
+    SourceFilesService,
     AssetService,
     FindingsService,
     NotificationsService,

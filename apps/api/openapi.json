@@ -863,6 +863,152 @@
         ]
       }
     },
+    "/sources/{sourceId}/files": {
+      "get": {
+        "operationId": "SourceFilesController_list",
+        "parameters": [
+          {
+            "name": "sourceId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/UploadedSourceFileDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "List uploaded files for a Sandbox source",
+        "tags": [
+          "Sources"
+        ]
+      },
+      "post": {
+        "operationId": "SourceFilesController_upload",
+        "parameters": [
+          {
+            "name": "sourceId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "file"
+                ],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadedSourceFileDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Upload one file to a Sandbox source",
+        "tags": [
+          "Sources"
+        ]
+      }
+    },
+    "/sources/{sourceId}/files/{fileId}/content": {
+      "get": {
+        "operationId": "SourceFilesController_content",
+        "parameters": [
+          {
+            "name": "sourceId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "fileId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Stream uploaded source file bytes",
+        "tags": [
+          "Sources"
+        ]
+      }
+    },
+    "/sources/{sourceId}/files/{fileId}": {
+      "delete": {
+        "operationId": "SourceFilesController_delete",
+        "parameters": [
+          {
+            "name": "sourceId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "fileId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "summary": "Delete an uploaded source file",
+        "tags": [
+          "Sources"
+        ]
+      }
+    },
     "/search/sources": {
       "post": {
         "description": "Paginated search over data sources with optional filters. Returns source details with the latest runner summary and aggregate totals (total, healthy, errors, running).",
@@ -1179,6 +1325,7 @@
                   "LOCAL_FOLDER",
                   "MICROSOFT_365",
                   "GOOGLE_WORKSPACE",
+                  "SANDBOX",
                   "CUSTOM"
                 ]
               }
@@ -1531,6 +1678,7 @@
                   "LOCAL_FOLDER",
                   "MICROSOFT_365",
                   "GOOGLE_WORKSPACE",
+                  "SANDBOX",
                   "CUSTOM"
                 ]
               }
@@ -1905,6 +2053,7 @@
                   "LOCAL_FOLDER",
                   "MICROSOFT_365",
                   "GOOGLE_WORKSPACE",
+                  "SANDBOX",
                   "CUSTOM"
                 ]
               }
@@ -2739,6 +2888,37 @@
         ],
         "responses": {
           "204": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "CustomDetectorTests"
+        ]
+      }
+    },
+    "/custom-detectors/{detectorId}/test-scenarios/{scenarioId}/input": {
+      "get": {
+        "operationId": "CustomDetectorTestsController_input",
+        "parameters": [
+          {
+            "name": "detectorId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "scenarioId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
             "description": ""
           }
         },
@@ -7204,360 +7384,6 @@
         ]
       }
     },
-    "/sandbox/runs": {
-      "post": {
-        "description": "Upload any local file (PDF, DOCX, XLSX, TXT, CSV, HTML, JSON, …) and run one\nor more detectors against its extracted text.\n\n**`detectors`** is a JSON string containing an array of detector config objects.\nEach object has the shape:\n```json\n{ \"type\": \"<TYPE>\", \"enabled\": true, \"config\": { ... } }\n```\n\n### Detector types & sample configs\n\n| Type | What it finds |\n|------|---------------|\n| `SECRETS` | API keys, tokens, private keys |\n| `PII` | Emails, SSNs, credit cards, phone numbers |\n| `YARA` | Custom YARA rule matches |\n| `BROKEN_LINKS` | Unreachable URLs in text |\n| `CUSTOM` | User-defined pipelines (REGEX, GLiNER2, HuggingFace transformers) |\n\n**Minimal — secrets only (all patterns):**\n```json\n[{\"type\":\"SECRETS\",\"enabled\":true,\"config\":{}}]\n```\n\n**PII with specific patterns:**\n```json\n[{\"type\":\"PII\",\"enabled\":true,\"config\":{\"enabled_patterns\":[\"email\",\"credit_card\",\"ssn\",\"phone_number\"],\"confidence_threshold\":0.8}}]\n```\n\n**Secrets + PII combined:**\n```json\n[\n  {\"type\":\"SECRETS\",\"enabled\":true,\"config\":{\"enabled_patterns\":[\"aws\",\"github\",\"stripe\",\"generic_api_key\"]}},\n  {\"type\":\"PII\",\"enabled\":true,\"config\":{\"enabled_patterns\":[\"email\",\"ssn\",\"credit_card\"],\"confidence_threshold\":0.75}}\n]\n```\n\n**Full scan — all detectors:**\n```json\n[\n  {\"type\":\"SECRETS\",\"enabled\":true,\"config\":{}},\n  {\"type\":\"PII\",\"enabled\":true,\"config\":{\"confidence_threshold\":0.7}},\n  {\"type\":\"BROKEN_LINKS\",\"enabled\":true,\"config\":{}}\n]\n```",
-        "operationId": "SandboxController_createRun",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "multipart/form-data": {
-              "schema": {
-                "type": "object",
-                "required": [
-                  "file",
-                  "detectors"
-                ],
-                "properties": {
-                  "file": {
-                    "type": "string",
-                    "format": "binary",
-                    "description": "File to scan"
-                  },
-                  "detectors": {
-                    "type": "string",
-                    "description": "JSON array of detector config objects",
-                    "example": "[{\"type\":\"SECRETS\",\"enabled\":true,\"config\":{\"enabled_patterns\":[\"aws\",\"github\",\"stripe\",\"generic_api_key\"]}},{\"type\":\"PII\",\"enabled\":true,\"config\":{\"enabled_patterns\":[\"email\",\"credit_card\",\"ssn\",\"phone_number\"],\"confidence_threshold\":0.75}}]"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SandboxRunDto"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Conflict — a run with the same file content already exists"
-          }
-        },
-        "summary": "Upload a file and run detectors on it",
-        "tags": [
-          "Sandbox"
-        ]
-      },
-      "get": {
-        "operationId": "SandboxController_listRuns",
-        "parameters": [
-          {
-            "name": "search",
-            "required": false,
-            "in": "query",
-            "description": "Search by file name or MIME type",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "status",
-            "required": false,
-            "in": "query",
-            "description": "Filter by one or more run statuses",
-            "schema": {
-              "type": "array",
-              "items": {
-                "type": "string",
-                "enum": [
-                  "PENDING",
-                  "RUNNING",
-                  "COMPLETED",
-                  "ERROR"
-                ]
-              }
-            }
-          },
-          {
-            "name": "contentType",
-            "required": false,
-            "in": "query",
-            "description": "Filter by one or more content types",
-            "schema": {
-              "type": "array",
-              "items": {
-                "type": "string",
-                "enum": [
-                  "TXT",
-                  "TABLE",
-                  "IMAGE",
-                  "VIDEO",
-                  "AUDIO",
-                  "URL",
-                  "BINARY",
-                  "OTHER"
-                ]
-              }
-            }
-          },
-          {
-            "name": "detectorType",
-            "required": false,
-            "in": "query",
-            "description": "Filter by detectors used in the run configuration or reported findings",
-            "schema": {
-              "type": "array",
-              "items": {
-                "type": "string",
-                "enum": [
-                  "SECRETS",
-                  "PII",
-                  "YARA",
-                  "BROKEN_LINKS",
-                  "CODE_SECURITY",
-                  "CUSTOM"
-                ]
-              }
-            }
-          },
-          {
-            "name": "hasFindings",
-            "required": false,
-            "in": "query",
-            "description": "Filter by whether findings exist",
-            "schema": {
-              "type": "boolean"
-            }
-          },
-          {
-            "name": "sortBy",
-            "required": false,
-            "in": "query",
-            "description": "Sort field",
-            "schema": {
-              "default": "CREATED_AT",
-              "type": "string",
-              "enum": [
-                "CREATED_AT",
-                "FILE_NAME",
-                "STATUS",
-                "FILE_SIZE_BYTES",
-                "DURATION_MS",
-                "FINDINGS_COUNT"
-              ]
-            }
-          },
-          {
-            "name": "sortOrder",
-            "required": false,
-            "in": "query",
-            "description": "Sort direction",
-            "schema": {
-              "default": "DESC",
-              "type": "string",
-              "enum": [
-                "ASC",
-                "DESC"
-              ]
-            }
-          },
-          {
-            "name": "skip",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "default": 0,
-              "type": "number"
-            }
-          },
-          {
-            "name": "limit",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "default": 50,
-              "type": "number"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SandboxRunListResponseDto"
-                }
-              }
-            }
-          }
-        },
-        "summary": "List sandbox runs (paginated)",
-        "tags": [
-          "Sandbox"
-        ]
-      }
-    },
-    "/sandbox/runs/{id}": {
-      "get": {
-        "operationId": "SandboxController_getRun",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SandboxRunDto"
-                }
-              }
-            }
-          }
-        },
-        "summary": "Get a sandbox run by ID",
-        "tags": [
-          "Sandbox"
-        ]
-      },
-      "delete": {
-        "description": "Deletes a sandbox run record and its stored input file. If the run is currently in progress the CLI process is killed first.",
-        "operationId": "SandboxController_deleteRun",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "Run deleted"
-          }
-        },
-        "summary": "Delete a sandbox run",
-        "tags": [
-          "Sandbox"
-        ]
-      }
-    },
-    "/sandbox/runs/{id}/input": {
-      "get": {
-        "description": "Internal endpoint used by the Kubernetes sandbox job init-container to fetch the input file over the cluster network. Available only while the file is staged (during the run).",
-        "operationId": "SandboxController_getRunInput",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "summary": "Download the staged input file for an in-flight sandbox run",
-        "tags": [
-          "Sandbox"
-        ]
-      }
-    },
-    "/sandbox/runs/{id}/rerun": {
-      "post": {
-        "description": "Re-scans the SAME run's already-uploaded file with a different set of\ndetectors and appends the new findings to the run. No new run is created and the\nfile is reused from storage — no re-upload, never S3.",
-        "operationId": "SandboxController_rerunRun",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/RerunSandboxRunDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "The run, now re-scanning (status RUNNING)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SandboxRunDto"
-                }
-              }
-            }
-          }
-        },
-        "summary": "Re-scan a run with different detectors (appends findings)",
-        "tags": [
-          "Sandbox"
-        ]
-      }
-    },
-    "/sandbox/runs/{id}/findings": {
-      "delete": {
-        "description": "Removes all findings from the run while keeping the uploaded file so it can be re-scanned.",
-        "operationId": "SandboxController_clearFindings",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SandboxRunDto"
-                }
-              }
-            }
-          }
-        },
-        "summary": "Clear all findings for a run",
-        "tags": [
-          "Sandbox"
-        ]
-      }
-    },
     "/autopilot/trigger": {
       "post": {
         "operationId": "AutopilotController_trigger",
@@ -9268,7 +9094,8 @@
               "MEILISEARCH",
               "LOCAL_FOLDER",
               "MICROSOFT_365",
-              "GOOGLE_WORKSPACE"
+              "GOOGLE_WORKSPACE",
+              "SANDBOX"
             ],
             "description": "The type of the source",
             "example": "WORDPRESS"
@@ -9462,7 +9289,8 @@
               "MEILISEARCH",
               "LOCAL_FOLDER",
               "MICROSOFT_365",
-              "GOOGLE_WORKSPACE"
+              "GOOGLE_WORKSPACE",
+              "SANDBOX"
             ],
             "description": "The type of the source",
             "example": "WORDPRESS"
@@ -9546,6 +9374,52 @@
           "status"
         ]
       },
+      "UploadedSourceFileDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "sourceId": {
+            "type": "string"
+          },
+          "fileName": {
+            "type": "string"
+          },
+          "declaredMimeType": {
+            "type": "string"
+          },
+          "fileExtension": {
+            "type": "string"
+          },
+          "fileSizeBytes": {
+            "type": "number"
+          },
+          "contentHash": {
+            "type": "string",
+            "description": "SHA-256 hash of the uploaded bytes"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "sourceId",
+          "fileName",
+          "declaredMimeType",
+          "fileExtension",
+          "fileSizeBytes",
+          "contentHash",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
       "SearchSourcesFiltersDto": {
         "type": "object",
         "properties": {
@@ -9598,6 +9472,7 @@
                 "LOCAL_FOLDER",
                 "MICROSOFT_365",
                 "GOOGLE_WORKSPACE",
+                "SANDBOX",
                 "CUSTOM"
               ]
             }
@@ -9915,6 +9790,7 @@
               "LOCAL_FOLDER",
               "MICROSOFT_365",
               "GOOGLE_WORKSPACE",
+              "SANDBOX",
               "CUSTOM"
             ]
           },
@@ -10061,6 +9937,7 @@
                 "LOCAL_FOLDER",
                 "MICROSOFT_365",
                 "GOOGLE_WORKSPACE",
+                "SANDBOX",
                 "CUSTOM"
               ]
             }
@@ -11021,6 +10898,7 @@
               "LOCAL_FOLDER",
               "MICROSOFT_365",
               "GOOGLE_WORKSPACE",
+              "SANDBOX",
               "CUSTOM"
             ]
           }
@@ -17347,6 +17225,7 @@
                 "LOCAL_FOLDER",
                 "MICROSOFT_365",
                 "GOOGLE_WORKSPACE",
+                "SANDBOX",
                 "CUSTOM"
               ]
             }
@@ -17948,136 +17827,6 @@
           "total",
           "skip",
           "limit"
-        ]
-      },
-      "SandboxRunDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "createdAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "fileName": {
-            "type": "string"
-          },
-          "fileType": {
-            "type": "string",
-            "description": "Raw MIME type detected by the CLI (e.g. \"application/pdf\")"
-          },
-          "contentType": {
-            "type": "string",
-            "enum": [
-              "TXT",
-              "TABLE",
-              "IMAGE",
-              "VIDEO",
-              "AUDIO",
-              "URL",
-              "BINARY",
-              "OTHER"
-            ],
-            "description": "Internal content classification derived from the MIME type"
-          },
-          "fileExtension": {
-            "type": "string"
-          },
-          "fileSizeBytes": {
-            "type": "number"
-          },
-          "detectors": {
-            "type": "object"
-          },
-          "findings": {
-            "type": "object"
-          },
-          "status": {
-            "type": "string",
-            "enum": [
-              "PENDING",
-              "RUNNING",
-              "COMPLETED",
-              "ERROR"
-            ]
-          },
-          "errorMessage": {
-            "type": "string"
-          },
-          "durationMs": {
-            "type": "number"
-          },
-          "s3Key": {
-            "type": "string",
-            "description": "S3 object key for the uploaded file (null when S3 is not configured)"
-          },
-          "contentHash": {
-            "type": "string",
-            "description": "SHA-256 content hash of the uploaded file (used for duplicate detection)"
-          }
-        },
-        "required": [
-          "id",
-          "createdAt",
-          "fileName",
-          "fileType",
-          "contentType",
-          "fileExtension",
-          "fileSizeBytes",
-          "detectors",
-          "findings",
-          "status"
-        ]
-      },
-      "SandboxRunListResponseDto": {
-        "type": "object",
-        "properties": {
-          "items": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/SandboxRunDto"
-            }
-          },
-          "total": {
-            "type": "number"
-          },
-          "skip": {
-            "type": "number"
-          },
-          "limit": {
-            "type": "number"
-          }
-        },
-        "required": [
-          "items",
-          "total",
-          "skip",
-          "limit"
-        ]
-      },
-      "RerunSandboxRunDto": {
-        "type": "object",
-        "properties": {
-          "detectors": {
-            "type": "array",
-            "description": "Array of detector config objects to use for the new run",
-            "example": [
-              {
-                "type": "SECRETS",
-                "enabled": true,
-                "config": {}
-              }
-            ]
-          },
-          "skipDuplicateCheck": {
-            "type": "boolean",
-            "description": "When true, skip the duplicate-file check and create a new run even if an identical file exists",
-            "default": false
-          }
-        },
-        "required": [
-          "detectors"
         ]
       },
       "TriggerAutopilotDto": {

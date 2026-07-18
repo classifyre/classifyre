@@ -20,7 +20,6 @@
     "fingerprints": "Fingerprints",
     "glossary": "Glossary",
     "scans": "Scans",
-    "sandbox": "Sandbox",
     "operations": "Operations",
     "settings": "Settings",
     "harness": "Harness AI"
@@ -266,6 +265,22 @@
       "nameHelp": "Give your source a memorable name to identify it",
       "descriptionLabel": "Description",
       "descriptionHelp": "Optional. Add notes about what this source is for."
+    },
+    "uploadedFiles": {
+      "title": "Uploaded files",
+      "dropPrompt": "Drop files here or choose files",
+      "maximumSize": "Maximum 50 MiB per file",
+      "chooseFiles": "Choose files",
+      "tooLarge": "{{count}} file(s) exceed the 50 MiB limit.",
+      "keepOne": "A Sandbox source must keep at least one file.",
+      "required": "At least one file is required.",
+      "pending": "pending upload",
+      "remove": "Remove {{name}}",
+      "allUploadsFailed": "No files could be uploaded. The Sandbox source was not saved.",
+      "uploadFailures": "{{count}} file(s) failed to upload.",
+      "deletionFailures": "{{count}} file(s) could not be removed.",
+      "requiredBeforeSave": "Add at least one file before saving this Sandbox source.",
+      "requiredBeforeContinue": "Add at least one file before continuing."
     },
     "totalSources": "Total Sources",
     "connectedSources": "Connected sources",
@@ -1349,63 +1364,6 @@
     },
     "sourceRun": "{{source}} Run"
   },
-  "sandbox": {
-    "title": "Sandbox",
-    "uploadFiles": "Upload files",
-    "uploadFilesDesc": "Choose one or many files for this sandbox scan.",
-    "detectors": "Detectors",
-    "detectorsDesc": "Select detector coverage and run the scan.",
-    "dropFiles": "Drop files here or click to select",
-    "dropFilesActive": "Drop files to upload",
-    "selectDetector": "Select at least one detector",
-    "runs": {
-      "deleteRun": "Delete run",
-      "search": "Search file name or MIME",
-      "contentType": "Content type",
-      "detectors": "Detectors",
-      "findings": "Findings",
-      "noRuns": "No sandbox runs found",
-      "noRunsHint": "Adjust filters to broaden the run search.",
-      "loading": "Loading runs...",
-      "file": "File",
-      "content": "Content",
-      "mimeType": "MIME Type",
-      "size": "Size",
-      "duration": "Duration",
-      "topFindings": "Top Findings",
-      "when": "When",
-      "allRuns": "All runs",
-      "withFindings": "With findings",
-      "noFindings": "No findings",
-      "newestFirst": "Newest first",
-      "oldestFirst": "Oldest first",
-      "mostFindings": "Most findings",
-      "fileNameAZ": "File name A-Z",
-      "largestFile": "Largest file",
-      "updating": "Updating",
-      "refreshingRuns": "Refreshing runs",
-      "pickDetectors": "Add detectors to run",
-      "searchDetectors": "Search detectors...",
-      "noDetectors": "No detectors found",
-      "rescanAppend": "Re-scan (append)",
-      "clearFindings": "Clear findings",
-      "selectDetectorsFirst": "Select at least one detector",
-      "rescanStarted": "Re-scan started — findings will be appended",
-      "rescanFailed": "Failed to start re-scan",
-      "findingsCleared": "Findings cleared",
-      "clearFailed": "Failed to clear findings"
-    },
-    "monitorDesc": "Monitor sandbox runs and inspect detector findings",
-    "newScan": "New sandbox scan",
-    "runResults": "Run results",
-    "autoRefresh": "Runs auto-refresh while processing. Expand completed rows to inspect findings.",
-    "stepper": {
-      "step": "Step {{index}}",
-      "active": "active",
-      "done": "done",
-      "locked": "locked"
-    }
-  },
   "notifications": {
     "title": "Notifications",
     "total": "Total",
@@ -1847,14 +1805,6 @@
     "copied": "{{label}} copied",
     "failedToCopy": "Failed to copy {{label}}"
   },
-  "upload": {
-    "uploaded": "Uploaded {{fileName}}",
-    "failed": "File upload failed",
-    "oversized": "Skipped {{count}} file(s) over 50 MB.",
-    "failedToQueue": "Failed to queue {{count}} file(s)",
-    "failedToStart": "Failed to start sandbox scan",
-    "queued": "Queued \"{{fileName}}\". Redirecting to results..."
-  },
   "validation": {
     "configValidationFailed": "Configuration failed schema validation"
   },
@@ -1916,8 +1866,7 @@
     "assets": "Assets",
     "notifications": "Notifications",
     "settings": "Settings",
-    "detectors": "Custom Detectors",
-    "sandbox": "Sandbox"
+    "detectors": "Custom Detectors"
   },
   "investigations": {
     "page": {

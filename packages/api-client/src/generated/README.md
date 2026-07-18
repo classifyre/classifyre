@@ -144,6 +144,7 @@ All URIs are relative to *http://localhost*
 *CustomDetectorExtractionsApi* | [**customDetectorExtractionsControllerSearch**](docs/CustomDetectorExtractionsApi.md#customdetectorextractionscontrollersearch) | **GET** /custom-detectors/{id}/extractions | 
 *CustomDetectorTestsApi* | [**customDetectorTestsControllerCreate**](docs/CustomDetectorTestsApi.md#customdetectortestscontrollercreate) | **POST** /custom-detectors/{detectorId}/test-scenarios | 
 *CustomDetectorTestsApi* | [**customDetectorTestsControllerDelete**](docs/CustomDetectorTestsApi.md#customdetectortestscontrollerdelete) | **DELETE** /custom-detectors/{detectorId}/test-scenarios/{scenarioId} | 
+*CustomDetectorTestsApi* | [**customDetectorTestsControllerInput**](docs/CustomDetectorTestsApi.md#customdetectortestscontrollerinput) | **GET** /custom-detectors/{detectorId}/test-scenarios/{scenarioId}/input | 
 *CustomDetectorTestsApi* | [**customDetectorTestsControllerList**](docs/CustomDetectorTestsApi.md#customdetectortestscontrollerlist) | **GET** /custom-detectors/{detectorId}/test-scenarios | 
 *CustomDetectorTestsApi* | [**customDetectorTestsControllerRun**](docs/CustomDetectorTestsApi.md#customdetectortestscontrollerrun) | **POST** /custom-detectors/{detectorId}/test-scenarios/run | 
 *CustomDetectorsApi* | [**customDetectorsControllerClearTrainingExamples**](docs/CustomDetectorsApi.md#customdetectorscontrollercleartrainingexamples) | **DELETE** /custom-detectors/{id}/training-examples | Delete all training examples for a detector
@@ -229,17 +230,14 @@ All URIs are relative to *http://localhost*
 *RunnersApi* | [**searchRunnersControllerSearchRunnerAssets**](docs/RunnersApi.md#searchrunnerscontrollersearchrunnerassets) | **POST** /search/runner-assets | Search runner assets
 *RunnersApi* | [**searchRunnersControllerSearchRunners**](docs/RunnersApi.md#searchrunnerscontrollersearchrunners) | **POST** /search/runners | Search runners
 *RunnersApi* | [**searchRunnersControllerSearchRunnersCharts**](docs/RunnersApi.md#searchrunnerscontrollersearchrunnerscharts) | **POST** /search/runners/charts | Runners charts overview
-*SandboxApi* | [**sandboxControllerClearFindings**](docs/SandboxApi.md#sandboxcontrollerclearfindings) | **DELETE** /sandbox/runs/{id}/findings | Clear all findings for a run
-*SandboxApi* | [**sandboxControllerCreateRun**](docs/SandboxApi.md#sandboxcontrollercreaterun) | **POST** /sandbox/runs | Upload a file and run detectors on it
-*SandboxApi* | [**sandboxControllerDeleteRun**](docs/SandboxApi.md#sandboxcontrollerdeleterun) | **DELETE** /sandbox/runs/{id} | Delete a sandbox run
-*SandboxApi* | [**sandboxControllerGetRun**](docs/SandboxApi.md#sandboxcontrollergetrun) | **GET** /sandbox/runs/{id} | Get a sandbox run by ID
-*SandboxApi* | [**sandboxControllerGetRunInput**](docs/SandboxApi.md#sandboxcontrollergetruninput) | **GET** /sandbox/runs/{id}/input | Download the staged input file for an in-flight sandbox run
-*SandboxApi* | [**sandboxControllerListRuns**](docs/SandboxApi.md#sandboxcontrollerlistruns) | **GET** /sandbox/runs | List sandbox runs (paginated)
-*SandboxApi* | [**sandboxControllerRerunRun**](docs/SandboxApi.md#sandboxcontrollerrerunrun) | **POST** /sandbox/runs/{id}/rerun | Re-scan a run with different detectors (appends findings)
 *SourcesApi* | [**searchSourcesControllerSearchSources**](docs/SourcesApi.md#searchsourcescontrollersearchsources) | **POST** /search/sources | Search data sources
 *SourcesApi* | [**sourceAssetsControllerBulkIngest**](docs/SourcesApi.md#sourceassetscontrollerbulkingest) | **POST** /sources/{sourceId}/assets/bulk | Bulk ingest assets
 *SourcesApi* | [**sourceAssetsControllerFinalizeIngest**](docs/SourcesApi.md#sourceassetscontrollerfinalizeingest) | **POST** /sources/{sourceId}/assets/finalize | Finalize ingest run
 *SourcesApi* | [**sourceAssetsControllerListSourceAssets**](docs/SourcesApi.md#sourceassetscontrollerlistsourceassets) | **GET** /sources/{sourceId}/assets | List assets for a source
+*SourcesApi* | [**sourceFilesControllerContent**](docs/SourcesApi.md#sourcefilescontrollercontent) | **GET** /sources/{sourceId}/files/{fileId}/content | Stream uploaded source file bytes
+*SourcesApi* | [**sourceFilesControllerDelete**](docs/SourcesApi.md#sourcefilescontrollerdelete) | **DELETE** /sources/{sourceId}/files/{fileId} | Delete an uploaded source file
+*SourcesApi* | [**sourceFilesControllerList**](docs/SourcesApi.md#sourcefilescontrollerlist) | **GET** /sources/{sourceId}/files | List uploaded files for a Sandbox source
+*SourcesApi* | [**sourceFilesControllerUpload**](docs/SourcesApi.md#sourcefilescontrollerupload) | **POST** /sources/{sourceId}/files | Upload one file to a Sandbox source
 *SourcesApi* | [**sourcesControllerCreateSource**](docs/SourcesApi.md#sourcescontrollercreatesource) | **POST** /sources | Create a new data source
 *SourcesApi* | [**sourcesControllerDeleteSource**](docs/SourcesApi.md#sourcescontrollerdeletesource) | **DELETE** /sources/{id} | Delete a data source
 *SourcesApi* | [**sourcesControllerGetSchedule**](docs/SourcesApi.md#sourcescontrollergetschedule) | **GET** /sources/{id}/schedule | Get source schedule
@@ -440,7 +438,6 @@ All URIs are relative to *http://localhost*
 - [RegisterDiscoveredAssetsResponseDto](docs/RegisterDiscoveredAssetsResponseDto.md)
 - [RelationTypesResponseDto](docs/RelationTypesResponseDto.md)
 - [RematchResponseDto](docs/RematchResponseDto.md)
-- [RerunSandboxRunDto](docs/RerunSandboxRunDto.md)
 - [ReviewCaseLeadDto](docs/ReviewCaseLeadDto.md)
 - [RunnerAssetItemDto](docs/RunnerAssetItemDto.md)
 - [RunnerAssetProgressDto](docs/RunnerAssetProgressDto.md)
@@ -451,8 +448,6 @@ All URIs are relative to *http://localhost*
 - [RunnersChartsTimelineBucketDto](docs/RunnersChartsTimelineBucketDto.md)
 - [RunnersChartsTopSourceDto](docs/RunnersChartsTopSourceDto.md)
 - [RunnersChartsTotalsDto](docs/RunnersChartsTotalsDto.md)
-- [SandboxRunDto](docs/SandboxRunDto.md)
-- [SandboxRunListResponseDto](docs/SandboxRunListResponseDto.md)
 - [SaveTrainingExamplesDto](docs/SaveTrainingExamplesDto.md)
 - [SearchAssetFindingDto](docs/SearchAssetFindingDto.md)
 - [SearchAssetItemDto](docs/SearchAssetItemDto.md)
@@ -542,6 +537,7 @@ All URIs are relative to *http://localhost*
 - [UpdateSourceDto](docs/UpdateSourceDto.md)
 - [UpdateSystemBriefDto](docs/UpdateSystemBriefDto.md)
 - [UpdateThreadDto](docs/UpdateThreadDto.md)
+- [UploadedSourceFileDto](docs/UploadedSourceFileDto.md)
 - [UpsertGlossaryTermDto](docs/UpsertGlossaryTermDto.md)
 - [UpsertGlossaryTermResponseDto](docs/UpsertGlossaryTermResponseDto.md)
 - [ValueOccurrenceAssetDto](docs/ValueOccurrenceAssetDto.md)

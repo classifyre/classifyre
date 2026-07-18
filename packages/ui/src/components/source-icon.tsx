@@ -33,6 +33,7 @@ import {
   Cloud,
   Database,
   Folder,
+  FlaskConical,
   Layers,
   Mail,
   Monitor,
@@ -123,6 +124,7 @@ const SOURCE_SIMPLE_ICON_BY_INGESTION_TYPE: Record<
   ApiSourceType,
   SimpleIcon | null
 > = {
+  [CreateSourceDtoTypeEnum.Sandbox]: null,
   [CreateSourceDtoTypeEnum.Wordpress]: siWordpress,
   [CreateSourceDtoTypeEnum.Slack]: null,
   [CreateSourceDtoTypeEnum.S3CompatibleStorage]: null,
@@ -175,6 +177,7 @@ export const MISSING_SIMPLE_ICON_SOURCE_TYPES = Object.values(
 );
 
 const SOURCE_ICON_BY_INGESTION_TYPE: Record<ApiSourceType, IconComponent> = {
+  [CreateSourceDtoTypeEnum.Sandbox]: FlaskConical,
   [CreateSourceDtoTypeEnum.Wordpress]: createSimpleIconComponent(siWordpress),
   [CreateSourceDtoTypeEnum.Slack]: SlackIcon,
   [CreateSourceDtoTypeEnum.S3CompatibleStorage]: Cloud,
@@ -201,12 +204,15 @@ const SOURCE_ICON_BY_INGESTION_TYPE: Record<ApiSourceType, IconComponent> = {
   [CreateSourceDtoTypeEnum.DeltaLake]: Layers,
   [CreateSourceDtoTypeEnum.Iceberg]: Layers,
   [CreateSourceDtoTypeEnum.Kafka]: createSimpleIconComponent(siApachekafka),
-  [CreateSourceDtoTypeEnum.Elasticsearch]: createSimpleIconComponent(siElasticsearch),
+  [CreateSourceDtoTypeEnum.Elasticsearch]:
+    createSimpleIconComponent(siElasticsearch),
   [CreateSourceDtoTypeEnum.Opensearch]: createSimpleIconComponent(siOpensearch),
-  [CreateSourceDtoTypeEnum.Meilisearch]: createSimpleIconComponent(siMeilisearch),
+  [CreateSourceDtoTypeEnum.Meilisearch]:
+    createSimpleIconComponent(siMeilisearch),
   [CreateSourceDtoTypeEnum.LocalFolder]: Folder,
   [CreateSourceDtoTypeEnum.Microsoft365]: Microsoft365Icon,
-  [CreateSourceDtoTypeEnum.GoogleWorkspace]: createSimpleIconComponent(siGoogledrive),
+  [CreateSourceDtoTypeEnum.GoogleWorkspace]:
+    createSimpleIconComponent(siGoogledrive),
 };
 
 const SOURCE_ICON_BY_INGESTION_TYPE_LOWERCASE: Record<string, IconComponent> =

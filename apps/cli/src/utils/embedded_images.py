@@ -5,7 +5,7 @@ standalone assets — e.g. HuggingFace image datasets store an ``image`` column 
 ``struct<bytes, path>``, and Office documents embed pictures under their ``media/``
 folders. This module surfaces those images as raw bytes so the scan pipeline can
 treat each one as its own child IMAGE asset (or run image detectors on it directly
-in the sandbox), instead of dumping undecodable bytes into text detectors.
+in file evaluation), instead of dumping undecodable bytes into text detectors.
 
 On any missing optional dependency or parse failure the iterators log a warning and
 yield nothing, so callers degrade gracefully.

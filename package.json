@@ -21,7 +21,6 @@
     "test:e2e:remote": "cd apps/api && bun run test:e2e:remote && cd ../cli && bun run test:e2e",
     "test:integration": "cd apps/api && bun run test:integration",
     "api:test:e2e": "cd apps/api && bun run test:e2e",
-    "api:test:e2e:sandbox": "cd apps/api && bun run test:e2e -- --testPathPattern=sandbox",
     "ops:build": "turbo build --filter=@workspace/devops",
     "ops:lint": "turbo lint --filter=@workspace/devops",
     "ops:test": "turbo test --filter=@workspace/devops",

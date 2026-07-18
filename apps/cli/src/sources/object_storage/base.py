@@ -303,6 +303,10 @@ class ObjectStorageSourceBase(BaseSource, ABC):
     def _file_extension(self, key: str) -> str:
         return PurePosixPath(key).suffix.lower()
 
+    def _object_file_name(self, ref: ObjectRef) -> str:
+        """File name used for MIME inference and normalized metadata."""
+        return ref.key
+
     def _asset_type_from_mime_or_key(self, mime_type: str | None, key: str) -> OutputAssetType:
         normalized_mime = (mime_type or "").split(";", maxsplit=1)[0].strip().lower()
         extension = self._file_extension(key)
@@ -364,7 +368,7 @@ class ObjectStorageSourceBase(BaseSource, ABC):
         if self._discovery_only or not self._include_content_preview():
             mime = (ref.content_type_hint or "").split(";", maxsplit=1)[0].strip().lower()
             if not mime:
-                mime = infer_mime_type_from_file_name(ref.key)
+                mime = infer_mime_type_from_file_name(self._object_file_name(ref))
             return ContentSnapshot(
                 mime_type=mime or "application/octet-stream",
                 raw_content="",
@@ -389,7 +393,7 @@ class ObjectStorageSourceBase(BaseSource, ABC):
         mime_type = resolve_mime_type(
             file_bytes,
             declared_mime_type=content_type_hint or ref.content_type_hint or "",
-            file_name=ref.key,
+            file_name=self._object_file_name(ref),
         )
         normalized_mime = mime_type.split(";", 1)[0].strip().lower()
 
@@ -414,7 +418,8 @@ class ObjectStorageSourceBase(BaseSource, ABC):
         asset_hash = self.generate_hash_id(external_url)
 
         snapshot = self._build_snapshot(ref)
-        asset_type = self._asset_type_from_mime_or_key(snapshot.mime_type, ref.key)
+        file_name = self._object_file_name(ref)
+        asset_type = self._asset_type_from_mime_or_key(snapshot.mime_type, file_name)
 
         if snapshot.text_content:
             self._content_cache[asset_hash] = (snapshot.raw_content, snapshot.text_content)
@@ -459,14 +464,14 @@ class ObjectStorageSourceBase(BaseSource, ABC):
             file_meta = extract_file_metadata(
                 snapshot.raw_bytes,
                 snapshot.mime_type,
-                file_name=ref.key,
+                file_name=file_name,
             )
             asset_metadata.update({k: v for k, v in file_meta.items() if v is not None})
 
         asset = SingleAssetScanResults(
             hash=asset_hash,
             checksum=self.calculate_checksum(metadata),
-            name=ref.key.split("/")[-1] or ref.key,
+            name=file_name.split("/")[-1] or file_name,
             external_url=external_url,
             links=[],
             asset_type=asset_type,
