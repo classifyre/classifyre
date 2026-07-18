@@ -148,6 +148,28 @@ jobs:
         if: success() || failure()
         run: cd apps/web && bunx playwright install --with-deps chromium
 
+      - name: Install PostgreSQL 18 development files
+        # The desktop test (classifyre-desktop#test) builds pgvector against the
+        # embedded PostgreSQL 18 native runtime via stage-pgvector.sh, which needs
+        # a matching pg_config. ubuntu-latest ships PostgreSQL 16, so install the
+        # v18 server dev headers from the PGDG apt repo and point PG_CONFIG at them.
+        if: success() || failure()
+        shell: bash
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y curl ca-certificates gnupg
+          sudo install -d /usr/share/postgresql-common/pgdg
+          curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc -o "$RUNNER_TEMP/postgresql.asc"
+          sudo gpg --batch --yes --dearmor \
+            --output /usr/share/postgresql-common/pgdg/apt.postgresql.org.gpg \
+            "$RUNNER_TEMP/postgresql.asc"
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.gpg] https://apt.postgresql.org/pub/repos/apt $(. /etc/os-release && echo $VERSION_CODENAME)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
+          sudo apt-get update
+          sudo apt-get install -y postgresql-server-dev-18
+          echo "PG_CONFIG=/usr/lib/postgresql/18/bin/pg_config" >> "$GITHUB_ENV"
+
       - name: Unit tests
         if: success() || failure()
         run: bun run test
