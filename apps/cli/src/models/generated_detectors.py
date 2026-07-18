@@ -75,6 +75,7 @@ class SourceAssetType(StrEnum):
     ORACLE = 'ORACLE'
     HIVE = 'HIVE'
     POWERBI = 'POWERBI'
+    SANDBOX = 'SANDBOX'
 
 
 class DetectorLifecycleStatus(StrEnum):

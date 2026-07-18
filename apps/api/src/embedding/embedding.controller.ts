@@ -8,11 +8,22 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
-import { ApiAcceptedResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  ApiAcceptedResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiTags,
+} from '@nestjs/swagger';
 import { EmbeddingService } from './embedding.service';
 import {
+  BoilerplateClusterDto,
+  BoilerplateClustersQueryDto,
+  EmbeddingRecalibrateResponseDto,
   EmbeddingReindexResponseDto,
+  EmbeddingStatusResponseDto,
+  GlobalBoilerplateClustersQueryDto,
   PutAssetChunksDto,
+  SimilarFindingDto,
   SimilarFindingsQueryDto,
 } from './dto/embedding.dto';
 import { EmbeddingQueueService } from './embedding-queue.service';
@@ -27,8 +38,9 @@ export class EmbeddingController {
 
   @Get('embeddings/status')
   @ApiOperation({ summary: 'Get semantic storage and search capability' })
-  status() {
-    return { ...this.embeddings.status(), ...this.queue.status() };
+  @ApiOkResponse({ type: EmbeddingStatusResponseDto })
+  async status() {
+    return { ...this.embeddings.status(), ...(await this.queue.status()) };
   }
 
   @Post('embeddings/reindex')
@@ -57,10 +69,56 @@ export class EmbeddingController {
   @ApiOperation({
     summary: 'Find semantically similar findings with ranking evidence',
   })
+  @ApiOkResponse({ type: [SimilarFindingDto] })
   similar(
     @Param('findingId') findingId: string,
     @Query() query: SimilarFindingsQueryDto,
   ) {
     return this.embeddings.similarFindings(findingId, query.limit);
+  }
+
+  @Get('embeddings/boilerplate-clusters')
+  @ApiOperation({
+    summary:
+      'Near-duplicate finding clusters across the corpus, optionally filtered to specific sources',
+  })
+  @ApiOkResponse({ type: [BoilerplateClusterDto] })
+  boilerplateGlobal(@Query() query: GlobalBoilerplateClustersQueryDto) {
+    return this.embeddings.boilerplateClusters({
+      sourceIds:
+        typeof query.sourceIds === 'string'
+          ? [query.sourceIds]
+          : query.sourceIds,
+      threshold: query.threshold,
+      limit: query.limit,
+    });
+  }
+
+  @Post('embeddings/recalibrate')
+  @HttpCode(HttpStatus.ACCEPTED)
+  @ApiOperation({
+    summary:
+      'Schedule a full evidence-ranking recalibration pass (importance scores, outliers, near-duplicate groups)',
+  })
+  @ApiAcceptedResponse({ type: EmbeddingRecalibrateResponseDto })
+  async recalibrate(): Promise<EmbeddingRecalibrateResponseDto> {
+    return { scheduled: await this.queue.scheduleRecalibration() };
+  }
+
+  @Get('sources/:sourceId/boilerplate-clusters')
+  @ApiOperation({
+    summary:
+      'Near-duplicate finding clusters in a source (repeated boilerplate)',
+  })
+  @ApiOkResponse({ type: [BoilerplateClusterDto] })
+  boilerplate(
+    @Param('sourceId') sourceId: string,
+    @Query() query: BoilerplateClustersQueryDto,
+  ) {
+    return this.embeddings.boilerplateClusters({
+      sourceIds: [sourceId],
+      threshold: query.threshold,
+      limit: query.limit,
+    });
   }
 }

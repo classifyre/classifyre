@@ -61,6 +61,7 @@ import { FINDING_SEVERITY_COLOR_BY_LEVEL } from "@workspace/ui/lib/finding-sever
 import { DetailBackButton } from "@/components/detail-back-button";
 import { MatchedContentBlock } from "@/components/matched-content-block";
 import { WhereElseFound } from "@/components/where-else-found";
+import { SimilarFindingsCard } from "@/components/similar-findings-card";
 import { FindingExtractionCard } from "@/components/finding-extraction-card";
 import { FindingMetadataCard } from "@/components/finding-metadata-card";
 import { useTranslation } from "@/hooks/use-translation";
@@ -500,6 +501,9 @@ export default function FindingDetailPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* ── Similar findings (semantic neighbours) ── */}
+      <SimilarFindingsCard findingId={finding.id} />
 
       {/* ── Matched content ── */}
       <MatchedContentBlock

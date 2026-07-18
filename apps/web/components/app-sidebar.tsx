@@ -28,8 +28,8 @@ import {
   FlaskConical,
   Search,
   Fingerprint,
+  BookOpen,
   ScanSearch,
-  Terminal,
   Settings,
   Bot,
   type LucideIcon,
@@ -47,12 +47,14 @@ export function AppSidebar() {
     { title: t("nav.detectors"), href: "/detectors", icon: FlaskConical },
     { title: t("nav.investigations"), href: "/investigations", icon: Search },
     { title: t("nav.fingerprints"), href: "/fingerprints", icon: Fingerprint },
+    { title: t("nav.glossary"), href: "/glossary", icon: BookOpen },
   ];
 
-  const operationsNavigation: { title: string; href: string; icon: LucideIcon }[] = [
-    { title: t("nav.scans"), href: "/scans", icon: ScanSearch },
-    { title: t("nav.sandbox"), href: "/sandbox", icon: Terminal },
-  ];
+  const operationsNavigation: {
+    title: string;
+    href: string;
+    icon: LucideIcon;
+  }[] = [{ title: t("nav.scans"), href: "/scans", icon: ScanSearch }];
 
   return (
     <Sidebar collapsible="icon">
@@ -156,7 +158,9 @@ export function AppSidebar() {
           <SidebarMenuItem>
             <SidebarMenuButton
               asChild
-              isActive={pathname === "/settings" || pathname.startsWith("/settings/")}
+              isActive={
+                pathname === "/settings" || pathname.startsWith("/settings/")
+              }
               tooltip={t("nav.settings")}
             >
               <Link href="/settings">

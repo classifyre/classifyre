@@ -100,7 +100,7 @@ helm upgrade --install classifyre ./helm/classifyre \
 | api.cliJobs.pollIntervalMs | int | `2000` | Poll interval while waiting for job completion (milliseconds). |
 | api.cliJobs.priorityClassName | string | `""` | CLI job priority class. |
 | api.cliJobs.resources.limits | object | `{"cpu":"2","ephemeral-storage":"20Gi","memory":"4Gi"}` | CLI job resource limits. |
-| api.cliJobs.resources.requests | object | `{"cpu":"500m","ephemeral-storage":"6Gi","memory":"1Gi"}` | CLI job resource requests. |
+| api.cliJobs.resources.requests | object | `{"cpu":"500m","ephemeral-storage":"6Gi","memory":"3Gi"}` | CLI job resource requests. |
 | api.cliJobs.serviceAccountName | string | `""` | Service account for CLI jobs. Empty uses API service account. |
 | api.cliJobs.tolerations | list | `[]` | CLI job scheduling: tolerations. |
 | api.cliJobs.ttlSecondsAfterFinished | int | `1800` | TTL for completed CLI jobs (seconds). Ignored when cleanup policy deletes jobs immediately. |
@@ -121,6 +121,30 @@ helm upgrade --install classifyre ./helm/classifyre \
 | api.containerSecurityContext.allowPrivilegeEscalation | bool | `false` | Disallow privilege escalation in API container. |
 | api.containerSecurityContext.capabilities.drop | list | `["ALL"]` | Drop all Linux capabilities in API container. |
 | api.containerSecurityContext.readOnlyRootFilesystem | bool | `false` | path the app writes to at runtime (e.g. /tmp, log dirs). Hardening step for advanced users. |
+| api.embedding.allowRemoteModels | bool | `true` |  |
+| api.embedding.autoBackfill | bool | `true` | embedding space on API startup. Existing vectors are hash-skipped. |
+| api.embedding.batchSize | int | `32` |  |
+| api.embedding.cacheDir | string | `"/var/cache/classifyre/transformers"` |  |
+| api.embedding.cacheSizeLimit | string | `"2Gi"` |  |
+| api.embedding.device | string | `"cpu"` |  |
+| api.embedding.dimensions | int | `384` | Output dimensions. pgvector HNSW supports vector dimensions up to 2000. |
+| api.embedding.dtype | string | `"q8"` | Transformers.js ONNX precision and execution device. |
+| api.embedding.enabled | bool | `true` | Enable semantic embedding generation inside the API process. |
+| api.embedding.external.apiKeyKey | string | `"api-key"` |  |
+| api.embedding.external.baseUrl | string | `""` | Base URL for an OpenAI-compatible embeddings API. |
+| api.embedding.external.existingSecret | string | `""` | Existing secret containing the provider API key. |
+| api.embedding.hnsw.efConstruction | int | `64` |  |
+| api.embedding.hnsw.efSearch | int | `100` |  |
+| api.embedding.hnsw.m | int | `16` |  |
+| api.embedding.localModelPath | string | `""` | Optional local Transformers.js model root mounted into the API pod. |
+| api.embedding.maxParallelCalls | int | `2` |  |
+| api.embedding.model | string | `"Xenova/all-MiniLM-L6-v2"` | Hugging Face model id or external provider model id. |
+| api.embedding.normalize | bool | `true` |  |
+| api.embedding.pooling | string | `"mean"` |  |
+| api.embedding.provider | string | `"transformers-js"` | Embedding provider: transformers-js or openai-compatible. |
+| api.embedding.retrySeconds | int | `30` |  |
+| api.embedding.revision | string | `"751bff37182d3f1213fa05d7196b954e230abad9"` | Immutable model revision. Change it to create a new embedding space. |
+| api.embedding.workerConcurrency | int | `1` | Maximum embedding batches processed concurrently across all API replicas. |
 | api.env.DEMO_MODE | string | `"false"` | Enable read-only demo mode. When "true" all mutating API operations return 403. |
 | api.env.ENVIRONMENT | string | `"kubernetes"` | Execution mode used by API. |
 | api.env.MAX_CONCURRENT_RUNNERS | string | `"3"` | Set to "0" to disable the limit (unlimited concurrency). |
@@ -149,7 +173,7 @@ helm upgrade --install classifyre ./helm/classifyre \
 | api.maskedConfigEncryption.secretName | string | `""` | Secret name created by this chart when existingSecret is empty. |
 | api.maskedConfigEncryption.value | string | `""` | Must be exactly 32 chars when using raw string format. |
 | api.migration.containerSecurityContext | object | `{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]}}` | Override with runAsUser/runAsNonRoot: false if the migration toolchain requires root (e.g. Prisma on Bun). |
-| api.migration.enabled | bool | `true` | Run database migrations as an API init container. |
+| api.migration.enabled | bool | `true` | API applies pending migrations itself before NestJS startup. |
 | api.migration.script | string | `"npx prisma migrate deploy --schema /app/api/prisma/schema.prisma"` | Migration command/script. |
 | api.nodeSelector | object | `{}` | API scheduling: node selector. |
 | api.pdb.enabled | bool | `true` | Enable PodDisruptionBudget for API deployment. |
@@ -171,8 +195,6 @@ helm upgrade --install classifyre ./helm/classifyre \
 | api.replicaCount | int | `2` | Number of API replicas when autoscaling is disabled. |
 | api.resources.limits | object | `{"cpu":"1","memory":"1Gi"}` | API resource limits. |
 | api.resources.requests | object | `{"cpu":"250m","memory":"512Mi"}` | API resource requests. |
-| api.sandbox.tempDir | string | `"/var/lib/classifyre/sandbox-tmp"` | Mount path for the sandbox emptyDir volume (temp files for local subprocess mode). Must match SANDBOX_TEMP_DIR env var. The emptyDir keeps temp files off the container overlay filesystem and ensures they are cleared on pod restart. In Kubernetes (K8S_JOBS_ENABLED=1) sandbox runs as a K8s Job: file data is passed via base64 env vars (same pattern as RECIPE_B64 for extractions) and decoded inside the job pod's /tmp — no shared volume required. |
-| api.sandbox.tempSizeLimit | string | `"2Gi"` | Size limit for the sandbox emptyDir. Prevents runaway uploads filling the node. |
 | api.service.annotations | object | `{}` | Additional API service annotations. |
 | api.service.nodePort | string | `nil` | Fixed nodePort when `type` is `NodePort` or `LoadBalancer`. |
 | api.service.port | int | `8000` | API service port. |
@@ -278,13 +300,12 @@ helm upgrade --install classifyre ./helm/classifyre \
 | objectStorage.forcePathStyle | bool | `false` | Force path-style S3 URLs. Required for MinIO, Garage, Backblaze B2, and most non-AWS providers. |
 | objectStorage.logPrefix | string | `"runner-logs/"` | S3 object key prefix for runner logs. |
 | objectStorage.region | string | `"us-east-1"` | AWS region. Required for AWS S3; ignored by most self-hosted providers. |
-| objectStorage.sandboxBucket | string | `"classifyre-sandbox"` | S3 bucket used for sandbox uploaded files. |
 | objectStorage.secretAccessKey | string | `""` | Inline secret access key. Prefer existingSecret for production. |
 | postgres.cnpg.appPassword | string | `""` | Application password for generated CNPG secret. |
 | postgres.cnpg.bootstrapSecretName | string | `""` | Existing CNPG app secret name. |
 | postgres.cnpg.clusterName | string | `"classifyre-cnpg"` | CloudNativePG cluster resource name. |
 | postgres.cnpg.database | string | `"classifyre"` | Database bootstrapped by CNPG. |
-| postgres.cnpg.imageName | string | `"ghcr.io/cloudnative-pg/postgresql:17"` | CNPG Postgres image. |
+| postgres.cnpg.imageName | string | `"ghcr.io/cloudnative-pg/postgresql:18-standard-trixie"` | CNPG Postgres image. |
 | postgres.cnpg.instances | int | `3` | Number of CNPG instances. |
 | postgres.cnpg.storage.size | string | `"20Gi"` | CNPG storage size per instance. |
 | postgres.cnpg.storage.storageClassName | string | `""` | CNPG storage class name. |
@@ -297,8 +318,8 @@ helm upgrade --install classifyre ./helm/classifyre \
 | postgres.embedded.existingSecret | string | `""` | Existing secret name holding embedded Postgres password. |
 | postgres.embedded.existingSecretPasswordKey | string | `"password"` | Secret key name for embedded Postgres password. |
 | postgres.embedded.image.pullPolicy | string | `"IfNotPresent"` | Embedded Postgres image pull policy. |
-| postgres.embedded.image.repository | string | `"postgres"` | Embedded Postgres image repository. |
-| postgres.embedded.image.tag | string | `"18"` | Embedded Postgres image tag. |
+| postgres.embedded.image.repository | string | `"pgvector/pgvector"` | Embedded Postgres image repository. |
+| postgres.embedded.image.tag | string | `"0.8.5-pg18-bookworm"` | Embedded Postgres image tag. |
 | postgres.embedded.nodeSelector | object | `{}` | Embedded Postgres scheduling: node selector. |
 | postgres.embedded.password | string | `""` | Embedded Postgres password (required when existingSecret is empty). |
 | postgres.embedded.persistence.accessModes | list | `["ReadWriteOnce"]` | Access modes for embedded Postgres PVC. |

@@ -51,7 +51,7 @@ const STORY_STEPS: readonly StoryStep[] = [
     marker: "DETECTORS → FINDINGS",
     title: "The secrets pack recognizes a key",
     body:
-      "Detectors read each asset as it lands. The built-in secrets pack matches an AWS access key pasted into a deploy job's log and raises a critical finding — with the exact match, its location, and a deterministic identity so a re-scan updates it instead of duplicating it.",
+      "Detectors read each asset as it lands. The built-in secrets pack matches an AWS access key pasted into a deploy job's log and raises a critical finding — with the exact match, its location, and a deterministic identity so a re-scan updates it instead of duplicating it. Semantic ranking scores it 0.94: novel, high quality, nothing like boilerplate — top of the docket.",
     stages: ["detectors", "findings"],
   },
   {
@@ -78,7 +78,7 @@ const STORY_STEPS: readonly StoryStep[] = [
     marker: "CASES & HYPOTHESES",
     title: "Case #42 opens with two explanations",
     body:
-      "“Credential exposure” opens as a case with both findings attached as evidence and two competing hypotheses: the key leaked via CI logs, or it lingers in a stale export. Each hypothesis is pinned to the evidence that supports or contradicts it — confirm one, kill the other, resolve the case.",
+      "“Credential exposure” opens as a case with both findings attached as evidence and two competing hypotheses: the key leaked via CI logs, or it lingers in a stale export. Each hypothesis is pinned to the evidence that supports or contradicts it — and the case starts proposing its own next leads, ranked by importance: semantic neighbours of the evidence plus high-ranking matches from inquiry #7.",
     stages: ["cases"],
   },
   {

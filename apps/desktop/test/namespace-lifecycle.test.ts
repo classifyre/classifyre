@@ -12,6 +12,7 @@ import fs from 'fs';
 import os from 'os';
 import http from 'http';
 import net from 'net';
+import { createRequire } from 'module';
 
 const MONOREPO_ROOT = path.resolve(__dirname, '../../..');
 const API_DIR = path.join(MONOREPO_ROOT, 'apps/api');
@@ -51,6 +52,50 @@ function findBun(): string {
     if (fs.existsSync(c)) return c;
   }
   throw new Error('bun not found');
+}
+
+function embeddedPostgresNativeRoot(): string {
+  const platform = process.platform === 'win32' ? 'windows' : process.platform;
+  const packageName = `${platform}-${process.arch}`;
+  const require = createRequire(__filename);
+  const embeddedPostgresEntry = require.resolve('embedded-postgres');
+  const nativeRoot = path.resolve(
+    path.dirname(embeddedPostgresEntry),
+    '..',
+    '..',
+    '@embedded-postgres',
+    packageName,
+    'native',
+  );
+  assert(
+    fs.existsSync(nativeRoot),
+    `Embedded PostgreSQL native runtime not found at ${nativeRoot}`,
+  );
+  return nativeRoot;
+}
+
+function ensurePgvectorRuntime(env: Record<string, string>): void {
+  const nativeRoot = embeddedPostgresNativeRoot();
+  const controlFile = path.join(
+    nativeRoot,
+    'share',
+    'postgresql',
+    'extension',
+    'vector.control',
+  );
+  if (fs.existsSync(controlFile)) return;
+
+  console.log('[test] Staging pgvector into embedded PostgreSQL...');
+  execFileSync(
+    'bash',
+    [path.join(__dirname, '../scripts/stage-pgvector.sh'), nativeRoot],
+    {
+      cwd: MONOREPO_ROOT,
+      env,
+      stdio: 'inherit',
+    },
+  );
+  assert(fs.existsSync(controlFile), `pgvector was not staged at ${controlFile}`);
 }
 
 async function getAvailablePort(preferred?: number): Promise<number> {
@@ -137,6 +182,7 @@ async function main() {
 
   // --- Step 1: Start embedded PostgreSQL ---
   console.log('\n[test] Step 1: Starting embedded PostgreSQL...');
+  ensurePgvectorRuntime(env);
   pgPort = await getAvailablePort(54321);
 
   const { default: EmbeddedPostgres } = await import('embedded-postgres');

@@ -1,0 +1,176 @@
+{{- /*
+Worker deployment: runs the same API image/process (background pg-boss queue
+workers, embedding inference) with SERVICE_ROLE=worker so it skips serving
+production HTTP traffic while keeping /ping alive for probes. Splitting this out
+of the api Deployment keeps heavy background work from OOMing HTTP-serving pods.
+No Service/Ingress is created for this workload — it is not meant to receive
+external traffic.
+*/ -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "classifyre.worker.fullname" . }}
+  labels:
+    {{- include "classifyre.commonLabels" . | nindent 4 }}
+    app.kubernetes.io/component: worker
+  {{- with .Values.commonAnnotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  replicas: {{ .Values.worker.replicaCount }}
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      {{- include "classifyre.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: worker
+  template:
+    metadata:
+      labels:
+        {{- include "classifyre.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: worker
+        {{- with .Values.api.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- with .Values.api.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      serviceAccountName: {{ include "classifyre.serviceAccountName" . }}
+      automountServiceAccountToken: {{ .Values.serviceAccount.automount }}
+      {{- with .Values.api.priorityClassName }}
+      priorityClassName: {{ . | quote }}
+      {{- end }}
+      {{- if ne .Values.api.terminationGracePeriodSeconds nil }}
+      terminationGracePeriodSeconds: {{ .Values.api.terminationGracePeriodSeconds }}
+      {{- end }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.api.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: worker
+          image: {{ .Values.api.image.repository }}:{{ .Values.api.image.tag | default .Chart.AppVersion }}
+          imagePullPolicy: {{ .Values.api.image.pullPolicy }}
+          {{- if .Values.api.command }}
+          command:
+            {{- toYaml .Values.api.command | nindent 12 }}
+          {{- else }}
+          command:
+            - /bin/sh
+            - -lc
+          {{- end }}
+          {{- if .Values.api.args }}
+          args:
+            {{- toYaml .Values.api.args | nindent 12 }}
+          {{- else if not .Values.api.command }}
+          args:
+            - >-
+              set -eu;
+              {{- if .Values.api.workingDir }}
+              cd {{ .Values.api.workingDir | quote }};
+              {{- end }}
+              if [ -d "/app/node_modules" ] && [ ! -e "/node_modules" ]; then
+                ln -s /app/node_modules /node_modules;
+              fi;
+              if [ -z "${DATABASE_URL:-}" ] || [ "${DATABASE_URL}" = "postgresql://postgres@127.0.0.1:5432/classifyre" ]; then
+                export DATABASE_URL="postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=${DB_SSLMODE}";
+              fi;
+              exec {{ .Values.api.startCommand }}
+          {{- end }}
+          ports:
+            {{- /* SERVICE_ROLE=worker still starts the HTTP server, so /ping probes keep working. */}}
+            - name: http
+              containerPort: {{ .Values.api.service.port }}
+              protocol: TCP
+          env:
+            {{- include "classifyre.api.env" . | nindent 12 }}
+            - name: SERVICE_ROLE
+              value: "worker"
+          {{- with .Values.api.extraEnvFrom }}
+          envFrom:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            {{- if .Values.api.embedding.enabled }}
+            - name: embedding-cache
+              mountPath: {{ .Values.api.embedding.cacheDir | quote }}
+            {{- end }}
+            {{- if .Values.api.cliJobs.enabled }}
+            - name: cli-job-template
+              mountPath: /etc/classifyre/cli-job-template
+              readOnly: true
+            {{- end }}
+            {{- with .Values.api.extraVolumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          {{- with .Values.worker.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- if .Values.api.livenessProbe.enabled }}
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.api.livenessProbe.path }}
+              port: http
+            initialDelaySeconds: {{ .Values.api.livenessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.api.livenessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.api.livenessProbe.timeoutSeconds }}
+            failureThreshold: {{ .Values.api.livenessProbe.failureThreshold }}
+          {{- end }}
+          {{- if .Values.api.readinessProbe.enabled }}
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.api.readinessProbe.path }}
+              port: http
+            initialDelaySeconds: {{ .Values.api.readinessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.api.readinessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.api.readinessProbe.timeoutSeconds }}
+            failureThreshold: {{ .Values.api.readinessProbe.failureThreshold }}
+          {{- end }}
+          {{- if .Values.api.startupProbe.enabled }}
+          startupProbe:
+            httpGet:
+              path: {{ .Values.api.startupProbe.path }}
+              port: http
+            periodSeconds: {{ .Values.api.startupProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.api.startupProbe.timeoutSeconds }}
+            failureThreshold: {{ .Values.api.startupProbe.failureThreshold }}
+          {{- end }}
+          {{- with .Values.api.containerSecurityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.api.lifecycle }}
+          lifecycle:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      volumes:
+        {{- if .Values.api.embedding.enabled }}
+        - name: embedding-cache
+          emptyDir:
+            {{- with .Values.api.embedding.cacheSizeLimit }}
+            sizeLimit: {{ . | quote }}
+            {{- end }}
+        {{- end }}
+        {{- if .Values.api.cliJobs.enabled }}
+        - name: cli-job-template
+          configMap:
+            name: {{ include "classifyre.api.fullname" . }}-cli-job-template
+        {{- end }}
+        {{- with .Values.api.extraVolumes }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- with .Values.api.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.api.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

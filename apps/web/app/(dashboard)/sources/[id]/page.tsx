@@ -10,6 +10,7 @@ import {
   Pencil,
   Play,
   ArrowUpRight,
+  TriangleAlert,
 } from "lucide-react";
 import {
   api,
@@ -32,6 +33,11 @@ import {
   CardTitle,
 } from "@workspace/ui/components/card";
 import { Badge } from "@workspace/ui/components/badge";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@workspace/ui/components/tooltip";
 import { Separator } from "@workspace/ui/components/separator";
 import {
   Tabs,
@@ -55,6 +61,7 @@ import { RunnerStatusBadge } from "@/components/runner-status-badge";
 import { isRunnerStatusRunning } from "@/lib/runner-status-badge";
 import { useTranslation } from "@/hooks/use-translation";
 import { useFormatDuration } from "@/hooks/use-format-duration";
+import { summarizeTextCoverage } from "@/lib/text-coverage";
 
 const EMPTY_CHARTS: SearchAssetsChartsResponseDto = {
   totals: {
@@ -223,6 +230,11 @@ export default function SourceViewPage() {
   const lastRunner = useMemo(() => {
     return recentRunners[0];
   }, [recentRunners]);
+
+  const lastRunnerCoverage = useMemo(
+    () => summarizeTextCoverage(lastRunner?.textCoverage),
+    [lastRunner],
+  );
 
   const SourceTypeIcon = getSourceIcon(source?.type);
 
@@ -597,6 +609,42 @@ export default function SourceViewPage() {
                       <p className="text-sm">—</p>
                     )}
                   </div>
+                  {lastRunner && lastRunnerCoverage && (
+                    <div className="space-y-1">
+                      <p className="text-xs uppercase text-muted-foreground">
+                        {t("sources.detail.textCoverage")}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => router.push(`/scans/${lastRunner.id}`)}
+                        className="inline-flex flex-wrap items-center gap-1.5 cursor-pointer transition-opacity hover:opacity-80"
+                      >
+                        <span className="text-sm">
+                          {t("sources.detail.textCoverageValue", {
+                            pct: lastRunnerCoverage.percent,
+                          })}
+                        </span>
+                        {lastRunnerCoverage.isLow && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Badge
+                                variant="outline"
+                                className="gap-1 rounded-[4px] border-amber-500/30 bg-amber-50 text-[11px] text-amber-700 dark:bg-amber-950/30 dark:text-amber-400"
+                              >
+                                <TriangleAlert className="h-3 w-3" />
+                                {t("sources.detail.lowTextCoverageBadge", {
+                                  pct: lastRunnerCoverage.percent,
+                                })}
+                              </Badge>
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-[280px] break-words">
+                              {t("sources.detail.lowTextCoverageTooltip")}
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
+                      </button>
+                    </div>
+                  )}
                   <div className="space-y-1">
                     <p className="text-xs uppercase text-muted-foreground">
                       {t("sources.detail.lastRunDuration")}

@@ -69,7 +69,6 @@ its startup sequence), the web frontend starts third, and Caddy starts
 last. The API waits up to 90 seconds for PostgreSQL to be ready, creates
 the database if missing, runs any pending migrations, then starts serving.
 
-
 ---
 
 ## Upgrade procedure (Helm)
@@ -98,19 +97,19 @@ the database if missing, runs any pending migrations, then starts serving.
    `--set api.image.tag=...` only when pinning immutable tags that differ
    from the chart version.
 
-4. Watch the rollout until new pods are ready:
+3. Watch the rollout until new pods are ready:
 
    ```bash
    kubectl -n classifyre get pods -w
    ```
 
-5. Verify the deployment:
+4. Verify the deployment:
 
    ```bash
    curl https://<your-host>/api/ping
    ```
 
-6. Run a sandbox scan and a real ingestion run to confirm everything works.
+5. Run a Sandbox source scan and another connector scan to confirm everything works.
 
 ### What is preserved across upgrades
 
@@ -124,12 +123,12 @@ the database if missing, runs any pending migrations, then starts serving.
 
 ### Post-upgrade verification
 
-| Check | Command |
-|---|---|
-| Release status | `helm status classifyre -n classifyre` |
-| Pod status | `kubectl -n classifyre get pods` |
-| API health | `curl https://<your-host>/api/ping` |
-| Functionality | Start a sandbox run and a source scan |
+| Check          | Command                                                |
+| -------------- | ------------------------------------------------------ |
+| Release status | `helm status classifyre -n classifyre`                 |
+| Pod status     | `kubectl -n classifyre get pods`                       |
+| API health     | `curl https://<your-host>/api/ping`                    |
+| Functionality  | Start a Sandbox source scan and another connector scan |
 
 ---
 

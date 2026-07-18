@@ -275,26 +275,27 @@ describe('KubernetesCliJobService', () => {
     expect(command).toContain('--managed-runner');
   });
 
-  it('builds sandbox command reading file from the mounted volume', () => {
+  it('builds file-evaluation command reading input from the mounted volume', () => {
     const service = new KubernetesCliJobService(mockInstanceSettings());
     const command = (service as any).buildJobCommand(
-      'sandbox',
+      'evaluation',
       '/app/apps/cli',
-      true, // sandboxViaVolume
     );
 
     expect(command).toContain('cd /app/apps/cli');
-    // File is no longer inlined; it is read from the init-container volume.
-    expect(command).not.toContain('SANDBOX_FILE_B64');
-    expect(command).toContain('/sandbox-input/input${SANDBOX_FILE_EXT:-}');
-    expect(command).toContain('SANDBOX_DETECTORS_B64');
+    expect(command).toContain(
+      '/evaluation-input/input${EVALUATION_FILE_EXT:-}',
+    );
+    expect(command).toContain('EVALUATION_DETECTORS_B64');
     expect(command).toContain('base64 -d');
-    expect(command).toContain('src.main sandbox');
-    expect(command).toContain('--detectors-file /tmp/sandbox-detectors.json');
+    expect(command).toContain('src.main evaluate-file');
+    expect(command).toContain(
+      '--detectors-file /tmp/evaluation-detectors.json',
+    );
     expect(command).not.toContain('RECIPE_B64');
   });
 
-  it('transports the sandbox file via an init-container + emptyDir volume (no base64 inline)', async () => {
+  it('transports evaluation input via an init-container and emptyDir volume', async () => {
     const service = new KubernetesCliJobService(mockInstanceSettings());
     const detectors = [{ type: 'BUILTIN_EMAIL', enabled: true }];
     const job = await (service as any).buildJobFromTemplate(
@@ -321,10 +322,12 @@ describe('KubernetesCliJobService', () => {
         },
       },
       {
-        sourceId: 'sandbox-run-1',
-        mode: 'sandbox',
-        sandboxFileExt: '.txt',
-        sandboxDetectorsB64: Buffer.from(
+        sourceId: 'detector-1-scenario-1',
+        mode: 'evaluation',
+        evaluationInputUrl:
+          'http://api.svc:8000/custom-detectors/detector-1/test-scenarios/scenario-1/input',
+        evaluationFileExt: '.txt',
+        evaluationDetectorsB64: Buffer.from(
           JSON.stringify(detectors),
           'utf8',
         ).toString('base64'),
@@ -335,41 +338,40 @@ describe('KubernetesCliJobService', () => {
 
     // File is NOT inlined anymore.
     expect(
-      env.find((item: any) => item.name === 'SANDBOX_FILE_B64'),
+      env.find((item: any) => item.name === 'EVALUATION_FILE_B64'),
     ).toBeUndefined();
     expect(
-      env.find((item: any) => item.name === 'SANDBOX_FILE_EXT')?.value,
+      env.find((item: any) => item.name === 'EVALUATION_FILE_EXT')?.value,
     ).toBe('.txt');
     expect(
-      env.find((item: any) => item.name === 'SANDBOX_DETECTORS_B64')?.value,
+      env.find((item: any) => item.name === 'EVALUATION_DETECTORS_B64')?.value,
     ).toBe(Buffer.from(JSON.stringify(detectors), 'utf8').toString('base64'));
 
     // emptyDir volume mounted into the main container.
     expect(
-      podSpec.volumes?.find((v: any) => v.name === 'sandbox-input')?.emptyDir,
+      podSpec.volumes?.find((v: any) => v.name === 'evaluation-input')
+        ?.emptyDir,
     ).toBeDefined();
     expect(
       podSpec.containers[0].volumeMounts?.find(
-        (m: any) => m.name === 'sandbox-input',
+        (m: any) => m.name === 'evaluation-input',
       )?.mountPath,
-    ).toBe('/sandbox-input');
+    ).toBe('/evaluation-input');
 
     // init-container fetches the file from the API into the volume.
     const init = podSpec.initContainers?.find(
-      (c: any) => c.name === 'sandbox-input-fetch',
+      (c: any) => c.name === 'evaluation-input-fetch',
     );
     expect(init).toBeDefined();
     expect(init.image).toBe('cli:latest');
     expect(
-      init.volumeMounts?.find((m: any) => m.name === 'sandbox-input')
+      init.volumeMounts?.find((m: any) => m.name === 'evaluation-input')
         ?.mountPath,
-    ).toBe('/sandbox-input');
-    expect(init.args?.[0]).toContain('/sandbox/runs/');
-    expect(init.args?.[0]).toContain('/input');
+    ).toBe('/evaluation-input');
+    expect(init.args?.[0]).toContain('EVALUATION_INPUT_URL');
     expect(
-      init.env?.find((e: any) => e.name === 'CLASSIFYRE_OUTPUT_REST_URL')
-        ?.value,
-    ).toBe('http://api.svc:8000');
+      init.env?.find((e: any) => e.name === 'EVALUATION_INPUT_URL')?.value,
+    ).toContain('/custom-detectors/detector-1/test-scenarios/scenario-1/input');
   });
 
   it('strips server-generated identity fields from a captured-job template', async () => {

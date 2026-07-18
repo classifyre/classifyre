@@ -1,4 +1,20 @@
 {
+  "SANDBOX": [
+    {
+      "name": "Uploaded files",
+      "description": "Upload local files and scan them through the standard source lifecycle",
+      "config": {
+        "type": "SANDBOX",
+        "required": {},
+        "masked": {},
+        "optional": {},
+        "sampling": {
+          "strategy": "ALL",
+          "rows_per_page": 100
+        }
+      }
+    }
+  ],
   "WORDPRESS": [
     {
       "name": "Public blog content scan",
@@ -80,10 +96,7 @@
           "content": {
             "fetch_posts": true,
             "fetch_pages": true,
-            "post_status": [
-              "publish",
-              "draft"
-            ]
+            "post_status": ["publish", "draft"]
           }
         },
         "sampling": {
@@ -122,9 +135,7 @@
         },
         "optional": {
           "channels": {
-            "channel_types": [
-              "public_channel"
-            ],
+            "channel_types": ["public_channel"],
             "exclude_archived": true
           },
           "ingestion": {
@@ -165,11 +176,7 @@
         },
         "optional": {
           "channels": {
-            "channel_types": [
-              "private_channel",
-              "mpim",
-              "im"
-            ],
+            "channel_types": ["private_channel", "mpim", "im"],
             "exclude_archived": true
           }
         },
@@ -197,10 +204,7 @@
         },
         "optional": {
           "channels": {
-            "channel_ids": [
-              "C1234567890",
-              "C0987654321"
-            ]
+            "channel_ids": ["C1234567890", "C0987654321"]
           },
           "time_range": {
             "oldest": "2025-01-01T00:00:00Z",
@@ -251,13 +255,7 @@
             "max_file_bytes": 10485760
           },
           "scope": {
-            "include_extensions": [
-              ".pdf",
-              ".docx",
-              ".xlsx",
-              ".csv",
-              ".txt"
-            ],
+            "include_extensions": [".pdf", ".docx", ".xlsx", ".csv", ".txt"],
             "include_content_preview": true
           }
         },
@@ -331,11 +329,7 @@
           },
           "scope": {
             "prefix": "exports/",
-            "include_extensions": [
-              ".csv",
-              ".parquet",
-              ".pdf"
-            ],
+            "include_extensions": [".csv", ".parquet", ".pdf"],
             "include_content_preview": true
           }
         },
@@ -405,11 +399,7 @@
         "optional": {
           "scope": {
             "prefix": "documents/",
-            "exclude_extensions": [
-              ".png",
-              ".jpg",
-              ".gif"
-            ],
+            "exclude_extensions": [".png", ".jpg", ".gif"],
             "include_content_preview": true
           }
         },
@@ -568,9 +558,7 @@
         },
         "optional": {
           "scope": {
-            "include_schemas": [
-              "public"
-            ]
+            "include_schemas": ["public"]
           }
         },
         "sampling": {
@@ -838,9 +826,7 @@
           "scope": {
             "include_tables": true,
             "include_views": true,
-            "include_schemas": [
-              "YOUR_SCHEMA"
-            ]
+            "include_schemas": ["YOUR_SCHEMA"]
           }
         },
         "sampling": {
@@ -1015,13 +1001,8 @@
         },
         "optional": {
           "scope": {
-            "include_catalogs": [
-              "production",
-              "analytics"
-            ],
-            "exclude_schemas": [
-              "information_schema"
-            ],
+            "include_catalogs": ["production", "analytics"],
+            "exclude_schemas": ["information_schema"],
             "table_limit_per_schema": 100
           },
           "extraction": {
@@ -1277,11 +1258,7 @@
         },
         "optional": {
           "scope": {
-            "include_labels": [
-              "Person",
-              "Organization",
-              "Transaction"
-            ],
+            "include_labels": ["Person", "Organization", "Transaction"],
             "include_relationships": true
           }
         },
@@ -1369,10 +1346,7 @@
         },
         "optional": {
           "scope": {
-            "workspace_names": [
-              "Finance",
-              "Marketing"
-            ]
+            "workspace_names": ["Finance", "Marketing"]
           },
           "extraction": {
             "extract_reports": true,
@@ -1441,10 +1415,7 @@
         },
         "optional": {
           "scope": {
-            "project_names": [
-              "Finance",
-              "Operations"
-            ],
+            "project_names": ["Finance", "Operations"],
             "include_workbooks": true,
             "include_datasources": true
           }
@@ -1477,10 +1448,7 @@
         "optional": {
           "scope": {
             "spaces": {
-              "keys": [
-                "ENG",
-                "PLATFORM"
-              ],
+              "keys": ["ENG", "PLATFORM"],
               "status": "current"
             }
           },
@@ -1561,10 +1529,7 @@
         },
         "optional": {
           "scope": {
-            "project_keys": [
-              "PROJ",
-              "SEC"
-            ]
+            "project_keys": ["PROJ", "SEC"]
           },
           "content": {
             "include_comments": true,
@@ -1634,10 +1599,7 @@
         },
         "optional": {
           "scope": {
-            "service_desk_ids": [
-              1,
-              2
-            ],
+            "service_desk_ids": [1, 2],
             "request_status": "OPEN_REQUESTS"
           },
           "content": {
@@ -1723,10 +1685,7 @@
         },
         "optional": {
           "scope": {
-            "include_tables": [
-              "users",
-              "events"
-            ],
+            "include_tables": ["users", "events"],
             "table_limit": 50
           }
         },
@@ -1783,9 +1742,7 @@
         },
         "optional": {
           "scope": {
-            "data_source_ids": [
-              "11111111-2222-3333-4444-555555555555"
-            ]
+            "data_source_ids": ["11111111-2222-3333-4444-555555555555"]
           },
           "content": {
             "include_comments": true,
@@ -1865,9 +1822,7 @@
         },
         "optional": {
           "scope": {
-            "folders": [
-              "INBOX"
-            ],
+            "folders": ["INBOX"],
             "include_attachments": true
           }
         },
@@ -1907,9 +1862,7 @@
         },
         "optional": {
           "scope": {
-            "folders": [
-              "INBOX"
-            ],
+            "folders": ["INBOX"],
             "unseen_only": true,
             "since_date": "2026-01-01",
             "max_attachment_size_bytes": 26214400
@@ -1945,11 +1898,7 @@
             "timeout_seconds": 60
           },
           "scope": {
-            "folders": [
-              "INBOX",
-              "Sent",
-              "Archive"
-            ],
+            "folders": ["INBOX", "Sent", "Archive"],
             "include_attachments": true
           }
         },
@@ -1982,16 +1931,11 @@
       "config": {
         "type": "YOUTUBE",
         "required": {
-          "channels": [
-            "https://www.youtube.com/@OpenAI",
-            "@AnthropicAI"
-          ]
+          "channels": ["https://www.youtube.com/@OpenAI", "@AnthropicAI"]
         },
         "optional": {
           "transcript": {
-            "languages": [
-              "en"
-            ]
+            "languages": ["en"]
           }
         },
         "sampling": {
@@ -2038,9 +1982,7 @@
       "config": {
         "type": "YOUTUBE",
         "required": {
-          "channels": [
-            "https://www.youtube.com/@GoogleDevelopers/videos"
-          ]
+          "channels": ["https://www.youtube.com/@GoogleDevelopers/videos"]
         },
         "optional": {
           "connection": {
@@ -2115,10 +2057,7 @@
             "region_name": "us-east-1"
           },
           "scope": {
-            "table_paths": [
-              "warehouse/sales/orders",
-              "warehouse/crm/customers"
-            ]
+            "table_paths": ["warehouse/sales/orders", "warehouse/crm/customers"]
           }
         },
         "sampling": {
@@ -2192,9 +2131,7 @@
             "region_name": "us-east-1"
           },
           "scope": {
-            "table_paths": [
-              "warehouse/analytics/events"
-            ]
+            "table_paths": ["warehouse/analytics/events"]
           }
         },
         "sampling": {
@@ -2262,10 +2199,7 @@
             "sasl_mechanism": "SCRAM-SHA-256"
           },
           "scope": {
-            "include_topics": [
-              "payments",
-              "users"
-            ]
+            "include_topics": ["payments", "users"]
           }
         },
         "sampling": {
@@ -2408,10 +2342,7 @@
             "verify_ssl": true
           },
           "scope": {
-            "include_indices": [
-              "orders",
-              "customers"
-            ]
+            "include_indices": ["orders", "customers"]
           }
         },
         "sampling": {
@@ -2450,9 +2381,7 @@
         },
         "optional": {
           "scope": {
-            "exclude_indices": [
-              ".kibana*"
-            ]
+            "exclude_indices": [".kibana*"]
           }
         },
         "sampling": {
@@ -2513,10 +2442,7 @@
             "verify_ssl": true
           },
           "scope": {
-            "include_indices": [
-              "logs-app",
-              "logs-infra"
-            ]
+            "include_indices": ["logs-app", "logs-infra"]
           }
         },
         "sampling": {
@@ -2555,9 +2481,7 @@
         },
         "optional": {
           "scope": {
-            "exclude_indices": [
-              ".opensearch-*"
-            ]
+            "exclude_indices": [".opensearch-*"]
           }
         },
         "sampling": {
@@ -2609,10 +2533,7 @@
         },
         "optional": {
           "scope": {
-            "include_indices": [
-              "products",
-              "customers"
-            ]
+            "include_indices": ["products", "customers"]
           }
         },
         "sampling": {
@@ -2654,9 +2575,7 @@
             "verify_ssl": true
           },
           "scope": {
-            "exclude_indices": [
-              "internal_logs"
-            ]
+            "exclude_indices": ["internal_logs"]
           }
         },
         "sampling": {
@@ -2688,9 +2607,7 @@
         },
         "optional": {
           "scope": {
-            "ecosystems": [
-              "sharepoint_sites"
-            ]
+            "ecosystems": ["sharepoint_sites"]
           },
           "extraction": {
             "include_site_metadata": true,
@@ -2733,18 +2650,9 @@
         },
         "optional": {
           "scope": {
-            "ecosystems": [
-              "sharepoint_sites",
-              "onedrive",
-              "teams_files"
-            ],
+            "ecosystems": ["sharepoint_sites", "onedrive", "teams_files"],
             "path_prefix": "/Documents",
-            "include_extensions": [
-              ".pdf",
-              ".docx",
-              ".xlsx",
-              ".pptx"
-            ]
+            "include_extensions": [".pdf", ".docx", ".xlsx", ".pptx"]
           },
           "connection": {
             "page_size": 500,
@@ -2779,16 +2687,8 @@
         "masked": {},
         "optional": {
           "scope": {
-            "ecosystems": [
-              "sharepoint_sites",
-              "onedrive"
-            ],
-            "exclude_extensions": [
-              ".mp4",
-              ".mov",
-              ".avi",
-              ".wmv"
-            ],
+            "ecosystems": ["sharepoint_sites", "onedrive"],
+            "exclude_extensions": [".mp4", ".mov", ".avi", ".wmv"],
             "max_object_bytes": 52428800
           }
         },
@@ -2909,11 +2809,7 @@
             ],
             "include_my_drive": false,
             "include_permissions": true,
-            "include_file_extensions": [
-              ".pdf",
-              ".docx",
-              ".xlsx"
-            ]
+            "include_file_extensions": [".pdf", ".docx", ".xlsx"]
           },
           "connection": {
             "page_size": 500

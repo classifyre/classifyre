@@ -16,6 +16,7 @@ import { AssetService } from '../src/asset.service';
 import { CliRunnerService } from '../src/cli-runner/cli-runner.service';
 import { CustomDetectorExtractionsService } from '../src/custom-detector-extractions.service';
 import { EmbeddingAnalysisService } from '../src/embedding/embedding-analysis.service';
+import { EmbeddingConfigService } from '../src/embedding/embedding-config.service';
 import { EmbeddingService } from '../src/embedding/embedding.service';
 import { QueryEmbeddingService } from '../src/embedding/query-embedding.service';
 import { MaskedConfigCryptoService } from '../src/masked-config-crypto.service';
@@ -414,48 +415,75 @@ describe('Post-first-use store remediation (e2e)', () => {
         sourceId: source.id,
       },
     });
-    const hashes = ['1'.repeat(64), '2'.repeat(64), '3'.repeat(64)];
+    // Six distinct hashes: a semantic-outlier signal requires at least
+    // MIN_NEIGHBORHOOD comparable vectors; smaller neighbourhoods are
+    // explicitly treated as unknown rather than extreme.
+    const hashes = [
+      '1'.repeat(64),
+      '2'.repeat(64),
+      '3'.repeat(64),
+      '4'.repeat(64),
+      '5'.repeat(64),
+      '6'.repeat(64),
+    ];
+    const findingInputs: Array<{ hash: string; content: string }> = [
+      { hash: hashes[0], content: 'Contract payment schedule and legal reference' },
+      { hash: hashes[0], content: 'Contract payment schedule and legal reference' },
+      { hash: hashes[1], content: 'Agreement payment timetable and statutory citation' },
+      { hash: hashes[2], content: 'Unrelated aviation maintenance record' },
+      { hash: hashes[3], content: 'Contract invoicing calendar and legal citation' },
+      { hash: hashes[4], content: 'Payment agreement schedule with statute reference' },
+      { hash: hashes[5], content: 'Contractual payment plan and code citation' },
+    ];
     const createdFindings = await Promise.all(
-      [hashes[0], hashes[0], hashes[1], hashes[2]].map(
-        (embedContentHash, index) =>
-          prisma.finding.create({
-            data: {
-              detectionIdentity: `semantic-${Date.now()}-${index}`,
-              assetId: asset.id,
-              sourceId: source.id,
-              detectorType: DetectorType.CUSTOM,
-              findingType: 'LEGAL_REFERENCE',
-              category: 'custom',
-              severity: Severity.MEDIUM,
-              confidence: 0.9,
-              matchedContent: [
-                'Contract payment schedule and legal reference',
-                'Contract payment schedule and legal reference',
-                'Agreement payment timetable and statutory citation',
-                'Unrelated aviation maintenance record',
-              ][index],
-              contextBefore: 'Readable evidence context before the match',
-              contextAfter: 'Readable evidence context after the match',
-              embedContentHash,
-              detectedAt: new Date(),
-            },
-          }),
+      findingInputs.map(({ hash, content }, index) =>
+        prisma.finding.create({
+          data: {
+            detectionIdentity: `semantic-${Date.now()}-${index}`,
+            assetId: asset.id,
+            sourceId: source.id,
+            detectorType: DetectorType.CUSTOM,
+            findingType: 'LEGAL_REFERENCE',
+            category: 'custom',
+            severity: Severity.MEDIUM,
+            confidence: 0.9,
+            matchedContent: content,
+            contextBefore: 'Readable evidence context before the match',
+            contextAfter: 'Readable evidence context after the match',
+            embedContentHash: hash,
+            detectedAt: new Date(),
+          },
+        }),
       ),
     );
     const analysis = new EmbeddingAnalysisService(prisma);
+    // Pin the configured space to the test's own space: without this, active
+    // space resolution follows EMBEDDING_* env defaults, and on a database
+    // that already holds real vectors the semantic queries would search the
+    // production space instead of the fixtures below.
+    const revision = `revision-${Date.now()}`;
+    const previousModel = process.env.EMBEDDING_MODEL;
+    const previousRevision = process.env.EMBEDDING_MODEL_REVISION;
+    process.env.EMBEDDING_MODEL = 'first-use-e2e-model';
+    process.env.EMBEDDING_MODEL_REVISION = revision;
+    const testConfig = new EmbeddingConfigService();
+    process.env.EMBEDDING_MODEL = previousModel;
+    process.env.EMBEDDING_MODEL_REVISION = previousRevision;
     const pgvector = new EmbeddingService(
       prisma,
       { hasVector: () => true } as never,
       analysis,
+      testConfig,
     );
     const exact = new EmbeddingService(
       prisma,
       { hasVector: () => false } as never,
       analysis,
+      testConfig,
     );
     const space = await pgvector.ensureSpace({
       model: 'first-use-e2e-model',
-      revision: `revision-${Date.now()}`,
+      revision,
       dim: 384,
       pooling: 'mean',
       normalized: true,
@@ -472,12 +500,15 @@ describe('Post-first-use store remediation (e2e)', () => {
         { contentHash: hashes[0], vector: queryVector },
         { contentHash: hashes[1], vector: vector(0.999, 0.04) },
         { contentHash: hashes[2], vector: vector(0, 1) },
+        { contentHash: hashes[3], vector: vector(0.998, 0.06) },
+        { contentHash: hashes[4], vector: vector(0.997, 0.08) },
+        { contentHash: hashes[5], vector: vector(0.996, 0.09) },
       ],
     });
 
     const [indexedRows, exactRows] = await Promise.all([
-      pgvector.semanticFindingIds(queryVector, 4),
-      exact.semanticFindingIds(queryVector, 4),
+      pgvector.semanticFindingIds(queryVector, 7),
+      exact.semanticFindingIds(queryVector, 7),
     ]);
     expect(new Set(indexedRows.slice(0, 3).map((row) => row.id))).toEqual(
       new Set(exactRows.slice(0, 3).map((row) => row.id)),
@@ -505,7 +536,9 @@ describe('Post-first-use store remediation (e2e)', () => {
         expect.objectContaining({ code: 'semantic_outlier', impact: 'up' }),
       ]),
     );
-    expect(await pgvector.boilerplateClusters(source.id)).toEqual(
+    expect(
+      await pgvector.boilerplateClusters({ sourceIds: [source.id] }),
+    ).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
           groupHash: hashes[0],

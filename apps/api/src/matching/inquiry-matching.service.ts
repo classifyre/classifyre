@@ -5,6 +5,7 @@ import { PrismaService } from '../prisma.service';
 import { PgBossService } from '../scheduler/pg-boss.service';
 import { CompiledMatcher, InquiryMatchers } from './inquiry-matcher';
 import { INQUIRY_MATCH_QUEUE } from './matching.constants';
+import { runsBackgroundWorkers } from '../service-role';
 import {
   PreviewResponseDto,
   InquiryMatchDto,
@@ -23,6 +24,13 @@ interface FindingRow {
   matchedContent: string | null;
   createdAt?: Date;
   asset?: { name: string; sourceType: { toString(): string } } | null;
+  evidenceAnalysis?: {
+    importanceScore: number;
+    qualityScore: number;
+    similarCount: number;
+    duplicateGroupHash: string | null;
+    reasons: unknown;
+  } | null;
 }
 
 const FINDING_SELECT = {
@@ -57,6 +65,7 @@ export class InquiryMatchingService implements OnApplicationBootstrap {
   ) {}
 
   async onApplicationBootstrap(): Promise<void> {
+    if (!runsBackgroundWorkers()) return;
     const boss = await this.pgBoss.getBossAsync();
     await boss.createQueue(INQUIRY_MATCH_QUEUE);
     await boss.work(
@@ -207,7 +216,34 @@ export class InquiryMatchingService implements OnApplicationBootstrap {
       sourceType: f.asset ? String(f.asset.sourceType) : undefined,
       matchedAt: f.createdAt ?? new Date(),
       isNew: seenAt ? (f.createdAt ?? new Date(0)) > seenAt : false,
+      ranking: f.evidenceAnalysis
+        ? {
+            importance: f.evidenceAnalysis.importanceScore,
+            quality: f.evidenceAnalysis.qualityScore,
+            similarCount: f.evidenceAnalysis.similarCount,
+            duplicateGroupHash: f.evidenceAnalysis.duplicateGroupHash,
+            reasons: Array.isArray(f.evidenceAnalysis.reasons)
+              ? (f.evidenceAnalysis.reasons as never[])
+              : [],
+            coverage: 'analyzed' as const,
+          }
+        : {
+            similarCount: 0,
+            reasons: [],
+            coverage: 'pending' as const,
+          },
     }));
+    // Importance-first: matches are a triage queue, not a log. Unanalyzed
+    // rows keep their recency order below the ranked ones.
+    matches.sort((a, b) => {
+      const ai = a.ranking?.importance ?? -1;
+      const bi = b.ranking?.importance ?? -1;
+      if (ai !== bi) return bi - ai;
+      return (
+        (b.matchedAt instanceof Date ? b.matchedAt.getTime() : 0) -
+        (a.matchedAt instanceof Date ? a.matchedAt.getTime() : 0)
+      );
+    });
 
     const term =
       typeof query.search === 'string' ? query.search.trim().toLowerCase() : '';
@@ -234,8 +270,6 @@ export class InquiryMatchingService implements OnApplicationBootstrap {
     const onlyNew = query.onlyNew === true || String(query.onlyNew) === 'true';
     const newCount = matches.filter((m) => m.isNew).length;
     if (onlyNew) matches = matches.filter((m) => m.isNew);
-
-    matches.sort((a, b) => b.matchedAt.getTime() - a.matchedAt.getTime());
 
     return {
       items: matches.slice(skip, skip + limit),
@@ -322,6 +356,15 @@ export class InquiryMatchingService implements OnApplicationBootstrap {
         ? {
             ...FINDING_SELECT,
             asset: { select: { name: true, sourceType: true } },
+            evidenceAnalysis: {
+              select: {
+                importanceScore: true,
+                qualityScore: true,
+                similarCount: true,
+                duplicateGroupHash: true,
+                reasons: true,
+              },
+            },
           }
         : FINDING_SELECT,
     })) as FindingRow[];

@@ -97,6 +97,14 @@ All URIs are relative to *http://localhost*
 *AutopilotApi* | [**mcpServersControllerRemove**](docs/AutopilotApi.md#mcpserverscontrollerremove) | **DELETE** /autopilot/mcp-servers/{id} | Remove an MCP server
 *AutopilotApi* | [**mcpServersControllerTest**](docs/AutopilotApi.md#mcpserverscontrollertest) | **POST** /autopilot/mcp-servers/{id}/test | Probe a server: connect and list its tools
 *AutopilotApi* | [**mcpServersControllerUpdate**](docs/AutopilotApi.md#mcpserverscontrollerupdate) | **PATCH** /autopilot/mcp-servers/{id} | Update an MCP server
+*CasesApi* | [**caseEventsControllerCreate**](docs/CasesApi.md#caseeventscontrollercreate) | **POST** /cases/{caseId}/events | Add a dated event to the case chronology
+*CasesApi* | [**caseEventsControllerList**](docs/CasesApi.md#caseeventscontrollerlist) | **GET** /cases/{caseId}/events | List the case chronology (real-world events, ordered by date)
+*CasesApi* | [**caseEventsControllerRemove**](docs/CasesApi.md#caseeventscontrollerremove) | **DELETE** /cases/{caseId}/events/{eventId} | Remove a chronology event
+*CasesApi* | [**caseEventsControllerUpdate**](docs/CasesApi.md#caseeventscontrollerupdate) | **PATCH** /cases/{caseId}/events/{eventId} | Update (and implicitly verify) a chronology event
+*CasesApi* | [**caseLeadsControllerGenerate**](docs/CasesApi.md#caseleadscontrollergenerate) | **POST** /cases/{caseId}/leads/generate | Generate leads from case evidence (semantic neighbours + linked-inquiry matches)
+*CasesApi* | [**caseLeadsControllerList**](docs/CasesApi.md#caseleadscontrollerlist) | **GET** /cases/{caseId}/leads | List leads (exploration candidates) for a case
+*CasesApi* | [**caseLeadsControllerPropose**](docs/CasesApi.md#caseleadscontrollerpropose) | **POST** /cases/{caseId}/leads | Propose a finding as a lead for this case
+*CasesApi* | [**caseLeadsControllerReview**](docs/CasesApi.md#caseleadscontrollerreview) | **POST** /cases/{caseId}/leads/{leadId}/review | Accept a lead into evidence, or dismiss it
 *CasesApi* | [**caseTimelineControllerGetTimeline**](docs/CasesApi.md#casetimelinecontrollergettimeline) | **GET** /cases/{caseId}/timeline | Paginated unified case activity feed (newest first)
 *CasesApi* | [**casesControllerAddEvidence**](docs/CasesApi.md#casescontrolleraddevidence) | **POST** /cases/{id}/evidence | Attach an asset as evidence
 *CasesApi* | [**casesControllerAddFinding**](docs/CasesApi.md#casescontrolleraddfinding) | **POST** /cases/{id}/evidence/{evidenceId}/findings | Attach a finding to a piece of evidence
@@ -136,6 +144,7 @@ All URIs are relative to *http://localhost*
 *CustomDetectorExtractionsApi* | [**customDetectorExtractionsControllerSearch**](docs/CustomDetectorExtractionsApi.md#customdetectorextractionscontrollersearch) | **GET** /custom-detectors/{id}/extractions | 
 *CustomDetectorTestsApi* | [**customDetectorTestsControllerCreate**](docs/CustomDetectorTestsApi.md#customdetectortestscontrollercreate) | **POST** /custom-detectors/{detectorId}/test-scenarios | 
 *CustomDetectorTestsApi* | [**customDetectorTestsControllerDelete**](docs/CustomDetectorTestsApi.md#customdetectortestscontrollerdelete) | **DELETE** /custom-detectors/{detectorId}/test-scenarios/{scenarioId} | 
+*CustomDetectorTestsApi* | [**customDetectorTestsControllerInput**](docs/CustomDetectorTestsApi.md#customdetectortestscontrollerinput) | **GET** /custom-detectors/{detectorId}/test-scenarios/{scenarioId}/input | 
 *CustomDetectorTestsApi* | [**customDetectorTestsControllerList**](docs/CustomDetectorTestsApi.md#customdetectortestscontrollerlist) | **GET** /custom-detectors/{detectorId}/test-scenarios | 
 *CustomDetectorTestsApi* | [**customDetectorTestsControllerRun**](docs/CustomDetectorTestsApi.md#customdetectortestscontrollerrun) | **POST** /custom-detectors/{detectorId}/test-scenarios/run | 
 *CustomDetectorsApi* | [**customDetectorsControllerClearTrainingExamples**](docs/CustomDetectorsApi.md#customdetectorscontrollercleartrainingexamples) | **DELETE** /custom-detectors/{id}/training-examples | Delete all training examples for a detector
@@ -152,7 +161,10 @@ All URIs are relative to *http://localhost*
 *CustomDetectorsApi* | [**customDetectorsControllerTrainingExamplesStats**](docs/CustomDetectorsApi.md#customdetectorscontrollertrainingexamplesstats) | **GET** /custom-detectors/{id}/training-examples/stats | Get training example counts grouped by label
 *CustomDetectorsApi* | [**customDetectorsControllerTrainingHistory**](docs/CustomDetectorsApi.md#customdetectorscontrollertraininghistory) | **GET** /custom-detectors/{id}/training-history | List training history for custom detector
 *CustomDetectorsApi* | [**customDetectorsControllerUpdate**](docs/CustomDetectorsApi.md#customdetectorscontrollerupdate) | **PATCH** /custom-detectors/{id} | Update custom detector
+*EmbeddingsApi* | [**embeddingControllerBoilerplate**](docs/EmbeddingsApi.md#embeddingcontrollerboilerplate) | **GET** /sources/{sourceId}/boilerplate-clusters | Near-duplicate finding clusters in a source (repeated boilerplate)
+*EmbeddingsApi* | [**embeddingControllerBoilerplateGlobal**](docs/EmbeddingsApi.md#embeddingcontrollerboilerplateglobal) | **GET** /embeddings/boilerplate-clusters | Near-duplicate finding clusters across the corpus, optionally filtered to specific sources
 *EmbeddingsApi* | [**embeddingControllerChunks**](docs/EmbeddingsApi.md#embeddingcontrollerchunks) | **POST** /sources/{sourceId}/embeddings/chunks | Store asset chunk-to-content mappings
+*EmbeddingsApi* | [**embeddingControllerRecalibrate**](docs/EmbeddingsApi.md#embeddingcontrollerrecalibrate) | **POST** /embeddings/recalibrate | Schedule a full evidence-ranking recalibration pass (importance scores, outliers, near-duplicate groups)
 *EmbeddingsApi* | [**embeddingControllerReindex**](docs/EmbeddingsApi.md#embeddingcontrollerreindex) | **POST** /embeddings/reindex | Reconcile stored findings and asset chunks into the configured embedding space
 *EmbeddingsApi* | [**embeddingControllerSimilar**](docs/EmbeddingsApi.md#embeddingcontrollersimilar) | **GET** /findings/{findingId}/similar | Find semantically similar findings with ranking evidence
 *EmbeddingsApi* | [**embeddingControllerStatus**](docs/EmbeddingsApi.md#embeddingcontrollerstatus) | **GET** /embeddings/status | Get semantic storage and search capability
@@ -163,6 +175,11 @@ All URIs are relative to *http://localhost*
 *FindingsApi* | [**findingsControllerGetStats**](docs/FindingsApi.md#findingscontrollergetstats) | **GET** /findings/stats | Get finding statistics
 *FindingsApi* | [**findingsControllerListAssetSummaries**](docs/FindingsApi.md#findingscontrollerlistassetsummaries) | **GET** /findings/assets | List asset finding summaries with optional filters
 *FindingsApi* | [**findingsControllerUpdate**](docs/FindingsApi.md#findingscontrollerupdate) | **PATCH** /findings/{id} | Update a finding
+*GlossaryApi* | [**glossaryControllerList**](docs/GlossaryApi.md#glossarycontrollerlist) | **GET** /glossary | List glossary terms
+*GlossaryApi* | [**glossaryControllerLookup**](docs/GlossaryApi.md#glossarycontrollerlookup) | **GET** /glossary/lookup | Resolve a name or alias to glossary terms (exact + semantic)
+*GlossaryApi* | [**glossaryControllerRemove**](docs/GlossaryApi.md#glossarycontrollerremove) | **DELETE** /glossary/{id} | Delete a glossary term
+*GlossaryApi* | [**glossaryControllerUpsert**](docs/GlossaryApi.md#glossarycontrollerupsert) | **POST** /glossary | Create or update a glossary term (operator)
+*GlossaryApi* | [**glossaryControllerVerify**](docs/GlossaryApi.md#glossarycontrollerverify) | **PATCH** /glossary/{id}/verify | Mark an agent-proposed term as verified
 *GraphApi* | [**graphControllerCreateManualEdge**](docs/GraphApi.md#graphcontrollercreatemanualedge) | **POST** /graph/edges/manual | Create a manual edge between two entities (user-defined relation type)
 *GraphApi* | [**graphControllerDeleteEdge**](docs/GraphApi.md#graphcontrollerdeleteedge) | **DELETE** /graph/edges/{id} | Delete an edge
 *GraphApi* | [**graphControllerExpand**](docs/GraphApi.md#graphcontrollerexpand) | **POST** /graph/expand | Expand the graph around a seed entity (recursive traversal)
@@ -213,17 +230,14 @@ All URIs are relative to *http://localhost*
 *RunnersApi* | [**searchRunnersControllerSearchRunnerAssets**](docs/RunnersApi.md#searchrunnerscontrollersearchrunnerassets) | **POST** /search/runner-assets | Search runner assets
 *RunnersApi* | [**searchRunnersControllerSearchRunners**](docs/RunnersApi.md#searchrunnerscontrollersearchrunners) | **POST** /search/runners | Search runners
 *RunnersApi* | [**searchRunnersControllerSearchRunnersCharts**](docs/RunnersApi.md#searchrunnerscontrollersearchrunnerscharts) | **POST** /search/runners/charts | Runners charts overview
-*SandboxApi* | [**sandboxControllerClearFindings**](docs/SandboxApi.md#sandboxcontrollerclearfindings) | **DELETE** /sandbox/runs/{id}/findings | Clear all findings for a run
-*SandboxApi* | [**sandboxControllerCreateRun**](docs/SandboxApi.md#sandboxcontrollercreaterun) | **POST** /sandbox/runs | Upload a file and run detectors on it
-*SandboxApi* | [**sandboxControllerDeleteRun**](docs/SandboxApi.md#sandboxcontrollerdeleterun) | **DELETE** /sandbox/runs/{id} | Delete a sandbox run
-*SandboxApi* | [**sandboxControllerGetRun**](docs/SandboxApi.md#sandboxcontrollergetrun) | **GET** /sandbox/runs/{id} | Get a sandbox run by ID
-*SandboxApi* | [**sandboxControllerGetRunInput**](docs/SandboxApi.md#sandboxcontrollergetruninput) | **GET** /sandbox/runs/{id}/input | Download the staged input file for an in-flight sandbox run
-*SandboxApi* | [**sandboxControllerListRuns**](docs/SandboxApi.md#sandboxcontrollerlistruns) | **GET** /sandbox/runs | List sandbox runs (paginated)
-*SandboxApi* | [**sandboxControllerRerunRun**](docs/SandboxApi.md#sandboxcontrollerrerunrun) | **POST** /sandbox/runs/{id}/rerun | Re-scan a run with different detectors (appends findings)
 *SourcesApi* | [**searchSourcesControllerSearchSources**](docs/SourcesApi.md#searchsourcescontrollersearchsources) | **POST** /search/sources | Search data sources
 *SourcesApi* | [**sourceAssetsControllerBulkIngest**](docs/SourcesApi.md#sourceassetscontrollerbulkingest) | **POST** /sources/{sourceId}/assets/bulk | Bulk ingest assets
 *SourcesApi* | [**sourceAssetsControllerFinalizeIngest**](docs/SourcesApi.md#sourceassetscontrollerfinalizeingest) | **POST** /sources/{sourceId}/assets/finalize | Finalize ingest run
 *SourcesApi* | [**sourceAssetsControllerListSourceAssets**](docs/SourcesApi.md#sourceassetscontrollerlistsourceassets) | **GET** /sources/{sourceId}/assets | List assets for a source
+*SourcesApi* | [**sourceFilesControllerContent**](docs/SourcesApi.md#sourcefilescontrollercontent) | **GET** /sources/{sourceId}/files/{fileId}/content | Stream uploaded source file bytes
+*SourcesApi* | [**sourceFilesControllerDelete**](docs/SourcesApi.md#sourcefilescontrollerdelete) | **DELETE** /sources/{sourceId}/files/{fileId} | Delete an uploaded source file
+*SourcesApi* | [**sourceFilesControllerList**](docs/SourcesApi.md#sourcefilescontrollerlist) | **GET** /sources/{sourceId}/files | List uploaded files for a Sandbox source
+*SourcesApi* | [**sourceFilesControllerUpload**](docs/SourcesApi.md#sourcefilescontrollerupload) | **POST** /sources/{sourceId}/files | Upload one file to a Sandbox source
 *SourcesApi* | [**sourcesControllerCreateSource**](docs/SourcesApi.md#sourcescontrollercreatesource) | **POST** /sources | Create a new data source
 *SourcesApi* | [**sourcesControllerDeleteSource**](docs/SourcesApi.md#sourcescontrollerdeletesource) | **DELETE** /sources/{id} | Delete a data source
 *SourcesApi* | [**sourcesControllerGetSchedule**](docs/SourcesApi.md#sourcescontrollergetschedule) | **GET** /sources/{id}/schedule | Get source schedule
@@ -287,6 +301,7 @@ All URIs are relative to *http://localhost*
 - [AttachFindingsDto](docs/AttachFindingsDto.md)
 - [AttachFindingsResponseDto](docs/AttachFindingsResponseDto.md)
 - [AutopilotStatsDto](docs/AutopilotStatsDto.md)
+- [BoilerplateClusterDto](docs/BoilerplateClusterDto.md)
 - [BriefMemoryEntryDto](docs/BriefMemoryEntryDto.md)
 - [BriefSetupItemDto](docs/BriefSetupItemDto.md)
 - [BulkIngestAssetsDto](docs/BulkIngestAssetsDto.md)
@@ -297,8 +312,10 @@ All URIs are relative to *http://localhost*
 - [CaseActionRequestDto](docs/CaseActionRequestDto.md)
 - [CaseActionResponseDto](docs/CaseActionResponseDto.md)
 - [CaseActivityDto](docs/CaseActivityDto.md)
+- [CaseEventDto](docs/CaseEventDto.md)
 - [CaseEvidenceDto](docs/CaseEvidenceDto.md)
 - [CaseFindingDto](docs/CaseFindingDto.md)
+- [CaseLeadDto](docs/CaseLeadDto.md)
 - [CaseLinkedInquiryDto](docs/CaseLinkedInquiryDto.md)
 - [CaseListResponseDto](docs/CaseListResponseDto.md)
 - [CaseResponseDto](docs/CaseResponseDto.md)
@@ -319,6 +336,7 @@ All URIs are relative to *http://localhost*
 - [CreateAgentMemoryDto](docs/CreateAgentMemoryDto.md)
 - [CreateAiProviderConfigDto](docs/CreateAiProviderConfigDto.md)
 - [CreateCaseDto](docs/CreateCaseDto.md)
+- [CreateCaseEventDto](docs/CreateCaseEventDto.md)
 - [CreateChatBotDto](docs/CreateChatBotDto.md)
 - [CreateCustomDetectorDto](docs/CreateCustomDetectorDto.md)
 - [CreateExternalRunnerDto](docs/CreateExternalRunnerDto.md)
@@ -333,11 +351,14 @@ All URIs are relative to *http://localhost*
 - [CustomDetectorResponseDto](docs/CustomDetectorResponseDto.md)
 - [CustomDetectorResponseDtoSourcesUsingInner](docs/CustomDetectorResponseDtoSourcesUsingInner.md)
 - [CustomDetectorTrainingRunDto](docs/CustomDetectorTrainingRunDto.md)
+- [DeleteGlossaryTermResponseDto](docs/DeleteGlossaryTermResponseDto.md)
 - [DeleteRunnerResponseDto](docs/DeleteRunnerResponseDto.md)
 - [DiscoveryRecentRunDto](docs/DiscoveryRecentRunDto.md)
 - [DiscoveryRunSourceDto](docs/DiscoveryRunSourceDto.md)
 - [EdgeDetailDto](docs/EdgeDetailDto.md)
+- [EmbeddingRecalibrateResponseDto](docs/EmbeddingRecalibrateResponseDto.md)
 - [EmbeddingReindexResponseDto](docs/EmbeddingReindexResponseDto.md)
+- [EmbeddingStatusResponseDto](docs/EmbeddingStatusResponseDto.md)
 - [EvidenceEntityDto](docs/EvidenceEntityDto.md)
 - [ExclusionRuleDto](docs/ExclusionRuleDto.md)
 - [ExpandGraphDto](docs/ExpandGraphDto.md)
@@ -359,6 +380,10 @@ All URIs are relative to *http://localhost*
 - [FindingsDiscoveryTopAssetDto](docs/FindingsDiscoveryTopAssetDto.md)
 - [FindingsDiscoveryTotalsDto](docs/FindingsDiscoveryTotalsDto.md)
 - [FindingsRankingDto](docs/FindingsRankingDto.md)
+- [GenerateCaseLeadsResponseDto](docs/GenerateCaseLeadsResponseDto.md)
+- [GlossaryListResponseDto](docs/GlossaryListResponseDto.md)
+- [GlossaryLookupHitDto](docs/GlossaryLookupHitDto.md)
+- [GlossaryTermDto](docs/GlossaryTermDto.md)
 - [GraphEdgeDto](docs/GraphEdgeDto.md)
 - [GraphNodeDto](docs/GraphNodeDto.md)
 - [GraphResponseDto](docs/GraphResponseDto.md)
@@ -403,6 +428,7 @@ All URIs are relative to *http://localhost*
 - [PivotGraphDto](docs/PivotGraphDto.md)
 - [PreviewInquiryDto](docs/PreviewInquiryDto.md)
 - [PreviewResponseDto](docs/PreviewResponseDto.md)
+- [ProposeCaseLeadDto](docs/ProposeCaseLeadDto.md)
 - [PullFromInquiryDto](docs/PullFromInquiryDto.md)
 - [PullFromInquiryResponseDto](docs/PullFromInquiryResponseDto.md)
 - [PutAssetChunksDto](docs/PutAssetChunksDto.md)
@@ -412,7 +438,7 @@ All URIs are relative to *http://localhost*
 - [RegisterDiscoveredAssetsResponseDto](docs/RegisterDiscoveredAssetsResponseDto.md)
 - [RelationTypesResponseDto](docs/RelationTypesResponseDto.md)
 - [RematchResponseDto](docs/RematchResponseDto.md)
-- [RerunSandboxRunDto](docs/RerunSandboxRunDto.md)
+- [ReviewCaseLeadDto](docs/ReviewCaseLeadDto.md)
 - [RunnerAssetItemDto](docs/RunnerAssetItemDto.md)
 - [RunnerAssetProgressDto](docs/RunnerAssetProgressDto.md)
 - [RunnerAssetStatusUpdateItem](docs/RunnerAssetStatusUpdateItem.md)
@@ -422,8 +448,6 @@ All URIs are relative to *http://localhost*
 - [RunnersChartsTimelineBucketDto](docs/RunnersChartsTimelineBucketDto.md)
 - [RunnersChartsTopSourceDto](docs/RunnersChartsTopSourceDto.md)
 - [RunnersChartsTotalsDto](docs/RunnersChartsTotalsDto.md)
-- [SandboxRunDto](docs/SandboxRunDto.md)
-- [SandboxRunListResponseDto](docs/SandboxRunListResponseDto.md)
 - [SaveTrainingExamplesDto](docs/SaveTrainingExamplesDto.md)
 - [SearchAssetFindingDto](docs/SearchAssetFindingDto.md)
 - [SearchAssetItemDto](docs/SearchAssetItemDto.md)
@@ -468,6 +492,10 @@ All URIs are relative to *http://localhost*
 - [SearchSourcesResponseDto](docs/SearchSourcesResponseDto.md)
 - [SearchSourcesTotalsDto](docs/SearchSourcesTotalsDto.md)
 - [SemanticFindingsSearchDto](docs/SemanticFindingsSearchDto.md)
+- [SimilarFindingAssetDto](docs/SimilarFindingAssetDto.md)
+- [SimilarFindingDto](docs/SimilarFindingDto.md)
+- [SimilarFindingEvidenceAnalysisDto](docs/SimilarFindingEvidenceAnalysisDto.md)
+- [SimilarFindingSourceDto](docs/SimilarFindingSourceDto.md)
 - [SourceAssetsControllerBulkIngest201Response](docs/SourceAssetsControllerBulkIngest201Response.md)
 - [SourceInfoDto](docs/SourceInfoDto.md)
 - [SourceResponseDto](docs/SourceResponseDto.md)
@@ -492,6 +520,7 @@ All URIs are relative to *http://localhost*
 - [UpdateAgentMemoryDto](docs/UpdateAgentMemoryDto.md)
 - [UpdateAiProviderConfigDto](docs/UpdateAiProviderConfigDto.md)
 - [UpdateCaseDto](docs/UpdateCaseDto.md)
+- [UpdateCaseEventDto](docs/UpdateCaseEventDto.md)
 - [UpdateCaseFindingNoteDto](docs/UpdateCaseFindingNoteDto.md)
 - [UpdateChatBotDto](docs/UpdateChatBotDto.md)
 - [UpdateCorrelationConfigDto](docs/UpdateCorrelationConfigDto.md)
@@ -508,8 +537,12 @@ All URIs are relative to *http://localhost*
 - [UpdateSourceDto](docs/UpdateSourceDto.md)
 - [UpdateSystemBriefDto](docs/UpdateSystemBriefDto.md)
 - [UpdateThreadDto](docs/UpdateThreadDto.md)
+- [UploadedSourceFileDto](docs/UploadedSourceFileDto.md)
+- [UpsertGlossaryTermDto](docs/UpsertGlossaryTermDto.md)
+- [UpsertGlossaryTermResponseDto](docs/UpsertGlossaryTermResponseDto.md)
 - [ValueOccurrenceAssetDto](docs/ValueOccurrenceAssetDto.md)
 - [ValueOccurrencesResponseDto](docs/ValueOccurrencesResponseDto.md)
+- [VerifyGlossaryTermDto](docs/VerifyGlossaryTermDto.md)
 
 ### Authorization
 

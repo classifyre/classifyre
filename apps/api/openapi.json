@@ -863,6 +863,152 @@
         ]
       }
     },
+    "/sources/{sourceId}/files": {
+      "get": {
+        "operationId": "SourceFilesController_list",
+        "parameters": [
+          {
+            "name": "sourceId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/UploadedSourceFileDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "List uploaded files for a Sandbox source",
+        "tags": [
+          "Sources"
+        ]
+      },
+      "post": {
+        "operationId": "SourceFilesController_upload",
+        "parameters": [
+          {
+            "name": "sourceId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "file"
+                ],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadedSourceFileDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Upload one file to a Sandbox source",
+        "tags": [
+          "Sources"
+        ]
+      }
+    },
+    "/sources/{sourceId}/files/{fileId}/content": {
+      "get": {
+        "operationId": "SourceFilesController_content",
+        "parameters": [
+          {
+            "name": "sourceId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "fileId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Stream uploaded source file bytes",
+        "tags": [
+          "Sources"
+        ]
+      }
+    },
+    "/sources/{sourceId}/files/{fileId}": {
+      "delete": {
+        "operationId": "SourceFilesController_delete",
+        "parameters": [
+          {
+            "name": "sourceId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "fileId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "summary": "Delete an uploaded source file",
+        "tags": [
+          "Sources"
+        ]
+      }
+    },
     "/search/sources": {
       "post": {
         "description": "Paginated search over data sources with optional filters. Returns source details with the latest runner summary and aggregate totals (total, healthy, errors, running).",
@@ -1179,6 +1325,7 @@
                   "LOCAL_FOLDER",
                   "MICROSOFT_365",
                   "GOOGLE_WORKSPACE",
+                  "SANDBOX",
                   "CUSTOM"
                 ]
               }
@@ -1531,6 +1678,7 @@
                   "LOCAL_FOLDER",
                   "MICROSOFT_365",
                   "GOOGLE_WORKSPACE",
+                  "SANDBOX",
                   "CUSTOM"
                 ]
               }
@@ -1905,6 +2053,7 @@
                   "LOCAL_FOLDER",
                   "MICROSOFT_365",
                   "GOOGLE_WORKSPACE",
+                  "SANDBOX",
                   "CUSTOM"
                 ]
               }
@@ -2739,6 +2888,37 @@
         ],
         "responses": {
           "204": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "CustomDetectorTests"
+        ]
+      }
+    },
+    "/custom-detectors/{detectorId}/test-scenarios/{scenarioId}/input": {
+      "get": {
+        "operationId": "CustomDetectorTestsController_input",
+        "parameters": [
+          {
+            "name": "detectorId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "scenarioId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
             "description": ""
           }
         },
@@ -5952,49 +6132,154 @@
         ]
       }
     },
-    "/embeddings/status": {
+    "/glossary": {
       "get": {
-        "operationId": "EmbeddingController_status",
-        "parameters": [],
+        "operationId": "GlossaryController_list",
+        "parameters": [
+          {
+            "name": "query",
+            "required": false,
+            "in": "query",
+            "description": "Free-text filter over term, aliases and notes (ILIKE).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "entityType",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "PERSON",
+                "ORGANIZATION",
+                "LOCATION",
+                "REFERENCE",
+                "TERM",
+                "OTHER"
+              ]
+            }
+          },
+          {
+            "name": "take",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 200,
+              "default": 25,
+              "type": "number"
+            }
+          },
+          {
+            "name": "skip",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 0,
+              "type": "number"
+            }
+          }
+        ],
         "responses": {
           "200": {
-            "description": ""
-          }
-        },
-        "summary": "Get semantic storage and search capability",
-        "tags": [
-          "embeddings"
-        ]
-      }
-    },
-    "/embeddings/reindex": {
-      "post": {
-        "operationId": "EmbeddingController_reindex",
-        "parameters": [],
-        "responses": {
-          "202": {
             "description": "",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/EmbeddingReindexResponseDto"
+                  "$ref": "#/components/schemas/GlossaryListResponseDto"
                 }
               }
             }
           }
         },
-        "summary": "Reconcile stored findings and asset chunks into the configured embedding space",
+        "summary": "List glossary terms",
         "tags": [
-          "embeddings"
+          "glossary"
+        ]
+      },
+      "post": {
+        "operationId": "GlossaryController_upsert",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpsertGlossaryTermDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpsertGlossaryTermResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Create or update a glossary term (operator)",
+        "tags": [
+          "glossary"
         ]
       }
     },
-    "/sources/{sourceId}/embeddings/chunks": {
-      "post": {
-        "operationId": "EmbeddingController_chunks",
+    "/glossary/lookup": {
+      "get": {
+        "operationId": "GlossaryController_lookup",
         "parameters": [
           {
-            "name": "sourceId",
+            "name": "query",
+            "required": true,
+            "in": "query",
+            "description": "Name or alias to resolve.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 50,
+              "default": 10,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/GlossaryLookupHitDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Resolve a name or alias to glossary terms (exact + semantic)",
+        "tags": [
+          "glossary"
+        ]
+      }
+    },
+    "/glossary/{id}/verify": {
+      "patch": {
+        "operationId": "GlossaryController_verify",
+        "parameters": [
+          {
+            "name": "id",
             "required": true,
             "in": "path",
             "schema": {
@@ -6007,7 +6292,124 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/PutAssetChunksDto"
+                "$ref": "#/components/schemas/VerifyGlossaryTermDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GlossaryTermDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Mark an agent-proposed term as verified",
+        "tags": [
+          "glossary"
+        ]
+      }
+    },
+    "/glossary/{id}": {
+      "delete": {
+        "operationId": "GlossaryController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeleteGlossaryTermResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Delete a glossary term",
+        "tags": [
+          "glossary"
+        ]
+      }
+    },
+    "/cases/{caseId}/leads": {
+      "get": {
+        "operationId": "CaseLeadsController_list",
+        "parameters": [
+          {
+            "name": "caseId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "PROPOSED",
+                "ACCEPTED",
+                "DISMISSED"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CaseLeadDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "List leads (exploration candidates) for a case",
+        "tags": [
+          "cases"
+        ]
+      },
+      "post": {
+        "operationId": "CaseLeadsController_propose",
+        "parameters": [
+          {
+            "name": "caseId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProposeCaseLeadDto"
               }
             }
           }
@@ -6017,18 +6419,49 @@
             "description": ""
           }
         },
-        "summary": "Store asset chunk-to-content mappings",
+        "summary": "Propose a finding as a lead for this case",
         "tags": [
-          "embeddings"
+          "cases"
         ]
       }
     },
-    "/findings/{findingId}/similar": {
-      "get": {
-        "operationId": "EmbeddingController_similar",
+    "/cases/{caseId}/leads/generate": {
+      "post": {
+        "operationId": "CaseLeadsController_generate",
         "parameters": [
           {
-            "name": "findingId",
+            "name": "caseId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GenerateCaseLeadsResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Generate leads from case evidence (semantic neighbours + linked-inquiry matches)",
+        "tags": [
+          "cases"
+        ]
+      }
+    },
+    "/cases/{caseId}/leads/{leadId}/review": {
+      "post": {
+        "operationId": "CaseLeadsController_review",
+        "parameters": [
+          {
+            "name": "caseId",
             "required": true,
             "in": "path",
             "schema": {
@@ -6036,17 +6469,173 @@
             }
           },
           {
-            "name": "limit",
-            "required": false,
-            "in": "query",
+            "name": "leadId",
+            "required": true,
+            "in": "path",
             "schema": {
-              "maximum": 100,
-              "default": 20,
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/Object"
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewCaseLeadDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Accept a lead into evidence, or dismiss it",
+        "tags": [
+          "cases"
+        ]
+      }
+    },
+    "/cases/{caseId}/events": {
+      "get": {
+        "operationId": "CaseEventsController_list",
+        "parameters": [
+          {
+            "name": "caseId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CaseEventDto"
+                  }
                 }
-              ]
+              }
+            }
+          }
+        },
+        "summary": "List the case chronology (real-world events, ordered by date)",
+        "tags": [
+          "cases"
+        ]
+      },
+      "post": {
+        "operationId": "CaseEventsController_create",
+        "parameters": [
+          {
+            "name": "caseId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCaseEventDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseEventDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Add a dated event to the case chronology",
+        "tags": [
+          "cases"
+        ]
+      }
+    },
+    "/cases/{caseId}/events/{eventId}": {
+      "patch": {
+        "operationId": "CaseEventsController_update",
+        "parameters": [
+          {
+            "name": "caseId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "eventId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCaseEventDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseEventDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Update (and implicitly verify) a chronology event",
+        "tags": [
+          "cases"
+        ]
+      },
+      "delete": {
+        "operationId": "CaseEventsController_remove",
+        "parameters": [
+          {
+            "name": "caseId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "eventId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
             }
           }
         ],
@@ -6055,9 +6644,9 @@
             "description": ""
           }
         },
-        "summary": "Find semantically similar findings with ranking evidence",
+        "summary": "Remove a chronology event",
         "tags": [
-          "embeddings"
+          "cases"
         ]
       }
     },
@@ -6792,360 +7381,6 @@
         "summary": "Search runner assets",
         "tags": [
           "Runners"
-        ]
-      }
-    },
-    "/sandbox/runs": {
-      "post": {
-        "description": "Upload any local file (PDF, DOCX, XLSX, TXT, CSV, HTML, JSON, …) and run one\nor more detectors against its extracted text.\n\n**`detectors`** is a JSON string containing an array of detector config objects.\nEach object has the shape:\n```json\n{ \"type\": \"<TYPE>\", \"enabled\": true, \"config\": { ... } }\n```\n\n### Detector types & sample configs\n\n| Type | What it finds |\n|------|---------------|\n| `SECRETS` | API keys, tokens, private keys |\n| `PII` | Emails, SSNs, credit cards, phone numbers |\n| `YARA` | Custom YARA rule matches |\n| `BROKEN_LINKS` | Unreachable URLs in text |\n| `CUSTOM` | User-defined pipelines (REGEX, GLiNER2, HuggingFace transformers) |\n\n**Minimal — secrets only (all patterns):**\n```json\n[{\"type\":\"SECRETS\",\"enabled\":true,\"config\":{}}]\n```\n\n**PII with specific patterns:**\n```json\n[{\"type\":\"PII\",\"enabled\":true,\"config\":{\"enabled_patterns\":[\"email\",\"credit_card\",\"ssn\",\"phone_number\"],\"confidence_threshold\":0.8}}]\n```\n\n**Secrets + PII combined:**\n```json\n[\n  {\"type\":\"SECRETS\",\"enabled\":true,\"config\":{\"enabled_patterns\":[\"aws\",\"github\",\"stripe\",\"generic_api_key\"]}},\n  {\"type\":\"PII\",\"enabled\":true,\"config\":{\"enabled_patterns\":[\"email\",\"ssn\",\"credit_card\"],\"confidence_threshold\":0.75}}\n]\n```\n\n**Full scan — all detectors:**\n```json\n[\n  {\"type\":\"SECRETS\",\"enabled\":true,\"config\":{}},\n  {\"type\":\"PII\",\"enabled\":true,\"config\":{\"confidence_threshold\":0.7}},\n  {\"type\":\"BROKEN_LINKS\",\"enabled\":true,\"config\":{}}\n]\n```",
-        "operationId": "SandboxController_createRun",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "multipart/form-data": {
-              "schema": {
-                "type": "object",
-                "required": [
-                  "file",
-                  "detectors"
-                ],
-                "properties": {
-                  "file": {
-                    "type": "string",
-                    "format": "binary",
-                    "description": "File to scan"
-                  },
-                  "detectors": {
-                    "type": "string",
-                    "description": "JSON array of detector config objects",
-                    "example": "[{\"type\":\"SECRETS\",\"enabled\":true,\"config\":{\"enabled_patterns\":[\"aws\",\"github\",\"stripe\",\"generic_api_key\"]}},{\"type\":\"PII\",\"enabled\":true,\"config\":{\"enabled_patterns\":[\"email\",\"credit_card\",\"ssn\",\"phone_number\"],\"confidence_threshold\":0.75}}]"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SandboxRunDto"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Conflict — a run with the same file content already exists"
-          }
-        },
-        "summary": "Upload a file and run detectors on it",
-        "tags": [
-          "Sandbox"
-        ]
-      },
-      "get": {
-        "operationId": "SandboxController_listRuns",
-        "parameters": [
-          {
-            "name": "search",
-            "required": false,
-            "in": "query",
-            "description": "Search by file name or MIME type",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "status",
-            "required": false,
-            "in": "query",
-            "description": "Filter by one or more run statuses",
-            "schema": {
-              "type": "array",
-              "items": {
-                "type": "string",
-                "enum": [
-                  "PENDING",
-                  "RUNNING",
-                  "COMPLETED",
-                  "ERROR"
-                ]
-              }
-            }
-          },
-          {
-            "name": "contentType",
-            "required": false,
-            "in": "query",
-            "description": "Filter by one or more content types",
-            "schema": {
-              "type": "array",
-              "items": {
-                "type": "string",
-                "enum": [
-                  "TXT",
-                  "TABLE",
-                  "IMAGE",
-                  "VIDEO",
-                  "AUDIO",
-                  "URL",
-                  "BINARY",
-                  "OTHER"
-                ]
-              }
-            }
-          },
-          {
-            "name": "detectorType",
-            "required": false,
-            "in": "query",
-            "description": "Filter by detectors used in the run configuration or reported findings",
-            "schema": {
-              "type": "array",
-              "items": {
-                "type": "string",
-                "enum": [
-                  "SECRETS",
-                  "PII",
-                  "YARA",
-                  "BROKEN_LINKS",
-                  "CODE_SECURITY",
-                  "CUSTOM"
-                ]
-              }
-            }
-          },
-          {
-            "name": "hasFindings",
-            "required": false,
-            "in": "query",
-            "description": "Filter by whether findings exist",
-            "schema": {
-              "type": "boolean"
-            }
-          },
-          {
-            "name": "sortBy",
-            "required": false,
-            "in": "query",
-            "description": "Sort field",
-            "schema": {
-              "default": "CREATED_AT",
-              "type": "string",
-              "enum": [
-                "CREATED_AT",
-                "FILE_NAME",
-                "STATUS",
-                "FILE_SIZE_BYTES",
-                "DURATION_MS",
-                "FINDINGS_COUNT"
-              ]
-            }
-          },
-          {
-            "name": "sortOrder",
-            "required": false,
-            "in": "query",
-            "description": "Sort direction",
-            "schema": {
-              "default": "DESC",
-              "type": "string",
-              "enum": [
-                "ASC",
-                "DESC"
-              ]
-            }
-          },
-          {
-            "name": "skip",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "default": 0,
-              "type": "number"
-            }
-          },
-          {
-            "name": "limit",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "default": 50,
-              "type": "number"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SandboxRunListResponseDto"
-                }
-              }
-            }
-          }
-        },
-        "summary": "List sandbox runs (paginated)",
-        "tags": [
-          "Sandbox"
-        ]
-      }
-    },
-    "/sandbox/runs/{id}": {
-      "get": {
-        "operationId": "SandboxController_getRun",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SandboxRunDto"
-                }
-              }
-            }
-          }
-        },
-        "summary": "Get a sandbox run by ID",
-        "tags": [
-          "Sandbox"
-        ]
-      },
-      "delete": {
-        "description": "Deletes a sandbox run record and its stored input file. If the run is currently in progress the CLI process is killed first.",
-        "operationId": "SandboxController_deleteRun",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "Run deleted"
-          }
-        },
-        "summary": "Delete a sandbox run",
-        "tags": [
-          "Sandbox"
-        ]
-      }
-    },
-    "/sandbox/runs/{id}/input": {
-      "get": {
-        "description": "Internal endpoint used by the Kubernetes sandbox job init-container to fetch the input file over the cluster network. Available only while the file is staged (during the run).",
-        "operationId": "SandboxController_getRunInput",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "summary": "Download the staged input file for an in-flight sandbox run",
-        "tags": [
-          "Sandbox"
-        ]
-      }
-    },
-    "/sandbox/runs/{id}/rerun": {
-      "post": {
-        "description": "Re-scans the SAME run's already-uploaded file with a different set of\ndetectors and appends the new findings to the run. No new run is created and the\nfile is reused from storage — no re-upload, never S3.",
-        "operationId": "SandboxController_rerunRun",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/RerunSandboxRunDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "The run, now re-scanning (status RUNNING)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SandboxRunDto"
-                }
-              }
-            }
-          }
-        },
-        "summary": "Re-scan a run with different detectors (appends findings)",
-        "tags": [
-          "Sandbox"
-        ]
-      }
-    },
-    "/sandbox/runs/{id}/findings": {
-      "delete": {
-        "description": "Removes all findings from the run while keeping the uploaded file so it can be re-scanned.",
-        "operationId": "SandboxController_clearFindings",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SandboxRunDto"
-                }
-              }
-            }
-          }
-        },
-        "summary": "Clear all findings for a run",
-        "tags": [
-          "Sandbox"
         ]
       }
     },
@@ -8499,6 +8734,284 @@
           "correlation"
         ]
       }
+    },
+    "/embeddings/status": {
+      "get": {
+        "operationId": "EmbeddingController_status",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmbeddingStatusResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Get semantic storage and search capability",
+        "tags": [
+          "embeddings"
+        ]
+      }
+    },
+    "/embeddings/reindex": {
+      "post": {
+        "operationId": "EmbeddingController_reindex",
+        "parameters": [],
+        "responses": {
+          "202": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmbeddingReindexResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Reconcile stored findings and asset chunks into the configured embedding space",
+        "tags": [
+          "embeddings"
+        ]
+      }
+    },
+    "/sources/{sourceId}/embeddings/chunks": {
+      "post": {
+        "operationId": "EmbeddingController_chunks",
+        "parameters": [
+          {
+            "name": "sourceId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PutAssetChunksDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Store asset chunk-to-content mappings",
+        "tags": [
+          "embeddings"
+        ]
+      }
+    },
+    "/findings/{findingId}/similar": {
+      "get": {
+        "operationId": "EmbeddingController_similar",
+        "parameters": [
+          {
+            "name": "findingId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 100,
+              "default": 20,
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Object"
+                }
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SimilarFindingDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Find semantically similar findings with ranking evidence",
+        "tags": [
+          "embeddings"
+        ]
+      }
+    },
+    "/embeddings/boilerplate-clusters": {
+      "get": {
+        "operationId": "EmbeddingController_boilerplateGlobal",
+        "parameters": [
+          {
+            "name": "threshold",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 0.8,
+              "maximum": 1,
+              "default": 0.95,
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Object"
+                }
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 100,
+              "default": 50,
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Object"
+                }
+              ]
+            }
+          },
+          {
+            "name": "sourceIds",
+            "required": false,
+            "in": "query",
+            "description": "Restrict clusters to findings from these sources; omit for the whole corpus",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BoilerplateClusterDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Near-duplicate finding clusters across the corpus, optionally filtered to specific sources",
+        "tags": [
+          "embeddings"
+        ]
+      }
+    },
+    "/embeddings/recalibrate": {
+      "post": {
+        "operationId": "EmbeddingController_recalibrate",
+        "parameters": [],
+        "responses": {
+          "202": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmbeddingRecalibrateResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Schedule a full evidence-ranking recalibration pass (importance scores, outliers, near-duplicate groups)",
+        "tags": [
+          "embeddings"
+        ]
+      }
+    },
+    "/sources/{sourceId}/boilerplate-clusters": {
+      "get": {
+        "operationId": "EmbeddingController_boilerplate",
+        "parameters": [
+          {
+            "name": "sourceId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "threshold",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 0.8,
+              "maximum": 1,
+              "default": 0.95,
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Object"
+                }
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 100,
+              "default": 50,
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Object"
+                }
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BoilerplateClusterDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Near-duplicate finding clusters in a source (repeated boilerplate)",
+        "tags": [
+          "embeddings"
+        ]
+      }
     }
   },
   "info": {
@@ -8581,7 +9094,8 @@
               "MEILISEARCH",
               "LOCAL_FOLDER",
               "MICROSOFT_365",
-              "GOOGLE_WORKSPACE"
+              "GOOGLE_WORKSPACE",
+              "SANDBOX"
             ],
             "description": "The type of the source",
             "example": "WORDPRESS"
@@ -8775,7 +9289,8 @@
               "MEILISEARCH",
               "LOCAL_FOLDER",
               "MICROSOFT_365",
-              "GOOGLE_WORKSPACE"
+              "GOOGLE_WORKSPACE",
+              "SANDBOX"
             ],
             "description": "The type of the source",
             "example": "WORDPRESS"
@@ -8859,6 +9374,52 @@
           "status"
         ]
       },
+      "UploadedSourceFileDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "sourceId": {
+            "type": "string"
+          },
+          "fileName": {
+            "type": "string"
+          },
+          "declaredMimeType": {
+            "type": "string"
+          },
+          "fileExtension": {
+            "type": "string"
+          },
+          "fileSizeBytes": {
+            "type": "number"
+          },
+          "contentHash": {
+            "type": "string",
+            "description": "SHA-256 hash of the uploaded bytes"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "sourceId",
+          "fileName",
+          "declaredMimeType",
+          "fileExtension",
+          "fileSizeBytes",
+          "contentHash",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
       "SearchSourcesFiltersDto": {
         "type": "object",
         "properties": {
@@ -8911,6 +9472,7 @@
                 "LOCAL_FOLDER",
                 "MICROSOFT_365",
                 "GOOGLE_WORKSPACE",
+                "SANDBOX",
                 "CUSTOM"
               ]
             }
@@ -9228,6 +9790,7 @@
               "LOCAL_FOLDER",
               "MICROSOFT_365",
               "GOOGLE_WORKSPACE",
+              "SANDBOX",
               "CUSTOM"
             ]
           },
@@ -9374,6 +9937,7 @@
                 "LOCAL_FOLDER",
                 "MICROSOFT_365",
                 "GOOGLE_WORKSPACE",
+                "SANDBOX",
                 "CUSTOM"
               ]
             }
@@ -10334,6 +10898,7 @@
               "LOCAL_FOLDER",
               "MICROSOFT_365",
               "GOOGLE_WORKSPACE",
+              "SANDBOX",
               "CUSTOM"
             ]
           }
@@ -14057,6 +14622,14 @@
           "isNew": {
             "type": "boolean",
             "description": "Appeared since the question was last viewed"
+          },
+          "ranking": {
+            "description": "Evidence ranking (importance, quality, reasons) when the finding has been analyzed",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/FindingSearchRankingDto"
+              }
+            ]
           }
         },
         "required": [
@@ -14351,7 +14924,13 @@
               "THREAD_CONFIDENCE_CHANGED",
               "SUPPORT_LINKED",
               "SUPPORT_UNLINKED",
-              "SUPPORT_UPDATED"
+              "SUPPORT_UPDATED",
+              "LEAD_PROPOSED",
+              "LEAD_ACCEPTED",
+              "LEAD_DISMISSED",
+              "EVENT_ADDED",
+              "EVENT_UPDATED",
+              "EVENT_REMOVED"
             ]
           },
           "actor": {
@@ -15348,69 +15927,659 @@
           "reply"
         ]
       },
-      "EmbeddingReindexResponseDto": {
+      "GlossaryTermDto": {
         "type": "object",
         "properties": {
-          "started": {
-            "type": "boolean"
-          },
-          "spaceId": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "started",
-          "spaceId"
-        ]
-      },
-      "AssetChunkDto": {
-        "type": "object",
-        "properties": {
-          "ordinal": {
-            "type": "number"
-          },
-          "page": {
-            "type": "number"
-          },
-          "charOffset": {
-            "type": "number"
-          },
-          "charLength": {
-            "type": "number"
-          },
-          "text": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "ordinal",
-          "charOffset",
-          "charLength",
-          "text"
-        ]
-      },
-      "PutAssetChunksDto": {
-        "type": "object",
-        "properties": {
-          "assetHash": {
+          "id": {
             "type": "string"
           },
-          "chunks": {
-            "maxItems": 5000,
+          "term": {
+            "type": "string"
+          },
+          "aliases": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/AssetChunkDto"
+              "type": "string"
             }
+          },
+          "proposedAliases": {
+            "description": "Unverified aliases suggested by agents for operator review",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "entityType": {
+            "type": "string",
+            "enum": [
+              "PERSON",
+              "ORGANIZATION",
+              "LOCATION",
+              "REFERENCE",
+              "TERM",
+              "OTHER"
+            ]
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true
+          },
+          "refType": {
+            "type": "string",
+            "nullable": true
+          },
+          "refId": {
+            "type": "string",
+            "nullable": true
+          },
+          "origin": {
+            "type": "string",
+            "description": "AGENT proposals are unverified hypotheses"
+          },
+          "verified": {
+            "type": "boolean"
+          },
+          "verifiedBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
           }
         },
         "required": [
-          "assetHash",
-          "chunks"
+          "id",
+          "term",
+          "aliases",
+          "proposedAliases",
+          "entityType",
+          "origin",
+          "verified",
+          "createdAt",
+          "updatedAt"
         ]
       },
-      "Object": {
+      "GlossaryListResponseDto": {
         "type": "object",
-        "properties": {}
+        "properties": {
+          "terms": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GlossaryTermDto"
+            }
+          },
+          "total": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "terms",
+          "total"
+        ]
+      },
+      "GlossaryLookupHitDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "term": {
+            "type": "string"
+          },
+          "aliases": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "proposedAliases": {
+            "description": "Unverified aliases suggested by agents for operator review",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "entityType": {
+            "type": "string",
+            "enum": [
+              "PERSON",
+              "ORGANIZATION",
+              "LOCATION",
+              "REFERENCE",
+              "TERM",
+              "OTHER"
+            ]
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true
+          },
+          "refType": {
+            "type": "string",
+            "nullable": true
+          },
+          "refId": {
+            "type": "string",
+            "nullable": true
+          },
+          "origin": {
+            "type": "string",
+            "description": "AGENT proposals are unverified hypotheses"
+          },
+          "verified": {
+            "type": "boolean"
+          },
+          "verifiedBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "matchType": {
+            "type": "string",
+            "enum": [
+              "exact",
+              "alias",
+              "semantic"
+            ]
+          },
+          "similarity": {
+            "type": "number",
+            "minimum": -1,
+            "maximum": 1
+          }
+        },
+        "required": [
+          "id",
+          "term",
+          "aliases",
+          "proposedAliases",
+          "entityType",
+          "origin",
+          "verified",
+          "createdAt",
+          "updatedAt",
+          "matchType"
+        ]
+      },
+      "UpsertGlossaryTermDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Existing row ID when editing or renaming"
+          },
+          "term": {
+            "type": "string"
+          },
+          "aliases": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "entityType": {
+            "type": "string",
+            "enum": [
+              "PERSON",
+              "ORGANIZATION",
+              "LOCATION",
+              "REFERENCE",
+              "TERM",
+              "OTHER"
+            ]
+          },
+          "notes": {
+            "type": "string"
+          },
+          "refType": {
+            "type": "string"
+          },
+          "refId": {
+            "type": "string"
+          },
+          "author": {
+            "type": "string",
+            "description": "Operator identity recorded as verifiedBy. Defaults to \"operator\"."
+          }
+        },
+        "required": [
+          "term"
+        ]
+      },
+      "UpsertGlossaryTermResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "term": {
+            "type": "string"
+          },
+          "aliases": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "proposedAliases": {
+            "description": "Unverified aliases suggested by agents for operator review",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "entityType": {
+            "type": "string",
+            "enum": [
+              "PERSON",
+              "ORGANIZATION",
+              "LOCATION",
+              "REFERENCE",
+              "TERM",
+              "OTHER"
+            ]
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true
+          },
+          "refType": {
+            "type": "string",
+            "nullable": true
+          },
+          "refId": {
+            "type": "string",
+            "nullable": true
+          },
+          "origin": {
+            "type": "string",
+            "description": "AGENT proposals are unverified hypotheses"
+          },
+          "verified": {
+            "type": "boolean"
+          },
+          "verifiedBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "merged": {
+            "type": "boolean",
+            "description": "True when an agent alias proposal was stored for an operator-owned term"
+          }
+        },
+        "required": [
+          "id",
+          "term",
+          "aliases",
+          "proposedAliases",
+          "entityType",
+          "origin",
+          "verified",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "VerifyGlossaryTermDto": {
+        "type": "object",
+        "properties": {
+          "verifiedBy": {
+            "type": "string",
+            "description": "Operator identity recorded as verifiedBy. Defaults to \"operator\"."
+          }
+        }
+      },
+      "DeleteGlossaryTermResponseDto": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "boolean"
+          },
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "deleted",
+          "id"
+        ]
+      },
+      "CaseLeadDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "caseId": {
+            "type": "string"
+          },
+          "findingId": {
+            "type": "string"
+          },
+          "assetId": {
+            "type": "string",
+            "nullable": true
+          },
+          "origin": {
+            "type": "string",
+            "enum": [
+              "SEMANTIC_NEIGHBOR",
+              "INQUIRY",
+              "AUTOPILOT",
+              "MANUAL"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PROPOSED",
+              "ACCEPTED",
+              "DISMISSED"
+            ]
+          },
+          "rationale": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "importance": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 0,
+            "maximum": 1
+          },
+          "similarity": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 0,
+            "maximum": 1
+          },
+          "proposedBy": {
+            "type": "string"
+          },
+          "reviewedBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "reviewedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "caseId",
+          "findingId",
+          "origin",
+          "status",
+          "rationale",
+          "title",
+          "proposedBy",
+          "createdAt"
+        ]
+      },
+      "ProposeCaseLeadDto": {
+        "type": "object",
+        "properties": {
+          "findingId": {
+            "type": "string"
+          },
+          "rationale": {
+            "type": "string",
+            "description": "Why this finding might belong in the case"
+          },
+          "proposedBy": {
+            "type": "string",
+            "description": "Actor recorded as proposedBy"
+          }
+        },
+        "required": [
+          "findingId",
+          "rationale"
+        ]
+      },
+      "GenerateCaseLeadsResponseDto": {
+        "type": "object",
+        "properties": {
+          "proposed": {
+            "type": "number"
+          },
+          "considered": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "proposed",
+          "considered"
+        ]
+      },
+      "ReviewCaseLeadDto": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "ACCEPT",
+              "DISMISS"
+            ]
+          },
+          "reviewedBy": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string",
+            "description": "Why the lead was dismissed"
+          }
+        },
+        "required": [
+          "action"
+        ]
+      },
+      "CaseEventDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "caseId": {
+            "type": "string"
+          },
+          "occurredAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "precision": {
+            "type": "string",
+            "enum": [
+              "DAY",
+              "MONTH",
+              "YEAR"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "confidence": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 0,
+            "maximum": 1
+          },
+          "origin": {
+            "type": "string",
+            "description": "AGENT-extracted events are unverified hypotheses"
+          },
+          "verified": {
+            "type": "boolean"
+          },
+          "verifiedBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "findingIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "evidenceIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "createdBy": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "caseId",
+          "occurredAt",
+          "precision",
+          "title",
+          "origin",
+          "verified",
+          "findingIds",
+          "evidenceIds",
+          "createdBy",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "CreateCaseEventDto": {
+        "type": "object",
+        "properties": {
+          "occurredAt": {
+            "format": "date-time",
+            "type": "string",
+            "description": "When the real-world event happened"
+          },
+          "precision": {
+            "type": "string",
+            "enum": [
+              "DAY",
+              "MONTH",
+              "YEAR"
+            ],
+            "default": "DAY"
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "confidence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "findingIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "evidenceIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "createdBy": {
+            "type": "string",
+            "description": "Actor recorded as createdBy"
+          }
+        },
+        "required": [
+          "occurredAt",
+          "title"
+        ]
+      },
+      "UpdateCaseEventDto": {
+        "type": "object",
+        "properties": {
+          "occurredAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "precision": {
+            "type": "string",
+            "enum": [
+              "DAY",
+              "MONTH",
+              "YEAR"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "confidence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "findingIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "evidenceIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "verified": {
+            "type": "boolean",
+            "description": "Explicitly mark the event verified"
+          },
+          "updatedBy": {
+            "type": "string"
+          }
+        }
       },
       "StartRunnerDto": {
         "type": "object",
@@ -16056,6 +17225,7 @@
                 "LOCAL_FOLDER",
                 "MICROSOFT_365",
                 "GOOGLE_WORKSPACE",
+                "SANDBOX",
                 "CUSTOM"
               ]
             }
@@ -16657,136 +17827,6 @@
           "total",
           "skip",
           "limit"
-        ]
-      },
-      "SandboxRunDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "createdAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "fileName": {
-            "type": "string"
-          },
-          "fileType": {
-            "type": "string",
-            "description": "Raw MIME type detected by the CLI (e.g. \"application/pdf\")"
-          },
-          "contentType": {
-            "type": "string",
-            "enum": [
-              "TXT",
-              "TABLE",
-              "IMAGE",
-              "VIDEO",
-              "AUDIO",
-              "URL",
-              "BINARY",
-              "OTHER"
-            ],
-            "description": "Internal content classification derived from the MIME type"
-          },
-          "fileExtension": {
-            "type": "string"
-          },
-          "fileSizeBytes": {
-            "type": "number"
-          },
-          "detectors": {
-            "type": "object"
-          },
-          "findings": {
-            "type": "object"
-          },
-          "status": {
-            "type": "string",
-            "enum": [
-              "PENDING",
-              "RUNNING",
-              "COMPLETED",
-              "ERROR"
-            ]
-          },
-          "errorMessage": {
-            "type": "string"
-          },
-          "durationMs": {
-            "type": "number"
-          },
-          "s3Key": {
-            "type": "string",
-            "description": "S3 object key for the uploaded file (null when S3 is not configured)"
-          },
-          "contentHash": {
-            "type": "string",
-            "description": "SHA-256 content hash of the uploaded file (used for duplicate detection)"
-          }
-        },
-        "required": [
-          "id",
-          "createdAt",
-          "fileName",
-          "fileType",
-          "contentType",
-          "fileExtension",
-          "fileSizeBytes",
-          "detectors",
-          "findings",
-          "status"
-        ]
-      },
-      "SandboxRunListResponseDto": {
-        "type": "object",
-        "properties": {
-          "items": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/SandboxRunDto"
-            }
-          },
-          "total": {
-            "type": "number"
-          },
-          "skip": {
-            "type": "number"
-          },
-          "limit": {
-            "type": "number"
-          }
-        },
-        "required": [
-          "items",
-          "total",
-          "skip",
-          "limit"
-        ]
-      },
-      "RerunSandboxRunDto": {
-        "type": "object",
-        "properties": {
-          "detectors": {
-            "type": "array",
-            "description": "Array of detector config objects to use for the new run",
-            "example": [
-              {
-                "type": "SECRETS",
-                "enabled": true,
-                "config": {}
-              }
-            ]
-          },
-          "skipDuplicateCheck": {
-            "type": "boolean",
-            "description": "When true, skip the duplicate-file check and create a new run even if an identical file exists",
-            "default": false
-          }
-        },
-        "required": [
-          "detectors"
         ]
       },
       "TriggerAutopilotDto": {
@@ -18611,6 +19651,352 @@
           "value",
           "valueHash",
           "assets"
+        ]
+      },
+      "EmbeddingStatusResponseDto": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "pgvector": {
+            "type": "boolean"
+          },
+          "pgvectorVersion": {
+            "type": "string",
+            "nullable": true
+          },
+          "searchStrategy": {
+            "type": "string"
+          },
+          "provider": {
+            "type": "string"
+          },
+          "model": {
+            "type": "string"
+          },
+          "dimensions": {
+            "type": "number"
+          },
+          "spaceId": {
+            "type": "string",
+            "nullable": true
+          },
+          "persistentQueue": {
+            "type": "boolean"
+          },
+          "pendingQueueWrites": {
+            "type": "number"
+          },
+          "workerRegistered": {
+            "type": "boolean"
+          },
+          "autoBackfill": {
+            "type": "boolean"
+          },
+          "backfillRunning": {
+            "type": "boolean"
+          },
+          "backfillStartedAt": {
+            "type": "string",
+            "nullable": true
+          },
+          "backfillCompletedAt": {
+            "type": "string",
+            "nullable": true
+          },
+          "backfillError": {
+            "type": "string",
+            "nullable": true
+          },
+          "recalibrationScheduled": {
+            "type": "boolean",
+            "description": "A recalibration pass is queued (debounced) but not yet running"
+          },
+          "recalibrationRunning": {
+            "type": "boolean"
+          },
+          "lastRecalibratedAt": {
+            "type": "string",
+            "nullable": true
+          },
+          "lastRecalibrationError": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "enabled",
+          "pgvector",
+          "searchStrategy",
+          "provider",
+          "model",
+          "dimensions",
+          "persistentQueue",
+          "pendingQueueWrites",
+          "workerRegistered",
+          "autoBackfill",
+          "backfillRunning",
+          "recalibrationScheduled",
+          "recalibrationRunning"
+        ]
+      },
+      "EmbeddingReindexResponseDto": {
+        "type": "object",
+        "properties": {
+          "started": {
+            "type": "boolean"
+          },
+          "spaceId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "started",
+          "spaceId"
+        ]
+      },
+      "AssetChunkDto": {
+        "type": "object",
+        "properties": {
+          "ordinal": {
+            "type": "number"
+          },
+          "page": {
+            "type": "number"
+          },
+          "charOffset": {
+            "type": "number"
+          },
+          "charLength": {
+            "type": "number"
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "ordinal",
+          "charOffset",
+          "charLength",
+          "text"
+        ]
+      },
+      "PutAssetChunksDto": {
+        "type": "object",
+        "properties": {
+          "assetHash": {
+            "type": "string"
+          },
+          "chunks": {
+            "maxItems": 5000,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AssetChunkDto"
+            }
+          }
+        },
+        "required": [
+          "assetHash",
+          "chunks"
+        ]
+      },
+      "Object": {
+        "type": "object",
+        "properties": {}
+      },
+      "SimilarFindingAssetDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ]
+      },
+      "SimilarFindingSourceDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ]
+      },
+      "SimilarFindingEvidenceAnalysisDto": {
+        "type": "object",
+        "properties": {
+          "importanceScore": {
+            "type": "number"
+          },
+          "qualityScore": {
+            "type": "number"
+          },
+          "similarCount": {
+            "type": "number"
+          },
+          "duplicateGroupHash": {
+            "type": "string",
+            "nullable": true
+          },
+          "reasons": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          }
+        },
+        "required": [
+          "importanceScore",
+          "qualityScore",
+          "similarCount",
+          "reasons"
+        ]
+      },
+      "SimilarFindingDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "findingType": {
+            "type": "string"
+          },
+          "severity": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "matchedContent": {
+            "type": "string"
+          },
+          "similarity": {
+            "type": "number",
+            "minimum": -1,
+            "maximum": 1
+          },
+          "confidence": {
+            "type": "number"
+          },
+          "assetId": {
+            "type": "string"
+          },
+          "sourceId": {
+            "type": "string"
+          },
+          "asset": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SimilarFindingAssetDto"
+              }
+            ]
+          },
+          "source": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SimilarFindingSourceDto"
+              }
+            ]
+          },
+          "evidenceAnalysis": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SimilarFindingEvidenceAnalysisDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "findingType",
+          "severity",
+          "status",
+          "matchedContent",
+          "similarity",
+          "confidence",
+          "assetId",
+          "sourceId"
+        ]
+      },
+      "BoilerplateClusterDto": {
+        "type": "object",
+        "properties": {
+          "groupHash": {
+            "type": "string"
+          },
+          "findingCount": {
+            "type": "number"
+          },
+          "findingIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "meanImportance": {
+            "type": "number"
+          },
+          "sourceCount": {
+            "type": "number",
+            "description": "Distinct sources the cluster spans (>1 = cross-source)"
+          },
+          "sourceIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "assetIds": {
+            "description": "Assets containing the clustered findings (up to 50)",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "threshold": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "groupHash",
+          "findingCount",
+          "findingIds",
+          "meanImportance",
+          "sourceCount",
+          "sourceIds",
+          "assetIds",
+          "threshold"
+        ]
+      },
+      "EmbeddingRecalibrateResponseDto": {
+        "type": "object",
+        "properties": {
+          "scheduled": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "scheduled"
         ]
       }
     }

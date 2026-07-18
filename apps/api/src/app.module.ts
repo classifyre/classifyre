@@ -5,6 +5,7 @@ import { PrismaService } from './prisma.service';
 import { DemoModeService } from './demo-mode.service';
 import { DemoModeGuard } from './demo-mode.guard';
 import { SourceService } from './source.service';
+import { SourceFilesService } from './source-files.service';
 import { AssetService } from './asset.service';
 import { FindingsService } from './findings.service';
 import { NotificationsService } from './notifications.service';
@@ -14,7 +15,6 @@ import { CustomDetectorExtractionsService } from './custom-detector-extractions.
 import { CustomDetectorTestsService } from './custom-detector-tests.service';
 import { CliRunnerModule } from './cli-runner/cli-runner.module';
 import { WebSocketModule } from './websocket/websocket.module';
-import { SandboxModule } from './sandbox/sandbox.module';
 import { SchedulerModule } from './scheduler/scheduler.module';
 import { MatchingModule } from './matching/matching.module';
 import { AutopilotModule } from './autopilot/autopilot.module';
@@ -43,19 +43,19 @@ import { ChatBotsService } from './chat-gateway/chat-bots.service';
 import { ChatGatewayService } from './chat-gateway/chat-gateway.service';
 import { ChatHarnessToolset } from './chat-gateway/chat-harness.toolset';
 import { ChatSessionService } from './chat-gateway/chat-session.service';
-import { EmbeddingController } from './embedding/embedding.controller';
-import { EmbeddingCapabilityService } from './embedding/embedding-capability.service';
-import { EmbeddingAnalysisService } from './embedding/embedding-analysis.service';
-import { EmbeddingService } from './embedding/embedding.service';
-import { QueryEmbeddingService } from './embedding/query-embedding.service';
-import { EmbeddingConfigService } from './embedding/embedding-config.service';
-import { EmbeddingProviderService } from './embedding/embedding-provider.service';
-import { EmbeddingQueueService } from './embedding/embedding-queue.service';
+import { EmbeddingModule } from './embedding/embedding.module';
+import { GlossaryController } from './glossary/glossary.controller';
+import { GlossaryService } from './glossary/glossary.service';
+import { CaseLeadsController } from './controllers/case-leads.controller';
+import { CaseEventsController } from './controllers/case-events.controller';
+import { CaseLeadsService } from './case-leads.service';
+import { CaseEventsService } from './case-events.service';
 
 // Import organized controllers
 import {
   HealthController,
   SourcesController,
+  SourceFilesController,
   SearchSourcesController,
   AssetsController,
   SearchAssetsController,
@@ -82,16 +82,17 @@ import {
   imports: [
     CliRunnerModule,
     WebSocketModule,
-    SandboxModule,
     SchedulerModule,
     MatchingModule,
     AutopilotModule,
     CorrelationModule,
     ExportModule,
+    EmbeddingModule,
   ],
   controllers: [
     HealthController,
     SourcesController,
+    SourceFilesController,
     SearchSourcesController,
     AssetsController,
     SearchAssetsController,
@@ -112,7 +113,9 @@ import {
     CaseThreadsController,
     GraphController,
     ChatBotsController,
-    EmbeddingController,
+    GlossaryController,
+    CaseLeadsController,
+    CaseEventsController,
   ],
   providers: [
     { provide: APP_GUARD, useClass: DemoModeGuard },
@@ -120,6 +123,7 @@ import {
     DemoModeService,
     PrismaService,
     SourceService,
+    SourceFilesService,
     AssetService,
     FindingsService,
     NotificationsService,
@@ -152,13 +156,9 @@ import {
     ChatAgentService,
     ChatGatewayService,
     ChatBotsService,
-    EmbeddingConfigService,
-    EmbeddingCapabilityService,
-    EmbeddingAnalysisService,
-    EmbeddingService,
-    EmbeddingProviderService,
-    EmbeddingQueueService,
-    QueryEmbeddingService,
+    GlossaryService,
+    CaseLeadsService,
+    CaseEventsService,
   ],
 })
 export class AppModule {}

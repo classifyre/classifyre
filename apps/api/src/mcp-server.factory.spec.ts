@@ -88,7 +88,7 @@ describe('McpServerFactoryService semantic tools', () => {
       limit: 5,
     });
     const clusters = (await tools.get('find_boilerplate_clusters')?.handler({
-      sourceId: 'source-1',
+      sourceIds: ['source-1'],
     })) as { structuredContent: Record<string, unknown> };
 
     expect(assetService.searchAssets).toHaveBeenCalledWith({
@@ -102,11 +102,11 @@ describe('McpServerFactoryService semantic tools', () => {
       'finding-1',
       5,
     );
-    expect(embeddingService.boilerplateClusters).toHaveBeenCalledWith(
-      'source-1',
-      0.95,
-      50,
-    );
+    expect(embeddingService.boilerplateClusters).toHaveBeenCalledWith({
+      sourceIds: ['source-1'],
+      threshold: undefined,
+      limit: undefined,
+    });
     expect(clusters.structuredContent).toEqual({
       result: [{ groupHash: 'group-1', findingCount: 12 }],
     });

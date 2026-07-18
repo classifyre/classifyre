@@ -138,17 +138,6 @@ api:
     # -- Generated key is persisted via Kubernetes Secret lookup across upgrades.
     autoGenerate: true
 
-  sandbox:
-    # -- Mount path for the sandbox emptyDir volume (temp files for local subprocess mode).
-    # Must match SANDBOX_TEMP_DIR env var. The emptyDir keeps temp files off the
-    # container overlay filesystem and ensures they are cleared on pod restart.
-    # In Kubernetes (K8S_JOBS_ENABLED=1) sandbox runs as a K8s Job: file data is
-    # passed via base64 env vars (same pattern as RECIPE_B64 for extractions) and
-    # decoded inside the job pod's /tmp — no shared volume required.
-    tempDir: /var/lib/classifyre/sandbox-tmp
-    # -- Size limit for the sandbox emptyDir. Prevents runaway uploads filling the node.
-    tempSizeLimit: 2Gi
-
   # -- Extra environment variables for API container.
   extraEnv: []
   # -- Extra envFrom sources for API container.
@@ -446,6 +435,23 @@ api:
         # -- TTL for completed prune jobs (seconds).
         ttlSecondsAfterFinished: 3600
 
+worker:
+  # -- Number of worker replicas. The worker runs the same image as the API
+  # -- (SERVICE_ROLE=worker) to process background pg-boss queue jobs and
+  # -- embedding inference outside the HTTP-serving api pods, so heavy
+  # -- background work no longer competes with api pods for their memory limit.
+  replicaCount: 1
+
+  resources:
+    # -- Worker resource requests.
+    requests:
+      cpu: 100m
+      memory: 512Mi
+    # -- Worker resource limits.
+    limits:
+      cpu: "1"
+      memory: 2Gi
+
 frontend:
   # -- Number of web replicas when autoscaling is disabled.
   replicaCount: 2
@@ -713,6 +719,13 @@ postgres:
         - ReadWriteOnce
       # -- Requested size for embedded Postgres PVC.
       size: 20Gi
+    # -- postgresql.conf parameters passed to the server as `-c key=value` container
+    # -- args. Tune these for the workload rather than raising Postgres resource
+    # -- limits (see postgres.embedded.resources) — shared_buffers/work_mem control
+    # -- how Postgres itself uses the memory already granted to it.
+    parameters:
+      shared_buffers: 512MB
+      work_mem: 16MB
     resources:
       # -- Embedded Postgres resource requests.
       requests:
@@ -765,6 +778,14 @@ postgres:
       size: 20Gi
       # -- CNPG storage class name.
       storageClassName: ""
+    postgresql:
+      # -- postgresql.conf parameters merged into the CNPG Cluster's
+      # -- `spec.postgresql.parameters`. Tune these for the workload rather than
+      # -- raising CNPG resource limits — shared_buffers/work_mem control how
+      # -- Postgres itself uses the memory already granted to each instance.
+      parameters:
+        shared_buffers: 512MB
+        work_mem: 16MB
 
 networkPolicy:
   # -- Enable network policies for API and web pods.
@@ -825,8 +846,6 @@ objectStorage:
   enabled: false
   # -- S3 bucket used for runner logs.
   bucket: classifyre-logs
-  # -- S3 bucket used for sandbox uploaded files.
-  sandboxBucket: classifyre-sandbox
   # -- S3 object key prefix for runner logs.
   logPrefix: "runner-logs/"
   # -- AWS region. Required for AWS S3; ignored by most self-hosted providers.

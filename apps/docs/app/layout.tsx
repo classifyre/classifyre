@@ -192,7 +192,7 @@ export const metadata: Metadata = {
     template: "%s | Classifyre Docs",
   },
   description:
-    "Documentation for the Classifyre platform: architecture notes, deployment patterns, and practical implementation guides.",
+    "Documentation for the Classifyre platform: how the app works, section by section — sources, detectors, scans, investigations, and the AI autopilot.",
   keywords: [
     "classifyre",
     "documentation",
@@ -218,7 +218,7 @@ export const metadata: Metadata = {
     type: "website",
     title: "Classifyre Docs",
     description:
-      "Documentation for the Classifyre platform: architecture notes, deployment patterns, and practical implementation guides.",
+      "Documentation for the Classifyre platform: how the app works, section by section — sources, detectors, scans, investigations, and the AI autopilot.",
     url: docsSiteUrl,
     siteName: "Classifyre Docs",
   },
@@ -226,7 +226,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Classifyre Docs",
     description:
-      "Documentation for the Classifyre platform: architecture notes, deployment patterns, and practical implementation guides.",
+      "Documentation for the Classifyre platform: how the app works, section by section — sources, detectors, scans, investigations, and the AI autopilot.",
   },
 };
 

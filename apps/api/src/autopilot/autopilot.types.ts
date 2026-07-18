@@ -166,6 +166,9 @@ export interface RecalledMemory {
   key: string;
   content: string;
   weight: number;
+  /** AGENT-authored memory is a hypothesis until verified; OPERATOR is authoritative. */
+  origin: string;
+  verified: boolean;
 }
 
 /**
@@ -268,6 +271,12 @@ export interface MemoryWrite {
   key: string;
   content: string;
   tags?: string[];
+  /**
+   * Set true only when the content was checked against real system state this
+   * cycle (e.g. a detector's actual findings). Refreshed-but-unchecked content
+   * must stay unverified.
+   */
+  verified?: boolean;
 }
 
 export type CaseOperation = {

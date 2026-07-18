@@ -43,10 +43,14 @@ async function generateSpec() {
 
   // Write OpenAPI spec to file
   const outputPath = join(__dirname, '../openapi.json');
-  writeFileSync(outputPath, JSON.stringify(document, null, 2));
+  const rootOutputPath = join(__dirname, '../../../openapi.json');
+  const serialized = JSON.stringify(document, null, 2);
+  writeFileSync(outputPath, serialized);
+  writeFileSync(rootOutputPath, serialized);
 
   console.log('✅ OpenAPI spec generated successfully!');
   console.log(`📄 File: ${outputPath}`);
+  console.log(`📄 Root mirror: ${rootOutputPath}`);
   console.log(`📊 Endpoints: ${Object.keys(document.paths).length}`);
   console.log(`🏷️  Tags: ${document.tags?.length || 0}`);
 

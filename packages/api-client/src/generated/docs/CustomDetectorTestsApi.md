@@ -6,6 +6,7 @@ All URIs are relative to *http://localhost*
 |------------- | ------------- | -------------|
 | [**customDetectorTestsControllerCreate**](CustomDetectorTestsApi.md#customdetectortestscontrollercreate) | **POST** /custom-detectors/{detectorId}/test-scenarios |  |
 | [**customDetectorTestsControllerDelete**](CustomDetectorTestsApi.md#customdetectortestscontrollerdelete) | **DELETE** /custom-detectors/{detectorId}/test-scenarios/{scenarioId} |  |
+| [**customDetectorTestsControllerInput**](CustomDetectorTestsApi.md#customdetectortestscontrollerinput) | **GET** /custom-detectors/{detectorId}/test-scenarios/{scenarioId}/input |  |
 | [**customDetectorTestsControllerList**](CustomDetectorTestsApi.md#customdetectortestscontrollerlist) | **GET** /custom-detectors/{detectorId}/test-scenarios |  |
 | [**customDetectorTestsControllerRun**](CustomDetectorTestsApi.md#customdetectortestscontrollerrun) | **POST** /custom-detectors/{detectorId}/test-scenarios/run |  |
 
@@ -140,6 +141,74 @@ No authorization required
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
 | **204** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## customDetectorTestsControllerInput
+
+> customDetectorTestsControllerInput(detectorId, scenarioId)
+
+
+
+### Example
+
+```ts
+import {
+  Configuration,
+  CustomDetectorTestsApi,
+} from '@workspace/api-client';
+import type { CustomDetectorTestsControllerInputRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new CustomDetectorTestsApi();
+
+  const body = {
+    // string
+    detectorId: detectorId_example,
+    // string
+    scenarioId: scenarioId_example,
+  } satisfies CustomDetectorTestsControllerInputRequest;
+
+  try {
+    const data = await api.customDetectorTestsControllerInput(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **detectorId** | `string` |  | [Defaults to `undefined`] |
+| **scenarioId** | `string` |  | [Defaults to `undefined`] |
+
+### Return type
+
+`void` (Empty response body)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: Not defined
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
 
 [[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
 

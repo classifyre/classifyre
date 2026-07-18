@@ -1,10 +1,12 @@
 export default {
-  index: "Classifyre Docs",
-  flow: "Flow",
+  index: "Welcome",
+  "how-it-works": "How It Works",
   sources: "Sources",
   detectors: "Detectors",
-  deployment: "Deployment",
+  flow: "Scans",
+  investigations: "Investigations",
+  notifications: "Notifications",
   "data-export": "Data Export",
   settings: "Settings",
-  notifications: "Notifications"
-}
+  deployment: "Deployment",
+};
