@@ -14,113 +14,140 @@ import {
 export const metadata: Metadata = {
   title: "Documentation",
   description:
-    "Classifyre documentation — learn how to investigate your data estate with inquiries, cases, hypotheses, and AI autopilot.",
+    "Classifyre documentation — how the app works, section by section: connect sources, scan them, review findings, and investigate what matters.",
   openGraph: {
     title: "Documentation | Classifyre",
     description:
-      "Connect sources, configure detectors, work investigations, and deploy at scale.",
+      "Connect sources, scan them, review findings, and investigate what matters — with an AI autopilot doing the legwork.",
   },
 };
 
 const docSections = [
   {
+    title: "How It Works",
+    badge: "START HERE",
+    description:
+      "The whole platform in plain English — how scattered data becomes a small number of leads worth your time, and a tour of every screen in the app.",
+    href: "/docs/how-it-works/",
+    items: [
+      { label: "The big picture", href: "/docs/how-it-works/" },
+      { label: "A tour of the app", href: "/docs/how-it-works/in-the-app/" },
+      {
+        label: "From documents to findings",
+        href: "/docs/how-it-works/documents-to-findings/",
+      },
+      {
+        label: "Glossary & shared vocabulary",
+        href: "/docs/how-it-works/glossary/",
+      },
+    ],
+  },
+  {
+    title: "Sources",
+    badge: "CONNECT",
+    description:
+      "Connect the systems you already run — SharePoint, Confluence, Jira, databases, file shares, and more. Nothing is moved; Classifyre reads data in place.",
+    href: "/docs/sources/",
+    items: [
+      { label: "Source catalog & overview", href: "/docs/sources/" },
+      { label: "Configuration & fields", href: "/docs/sources/configuration/" },
+      { label: "Testing & scheduling", href: "/docs/sources/testing/" },
+      {
+        label: "Assets & metadata",
+        href: "/docs/sources/assets-and-metadata/",
+      },
+    ],
+  },
+  {
+    title: "Detectors",
+    badge: "DETECT",
+    description:
+      "Ready-made packs for secrets, personal data, and security — plus custom detectors you build yourself, from a simple pattern to a full AI model.",
+    href: "/docs/detectors/",
+    items: [
+      { label: "Pre-built detectors", href: "/docs/detectors/pre-built/" },
+      { label: "Custom detectors", href: "/docs/detectors/custom-detectors/" },
+      { label: "Findings & results", href: "/docs/detectors/findings/" },
+    ],
+  },
+  {
+    title: "Scans",
+    badge: "RUN",
+    description:
+      "What happens between pressing “scan” and seeing findings — the phases of a run, the statuses you'll see, and how repeat scans stay accurate.",
+    href: "/docs/flow/",
+    items: [
+      { label: "The journey of a scan", href: "/docs/flow/" },
+      { label: "Sampling strategies", href: "/docs/sources/sampling/" },
+      {
+        label: "OCR & transcription",
+        href: "/docs/sources/content-extraction/",
+      },
+    ],
+  },
+  {
     title: "Investigations",
     badge: "CORE WORKFLOW",
     description:
-      "Inquiries, cases, hypotheses, timeline, and the knowledge graph — the full investigation workflow that turns findings into resolved incidents.",
-    href: "/docs/flow/investigations/",
+      "Where findings become answers: inquiries keep watch, fingerprints connect duplicates across systems, and cases collect evidence toward a conclusion.",
+    href: "/docs/investigations/",
     items: [
-      { label: "Inquiry & Case overview", href: "/docs/flow/investigations/" },
-      { label: "Inquiry matchers", href: "/docs/flow/investigations/inquiry/" },
-      { label: "Case workspace", href: "/docs/flow/investigations/cases/" },
-      { label: "Hypothesis & Threads", href: "/docs/flow/investigations/cases/hypothesis/" },
-      { label: "Knowledge Graph", href: "/docs/flow/investigations/cases/graph/" },
-      { label: "Timeline", href: "/docs/flow/investigations/cases/timeline/" },
+      { label: "Overview", href: "/docs/investigations/" },
+      { label: "Inquiries", href: "/docs/investigations/inquiry/" },
+      { label: "Fingerprints", href: "/docs/investigations/fingerprints/" },
+      { label: "Cases & hypotheses", href: "/docs/investigations/cases/" },
     ],
   },
   {
     title: "Autopilot",
     badge: "AI AGENTS",
     description:
-      "Autonomous inquiry and case agents that wake after every scan — no prompt required. Every decision explained in the flight recorder.",
-    href: "/docs/flow/investigations/autopilot/",
+      "AI agents that do the legwork after every scan — triaging findings, building cases, drafting hypotheses — with a written reason for every action.",
+    href: "/docs/investigations/autopilot/",
     items: [
-      { label: "Architecture & pipeline", href: "/docs/flow/investigations/autopilot/" },
-      { label: "Inquiry agent actions", href: "/docs/flow/investigations/autopilot/" },
-      { label: "Case agent actions", href: "/docs/flow/investigations/autopilot/" },
-      { label: "Memory & flight recorder", href: "/docs/flow/investigations/autopilot/" },
+      {
+        label: "What the autopilot does",
+        href: "/docs/investigations/autopilot/",
+      },
+      {
+        label: "Meet the agents",
+        href: "/docs/investigations/autopilot/agents/",
+      },
+      {
+        label: "Steering & supervision",
+        href: "/docs/investigations/autopilot/steering/",
+      },
+      {
+        label: "Flight recorder & audit",
+        href: "/docs/investigations/autopilot/flight-recorder/",
+      },
     ],
   },
   {
-    title: "Sources",
-    badge: "CONNECTORS",
+    title: "Staying Informed",
+    badge: "OUTPUTS",
     description:
-      "Connect databases, lakehouses, collaboration tools, analytics systems, and web content — all feeding evidence into the same investigation layer.",
-    href: "/docs/sources/",
+      "Notifications for the events worth knowing about, and exports that put findings into Excel, Google Sheets, or your BI tool — as a snapshot or a live feed.",
+    href: "/docs/notifications/",
     items: [
-      { label: "Source configuration", href: "/docs/sources/" },
-      { label: "Scan lifecycle", href: "/docs/flow/" },
-      { label: "Asset ingestion & diffing", href: "/docs/flow/" },
+      { label: "Notifications", href: "/docs/notifications/" },
+      { label: "Data export", href: "/docs/data-export/" },
     ],
   },
   {
-    title: "Detectors",
-    badge: "EVIDENCE PIPELINE",
+    title: "Setup & Administration",
+    badge: "ADMIN",
     description:
-      "Built-in packs for PII, secrets, and security — plus four custom engines from regex to any LLM. Every rung feeds the same findings stream.",
-    href: "/docs/detectors/",
-    items: [
-      { label: "Pre-built detectors", href: "/docs/detectors/" },
-      { label: "Custom detectors", href: "/docs/detectors/custom-detectors/" },
-      { label: "Detector ladder", href: "/docs/detectors/custom-detectors/" },
-    ],
-  },
-  {
-    title: "Flow",
-    badge: "LIFECYCLE",
-    description:
-      "End-to-end lifecycle from source creation to findings — entity model, scan run phases, state machines for assets and findings.",
-    href: "/docs/flow/",
-    items: [
-      { label: "Entity model", href: "/docs/flow/" },
-      { label: "Source & scan lifecycle", href: "/docs/flow/" },
-      { label: "Finding lifecycle", href: "/docs/flow/" },
-    ],
-  },
-  {
-    title: "Deployment",
-    badge: "OPERATIONS",
-    description:
-      "Run locally with Docker, deploy to production on Kubernetes with Helm, or add the enterprise layer for governance and SLA-backed support.",
-    href: "/docs/deployment/",
-    items: [
-      { label: "Docker (dev/demo)", href: "/docs/deployment/docker/" },
-      { label: "Kubernetes (production)", href: "/docs/deployment/kubernetes/" },
-      { label: "PostgreSQL & S3 config", href: "/docs/deployment/database/" },
-      { label: "Upgrade & versioning", href: "/docs/deployment/upgrade-and-versioning/" },
-    ],
-  },
-  {
-    title: "Settings",
-    badge: "REFERENCE",
-    description:
-      "Instance configuration, AI provider setup, MCP server config, and notification channels.",
+      "Instance settings, AI provider credentials, and the MCP server — plus running Classifyre with Docker on a laptop or Kubernetes in production.",
     href: "/docs/settings/",
     items: [
-      { label: "Instance settings", href: "/docs/settings/instance-settings/" },
-      { label: "AI providers", href: "/docs/settings/ai-providers/" },
+      { label: "Settings & AI providers", href: "/docs/settings/" },
       { label: "MCP server", href: "/docs/settings/mcp-server/" },
-      { label: "Notifications", href: "/docs/notifications/" },
-    ],
-  },
-  {
-    title: "Data Export",
-    badge: "INTEGRATION",
-    description:
-      "Export findings, assets, and investigation data for external analysis and reporting.",
-    href: "/docs/data-export/",
-    items: [
-      { label: "Export overview", href: "/docs/data-export/" },
+      { label: "Docker (try it out)", href: "/docs/deployment/docker/" },
+      {
+        label: "Kubernetes (production)",
+        href: "/docs/deployment/kubernetes/",
+      },
     ],
   },
 ];
@@ -137,13 +164,20 @@ export default function DocsPage() {
           Documentation
         </Badge>
         <h1 className="font-serif text-4xl font-black uppercase tracking-[0.08em] sm:text-5xl">
-          Detect. Investigate. Resolve.
+          Connect. Scan. Investigate.
         </h1>
         <p className="max-w-2xl text-muted-foreground">
-          Classifyre is an open-source investigation platform — detectors
-          surface evidence, inquiries keep watch, cases and hypotheses organise
-          the work, and an AI autopilot does the legwork between scans. This
-          documentation covers the full platform.
+          These docs explain how Classifyre works, section by section: connect
+          the systems you already run, let scans and detectors surface what
+          matters, then work the results as investigations — with an AI
+          autopilot doing the legwork in between. New here? Start with{" "}
+          <Link
+            href="/docs/how-it-works/"
+            className="font-semibold text-foreground underline decoration-accent decoration-2 underline-offset-2"
+          >
+            How It Works
+          </Link>
+          .
         </p>
       </header>
 
@@ -180,9 +214,7 @@ export default function DocsPage() {
                 variant="secondary"
                 className="w-full border-2 border-border"
               >
-                <Link href={section.href}>
-                  View {section.title} docs
-                </Link>
+                <Link href={section.href}>View {section.title} docs</Link>
               </Button>
             </CardContent>
           </Card>
