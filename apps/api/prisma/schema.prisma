@@ -40,10 +40,31 @@ model Source {
   notifications              Notification[]
   customDetectorExtractions  CustomDetectorExtraction[]
   assetChunks                AssetChunk[]
+  uploadedFiles              UploadedSourceFile[]
 
   @@index([currentRunnerId])
   @@index([scheduleEnabled])
   @@map("sources")
+}
+
+model UploadedSourceFile {
+  id               String   @id @default(uuid())
+  sourceId         String   @map("source_id")
+  fileName         String   @map("file_name")
+  declaredMimeType String   @map("declared_mime_type")
+  fileExtension    String   @map("file_extension")
+  fileSizeBytes    Int      @map("file_size_bytes")
+  contentHash      String   @map("content_hash") @db.VarChar(64)
+  data             Bytes
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  source Source @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+
+  @@unique([sourceId, contentHash])
+  @@index([sourceId, createdAt(sort: Desc)])
+  @@index([contentHash])
+  @@map("source_files")
 }
 
 model Asset {
@@ -54,7 +75,7 @@ model Asset {
   externalUrl               String                     @map("external_url")
   links                     Json                       @default("[]") @db.JsonB
   // Catalog asset kind (file, image, page, comment, table, ...) — free-form
-  // string, not the AssetContentType enum (which is kept for SandboxRun).
+  // string, not a database enum.
   assetType                 String                     @map("asset_type")
   sourceType                AssetType                  @map("source_type")
   createdAt                 DateTime                   @default(now()) @map("created_at")
@@ -666,6 +687,7 @@ enum AssetType {
   LOCAL_FOLDER
   MICROSOFT_365
   GOOGLE_WORKSPACE
+  SANDBOX
   CUSTOM
 }
 
@@ -790,51 +812,6 @@ enum TextExtractionStatus {
   ENGINE_UNAVAILABLE
   ZERO_FRAMES
   FAILED
-}
-
-enum AssetContentType {
-  TXT
-  TABLE
-  IMAGE
-  VIDEO
-  AUDIO
-  URL
-  BINARY
-  OTHER
-}
-
-enum SandboxRunStatus {
-  PENDING
-  RUNNING
-  COMPLETED
-  ERROR
-}
-
-model SandboxRun {
-  id            String           @id @default(uuid())
-  createdAt     DateTime         @default(now()) @map("created_at")
-  fileName      String           @map("file_name")
-  fileType      String           @map("file_type")
-  contentType   AssetContentType @default(OTHER) @map("content_type")
-  fileExtension String           @map("file_extension")
-  fileSizeBytes Int              @map("file_size_bytes")
-  detectors     Json             @db.JsonB
-  findings      Json             @default("[]") @db.JsonB
-  status        SandboxRunStatus @default(PENDING)
-  errorMessage  String?          @map("error_message")
-  durationMs    Int?             @map("duration_ms")
-  // S3-backed file storage: key in the sandbox bucket and SHA-256 content hash
-  s3Key         String?          @map("s3_key")
-  contentHash   String?          @map("content_hash")
-  // Transient file bytes for K8s job transport: the input file is stored here
-  // only while a K8s sandbox job runs, served to the job's init-container over
-  // the cluster network, then cleared. Never uses S3 for the sandbox.
-  inputData     Bytes?           @map("input_data")
-
-  @@index([status])
-  @@index([createdAt])
-  @@index([contentHash])
-  @@map("sandbox_runs")
 }
 
 // ─── INVESTIGATIONS (CASES / GRAPH) ──────────────────────────────
@@ -1224,7 +1201,7 @@ model CaseInquiry {
   @@map("case_inquiries")
 }
 
-// An observed node attached to a CASE. entityType: "asset" | "sandbox". Display
+// An observed node attached to a CASE. Display
 // fields are denormalized snapshots so the node survives source-row deletion.
 model CaseEvidence {
   id         String   @id @default(uuid())

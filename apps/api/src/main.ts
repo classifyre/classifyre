@@ -25,7 +25,9 @@ async function bootstrap() {
 
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule,
-    new FastifyAdapter({ bodyLimit: 50 * 1024 * 1024 }), // 50 MB
+    // Leave room for multipart framing while @fastify/multipart enforces the
+    // exact 50 MiB per-file limit below.
+    new FastifyAdapter({ bodyLimit: 51 * 1024 * 1024 }),
   );
 
   app.enableCors({
@@ -95,7 +97,6 @@ async function bootstrap() {
     .addTag('Sources', 'Data source management and configuration')
     .addTag('Assets', 'Ingested asset retrieval and management')
     .addTag('Detectors', 'Content detection and analysis')
-    .addTag('Sandbox', 'Sandbox file scanning')
     .addTag(
       'Instance Settings',
       'Global instance-wide behavior and localization settings',

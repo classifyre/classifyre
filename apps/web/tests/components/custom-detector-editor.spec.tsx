@@ -2,8 +2,23 @@ import * as React from "react";
 import { expect, test } from "@playwright/experimental-ct-react";
 import { CustomDetectorEditor } from "@/components/custom-detector-editor";
 
+type RouteLike = {
+  request(): { url(): string };
+  fulfill(options: {
+    status: number;
+    contentType: string;
+    body: string;
+  }): Promise<void>;
+  continue(): Promise<void>;
+};
+
 async function mockCustomDetectorList(
-  page: import("@playwright/test").Page,
+  page: {
+    route(
+      url: string,
+      handler: (route: RouteLike) => Promise<void>,
+    ): Promise<unknown>;
+  },
   detectors: Array<Record<string, unknown>> = [],
 ) {
   await page.route("**/custom-detectors*", async (route) => {

@@ -20,7 +20,6 @@
     "fingerprints": "Fingerabdrücke",
     "glossary": "Glossar",
     "scans": "Scans",
-    "sandbox": "Sandbox",
     "operations": "Operationen",
     "settings": "Einstellungen",
     "harness": "Harness AI"
@@ -266,6 +265,22 @@
       "nameHelp": "Geben Sie Ihrer Quelle einen einprägsamen Namen zur Identifizierung",
       "descriptionLabel": "Beschreibung",
       "descriptionHelp": "Optional. Fügen Sie Notizen hinzu, wofür diese Quelle dient."
+    },
+    "uploadedFiles": {
+      "title": "Hochgeladene Dateien",
+      "dropPrompt": "Dateien hier ablegen oder auswählen",
+      "maximumSize": "Maximal 50 MiB pro Datei",
+      "chooseFiles": "Dateien auswählen",
+      "tooLarge": "Zu große Dateien: {{count}}. Das Limit beträgt 50 MiB pro Datei.",
+      "keepOne": "Eine Sandbox-Quelle muss mindestens eine Datei behalten.",
+      "required": "Mindestens eine Datei ist erforderlich.",
+      "pending": "Upload ausstehend",
+      "remove": "{{name}} entfernen",
+      "allUploadsFailed": "Es konnten keine Dateien hochgeladen werden. Die Sandbox-Quelle wurde nicht gespeichert.",
+      "uploadFailures": "Fehlgeschlagene Datei-Uploads: {{count}}.",
+      "deletionFailures": "Dateien konnten nicht entfernt werden: {{count}}.",
+      "requiredBeforeSave": "Fügen Sie vor dem Speichern dieser Sandbox-Quelle mindestens eine Datei hinzu.",
+      "requiredBeforeContinue": "Fügen Sie mindestens eine Datei hinzu, bevor Sie fortfahren."
     },
     "totalSources": "Quellen gesamt",
     "connectedSources": "Verbundene Quellen",
@@ -1349,63 +1364,6 @@
     },
     "sourceRun": "{{source}}-Ausführung"
   },
-  "sandbox": {
-    "title": "Sandbox",
-    "uploadFiles": "Dateien hochladen",
-    "uploadFilesDesc": "Eine oder mehrere Dateien für diesen Sandbox-Scan auswählen.",
-    "detectors": "Erkennungsregeln",
-    "detectorsDesc": "Erkennungsabdeckung auswählen und Scan starten.",
-    "dropFiles": "Dateien hier ablegen oder zum Auswählen klicken",
-    "dropFilesActive": "Dateien zum Hochladen ablegen",
-    "selectDetector": "Mindestens eine Erkennungsregel auswählen",
-    "runs": {
-      "deleteRun": "Ausführung löschen",
-      "search": "Dateiname oder MIME-Typ suchen",
-      "contentType": "Inhaltstyp",
-      "detectors": "Erkennungsregeln",
-      "findings": "Befunde",
-      "noRuns": "Keine Sandbox-Ausführungen gefunden",
-      "noRunsHint": "Filter anpassen, um die Suche zu erweitern.",
-      "loading": "Ausführungen werden geladen...",
-      "file": "Datei",
-      "content": "Inhalt",
-      "mimeType": "MIME-Typ",
-      "size": "Größe",
-      "duration": "Dauer",
-      "topFindings": "Top-Befunde",
-      "when": "Wann",
-      "allRuns": "Alle Ausführungen",
-      "withFindings": "Mit Befunden",
-      "noFindings": "Ohne Befunde",
-      "newestFirst": "Neueste zuerst",
-      "oldestFirst": "Älteste zuerst",
-      "mostFindings": "Meiste Befunde",
-      "fileNameAZ": "Dateiname A-Z",
-      "largestFile": "Größte Datei",
-      "updating": "Wird aktualisiert",
-      "refreshingRuns": "Ausführungen werden aktualisiert",
-      "pickDetectors": "Detektoren hinzufügen",
-      "searchDetectors": "Detektoren suchen...",
-      "noDetectors": "Keine Detektoren gefunden",
-      "rescanAppend": "Erneut scannen (anhängen)",
-      "clearFindings": "Funde löschen",
-      "selectDetectorsFirst": "Mindestens einen Detektor auswählen",
-      "rescanStarted": "Erneuter Scan gestartet — Funde werden angehängt",
-      "rescanFailed": "Erneuter Scan konnte nicht gestartet werden",
-      "findingsCleared": "Funde gelöscht",
-      "clearFailed": "Funde konnten nicht gelöscht werden"
-    },
-    "monitorDesc": "Sandbox-Läufe überwachen und Detektor-Befunde prüfen",
-    "newScan": "Neuer Sandbox-Scan",
-    "runResults": "Laufergebnisse",
-    "autoRefresh": "Läufe werden während der Verarbeitung automatisch aktualisiert. Abgeschlossene Zeilen aufklappen.",
-    "stepper": {
-      "step": "Schritt {{index}}",
-      "active": "aktiv",
-      "done": "fertig",
-      "locked": "gesperrt"
-    }
-  },
   "notifications": {
     "title": "Benachrichtigungen",
     "total": "Gesamt",
@@ -1847,14 +1805,6 @@
     "copied": "{{label}} kopiert",
     "failedToCopy": "{{label}} konnte nicht kopiert werden"
   },
-  "upload": {
-    "uploaded": "{{fileName}} hochgeladen",
-    "failed": "Datei-Upload fehlgeschlagen",
-    "oversized": "{{count}} Datei(en) über 50 MB übersprungen.",
-    "failedToQueue": "{{count}} Datei(en) konnten nicht in die Warteschlange gestellt werden",
-    "failedToStart": "Sandbox-Scan konnte nicht gestartet werden",
-    "queued": "„{{fileName}}“ in Warteschlange gestellt. Weiterleitung zu Ergebnissen..."
-  },
   "validation": {
     "configValidationFailed": "Konfiguration hat die Schema-Validierung nicht bestanden"
   },
@@ -1916,8 +1866,7 @@
     "assets": "Assets",
     "notifications": "Benachrichtigungen",
     "settings": "Einstellungen",
-    "detectors": "Custom-Detektoren",
-    "sandbox": "Sandbox"
+    "detectors": "Custom-Detektoren"
   },
   "investigations": {
     "page": {

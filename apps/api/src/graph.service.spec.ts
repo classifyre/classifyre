@@ -180,42 +180,6 @@ describe('GraphService', () => {
       expect(result.edges).toHaveLength(0);
     });
 
-    it('renders sandbox evidence and its findings from snapshots (no live tables)', async () => {
-      mockPrisma.caseEvidence.findMany.mockResolvedValue([
-        {
-          id: 'ev1',
-          entityType: 'sandbox',
-          entityId: 'run-1',
-          label: 'leak.csv',
-          assetType: 'table',
-          sourceType: 'SANDBOX',
-          findings: [
-            {
-              id: 'cf1',
-              findingId: 'sandbox:run-1:0',
-              label: 'email',
-              severity: 'HIGH',
-              detectorType: 'PII',
-              matchedContent: 'a@b.com',
-            },
-          ],
-        },
-      ]);
-      mockPrisma.caseThreadSupport.findMany.mockResolvedValue([]);
-
-      const result = await service.caseGraph('case-1', 1);
-
-      const sandbox = result.nodes.find((n) => n.type === 'sandbox');
-      expect(sandbox?.label).toBe('leak.csv');
-      const finding = result.nodes.find((n) => n.type === 'finding');
-      expect(finding?.id).toBe('sandbox:run-1:0');
-      expect(finding?.caseFindingId).toBe('cf1');
-      // No recursive traversal for a sandbox-only case.
-      expect(mockPrisma.$queryRaw).not.toHaveBeenCalled();
-      expect(result.edges).toHaveLength(1);
-      expect(result.edges[0].relationType).toBe('CONTAINS');
-    });
-
     it('keeps deleted asset/finding nodes alive via case snapshots', async () => {
       mockPrisma.caseEvidence.findMany.mockResolvedValue([
         {

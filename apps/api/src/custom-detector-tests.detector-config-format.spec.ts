@@ -3,13 +3,13 @@
  *
  * The old evaluateViaCli built a payload:
  *   [{ detector_type: "CUSTOM", custom: [config] }]
- * which is not the format the CLI's SandboxRunner expects. Additionally, it
+ * which is not the format the CLI file-evaluation runner expects. Additionally, it
  * always ran `cd /app/cli` which fails on K8s API pods where the CLI is not
  * installed locally.
  *
- * Fix: evaluateViaCli now builds the correct sandbox detector format:
+ * Fix: evaluateViaCli now builds the correct file-evaluation detector format:
  *   [{ type: "CUSTOM", enabled: true, config: { custom_detector_key, name, method, ...config } }]
- * and uses KubernetesCliJobService.runSandboxJob when K8s is enabled.
+ * and uses KubernetesCliJobService.runFileEvaluationJob when K8s is enabled.
  *
  * Tests here validate the detector config payload format (pure logic).
  */
@@ -92,7 +92,7 @@ describe('evaluateViaCli - detector config format (Bug 2)', () => {
     expect(cfg.method).toBe('ENTITY');
   });
 
-  it('wraps in array for the CLI sandbox detectors format', () => {
+  it('wraps in array for the CLI file-evaluation detector format', () => {
     const entry = buildDetectorEntry(classifierDetector);
     const payload = JSON.parse(JSON.stringify([entry]));
     expect(Array.isArray(payload)).toBe(true);

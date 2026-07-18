@@ -27,6 +27,7 @@ import type {
   SourcesControllerUpdateStatusRequest,
   TestConnectionResponseDto,
   UpdateSourceDto,
+  UploadedSourceFileDto,
 } from '../models/index';
 import {
     AssetListResponseDtoFromJSON,
@@ -53,6 +54,8 @@ import {
     TestConnectionResponseDtoToJSON,
     UpdateSourceDtoFromJSON,
     UpdateSourceDtoToJSON,
+    UploadedSourceFileDtoFromJSON,
+    UploadedSourceFileDtoToJSON,
 } from '../models/index';
 
 export interface SearchSourcesControllerSearchSourcesRequest {
@@ -77,6 +80,25 @@ export interface SourceAssetsControllerListSourceAssetsRequest {
     sourceTypes?: Array<SourceAssetsControllerListSourceAssetsSourceTypesEnum>;
     skip?: number;
     limit?: number;
+}
+
+export interface SourceFilesControllerContentRequest {
+    sourceId: string;
+    fileId: string;
+}
+
+export interface SourceFilesControllerDeleteRequest {
+    sourceId: string;
+    fileId: string;
+}
+
+export interface SourceFilesControllerListRequest {
+    sourceId: string;
+}
+
+export interface SourceFilesControllerUploadRequest {
+    sourceId: string;
+    file: Blob;
 }
 
 export interface SourcesControllerCreateSourceRequest {
@@ -316,6 +338,196 @@ export class SourcesApi extends runtime.BaseAPI {
      */
     async sourceAssetsControllerListSourceAssets(requestParameters: SourceAssetsControllerListSourceAssetsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<AssetListResponseDto> {
         const response = await this.sourceAssetsControllerListSourceAssetsRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Stream uploaded source file bytes
+     */
+    async sourceFilesControllerContentRaw(requestParameters: SourceFilesControllerContentRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
+        if (requestParameters['sourceId'] == null) {
+            throw new runtime.RequiredError(
+                'sourceId',
+                'Required parameter "sourceId" was null or undefined when calling sourceFilesControllerContent().'
+            );
+        }
+
+        if (requestParameters['fileId'] == null) {
+            throw new runtime.RequiredError(
+                'fileId',
+                'Required parameter "fileId" was null or undefined when calling sourceFilesControllerContent().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/sources/{sourceId}/files/{fileId}/content`;
+        urlPath = urlPath.replace(`{${"sourceId"}}`, encodeURIComponent(String(requestParameters['sourceId'])));
+        urlPath = urlPath.replace(`{${"fileId"}}`, encodeURIComponent(String(requestParameters['fileId'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.VoidApiResponse(response);
+    }
+
+    /**
+     * Stream uploaded source file bytes
+     */
+    async sourceFilesControllerContent(requestParameters: SourceFilesControllerContentRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
+        await this.sourceFilesControllerContentRaw(requestParameters, initOverrides);
+    }
+
+    /**
+     * Delete an uploaded source file
+     */
+    async sourceFilesControllerDeleteRaw(requestParameters: SourceFilesControllerDeleteRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
+        if (requestParameters['sourceId'] == null) {
+            throw new runtime.RequiredError(
+                'sourceId',
+                'Required parameter "sourceId" was null or undefined when calling sourceFilesControllerDelete().'
+            );
+        }
+
+        if (requestParameters['fileId'] == null) {
+            throw new runtime.RequiredError(
+                'fileId',
+                'Required parameter "fileId" was null or undefined when calling sourceFilesControllerDelete().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/sources/{sourceId}/files/{fileId}`;
+        urlPath = urlPath.replace(`{${"sourceId"}}`, encodeURIComponent(String(requestParameters['sourceId'])));
+        urlPath = urlPath.replace(`{${"fileId"}}`, encodeURIComponent(String(requestParameters['fileId'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'DELETE',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.VoidApiResponse(response);
+    }
+
+    /**
+     * Delete an uploaded source file
+     */
+    async sourceFilesControllerDelete(requestParameters: SourceFilesControllerDeleteRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
+        await this.sourceFilesControllerDeleteRaw(requestParameters, initOverrides);
+    }
+
+    /**
+     * List uploaded files for a Sandbox source
+     */
+    async sourceFilesControllerListRaw(requestParameters: SourceFilesControllerListRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Array<UploadedSourceFileDto>>> {
+        if (requestParameters['sourceId'] == null) {
+            throw new runtime.RequiredError(
+                'sourceId',
+                'Required parameter "sourceId" was null or undefined when calling sourceFilesControllerList().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/sources/{sourceId}/files`;
+        urlPath = urlPath.replace(`{${"sourceId"}}`, encodeURIComponent(String(requestParameters['sourceId'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => jsonValue.map(UploadedSourceFileDtoFromJSON));
+    }
+
+    /**
+     * List uploaded files for a Sandbox source
+     */
+    async sourceFilesControllerList(requestParameters: SourceFilesControllerListRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Array<UploadedSourceFileDto>> {
+        const response = await this.sourceFilesControllerListRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Upload one file to a Sandbox source
+     */
+    async sourceFilesControllerUploadRaw(requestParameters: SourceFilesControllerUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<UploadedSourceFileDto>> {
+        if (requestParameters['sourceId'] == null) {
+            throw new runtime.RequiredError(
+                'sourceId',
+                'Required parameter "sourceId" was null or undefined when calling sourceFilesControllerUpload().'
+            );
+        }
+
+        if (requestParameters['file'] == null) {
+            throw new runtime.RequiredError(
+                'file',
+                'Required parameter "file" was null or undefined when calling sourceFilesControllerUpload().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        const consumes: runtime.Consume[] = [
+            { contentType: 'multipart/form-data' },
+        ];
+        // @ts-ignore: canConsumeForm may be unused
+        const canConsumeForm = runtime.canConsumeForm(consumes);
+
+        let formParams: { append(param: string, value: any): any };
+        let useForm = false;
+        // use FormData to transmit files using content-type "multipart/form-data"
+        useForm = canConsumeForm;
+        if (useForm) {
+            formParams = new FormData();
+        } else {
+            formParams = new URLSearchParams();
+        }
+
+        if (requestParameters['file'] != null) {
+            formParams.append('file', requestParameters['file'] as any);
+        }
+
+
+        let urlPath = `/sources/{sourceId}/files`;
+        urlPath = urlPath.replace(`{${"sourceId"}}`, encodeURIComponent(String(requestParameters['sourceId'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+            body: formParams,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => UploadedSourceFileDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Upload one file to a Sandbox source
+     */
+    async sourceFilesControllerUpload(requestParameters: SourceFilesControllerUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<UploadedSourceFileDto> {
+        const response = await this.sourceFilesControllerUploadRaw(requestParameters, initOverrides);
         return await response.value();
     }
 
@@ -738,6 +950,7 @@ export const SourceAssetsControllerListSourceAssetsSourceTypesEnum = {
     LocalFolder: 'LOCAL_FOLDER',
     Microsoft365: 'MICROSOFT_365',
     GoogleWorkspace: 'GOOGLE_WORKSPACE',
+    Sandbox: 'SANDBOX',
     Custom: 'CUSTOM'
 } as const;
 export type SourceAssetsControllerListSourceAssetsSourceTypesEnum = typeof SourceAssetsControllerListSourceAssetsSourceTypesEnum[keyof typeof SourceAssetsControllerListSourceAssetsSourceTypesEnum];

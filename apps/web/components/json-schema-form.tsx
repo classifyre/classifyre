@@ -117,7 +117,10 @@ function formatPlaceholder(
  * threading a source-type prop through every layer of the generic
  * schema-driven form renderer.
  */
-function isDesktopFolderPathField(fieldPath: string, schema: JSONSchema7): boolean {
+function isDesktopFolderPathField(
+  fieldPath: string,
+  schema: JSONSchema7,
+): boolean {
   return fieldPath === "required.path" && schema.type === "string";
 }
 
@@ -789,10 +792,15 @@ function OneOfFieldInner({
   // Treating undefined as {} would cause empty-property options to score 0 and
   // appear "selected" even though the real form value is still undefined.
   const currentValue =
-    field.value !== undefined && isPlainObject(field.value) ? field.value : null;
+    field.value !== undefined && isPlainObject(field.value)
+      ? field.value
+      : null;
   const selectedOption =
-    currentValue !== null ? findSelectedOneOfOption(oneOfOptions, currentValue) : null;
-  const fallbackOption = required && hasMounted ? oneOfOptions[0] || null : null;
+    currentValue !== null
+      ? findSelectedOneOfOption(oneOfOptions, currentValue)
+      : null;
+  const fallbackOption =
+    required && hasMounted ? oneOfOptions[0] || null : null;
   const activeOption = selectedOption ?? fallbackOption;
   const selectedKey = selectedOption
     ? getOneOfOptionIdentity(
@@ -800,7 +808,10 @@ function OneOfFieldInner({
         oneOfOptions.indexOf(selectedOption) ?? 0,
       )
     : fallbackOption
-      ? getOneOfOptionIdentity(fallbackOption, oneOfOptions.indexOf(fallbackOption))
+      ? getOneOfOptionIdentity(
+          fallbackOption,
+          oneOfOptions.indexOf(fallbackOption),
+        )
       : "";
 
   return (
@@ -819,7 +830,9 @@ function OneOfFieldInner({
               return;
             }
             const option = oneOfOptions.find((opt, index) => {
-              return getOneOfOptionIdentity(opt as JSONSchema7, index) === value;
+              return (
+                getOneOfOptionIdentity(opt as JSONSchema7, index) === value
+              );
             });
 
             if (option) {
@@ -832,12 +845,18 @@ function OneOfFieldInner({
           disabled={disabled}
         >
           <FormControl>
-            <SelectTrigger data-testid={`select-${String(label).toLowerCase().replace(/[^a-z0-9]/g, "-")}`}>
+            <SelectTrigger
+              data-testid={`select-${String(label)
+                .toLowerCase()
+                .replace(/[^a-z0-9]/g, "-")}`}
+            >
               <SelectValue placeholder={t("common.selectOption")} />
             </SelectTrigger>
           </FormControl>
           <SelectContent>
-            {!required && <SelectItem value="__none__">{t("common.notSet")}</SelectItem>}
+            {!required && (
+              <SelectItem value="__none__">{t("common.notSet")}</SelectItem>
+            )}
             {oneOfOptions.map((option, idx) => {
               const opt = option as JSONSchema7;
               const optionValue = getOneOfOptionIdentity(opt, idx);
@@ -910,16 +929,30 @@ function CoupledOneOfAuthBlockInner({
   // Initialize both required and masked to the first option after mount
   React.useEffect(() => {
     if (!isRequired || !hasMounted || hasInitializedRef.current) return;
-    if (requiredField.value !== undefined || requiredOptions.length === 0) return;
+    if (requiredField.value !== undefined || requiredOptions.length === 0)
+      return;
     requiredField.onChange(createOneOfValue(requiredOptions[0]!));
     setValue(
       maskedKey as FieldPath<FieldValues>,
-      createOneOfValue(maskedOptions[0]!) as PathValue<FieldValues, FieldPath<FieldValues>>,
+      createOneOfValue(maskedOptions[0]!) as PathValue<
+        FieldValues,
+        FieldPath<FieldValues>
+      >,
     );
     hasInitializedRef.current = true;
-  }, [hasMounted, isRequired, maskedKey, maskedOptions, requiredField, requiredOptions, setValue]);
+  }, [
+    hasMounted,
+    isRequired,
+    maskedKey,
+    maskedOptions,
+    requiredField,
+    requiredOptions,
+    setValue,
+  ]);
 
-  const requiredValue = isPlainObject(requiredField.value) ? requiredField.value : null;
+  const requiredValue = isPlainObject(requiredField.value)
+    ? requiredField.value
+    : null;
 
   // Find which option is selected by matching the const discriminator
   const selectedIdx = React.useMemo(() => {
@@ -931,11 +964,7 @@ function CoupledOneOfAuthBlockInner({
   }, [requiredValue, requiredOptions]);
 
   const effectiveIdx =
-    selectedIdx >= 0
-      ? selectedIdx
-      : isRequired && hasMounted
-        ? 0
-        : -1;
+    selectedIdx >= 0 ? selectedIdx : isRequired && hasMounted ? 0 : -1;
 
   const activeRequired =
     effectiveIdx >= 0 ? (requiredOptions[effectiveIdx] as JSONSchema7) : null;
@@ -989,9 +1018,7 @@ function CoupledOneOfAuthBlockInner({
           disabled={disabled}
         >
           <FormControl>
-            <SelectTrigger
-              data-testid="select-auth-mode"
-            >
+            <SelectTrigger data-testid="select-auth-mode">
               <SelectValue placeholder={t("common.selectOption")} />
             </SelectTrigger>
           </FormControl>
@@ -1319,7 +1346,10 @@ function ComplexObjectArrayField({
   autoDetectSensitiveFields: boolean;
 }) {
   const { t } = useTranslation();
-  const { fields, append, remove } = useFieldArray({ control, name: fieldName });
+  const { fields, append, remove } = useFieldArray({
+    control,
+    name: fieldName,
+  });
 
   return (
     <FormItem>
@@ -1505,7 +1535,11 @@ function SchemaField({
     const hasEnumItems =
       Array.isArray(itemsSchema.enum) && itemsSchema.enum.length > 0;
 
-    if (!hasEnumItems && isObjectSchema(itemsSchema) && itemsSchema.properties) {
+    if (
+      !hasEnumItems &&
+      isObjectSchema(itemsSchema) &&
+      itemsSchema.properties
+    ) {
       return (
         <ComplexObjectArrayField
           control={control}
@@ -1671,7 +1705,9 @@ function SchemaField({
                                 disabled={disabled}
                               >
                                 <SelectTrigger>
-                                  <SelectValue placeholder={t("common.selectOption")} />
+                                  <SelectValue
+                                    placeholder={t("common.selectOption")}
+                                  />
                                 </SelectTrigger>
                                 <SelectContent>
                                   {options.map((option) => (
@@ -1773,7 +1809,8 @@ function SchemaField({
                               disabled={disabled}
                               data-testid={`input-${fieldName.toLowerCase().replace(/[^a-z0-9]/g, "-")}-${index}`}
                             />
-                          </FormControl>                          <Button
+                          </FormControl>{" "}
+                          <Button
                             type="button"
                             variant="ghost"
                             size="icon"
@@ -1949,7 +1986,10 @@ function SchemaField({
   const isUrl =
     normalizedSchema.format === "uri" || name.toLowerCase().includes("url");
   const isLongField = isCertField || isLongText(normalizedSchema);
-  const isFolderPathField = isDesktopFolderPathField(fieldPath, normalizedSchema);
+  const isFolderPathField = isDesktopFolderPathField(
+    fieldPath,
+    normalizedSchema,
+  );
 
   return (
     <FormField
@@ -2106,6 +2146,7 @@ export interface JsonSchemaFormProps {
   schedule?: ScheduleValue;
   onScheduleChange?: (value: ScheduleValue) => void;
   showActions?: boolean;
+  afterNameContent?: React.ReactNode;
 }
 
 export interface JsonSchemaFormHandle {
@@ -2179,6 +2220,7 @@ export const JsonSchemaForm = React.forwardRef<
     schedule,
     onScheduleChange,
     showActions = true,
+    afterNameContent,
   },
   ref,
 ) {
@@ -2256,10 +2298,12 @@ export const JsonSchemaForm = React.forwardRef<
           form.formState.errors as Record<string, unknown>,
         );
         if (!isValid || missingFields.length > 0) {
-          console.warn(
-            "[JsonSchemaForm] Validation failed",
-            { isValid, missingFields, errors, values },
-          );
+          console.warn("[JsonSchemaForm] Validation failed", {
+            isValid,
+            missingFields,
+            errors,
+            values,
+          });
         }
         return { isValid, missingFields, errors };
       },
@@ -2325,6 +2369,7 @@ export const JsonSchemaForm = React.forwardRef<
     );
 
   const TABULAR_SOURCE_TYPE_MAP: Record<IngestionSourceType, boolean> = {
+    SANDBOX: false,
     WORDPRESS: false,
     SLACK: false,
     S3_COMPATIBLE_STORAGE: false,
@@ -2491,6 +2536,8 @@ export const JsonSchemaForm = React.forwardRef<
             );
           })()}
 
+        {afterNameContent}
+
         {hasCoupledAuth && requiredBlock && maskedBlock && (
           <AiAssistedCard
             title={t("forms.authentication")}
@@ -2510,7 +2557,8 @@ export const JsonSchemaForm = React.forwardRef<
           </AiAssistedCard>
         )}
 
-        {!hasCoupledAuth && requiredBlock &&
+        {!hasCoupledAuth &&
+          requiredBlock &&
           (() => {
             const section = resolveKnowledge(
               requiredBlock.key,
@@ -2551,7 +2599,8 @@ export const JsonSchemaForm = React.forwardRef<
             );
           })()}
 
-        {!hasCoupledAuth && maskedBlock &&
+        {!hasCoupledAuth &&
+          maskedBlock &&
           (() => {
             const section = resolveKnowledge(
               maskedBlock.key,
@@ -2855,10 +2904,18 @@ export const JsonSchemaForm = React.forwardRef<
                     ([, v]) =>
                       v !== undefined &&
                       v !== "" &&
-                      !(typeof v === "object" && v !== null && Object.values(v as Record<string, unknown>).every((x) => !x)),
+                      !(
+                        typeof v === "object" &&
+                        v !== null &&
+                        Object.values(v as Record<string, unknown>).every(
+                          (x) => !x,
+                        )
+                      ),
                   ),
                 );
-                field.onChange(Object.keys(cleaned).length ? cleaned : undefined);
+                field.onChange(
+                  Object.keys(cleaned).length ? cleaned : undefined,
+                );
               };
               const requests = (val.requests ?? {}) as Record<string, string>;
               const limits = (val.limits ?? {}) as Record<string, string>;
@@ -2877,20 +2934,32 @@ export const JsonSchemaForm = React.forwardRef<
                               placeholder="Default: 500m"
                               value={requests.cpu ?? ""}
                               onChange={(e) =>
-                                update({ requests: { ...requests, cpu: e.target.value || undefined } })
+                                update({
+                                  requests: {
+                                    ...requests,
+                                    cpu: e.target.value || undefined,
+                                  },
+                                })
                               }
                               disabled={disabled}
                             />
                           </FormControl>
                         </FormItem>
                         <FormItem>
-                          <FormLabel className="text-xs">Memory Request</FormLabel>
+                          <FormLabel className="text-xs">
+                            Memory Request
+                          </FormLabel>
                           <FormControl>
                             <Input
                               placeholder="Default: 1Gi"
                               value={requests.memory ?? ""}
                               onChange={(e) =>
-                                update({ requests: { ...requests, memory: e.target.value || undefined } })
+                                update({
+                                  requests: {
+                                    ...requests,
+                                    memory: e.target.value || undefined,
+                                  },
+                                })
                               }
                               disabled={disabled}
                             />
@@ -2903,42 +2972,63 @@ export const JsonSchemaForm = React.forwardRef<
                               placeholder="Default: 2"
                               value={limits.cpu ?? ""}
                               onChange={(e) =>
-                                update({ limits: { ...limits, cpu: e.target.value || undefined } })
+                                update({
+                                  limits: {
+                                    ...limits,
+                                    cpu: e.target.value || undefined,
+                                  },
+                                })
                               }
                               disabled={disabled}
                             />
                           </FormControl>
                         </FormItem>
                         <FormItem>
-                          <FormLabel className="text-xs">Memory Limit</FormLabel>
+                          <FormLabel className="text-xs">
+                            Memory Limit
+                          </FormLabel>
                           <FormControl>
                             <Input
                               placeholder="Default: 4Gi"
                               value={limits.memory ?? ""}
                               onChange={(e) =>
-                                update({ limits: { ...limits, memory: e.target.value || undefined } })
+                                update({
+                                  limits: {
+                                    ...limits,
+                                    memory: e.target.value || undefined,
+                                  },
+                                })
                               }
                               disabled={disabled}
                             />
                           </FormControl>
                         </FormItem>
                         <FormItem className="col-span-2">
-                          <FormLabel className="text-xs">Timeout (seconds)</FormLabel>
+                          <FormLabel className="text-xs">
+                            Timeout (seconds)
+                          </FormLabel>
                           <FormControl>
                             <Input
                               type="number"
                               placeholder="Default: 14400"
                               value={(val.timeout_seconds as number) ?? ""}
                               onChange={(e) => {
-                                const v = e.target.value ? parseInt(e.target.value, 10) : undefined;
-                                update({ timeout_seconds: v && !isNaN(v) ? v : undefined });
+                                const v = e.target.value
+                                  ? parseInt(e.target.value, 10)
+                                  : undefined;
+                                update({
+                                  timeout_seconds:
+                                    v && !isNaN(v) ? v : undefined,
+                                });
                               }}
                               disabled={disabled}
                             />
                           </FormControl>
                         </FormItem>
                         <FormItem>
-                          <FormLabel className="text-xs">Max Pool Workers</FormLabel>
+                          <FormLabel className="text-xs">
+                            Max Pool Workers
+                          </FormLabel>
                           <FormControl>
                             <Input
                               type="number"
@@ -2947,25 +3037,39 @@ export const JsonSchemaForm = React.forwardRef<
                               max={16}
                               value={(val.max_pool_workers as number) ?? ""}
                               onChange={(e) => {
-                                const v = e.target.value ? parseInt(e.target.value, 10) : undefined;
-                                update({ max_pool_workers: v && !isNaN(v) ? v : undefined });
+                                const v = e.target.value
+                                  ? parseInt(e.target.value, 10)
+                                  : undefined;
+                                update({
+                                  max_pool_workers:
+                                    v && !isNaN(v) ? v : undefined,
+                                });
                               }}
                               disabled={disabled}
                             />
                           </FormControl>
                         </FormItem>
                         <FormItem>
-                          <FormLabel className="text-xs">Max Concurrent Assets</FormLabel>
+                          <FormLabel className="text-xs">
+                            Max Concurrent Assets
+                          </FormLabel>
                           <FormControl>
                             <Input
                               type="number"
                               placeholder="Auto (pool_workers × 2)"
                               min={1}
                               max={50}
-                              value={(val.max_concurrent_assets as number) ?? ""}
+                              value={
+                                (val.max_concurrent_assets as number) ?? ""
+                              }
                               onChange={(e) => {
-                                const v = e.target.value ? parseInt(e.target.value, 10) : undefined;
-                                update({ max_concurrent_assets: v && !isNaN(v) ? v : undefined });
+                                const v = e.target.value
+                                  ? parseInt(e.target.value, 10)
+                                  : undefined;
+                                update({
+                                  max_concurrent_assets:
+                                    v && !isNaN(v) ? v : undefined,
+                                });
                               }}
                               disabled={disabled}
                             />

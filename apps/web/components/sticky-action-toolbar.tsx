@@ -41,6 +41,7 @@ type StickyActionToolbarProps = {
   testLabel: string;
   saveAndRunLabel: string;
   isBusy?: boolean;
+  disabled?: boolean;
   className?: string;
   saveAndRunTestId?: string;
   testIcon?: ReactNode;
@@ -55,6 +56,7 @@ export function StickyActionToolbar({
   testLabel,
   saveAndRunLabel,
   isBusy = false,
+  disabled = false,
   className,
   saveAndRunTestId,
   testIcon,
@@ -64,13 +66,16 @@ export function StickyActionToolbar({
   useAssistantFabOffset(toolbarRef);
 
   return (
-    <Card ref={toolbarRef} className={cn("sticky bottom-0 z-30 p-4", className)}>
+    <Card
+      ref={toolbarRef}
+      className={cn("sticky bottom-0 z-30 p-4", className)}
+    >
       <div className="flex items-center justify-between gap-3">
         <Button
           type="button"
           variant="outline"
           onClick={onSave}
-          disabled={isBusy}
+          disabled={isBusy || disabled}
           data-testid="btn-save-source"
         >
           {saveLabel}
@@ -81,7 +86,7 @@ export function StickyActionToolbar({
             type="button"
             variant="outline"
             onClick={onTest}
-            disabled={isBusy}
+            disabled={isBusy || disabled}
             data-testid="btn-test-source"
           >
             {testIcon}
@@ -90,7 +95,7 @@ export function StickyActionToolbar({
           <Button
             type="submit"
             onClick={onSaveAndRun}
-            disabled={isBusy}
+            disabled={isBusy || disabled}
             data-testid={saveAndRunTestId}
           >
             {runIcon}

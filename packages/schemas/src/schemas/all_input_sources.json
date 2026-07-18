@@ -4,6 +4,9 @@
   "description": "Merged configuration schema with all source types and common definitions",
   "oneOf": [
     {
+      "$ref": "#/definitions/SandboxInput"
+    },
+    {
       "$ref": "#/definitions/SlackInput"
     },
     {
@@ -120,10 +123,7 @@
             "description": "Set when content extraction failed"
           }
         },
-        "required": [
-          "size_bytes",
-          "mime_type"
-        ]
+        "required": ["size_bytes", "mime_type"]
       },
       "image": {
         "type": "object",
@@ -258,11 +258,7 @@
             "description": "Estimated number of rows"
           }
         },
-        "required": [
-          "database",
-          "table_name",
-          "table_type"
-        ]
+        "required": ["database", "table_name", "table_type"]
       },
       "comments": {
         "type": "object",
@@ -273,9 +269,7 @@
             "description": "Number of comments"
           }
         },
-        "required": [
-          "comments_count"
-        ]
+        "required": ["comments_count"]
       },
       "attachment": {
         "type": "object",
@@ -297,16 +291,83 @@
       }
     },
     "sources": {
+      "SANDBOX": {
+        "file": {
+          "use": ["file", "image", "document", "spreadsheet", "text", "json"],
+          "properties": {
+            "provider": {
+              "type": "string",
+              "description": "Uploaded-file source provider label"
+            },
+            "object_key": {
+              "type": "string",
+              "description": "Uploaded source file ID"
+            },
+            "etag": {
+              "type": "string",
+              "description": "SHA-256 content hash"
+            }
+          },
+          "required": ["provider", "object_key"]
+        },
+        "image": {
+          "use": ["file", "image"],
+          "properties": {
+            "provider": {
+              "type": "string",
+              "description": "Uploaded-file source provider label"
+            },
+            "object_key": {
+              "type": "string",
+              "description": "Uploaded source file ID"
+            },
+            "etag": {
+              "type": "string",
+              "description": "SHA-256 content hash"
+            },
+            "source_hash": {
+              "type": "string",
+              "description": "Hash of the parent uploaded file asset"
+            },
+            "location": {
+              "type": "string",
+              "description": "Location of the embedded image within the parent"
+            }
+          },
+          "required": []
+        },
+        "audio": {
+          "use": ["file"],
+          "properties": {
+            "provider": {
+              "type": "string",
+              "description": "Uploaded-file source provider label"
+            },
+            "object_key": {
+              "type": "string",
+              "description": "Uploaded source file ID"
+            }
+          },
+          "required": ["provider", "object_key"]
+        },
+        "video": {
+          "use": ["file"],
+          "properties": {
+            "provider": {
+              "type": "string",
+              "description": "Uploaded-file source provider label"
+            },
+            "object_key": {
+              "type": "string",
+              "description": "Uploaded source file ID"
+            }
+          },
+          "required": ["provider", "object_key"]
+        }
+      },
       "S3_COMPATIBLE_STORAGE": {
         "file": {
-          "use": [
-            "file",
-            "image",
-            "document",
-            "spreadsheet",
-            "text",
-            "json"
-          ],
+          "use": ["file", "image", "document", "spreadsheet", "text", "json"],
           "properties": {
             "provider": {
               "type": "string",
@@ -321,16 +382,10 @@
               "description": "Object entity tag"
             }
           },
-          "required": [
-            "provider",
-            "object_key"
-          ]
+          "required": ["provider", "object_key"]
         },
         "image": {
-          "use": [
-            "file",
-            "image"
-          ],
+          "use": ["file", "image"],
           "properties": {
             "provider": {
               "type": "string",
@@ -356,9 +411,7 @@
           "required": []
         },
         "audio": {
-          "use": [
-            "file"
-          ],
+          "use": ["file"],
           "properties": {
             "provider": {
               "type": "string",
@@ -369,15 +422,10 @@
               "description": "Object key/path"
             }
           },
-          "required": [
-            "provider",
-            "object_key"
-          ]
+          "required": ["provider", "object_key"]
         },
         "video": {
-          "use": [
-            "file"
-          ],
+          "use": ["file"],
           "properties": {
             "provider": {
               "type": "string",
@@ -388,22 +436,12 @@
               "description": "Object key/path"
             }
           },
-          "required": [
-            "provider",
-            "object_key"
-          ]
+          "required": ["provider", "object_key"]
         }
       },
       "LOCAL_FOLDER": {
         "file": {
-          "use": [
-            "file",
-            "image",
-            "document",
-            "spreadsheet",
-            "text",
-            "json"
-          ],
+          "use": ["file", "image", "document", "spreadsheet", "text", "json"],
           "properties": {
             "provider": {
               "type": "string",
@@ -418,16 +456,10 @@
               "description": "Change signature derived from file size and modification time"
             }
           },
-          "required": [
-            "provider",
-            "object_key"
-          ]
+          "required": ["provider", "object_key"]
         },
         "image": {
-          "use": [
-            "file",
-            "image"
-          ],
+          "use": ["file", "image"],
           "properties": {
             "provider": {
               "type": "string",
@@ -453,9 +485,7 @@
           "required": []
         },
         "audio": {
-          "use": [
-            "file"
-          ],
+          "use": ["file"],
           "properties": {
             "provider": {
               "type": "string",
@@ -470,15 +500,10 @@
               "description": "Change signature derived from file size and modification time"
             }
           },
-          "required": [
-            "provider",
-            "object_key"
-          ]
+          "required": ["provider", "object_key"]
         },
         "video": {
-          "use": [
-            "file"
-          ],
+          "use": ["file"],
           "properties": {
             "provider": {
               "type": "string",
@@ -493,22 +518,12 @@
               "description": "Change signature derived from file size and modification time"
             }
           },
-          "required": [
-            "provider",
-            "object_key"
-          ]
+          "required": ["provider", "object_key"]
         }
       },
       "AZURE_BLOB_STORAGE": {
         "file": {
-          "use": [
-            "file",
-            "image",
-            "document",
-            "spreadsheet",
-            "text",
-            "json"
-          ],
+          "use": ["file", "image", "document", "spreadsheet", "text", "json"],
           "properties": {
             "provider": {
               "type": "string",
@@ -523,16 +538,10 @@
               "description": "Object entity tag"
             }
           },
-          "required": [
-            "provider",
-            "object_key"
-          ]
+          "required": ["provider", "object_key"]
         },
         "image": {
-          "use": [
-            "file",
-            "image"
-          ],
+          "use": ["file", "image"],
           "properties": {
             "provider": {
               "type": "string",
@@ -558,9 +567,7 @@
           "required": []
         },
         "audio": {
-          "use": [
-            "file"
-          ],
+          "use": ["file"],
           "properties": {
             "provider": {
               "type": "string",
@@ -571,15 +578,10 @@
               "description": "Object key/path"
             }
           },
-          "required": [
-            "provider",
-            "object_key"
-          ]
+          "required": ["provider", "object_key"]
         },
         "video": {
-          "use": [
-            "file"
-          ],
+          "use": ["file"],
           "properties": {
             "provider": {
               "type": "string",
@@ -590,22 +592,12 @@
               "description": "Object key/path"
             }
           },
-          "required": [
-            "provider",
-            "object_key"
-          ]
+          "required": ["provider", "object_key"]
         }
       },
       "GOOGLE_CLOUD_STORAGE": {
         "file": {
-          "use": [
-            "file",
-            "image",
-            "document",
-            "spreadsheet",
-            "text",
-            "json"
-          ],
+          "use": ["file", "image", "document", "spreadsheet", "text", "json"],
           "properties": {
             "provider": {
               "type": "string",
@@ -620,16 +612,10 @@
               "description": "Object entity tag"
             }
           },
-          "required": [
-            "provider",
-            "object_key"
-          ]
+          "required": ["provider", "object_key"]
         },
         "image": {
-          "use": [
-            "file",
-            "image"
-          ],
+          "use": ["file", "image"],
           "properties": {
             "provider": {
               "type": "string",
@@ -655,9 +641,7 @@
           "required": []
         },
         "audio": {
-          "use": [
-            "file"
-          ],
+          "use": ["file"],
           "properties": {
             "provider": {
               "type": "string",
@@ -668,15 +652,10 @@
               "description": "Object key/path"
             }
           },
-          "required": [
-            "provider",
-            "object_key"
-          ]
+          "required": ["provider", "object_key"]
         },
         "video": {
-          "use": [
-            "file"
-          ],
+          "use": ["file"],
           "properties": {
             "provider": {
               "type": "string",
@@ -687,38 +666,27 @@
               "description": "Object key/path"
             }
           },
-          "required": [
-            "provider",
-            "object_key"
-          ]
+          "required": ["provider", "object_key"]
         }
       },
       "POSTGRESQL": {
         "table": {
-          "use": [
-            "tabularTable"
-          ]
+          "use": ["tabularTable"]
         }
       },
       "MYSQL": {
         "table": {
-          "use": [
-            "tabularTable"
-          ]
+          "use": ["tabularTable"]
         }
       },
       "SQLITE": {
         "table": {
-          "use": [
-            "tabularTable"
-          ]
+          "use": ["tabularTable"]
         }
       },
       "MSSQL": {
         "table": {
-          "use": [
-            "tabularTable"
-          ],
+          "use": ["tabularTable"],
           "properties": {
             "object_type": {
               "type": "string",
@@ -733,9 +701,7 @@
       },
       "ORACLE": {
         "table": {
-          "use": [
-            "tabularTable"
-          ],
+          "use": ["tabularTable"],
           "properties": {
             "object_type": {
               "type": "string",
@@ -750,9 +716,7 @@
       },
       "HIVE": {
         "table": {
-          "use": [
-            "tabularTable"
-          ],
+          "use": ["tabularTable"],
           "properties": {
             "object_type": {
               "type": "string",
@@ -763,9 +727,7 @@
       },
       "SNOWFLAKE": {
         "table": {
-          "use": [
-            "tabularTable"
-          ],
+          "use": ["tabularTable"],
           "properties": {
             "account_id": {
               "type": "string",
@@ -784,9 +746,7 @@
       },
       "DATABRICKS": {
         "table": {
-          "use": [
-            "tabularTable"
-          ],
+          "use": ["tabularTable"],
           "properties": {
             "catalog": {
               "type": "string",
@@ -825,10 +785,7 @@
               "description": "Last modified time (epoch ms)"
             }
           },
-          "required": [
-            "kind",
-            "path"
-          ]
+          "required": ["kind", "path"]
         },
         "pipeline": {
           "properties": {
@@ -849,11 +806,7 @@
               "description": "Pipeline state"
             }
           },
-          "required": [
-            "kind",
-            "pipeline_id",
-            "name"
-          ]
+          "required": ["kind", "pipeline_id", "name"]
         }
       },
       "MONGODB": {
@@ -876,11 +829,7 @@
               "description": "Estimated number of documents in the collection"
             }
           },
-          "required": [
-            "database",
-            "collection",
-            "deployment"
-          ]
+          "required": ["database", "collection", "deployment"]
         }
       },
       "NEO4J": {
@@ -906,10 +855,7 @@
               }
             }
           },
-          "required": [
-            "label",
-            "database"
-          ]
+          "required": ["label", "database"]
         }
       },
       "POWERBI": {
@@ -936,11 +882,7 @@
               "description": "Author display name or email"
             }
           },
-          "required": [
-            "workspace_id",
-            "workspace_name",
-            "report_type"
-          ]
+          "required": ["workspace_id", "workspace_name", "report_type"]
         }
       },
       "TABLEAU": {
@@ -974,11 +916,7 @@
               "description": "Owner display name or email"
             }
           },
-          "required": [
-            "site",
-            "report_type",
-            "workbook_id"
-          ]
+          "required": ["site", "report_type", "workbook_id"]
         }
       },
       "WORDPRESS": {
@@ -1027,11 +965,7 @@
               "description": "Category ids"
             }
           },
-          "required": [
-            "wp_id",
-            "title",
-            "links_count"
-          ]
+          "required": ["wp_id", "title", "links_count"]
         },
         "image": {
           "properties": {
@@ -1040,9 +974,7 @@
               "description": "Hash of the referencing post asset"
             }
           },
-          "required": [
-            "referenced_by"
-          ]
+          "required": ["referenced_by"]
         }
       },
       "SLACK": {
@@ -1069,10 +1001,7 @@
               "description": "Parent thread timestamp"
             }
           },
-          "required": [
-            "channel_id",
-            "ts"
-          ]
+          "required": ["channel_id", "ts"]
         }
       },
       "CONFLUENCE": {
@@ -1103,16 +1032,10 @@
               "description": "Author id"
             }
           },
-          "required": [
-            "page_id",
-            "title",
-            "links_count"
-          ]
+          "required": ["page_id", "title", "links_count"]
         },
         "attachment": {
-          "use": [
-            "attachment"
-          ],
+          "use": ["attachment"],
           "properties": {
             "title": {
               "type": "string",
@@ -1123,24 +1046,17 @@
               "description": "Hash of the parent page asset"
             }
           },
-          "required": [
-            "title",
-            "page_hash"
-          ]
+          "required": ["title", "page_hash"]
         },
         "comments": {
-          "use": [
-            "comments"
-          ],
+          "use": ["comments"],
           "properties": {
             "page_id": {
               "type": "string",
               "description": "Parent page id"
             }
           },
-          "required": [
-            "page_id"
-          ]
+          "required": ["page_id"]
         },
         "linked_file": {
           "properties": {
@@ -1149,9 +1065,7 @@
               "description": "Hash of the referencing page asset"
             }
           },
-          "required": [
-            "referenced_by"
-          ]
+          "required": ["referenced_by"]
         }
       },
       "JIRA": {
@@ -1197,15 +1111,10 @@
               "description": "Labels"
             }
           },
-          "required": [
-            "issue_key",
-            "links_count"
-          ]
+          "required": ["issue_key", "links_count"]
         },
         "attachment": {
-          "use": [
-            "attachment"
-          ],
+          "use": ["attachment"],
           "properties": {
             "issue_hash": {
               "type": "string",
@@ -1216,24 +1125,17 @@
               "description": "Uploader display name/email"
             }
           },
-          "required": [
-            "filename",
-            "issue_hash"
-          ]
+          "required": ["filename", "issue_hash"]
         },
         "comments": {
-          "use": [
-            "comments"
-          ],
+          "use": ["comments"],
           "properties": {
             "issue_key": {
               "type": "string",
               "description": "Parent issue key"
             }
           },
-          "required": [
-            "issue_key"
-          ]
+          "required": ["issue_key"]
         }
       },
       "SERVICEDESK": {
@@ -1260,39 +1162,27 @@
               "description": "Service desk name"
             }
           },
-          "required": [
-            "issue_key",
-            "links_count"
-          ]
+          "required": ["issue_key", "links_count"]
         },
         "attachment": {
-          "use": [
-            "attachment"
-          ],
+          "use": ["attachment"],
           "properties": {
             "request_hash": {
               "type": "string",
               "description": "Hash of the parent request asset"
             }
           },
-          "required": [
-            "filename",
-            "request_hash"
-          ]
+          "required": ["filename", "request_hash"]
         },
         "comments": {
-          "use": [
-            "comments"
-          ],
+          "use": ["comments"],
           "properties": {
             "issue_key": {
               "type": "string",
               "description": "Parent request key"
             }
           },
-          "required": [
-            "issue_key"
-          ]
+          "required": ["issue_key"]
         }
       },
       "NOTION": {
@@ -1330,11 +1220,7 @@
               "description": "Multi-select property values"
             }
           },
-          "required": [
-            "page_id",
-            "title",
-            "links_count"
-          ]
+          "required": ["page_id", "title", "links_count"]
         },
         "data_source": {
           "properties": {
@@ -1376,11 +1262,7 @@
               "description": "Parent object id"
             }
           },
-          "required": [
-            "data_source_id",
-            "name",
-            "row_count"
-          ]
+          "required": ["data_source_id", "name", "row_count"]
         },
         "file": {
           "properties": {
@@ -1397,25 +1279,17 @@
               "description": "Whether the file is externally hosted"
             }
           },
-          "required": [
-            "selector",
-            "name",
-            "is_external"
-          ]
+          "required": ["selector", "name", "is_external"]
         },
         "comments": {
-          "use": [
-            "comments"
-          ],
+          "use": ["comments"],
           "properties": {
             "page_id": {
               "type": "string",
               "description": "Parent page id"
             }
           },
-          "required": [
-            "page_id"
-          ]
+          "required": ["page_id"]
         }
       },
       "EMAIL": {
@@ -1492,11 +1366,7 @@
               "description": "DMARC result parsed from Authentication-Results"
             }
           },
-          "required": [
-            "message_id",
-            "subject",
-            "from_address"
-          ]
+          "required": ["message_id", "subject", "from_address"]
         },
         "attachment": {
           "use": [
@@ -1526,11 +1396,7 @@
               "description": "Content-ID header for inline parts"
             }
           },
-          "required": [
-            "filename",
-            "parent_email_hash",
-            "size_bytes"
-          ]
+          "required": ["filename", "parent_email_hash", "size_bytes"]
         }
       },
       "YOUTUBE": {
@@ -1592,17 +1458,12 @@
               }
             }
           },
-          "required": [
-            "video_id",
-            "title"
-          ]
+          "required": ["video_id", "title"]
         }
       },
       "DELTA_LAKE": {
         "table": {
-          "use": [
-            "tabularTable"
-          ],
+          "use": ["tabularTable"],
           "properties": {
             "format_version": {
               "type": "integer",
@@ -1628,9 +1489,7 @@
       },
       "ICEBERG": {
         "table": {
-          "use": [
-            "tabularTable"
-          ],
+          "use": ["tabularTable"],
           "properties": {
             "format_version": {
               "type": "integer",
@@ -1683,9 +1542,7 @@
               "description": "Topic cleanup policy (delete/compact)"
             }
           },
-          "required": [
-            "partition_count"
-          ]
+          "required": ["partition_count"]
         }
       },
       "ELASTICSEARCH": {
@@ -1716,10 +1573,7 @@
               "description": "Number of replica shards"
             }
           },
-          "required": [
-            "index_name",
-            "doc_count"
-          ]
+          "required": ["index_name", "doc_count"]
         }
       },
       "OPENSEARCH": {
@@ -1750,10 +1604,7 @@
               "description": "Number of replica shards"
             }
           },
-          "required": [
-            "index_name",
-            "doc_count"
-          ]
+          "required": ["index_name", "doc_count"]
         }
       },
       "MEILISEARCH": {
@@ -1776,22 +1627,12 @@
               "description": "Whether the index has an indexing operation in progress"
             }
           },
-          "required": [
-            "index_name",
-            "doc_count"
-          ]
+          "required": ["index_name", "doc_count"]
         }
       },
       "MICROSOFT_365": {
         "file": {
-          "use": [
-            "file",
-            "image",
-            "document",
-            "spreadsheet",
-            "text",
-            "json"
-          ],
+          "use": ["file", "image", "document", "spreadsheet", "text", "json"],
           "properties": {
             "site_name": {
               "type": "string",
@@ -1830,16 +1671,10 @@
               "description": "Sharing permissions on the item: list of {role, grantee_type, grantee} entries (requires include_permissions)"
             }
           },
-          "required": [
-            "drive_name",
-            "item_path",
-            "ecosystem"
-          ]
+          "required": ["drive_name", "item_path", "ecosystem"]
         },
         "image": {
-          "use": [
-            "file"
-          ],
+          "use": ["file"],
           "properties": {
             "source_hash": {
               "type": "string",
@@ -1850,10 +1685,7 @@
               "description": "Location of the embedded image within the parent"
             }
           },
-          "required": [
-            "source_hash",
-            "location"
-          ]
+          "required": ["source_hash", "location"]
         },
         "site": {
           "properties": {
@@ -1874,10 +1706,7 @@
               "description": "Number of document libraries"
             }
           },
-          "required": [
-            "site_id",
-            "site_name"
-          ]
+          "required": ["site_id", "site_name"]
         },
         "drive": {
           "properties": {
@@ -1906,22 +1735,12 @@
               "description": "Used storage in bytes"
             }
           },
-          "required": [
-            "drive_id",
-            "drive_name"
-          ]
+          "required": ["drive_id", "drive_name"]
         }
       },
       "GOOGLE_WORKSPACE": {
         "file": {
-          "use": [
-            "file",
-            "image",
-            "document",
-            "spreadsheet",
-            "text",
-            "json"
-          ],
+          "use": ["file", "image", "document", "spreadsheet", "text", "json"],
           "properties": {
             "drive_name": {
               "type": "string",
@@ -1956,15 +1775,10 @@
               "description": "Export MIME type used to download a Google-native file, if applicable"
             }
           },
-          "required": [
-            "drive_name",
-            "item_path"
-          ]
+          "required": ["drive_name", "item_path"]
         },
         "image": {
-          "use": [
-            "file"
-          ],
+          "use": ["file"],
           "properties": {
             "source_hash": {
               "type": "string",
@@ -1975,10 +1789,7 @@
               "description": "Location of the embedded image within the parent"
             }
           },
-          "required": [
-            "source_hash",
-            "location"
-          ]
+          "required": ["source_hash", "location"]
         },
         "drive": {
           "properties": {
@@ -1995,10 +1806,7 @@
               "description": "Drive type (my_drive or shared_drive)"
             }
           },
-          "required": [
-            "drive_id",
-            "drive_name"
-          ]
+          "required": ["drive_id", "drive_name"]
         }
       }
     }
@@ -2038,7 +1846,8 @@
         "MEILISEARCH",
         "LOCAL_FOLDER",
         "MICROSOFT_365",
-        "GOOGLE_WORKSPACE"
+        "GOOGLE_WORKSPACE",
+        "SANDBOX"
       ],
       "description": "Type of the asset or source"
     },
@@ -2056,33 +1865,17 @@
     },
     "PostStatus": {
       "type": "string",
-      "enum": [
-        "publish",
-        "future",
-        "draft",
-        "pending",
-        "private"
-      ],
+      "enum": ["publish", "future", "draft", "pending", "private"],
       "description": "WordPress post status"
     },
     "SlackChannelType": {
       "type": "string",
-      "enum": [
-        "public_channel",
-        "private_channel",
-        "mpim",
-        "im"
-      ],
+      "enum": ["public_channel", "private_channel", "mpim", "im"],
       "description": "Slack conversation types to include"
     },
     "SamplingStrategy": {
       "type": "string",
-      "enum": [
-        "AUTOMATIC",
-        "RANDOM",
-        "LATEST",
-        "ALL"
-      ],
+      "enum": ["AUTOMATIC", "RANDOM", "LATEST", "ALL"],
       "description": "Sampling strategy. AUTOMATIC (recommended default) incrementally ingests a new slice of not-yet-seen data on every run, remembering its position between runs and wrapping around to re-scan from the start once everything has been covered \u2014 eventually ingesting everything at a bounded cost per run. RANDOM samples items randomly. LATEST prioritises the most recently modified/created items. ALL scans every item with no limit."
     },
     "SamplingConfig": {
@@ -2115,9 +1908,7 @@
           "description": "Tabular sources only. Number of rows per sample (AUTOMATIC/RANDOM/LATEST) or per pagination batch (ALL). For AUTOMATIC this is the size of the incremental slice ingested each run. Controls memory usage during large table scans."
         }
       },
-      "required": [
-        "strategy"
-      ],
+      "required": ["strategy"],
       "default": {
         "strategy": "AUTOMATIC",
         "fallback_to_random": true,
@@ -2198,9 +1989,7 @@
             "description": "Detector-specific configuration"
           }
         },
-        "required": [
-          "type"
-        ],
+        "required": ["type"],
         "additionalProperties": true
       }
     },
@@ -2223,9 +2012,7 @@
           "description": "Base URL of the WordPress site (e.g., https://example.com)"
         }
       },
-      "required": [
-        "url"
-      ],
+      "required": ["url"],
       "additionalProperties": false
     },
     "WordPressMasked": {
@@ -2263,9 +2050,7 @@
           "items": {
             "$ref": "#/definitions/PostStatus"
           },
-          "default": [
-            "publish"
-          ],
+          "default": ["publish"],
           "description": "Post status filters (requires authentication for non-public statuses)"
         }
       },
@@ -2297,9 +2082,7 @@
           "description": "IMAP server port (993 for IMAPS)"
         }
       },
-      "required": [
-        "host"
-      ],
+      "required": ["host"],
       "additionalProperties": false
     },
     "EmailMasked": {
@@ -2315,10 +2098,7 @@
           "description": "Account or app-specific password (use an app password for Gmail/Outlook)"
         }
       },
-      "required": [
-        "username",
-        "password"
-      ],
+      "required": ["username", "password"],
       "additionalProperties": false
     },
     "EmailOptionalConnection": {
@@ -2350,9 +2130,7 @@
           "items": {
             "type": "string"
           },
-          "default": [
-            "INBOX"
-          ],
+          "default": ["INBOX"],
           "description": "Mailbox folders to scan"
         },
         "since_date": {
@@ -2429,10 +2207,7 @@
               "$ref": "#/definitions/ResourceOverrides"
             }
           },
-          "required": [
-            "required",
-            "sampling"
-          ],
+          "required": ["required", "sampling"],
           "additionalProperties": false
         }
       ]
@@ -2547,9 +2322,7 @@
               "description": "Slack bot token (starts with xoxb-)"
             }
           },
-          "required": [
-            "bot_token"
-          ],
+          "required": ["bot_token"],
           "additionalProperties": false
         },
         {
@@ -2561,9 +2334,7 @@
               "description": "Slack user token (starts with xoxp-)"
             }
           },
-          "required": [
-            "user_token"
-          ],
+          "required": ["user_token"],
           "additionalProperties": false
         },
         {
@@ -2576,16 +2347,11 @@
             },
             "token_type": {
               "type": "string",
-              "enum": [
-                "bot",
-                "user"
-              ],
+              "enum": ["bot", "user"],
               "description": "Token type hint"
             }
           },
-          "required": [
-            "token"
-          ],
+          "required": ["token"],
           "additionalProperties": false
         }
       ]
@@ -2600,9 +2366,7 @@
           "items": {
             "$ref": "#/definitions/SlackChannelType"
           },
-          "default": [
-            "public_channel"
-          ],
+          "default": ["public_channel"],
           "description": "Slack conversation types to include when listing channels"
         },
         "channel_ids": {
@@ -2728,9 +2492,7 @@
           "description": "Bucket name for AWS S3, MinIO, Cloudflare R2, Backblaze B2, Garage, and other S3-compatible endpoints"
         }
       },
-      "required": [
-        "bucket"
-      ],
+      "required": ["bucket"],
       "additionalProperties": false
     },
     "S3CompatibleStorageMasked": {
@@ -2817,9 +2579,27 @@
           "description": "Absolute path of the local folder to scan (for example, /Users/jane/Documents)"
         }
       },
-      "required": [
-        "path"
-      ],
+      "required": ["path"],
+      "additionalProperties": false
+    },
+    "SandboxRequired": {
+      "title": "SandboxRequired",
+      "type": "object",
+      "description": "Sandbox files are uploaded separately through the source files API.",
+      "properties": {},
+      "additionalProperties": false
+    },
+    "SandboxMasked": {
+      "title": "SandboxMasked",
+      "type": "object",
+      "description": "Sandbox sources do not require credentials.",
+      "properties": {},
+      "additionalProperties": false
+    },
+    "SandboxOptional": {
+      "title": "SandboxOptional",
+      "type": "object",
+      "properties": {},
       "additionalProperties": false
     },
     "LocalFolderMasked": {
@@ -2887,10 +2667,7 @@
           "description": "Azure Blob container name"
         }
       },
-      "required": [
-        "account_url",
-        "container"
-      ],
+      "required": ["account_url", "container"],
       "additionalProperties": false
     },
     "AzureBlobStorageMasked": {
@@ -2975,9 +2752,7 @@
           "description": "Google Cloud Storage bucket name"
         }
       },
-      "required": [
-        "bucket"
-      ],
+      "required": ["bucket"],
       "additionalProperties": false
     },
     "GoogleCloudStorageMasked": {
@@ -3071,10 +2846,7 @@
           "description": "PostgreSQL port"
         }
       },
-      "required": [
-        "host",
-        "port"
-      ],
+      "required": ["host", "port"],
       "additionalProperties": false
     },
     "PostgreSQLMasked": {
@@ -3090,10 +2862,7 @@
           "description": "Database password"
         }
       },
-      "required": [
-        "username",
-        "password"
-      ],
+      "required": ["username", "password"],
       "additionalProperties": false
     },
     "PostgreSQLOptionalConnection": {
@@ -3145,11 +2914,7 @@
           "items": {
             "type": "string"
           },
-          "default": [
-            "information_schema",
-            "pg_catalog",
-            "pg_toast"
-          ],
+          "default": ["information_schema", "pg_catalog", "pg_toast"],
           "description": "Schema denylist (exact schema names)"
         },
         "include_tables": {
@@ -3209,10 +2974,7 @@
           "description": "MySQL port"
         }
       },
-      "required": [
-        "host",
-        "port"
-      ],
+      "required": ["host", "port"],
       "additionalProperties": false
     },
     "MySQLMasked": {
@@ -3232,10 +2994,7 @@
           "description": "PEM-encoded CA certificate for SSL/TLS verification. Paste the full certificate content (-----BEGIN CERTIFICATE----- ... -----END CERTIFICATE-----). Required when ssl_mode is VERIFY_CA or VERIFY_IDENTITY."
         }
       },
-      "required": [
-        "username",
-        "password"
-      ],
+      "required": ["username", "password"],
       "additionalProperties": false
     },
     "MySQLOptionalConnection": {
@@ -3333,10 +3092,7 @@
           "description": "SQL Server TCP port"
         }
       },
-      "required": [
-        "host",
-        "port"
-      ],
+      "required": ["host", "port"],
       "additionalProperties": false
     },
     "MSSQLMasked": {
@@ -3352,10 +3108,7 @@
           "description": "SQL Server login password"
         }
       },
-      "required": [
-        "username",
-        "password"
-      ],
+      "required": ["username", "password"],
       "additionalProperties": false
     },
     "MSSQLOptionalConnection": {
@@ -3365,10 +3118,7 @@
       "properties": {
         "auth_mode": {
           "type": "string",
-          "enum": [
-            "CUSTOM",
-            "LDAP"
-          ],
+          "enum": ["CUSTOM", "LDAP"],
           "default": "CUSTOM",
           "description": "Authentication mode. CUSTOM uses masked.username as-is, LDAP prefixes username with ldap_domain when provided."
         },
@@ -3478,11 +3228,7 @@
           "items": {
             "type": "string"
           },
-          "default": [
-            "master",
-            "tempdb",
-            "model"
-          ],
+          "default": ["master", "tempdb", "model"],
           "description": "Database denylist (exact database names)"
         },
         "include_schemas": {
@@ -3497,10 +3243,7 @@
           "items": {
             "type": "string"
           },
-          "default": [
-            "INFORMATION_SCHEMA",
-            "sys"
-          ],
+          "default": ["INFORMATION_SCHEMA", "sys"],
           "description": "Schema denylist (exact schema names)"
         },
         "include_tables": {
@@ -3565,11 +3308,7 @@
           "description": "Oracle service name (for example, TEST_PDB)"
         }
       },
-      "required": [
-        "host",
-        "port",
-        "service_name"
-      ],
+      "required": ["host", "port", "service_name"],
       "additionalProperties": false
     },
     "OracleMasked": {
@@ -3585,10 +3324,7 @@
           "description": "Oracle login password"
         }
       },
-      "required": [
-        "username",
-        "password"
-      ],
+      "required": ["username", "password"],
       "additionalProperties": false
     },
     "OracleOptionalConnection": {
@@ -3714,10 +3450,7 @@
           "description": "Hive TCP port"
         }
       },
-      "required": [
-        "host",
-        "port"
-      ],
+      "required": ["host", "port"],
       "additionalProperties": false
     },
     "HiveMasked": {
@@ -3733,10 +3466,7 @@
           "description": "Hive login password"
         }
       },
-      "required": [
-        "username",
-        "password"
-      ],
+      "required": ["username", "password"],
       "additionalProperties": false
     },
     "HiveOptionalConnection": {
@@ -3775,10 +3505,7 @@
           "items": {
             "type": "string"
           },
-          "default": [
-            "information_schema",
-            "sys"
-          ],
+          "default": ["information_schema", "sys"],
           "description": "Database denylist (exact database names)"
         },
         "include_tables": {
@@ -3822,11 +3549,7 @@
     "DatabricksAuthMode": {
       "title": "DatabricksAuthMode",
       "type": "string",
-      "enum": [
-        "PAT_TOKEN",
-        "SERVICE_PRINCIPAL",
-        "AZURE_SERVICE_PRINCIPAL"
-      ],
+      "enum": ["PAT_TOKEN", "SERVICE_PRINCIPAL", "AZURE_SERVICE_PRINCIPAL"],
       "description": "Databricks authentication mode"
     },
     "DatabricksRequiredPat": {
@@ -3846,11 +3569,7 @@
           "description": "Databricks SQL warehouse ID used for sampling queries"
         }
       },
-      "required": [
-        "auth_mode",
-        "workspace_url",
-        "warehouse_id"
-      ],
+      "required": ["auth_mode", "workspace_url", "warehouse_id"],
       "additionalProperties": false
     },
     "DatabricksRequiredServicePrincipal": {
@@ -3874,12 +3593,7 @@
           "description": "Databricks service principal client ID"
         }
       },
-      "required": [
-        "auth_mode",
-        "workspace_url",
-        "warehouse_id",
-        "client_id"
-      ],
+      "required": ["auth_mode", "workspace_url", "warehouse_id", "client_id"],
       "additionalProperties": false
     },
     "DatabricksRequiredAzureServicePrincipal": {
@@ -3939,9 +3653,7 @@
           "description": "Databricks personal access token (PAT)"
         }
       },
-      "required": [
-        "token"
-      ],
+      "required": ["token"],
       "additionalProperties": false
     },
     "DatabricksMaskedServicePrincipal": {
@@ -3953,9 +3665,7 @@
           "description": "Databricks service principal client secret"
         }
       },
-      "required": [
-        "client_secret"
-      ],
+      "required": ["client_secret"],
       "additionalProperties": false
     },
     "DatabricksMaskedAzureServicePrincipal": {
@@ -3967,9 +3677,7 @@
           "description": "Azure AD client secret for the service principal"
         }
       },
-      "required": [
-        "client_secret"
-      ],
+      "required": ["client_secret"],
       "additionalProperties": false
     },
     "DatabricksMasked": {
@@ -4044,9 +3752,7 @@
           "items": {
             "type": "string"
           },
-          "default": [
-            "information_schema"
-          ],
+          "default": ["information_schema"],
           "description": "Schema denylist. Accepted forms: schema or catalog.schema"
         },
         "include_tables": {
@@ -4136,10 +3842,7 @@
           "description": "Snowflake account identifier (for example, xy12345.us-east-2.aws or LMAUONV-ONE_DATA_DEV)"
         }
       },
-      "required": [
-        "authentication_type",
-        "account_id"
-      ],
+      "required": ["authentication_type", "account_id"],
       "additionalProperties": false
     },
     "SnowflakeRequiredExternalBrowserAuthenticator": {
@@ -4154,10 +3857,7 @@
           "description": "Snowflake account identifier (for example, xy12345.us-east-2.aws or LMAUONV-ONE_DATA_DEV)"
         }
       },
-      "required": [
-        "authentication_type",
-        "account_id"
-      ],
+      "required": ["authentication_type", "account_id"],
       "additionalProperties": false
     },
     "SnowflakeRequiredKeyPairAuthenticator": {
@@ -4172,10 +3872,7 @@
           "description": "Snowflake account identifier (for example, xy12345.us-east-2.aws or LMAUONV-ONE_DATA_DEV)"
         }
       },
-      "required": [
-        "authentication_type",
-        "account_id"
-      ],
+      "required": ["authentication_type", "account_id"],
       "additionalProperties": false
     },
     "SnowflakeRequiredOauthAuthenticatorToken": {
@@ -4190,10 +3887,7 @@
           "description": "Snowflake account identifier (for example, xy12345.us-east-2.aws or LMAUONV-ONE_DATA_DEV)"
         }
       },
-      "required": [
-        "authentication_type",
-        "account_id"
-      ],
+      "required": ["authentication_type", "account_id"],
       "additionalProperties": false
     },
     "SnowflakeRequired": {
@@ -4226,10 +3920,7 @@
           "description": "Snowflake login password"
         }
       },
-      "required": [
-        "username",
-        "password"
-      ],
+      "required": ["username", "password"],
       "additionalProperties": false
     },
     "SnowflakeMaskedExternalBrowserAuthenticator": {
@@ -4241,9 +3932,7 @@
           "description": "Snowflake login username"
         }
       },
-      "required": [
-        "username"
-      ],
+      "required": ["username"],
       "additionalProperties": false
     },
     "SnowflakeMaskedKeyPairAuthenticator": {
@@ -4263,10 +3952,7 @@
           "description": "Password for encrypted private key PEM (optional when key is not encrypted)."
         }
       },
-      "required": [
-        "username",
-        "private_key"
-      ],
+      "required": ["username", "private_key"],
       "additionalProperties": false
     },
     "SnowflakeMaskedOauthAuthenticatorToken": {
@@ -4282,10 +3968,7 @@
           "description": "OAuth bearer token for Snowflake authentication"
         }
       },
-      "required": [
-        "username",
-        "token"
-      ],
+      "required": ["username", "token"],
       "additionalProperties": false
     },
     "SnowflakeMasked": {
@@ -4358,10 +4041,7 @@
           "items": {
             "type": "string"
           },
-          "default": [
-            "SNOWFLAKE",
-            "SNOWFLAKE_SAMPLE_DATA"
-          ],
+          "default": ["SNOWFLAKE", "SNOWFLAKE_SAMPLE_DATA"],
           "description": "Database denylist (exact database names)"
         },
         "include_schemas": {
@@ -4376,9 +4056,7 @@
           "items": {
             "type": "string"
           },
-          "default": [
-            "INFORMATION_SCHEMA"
-          ],
+          "default": ["INFORMATION_SCHEMA"],
           "description": "Schema denylist (exact schema names)"
         },
         "include_tables": {
@@ -4448,10 +4126,7 @@
     "MongoDBDeployment": {
       "title": "MongoDBDeployment",
       "type": "string",
-      "enum": [
-        "ATLAS",
-        "ON_PREM"
-      ],
+      "enum": ["ATLAS", "ON_PREM"],
       "description": "MongoDB deployment mode"
     },
     "MongoDBRequiredAtlas": {
@@ -4467,10 +4142,7 @@
           "description": "Atlas SRV cluster host or full mongodb+srv:// URI (for example, cluster.abc123.mongodb.net or mongodb+srv://cluster.abc123.mongodb.net). If a full URI is supplied, the host is extracted and credentials are discarded \u2014 set them in masked fields instead."
         }
       },
-      "required": [
-        "deployment",
-        "cluster_host"
-      ],
+      "required": ["deployment", "cluster_host"],
       "additionalProperties": false
     },
     "MongoDBRequiredOnPrem": {
@@ -4493,11 +4165,7 @@
           "description": "On-prem MongoDB TCP port"
         }
       },
-      "required": [
-        "deployment",
-        "host",
-        "port"
-      ],
+      "required": ["deployment", "host", "port"],
       "additionalProperties": false
     },
     "MongoDBRequired": {
@@ -4524,10 +4192,7 @@
           "description": "MongoDB login password"
         }
       },
-      "required": [
-        "username",
-        "password"
-      ],
+      "required": ["username", "password"],
       "additionalProperties": false
     },
     "MongoDBMaskedNone": {
@@ -4625,11 +4290,7 @@
           "items": {
             "type": "string"
           },
-          "default": [
-            "admin",
-            "config",
-            "local"
-          ],
+          "default": ["admin", "config", "local"],
           "description": "Database denylist (exact database names)"
         },
         "include_collections": {
@@ -4675,10 +4336,7 @@
     "PowerBIAuthMode": {
       "title": "PowerBIAuthMode",
       "type": "string",
-      "enum": [
-        "SERVICE_PRINCIPAL",
-        "ACCESS_TOKEN"
-      ],
+      "enum": ["SERVICE_PRINCIPAL", "ACCESS_TOKEN"],
       "description": "PowerBI authentication mode"
     },
     "PowerBIRequiredServicePrincipal": {
@@ -4699,11 +4357,7 @@
           "description": "Azure app client identifier"
         }
       },
-      "required": [
-        "auth_mode",
-        "tenant_id",
-        "client_id"
-      ],
+      "required": ["auth_mode", "tenant_id", "client_id"],
       "additionalProperties": false
     },
     "PowerBIRequiredAccessToken": {
@@ -4714,9 +4368,7 @@
           "const": "ACCESS_TOKEN"
         }
       },
-      "required": [
-        "auth_mode"
-      ],
+      "required": ["auth_mode"],
       "additionalProperties": false
     },
     "PowerBIRequired": {
@@ -4739,9 +4391,7 @@
           "description": "Azure app client secret for service principal auth"
         }
       },
-      "required": [
-        "client_secret"
-      ],
+      "required": ["client_secret"],
       "additionalProperties": false
     },
     "PowerBIMaskedAccessToken": {
@@ -4753,9 +4403,7 @@
           "description": "Bearer token for PowerBI API access"
         }
       },
-      "required": [
-        "access_token"
-      ],
+      "required": ["access_token"],
       "additionalProperties": false
     },
     "PowerBIMasked": {
@@ -4880,10 +4528,7 @@
     "TableauAuthMode": {
       "title": "TableauAuthMode",
       "type": "string",
-      "enum": [
-        "USERNAME_PASSWORD",
-        "PERSONAL_ACCESS_TOKEN"
-      ],
+      "enum": ["USERNAME_PASSWORD", "PERSONAL_ACCESS_TOKEN"],
       "description": "Tableau authentication mode"
     },
     "TableauRequiredUsernamePassword": {
@@ -4904,11 +4549,7 @@
           "description": "Tableau site content URL. Use empty string for the Default site on Tableau Server."
         }
       },
-      "required": [
-        "auth_mode",
-        "connect_uri",
-        "site"
-      ],
+      "required": ["auth_mode", "connect_uri", "site"],
       "additionalProperties": false
     },
     "TableauRequiredPersonalAccessToken": {
@@ -4933,12 +4574,7 @@
           "description": "Tableau personal access token name"
         }
       },
-      "required": [
-        "auth_mode",
-        "connect_uri",
-        "site",
-        "token_name"
-      ],
+      "required": ["auth_mode", "connect_uri", "site", "token_name"],
       "additionalProperties": false
     },
     "TableauRequired": {
@@ -4965,10 +4601,7 @@
           "description": "Tableau login password"
         }
       },
-      "required": [
-        "username",
-        "password"
-      ],
+      "required": ["username", "password"],
       "additionalProperties": false
     },
     "TableauMaskedPersonalAccessToken": {
@@ -4980,9 +4613,7 @@
           "description": "Tableau personal access token value"
         }
       },
-      "required": [
-        "token_value"
-      ],
+      "required": ["token_value"],
       "additionalProperties": false
     },
     "TableauMasked": {
@@ -5009,10 +4640,7 @@
           "description": "Maximum retries for transient Tableau API request failures"
         },
         "ssl_verify": {
-          "type": [
-            "boolean",
-            "string"
-          ],
+          "type": ["boolean", "string"],
           "default": true,
           "description": "Verify SSL certificates. Provide a PEM bundle path string for custom certs."
         },
@@ -5128,10 +4756,7 @@
           "$ref": "#/definitions/ResourceOverrides"
         }
       },
-      "required": [
-        "type",
-        "sampling"
-      ]
+      "required": ["type", "sampling"]
     },
     "SlackInput": {
       "title": "SlackInput",
@@ -5168,11 +4793,7 @@
               "$ref": "#/definitions/ResourceOverrides"
             }
           },
-          "required": [
-            "required",
-            "masked",
-            "sampling"
-          ],
+          "required": ["required", "masked", "sampling"],
           "additionalProperties": false
         }
       ]
@@ -5212,11 +4833,7 @@
               "$ref": "#/definitions/ResourceOverrides"
             }
           },
-          "required": [
-            "required",
-            "masked",
-            "sampling"
-          ],
+          "required": ["required", "masked", "sampling"],
           "additionalProperties": false
         }
       ]
@@ -5256,10 +4873,7 @@
               "$ref": "#/definitions/ResourceOverrides"
             }
           },
-          "required": [
-            "required",
-            "sampling"
-          ],
+          "required": ["required", "sampling"],
           "additionalProperties": false
         }
       ]
@@ -5299,10 +4913,47 @@
               "$ref": "#/definitions/ResourceOverrides"
             }
           },
-          "required": [
-            "required",
-            "sampling"
-          ],
+          "required": ["required", "sampling"],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "SandboxInput": {
+      "title": "SandboxInput",
+      "label": "Sandbox",
+      "allOf": [
+        {
+          "$ref": "#/definitions/CoreInput"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "SANDBOX"
+            },
+            "required": {
+              "$ref": "#/definitions/SandboxRequired"
+            },
+            "masked": {
+              "$ref": "#/definitions/SandboxMasked"
+            },
+            "optional": {
+              "$ref": "#/definitions/SandboxOptional"
+            },
+            "detectors": {
+              "$ref": "#/definitions/Detectors"
+            },
+            "custom_detectors": {
+              "$ref": "#/definitions/CustomDetectorSelections"
+            },
+            "sampling": {
+              "$ref": "#/definitions/SamplingConfig"
+            },
+            "resources": {
+              "$ref": "#/definitions/ResourceOverrides"
+            }
+          },
+          "required": ["required", "sampling"],
           "additionalProperties": false
         }
       ]
@@ -5342,10 +4993,7 @@
               "$ref": "#/definitions/ResourceOverrides"
             }
           },
-          "required": [
-            "required",
-            "sampling"
-          ],
+          "required": ["required", "sampling"],
           "additionalProperties": false
         }
       ]
@@ -5385,10 +5033,7 @@
               "$ref": "#/definitions/ResourceOverrides"
             }
           },
-          "required": [
-            "required",
-            "sampling"
-          ],
+          "required": ["required", "sampling"],
           "additionalProperties": false
         }
       ]
@@ -5428,11 +5073,7 @@
               "$ref": "#/definitions/ResourceOverrides"
             }
           },
-          "required": [
-            "required",
-            "masked",
-            "sampling"
-          ],
+          "required": ["required", "masked", "sampling"],
           "additionalProperties": false
         }
       ]
@@ -5472,11 +5113,7 @@
               "$ref": "#/definitions/ResourceOverrides"
             }
           },
-          "required": [
-            "required",
-            "masked",
-            "sampling"
-          ],
+          "required": ["required", "masked", "sampling"],
           "additionalProperties": false
         }
       ]
@@ -5516,11 +5153,7 @@
               "$ref": "#/definitions/ResourceOverrides"
             }
           },
-          "required": [
-            "required",
-            "masked",
-            "sampling"
-          ],
+          "required": ["required", "masked", "sampling"],
           "additionalProperties": false
         }
       ]
@@ -5560,11 +5193,7 @@
               "$ref": "#/definitions/ResourceOverrides"
             }
           },
-          "required": [
-            "required",
-            "masked",
-            "sampling"
-          ],
+          "required": ["required", "masked", "sampling"],
           "additionalProperties": false
         }
       ]
@@ -5604,11 +5233,7 @@
               "$ref": "#/definitions/ResourceOverrides"
             }
           },
-          "required": [
-            "required",
-            "masked",
-            "sampling"
-          ],
+          "required": ["required", "masked", "sampling"],
           "additionalProperties": false
         }
       ]
@@ -5648,11 +5273,7 @@
               "$ref": "#/definitions/ResourceOverrides"
             }
           },
-          "required": [
-            "required",
-            "masked",
-            "sampling"
-          ],
+          "required": ["required", "masked", "sampling"],
           "additionalProperties": false
         }
       ]
@@ -5692,11 +5313,7 @@
               "$ref": "#/definitions/ResourceOverrides"
             }
           },
-          "required": [
-            "required",
-            "masked",
-            "sampling"
-          ],
+          "required": ["required", "masked", "sampling"],
           "additionalProperties": false
         }
       ]
@@ -5736,11 +5353,7 @@
               "$ref": "#/definitions/ResourceOverrides"
             }
           },
-          "required": [
-            "required",
-            "masked",
-            "sampling"
-          ],
+          "required": ["required", "masked", "sampling"],
           "additionalProperties": false
         }
       ]
@@ -5780,11 +5393,7 @@
               "$ref": "#/definitions/ResourceOverrides"
             }
           },
-          "required": [
-            "required",
-            "masked",
-            "sampling"
-          ],
+          "required": ["required", "masked", "sampling"],
           "additionalProperties": false
         }
       ]
@@ -5803,9 +5412,7 @@
           "description": "Target database name (defaults to \"neo4j\"). Multi-database requires Neo4j 4.0+."
         }
       },
-      "required": [
-        "uri"
-      ],
+      "required": ["uri"],
       "additionalProperties": false
     },
     "Neo4jMaskedUsernamePassword": {
@@ -5822,10 +5429,7 @@
           "description": "Neo4j password"
         }
       },
-      "required": [
-        "username",
-        "password"
-      ],
+      "required": ["username", "password"],
       "additionalProperties": false
     },
     "Neo4jMaskedNone": {
@@ -5958,11 +5562,7 @@
               "$ref": "#/definitions/ResourceOverrides"
             }
           },
-          "required": [
-            "required",
-            "masked",
-            "sampling"
-          ],
+          "required": ["required", "masked", "sampling"],
           "additionalProperties": false
         }
       ]
@@ -6002,11 +5602,7 @@
               "$ref": "#/definitions/ResourceOverrides"
             }
           },
-          "required": [
-            "required",
-            "masked",
-            "sampling"
-          ],
+          "required": ["required", "masked", "sampling"],
           "additionalProperties": false
         }
       ]
@@ -6046,11 +5642,7 @@
               "$ref": "#/definitions/ResourceOverrides"
             }
           },
-          "required": [
-            "required",
-            "masked",
-            "sampling"
-          ],
+          "required": ["required", "masked", "sampling"],
           "additionalProperties": false
         }
       ]
@@ -6070,10 +5662,7 @@
           "description": "Atlassian account email used with API token for Basic authentication"
         }
       },
-      "required": [
-        "base_url",
-        "account_email"
-      ],
+      "required": ["base_url", "account_email"],
       "additionalProperties": false
     },
     "ConfluenceMasked": {
@@ -6085,9 +5674,7 @@
           "description": "Atlassian API token for Confluence Cloud"
         }
       },
-      "required": [
-        "api_token"
-      ],
+      "required": ["api_token"],
       "additionalProperties": false
     },
     "ConfluenceOptionalConnection": {
@@ -6153,10 +5740,7 @@
         },
         "status": {
           "type": "string",
-          "enum": [
-            "current",
-            "archived"
-          ],
+          "enum": ["current", "archived"],
           "description": "Filter spaces by status"
         },
         "labels": {
@@ -6245,10 +5829,7 @@
           "description": "Atlassian account email used with API token for Basic authentication"
         }
       },
-      "required": [
-        "base_url",
-        "account_email"
-      ],
+      "required": ["base_url", "account_email"],
       "additionalProperties": false
     },
     "JiraMasked": {
@@ -6260,9 +5841,7 @@
           "description": "Atlassian API token for Jira Cloud"
         }
       },
-      "required": [
-        "api_token"
-      ],
+      "required": ["api_token"],
       "additionalProperties": false
     },
     "JiraOptionalConnection": {
@@ -6378,10 +5957,7 @@
           "description": "Atlassian account email used with API token for Basic authentication"
         }
       },
-      "required": [
-        "base_url",
-        "account_email"
-      ],
+      "required": ["base_url", "account_email"],
       "additionalProperties": false
     },
     "ServiceDeskMasked": {
@@ -6393,9 +5969,7 @@
           "description": "Atlassian API token for Jira Service Management Cloud"
         }
       },
-      "required": [
-        "api_token"
-      ],
+      "required": ["api_token"],
       "additionalProperties": false
     },
     "ServiceDeskOptionalConnection": {
@@ -6546,11 +6120,7 @@
               "$ref": "#/definitions/ResourceOverrides"
             }
           },
-          "required": [
-            "required",
-            "masked",
-            "sampling"
-          ],
+          "required": ["required", "masked", "sampling"],
           "additionalProperties": false
         }
       ]
@@ -6590,11 +6160,7 @@
               "$ref": "#/definitions/ResourceOverrides"
             }
           },
-          "required": [
-            "required",
-            "masked",
-            "sampling"
-          ],
+          "required": ["required", "masked", "sampling"],
           "additionalProperties": false
         }
       ]
@@ -6634,11 +6200,7 @@
               "$ref": "#/definitions/ResourceOverrides"
             }
           },
-          "required": [
-            "required",
-            "masked",
-            "sampling"
-          ],
+          "required": ["required", "masked", "sampling"],
           "additionalProperties": false
         }
       ]
@@ -6652,9 +6214,7 @@
           "description": "Absolute or relative path to the SQLite database file (e.g. /data/app.db)"
         }
       },
-      "required": [
-        "database_path"
-      ],
+      "required": ["database_path"],
       "additionalProperties": false
     },
     "SQLiteOptionalScope": {
@@ -6725,10 +6285,7 @@
               "$ref": "#/definitions/ResourceOverrides"
             }
           },
-          "required": [
-            "required",
-            "sampling"
-          ],
+          "required": ["required", "sampling"],
           "additionalProperties": false
         }
       ]
@@ -6749,9 +6306,7 @@
           "description": "Notion API token used as a Bearer credential. Accepts an internal integration secret (ntn_...) or an OAuth public-integration access token."
         }
       },
-      "required": [
-        "notion_token"
-      ],
+      "required": ["notion_token"],
       "additionalProperties": false
     },
     "NotionOptionalConnection": {
@@ -6900,11 +6455,7 @@
               "$ref": "#/definitions/ResourceOverrides"
             }
           },
-          "required": [
-            "required",
-            "masked",
-            "sampling"
-          ],
+          "required": ["required", "masked", "sampling"],
           "additionalProperties": false
         }
       ]
@@ -6912,23 +6463,14 @@
     "KafkaSecurityProtocol": {
       "title": "KafkaSecurityProtocol",
       "type": "string",
-      "enum": [
-        "PLAINTEXT",
-        "SSL",
-        "SASL_PLAINTEXT",
-        "SASL_SSL"
-      ],
+      "enum": ["PLAINTEXT", "SSL", "SASL_PLAINTEXT", "SASL_SSL"],
       "default": "PLAINTEXT",
       "description": "Kafka client security protocol"
     },
     "KafkaSaslMechanism": {
       "title": "KafkaSaslMechanism",
       "type": "string",
-      "enum": [
-        "PLAIN",
-        "SCRAM-SHA-256",
-        "SCRAM-SHA-512"
-      ],
+      "enum": ["PLAIN", "SCRAM-SHA-256", "SCRAM-SHA-512"],
       "default": "PLAIN",
       "description": "SASL mechanism used when security_protocol is SASL_*"
     },
@@ -6941,9 +6483,7 @@
           "description": "Bucket holding the tables \u2014 AWS S3, MinIO, Cloudflare R2, Backblaze B2, Garage, and other S3-compatible endpoints"
         }
       },
-      "required": [
-        "bucket"
-      ],
+      "required": ["bucket"],
       "additionalProperties": false
     },
     "DeltaLakeOptionalScope": {
@@ -7018,10 +6558,7 @@
               "$ref": "#/definitions/ResourceOverrides"
             }
           },
-          "required": [
-            "required",
-            "sampling"
-          ],
+          "required": ["required", "sampling"],
           "additionalProperties": false
         }
       ]
@@ -7035,9 +6572,7 @@
           "description": "Bucket holding the tables \u2014 AWS S3, MinIO, Cloudflare R2, Backblaze B2, Garage, and other S3-compatible endpoints"
         }
       },
-      "required": [
-        "bucket"
-      ],
+      "required": ["bucket"],
       "additionalProperties": false
     },
     "IcebergOptional": {
@@ -7088,10 +6623,7 @@
               "$ref": "#/definitions/ResourceOverrides"
             }
           },
-          "required": [
-            "required",
-            "sampling"
-          ],
+          "required": ["required", "sampling"],
           "additionalProperties": false
         }
       ]
@@ -7109,10 +6641,7 @@
           "default": "localhost:9092"
         }
       },
-      "required": [
-        "auth_mode",
-        "bootstrap_servers"
-      ],
+      "required": ["auth_mode", "bootstrap_servers"],
       "additionalProperties": false
     },
     "KafkaRequiredSasl": {
@@ -7128,10 +6657,7 @@
           "default": "localhost:9092"
         }
       },
-      "required": [
-        "auth_mode",
-        "bootstrap_servers"
-      ],
+      "required": ["auth_mode", "bootstrap_servers"],
       "additionalProperties": false
     },
     "KafkaRequiredClientCert": {
@@ -7147,10 +6673,7 @@
           "default": "localhost:9092"
         }
       },
-      "required": [
-        "auth_mode",
-        "bootstrap_servers"
-      ],
+      "required": ["auth_mode", "bootstrap_servers"],
       "additionalProperties": false
     },
     "KafkaRequired": {
@@ -7187,10 +6710,7 @@
           "description": "SASL password"
         }
       },
-      "required": [
-        "sasl_username",
-        "sasl_password"
-      ],
+      "required": ["sasl_username", "sasl_password"],
       "additionalProperties": false
     },
     "KafkaMaskedClientCert": {
@@ -7207,10 +6727,7 @@
           "description": "PEM-encoded client private key (access key)"
         }
       },
-      "required": [
-        "ssl_certfile",
-        "ssl_keyfile"
-      ],
+      "required": ["ssl_certfile", "ssl_keyfile"],
       "additionalProperties": false
     },
     "KafkaMasked": {
@@ -7331,10 +6848,7 @@
               "$ref": "#/definitions/ResourceOverrides"
             }
           },
-          "required": [
-            "required",
-            "sampling"
-          ],
+          "required": ["required", "sampling"],
           "additionalProperties": false
         }
       ]
@@ -7352,10 +6866,7 @@
           "description": "Base URL of the cluster (e.g. https://localhost:9200)"
         }
       },
-      "required": [
-        "auth_mode",
-        "url"
-      ],
+      "required": ["auth_mode", "url"],
       "additionalProperties": false
     },
     "SearchEngineRequiredBasic": {
@@ -7371,10 +6882,7 @@
           "description": "Base URL of the cluster (e.g. https://localhost:9200)"
         }
       },
-      "required": [
-        "auth_mode",
-        "url"
-      ],
+      "required": ["auth_mode", "url"],
       "additionalProperties": false
     },
     "SearchEngineRequiredApiKey": {
@@ -7390,10 +6898,7 @@
           "description": "Base URL of the cluster (e.g. https://localhost:9200)"
         }
       },
-      "required": [
-        "auth_mode",
-        "url"
-      ],
+      "required": ["auth_mode", "url"],
       "additionalProperties": false
     },
     "SearchEngineMaskedNone": {
@@ -7416,10 +6921,7 @@
           "description": "Basic auth password"
         }
       },
-      "required": [
-        "username",
-        "password"
-      ],
+      "required": ["username", "password"],
       "additionalProperties": false
     },
     "SearchEngineMaskedApiKey": {
@@ -7432,9 +6934,7 @@
           "description": "API key or bearer token, sent as an Authorization header"
         }
       },
-      "required": [
-        "api_key"
-      ],
+      "required": ["api_key"],
       "additionalProperties": false
     },
     "SearchEngineOptionalConnection": {
@@ -7565,10 +7065,7 @@
               "$ref": "#/definitions/ResourceOverrides"
             }
           },
-          "required": [
-            "required",
-            "sampling"
-          ],
+          "required": ["required", "sampling"],
           "additionalProperties": false
         }
       ]
@@ -7649,10 +7146,7 @@
               "$ref": "#/definitions/ResourceOverrides"
             }
           },
-          "required": [
-            "required",
-            "sampling"
-          ],
+          "required": ["required", "sampling"],
           "additionalProperties": false
         }
       ]
@@ -7670,10 +7164,7 @@
           "description": "Base URL of the Meilisearch instance (e.g. http://localhost:7700)"
         }
       },
-      "required": [
-        "auth_mode",
-        "url"
-      ],
+      "required": ["auth_mode", "url"],
       "additionalProperties": false
     },
     "MeilisearchRequiredApiKey": {
@@ -7689,10 +7180,7 @@
           "description": "Base URL of the Meilisearch instance (e.g. http://localhost:7700)"
         }
       },
-      "required": [
-        "auth_mode",
-        "url"
-      ],
+      "required": ["auth_mode", "url"],
       "additionalProperties": false
     },
     "MeilisearchRequired": {
@@ -7722,9 +7210,7 @@
           "description": "API key or master key"
         }
       },
-      "required": [
-        "api_key"
-      ],
+      "required": ["api_key"],
       "additionalProperties": false
     },
     "MeilisearchMasked": {
@@ -7813,10 +7299,7 @@
               "$ref": "#/definitions/ResourceOverrides"
             }
           },
-          "required": [
-            "required",
-            "sampling"
-          ],
+          "required": ["required", "sampling"],
           "additionalProperties": false
         }
       ]
@@ -7883,11 +7366,7 @@
     },
     "Microsoft365Ecosystem": {
       "type": "string",
-      "enum": [
-        "sharepoint_sites",
-        "onedrive",
-        "teams_files"
-      ],
+      "enum": ["sharepoint_sites", "onedrive", "teams_files"],
       "description": "Microsoft 365 ecosystem to scan"
     },
     "Microsoft365RequiredClientSecret": {
@@ -7906,11 +7385,7 @@
           "description": "Azure AD application (client) ID"
         }
       },
-      "required": [
-        "auth_mode",
-        "tenant_id",
-        "client_id"
-      ],
+      "required": ["auth_mode", "tenant_id", "client_id"],
       "additionalProperties": false
     },
     "Microsoft365RequiredCertificate": {
@@ -7929,11 +7404,7 @@
           "description": "Azure AD application (client) ID"
         }
       },
-      "required": [
-        "auth_mode",
-        "tenant_id",
-        "client_id"
-      ],
+      "required": ["auth_mode", "tenant_id", "client_id"],
       "additionalProperties": false
     },
     "Microsoft365RequiredManagedIdentity": {
@@ -7948,9 +7419,7 @@
           "description": "User-assigned managed identity client ID (omit for system-assigned)"
         }
       },
-      "required": [
-        "auth_mode"
-      ],
+      "required": ["auth_mode"],
       "additionalProperties": false
     },
     "Microsoft365Required": {
@@ -7976,9 +7445,7 @@
           "description": "Azure AD application client secret"
         }
       },
-      "required": [
-        "client_secret"
-      ],
+      "required": ["client_secret"],
       "additionalProperties": false
     },
     "Microsoft365MaskedCertificate": {
@@ -7994,9 +7461,7 @@
           "description": "Passphrase for encrypted PEM private key (optional)"
         }
       },
-      "required": [
-        "certificate_pem"
-      ],
+      "required": ["certificate_pem"],
       "additionalProperties": false
     },
     "Microsoft365MaskedManagedIdentity": {
@@ -8029,9 +7494,7 @@
           "items": {
             "$ref": "#/definitions/Microsoft365Ecosystem"
           },
-          "default": [
-            "sharepoint_sites"
-          ],
+          "default": ["sharepoint_sites"],
           "description": "Microsoft 365 ecosystems to scan (select one or more)"
         },
         "site_filter": {
@@ -8184,11 +7647,7 @@
               "$ref": "#/definitions/ResourceOverrides"
             }
           },
-          "required": [
-            "required",
-            "masked",
-            "sampling"
-          ],
+          "required": ["required", "masked", "sampling"],
           "additionalProperties": false
         }
       ]
@@ -8205,9 +7664,7 @@
           "description": "User email to impersonate via domain-wide delegation (optional)"
         }
       },
-      "required": [
-        "auth_method"
-      ],
+      "required": ["auth_method"],
       "additionalProperties": false
     },
     "GoogleWorkspaceRequiredOAuth": {
@@ -8222,10 +7679,7 @@
           "description": "OAuth 2.0 client ID"
         }
       },
-      "required": [
-        "auth_method",
-        "client_id"
-      ],
+      "required": ["auth_method", "client_id"],
       "additionalProperties": false
     },
     "GoogleWorkspaceRequired": {
@@ -8248,9 +7702,7 @@
           "description": "Full JSON key for the Google service account"
         }
       },
-      "required": [
-        "service_account_json"
-      ],
+      "required": ["service_account_json"],
       "additionalProperties": false
     },
     "GoogleWorkspaceMaskedOAuth": {
@@ -8266,10 +7718,7 @@
           "description": "OAuth 2.0 refresh token"
         }
       },
-      "required": [
-        "client_secret",
-        "refresh_token"
-      ],
+      "required": ["client_secret", "refresh_token"],
       "additionalProperties": false
     },
     "GoogleWorkspaceMasked": {
@@ -8438,11 +7887,7 @@
               "$ref": "#/definitions/ResourceOverrides"
             }
           },
-          "required": [
-            "required",
-            "masked",
-            "sampling"
-          ],
+          "required": ["required", "masked", "sampling"],
           "additionalProperties": false
         }
       ]

@@ -86,29 +86,19 @@
         "MSSQL",
         "ORACLE",
         "HIVE",
-        "POWERBI"
+        "POWERBI",
+        "SANDBOX"
       ],
       "description": "Source types where detector execution is supported"
     },
     "DetectorLifecycleStatus": {
       "type": "string",
-      "enum": [
-        "active",
-        "planned",
-        "experimental",
-        "deprecated"
-      ],
+      "enum": ["active", "planned", "experimental", "deprecated"],
       "description": "Implementation lifecycle status of a detector"
     },
     "DetectorPriority": {
       "type": "string",
-      "enum": [
-        "P0",
-        "P1",
-        "P2",
-        "P3",
-        "P4"
-      ],
+      "enum": ["P0", "P1", "P2", "P3", "P4"],
       "description": "Roadmap priority for rollout"
     },
     "DetectorCatalogEntry": {
@@ -203,15 +193,8 @@
           "detector_type": "SECRETS",
           "lifecycle_status": "active",
           "priority": "P0",
-          "categories": [
-            "SECURITY",
-            "COMPLIANCE"
-          ],
-          "supported_asset_types": [
-            "TXT",
-            "TABLE",
-            "URL"
-          ],
+          "categories": ["SECURITY", "COMPLIANCE"],
+          "supported_asset_types": ["TXT", "TABLE", "URL"],
           "recommended_model": "detect-secrets",
           "notes": "Detects confidential credentials like API keys, tokens, or passwords that could lead to security breaches."
         },
@@ -219,15 +202,8 @@
           "detector_type": "PII",
           "lifecycle_status": "active",
           "priority": "P0",
-          "categories": [
-            "PRIVACY",
-            "COMPLIANCE"
-          ],
-          "supported_asset_types": [
-            "TXT",
-            "TABLE",
-            "URL"
-          ],
+          "categories": ["PRIVACY", "COMPLIANCE"],
+          "supported_asset_types": ["TXT", "TABLE", "URL"],
           "recommended_model": "presidio-analyzer",
           "notes": "Identifies personal data (e.g., names, emails, IDs) that must be protected for privacy and compliance."
         },
@@ -235,16 +211,8 @@
           "detector_type": "YARA",
           "lifecycle_status": "active",
           "priority": "P1",
-          "categories": [
-            "THREAT",
-            "SECURITY"
-          ],
-          "supported_asset_types": [
-            "TXT",
-            "TABLE",
-            "URL",
-            "BINARY"
-          ],
+          "categories": ["THREAT", "SECURITY"],
+          "supported_asset_types": ["TXT", "TABLE", "URL", "BINARY"],
           "recommended_model": "yara-python",
           "notes": "Uses security rules to identify known malware patterns or suspicious file content."
         },
@@ -252,14 +220,8 @@
           "detector_type": "BROKEN_LINKS",
           "lifecycle_status": "active",
           "priority": "P2",
-          "categories": [
-            "QUALITY"
-          ],
-          "supported_asset_types": [
-            "TXT",
-            "TABLE",
-            "URL"
-          ],
+          "categories": ["QUALITY"],
+          "supported_asset_types": ["TXT", "TABLE", "URL"],
           "recommended_model": "HTTP validation engine",
           "notes": "Finds non-working or invalid links that reduce content quality and user trust."
         },
@@ -267,15 +229,8 @@
           "detector_type": "CODE_SECURITY",
           "lifecycle_status": "active",
           "priority": "P3",
-          "categories": [
-            "SECURITY",
-            "THREAT"
-          ],
-          "supported_asset_types": [
-            "TXT",
-            "TABLE",
-            "OTHER"
-          ],
+          "categories": ["SECURITY", "THREAT"],
+          "supported_asset_types": ["TXT", "TABLE", "OTHER"],
           "recommended_model": "bandit",
           "notes": "Identifies vulnerabilities or insecure patterns in source code (e.g., hardcoded secrets)."
         },
@@ -283,16 +238,8 @@
           "detector_type": "CUSTOM",
           "lifecycle_status": "active",
           "priority": "P0",
-          "categories": [
-            "CLASSIFICATION",
-            "COMPLIANCE"
-          ],
-          "supported_asset_types": [
-            "TXT",
-            "TABLE",
-            "URL",
-            "IMAGE"
-          ],
+          "categories": ["CLASSIFICATION", "COMPLIANCE"],
+          "supported_asset_types": ["TXT", "TABLE", "URL", "IMAGE"],
           "recommended_model": "mDeBERTa-v3 + SetFit + GLiNER + HuggingFace transformers",
           "notes": "User-defined rules and pipelines tailored to specific business needs. Supports regex, GLiNER2, AI/LLM (prompt-driven classification + extraction via a configured provider), text classification, image classification, feature extraction, and object detection pipelines."
         }
@@ -300,13 +247,7 @@
     },
     "Severity": {
       "type": "string",
-      "enum": [
-        "critical",
-        "high",
-        "medium",
-        "low",
-        "info"
-      ],
+      "enum": ["critical", "high", "medium", "low", "info"],
       "description": "Severity level of finding"
     },
     "Location": {
@@ -334,10 +275,7 @@
           "description": "File path or identifier"
         }
       },
-      "required": [
-        "start",
-        "end"
-      ]
+      "required": ["start", "end"]
     },
     "SecretsEnabledPattern": {
       "type": "string",
@@ -438,11 +376,7 @@
           "description": "Confidence score assigned when this pattern matches (0-1)"
         }
       },
-      "required": [
-        "name",
-        "regex",
-        "score"
-      ],
+      "required": ["name", "regex", "score"],
       "additionalProperties": false
     },
     "PIICustomRecognizer": {
@@ -510,10 +444,7 @@
           "description": "Context words that boost the score when found near a match (e.g. ['zip', 'code'])"
         }
       },
-      "required": [
-        "name",
-        "supported_entity"
-      ],
+      "required": ["name", "supported_entity"],
       "additionalProperties": false
     },
     "DetectorConfig": {
@@ -806,12 +737,7 @@
           "description": "YARA condition expression, e.g. 'any of them', '2 of ($s*)', '$s0 and $s1'."
         }
       },
-      "required": [
-        "name",
-        "severity",
-        "strings",
-        "condition"
-      ]
+      "required": ["name", "severity", "strings", "condition"]
     },
     "ThreatDetectorConfig": {
       "title": "ThreatDetectorConfig",
@@ -906,12 +832,7 @@
     },
     "CustomDetectorMethod": {
       "type": "string",
-      "enum": [
-        "RULESET",
-        "CLASSIFIER",
-        "ENTITY",
-        "PIPELINE"
-      ],
+      "enum": ["RULESET", "CLASSIFIER", "ENTITY", "PIPELINE"],
       "description": "Execution method for custom detector logic"
     },
     "CustomRegexRule": {
@@ -938,11 +859,7 @@
           "$ref": "#/definitions/Severity"
         }
       },
-      "required": [
-        "id",
-        "name",
-        "pattern"
-      ],
+      "required": ["id", "name", "pattern"],
       "additionalProperties": false
     },
     "CustomKeywordRule": {
@@ -973,11 +890,7 @@
           "$ref": "#/definitions/Severity"
         }
       },
-      "required": [
-        "id",
-        "name",
-        "keywords"
-      ],
+      "required": ["id", "name", "keywords"],
       "additionalProperties": false
     },
     "CustomExtractorField": {
@@ -1018,13 +931,7 @@
         },
         "aggregate": {
           "type": "string",
-          "enum": [
-            "first",
-            "last",
-            "list",
-            "join",
-            "count"
-          ],
+          "enum": ["first", "last", "list", "join", "count"],
           "default": "list",
           "description": "How to aggregate multiple matches"
         },
@@ -1045,9 +952,7 @@
           "description": "If true, skip saving extraction when this field is empty"
         }
       },
-      "required": [
-        "name"
-      ],
+      "required": ["name"],
       "additionalProperties": false
     },
     "CustomExtractorConfig": {
@@ -1077,9 +982,7 @@
           "description": "Chars of content to pass to extractor (classifier matched_content is only 320 chars)"
         }
       },
-      "required": [
-        "fields"
-      ],
+      "required": ["fields"],
       "additionalProperties": false
     },
     "CustomRulesetConfig": {
@@ -1115,10 +1018,7 @@
           "type": "string"
         }
       },
-      "required": [
-        "id",
-        "name"
-      ],
+      "required": ["id", "name"],
       "additionalProperties": false
     },
     "CustomClassifierTrainingExample": {
@@ -1140,10 +1040,7 @@
           "description": "Origin of this example (editor/feedback/import)"
         }
       },
-      "required": [
-        "text",
-        "label"
-      ],
+      "required": ["text", "label"],
       "additionalProperties": false
     },
     "CustomClassifierConfig": {
@@ -1237,10 +1134,7 @@
               "items": {
                 "type": "string"
               },
-              "default": [
-                "de",
-                "en"
-              ]
+              "default": ["de", "en"]
             },
             "ruleset": {
               "$ref": "#/definitions/CustomRulesetConfig"
@@ -1271,10 +1165,7 @@
               "description": "Maximum number of findings to return per asset"
             }
           },
-          "required": [
-            "custom_detector_key",
-            "name"
-          ],
+          "required": ["custom_detector_key", "name"],
           "additionalProperties": false
         }
       ]
@@ -1549,9 +1440,7 @@
           "description": "Capture group index to extract as matched content. 0 = entire match (default)."
         }
       },
-      "required": [
-        "pattern"
-      ],
+      "required": ["pattern"],
       "additionalProperties": false
     },
     "PipelineSeverityRule": {
@@ -1567,10 +1456,7 @@
           "$ref": "#/definitions/Severity"
         }
       },
-      "required": [
-        "pattern",
-        "severity"
-      ],
+      "required": ["pattern", "severity"],
       "additionalProperties": false
     },
     "GLiNER2PipelineSchema": {
@@ -1579,9 +1465,7 @@
       "properties": {
         "type": {
           "type": "string",
-          "enum": [
-            "GLINER2"
-          ],
+          "enum": ["GLINER2"],
           "default": "GLINER2"
         },
         "entities": {
@@ -1611,9 +1495,7 @@
       "properties": {
         "type": {
           "type": "string",
-          "enum": [
-            "REGEX"
-          ],
+          "enum": ["REGEX"],
           "default": "REGEX"
         },
         "patterns": {
@@ -1643,9 +1525,7 @@
           "description": "Guidance describing when this label applies."
         }
       },
-      "required": [
-        "name"
-      ],
+      "required": ["name"],
       "additionalProperties": false
     },
     "LLMOutputField": {
@@ -1674,9 +1554,7 @@
           "default": "string"
         }
       },
-      "required": [
-        "name"
-      ],
+      "required": ["name"],
       "additionalProperties": false
     },
     "LLMProviderRuntime": {
@@ -1686,11 +1564,7 @@
       "properties": {
         "provider": {
           "type": "string",
-          "enum": [
-            "OPENAI_COMPATIBLE",
-            "CLAUDE",
-            "GEMINI"
-          ],
+          "enum": ["OPENAI_COMPATIBLE", "CLAUDE", "GEMINI"],
           "description": "Resolved AI provider type."
         },
         "model": {
@@ -1731,11 +1605,7 @@
           "description": "Whether the resolved provider/model accepts image/PDF input. When true the detector renders supported files to images and sends them to the model as multimodal input instead of extracting text."
         }
       },
-      "required": [
-        "provider",
-        "model",
-        "api_key"
-      ],
+      "required": ["provider", "model", "api_key"],
       "additionalProperties": false
     },
     "LLMPipelineSchema": {
@@ -1745,9 +1615,7 @@
       "properties": {
         "type": {
           "type": "string",
-          "enum": [
-            "LLM"
-          ],
+          "enum": ["LLM"],
           "default": "LLM"
         },
         "system_prompt": {
@@ -1860,9 +1728,7 @@
           "description": "Runtime-only credentials injected by the API at dispatch. Never persisted; rejected on create/update."
         }
       },
-      "required": [
-        "system_prompt"
-      ],
+      "required": ["system_prompt"],
       "additionalProperties": false
     },
     "TextClassificationPipelineSchema": {

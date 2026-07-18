@@ -657,7 +657,7 @@ def parse_bytes(
     """
     Parse in-memory bytes: resolve MIME type and extract raw/text content.
 
-    Used by the sandbox and any caller that needs a complete ParsedBytes in one shot.
+    Used by file evaluation and any caller that needs a complete ParsedBytes in one shot.
     Object-storage sources prefer resolve_mime_type() + iter_file_pages() to avoid
     loading all content into memory before detector scanning.
     """

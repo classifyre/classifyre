@@ -199,7 +199,6 @@ docs/RegisterDiscoveredAssetsDto.md
 docs/RegisterDiscoveredAssetsResponseDto.md
 docs/RelationTypesResponseDto.md
 docs/RematchResponseDto.md
-docs/RerunSandboxRunDto.md
 docs/ReviewCaseLeadDto.md
 docs/RunnerAssetItemDto.md
 docs/RunnerAssetProgressDto.md
@@ -211,9 +210,6 @@ docs/RunnersApi.md
 docs/RunnersChartsTimelineBucketDto.md
 docs/RunnersChartsTopSourceDto.md
 docs/RunnersChartsTotalsDto.md
-docs/SandboxApi.md
-docs/SandboxRunDto.md
-docs/SandboxRunListResponseDto.md
 docs/SaveTrainingExamplesDto.md
 docs/SearchAssetFindingDto.md
 docs/SearchAssetItemDto.md
@@ -305,6 +301,7 @@ docs/UpdateRunnerAssetStatusDto.md
 docs/UpdateSourceDto.md
 docs/UpdateSystemBriefDto.md
 docs/UpdateThreadDto.md
+docs/UploadedSourceFileDto.md
 docs/UpsertGlossaryTermDto.md
 docs/UpsertGlossaryTermResponseDto.md
 docs/ValueOccurrenceAssetDto.md
@@ -331,7 +328,6 @@ src/apis/InquiriesApi.ts
 src/apis/InstanceSettingsApi.ts
 src/apis/NotificationsApi.ts
 src/apis/RunnersApi.ts
-src/apis/SandboxApi.ts
 src/apis/SourcesApi.ts
 src/apis/ThreadsApi.ts
 src/apis/index.ts
@@ -515,7 +511,6 @@ src/models/RegisterDiscoveredAssetsDto.ts
 src/models/RegisterDiscoveredAssetsResponseDto.ts
 src/models/RelationTypesResponseDto.ts
 src/models/RematchResponseDto.ts
-src/models/RerunSandboxRunDto.ts
 src/models/ReviewCaseLeadDto.ts
 src/models/RunnerAssetItemDto.ts
 src/models/RunnerAssetProgressDto.ts
@@ -526,8 +521,6 @@ src/models/RunnerLogsResponseDto.ts
 src/models/RunnersChartsTimelineBucketDto.ts
 src/models/RunnersChartsTopSourceDto.ts
 src/models/RunnersChartsTotalsDto.ts
-src/models/SandboxRunDto.ts
-src/models/SandboxRunListResponseDto.ts
 src/models/SaveTrainingExamplesDto.ts
 src/models/SearchAssetFindingDto.ts
 src/models/SearchAssetItemDto.ts
@@ -617,6 +610,7 @@ src/models/UpdateRunnerAssetStatusDto.ts
 src/models/UpdateSourceDto.ts
 src/models/UpdateSystemBriefDto.ts
 src/models/UpdateThreadDto.ts
+src/models/UploadedSourceFileDto.ts
 src/models/UpsertGlossaryTermDto.ts
 src/models/UpsertGlossaryTermResponseDto.ts
 src/models/ValueOccurrenceAssetDto.ts
