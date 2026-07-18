@@ -18,6 +18,8 @@ import { renderChatEvent, type ChatEventCode } from './chat-activity';
 import type { ChatConnector } from './connectors/connector.types';
 import { SlackConnector } from './connectors/slack.connector';
 import { TelegramConnector } from './connectors/telegram.connector';
+import { runsBackgroundWorkers } from '../service-role';
+import { stableJsonHash } from '../utils/stable-json';
 
 interface ActivityEntry {
   at: Date;
@@ -39,6 +41,8 @@ interface BotRuntime {
 }
 
 const ACTIVITY_LIMIT = 50;
+/** How often the worker checks for ChatBot config changes made via API pods. */
+const CONFIG_WATCH_INTERVAL_MS = 60_000;
 
 /**
  * Owns the live platform connections: one connector per enabled ChatBot,
@@ -49,9 +53,12 @@ const ACTIVITY_LIMIT = 50;
  * ring buffer served by the diagnostics endpoint; entries carry a stable
  * code + params so the web UI can translate them.
  *
- * NOTE: connectors assume a single API instance. A scaled-out deployment
- * would double-poll Telegram (surfaces as 409 lastError) and double-reply on
- * Slack; leader election / pg-boss singleton jobs are the follow-up fix.
+ * NOTE: connectors assume a single running instance. In a scaled-out
+ * deployment only the SERVICE_ROLE=worker process starts connectors —
+ * multiple pollers would double-poll Telegram (surfaces as 409 lastError)
+ * and double-reply on Slack. API pods that change bot config bump the
+ * ChatBot rows; the worker picks the change up via a periodic revision
+ * check instead of a direct refresh() call.
  */
 @Injectable()
 export class ChatGatewayService
@@ -61,6 +68,8 @@ export class ChatGatewayService
   private readonly connectors = new Map<string, ChatConnector>();
   private readonly runtimes = new Map<string, BotRuntime>();
   private refreshing = false;
+  private configWatchTimer?: NodeJS.Timeout;
+  private lastConfigRevision?: string;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -69,23 +78,65 @@ export class ChatGatewayService
   ) {}
 
   async onApplicationBootstrap(): Promise<void> {
+    if (!runsBackgroundWorkers()) {
+      this.logger.log(
+        'SERVICE_ROLE=api: chat connectors left to the worker deployment',
+      );
+      return;
+    }
     await this.refresh().catch((e) =>
       this.logger.warn(
         `Initial chat gateway refresh failed: ${e instanceof Error ? e.message : String(e)}`,
       ),
     );
+    this.configWatchTimer = setInterval(() => {
+      void this.refreshIfConfigChanged().catch(() => undefined);
+    }, CONFIG_WATCH_INTERVAL_MS);
+    this.configWatchTimer.unref();
   }
 
   async onModuleDestroy(): Promise<void> {
+    if (this.configWatchTimer) clearInterval(this.configWatchTimer);
     await this.stopAll();
+  }
+
+  /**
+   * Hash of the connector-relevant ChatBot config. Deliberately excludes the
+   * status fields the connectors themselves write (lastError, lastConnectedAt,
+   * telegramLastUpdateId) — those bump updatedAt on every poll.
+   */
+  private async configRevision(): Promise<string> {
+    const bots = await this.prisma.chatBot.findMany({
+      select: {
+        id: true,
+        platform: true,
+        name: true,
+        enabled: true,
+        botTokenEnc: true,
+        appTokenEnc: true,
+        capabilityGroups: true,
+        agentKinds: true,
+        allowMutations: true,
+      },
+      orderBy: { id: 'asc' },
+    });
+    return stableJsonHash(bots);
+  }
+
+  private async refreshIfConfigChanged(): Promise<void> {
+    const revision = await this.configRevision();
+    if (revision === this.lastConfigRevision) return;
+    await this.refresh();
   }
 
   /** Rebuild every connector from the current ChatBot rows. */
   async refresh(): Promise<void> {
+    if (!runsBackgroundWorkers()) return;
     if (this.refreshing) return;
     this.refreshing = true;
     try {
       await this.stopAll();
+      this.lastConfigRevision = await this.configRevision();
       const bots = await this.prisma.chatBot.findMany({
         where: { enabled: true },
       });
