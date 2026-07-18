@@ -17,6 +17,7 @@ describe('EmbeddingService', () => {
   const prisma = {
     embeddingSpace: {
       findUnique: jest.fn(),
+      findUniqueOrThrow: jest.fn(),
       findFirst: jest.fn(),
       updateMany: jest.fn(),
       update: jest.fn(),
@@ -29,6 +30,7 @@ describe('EmbeddingService', () => {
     },
     findingEvidenceAnalysis: {
       findUnique: jest.fn(),
+      findMany: jest.fn(),
       update: jest.fn(),
       updateMany: jest.fn(),
     },
@@ -56,6 +58,8 @@ describe('EmbeddingService', () => {
     capability.hasVector.mockReturnValue(false);
     capability.version.mockReturnValue('0.8.2');
     prisma.embeddingSpace.findUnique.mockResolvedValue(activeSpace);
+    prisma.embeddingSpace.findUniqueOrThrow.mockResolvedValue(activeSpace);
+    prisma.findingEvidenceAnalysis.findMany.mockResolvedValue([]);
     prisma.$transaction.mockImplementation(
       (callback: (tx: typeof prisma) => unknown) => callback(prisma),
     );

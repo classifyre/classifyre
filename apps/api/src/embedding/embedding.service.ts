@@ -224,7 +224,10 @@ export class EmbeddingService implements OnApplicationBootstrap {
         .filter((hash): hash is string => hash !== null);
       if (healHashes.length) {
         await this.analysis.analyzeHashes(space.id, healHashes);
-        await this.calibrateNeighborhood(space.id, healHashes);
+        await this.calibrateNeighborhood(
+          { id: space.id, dim: space.dim },
+          healHashes,
+        );
       }
     }
     return {
@@ -302,7 +305,12 @@ export class EmbeddingService implements OnApplicationBootstrap {
    * make importance scores corpus-relative instead of insert-order-relative.
    */
   async recalibrateSpace(spaceId?: string): Promise<{ analyzed: number }> {
-    const resolvedSpaceId = spaceId ?? (await this.activeSpace()).id;
+    const space = spaceId
+      ? await this.prisma.embeddingSpace.findUniqueOrThrow({
+          where: { id: spaceId },
+        })
+      : await this.activeSpace();
+    const resolvedSpaceId = space.id;
     const recurrence = await this.analysis.valueRecurrenceSnapshot();
     let cursor: string | undefined;
     let analyzed = 0;
@@ -321,7 +329,10 @@ export class EmbeddingService implements OnApplicationBootstrap {
         ),
       ];
       await this.analysis.analyzeHashes(resolvedSpaceId, hashes, recurrence);
-      await this.calibrateNeighborhood(resolvedSpaceId, hashes);
+      await this.calibrateNeighborhood(
+        { id: resolvedSpaceId, dim: space.dim },
+        hashes,
+      );
       analyzed += findings.length;
       cursor = findings.at(-1)?.id;
       await new Promise((resolve) => setImmediate(resolve));
