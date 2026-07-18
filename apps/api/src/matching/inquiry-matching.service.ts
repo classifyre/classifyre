@@ -5,6 +5,7 @@ import { PrismaService } from '../prisma.service';
 import { PgBossService } from '../scheduler/pg-boss.service';
 import { CompiledMatcher, InquiryMatchers } from './inquiry-matcher';
 import { INQUIRY_MATCH_QUEUE } from './matching.constants';
+import { runsBackgroundWorkers } from '../service-role';
 import {
   PreviewResponseDto,
   InquiryMatchDto,
@@ -57,6 +58,7 @@ export class InquiryMatchingService implements OnApplicationBootstrap {
   ) {}
 
   async onApplicationBootstrap(): Promise<void> {
+    if (!runsBackgroundWorkers()) return;
     const boss = await this.pgBoss.getBossAsync();
     await boss.createQueue(INQUIRY_MATCH_QUEUE);
     await boss.work(

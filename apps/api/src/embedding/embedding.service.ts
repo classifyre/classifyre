@@ -9,6 +9,7 @@ import { randomUUID } from 'node:crypto';
 import { FindingStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
 import { UnionFind } from '../utils/union-find';
+import { mapBounded } from '../utils/map-bounded';
 import { EmbeddingCapabilityService } from './embedding-capability.service';
 import { EmbeddingAnalysisService } from './embedding-analysis.service';
 import { PutAssetChunksDto } from './dto/embedding.dto';
@@ -129,6 +130,19 @@ export class EmbeddingService implements OnApplicationBootstrap {
     return this.configuredSpace();
   }
 
+  /**
+   * The per-space HNSW indexes are partial (`WHERE space_id = '<literal>'`).
+   * The planner only matches a partial index when the query embeds the same
+   * literal — a bound parameter can't be proven equal at plan time — so every
+   * vector query must inline the (validated) space id instead of binding it.
+   */
+  private spaceIdLiteral(spaceId: string): Prisma.Sql {
+    if (!/^[0-9a-f-]{36}$/i.test(spaceId)) {
+      throw new Error(`Invalid embedding space id ${spaceId}`);
+    }
+    return Prisma.raw(`'${spaceId}'`);
+  }
+
   private async ensureHnswIndex(spaceId: string, dim: number): Promise<void> {
     if (!/^[0-9a-f-]{36}$/i.test(spaceId)) {
       throw new Error(`Invalid embedding space id ${spaceId}`);
@@ -224,15 +238,15 @@ export class EmbeddingService implements OnApplicationBootstrap {
     }
 
     let created = 0;
-    for (const item of items) {
-      created += await this.prisma.$executeRaw`
+    if (items.length) {
+      const ids = items.map(() => randomUUID());
+      const hashes = items.map((item) => item.contentHash);
+      const vectors = items.map((item) => JSON.stringify(item.vector));
+      created = await this.prisma.$executeRaw`
         INSERT INTO content_embeddings (id, space_id, content_hash, vec)
-        VALUES (
-          ${randomUUID()},
-          ${space.id},
-          ${item.contentHash},
-          ${JSON.stringify(item.vector)}::public.vector
-        )
+        SELECT t.id, ${space.id}, t.content_hash, t.vec::public.vector
+        FROM unnest(${ids}::text[], ${hashes}::text[], ${vectors}::text[])
+          AS t(id, content_hash, vec)
         ON CONFLICT (space_id, content_hash) DO NOTHING
       `;
     }
@@ -241,41 +255,53 @@ export class EmbeddingService implements OnApplicationBootstrap {
       items.map((item) => item.contentHash),
     );
     await this.calibrateNeighborhood(
-      space.id,
+      { id: space.id, dim: space.dim },
       items.map((item) => item.contentHash),
     );
     return { created, received: items.length };
   }
 
   private async calibrateNeighborhood(
-    spaceId: string,
+    space: { id: string; dim: number },
     contentHashes: string[],
   ) {
     if (!contentHashes.length) return;
-    const rows = await this.prisma.$queryRaw<NeighborhoodRow[]>`
-      SELECT target.id AS "findingId", target.embed_content_hash AS "targetHash",
-        neighbor.content_hash AS "neighborHash",
-        1 - (target_embedding.vec <=> neighbor.vec) AS score
-      FROM findings target
-      JOIN content_embeddings target_embedding
-        ON target_embedding.content_hash = target.embed_content_hash
-       AND target_embedding.space_id = ${spaceId}
-      CROSS JOIN LATERAL (
-        SELECT candidate.content_hash, candidate.vec
-        FROM content_embeddings candidate
-        WHERE candidate.space_id = ${spaceId}
-          AND candidate.vec IS NOT NULL
-          AND candidate.content_hash != target.embed_content_hash
-          AND EXISTS (
-            SELECT 1 FROM findings neighbor_finding
-            WHERE neighbor_finding.embed_content_hash = candidate.content_hash
-              AND neighbor_finding.finding_type = target.finding_type
-          )
-        ORDER BY candidate.vec <=> target_embedding.vec
-        LIMIT 10
-      ) neighbor
-      WHERE target.embed_content_hash = ANY(${contentHashes}::text[])
-    `;
+    const spaceId = this.spaceIdLiteral(space.id);
+    const dim = Prisma.raw(String(space.dim));
+    const rows = await this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw(
+        Prisma.raw(`SET LOCAL hnsw.ef_search = ${this.config.hnswEfSearch}`),
+      );
+      // The candidate pre-filters (space, hash, finding_type) are applied after
+      // the index scan; relaxed_order lets the scan keep going until LIMIT is
+      // filled instead of falling back to an exact full-table sort.
+      await tx.$executeRaw`SET LOCAL hnsw.iterative_scan = relaxed_order`;
+      return tx.$queryRaw<NeighborhoodRow[]>(Prisma.sql`
+        SELECT target.id AS "findingId", target.embed_content_hash AS "targetHash",
+          neighbor.content_hash AS "neighborHash",
+          1 - (target_embedding.vec <=> neighbor.vec) AS score
+        FROM findings target
+        JOIN content_embeddings target_embedding
+          ON target_embedding.content_hash = target.embed_content_hash
+         AND target_embedding.space_id = ${spaceId}
+        CROSS JOIN LATERAL (
+          SELECT candidate.content_hash, candidate.vec
+          FROM content_embeddings candidate
+          WHERE candidate.space_id = ${spaceId}
+            AND candidate.vec IS NOT NULL
+            AND candidate.content_hash != target.embed_content_hash
+            AND EXISTS (
+              SELECT 1 FROM findings neighbor_finding
+              WHERE neighbor_finding.embed_content_hash = candidate.content_hash
+                AND neighbor_finding.finding_type = target.finding_type
+            )
+          ORDER BY candidate.vec::public.vector(${dim}) <=>
+            target_embedding.vec::public.vector(${dim})
+          LIMIT 10
+        ) neighbor
+        WHERE target.embed_content_hash = ANY(${contentHashes}::text[])
+      `);
+    });
     const grouped = new Map<string, NeighborhoodRow[]>();
     const nearDuplicateComponents = new UnionFind([]);
     for (const row of rows) {
@@ -299,11 +325,17 @@ export class EmbeddingService implements OnApplicationBootstrap {
       const groupHash = [...members].sort()[0];
       for (const hash of members) duplicateGroupByHash.set(hash, groupHash);
     }
-    await Promise.all(
-      [...grouped.entries()].map(async ([findingId, neighbors]) => {
-        const analysis = await this.prisma.findingEvidenceAnalysis.findUnique({
-          where: { findingId },
-        });
+    const analyses = await this.prisma.findingEvidenceAnalysis.findMany({
+      where: { findingId: { in: [...grouped.keys()] } },
+    });
+    const analysisByFinding = new Map(
+      analyses.map((analysis) => [analysis.findingId, analysis]),
+    );
+    await mapBounded(
+      [...grouped.entries()],
+      8,
+      async ([findingId, neighbors]) => {
+        const analysis = analysisByFinding.get(findingId);
         if (!analysis || !neighbors.length) return;
         const meanSimilarity =
           neighbors.reduce((sum, neighbor) => sum + neighbor.score, 0) /
@@ -383,10 +415,12 @@ export class EmbeddingService implements OnApplicationBootstrap {
             analyzedAt: new Date(),
           },
         });
-      }),
+      },
     );
-    await Promise.all(
-      [...new Set(duplicateGroupByHash.values())].map((groupHash) => {
+    await mapBounded(
+      [...new Set(duplicateGroupByHash.values())],
+      8,
+      (groupHash) => {
         const hashes = [...duplicateGroupByHash.entries()]
           .filter(([, value]) => value === groupHash)
           .map(([hash]) => hash);
@@ -394,7 +428,7 @@ export class EmbeddingService implements OnApplicationBootstrap {
           where: { finding: { embedContentHash: { in: hashes } } },
           data: { duplicateGroupHash: groupHash },
         });
-      }),
+      },
     );
   }
 
@@ -467,7 +501,7 @@ export class EmbeddingService implements OnApplicationBootstrap {
         ) AS score
         FROM content_embeddings ce
         JOIN findings f ON f.embed_content_hash = ce.content_hash
-        WHERE ce.space_id = ${space.id}
+        WHERE ce.space_id = ${this.spaceIdLiteral(space.id)}
           AND (${sourceFilter}::text[] IS NULL OR f.source_id = ANY(${sourceFilter}::text[]))
           ${statusScope}
         ORDER BY ce.vec::public.vector(${dim}) <=>
@@ -521,7 +555,7 @@ export class EmbeddingService implements OnApplicationBootstrap {
             ) AS score
           FROM content_embeddings ce
           JOIN asset_chunks ac ON ac.content_hash = ce.content_hash
-          WHERE ce.space_id = ${space.id}
+          WHERE ce.space_id = ${this.spaceIdLiteral(space.id)}
             AND (${sourceId ?? null}::text IS NULL OR ac.source_id = ${sourceId ?? null})
           ORDER BY ce.vec::public.vector(${dim}) <=>
             ${vector}::public.vector(${dim})
