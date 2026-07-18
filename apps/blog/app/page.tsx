@@ -32,21 +32,21 @@ import "./landing.css";
 export const metadata: Metadata = {
   title: "The Open-Source Investigation Platform for Your Data",
   description:
-    "Classifyre turns raw findings into real investigations. Download the desktop app or deploy to Kubernetes, connect the systems you already run, and let Harness AI — five autonomous agents — open inquiries, build cases, tune sources, and author detectors, with every decision explained.",
+    "Classifyre turns raw findings into real investigations. Run the full product three ways — desktop app, all-in-one Docker, or Helm at any scale — connect the systems you already run, and let semantic ranking float the evidence that matters while Harness AI, five autonomous agents, opens inquiries, builds cases, tunes sources, and authors detectors with every decision explained.",
   alternates: {
     canonical: "/",
   },
   openGraph: {
     title: "Classifyre | Every leak leaves a trail",
     description:
-      "An open-source investigation platform: detectors surface evidence, and Harness AI — a five-agent autopilot — opens inquiries, builds cases, drafts hypotheses, and authors detectors with a full audit trail. Runs on your desktop or your cluster.",
+      "An open-source investigation platform: detectors surface evidence, semantic ranking sorts signal from boilerplate, and Harness AI — a five-agent autopilot — opens inquiries, builds cases, drafts hypotheses, and authors detectors with a full audit trail. One product, three runtimes: desktop, all-in-one Docker, Helm.",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
     title: "Classifyre | Every leak leaves a trail",
     description:
-      "Open-source core, Harness AI — autonomous agents that act instead of chat — custom detectors from regex to any model, and a clear path from a desktop download to enterprise Kubernetes.",
+      "Open-source core, importance-ranked evidence with written reasons, Harness AI — autonomous agents that act instead of chat — custom detectors from regex to any model, and one product that runs on a laptop, in one container, or across any cluster.",
   },
 };
 
@@ -63,12 +63,18 @@ const helmInstallCommand = [
   "  oci://registry-1.docker.io/classifyre/classifyre-core \\",
   `  --version ${softwareVersion}`,
 ];
+const dockerRunCommand = [
+  "docker run --rm -p 3000:3000 \\",
+  "  classifyre/all-in-one:latest",
+];
+const dockerDocsUrl = "https://docs.classifyre.com/deployment/docker/";
+const helmDocsUrl = "https://docs.classifyre.com/deployment/kubernetes/";
 const enterpriseContactEmail = "contact@classifyre.com";
 
 const desktopDownloads = [
-  { os: "macOS", detail: "Apple Silicon & Intel" },
+  { os: "macOS", detail: "Apple Silicon" },
   { os: "Windows", detail: "x64 installer" },
-  { os: "Linux", detail: "x64 & arm64" },
+  { os: "Linux", detail: "deb · rpm — x64 & arm64" },
 ] as const;
 
 const enterprisePillars = [
@@ -109,7 +115,7 @@ const investigationPillars = [
     marker: "CASES",
     title: "Evidence with an owner and a lifecycle",
     description:
-      "Findings get attached to cases instead of dying in a CSV export. Each case carries its evidence, status, and history toward an actual resolution.",
+      "Findings get attached to cases instead of dying in a CSV export. Each case carries its evidence, status, and history — and proposes its own next leads, ranked by importance.",
   },
   {
     marker: "HYPOTHESES",
@@ -122,6 +128,98 @@ const investigationPillars = [
     title: "Humans and AI in one audit trail",
     description:
       "Teammates and the autopilot operate on the same cases, with every action — human or AI — attributed and explained in a shared record.",
+  },
+] as const;
+
+const semanticsPillars = [
+  {
+    marker: "IMPORTANCE 0–1",
+    title: "Ranked, not piled",
+    description:
+      "Every finding gets an importance score, and the docket sorts by it out of the box. Severity is one input weighted at ten percent — not the verdict.",
+  },
+  {
+    marker: "WRITTEN REASONS",
+    title: "A score you can argue with",
+    description:
+      "Each rank carries readable reasons — “recurs across systems”, “known test value”, “near-duplicate of 38”. No black-box number decides your morning.",
+  },
+  {
+    marker: "RECURRENCE IS A LEAD",
+    title: "Twice is a trail. Fifty times is wallpaper.",
+    description:
+      "The same value surfacing in a handful of systems, in different contexts, gets promoted as a lead. The same value in fifty assets is boilerplate — it sinks.",
+  },
+  {
+    marker: "SELF-CALIBRATING",
+    title: "It re-ranks itself",
+    description:
+      "Early findings score against an almost-empty space, so once the embedding queue drains, Classifyre recalibrates the whole corpus. Ranks stay honest as evidence grows.",
+  },
+] as const;
+
+const semanticsFacts = [
+  {
+    marker: "ONE SEMANTIC SPACE",
+    title: "Meaning, indexed",
+    description:
+      "Every finding is embedded into a pgvector semantic space — a local model out of the box, or any OpenAI-compatible provider you configure. Similar findings and boilerplate clusters come for free.",
+  },
+  {
+    marker: "HYBRID SEARCH",
+    title: "Ask in your own words",
+    description:
+      "Search fuses semantic and keyword results into one ranked list. Ask for “bank details” and the IBANs surface — even when no keyword matches.",
+  },
+  {
+    marker: "RANKED LEADS",
+    title: "Cases find their own next evidence",
+    description:
+      "Each case proposes leads: semantic neighbours of the evidence already attached, plus high-importance matches from its linked inquiries — ranked, capped, reviewable.",
+  },
+] as const;
+
+/** Illustrative docket rows for the ranked-evidence section. */
+const rankedDocket = [
+  {
+    id: "F-2041",
+    label: "AWS access key · CI deploy log",
+    score: 0.94,
+    reasons: [
+      { dir: "up", text: "recurs in 2 systems" },
+      { dir: "up", text: "novel" },
+      { dir: "up", text: "semantic outlier" },
+    ],
+  },
+  {
+    id: "F-1987",
+    label: "IBAN · quarterly finance export",
+    score: 0.81,
+    reasons: [
+      { dir: "up", text: "high quality" },
+      { dir: "up", text: "distinct context" },
+    ],
+  },
+  {
+    id: "F-2033",
+    label: "Email address · support inbox dump",
+    score: 0.42,
+    reasons: [{ dir: "down", text: "38 near-duplicates" }],
+  },
+  {
+    id: "F-2012",
+    label: "Card number · 4111 1111 1111 1111",
+    score: 0.18,
+    reasons: [{ dir: "down", text: "known test value" }],
+  },
+  {
+    id: "F-2029",
+    label: "Phone number · page-footer boilerplate",
+    score: 0.07,
+    reasons: [
+      { dir: "down", text: "found in 48 assets" },
+      { dir: "down", text: "low extraction quality" },
+    ],
   },
 ] as const;
 
@@ -445,7 +543,13 @@ export default function HomePage() {
       },
       {
         "@type": "Offer",
-        name: "Open Source Core on Kubernetes",
+        name: "Classifyre All-in-One (Docker)",
+        price: "0",
+        priceCurrency: "USD",
+      },
+      {
+        "@type": "Offer",
+        name: "Open Source Core on Kubernetes (Helm)",
         price: "0",
         priceCurrency: "USD",
       },
@@ -504,9 +608,9 @@ export default function HomePage() {
                   Classifyre is an open-source investigation platform for your
                   data estate. It scans the systems you already run, detects
                   secrets, PII, and the signals you define — then works them
-                  like a detective: standing inquiries, fingerprints, cases,
-                  competing hypotheses, and an AI autopilot that does the
-                  legwork between scans.
+                  like a detective: standing inquiries, fingerprints,
+                  importance-ranked evidence, cases, competing hypotheses, and
+                  an AI autopilot that does the legwork between scans.
                 </p>
 
                 <div className="flex flex-wrap items-center gap-3">
@@ -531,9 +635,6 @@ export default function HomePage() {
                       Try the live demo
                     </a>
                   </Button>
-                  <span className="font-mono text-[11px] uppercase tracking-[0.12em] text-white/50">
-                    macOS · Windows · Linux — the full product, on your machine
-                  </span>
                 </div>
               </div>
 
@@ -607,25 +708,118 @@ export default function HomePage() {
               </div>
             </div>
 
+            {/* Runtime rail: three productized ways to run the same platform */}
+            <div className="border-2 border-white/25 bg-white/4">
+              <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b-2 border-white/25 px-4 py-3 sm:px-5">
+                <span className="font-mono text-[11px] font-bold uppercase tracking-[0.2em] text-accent">
+                  Three ways to run it
+                </span>
+                <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-white/50">
+                  Every one is the full product — only the jurisdiction changes
+                </span>
+              </div>
+              <div className="grid divide-y-2 divide-white/25 lg:grid-cols-3 lg:divide-x-2 lg:divide-y-0">
+                {/* Desktop */}
+                <div className="flex flex-col gap-3 p-4 sm:p-5">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <span className="font-mono text-xs font-bold uppercase tracking-[0.16em] text-white">
+                      Desktop
+                    </span>
+                    <span className="border border-white/30 px-1.5 py-0.5 font-mono text-[9px] font-bold uppercase tracking-[0.16em] text-white/60">
+                      Local · one install
+                    </span>
+                  </div>
+                  <div className="grid gap-1.5">
+                    {desktopDownloads.map((download) => (
+                      <a
+                        key={download.os}
+                        href={desktopDownloadUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="group flex items-baseline justify-between gap-2 border border-white/20 bg-white/6 px-2.5 py-1.5 transition-colors hover:border-accent hover:bg-accent/10"
+                      >
+                        <span className="font-mono text-xs font-bold uppercase tracking-[0.1em] text-white">
+                          {download.os}
+                          <span className="text-accent"> ↓</span>
+                        </span>
+                        <span className="font-mono text-[10px] uppercase tracking-[0.06em] text-white/50 group-hover:text-white/75">
+                          {download.detail}
+                        </span>
+                      </a>
+                    ))}
+                  </div>
+                  <p className="mt-auto font-mono text-[10px] uppercase tracking-[0.1em] text-white/45">
+                    Everything stays on your machine
+                  </p>
+                </div>
+
+                {/* Docker all-in-one */}
+                <div className="flex flex-col gap-3 p-4 sm:p-5">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <span className="font-mono text-xs font-bold uppercase tracking-[0.16em] text-white">
+                      Docker all-in-one
+                    </span>
+                    <span className="border border-white/30 px-1.5 py-0.5 font-mono text-[9px] font-bold uppercase tracking-[0.16em] text-white/60">
+                      Local · one container
+                    </span>
+                  </div>
+                  <pre className="overflow-hidden whitespace-pre-wrap wrap-break-word border border-white/20 bg-black/40 px-2.5 py-2 font-mono text-[11px] leading-5 text-white/85">
+                    <code>{dockerRunCommand.join("\n")}</code>
+                  </pre>
+                  <a
+                    href={dockerDocsUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="mt-auto font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-accent hover:underline"
+                  >
+                    Docker docs →
+                  </a>
+                </div>
+
+                {/* Helm */}
+                <div className="flex flex-col gap-3 p-4 sm:p-5">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <span className="font-mono text-xs font-bold uppercase tracking-[0.16em] text-white">
+                      Helm on Kubernetes
+                    </span>
+                    <span className="border border-accent px-1.5 py-0.5 font-mono text-[9px] font-bold uppercase tracking-[0.16em] text-accent">
+                      Remote · any size
+                    </span>
+                  </div>
+                  <pre className="overflow-hidden whitespace-pre-wrap wrap-break-word border border-white/20 bg-black/40 px-2.5 py-2 font-mono text-[11px] leading-5 text-white/85">
+                    <code>{helmInstallCommand.join("\n")}</code>
+                  </pre>
+                  <a
+                    href={helmDocsUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="mt-auto font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-accent hover:underline"
+                  >
+                    Helm chart docs →
+                  </a>
+                </div>
+              </div>
+            </div>
+
             <div className="grid gap-4 pt-4 sm:grid-cols-3">
               <EvidenceTag
                 label="Source types"
                 value={`${sourceEntries.length}+`}
-                detail="Databases, lakehouses, collaboration tools, BI, and web content."
+                detail="Databases, lakehouses, collaboration tools, BI, and web content — one evidence stream."
                 tilt="l"
                 delayMs={0}
               />
               <EvidenceTag
-                label="Detector families"
+                label="Built-in detectors"
                 value={`${activeDetectorItems.length}`}
-                detail="Built-in packs for PII, secrets, and security — plus four custom engines from regex to any LLM."
+                detail="Switch-on packs for PII, secrets, and security — plus four custom engines, regex to any LLM."
                 tilt="r"
                 delayMs={120}
               />
               <EvidenceTag
-                label="AI decisions explained"
-                value="100%"
-                detail="Every autopilot action lands in the audit trail with a written rationale."
+                label="Autopilot agents"
+                value="5"
+                detail="Inquiry, case, config, detector author, dream — every move logged with a written rationale."
                 tilt="l"
                 delayMs={240}
               />
@@ -709,6 +903,132 @@ export default function HomePage() {
                   fingerprint match, and autopilot contributions.
                 </figcaption>
               </figure>
+            </div>
+          </div>
+        </LandingSectionShell>
+      </section>
+
+      {/* ── Semantics: ranked evidence ───────────────────────────────────── */}
+      <section aria-labelledby="semantics-title">
+        <LandingSectionShell tone="plain">
+          <div className="space-y-8">
+            <div className="space-y-3">
+              <Marker label="The semantic layer" inverted />
+              <h2
+                id="semantics-title"
+                className="font-serif text-4xl font-black uppercase leading-[0.9] tracking-[0.06em] sm:text-5xl"
+              >
+                Signal rises.
+                <br />
+                Noise sinks.
+              </h2>
+              <p className="max-w-3xl text-muted-foreground">
+                Severity tells you what a finding is. Importance tells you
+                whether it deserves your morning. Classifyre embeds every
+                finding into a semantic space and ranks it from 0 to 1 —
+                weighing quality, novelty, context, and how the same value
+                recurs across your estate — so the docket opens on the leak,
+                not on page forty of boilerplate.
+              </p>
+            </div>
+
+            <div className="grid gap-8 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] lg:items-center">
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+                {semanticsPillars.map((pillar, index) => (
+                  <Reveal key={pillar.marker} delayMs={index * 90}>
+                    <div className="flex h-full flex-col gap-2 border-2 border-border bg-background p-4 shadow-[4px_4px_0_var(--color-border)]">
+                      <span className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-accent-foreground/60 dark:text-accent">
+                        {pillar.marker}
+                      </span>
+                      <p className="font-serif text-base font-black uppercase leading-tight tracking-[0.04em]">
+                        {pillar.title}
+                      </p>
+                      <p className="text-sm leading-6 text-muted-foreground">
+                        {pillar.description}
+                      </p>
+                    </div>
+                  </Reveal>
+                ))}
+              </div>
+
+              {/* The morning docket */}
+              <figure className="border-2 border-border bg-background p-4 shadow-[6px_6px_0_var(--color-border)]">
+                <div className="mb-3 flex items-center justify-between border-b-2 border-border pb-3">
+                  <span className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
+                    The morning docket
+                  </span>
+                  <span className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-accent-foreground/60 dark:text-accent">
+                    Sorted by importance
+                  </span>
+                </div>
+                <ol className="flex flex-col gap-2.5">
+                  {rankedDocket.map((row, index) => (
+                    <Reveal key={row.id} as="li" delayMs={index * 130}>
+                      <div className="border border-border/60 bg-background p-2.5">
+                        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                          <span className="font-mono text-[10px] font-bold tracking-[0.1em] text-muted-foreground">
+                            {row.id}
+                          </span>
+                          <span className="min-w-0 flex-1 truncate text-sm font-medium">
+                            {row.label}
+                          </span>
+                          <span className="font-mono text-xs font-black tabular-nums">
+                            {row.score.toFixed(2)}
+                          </span>
+                        </div>
+                        <div className="mt-2 h-2 border border-border bg-foreground/5">
+                          <div
+                            className={cn(
+                              "cl-docket-fill h-full",
+                              row.score >= 0.6
+                                ? "bg-accent"
+                                : "bg-foreground/25",
+                            )}
+                            style={{ width: `${Math.round(row.score * 100)}%` }}
+                          />
+                        </div>
+                        <div className="mt-2 flex flex-wrap gap-1">
+                          {row.reasons.map((reason) => (
+                            <span
+                              key={reason.text}
+                              className={cn(
+                                "border px-1.5 py-0.5 font-mono text-[10px]",
+                                reason.dir === "up"
+                                  ? "border-accent-foreground/30 text-accent-foreground/80 dark:border-accent/50 dark:text-accent"
+                                  : "border-border/60 text-muted-foreground",
+                              )}
+                            >
+                              {reason.dir === "up" ? "↑" : "↓"} {reason.text}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    </Reveal>
+                  ))}
+                </ol>
+                <figcaption className="mt-3 border-t-2 border-border pt-3 font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
+                  Every rank ships with its reasons — inspect them, argue with
+                  them, or re-sort by severity or recency any time.
+                </figcaption>
+              </figure>
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-3">
+              {semanticsFacts.map((fact, index) => (
+                <Reveal key={fact.marker} delayMs={index * 110}>
+                  <div className="h-full border-2 border-border bg-background p-5 shadow-[4px_4px_0_var(--color-border)]">
+                    <span className="inline-flex bg-accent px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-black">
+                      {fact.marker}
+                    </span>
+                    <p className="mt-3 font-serif text-lg font-black uppercase leading-tight tracking-[0.04em]">
+                      {fact.title}
+                    </p>
+                    <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                      {fact.description}
+                    </p>
+                  </div>
+                </Reveal>
+              ))}
             </div>
           </div>
         </LandingSectionShell>
@@ -1035,30 +1355,31 @@ export default function HomePage() {
                   id="runtime-title"
                   className="font-serif text-4xl font-black uppercase leading-[0.9] tracking-wider sm:text-5xl"
                 >
-                  On your desk tonight.
+                  One product.
                   <br />
-                  In your cluster later.
+                  Three jurisdictions.
                 </h2>
               </div>
               <p className="max-w-2xl text-muted-foreground">
-                The same open-source platform runs at three altitudes: a
-                desktop app for one investigator, a Helm chart for a team, and
-                an enterprise partnership when it becomes company
-                infrastructure. Nothing you build at one altitude is thrown
-                away at the next.
+                These aren&apos;t tiers, trials, or lite editions — each
+                runtime is the full, productized platform. The desktop app and
+                the all-in-one container keep the whole investigation local;
+                the Helm chart runs it remotely and scales as heavily as your
+                estate demands. Nothing you build in one runtime is thrown
+                away in the next.
               </p>
             </div>
 
-            <div className="grid gap-4 lg:grid-cols-2">
+            <div className="grid gap-4 lg:grid-cols-3">
               {/* Desktop */}
               <div className="panel-card flex h-full flex-col gap-4 rounded-[16px] bg-card p-6">
                 <div className="flex items-start justify-between gap-3">
                   <div className="space-y-2">
                     <span className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
-                      01 · Tonight
+                      01 · Local · one install
                     </span>
                     <h3 className="font-serif text-2xl font-black uppercase leading-tight tracking-[0.04em]">
-                      Download the app
+                      Desktop
                     </h3>
                   </div>
                   <span className="inline-flex shrink-0 border-2 border-accent bg-accent px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-black">
@@ -1066,21 +1387,19 @@ export default function HomePage() {
                   </span>
                 </div>
                 <p className="text-sm leading-6 text-muted-foreground">
-                  Classifyre Desktop is the complete platform in a single
-                  install — the same product that runs in production, with
-                  PostgreSQL embedded and every scan worker running in its own
-                  isolated sandbox under the hood. Not a demo, not a trial:
-                  it&apos;s how a single investigator runs Classifyre day to
-                  day. Everything stays on your machine.
+                  The complete platform in a single install — PostgreSQL
+                  embedded, every scan worker sandboxed under the hood. Not a
+                  demo, not a trial: it&apos;s how a single investigator runs
+                  Classifyre day to day, with everything on your machine.
                 </p>
-                <div className="grid gap-2 sm:grid-cols-3">
+                <div className="grid gap-2">
                   {desktopDownloads.map((download) => (
                     <a
                       key={download.os}
                       href={desktopDownloadUrl}
                       target="_blank"
                       rel="noreferrer"
-                      className="group flex flex-col border-2 border-border bg-background px-3 py-2.5 transition-all hover:-translate-y-0.5 hover:border-accent hover:shadow-[4px_4px_0_var(--color-accent)]"
+                      className="group flex items-baseline justify-between gap-2 border-2 border-border bg-background px-3 py-2.5 transition-all hover:-translate-y-0.5 hover:border-accent hover:shadow-[4px_4px_0_var(--color-accent)]"
                     >
                       <span className="font-mono text-sm font-bold uppercase tracking-[0.1em]">
                         {download.os}
@@ -1089,7 +1408,7 @@ export default function HomePage() {
                           ↓
                         </span>
                       </span>
-                      <span className="mt-0.5 font-mono text-[10px] uppercase tracking-[0.08em] text-muted-foreground">
+                      <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-muted-foreground">
                         {download.detail}
                       </span>
                     </a>
@@ -1100,21 +1419,62 @@ export default function HomePage() {
                 </p>
               </div>
 
+              {/* Docker all-in-one */}
+              <div className="panel-card flex h-full flex-col gap-4 rounded-[16px] bg-card p-6">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="space-y-2">
+                    <span className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
+                      02 · Local · one container
+                    </span>
+                    <h3 className="font-serif text-2xl font-black uppercase leading-tight tracking-[0.04em]">
+                      Docker all-in-one
+                    </h3>
+                  </div>
+                  <span className="inline-flex shrink-0 border-2 border-accent bg-accent px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-black">
+                    Full product
+                  </span>
+                </div>
+                <p className="text-sm leading-6 text-muted-foreground">
+                  The entire platform — UI, API, workers, PostgreSQL — in one
+                  container. One command, port 3000, zero config: the fastest
+                  way to run Classifyre on a workstation or a shared box
+                  without installing anything.
+                </p>
+                <CommandBlock label="Docker run" lines={dockerRunCommand} />
+                <div className="mt-auto pt-1">
+                  <Button
+                    asChild
+                    variant="secondary"
+                    className="w-full border-2 border-border"
+                  >
+                    <a href={dockerDocsUrl} target="_blank" rel="noreferrer">
+                      Docker docs
+                    </a>
+                  </Button>
+                </div>
+              </div>
+
               {/* Kubernetes */}
               <div className="panel-card flex h-full flex-col gap-4 rounded-[16px] bg-foreground p-6 text-primary-foreground">
-                <div className="space-y-2">
-                  <span className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-primary-foreground/55">
-                    02 · When the team joins
+                <div className="flex items-start justify-between gap-3">
+                  <div className="space-y-2">
+                    <span className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-primary-foreground/55">
+                      03 · Remote · any size
+                    </span>
+                    <h3 className="font-serif text-2xl font-black uppercase leading-tight tracking-[0.04em]">
+                      Helm on Kubernetes
+                    </h3>
+                  </div>
+                  <span className="inline-flex shrink-0 border-2 border-accent px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-accent">
+                    Scales to any size
                   </span>
-                  <h3 className="font-serif text-2xl font-black uppercase leading-tight tracking-[0.04em]">
-                    Helm on Kubernetes
-                  </h3>
                 </div>
                 <p className="text-sm leading-6 text-primary-foreground/72">
-                  Deploy the same open-source core to Kubernetes — self-hosted
-                  or in your cloud — with properly separated components and
-                  ephemeral processing workers that scale to zero between
-                  scans. Your infrastructure, your data.
+                  The same open-source core, deployed remotely — self-hosted or
+                  in your cloud — with properly separated components and
+                  ephemeral processing workers that scale to zero between scans
+                  and fan out as far as your estate goes. Your infrastructure,
+                  your data.
                 </p>
                 <CommandBlock label="Helm install" lines={helmInstallCommand} />
                 <div className="mt-auto pt-1">
@@ -1123,11 +1483,7 @@ export default function HomePage() {
                     variant="secondary"
                     className="w-full border-2 border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/16"
                   >
-                    <a
-                      href="https://docs.classifyre.com/deployment/kubernetes/"
-                      target="_blank"
-                      rel="noreferrer"
-                    >
+                    <a href={helmDocsUrl} target="_blank" rel="noreferrer">
                       Helm chart docs
                     </a>
                   </Button>
@@ -1142,7 +1498,7 @@ export default function HomePage() {
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                   <div className="space-y-2">
                     <span className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
-                      03 · When it becomes infrastructure
+                      04 · When it becomes infrastructure
                     </span>
                     <h3 className="font-serif text-3xl font-black uppercase leading-[0.95] tracking-[0.04em] sm:text-4xl">
                       A partnership,
@@ -1236,10 +1592,10 @@ export default function HomePage() {
                 </span>
               </h2>
               <p className="max-w-xl text-base leading-7 text-white/70">
-                Download the desktop app, point it at one system you already
-                run, and see what the investigator finds. Everything stays on
-                your machine — and everything you build carries over when you
-                scale.
+                Download the desktop app — or run one Docker command — point
+                it at a system you already run, and see what the investigator
+                finds. Everything stays on your machine, and everything you
+                build carries over when you go remote with Helm.
               </p>
               <div className="flex flex-wrap justify-center gap-3">
                 <Button
