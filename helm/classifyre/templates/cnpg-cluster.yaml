@@ -9,6 +9,13 @@ spec:
   instances: {{ .Values.postgres.cnpg.instances }}
   imageName: {{ .Values.postgres.cnpg.imageName | quote }}
   enableSuperuserAccess: false
+  {{- with .Values.postgres.cnpg.postgresql.parameters }}
+  postgresql:
+    parameters:
+      {{- range $key, $value := . }}
+      {{ $key }}: {{ $value | quote }}
+      {{- end }}
+  {{- end }}
   storage:
     size: {{ .Values.postgres.cnpg.storage.size }}
     {{- with .Values.postgres.cnpg.storage.storageClassName }}
