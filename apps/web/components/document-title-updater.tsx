@@ -13,8 +13,6 @@ const ROUTE_TITLE_KEYS: Record<string, string> = {
   "/detectors": "detectors.title",
   "/detectors/new": "detectors.new.title",
   "/scans": "scans.title",
-  "/sandbox": "sandbox.title",
-  "/sandbox/new": "sandbox.newScan",
   "/notifications": "notifications.title",
   "/settings": "settings.title",
 };

@@ -181,6 +181,7 @@ describe('CliRunnerService', () => {
     expect(kubernetesCliJobService.runTestJob).toHaveBeenCalledWith(
       'source-2',
       plainConfig,
+      undefined,
     );
   });
 

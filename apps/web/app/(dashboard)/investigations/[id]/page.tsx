@@ -8,6 +8,7 @@ import {
   ArrowRight,
   Bot,
   CheckCircle2,
+  Compass,
   DownloadCloud,
   Lightbulb,
   Link2,
@@ -27,6 +28,8 @@ import {
   api,
   ThreadResponseDtoKindEnum,
   type CaseActivityDto,
+  type CaseEventDto,
+  type CaseLeadDto,
   type CaseResponseDto,
   type GraphEdgeDto,
   type GraphNodeDto,
@@ -67,6 +70,8 @@ import { DetailBackButton } from "@/components/detail-back-button";
 import { EvidenceTable } from "@/components/evidence-table";
 import { CaseThreads } from "@/components/case-threads";
 import { CaseTimeline } from "@/components/case-timeline";
+import { CaseChronology } from "@/components/case-chronology";
+import { CaseLeads } from "@/components/case-leads";
 import { useTranslation } from "@/hooks/use-translation";
 
 const CaseGraphView = dynamic(
@@ -75,7 +80,7 @@ const CaseGraphView = dynamic(
 );
 
 // The graph is the case's front door — every other view is a drill-down.
-const TABS = ["graph", "evidence", "threads", "timeline", "overview"] as const;
+const TABS = ["graph", "evidence", "explore", "threads", "timeline", "overview"] as const;
 type TabValue = (typeof TABS)[number];
 const DEFAULT_TAB: TabValue = "graph";
 
@@ -119,6 +124,13 @@ function CaseWorkspaceInner() {
   const [inquiryToLink, setInquiryToLink] = React.useState("");
   const [linkingInquiry, setLinkingInquiry] = React.useState(false);
   const [recentActivity, setRecentActivity] = React.useState<CaseActivityDto[]>([]);
+
+  const [leads, setLeads] = React.useState<CaseLeadDto[]>([]);
+  const [leadsLoading, setLeadsLoading] = React.useState(true);
+  const [events, setEvents] = React.useState<CaseEventDto[]>([]);
+  const [eventsLoading, setEventsLoading] = React.useState(true);
+  const [timelineMode, setTimelineMode] = React.useState<"chronology" | "activity">("activity");
+  const [timelineModeInitialized, setTimelineModeInitialized] = React.useState(false);
 
   const [aiDialogOpen, setAiDialogOpen] = React.useState(false);
   const [aiRefreshKey, setAiRefreshKey] = React.useState(0);
@@ -175,19 +187,64 @@ function CaseWorkspaceInner() {
     }
   }, [caseId]);
 
+  const loadLeads = React.useCallback(async () => {
+    setLeadsLoading(true);
+    try {
+      const res = await api.cases.caseLeadsControllerList({ caseId });
+      setLeads(res);
+    } catch {
+      setLeads([]);
+    } finally {
+      setLeadsLoading(false);
+    }
+  }, [caseId]);
+
+  const loadEvents = React.useCallback(async () => {
+    setEventsLoading(true);
+    try {
+      const res = await api.cases.caseEventsControllerList({ caseId });
+      setEvents(res);
+    } catch {
+      setEvents([]);
+    } finally {
+      setEventsLoading(false);
+    }
+  }, [caseId]);
+
   React.useEffect(() => {
     void loadCase();
     void loadThreads();
     void loadRecentActivity();
     void loadGraph();
-  }, [loadCase, loadThreads, loadRecentActivity, loadGraph]);
+    void loadLeads();
+    void loadEvents();
+  }, [loadCase, loadThreads, loadRecentActivity, loadGraph, loadLeads, loadEvents]);
 
   const reloadAll = React.useCallback(() => {
     void loadCase();
     void loadThreads();
     void loadGraph();
     void loadRecentActivity();
-  }, [loadCase, loadThreads, loadGraph, loadRecentActivity]);
+    void loadLeads();
+    void loadEvents();
+  }, [loadCase, loadThreads, loadGraph, loadRecentActivity, loadLeads, loadEvents]);
+
+  // Accept/dismiss on a lead attaches evidence — refresh both the lead queue
+  // and the case's evidence, without the heavier graph/threads reloads.
+  const refreshLeadsAndEvidence = React.useCallback(() => {
+    void loadLeads();
+    void loadCase();
+  }, [loadLeads, loadCase]);
+
+  // Chronology defaults to shown when the case already has dated events;
+  // otherwise the familiar activity log stays the default. Only decided once,
+  // so toggling manually afterwards isn't overridden by later reloads.
+  React.useEffect(() => {
+    if (!timelineModeInitialized && !eventsLoading) {
+      setTimelineMode(events.length > 0 ? "chronology" : "activity");
+      setTimelineModeInitialized(true);
+    }
+  }, [eventsLoading, events.length, timelineModeInitialized]);
 
   const assistantBridge = React.useMemo(
     () => ({
@@ -218,6 +275,8 @@ function CaseWorkspaceInner() {
 
   const evidence = React.useMemo(() => caseData?.evidence ?? [], [caseData]);
   const findingCount = evidence.reduce((sum, e) => sum + (e.findings?.length ?? 0), 0);
+
+  const proposedLeadsCount = leads.filter((l) => l.status === "PROPOSED").length;
 
   const hypothesisThreads = threads.filter(
     (t) => t.kind === ThreadResponseDtoKindEnum.Hypothesis,
@@ -539,6 +598,14 @@ function CaseWorkspaceInner() {
             <TabsTrigger value="evidence">
               <Paperclip className="h-3.5 w-3.5" /> {t("investigations.caseDetail.tabEvidence")} ({evidence.length})
             </TabsTrigger>
+            <TabsTrigger value="explore">
+              <Compass className="h-3.5 w-3.5" /> {t("investigations.caseDetail.tabExplore")}
+              {proposedLeadsCount > 0 && (
+                <Badge className="ml-1 h-4 min-w-4 rounded-[3px] border-0 bg-[color:var(--color-amber-600,#d97706)] px-1 py-0 text-[10px] text-white">
+                  {proposedLeadsCount}
+                </Badge>
+              )}
+            </TabsTrigger>
             <TabsTrigger value="threads">
               <Lightbulb className="h-3.5 w-3.5" /> {t("investigations.caseDetail.tabThreads")} ({threads.length})
             </TabsTrigger>
@@ -851,14 +918,48 @@ function CaseWorkspaceInner() {
           />
         </TabsContent>
 
+        {/* ════ Explore (leads) ════ */}
+        <TabsContent value="explore">
+          <CaseLeads
+            caseId={caseId}
+            leads={leads}
+            loading={leadsLoading}
+            onReviewed={refreshLeadsAndEvidence}
+            onGenerated={() => void loadLeads()}
+          />
+        </TabsContent>
+
         {/* ════ Threads ════ */}
         <TabsContent value="threads">
           <CaseThreads caseId={caseId} evidence={evidence} />
         </TabsContent>
 
         {/* ════ Timeline ════ */}
-        <TabsContent value="timeline">
-          <CaseTimeline caseId={caseId} />
+        <TabsContent value="timeline" className="space-y-4">
+          <Tabs
+            value={timelineMode}
+            onValueChange={(v) => setTimelineMode(v as "chronology" | "activity")}
+          >
+            <TabsList className="h-8">
+              <TabsTrigger value="chronology" className="text-xs">
+                {t("investigations.caseDetail.timelineChronology")}
+              </TabsTrigger>
+              <TabsTrigger value="activity" className="text-xs">
+                {t("investigations.caseDetail.timelineActivity")}
+              </TabsTrigger>
+            </TabsList>
+            <TabsContent value="chronology">
+              <CaseChronology
+                caseId={caseId}
+                events={events}
+                loading={eventsLoading}
+                onChanged={() => void loadEvents()}
+              />
+            </TabsContent>
+            <TabsContent value="activity">
+              <CaseTimeline caseId={caseId} />
+            </TabsContent>
+          </Tabs>
         </TabsContent>
       </Tabs>
     </div>

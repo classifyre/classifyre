@@ -517,6 +517,17 @@ export class CliRunnerService implements OnApplicationBootstrap {
         const { source, previousSourceState, hasSuccessfulRuns } =
           await this.claimSourceForRunnerCreation(tx, sourceId);
 
+        if (source.type === AssetType.SANDBOX) {
+          const uploadedFileCount = await tx.uploadedSourceFile.count({
+            where: { sourceId },
+          });
+          if (uploadedFileCount === 0) {
+            throw new BadRequestException(
+              'A sandbox source must contain at least one uploaded file before it can run',
+            );
+          }
+        }
+
         const runner = await tx.runner.create({
           data: {
             sourceId,
@@ -1337,13 +1348,19 @@ export class CliRunnerService implements OnApplicationBootstrap {
     cliPath: string,
     venvPath: string,
     recipeFile: string,
+    sourceId: string,
+    outputRestUrl?: string,
   ): string {
     const escapedCliPath = this.shellEscape(cliPath);
     const escapedVenvPython = this.shellEscape(this.getVenvPython(venvPath));
     return (
       `cd ${escapedCliPath} && ` +
       `uv run --locked --no-dev --python ${escapedVenvPython} ` +
-      `python -m src.main test ${this.shellEscape(recipeFile)}`
+      `python -m src.main test ${this.shellEscape(recipeFile)} ` +
+      `--source-id ${this.shellEscape(sourceId)}` +
+      (outputRestUrl
+        ? ` --output-rest-url ${this.shellEscape(outputRestUrl)}`
+        : '')
     );
   }
 
@@ -1381,6 +1398,16 @@ export class CliRunnerService implements OnApplicationBootstrap {
     if (!source) {
       throw new NotFoundException(`Source ${sourceId} not found`);
     }
+    if (source.type === AssetType.SANDBOX) {
+      const uploadedFileCount = await this.prisma.uploadedSourceFile.count({
+        where: { sourceId },
+      });
+      if (uploadedFileCount === 0) {
+        throw new BadRequestException(
+          'A sandbox source must contain at least one uploaded file before it can be tested',
+        );
+      }
+    }
     const decryptedConfig = this.toDecryptedRecipeConfig(source.config);
 
     const environment = process.env.ENVIRONMENT || 'development';
@@ -1393,7 +1420,13 @@ export class CliRunnerService implements OnApplicationBootstrap {
     const recipeFile = await this.createTempRecipeFile(decryptedConfig);
 
     try {
-      const command = this.buildCliTestCommand(cliPath, venvPath, recipeFile);
+      const command = this.buildCliTestCommand(
+        cliPath,
+        venvPath,
+        recipeFile,
+        sourceId,
+        this.resolveOutputRestUrl(environment),
+      );
       const { stdout, stderr, exitCode } = await this.executeCli(
         command,
         (chunk) => {
@@ -1458,6 +1491,7 @@ export class CliRunnerService implements OnApplicationBootstrap {
     const result = await this.kubernetesCliJobService.runTestJob(
       sourceId,
       config,
+      this.resolveOutputRestUrl('kubernetes'),
     );
     const output = result.output || '';
     const lines = output.split(/\r?\n/);

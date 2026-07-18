@@ -84,6 +84,13 @@ spec:
         - name: postgres
           image: {{ .Values.postgres.embedded.image.repository }}:{{ .Values.postgres.embedded.image.tag }}
           imagePullPolicy: {{ .Values.postgres.embedded.image.pullPolicy }}
+          {{- with .Values.postgres.embedded.parameters }}
+          args:
+            {{- range $key, $value := . }}
+            - -c
+            - {{ printf "%s=%v" $key $value | quote }}
+            {{- end }}
+          {{- end }}
           ports:
             - name: pg
               containerPort: {{ .Values.postgres.embedded.port }}

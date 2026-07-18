@@ -8,7 +8,9 @@ import {
   Param,
   Post,
   Query,
+  Res,
 } from '@nestjs/common';
+import type { FastifyReply } from 'fastify';
 import { CustomDetectorTestsService } from '../custom-detector-tests.service';
 import type { TestTrigger } from '../dto/custom-detector-tests.dto';
 
@@ -34,6 +36,20 @@ export class CustomDetectorTestsController {
     @Param('scenarioId') scenarioId: string,
   ) {
     return this.tests.deleteScenario(detectorId, scenarioId);
+  }
+
+  @Get(':scenarioId/input')
+  async input(
+    @Param('detectorId') detectorId: string,
+    @Param('scenarioId') scenarioId: string,
+    @Res() reply: FastifyReply,
+  ): Promise<void> {
+    const input = await this.tests.getScenarioInput(detectorId, scenarioId);
+    const data = Buffer.from(input, 'utf8');
+    await reply
+      .header('Content-Type', 'text/plain; charset=utf-8')
+      .header('Content-Length', String(data.length))
+      .send(data);
   }
 
   @Post('run')

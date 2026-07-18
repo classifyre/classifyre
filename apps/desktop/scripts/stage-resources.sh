@@ -70,11 +70,6 @@ mkdir -p "$RESOURCES"/{api,web}
 # `external` list: Prisma client+engines, the prisma CLI, the NestJS framework,
 # fastify, rxjs, class-transformer/validator, pg, natural, socket.io, swagger's
 # static assets). Everything else is inlined into backend.js.
-echo "Bundling API into backend.js (esbuild)…"
-API_MAIN_NODE="$(to_node_path "$MONOREPO_ROOT/apps/api/dist/src/main.js")"
-BACKEND_OUT_NODE="$(to_node_path "$RESOURCES/api/backend.js")"
-(cd "$DESKTOP_DIR" && node scripts/bundle-api.mjs "$API_MAIN_NODE" "$BACKEND_OUT_NODE")
-
 echo "Installing API external dependencies (standalone npm install)…"
 # Only the externalized framework layer is installed as real files; every other
 # dependency is inlined into backend.js. KEEP must stay in sync with the
@@ -106,6 +101,16 @@ node -e "
   fs.writeFileSync('$RESOURCES_NODE/api/package.json', JSON.stringify(out, null, 2));
 "
 (cd "$RESOURCES/api" && npm install --omit=dev --no-audit --no-fund --loglevel=error)
+
+# The bundler must run AFTER the npm install above: besides backend.js it also
+# emits transformers-embedding.worker.js and stages that worker's native deps
+# (sharp, onnxruntime-node/-common) into the same node_modules — packages npm
+# would prune as "extraneous" (not in the generated package.json) if it ran
+# afterwards.
+echo "Bundling API into backend.js (esbuild)…"
+API_MAIN_NODE="$(to_node_path "$MONOREPO_ROOT/apps/api/dist/src/main.js")"
+BACKEND_OUT_NODE="$(to_node_path "$RESOURCES/api/backend.js")"
+(cd "$DESKTOP_DIR" && node scripts/bundle-api.mjs "$API_MAIN_NODE" "$BACKEND_OUT_NODE")
 
 # @workspace/schemas TypeScript is compiled into backend.js by esbuild, but the
 # JSON schema FILES that package ships are read at runtime by filesystem path:
@@ -139,6 +144,12 @@ cp "$MONOREPO_ROOT/apps/api/prisma.config.ts" "$RESOURCES/api/prisma.config.ts"
 # be present/loadable. `node --check` parses backend.js without executing it
 # (a full require would boot Nest and connect to a database).
 [ -f "$RESOURCES/api/backend.js" ] || { echo "backend.js missing in staged tree" >&2; exit 1; }
+# The embedding worker is spawned at runtime via path.join(__dirname, …) from
+# backend.js; a missing file puts the API's embedding provider in a crash loop.
+[ -f "$RESOURCES/api/transformers-embedding.worker.js" ] \
+  || { echo "transformers-embedding.worker.js missing in staged tree" >&2; exit 1; }
+[ -d "$RESOURCES/api/node_modules/onnxruntime-node" ] \
+  || { echo "onnxruntime-node missing in staged tree (embedding worker deps)" >&2; exit 1; }
 [ -f "$RESOURCES/api/node_modules/prisma/build/index.js" ] || { echo "prisma CLI missing in staged tree" >&2; exit 1; }
 # The API reads this at module load; if it's absent the packaged app crashes on
 # first workspace open with "Schemas directory not found".

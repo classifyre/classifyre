@@ -9,6 +9,7 @@ import { AgentAuditService } from './audit/agent-audit.service';
 import { AgentLoggerService } from './audit/agent-logger.service';
 import { AgentSearchService } from './search/agent-search.service';
 import { HarnessService } from './harness/harness.service';
+import { runsBackgroundWorkers } from '../service-role';
 import { AgentRunCancelledError } from './agent-runtime';
 import type { ApplySummary } from './decision-applier.service';
 import {
@@ -58,6 +59,7 @@ export class AutopilotWorker implements OnApplicationBootstrap {
   ) {}
 
   async onApplicationBootstrap(): Promise<void> {
+    if (!runsBackgroundWorkers()) return;
     const boss = await this.pgBoss.getBossAsync();
     await boss.createQueue(AUTOPILOT_QUEUE);
     await boss.work(AUTOPILOT_QUEUE, { localConcurrency: 1 }, (jobs: Job[]) =>

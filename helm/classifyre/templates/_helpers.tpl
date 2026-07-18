@@ -42,6 +42,10 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- printf "%s-web" (include "classifyre.fullname" .) | trunc 63 | trimSuffix "-" -}}
 {{- end -}}
 
+{{- define "classifyre.worker.fullname" -}}
+{{- printf "%s-worker" (include "classifyre.fullname" .) | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+
 {{- define "classifyre.postgres.fullname" -}}
 {{- printf "%s-postgres" (include "classifyre.fullname" .) | trunc 63 | trimSuffix "-" -}}
 {{- end -}}
@@ -204,4 +208,158 @@ Renders nothing when telemetry is disabled.
 - name: TELEMETRY_DISABLED
   value: "1"
 {{- end -}}
+{{- end -}}
+
+{{/*
+Shared runtime environment variables for API-image containers (API and worker
+deployments): DB connection, masked-config key, embedding config, user-supplied
+env, object storage, and telemetry. Both deployments run the exact same image and
+process (`startCommand`), so they must see identical env aside from SERVICE_ROLE,
+which each deployment sets on its own after including this block.
+*/}}
+{{- define "classifyre.api.env" -}}
+- name: DB_HOST
+  value: {{ include "classifyre.databaseHost" . | quote }}
+- name: DB_PORT
+  value: {{ include "classifyre.databasePort" . | quote }}
+- name: DB_NAME
+  value: {{ include "classifyre.databaseName" . | quote }}
+- name: DB_USER
+  value: {{ include "classifyre.databaseUser" . | quote }}
+- name: DB_SSLMODE
+  value: {{ include "classifyre.databaseSslMode" . | quote }}
+- name: DB_PASSWORD
+  valueFrom:
+    secretKeyRef:
+      name: {{ include "classifyre.databaseSecretName" . }}
+      key: {{ include "classifyre.databasePasswordKey" . }}
+- name: CLASSIFYRE_MASKED_CONFIG_KEY
+  valueFrom:
+    secretKeyRef:
+      name: {{ include "classifyre.apiMaskedConfigSecretName" . }}
+      key: {{ include "classifyre.apiMaskedConfigSecretKey" . }}
+- name: CLASSIFYRE_AUTO_MIGRATE
+  value: {{ ternary "false" "true" .Values.api.migration.enabled | quote }}
+{{- if and (eq .Values.postgres.mode "external") .Values.postgres.external.existingSecret .Values.postgres.external.existingSecretUrlKey }}
+- name: DATABASE_URL
+  valueFrom:
+    secretKeyRef:
+      name: {{ include "classifyre.databaseSecretName" . }}
+      key: {{ .Values.postgres.external.existingSecretUrlKey }}
+{{- end }}
+- name: EMBEDDING_ENABLED
+  value: {{ .Values.api.embedding.enabled | quote }}
+{{- if .Values.api.embedding.enabled }}
+- name: EMBEDDING_PROVIDER
+  value: {{ .Values.api.embedding.provider | quote }}
+- name: EMBEDDING_MODEL
+  value: {{ .Values.api.embedding.model | quote }}
+- name: EMBEDDING_MODEL_REVISION
+  value: {{ .Values.api.embedding.revision | quote }}
+- name: EMBEDDING_DIMENSIONS
+  value: {{ .Values.api.embedding.dimensions | quote }}
+- name: EMBEDDING_POOLING
+  value: {{ .Values.api.embedding.pooling | quote }}
+- name: EMBEDDING_NORMALIZE
+  value: {{ .Values.api.embedding.normalize | quote }}
+- name: EMBEDDING_DTYPE
+  value: {{ .Values.api.embedding.dtype | quote }}
+- name: EMBEDDING_DEVICE
+  value: {{ .Values.api.embedding.device | quote }}
+- name: EMBEDDING_ALLOW_REMOTE_MODELS
+  value: {{ .Values.api.embedding.allowRemoteModels | quote }}
+{{- with .Values.api.embedding.localModelPath }}
+- name: EMBEDDING_LOCAL_MODEL_PATH
+  value: {{ . | quote }}
+{{- end }}
+- name: EMBEDDING_CACHE_DIR
+  value: {{ .Values.api.embedding.cacheDir | quote }}
+- name: EMBEDDING_BATCH_SIZE
+  value: {{ .Values.api.embedding.batchSize | quote }}
+- name: EMBEDDING_RETRY_SECONDS
+  value: {{ .Values.api.embedding.retrySeconds | quote }}
+- name: EMBEDDING_AUTO_BACKFILL
+  value: {{ .Values.api.embedding.autoBackfill | quote }}
+- name: EMBEDDING_WORKER_CONCURRENCY
+  value: {{ .Values.api.embedding.workerConcurrency | quote }}
+- name: EMBEDDING_MAX_PARALLEL_CALLS
+  value: {{ .Values.api.embedding.maxParallelCalls | quote }}
+- name: EMBEDDING_HNSW_M
+  value: {{ .Values.api.embedding.hnsw.m | quote }}
+- name: EMBEDDING_HNSW_EF_CONSTRUCTION
+  value: {{ .Values.api.embedding.hnsw.efConstruction | quote }}
+- name: EMBEDDING_HNSW_EF_SEARCH
+  value: {{ .Values.api.embedding.hnsw.efSearch | quote }}
+{{- with .Values.api.embedding.external.baseUrl }}
+- name: EMBEDDING_BASE_URL
+  value: {{ . | quote }}
+{{- end }}
+{{- with .Values.api.embedding.external.existingSecret }}
+- name: EMBEDDING_API_KEY
+  valueFrom:
+    secretKeyRef:
+      name: {{ . }}
+      key: {{ $.Values.api.embedding.external.apiKeyKey }}
+{{- end }}
+{{- end }}
+{{- range $key, $value := .Values.api.env }}
+- name: {{ $key }}
+  value: {{ $value | quote }}
+{{- end }}
+- name: POD_NAMESPACE
+  valueFrom:
+    fieldRef:
+      fieldPath: metadata.namespace
+{{- if .Values.api.cliJobs.enabled }}
+- name: K8S_JOBS_ENABLED
+  value: {{ ternary "1" "0" .Values.api.cliJobs.enabled | quote }}
+- name: K8S_JOBS_NAMESPACE
+  value: {{ default .Release.Namespace .Values.api.cliJobs.namespace | quote }}
+- name: K8S_CLI_JOB_TEMPLATE_PATH
+  value: /etc/classifyre/cli-job-template/job-template.json
+- name: K8S_CLI_JOB_WAIT_TIMEOUT_SECONDS
+  value: {{ .Values.api.cliJobs.waitTimeoutSeconds | quote }}
+- name: K8S_CLI_JOB_POLL_INTERVAL_MS
+  value: {{ .Values.api.cliJobs.pollIntervalMs | quote }}
+- name: K8S_CLI_JOB_CLEANUP_POLICY
+  value: {{ .Values.api.cliJobs.cleanupPolicy | quote }}
+- name: K8S_CLI_JOB_WORKDIR
+  value: {{ .Values.api.cliJobs.workDir | quote }}
+{{- if .Values.api.cliJobs.huggingFace.existingSecret }}
+- name: HF_TOKEN_INSTANCE_SET
+  value: "1"
+{{- end }}
+{{- end }}
+{{- /* ── S3 / object-storage configuration ─────────────────── */}}
+- name: S3_CONFIGURED
+  value: {{ .Values.objectStorage.enabled | quote }}
+{{- if .Values.objectStorage.enabled }}
+- name: S3_BUCKET
+  value: {{ .Values.objectStorage.bucket | quote }}
+- name: S3_LOG_PREFIX
+  value: {{ .Values.objectStorage.logPrefix | quote }}
+- name: S3_REGION
+  value: {{ .Values.objectStorage.region | quote }}
+- name: S3_FORCE_PATH_STYLE
+  value: {{ .Values.objectStorage.forcePathStyle | quote }}
+{{- $s3Endpoint := include "classifyre.s3Endpoint" . }}
+{{- if $s3Endpoint }}
+- name: S3_ENDPOINT
+  value: {{ $s3Endpoint | quote }}
+{{- end }}
+- name: S3_ACCESS_KEY_ID
+  valueFrom:
+    secretKeyRef:
+      name: {{ include "classifyre.s3SecretName" . }}
+      key: {{ include "classifyre.s3SecretAccessKeyIdKey" . }}
+- name: S3_SECRET_ACCESS_KEY
+  valueFrom:
+    secretKeyRef:
+      name: {{ include "classifyre.s3SecretName" . }}
+      key: {{ include "classifyre.s3SecretSecretAccessKeyKey" . }}
+{{- end }}
+{{- include "classifyre.telemetryEnv" . | nindent 0 }}
+{{- with .Values.api.extraEnv }}
+{{- toYaml . | nindent 0 }}
+{{- end }}
 {{- end -}}

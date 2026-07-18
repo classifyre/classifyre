@@ -8,6 +8,10 @@ All URIs are relative to *http://localhost*
 | [**sourceAssetsControllerBulkIngest**](SourcesApi.md#sourceassetscontrollerbulkingest) | **POST** /sources/{sourceId}/assets/bulk | Bulk ingest assets |
 | [**sourceAssetsControllerFinalizeIngest**](SourcesApi.md#sourceassetscontrollerfinalizeingest) | **POST** /sources/{sourceId}/assets/finalize | Finalize ingest run |
 | [**sourceAssetsControllerListSourceAssets**](SourcesApi.md#sourceassetscontrollerlistsourceassets) | **GET** /sources/{sourceId}/assets | List assets for a source |
+| [**sourceFilesControllerContent**](SourcesApi.md#sourcefilescontrollercontent) | **GET** /sources/{sourceId}/files/{fileId}/content | Stream uploaded source file bytes |
+| [**sourceFilesControllerDelete**](SourcesApi.md#sourcefilescontrollerdelete) | **DELETE** /sources/{sourceId}/files/{fileId} | Delete an uploaded source file |
+| [**sourceFilesControllerList**](SourcesApi.md#sourcefilescontrollerlist) | **GET** /sources/{sourceId}/files | List uploaded files for a Sandbox source |
+| [**sourceFilesControllerUpload**](SourcesApi.md#sourcefilescontrollerupload) | **POST** /sources/{sourceId}/files | Upload one file to a Sandbox source |
 | [**sourcesControllerCreateSource**](SourcesApi.md#sourcescontrollercreatesource) | **POST** /sources | Create a new data source |
 | [**sourcesControllerDeleteSource**](SourcesApi.md#sourcescontrollerdeletesource) | **DELETE** /sources/{id} | Delete a data source |
 | [**sourcesControllerGetSchedule**](SourcesApi.md#sourcescontrollergetschedule) | **GET** /sources/{id}/schedule | Get source schedule |
@@ -259,7 +263,7 @@ async function example() {
     runnerId: runnerId_example,
     // Array<'NEW' | 'UPDATED' | 'UNCHANGED' | 'DELETED'> | Filter by one or more asset statuses (optional)
     status: ...,
-    // Array<'JIRA' | 'CONFLUENCE' | 'CROWD' | 'BITBUCKET' | 'SERVICEDESK' | 'XRAY' | 'GOOGLE_DRIVE' | 'GOOGLE_SHEETS' | 'GOOGLE_DOCS' | 'GOOGLE_SLIDES' | 'WORDPRESS' | 'SLACK' | 'S3_COMPATIBLE_STORAGE' | 'AZURE_BLOB_STORAGE' | 'GOOGLE_CLOUD_STORAGE' | 'POSTGRESQL' | 'MYSQL' | 'MSSQL' | 'ORACLE' | 'HIVE' | 'DATABRICKS' | 'SNOWFLAKE' | 'MONGODB' | 'NEO4J' | 'SQLITE' | 'NOTION' | 'POWERBI' | 'TABLEAU' | 'EMAIL' | 'YOUTUBE' | 'DELTA_LAKE' | 'ICEBERG' | 'KAFKA' | 'ELASTICSEARCH' | 'OPENSEARCH' | 'MEILISEARCH' | 'LOCAL_FOLDER' | 'MICROSOFT_365' | 'GOOGLE_WORKSPACE' | 'CUSTOM'> | Filter by one or more source types (optional)
+    // Array<'JIRA' | 'CONFLUENCE' | 'CROWD' | 'BITBUCKET' | 'SERVICEDESK' | 'XRAY' | 'GOOGLE_DRIVE' | 'GOOGLE_SHEETS' | 'GOOGLE_DOCS' | 'GOOGLE_SLIDES' | 'WORDPRESS' | 'SLACK' | 'S3_COMPATIBLE_STORAGE' | 'AZURE_BLOB_STORAGE' | 'GOOGLE_CLOUD_STORAGE' | 'POSTGRESQL' | 'MYSQL' | 'MSSQL' | 'ORACLE' | 'HIVE' | 'DATABRICKS' | 'SNOWFLAKE' | 'MONGODB' | 'NEO4J' | 'SQLITE' | 'NOTION' | 'POWERBI' | 'TABLEAU' | 'EMAIL' | 'YOUTUBE' | 'DELTA_LAKE' | 'ICEBERG' | 'KAFKA' | 'ELASTICSEARCH' | 'OPENSEARCH' | 'MEILISEARCH' | 'LOCAL_FOLDER' | 'MICROSOFT_365' | 'GOOGLE_WORKSPACE' | 'SANDBOX' | 'CUSTOM'> | Filter by one or more source types (optional)
     sourceTypes: ...,
     // number (optional)
     skip: 8.14,
@@ -288,7 +292,7 @@ example().catch(console.error);
 | **search** | `string` | Search by asset name | [Optional] [Defaults to `undefined`] |
 | **runnerId** | `string` | Filter by runner ID | [Optional] [Defaults to `undefined`] |
 | **status** | `NEW`, `UPDATED`, `UNCHANGED`, `DELETED` | Filter by one or more asset statuses | [Optional] [Enum: NEW, UPDATED, UNCHANGED, DELETED] |
-| **sourceTypes** | `JIRA`, `CONFLUENCE`, `CROWD`, `BITBUCKET`, `SERVICEDESK`, `XRAY`, `GOOGLE_DRIVE`, `GOOGLE_SHEETS`, `GOOGLE_DOCS`, `GOOGLE_SLIDES`, `WORDPRESS`, `SLACK`, `S3_COMPATIBLE_STORAGE`, `AZURE_BLOB_STORAGE`, `GOOGLE_CLOUD_STORAGE`, `POSTGRESQL`, `MYSQL`, `MSSQL`, `ORACLE`, `HIVE`, `DATABRICKS`, `SNOWFLAKE`, `MONGODB`, `NEO4J`, `SQLITE`, `NOTION`, `POWERBI`, `TABLEAU`, `EMAIL`, `YOUTUBE`, `DELTA_LAKE`, `ICEBERG`, `KAFKA`, `ELASTICSEARCH`, `OPENSEARCH`, `MEILISEARCH`, `LOCAL_FOLDER`, `MICROSOFT_365`, `GOOGLE_WORKSPACE`, `CUSTOM` | Filter by one or more source types | [Optional] [Enum: JIRA, CONFLUENCE, CROWD, BITBUCKET, SERVICEDESK, XRAY, GOOGLE_DRIVE, GOOGLE_SHEETS, GOOGLE_DOCS, GOOGLE_SLIDES, WORDPRESS, SLACK, S3_COMPATIBLE_STORAGE, AZURE_BLOB_STORAGE, GOOGLE_CLOUD_STORAGE, POSTGRESQL, MYSQL, MSSQL, ORACLE, HIVE, DATABRICKS, SNOWFLAKE, MONGODB, NEO4J, SQLITE, NOTION, POWERBI, TABLEAU, EMAIL, YOUTUBE, DELTA_LAKE, ICEBERG, KAFKA, ELASTICSEARCH, OPENSEARCH, MEILISEARCH, LOCAL_FOLDER, MICROSOFT_365, GOOGLE_WORKSPACE, CUSTOM] |
+| **sourceTypes** | `JIRA`, `CONFLUENCE`, `CROWD`, `BITBUCKET`, `SERVICEDESK`, `XRAY`, `GOOGLE_DRIVE`, `GOOGLE_SHEETS`, `GOOGLE_DOCS`, `GOOGLE_SLIDES`, `WORDPRESS`, `SLACK`, `S3_COMPATIBLE_STORAGE`, `AZURE_BLOB_STORAGE`, `GOOGLE_CLOUD_STORAGE`, `POSTGRESQL`, `MYSQL`, `MSSQL`, `ORACLE`, `HIVE`, `DATABRICKS`, `SNOWFLAKE`, `MONGODB`, `NEO4J`, `SQLITE`, `NOTION`, `POWERBI`, `TABLEAU`, `EMAIL`, `YOUTUBE`, `DELTA_LAKE`, `ICEBERG`, `KAFKA`, `ELASTICSEARCH`, `OPENSEARCH`, `MEILISEARCH`, `LOCAL_FOLDER`, `MICROSOFT_365`, `GOOGLE_WORKSPACE`, `SANDBOX`, `CUSTOM` | Filter by one or more source types | [Optional] [Enum: JIRA, CONFLUENCE, CROWD, BITBUCKET, SERVICEDESK, XRAY, GOOGLE_DRIVE, GOOGLE_SHEETS, GOOGLE_DOCS, GOOGLE_SLIDES, WORDPRESS, SLACK, S3_COMPATIBLE_STORAGE, AZURE_BLOB_STORAGE, GOOGLE_CLOUD_STORAGE, POSTGRESQL, MYSQL, MSSQL, ORACLE, HIVE, DATABRICKS, SNOWFLAKE, MONGODB, NEO4J, SQLITE, NOTION, POWERBI, TABLEAU, EMAIL, YOUTUBE, DELTA_LAKE, ICEBERG, KAFKA, ELASTICSEARCH, OPENSEARCH, MEILISEARCH, LOCAL_FOLDER, MICROSOFT_365, GOOGLE_WORKSPACE, SANDBOX, CUSTOM] |
 | **skip** | `number` |  | [Optional] [Defaults to `0`] |
 | **limit** | `number` |  | [Optional] [Defaults to `50`] |
 
@@ -311,6 +315,275 @@ No authorization required
 |-------------|-------------|------------------|
 | **200** | List of assets for the source |  -  |
 | **404** | Source not found |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## sourceFilesControllerContent
+
+> sourceFilesControllerContent(sourceId, fileId)
+
+Stream uploaded source file bytes
+
+### Example
+
+```ts
+import {
+  Configuration,
+  SourcesApi,
+} from '@workspace/api-client';
+import type { SourceFilesControllerContentRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new SourcesApi();
+
+  const body = {
+    // string
+    sourceId: sourceId_example,
+    // string
+    fileId: fileId_example,
+  } satisfies SourceFilesControllerContentRequest;
+
+  try {
+    const data = await api.sourceFilesControllerContent(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **sourceId** | `string` |  | [Defaults to `undefined`] |
+| **fileId** | `string` |  | [Defaults to `undefined`] |
+
+### Return type
+
+`void` (Empty response body)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: Not defined
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## sourceFilesControllerDelete
+
+> sourceFilesControllerDelete(sourceId, fileId)
+
+Delete an uploaded source file
+
+### Example
+
+```ts
+import {
+  Configuration,
+  SourcesApi,
+} from '@workspace/api-client';
+import type { SourceFilesControllerDeleteRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new SourcesApi();
+
+  const body = {
+    // string
+    sourceId: sourceId_example,
+    // string
+    fileId: fileId_example,
+  } satisfies SourceFilesControllerDeleteRequest;
+
+  try {
+    const data = await api.sourceFilesControllerDelete(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **sourceId** | `string` |  | [Defaults to `undefined`] |
+| **fileId** | `string` |  | [Defaults to `undefined`] |
+
+### Return type
+
+`void` (Empty response body)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: Not defined
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **204** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## sourceFilesControllerList
+
+> Array&lt;UploadedSourceFileDto&gt; sourceFilesControllerList(sourceId)
+
+List uploaded files for a Sandbox source
+
+### Example
+
+```ts
+import {
+  Configuration,
+  SourcesApi,
+} from '@workspace/api-client';
+import type { SourceFilesControllerListRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new SourcesApi();
+
+  const body = {
+    // string
+    sourceId: sourceId_example,
+  } satisfies SourceFilesControllerListRequest;
+
+  try {
+    const data = await api.sourceFilesControllerList(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **sourceId** | `string` |  | [Defaults to `undefined`] |
+
+### Return type
+
+[**Array&lt;UploadedSourceFileDto&gt;**](UploadedSourceFileDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## sourceFilesControllerUpload
+
+> UploadedSourceFileDto sourceFilesControllerUpload(sourceId, file)
+
+Upload one file to a Sandbox source
+
+### Example
+
+```ts
+import {
+  Configuration,
+  SourcesApi,
+} from '@workspace/api-client';
+import type { SourceFilesControllerUploadRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new SourcesApi();
+
+  const body = {
+    // string
+    sourceId: sourceId_example,
+    // Blob
+    file: BINARY_DATA_HERE,
+  } satisfies SourceFilesControllerUploadRequest;
+
+  try {
+    const data = await api.sourceFilesControllerUpload(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **sourceId** | `string` |  | [Defaults to `undefined`] |
+| **file** | `Blob` |  | [Defaults to `undefined`] |
+
+### Return type
+
+[**UploadedSourceFileDto**](UploadedSourceFileDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: `multipart/form-data`
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **201** |  |  -  |
 
 [[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
 

@@ -54,6 +54,7 @@ class AssetType(StrEnum):
     LOCAL_FOLDER = 'LOCAL_FOLDER'
     MICROSOFT_365 = 'MICROSOFT_365'
     GOOGLE_WORKSPACE = 'GOOGLE_WORKSPACE'
+    SANDBOX = 'SANDBOX'
 
 
 class DetectorType(StrEnum):
@@ -353,6 +354,7 @@ class Type(StrEnum):
     LOCAL_FOLDER = 'LOCAL_FOLDER'
     MICROSOFT_365 = 'MICROSOFT_365'
     GOOGLE_WORKSPACE = 'GOOGLE_WORKSPACE'
+    SANDBOX = 'SANDBOX'
 
 
 class YouTubeRequired(BaseModel):
@@ -645,6 +647,32 @@ class LocalFolderRequired(BaseModel):
     path: str = Field(
         ...,
         description='Absolute path of the local folder to scan (for example, /Users/jane/Documents)',
+    )
+
+
+class SandboxRequired(BaseModel):
+    """
+    Sandbox files are uploaded separately through the source files API.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+
+
+class SandboxMasked(BaseModel):
+    """
+    Sandbox sources do not require credentials.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+
+
+class SandboxOptional(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
     )
 
 
@@ -2170,6 +2198,24 @@ class LocalFolderInput(CoreInput):
     resources: ResourceOverrides | None = None
 
 
+class SandboxInput(CoreInput):
+    type: Literal['SANDBOX'] | None = Field(
+        None, description='Type of the asset or source'
+    )
+    required: SandboxRequired
+    masked: SandboxMasked | None = None
+    optional: SandboxOptional | None = None
+    detectors: list[Detector] | None = Field(
+        None, description='Detectors to run on ingested content'
+    )
+    custom_detectors: list[CustomDetectorSelection] | None = Field(
+        None,
+        description='Reusable custom detector IDs selected from the custom detector catalog.',
+    )
+    sampling: SamplingConfig
+    resources: ResourceOverrides | None = None
+
+
 class AzureBlobStorageInput(CoreInput):
     type: Literal['AZURE_BLOB_STORAGE'] | None = Field(
         None, description='Type of the asset or source'
@@ -2601,7 +2647,7 @@ class ConfluenceOptionalConnection(BaseModel):
     )
 
 
-class Type19(StrEnum):
+class Type20(StrEnum):
     """
     Filter spaces by space type
     """
@@ -2638,7 +2684,7 @@ class ConfluenceOptionalScopeSpaces(BaseModel):
     keys: list[str] | None = Field(
         None, description='Filter spaces by keys (up to 250)', max_length=250
     )
-    type: Type19 | None = Field(None, description='Filter spaces by space type')
+    type: Type20 | None = Field(None, description='Filter spaces by space type')
     status: Status | None = Field(None, description='Filter spaces by status')
     labels: list[str] | None = Field(
         None,
@@ -2904,7 +2950,7 @@ class ServiceDeskOptional(BaseModel):
     content: ServiceDeskOptionalContent | None = None
 
 
-class Type20(StrEnum):
+class Type21(StrEnum):
     """
     Type of the asset or source
     """
@@ -2941,6 +2987,7 @@ class Type20(StrEnum):
     LOCAL_FOLDER = 'LOCAL_FOLDER'
     MICROSOFT_365 = 'MICROSOFT_365'
     GOOGLE_WORKSPACE = 'GOOGLE_WORKSPACE'
+    SANDBOX = 'SANDBOX'
 
 
 class ConfluenceInput(CoreInput):
@@ -4075,7 +4122,8 @@ class IcebergInput(CoreInput):
 
 class SourceInput(
     RootModel[
-        SlackInput
+        SandboxInput
+        | SlackInput
         | S3CompatibleStorageInput
         | LocalFolderInput
         | AzureBlobStorageInput
@@ -4110,7 +4158,8 @@ class SourceInput(
     ]
 ):
     root: (
-        SlackInput
+        SandboxInput
+        | SlackInput
         | S3CompatibleStorageInput
         | LocalFolderInput
         | AzureBlobStorageInput
