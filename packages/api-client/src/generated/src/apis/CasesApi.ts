@@ -19,19 +19,26 @@ import type {
   AddFindingDto,
   AttachFindingsDto,
   AttachFindingsResponseDto,
+  CaseEventDto,
   CaseEvidenceDto,
   CaseFindingDto,
+  CaseLeadDto,
   CaseListResponseDto,
   CaseResponseDto,
   CaseTimelineResponseDto,
   CloseCaseDto,
   CloseCaseResponseDto,
   CreateCaseDto,
+  CreateCaseEventDto,
+  GenerateCaseLeadsResponseDto,
   GraphResponseDto,
   LinkInquiriesDto,
+  ProposeCaseLeadDto,
   PullFromInquiryDto,
   PullFromInquiryResponseDto,
+  ReviewCaseLeadDto,
   UpdateCaseDto,
+  UpdateCaseEventDto,
   UpdateCaseFindingNoteDto,
   UpdateEvidenceNoteDto,
 } from '../models/index';
@@ -44,10 +51,14 @@ import {
     AttachFindingsDtoToJSON,
     AttachFindingsResponseDtoFromJSON,
     AttachFindingsResponseDtoToJSON,
+    CaseEventDtoFromJSON,
+    CaseEventDtoToJSON,
     CaseEvidenceDtoFromJSON,
     CaseEvidenceDtoToJSON,
     CaseFindingDtoFromJSON,
     CaseFindingDtoToJSON,
+    CaseLeadDtoFromJSON,
+    CaseLeadDtoToJSON,
     CaseListResponseDtoFromJSON,
     CaseListResponseDtoToJSON,
     CaseResponseDtoFromJSON,
@@ -60,21 +71,71 @@ import {
     CloseCaseResponseDtoToJSON,
     CreateCaseDtoFromJSON,
     CreateCaseDtoToJSON,
+    CreateCaseEventDtoFromJSON,
+    CreateCaseEventDtoToJSON,
+    GenerateCaseLeadsResponseDtoFromJSON,
+    GenerateCaseLeadsResponseDtoToJSON,
     GraphResponseDtoFromJSON,
     GraphResponseDtoToJSON,
     LinkInquiriesDtoFromJSON,
     LinkInquiriesDtoToJSON,
+    ProposeCaseLeadDtoFromJSON,
+    ProposeCaseLeadDtoToJSON,
     PullFromInquiryDtoFromJSON,
     PullFromInquiryDtoToJSON,
     PullFromInquiryResponseDtoFromJSON,
     PullFromInquiryResponseDtoToJSON,
+    ReviewCaseLeadDtoFromJSON,
+    ReviewCaseLeadDtoToJSON,
     UpdateCaseDtoFromJSON,
     UpdateCaseDtoToJSON,
+    UpdateCaseEventDtoFromJSON,
+    UpdateCaseEventDtoToJSON,
     UpdateCaseFindingNoteDtoFromJSON,
     UpdateCaseFindingNoteDtoToJSON,
     UpdateEvidenceNoteDtoFromJSON,
     UpdateEvidenceNoteDtoToJSON,
 } from '../models/index';
+
+export interface CaseEventsControllerCreateRequest {
+    caseId: string;
+    createCaseEventDto: CreateCaseEventDto;
+}
+
+export interface CaseEventsControllerListRequest {
+    caseId: string;
+}
+
+export interface CaseEventsControllerRemoveRequest {
+    caseId: string;
+    eventId: string;
+}
+
+export interface CaseEventsControllerUpdateRequest {
+    caseId: string;
+    eventId: string;
+    updateCaseEventDto: UpdateCaseEventDto;
+}
+
+export interface CaseLeadsControllerGenerateRequest {
+    caseId: string;
+}
+
+export interface CaseLeadsControllerListRequest {
+    caseId: string;
+    status?: CaseLeadsControllerListStatusEnum;
+}
+
+export interface CaseLeadsControllerProposeRequest {
+    caseId: string;
+    proposeCaseLeadDto: ProposeCaseLeadDto;
+}
+
+export interface CaseLeadsControllerReviewRequest {
+    caseId: string;
+    leadId: string;
+    reviewCaseLeadDto: ReviewCaseLeadDto;
+}
 
 export interface CaseTimelineControllerGetTimelineRequest {
     caseId: string;
@@ -174,6 +235,367 @@ export interface CasesControllerUpdateRequest {
  * 
  */
 export class CasesApi extends runtime.BaseAPI {
+
+    /**
+     * Add a dated event to the case chronology
+     */
+    async caseEventsControllerCreateRaw(requestParameters: CaseEventsControllerCreateRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<CaseEventDto>> {
+        if (requestParameters['caseId'] == null) {
+            throw new runtime.RequiredError(
+                'caseId',
+                'Required parameter "caseId" was null or undefined when calling caseEventsControllerCreate().'
+            );
+        }
+
+        if (requestParameters['createCaseEventDto'] == null) {
+            throw new runtime.RequiredError(
+                'createCaseEventDto',
+                'Required parameter "createCaseEventDto" was null or undefined when calling caseEventsControllerCreate().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/cases/{caseId}/events`;
+        urlPath = urlPath.replace(`{${"caseId"}}`, encodeURIComponent(String(requestParameters['caseId'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+            body: CreateCaseEventDtoToJSON(requestParameters['createCaseEventDto']),
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => CaseEventDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Add a dated event to the case chronology
+     */
+    async caseEventsControllerCreate(requestParameters: CaseEventsControllerCreateRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<CaseEventDto> {
+        const response = await this.caseEventsControllerCreateRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * List the case chronology (real-world events, ordered by date)
+     */
+    async caseEventsControllerListRaw(requestParameters: CaseEventsControllerListRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Array<CaseEventDto>>> {
+        if (requestParameters['caseId'] == null) {
+            throw new runtime.RequiredError(
+                'caseId',
+                'Required parameter "caseId" was null or undefined when calling caseEventsControllerList().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/cases/{caseId}/events`;
+        urlPath = urlPath.replace(`{${"caseId"}}`, encodeURIComponent(String(requestParameters['caseId'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => jsonValue.map(CaseEventDtoFromJSON));
+    }
+
+    /**
+     * List the case chronology (real-world events, ordered by date)
+     */
+    async caseEventsControllerList(requestParameters: CaseEventsControllerListRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Array<CaseEventDto>> {
+        const response = await this.caseEventsControllerListRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Remove a chronology event
+     */
+    async caseEventsControllerRemoveRaw(requestParameters: CaseEventsControllerRemoveRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
+        if (requestParameters['caseId'] == null) {
+            throw new runtime.RequiredError(
+                'caseId',
+                'Required parameter "caseId" was null or undefined when calling caseEventsControllerRemove().'
+            );
+        }
+
+        if (requestParameters['eventId'] == null) {
+            throw new runtime.RequiredError(
+                'eventId',
+                'Required parameter "eventId" was null or undefined when calling caseEventsControllerRemove().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/cases/{caseId}/events/{eventId}`;
+        urlPath = urlPath.replace(`{${"caseId"}}`, encodeURIComponent(String(requestParameters['caseId'])));
+        urlPath = urlPath.replace(`{${"eventId"}}`, encodeURIComponent(String(requestParameters['eventId'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'DELETE',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.VoidApiResponse(response);
+    }
+
+    /**
+     * Remove a chronology event
+     */
+    async caseEventsControllerRemove(requestParameters: CaseEventsControllerRemoveRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
+        await this.caseEventsControllerRemoveRaw(requestParameters, initOverrides);
+    }
+
+    /**
+     * Update (and implicitly verify) a chronology event
+     */
+    async caseEventsControllerUpdateRaw(requestParameters: CaseEventsControllerUpdateRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<CaseEventDto>> {
+        if (requestParameters['caseId'] == null) {
+            throw new runtime.RequiredError(
+                'caseId',
+                'Required parameter "caseId" was null or undefined when calling caseEventsControllerUpdate().'
+            );
+        }
+
+        if (requestParameters['eventId'] == null) {
+            throw new runtime.RequiredError(
+                'eventId',
+                'Required parameter "eventId" was null or undefined when calling caseEventsControllerUpdate().'
+            );
+        }
+
+        if (requestParameters['updateCaseEventDto'] == null) {
+            throw new runtime.RequiredError(
+                'updateCaseEventDto',
+                'Required parameter "updateCaseEventDto" was null or undefined when calling caseEventsControllerUpdate().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/cases/{caseId}/events/{eventId}`;
+        urlPath = urlPath.replace(`{${"caseId"}}`, encodeURIComponent(String(requestParameters['caseId'])));
+        urlPath = urlPath.replace(`{${"eventId"}}`, encodeURIComponent(String(requestParameters['eventId'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'PATCH',
+            headers: headerParameters,
+            query: queryParameters,
+            body: UpdateCaseEventDtoToJSON(requestParameters['updateCaseEventDto']),
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => CaseEventDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Update (and implicitly verify) a chronology event
+     */
+    async caseEventsControllerUpdate(requestParameters: CaseEventsControllerUpdateRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<CaseEventDto> {
+        const response = await this.caseEventsControllerUpdateRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Generate leads from case evidence (semantic neighbours + linked-inquiry matches)
+     */
+    async caseLeadsControllerGenerateRaw(requestParameters: CaseLeadsControllerGenerateRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<GenerateCaseLeadsResponseDto>> {
+        if (requestParameters['caseId'] == null) {
+            throw new runtime.RequiredError(
+                'caseId',
+                'Required parameter "caseId" was null or undefined when calling caseLeadsControllerGenerate().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/cases/{caseId}/leads/generate`;
+        urlPath = urlPath.replace(`{${"caseId"}}`, encodeURIComponent(String(requestParameters['caseId'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => GenerateCaseLeadsResponseDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Generate leads from case evidence (semantic neighbours + linked-inquiry matches)
+     */
+    async caseLeadsControllerGenerate(requestParameters: CaseLeadsControllerGenerateRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<GenerateCaseLeadsResponseDto> {
+        const response = await this.caseLeadsControllerGenerateRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * List leads (exploration candidates) for a case
+     */
+    async caseLeadsControllerListRaw(requestParameters: CaseLeadsControllerListRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Array<CaseLeadDto>>> {
+        if (requestParameters['caseId'] == null) {
+            throw new runtime.RequiredError(
+                'caseId',
+                'Required parameter "caseId" was null or undefined when calling caseLeadsControllerList().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        if (requestParameters['status'] != null) {
+            queryParameters['status'] = requestParameters['status'];
+        }
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/cases/{caseId}/leads`;
+        urlPath = urlPath.replace(`{${"caseId"}}`, encodeURIComponent(String(requestParameters['caseId'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => jsonValue.map(CaseLeadDtoFromJSON));
+    }
+
+    /**
+     * List leads (exploration candidates) for a case
+     */
+    async caseLeadsControllerList(requestParameters: CaseLeadsControllerListRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Array<CaseLeadDto>> {
+        const response = await this.caseLeadsControllerListRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Propose a finding as a lead for this case
+     */
+    async caseLeadsControllerProposeRaw(requestParameters: CaseLeadsControllerProposeRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
+        if (requestParameters['caseId'] == null) {
+            throw new runtime.RequiredError(
+                'caseId',
+                'Required parameter "caseId" was null or undefined when calling caseLeadsControllerPropose().'
+            );
+        }
+
+        if (requestParameters['proposeCaseLeadDto'] == null) {
+            throw new runtime.RequiredError(
+                'proposeCaseLeadDto',
+                'Required parameter "proposeCaseLeadDto" was null or undefined when calling caseLeadsControllerPropose().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/cases/{caseId}/leads`;
+        urlPath = urlPath.replace(`{${"caseId"}}`, encodeURIComponent(String(requestParameters['caseId'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+            body: ProposeCaseLeadDtoToJSON(requestParameters['proposeCaseLeadDto']),
+        }, initOverrides);
+
+        return new runtime.VoidApiResponse(response);
+    }
+
+    /**
+     * Propose a finding as a lead for this case
+     */
+    async caseLeadsControllerPropose(requestParameters: CaseLeadsControllerProposeRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
+        await this.caseLeadsControllerProposeRaw(requestParameters, initOverrides);
+    }
+
+    /**
+     * Accept a lead into evidence, or dismiss it
+     */
+    async caseLeadsControllerReviewRaw(requestParameters: CaseLeadsControllerReviewRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
+        if (requestParameters['caseId'] == null) {
+            throw new runtime.RequiredError(
+                'caseId',
+                'Required parameter "caseId" was null or undefined when calling caseLeadsControllerReview().'
+            );
+        }
+
+        if (requestParameters['leadId'] == null) {
+            throw new runtime.RequiredError(
+                'leadId',
+                'Required parameter "leadId" was null or undefined when calling caseLeadsControllerReview().'
+            );
+        }
+
+        if (requestParameters['reviewCaseLeadDto'] == null) {
+            throw new runtime.RequiredError(
+                'reviewCaseLeadDto',
+                'Required parameter "reviewCaseLeadDto" was null or undefined when calling caseLeadsControllerReview().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/cases/{caseId}/leads/{leadId}/review`;
+        urlPath = urlPath.replace(`{${"caseId"}}`, encodeURIComponent(String(requestParameters['caseId'])));
+        urlPath = urlPath.replace(`{${"leadId"}}`, encodeURIComponent(String(requestParameters['leadId'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+            body: ReviewCaseLeadDtoToJSON(requestParameters['reviewCaseLeadDto']),
+        }, initOverrides);
+
+        return new runtime.VoidApiResponse(response);
+    }
+
+    /**
+     * Accept a lead into evidence, or dismiss it
+     */
+    async caseLeadsControllerReview(requestParameters: CaseLeadsControllerReviewRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
+        await this.caseLeadsControllerReviewRaw(requestParameters, initOverrides);
+    }
 
     /**
      * Paginated unified case activity feed (newest first)
@@ -1004,6 +1426,15 @@ export class CasesApi extends runtime.BaseAPI {
 
 }
 
+/**
+ * @export
+ */
+export const CaseLeadsControllerListStatusEnum = {
+    Proposed: 'PROPOSED',
+    Accepted: 'ACCEPTED',
+    Dismissed: 'DISMISSED'
+} as const;
+export type CaseLeadsControllerListStatusEnum = typeof CaseLeadsControllerListStatusEnum[keyof typeof CaseLeadsControllerListStatusEnum];
 /**
  * @export
  */

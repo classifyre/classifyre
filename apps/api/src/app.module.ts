@@ -43,14 +43,13 @@ import { ChatBotsService } from './chat-gateway/chat-bots.service';
 import { ChatGatewayService } from './chat-gateway/chat-gateway.service';
 import { ChatHarnessToolset } from './chat-gateway/chat-harness.toolset';
 import { ChatSessionService } from './chat-gateway/chat-session.service';
-import { EmbeddingController } from './embedding/embedding.controller';
-import { EmbeddingCapabilityService } from './embedding/embedding-capability.service';
-import { EmbeddingAnalysisService } from './embedding/embedding-analysis.service';
-import { EmbeddingService } from './embedding/embedding.service';
-import { QueryEmbeddingService } from './embedding/query-embedding.service';
-import { EmbeddingConfigService } from './embedding/embedding-config.service';
-import { EmbeddingProviderService } from './embedding/embedding-provider.service';
-import { EmbeddingQueueService } from './embedding/embedding-queue.service';
+import { EmbeddingModule } from './embedding/embedding.module';
+import { GlossaryController } from './glossary/glossary.controller';
+import { GlossaryService } from './glossary/glossary.service';
+import { CaseLeadsController } from './controllers/case-leads.controller';
+import { CaseEventsController } from './controllers/case-events.controller';
+import { CaseLeadsService } from './case-leads.service';
+import { CaseEventsService } from './case-events.service';
 
 // Import organized controllers
 import {
@@ -88,6 +87,7 @@ import {
     AutopilotModule,
     CorrelationModule,
     ExportModule,
+    EmbeddingModule,
   ],
   controllers: [
     HealthController,
@@ -112,7 +112,9 @@ import {
     CaseThreadsController,
     GraphController,
     ChatBotsController,
-    EmbeddingController,
+    GlossaryController,
+    CaseLeadsController,
+    CaseEventsController,
   ],
   providers: [
     { provide: APP_GUARD, useClass: DemoModeGuard },
@@ -152,13 +154,9 @@ import {
     ChatAgentService,
     ChatGatewayService,
     ChatBotsService,
-    EmbeddingConfigService,
-    EmbeddingCapabilityService,
-    EmbeddingAnalysisService,
-    EmbeddingService,
-    EmbeddingProviderService,
-    EmbeddingQueueService,
-    QueryEmbeddingService,
+    GlossaryService,
+    CaseLeadsService,
+    CaseEventsService,
   ],
 })
 export class AppModule {}

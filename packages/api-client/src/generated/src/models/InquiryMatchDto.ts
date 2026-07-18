@@ -13,6 +13,14 @@
  */
 
 import { mapValues } from '../runtime';
+import type { FindingSearchRankingDto } from './FindingSearchRankingDto';
+import {
+    FindingSearchRankingDtoFromJSON,
+    FindingSearchRankingDtoFromJSONTyped,
+    FindingSearchRankingDtoToJSON,
+    FindingSearchRankingDtoToJSONTyped,
+} from './FindingSearchRankingDto';
+
 /**
  * 
  * @export
@@ -79,6 +87,12 @@ export interface InquiryMatchDto {
      * @memberof InquiryMatchDto
      */
     isNew: boolean;
+    /**
+     * Evidence ranking (importance, quality, reasons) when the finding has been analyzed
+     * @type {FindingSearchRankingDto}
+     * @memberof InquiryMatchDto
+     */
+    ranking?: FindingSearchRankingDto;
 }
 
 /**
@@ -113,6 +127,7 @@ export function InquiryMatchDtoFromJSONTyped(json: any, ignoreDiscriminator: boo
         'sourceType': json['sourceType'] == null ? undefined : json['sourceType'],
         'matchedAt': (new Date(json['matchedAt'])),
         'isNew': json['isNew'],
+        'ranking': json['ranking'] == null ? undefined : FindingSearchRankingDtoFromJSON(json['ranking']),
     };
 }
 
@@ -137,6 +152,7 @@ export function InquiryMatchDtoToJSONTyped(value?: InquiryMatchDto | null, ignor
         'sourceType': value['sourceType'],
         'matchedAt': value['matchedAt'].toISOString(),
         'isNew': value['isNew'],
+        'ranking': FindingSearchRankingDtoToJSON(value['ranking']),
     };
 }
 
