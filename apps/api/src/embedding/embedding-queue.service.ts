@@ -7,6 +7,7 @@ import { embeddingContentHash, normalizeEmbeddingText } from './embedding-text';
 import { EmbeddingConfigService } from './embedding-config.service';
 import { EmbeddingProviderService } from './embedding-provider.service';
 import { EmbeddingService } from './embedding.service';
+import { runsBackgroundWorkers } from '../service-role';
 
 const EMBEDDING_QUEUE_PREFIX = 'semantic-embeddings';
 const RECALIBRATE_QUEUE_PREFIX = 'semantic-recalibrate';
@@ -54,6 +55,12 @@ export class EmbeddingQueueService implements OnApplicationBootstrap {
     this.queueName = `${EMBEDDING_QUEUE_PREFIX}-${space.id}`;
     const boss = await this.pgBoss.getBossAsync();
     await boss.createQueue(this.queueName, { policy: 'exclusive' });
+    if (!runsBackgroundWorkers()) {
+      this.logger.log(
+        `SERVICE_ROLE=api: embedding worker and backfill left to the worker deployment (enqueue only)`,
+      );
+      return;
+    }
     await boss.work<EmbeddingJob>(
       this.queueName,
       {

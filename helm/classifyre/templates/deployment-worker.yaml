@@ -1,42 +1,41 @@
+{{- /*
+Worker deployment: runs the same API image/process (background pg-boss queue
+workers, embedding inference) with SERVICE_ROLE=worker so it skips serving
+production HTTP traffic while keeping /ping alive for probes. Splitting this out
+of the api Deployment keeps heavy background work from OOMing HTTP-serving pods.
+No Service/Ingress is created for this workload — it is not meant to receive
+external traffic.
+*/ -}}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "classifyre.api.fullname" . }}
+  name: {{ include "classifyre.worker.fullname" . }}
   labels:
     {{- include "classifyre.commonLabels" . | nindent 4 }}
-    app.kubernetes.io/component: api
+    app.kubernetes.io/component: worker
   {{- with .Values.commonAnnotations }}
   annotations:
     {{- toYaml . | nindent 4 }}
   {{- end }}
 spec:
-  {{- if not .Values.api.autoscaling.enabled }}
-  replicas: {{ .Values.api.replicaCount }}
-  {{- end }}
-  {{- with .Values.api.strategy }}
-  strategy:
-    {{- toYaml . | nindent 4 }}
-  {{- end }}
+  replicas: {{ .Values.worker.replicaCount }}
   revisionHistoryLimit: 3
   selector:
     matchLabels:
       {{- include "classifyre.selectorLabels" . | nindent 6 }}
-      app.kubernetes.io/component: api
+      app.kubernetes.io/component: worker
   template:
     metadata:
       labels:
         {{- include "classifyre.selectorLabels" . | nindent 8 }}
-        app.kubernetes.io/component: api
+        app.kubernetes.io/component: worker
         {{- with .Values.api.podLabels }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
+      {{- with .Values.api.podAnnotations }}
       annotations:
-        {{- if .Values.api.cliJobs.enabled }}
-        checksum/cli-job-template: {{ include (print $.Template.BasePath "/api-cli-job-template-configmap.yaml") . | sha256sum }}
-        {{- end }}
-        {{- with .Values.api.podAnnotations }}
         {{- toYaml . | nindent 8 }}
-        {{- end }}
+      {{- end }}
     spec:
       serviceAccountName: {{ include "classifyre.serviceAccountName" . }}
       automountServiceAccountToken: {{ .Values.serviceAccount.automount }}
@@ -54,62 +53,8 @@ spec:
       securityContext:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- if .Values.api.migration.enabled }}
-      initContainers:
-        - name: prisma-migrate
-          image: {{ .Values.api.image.repository }}:{{ .Values.api.image.tag | default .Chart.AppVersion }}
-          imagePullPolicy: {{ .Values.api.image.pullPolicy }}
-          {{- with .Values.api.migration.containerSecurityContext }}
-          securityContext:
-            {{- toYaml . | nindent 12 }}
-          {{- end }}
-          command:
-            - /bin/sh
-            - -lc
-          args:
-            - >-
-              set -eu;
-              {{- if .Values.api.workingDir }}
-              cd {{ .Values.api.workingDir | quote }};
-              {{- end }}
-              if [ -d "/app/node_modules" ] && [ ! -e "/node_modules" ]; then
-                ln -s /app/node_modules /node_modules;
-              fi;
-              if [ -z "${DATABASE_URL:-}" ] || [ "${DATABASE_URL}" = "postgresql://postgres@127.0.0.1:5432/classifyre" ]; then
-                export DATABASE_URL="postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=${DB_SSLMODE}";
-              fi;
-              {{ .Values.api.migration.script }}
-          env:
-            - name: DB_HOST
-              value: {{ include "classifyre.databaseHost" . | quote }}
-            - name: DB_PORT
-              value: {{ include "classifyre.databasePort" . | quote }}
-            - name: DB_NAME
-              value: {{ include "classifyre.databaseName" . | quote }}
-            - name: DB_USER
-              value: {{ include "classifyre.databaseUser" . | quote }}
-            - name: DB_SSLMODE
-              value: {{ include "classifyre.databaseSslMode" . | quote }}
-            - name: DB_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "classifyre.databaseSecretName" . }}
-                  key: {{ include "classifyre.databasePasswordKey" . }}
-            - name: CLASSIFYRE_MASKED_CONFIG_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "classifyre.apiMaskedConfigSecretName" . }}
-                  key: {{ include "classifyre.apiMaskedConfigSecretKey" . }}
-            {{- if and (eq .Values.postgres.mode "external") .Values.postgres.external.existingSecret .Values.postgres.external.existingSecretUrlKey }}
-            - name: DATABASE_URL
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "classifyre.databaseSecretName" . }}
-                  key: {{ .Values.postgres.external.existingSecretUrlKey }}
-            {{- end }}
-      {{- end }}
       containers:
-        - name: api
+        - name: worker
           image: {{ .Values.api.image.repository }}:{{ .Values.api.image.tag | default .Chart.AppVersion }}
           imagePullPolicy: {{ .Values.api.image.pullPolicy }}
           {{- if .Values.api.command }}
@@ -139,13 +84,14 @@ spec:
               exec {{ .Values.api.startCommand }}
           {{- end }}
           ports:
+            {{- /* SERVICE_ROLE=worker still starts the HTTP server, so /ping probes keep working. */}}
             - name: http
               containerPort: {{ .Values.api.service.port }}
               protocol: TCP
           env:
             {{- include "classifyre.api.env" . | nindent 12 }}
             - name: SERVICE_ROLE
-              value: "api"
+              value: "worker"
           {{- with .Values.api.extraEnvFrom }}
           envFrom:
             {{- toYaml . | nindent 12 }}
@@ -166,7 +112,7 @@ spec:
             {{- with .Values.api.extraVolumeMounts }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
-          {{- with .Values.api.resources }}
+          {{- with .Values.worker.resources }}
           resources:
             {{- toYaml . | nindent 12 }}
           {{- end }}
@@ -235,32 +181,4 @@ spec:
       {{- with .Values.api.tolerations }}
       tolerations:
         {{- toYaml . | nindent 8 }}
-      {{- end }}
-      {{- if .Values.api.affinity }}
-      affinity:
-        {{- toYaml .Values.api.affinity | nindent 8 }}
-      {{- else }}
-      affinity:
-        podAntiAffinity:
-          preferredDuringSchedulingIgnoredDuringExecution:
-            - weight: 100
-              podAffinityTerm:
-                labelSelector:
-                  matchLabels:
-                    {{- include "classifyre.selectorLabels" . | nindent 20 }}
-                    app.kubernetes.io/component: api
-                topologyKey: kubernetes.io/hostname
-      {{- end }}
-      {{- if .Values.api.topologySpreadConstraints }}
-      topologySpreadConstraints:
-        {{- toYaml .Values.api.topologySpreadConstraints | nindent 8 }}
-      {{- else }}
-      topologySpreadConstraints:
-        - maxSkew: 1
-          topologyKey: kubernetes.io/hostname
-          whenUnsatisfiable: ScheduleAnyway
-          labelSelector:
-            matchLabels:
-              {{- include "classifyre.selectorLabels" . | nindent 14 }}
-              app.kubernetes.io/component: api
       {{- end }}

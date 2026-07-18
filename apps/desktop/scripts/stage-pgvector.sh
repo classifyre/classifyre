@@ -34,7 +34,22 @@ mkdir -p "$CONTROL_DIR"
 case "$(uname -s)" in
   MINGW*|MSYS*|CYGWIN*)
     : "${PGROOT:?PGROOT must point at a PostgreSQL 18 installation on Windows}"
-    (cd "$SOURCE_DIR" && nmake /F Makefile.win)
+    NMAKE="$(command -v nmake.exe || command -v nmake || true)"
+    [ -n "$NMAKE" ] || {
+      echo "MSVC nmake.exe is required to build pgvector on Windows. Run from an x64 Visual Studio Developer Command Prompt." >&2
+      exit 1
+    }
+    # GitHub's bash shell prepends Git's /usr/bin after msvc-dev-cmd runs,
+    # which can shadow Microsoft's link.exe. Put the MSVC tools first again.
+    MSVC_BIN="$(dirname "$NMAKE")"
+    export PATH="$MSVC_BIN:$PATH"
+    command -v cl.exe >/dev/null 2>&1 || {
+      echo "MSVC cl.exe is missing from PATH after locating nmake.exe" >&2
+      exit 1
+    }
+    # MSYS otherwise rewrites NMake's /F switch as a filesystem path, causing
+    # NMake to ignore Makefile.win and parse the GNU Makefile instead.
+    (cd "$SOURCE_DIR" && MSYS2_ARG_CONV_EXCL='*' "$NMAKE" /F Makefile.win)
     LIB_FILE="$(find "$NATIVE_ROOT" -type f -name plpgsql.dll -print -quit)"
     LIB_DIR="${LIB_FILE:+$(dirname "$LIB_FILE")}"
     [ -n "$LIB_DIR" ] || LIB_DIR="$NATIVE_ROOT/lib"
