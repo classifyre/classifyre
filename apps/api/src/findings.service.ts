@@ -112,9 +112,14 @@ export class FindingsService {
     return [];
   }
 
-  private async buildSearchFindingsWhere(
+  /**
+   * Builds the non-search portion of the findings `where` clause. This is
+   * cheap (no DB round-trips) and can be safely computed once and reused by
+   * both the plain and search-augmented variants of the query.
+   */
+  private buildBaseFindingsWhere(
     filters?: SearchFindingsRequestDto['filters'],
-  ): Promise<Prisma.FindingWhereInput> {
+  ): { where: Prisma.FindingWhereInput; search: string } {
     const where: Prisma.FindingWhereInput = {};
     const includeResolved = filters?.includeResolved ?? false;
 
@@ -185,7 +190,19 @@ export class FindingsService {
       where.status = { not: FindingStatus.RESOLVED };
     }
 
-    const search = filters?.search?.trim();
+    const search = filters?.search?.trim() ?? '';
+    return { where, search };
+  }
+
+  /**
+   * Extends a base `where` clause (from buildBaseFindingsWhere) with the
+   * text/FTS search OR-clause. Runs the raw full-text-search sub-query
+   * (at most once per call) only when `search` is non-empty.
+   */
+  private async applySearchClause(
+    where: Prisma.FindingWhereInput,
+    search: string,
+  ): Promise<Prisma.FindingWhereInput> {
     if (!search) {
       return where;
     }
@@ -246,6 +263,8 @@ export class FindingsService {
       const ftsRows = await this.prisma.$queryRaw<{ id: string }[]>`
         SELECT id FROM findings
         WHERE to_tsvector('simple', matched_content) @@ plainto_tsquery('simple', ${search})
+        ORDER BY id
+        LIMIT 1000
       `;
       if (ftsRows.length > 0) {
         textOr.push({ id: { in: ftsRows.map((r) => r.id) } });
@@ -258,6 +277,13 @@ export class FindingsService {
       ...where,
       AND: [{ OR: textOr }],
     };
+  }
+
+  private async buildSearchFindingsWhere(
+    filters?: SearchFindingsRequestDto['filters'],
+  ): Promise<Prisma.FindingWhereInput> {
+    const { where, search } = this.buildBaseFindingsWhere(filters);
+    return this.applySearchClause(where, search);
   }
 
   private shouldRecordFeedbackStatus(status: FindingStatus): boolean {
@@ -439,9 +465,11 @@ export class FindingsService {
     const semanticEnabled =
       Boolean(semantic?.query?.trim()) &&
       semantic?.mode !== SemanticSearchMode.OFF;
-    const where = await this.buildSearchFindingsWhere(
-      semanticEnabled ? { ...filters, search: undefined } : filters,
-    );
+    const { where: baseWhere, search: baseSearch } =
+      this.buildBaseFindingsWhere(
+        semanticEnabled ? { ...filters, search: undefined } : filters,
+      );
+    const where = await this.applySearchClause(baseWhere, baseSearch);
 
     if (semanticEnabled) {
       const query = semantic?.query.trim() as string;
@@ -462,10 +490,9 @@ export class FindingsService {
             filters.includeResolved ?? false,
           )
         : [];
-      const lexicalWhere = await this.buildSearchFindingsWhere({
-        ...filters,
-        search: query,
-      });
+      // Reuse the base where (built once above) and only add the lexical
+      // search clause; avoids rebuilding all filters for the second arm.
+      const lexicalWhere = await this.applySearchClause(baseWhere, query);
       const lexical =
         semantic?.mode === SemanticSearchMode.VECTOR
           ? []
@@ -1197,11 +1224,15 @@ export class FindingsService {
       this.prisma.finding.count({
         where: { ...statusFilter, detectedAt: { gte: monthStart } },
       }),
+      // Bounded to the 50 assets with the most open findings; the response
+      // only surfaces the top 12 after severity-aware re-ranking below.
       this.prisma.finding.groupBy({
         by: ['assetId'],
         where: topAssetsWhere,
         _count: { _all: true },
         _max: { detectedAt: true },
+        orderBy: { _count: { assetId: 'desc' } },
+        take: 50,
       }),
       this.prisma.runner.findMany({
         orderBy: { triggeredAt: 'desc' },
