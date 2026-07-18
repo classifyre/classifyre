@@ -13,6 +13,7 @@ export { CustomDetectorTestsApi } from './CustomDetectorTestsApi';
 export { CustomDetectorsApi } from './CustomDetectorsApi';
 export { EmbeddingsApi } from './EmbeddingsApi';
 export { FindingsApi } from './FindingsApi';
+export { GlossaryApi } from './GlossaryApi';
 export { GraphApi } from './GraphApi';
 export { HealthApi } from './HealthApi';
 export { HypothesesApi } from './HypothesesApi';

@@ -891,6 +891,12 @@ export class FindingsService {
     });
   }
 
+  countDuplicateGroup(duplicateGroupHash: string) {
+    return this.prisma.findingEvidenceAnalysis.count({
+      where: { duplicateGroupHash },
+    });
+  }
+
   async update(id: string, updateDto: UpdateFindingDto, userId?: string) {
     const finding = await this.prisma.finding.findUnique({ where: { id } });
     if (!finding) throw new NotFoundException();

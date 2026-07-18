@@ -16,6 +16,7 @@ Name | Type
 `sourceType` | string
 `matchedAt` | Date
 `isNew` | boolean
+`ranking` | [FindingSearchRankingDto](FindingSearchRankingDto.md)
 
 ## Example
 
@@ -34,6 +35,7 @@ const example = {
   "sourceType": null,
   "matchedAt": null,
   "isNew": null,
+  "ranking": null,
 } satisfies InquiryMatchDto
 
 console.log(example)

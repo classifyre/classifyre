@@ -1348,6 +1348,25 @@ export function FindingsTable({
                               —
                             </span>
                           )}
+                          {finding.ranking?.reasons &&
+                            finding.ranking.reasons.length > 0 && (
+                              <div className="mt-1 flex flex-wrap gap-1">
+                                {finding.ranking.reasons
+                                  .slice(0, 2)
+                                  .map((reason) => (
+                                    <span
+                                      key={reason.code}
+                                      className={
+                                        reason.impact === "down"
+                                          ? "rounded-[3px] border border-destructive/30 bg-destructive/5 px-1.5 py-0 text-[10px] text-destructive/80"
+                                          : "rounded-[3px] border border-border px-1.5 py-0 text-[10px] text-muted-foreground"
+                                      }
+                                    >
+                                      {reason.label}
+                                    </span>
+                                  ))}
+                              </div>
+                            )}
                         </TableCell>
 
                         <TableCell>

@@ -37,6 +37,9 @@ import { PgBossService } from './scheduler/pg-boss.service';
 import { CORRELATION_QUEUE } from './correlation/correlation.constants';
 import { CaseThreadKind } from '@prisma/client';
 import { EmbeddingService } from './embedding/embedding.service';
+import { GlossaryService } from './glossary/glossary.service';
+import { CaseLeadsService } from './case-leads.service';
+import { CaseEventsService } from './case-events.service';
 
 const jsonObjectSchema = z.record(z.string(), z.unknown());
 
@@ -74,17 +77,77 @@ type McpServerCompat = Omit<McpServer, 'registerTool' | 'registerPrompt'> & {
   ): unknown;
 };
 
+// Every tool result shares one serialized-size budget so a broad search can
+// never flood the client agent's context window. Oversized payloads shrink by
+// capping arrays/strings progressively, with an explicit truncation notice
+// telling the agent to narrow the query instead of silently losing rows.
+const MAX_RESULT_CHARS = 30_000;
+const TRUNCATION_NOTICE =
+  'Result truncated to fit the response budget. Narrow the query (filters, smaller take/limit, pagination cursor) to see the rest.';
+
+function capValue(value: unknown, arrayCap: number, stringCap: number): unknown {
+  if (Array.isArray(value)) {
+    const capped = value
+      .slice(0, arrayCap)
+      .map((item) => capValue(item, arrayCap, stringCap));
+    if (value.length > arrayCap) {
+      capped.push(`… ${value.length - arrayCap} more items truncated`);
+    }
+    return capped;
+  }
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>).map(([key, entry]) => [
+        key,
+        capValue(entry, arrayCap, stringCap),
+      ]),
+    );
+  }
+  if (typeof value === 'string' && value.length > stringCap) {
+    return `${value.slice(0, stringCap)}…`;
+  }
+  return value;
+}
+
 function jsonResult(payload: unknown) {
+  let bounded = payload;
+  let truncated = false;
+  let text = JSON.stringify(payload, null, 2);
+  for (const [arrayCap, stringCap] of [
+    [100, 4000],
+    [40, 2000],
+    [15, 800],
+    [5, 400],
+  ] as const) {
+    if (text.length <= MAX_RESULT_CHARS) break;
+    bounded = capValue(payload, arrayCap, stringCap);
+    truncated = true;
+    text = JSON.stringify(bounded, null, 2);
+  }
+  if (text.length > MAX_RESULT_CHARS) {
+    truncated = true;
+    text = `${text.slice(0, MAX_RESULT_CHARS)}\n… hard-truncated`;
+  }
+  if (truncated) {
+    text = `NOTE: ${TRUNCATION_NOTICE}\n${text}`;
+  }
+
   const structuredContent =
-    payload && typeof payload === 'object' && !Array.isArray(payload)
-      ? (payload as Record<string, unknown>)
-      : { result: payload };
+    bounded && typeof bounded === 'object' && !Array.isArray(bounded)
+      ? ({
+          ...(bounded as Record<string, unknown>),
+          ...(truncated ? { _truncated: TRUNCATION_NOTICE } : {}),
+        } as Record<string, unknown>)
+      : {
+          result: bounded,
+          ...(truncated ? { _truncated: TRUNCATION_NOTICE } : {}),
+        };
 
   return {
     content: [
       {
         type: 'text' as const,
-        text: JSON.stringify(payload, null, 2),
+        text,
       },
     ],
     structuredContent,
@@ -104,6 +167,49 @@ function errorMessageLines(error: unknown): string[] {
 function normalizeTemplateParam(value: string | string[]): string {
   return Array.isArray(value) ? (value[0] ?? '') : value;
 }
+
+const INVESTIGATION_GUIDE = `# Running an investigation with Classifyre
+
+This is the intended end-to-end loop. Individual tools describe themselves; this
+resource explains how they compose.
+
+## Ground rules (from real first-use failures)
+1. **Severity is not importance.** Detector severity describes the pattern that
+   matched, not evidentiary value. A CRITICAL credit-card hit on repeated digits
+   is usually OCR noise. Rank and triage by \`ranking.importance\` and its
+   \`reasons\`, never by severity alone.
+2. **Similarity is not proof.** Semantic neighbours and duplicate clusters are
+   retrieval aids. Before claiming a connection, verify against the source text
+   (get_asset / get_finding context).
+3. **Coverage before conclusions.** A source with empty text extraction looks
+   healthy while missing content. Check run text coverage (get_run) before
+   concluding "nothing found".
+4. **Unverified memory is a hypothesis.** Agent-written summaries and profiles
+   must be re-checked against live state before being treated as fact.
+
+## The loop
+1. **Survey coverage** — search_sources, get_run / get_run_logs: did scans
+   complete, and did text extraction actually produce text (textCoverage)?
+2. **Triage ranked evidence** — search_findings with ranking=importance (the
+   default): read each row's ranking.reasons. Strong: cross_document_recurrence,
+   readable unique evidence. Weak: ocr_fragment, duplicate_group, common_value.
+   Use find_boilerplate_clusters per source to identify repeated noise wholesale,
+   and explain_finding on anything you intend to act on.
+3. **Explore hypotheses** — search_findings with semantic_query (hybrid mode)
+   for meaning-based retrieval; find_similar_findings to expand a confirmed lead
+   across sources; get_value_occurrences for exact value recurrence.
+4. **Monitor with inquiries** — create_inquiry with matchers for the evidence
+   class you care about; list_inquiry_matches to review; rematch_inquiry after
+   new scans. Archive noisy inquiries instead of letting them accumulate matches.
+5. **Build a case** — create_case (or pull_case_from_inquiry), attach verified
+   findings (attach_case_findings), add evidence and hypotheses as threads
+   (create_case_thread), and link support/contradiction per thread entry
+   (link_case_thread_support). The case graph (get_case_graph) and timeline
+   (get_case_timeline) show structure and history.
+6. **Conclude honestly** — close_case with a conclusion the evidence actually
+   supports. An empty or speculative case should be closed as such, not
+   escalated.
+`;
 
 @Injectable()
 export class McpServerFactoryService {
@@ -125,6 +231,9 @@ export class McpServerFactoryService {
     private readonly correlationService: CorrelationService,
     private readonly pgBossService: PgBossService,
     private readonly embeddingService: EmbeddingService,
+    private readonly glossaryService: GlossaryService,
+    private readonly caseLeadsService: CaseLeadsService,
+    private readonly caseEventsService: CaseEventsService,
   ) {}
 
   createServer(): McpServer {
@@ -145,7 +254,248 @@ export class McpServerFactoryService {
     this.registerInquiryTools(srv);
     this.registerCaseTools(srv);
     this.registerCorrelationTools(srv);
+    this.registerGlossaryTools(srv);
+    this.registerCaseLeadTools(srv);
     return server;
+  }
+
+  private registerCaseLeadTools(server: McpServerCompat) {
+    server.registerTool(
+      'list_case_leads',
+      {
+        title: 'List Case Leads',
+        description:
+          'List a case\'s lead queue: ranked exploration candidates (semantic neighbours, high-importance inquiry matches, agent proposals) awaiting accept/dismiss review, plus reviewed history.',
+        inputSchema: {
+          caseId: z.string().uuid(),
+          status: z.enum(['PROPOSED', 'ACCEPTED', 'DISMISSED']).optional(),
+        },
+        annotations: { readOnlyHint: true, idempotentHint: true },
+      },
+      async ({ caseId, status }) =>
+        jsonResult(await this.caseLeadsService.list(caseId, status)),
+    );
+
+    server.registerTool(
+      'propose_case_lead',
+      {
+        title: 'Propose Case Lead',
+        description:
+          'Propose a finding as a lead for a case (instead of attaching it as evidence directly). Leads are reviewed by a human; a dismissed lead is never re-proposed.',
+        inputSchema: {
+          caseId: z.string().uuid(),
+          findingId: z.string().uuid(),
+          rationale: z.string().min(1).max(2000),
+        },
+        annotations: { readOnlyHint: false, destructiveHint: false },
+      },
+      async ({ caseId, findingId, rationale }) => {
+        this.mcpToolExecutor.assertNotDemoMode();
+        return jsonResult(
+          await this.caseLeadsService.propose(caseId, {
+            findingId,
+            rationale,
+            origin: 'MANUAL',
+            proposedBy: 'mcp',
+          }),
+        );
+      },
+    );
+
+    server.registerTool(
+      'generate_case_leads',
+      {
+        title: 'Generate Case Leads',
+        description:
+          'Generate leads for a case from its own evidence: semantic neighbours of attached findings plus high-importance matches of linked inquiries. Bounded and idempotent (existing/dismissed leads are skipped).',
+        inputSchema: { caseId: z.string().uuid() },
+        annotations: { readOnlyHint: false, destructiveHint: false },
+      },
+      async ({ caseId }) => {
+        this.mcpToolExecutor.assertNotDemoMode();
+        return jsonResult(await this.caseLeadsService.generate(caseId, 'mcp'));
+      },
+    );
+
+    server.registerTool(
+      'review_case_lead',
+      {
+        title: 'Review Case Lead',
+        description:
+          'Accept a lead into case evidence (via the normal attach flow) or dismiss it. Dismissals are remembered as precedents so agents stop re-proposing the finding.',
+        inputSchema: {
+          caseId: z.string().uuid(),
+          leadId: z.string().uuid(),
+          action: z.enum(['ACCEPT', 'DISMISS']),
+          reason: z.string().max(1000).optional(),
+        },
+        annotations: { readOnlyHint: false, destructiveHint: false },
+      },
+      async ({ caseId, leadId, action, reason }) => {
+        this.mcpToolExecutor.assertNotDemoMode();
+        return jsonResult(
+          await this.caseLeadsService.review(
+            caseId,
+            leadId,
+            action,
+            'mcp',
+            reason,
+          ),
+        );
+      },
+    );
+
+    server.registerTool(
+      'list_case_events',
+      {
+        title: 'List Case Events',
+        description:
+          'List the case chronology: dated real-world events reconstructed from evidence, ordered by date. Distinct from get_case_timeline (the app activity/audit log).',
+        inputSchema: { caseId: z.string().uuid() },
+        annotations: { readOnlyHint: true, idempotentHint: true },
+      },
+      async ({ caseId }) =>
+        jsonResult(await this.caseEventsService.list(caseId)),
+    );
+
+    server.registerTool(
+      'create_case_event',
+      {
+        title: 'Create Case Event',
+        description:
+          'Add a dated real-world event to the case chronology. Cite the findingIds/evidenceIds the date came from; unsupported dates do not belong in a chronology.',
+        inputSchema: {
+          caseId: z.string().uuid(),
+          occurredAt: z.string().describe('ISO date or datetime'),
+          precision: z.enum(['DAY', 'MONTH', 'YEAR']).optional(),
+          title: z.string().min(1).max(300),
+          description: z.string().max(4000).optional(),
+          confidence: z.number().min(0).max(1).optional(),
+          findingIds: z.array(z.string()).optional(),
+          evidenceIds: z.array(z.string()).optional(),
+        },
+        annotations: { readOnlyHint: false, destructiveHint: false },
+      },
+      async ({ caseId, occurredAt, ...rest }) => {
+        this.mcpToolExecutor.assertNotDemoMode();
+        const when = new Date(occurredAt);
+        if (Number.isNaN(when.getTime())) {
+          throw new NotFoundException(`Invalid occurredAt: ${occurredAt}`);
+        }
+        return jsonResult(
+          await this.caseEventsService.create(
+            caseId,
+            { ...rest, occurredAt: when },
+            'mcp',
+            'OPERATOR',
+          ),
+        );
+      },
+    );
+
+    server.registerTool(
+      'delete_case_event',
+      {
+        title: 'Delete Case Event',
+        description: 'Remove an event from the case chronology.',
+        inputSchema: {
+          caseId: z.string().uuid(),
+          eventId: z.string().uuid(),
+        },
+        annotations: { readOnlyHint: false, destructiveHint: true },
+      },
+      async ({ caseId, eventId }) => {
+        this.mcpToolExecutor.assertNotDemoMode();
+        return jsonResult(
+          await this.caseEventsService.remove(caseId, eventId, 'mcp'),
+        );
+      },
+    );
+  }
+
+  private registerGlossaryTools(server: McpServerCompat) {
+    server.registerTool(
+      'list_glossary_terms',
+      {
+        title: 'List Glossary Terms',
+        description:
+          'List the shared investigation glossary: canonical terms, aliases, entity types and verification state. The vocabulary investigators and agents share.',
+        inputSchema: {
+          query: z.string().optional(),
+          entityType: z
+            .enum([
+              'PERSON',
+              'ORGANIZATION',
+              'LOCATION',
+              'REFERENCE',
+              'TERM',
+              'OTHER',
+            ])
+            .optional(),
+          take: z.number().int().min(1).max(200).optional(),
+          skip: z.number().int().min(0).optional(),
+        },
+        annotations: { readOnlyHint: true, idempotentHint: true },
+      },
+      async ({ query, entityType, take, skip }) =>
+        jsonResult(
+          await this.glossaryService.list({ query, entityType, take, skip }),
+        ),
+    );
+
+    server.registerTool(
+      'lookup_glossary',
+      {
+        title: 'Lookup Glossary',
+        description:
+          'Resolve a name, alias or concept against the glossary (exact, alias and semantic matching). Use before treating two spellings as separate entities.',
+        inputSchema: {
+          query: z.string().min(1).max(200),
+          limit: z.number().int().min(1).max(50).optional(),
+        },
+        annotations: { readOnlyHint: true, idempotentHint: true },
+      },
+      async ({ query, limit }) =>
+        jsonResult(await this.glossaryService.lookup(query, limit ?? 10)),
+    );
+
+    server.registerTool(
+      'upsert_glossary_term',
+      {
+        title: 'Upsert Glossary Term',
+        description:
+          'Create or update a glossary term (canonical name, aliases, entity type, notes). Terms written through MCP are operator-curated and verified.',
+        inputSchema: {
+          term: z.string().min(1).max(200),
+          aliases: z.array(z.string()).max(50).optional(),
+          entityType: z
+            .enum([
+              'PERSON',
+              'ORGANIZATION',
+              'LOCATION',
+              'REFERENCE',
+              'TERM',
+              'OTHER',
+            ])
+            .optional(),
+          notes: z.string().optional(),
+        },
+        annotations: { readOnlyHint: false, destructiveHint: false },
+      },
+      async ({ term, aliases, entityType, notes }) => {
+        this.mcpToolExecutor.assertNotDemoMode();
+        return jsonResult(
+          await this.glossaryService.upsert({
+            term,
+            aliases,
+            entityType,
+            notes,
+            origin: 'OPERATOR',
+            author: 'mcp',
+          }),
+        );
+      },
+    );
   }
 
   private registerResources(server: McpServerCompat) {
@@ -166,6 +516,25 @@ export class McpServerFactoryService {
               null,
               2,
             ),
+          },
+        ],
+      }),
+    );
+
+    server.registerResource(
+      'classifyre-investigation-guide',
+      'classifyre://investigation-guide',
+      {
+        title: 'How to run an investigation with Classifyre',
+        description:
+          'End-to-end workflow narrative for agents: coverage → ranked findings → inquiries → cases → threads → conclusion, with the evidence-judgment ground rules.',
+        mimeType: 'text/markdown',
+      },
+      () => ({
+        contents: [
+          {
+            uri: 'classifyre://investigation-guide',
+            text: INVESTIGATION_GUIDE,
           },
         ],
       }),
@@ -1114,24 +1483,24 @@ export class McpServerFactoryService {
       {
         title: 'Find Boilerplate Clusters',
         description:
-          'Find repeated or near-duplicate finding groups in a source, ordered by cluster size. Use this to separate bulk boilerplate from distinctive evidence.',
+          'Find repeated or near-duplicate finding groups, ordered by cluster size. Omit sourceIds to scan the whole corpus — clusters spanning multiple sources (sourceCount > 1) are the same content circulating between systems, which can itself be a lead. Use this to separate bulk boilerplate from distinctive evidence.',
         inputSchema: {
-          sourceId: z.string().uuid(),
+          sourceIds: z.array(z.string().uuid()).optional(),
           threshold: z.number().min(0.8).max(1).optional(),
-          limit: z.number().int().min(1).max(100).optional(),
+          limit: z.number().int().min(1).max(200).optional(),
         },
         annotations: {
           readOnlyHint: true,
           idempotentHint: true,
         },
       },
-      async ({ sourceId, threshold, limit }) =>
+      async ({ sourceIds, threshold, limit }) =>
         jsonResult(
-          await this.embeddingService.boilerplateClusters(
-            sourceId,
-            threshold ?? 0.95,
-            limit ?? 50,
-          ),
+          await this.embeddingService.boilerplateClusters({
+            sourceIds,
+            threshold,
+            limit,
+          }),
         ),
     );
 
@@ -1154,6 +1523,81 @@ export class McpServerFactoryService {
           throw new NotFoundException(`Finding with ID ${id} not found`);
         }
         return jsonResult(finding);
+      },
+    );
+
+    server.registerTool(
+      'explain_finding',
+      {
+        title: 'Explain Finding',
+        description:
+          'One-call evidence explanation for a finding: importance/quality ranking with its reasons and raw signals, duplicate-group size, top semantic neighbours, and the detector severity/confidence kept as a separate axis. Use before escalating or attaching a finding as case evidence. Similarity and importance are triage signals, not proof.',
+        inputSchema: {
+          id: z.string().uuid(),
+        },
+        annotations: {
+          readOnlyHint: true,
+          idempotentHint: true,
+        },
+      },
+      async ({ id }) => {
+        const finding = await this.findingsService.findOne(id);
+        if (!finding) {
+          throw new NotFoundException(`Finding with ID ${id} not found`);
+        }
+        const analysis = finding.evidenceAnalysis;
+        const [duplicateGroupSize, similar] = await Promise.all([
+          analysis?.duplicateGroupHash
+            ? this.findingsService.countDuplicateGroup(
+                analysis.duplicateGroupHash,
+              )
+            : Promise.resolve(1),
+          this.embeddingService
+            .similarFindings(id, 5)
+            .catch(() => [] as never[]),
+        ]);
+        return jsonResult({
+          findingId: finding.id,
+          findingType: finding.findingType,
+          matchedContent: finding.matchedContent,
+          asset: finding.asset,
+          source: finding.source,
+          detector: {
+            severity: finding.severity,
+            confidence: Number(finding.confidence),
+            note: 'Detector severity/confidence describe the pattern match, not investigative importance.',
+          },
+          ranking: analysis
+            ? {
+                importance: analysis.importanceScore,
+                quality: analysis.qualityScore,
+                semanticOutlier: analysis.semanticOutlier,
+                similarCount: analysis.similarCount,
+                duplicateGroupSize,
+                reasons: analysis.reasons,
+                signals: analysis.signals,
+                coverage: 'analyzed',
+              }
+            : {
+                coverage:
+                  'pending — importance is not yet computed for this finding; do not read that as unimportant',
+              },
+          similarFindings: (
+            similar as Array<{
+              id: string;
+              matchedContent: string;
+              similarity: number;
+              sourceId: string;
+              assetId: string;
+            }>
+          ).map((neighbor) => ({
+            findingId: neighbor.id,
+            value: neighbor.matchedContent,
+            similarity: neighbor.similarity,
+            sourceId: neighbor.sourceId,
+            assetId: neighbor.assetId,
+          })),
+        });
       },
     );
 

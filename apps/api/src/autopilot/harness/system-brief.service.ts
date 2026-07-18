@@ -69,6 +69,27 @@ export class SystemBriefService {
     private readonly memory: AgentMemoryService,
   ) {}
 
+  /** Top glossary terms as brief entries: verified first, then newest. */
+  private async glossaryEntries(): Promise<BriefMemoryEntry[]> {
+    const terms = await this.prisma.glossaryTerm.findMany({
+      orderBy: [{ verifiedAt: { sort: 'desc', nulls: 'last' } }, { updatedAt: 'desc' }],
+      take: MAX_GLOSSARY_ENTRIES,
+      select: { term: true, aliases: true, entityType: true, notes: true },
+    });
+    return terms.map((term) => ({
+      key: term.term,
+      content: [
+        term.entityType !== 'TERM' ? term.entityType : null,
+        term.aliases.length ? `aka ${term.aliases.join(', ')}` : null,
+        term.notes,
+      ]
+        .filter(Boolean)
+        .join(' — ')
+        .slice(0, MAX_MEMORY_CONTENT_LENGTH),
+      weight: 1,
+    }));
+  }
+
   /** Read the singleton; returns an empty default when none exists yet. */
   async get(): Promise<SystemBrief> {
     const row = await this.prisma.agentSystemBrief.findUnique({
@@ -100,7 +121,9 @@ export class SystemBriefService {
     const [brief, glossary, entityMaps, detectorInsights, precedents] =
       await Promise.all([
         this.get(),
-        this.memory.topByWeight(AgentMemoryKind.GLOSSARY, MAX_GLOSSARY_ENTRIES),
+        // Real operator-facing vocabulary, not legacy GLOSSARY memory slugs —
+        // what the brief shows is what agents imitate when proposing terms.
+        this.glossaryEntries(),
         this.memory.topByWeight(AgentMemoryKind.ENTITY_MAP, MAX_TOPIC_ENTRIES),
         this.memory.topByWeight(
           AgentMemoryKind.DETECTOR_INSIGHT,
@@ -119,7 +142,7 @@ export class SystemBriefService {
     return {
       overview: brief.content.trim(),
       facts,
-      glossary: glossary.map(toEntry),
+      glossary,
       topics: entityMaps.map(toEntry).slice(0, MAX_TOPIC_ENTRIES),
       gaps: [...detectorInsights, ...precedents]
         .map(toEntry)

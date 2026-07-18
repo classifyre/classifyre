@@ -8,9 +8,119 @@ type Reason = {
   impact: 'up' | 'down' | 'neutral';
 };
 
+type ValueRecurrenceRow = {
+  normalizedValue: string;
+  assetCount: bigint | number;
+  sourceCount: bigint | number;
+};
+
+export type ValueRecurrence = Map<string, { assets: number; sources: number }>;
+
+// Findings whose evidence text falls below this quality are treated as likely
+// OCR noise: their importance is scaled down proportionally instead of only
+// losing the 30% quality term, so junk lands near the bottom of the ranking.
+const QUALITY_GATE = 0.45;
+// A value shared by this many assets or more stops being a lead and becomes a
+// common token (dates, boilerplate headers); mirrors the correlation fan-out cap.
+const RECURRENCE_HUB_CAP = 25;
+const RECURRENCE_BONUS = 0.12;
+const COMMON_VALUE_PENALTY = 0.1;
+const MIN_RECURRENCE_VALUE_LENGTH = 4;
+const TEST_VALUE_PENALTY = 0.25;
+const REPEATED_DIGIT_PENALTY = 0.2;
+
+// Canonical payment-network test numbers (Visa/Mastercard/Amex/Discover/JCB/
+// Diners documentation values). A CRITICAL recognizer hit on one of these is a
+// fixture or template, never evidence.
+const KNOWN_TEST_NUMBERS = new Set([
+  '4111111111111111',
+  '4012888888881881',
+  '4222222222222',
+  '4917610000000000',
+  '5555555555554444',
+  '5105105105105100',
+  '2223003122003222',
+  '378282246310005',
+  '371449635398431',
+  '378734493671000',
+  '6011111111111117',
+  '6011000990139424',
+  '6011004829032453',
+  '3530111333300000',
+  '3566002020360505',
+  '30569309025904',
+  '38520000023237',
+]);
+
+function digitsOf(value: string): string {
+  return value.replace(/\D/g, '');
+}
+
+/** A long digit string dominated by one or two digits — OCR/repetition artifact. */
+function isRepeatedDigitPattern(value: string): boolean {
+  const digits = digitsOf(value);
+  if (digits.length < 8) return false;
+  return new Set(digits).size <= 2;
+}
+
+function isKnownTestValue(value: string): boolean {
+  const digits = digitsOf(value);
+  return digits.length >= 12 && KNOWN_TEST_NUMBERS.has(digits);
+}
+
 @Injectable()
 export class EmbeddingAnalysisService {
   constructor(private readonly prisma: PrismaService) {}
+
+  private normalizeValue(value: string): string {
+    return value.toLowerCase().replace(/\s+/g, ' ').trim();
+  }
+
+  private async valueRecurrence(values: string[]): Promise<ValueRecurrence> {
+    const unique = [
+      ...new Set(
+        values.filter((value) => value.length >= MIN_RECURRENCE_VALUE_LENGTH),
+      ),
+    ];
+    if (!unique.length) return new Map();
+    const rows = await this.prisma.$queryRaw<ValueRecurrenceRow[]>`
+      SELECT lower(btrim(regexp_replace(matched_content, '\\s+', ' ', 'g'))) AS "normalizedValue",
+        count(DISTINCT asset_id) AS "assetCount",
+        count(DISTINCT source_id) AS "sourceCount"
+      FROM findings
+      WHERE lower(btrim(regexp_replace(matched_content, '\\s+', ' ', 'g'))) = ANY(${unique}::text[])
+      GROUP BY 1
+    `;
+    return new Map(
+      rows.map((row) => [
+        row.normalizedValue,
+        { assets: Number(row.assetCount), sources: Number(row.sourceCount) },
+      ]),
+    );
+  }
+
+  /**
+   * Compute corpus-wide recurrence once for a full recalibration. Passing this
+   * snapshot into every analysis batch avoids rescanning the findings table
+   * once per 500 rows.
+   */
+  async valueRecurrenceSnapshot(): Promise<ValueRecurrence> {
+    const rows = await this.prisma.$queryRaw<ValueRecurrenceRow[]>`
+      SELECT lower(btrim(regexp_replace(matched_content, '\\s+', ' ', 'g'))) AS "normalizedValue",
+        count(DISTINCT asset_id) AS "assetCount",
+        count(DISTINCT source_id) AS "sourceCount"
+      FROM findings
+      WHERE length(lower(btrim(regexp_replace(matched_content, '\\s+', ' ', 'g')))) >= ${MIN_RECURRENCE_VALUE_LENGTH}
+      GROUP BY 1
+      HAVING count(DISTINCT asset_id) >= 2
+    `;
+    return new Map(
+      rows.map((row) => [
+        row.normalizedValue,
+        { assets: Number(row.assetCount), sources: Number(row.sourceCount) },
+      ]),
+    );
+  }
 
   private textQuality(text: string): number {
     if (!text.trim()) return 0;
@@ -41,7 +151,11 @@ export class EmbeddingAnalysisService {
     ];
   }
 
-  async analyzeHashes(spaceId: string, contentHashes: string[]): Promise<void> {
+  async analyzeHashes(
+    spaceId: string,
+    contentHashes: string[],
+    recurrenceSnapshot?: ValueRecurrence,
+  ): Promise<void> {
     if (!contentHashes.length) return;
     const findings = await this.prisma.finding.findMany({
       where: { embedContentHash: { in: contentHashes } },
@@ -64,6 +178,11 @@ export class EmbeddingAnalysisService {
         );
       }
     }
+    const recurrence =
+      recurrenceSnapshot ??
+      (await this.valueRecurrence(
+        findings.map((finding) => this.normalizeValue(finding.matchedContent)),
+      ));
 
     await Promise.all(
       findings.map(async (finding) => {
@@ -79,15 +198,41 @@ export class EmbeddingAnalysisService {
         const qualityScore = this.textQuality(context);
         const contextScore = Math.min(1, context.length / 320);
         const noveltyScore = 1 / Math.sqrt(similarCount + 1);
+        const normalizedValue = this.normalizeValue(finding.matchedContent);
+        const valueSpread = recurrence.get(normalizedValue);
+        const crossAssetCount = valueSpread?.assets ?? 0;
+        const crossSourceCount = valueSpread?.sources ?? 0;
+        const testValue = isKnownTestValue(finding.matchedContent);
+        const repeatedDigits =
+          !testValue && isRepeatedDigitPattern(finding.matchedContent);
+        // Recurrence is a lead only when the value reappears in DIFFERENT
+        // contexts: the same value inside identical context windows is a
+        // copied template/fixture, already handled as a duplicate group.
+        const crossDocumentLead =
+          !testValue &&
+          !repeatedDigits &&
+          similarCount === 0 &&
+          crossAssetCount >= 2 &&
+          crossAssetCount <= RECURRENCE_HUB_CAP;
+        const commonValue = crossAssetCount > RECURRENCE_HUB_CAP;
+        let base =
+          qualityScore * 0.3 +
+          Number(finding.confidence) * 0.2 +
+          noveltyScore * 0.25 +
+          contextScore * 0.15 +
+          this.severityWeight(finding.severity) * 0.1;
+        // Below the gate, quality scales the whole score: an unreadable
+        // fragment must not keep the novelty/severity/confidence points that
+        // let OCR junk rank mid-table.
+        if (qualityScore < QUALITY_GATE) {
+          base *= qualityScore / QUALITY_GATE;
+        }
+        if (crossDocumentLead) base += RECURRENCE_BONUS;
+        if (commonValue) base -= COMMON_VALUE_PENALTY;
+        if (testValue) base -= TEST_VALUE_PENALTY;
+        if (repeatedDigits) base -= REPEATED_DIGIT_PENALTY;
         const importanceScore =
-          Math.round(
-            (qualityScore * 0.3 +
-              Number(finding.confidence) * 0.2 +
-              noveltyScore * 0.25 +
-              contextScore * 0.15 +
-              this.severityWeight(finding.severity) * 0.1) *
-              1000,
-          ) / 1000;
+          Math.round(Math.max(0, Math.min(1, base)) * 1000) / 1000;
         const reasons: Reason[] = [];
         reasons.push(
           qualityScore < 0.45
@@ -122,6 +267,36 @@ export class EmbeddingAnalysisService {
             impact: 'up',
           });
         }
+        if (crossDocumentLead) {
+          reasons.push({
+            code: 'cross_document_recurrence',
+            label: `Same value found in ${crossAssetCount} assets${
+              crossSourceCount > 1 ? ` across ${crossSourceCount} sources` : ''
+            }`,
+            impact: 'up',
+          });
+        }
+        if (commonValue) {
+          reasons.push({
+            code: 'common_value',
+            label: `Common value shared by ${crossAssetCount} assets; not discriminating`,
+            impact: 'down',
+          });
+        }
+        if (testValue) {
+          reasons.push({
+            code: 'known_test_value',
+            label: 'Matches a documented payment-network test number',
+            impact: 'down',
+          });
+        }
+        if (repeatedDigits) {
+          reasons.push({
+            code: 'repeated_digit_pattern',
+            label: 'Digit string dominated by repeated digits; likely artifact',
+            impact: 'down',
+          });
+        }
         reasons.push({
           code: 'severity_separate',
           label: `${finding.severity.toLowerCase()} detector severity (not importance)`,
@@ -142,6 +317,9 @@ export class EmbeddingAnalysisService {
               contextScore,
               noveltyScore,
               detectorConfidence: Number(finding.confidence),
+              crossAssetCount,
+              crossSourceCount,
+              valueLength: normalizedValue.length,
               ...(similarCount > 0 ? { duplicateSimilarity: 1 } : {}),
             },
           },
@@ -156,6 +334,9 @@ export class EmbeddingAnalysisService {
               contextScore,
               noveltyScore,
               detectorConfidence: Number(finding.confidence),
+              crossAssetCount,
+              crossSourceCount,
+              valueLength: normalizedValue.length,
               ...(similarCount > 0 ? { duplicateSimilarity: 1 } : {}),
             },
             analyzedAt: new Date(),
