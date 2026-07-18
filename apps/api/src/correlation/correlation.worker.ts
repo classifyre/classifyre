@@ -8,6 +8,7 @@ import {
   AUTOPILOT_START_AFTER_SECONDS,
 } from '../autopilot/autopilot.constants';
 import { CORRELATION_QUEUE } from './correlation.constants';
+import { runsBackgroundWorkers } from '../service-role';
 import { DuplicatesFinderAgentService } from './duplicates-finder-agent.service';
 
 interface CorrelationJob {
@@ -34,6 +35,7 @@ export class CorrelationWorker implements OnApplicationBootstrap {
   ) {}
 
   async onApplicationBootstrap(): Promise<void> {
+    if (!runsBackgroundWorkers()) return;
     await this.recoverStaleRuns();
 
     const boss = await this.pgBoss.getBossAsync();
