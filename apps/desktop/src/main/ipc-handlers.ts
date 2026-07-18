@@ -4,6 +4,7 @@ import { NamespaceManager, type NamespaceUpdate } from './namespace-manager.js';
 import { SettingsManager, type AppSettings } from './settings-manager.js';
 import { UpdateChecker } from './update-checker.js';
 import { PostgresManager } from './postgres-manager.js';
+import { getThumbnailDataUrl, deleteThumbnail } from './thumbnails.js';
 
 export function registerIpcHandlers(
   runtime: NamespaceRuntime,
@@ -28,6 +29,7 @@ export function registerIpcHandlers(
       await runtime.close(id);
     }
     namespaceManager.delete(id);
+    deleteThumbnail(id);
     // Drop the workspace's data so deleting actually frees the database.
     if (ns && ns.type === 'local' && pg.isRunning()) {
       try {
@@ -45,10 +47,13 @@ export function registerIpcHandlers(
     return updated;
   });
 
-  ipcMain.handle('namespace:open', async (_event, id: string) => {
-    const entry = await runtime.open(id);
-    return { apiPort: entry.apiPort, namespaceId: id };
-  });
+  ipcMain.handle(
+    'namespace:open',
+    async (_event, id: string, options?: { activate?: boolean }) => {
+      const entry = await runtime.open(id, options ?? {});
+      return { apiPort: entry.apiPort, namespaceId: id };
+    },
+  );
 
   ipcMain.handle('namespace:close', async (_event, id: string) => {
     await runtime.close(id);
@@ -56,6 +61,12 @@ export function registerIpcHandlers(
 
   ipcMain.handle('namespace:is-open', (_event, id: string) => {
     return runtime.isOpen(id);
+  });
+
+  // Last captured screenshot of the workspace view (or null) as a data URL —
+  // the selector page is file://-served, so a filesystem path wouldn't load.
+  ipcMain.handle('namespace:thumbnail', (_event, id: string) => {
+    return getThumbnailDataUrl(id);
   });
 
   // Global app settings
