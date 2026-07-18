@@ -263,6 +263,7 @@ export class FindingsService {
       const ftsRows = await this.prisma.$queryRaw<{ id: string }[]>`
         SELECT id FROM findings
         WHERE to_tsvector('simple', matched_content) @@ plainto_tsquery('simple', ${search})
+        ORDER BY id
         LIMIT 1000
       `;
       if (ftsRows.length > 0) {
