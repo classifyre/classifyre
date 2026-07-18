@@ -97,9 +97,6 @@ spec:
             {{- toYaml . | nindent 12 }}
           {{- end }}
           volumeMounts:
-            {{- /* Dedicated emptyDir for sandbox temp files — ephemeral, no external storage needed. */}}
-            - name: sandbox-temp
-              mountPath: {{ .Values.api.sandbox.tempDir | quote }}
             {{- if .Values.api.embedding.enabled }}
             - name: embedding-cache
               mountPath: {{ .Values.api.embedding.cacheDir | quote }}
@@ -154,11 +151,6 @@ spec:
             {{- toYaml . | nindent 12 }}
           {{- end }}
       volumes:
-        - name: sandbox-temp
-          emptyDir:
-            {{- if .Values.api.sandbox.tempSizeLimit }}
-            sizeLimit: {{ .Values.api.sandbox.tempSizeLimit | quote }}
-            {{- end }}
         {{- if .Values.api.embedding.enabled }}
         - name: embedding-cache
           emptyDir:

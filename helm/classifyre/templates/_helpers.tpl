@@ -247,8 +247,6 @@ which each deployment sets on its own after including this block.
       name: {{ include "classifyre.databaseSecretName" . }}
       key: {{ .Values.postgres.external.existingSecretUrlKey }}
 {{- end }}
-- name: SANDBOX_TEMP_DIR
-  value: {{ .Values.api.sandbox.tempDir | quote }}
 - name: EMBEDDING_ENABLED
   value: {{ .Values.api.embedding.enabled | quote }}
 {{- if .Values.api.embedding.enabled }}
@@ -338,8 +336,6 @@ which each deployment sets on its own after including this block.
 {{- if .Values.objectStorage.enabled }}
 - name: S3_BUCKET
   value: {{ .Values.objectStorage.bucket | quote }}
-- name: S3_SANDBOX_BUCKET
-  value: {{ .Values.objectStorage.sandboxBucket | quote }}
 - name: S3_LOG_PREFIX
   value: {{ .Values.objectStorage.logPrefix | quote }}
 - name: S3_REGION
