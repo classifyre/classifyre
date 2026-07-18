@@ -10,8 +10,13 @@ import { EmbeddingService } from './embedding.service';
 import { runsBackgroundWorkers } from '../service-role';
 
 const EMBEDDING_QUEUE_PREFIX = 'semantic-embeddings';
+const RECALIBRATE_QUEUE_PREFIX = 'semantic-recalibrate';
 const EMBEDDING_GROUP = 'embedding-inference';
 const INSERT_BATCH_SIZE = 500;
+// Insert-time analysis is order-dependent (early vectors see a sparse space),
+// so a full recalibration pass runs once the inference queue drains. The delay
+// batches bursts of scans into one pass; singletonKey collapses repeat requests.
+const RECALIBRATE_DELAY_SECONDS = 120;
 
 type QueuedContent = { hash: string; text: string };
 type EmbeddingJob = QueuedContent & { spaceId: string };
@@ -23,11 +28,15 @@ export class EmbeddingQueueService implements OnApplicationBootstrap {
   private workerRegistered = false;
   private recoveryTimer?: NodeJS.Timeout;
   private queueName?: string;
+  private recalibrateQueueName?: string;
   private spaceId?: string;
   private backfillPromise?: Promise<void>;
   private backfillStartedAt?: string;
   private backfillCompletedAt?: string;
   private backfillError?: string;
+  private recalibrationRunning = false;
+  private lastRecalibratedAt?: string;
+  private lastRecalibrationError?: string;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -61,6 +70,13 @@ export class EmbeddingQueueService implements OnApplicationBootstrap {
       },
       (jobs) => this.handle(jobs),
     );
+    this.recalibrateQueueName = `${RECALIBRATE_QUEUE_PREFIX}-${space.id}`;
+    await boss.createQueue(this.recalibrateQueueName, { policy: 'exclusive' });
+    await boss.work(
+      this.recalibrateQueueName,
+      { batchSize: 1, localConcurrency: 1 },
+      () => this.handleRecalibration(),
+    );
     this.workerRegistered = true;
     this.logger.log(
       `Registered persistent embedding worker for space ${space.id} (batch=${this.config.batchSize}, global concurrency=${this.config.workerConcurrency})`,
@@ -82,7 +98,30 @@ export class EmbeddingQueueService implements OnApplicationBootstrap {
     });
   }
 
-  status() {
+  async status() {
+    // A recalibration pass is deliberately debounced (RECALIBRATE_DELAY_SECONDS),
+    // so "scheduled but not yet running" is the state operators actually see
+    // right after reindexing — surface it instead of looking idle.
+    let recalibrationScheduled = false;
+    if (this.recalibrateQueueName) {
+      try {
+        const boss = await this.pgBoss.getBossAsync();
+        const stats = await boss.getQueueStats(this.recalibrateQueueName);
+        recalibrationScheduled =
+          stats.queuedCount + stats.activeCount + stats.deferredCount > 0;
+      } catch {
+        // pg-boss not ready; report unscheduled rather than failing status.
+      }
+    }
+    let lastRecalibratedAt = this.lastRecalibratedAt;
+    if (this.spaceId) {
+      const space = await this.prisma.embeddingSpace.findUnique({
+        where: { id: this.spaceId },
+        select: { lastRecalibratedAt: true },
+      });
+      lastRecalibratedAt =
+        space?.lastRecalibratedAt?.toISOString() ?? lastRecalibratedAt;
+    }
     return {
       persistentQueue: true,
       pendingQueueWrites: this.pendingWrites,
@@ -95,7 +134,72 @@ export class EmbeddingQueueService implements OnApplicationBootstrap {
       backfillStartedAt: this.backfillStartedAt,
       backfillCompletedAt: this.backfillCompletedAt,
       backfillError: this.backfillError,
+      recalibrationScheduled,
+      recalibrationRunning: this.recalibrationRunning,
+      lastRecalibratedAt,
+      lastRecalibrationError: this.lastRecalibrationError,
     };
+  }
+
+  async scheduleRecalibration(): Promise<boolean> {
+    if (!this.config.enabled) return false;
+    try {
+      return await this.persistRecalibration();
+    } catch (error) {
+      this.logger.error(
+        `Failed to schedule embedding recalibration: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      return false;
+    }
+  }
+
+  private async persistRecalibration(singleton = true): Promise<boolean> {
+    if (!this.recalibrateQueueName || !this.spaceId) return false;
+    const boss = await this.pgBoss.getBossAsync();
+    const jobId = await boss.send(
+      this.recalibrateQueueName,
+      { spaceId: this.spaceId },
+      {
+        ...(singleton ? { singletonKey: this.spaceId } : {}),
+        startAfter: RECALIBRATE_DELAY_SECONDS,
+        retryLimit: 3,
+        retryDelay: this.config.retrySeconds,
+        expireInSeconds: 3600,
+        retentionSeconds: 86400,
+      },
+    );
+    return jobId !== null;
+  }
+
+  private async handleRecalibration(): Promise<void> {
+    if (!this.queueName || !this.spaceId) return;
+    const boss = await this.pgBoss.getBossAsync();
+    const stats = await boss.getQueueStats(this.queueName);
+    const pending = stats.queuedCount + stats.activeCount + stats.deferredCount;
+    if (pending > 0) {
+      // Inference is still draining; push the pass back until the space is
+      // stable so scores are computed against the full neighbourhood.
+      // The active job owns the singleton key until this handler returns, so
+      // another singleton send would be rejected. This worker is serial and
+      // only the active job takes this path, making one non-singleton deferred
+      // successor both reliable and duplicate-safe.
+      await this.persistRecalibration(false);
+      return;
+    }
+    this.recalibrationRunning = true;
+    this.lastRecalibrationError = undefined;
+    try {
+      await this.embeddings.recalibrateSpace(this.spaceId);
+      this.lastRecalibratedAt = new Date().toISOString();
+    } catch (error) {
+      this.lastRecalibrationError =
+        error instanceof Error ? error.message : String(error);
+      throw error;
+    } finally {
+      this.recalibrationRunning = false;
+    }
   }
 
   requestBackfill() {
@@ -181,6 +285,7 @@ export class EmbeddingQueueService implements OnApplicationBootstrap {
         vector: vectors[index],
       })),
     });
+    void this.scheduleRecalibration();
   }
 
   private scheduleRecovery(): void {
@@ -195,7 +300,9 @@ export class EmbeddingQueueService implements OnApplicationBootstrap {
     try {
       await this.backfillFindings();
       await this.backfillAssetChunks();
+      await this.backfillGlossaryTerms();
       this.backfillCompletedAt = new Date().toISOString();
+      void this.scheduleRecalibration();
       this.logger.log(
         `Embedding reconciliation queued for space ${this.spaceId}`,
       );
@@ -280,6 +387,53 @@ export class EmbeddingQueueService implements OnApplicationBootstrap {
         })),
       );
       cursor = chunks.at(-1)?.id;
+      await new Promise((resolve) => setImmediate(resolve));
+    } while (cursor);
+  }
+
+  private async backfillGlossaryTerms(): Promise<void> {
+    let cursor: string | undefined;
+    do {
+      const terms = await this.prisma.glossaryTerm.findMany({
+        ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+        orderBy: { id: 'asc' },
+        take: INSERT_BATCH_SIZE,
+        select: {
+          id: true,
+          term: true,
+          aliases: true,
+          notes: true,
+          embedContentHash: true,
+        },
+      });
+      if (!terms.length) break;
+      const contents = terms.map((term) => {
+        const text = normalizeEmbeddingText(
+          term.term,
+          ...term.aliases,
+          term.notes,
+        );
+        const hash = embeddingContentHash(text);
+        return {
+          id: term.id,
+          hash,
+          text,
+          needsHash: term.embedContentHash !== hash,
+        };
+      });
+      await Promise.all(
+        contents
+          .filter((content) => content.needsHash)
+          .map((content) =>
+            this.prisma.glossaryTerm.update({
+              where: { id: content.id },
+              data: { embedContentHash: content.hash },
+              select: { id: true },
+            }),
+          ),
+      );
+      await this.persistMissing(contents);
+      cursor = terms.at(-1)?.id;
       await new Promise((resolve) => setImmediate(resolve));
     } while (cursor);
   }

@@ -18,6 +18,7 @@ describe('SystemBriefService', () => {
     assetCluster: { count: jest.fn() },
     instanceSettings: { findUnique: jest.fn() },
     aiProviderConfig: { count: jest.fn() },
+    glossaryTerm: { findMany: jest.fn() },
   };
 
   const mockMemory = {
@@ -35,6 +36,9 @@ describe('SystemBriefService', () => {
     service = module.get(SystemBriefService);
     jest.clearAllMocks();
 
+    mockPrisma.glossaryTerm.findMany.mockResolvedValue([
+      { term: 'pii', aliases: [], entityType: 'TERM', notes: 'personal data' },
+    ]);
     mockMemory.topByWeight.mockImplementation((kind: AgentMemoryKind) => {
       const byKind: Partial<Record<AgentMemoryKind, unknown[]>> = {
         [AgentMemoryKind.GLOSSARY]: [

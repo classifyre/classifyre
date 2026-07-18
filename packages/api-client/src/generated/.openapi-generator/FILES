@@ -48,6 +48,7 @@ docs/AttachFindingsDto.md
 docs/AttachFindingsResponseDto.md
 docs/AutopilotApi.md
 docs/AutopilotStatsDto.md
+docs/BoilerplateClusterDto.md
 docs/BriefMemoryEntryDto.md
 docs/BriefSetupItemDto.md
 docs/BulkIngestAssetsDto.md
@@ -58,8 +59,10 @@ docs/BulkUpdateFindingsResponseDto.md
 docs/CaseActionRequestDto.md
 docs/CaseActionResponseDto.md
 docs/CaseActivityDto.md
+docs/CaseEventDto.md
 docs/CaseEvidenceDto.md
 docs/CaseFindingDto.md
+docs/CaseLeadDto.md
 docs/CaseLinkedInquiryDto.md
 docs/CaseListResponseDto.md
 docs/CaseResponseDto.md
@@ -83,6 +86,7 @@ docs/CorrelationLabelWeightDto.md
 docs/CreateAgentMemoryDto.md
 docs/CreateAiProviderConfigDto.md
 docs/CreateCaseDto.md
+docs/CreateCaseEventDto.md
 docs/CreateChatBotDto.md
 docs/CreateCustomDetectorDto.md
 docs/CreateExternalRunnerDto.md
@@ -100,11 +104,14 @@ docs/CustomDetectorResponseDtoSourcesUsingInner.md
 docs/CustomDetectorTestsApi.md
 docs/CustomDetectorTrainingRunDto.md
 docs/CustomDetectorsApi.md
+docs/DeleteGlossaryTermResponseDto.md
 docs/DeleteRunnerResponseDto.md
 docs/DiscoveryRecentRunDto.md
 docs/DiscoveryRunSourceDto.md
 docs/EdgeDetailDto.md
+docs/EmbeddingRecalibrateResponseDto.md
 docs/EmbeddingReindexResponseDto.md
+docs/EmbeddingStatusResponseDto.md
 docs/EmbeddingsApi.md
 docs/EvidenceEntityDto.md
 docs/ExclusionRuleDto.md
@@ -128,6 +135,11 @@ docs/FindingsDiscoveryStatusBreakdownDto.md
 docs/FindingsDiscoveryTopAssetDto.md
 docs/FindingsDiscoveryTotalsDto.md
 docs/FindingsRankingDto.md
+docs/GenerateCaseLeadsResponseDto.md
+docs/GlossaryApi.md
+docs/GlossaryListResponseDto.md
+docs/GlossaryLookupHitDto.md
+docs/GlossaryTermDto.md
 docs/GraphApi.md
 docs/GraphEdgeDto.md
 docs/GraphNodeDto.md
@@ -177,6 +189,7 @@ docs/ParsedTrainingExampleDto.md
 docs/PivotGraphDto.md
 docs/PreviewInquiryDto.md
 docs/PreviewResponseDto.md
+docs/ProposeCaseLeadDto.md
 docs/PullFromInquiryDto.md
 docs/PullFromInquiryResponseDto.md
 docs/PutAssetChunksDto.md
@@ -187,6 +200,7 @@ docs/RegisterDiscoveredAssetsResponseDto.md
 docs/RelationTypesResponseDto.md
 docs/RematchResponseDto.md
 docs/RerunSandboxRunDto.md
+docs/ReviewCaseLeadDto.md
 docs/RunnerAssetItemDto.md
 docs/RunnerAssetProgressDto.md
 docs/RunnerAssetStatusUpdateItem.md
@@ -244,6 +258,10 @@ docs/SearchSourcesRequestDto.md
 docs/SearchSourcesResponseDto.md
 docs/SearchSourcesTotalsDto.md
 docs/SemanticFindingsSearchDto.md
+docs/SimilarFindingAssetDto.md
+docs/SimilarFindingDto.md
+docs/SimilarFindingEvidenceAnalysisDto.md
+docs/SimilarFindingSourceDto.md
 docs/SourceAssetsControllerBulkIngest201Response.md
 docs/SourceInfoDto.md
 docs/SourceResponseDto.md
@@ -270,6 +288,7 @@ docs/UpdateAgentConfigDto.md
 docs/UpdateAgentMemoryDto.md
 docs/UpdateAiProviderConfigDto.md
 docs/UpdateCaseDto.md
+docs/UpdateCaseEventDto.md
 docs/UpdateCaseFindingNoteDto.md
 docs/UpdateChatBotDto.md
 docs/UpdateCorrelationConfigDto.md
@@ -286,8 +305,11 @@ docs/UpdateRunnerAssetStatusDto.md
 docs/UpdateSourceDto.md
 docs/UpdateSystemBriefDto.md
 docs/UpdateThreadDto.md
+docs/UpsertGlossaryTermDto.md
+docs/UpsertGlossaryTermResponseDto.md
 docs/ValueOccurrenceAssetDto.md
 docs/ValueOccurrencesResponseDto.md
+docs/VerifyGlossaryTermDto.md
 package.json
 src/apis/AIApi.ts
 src/apis/AIProviderConfigsApi.ts
@@ -302,6 +324,7 @@ src/apis/CustomDetectorTestsApi.ts
 src/apis/CustomDetectorsApi.ts
 src/apis/EmbeddingsApi.ts
 src/apis/FindingsApi.ts
+src/apis/GlossaryApi.ts
 src/apis/GraphApi.ts
 src/apis/HealthApi.ts
 src/apis/InquiriesApi.ts
@@ -355,6 +378,7 @@ src/models/AssistantControllerRespondRequestMessagesInner.ts
 src/models/AttachFindingsDto.ts
 src/models/AttachFindingsResponseDto.ts
 src/models/AutopilotStatsDto.ts
+src/models/BoilerplateClusterDto.ts
 src/models/BriefMemoryEntryDto.ts
 src/models/BriefSetupItemDto.ts
 src/models/BulkIngestAssetsDto.ts
@@ -365,8 +389,10 @@ src/models/BulkUpdateFindingsResponseDto.ts
 src/models/CaseActionRequestDto.ts
 src/models/CaseActionResponseDto.ts
 src/models/CaseActivityDto.ts
+src/models/CaseEventDto.ts
 src/models/CaseEvidenceDto.ts
 src/models/CaseFindingDto.ts
+src/models/CaseLeadDto.ts
 src/models/CaseLinkedInquiryDto.ts
 src/models/CaseListResponseDto.ts
 src/models/CaseResponseDto.ts
@@ -387,6 +413,7 @@ src/models/CorrelationLabelWeightDto.ts
 src/models/CreateAgentMemoryDto.ts
 src/models/CreateAiProviderConfigDto.ts
 src/models/CreateCaseDto.ts
+src/models/CreateCaseEventDto.ts
 src/models/CreateChatBotDto.ts
 src/models/CreateCustomDetectorDto.ts
 src/models/CreateExternalRunnerDto.ts
@@ -401,11 +428,14 @@ src/models/CustomDetectorExampleDto.ts
 src/models/CustomDetectorResponseDto.ts
 src/models/CustomDetectorResponseDtoSourcesUsingInner.ts
 src/models/CustomDetectorTrainingRunDto.ts
+src/models/DeleteGlossaryTermResponseDto.ts
 src/models/DeleteRunnerResponseDto.ts
 src/models/DiscoveryRecentRunDto.ts
 src/models/DiscoveryRunSourceDto.ts
 src/models/EdgeDetailDto.ts
+src/models/EmbeddingRecalibrateResponseDto.ts
 src/models/EmbeddingReindexResponseDto.ts
+src/models/EmbeddingStatusResponseDto.ts
 src/models/EvidenceEntityDto.ts
 src/models/ExclusionRuleDto.ts
 src/models/ExpandGraphDto.ts
@@ -427,6 +457,10 @@ src/models/FindingsDiscoveryStatusBreakdownDto.ts
 src/models/FindingsDiscoveryTopAssetDto.ts
 src/models/FindingsDiscoveryTotalsDto.ts
 src/models/FindingsRankingDto.ts
+src/models/GenerateCaseLeadsResponseDto.ts
+src/models/GlossaryListResponseDto.ts
+src/models/GlossaryLookupHitDto.ts
+src/models/GlossaryTermDto.ts
 src/models/GraphEdgeDto.ts
 src/models/GraphNodeDto.ts
 src/models/GraphResponseDto.ts
@@ -471,6 +505,7 @@ src/models/ParsedTrainingExampleDto.ts
 src/models/PivotGraphDto.ts
 src/models/PreviewInquiryDto.ts
 src/models/PreviewResponseDto.ts
+src/models/ProposeCaseLeadDto.ts
 src/models/PullFromInquiryDto.ts
 src/models/PullFromInquiryResponseDto.ts
 src/models/PutAssetChunksDto.ts
@@ -481,6 +516,7 @@ src/models/RegisterDiscoveredAssetsResponseDto.ts
 src/models/RelationTypesResponseDto.ts
 src/models/RematchResponseDto.ts
 src/models/RerunSandboxRunDto.ts
+src/models/ReviewCaseLeadDto.ts
 src/models/RunnerAssetItemDto.ts
 src/models/RunnerAssetProgressDto.ts
 src/models/RunnerAssetStatusUpdateItem.ts
@@ -536,6 +572,10 @@ src/models/SearchSourcesRequestDto.ts
 src/models/SearchSourcesResponseDto.ts
 src/models/SearchSourcesTotalsDto.ts
 src/models/SemanticFindingsSearchDto.ts
+src/models/SimilarFindingAssetDto.ts
+src/models/SimilarFindingDto.ts
+src/models/SimilarFindingEvidenceAnalysisDto.ts
+src/models/SimilarFindingSourceDto.ts
 src/models/SourceAssetsControllerBulkIngest201Response.ts
 src/models/SourceInfoDto.ts
 src/models/SourceResponseDto.ts
@@ -560,6 +600,7 @@ src/models/UpdateAgentConfigDto.ts
 src/models/UpdateAgentMemoryDto.ts
 src/models/UpdateAiProviderConfigDto.ts
 src/models/UpdateCaseDto.ts
+src/models/UpdateCaseEventDto.ts
 src/models/UpdateCaseFindingNoteDto.ts
 src/models/UpdateChatBotDto.ts
 src/models/UpdateCorrelationConfigDto.ts
@@ -576,8 +617,11 @@ src/models/UpdateRunnerAssetStatusDto.ts
 src/models/UpdateSourceDto.ts
 src/models/UpdateSystemBriefDto.ts
 src/models/UpdateThreadDto.ts
+src/models/UpsertGlossaryTermDto.ts
+src/models/UpsertGlossaryTermResponseDto.ts
 src/models/ValueOccurrenceAssetDto.ts
 src/models/ValueOccurrencesResponseDto.ts
+src/models/VerifyGlossaryTermDto.ts
 src/models/index.ts
 src/runtime.ts
 tsconfig.esm.json

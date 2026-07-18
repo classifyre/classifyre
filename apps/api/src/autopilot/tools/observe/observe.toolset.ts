@@ -2,7 +2,6 @@ import { Injectable } from '@nestjs/common';
 import { AgentMemoryKind } from '@prisma/client';
 import { AgentSearchService } from '../../search/agent-search.service';
 import { AgentMemoryService } from '../../memory/agent-memory.service';
-import { MAX_GLOSSARY_ENTRIES } from '../../autopilot.constants';
 import type { Tool } from '../tool.types';
 
 const EMPTY_INPUT = {
@@ -179,7 +178,7 @@ export class ObserveToolset {
       {
         name: 'memory.search',
         description:
-          'Recall long-lived agent memory (glossary, decision precedents, topic→entity maps) by free-text query.',
+          'Recall long-lived agent memory (decision precedents, topic→entity maps) by free-text query. For shared vocabulary (names, orgs, codenames) use glossary.lookup instead.',
         inputSchema: {
           type: 'object',
           properties: {
@@ -196,17 +195,10 @@ export class ObserveToolset {
           const terms = (typeof input.query === 'string' ? input.query : '')
             .split(/\s+/)
             .filter(Boolean);
-          const [glossary, related] = await Promise.all([
-            this.memory.topByWeight(
-              AgentMemoryKind.GLOSSARY,
-              MAX_GLOSSARY_ENTRIES,
-            ),
-            this.memory.recall(
-              [AgentMemoryKind.ENTITY_MAP, AgentMemoryKind.DECISION_PRECEDENT],
-              terms,
-            ),
-          ]);
-          return [...glossary, ...related];
+          return this.memory.recall(
+            [AgentMemoryKind.ENTITY_MAP, AgentMemoryKind.DECISION_PRECEDENT],
+            terms,
+          );
         },
       },
     ];

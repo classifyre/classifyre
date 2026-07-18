@@ -28,7 +28,20 @@ type BoilerplateClusterRow = {
   findingCount: bigint | number;
   findingIds: string[];
   meanImportance: number;
+  sourceCount: bigint | number;
+  sourceIds: string[];
+  assetIds: string[];
 };
+
+// Outlier/quality adjustments need at least this many same-type neighbours to
+// mean anything; below it the neighbourhood signal is treated as unavailable.
+const MIN_NEIGHBORHOOD = 5;
+// "Semantically unusual" must be rare to mean anything. On MiniLM over diverse
+// evidence text the corpus-median outlier strength is ~0.3, so the reason/bonus
+// bar sits at the top decile (~0.55) rather than the old 0.35, which flagged
+// half the corpus.
+const OUTLIER_BONUS_THRESHOLD = 0.55;
+const RECALIBRATE_BATCH_SIZE = 500;
 
 @Injectable()
 export class EmbeddingService implements OnApplicationBootstrap {
@@ -194,6 +207,26 @@ export class EmbeddingService implements OnApplicationBootstrap {
       select: { contentHash: true },
     });
     const presentSet = new Set(present.map((item) => item.contentHash));
+    // Self-heal: a vector that is already stored but whose finding lost its
+    // evidence analysis (manual deletion, partial failure) is re-analyzed as
+    // part of negotiation, so scans repair ranking coverage as they run.
+    if (presentSet.size) {
+      const unanalyzed = await this.prisma.finding.findMany({
+        where: {
+          embedContentHash: { in: [...presentSet] },
+          evidenceAnalysis: null,
+        },
+        select: { embedContentHash: true },
+        distinct: ['embedContentHash'],
+      });
+      const healHashes = unanalyzed
+        .map((row) => row.embedContentHash)
+        .filter((hash): hash is string => hash !== null);
+      if (healHashes.length) {
+        await this.analysis.analyzeHashes(space.id, healHashes);
+        await this.calibrateNeighborhood(space.id, healHashes);
+      }
+    }
     return {
       spaceId: space.id,
       missing: [...new Set(hashes)].filter((hash) => !presentSet.has(hash)),
@@ -259,6 +292,49 @@ export class EmbeddingService implements OnApplicationBootstrap {
       items.map((item) => item.contentHash),
     );
     return { created, received: items.length };
+  }
+
+  /**
+   * Re-run evidence analysis and neighbourhood calibration for every finding
+   * that has an embedding hash. Insert-time calibration is order-dependent —
+   * the first vectors stored see a nearly empty space — so this pass must run
+   * once the space is stable (after a backfill or scan drains the queue) to
+   * make importance scores corpus-relative instead of insert-order-relative.
+   */
+  async recalibrateSpace(spaceId?: string): Promise<{ analyzed: number }> {
+    const resolvedSpaceId = spaceId ?? (await this.activeSpace()).id;
+    const recurrence = await this.analysis.valueRecurrenceSnapshot();
+    let cursor: string | undefined;
+    let analyzed = 0;
+    do {
+      const findings = await this.prisma.finding.findMany({
+        where: { embedContentHash: { not: null } },
+        ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+        orderBy: { id: 'asc' },
+        take: RECALIBRATE_BATCH_SIZE,
+        select: { id: true, embedContentHash: true },
+      });
+      if (!findings.length) break;
+      const hashes = [
+        ...new Set(
+          findings.map((finding) => finding.embedContentHash as string),
+        ),
+      ];
+      await this.analysis.analyzeHashes(resolvedSpaceId, hashes, recurrence);
+      await this.calibrateNeighborhood(resolvedSpaceId, hashes);
+      analyzed += findings.length;
+      cursor = findings.at(-1)?.id;
+      await new Promise((resolve) => setImmediate(resolve));
+    } while (cursor);
+    await this.prisma.embeddingSpace.update({
+      where: { id: resolvedSpaceId },
+      data: { lastRecalibratedAt: new Date() },
+      select: { id: true },
+    });
+    this.logger.log(
+      `Recalibrated evidence analyses for ${analyzed} findings in space ${resolvedSpaceId}`,
+    );
+    return { analyzed };
   }
 
   private async calibrateNeighborhood(
@@ -340,17 +416,35 @@ export class EmbeddingService implements OnApplicationBootstrap {
         const meanSimilarity =
           neighbors.reduce((sum, neighbor) => sum + neighbor.score, 0) /
           neighbors.length;
-        const semanticOutlier = Math.max(0, Math.min(1, 1 - meanSimilarity));
         const nearDuplicates = neighbors.filter(
           (neighbor) => neighbor.score >= 0.95,
         );
+        // A sparse neighbourhood (fewer than MIN_NEIGHBORHOOD same-type
+        // vectors in the space) says nothing about how unusual the evidence
+        // is — the first vectors analyzed would otherwise all read as extreme
+        // outliers and keep that bonus forever.
+        const neighborhoodReliable = neighbors.length >= MIN_NEIGHBORHOOD;
+        const semanticOutlier = neighborhoodReliable
+          ? Math.max(0, Math.min(1, 1 - meanSimilarity))
+          : 0;
         const textQuality = analysis.qualityScore;
-        const qualityScore = Math.max(
-          0,
-          Math.min(1, textQuality * 0.8 + meanSimilarity * 0.2),
+        const qualityScore = neighborhoodReliable
+          ? Math.max(0, Math.min(1, textQuality * 0.8 + meanSimilarity * 0.2))
+          : textQuality;
+        // A tiny matched value ("LOCH", "=") is weak evidence however unusual
+        // its embedding looks; the outlier bonus needs substance to reward.
+        const valueLength = Number(
+          (analysis.signals as Record<string, unknown> | null)?.[
+            'valueLength'
+          ] ?? Number.MAX_SAFE_INTEGER,
         );
-        const outlierAdjustment =
-          textQuality >= 0.55 ? semanticOutlier * 0.12 : -semanticOutlier * 0.2;
+        const outlierAdjustment = !neighborhoodReliable
+          ? 0
+          : textQuality < 0.55
+            ? -semanticOutlier * 0.2
+            : semanticOutlier >= OUTLIER_BONUS_THRESHOLD && valueLength >= 5
+              ? semanticOutlier * 0.12
+              : 0;
         const duplicatePenalty = Math.min(0.15, nearDuplicates.length * 0.025);
         const importanceScore = Math.max(
           0,
@@ -370,23 +464,29 @@ export class EmbeddingService implements OnApplicationBootstrap {
           });
         }
         reasons.push(
-          textQuality < 0.55 && semanticOutlier > 0.45
+          !neighborhoodReliable
             ? {
-                code: 'isolated_ocr',
-                label: 'Isolated low-quality text; possible OCR noise',
-                impact: 'down',
+                code: 'insufficient_neighborhood',
+                label: 'Too few comparable findings for semantic analysis',
+                impact: 'neutral',
               }
-            : semanticOutlier > 0.35
+            : textQuality < 0.55 && semanticOutlier > 0.45
               ? {
-                  code: 'semantic_outlier',
-                  label: 'Semantically unusual for its neighbours',
-                  impact: 'up',
+                  code: 'isolated_ocr',
+                  label: 'Isolated low-quality text; possible OCR noise',
+                  impact: 'down',
                 }
-              : {
-                  code: 'semantic_support',
-                  label: 'Consistent with its semantic neighbours',
-                  impact: 'neutral',
-                },
+              : semanticOutlier >= OUTLIER_BONUS_THRESHOLD
+                ? {
+                    code: 'semantic_outlier',
+                    label: 'Semantically unusual for its neighbours',
+                    impact: 'up',
+                  }
+                : {
+                    code: 'semantic_support',
+                    label: 'Consistent with its semantic neighbours',
+                    impact: 'neutral',
+                  },
         );
         await this.prisma.findingEvidenceAnalysis.update({
           where: { findingId },
@@ -570,7 +670,16 @@ export class EmbeddingService implements OnApplicationBootstrap {
     });
   }
 
-  async similarFindings(findingId: string, limit: number) {
+  // Query params arrive as strings (no global ValidationPipe); coerce before
+  // they reach arithmetic or SQL.
+  private toNumber(value: unknown, fallback: number, min: number, max: number) {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) return fallback;
+    return Math.min(Math.max(parsed, min), max);
+  }
+
+  async similarFindings(findingId: string, limitInput: number) {
+    const limit = Math.trunc(this.toNumber(limitInput, 20, 1, 100));
     const finding = await this.prisma.finding.findUnique({
       where: { id: findingId },
       select: { embedContentHash: true, sourceId: true },
@@ -614,16 +723,38 @@ export class EmbeddingService implements OnApplicationBootstrap {
     });
   }
 
-  async boilerplateClusters(sourceId: string, threshold = 0.95, limit = 50) {
-    const rows = await this.prisma.$queryRaw<BoilerplateClusterRow[]>`
+  /**
+   * Near-duplicate finding clusters. Group hashes are precomputed during
+   * neighbourhood calibration across the WHOLE space, so clusters naturally
+   * span sources; `sourceIds` only filters which findings are counted.
+   * Omit it to see duplicates across the entire corpus.
+   */
+  async boilerplateClusters(options: {
+    sourceIds?: string[];
+    threshold?: number;
+    limit?: number;
+  }) {
+    const threshold = this.toNumber(options.threshold, 0.95, 0.8, 1);
+    const limit = Math.trunc(this.toNumber(options.limit, 50, 1, 200));
+    const sourceIds = (options.sourceIds ?? []).filter(
+      (id) => typeof id === 'string' && id.length > 0,
+    );
+    const sourceFilter = sourceIds.length
+      ? Prisma.sql`AND finding.source_id IN (${Prisma.join(sourceIds)})`
+      : Prisma.empty;
+    const rows = await this.prisma.$queryRaw<BoilerplateClusterRow[]>(
+      Prisma.sql`
       SELECT analysis.duplicate_group_hash AS "groupHash",
         COUNT(*) AS "findingCount",
         (ARRAY_AGG(finding.id ORDER BY analysis.importance_score DESC))[1:10] AS "findingIds",
-        AVG(analysis.importance_score) AS "meanImportance"
+        AVG(analysis.importance_score) AS "meanImportance",
+        COUNT(DISTINCT finding.source_id) AS "sourceCount",
+        (ARRAY_AGG(DISTINCT finding.source_id))[1:10] AS "sourceIds",
+        (ARRAY_AGG(DISTINCT finding.asset_id))[1:50] AS "assetIds"
       FROM finding_evidence_analyses analysis
       JOIN findings finding ON finding.id = analysis.finding_id
-      WHERE finding.source_id = ${sourceId}
-        AND analysis.duplicate_group_hash IS NOT NULL
+      WHERE analysis.duplicate_group_hash IS NOT NULL
+        ${sourceFilter}
         AND COALESCE(
           (analysis.signals->>'duplicateSimilarity')::double precision,
           0
@@ -632,11 +763,13 @@ export class EmbeddingService implements OnApplicationBootstrap {
       HAVING COUNT(*) > 1
       ORDER BY COUNT(*) DESC, AVG(analysis.importance_score) DESC
       LIMIT ${limit}
-    `;
+    `,
+    );
     return rows.map((row) => ({
       ...row,
       findingCount: Number(row.findingCount),
       meanImportance: Number(row.meanImportance),
+      sourceCount: Number(row.sourceCount),
       threshold,
     }));
   }
