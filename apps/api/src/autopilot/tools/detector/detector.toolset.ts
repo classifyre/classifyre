@@ -122,7 +122,7 @@ export class DetectorToolset {
       {
         name: 'detector.test',
         description:
-          'Run a detector against ad-hoc sample text and return what it matched — use it to verify a detector works BEFORE and AFTER creating it. Pass `pipelineSchema` to dry-run a draft, or `detectorId` to test a saved detector. First call may take 90–120s (model cold start).',
+          'Run a detector against ad-hoc sample text and return what it matched — use it to verify a detector works BEFORE and AFTER creating it. Pass `pipelineSchema` to dry-run a draft (for LLM drafts also pass `aiProviderConfigId`), or `detectorId` to test a saved detector. First call may take 90–120s (model cold start).',
         inputSchema: {
           type: 'object',
           properties: {
@@ -130,6 +130,7 @@ export class DetectorToolset {
             pipelineSchema: { type: 'object' },
             key: { type: 'string' },
             name: { type: 'string' },
+            aiProviderConfigId: { type: 'string' },
             sampleText: { type: 'string', minLength: 1 },
           },
           required: ['sampleText'],
@@ -144,6 +145,7 @@ export class DetectorToolset {
             key: string;
             name: string;
             pipelineSchema: Record<string, unknown>;
+            aiProviderConfigId?: string | null;
           };
           if (typeof input.detectorId === 'string' && input.detectorId) {
             const saved = await this.detectors.getById(input.detectorId);
@@ -151,6 +153,7 @@ export class DetectorToolset {
               key: saved.key,
               name: saved.name,
               pipelineSchema: saved.pipelineSchema,
+              aiProviderConfigId: saved.aiProviderConfigId ?? null,
             };
           } else if (
             input.pipelineSchema &&
@@ -160,6 +163,8 @@ export class DetectorToolset {
               key: (input.key as string | undefined) ?? 'draft-test',
               name: (input.name as string | undefined) ?? 'draft',
               pipelineSchema: input.pipelineSchema as Record<string, unknown>,
+              aiProviderConfigId:
+                (input.aiProviderConfigId as string | undefined) ?? null,
             };
           } else {
             throw new Error('Provide either detectorId or pipelineSchema.');

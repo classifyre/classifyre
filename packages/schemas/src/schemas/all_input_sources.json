@@ -127,7 +127,7 @@
       },
       "image": {
         "type": "object",
-        "description": "Image dimensions (png, jpg, gif, webp, \u2026)",
+        "description": "Image dimensions (png, jpg, gif, webp, heic, \u2026)",
         "properties": {
           "image_width": {
             "type": "integer",
@@ -306,6 +306,14 @@
             "etag": {
               "type": "string",
               "description": "SHA-256 content hash"
+            },
+            "source_hash": {
+              "type": "string",
+              "description": "Hash of the parent asset (embedded images and archive members only)"
+            },
+            "location": {
+              "type": "string",
+              "description": "Location within the parent (embedded image location or archive member path)"
             }
           },
           "required": ["provider", "object_key"]
@@ -327,11 +335,11 @@
             },
             "source_hash": {
               "type": "string",
-              "description": "Hash of the parent uploaded file asset"
+              "description": "Hash of the parent asset (embedded images and archive members only)"
             },
             "location": {
               "type": "string",
-              "description": "Location of the embedded image within the parent"
+              "description": "Location within the parent (embedded image location or archive member path)"
             }
           },
           "required": []
@@ -346,6 +354,14 @@
             "object_key": {
               "type": "string",
               "description": "Uploaded source file ID"
+            },
+            "source_hash": {
+              "type": "string",
+              "description": "Hash of the parent asset (embedded images and archive members only)"
+            },
+            "location": {
+              "type": "string",
+              "description": "Location within the parent (embedded image location or archive member path)"
             }
           },
           "required": ["provider", "object_key"]
@@ -360,6 +376,40 @@
             "object_key": {
               "type": "string",
               "description": "Uploaded source file ID"
+            },
+            "source_hash": {
+              "type": "string",
+              "description": "Hash of the parent asset (embedded images and archive members only)"
+            },
+            "location": {
+              "type": "string",
+              "description": "Location within the parent (embedded image location or archive member path)"
+            }
+          },
+          "required": ["provider", "object_key"]
+        },
+        "archive": {
+          "use": ["file"],
+          "properties": {
+            "provider": {
+              "type": "string",
+              "description": "Uploaded-file source provider label"
+            },
+            "object_key": {
+              "type": "string",
+              "description": "Uploaded source file ID"
+            },
+            "etag": {
+              "type": "string",
+              "description": "SHA-256 content hash"
+            },
+            "source_hash": {
+              "type": "string",
+              "description": "Hash of the parent asset (embedded images and archive members only)"
+            },
+            "location": {
+              "type": "string",
+              "description": "Location within the parent (embedded image location or archive member path)"
             }
           },
           "required": ["provider", "object_key"]
@@ -380,6 +430,14 @@
             "etag": {
               "type": "string",
               "description": "Object entity tag"
+            },
+            "source_hash": {
+              "type": "string",
+              "description": "Hash of the parent asset (embedded images and archive members only)"
+            },
+            "location": {
+              "type": "string",
+              "description": "Location within the parent (embedded image location or archive member path)"
             }
           },
           "required": ["provider", "object_key"]
@@ -401,11 +459,11 @@
             },
             "source_hash": {
               "type": "string",
-              "description": "Hash of the parent object asset"
+              "description": "Hash of the parent asset (embedded images and archive members only)"
             },
             "location": {
               "type": "string",
-              "description": "Location of the embedded image within the parent"
+              "description": "Location within the parent (embedded image location or archive member path)"
             }
           },
           "required": []
@@ -420,6 +478,14 @@
             "object_key": {
               "type": "string",
               "description": "Object key/path"
+            },
+            "source_hash": {
+              "type": "string",
+              "description": "Hash of the parent asset (embedded images and archive members only)"
+            },
+            "location": {
+              "type": "string",
+              "description": "Location within the parent (embedded image location or archive member path)"
             }
           },
           "required": ["provider", "object_key"]
@@ -434,6 +500,40 @@
             "object_key": {
               "type": "string",
               "description": "Object key/path"
+            },
+            "source_hash": {
+              "type": "string",
+              "description": "Hash of the parent asset (embedded images and archive members only)"
+            },
+            "location": {
+              "type": "string",
+              "description": "Location within the parent (embedded image location or archive member path)"
+            }
+          },
+          "required": ["provider", "object_key"]
+        },
+        "archive": {
+          "use": ["file"],
+          "properties": {
+            "provider": {
+              "type": "string",
+              "description": "Storage provider label"
+            },
+            "object_key": {
+              "type": "string",
+              "description": "Object key/path"
+            },
+            "etag": {
+              "type": "string",
+              "description": "Object entity tag"
+            },
+            "source_hash": {
+              "type": "string",
+              "description": "Hash of the parent asset (embedded images and archive members only)"
+            },
+            "location": {
+              "type": "string",
+              "description": "Location within the parent (embedded image location or archive member path)"
             }
           },
           "required": ["provider", "object_key"]
@@ -454,6 +554,14 @@
             "etag": {
               "type": "string",
               "description": "Change signature derived from file size and modification time"
+            },
+            "source_hash": {
+              "type": "string",
+              "description": "Hash of the parent asset (embedded images and archive members only)"
+            },
+            "location": {
+              "type": "string",
+              "description": "Location within the parent (embedded image location or archive member path)"
             }
           },
           "required": ["provider", "object_key"]
@@ -475,11 +583,11 @@
             },
             "source_hash": {
               "type": "string",
-              "description": "Hash of the parent file asset (embedded images only)"
+              "description": "Hash of the parent asset (embedded images and archive members only)"
             },
             "location": {
               "type": "string",
-              "description": "Location of the embedded image within the parent (embedded images only)"
+              "description": "Location within the parent (embedded image location or archive member path)"
             }
           },
           "required": []
@@ -498,6 +606,14 @@
             "etag": {
               "type": "string",
               "description": "Change signature derived from file size and modification time"
+            },
+            "source_hash": {
+              "type": "string",
+              "description": "Hash of the parent asset (embedded images and archive members only)"
+            },
+            "location": {
+              "type": "string",
+              "description": "Location within the parent (embedded image location or archive member path)"
             }
           },
           "required": ["provider", "object_key"]
@@ -516,6 +632,40 @@
             "etag": {
               "type": "string",
               "description": "Change signature derived from file size and modification time"
+            },
+            "source_hash": {
+              "type": "string",
+              "description": "Hash of the parent asset (embedded images and archive members only)"
+            },
+            "location": {
+              "type": "string",
+              "description": "Location within the parent (embedded image location or archive member path)"
+            }
+          },
+          "required": ["provider", "object_key"]
+        },
+        "archive": {
+          "use": ["file"],
+          "properties": {
+            "provider": {
+              "type": "string",
+              "description": "Storage provider label"
+            },
+            "object_key": {
+              "type": "string",
+              "description": "File path relative to the scanned folder"
+            },
+            "etag": {
+              "type": "string",
+              "description": "Change signature derived from file size and modification time"
+            },
+            "source_hash": {
+              "type": "string",
+              "description": "Hash of the parent asset (embedded images and archive members only)"
+            },
+            "location": {
+              "type": "string",
+              "description": "Location within the parent (embedded image location or archive member path)"
             }
           },
           "required": ["provider", "object_key"]
@@ -536,6 +686,14 @@
             "etag": {
               "type": "string",
               "description": "Object entity tag"
+            },
+            "source_hash": {
+              "type": "string",
+              "description": "Hash of the parent asset (embedded images and archive members only)"
+            },
+            "location": {
+              "type": "string",
+              "description": "Location within the parent (embedded image location or archive member path)"
             }
           },
           "required": ["provider", "object_key"]
@@ -557,11 +715,11 @@
             },
             "source_hash": {
               "type": "string",
-              "description": "Hash of the parent object asset"
+              "description": "Hash of the parent asset (embedded images and archive members only)"
             },
             "location": {
               "type": "string",
-              "description": "Location of the embedded image within the parent"
+              "description": "Location within the parent (embedded image location or archive member path)"
             }
           },
           "required": []
@@ -576,6 +734,14 @@
             "object_key": {
               "type": "string",
               "description": "Object key/path"
+            },
+            "source_hash": {
+              "type": "string",
+              "description": "Hash of the parent asset (embedded images and archive members only)"
+            },
+            "location": {
+              "type": "string",
+              "description": "Location within the parent (embedded image location or archive member path)"
             }
           },
           "required": ["provider", "object_key"]
@@ -590,6 +756,40 @@
             "object_key": {
               "type": "string",
               "description": "Object key/path"
+            },
+            "source_hash": {
+              "type": "string",
+              "description": "Hash of the parent asset (embedded images and archive members only)"
+            },
+            "location": {
+              "type": "string",
+              "description": "Location within the parent (embedded image location or archive member path)"
+            }
+          },
+          "required": ["provider", "object_key"]
+        },
+        "archive": {
+          "use": ["file"],
+          "properties": {
+            "provider": {
+              "type": "string",
+              "description": "Storage provider label"
+            },
+            "object_key": {
+              "type": "string",
+              "description": "Object key/path"
+            },
+            "etag": {
+              "type": "string",
+              "description": "Object entity tag"
+            },
+            "source_hash": {
+              "type": "string",
+              "description": "Hash of the parent asset (embedded images and archive members only)"
+            },
+            "location": {
+              "type": "string",
+              "description": "Location within the parent (embedded image location or archive member path)"
             }
           },
           "required": ["provider", "object_key"]
@@ -610,6 +810,14 @@
             "etag": {
               "type": "string",
               "description": "Object entity tag"
+            },
+            "source_hash": {
+              "type": "string",
+              "description": "Hash of the parent asset (embedded images and archive members only)"
+            },
+            "location": {
+              "type": "string",
+              "description": "Location within the parent (embedded image location or archive member path)"
             }
           },
           "required": ["provider", "object_key"]
@@ -631,11 +839,11 @@
             },
             "source_hash": {
               "type": "string",
-              "description": "Hash of the parent object asset"
+              "description": "Hash of the parent asset (embedded images and archive members only)"
             },
             "location": {
               "type": "string",
-              "description": "Location of the embedded image within the parent"
+              "description": "Location within the parent (embedded image location or archive member path)"
             }
           },
           "required": []
@@ -650,6 +858,14 @@
             "object_key": {
               "type": "string",
               "description": "Object key/path"
+            },
+            "source_hash": {
+              "type": "string",
+              "description": "Hash of the parent asset (embedded images and archive members only)"
+            },
+            "location": {
+              "type": "string",
+              "description": "Location within the parent (embedded image location or archive member path)"
             }
           },
           "required": ["provider", "object_key"]
@@ -664,6 +880,40 @@
             "object_key": {
               "type": "string",
               "description": "Object key/path"
+            },
+            "source_hash": {
+              "type": "string",
+              "description": "Hash of the parent asset (embedded images and archive members only)"
+            },
+            "location": {
+              "type": "string",
+              "description": "Location within the parent (embedded image location or archive member path)"
+            }
+          },
+          "required": ["provider", "object_key"]
+        },
+        "archive": {
+          "use": ["file"],
+          "properties": {
+            "provider": {
+              "type": "string",
+              "description": "Storage provider label"
+            },
+            "object_key": {
+              "type": "string",
+              "description": "Object key/path"
+            },
+            "etag": {
+              "type": "string",
+              "description": "Object entity tag"
+            },
+            "source_hash": {
+              "type": "string",
+              "description": "Hash of the parent asset (embedded images and archive members only)"
+            },
+            "location": {
+              "type": "string",
+              "description": "Location within the parent (embedded image location or archive member path)"
             }
           },
           "required": ["provider", "object_key"]

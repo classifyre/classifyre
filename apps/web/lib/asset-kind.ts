@@ -1,4 +1,5 @@
 import {
+  Archive,
   Database,
   File,
   FileText,
@@ -23,6 +24,7 @@ import {
 // Mirrors the asset kinds declared in x-asset-metadata.
 const assetKindIconMap: Record<string, LucideIcon> = {
   file: File,
+  archive: Archive,
   image: Image,
   page: FileText,
   post: FileText,

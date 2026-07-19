@@ -99,7 +99,18 @@ def extract_file_metadata(
     return metadata
 
 
-_IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".tiff", ".ico"}
+_IMAGE_EXTENSIONS = {
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".gif",
+    ".webp",
+    ".bmp",
+    ".tiff",
+    ".ico",
+    ".heic",
+    ".heif",
+}
 _TEXT_EXTENSIONS = {".txt", ".md", ".xml", ".log", ".yaml", ".yml"}
 
 
@@ -220,6 +231,13 @@ def _csv_metadata(file_bytes: bytes, extension: str) -> dict[str, Any]:
 
 
 def _image_metadata(file_bytes: bytes) -> dict[str, Any]:
+    try:
+        # Registers HEIC/HEIF decoding with Pillow when pillow-heif is present.
+        from pillow_heif import register_heif_opener  # type: ignore[import-untyped]
+
+        register_heif_opener()
+    except ImportError:
+        pass
     from PIL import Image  # type: ignore[import-untyped]
 
     with Image.open(io.BytesIO(file_bytes)) as image:
