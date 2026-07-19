@@ -40,6 +40,7 @@ const config = {
 };
 
 const worker = new Worker(path.resolve(workerPath));
+let terminating = false;
 const timer = setTimeout(() => {
   console.error(`Embedding worker smoke test timed out after ${TIMEOUT_MS}ms`);
   process.exit(1);
@@ -61,6 +62,7 @@ worker.on('message', (message) => {
   console.log(
     `Embedding worker smoke test passed (${vector.length}-dim vector from staged worker).`,
   );
+  terminating = true;
   worker.terminate().then(() => process.exit(0));
 });
 worker.on('error', (error) => {
@@ -69,7 +71,7 @@ worker.on('error', (error) => {
   process.exit(1);
 });
 worker.on('exit', (code) => {
-  if (code !== 0) {
+  if (!terminating && code !== 0) {
     clearTimeout(timer);
     console.error(
       `Embedding worker smoke test FAILED: worker exited with code ${code}`,
