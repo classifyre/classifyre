@@ -60,7 +60,7 @@ privacy = [
     # phonenumbers 9.x introduced lazy region loading via __import__ which fails
     # mid-run in frozen/venv contexts. 8.x eagerly loads all data at import time,
     # avoiding ModuleNotFoundError during Presidio phone number analysis.
-    "phonenumbers>=8.13.0,<10.0.0",
+    "phonenumbers>=8.13.0,<9.0.0",
     "numpy>=1.26.0,<3.0.0",
 ]
 security = [
