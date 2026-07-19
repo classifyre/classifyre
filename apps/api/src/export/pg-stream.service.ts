@@ -41,7 +41,8 @@ export class PgStreamService implements OnModuleDestroy {
     this.pool = new Pool({
       connectionString: rawUrl.toString(),
       max: 4,
-      ...(schema ? { options: `-c search_path=${schema}` } : {}),
+      // `public` stays on the path so extension operators keep resolving.
+      ...(schema ? { options: `-c search_path=${schema},public` } : {}),
     });
   }
 

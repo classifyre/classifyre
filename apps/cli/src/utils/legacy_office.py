@@ -106,9 +106,17 @@ def convert_legacy_office(
             # profile's lock file, which otherwise makes concurrent (or
             # crashed) soffice runs fail with "another instance is running".
             profile_dir = temp_path / "profile"
+            # --headless alone still lets macOS surface the app (Dock icon /
+            # brief window flash) on some LibreOffice builds; the extra flags
+            # suppress the start center, first-run wizard, and lock checks so
+            # conversions stay invisible.
             command = [
                 soffice,
                 "--headless",
+                "--invisible",
+                "--nologo",
+                "--nodefault",
+                "--nolockcheck",
                 "--norestore",
                 f"-env:UserInstallation={profile_dir.as_uri()}",
                 "--convert-to",

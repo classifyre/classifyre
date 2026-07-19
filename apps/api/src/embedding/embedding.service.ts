@@ -223,11 +223,7 @@ export class EmbeddingService implements OnApplicationBootstrap {
         .map((row) => row.embedContentHash)
         .filter((hash): hash is string => hash !== null);
       if (healHashes.length) {
-        await this.analysis.analyzeHashes(space.id, healHashes);
-        await this.calibrateNeighborhood(
-          { id: space.id, dim: space.dim },
-          healHashes,
-        );
+        await this.analyzeAndCalibrate(space, healHashes);
       }
     }
     return {
@@ -286,15 +282,32 @@ export class EmbeddingService implements OnApplicationBootstrap {
         ON CONFLICT (space_id, content_hash) DO NOTHING
       `;
     }
-    await this.analysis.analyzeHashes(
-      space.id,
-      items.map((item) => item.contentHash),
-    );
-    await this.calibrateNeighborhood(
-      { id: space.id, dim: space.dim },
+    await this.analyzeAndCalibrate(
+      space,
       items.map((item) => item.contentHash),
     );
     return { created, received: items.length };
+  }
+
+  // Evidence analysis and neighborhood calibration are ranking enhancements on
+  // top of already-committed vectors. A failure here must not fail ingestion:
+  // it once turned every embedding batch into a pg-boss retry storm on desktop.
+  // The debounced full recalibration pass (and the self-heal in missing())
+  // repairs any gap left behind.
+  private async analyzeAndCalibrate(
+    space: { id: string; dim: number },
+    contentHashes: string[],
+  ): Promise<void> {
+    try {
+      await this.analysis.analyzeHashes(space.id, contentHashes);
+      await this.calibrateNeighborhood(space, contentHashes);
+    } catch (error) {
+      this.logger.error(
+        `Evidence analysis failed for ${contentHashes.length} hashes in space ${space.id}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
   }
 
   /**

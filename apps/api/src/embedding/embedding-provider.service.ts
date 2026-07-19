@@ -1,5 +1,5 @@
 import { Injectable, Logger, OnApplicationShutdown } from '@nestjs/common';
-import { Worker } from 'node:worker_threads';
+import { fork, type ChildProcess } from 'node:child_process';
 import path from 'node:path';
 import { EmbeddingConfigService } from './embedding-config.service';
 
@@ -17,7 +17,7 @@ const MAX_CONSECUTIVE_WORKER_FAILURES = 3;
 @Injectable()
 export class EmbeddingProviderService implements OnApplicationShutdown {
   private readonly logger = new Logger(EmbeddingProviderService.name);
-  private worker?: Worker;
+  private worker?: ChildProcess;
   private shuttingDown = false;
   private sequence = 0;
   private readonly pending = new Map<number, PendingRequest>();
@@ -100,7 +100,7 @@ export class EmbeddingProviderService implements OnApplicationShutdown {
     const id = ++this.sequence;
     return new Promise((resolve, reject) => {
       this.pending.set(id, { resolve, reject });
-      worker.postMessage({
+      worker.send({
         id,
         texts,
         config: {
@@ -118,10 +118,15 @@ export class EmbeddingProviderService implements OnApplicationShutdown {
     });
   }
 
-  private ensureWorker(): Worker {
+  private ensureWorker(): ChildProcess {
     if (this.worker) return this.worker;
     const workerPath = path.join(__dirname, 'transformers-embedding.worker.js');
-    const worker = new Worker(workerPath);
+    // A forked child process, not a worker_thread: onnxruntime inference can
+    // abort the whole process natively (allocation failure under memory
+    // pressure trips SIGTRAP inside BFCArena), and in a thread that took the
+    // entire API down. In a child process it only kills the child; the batch
+    // fails, pg-boss retries, and the API keeps serving.
+    const worker = fork(workerPath);
     // A crashed worker typically fires both 'error' and 'exit' for the same
     // underlying failure; guard so one crash only counts once.
     let failureRecorded = false;
@@ -168,11 +173,20 @@ export class EmbeddingProviderService implements OnApplicationShutdown {
       this.worker = undefined;
       recordFailure();
     });
-    worker.on('exit', (code) => {
-      if (code !== 0 && !this.shuttingDown) {
-        this.logger.error(`Transformers.js worker exited with code ${code}`);
+    worker.on('exit', (code, signal) => {
+      if ((code !== 0 || signal) && !this.shuttingDown) {
+        this.logger.error(
+          `Transformers.js worker exited with code ${code}${signal ? ` (signal ${signal})` : ''}`,
+        );
         recordFailure();
       }
+      // A native crash fires 'exit' without 'error'; requests still in flight
+      // would otherwise hang forever.
+      const exitError = new Error(
+        `Embedding worker exited (code ${code}${signal ? `, signal ${signal}` : ''}) before responding`,
+      );
+      for (const pending of this.pending.values()) pending.reject(exitError);
+      this.pending.clear();
       this.worker = undefined;
     });
     this.worker = worker;
@@ -195,6 +209,6 @@ export class EmbeddingProviderService implements OnApplicationShutdown {
 
   async onApplicationShutdown(): Promise<void> {
     this.shuttingDown = true;
-    await this.worker?.terminate();
+    this.worker?.kill();
   }
 }

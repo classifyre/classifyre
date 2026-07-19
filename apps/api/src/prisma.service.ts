@@ -14,7 +14,10 @@ export class PrismaService extends PrismaClient implements OnModuleInit {
     const adapter = new PrismaPg(
       {
         connectionString: rawUrl.toString(),
-        ...(schema ? { options: `-c search_path=${schema}` } : {}),
+        // Keep `public` on the search_path: extensions (pgvector's `<=>`
+        // operator, pgcrypto, …) are installed there, and a schema-only path
+        // makes their operators unresolvable.
+        ...(schema ? { options: `-c search_path=${schema},public` } : {}),
       },
       { schema: schema ?? undefined },
     );

@@ -177,8 +177,16 @@ interface ManagedProcess {
   port: number;
 }
 
+// Unexpected API death (native crash, external kill) is respawned so the
+// workspace heals without the user reopening it — but bounded, so a
+// crash-on-boot bug degrades to a logged failure instead of a spawn loop.
+const RESTART_WINDOW_MS = 10 * 60 * 1000;
+const MAX_RESTARTS_PER_WINDOW = 3;
+const RESTART_DELAY_MS = 2000;
+
 export class ProcessManager {
   private processes = new Map<string, ManagedProcess>();
+  private restartTimestamps = new Map<string, number[]>();
   private venvPathOverride: string | null = null;
   private venvPreparation: Promise<void> | null = null;
   private apiDirPromise: Promise<string> | null = null;
@@ -444,9 +452,16 @@ export class ProcessManager {
       process.stderr.write(`[API:${namespaceId}] ${data.toString().trim()}\n`);
     });
 
-    child.on("exit", (code) => {
-      process.stderr.write(`[API:${namespaceId}] exited with code ${code}\n`);
+    child.on("exit", (code, signal) => {
+      process.stderr.write(
+        `[API:${namespaceId}] exited with code ${code}${signal ? ` (signal ${signal})` : ""}\n`,
+      );
+      // stopApi removes the entry from the map before killing; if this child
+      // is still the registered one, nobody asked it to die — respawn it.
+      const current = this.processes.get(namespaceId);
+      if (!current || current.child !== child) return;
       this.processes.delete(namespaceId);
+      this.scheduleRestart(namespaceId, port, databaseUrl, options);
     });
 
     // Without an 'error' listener a failed spawn (ENOENT/EACCES from a
@@ -587,6 +602,38 @@ export class ProcessManager {
 
       check();
     });
+  }
+
+  private scheduleRestart(
+    namespaceId: string,
+    port: number,
+    databaseUrl: string,
+    options: ApiRuntimeOptions,
+  ): void {
+    const now = Date.now();
+    const recent = (this.restartTimestamps.get(namespaceId) ?? []).filter(
+      (at) => now - at < RESTART_WINDOW_MS,
+    );
+    if (recent.length >= MAX_RESTARTS_PER_WINDOW) {
+      process.stderr.write(
+        `[API:${namespaceId}] crashed ${recent.length} times in ${RESTART_WINDOW_MS / 60000} minutes; not restarting again\n`,
+      );
+      return;
+    }
+    recent.push(now);
+    this.restartTimestamps.set(namespaceId, recent);
+    process.stderr.write(
+      `[API:${namespaceId}] restarting in ${RESTART_DELAY_MS}ms (attempt ${recent.length}/${MAX_RESTARTS_PER_WINDOW})\n`,
+    );
+    setTimeout(() => {
+      // The workspace may have been closed or reopened while we waited.
+      if (this.processes.has(namespaceId)) return;
+      this.startApi(namespaceId, port, databaseUrl, options).catch((err) => {
+        process.stderr.write(
+          `[API:${namespaceId}] restart failed: ${err instanceof Error ? err.message : String(err)}\n`,
+        );
+      });
+    }, RESTART_DELAY_MS);
   }
 
   async stopApi(namespaceId: string): Promise<void> {

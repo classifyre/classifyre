@@ -242,7 +242,7 @@ async function main() {
 
   // --- Step 3: Run Prisma migrations ---
   console.log('\n[test] Step 3: Running Prisma migrations...');
-  const migrateUrl = `${dbUrl}?schema=${schemaName}&options=${encodeURIComponent(`-csearch_path=${schemaName}`)}`;
+  const migrateUrl = `${dbUrl}?schema=${schemaName}&options=${encodeURIComponent(`-csearch_path=${schemaName},public`)}`;
 
   const migrateResult = await new Promise<{ code: number; stdout: string; stderr: string }>((resolve) => {
     const child = spawn(

@@ -67,6 +67,15 @@ async function extractorFor(config: WorkerRequest['config']) {
   return extractorPromise;
 }
 
+// In production this file runs as a forked child process so a native
+// onnxruntime crash (e.g. allocation abort under memory pressure) kills only
+// this process, never the API — see EmbeddingProviderService. worker_threads
+// is still supported for the build smoke test (smoke-embedding-worker.mjs).
+function send(message: unknown): void {
+  if (parentPort) parentPort.postMessage(message);
+  else process.send?.(message);
+}
+
 async function handleRequest(request: WorkerRequest): Promise<void> {
   try {
     const extractor = await extractorFor(request.config);
@@ -74,15 +83,17 @@ async function handleRequest(request: WorkerRequest): Promise<void> {
       pooling: request.config.pooling,
       normalize: request.config.normalize,
     });
-    parentPort?.postMessage({ id: request.id, vectors: tensor.tolist() });
+    send({ id: request.id, vectors: tensor.tolist() });
   } catch (error) {
-    parentPort?.postMessage({
+    send({
       id: request.id,
       error: error instanceof Error ? error.message : String(error),
     });
   }
 }
 
-parentPort?.on('message', (request: WorkerRequest) => {
+const onMessage = (request: WorkerRequest) => {
   void handleRequest(request);
-});
+};
+if (parentPort) parentPort.on('message', onMessage);
+else process.on('message', onMessage);
