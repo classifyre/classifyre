@@ -50,7 +50,9 @@ export class CaseEventsController {
   }
 
   @Patch(':eventId')
-  @ApiOperation({ summary: 'Update (and implicitly verify) a chronology event' })
+  @ApiOperation({
+    summary: 'Update (and implicitly verify) a chronology event',
+  })
   @ApiOkResponse({ type: CaseEventDto })
   update(
     @Param('caseId') caseId: string,

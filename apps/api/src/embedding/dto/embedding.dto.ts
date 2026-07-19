@@ -195,7 +195,10 @@ export class SimilarFindingEvidenceAnalysisDto {
   @ApiPropertyOptional({ nullable: true })
   duplicateGroupHash?: string | null;
 
-  @ApiProperty({ type: 'array', items: { type: 'object', additionalProperties: true } })
+  @ApiProperty({
+    type: 'array',
+    items: { type: 'object', additionalProperties: true },
+  })
   reasons!: Array<Record<string, unknown>>;
 }
 

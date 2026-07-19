@@ -85,7 +85,11 @@ const MAX_RESULT_CHARS = 30_000;
 const TRUNCATION_NOTICE =
   'Result truncated to fit the response budget. Narrow the query (filters, smaller take/limit, pagination cursor) to see the rest.';
 
-function capValue(value: unknown, arrayCap: number, stringCap: number): unknown {
+function capValue(
+  value: unknown,
+  arrayCap: number,
+  stringCap: number,
+): unknown {
   if (Array.isArray(value)) {
     const capped = value
       .slice(0, arrayCap)
@@ -265,7 +269,7 @@ export class McpServerFactoryService {
       {
         title: 'List Case Leads',
         description:
-          'List a case\'s lead queue: ranked exploration candidates (semantic neighbours, high-importance inquiry matches, agent proposals) awaiting accept/dismiss review, plus reviewed history.',
+          "List a case's lead queue: ranked exploration candidates (semantic neighbours, high-importance inquiry matches, agent proposals) awaiting accept/dismiss review, plus reviewed history.",
         inputSchema: {
           caseId: z.string().uuid(),
           status: z.enum(['PROPOSED', 'ACCEPTED', 'DISMISSED']).optional(),

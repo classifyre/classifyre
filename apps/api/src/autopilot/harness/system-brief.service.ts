@@ -72,7 +72,10 @@ export class SystemBriefService {
   /** Top glossary terms as brief entries: verified first, then newest. */
   private async glossaryEntries(): Promise<BriefMemoryEntry[]> {
     const terms = await this.prisma.glossaryTerm.findMany({
-      orderBy: [{ verifiedAt: { sort: 'desc', nulls: 'last' } }, { updatedAt: 'desc' }],
+      orderBy: [
+        { verifiedAt: { sort: 'desc', nulls: 'last' } },
+        { updatedAt: 'desc' },
+      ],
       take: MAX_GLOSSARY_ENTRIES,
       select: { term: true, aliases: true, entityType: true, notes: true },
     });

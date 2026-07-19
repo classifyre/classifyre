@@ -1,11 +1,4 @@
-import {
-  Body,
-  Controller,
-  Get,
-  Param,
-  Post,
-  Query,
-} from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CaseLeadsService } from '../case-leads.service';
 import {
@@ -24,10 +17,7 @@ export class CaseLeadsController {
   @Get()
   @ApiOperation({ summary: 'List leads (exploration candidates) for a case' })
   @ApiOkResponse({ type: [CaseLeadDto] })
-  list(
-    @Param('caseId') caseId: string,
-    @Query() query: ListCaseLeadsQueryDto,
-  ) {
+  list(@Param('caseId') caseId: string, @Query() query: ListCaseLeadsQueryDto) {
     return this.leads.list(caseId, query.status);
   }
 

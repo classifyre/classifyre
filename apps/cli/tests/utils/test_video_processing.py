@@ -63,9 +63,7 @@ def test_changed_frame_ocr_is_timestamped_and_deduplicated(
     ocr_results = iter(["Opening slide", "Architecture slide"])
     monkeypatch.setattr(video_processing, "_ocr_text", lambda _frame: next(ocr_results))
 
-    segments = list(
-        video_processing.iter_video_ocr_segments(b"video", file_name="lecture.mp4")
-    )
+    segments = list(video_processing.iter_video_ocr_segments(b"video", file_name="lecture.mp4"))
 
     assert segments == [
         "[On-screen text 00:00:00]\nOpening slide",
@@ -122,9 +120,7 @@ def test_rapidocr_filters_low_confidence_lines(monkeypatch: pytest.MonkeyPatch) 
     assert video_processing._ocr_text(object()) == "clear text\nanother line"
 
 
-def test_path_ocr_reuses_existing_video(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_path_ocr_reuses_existing_video(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     video_path = tmp_path / "video.mp4"
     video_path.write_bytes(b"video")
     seen: list[Path] = []
