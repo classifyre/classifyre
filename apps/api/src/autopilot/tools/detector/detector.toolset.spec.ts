@@ -72,7 +72,12 @@ describe('DetectorToolset', () => {
       await test().handler({ detectorId: 'd1', sampleText: 'hi' }, tc);
       expect(mockDetectors.getById).toHaveBeenCalledWith('d1');
       expect(mockTests.evaluateSample).toHaveBeenCalledWith(
-        { key: 'cust_x', name: 'X', pipelineSchema: { type: 'GLINER2' } },
+        {
+          key: 'cust_x',
+          name: 'X',
+          pipelineSchema: { type: 'GLINER2' },
+          aiProviderConfigId: null,
+        },
         'hi',
       );
     });
