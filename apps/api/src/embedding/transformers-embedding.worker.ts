@@ -11,6 +11,7 @@ type WorkerRequest = {
     normalize: boolean;
     dtype: string;
     device: string;
+    intraOpThreads?: number;
     cacheDir: string;
     localModelPath?: string;
     allowRemoteModels: boolean;
@@ -62,7 +63,17 @@ async function extractorFor(config: WorkerRequest['config']) {
       dtype: config.dtype as any,
       device: config.device as any,
       local_files_only: offline,
-    });
+      // Bound inference so it can't starve the host: onnxruntime otherwise
+      // threads across every core, and its BFC arena hoards allocations until
+      // an allocation failure aborts the process (observed on desktop as
+      // SIGTRAP in BFCArena::Extend). Without the arena, tensors go through
+      // plain malloc and memory returns to the OS between batches.
+      session_options: {
+        intraOpNumThreads: config.intraOpThreads ?? 1,
+        interOpNumThreads: 1,
+        enableCpuMemArena: false,
+      },
+    } as any);
   })();
   return extractorPromise;
 }
@@ -95,5 +106,16 @@ async function handleRequest(request: WorkerRequest): Promise<void> {
 const onMessage = (request: WorkerRequest) => {
   void handleRequest(request);
 };
-if (parentPort) parentPort.on('message', onMessage);
-else process.on('message', onMessage);
+if (parentPort) {
+  parentPort.on('message', onMessage);
+} else {
+  // Forked child: deprioritize so inference yields to the UI and API under
+  // load (maps to BELOW_NORMAL on Windows). Embedding is background work.
+  try {
+    const { setPriority } = require('node:os') as typeof import('node:os');
+    setPriority(10);
+  } catch {
+    // priority is best-effort (may be denied in sandboxes)
+  }
+  process.on('message', onMessage);
+}

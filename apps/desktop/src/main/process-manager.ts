@@ -177,6 +177,33 @@ interface ManagedProcess {
   port: number;
 }
 
+// Desktop resource governor: the laptop also runs the UI, embedded Postgres,
+// and the user's other apps, so the scan pipeline must never size itself to
+// the whole machine (the CLI pool auto-sizes to cores-1 when unconstrained,
+// which froze the host during scans). Everything here is a default — a
+// workspace's custom env (spread after this) can raise any of these knobs.
+function resourceDefaultEnv(
+  options: ApiRuntimeOptions,
+): Record<string, string> {
+  const cores = os.cpus().length;
+  const detectorWorkers = Math.max(1, Math.min(4, Math.floor(cores / 2) - 1));
+  return {
+    // Detector process pool: at most half the machine, and 2 BLAS/torch
+    // threads per worker so workers*threads stays well under core count.
+    CLASSIFYRE_MAX_POOL_WORKERS: String(detectorWorkers),
+    CLASSIFYRE_WORKER_THREADS: "2",
+    // Embedding inference: small batches, few threads — throughput matters
+    // less than the machine staying responsive.
+    EMBEDDING_BATCH_SIZE: "8",
+    EMBEDDING_INTRA_OP_THREADS: cores >= 8 ? "2" : "1",
+    // One scan at a time unless the user raised it in workspace settings
+    // (the API treats 0/unset as unlimited, which is a server default).
+    ...(options.maxParallelScans && options.maxParallelScans > 0
+      ? {}
+      : { MAX_CONCURRENT_RUNNERS: "1" }),
+  };
+}
+
 // Unexpected API death (native crash, external kill) is respawned so the
 // workspace heals without the user reopening it — but bounded, so a
 // crash-on-boot bug degrades to a logged failure instead of a spawn loop.
@@ -385,6 +412,10 @@ export class ProcessManager {
       nodeArgs.push(
         `--max-old-space-size=${Math.floor(options.memoryLimitMb)}`,
       );
+    } else {
+      // Default heap cap: Node's ~4GB default lets a runaway API squeeze the
+      // whole machine before dying; fail (and get auto-restarted) earlier.
+      nodeArgs.push("--max-old-space-size=2048");
     }
 
     const child = spawn(process.execPath, [...nodeArgs, entryPath], {
@@ -435,6 +466,9 @@ export class ProcessManager {
               ),
             }
           : {}),
+        // Conservative resource defaults sized to this machine; the CLI
+        // inherits them through the API's env (uv run passes env through).
+        ...resourceDefaultEnv(options),
         // Workspace-level custom env (embedding model, runner limits, feature
         // flags…). Spread last so user overrides win over the tunable defaults
         // above; keys that would break the runtime are rejected at save time

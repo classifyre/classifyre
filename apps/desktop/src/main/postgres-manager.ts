@@ -171,6 +171,17 @@ export class PostgresManager {
       password: "classifyre",
       port: this.port,
       persistent: true,
+      // The embedded server shares a laptop with the UI and the scan
+      // pipeline; PG's server-class parallelism defaults (parallel query
+      // workers, parallel index builds) otherwise pile onto an already
+      // saturated machine during scans and HNSW (re)builds.
+      postgresFlags: [
+        "-c", "max_parallel_workers_per_gather=1",
+        "-c", "max_parallel_maintenance_workers=1",
+        "-c", "max_parallel_workers=2",
+        "-c", "shared_buffers=256MB",
+        "-c", "work_mem=16MB",
+      ],
     }) as unknown as EmbeddedPostgresInstance;
 
     const pgVersionFile = path.join(this.dataDir, "PG_VERSION");

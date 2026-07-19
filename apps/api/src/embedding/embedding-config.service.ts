@@ -1,6 +1,16 @@
 import { Injectable } from '@nestjs/common';
+import os from 'node:os';
 
 export type EmbeddingProviderKind = 'transformers-js' | 'openai-compatible';
+
+// onnxruntime defaults its intra-op pool to every visible core, which on a
+// laptop starves the UI (and in a pod ignores the CPU limit — ORT reads host
+// cores, not the cgroup quota). availableParallelism is cgroup-aware on
+// Node 20+, so half of it (capped) is a polite default everywhere.
+function defaultIntraOpThreads(): number {
+  const available = os.availableParallelism?.() ?? os.cpus().length;
+  return Math.max(1, Math.min(4, Math.floor(available / 2)));
+}
 
 function integerEnv(name: string, fallback: number, min: number, max: number) {
   const raw = process.env[name];
@@ -40,6 +50,13 @@ export class EmbeddingConfigService {
   );
   readonly retrySeconds = integerEnv('EMBEDDING_RETRY_SECONDS', 30, 1, 3600);
   readonly autoBackfill = booleanEnv('EMBEDDING_AUTO_BACKFILL', true);
+
+  readonly intraOpThreads = integerEnv(
+    'EMBEDDING_INTRA_OP_THREADS',
+    defaultIntraOpThreads(),
+    1,
+    16,
+  );
 
   readonly dtype = process.env.EMBEDDING_DTYPE ?? 'q8';
   readonly device = process.env.EMBEDDING_DEVICE ?? 'cpu';

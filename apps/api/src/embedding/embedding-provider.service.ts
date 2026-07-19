@@ -110,6 +110,7 @@ export class EmbeddingProviderService implements OnApplicationShutdown {
           normalize: this.config.normalize,
           dtype: this.config.dtype,
           device: this.config.device,
+          intraOpThreads: this.config.intraOpThreads,
           cacheDir: this.config.cacheDir,
           localModelPath: this.config.localModelPath,
           allowRemoteModels: this.config.allowRemoteModels,
