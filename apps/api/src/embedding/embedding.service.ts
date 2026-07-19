@@ -552,10 +552,12 @@ export class EmbeddingService implements OnApplicationBootstrap {
       throw new NotFoundException(
         `Asset ${dto.assetHash} not found in source ${sourceId}`,
       );
-    const chunks = dto.chunks.map((chunk) => ({
-      ...chunk,
-      contentHash: embeddingContentHash(chunk.text),
-    }));
+    const chunks = dto.chunks.map((chunk) => {
+      // Postgres TEXT rejects NUL bytes; strip them rather than 500 the whole
+      // batch when binary-contaminated text slips past extraction.
+      const text = chunk.text.replace(/\u0000/g, '');
+      return { ...chunk, text, contentHash: embeddingContentHash(text) };
+    });
     await this.prisma.$transaction(async (tx) => {
       await tx.assetChunk.deleteMany({ where: { assetId: asset.id } });
       if (chunks.length) {

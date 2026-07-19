@@ -260,6 +260,17 @@ if [ "${SKIP_PYTHON:-0}" != "1" ]; then
   EMBEDDING_CACHE_DIR="$RESOURCES/models/transformers" \
     bun "$MONOREPO_ROOT/apps/api/scripts/cache-embedding-model.ts"
 
+  # Execute the STAGED worker bundle against the staged node_modules and model
+  # cache with allowRemoteModels=false — the exact packaged-app configuration.
+  # The preload above runs through the monorepo's dev copy of
+  # @huggingface/transformers, so it cannot catch a broken worker bundle or a
+  # cache layout the bundled runtime can't read (shipped silently broken in
+  # v0.4.57: zero embeddings ever generated, no errors logged).
+  echo "=== Smoke-test staged embedding worker ==="
+  node "$SCRIPT_DIR/smoke-embedding-worker.mjs" \
+    "$RESOURCES/api/transformers-embedding.worker.js" \
+    "$RESOURCES/models/transformers"
+
   # Bundle the uv binary inside the venv so it lands on PATH at runtime: the API
   # spawns the CLI via `uv run`, and optional groups self-install via `uv sync`.
   # The build host's arch matches this per-platform bundle, so its uv is correct.
