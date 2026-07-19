@@ -251,7 +251,11 @@ export class PostgresManager {
   getConnectionString(schemaName?: string): string {
     const base = `postgresql://classifyre:classifyre@127.0.0.1:${this.port}/classifyre`;
     if (!schemaName) return base;
-    const encodedOptions = encodeURIComponent(`-csearch_path=${schemaName}`);
+    // `public` must stay on the search_path: pgvector lives there, and its
+    // `<=>` operator is unresolvable from a schema-only path.
+    const encodedOptions = encodeURIComponent(
+      `-csearch_path=${schemaName},public`,
+    );
     return `${base}?schema=${schemaName}&options=${encodedOptions}`;
   }
 

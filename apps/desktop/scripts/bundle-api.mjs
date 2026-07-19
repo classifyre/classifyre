@@ -136,7 +136,7 @@ console.log(`Bundled API → ${outfile}`);
 // ---------------------------------------------------------------------------
 // Embedding worker: transformers-embedding.worker.js
 // ---------------------------------------------------------------------------
-// EmbeddingProviderService spawns a worker_threads Worker at
+// EmbeddingProviderService forks a child process at
 // path.join(__dirname, 'transformers-embedding.worker.js') (see
 // apps/api/src/embedding/embedding-provider.service.ts). That file is never
 // require()'d/imported by main.js, so the single-entry bundle above never

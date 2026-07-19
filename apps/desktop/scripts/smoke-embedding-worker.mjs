@@ -1,6 +1,8 @@
 // Executes the STAGED transformers-embedding.worker.js exactly the way the
-// packaged app does — allowRemoteModels=false against the pre-baked model
-// cache — and fails the build if a single embed request cannot be served.
+// packaged app does — forked as a child process (mirroring
+// EmbeddingProviderService), allowRemoteModels=false against the pre-baked
+// model cache — and fails the build if a single embed request cannot be
+// served.
 //
 // Why: the worker bundle inlines @huggingface/transformers and depends on the
 // staged onnxruntime/sharp node_modules plus the resources/models cache being
@@ -10,7 +12,7 @@
 // actually running the worker can.
 //
 // Usage: node smoke-embedding-worker.mjs <worker.js path> <model cache dir>
-import { Worker } from 'node:worker_threads';
+import { fork } from 'node:child_process';
 import path from 'node:path';
 import process from 'node:process';
 
@@ -39,7 +41,7 @@ const config = {
   allowRemoteModels: false,
 };
 
-const worker = new Worker(path.resolve(workerPath));
+const worker = fork(path.resolve(workerPath));
 let terminating = false;
 const timer = setTimeout(() => {
   console.error(`Embedding worker smoke test timed out after ${TIMEOUT_MS}ms`);
@@ -63,24 +65,25 @@ worker.on('message', (message) => {
     `Embedding worker smoke test passed (${vector.length}-dim vector from staged worker).`,
   );
   terminating = true;
-  worker.terminate().then(() => process.exit(0));
+  worker.kill();
+  process.exit(0);
 });
 worker.on('error', (error) => {
   clearTimeout(timer);
   console.error(`Embedding worker smoke test FAILED (worker error): ${error}`);
   process.exit(1);
 });
-worker.on('exit', (code) => {
-  if (!terminating && code !== 0) {
+worker.on('exit', (code, signal) => {
+  if (!terminating && (code !== 0 || signal)) {
     clearTimeout(timer);
     console.error(
-      `Embedding worker smoke test FAILED: worker exited with code ${code}`,
+      `Embedding worker smoke test FAILED: worker exited with code ${code}${signal ? ` (signal ${signal})` : ''}`,
     );
     process.exit(1);
   }
 });
 
-worker.postMessage({
+worker.send({
   id: 1,
   texts: ['classifyre staged embedding smoke test'],
   config,
