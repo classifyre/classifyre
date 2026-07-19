@@ -20,6 +20,10 @@ class FileEvaluationRunner:
 
     def __init__(self, detectors_config: list[dict[str, Any]]) -> None:
         self._config = detectors_config
+        # Detector construction failures, surfaced in the evaluate-file JSON
+        # output so callers can distinguish "misconfigured detector" from
+        # "no findings".
+        self.detector_errors: list[str] = []
 
     def _build_detectors(self) -> list[Any]:
         from ..detectors import get_detector
@@ -44,6 +48,7 @@ class FileEvaluationRunner:
                 logger.info(f"Initialized file-evaluation detector: {detector_name}")
             except Exception as e:
                 logger.error(f"Failed to initialize detector {detector_type}: {e}")
+                self.detector_errors.append(f"{detector_type}: {e}")
 
         return detectors
 

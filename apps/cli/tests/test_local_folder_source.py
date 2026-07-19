@@ -333,3 +333,112 @@ async def test_sampling_latest_respects_rows_per_page(tmp_path: Path):
     assets = await _extract_assets(source)
 
     assert len(assets) == 10
+
+
+# ---------------------------------------------------------------------------
+# Archive expansion (zip/tar members become child assets)
+# ---------------------------------------------------------------------------
+
+
+def _write_zip(path: Path, entries: dict[str, bytes]) -> None:
+    import io
+    import zipfile
+
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as archive:
+        for name, data in entries.items():
+            archive.writestr(name, data)
+    path.write_bytes(buffer.getvalue())
+
+
+@pytest.mark.asyncio
+async def test_zip_archive_expands_members_into_child_assets(tmp_path: Path):
+    _write_zip(
+        tmp_path / "bundle.zip",
+        {"docs/readme.txt": b"member text content", "logo.png": _PNG_BYTES},
+    )
+
+    source = _make_source(tmp_path)
+    assets = await _extract_assets(source)
+
+    by_key = {a.metadata["object_key"]: a for a in assets}
+    assert set(by_key) == {
+        "bundle.zip",
+        "bundle.zip#docs/readme.txt",
+        "bundle.zip#logo.png",
+    }
+
+    parent = by_key["bundle.zip"]
+    assert parent.asset_kind == "archive"
+    assert parent.asset_type == OutputAssetType.BINARY
+
+    text_child = by_key["bundle.zip#docs/readme.txt"]
+    assert text_child.asset_kind == "file"
+    assert text_child.asset_type == OutputAssetType.TXT
+    assert text_child.metadata["source_hash"] == parent.hash
+    assert text_child.metadata["location"] == "docs/readme.txt"
+    assert text_child.metadata["mime_type"] == "text/plain"
+    assert set(parent.links) == {text_child.hash, by_key["bundle.zip#logo.png"].hash}
+
+    image_child = by_key["bundle.zip#logo.png"]
+    assert image_child.asset_kind == "image"
+    assert image_child.asset_type == OutputAssetType.IMAGE
+    assert image_child.metadata["image_width"] == 1
+
+
+@pytest.mark.asyncio
+async def test_zip_member_content_flows_to_text_pages(tmp_path: Path):
+    _write_zip(tmp_path / "bundle.zip", {"inner.txt": b"secret member text"})
+
+    source = _make_source(tmp_path)
+    assets = await _extract_assets(source)
+    child = next(a for a in assets if a.metadata["object_key"].endswith("#inner.txt"))
+
+    pages = [page async for page in source.fetch_content_pages(child.hash)]
+    assert any("secret member text" in page for _, page in pages)
+
+    fetched = await source.fetch_content_bytes(child.hash)
+    assert fetched is not None
+    assert fetched[0] == b"secret member text"
+    assert fetched[1] == "text/plain"
+
+
+@pytest.mark.asyncio
+async def test_nested_archive_member_not_expanded(tmp_path: Path):
+    import io
+    import zipfile
+
+    inner = io.BytesIO()
+    with zipfile.ZipFile(inner, "w") as archive:
+        archive.writestr("deep.txt", b"deep content")
+    _write_zip(tmp_path / "outer.zip", {"nested.zip": inner.getvalue()})
+
+    source = _make_source(tmp_path)
+    assets = await _extract_assets(source)
+
+    keys = _keys(assets)
+    assert keys == {"outer.zip", "outer.zip#nested.zip"}
+    nested = next(a for a in assets if a.metadata["object_key"] == "outer.zip#nested.zip")
+    assert nested.asset_kind == "archive"
+
+
+@pytest.mark.asyncio
+async def test_tar_gz_archive_expands_members(tmp_path: Path):
+    import io
+    import tarfile
+
+    buffer = io.BytesIO()
+    with tarfile.open(fileobj=buffer, mode="w:gz") as archive:
+        data = b"tar member body"
+        info = tarfile.TarInfo("report/summary.txt")
+        info.size = len(data)
+        archive.addfile(info, io.BytesIO(data))
+    (tmp_path / "backup.tar.gz").write_bytes(buffer.getvalue())
+
+    source = _make_source(tmp_path)
+    assets = await _extract_assets(source)
+
+    keys = _keys(assets)
+    assert keys == {"backup.tar.gz", "backup.tar.gz#report/summary.txt"}
+    parent = next(a for a in assets if a.metadata["object_key"] == "backup.tar.gz")
+    assert parent.asset_kind == "archive"

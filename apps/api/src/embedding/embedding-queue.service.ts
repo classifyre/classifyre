@@ -37,6 +37,10 @@ export class EmbeddingQueueService implements OnApplicationBootstrap {
   private recalibrationRunning = false;
   private lastRecalibratedAt?: string;
   private lastRecalibrationError?: string;
+  private embedJobFailureCount = 0;
+  private lastEmbedJobError?: string;
+  private lastEmbedJobErrorAt?: string;
+  private lastEmbedSuccessAt?: string;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -122,10 +126,44 @@ export class EmbeddingQueueService implements OnApplicationBootstrap {
       lastRecalibratedAt =
         space?.lastRecalibratedAt?.toISOString() ?? lastRecalibratedAt;
     }
+    // Ground truth: rows actually embedded vs rows awaiting embedding.
+    // "workerRegistered/backfillCompleted" only prove the queue subsystem
+    // initialized — they say nothing about whether any job ever succeeded.
+    let embeddedRows: number | null = null;
+    let pendingEmbedJobs: number | null = null;
+    if (this.spaceId) {
+      try {
+        const rows = await this.prisma.$queryRaw<Array<{ count: bigint }>>`
+          SELECT count(*)::bigint AS count
+          FROM content_embeddings
+          WHERE space_id = ${this.spaceId}
+        `;
+        embeddedRows = Number(rows[0]?.count ?? 0);
+      } catch {
+        // capability not ready; leave null rather than failing status.
+      }
+    }
+    if (this.queueName) {
+      try {
+        const boss = await this.pgBoss.getBossAsync();
+        const stats = await boss.getQueueStats(this.queueName);
+        pendingEmbedJobs =
+          stats.queuedCount + stats.activeCount + stats.deferredCount;
+      } catch {
+        // pg-boss not ready.
+      }
+    }
     return {
       persistentQueue: true,
       pendingQueueWrites: this.pendingWrites,
       workerRegistered: this.workerRegistered,
+      embeddedRows,
+      pendingEmbedJobs,
+      embedJobFailureCount: this.embedJobFailureCount,
+      lastEmbedJobError: this.lastEmbedJobError ?? null,
+      lastEmbedJobErrorAt: this.lastEmbedJobErrorAt ?? null,
+      lastEmbedSuccessAt: this.lastEmbedSuccessAt ?? null,
+      providerHealth: this.provider.status(),
       provider: this.config.provider,
       model: this.config.model,
       spaceId: this.spaceId,
@@ -275,16 +313,37 @@ export class EmbeddingQueueService implements OnApplicationBootstrap {
     const work = contents.filter((content) => missing.has(content.hash));
     if (!work.length) return;
 
-    const vectors = await this.provider.embedMany(
-      work.map((content) => content.text),
-    );
-    await this.embeddings.putVectors({
-      spaceId: this.spaceId as string,
-      items: work.map((content, index) => ({
-        contentHash: content.hash,
-        vector: vectors[index],
-      })),
-    });
+    // pg-boss swallows handler exceptions (marks the job failed with no
+    // emit/log), so an always-failing provider is invisible without this
+    // catch. Log throttled — every job fails when the model is broken —
+    // and rethrow so pg-boss still records the failure and retries.
+    try {
+      const vectors = await this.provider.embedMany(
+        work.map((content) => content.text),
+      );
+      await this.embeddings.putVectors({
+        spaceId: this.spaceId as string,
+        items: work.map((content, index) => ({
+          contentHash: content.hash,
+          vector: vectors[index],
+        })),
+      });
+      this.lastEmbedSuccessAt = new Date().toISOString();
+    } catch (error) {
+      this.embedJobFailureCount += 1;
+      this.lastEmbedJobError =
+        error instanceof Error ? error.message : String(error);
+      this.lastEmbedJobErrorAt = new Date().toISOString();
+      if (
+        this.embedJobFailureCount === 1 ||
+        this.embedJobFailureCount % 100 === 0
+      ) {
+        this.logger.error(
+          `Embedding job batch failed (${this.embedJobFailureCount} total): ${this.lastEmbedJobError}`,
+        );
+      }
+      throw error;
+    }
     void this.scheduleRecalibration();
   }
 

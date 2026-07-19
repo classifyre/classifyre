@@ -2056,7 +2056,7 @@ export class AssetService {
           // reported "assetsCreated: 0, assetsUnchanged: 10".
           const changeType = changeTypeByHash.get(assetHash);
           if (changeType !== undefined) {
-            await tx.runnerAsset.updateMany({
+            const stamped = await tx.runnerAsset.updateMany({
               where: {
                 runnerId,
                 assetHash,
@@ -2064,6 +2064,18 @@ export class AssetService {
               },
               data: { changeType },
             });
+            if (stamped.count === 0) {
+              // The CLI may bulk-ingest a discovery batch before registering
+              // it, so the runner_assets row may not exist yet — updateMany
+              // then no-ops and the CREATED stamp is lost for good (first
+              // runs reporting assetsCreated: 0). Create the row pre-stamped;
+              // skipDuplicates keeps this a no-op when the row does exist and
+              // the rank guard above legitimately blocked a downgrade.
+              await tx.runnerAsset.createMany({
+                data: [{ runnerId, assetHash, changeType }],
+                skipDuplicates: true,
+              });
+            }
           }
         }
 

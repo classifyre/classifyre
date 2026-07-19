@@ -10,6 +10,7 @@ import * as os from 'os';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { PrismaService } from './prisma.service';
+import { CustomDetectorsService } from './custom-detectors.service';
 import { KubernetesCliJobService } from './cli-runner/kubernetes-cli-job.service';
 import {
   createTestScenarioSchema,
@@ -27,6 +28,7 @@ export class CustomDetectorTestsService {
 
   constructor(
     private readonly prisma: PrismaService,
+    private readonly customDetectorsService: CustomDetectorsService,
     @Optional()
     private readonly kubernetesCliJobService?: KubernetesCliJobService,
   ) {}
@@ -154,10 +156,16 @@ export class CustomDetectorTestsService {
       key: string;
       name: string;
       pipelineSchema: Record<string, unknown>;
+      aiProviderConfigId?: string | null;
     },
     sampleText: string,
   ): Promise<Record<string, unknown>> {
-    return this.evaluateViaCli(detector, sampleText);
+    const pipelineSchema =
+      await this.customDetectorsService.injectLlmProviderRuntime(
+        detector.pipelineSchema,
+        detector.aiProviderConfigId ?? null,
+      );
+    return this.evaluateViaCli({ ...detector, pipelineSchema }, sampleText);
   }
 
   // ── Internals ─────────────────────────────────────────────────────────────
@@ -168,6 +176,7 @@ export class CustomDetectorTestsService {
       key: string;
       name: string;
       pipelineSchema: unknown;
+      aiProviderConfigId: string | null;
       version: number;
     },
     scenario: { id: string; inputText: string; expectedOutcome: unknown },
@@ -176,11 +185,19 @@ export class CustomDetectorTestsService {
     const start = Date.now();
 
     try {
+      // LLM detectors need resolved provider credentials injected before
+      // dispatch — the same step the real scan path performs. Without it the
+      // CLI drops the detector and reports zero findings with no error.
+      const pipelineSchema =
+        await this.customDetectorsService.injectLlmProviderRuntime(
+          detector.pipelineSchema as Record<string, unknown>,
+          detector.aiProviderConfigId,
+        );
       const actualOutput = await this.evaluateViaCli(
         {
           key: detector.key,
           name: detector.name,
-          pipelineSchema: detector.pipelineSchema as Record<string, unknown>,
+          pipelineSchema,
         },
         scenario.inputText,
         { detectorId: detector.id, scenarioId: scenario.id },
@@ -308,6 +325,15 @@ export class CustomDetectorTestsService {
     }
 
     const parsed = parseCliOutput(stdout);
+
+    // The CLI logs-and-drops detectors that fail to initialize (bad schema,
+    // missing credentials) and still exits 0 — surface that as an error
+    // instead of reporting a clean zero-findings result.
+    if (parsed.detectorErrors.length > 0) {
+      throw new Error(
+        `Detector failed to initialize in CLI: ${parsed.detectorErrors.join('; ')}`,
+      );
+    }
 
     return {
       findings: parsed.findings,
@@ -505,7 +531,10 @@ function shellEscape(s: string): string {
   return `'${s.replace(/'/g, "'\\''")}'`;
 }
 
-function parseCliOutput(stdout: string): { findings: unknown[] } {
+function parseCliOutput(stdout: string): {
+  findings: unknown[];
+  detectorErrors: string[];
+} {
   const lines = stdout.split('\n').filter((l) => l.trim().length > 0);
   for (const line of lines) {
     try {
@@ -517,11 +546,17 @@ function parseCliOutput(stdout: string): { findings: unknown[] } {
         'findings' in parsed &&
         Array.isArray((parsed as Record<string, unknown>).findings)
       ) {
-        return parsed as { findings: unknown[] };
+        const record = parsed as Record<string, unknown>;
+        return {
+          findings: record.findings as unknown[],
+          detectorErrors: Array.isArray(record.detector_errors)
+            ? (record.detector_errors as unknown[]).map(String)
+            : [],
+        };
       }
     } catch {
       // not JSON
     }
   }
-  return { findings: [] };
+  return { findings: [], detectorErrors: [] };
 }
