@@ -1,4 +1,5 @@
 import { parentPort } from 'node:worker_threads';
+import { setPriority } from 'node:os';
 import path from 'node:path';
 
 type WorkerRequest = {
@@ -112,7 +113,6 @@ if (parentPort) {
   // Forked child: deprioritize so inference yields to the UI and API under
   // load (maps to BELOW_NORMAL on Windows). Embedding is background work.
   try {
-    const { setPriority } = require('node:os') as typeof import('node:os');
     setPriority(10);
   } catch {
     // priority is best-effort (may be denied in sandboxes)
