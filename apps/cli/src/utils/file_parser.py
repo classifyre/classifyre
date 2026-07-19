@@ -11,6 +11,8 @@ from enum import StrEnum
 from pathlib import Path
 from urllib.parse import urlsplit
 
+from .legacy_office import LEGACY_OFFICE_MIME_TYPES as _LEGACY_OFFICE_MIME_TYPES
+
 logger = logging.getLogger(__name__)
 
 
@@ -89,6 +91,15 @@ _MIME_HINTS_BY_EXTENSION = {
     ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    ".rtf": "application/rtf",
+    ".odt": "application/vnd.oasis.opendocument.text",
+    ".ods": "application/vnd.oasis.opendocument.spreadsheet",
+    ".odp": "application/vnd.oasis.opendocument.presentation",
+    ".eml": "message/rfc822",
+    ".msg": "application/vnd.ms-outlook",
+    ".doc": "application/msword",
+    ".xls": "application/vnd.ms-excel",
+    ".ppt": "application/vnd.ms-powerpoint",
     ".png": "image/png",
     ".jpg": "image/jpeg",
     ".jpeg": "image/jpeg",
@@ -97,6 +108,15 @@ _MIME_HINTS_BY_EXTENSION = {
     ".tif": "image/tiff",
     ".tiff": "image/tiff",
     ".webp": "image/webp",
+    ".heic": "image/heic",
+    ".heif": "image/heif",
+    # Archives
+    ".zip": "application/zip",
+    ".tar": "application/x-tar",
+    ".gz": "application/gzip",
+    ".tgz": "application/gzip",
+    ".7z": "application/x-7z-compressed",
+    ".rar": "application/vnd.rar",
     # Audio
     ".mp3": "audio/mpeg",
     ".wav": "audio/wav",
@@ -125,6 +145,14 @@ _DOCLING_IMAGE_MIME_TYPES = {
     "image/webp",
 }
 
+# Image formats docling can't ingest directly; converted to PNG (first frame
+# for animated GIFs) via Pillow before OCR. HEIC/HEIF decode needs pillow-heif.
+_OCR_CONVERTIBLE_IMAGE_MIME_TYPES = {
+    "image/gif",
+    "image/heic",
+    "image/heif",
+}
+
 _DOCLING_MIME_TYPES = {
     "application/pdf",
     "application/vnd.openxmlformats-officedocument.presentationml.presentation",
@@ -139,7 +167,59 @@ _DOCLING_EXTENSIONS = {
     ".tif",
     ".tiff",
     ".webp",
+    ".gif",
+    ".heic",
+    ".heif",
 }
+
+# OpenDocument formats and Outlook .msg are parsed natively by docling (no OCR
+# models involved, but the converter lives in the same `ocr` dependency group).
+_DOCLING_NATIVE_DOCUMENT_MIME_TYPES = {
+    "application/vnd.oasis.opendocument.text",
+    "application/vnd.oasis.opendocument.spreadsheet",
+    "application/vnd.oasis.opendocument.presentation",
+    "application/vnd.ms-outlook",
+}
+
+# Archive containers: never text-extracted here — object-storage sources expand
+# their members into standalone child assets (see utils/archive_extraction.py).
+ARCHIVE_MIME_TYPES = frozenset(
+    {
+        "application/zip",
+        "application/x-tar",
+        "application/gzip",
+        "application/x-7z-compressed",
+        "application/vnd.rar",
+        "application/x-rar-compressed",
+    }
+)
+
+# ZIP-container document formats: a bare `PK\x03\x04` signature is refined by
+# peeking at the archive contents (see _refine_zip_mime).
+_OOXML_MIME_BY_PREFIX = (
+    ("word/", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
+    ("xl/", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
+    ("ppt/", "application/vnd.openxmlformats-officedocument.presentationml.presentation"),
+)
+_ZIP_CONTAINER_MIME_TYPES = frozenset(
+    {mime for _, mime in _OOXML_MIME_BY_PREFIX}
+    | {
+        "application/vnd.oasis.opendocument.text",
+        "application/vnd.oasis.opendocument.spreadsheet",
+        "application/vnd.oasis.opendocument.presentation",
+    }
+)
+
+# OLE Compound File (magic D0CF11E0): legacy Office and Outlook .msg all share
+# it, so the concrete format comes from the file extension.
+_CFB_MIME_TYPES = frozenset(
+    {
+        "application/msword",
+        "application/vnd.ms-excel",
+        "application/vnd.ms-powerpoint",
+        "application/vnd.ms-outlook",
+    }
+)
 
 
 class _DoclingState:
@@ -272,6 +352,14 @@ def normalize_detected_mime_type(detected_mime_type: str, file_name: str) -> str
     if mime == "text/plain" and inferred_mime in _TABULAR_MIME_TYPES:
         return inferred_mime
 
+    # OLE Compound Files (.doc/.xls/.ppt/.msg) share one magic signature; the
+    # extension picks the concrete format. Same for a truncated OOXML/ODF zip
+    # whose container structure could not be inspected.
+    if mime == "application/x-ole-storage" and inferred_mime in _CFB_MIME_TYPES:
+        return inferred_mime
+    if mime == "application/zip" and inferred_mime in _ZIP_CONTAINER_MIME_TYPES:
+        return inferred_mime
+
     return mime
 
 
@@ -287,14 +375,51 @@ def _detect_magic_mime_type(file_bytes: bytes) -> str | None:
         (b"\xff\xd8\xff", "image/jpeg"),
         (b"GIF87a", "image/gif"),
         (b"GIF89a", "image/gif"),
-        (b"PK\x03\x04", "application/zip"),
+        (b"{\\rtf", "application/rtf"),
+        (b"\x1f\x8b", "application/gzip"),
+        (b"7z\xbc\xaf\x27\x1c", "application/x-7z-compressed"),
+        (b"Rar!\x1a\x07", "application/vnd.rar"),
+        (b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1", "application/x-ole-storage"),
     )
 
     for signature, mime_type in signatures:
         if file_bytes.startswith(signature):
             return mime_type
 
+    if file_bytes.startswith(b"PK\x03\x04"):
+        return _refine_zip_mime(file_bytes)
+
+    # POSIX tar: "ustar" magic at offset 257 (no leading signature).
+    if len(file_bytes) > 262 and file_bytes[257:262] == b"ustar":
+        return "application/x-tar"
+
     return None
+
+
+def _refine_zip_mime(file_bytes: bytes) -> str:
+    """Distinguish document formats that are ZIP containers from real archives.
+
+    ODF files carry an uncompressed ``mimetype`` entry; OOXML files carry
+    ``[Content_Types].xml`` plus a format-specific folder (word/, xl/, ppt/).
+    Anything else (or an unreadable/truncated zip) stays ``application/zip``.
+    """
+    import io
+    import zipfile
+
+    try:
+        with zipfile.ZipFile(io.BytesIO(file_bytes)) as archive:
+            names = set(archive.namelist())
+            if "mimetype" in names:
+                declared = archive.read("mimetype").decode("ascii", errors="replace").strip()
+                if declared.startswith("application/vnd.oasis.opendocument"):
+                    return declared
+            if "[Content_Types].xml" in names:
+                for prefix, mime_type in _OOXML_MIME_BY_PREFIX:
+                    if any(name.startswith(prefix) for name in names):
+                        return mime_type
+    except Exception as exc:
+        logger.debug("ZIP MIME refinement failed: %s", exc)
+    return "application/zip"
 
 
 def _sniff_text_mime(file_bytes: bytes) -> str:
@@ -364,9 +489,30 @@ def _supports_docling_ocr(mime_type: str, file_name: str) -> bool:
     normalized = _normalize_mime_type(mime_type)
     if normalized in _DOCLING_IMAGE_MIME_TYPES:
         return True
+    if normalized in _OCR_CONVERTIBLE_IMAGE_MIME_TYPES:
+        return True
     if normalized in _DOCLING_MIME_TYPES:
         return True
     return _file_extension(file_name) in _DOCLING_EXTENSIONS
+
+
+def _convert_image_to_png(file_bytes: bytes, mime_type: str) -> tuple[bytes | None, str | None]:
+    """Convert a GIF (first frame) or HEIC/HEIF image to PNG bytes for OCR."""
+    import io
+
+    try:
+        if mime_type in ("image/heic", "image/heif"):
+            pillow_heif = _require_file_processing("pillow_heif")
+            pillow_heif.register_heif_opener()  # type: ignore[attr-defined]
+        image_module = _require_file_processing("PIL.Image")
+        with image_module.open(io.BytesIO(file_bytes)) as image:  # type: ignore[attr-defined]
+            image.seek(0)  # first frame of animated GIFs
+            frame = image.convert("RGB")
+        output = io.BytesIO()
+        frame.save(output, format="PNG")
+        return output.getvalue(), None
+    except Exception as exc:
+        return None, f"Image conversion to PNG failed: {exc}"
 
 
 # PDFs with fewer extracted chars than this are likely scanned/image-only and
@@ -474,16 +620,30 @@ def extract_text(
         # Images, PPTX, and sparse/scanned PDFs: use docling. DOCX/XLSX/HTML
         # take their inexpensive native text paths; embedded images are emitted
         # separately as IMAGE assets by sources that materialize containers.
-        text, error = _extract_docling_markdown(
-            file_bytes,
-            mime_type=mime_type,
-            file_name=file_name,
-        )
-        if text:
-            return text, None
-        if error:
-            logger.warning("OCR extraction failed for %s: %s", file_name or mime_type, error)
-            ocr_error = error
+        # GIF/HEIC/HEIF are converted to PNG first — docling can't read them.
+        ocr_bytes: bytes | None = file_bytes
+        ocr_mime = mime_type
+        ocr_name = file_name
+        if _normalize_mime_type(mime_type) in _OCR_CONVERTIBLE_IMAGE_MIME_TYPES:
+            ocr_bytes, conversion_error = _convert_image_to_png(file_bytes, mime_type)
+            ocr_mime = "image/png"
+            ocr_name = "converted.png"
+            if conversion_error:
+                logger.warning(
+                    "Image conversion failed for %s: %s", file_name or mime_type, conversion_error
+                )
+                ocr_error = conversion_error
+        if ocr_bytes is not None:
+            text, error = _extract_docling_markdown(
+                ocr_bytes,
+                mime_type=ocr_mime,
+                file_name=ocr_name,
+            )
+            if text:
+                return text, None
+            if error:
+                logger.warning("OCR extraction failed for %s: %s", file_name or mime_type, error)
+                ocr_error = error
 
     # Media processing is based on detected content type, never source config.
     if mime_type.startswith("audio/"):
@@ -569,6 +729,36 @@ def extract_text(
         except Exception as e:
             return "", f"XLSX extraction failed: {e}"
 
+    # ODF (odt/ods/odp) and Outlook .msg — docling parses these natively.
+    if mime_type in _DOCLING_NATIVE_DOCUMENT_MIME_TYPES:
+        return _extract_docling_markdown(
+            file_bytes,
+            mime_type=mime_type,
+            file_name=file_name,
+        )
+
+    # EML — stdlib email parser (headers + body; no heavy dependencies).
+    if mime_type == "message/rfc822":
+        return _extract_eml_text(file_bytes)
+
+    # RTF (before the generic text/* branch: text/rtf must not pass through raw)
+    if mime_type in ("application/rtf", "text/rtf"):
+        try:
+            striprtf = _require_file_processing("striprtf.striprtf")
+
+            return striprtf.rtf_to_text(_decode_bytes(file_bytes)), None  # type: ignore[attr-defined]
+        except Exception as e:
+            return "", f"RTF extraction failed: {e}"
+
+    # Legacy Office (.doc/.xls/.ppt): LibreOffice → OOXML → native extraction.
+    if mime_type in _LEGACY_OFFICE_MIME_TYPES:
+        return _extract_legacy_office_text(file_bytes, mime_type, file_name=file_name)
+
+    # Archive containers carry no text of their own; object-storage sources
+    # expand their members into standalone child assets instead.
+    if mime_type in ARCHIVE_MIME_TYPES:
+        return "", None
+
     # HTML / XHTML
     if mime_type in ("text/html", "application/xhtml+xml"):
         try:
@@ -579,12 +769,12 @@ def extract_text(
         except Exception as e:
             return "", f"HTML extraction failed: {e}"
 
-    # JSON, XML — decode as-is
-    if mime_type in (
-        "application/json",
-        "application/xml",
-        "text/xml",
-    ):
+    # XML — parsed securely with defusedxml (falls back to raw decoded text)
+    if mime_type in ("application/xml", "text/xml"):
+        return _extract_xml_text(file_bytes)
+
+    # JSON — decode as-is
+    if mime_type == "application/json":
         return _decode_bytes(file_bytes), None
 
     # Plain text, CSV, Markdown, and other text/* types
@@ -602,6 +792,90 @@ def extract_text(
 
     # Unknown / binary
     return "", ocr_error
+
+
+def _extract_eml_text(file_bytes: bytes) -> tuple[str, str | None]:
+    """Extract headers, body text, and attachment names from an RFC-822 email."""
+    import email
+    import email.policy
+
+    try:
+        message = email.message_from_bytes(file_bytes, policy=email.policy.default)
+
+        sections: list[str] = []
+        for header in ("From", "To", "Cc", "Subject", "Date"):
+            value = message.get(header)
+            if value:
+                sections.append(f"{header}: {value}")
+
+        body = message.get_body(preferencelist=("plain", "html"))  # type: ignore[attr-defined]
+        if body is not None:
+            content = str(body.get_content())
+            if body.get_content_type() == "text/html":
+                from .content_extraction import html_to_text
+
+                content = html_to_text(content)
+            if content.strip():
+                sections.append("")
+                sections.append(content.strip())
+
+        for attachment in message.iter_attachments():  # type: ignore[attr-defined]
+            file_name = attachment.get_filename()
+            if file_name:
+                sections.append(f"[Attachment: {file_name} ({attachment.get_content_type()})]")
+
+        return "\n".join(sections), None
+    except Exception as e:
+        return "", f"EML extraction failed: {e}"
+
+
+def _extract_xml_text(file_bytes: bytes) -> tuple[str, str | None]:
+    """Extract text securely from XML using defusedxml (XXE / entity-expansion safe).
+
+    Emits one ``tag: text`` line per element plus ``tag@attribute: value`` lines
+    so detectors keep the element context. Malformed XML (or a missing
+    defusedxml) falls back to the raw decoded text, matching the old behavior.
+    """
+    decoded = _decode_bytes(file_bytes)
+    try:
+        defused_et = _require_file_processing("defusedxml.ElementTree")
+
+        root = defused_et.fromstring(decoded)  # type: ignore[attr-defined]
+    except Exception as exc:
+        logger.debug("Secure XML parse failed; falling back to raw text: %s", exc)
+        return decoded, None
+
+    def _local_name(name: str) -> str:
+        return name.rsplit("}", 1)[-1]
+
+    lines: list[str] = []
+    for element in root.iter():
+        tag = _local_name(str(element.tag))
+        for attribute, value in element.attrib.items():
+            lines.append(f"{tag}@{_local_name(attribute)}: {value}")
+        text = (element.text or "").strip()
+        if text:
+            lines.append(f"{tag}: {text}")
+    return "\n".join(lines), None
+
+
+def _extract_legacy_office_text(
+    file_bytes: bytes,
+    mime_type: str,
+    *,
+    file_name: str,
+) -> tuple[str, str | None]:
+    """Convert .doc/.xls/.ppt via LibreOffice, then run the modern extractor."""
+    from .legacy_office import convert_legacy_office
+
+    converted, target_mime, error = convert_legacy_office(file_bytes, mime_type)
+    if converted is None:
+        return "", error
+    suffix = next(
+        (ext for ext, mime in _MIME_HINTS_BY_EXTENSION.items() if mime == target_mime), ""
+    )
+    converted_name = f"{Path(file_name).stem or 'converted'}{suffix}"
+    return extract_text(converted, target_mime, file_name=converted_name)
 
 
 def _decode_bytes(file_bytes: bytes) -> str:
@@ -681,6 +955,7 @@ def parse_bytes(
     is_binary = (
         mime_type.startswith(("image/", "audio/", "video/"))
         or mime_type == "application/octet-stream"
+        or mime_type in ARCHIVE_MIME_TYPES
     )
 
     return ParsedBytes(
