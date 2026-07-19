@@ -555,7 +555,7 @@ export class EmbeddingService implements OnApplicationBootstrap {
     const chunks = dto.chunks.map((chunk) => {
       // Postgres TEXT rejects NUL bytes; strip them rather than 500 the whole
       // batch when binary-contaminated text slips past extraction.
-      const text = chunk.text.replace(/\u0000/g, '');
+      const text = chunk.text.split('\u0000').join('');
       return { ...chunk, text, contentHash: embeddingContentHash(text) };
     });
     await this.prisma.$transaction(async (tx) => {
