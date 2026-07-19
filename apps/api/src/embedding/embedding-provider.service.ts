@@ -23,8 +23,21 @@ export class EmbeddingProviderService implements OnApplicationShutdown {
   private readonly pending = new Map<number, PendingRequest>();
   private consecutiveWorkerFailures = 0;
   private workerDisabled = false;
+  private requestErrorCount = 0;
+  private lastRequestError?: string;
+  private lastRequestErrorAt?: string;
 
   constructor(private readonly config: EmbeddingConfigService) {}
+
+  /** Provider-level failure state, surfaced via GET /embeddings/status. */
+  status() {
+    return {
+      workerDisabled: this.workerDisabled,
+      requestErrorCount: this.requestErrorCount,
+      lastRequestError: this.lastRequestError ?? null,
+      lastRequestErrorAt: this.lastRequestErrorAt ?? null,
+    };
+  }
 
   async embedMany(texts: string[]): Promise<number[][]> {
     if (!texts.length) return [];
@@ -124,6 +137,21 @@ export class EmbeddingProviderService implements OnApplicationShutdown {
         if (!pending) return;
         this.pending.delete(message.id);
         if (message.error) {
+          // Every embed request failing here is invisible otherwise (the
+          // worker survives, so 'error'/'exit' never fire). Log the first
+          // failure at full volume, then throttle — a broken model cache
+          // fails every request and would otherwise flood the log.
+          this.requestErrorCount += 1;
+          this.lastRequestError = message.error;
+          this.lastRequestErrorAt = new Date().toISOString();
+          if (
+            this.requestErrorCount === 1 ||
+            this.requestErrorCount % 100 === 0
+          ) {
+            this.logger.error(
+              `Embedding request failed (${this.requestErrorCount} total): ${message.error}`,
+            );
+          }
           pending.reject(new Error(message.error));
         } else {
           this.consecutiveWorkerFailures = 0;

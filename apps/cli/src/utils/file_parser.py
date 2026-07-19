@@ -263,7 +263,18 @@ def _get_docling_converter() -> tuple[object, str | None]:
             return _docling_state.converter, _docling_state.error
         _docling_state.attempted = True
         try:
+            import os
+
             from ..sources.dependencies import require_module
+
+            # docling's AcceleratorOptions defaults to device="auto", which
+            # resolves to MPS on Apple Silicon — where the layout model crashes
+            # ("Cannot convert a MPS Tensor to float64"), silently producing
+            # zero text for every scanned image and PDF. Default to CPU (the
+            # same choice WhisperConfig makes); AcceleratorOptions reads the
+            # DOCLING_DEVICE env var at construction, so an explicit setting
+            # still overrides this.
+            os.environ.setdefault("DOCLING_DEVICE", "cpu")
 
             converter_module = require_module(
                 "docling.document_converter",
@@ -422,10 +433,36 @@ def _refine_zip_mime(file_bytes: bytes) -> str:
     return "application/zip"
 
 
+def _is_null_byte_unicode_text(file_bytes: bytes) -> bool:
+    """UTF-16/32 text interleaves null bytes with every character — still text."""
+    # \xff\xfe prefixes both UTF-16 LE and UTF-32 LE BOMs.
+    if file_bytes.startswith((b"\xff\xfe", b"\xfe\xff", b"\x00\x00\xfe\xff")):
+        return True
+    try:
+        chardet = _require_file_processing("chardet")
+
+        detected = chardet.detect(file_bytes[:4096])  # type: ignore[attr-defined]
+        encoding = (detected.get("encoding") or "").lower()
+        if not encoding.startswith(("utf-16", "utf-32")):
+            return False
+        # Almost any even byte sequence decodes as *valid* UTF-16 code units,
+        # so a successful decode is not enough — the result must read as text.
+        unit = 4 if encoding.startswith("utf-32") else 2
+        sample = file_bytes[:4096]
+        sample = sample[: len(sample) - len(sample) % unit]
+        decoded = sample.decode(encoding)
+        if not decoded:
+            return False
+        printable = sum(1 for ch in decoded if ch.isprintable() or ch.isspace())
+        return printable / len(decoded) >= 0.9
+    except Exception:
+        return False
+
+
 def _sniff_text_mime(file_bytes: bytes) -> str:
     """Fallback MIME detection for text formats not handled by filetype."""
-    # Check for null bytes → binary
-    if b"\x00" in file_bytes[:8192]:
+    # Check for null bytes → binary (unless it's null-byte-bearing Unicode text)
+    if b"\x00" in file_bytes[:8192] and not _is_null_byte_unicode_text(file_bytes):
         return "application/octet-stream"
 
     # Try to decode a sample for text-based sniffing
@@ -885,9 +922,12 @@ def _decode_bytes(file_bytes: bytes) -> str:
 
         detected = chardet.detect(file_bytes[:65536])  # type: ignore[attr-defined]
         encoding = detected.get("encoding") or "utf-8"
-        return file_bytes.decode(encoding, errors="replace")
+        decoded = file_bytes.decode(encoding, errors="replace")
     except Exception:
-        return file_bytes.decode("utf-8", errors="replace")
+        decoded = file_bytes.decode("utf-8", errors="replace")
+    # Postgres TEXT columns reject NUL outright; any that survive decoding
+    # (binary content that slipped past mime detection) must not reach storage.
+    return decoded.replace("\x00", "")
 
 
 def resolve_mime_type(
@@ -918,6 +958,16 @@ def resolve_mime_type(
     mime_type = normalize_detected_mime_type(mime_type, file_name)
     if mime_type == "application/octet-stream" and inferred_mime != "application/octet-stream":
         mime_type = inferred_mime
+
+    # A text-like claim (declared upload header or file extension) must survive
+    # content inspection: a binary renamed to .txt otherwise decodes to
+    # control-character garbage that poisons every text consumer downstream.
+    if (
+        file_bytes
+        and detected_mime == "application/octet-stream"
+        and (mime_type.startswith("text/") or mime_type in ("application/json", "application/xml"))
+    ):
+        return "application/octet-stream"
 
     return mime_type
 

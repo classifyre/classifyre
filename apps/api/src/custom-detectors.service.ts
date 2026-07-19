@@ -806,8 +806,10 @@ export class CustomDetectorsService {
    * For LLM detectors, resolve the configured provider credential (decrypting the
    * API key) and inject a runtime-only `provider_runtime` block into the pipeline
    * schema so the CLI worker can call the provider directly. No-op for other types.
+   * Public: the test-scenario path (CustomDetectorTestsService) must inject the
+   * same runtime before dispatching `evaluate-file`, or LLM detectors fail.
    */
-  private async injectLlmProviderRuntime(
+  async injectLlmProviderRuntime(
     pipelineSchema: Record<string, unknown>,
     aiProviderConfigId: string | null,
   ): Promise<Record<string, unknown>> {

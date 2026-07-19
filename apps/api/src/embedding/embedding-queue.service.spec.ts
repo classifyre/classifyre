@@ -23,7 +23,15 @@ describe('EmbeddingQueueService', () => {
     provider: 'transformers-js',
     model: 'Xenova/all-MiniLM-L6-v2',
   };
-  const provider = { embedMany: jest.fn() };
+  const provider = {
+    embedMany: jest.fn(),
+    status: jest.fn().mockReturnValue({
+      workerDisabled: false,
+      requestErrorCount: 0,
+      lastRequestError: null,
+      lastRequestErrorAt: null,
+    }),
+  };
   const embeddings = {
     configuredSpace: jest.fn(),
     missingHashes: jest.fn(),

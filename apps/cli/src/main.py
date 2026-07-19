@@ -250,12 +250,17 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
                         stub_batch = [_asset_to_payload(asset) for asset in raw_batch]
                         for stub in stub_batch:
                             stub["findings"] = []
-                        await sink.emit_batch(stub_batch, skip_findings=True)
-                        output_batch_count += 1
 
+                        # Register BEFORE ingesting: the API stamps per-run
+                        # change_type onto runner_assets rows during ingest, so
+                        # the row must exist or the CREATED stamp is lost and
+                        # first-run counters report every asset as unchanged.
                         hashes = [s["hash"] for s in stub_batch if s.get("hash")]
                         if hasattr(sink, "register_discovered_assets") and hashes:
                             await sink.register_discovered_assets(hashes)
+
+                        await sink.emit_batch(stub_batch, skip_findings=True)
+                        output_batch_count += 1
 
                         all_stubs.extend(raw_batch)
                         logger.info(
@@ -326,7 +331,18 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
                                 if hasattr(sink, "emit_text_chunks"):
                                     artifact = pipeline.take_text_artifact(asset_hash)
                                     if artifact is not None:
-                                        await sink.emit_text_chunks(asset_hash, artifact)
+                                        try:
+                                            await sink.emit_text_chunks(asset_hash, artifact)
+                                        except Exception as chunk_exc:
+                                            # Findings are already persisted at this
+                                            # point; embedding provenance is best-effort
+                                            # and must not fail the whole asset.
+                                            logger.warning(
+                                                "Text-chunk emission failed for asset %s"
+                                                " (continuing): %s",
+                                                asset_hash,
+                                                chunk_exc,
+                                            )
 
                                 if hasattr(sink, "update_asset_status"):
                                     f_total, f_by_sev, f_by_det = _compute_findings_counts(
@@ -506,6 +522,8 @@ def run_evaluate_file_command(args: argparse.Namespace) -> None:
         }
         if parsed.parse_error:
             output["parse_error"] = parsed.parse_error
+        if runner.detector_errors:
+            output["detector_errors"] = runner.detector_errors
         print(json.dumps(_sanitize_for_json(output), ensure_ascii=False))
     except Exception as e:
         logger.error("File evaluation failed: %s", e, exc_info=True)
