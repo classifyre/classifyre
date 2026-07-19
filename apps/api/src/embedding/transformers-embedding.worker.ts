@@ -1,4 +1,5 @@
 import { parentPort } from 'node:worker_threads';
+import path from 'node:path';
 
 type WorkerRequest = {
   id: number;
@@ -28,10 +29,26 @@ async function extractorFor(config: WorkerRequest['config']) {
     env.cacheDir = config.cacheDir;
     env.allowRemoteModels = config.allowRemoteModels;
     if (config.localModelPath) env.localModelPath = config.localModelPath;
-    return pipeline('feature-extraction', config.model, {
-      revision: config.revision,
+
+    // Transformers.js 4.2 discovers pipeline components without forwarding
+    // the requested revision. In an offline desktop build that makes it look
+    // for tokenizer metadata at <cache>/<model>/ instead of the pinned
+    // <cache>/<model>/<revision>/ directory, so it constructs a pipeline with
+    // tokenizer=null even though the tokenizer files are present. Point the
+    // offline pipeline directly at the cached revision to bypass discovery.
+    const offline = !config.allowRemoteModels;
+    const modelSource = offline
+      ? path.resolve(
+          config.localModelPath ?? config.cacheDir,
+          config.model,
+          config.revision,
+        )
+      : config.model;
+    return pipeline('feature-extraction', modelSource, {
+      revision: offline ? 'main' : config.revision,
       dtype: config.dtype as any,
       device: config.device as any,
+      local_files_only: offline,
     });
   })();
   return extractorPromise;
