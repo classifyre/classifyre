@@ -15,6 +15,7 @@ CURSOR_ENV = "CLASSIFYRE_SAMPLING_CURSOR"
 def _encode_cursor(cursor: dict[str, Any]) -> str:
     return base64.b64encode(json.dumps(cursor).encode()).decode()
 
+
 # ── confluent-kafka fakes ────────────────────────────────────────────────
 
 

@@ -144,9 +144,7 @@ class TestSampling:
         import json
         import os
 
-        encoded = base64.b64encode(
-            json.dumps(cursor_after_first).encode("utf-8")
-        ).decode("utf-8")
+        encoded = base64.b64encode(json.dumps(cursor_after_first).encode("utf-8")).decode("utf-8")
         os.environ["CLASSIFYRE_SAMPLING_CURSOR"] = encoded
         try:
             source2 = GoogleWorkspaceSource(recipe)
@@ -366,9 +364,7 @@ class TestEndToEndExtraction:
 
         # drives().list() -> one shared drive
         drives_list_result = {"drives": [{"id": "drive-1", "name": "Team Drive"}]}
-        mock_service.drives.return_value.list.return_value.execute.return_value = (
-            drives_list_result
-        )
+        mock_service.drives.return_value.list.return_value.execute.return_value = drives_list_result
 
         # files().list() -> root has one subfolder + nothing else, subfolder has
         # one binary file and one Google Doc.

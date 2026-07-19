@@ -427,13 +427,31 @@ describe('Post-first-use store remediation (e2e)', () => {
       '6'.repeat(64),
     ];
     const findingInputs: Array<{ hash: string; content: string }> = [
-      { hash: hashes[0], content: 'Contract payment schedule and legal reference' },
-      { hash: hashes[0], content: 'Contract payment schedule and legal reference' },
-      { hash: hashes[1], content: 'Agreement payment timetable and statutory citation' },
+      {
+        hash: hashes[0],
+        content: 'Contract payment schedule and legal reference',
+      },
+      {
+        hash: hashes[0],
+        content: 'Contract payment schedule and legal reference',
+      },
+      {
+        hash: hashes[1],
+        content: 'Agreement payment timetable and statutory citation',
+      },
       { hash: hashes[2], content: 'Unrelated aviation maintenance record' },
-      { hash: hashes[3], content: 'Contract invoicing calendar and legal citation' },
-      { hash: hashes[4], content: 'Payment agreement schedule with statute reference' },
-      { hash: hashes[5], content: 'Contractual payment plan and code citation' },
+      {
+        hash: hashes[3],
+        content: 'Contract invoicing calendar and legal citation',
+      },
+      {
+        hash: hashes[4],
+        content: 'Payment agreement schedule with statute reference',
+      },
+      {
+        hash: hashes[5],
+        content: 'Contractual payment plan and code citation',
+      },
     ];
     const createdFindings = await Promise.all(
       findingInputs.map(({ hash, content }, index) =>

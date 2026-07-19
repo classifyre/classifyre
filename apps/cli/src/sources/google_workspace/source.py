@@ -178,9 +178,7 @@ class GoogleWorkspaceSource(BaseSource):
 
         if isinstance(required, GoogleWorkspaceRequiredServiceAccount):
             if not isinstance(masked, GoogleWorkspaceMaskedServiceAccount):
-                raise ValueError(
-                    "service_account auth requires masked.service_account_json"
-                )
+                raise ValueError("service_account auth requires masked.service_account_json")
         elif isinstance(required, GoogleWorkspaceRequiredOAuth):
             if not isinstance(masked, GoogleWorkspaceMaskedOAuth):
                 raise ValueError(
@@ -655,9 +653,7 @@ class GoogleWorkspaceSource(BaseSource):
                         mime_type = export_mime
                         exported_as = export_mime
                 elif ref.size and ref.size > self._max_object_bytes():
-                    parse_error = (
-                        f"File size {ref.size} exceeds limit {self._max_object_bytes()}"
-                    )
+                    parse_error = f"File size {ref.size} exceeds limit {self._max_object_bytes()}"
                 else:
                     service = self._get_service()
                     request = service.files().get_media(fileId=ref.file_id)
@@ -792,9 +788,7 @@ class GoogleWorkspaceSource(BaseSource):
                         drive_id=_MY_DRIVE_ID, display_name="My Drive", drive_type="my_drive"
                     )
                 else:
-                    drive_ref = known_drives.get(drive_id) or self._resolve_shared_drive(
-                        drive_id
-                    )
+                    drive_ref = known_drives.get(drive_id) or self._resolve_shared_drive(drive_id)
                 ensure_drive(drive_ref)
                 if len(batch) >= self.BATCH_SIZE:
                     yield batch
@@ -849,7 +843,9 @@ class GoogleWorkspaceSource(BaseSource):
 
             logger.info(
                 "Processing %d/%d items from drive '%s'",
-                len(sampled), len(files), drive_id,
+                len(sampled),
+                len(files),
+                drive_id,
             )
 
             for file_ref in sampled:
@@ -884,18 +880,14 @@ class GoogleWorkspaceSource(BaseSource):
                 and bool(required.delegated_subject)
             )
             if uses_identity:
-                data = service.about().get(fields="user").execute(
-                    num_retries=self._max_retries()
-                )
+                data = service.about().get(fields="user").execute(num_retries=self._max_retries())
                 user = data.get("user", {})
                 result["status"] = "SUCCESS"
                 result["message"] = (
                     f"Connected to Google Drive API as {user.get('emailAddress', 'unknown')}"
                 )
             else:
-                data = service.drives().list(pageSize=1).execute(
-                    num_retries=self._max_retries()
-                )
+                data = service.drives().list(pageSize=1).execute(num_retries=self._max_retries())
                 drives = data.get("drives", [])
                 result["status"] = "SUCCESS"
                 if drives:
@@ -904,7 +896,9 @@ class GoogleWorkspaceSource(BaseSource):
                         f"{drives[0].get('name', 'unknown')}"
                     )
                 else:
-                    result["message"] = "Connected to Google Drive API. No shared drives accessible."
+                    result["message"] = (
+                        "Connected to Google Drive API. No shared drives accessible."
+                    )
         except Exception as exc:
             result["status"] = "FAILURE"
             result["message"] = f"Failed to connect to Google Drive API: {exc}"

@@ -54,7 +54,12 @@ import { AutopilotController } from './autopilot.controller';
  * full audit trail (AgentRun / AgentDecision) and DB-backed memory.
  */
 @Module({
-  imports: [MatchingModule, CorrelationModule, CliRunnerModule, EmbeddingModule],
+  imports: [
+    MatchingModule,
+    CorrelationModule,
+    CliRunnerModule,
+    EmbeddingModule,
+  ],
   controllers: [AutopilotController, McpServersController],
   providers: [
     PrismaService,

@@ -339,8 +339,7 @@ class YouTubeSource(BaseSource):
         # Requiring both codecs avoids yt-dlp's ffmpeg merge path. Visual OCR only
         # needs readable text, while the audio track remains suitable for Whisper.
         opts["format"] = (
-            "best[height<=480][acodec!=none][vcodec!=none]/"
-            "best[acodec!=none][vcodec!=none]"
+            "best[height<=480][acodec!=none][vcodec!=none]/best[acodec!=none][vcodec!=none]"
         )
         opts["noplaylist"] = True
         opts["outtmpl"] = str(dest_dir / "%(id)s.%(ext)s")

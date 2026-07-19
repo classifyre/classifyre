@@ -207,7 +207,7 @@ export class EmbeddingProviderService implements OnApplicationShutdown {
     );
   }
 
-  async onApplicationShutdown(): Promise<void> {
+  onApplicationShutdown(): void {
     this.shuttingDown = true;
     this.worker?.kill();
   }

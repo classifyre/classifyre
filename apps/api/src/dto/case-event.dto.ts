@@ -137,7 +137,9 @@ export class CaseEventDto {
   @ApiPropertyOptional({ nullable: true, minimum: 0, maximum: 1 })
   confidence?: number | null;
 
-  @ApiProperty({ description: 'AGENT-extracted events are unverified hypotheses' })
+  @ApiProperty({
+    description: 'AGENT-extracted events are unverified hypotheses',
+  })
   origin!: string;
 
   @ApiProperty()
