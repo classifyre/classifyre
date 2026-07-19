@@ -8,6 +8,8 @@ import type { GraphNodeDto } from "@workspace/api-client";
  */
 const ICON_PATHS: Record<string, string> = {
   file: "M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z M14 2v5a1 1 0 0 0 1 1h5",
+  archive:
+    "M3 3 L21 3 A1 1 0 0 1 22 4 L22 7 A1 1 0 0 1 21 8 L3 8 A1 1 0 0 1 2 7 L2 4 A1 1 0 0 1 3 3 Z M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8 M10 12h4",
   fileText:
     "M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z M14 2v5a1 1 0 0 0 1 1h5 M10 9H8 M16 13H8 M16 17H8",
   image:
@@ -60,6 +62,7 @@ function getPath(key: string): Path2D | null {
 /** Map asset type → lucide icon key (mirrors the old getAssetKindIcon()). */
 const assetIconKey: Record<string, string> = {
   file: "file",
+  archive: "archive",
   image: "image",
   page: "fileText",
   post: "fileText",

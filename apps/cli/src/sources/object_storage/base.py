@@ -20,6 +20,7 @@ from ...models.generated_single_asset_scan_results import (
     Location,
     SingleAssetScanResults,
 )
+from ...utils.archive_extraction import ArchiveMember, is_archive_mime, iter_archive_members
 from ...utils.embedded_images import EmbeddedImage, has_embedded_images, iter_embedded_images
 from ...utils.file_metadata import extract_file_metadata
 from ...utils.file_parser import infer_mime_type_from_file_name, resolve_mime_type
@@ -65,6 +66,8 @@ _FILE_EXTENSION_HINTS: dict[str, OutputAssetType] = {
     ".wav": OutputAssetType.AUDIO,
     ".aac": OutputAssetType.AUDIO,
     ".ogg": OutputAssetType.AUDIO,
+    ".heic": OutputAssetType.IMAGE,
+    ".heif": OutputAssetType.IMAGE,
     ".pdf": OutputAssetType.BINARY,
     ".doc": OutputAssetType.BINARY,
     ".docx": OutputAssetType.BINARY,
@@ -72,11 +75,18 @@ _FILE_EXTENSION_HINTS: dict[str, OutputAssetType] = {
     ".xlsx": OutputAssetType.TABLE,
     ".ppt": OutputAssetType.BINARY,
     ".pptx": OutputAssetType.BINARY,
+    ".odt": OutputAssetType.BINARY,
+    ".ods": OutputAssetType.TABLE,
+    ".odp": OutputAssetType.BINARY,
+    ".rtf": OutputAssetType.BINARY,
+    ".eml": OutputAssetType.BINARY,
+    ".msg": OutputAssetType.BINARY,
     ".zip": OutputAssetType.BINARY,
     ".rar": OutputAssetType.BINARY,
     ".7z": OutputAssetType.BINARY,
     ".tar": OutputAssetType.BINARY,
     ".gz": OutputAssetType.BINARY,
+    ".tgz": OutputAssetType.BINARY,
     ".parquet": OutputAssetType.TABLE,
     ".json": OutputAssetType.TXT,
     ".xml": OutputAssetType.TXT,
@@ -339,6 +349,13 @@ class ObjectStorageSourceBase(BaseSource, ABC):
         }
         return mapping.get(asset_type, "file")
 
+    @classmethod
+    def _asset_kind_for_mime(cls, mime_type: str | None, asset_type: OutputAssetType) -> str:
+        """Catalog kind for an asset: archives get their own kind for display."""
+        if mime_type and is_archive_mime(mime_type):
+            return "archive"
+        return cls._asset_kind_for_asset_type(asset_type)
+
     def _ensure_file_processing_dependencies(self) -> None:
         if self._file_processing_deps_checked:
             return
@@ -399,10 +416,9 @@ class ObjectStorageSourceBase(BaseSource, ABC):
 
         # Images and audio/video are extractable automatically. Opaque binaries
         # remain available to binary detectors but have no text page stream.
-        is_non_extractable = normalized_mime in (
-            "application/octet-stream",
-            "application/zip",
-        )
+        # Archives keep their bytes so member files can be expanded into child
+        # assets (the container itself still yields no text pages).
+        is_non_extractable = normalized_mime == "application/octet-stream"
 
         return ContentSnapshot(
             mime_type=mime_type,
@@ -479,7 +495,9 @@ class ObjectStorageSourceBase(BaseSource, ABC):
             created_at=ref.last_modified,
             updated_at=ref.last_modified,
             runner_id=self.runner_id,
-            **self.metadata_fields(self._asset_kind_for_asset_type(asset_type), asset_metadata),
+            **self.metadata_fields(
+                self._asset_kind_for_mime(snapshot.mime_type, asset_type), asset_metadata
+            ),
         )
         self._hash_to_uri[asset_hash] = external_url
         self._object_ref_by_hash[asset_hash] = ref
@@ -491,6 +509,18 @@ class ObjectStorageSourceBase(BaseSource, ABC):
         # Bytes are cached here so fetch_content_bytes() serves them without re-download.
         if snapshot.raw_bytes is not None and has_embedded_images(snapshot.mime_type):
             self._queue_child_image_assets(
+                parent=asset,
+                file_bytes=snapshot.raw_bytes,
+                mime_type=snapshot.mime_type,
+                ref=ref,
+            )
+
+        # Archive containers (zip/tar/gz/7z/rar) expand into one child asset per
+        # member file so each member gets its own MIME resolution, text
+        # extraction, and detector pass. Nested archives are kept as opaque
+        # child assets (single-level expansion) to bound memory and fan-out.
+        if snapshot.raw_bytes is not None and is_archive_mime(snapshot.mime_type):
+            self._queue_child_archive_assets(
                 parent=asset,
                 file_bytes=snapshot.raw_bytes,
                 mime_type=snapshot.mime_type,
@@ -553,6 +583,75 @@ class ObjectStorageSourceBase(BaseSource, ABC):
             updated_at=ref.last_modified,
             runner_id=self.runner_id,
             **self.metadata_fields("image", metadata),
+        )
+
+    def _queue_child_archive_assets(
+        self,
+        *,
+        parent: SingleAssetScanResults,
+        file_bytes: bytes,
+        mime_type: str,
+        ref: ObjectRef,
+    ) -> None:
+        """Expand archive members into child assets linked from the parent
+        (appended to ``parent.links``, never removing existing links)."""
+        try:
+            for member in iter_archive_members(
+                file_bytes,
+                mime_type,
+                file_name=self._object_file_name(ref),
+            ):
+                child = self._build_child_archive_member_asset(parent, member, ref)
+                self._pending_child_assets.append(child)
+                if child.hash not in parent.links:
+                    parent.links.append(child.hash)
+        except Exception as exc:
+            logger.warning("Failed to expand archive members from %s: %s", parent.external_url, exc)
+
+    def _build_child_archive_member_asset(
+        self,
+        parent: SingleAssetScanResults,
+        member: ArchiveMember,
+        ref: ObjectRef,
+    ) -> SingleAssetScanResults:
+        child_url = f"{parent.external_url}#{member.location}"
+        child_hash = self.generate_hash_id(child_url)
+        member_type = self._asset_type_from_mime_or_key(member.mime_type, member.location)
+        metadata: dict[str, Any] = {
+            "provider": self.provider_label,
+            "object_key": f"{ref.key}#{member.location}",
+            "source_hash": parent.hash,
+            "location": member.location,
+            "mime_type": member.mime_type,
+            "size_bytes": len(member.member_bytes),
+        }
+        file_meta = extract_file_metadata(
+            member.member_bytes,
+            member.mime_type,
+            file_name=member.location,
+        )
+        metadata.update({k: v for k, v in file_meta.items() if v is not None})
+        # Serve member bytes from cache (keyed by both hash and url) so both the
+        # text-page and binary-detector paths resolve without re-reading the archive.
+        self._bytes_cache[child_hash] = member.member_bytes
+        self._bytes_cache[child_url] = member.member_bytes
+        self._mime_cache[child_hash] = member.mime_type
+        self._mime_cache[child_url] = member.mime_type
+        self._hash_to_uri[child_hash] = child_url
+        return SingleAssetScanResults(
+            hash=child_hash,
+            checksum=self.calculate_checksum(metadata),
+            name=f"{parent.name}#{member.location}",
+            external_url=child_url,
+            links=[],
+            asset_type=member_type,
+            source_id=self.source_id,
+            created_at=ref.last_modified,
+            updated_at=ref.last_modified,
+            runner_id=self.runner_id,
+            **self.metadata_fields(
+                self._asset_kind_for_mime(member.mime_type, member_type), metadata
+            ),
         )
 
     def test_connection(self) -> dict[str, Any]:

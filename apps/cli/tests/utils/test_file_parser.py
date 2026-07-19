@@ -544,3 +544,290 @@ class TestParseBytes:
         )
 
         assert pages == ["first line\n", "second line"]
+
+
+# ---------------------------------------------------------------------------
+# New format support: magic detection, zip refinement, RTF/XML/EML,
+# ODF/MSG docling routing, legacy Office, GIF/HEIC OCR conversion, archives
+# ---------------------------------------------------------------------------
+
+
+def _zip_container(entries: dict[str, bytes]) -> bytes:
+    import io
+    import zipfile
+
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as archive:
+        for name, data in entries.items():
+            archive.writestr(name, data)
+    return buffer.getvalue()
+
+
+class TestMagicSignatures:
+    def test_rtf(self) -> None:
+        assert detect_mime_type(rb"{\rtf1\ansi hi}") == "application/rtf"
+
+    def test_gzip(self) -> None:
+        import gzip
+
+        assert detect_mime_type(gzip.compress(b"data")) == "application/gzip"
+
+    def test_7z(self) -> None:
+        assert detect_mime_type(b"7z\xbc\xaf\x27\x1cxxxx") == "application/x-7z-compressed"
+
+    def test_rar(self) -> None:
+        assert detect_mime_type(b"Rar!\x1a\x07\x00xxxx") == "application/vnd.rar"
+
+    def test_ole_compound_file(self) -> None:
+        assert (
+            detect_mime_type(b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1" + b"\x00" * 32)
+            == "application/x-ole-storage"
+        )
+
+    def test_tar_ustar_magic(self) -> None:
+        import io
+        import tarfile
+
+        buffer = io.BytesIO()
+        with tarfile.open(fileobj=buffer, mode="w") as archive:
+            info = tarfile.TarInfo("a.txt")
+            info.size = 2
+            archive.addfile(info, io.BytesIO(b"hi"))
+        assert detect_mime_type(buffer.getvalue()) == "application/x-tar"
+
+
+class TestZipMimeRefinement:
+    def test_odt_detected_from_mimetype_entry(self) -> None:
+        data = _zip_container(
+            {"mimetype": b"application/vnd.oasis.opendocument.text", "content.xml": b"<x/>"}
+        )
+        assert detect_mime_type(data) == "application/vnd.oasis.opendocument.text"
+
+    def test_docx_detected_from_content_types(self) -> None:
+        data = _zip_container({"[Content_Types].xml": b"<Types/>", "word/document.xml": b"<d/>"})
+        assert (
+            detect_mime_type(data)
+            == "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        )
+
+    def test_xlsx_detected_from_content_types(self) -> None:
+        data = _zip_container({"[Content_Types].xml": b"<Types/>", "xl/workbook.xml": b"<w/>"})
+        assert (
+            detect_mime_type(data)
+            == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+
+    def test_plain_zip_stays_zip(self) -> None:
+        data = _zip_container({"readme.txt": b"hello"})
+        assert detect_mime_type(data) == "application/zip"
+
+    def test_truncated_zip_falls_back_by_extension(self) -> None:
+        from src.utils.file_parser import resolve_mime_type
+
+        # Unreadable container bytes + a .docx name → extension wins.
+        assert (
+            resolve_mime_type(b"PK\x03\x04truncated", file_name="report.docx")
+            == "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        )
+
+
+class TestOleMimeResolution:
+    def test_doc_extension_refines_ole(self) -> None:
+        from src.utils.file_parser import resolve_mime_type
+
+        ole = b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1" + b"\x00" * 32
+        assert resolve_mime_type(ole, file_name="legacy.doc") == "application/msword"
+        assert resolve_mime_type(ole, file_name="legacy.xls") == "application/vnd.ms-excel"
+        assert resolve_mime_type(ole, file_name="legacy.ppt") == "application/vnd.ms-powerpoint"
+        assert resolve_mime_type(ole, file_name="mail.msg") == "application/vnd.ms-outlook"
+
+    def test_ole_without_extension_stays_generic(self) -> None:
+        from src.utils.file_parser import resolve_mime_type
+
+        ole = b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1" + b"\x00" * 32
+        assert resolve_mime_type(ole, file_name="blob") == "application/x-ole-storage"
+
+
+class TestRtfExtraction:
+    def test_text_extracted(self) -> None:
+        pytest.importorskip("striprtf")
+        text, error = extract_text(rb"{\rtf1\ansi Hello {\b World}!}", "application/rtf")
+        assert error is None
+        assert "Hello" in text and "World" in text
+        assert "rtf1" not in text
+
+
+class TestXmlExtraction:
+    def test_element_text_and_attributes(self) -> None:
+        pytest.importorskip("defusedxml")
+        data = b"<?xml version='1.0'?><root attr='v'><item>hello</item></root>"
+        text, error = extract_text(data, "application/xml")
+        assert error is None
+        assert "item: hello" in text
+        assert "root@attr: v" in text
+
+    def test_malformed_xml_falls_back_to_raw(self) -> None:
+        data = b"<?xml version='1.0'?><unclosed>"
+        text, error = extract_text(data, "application/xml")
+        assert error is None
+        assert "unclosed" in text
+
+    def test_entity_expansion_is_defused(self) -> None:
+        pytest.importorskip("defusedxml")
+        bomb = b"<?xml version='1.0'?><!DOCTYPE a [<!ENTITY x 'yyyy'>]><root>&x;</root>"
+        text, _error = extract_text(bomb, "application/xml")
+        # defusedxml rejects the DTD, so the raw fallback is returned with the
+        # entity reference left unexpanded.
+        assert "&x;" in text
+        assert "root: yyyy" not in text
+
+
+class TestEmlExtraction:
+    def test_headers_body_and_attachments(self) -> None:
+        import email.message
+        import email.policy
+
+        message = email.message.EmailMessage(policy=email.policy.default)
+        message["From"] = "alice@example.com"
+        message["To"] = "bob@example.com"
+        message["Subject"] = "Quarterly numbers"
+        message.set_content("Hello Bob,\nplease find the report attached.")
+        message.add_attachment(
+            b"fake-bytes", maintype="application", subtype="pdf", filename="report.pdf"
+        )
+
+        text, error = extract_text(message.as_bytes(), "message/rfc822")
+        assert error is None
+        assert "From: alice@example.com" in text
+        assert "Subject: Quarterly numbers" in text
+        assert "please find the report attached." in text
+        assert "[Attachment: report.pdf (application/pdf)]" in text
+
+    def test_html_only_body_is_stripped(self) -> None:
+        import email.message
+        import email.policy
+
+        message = email.message.EmailMessage(policy=email.policy.default)
+        message["From"] = "a@example.com"
+        message.set_content("<html><body><p>Rich text</p></body></html>", subtype="html")
+
+        text, error = extract_text(message.as_bytes(), "message/rfc822")
+        assert error is None
+        assert "Rich text" in text
+        assert "<p>" not in text
+
+
+class TestDoclingNativeFormats:
+    def test_odt_routes_to_docling(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        calls: list[str] = []
+        monkeypatch.setattr(
+            "src.utils.file_parser._extract_docling_markdown",
+            lambda *_args, **kwargs: (calls.append(kwargs["mime_type"]), ("odt text", None))[1],
+        )
+        text, error = extract_text(
+            b"odt-bytes", "application/vnd.oasis.opendocument.text", file_name="doc.odt"
+        )
+        assert (text, error) == ("odt text", None)
+        assert calls == ["application/vnd.oasis.opendocument.text"]
+
+    def test_msg_routes_to_docling(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(
+            "src.utils.file_parser._extract_docling_markdown",
+            lambda *_args, **_kwargs: ("msg text", None),
+        )
+        text, error = extract_text(b"msg-bytes", "application/vnd.ms-outlook", file_name="mail.msg")
+        assert (text, error) == ("msg text", None)
+
+
+class TestLegacyOfficeExtraction:
+    def test_converted_bytes_flow_through_modern_extractor(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        import io
+
+        docx = pytest.importorskip("docx")
+        docx_mime = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        buffer = io.BytesIO()
+        document = docx.Document()
+        document.add_paragraph("converted body")
+        document.save(buffer)
+        monkeypatch.setattr(
+            "src.utils.legacy_office.convert_legacy_office",
+            lambda _bytes, _mime: (buffer.getvalue(), docx_mime, None),
+        )
+
+        text, error = extract_text(b"old-doc-bytes", "application/msword", file_name="a.doc")
+        assert error is None
+        assert "converted body" in text
+
+    def test_conversion_failure_surfaces_error(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(
+            "src.utils.legacy_office.convert_legacy_office",
+            lambda _bytes, _mime: (None, "target/mime", "soffice missing"),
+        )
+        text, error = extract_text(b"old", "application/vnd.ms-powerpoint", file_name="a.ppt")
+        assert text == ""
+        assert error == "soffice missing"
+
+
+class TestOcrImageConversion:
+    def test_gif_supported_for_ocr(self) -> None:
+        assert _supports_docling_ocr("image/gif", "animation.gif")
+        assert _supports_docling_ocr("image/heic", "photo.heic")
+
+    def test_gif_converted_to_png_before_docling(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        pytest.importorskip("PIL")
+        import io
+
+        from PIL import Image
+
+        buffer = io.BytesIO()
+        Image.new("RGB", (10, 10), (255, 0, 0)).save(buffer, format="GIF")
+
+        received: dict[str, Any] = {}
+
+        def _fake_docling(file_bytes: bytes, *, mime_type: str, file_name: str):
+            _ = file_name
+            received["mime_type"] = mime_type
+            received["magic"] = file_bytes[:8]
+            return "ocr text", None
+
+        monkeypatch.setattr("src.utils.file_parser._extract_docling_markdown", _fake_docling)
+        text, error = extract_text(buffer.getvalue(), "image/gif", file_name="anim.gif")
+        assert (text, error) == ("ocr text", None)
+        assert received["mime_type"] == "image/png"
+        assert received["magic"] == b"\x89PNG\r\n\x1a\n"
+
+    def test_convert_image_to_png_gif_first_frame(self) -> None:
+        pytest.importorskip("PIL")
+        import io
+
+        from PIL import Image
+
+        from src.utils.file_parser import _convert_image_to_png
+
+        buffer = io.BytesIO()
+        Image.new("RGB", (4, 4), (0, 255, 0)).save(buffer, format="GIF")
+        png, error = _convert_image_to_png(buffer.getvalue(), "image/gif")
+        assert error is None
+        assert png is not None and png.startswith(b"\x89PNG\r\n\x1a\n")
+
+    def test_invalid_image_returns_error(self) -> None:
+        from src.utils.file_parser import _convert_image_to_png
+
+        png, error = _convert_image_to_png(b"not-an-image", "image/gif")
+        assert png is None
+        assert error is not None
+
+
+class TestArchiveMimeHandling:
+    def test_archives_yield_no_text_and_no_error(self) -> None:
+        data = _zip_container({"a.txt": b"hello"})
+        text, error = extract_text(data, "application/zip", file_name="a.zip")
+        assert (text, error) == ("", None)
+
+    def test_parse_bytes_marks_archives_binary(self) -> None:
+        data = _zip_container({"a.txt": b"hello"})
+        parsed = parse_bytes(data, file_name="a.zip")
+        assert parsed.mime_type == "application/zip"
+        assert parsed.is_binary is True
