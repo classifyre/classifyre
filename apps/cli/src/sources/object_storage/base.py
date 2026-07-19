@@ -1,14 +1,16 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import itertools
 import logging
 import random
+import tempfile
 from abc import ABC, abstractmethod
 from collections.abc import AsyncGenerator, Iterator
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from pathlib import PurePosixPath
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 from ...models.generated_input import SamplingStrategy
@@ -144,6 +146,11 @@ class ObjectStorageSourceBase(BaseSource, ABC):
         self._file_processing_deps_checked = False
         # Keyed by both asset_hash and external_url for O(1) lookup from either.
         self._bytes_cache: dict[str, bytes] = {}
+        # Archive members can expand to 100 MB per container. Keep their
+        # discovery-to-processing lifetime on disk so many archives cannot
+        # multiply that budget into unbounded resident memory.
+        self._archive_bytes_cache: dict[str, Path] = {}
+        self._archive_cache_dir: tempfile.TemporaryDirectory[str] | None = None
         self._mime_cache: dict[str, str] = {}
         # asset_ids for which fetch_content_pages ran the full bytes path
         # (even if it produced no text, e.g. all-silence audio).  Checked by
@@ -631,10 +638,19 @@ class ObjectStorageSourceBase(BaseSource, ABC):
             file_name=member.location,
         )
         metadata.update({k: v for k, v in file_meta.items() if v is not None})
-        # Serve member bytes from cache (keyed by both hash and url) so both the
-        # text-page and binary-detector paths resolve without re-reading the archive.
-        self._bytes_cache[child_hash] = member.member_bytes
-        self._bytes_cache[child_url] = member.member_bytes
+        # Spool member bytes to a per-scan temporary directory. Phase 1 must
+        # discover every asset before phase 2 starts (B-4), so retaining these
+        # bytes in memory would make the per-archive extraction cap unbounded
+        # across the whole source.
+        if self._archive_cache_dir is None:
+            self._archive_cache_dir = tempfile.TemporaryDirectory(
+                prefix="classifyre-archive-members-"
+            )
+        cache_name = hashlib.sha256(child_hash.encode()).hexdigest()
+        member_path = Path(self._archive_cache_dir.name) / cache_name
+        member_path.write_bytes(member.member_bytes)
+        self._archive_bytes_cache[child_hash] = member_path
+        self._archive_bytes_cache[child_url] = member_path
         self._mime_cache[child_hash] = member.mime_type
         self._mime_cache[child_url] = member.mime_type
         self._hash_to_uri[child_hash] = child_url
@@ -680,6 +696,7 @@ class ObjectStorageSourceBase(BaseSource, ABC):
         self._hash_to_uri = {}
         self._object_ref_by_hash = {}
         self._bytes_cache = {}
+        self._reset_archive_cache()
         self._mime_cache = {}
         self._content_pages_processed = set()
         self._pending_child_assets = []
@@ -716,6 +733,10 @@ class ObjectStorageSourceBase(BaseSource, ABC):
 
     async def fetch_content_bytes(self, asset_id: str) -> tuple[bytes, str] | None:
         raw_bytes = self._bytes_cache.get(asset_id)
+        if raw_bytes is None:
+            member_path = self._archive_bytes_cache.get(asset_id)
+            if member_path is not None:
+                raw_bytes = member_path.read_bytes()
         mime = self._mime_cache.get(asset_id, "")
         if raw_bytes is not None and mime:
             return raw_bytes, mime
@@ -759,6 +780,10 @@ class ObjectStorageSourceBase(BaseSource, ABC):
 
     async def fetch_content_pages(self, asset_id: str) -> AsyncGenerator[tuple[str, str], None]:
         raw_bytes = self._bytes_cache.get(asset_id)
+        if raw_bytes is None:
+            member_path = self._archive_bytes_cache.get(asset_id)
+            if member_path is not None:
+                raw_bytes = member_path.read_bytes()
         mime = self._mime_cache.get(asset_id, "")
 
         logger.info(
@@ -906,20 +931,31 @@ class ObjectStorageSourceBase(BaseSource, ABC):
 
     def evict_asset_cache(self, asset_hash: str) -> None:
         external_url = self._hash_to_uri.get(asset_hash)
+        archive_path = self._archive_bytes_cache.pop(asset_hash, None)
         self._content_cache.pop(asset_hash, None)
         self._bytes_cache.pop(asset_hash, None)
         self._mime_cache.pop(asset_hash, None)
         self._object_ref_by_hash.pop(asset_hash, None)
         if external_url:
+            archive_path = self._archive_bytes_cache.pop(external_url, archive_path)
             self._content_cache.pop(external_url, None)
             self._bytes_cache.pop(external_url, None)
             self._mime_cache.pop(external_url, None)
+        if archive_path is not None:
+            archive_path.unlink(missing_ok=True)
+
+    def _reset_archive_cache(self) -> None:
+        self._archive_bytes_cache = {}
+        if self._archive_cache_dir is not None:
+            self._archive_cache_dir.cleanup()
+            self._archive_cache_dir = None
 
     def abort(self) -> None:
         logger.info("Aborting object storage extraction...")
         super().abort()
 
     def cleanup(self) -> None:
+        self._reset_archive_cache()
         client = self._cached_client
         if client is None:
             return

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import io
+import zipfile
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -231,6 +233,49 @@ async def test_s3_storage_emits_child_image_assets_for_parquet(monkeypatch):
         image_bytes, mime = fetched
         assert mime == "image/png"
         assert image_bytes.startswith(b"\x89PNG")
+
+
+@pytest.mark.asyncio
+async def test_s3_storage_spools_archive_members_until_processing(monkeypatch):
+    source = S3CompatibleStorageSource(_recipe(strategy="LATEST", rows_per_page=10))
+    ref = _ref("exports/documents.zip", days_ago=0)
+    monkeypatch.setattr(source, "_list_objects", lambda: [ref])
+
+    archive_buffer = io.BytesIO()
+    with zipfile.ZipFile(archive_buffer, "w") as archive:
+        archive.writestr("inside/report.txt", b"archive member content")
+    archive_bytes = archive_buffer.getvalue()
+    monkeypatch.setattr(
+        source,
+        "_build_snapshot",
+        lambda _ref: ContentSnapshot(
+            mime_type="application/zip",
+            raw_content="",
+            text_content="",
+            parse_error=None,
+            downloaded_bytes=len(archive_bytes),
+            raw_bytes=archive_bytes,
+        ),
+    )
+
+    assets = []
+    async for batch in source.extract():
+        assets.extend(batch)
+
+    child = next(asset for asset in assets if "#inside/report.txt" in asset.name)
+    member_path = source._archive_bytes_cache[child.hash]
+    assert child.hash not in source._bytes_cache
+    assert member_path.is_file()
+    assert len(member_path.name) == 64
+    assert await source.fetch_content_bytes(child.hash) == (
+        b"archive member content",
+        "text/plain",
+    )
+
+    source.evict_asset_cache(child.hash)
+
+    assert not member_path.exists()
+    source.cleanup()
 
 
 def test_s3_storage_external_url_for_custom_endpoint():

@@ -1,4 +1,5 @@
 import argparse
+import asyncio
 import json
 import logging
 import os
@@ -17,6 +18,7 @@ _SURROGATE_RE = re.compile(r"[\ud800-\udfff]")
 
 _TIMEOUT_PHRASES = ("timed out", "timeout", "connection reset", "errno 110", "connection refused")
 _TIMEOUT_MYSQL_CODES = {2003, 2006, 2013}
+_TEXT_CHUNK_EMIT_ATTEMPTS = 3
 
 
 def _is_timeout_error(exc: BaseException) -> bool:
@@ -41,6 +43,34 @@ def _sanitize_for_json(value: Any) -> Any:
     if isinstance(value, dict):
         return {key: _sanitize_for_json(item) for key, item in value.items()}
     return value
+
+
+async def _emit_text_chunks_with_retry(
+    sink: Any,
+    asset_hash: str,
+    artifact: Any,
+    *,
+    attempts: int = _TEXT_CHUNK_EMIT_ATTEMPTS,
+) -> None:
+    """Persist chunk provenance, retrying transient API failures.
+
+    The caller keeps the already-persisted asset successful, but propagates a
+    final failure at run level so missing chunks/embeddings cannot look healthy.
+    """
+    for attempt in range(1, attempts + 1):
+        try:
+            await sink.emit_text_chunks(asset_hash, artifact)
+            return
+        except Exception:
+            if attempt == attempts:
+                raise
+            logger.warning(
+                "Text-chunk emission failed for asset %s (attempt %d/%d); retrying",
+                asset_hash,
+                attempt,
+                attempts,
+            )
+            await asyncio.sleep(0.25 * (2 ** (attempt - 1)))
 
 
 def setup_logging() -> None:
@@ -274,13 +304,11 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
 
                     # --- Phase 2: Processing ---
                     if all_stubs:
-                        import asyncio as _asyncio
-
                         processed_count = 0
                         _pw = worker_pool.max_workers if worker_pool else 4
                         max_concurrent = args.max_concurrent_assets or (_pw * 2)
                         max_concurrent = max(1, max_concurrent)
-                        _asset_semaphore = _asyncio.Semaphore(max_concurrent)
+                        _asset_semaphore = asyncio.Semaphore(max_concurrent)
                         logger.info(
                             "Phase 2 starting: %d assets, pool_workers=%s, max_concurrent_assets=%d",
                             len(all_stubs),
@@ -288,6 +316,7 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
                             max_concurrent,
                         )
                         error_count = 0
+                        chunk_errors: list[str] = []
 
                         async def _process_one(asset: Any) -> None:
                             async with _asset_semaphore:
@@ -332,14 +361,20 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
                                     artifact = pipeline.take_text_artifact(asset_hash)
                                     if artifact is not None:
                                         try:
-                                            await sink.emit_text_chunks(asset_hash, artifact)
+                                            await _emit_text_chunks_with_retry(
+                                                sink, asset_hash, artifact
+                                            )
                                         except Exception as chunk_exc:
-                                            # Findings are already persisted at this
-                                            # point; embedding provenance is best-effort
-                                            # and must not fail the whole asset.
-                                            logger.warning(
-                                                "Text-chunk emission failed for asset %s"
-                                                " (continuing): %s",
+                                            # Findings and the asset remain persisted,
+                                            # preserving B-2's graceful degradation.
+                                            # The run fails after phase 2 so operators
+                                            # cannot mistake missing embeddings for a
+                                            # healthy completed scan.
+                                            detail = f"{asset_hash}: {chunk_exc}"
+                                            chunk_errors.append(detail)
+                                            logger.error(
+                                                "Text-chunk emission exhausted retries"
+                                                " for asset %s: %s",
                                                 asset_hash,
                                                 chunk_exc,
                                             )
@@ -370,13 +405,22 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
                                     except Exception:
                                         pass
 
-                        tasks = [_asyncio.create_task(_process_one(a)) for a in all_stubs]
-                        await _asyncio.gather(*tasks, return_exceptions=True)
+                        tasks = [asyncio.create_task(_process_one(a)) for a in all_stubs]
+                        await asyncio.gather(*tasks, return_exceptions=True)
                         logger.info(
                             "Phase 2 complete: %d processed, %d errors",
                             processed_count,
                             error_count,
                         )
+                        if chunk_errors:
+                            preview = "; ".join(chunk_errors[:3])
+                            remaining = len(chunk_errors) - 3
+                            if remaining > 0:
+                                preview += f"; and {remaining} more"
+                            raise RuntimeError(
+                                f"Text-chunk emission failed for {len(chunk_errors)}"
+                                f" asset(s) after retries: {preview}"
+                            )
 
                     # Persist the advanced AUTOMATIC sampling cursor (no-op for
                     # other strategies, which return None). Only on the normal
