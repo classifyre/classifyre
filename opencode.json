@@ -1,0 +1,13 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "classifyre": {
+      "type": "remote",
+      "url": "https://demo.classifyre.com/api/mcp",
+      "enabled": true,
+      "headers": {
+        "Authorization": "Bearer inmcp_b2eeacd8-cc30-43e6-b3ca-a7f0d8856113.afed51cf436a2a66299043f358027d02d2908b6a1c27e98116e72889fd9ba170"
+      }
+    }
+  }
+}

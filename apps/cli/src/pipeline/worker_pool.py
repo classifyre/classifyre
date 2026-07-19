@@ -45,6 +45,13 @@ def _init_worker_threads(threads_per_worker: int) -> None:
     threads = max(1, threads_per_worker)
     for var in ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS"):
         os.environ.setdefault(var, str(threads))
+    # Detector work is background work: on a shared host (desktop) the pool
+    # must yield to the UI, so deprioritize workers where the OS allows it.
+    if hasattr(os, "nice"):
+        try:
+            os.nice(5)
+        except OSError:
+            pass
     try:
         import torch
 
@@ -227,7 +234,15 @@ class DetectorWorkerPool:
             mp_start_method = "forkserver" if "forkserver" in available else "spawn"
 
         ctx = multiprocessing.get_context(mp_start_method)
-        threads_per_worker = max(1, get_effective_cpu_count() // effective_workers)
+        # CLASSIFYRE_WORKER_THREADS caps BLAS/torch threads per worker; the
+        # desktop app sets it so workers*threads stays below the core count
+        # instead of saturating the machine. Unset (K8s/dev) keeps the
+        # divide-the-cores behavior.
+        threads_env = os.environ.get("CLASSIFYRE_WORKER_THREADS", "")
+        if threads_env.isdigit() and int(threads_env) > 0:
+            threads_per_worker = min(int(threads_env), 16)
+        else:
+            threads_per_worker = max(1, get_effective_cpu_count() // effective_workers)
         self._pool = ProcessPoolExecutor(
             max_workers=effective_workers,
             mp_context=ctx,

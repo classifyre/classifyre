@@ -62,4 +62,15 @@ def get_effective_memory_mb() -> int:
     except (FileNotFoundError, OSError, ValueError):
         pass
 
+    # macOS (and other POSIX without /proc): total physical memory via sysconf.
+    # Without this the desktop app fell through to the 4096 MB guess, which
+    # oversized the pool on small laptops and undersized it on big ones.
+    try:
+        pages = os.sysconf("SC_PHYS_PAGES")
+        page_size = os.sysconf("SC_PAGE_SIZE")
+        if pages > 0 and page_size > 0:
+            return max(256, (pages * page_size) // (1024 * 1024))
+    except (AttributeError, ValueError, OSError):
+        pass
+
     return 4096
