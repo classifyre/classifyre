@@ -162,12 +162,23 @@ export class McpToolExecutorService {
     return this.customDetectorTests.createScenario(args.detectorId, args);
   }
 
-  async runDetectorTests(args: { detectorId: string; triggeredBy?: string }) {
+  async runDetectorTests(args: {
+    detectorId: string;
+    triggeredBy?: string;
+    scenarioIds?: string[];
+  }) {
     this.assertNotDemoMode();
     return this.customDetectorTests.runScenarios(
       args.detectorId,
       (args.triggeredBy as any) || 'ASSISTANT',
+      args.scenarioIds,
     );
+  }
+
+  async deleteDetectorTestScenario(detectorId: string, scenarioId: string) {
+    this.assertNotDemoMode();
+    await this.customDetectorTests.deleteScenario(detectorId, scenarioId);
+    return { deleted: true, scenarioId };
   }
 
   private async prepareSourceConfig(

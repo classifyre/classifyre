@@ -40,12 +40,24 @@ describe('SourceService', () => {
       deleteRunnerLogs: jest.fn(),
     };
     const maskedConfigCryptoService = new MaskedConfigCryptoService();
+    const pgBoss = {
+      getBossAsync: jest.fn().mockResolvedValue({
+        send: jest.fn().mockResolvedValue('job-id'),
+      }),
+    };
     const service = new SourceService(
       prisma as any,
       maskedConfigCryptoService,
       runnerLogStorage as any,
+      pgBoss as any,
     );
-    return { service, prisma, maskedConfigCryptoService, runnerLogStorage };
+    return {
+      service,
+      prisma,
+      maskedConfigCryptoService,
+      runnerLogStorage,
+      pgBoss,
+    };
   }
 
   it('persists the AUTOMATIC sampling cursor on the source', async () => {
@@ -249,5 +261,54 @@ describe('SourceService', () => {
     );
 
     expect(prisma.source.delete).not.toHaveBeenCalled();
+  });
+
+  describe('purgeFindings', () => {
+    it('deletes every finding of the source and schedules a correlation recompute', async () => {
+      const deleteMany = jest.fn().mockResolvedValue({ count: 42 });
+      const { service, pgBoss } = createService({
+        source: { findUnique: jest.fn().mockResolvedValue({ id: 'src-1' }) },
+        finding: { deleteMany },
+      });
+
+      const result = await service.purgeFindings('src-1');
+
+      expect(result).toEqual({ purgedFindings: 42 });
+      expect(deleteMany).toHaveBeenCalledWith({
+        where: { sourceId: 'src-1' },
+      });
+      const boss = await pgBoss.getBossAsync.mock.results[0].value;
+      expect(boss.send).toHaveBeenCalledWith(
+        'correlation.scan',
+        { recomputeAll: true },
+        expect.objectContaining({ singletonKey: 'correlation:recompute-all' }),
+      );
+    });
+
+    it('404s for an unknown source without deleting anything', async () => {
+      const deleteMany = jest.fn();
+      const { service } = createService({
+        source: { findUnique: jest.fn().mockResolvedValue(null) },
+        finding: { deleteMany },
+      });
+
+      await expect(service.purgeFindings('missing')).rejects.toThrow(
+        'Source with ID missing not found',
+      );
+      expect(deleteMany).not.toHaveBeenCalled();
+    });
+
+    it('still purges when scheduling the recompute fails', async () => {
+      const deleteMany = jest.fn().mockResolvedValue({ count: 3 });
+      const { service, pgBoss } = createService({
+        source: { findUnique: jest.fn().mockResolvedValue({ id: 'src-1' }) },
+        finding: { deleteMany },
+      });
+      pgBoss.getBossAsync.mockRejectedValue(new Error('boss down'));
+
+      await expect(service.purgeFindings('src-1')).resolves.toEqual({
+        purgedFindings: 3,
+      });
+    });
   });
 });

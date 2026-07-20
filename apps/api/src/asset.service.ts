@@ -1583,15 +1583,32 @@ export class AssetService {
     deleted: number;
     outOfScope: number;
     resolvedForAbsence: number;
+    resolvedForRemovedDetectors: number;
   }> {
     const { source, runner } = await this.assertSourceAndRunner(
       sourceId,
       runnerId,
     );
 
+    // Findings from detectors that are no longer configured (removed or
+    // disabled) resolve on the next run unless the source opts out via
+    // cleanup_removed_detector_findings: false. Leaving them OPEN makes every
+    // detector-set change accumulate stale noise. Config-based, not
+    // observation-based, so it applies to sampled runs too.
+    const resolvedForRemovedDetectors =
+      (source.config as Record<string, unknown> | null)
+        ?.cleanup_removed_detector_findings === false
+        ? 0
+        : await this.resolveRemovedDetectorFindings(source, runnerId);
+
     if (!isFullScan) {
       // Sampling means not all assets appear in every run — no deletion logic.
-      return { deleted: 0, outOfScope: 0, resolvedForAbsence: 0 };
+      return {
+        deleted: 0,
+        outOfScope: 0,
+        resolvedForAbsence: 0,
+        resolvedForRemovedDetectors,
+      };
     }
 
     const scopeFingerprint =
@@ -1614,7 +1631,12 @@ export class AssetService {
           `${sourceId} with zero assets seen. Skipping retirement — a zero-result ` +
           `scan is treated as a failed scan, not an emptied source.`,
       );
-      return { deleted: 0, outOfScope: 0, resolvedForAbsence: 0 };
+      return {
+        deleted: 0,
+        outOfScope: 0,
+        resolvedForAbsence: 0,
+        resolvedForRemovedDetectors,
+      };
     }
 
     // Full scan (strategy=ALL): every object in the *current* scope was visited,
@@ -1659,17 +1681,8 @@ export class AssetService {
     });
     const resolutionManifest = this.buildResolutionManifest(runnerAssets);
 
-    const hasManualStatusOverride = (finding: any): boolean => {
-      const history = Array.isArray(finding.history) ? finding.history : [];
-      const lastStatusChange = [...history]
-        .reverse()
-        .find(
-          (entry: any) => entry.eventType === HistoryEventType.STATUS_CHANGED,
-        );
-      return lastStatusChange
-        ? lastStatusChange.status !== FindingStatus.OPEN
-        : false;
-    };
+    const hasManualStatusOverride = (finding: any): boolean =>
+      this.findingHasManualStatusOverride(finding);
 
     let resolvedForAbsence = 0;
 
@@ -1823,7 +1836,154 @@ export class AssetService {
       deleted: missingAssetIds.length,
       outOfScope: outOfScopeAssets.length,
       resolvedForAbsence,
+      resolvedForRemovedDetectors,
     };
+  }
+
+  /**
+   * Resolve OPEN findings whose detector is no longer in the source's
+   * configured detector set. Skips entirely (returns 0) when the config
+   * carries no readable detector list — an unknown detector set must never
+   * be treated as an empty one.
+   */
+  private async resolveRemovedDetectorFindings(
+    source: { id: string; config: unknown },
+    runnerId: string,
+  ): Promise<number> {
+    const configured = await this.configuredDetectorKeys(source.config);
+    if (configured === null) return 0;
+
+    const openFindings = await this.prisma.finding.findMany({
+      where: { sourceId: source.id, status: FindingStatus.OPEN },
+    });
+
+    const removed = openFindings.filter((finding) => {
+      if (this.findingHasManualStatusOverride(finding)) return false;
+      const key = this.findingDetectorConfigKey(finding);
+      // Unknown identity (e.g. CUSTOM finding without a key): keep it —
+      // we cannot prove its detector was removed.
+      if (key === null) return false;
+      return !configured.has(key);
+    });
+    if (removed.length === 0) return 0;
+
+    const reason = 'Detector removed from source configuration';
+    const now = new Date();
+    await this.prisma.$transaction(
+      async (tx) => {
+        for (const finding of removed) {
+          const currentHistory = Array.isArray(finding.history)
+            ? finding.history
+            : [];
+          await tx.finding.update({
+            where: { id: finding.id },
+            data: {
+              status: FindingStatus.RESOLVED,
+              runnerId,
+              resolvedAt: now,
+              resolutionReason: reason,
+              history: [
+                ...currentHistory,
+                {
+                  timestamp: now,
+                  runnerId,
+                  eventType: HistoryEventType.RESOLVED,
+                  status: FindingStatus.RESOLVED,
+                  changeReason: reason,
+                },
+              ],
+            },
+          });
+        }
+      },
+      { timeout: 60000 },
+    );
+
+    console.warn(
+      `[finalizeIngestRun] Source ${source.id}: resolved ${removed.length} ` +
+        `finding(s) from detectors no longer configured on the source ` +
+        `(cleanup_removed_detector_findings is enabled).`,
+    );
+    return removed.length;
+  }
+
+  /**
+   * The source's enabled detector identities as comparison keys, or null when
+   * the config has no readable detector list (skip cleanup rather than treat
+   * unknown as empty).
+   */
+  private async configuredDetectorKeys(
+    config: unknown,
+  ): Promise<Set<string> | null> {
+    const recipe = (config ?? {}) as Record<string, any>;
+    const detectors = recipe.detectors;
+    if (!Array.isArray(detectors)) return null;
+
+    const keys = new Set<string>();
+    for (const entry of detectors) {
+      if (!entry || typeof entry !== 'object' || entry.enabled === false) {
+        continue;
+      }
+      const type = String(entry.type ?? '')
+        .trim()
+        .toUpperCase();
+      if (!type) continue;
+      if (type === 'CUSTOM') {
+        // Key lives at the top level in current configs; older shapes nested
+        // it under config.
+        const key =
+          typeof entry.custom_detector_key === 'string'
+            ? entry.custom_detector_key.trim()
+            : typeof entry.config?.custom_detector_key === 'string'
+              ? entry.config.custom_detector_key.trim()
+              : '';
+        if (key) keys.add(`CUSTOM::${key}`);
+      } else {
+        keys.add(type);
+      }
+    }
+
+    // Legacy path: recipe.custom_detectors is an array of custom-detector IDs.
+    const legacyIds = Array.isArray(recipe.custom_detectors)
+      ? recipe.custom_detectors.filter(
+          (id: unknown): id is string => typeof id === 'string',
+        )
+      : [];
+    if (legacyIds.length > 0) {
+      const rows = await this.prisma.customDetector.findMany({
+        where: { id: { in: legacyIds } },
+        select: { key: true },
+      });
+      for (const row of rows) keys.add(`CUSTOM::${row.key}`);
+    }
+
+    return keys;
+  }
+
+  private findingDetectorConfigKey(finding: {
+    detectorType: string;
+    customDetectorKey: string | null;
+  }): string | null {
+    if (finding.detectorType === 'CUSTOM') {
+      return finding.customDetectorKey
+        ? `CUSTOM::${finding.customDetectorKey}`
+        : null;
+    }
+    return finding.detectorType;
+  }
+
+  private findingHasManualStatusOverride(finding: {
+    history: unknown;
+  }): boolean {
+    const history = Array.isArray(finding.history) ? finding.history : [];
+    const lastStatusChange = [...history]
+      .reverse()
+      .find(
+        (entry: any) => entry?.eventType === HistoryEventType.STATUS_CHANGED,
+      ) as { status?: string } | undefined;
+    return lastStatusChange
+      ? lastStatusChange.status !== FindingStatus.OPEN
+      : false;
   }
 
   /**
