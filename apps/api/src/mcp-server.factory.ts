@@ -319,7 +319,9 @@ export class McpServerFactoryService {
             .max(50)
             .nullable()
             .optional()
-            .describe('Iteration budget override (1-50); null resets to default'),
+            .describe(
+              'Iteration budget override (1-50); null resets to default',
+            ),
         },
         annotations: { readOnlyHint: false, destructiveHint: false },
       },
@@ -347,8 +349,14 @@ export class McpServerFactoryService {
           '(scan_completed | manual | schedule), free-text search, or time window.',
         inputSchema: {
           agent_kind: z.enum(agentKinds).optional(),
-          source_id: z.string().optional().describe('Only runs for this source'),
-          case_id: z.string().optional().describe('Only runs focused on this case'),
+          source_id: z
+            .string()
+            .optional()
+            .describe('Only runs for this source'),
+          case_id: z
+            .string()
+            .optional()
+            .describe('Only runs focused on this case'),
           status: z
             .enum([
               'PENDING',
@@ -449,7 +457,9 @@ export class McpServerFactoryService {
           entity_type: z
             .string()
             .optional()
-            .describe('inquiry | case | source | detector | memory | system | asset'),
+            .describe(
+              'inquiry | case | source | detector | memory | system | asset',
+            ),
           search: z
             .string()
             .optional()
@@ -480,7 +490,7 @@ export class McpServerFactoryService {
       {
         title: 'List Autopilot Memory',
         description:
-          'List the autopilot agents\' persistent memory entries (glossary terms, ' +
+          "List the autopilot agents' persistent memory entries (glossary terms, " +
           'decision precedents, source profiles, detector lessons). Higher weight = ' +
           'recalled first.',
         inputSchema: {

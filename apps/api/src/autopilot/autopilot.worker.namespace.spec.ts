@@ -70,8 +70,15 @@ describe('AutopilotWorker namespace guard (BUG D)', () => {
     return { worker, prisma };
   };
 
-  const belongs = (worker: AutopilotWorker, sourceId: string | null, runnerId: string | null) =>
-    (worker as any).jobBelongsToThisNamespace(sourceId, runnerId) as Promise<boolean>;
+  const belongs = (
+    worker: AutopilotWorker,
+    sourceId: string | null,
+    runnerId: string | null,
+  ) =>
+    (worker as any).jobBelongsToThisNamespace(
+      sourceId,
+      runnerId,
+    ) as Promise<boolean>;
 
   it('accepts jobs whose source and runner exist in this namespace', async () => {
     const { worker } = buildWorker({ sourceExists: true, runnerExists: true });
@@ -99,7 +106,10 @@ describe('AutopilotWorker namespace guard (BUG D)', () => {
   });
 
   it('handle() drops a foreign-namespace job without running a cycle', async () => {
-    const { worker } = buildWorker({ sourceExists: false, runnerExists: false });
+    const { worker } = buildWorker({
+      sourceExists: false,
+      runnerExists: false,
+    });
     const runCycle = jest
       .spyOn(worker as any, 'runCycle')
       .mockResolvedValue(undefined);
@@ -117,7 +127,9 @@ describe('AutopilotWorker namespace guard (BUG D)', () => {
       .spyOn(worker as any, 'runCycle')
       .mockResolvedValue(undefined);
 
-    await (worker as any).handle([{ data: { sourceId: 's1', runnerId: 'r1' } }]);
+    await (worker as any).handle([
+      { data: { sourceId: 's1', runnerId: 'r1' } },
+    ]);
 
     expect(runCycle).toHaveBeenCalledTimes(1);
   });
