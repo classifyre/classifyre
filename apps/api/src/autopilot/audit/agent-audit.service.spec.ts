@@ -225,3 +225,62 @@ describe('AgentAuditService cancellation is terminal (G-029)', () => {
     ).toEqual(['PENDING', 'RUNNING', 'FAILED']);
   });
 });
+
+describe('AgentAuditService.checkKindFailureDivergence (R-5)', () => {
+  let service: AgentAuditService;
+
+  const prisma = {
+    agentRun: { findMany: jest.fn() },
+  };
+  const log = { business: jest.fn(), technical: jest.fn() };
+
+  beforeEach(async () => {
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        AgentAuditService,
+        { provide: PrismaService, useValue: prisma },
+        { provide: AgentLoggerService, useValue: log },
+      ],
+    }).compile();
+    service = module.get(AgentAuditService);
+    jest.clearAllMocks();
+  });
+
+  const runs = (statuses: string[]) => statuses.map((status) => ({ status }));
+
+  it('flags a kind failing far more than its healthy siblings', async () => {
+    // CASE: 3/4 failed; siblings: 0/5 failed.
+    prisma.agentRun.findMany
+      .mockResolvedValueOnce(runs(['FAILED', 'FAILED', 'FAILED', 'COMPLETED']))
+      .mockResolvedValueOnce(
+        runs(['COMPLETED', 'COMPLETED', 'COMPLETED', 'COMPLETED', 'COMPLETED']),
+      );
+
+    const result = await service.checkKindFailureDivergence('CASE' as never);
+
+    expect(result).not.toBeNull();
+    expect(result?.kind).toBe('CASE');
+    expect(result?.kindFailureRate).toBeCloseTo(0.75);
+    expect(result?.siblingFailureRate).toBeCloseTo(0);
+  });
+
+  it('stays quiet during a provider-wide outage (everyone failing)', async () => {
+    prisma.agentRun.findMany
+      .mockResolvedValueOnce(runs(['FAILED', 'FAILED', 'FAILED']))
+      .mockResolvedValueOnce(runs(['FAILED', 'FAILED', 'FAILED', 'FAILED']));
+
+    const result = await service.checkKindFailureDivergence('CASE' as never);
+
+    expect(result).toBeNull();
+  });
+
+  it('stays quiet without enough evidence', async () => {
+    prisma.agentRun.findMany
+      .mockResolvedValueOnce(runs(['FAILED', 'FAILED']))
+      .mockResolvedValueOnce(runs(['COMPLETED', 'COMPLETED', 'COMPLETED']));
+
+    const result = await service.checkKindFailureDivergence('CASE' as never);
+
+    expect(result).toBeNull();
+  });
+});

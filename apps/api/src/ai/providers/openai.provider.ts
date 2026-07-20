@@ -109,6 +109,22 @@ function isUnsupportedResponseFormat(err: unknown): boolean {
   );
 }
 
+/**
+ * A 404 is a genuinely-missing model only when the response body says so — an
+ * OpenAI-style `code: "model_not_found"` or a body that names the model. A 404
+ * with no body (`err.error` unset) is a gateway/routing miss and is treated as
+ * transient by the caller.
+ */
+function isGenuineMissingModel(err: NotFoundError): boolean {
+  const code = (err as { code?: string | null }).code;
+  if (typeof code === 'string' && code.toLowerCase().includes('model')) {
+    return true;
+  }
+  const body = (err as { error?: unknown }).error;
+  if (body == null) return false; // "(no body)" → transient, not a real 404 model
+  return JSON.stringify(body).toLowerCase().includes('model');
+}
+
 function mapOpenAiError(err: unknown): Error {
   if (err instanceof AuthenticationError) {
     return new AiAuthError(
@@ -121,7 +137,23 @@ function mapOpenAiError(err: unknown): Error {
     );
   }
   if (err instanceof NotFoundError) {
-    return new AiModelNotFoundError(`OpenAI model not found. (${err.message})`);
+    // A genuine missing-model 404 from an OpenAI-style server carries a body
+    // describing the model (code "model_not_found", or a message naming it). A
+    // bare "404 status code (no body)" from an OpenAI-compatible gateway
+    // (NVIDIA/vLLM behind a load balancer, a model still cold-starting) is a
+    // transient routing miss, NOT a config error — mapping it to
+    // AiModelNotFoundError (which the client never retries) turns a blip into a
+    // fatal run failure. Only the former is permanent; the latter is retryable.
+    if (isGenuineMissingModel(err)) {
+      return new AiModelNotFoundError(
+        `OpenAI model not found. (${err.message})`,
+      );
+    }
+    return new AiProviderError(
+      `OpenAI endpoint returned 404 with no error body — treating as a ` +
+        `transient gateway miss, not a missing model. (${err.message})`,
+      404,
+    );
   }
   if (err instanceof APIConnectionError) {
     return new AiProviderError(
