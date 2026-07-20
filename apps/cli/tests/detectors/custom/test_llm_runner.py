@@ -11,7 +11,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from src.detectors.custom.runners._llm import LLMRunner
+from src.detectors.custom.runners._llm import LLMCompletionError, LLMRunner
 from src.models.generated_detectors import (
     LLMLabelDefinition,
     LLMOutputField,
@@ -159,6 +159,63 @@ def test_malformed_json_returns_no_findings() -> None:
     completion = MagicMock(return_value=SimpleNamespace(choices=[SimpleNamespace(message=message)]))
     runner = _runner(_schema(), completion)
     assert runner.detect(TEXT, "text/plain") == []
+
+
+# ── Provider-failure handling (BUG A) ─────────────────────────────────────────
+
+
+class _RateLimitError(Exception):
+    status_code = 429
+
+
+class _AuthError(Exception):
+    status_code = 401
+
+
+def test_provider_error_raises_instead_of_empty_result(monkeypatch) -> None:
+    # A dead provider must surface as an error the pipeline records, never as
+    # a silent zero-findings result indistinguishable from a clean scan.
+    monkeypatch.setattr("src.detectors.custom.runners._llm.time.sleep", lambda _s: None)
+    completion = MagicMock(side_effect=_RateLimitError("rate limited"))
+    runner = _runner(_schema(), completion)
+    with pytest.raises(LLMCompletionError, match="sentiment"):
+        runner.detect(TEXT, "text/plain")
+
+
+def test_transient_provider_error_retries_then_succeeds(monkeypatch) -> None:
+    sleeps: list[float] = []
+    monkeypatch.setattr("src.detectors.custom.runners._llm.time.sleep", sleeps.append)
+    good = _mock_completion({"labels": [{"name": "bad", "confidence": 0.9}]})
+    completion = MagicMock(
+        side_effect=[_RateLimitError("429"), _RateLimitError("503"), good.return_value]
+    )
+    runner = _runner(_schema(), completion)
+
+    results = runner.detect(TEXT, "text/plain")
+
+    assert [r.finding_type for r in results] == ["bad"]
+    assert completion.call_count == 3
+    assert len(sleeps) == 2
+    assert sleeps[1] > sleeps[0]  # exponential backoff
+
+
+def test_non_retryable_provider_error_fails_fast(monkeypatch) -> None:
+    monkeypatch.setattr("src.detectors.custom.runners._llm.time.sleep", lambda _s: None)
+    completion = MagicMock(side_effect=_AuthError("bad key"))
+    runner = _runner(_schema(), completion)
+    with pytest.raises(LLMCompletionError):
+        runner.detect(TEXT, "text/plain")
+    assert completion.call_count == 1
+
+
+def test_completion_error_is_picklable() -> None:
+    # The error crosses the detector worker-pool process boundary.
+    import pickle
+
+    err = LLMCompletionError("LLM provider call failed for detector 'x': 429")
+    restored = pickle.loads(pickle.dumps(err))
+    assert isinstance(restored, LLMCompletionError)
+    assert "429" in str(restored)
 
 
 # ── Vision / file input ───────────────────────────────────────────────────────

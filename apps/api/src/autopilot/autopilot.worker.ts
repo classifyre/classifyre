@@ -110,6 +110,19 @@ export class AutopilotWorker implements OnApplicationBootstrap {
       ).filter((k) => typeof k === 'string' && k in AgentKind);
       const only: AgentKind[] | null = requested.length > 0 ? requested : null;
       if (!sourceId && !manual && !only) continue;
+      // Namespace-isolation guard: pg-boss queues can be shared across
+      // namespace deployments (and were, before the per-namespace pg-boss
+      // schema), so a dequeued job may reference a source/runner from another
+      // namespace. Executing it would persist foreign agent runs into this
+      // namespace's provenance — drop it loudly instead.
+      if (!(await this.jobBelongsToThisNamespace(sourceId, runnerId))) {
+        this.logger.warn(
+          `Skipping autopilot job for unknown source/runner ` +
+            `(sourceId=${sourceId}, runnerId=${runnerId}) — ` +
+            `not found in this namespace; likely enqueued by another namespace.`,
+        );
+        continue;
+      }
       await this.runCycle({
         sourceId,
         runnerId,
@@ -124,6 +137,31 @@ export class AutopilotWorker implements OnApplicationBootstrap {
         trigger: manual ? 'manual' : 'scan_completed',
       });
     }
+  }
+
+  /**
+   * True when the job's source/runner (if any) exist in this deployment's
+   * schema. A miss means the job belongs to a different namespace.
+   */
+  private async jobBelongsToThisNamespace(
+    sourceId: string | null,
+    runnerId: string | null,
+  ): Promise<boolean> {
+    if (sourceId) {
+      const source = await this.prisma.source.findUnique({
+        where: { id: sourceId },
+        select: { id: true },
+      });
+      if (!source) return false;
+    }
+    if (runnerId) {
+      const runner = await this.prisma.runner.findUnique({
+        where: { id: runnerId },
+        select: { id: true },
+      });
+      if (!runner) return false;
+    }
+    return true;
   }
 
   /** Scheduled or manually requested dream (memory consolidation) cycle. */

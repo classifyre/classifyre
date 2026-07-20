@@ -555,6 +555,44 @@ async def test_pipeline_runs_mixed_detector_on_ocr_text_and_binary_payloads() ->
 
 
 @pytest.mark.asyncio
+async def test_pipeline_runs_mixed_detector_once_on_binary_typed_text_assets() -> None:
+    # A detector supporting both text and binary types (e.g. a vision LLM
+    # detector) must not run twice on BINARY-typed assets whose text is the
+    # primary evidence — the raw-bytes pass would duplicate the text pass.
+    file_bytes = b"plain text stored without an extension"
+    source = OcrBinarySource(
+        {"type": "DUMMY"},
+        content="",
+        binary_data=file_bytes,
+        binary_mime="application/octet-stream",
+        ocr_pages=["extracted text"],
+    )
+    mixed_detector = RecordingDetector(["text/plain", "image/png"])
+
+    pipeline = DetectorPipeline(
+        detectors=[mixed_detector],
+        source=source,
+        runner_id="runner-binary-mixed",
+    )
+
+    now = datetime.now(UTC)
+    binary_asset = SingleAssetScanResults(
+        hash="bin-1",
+        checksum="checksum",
+        name="asset-bin-1",
+        external_url="urn:test/bin-1",
+        links=[],
+        asset_type=AssetType.BINARY,
+        created_at=now,
+        updated_at=now,
+    )
+    [_asset] = await pipeline.process([binary_asset])
+
+    assert mixed_detector.seen == ["extracted text"]
+    assert mixed_detector.seen_content_types == ["text/plain"]
+
+
+@pytest.mark.asyncio
 async def test_pipeline_resolves_effective_binary_mime_from_bytes_and_filename() -> None:
     image_bytes = b"\xff\xd8\xffjpeg-data"
     source = BinarySource(

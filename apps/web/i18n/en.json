@@ -507,6 +507,16 @@
       "starting": "Starting...",
       "runScan": "Run Scan",
       "selectSource": "Select {{name}}"
+    },
+    "purgeFindings": {
+      "button": "Purge findings",
+      "title": "Purge all findings?",
+      "cannotUndo": "This permanently deletes every finding of this source and cannot be undone.",
+      "permanentTitle": "Permanent removal",
+      "permanentBody": "All findings of this source will be permanently deleted — open, resolved and false-positive alike, including their history and triage notes. Assets and extracted text are kept. Evidence fingerprints are recomputed in the background.",
+      "confirm": "Purge findings",
+      "success": "Findings purged",
+      "failed": "Failed to purge findings"
     }
   },
   "findings": {

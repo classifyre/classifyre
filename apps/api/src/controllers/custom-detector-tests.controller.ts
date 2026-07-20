@@ -56,6 +56,7 @@ export class CustomDetectorTestsController {
   run(
     @Param('detectorId') detectorId: string,
     @Query('triggeredBy') triggeredBy?: string,
+    @Body() body?: { scenarioIds?: string[] },
   ) {
     const trigger: TestTrigger =
       triggeredBy === 'CI'
@@ -63,6 +64,9 @@ export class CustomDetectorTestsController {
         : triggeredBy === 'ASSISTANT'
           ? 'ASSISTANT'
           : 'MANUAL';
-    return this.tests.runScenarios(detectorId, trigger);
+    const scenarioIds = Array.isArray(body?.scenarioIds)
+      ? body.scenarioIds.filter((id): id is string => typeof id === 'string')
+      : undefined;
+    return this.tests.runScenarios(detectorId, trigger, scenarioIds);
   }
 }

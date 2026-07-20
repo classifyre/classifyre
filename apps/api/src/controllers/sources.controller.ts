@@ -872,6 +872,32 @@ export class SourcesController {
     await this.schedulerService.removeSchedule(id);
     await this.sourceService.deleteSource({ id });
   }
+
+  @Delete(':id/findings')
+  @ApiOperation({
+    summary: 'Purge all findings of a data source',
+    description:
+      'Permanently delete every finding of the source (all statuses, including resolved and false-positive). ' +
+      'Case evidence snapshots survive; correlation fingerprints are recomputed in the background. Irreversible.',
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'Source unique identifier',
+    example: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Findings purged; returns the number of deleted findings',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Source not found',
+  })
+  async purgeFindings(
+    @Param('id') id: string,
+  ): Promise<{ purgedFindings: number }> {
+    return this.sourceService.purgeFindings(id);
+  }
 }
 
 @AllowInDemoMode()

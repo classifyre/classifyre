@@ -507,6 +507,16 @@
       "starting": "Wird gestartet...",
       "runScan": "Scan starten",
       "selectSource": "{{name}} auswählen"
+    },
+    "purgeFindings": {
+      "button": "Findings bereinigen",
+      "title": "Alle Findings endgültig löschen?",
+      "cannotUndo": "Dies löscht alle Findings dieser Quelle unwiderruflich.",
+      "permanentTitle": "Endgültige Entfernung",
+      "permanentBody": "Alle Findings dieser Quelle werden endgültig gelöscht — offene, gelöste und False-Positives, einschließlich Historie und Triage-Notizen. Assets und extrahierter Text bleiben erhalten. Evidenz-Fingerprints werden im Hintergrund neu berechnet.",
+      "confirm": "Findings löschen",
+      "success": "Findings bereinigt",
+      "failed": "Findings konnten nicht bereinigt werden"
     }
   },
   "findings": {
