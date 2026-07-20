@@ -365,7 +365,7 @@
       "sections": {
         "name": {
           "title": "Source name",
-          "summary": "Use a folder-scoped name that makes the scanned path obvious. Desktop-only: this source scans a folder on the machine running the app and is not available in hosted/kubernetes/docker deployments.",
+          "summary": "Use a folder-scoped name that makes the scanned path obvious. Desktop-only: this source scans a folder on the machine running the app and is not available in Kubernetes deployments.",
           "suggestions": [
             "Include the folder's purpose (example: Local Downloads Folder).",
             "Add environment or machine markers when needed."

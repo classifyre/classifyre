@@ -14,22 +14,6 @@ const enterpriseContactEmail = "contact@classifyre.com";
 
 const editionCards = [
   {
-    name: "Docker",
-    eyebrow: "Open core preview",
-    description:
-      "Run the all-in-one image locally to test the workflow, show the product, and get a feel for how Classifyre works.",
-    highlights: [
-      "One command runtime on port 3000",
-      "Best for testing, demos, and internal evaluation",
-      "Not the production topology",
-    ],
-    ctaLabel: "Docker docs",
-    ctaHref: "https://docs.classifyre.com/deployment/docker/",
-    ctaExternal: true,
-    marker: "DKR",
-    accentClassName: "bg-card text-foreground",
-  },
-  {
     name: "Kubernetes Core",
     eyebrow: "Open source production",
     description:
@@ -120,11 +104,9 @@ export function EditionGrid() {
                 )}
               </Button>
               <div className="inline-flex items-center gap-2 rounded-full border border-border bg-background/70 px-3 py-1 text-[11px] font-mono uppercase tracking-[0.14em] text-foreground/70">
-                {edition.marker === "DKR"
-                  ? "Testing and evaluation"
-                  : edition.marker === "K8S"
-                    ? "Open source production"
-                    : "Commercial support"}
+                {edition.marker === "K8S"
+                  ? "Open source production"
+                  : "Commercial support"}
               </div>
             </div>
           </CardContent>

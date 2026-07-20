@@ -3,11 +3,9 @@
   "version": "0.4.62-SNAPSHOT",
   "private": true,
   "scripts": {
-    "build": "bun run docker:build",
+    "build": "bun run helm:test",
     "lint": "bun run helm:lint && bun run helm:docs:check",
     "test": "bun run helm:test",
-    "docker:build": "bash ../../scripts/docker-build-allinone.sh",
-    "docker:build:multiarch": "bash ../../scripts/docker-build-multiarch.sh",
     "helm:lint": "bash ../../scripts/helm-lint.sh",
     "helm:docs": "bash ../../scripts/helm-docs.sh",
     "helm:docs:check": "bash ../../scripts/helm-docs.sh --check",

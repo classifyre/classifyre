@@ -97,7 +97,6 @@ run_checks() {
 }
 
 run_checks "default values" "${CHART_DIR}/values.yaml"
-run_checks "minikube values" "${CHART_DIR}/values-minikube.yaml"
 
 echo ""
 echo "Results: ${PASS} passed, ${FAIL} failed"

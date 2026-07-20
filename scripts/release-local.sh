@@ -37,7 +37,6 @@ if ! [[ "${VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
 fi
 TAG="v${VERSION}"
 DOCKER_NAMESPACE="${DOCKER_USERNAME:-classifyre}"
-ALL_IN_ONE_REPO="${DOCKER_NAMESPACE}/all-in-one"
 
 echo ""
 echo "╔══════════════════════════════════════════╗"
@@ -118,7 +117,7 @@ git push origin "${TAG}"
 
 # ── Step 4: Retag Docker Hub images :main → release tags ─────────────────────
 echo ""
-echo "==> [4/5] Retagging Docker images ${ALL_IN_ONE_REPO}:main → ${VERSION}..."
+echo "==> [4/5] Retagging Kubernetes workload images → ${VERSION}..."
 
 if [[ -z "${DOCKER_USERNAME:-}" || -z "${DOCKERHUB_TOKEN:-}" ]]; then
   echo "Error: DOCKER_USERNAME and DOCKERHUB_TOKEN must be set." >&2
@@ -136,7 +135,6 @@ retag() {
     "${image}:main"
 }
 
-retag "${ALL_IN_ONE_REPO}"
 retag "${DOCKER_NAMESPACE}/web"
 retag "${DOCKER_NAMESPACE}/api"
 retag "${DOCKER_NAMESPACE}/cli"

@@ -17,6 +17,5 @@ fi
 
 helm lint "${CHART_DIR}" "${HELM_COMMON_ARGS[@]}"
 helm template classifyre "${CHART_DIR}" -f "${CHART_DIR}/values.yaml" "${HELM_COMMON_ARGS[@]}" >/dev/null
-helm template classifyre "${CHART_DIR}" -f "${CHART_DIR}/values-minikube.yaml" "${HELM_COMMON_ARGS[@]}" >/dev/null
 
 echo "Helm lint/template checks passed."

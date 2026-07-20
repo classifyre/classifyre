@@ -12,8 +12,8 @@ description: Version consistency, upgrade paths, and migration behaviour.
 
 Every artifact in a Classifyre release shares the **same version number**.
 
-All components — including the API, web frontend, CLI, Docker images
-(all-in-one and individual), and the Helm chart — are versioned together
+All components — including the API, web frontend, CLI workload images,
+and the Helm chart — are versioned together
 as a single unit. A release ships with a consistent set of images, charts,
 and packages, each carrying the same semver tag.
 
@@ -47,8 +47,7 @@ failure.
 
 ## How upgrades work
 
-When the API starts (whether as a Helm pod, a standalone container, or
-part of the all-in-one image), it automatically checks for and applies
+When the API starts as a Helm-managed pod, it automatically checks for and applies
 any pending database migrations before accepting traffic.
 
 ### Kubernetes (Helm)
@@ -60,14 +59,6 @@ container:
 2. Applies any pending schema migrations
 3. Exits — allowing the API container to start only after the database
    is up to date
-
-### All-in-one Docker
-
-The all-in-one image uses s6-overlay to manage service startup order:
-PostgreSQL starts first, the API starts second (running migrations during
-its startup sequence), the web frontend starts third, and Caddy starts
-last. The API waits up to 90 seconds for PostgreSQL to be ready, creates
-the database if missing, runs any pending migrations, then starts serving.
 
 ---
 
@@ -131,28 +122,6 @@ the database if missing, runs any pending migrations, then starts serving.
 | Functionality  | Start a Sandbox source scan and another connector scan |
 
 ---
-
-## Upgrade procedure (All-in-one Docker)
-
-1. Pull the new all-in-one image:
-
-   ```bash
-   docker pull classifyre/classifyre:<new-version>
-   ```
-
-2. Stop the running container and restart with the new image tag. **Always use a
-   volume mount for PostgreSQL data** — without it, all data is lost when the
-   container is replaced.
-
-   ```bash
-   docker run -d \
-     -p 8000:8000 \
-     -p 443:443 \
-     -v classifyre-data:/var/lib/postgresql/data \
-     classifyre/classifyre:<new-version>
-   ```
-
-   On startup, migrations run automatically before the web UI becomes available.
 
 ---
 

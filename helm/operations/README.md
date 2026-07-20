@@ -13,7 +13,7 @@ This document captures the practical configuration choices and operational consi
 
 - Keep one shared production baseline values file and environment-specific overlays beside it.
 - Keep single-node k3s overrides in a dedicated file such as [`helm/classifyre/values-vps.yaml`](/unstructured/helm/classifyre/values-vps.yaml).
-- Keep local and Minikube values separate from production values so storage classes, service exposure, and replica counts do not leak across environments.
+- Keep local k3d values separate from production values so storage classes, service exposure, and replica counts do not leak across environments.
 
 ## Secrets And Encryption
 
@@ -179,6 +179,6 @@ helm status classifyre -n classifyre
 ## Repo Workflow Notes
 
 - keep Helm values under version control
-- keep deployment-specific values files separate from local/minikube values
+- keep deployment-specific values files separate from local k3d values
 - prefer Helm upgrades over ad hoc manual cluster edits
 - treat image publication and chart publication as part of the same release workflow

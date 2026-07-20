@@ -179,7 +179,7 @@ confidence, or raw cosine distance.
 
 The Docker static build check parsed the changed Dockerfile and contexts but the
 local Docker engine stalled resolving base-image metadata with `only one
-connection allowed`; no all-in-one image was produced in this verification.
+connection allowed`; no application image was produced in this verification.
 
 ## Remaining Corpus Gate
 
