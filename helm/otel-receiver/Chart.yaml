@@ -22,7 +22,7 @@ maintainers:
 dependencies:
   # OTel Collector — the single OTLP ingestion endpoint that fans out to all backends.
   - name: opentelemetry-collector
-    version: 0.159.1
+    version: 0.165.0
     repository: "https://open-telemetry.github.io/opentelemetry-helm-charts"
     condition: opentelemetry-collector.enabled
 
@@ -40,7 +40,7 @@ dependencies:
 
   # Loki — log aggregation backend.
   - name: loki
-    version: 7.0.0
+    version: 7.1.0
     repository: "https://grafana.github.io/helm-charts"
     condition: loki.enabled
 
