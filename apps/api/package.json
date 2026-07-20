@@ -56,7 +56,7 @@
     "@prisma/adapter-pg": "^7.8.0",
     "@prisma/client": "^7.8.0",
     "@slack/socket-mode": "^2.0.7",
-    "@slack/web-api": "^7.18.0",
+    "@slack/web-api": "^8.0.0",
     "@workspace/schemas": "workspace:*",
     "ai": "^7.0.29",
     "ajv": "^8.18.0",
