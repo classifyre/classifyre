@@ -35,11 +35,12 @@ import { CaseActivityService } from './case-activity.service';
 import { CorrelationService } from './correlation/correlation.service';
 import { PgBossService } from './scheduler/pg-boss.service';
 import { CORRELATION_QUEUE } from './correlation/correlation.constants';
-import { CaseThreadKind } from '@prisma/client';
+import { AgentKind, CaseThreadKind } from '@prisma/client';
 import { EmbeddingService } from './embedding/embedding.service';
 import { GlossaryService } from './glossary/glossary.service';
 import { CaseLeadsService } from './case-leads.service';
 import { CaseEventsService } from './case-events.service';
+import { AutopilotService } from './autopilot/autopilot.service';
 
 const jsonObjectSchema = z.record(z.string(), z.unknown());
 
@@ -238,6 +239,7 @@ export class McpServerFactoryService {
     private readonly glossaryService: GlossaryService,
     private readonly caseLeadsService: CaseLeadsService,
     private readonly caseEventsService: CaseEventsService,
+    private readonly autopilotService: AutopilotService,
   ) {}
 
   createServer(): McpServer {
@@ -260,7 +262,330 @@ export class McpServerFactoryService {
     this.registerCorrelationTools(srv);
     this.registerGlossaryTools(srv);
     this.registerCaseLeadTools(srv);
+    this.registerAutopilotTools(srv);
     return server;
+  }
+
+  private registerAutopilotTools(server: McpServerCompat) {
+    const agentKinds = Object.values(AgentKind) as [string, ...string[]];
+    const toggleableKinds = [
+      'INQUIRY',
+      'CASE',
+      'CONFIG',
+      'DETECTOR_AUTHOR',
+      'ESCALATION',
+    ] as [string, ...string[]];
+
+    server.registerTool(
+      'list_autopilot_agents',
+      {
+        title: 'List Autopilot Agents',
+        description:
+          'List every AI-autopilot agent with its configuration: kind, whether it is ' +
+          'enabled for scan cycles, its goal (default + any override), iteration budget, ' +
+          'and assigned tools. INQUIRY/CASE/CONFIG/DETECTOR_AUTHOR/ESCALATION are ' +
+          'toggleable; DUPLICATES (deterministic fingerprinting) and DREAM (scheduled ' +
+          'memory consolidation) always run and cannot be toggled.',
+        inputSchema: {},
+        annotations: { readOnlyHint: true, idempotentHint: true },
+      },
+      async () => jsonResult(await this.autopilotService.getAgents()),
+    );
+
+    server.registerTool(
+      'update_autopilot_agent',
+      {
+        title: 'Update Autopilot Agent',
+        description:
+          'Enable/disable an autopilot agent for scan cycles, or override its goal or ' +
+          'iteration budget. Only INQUIRY, CASE, CONFIG, DETECTOR_AUTHOR and ESCALATION ' +
+          'accept enable/disable. Pass goal: null or max_iterations: null to reset to ' +
+          'the factory default.',
+        inputSchema: {
+          kind: z.enum(toggleableKinds).describe('Agent kind to update'),
+          enabled: z
+            .boolean()
+            .optional()
+            .describe('Enable or disable the agent on scan cycles'),
+          goal: z
+            .string()
+            .nullable()
+            .optional()
+            .describe('Goal override; null resets to the factory default'),
+          max_iterations: z
+            .number()
+            .int()
+            .min(1)
+            .max(50)
+            .nullable()
+            .optional()
+            .describe(
+              'Iteration budget override (1-50); null resets to default',
+            ),
+        },
+        annotations: { readOnlyHint: false, destructiveHint: false },
+      },
+      async ({ kind, enabled, goal, max_iterations }) => {
+        this.mcpToolExecutor.assertNotDemoMode();
+        return jsonResult(
+          await this.autopilotService.updateAgent(kind as AgentKind, {
+            ...(enabled !== undefined ? { enabled } : {}),
+            ...(goal !== undefined ? { goal } : {}),
+            ...(max_iterations !== undefined
+              ? { maxIterations: max_iterations }
+              : {}),
+          }),
+        );
+      },
+    );
+
+    server.registerTool(
+      'list_autopilot_runs',
+      {
+        title: 'List Autopilot Runs',
+        description:
+          'List AI-autopilot agent runs (newest first) with status, trigger, summary ' +
+          'and error. Filter by agent kind, source, case, status, trigger origin ' +
+          '(scan_completed | manual | schedule), free-text search, or time window.',
+        inputSchema: {
+          agent_kind: z.enum(agentKinds).optional(),
+          source_id: z
+            .string()
+            .optional()
+            .describe('Only runs for this source'),
+          case_id: z
+            .string()
+            .optional()
+            .describe('Only runs focused on this case'),
+          status: z
+            .enum([
+              'PENDING',
+              'RUNNING',
+              'COMPLETED',
+              'FAILED',
+              'SKIPPED',
+              'CANCELLED',
+            ])
+            .optional(),
+          trigger: z
+            .string()
+            .optional()
+            .describe('scan_completed | manual | schedule'),
+          search: z
+            .string()
+            .optional()
+            .describe('Substring search over summary, instruction and error'),
+          since: z.string().optional().describe('ISO time lower bound'),
+          until: z.string().optional().describe('ISO time upper bound'),
+          skip: z.number().int().min(0).optional(),
+          limit: z.number().int().min(1).max(200).optional(),
+        },
+        annotations: { readOnlyHint: true, idempotentHint: true },
+      },
+      async (args) =>
+        jsonResult(
+          await this.autopilotService.listRuns({
+            agentKind: args.agent_kind as AgentKind | undefined,
+            sourceId: args.source_id,
+            caseId: args.case_id,
+            status: args.status as any,
+            trigger: args.trigger,
+            search: args.search,
+            since: args.since,
+            until: args.until,
+            skip: args.skip ?? 0,
+            limit: args.limit ?? 50,
+          }),
+        ),
+    );
+
+    server.registerTool(
+      'get_autopilot_run',
+      {
+        title: 'Get Autopilot Run',
+        description:
+          'Full detail of one autopilot agent run, including every decision it made ' +
+          '(action, outcome, target entity, rationale, payload).',
+        inputSchema: {
+          id: z.string().describe('Agent run ID'),
+        },
+        annotations: { readOnlyHint: true, idempotentHint: true },
+      },
+      async ({ id }) => jsonResult(await this.autopilotService.getRun(id)),
+    );
+
+    server.registerTool(
+      'get_autopilot_run_logs',
+      {
+        title: 'Get Autopilot Run Logs',
+        description:
+          'Step-by-step logs of one autopilot run. channel BUSINESS is the analyst ' +
+          'narrative; TECHNICAL includes mechanics and raw model I/O.',
+        inputSchema: {
+          run_id: z.string().describe('Agent run ID'),
+          channel: z.enum(['BUSINESS', 'TECHNICAL']).optional(),
+          level: z.enum(['DEBUG', 'INFO', 'WARN', 'ERROR']).optional(),
+          search: z
+            .string()
+            .optional()
+            .describe('Substring search over the message'),
+        },
+        annotations: { readOnlyHint: true, idempotentHint: true },
+      },
+      async ({ run_id, channel, level, search }) =>
+        jsonResult(
+          await this.autopilotService.listLogs(run_id, {
+            channel: channel as any,
+            level: level as any,
+            search,
+          }),
+        ),
+    );
+
+    server.registerTool(
+      'list_autopilot_activity',
+      {
+        title: 'List Autopilot Activity',
+        description:
+          'Cross-run timeline of autopilot decisions (what each agent did, to which ' +
+          'entity, with what outcome and rationale). This is the audit surface for ' +
+          '"what did the AI change?" — filter by agent kind, action, outcome, entity ' +
+          'type (inquiry | case | source | detector | memory | system | asset), ' +
+          'rationale search, or time window.',
+        inputSchema: {
+          agent_kind: z.enum(agentKinds).optional(),
+          entity_type: z
+            .string()
+            .optional()
+            .describe(
+              'inquiry | case | source | detector | memory | system | asset',
+            ),
+          search: z
+            .string()
+            .optional()
+            .describe('Substring search over the rationale'),
+          since: z.string().optional().describe('ISO time lower bound'),
+          until: z.string().optional().describe('ISO time upper bound'),
+          skip: z.number().int().min(0).optional(),
+          limit: z.number().int().min(1).max(200).optional(),
+        },
+        annotations: { readOnlyHint: true, idempotentHint: true },
+      },
+      async (args) =>
+        jsonResult(
+          await this.autopilotService.listActivity({
+            agentKind: args.agent_kind as AgentKind | undefined,
+            entityType: args.entity_type,
+            search: args.search,
+            since: args.since,
+            until: args.until,
+            skip: args.skip ?? 0,
+            limit: args.limit ?? 50,
+          }),
+        ),
+    );
+
+    server.registerTool(
+      'list_autopilot_memory',
+      {
+        title: 'List Autopilot Memory',
+        description:
+          "List the autopilot agents' persistent memory entries (glossary terms, " +
+          'decision precedents, source profiles, detector lessons). Higher weight = ' +
+          'recalled first.',
+        inputSchema: {
+          search: z
+            .string()
+            .optional()
+            .describe('Substring search over key and content'),
+          skip: z.number().int().min(0).optional(),
+          limit: z.number().int().min(1).max(200).optional(),
+        },
+        annotations: { readOnlyHint: true, idempotentHint: true },
+      },
+      async (args) =>
+        jsonResult(
+          await this.autopilotService.listMemory({
+            search: args.search,
+            skip: args.skip ?? 0,
+            limit: args.limit ?? 50,
+          }),
+        ),
+    );
+
+    server.registerTool(
+      'get_autopilot_stats',
+      {
+        title: 'Get Autopilot Stats',
+        description:
+          'Aggregate autopilot health: runs by status and agent kind, recent ' +
+          'failures, decision counts.',
+        inputSchema: {},
+        annotations: { readOnlyHint: true, idempotentHint: true },
+      },
+      async () => jsonResult(await this.autopilotService.getStats()),
+    );
+
+    server.registerTool(
+      'trigger_autopilot',
+      {
+        title: 'Trigger Autopilot',
+        description:
+          'Manually enqueue an autopilot cycle. Pipeline agents (INQUIRY, CASE, ' +
+          'CONFIG, DETECTOR_AUTHOR, ESCALATION) run in canonical order; pass ' +
+          'agent_kinds to run a subset, source_id to focus on one source, case_id to ' +
+          'focus the CASE agent on one case, and instruction to steer the cycle.',
+        inputSchema: {
+          instruction: z
+            .string()
+            .max(4000)
+            .optional()
+            .describe('Highest-priority steering prompt for this cycle'),
+          source_id: z
+            .string()
+            .optional()
+            .describe('Limit the review to one source; omit for all sources'),
+          agent_kinds: z
+            .array(z.enum(agentKinds))
+            .optional()
+            .describe('Which agents to run; omit for the full pipeline'),
+          case_id: z
+            .string()
+            .optional()
+            .describe('Focus the CASE agent on one case'),
+        },
+        annotations: { readOnlyHint: false, destructiveHint: false },
+      },
+      async ({ instruction, source_id, agent_kinds, case_id }) => {
+        this.mcpToolExecutor.assertNotDemoMode();
+        return jsonResult(
+          await this.autopilotService.trigger({
+            instruction,
+            sourceId: source_id,
+            agentKinds: agent_kinds as AgentKind[] | undefined,
+            caseId: case_id,
+          }),
+        );
+      },
+    );
+
+    server.registerTool(
+      'cancel_autopilot_run',
+      {
+        title: 'Cancel Autopilot Run',
+        description:
+          'Cancel a pending or running autopilot agent run. The runtime aborts ' +
+          'before its next step.',
+        inputSchema: {
+          id: z.string().describe('Agent run ID to cancel'),
+        },
+        annotations: { readOnlyHint: false, destructiveHint: false },
+      },
+      async ({ id }) => {
+        this.mcpToolExecutor.assertNotDemoMode();
+        return jsonResult(await this.autopilotService.cancelRun(id));
+      },
+    );
   }
 
   private registerCaseLeadTools(server: McpServerCompat) {
@@ -1090,7 +1415,13 @@ export class McpServerFactoryService {
       {
         title: 'Create Detector Test Scenario',
         description:
-          'Create a test scenario for a custom detector. Expected outcome mirrors the unified pipeline output: { entities: { label: [{value, confidence}] }, classification: { task: {label, confidence} } }.',
+          'Create a test scenario for a custom detector. Expected outcome shapes by detector type: ' +
+          'REGEX/RULESET {"shouldMatch": true|false}; classifier/LLM {"label": "...", "minConfidence": 0.6}; ' +
+          'entity {"entities": [{"label": "PersonName", "text": "Ostap"}]}. ' +
+          'The nested pipeline-output shape ({"classification": {task: {label, confidence}}} / ' +
+          '{"entities": {label: [{value}]}}) is also accepted. ' +
+          'Labels compare case-insensitively with underscores treated as spaces, so ' +
+          '"market_gaming_instruction" matches "Market gaming instruction".',
         inputSchema: {
           detector_id: z.string(),
           name: z.string().describe('Short scenario name'),
@@ -1098,7 +1429,9 @@ export class McpServerFactoryService {
           input_text: z.string().describe('Text to test against the detector'),
           expected_outcome: z
             .record(z.string(), z.unknown())
-            .describe('Expected outcome — shape varies by method'),
+            .describe(
+              'Expected outcome — see tool description for the per-detector-type shapes',
+            ),
         },
         annotations: {
           readOnlyHint: false,
@@ -1128,21 +1461,55 @@ export class McpServerFactoryService {
       {
         title: 'Run Detector Tests',
         description:
-          'Run all test scenarios for a custom detector and return a pass/fail matrix.',
+          'Run test scenarios for a custom detector and return a pass/fail matrix. ' +
+          'Pass scenario_ids to re-run only specific scenarios (avoids re-running every ' +
+          'scenario — each LLM-detector scenario costs a model call); omit to run all. ' +
+          'FAIL results include an expected-vs-actual explanation in errorMessage.',
         inputSchema: {
           detector_id: z.string(),
+          scenario_ids: z
+            .array(z.string())
+            .optional()
+            .describe(
+              'Optional scenario IDs to run; omit to run every scenario for the detector',
+            ),
         },
         annotations: {
           readOnlyHint: false,
           destructiveHint: false,
         },
       },
-      async ({ detector_id }) =>
+      async ({ detector_id, scenario_ids }) =>
         jsonResult(
           await this.mcpToolExecutor.runDetectorTests({
             detectorId: detector_id,
             triggeredBy: 'ASSISTANT',
+            scenarioIds: scenario_ids,
           }),
+        ),
+    );
+
+    server.registerTool(
+      'delete_detector_test_scenario',
+      {
+        title: 'Delete Detector Test Scenario',
+        description:
+          'Delete a test scenario (and its past results) from a custom detector.',
+        inputSchema: {
+          detector_id: z.string().describe('Custom detector ID'),
+          scenario_id: z.string().describe('Test scenario ID to delete'),
+        },
+        annotations: {
+          readOnlyHint: false,
+          destructiveHint: true,
+        },
+      },
+      async ({ detector_id, scenario_id }) =>
+        jsonResult(
+          await this.mcpToolExecutor.deleteDetectorTestScenario(
+            detector_id,
+            scenario_id,
+          ),
         ),
     );
 
@@ -1683,6 +2050,35 @@ export class McpServerFactoryService {
             includeResolved,
           } as any),
         ),
+    );
+
+    server.registerTool(
+      'purge_source_findings',
+      {
+        title: 'Purge Source Findings',
+        description:
+          'Permanently delete EVERY finding of a source — all statuses, including ' +
+          'resolved and false-positive. Irreversible; finding history is lost. Case ' +
+          'evidence snapshots survive by design, and correlation fingerprints are ' +
+          'recomputed in the background afterwards. Useful when iterating on detector ' +
+          'configurations and the accumulated findings are pure noise. To clean up ' +
+          'only findings from removed/disabled detectors, rely instead on the ' +
+          'cleanup_removed_detector_findings source option (default on) and rescan.',
+        inputSchema: {
+          source_id: z.string().describe('Source whose findings to purge'),
+          confirm: z
+            .literal(true)
+            .describe('Must be true — acknowledges the purge is irreversible'),
+        },
+        annotations: {
+          readOnlyHint: false,
+          destructiveHint: true,
+        },
+      },
+      async ({ source_id }) => {
+        this.mcpToolExecutor.assertNotDemoMode();
+        return jsonResult(await this.sourceService.purgeFindings(source_id));
+      },
     );
   }
 

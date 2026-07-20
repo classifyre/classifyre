@@ -44,6 +44,10 @@ export const MCP_CAPABILITY_GROUPS: McpCapabilityGroupDto[] = [
       'train_custom_detector',
       'get_custom_detector_training_history',
       'validate_detector_config',
+      'list_detector_test_scenarios',
+      'create_detector_test_scenario',
+      'run_detector_tests',
+      'delete_detector_test_scenario',
     ],
     operations: [
       'Create detectors for rulesets, classifiers, and entities',
@@ -80,6 +84,7 @@ export const MCP_CAPABILITY_GROUPS: McpCapabilityGroupDto[] = [
       'update_finding',
       'bulk_update_findings',
       'get_findings_discovery',
+      'purge_source_findings',
     ],
     operations: [
       'Search and filter findings by status, severity, type, and text',
@@ -154,6 +159,30 @@ export const MCP_CAPABILITY_GROUPS: McpCapabilityGroupDto[] = [
       "Pull a saved question's current matches into a case",
       'Track hypotheses and discussion threads with supporting/contradicting links',
       'Close and reopen cases, archiving or reactivating linked questions',
+    ],
+  },
+  {
+    id: 'autopilot',
+    title: 'AI Autopilot',
+    description:
+      'Observe and control the autonomous agents: runs, decisions, memory, per-agent enable/disable, and manual triggers.',
+    toolNames: [
+      'list_autopilot_agents',
+      'update_autopilot_agent',
+      'list_autopilot_runs',
+      'get_autopilot_run',
+      'get_autopilot_run_logs',
+      'list_autopilot_activity',
+      'list_autopilot_memory',
+      'get_autopilot_stats',
+      'trigger_autopilot',
+      'cancel_autopilot_run',
+    ],
+    operations: [
+      'Audit what each agent did, to which entity, and why',
+      'Enable or disable individual agents for scan cycles',
+      'Trigger a steered autopilot cycle or cancel a running one',
+      'Inspect agent memory and aggregate health stats',
     ],
   },
   {

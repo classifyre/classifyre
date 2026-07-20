@@ -150,6 +150,15 @@ class DetectorPipeline:
                 "application/x.asset-links",
             )
         ]
+        # A detector can qualify for both the text and the binary bucket — a
+        # vision-enabled LLM detector supports text plus image/pdf types — and
+        # would then run twice per asset (2x cost, 2x provider rate-limit
+        # pressure). Keep both passes only for IMAGE assets, where OCR text and
+        # pixels are complementary evidence; everywhere else (e.g. extensionless
+        # text files typed BINARY) the raw-bytes pass duplicates the text pass.
+        if text_detectors and binary_detectors and asset.asset_type != OutputAssetType.IMAGE:
+            text_ids = {id(d) for d in text_detectors}
+            binary_detectors = [d for d in binary_detectors if id(d) not in text_ids]
         # Any asset we resolved a text content type for is expected to yield
         # text, so warn whenever it yields none. This previously covered only
         # TXT/TABLE/URL — excluding exactly the types whose text is *derived*

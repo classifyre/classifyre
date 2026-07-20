@@ -17,6 +17,7 @@ All URIs are relative to *http://localhost*
 | [**sourcesControllerGetSchedule**](SourcesApi.md#sourcescontrollergetschedule) | **GET** /sources/{id}/schedule | Get source schedule |
 | [**sourcesControllerGetSource**](SourcesApi.md#sourcescontrollergetsource) | **GET** /sources/{id} | Get source by ID |
 | [**sourcesControllerListSources**](SourcesApi.md#sourcescontrollerlistsources) | **GET** /sources | List all data sources |
+| [**sourcesControllerPurgeFindings**](SourcesApi.md#sourcescontrollerpurgefindings) | **DELETE** /sources/{id}/findings | Purge all findings of a data source |
 | [**sourcesControllerStartRun**](SourcesApi.md#sourcescontrollerstartrun) | **POST** /sources/{id}/runs | Start a new ingestion run |
 | [**sourcesControllerTestConnection**](SourcesApi.md#sourcescontrollertestconnection) | **POST** /sources/{id}/test | Test source connection |
 | [**sourcesControllerUpdateSource**](SourcesApi.md#sourcescontrollerupdatesource) | **PUT** /sources/{id} | Update a data source |
@@ -915,6 +916,74 @@ No authorization required
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
 | **200** | List of sources |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## sourcesControllerPurgeFindings
+
+> sourcesControllerPurgeFindings(id)
+
+Purge all findings of a data source
+
+Permanently delete every finding of the source (all statuses, including resolved and false-positive). Case evidence snapshots survive; correlation fingerprints are recomputed in the background. Irreversible.
+
+### Example
+
+```ts
+import {
+  Configuration,
+  SourcesApi,
+} from '@workspace/api-client';
+import type { SourcesControllerPurgeFindingsRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new SourcesApi();
+
+  const body = {
+    // string | Source unique identifier
+    id: a1b2c3d4-e5f6-7890-abcd-ef1234567890,
+  } satisfies SourcesControllerPurgeFindingsRequest;
+
+  try {
+    const data = await api.sourcesControllerPurgeFindings(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **id** | `string` | Source unique identifier | [Defaults to `undefined`] |
+
+### Return type
+
+`void` (Empty response body)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: Not defined
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** | Findings purged; returns the number of deleted findings |  -  |
+| **404** | Source not found |  -  |
 
 [[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
 

@@ -6,6 +6,8 @@ import base64
 import json
 import logging
 import os
+import random
+import time
 from datetime import UTC, datetime
 from typing import Any
 
@@ -42,6 +44,23 @@ _MAX_VISION_IMAGES = 20
 # Hard request timeout so a hung provider endpoint can never stall a pool
 # worker for litellm's ~10-minute default. Overridable per deployment.
 _COMPLETION_TIMEOUT_SECONDS = float(os.environ.get("CLASSIFYRE_LLM_TIMEOUT_SECONDS", "90"))
+
+# Retry budget for transient provider failures (429 rate limits, 5xx, timeouts).
+# Exponential backoff with jitter, honouring Retry-After when the provider
+# sends one, so a saturated endpoint is backed off from instead of hammered.
+_MAX_COMPLETION_ATTEMPTS = max(1, int(os.environ.get("CLASSIFYRE_LLM_MAX_ATTEMPTS", "4")))
+_RETRY_BACKOFF_BASE_SECONDS = float(os.environ.get("CLASSIFYRE_LLM_RETRY_BASE_SECONDS", "2"))
+_RETRY_BACKOFF_MAX_SECONDS = 60.0
+_RETRYABLE_STATUS_CODES = {408, 429, 500, 502, 503, 504}
+
+
+class LLMCompletionError(RuntimeError):
+    """Provider call failed after retries.
+
+    Carries only a string message so it survives pickling across the detector
+    worker-pool process boundary; the pipeline records the detector's outcome
+    as ERROR instead of a silent empty result.
+    """
 
 
 class LLMRunner(BaseRunner):
@@ -130,18 +149,8 @@ class LLMRunner(BaseRunner):
         *,
         vision_pages: int | None = None,
     ) -> list[DetectionResult]:
-        schema = self._schema
         try:
-            response = self._litellm.completion(
-                model=self._model_string(),
-                api_key=self._runtime.api_key,
-                api_base=self._runtime.base_url or None,
-                temperature=schema.temperature if schema.temperature is not None else 0.0,
-                max_tokens=self._max_tokens(),
-                messages=messages,
-                response_format={"type": "json_object"},
-                timeout=_COMPLETION_TIMEOUT_SECONDS,
-            )
+            response = self._complete_with_backoff(messages)
             raw = response.choices[0].message.content or "{}"
             parsed = self._parse_json(raw)
         except Exception as exc:
@@ -152,9 +161,69 @@ class LLMRunner(BaseRunner):
                 exc,
                 exc_info=True,
             )
-            return []
+            # Propagate instead of returning [] — an empty result here is
+            # indistinguishable from "genuinely found nothing" and would let
+            # the pipeline record this detector OK on an asset it never saw.
+            raise LLMCompletionError(
+                f"LLM provider call failed for detector '{self._detector_key}' "
+                f"(model={self._runtime.model}): {exc}"
+            ) from None
 
         return self._results_from_payload(snippet, parsed, vision_pages=vision_pages)
+
+    def _complete_with_backoff(self, messages: list[dict[str, Any]]) -> Any:
+        schema = self._schema
+        for attempt in range(1, _MAX_COMPLETION_ATTEMPTS + 1):
+            try:
+                return self._litellm.completion(
+                    model=self._model_string(),
+                    api_key=self._runtime.api_key,
+                    api_base=self._runtime.base_url or None,
+                    temperature=schema.temperature if schema.temperature is not None else 0.0,
+                    max_tokens=self._max_tokens(),
+                    messages=messages,
+                    response_format={"type": "json_object"},
+                    timeout=_COMPLETION_TIMEOUT_SECONDS,
+                )
+            except Exception as exc:
+                if attempt >= _MAX_COMPLETION_ATTEMPTS or not self._is_retryable(exc):
+                    raise
+                delay = min(
+                    _RETRY_BACKOFF_MAX_SECONDS,
+                    _RETRY_BACKOFF_BASE_SECONDS * (2 ** (attempt - 1)),
+                )
+                retry_after = _retry_after_seconds(exc)
+                if retry_after is not None:
+                    delay = min(_RETRY_BACKOFF_MAX_SECONDS, max(delay, retry_after))
+                delay *= 0.75 + random.random() * 0.5  # ±25% jitter
+                logger.warning(
+                    "llm provider transient failure (detector=%s, model=%s, "
+                    "attempt %d/%d), retrying in %.1fs: %s",
+                    self._detector_key,
+                    self._runtime.model,
+                    attempt,
+                    _MAX_COMPLETION_ATTEMPTS,
+                    delay,
+                    exc,
+                )
+                time.sleep(delay)
+        raise LLMCompletionError("unreachable")  # pragma: no cover
+
+    def _is_retryable(self, exc: Exception) -> bool:
+        retryable_types = tuple(
+            t
+            for t in (
+                getattr(self._litellm, "RateLimitError", None),
+                getattr(self._litellm, "Timeout", None),
+                getattr(self._litellm, "ServiceUnavailableError", None),
+                getattr(self._litellm, "InternalServerError", None),
+                getattr(self._litellm, "APIConnectionError", None),
+            )
+            if isinstance(t, type)
+        )
+        if retryable_types and isinstance(exc, retryable_types):
+            return True
+        return getattr(exc, "status_code", None) in _RETRYABLE_STATUS_CODES
 
     def _vision_enabled(self) -> bool:
         return bool(getattr(self._runtime, "supports_vision", False))
@@ -298,3 +367,22 @@ class LLMRunner(BaseRunner):
     @staticmethod
     def _coerce_fields(raw: Any) -> dict[str, Any]:
         return {str(k): v for k, v in raw.items()} if isinstance(raw, dict) else {}
+
+
+def _retry_after_seconds(exc: Exception) -> float | None:
+    """Best-effort extraction of a Retry-After hint from a provider exception."""
+    response = getattr(exc, "response", None)
+    headers = getattr(response, "headers", None)
+    if headers is None:
+        return None
+    try:
+        raw = headers.get("retry-after")
+    except Exception:
+        return None
+    if raw is None:
+        return None
+    try:
+        value = float(raw)
+    except (TypeError, ValueError):
+        return None
+    return value if value > 0 else None

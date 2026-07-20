@@ -117,6 +117,10 @@ export interface SourcesControllerGetSourceRequest {
     id: string;
 }
 
+export interface SourcesControllerPurgeFindingsRequest {
+    id: string;
+}
+
 export interface SourcesControllerStartRunRequest {
     id: string;
 }
@@ -717,6 +721,44 @@ export class SourcesApi extends runtime.BaseAPI {
     async sourcesControllerListSources(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Array<SourceResponseDto>> {
         const response = await this.sourcesControllerListSourcesRaw(initOverrides);
         return await response.value();
+    }
+
+    /**
+     * Permanently delete every finding of the source (all statuses, including resolved and false-positive). Case evidence snapshots survive; correlation fingerprints are recomputed in the background. Irreversible.
+     * Purge all findings of a data source
+     */
+    async sourcesControllerPurgeFindingsRaw(requestParameters: SourcesControllerPurgeFindingsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
+        if (requestParameters['id'] == null) {
+            throw new runtime.RequiredError(
+                'id',
+                'Required parameter "id" was null or undefined when calling sourcesControllerPurgeFindings().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/sources/{id}/findings`;
+        urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'DELETE',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.VoidApiResponse(response);
+    }
+
+    /**
+     * Permanently delete every finding of the source (all statuses, including resolved and false-positive). Case evidence snapshots survive; correlation fingerprints are recomputed in the background. Irreversible.
+     * Purge all findings of a data source
+     */
+    async sourcesControllerPurgeFindings(requestParameters: SourcesControllerPurgeFindingsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
+        await this.sourcesControllerPurgeFindingsRaw(requestParameters, initOverrides);
     }
 
     /**

@@ -23,6 +23,14 @@ on:
         options:
           - "true"
           - "false"
+      scale_down:
+        description: "Scale the app to zero after verifying it is alive (parks the release between runs)"
+        required: false
+        default: "false"
+        type: choice
+        options:
+          - "true"
+          - "false"
   workflow_call:
     inputs:
       environment:
@@ -34,6 +42,9 @@ on:
       demo_mode:
         type: string
         default: "true"
+      scale_down:
+        type: string
+        default: "false"
     secrets:
       DOCKER_USERNAME:
         required: true
@@ -56,6 +67,7 @@ jobs:
       HELM_NAMESPACE: ${{ inputs.environment || 'classifyre-develop' }}
       IMAGE_TAG: ${{ inputs.image_tag || 'develop' }}
       DEMO_MODE: ${{ inputs.demo_mode || 'true' }}
+      SCALE_DOWN: ${{ inputs.scale_down || 'false' }}
 
     steps:
       - name: Derive environment settings
@@ -166,6 +178,37 @@ jobs:
             kubectl -n "${HELM_NAMESPACE}" rollout restart deployment/"${HELM_RELEASE_NAME}-${deployment}"
             kubectl -n "${HELM_NAMESPACE}" rollout status deployment/"${HELM_RELEASE_NAME}-${deployment}" --timeout=10m
           done
+
+      - name: Scale down after verify
+        if: ${{ env.SCALE_DOWN == 'true' }}
+        env:
+          HELM_RELEASE_NAME: ${{ steps.env.outputs.release_name }}
+        run: |
+          set -euo pipefail
+
+          echo "SCALE_DOWN=true → parking ${HELM_RELEASE_NAME} at zero replicas."
+
+          # Remove HPAs first so they don't immediately scale the deployments
+          # back up (minReplicas). The next helm upgrade recreates them.
+          for name in api web; do
+            kubectl -n "${HELM_NAMESPACE}" delete hpa "${HELM_RELEASE_NAME}-${name}" \
+              --ignore-not-found=true
+          done
+
+          for name in api web; do
+            echo "Scaling deployment/${HELM_RELEASE_NAME}-${name} to 0"
+            kubectl -n "${HELM_NAMESPACE}" scale deployment/"${HELM_RELEASE_NAME}-${name}" \
+              --replicas=0
+          done
+
+          # Wait until the app pods are actually gone so the run reflects the
+          # parked state. The next deploy's helm upgrade restores replicas.
+          for name in api web; do
+            kubectl -n "${HELM_NAMESPACE}" rollout status \
+              deployment/"${HELM_RELEASE_NAME}-${name}" --timeout=5m || true
+          done
+
+          echo "Release parked. The next deploy starts from the scaled-down state."
 
       - name: Show rollout status
         env:

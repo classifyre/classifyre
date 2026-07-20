@@ -104,11 +104,15 @@ export class CustomDetectorTestsService {
   async runScenarios(
     detectorId: string,
     triggeredBy: TestTrigger = 'MANUAL',
+    scenarioIds?: string[],
   ): Promise<RunTestsResponseDto> {
     const detector = await this.prisma.customDetector.findUnique({
       where: { id: detectorId },
       include: {
         testScenarios: {
+          ...(scenarioIds && scenarioIds.length > 0
+            ? { where: { id: { in: scenarioIds } } }
+            : {}),
           orderBy: { createdAt: 'asc' },
         },
       },
@@ -118,6 +122,16 @@ export class CustomDetectorTestsService {
 
     if (!detector) {
       throw new NotFoundException(`Detector ${detectorId} not found`);
+    }
+
+    if (scenarioIds && scenarioIds.length > 0) {
+      const found = new Set(detector.testScenarios.map((s) => s.id));
+      const missing = scenarioIds.filter((id) => !found.has(id));
+      if (missing.length > 0) {
+        throw new NotFoundException(
+          `Test scenario(s) not found for detector ${detectorId}: ${missing.join(', ')}`,
+        );
+      }
     }
 
     const results: RunTestsResponseDto['results'] = [];
@@ -205,7 +219,11 @@ export class CustomDetectorTestsService {
 
       const expected = scenario.expectedOutcome as Record<string, unknown>;
       const schema = detector.pipelineSchema as Record<string, unknown>;
-      const status = this.compareOutcome(schema, expected, actualOutput);
+      const { status, explanation } = this.compareOutcome(
+        schema,
+        expected,
+        actualOutput,
+      );
 
       const result = await this.prisma.customDetectorTestResult.create({
         data: {
@@ -213,6 +231,9 @@ export class CustomDetectorTestsService {
           detectorId: detector.id,
           status,
           actualOutput: actualOutput as any,
+          // On FAIL, errorMessage carries the expected-vs-actual explanation so
+          // the result is diagnosable without reverse-engineering the comparator.
+          errorMessage: status === 'FAIL' ? explanation : null,
           durationMs: Date.now() - start,
           detectorVersion: detector.version,
           triggeredBy,
@@ -355,55 +376,65 @@ export class CustomDetectorTestsService {
       : '/app/cli';
   }
 
-  // Compare expected vs actual — returns PASS or FAIL.
-  // Dispatches on pipeline schema type; falls back to expected outcome shape.
+  // Compare expected vs actual — returns PASS/FAIL plus a human-readable
+  // explanation of any mismatch. Dispatches on pipeline schema type; falls
+  // back to expected outcome shape. Accepts both the flat scenario shapes
+  // ({shouldMatch}, {label, minConfidence}, {entities: [{label, text}]}) and
+  // the nested pipeline-output shape
+  // ({classification: {task: {label, confidence}}}, {entities: {label: [{value}]}}).
   private compareOutcome(
     pipelineSchema: Record<string, unknown>,
-    expected: Record<string, unknown>,
+    rawExpected: Record<string, unknown>,
     actual: Record<string, unknown>,
-  ): 'PASS' | 'FAIL' {
+  ): { status: 'PASS' | 'FAIL'; explanation: string | null } {
     const schemaType = (pipelineSchema.type as string | undefined) ?? '';
+    const expected = normalizeExpectedOutcome(rawExpected);
+    const findings = Array.isArray(actual.findings) ? actual.findings : [];
 
     if (schemaType === 'REGEX') {
       const shouldMatch = Boolean(expected.shouldMatch);
       const didMatch = Boolean(actual.matched);
-      return shouldMatch === didMatch ? 'PASS' : 'FAIL';
+      if (shouldMatch === didMatch)
+        return { status: 'PASS', explanation: null };
+      return {
+        status: 'FAIL',
+        explanation: shouldMatch
+          ? 'Expected the pattern to match, but no findings were produced.'
+          : `Expected no match, but ${findings.length} finding(s) were produced: ${summarizeFindings(findings)}.`,
+      };
     }
 
-    // For GLINER2 and unknown types: infer comparison from expected outcome shape.
+    // For GLINER2/LLM and unknown types: infer comparison from expected shape.
     if ('label' in expected) {
-      const expectedLabel = (
-        (expected.label as string | undefined) ?? ''
-      ).toLowerCase();
+      const expectedLabel = normalizeLabel(
+        (expected.label as string | undefined) ?? '',
+      );
       const minConf =
         typeof expected.minConfidence === 'number' ? expected.minConfidence : 0;
 
-      const findings = Array.isArray(actual.findings) ? actual.findings : [];
       const hit = findings.some((f: unknown) => {
         const finding = f as Record<string, unknown>;
         const metadata =
           (finding.metadata as Record<string, unknown> | undefined) ?? {};
 
         // finding_type uses the label_id with "class:" prefix, e.g.
-        // "class:european_country". Strip prefix and normalise underscores → spaces
-        // so it can be compared to the human-readable label ("european country").
+        // "class:european_country". Both sides are normalised (lowercase,
+        // underscores → spaces) so "european_country", "European country"
+        // and "european country" all compare equal.
         const rawType =
           (finding.finding_type as string | undefined) ??
           (finding.findingType as string | undefined) ??
           '';
-        const normalizedType = rawType
-          .toLowerCase()
-          .replace(/^class:/, '')
-          .replace(/_/g, ' ');
+        const normalizedType = normalizeLabel(rawType.replace(/^class:/i, ''));
 
         // metadata.label_name carries the original human-readable label name
         // (e.g. "European country"). Fall back to top-level label_name for
         // older CLI output formats that emitted it there directly.
-        const labelName = (
+        const labelName = normalizeLabel(
           (metadata.label_name as string | undefined) ??
-          (finding.label_name as string | undefined) ??
-          ''
-        ).toLowerCase();
+            (finding.label_name as string | undefined) ??
+            '',
+        );
 
         const labelMatch =
           normalizedType === expectedLabel || labelName === expectedLabel;
@@ -412,32 +443,42 @@ export class CustomDetectorTestsService {
         return labelMatch && conf >= minConf;
       });
 
-      return hit ? 'PASS' : 'FAIL';
+      if (hit) return { status: 'PASS', explanation: null };
+      return {
+        status: 'FAIL',
+        explanation:
+          `Expected a finding labeled "${String(expected.label)}"` +
+          (minConf > 0 ? ` with confidence >= ${minConf}` : '') +
+          (findings.length > 0
+            ? `; actual findings: ${summarizeFindings(findings)}.`
+            : '; no findings were produced.'),
+      };
     }
 
     if ('entities' in expected) {
       const expectedEntities = Array.isArray(expected.entities)
         ? (expected.entities as Array<Record<string, unknown>>)
         : [];
-      const findings = Array.isArray(actual.findings) ? actual.findings : [];
 
-      const allFound = expectedEntities.every((exp) => {
-        const expLabel = (
-          (exp.label as string | undefined) ?? ''
-        ).toLowerCase();
+      const missing = expectedEntities.filter((exp) => {
+        const expLabel = normalizeLabel(
+          (exp.label as string | undefined) ?? '',
+        );
         const expText = exp.text
           ? ((exp.text as string) ?? '').toLowerCase()
           : null;
 
-        return findings.some((f: unknown) => {
+        return !findings.some((f: unknown) => {
           const finding = f as Record<string, unknown>;
           const rawType =
             (finding.finding_type as string | undefined) ??
             (finding.findingType as string | undefined) ??
             '';
           // CLI prefixes ENTITY finding types with "entity:" (e.g. "entity:PERSON").
-          // Strip it before comparing against the user-provided label.
-          const normalizedType = rawType.toLowerCase().replace(/^entity:/, '');
+          // Strip it, then normalise both sides identically before comparing.
+          const normalizedType = normalizeLabel(
+            rawType.replace(/^entity:/i, ''),
+          );
           const labelMatch = normalizedType === expLabel;
           if (!labelMatch) return false;
           if (expText === null) return true;
@@ -449,10 +490,33 @@ export class CustomDetectorTestsService {
         });
       });
 
-      return allFound ? 'PASS' : 'FAIL';
+      if (missing.length === 0) return { status: 'PASS', explanation: null };
+      const missingDesc = missing
+        .map((m) => {
+          const label = (m.label as string | undefined) ?? '?';
+          const text = m.text as string | undefined;
+          return `"${label}"${text ? ` containing "${text}"` : ''}`;
+        })
+        .join(', ');
+      return {
+        status: 'FAIL',
+        explanation:
+          `Expected entity/entities not found: ${missingDesc}` +
+          (findings.length > 0
+            ? `; actual findings: ${summarizeFindings(findings)}.`
+            : '; no findings were produced.'),
+      };
     }
 
-    return 'FAIL';
+    return {
+      status: 'FAIL',
+      explanation:
+        'Unrecognized expected_outcome shape. Use {"shouldMatch": true|false} for REGEX, ' +
+        '{"label": "...", "minConfidence": 0.6} for classifier/LLM detectors, or ' +
+        '{"entities": [{"label": "...", "text": "..."}]} for entity detectors ' +
+        '(the nested pipeline-output shape {"classification": {task: {label, confidence}}} / ' +
+        '{"entities": {label: [{value}]}} is also accepted).',
+    };
   }
 
   private async assertDetectorExists(detectorId: string): Promise<void> {
@@ -529,6 +593,88 @@ export class CustomDetectorTestsService {
 
 function shellEscape(s: string): string {
   return `'${s.replace(/'/g, "'\\''")}'`;
+}
+
+// Labels compare case-insensitively with underscores treated as spaces, so
+// "market_gaming_instruction" and "Market gaming instruction" are equal.
+function normalizeLabel(s: string): string {
+  return s.toLowerCase().trim().replace(/_/g, ' ');
+}
+
+/**
+ * Normalize an expected outcome to the flat comparator shapes. Scenarios may
+ * be written in the nested pipeline-output shape
+ * ({classification: {task: {label, confidence}}}, {entities: {label: [{value}]}});
+ * fold those into the flat {label, minConfidence} / {entities: [{label, text}]}
+ * forms the comparator reads. Flat inputs pass through unchanged.
+ */
+function normalizeExpectedOutcome(
+  expected: Record<string, unknown>,
+): Record<string, unknown> {
+  const out: Record<string, unknown> = { ...expected };
+
+  const classification = expected.classification;
+  if (
+    !('label' in out) &&
+    classification &&
+    typeof classification === 'object' &&
+    !Array.isArray(classification)
+  ) {
+    const tasks = Object.values(classification as Record<string, unknown>);
+    const first = tasks.find(
+      (t): t is Record<string, unknown> =>
+        !!t && typeof t === 'object' && 'label' in t,
+    );
+    if (first) {
+      out.label = first.label;
+      if (
+        typeof first.confidence === 'number' &&
+        out.minConfidence === undefined
+      ) {
+        out.minConfidence = first.confidence;
+      }
+    }
+  }
+
+  const entities = out.entities;
+  if (entities && typeof entities === 'object' && !Array.isArray(entities)) {
+    const flat: Array<Record<string, unknown>> = [];
+    for (const [label, matches] of Object.entries(
+      entities as Record<string, unknown>,
+    )) {
+      if (Array.isArray(matches) && matches.length > 0) {
+        for (const m of matches) {
+          const rec =
+            m && typeof m === 'object' ? (m as Record<string, unknown>) : {};
+          flat.push({ label, text: rec.text ?? rec.value });
+        }
+      } else {
+        flat.push({ label });
+      }
+    }
+    out.entities = flat;
+  }
+
+  return out;
+}
+
+// Compact one-line description of actual findings for FAIL explanations.
+function summarizeFindings(findings: unknown[], limit = 5): string {
+  const parts = findings.slice(0, limit).map((f) => {
+    const finding = (f ?? {}) as Record<string, unknown>;
+    const type =
+      (finding.finding_type as string | undefined) ??
+      (finding.findingType as string | undefined) ??
+      'unknown';
+    const conf =
+      typeof finding.confidence === 'number'
+        ? ` (${finding.confidence.toFixed(2)})`
+        : '';
+    return `${type}${conf}`;
+  });
+  const more =
+    findings.length > limit ? ` and ${findings.length - limit} more` : '';
+  return `[${parts.join(', ')}]${more}`;
 }
 
 function parseCliOutput(stdout: string): {

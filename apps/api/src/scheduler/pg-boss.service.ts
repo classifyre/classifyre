@@ -8,6 +8,34 @@ import {
 type PgBossModule = typeof import('pg-boss');
 type PgBossInstance = InstanceType<PgBossModule['PgBoss']>;
 
+/**
+ * Derive the pg-boss schema for this deployment from DATABASE_URL.
+ *
+ * Namespaces are isolated as Postgres schemas via the Prisma-only `?schema=`
+ * URL param. pg-boss never reads that param and defaults to one shared
+ * `pgboss` schema, so every namespace on the same physical database would
+ * share a single job table — letting one namespace's worker dequeue and
+ * execute another namespace's jobs (observed as autopilot agent cycles
+ * leaking across namespaces). Give each namespace its own pg-boss schema.
+ */
+export function pgBossSchemaForDatabaseUrl(
+  databaseUrl: string | undefined,
+): string | undefined {
+  if (!databaseUrl) return undefined;
+  let namespace: string | null;
+  try {
+    namespace = new URL(databaseUrl).searchParams.get('schema');
+  } catch {
+    return undefined;
+  }
+  if (!namespace) return undefined;
+  // pg-boss requires a plain identifier (letters/digits/underscore, <= 50
+  // chars). Sanitize rather than fail so a scan can never be blocked by an
+  // exotic namespace name.
+  const sanitized = namespace.replace(/[^a-zA-Z0-9_]/g, '_');
+  return `pgboss_${sanitized}`.slice(0, 50);
+}
+
 @Injectable()
 export class PgBossService
   implements OnApplicationBootstrap, OnApplicationShutdown
@@ -21,9 +49,11 @@ export class PgBossService
     }
 
     const { PgBoss } = await import('pg-boss');
+    const schema = pgBossSchemaForDatabaseUrl(process.env.DATABASE_URL);
     const boss = new PgBoss({
       connectionString: process.env.DATABASE_URL,
       max: 5,
+      ...(schema ? { schema } : {}),
     });
 
     boss.on('error', (error) => {

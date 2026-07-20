@@ -1,274 +1,205 @@
 /**
- * Comparator unit tests for the unified GLiNER2 pipeline output format.
+ * Comparator unit tests for CustomDetectorTestsService.compareOutcome.
  *
- * The pipeline always produces:
- *   {
- *     entities: { label: [{ value, confidence, start, end }] },
- *     classification: { task: { label, confidence } },
- *     metadata: { model, latency_ms, timestamp }
- *   }
- *
- * Expected outcome in test scenarios mirrors this format.
+ * The comparator accepts both the flat scenario shapes
+ *   {shouldMatch}, {label, minConfidence}, {entities: [{label, text}]}
+ * and the nested pipeline-output shape
+ *   {classification: {task: {label, confidence}}}, {entities: {label: [{value}]}}.
+ * Labels compare case-insensitively with underscores treated as spaces.
  */
+import { CustomDetectorTestsService } from './custom-detector-tests.service';
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Comparator logic — mirrors CustomDetectorTestsService.compareOutcome()
-// ─────────────────────────────────────────────────────────────────────────────
+type Outcome = { status: 'PASS' | 'FAIL'; explanation: string | null };
 
-type PipelineEntitySpan = {
-  value?: string;
-  confidence?: number;
-  start?: number;
-  end?: number;
-};
-type PipelineClassificationOutcome = { label?: string; confidence?: number };
-type PipelineResult = {
-  entities: Record<string, PipelineEntitySpan[]>;
-  classification: Record<string, PipelineClassificationOutcome>;
-  metadata?: Record<string, unknown>;
-};
-
-type ExpectedEntityMatch = { value?: string; confidence?: number };
-type ExpectedClassificationMatch = { label?: string; confidence?: number };
-type ExpectedOutcome = {
-  entities?: Record<string, ExpectedEntityMatch[]>;
-  classification?: Record<string, ExpectedClassificationMatch>;
-};
-
-function comparePipelineOutcome(
-  expected: ExpectedOutcome,
-  actual: PipelineResult,
-): 'PASS' | 'FAIL' {
-  // Check entities
-  for (const [label, expectedSpans] of Object.entries(
-    expected.entities ?? {},
-  )) {
-    const actualSpans = actual.entities[label] ?? [];
-    for (const expectedSpan of expectedSpans) {
-      const minConf =
-        typeof expectedSpan.confidence === 'number'
-          ? expectedSpan.confidence
-          : 0;
-      const hit = actualSpans.some((span) => {
-        const confOk =
-          typeof span.confidence === 'number'
-            ? span.confidence >= minConf
-            : true;
-        const valueOk = expectedSpan.value
-          ? (span.value ?? '')
-              .toLowerCase()
-              .includes(expectedSpan.value.toLowerCase())
-          : true;
-        return confOk && valueOk;
-      });
-      if (!hit) return 'FAIL';
+function compare(
+  pipelineSchema: Record<string, unknown>,
+  expected: Record<string, unknown>,
+  actual: Record<string, unknown>,
+): Outcome {
+  const service = new CustomDetectorTestsService(
+    null as never,
+    null as never,
+    undefined,
+  );
+  return (
+    service as unknown as {
+      compareOutcome: (
+        s: Record<string, unknown>,
+        e: Record<string, unknown>,
+        a: Record<string, unknown>,
+      ) => Outcome;
     }
-  }
-
-  // Check classification
-  for (const [task, expectedOutcome] of Object.entries(
-    expected.classification ?? {},
-  )) {
-    const actualOutcome = actual.classification[task];
-    if (!actualOutcome) return 'FAIL';
-    if (
-      expectedOutcome.label &&
-      actualOutcome.label !== expectedOutcome.label
-    ) {
-      return 'FAIL';
-    }
-    if (
-      typeof expectedOutcome.confidence === 'number' &&
-      typeof actualOutcome.confidence === 'number' &&
-      actualOutcome.confidence < expectedOutcome.confidence
-    ) {
-      return 'FAIL';
-    }
-  }
-
-  return 'PASS';
+  ).compareOutcome(pipelineSchema, expected, actual);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Entity extraction comparisons
-// ─────────────────────────────────────────────────────────────────────────────
+const llmSchema = { type: 'LLM' };
+const glinerSchema = { type: 'GLINER2' };
+const regexSchema = { type: 'REGEX' };
 
-describe('Pipeline entity comparator', () => {
-  const actual: PipelineResult = {
-    entities: {
-      order_id: [{ value: 'ORD-123', confidence: 0.95, start: 10, end: 17 }],
-      amount: [{ value: '50€', confidence: 0.88, start: 25, end: 28 }],
-    },
-    classification: {},
-    metadata: { model: 'fastino/gliner2-base-v1', latency_ms: 32 },
-  };
-
-  it('PASS: expected entity label exists with value match', () => {
-    const result = comparePipelineOutcome(
-      { entities: { order_id: [{ value: 'ORD-123' }] } },
-      actual,
-    );
-    expect(result).toBe('PASS');
+describe('compareOutcome — REGEX shouldMatch', () => {
+  it('PASS when shouldMatch and matched agree', () => {
+    expect(
+      compare(
+        regexSchema,
+        { shouldMatch: true },
+        { matched: true, findings: [{}] },
+      ).status,
+    ).toBe('PASS');
+    expect(
+      compare(
+        regexSchema,
+        { shouldMatch: false },
+        { matched: false, findings: [] },
+      ).status,
+    ).toBe('PASS');
   });
 
-  it('PASS: expected entity label exists with confidence threshold', () => {
-    const result = comparePipelineOutcome(
-      { entities: { order_id: [{ confidence: 0.9 }] } },
-      actual,
+  it('FAIL includes an expected-vs-actual explanation', () => {
+    const result = compare(
+      regexSchema,
+      { shouldMatch: true },
+      { matched: false, findings: [] },
     );
-    expect(result).toBe('PASS');
-  });
-
-  it('FAIL: confidence below threshold', () => {
-    const result = comparePipelineOutcome(
-      { entities: { order_id: [{ confidence: 0.99 }] } },
-      actual,
-    );
-    expect(result).toBe('FAIL');
-  });
-
-  it('FAIL: wrong value', () => {
-    const result = comparePipelineOutcome(
-      { entities: { order_id: [{ value: 'ORD-999' }] } },
-      actual,
-    );
-    expect(result).toBe('FAIL');
-  });
-
-  it('FAIL: entity label not in result', () => {
-    const result = comparePipelineOutcome(
-      { entities: { customer_email: [{}] } },
-      actual,
-    );
-    expect(result).toBe('FAIL');
-  });
-
-  it('PASS: empty entities expectation always passes', () => {
-    const result = comparePipelineOutcome({ entities: {} }, actual);
-    expect(result).toBe('PASS');
-  });
-
-  it('PASS: multiple expected entities all found', () => {
-    const result = comparePipelineOutcome(
-      {
-        entities: {
-          order_id: [{ value: 'ORD-123' }],
-          amount: [{ value: '50€' }],
-        },
-      },
-      actual,
-    );
-    expect(result).toBe('PASS');
+    expect(result.status).toBe('FAIL');
+    expect(result.explanation).toContain('Expected the pattern to match');
   });
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Classification comparisons
-// ─────────────────────────────────────────────────────────────────────────────
-
-describe('Pipeline classification comparator', () => {
-  const actual: PipelineResult = {
-    entities: {},
-    classification: {
-      intent: { label: 'refund', confidence: 0.97 },
-      sentiment: { label: 'negative', confidence: 0.82 },
-    },
-    metadata: {},
+describe('compareOutcome — flat classifier/LLM shape', () => {
+  const finding = {
+    finding_type: 'class:market_gaming_instruction',
+    confidence: 0.99,
+    metadata: { label_name: 'Market gaming instruction' },
   };
 
-  it('PASS: label matches expected', () => {
-    const result = comparePipelineOutcome(
-      { classification: { intent: { label: 'refund' } } },
-      actual,
+  it('PASS with the underscored label id', () => {
+    const result = compare(
+      llmSchema,
+      { label: 'market_gaming_instruction', minConfidence: 0.5 },
+      { findings: [finding] },
     );
-    expect(result).toBe('PASS');
+    expect(result.status).toBe('PASS');
   });
 
-  it('FAIL: wrong label', () => {
-    const result = comparePipelineOutcome(
-      { classification: { intent: { label: 'bug' } } },
-      actual,
+  it('PASS with the human-readable space-separated label', () => {
+    const result = compare(
+      llmSchema,
+      { label: 'Market gaming instruction' },
+      { findings: [finding] },
     );
-    expect(result).toBe('FAIL');
+    expect(result.status).toBe('PASS');
   });
 
-  it('PASS: confidence above threshold', () => {
-    const result = comparePipelineOutcome(
-      { classification: { intent: { label: 'refund', confidence: 0.9 } } },
-      actual,
+  it('FAIL below minConfidence, with explanation naming the threshold', () => {
+    const result = compare(
+      llmSchema,
+      { label: 'market_gaming_instruction', minConfidence: 0.999 },
+      { findings: [finding] },
     );
-    expect(result).toBe('PASS');
+    expect(result.status).toBe('FAIL');
+    expect(result.explanation).toContain('confidence >= 0.999');
+    expect(result.explanation).toContain('class:market_gaming_instruction');
   });
 
-  it('FAIL: confidence below threshold', () => {
-    const result = comparePipelineOutcome(
-      { classification: { intent: { label: 'refund', confidence: 0.99 } } },
-      actual,
+  it('FAIL with no findings explains that none were produced', () => {
+    const result = compare(
+      llmSchema,
+      { label: 'market_gaming_instruction' },
+      { findings: [] },
     );
-    expect(result).toBe('FAIL');
+    expect(result.status).toBe('FAIL');
+    expect(result.explanation).toContain('no findings were produced');
   });
+});
 
-  it('FAIL: task not present in actual', () => {
-    const result = comparePipelineOutcome(
-      { classification: { language: { label: 'de' } } },
-      actual,
-    );
-    expect(result).toBe('FAIL');
-  });
-
-  it('PASS: multiple tasks all match', () => {
-    const result = comparePipelineOutcome(
+describe('compareOutcome — nested pipeline-output shape', () => {
+  it('PASS: nested classification maps onto label/minConfidence', () => {
+    const result = compare(
+      llmSchema,
       {
         classification: {
-          intent: { label: 'refund' },
-          sentiment: { label: 'negative' },
+          conduct: { label: 'market_gaming_instruction', confidence: 0.5 },
         },
       },
-      actual,
+      {
+        findings: [
+          { finding_type: 'class:market_gaming_instruction', confidence: 0.99 },
+        ],
+      },
     );
-    expect(result).toBe('PASS');
+    expect(result.status).toBe('PASS');
+  });
+
+  it('FAIL: nested classification confidence acts as a minimum', () => {
+    const result = compare(
+      llmSchema,
+      {
+        classification: {
+          conduct: { label: 'market_gaming_instruction', confidence: 0.999 },
+        },
+      },
+      {
+        findings: [
+          { finding_type: 'class:market_gaming_instruction', confidence: 0.99 },
+        ],
+      },
+    );
+    expect(result.status).toBe('FAIL');
+  });
+
+  it('PASS: nested entities map onto the flat entities list', () => {
+    const result = compare(
+      glinerSchema,
+      { entities: { PersonName: [{ value: 'Ostap' }] } },
+      {
+        findings: [
+          {
+            finding_type: 'entity:PersonName',
+            matched_content: 'Ostap Bender',
+          },
+        ],
+      },
+    );
+    expect(result.status).toBe('PASS');
+  });
+
+  it('FAIL: nested entities missing from findings lists what was expected', () => {
+    const result = compare(
+      glinerSchema,
+      { entities: { PersonName: [{ value: 'Ostap' }] } },
+      {
+        findings: [
+          { finding_type: 'entity:Organization', matched_content: 'FERC' },
+        ],
+      },
+    );
+    expect(result.status).toBe('FAIL');
+    expect(result.explanation).toContain('PersonName');
   });
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Combined entities + classification
-// ─────────────────────────────────────────────────────────────────────────────
-
-describe('Pipeline combined comparator', () => {
-  const actual: PipelineResult = {
-    entities: {
-      order_id: [{ value: 'ORD-456', confidence: 0.91 }],
-    },
-    classification: {
-      intent: { label: 'refund', confidence: 0.95 },
-    },
-    metadata: {},
-  };
-
-  it('PASS: both entities and classification match', () => {
-    const result = comparePipelineOutcome(
+describe('compareOutcome — flat entities shape', () => {
+  it('PASS on label + text substring match, case-insensitive', () => {
+    const result = compare(
+      glinerSchema,
+      { entities: [{ label: 'person_name', text: 'ostap' }] },
       {
-        entities: { order_id: [{ value: 'ORD-456' }] },
-        classification: { intent: { label: 'refund' } },
+        findings: [
+          {
+            finding_type: 'entity:Person_Name',
+            matched_content: 'Ostap Bender',
+          },
+        ],
       },
-      actual,
     );
-    expect(result).toBe('PASS');
+    expect(result.status).toBe('PASS');
   });
+});
 
-  it('FAIL: entities match but classification does not', () => {
-    const result = comparePipelineOutcome(
-      {
-        entities: { order_id: [{ value: 'ORD-456' }] },
-        classification: { intent: { label: 'bug' } },
-      },
-      actual,
-    );
-    expect(result).toBe('FAIL');
-  });
-
-  it('PASS: no expectations → always passes', () => {
-    const result = comparePipelineOutcome({}, actual);
-    expect(result).toBe('PASS');
+describe('compareOutcome — unrecognized shape', () => {
+  it('FAIL with guidance instead of a silent FAIL', () => {
+    const result = compare(llmSchema, { something: 'else' }, { findings: [] });
+    expect(result.status).toBe('FAIL');
+    expect(result.explanation).toContain('Unrecognized expected_outcome shape');
   });
 });

@@ -78,6 +78,21 @@ export class CorrelationWorker implements OnApplicationBootstrap {
         continue;
       }
       if (!data?.sourceId || !data?.runnerId) continue;
+      // Namespace-isolation guard: pg-boss queues can be shared across
+      // namespace deployments, so a dequeued job may reference a source from
+      // another namespace. Running it would record foreign DUPLICATES agent
+      // runs (and enqueue a foreign autopilot cycle) in this namespace.
+      const source = await this.prisma.source.findUnique({
+        where: { id: data.sourceId },
+        select: { id: true },
+      });
+      if (!source) {
+        this.logger.warn(
+          `Skipping correlation job for unknown source ${data.sourceId} — ` +
+            `not found in this namespace; likely enqueued by another namespace.`,
+        );
+        continue;
+      }
       await this.process(data.sourceId, data.runnerId);
     }
   }
