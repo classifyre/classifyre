@@ -13,12 +13,6 @@
     "test": {
       "cache": false
     },
-    "docker:build": {
-      "cache": false
-    },
-    "docker:build:multiarch": {
-      "cache": false
-    },
     "helm:lint": {
       "cache": false
     },

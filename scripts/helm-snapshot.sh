@@ -64,11 +64,10 @@ render_snapshot() {
 
 mkdir -p "${TMP_DIR}"
 render_snapshot "${CHART_DIR}/values.yaml" "${TMP_DIR}/default.yaml"
-render_snapshot "${CHART_DIR}/values-minikube.yaml" "${TMP_DIR}/minikube.yaml"
 
 if [[ "${CHECK_MODE}" -eq 1 ]]; then
   missing=0
-  for file in default.yaml minikube.yaml; do
+  for file in default.yaml; do
     if [[ ! -f "${OUT_DIR}/${file}" ]]; then
       echo "Missing snapshot: ${OUT_DIR}/${file}" >&2
       missing=1
@@ -89,6 +88,5 @@ fi
 
 mkdir -p "${OUT_DIR}"
 cp "${TMP_DIR}/default.yaml" "${OUT_DIR}/default.yaml"
-cp "${TMP_DIR}/minikube.yaml" "${OUT_DIR}/minikube.yaml"
 
 echo "Helm snapshots updated in ${OUT_DIR}"

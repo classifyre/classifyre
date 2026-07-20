@@ -371,9 +371,12 @@ export class CustomDetectorTestsService {
       return path.resolve(apiRoot, raw);
     }
     const env = process.env.ENVIRONMENT || 'development';
-    return env === 'development'
-      ? path.join(__dirname, '../../../cli')
-      : '/app/cli';
+    if (env === 'development' || env === 'desktop') {
+      return path.join(__dirname, '../../../cli');
+    }
+    throw new Error(
+      'Local detector execution is only available in development or desktop mode',
+    );
   }
 
   // Compare expected vs actual — returns PASS/FAIL plus a human-readable

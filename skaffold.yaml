@@ -1,0 +1,37 @@
+apiVersion: skaffold/v4beta13
+kind: Config
+metadata:
+  name: classifyre
+
+profiles:
+  - name: dev
+    activation:
+      - kubeContext: k3d-classifyre
+    deploy:
+      helm:
+        releases:
+          - name: classifyre
+            chartPath: helm/classifyre
+            namespace: classifyre-dev
+            createNamespace: true
+            valuesFiles:
+              - helm/classifyre/values-dev.yaml
+            skipBuildDependencies: true
+            wait: false
+
+    portForward:
+      - resourceType: service
+        resourceName: classifyre-web
+        namespace: classifyre-dev
+        port: 3000
+        localPort: 3000
+      - resourceType: service
+        resourceName: classifyre-api
+        namespace: classifyre-dev
+        port: 8000
+        localPort: 8000
+      - resourceType: service
+        resourceName: classifyre-postgres
+        namespace: classifyre-dev
+        port: 5432
+        localPort: 5433

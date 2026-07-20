@@ -335,7 +335,6 @@ jobs:
               .
           }
 
-          build_and_push "all-in-one" "runtime"
           build_and_push "web" "web-final"
           build_and_push "api" "api-final"
           build_and_push "cli" "cli-final"
