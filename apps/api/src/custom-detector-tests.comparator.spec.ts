@@ -39,12 +39,18 @@ const regexSchema = { type: 'REGEX' };
 describe('compareOutcome — REGEX shouldMatch', () => {
   it('PASS when shouldMatch and matched agree', () => {
     expect(
-      compare(regexSchema, { shouldMatch: true }, { matched: true, findings: [{}] })
-        .status,
+      compare(
+        regexSchema,
+        { shouldMatch: true },
+        { matched: true, findings: [{}] },
+      ).status,
     ).toBe('PASS');
     expect(
-      compare(regexSchema, { shouldMatch: false }, { matched: false, findings: [] })
-        .status,
+      compare(
+        regexSchema,
+        { shouldMatch: false },
+        { matched: false, findings: [] },
+      ).status,
     ).toBe('PASS');
   });
 
@@ -110,7 +116,11 @@ describe('compareOutcome — nested pipeline-output shape', () => {
   it('PASS: nested classification maps onto label/minConfidence', () => {
     const result = compare(
       llmSchema,
-      { classification: { conduct: { label: 'market_gaming_instruction', confidence: 0.5 } } },
+      {
+        classification: {
+          conduct: { label: 'market_gaming_instruction', confidence: 0.5 },
+        },
+      },
       {
         findings: [
           { finding_type: 'class:market_gaming_instruction', confidence: 0.99 },
@@ -123,7 +133,11 @@ describe('compareOutcome — nested pipeline-output shape', () => {
   it('FAIL: nested classification confidence acts as a minimum', () => {
     const result = compare(
       llmSchema,
-      { classification: { conduct: { label: 'market_gaming_instruction', confidence: 0.999 } } },
+      {
+        classification: {
+          conduct: { label: 'market_gaming_instruction', confidence: 0.999 },
+        },
+      },
       {
         findings: [
           { finding_type: 'class:market_gaming_instruction', confidence: 0.99 },
@@ -139,7 +153,10 @@ describe('compareOutcome — nested pipeline-output shape', () => {
       { entities: { PersonName: [{ value: 'Ostap' }] } },
       {
         findings: [
-          { finding_type: 'entity:PersonName', matched_content: 'Ostap Bender' },
+          {
+            finding_type: 'entity:PersonName',
+            matched_content: 'Ostap Bender',
+          },
         ],
       },
     );
@@ -150,7 +167,11 @@ describe('compareOutcome — nested pipeline-output shape', () => {
     const result = compare(
       glinerSchema,
       { entities: { PersonName: [{ value: 'Ostap' }] } },
-      { findings: [{ finding_type: 'entity:Organization', matched_content: 'FERC' }] },
+      {
+        findings: [
+          { finding_type: 'entity:Organization', matched_content: 'FERC' },
+        ],
+      },
     );
     expect(result.status).toBe('FAIL');
     expect(result.explanation).toContain('PersonName');
@@ -164,7 +185,10 @@ describe('compareOutcome — flat entities shape', () => {
       { entities: [{ label: 'person_name', text: 'ostap' }] },
       {
         findings: [
-          { finding_type: 'entity:Person_Name', matched_content: 'Ostap Bender' },
+          {
+            finding_type: 'entity:Person_Name',
+            matched_content: 'Ostap Bender',
+          },
         ],
       },
     );

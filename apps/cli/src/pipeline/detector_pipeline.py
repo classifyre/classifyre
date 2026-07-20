@@ -156,11 +156,7 @@ class DetectorPipeline:
         # pressure). Keep both passes only for IMAGE assets, where OCR text and
         # pixels are complementary evidence; everywhere else (e.g. extensionless
         # text files typed BINARY) the raw-bytes pass duplicates the text pass.
-        if (
-            text_detectors
-            and binary_detectors
-            and asset.asset_type != OutputAssetType.IMAGE
-        ):
+        if text_detectors and binary_detectors and asset.asset_type != OutputAssetType.IMAGE:
             text_ids = {id(d) for d in text_detectors}
             binary_detectors = [d for d in binary_detectors if id(d) not in text_ids]
         # Any asset we resolved a text content type for is expected to yield

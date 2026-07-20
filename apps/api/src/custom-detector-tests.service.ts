@@ -394,7 +394,8 @@ export class CustomDetectorTestsService {
     if (schemaType === 'REGEX') {
       const shouldMatch = Boolean(expected.shouldMatch);
       const didMatch = Boolean(actual.matched);
-      if (shouldMatch === didMatch) return { status: 'PASS', explanation: null };
+      if (shouldMatch === didMatch)
+        return { status: 'PASS', explanation: null };
       return {
         status: 'FAIL',
         explanation: shouldMatch
@@ -491,10 +492,11 @@ export class CustomDetectorTestsService {
 
       if (missing.length === 0) return { status: 'PASS', explanation: null };
       const missingDesc = missing
-        .map(
-          (m) =>
-            `"${String(m.label ?? '?')}"${m.text ? ` containing "${String(m.text)}"` : ''}`,
-        )
+        .map((m) => {
+          const label = (m.label as string | undefined) ?? '?';
+          const text = m.text as string | undefined;
+          return `"${label}"${text ? ` containing "${text}"` : ''}`;
+        })
         .join(', ');
       return {
         status: 'FAIL',
@@ -621,7 +623,7 @@ function normalizeExpectedOutcome(
     const tasks = Object.values(classification as Record<string, unknown>);
     const first = tasks.find(
       (t): t is Record<string, unknown> =>
-        !!t && typeof t === 'object' && 'label' in (t as object),
+        !!t && typeof t === 'object' && 'label' in t,
     );
     if (first) {
       out.label = first.label;

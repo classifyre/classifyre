@@ -301,4 +301,7 @@ jobs:
       environment: classifyre-develop
       image_tag: develop
       demo_mode: 'false'
+      # Deploy, verify the app is alive, then park it at zero replicas to free
+      # cluster resources. The next push redeploys from this scaled-down state.
+      scale_down: 'true'
     secrets: inherit
