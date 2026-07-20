@@ -2122,6 +2122,10 @@ class CoreInput(BaseModel):
     )
     sampling: SamplingConfig
     resources: ResourceOverrides | None = None
+    cleanup_removed_detector_findings: bool | None = Field(
+        True,
+        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
+    )
 
 
 class SlackInput(CoreInput):
@@ -2142,6 +2146,10 @@ class SlackInput(CoreInput):
     )
     sampling: SamplingConfig
     resources: ResourceOverrides | None = None
+    cleanup_removed_detector_findings: bool | None = Field(
+        True,
+        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
+    )
 
 
 class EmailInput(CoreInput):
@@ -2160,6 +2168,10 @@ class EmailInput(CoreInput):
     )
     sampling: SamplingConfig
     resources: ResourceOverrides | None = None
+    cleanup_removed_detector_findings: bool | None = Field(
+        True,
+        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
+    )
 
 
 class S3CompatibleStorageInput(CoreInput):
@@ -2178,6 +2190,10 @@ class S3CompatibleStorageInput(CoreInput):
     )
     sampling: SamplingConfig
     resources: ResourceOverrides | None = None
+    cleanup_removed_detector_findings: bool | None = Field(
+        True,
+        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
+    )
 
 
 class LocalFolderInput(CoreInput):
@@ -2196,6 +2212,10 @@ class LocalFolderInput(CoreInput):
     )
     sampling: SamplingConfig
     resources: ResourceOverrides | None = None
+    cleanup_removed_detector_findings: bool | None = Field(
+        True,
+        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
+    )
 
 
 class SandboxInput(CoreInput):
@@ -2214,6 +2234,10 @@ class SandboxInput(CoreInput):
     )
     sampling: SamplingConfig
     resources: ResourceOverrides | None = None
+    cleanup_removed_detector_findings: bool | None = Field(
+        True,
+        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
+    )
 
 
 class AzureBlobStorageInput(CoreInput):
@@ -2232,6 +2256,10 @@ class AzureBlobStorageInput(CoreInput):
     )
     sampling: SamplingConfig
     resources: ResourceOverrides | None = None
+    cleanup_removed_detector_findings: bool | None = Field(
+        True,
+        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
+    )
 
 
 class GoogleCloudStorageInput(CoreInput):
@@ -2250,6 +2278,10 @@ class GoogleCloudStorageInput(CoreInput):
     )
     sampling: SamplingConfig
     resources: ResourceOverrides | None = None
+    cleanup_removed_detector_findings: bool | None = Field(
+        True,
+        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
+    )
 
 
 class WordPressInput(CoreInput):
@@ -2268,6 +2300,10 @@ class WordPressInput(CoreInput):
     )
     sampling: SamplingConfig
     resources: ResourceOverrides | None = None
+    cleanup_removed_detector_findings: bool | None = Field(
+        True,
+        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
+    )
 
 
 class PostgreSQLInput(CoreInput):
@@ -2286,6 +2322,10 @@ class PostgreSQLInput(CoreInput):
     )
     sampling: SamplingConfig
     resources: ResourceOverrides | None = None
+    cleanup_removed_detector_findings: bool | None = Field(
+        True,
+        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
+    )
 
 
 class MySQLInput(CoreInput):
@@ -2304,6 +2344,10 @@ class MySQLInput(CoreInput):
     )
     sampling: SamplingConfig
     resources: ResourceOverrides | None = None
+    cleanup_removed_detector_findings: bool | None = Field(
+        True,
+        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
+    )
 
 
 class MSSQLInput(CoreInput):
@@ -2322,6 +2366,10 @@ class MSSQLInput(CoreInput):
     )
     sampling: SamplingConfig
     resources: ResourceOverrides | None = None
+    cleanup_removed_detector_findings: bool | None = Field(
+        True,
+        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
+    )
 
 
 class OracleInput(CoreInput):
@@ -2340,6 +2388,10 @@ class OracleInput(CoreInput):
     )
     sampling: SamplingConfig
     resources: ResourceOverrides | None = None
+    cleanup_removed_detector_findings: bool | None = Field(
+        True,
+        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
+    )
 
 
 class HiveInput(CoreInput):
@@ -2358,6 +2410,10 @@ class HiveInput(CoreInput):
     )
     sampling: SamplingConfig
     resources: ResourceOverrides | None = None
+    cleanup_removed_detector_findings: bool | None = Field(
+        True,
+        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
+    )
 
 
 class DatabricksInput(CoreInput):
@@ -2380,6 +2436,10 @@ class DatabricksInput(CoreInput):
     )
     sampling: SamplingConfig
     resources: ResourceOverrides | None = None
+    cleanup_removed_detector_findings: bool | None = Field(
+        True,
+        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
+    )
 
 
 class SnowflakeInput(CoreInput):
@@ -2408,6 +2468,10 @@ class SnowflakeInput(CoreInput):
     )
     sampling: SamplingConfig
     resources: ResourceOverrides | None = None
+    cleanup_removed_detector_findings: bool | None = Field(
+        True,
+        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
+    )
 
 
 class MongoDBInput(CoreInput):
@@ -2430,6 +2494,10 @@ class MongoDBInput(CoreInput):
     )
     sampling: SamplingConfig
     resources: ResourceOverrides | None = None
+    cleanup_removed_detector_findings: bool | None = Field(
+        True,
+        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
+    )
 
 
 class Neo4jRequired(BaseModel):
@@ -2556,6 +2624,10 @@ class Neo4jInput(CoreInput):
     )
     sampling: SamplingConfig
     resources: ResourceOverrides | None = None
+    cleanup_removed_detector_findings: bool | None = Field(
+        True,
+        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
+    )
 
 
 class PowerBIInput(CoreInput):
@@ -2578,6 +2650,10 @@ class PowerBIInput(CoreInput):
     )
     sampling: SamplingConfig
     resources: ResourceOverrides | None = None
+    cleanup_removed_detector_findings: bool | None = Field(
+        True,
+        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
+    )
 
 
 class TableauInput(CoreInput):
@@ -2600,6 +2676,10 @@ class TableauInput(CoreInput):
     )
     sampling: SamplingConfig
     resources: ResourceOverrides | None = None
+    cleanup_removed_detector_findings: bool | None = Field(
+        True,
+        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
+    )
 
 
 class ConfluenceRequired(BaseModel):
@@ -3006,6 +3086,10 @@ class ConfluenceInput(CoreInput):
     )
     sampling: SamplingConfig
     resources: ResourceOverrides | None = None
+    cleanup_removed_detector_findings: bool | None = Field(
+        True,
+        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
+    )
 
 
 class JiraInput(CoreInput):
@@ -3024,6 +3108,10 @@ class JiraInput(CoreInput):
     )
     sampling: SamplingConfig
     resources: ResourceOverrides | None = None
+    cleanup_removed_detector_findings: bool | None = Field(
+        True,
+        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
+    )
 
 
 class ServiceDeskInput(CoreInput):
@@ -3042,6 +3130,10 @@ class ServiceDeskInput(CoreInput):
     )
     sampling: SamplingConfig
     resources: ResourceOverrides | None = None
+    cleanup_removed_detector_findings: bool | None = Field(
+        True,
+        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
+    )
 
 
 class SQLiteRequired(BaseModel):
@@ -3098,6 +3190,10 @@ class SQLiteInput(CoreInput):
     )
     sampling: SamplingConfig
     resources: ResourceOverrides | None = None
+    cleanup_removed_detector_findings: bool | None = Field(
+        True,
+        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
+    )
 
 
 class NotionRequired(BaseModel):
@@ -3229,6 +3325,10 @@ class NotionInput(CoreInput):
     )
     sampling: SamplingConfig
     resources: ResourceOverrides | None = None
+    cleanup_removed_detector_findings: bool | None = Field(
+        True,
+        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
+    )
 
 
 class KafkaSecurityProtocol(StrEnum):
@@ -3424,6 +3524,10 @@ class KafkaInput(CoreInput):
     )
     sampling: SamplingConfig
     resources: ResourceOverrides | None = None
+    cleanup_removed_detector_findings: bool | None = Field(
+        True,
+        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
+    )
 
 
 class NoAuthentication2(BaseModel):
@@ -3554,6 +3658,10 @@ class ElasticsearchInput(CoreInput):
     )
     sampling: SamplingConfig
     resources: ResourceOverrides | None = None
+    cleanup_removed_detector_findings: bool | None = Field(
+        True,
+        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
+    )
 
 
 class OpenSearchOptional(BaseModel):
@@ -3584,6 +3692,10 @@ class OpenSearchInput(CoreInput):
     )
     sampling: SamplingConfig
     resources: ResourceOverrides | None = None
+    cleanup_removed_detector_findings: bool | None = Field(
+        True,
+        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
+    )
 
 
 class NoAuthentication4(BaseModel):
@@ -3672,6 +3784,10 @@ class MeilisearchInput(CoreInput):
     )
     sampling: SamplingConfig
     resources: ResourceOverrides | None = None
+    cleanup_removed_detector_findings: bool | None = Field(
+        True,
+        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
+    )
 
 
 class LakehouseStorageConnection(BaseModel):
@@ -3908,6 +4024,10 @@ class Microsoft365Input(CoreInput):
     )
     sampling: SamplingConfig
     resources: ResourceOverrides | None = None
+    cleanup_removed_detector_findings: bool | None = Field(
+        True,
+        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
+    )
 
 
 class GoogleWorkspaceRequiredServiceAccount(BaseModel):
@@ -4048,6 +4168,10 @@ class GoogleWorkspaceInput(CoreInput):
     )
     sampling: SamplingConfig
     resources: ResourceOverrides | None = None
+    cleanup_removed_detector_findings: bool | None = Field(
+        True,
+        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
+    )
 
 
 class YouTubeInput(CoreInput):
@@ -4066,6 +4190,10 @@ class YouTubeInput(CoreInput):
     )
     sampling: SamplingConfig
     resources: ResourceOverrides | None = None
+    cleanup_removed_detector_findings: bool | None = Field(
+        True,
+        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
+    )
 
 
 class DeltaLakeOptional(BaseModel):
@@ -4092,6 +4220,10 @@ class DeltaLakeInput(CoreInput):
     )
     sampling: SamplingConfig
     resources: ResourceOverrides | None = None
+    cleanup_removed_detector_findings: bool | None = Field(
+        True,
+        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
+    )
 
 
 class IcebergOptional(BaseModel):
@@ -4118,6 +4250,10 @@ class IcebergInput(CoreInput):
     )
     sampling: SamplingConfig
     resources: ResourceOverrides | None = None
+    cleanup_removed_detector_findings: bool | None = Field(
+        True,
+        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
+    )
 
 
 class SourceInput(

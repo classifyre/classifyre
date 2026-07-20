@@ -52,6 +52,7 @@ import { FingerprintsGraph } from "@/components/fingerprints-graph";
 import { AssetLinksGraph } from "@/components/asset-links-graph";
 import { DetailBackButton } from "@/components/detail-back-button";
 import { DeleteSourceAction } from "@/components/delete-source-action";
+import { PurgeFindingsAction } from "@/components/purge-findings-action";
 import { FindingsTable } from "@/components/findings-table";
 import type { FindingSelection } from "@/components/findings-table";
 import { BulkUpdateDialog } from "@/components/bulk-update-dialog";
@@ -434,6 +435,10 @@ export default function SourceViewPage() {
               <Pencil className="h-4 w-4" />
               {t("sources.editSource")}
             </Button>
+            <PurgeFindingsAction
+              sourceId={sourceId}
+              onPurged={() => void fetchSourceData(false)}
+            />
             <DeleteSourceAction sourceId={sourceId} />
             <Button
               variant="outline"

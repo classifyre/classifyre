@@ -65,7 +65,7 @@ const DETECTOR_KNOWLEDGE = [
   'Use list_custom_detector_examples to ground configs in proven templates.',
   'ALWAYS call validate_detector_config on the pipeline schema before proposing create/update.',
   'After creating a detector, proactively add at least one positive and one negative test scenario (create_detector_test_scenario) and run run_detector_tests.',
-  'Expected outcome format for scenarios: RULESET {"shouldMatch":true|false}; CLASSIFIER {"label":"advice","minConfidence":0.6}; ENTITY {"entities":[{"label":"PersonName","text":"Ostap"}]}.',
+  'Expected outcome format for scenarios: RULESET {"shouldMatch":true|false}; CLASSIFIER {"label":"advice","minConfidence":0.6}; ENTITY {"entities":[{"label":"PersonName","text":"Ostap"}]}. Labels compare case-insensitively with underscores treated as spaces. Re-run a single scenario via run_detector_tests scenario_ids to avoid paying for a full re-run.',
 ].join('\n');
 
 const SOURCE_KNOWLEDGE = [

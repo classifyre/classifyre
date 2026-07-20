@@ -3,6 +3,7 @@ import {
   Injectable,
   InternalServerErrorException,
   Logger,
+  NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from './prisma.service';
 import { AssetType, Source, Prisma, RunnerStatus } from '@prisma/client';
@@ -11,6 +12,8 @@ import { MaskedConfigCryptoService } from './masked-config-crypto.service';
 import { stableStringify } from './utils/masked-config.utils';
 import { normalizeSourceConfig } from './utils/source-config-normalizer';
 import { RunnerLogStorageService } from './cli-runner/runner-log-storage.service';
+import { PgBossService } from './scheduler/pg-boss.service';
+import { CORRELATION_QUEUE } from './correlation/correlation.constants';
 import {
   SearchSourcesRequestDto,
   SearchSourcesSortBy,
@@ -61,6 +64,7 @@ export class SourceService {
     private prisma: PrismaService,
     private maskedConfigCryptoService: MaskedConfigCryptoService,
     private runnerLogStorage: RunnerLogStorageService,
+    private pgBoss: PgBossService,
   ) {}
 
   generateId(data: any): string {
@@ -250,6 +254,50 @@ export class SourceService {
     }
 
     return this.prisma.source.delete({ where });
+  }
+
+  /**
+   * Permanently delete every finding of a source (all statuses). Evidence
+   * analyses and extractions cascade via FK; case-evidence snapshots survive
+   * by design. Correlation fingerprints are derived from findings, so a full
+   * background recompute is scheduled afterwards — content embeddings are
+   * content-addressed and need no rebalancing.
+   */
+  async purgeFindings(sourceId: string): Promise<{ purgedFindings: number }> {
+    const source = await this.prisma.source.findUnique({
+      where: { id: sourceId },
+      select: { id: true },
+    });
+    if (!source) {
+      throw new NotFoundException(`Source with ID ${sourceId} not found`);
+    }
+
+    const result = await this.prisma.finding.deleteMany({
+      where: { sourceId },
+    });
+
+    this.logger.warn(
+      `Purged ${result.count} finding(s) from source ${sourceId}; scheduling correlation recompute.`,
+    );
+
+    try {
+      const boss = await this.pgBoss.getBossAsync();
+      await boss.send(
+        CORRELATION_QUEUE,
+        { recomputeAll: true },
+        {
+          singletonKey: 'correlation:recompute-all',
+          expireInSeconds: 6 * 3600,
+        },
+      );
+    } catch (error) {
+      // Non-fatal: fingerprints refresh on the next scan recompute.
+      this.logger.warn(
+        `Failed to schedule correlation recompute after purge: ${String(error)}`,
+      );
+    }
+
+    return { purgedFindings: result.count };
   }
 
   async searchSources(

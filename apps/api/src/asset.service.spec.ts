@@ -1812,6 +1812,7 @@ describe('AssetService', () => {
           deleted: 0,
           outOfScope: 0,
           resolvedForAbsence: 0,
+          resolvedForRemovedDetectors: 0,
         });
         // The bug: with no seenHashes the `notIn` filter was dropped, so the
         // query matched every asset in the source. Nothing may even be queried.
@@ -2177,6 +2178,154 @@ describe('AssetService', () => {
         const result = await runFinalize([findingFrom()]);
 
         expect(result.resolvedForAbsence).toBe(0);
+        expect(findingUpdate).not.toHaveBeenCalled();
+      });
+    });
+
+    // Findings from detectors removed (or disabled) in the source config are
+    // resolved on the next run, unless the source opts out via
+    // cleanup_removed_detector_findings: false. Distinct from the G-021
+    // manifest path above: this is driven by the configured detector set, not
+    // by what ran.
+    describe('finalizeIngestRun removed-detector cleanup', () => {
+      const openFinding = (
+        overrides: Partial<Record<string, any>> = {},
+      ): Record<string, any> => ({
+        id: 'finding-llm',
+        sourceId,
+        assetId: 'asset-1',
+        runnerId: 'old-runner',
+        status: FindingStatus.OPEN,
+        history: [],
+        detectorType: DetectorType.CUSTOM,
+        customDetectorKey: 'email-conduct-screen',
+        ...overrides,
+      });
+
+      let findingUpdate: jest.Mock;
+
+      const runCleanup = (
+        config: Record<string, any> | undefined,
+        findings: Record<string, any>[],
+      ) => {
+        mockPrismaService.source.findUnique.mockResolvedValue({
+          id: sourceId,
+          type: AssetType.WORDPRESS,
+          config,
+        });
+        mockPrismaService.runner.findUnique.mockResolvedValue({
+          id: runnerId,
+          sourceId,
+        });
+        mockPrismaService.finding.findMany.mockResolvedValue(findings);
+        findingUpdate = jest.fn().mockResolvedValue({});
+        mockPrismaService.$transaction.mockImplementation((callback: any) =>
+          callback({ finding: { update: findingUpdate } }),
+        );
+        // isFullScan=false: only the cleanup path runs, nothing else.
+        return service.finalizeIngestRun(sourceId, runnerId, [], false);
+      };
+
+      it('resolves findings from a detector that was removed from the config', async () => {
+        const result = await runCleanup(
+          { detectors: [{ type: 'PII', enabled: true }] },
+          [openFinding()],
+        );
+
+        expect(result.resolvedForRemovedDetectors).toBe(1);
+        expect(findingUpdate).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: { id: 'finding-llm' },
+            data: expect.objectContaining({
+              status: FindingStatus.RESOLVED,
+              resolutionReason: 'Detector removed from source configuration',
+            }),
+          }),
+        );
+      });
+
+      it('treats a disabled detector as removed', async () => {
+        const result = await runCleanup(
+          {
+            detectors: [
+              { type: 'PII', enabled: true },
+              {
+                type: 'CUSTOM',
+                enabled: false,
+                custom_detector_key: 'email-conduct-screen',
+              },
+            ],
+          },
+          [openFinding()],
+        );
+
+        expect(result.resolvedForRemovedDetectors).toBe(1);
+      });
+
+      it('keeps findings whose detector is still configured', async () => {
+        const result = await runCleanup(
+          {
+            detectors: [
+              {
+                type: 'CUSTOM',
+                enabled: true,
+                custom_detector_key: 'email-conduct-screen',
+              },
+            ],
+          },
+          [openFinding()],
+        );
+
+        expect(result.resolvedForRemovedDetectors).toBe(0);
+        expect(findingUpdate).not.toHaveBeenCalled();
+      });
+
+      it('does nothing when the source opts out via the flag', async () => {
+        const result = await runCleanup(
+          {
+            cleanup_removed_detector_findings: false,
+            detectors: [{ type: 'PII', enabled: true }],
+          },
+          [openFinding()],
+        );
+
+        expect(result.resolvedForRemovedDetectors).toBe(0);
+        expect(findingUpdate).not.toHaveBeenCalled();
+      });
+
+      it('skips cleanup entirely when the config has no detector list', async () => {
+        const result = await runCleanup({}, [openFinding()]);
+
+        expect(result.resolvedForRemovedDetectors).toBe(0);
+        expect(findingUpdate).not.toHaveBeenCalled();
+      });
+
+      it('preserves findings with a manual status override', async () => {
+        const result = await runCleanup(
+          { detectors: [{ type: 'PII', enabled: true }] },
+          [
+            openFinding({
+              history: [
+                {
+                  eventType: HistoryEventType.STATUS_CHANGED,
+                  status: FindingStatus.FALSE_POSITIVE,
+                },
+              ],
+            }),
+          ],
+        );
+
+        expect(result.resolvedForRemovedDetectors).toBe(0);
+        expect(findingUpdate).not.toHaveBeenCalled();
+      });
+
+      it('keeps CUSTOM findings without a detector key (unknown identity)', async () => {
+        const result = await runCleanup(
+          { detectors: [{ type: 'PII', enabled: true }] },
+          [openFinding({ customDetectorKey: null })],
+        );
+
+        expect(result.resolvedForRemovedDetectors).toBe(0);
         expect(findingUpdate).not.toHaveBeenCalled();
       });
     });
