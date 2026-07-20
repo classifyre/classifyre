@@ -31,7 +31,7 @@
     "@anthropic-ai/sdk": "^0.111.0",
     "@aws-sdk/client-s3": "^3.1032.0",
     "@fastify/multipart": "^10.0.0",
-    "@fastify/static": "^9.3.0",
+    "@fastify/static": "^10.1.0",
     "@fastify/under-pressure": "^9.0.3",
     "@google/genai": "^2.6.0",
     "@huggingface/transformers": "^4.2.0",
