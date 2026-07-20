@@ -103,7 +103,3 @@ bun run ops:helm:docs:check
 bun run ops:helm:snapshot
 bun run ops:helm:snapshot:check
 ```
-
-## Local Minikube
-
-Local-only instructions are in `helm/MINIKUBE.md`.

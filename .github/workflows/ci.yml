@@ -193,9 +193,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: all-in-one
-            repository: all-in-one
-            target: runtime
           - name: web
             repository: web
             target: web-final
@@ -227,15 +224,6 @@ jobs:
         with:
           name: web-dist
           path: web-dist
-
-      - name: Free disk space for all-in-one build
-        if: matrix.name == 'all-in-one'
-        run: |
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /opt/ghc
-          sudo rm -rf /usr/local/lib/android
-          docker system prune -af || true
-          df -h
 
       - name: Set up QEMU
         # Skip QEMU when running locally with act: Docker Desktop uses Rosetta 2

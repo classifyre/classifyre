@@ -74,7 +74,7 @@ export class ValidationService {
       const environment = (
         process.env.ENVIRONMENT || 'development'
       ).toLowerCase();
-      if (environment === 'kubernetes' || environment === 'docker') {
+      if (environment === 'kubernetes') {
         throw new BadRequestException(
           'LOCAL_FOLDER sources are only available in the desktop application',
         );

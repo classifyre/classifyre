@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Run the CI workflow locally using act (https://github.com/nektos/act).
 #
-# Builds all Docker images (api, web, cli, all-in-one) and pushes them to
+# Builds the Kubernetes workload images (api, web, cli) and pushes them to
 # Docker Hub with the :main tag — same as what GitHub CI does on a push to main.
 #
 # Prerequisites:

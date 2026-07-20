@@ -192,13 +192,9 @@ When implementing database features:
 
 ### Deployment Context
 
-The extensive docs in `docs/architecture/` describe multiple deployment modes:
-
-1. **All-in-One Docker** - Single container for dev/demo (NOT production)
-2. **Kubernetes** - Production deployment with separated components
-3. **Docker Compose** - Intermediate testing environment
-
-All-in-one uses `s6-overlay` for process supervision (PostgreSQL, FastAPI, Orchestrator, Worker, Caddy).
+The supported deployment modes are Kubernetes through the production Helm chart
+and the packaged desktop application. Local Kubernetes development uses k3d,
+Skaffold, and the same Helm chart.
 
 ## Code Style and Patterns
 
@@ -273,7 +269,6 @@ When building Docker images:
 - `docs/architecture/ARCHITECTURE.md` - System architecture overview
 - `docs/architecture/PLUGIN_SYSTEM.md` - Plugin interface specifications
 - `docs/architecture/BUILD.md` - Docker build and deployment guide
-- `docs/architecture/ALL-IN-ONE-SUMMARY.md` - All-in-one Docker architecture
 
 ## Working in This Codebase
 

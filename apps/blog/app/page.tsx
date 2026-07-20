@@ -32,21 +32,21 @@ import "./landing.css";
 export const metadata: Metadata = {
   title: "The Open-Source Investigation Platform for Your Data",
   description:
-    "Classifyre turns raw findings into real investigations. Run the full product three ways — desktop app, all-in-one Docker, or Helm at any scale — connect the systems you already run, and let semantic ranking float the evidence that matters while Harness AI, five autonomous agents, opens inquiries, builds cases, tunes sources, and authors detectors with every decision explained.",
+    "Classifyre turns raw findings into real investigations. Run the full product as a desktop app or deploy it with Helm at any scale, connect the systems you already run, and let semantic ranking float the evidence that matters while Harness AI opens inquiries, builds cases, tunes sources, and authors detectors with every decision explained.",
   alternates: {
     canonical: "/",
   },
   openGraph: {
     title: "Classifyre | Every leak leaves a trail",
     description:
-      "An open-source investigation platform: detectors surface evidence, semantic ranking sorts signal from boilerplate, and Harness AI — a five-agent autopilot — opens inquiries, builds cases, drafts hypotheses, and authors detectors with a full audit trail. One product, three runtimes: desktop, all-in-one Docker, Helm.",
+      "An open-source investigation platform: detectors surface evidence, semantic ranking sorts signal from boilerplate, and Harness AI opens inquiries, builds cases, drafts hypotheses, and authors detectors with a full audit trail. Available for desktop and Kubernetes with Helm.",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
     title: "Classifyre | Every leak leaves a trail",
     description:
-      "Open-source core, importance-ranked evidence with written reasons, Harness AI — autonomous agents that act instead of chat — custom detectors from regex to any model, and one product that runs on a laptop, in one container, or across any cluster.",
+      "Open-source core, importance-ranked evidence with written reasons, Harness AI, custom detectors from regex to any model, and one product that runs on desktop or Kubernetes.",
   },
 };
 
@@ -63,11 +63,6 @@ const helmInstallCommand = [
   "  oci://registry-1.docker.io/classifyre/classifyre-core \\",
   `  --version ${softwareVersion}`,
 ];
-const dockerRunCommand = [
-  "docker run --rm -p 3000:3000 \\",
-  "  classifyre/all-in-one:latest",
-];
-const dockerDocsUrl = "https://docs.classifyre.com/deployment/docker/";
 const helmDocsUrl = "https://docs.classifyre.com/deployment/kubernetes/";
 const enterpriseContactEmail = "contact@classifyre.com";
 
@@ -326,7 +321,13 @@ const detectorLadder = [
   },
 ] as const;
 
-function Marker({ label, inverted = false }: { label: string; inverted?: boolean }) {
+function Marker({
+  label,
+  inverted = false,
+}: {
+  label: string;
+  inverted?: boolean;
+}) {
   return (
     <span
       className={cn(
@@ -543,12 +544,6 @@ export default function HomePage() {
       },
       {
         "@type": "Offer",
-        name: "Classifyre All-in-One (Docker)",
-        price: "0",
-        priceCurrency: "USD",
-      },
-      {
-        "@type": "Offer",
         name: "Open Source Core on Kubernetes (Helm)",
         price: "0",
         priceCurrency: "USD",
@@ -618,7 +613,11 @@ export default function HomePage() {
                     asChild
                     className="border-2 border-accent bg-accent text-black hover:bg-accent/90"
                   >
-                    <a href={desktopDownloadUrl} target="_blank" rel="noreferrer">
+                    <a
+                      href={desktopDownloadUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
                       Download the app
                     </a>
                   </Button>
@@ -708,17 +707,17 @@ export default function HomePage() {
               </div>
             </div>
 
-            {/* Runtime rail: three productized ways to run the same platform */}
+            {/* Runtime rail: desktop or Kubernetes */}
             <div className="border-2 border-white/25 bg-white/4">
               <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b-2 border-white/25 px-4 py-3 sm:px-5">
                 <span className="font-mono text-[11px] font-bold uppercase tracking-[0.2em] text-accent">
-                  Three ways to run it
+                  Two ways to run it
                 </span>
                 <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-white/50">
                   Every one is the full product — only the jurisdiction changes
                 </span>
               </div>
-              <div className="grid divide-y-2 divide-white/25 lg:grid-cols-3 lg:divide-x-2 lg:divide-y-0">
+              <div className="grid divide-y-2 divide-white/25 lg:grid-cols-2 lg:divide-x-2 lg:divide-y-0">
                 {/* Desktop */}
                 <div className="flex flex-col gap-3 p-4 sm:p-5">
                   <div className="flex items-baseline justify-between gap-2">
@@ -751,29 +750,6 @@ export default function HomePage() {
                   <p className="mt-auto font-mono text-[10px] uppercase tracking-[0.1em] text-white/45">
                     Everything stays on your machine
                   </p>
-                </div>
-
-                {/* Docker all-in-one */}
-                <div className="flex flex-col gap-3 p-4 sm:p-5">
-                  <div className="flex items-baseline justify-between gap-2">
-                    <span className="font-mono text-xs font-bold uppercase tracking-[0.16em] text-white">
-                      Docker all-in-one
-                    </span>
-                    <span className="border border-white/30 px-1.5 py-0.5 font-mono text-[9px] font-bold uppercase tracking-[0.16em] text-white/60">
-                      Local · one container
-                    </span>
-                  </div>
-                  <pre className="overflow-hidden whitespace-pre-wrap wrap-break-word border border-white/20 bg-black/40 px-2.5 py-2 font-mono text-[11px] leading-5 text-white/85">
-                    <code>{dockerRunCommand.join("\n")}</code>
-                  </pre>
-                  <a
-                    href={dockerDocsUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="mt-auto font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-accent hover:underline"
-                  >
-                    Docker docs →
-                  </a>
                 </div>
 
                 {/* Helm */}
@@ -844,8 +820,8 @@ export default function HomePage() {
                 One pipeline runs from the systems you connect to a resolved
                 investigation: sources become assets, detectors raise findings,
                 findings feed inquiries and fingerprints, and everything
-                converges into cases. Here is one real night in the life of it
-                — a credential leaking through CI logs, traced end to end.
+                converges into cases. Here is one real night in the life of it —
+                a credential leaking through CI logs, traced end to end.
               </p>
             </div>
 
@@ -927,8 +903,8 @@ export default function HomePage() {
                 whether it deserves your morning. Classifyre embeds every
                 finding into a semantic space and ranks it from 0 to 1 —
                 weighing quality, novelty, context, and how the same value
-                recurs across your estate — so the docket opens on the leak,
-                not on page forty of boilerplate.
+                recurs across your estate — so the docket opens on the leak, not
+                on page forty of boilerplate.
               </p>
             </div>
 
@@ -1050,14 +1026,14 @@ export default function HomePage() {
                 </span>
               </h2>
               <p className="max-w-3xl text-primary-foreground/72">
-                A copilot waits for you to type a prompt. Harness AI doesn&apos;t
-                wait. After every scan, five specialized agents wake in
-                sequence, read a system brief composed from live facts and
-                long-lived memory, and move the investigation forward on their
-                own — deduping findings, building cases, tuning silent sources,
-                even authoring the detectors you were missing. The fifth agent
-                literally dreams: it consolidates what the others learned while
-                nothing else is running.
+                A copilot waits for you to type a prompt. Harness AI
+                doesn&apos;t wait. After every scan, five specialized agents
+                wake in sequence, read a system brief composed from live facts
+                and long-lived memory, and move the investigation forward on
+                their own — deduping findings, building cases, tuning silent
+                sources, even authoring the detectors you were missing. The
+                fifth agent literally dreams: it consolidates what the others
+                learned while nothing else is running.
               </p>
             </div>
 
@@ -1357,20 +1333,18 @@ export default function HomePage() {
                 >
                   One product.
                   <br />
-                  Three jurisdictions.
+                  Two jurisdictions.
                 </h2>
               </div>
               <p className="max-w-2xl text-muted-foreground">
-                These aren&apos;t tiers, trials, or lite editions — each
-                runtime is the full, productized platform. The desktop app and
-                the all-in-one container keep the whole investigation local;
-                the Helm chart runs it remotely and scales as heavily as your
-                estate demands. Nothing you build in one runtime is thrown
-                away in the next.
+                These aren&apos;t tiers, trials, or lite editions — each runtime
+                is the full, productized platform. The desktop app keeps the
+                investigation local; the Helm chart runs it remotely and scales
+                as heavily as your estate demands.
               </p>
             </div>
 
-            <div className="grid gap-4 lg:grid-cols-3">
+            <div className="grid gap-4 lg:grid-cols-2">
               {/* Desktop */}
               <div className="panel-card flex h-full flex-col gap-4 rounded-[16px] bg-card p-6">
                 <div className="flex items-start justify-between gap-3">
@@ -1419,47 +1393,12 @@ export default function HomePage() {
                 </p>
               </div>
 
-              {/* Docker all-in-one */}
-              <div className="panel-card flex h-full flex-col gap-4 rounded-[16px] bg-card p-6">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="space-y-2">
-                    <span className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
-                      02 · Local · one container
-                    </span>
-                    <h3 className="font-serif text-2xl font-black uppercase leading-tight tracking-[0.04em]">
-                      Docker all-in-one
-                    </h3>
-                  </div>
-                  <span className="inline-flex shrink-0 border-2 border-accent bg-accent px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-black">
-                    Full product
-                  </span>
-                </div>
-                <p className="text-sm leading-6 text-muted-foreground">
-                  The entire platform — UI, API, workers, PostgreSQL — in one
-                  container. One command, port 3000, zero config: the fastest
-                  way to run Classifyre on a workstation or a shared box
-                  without installing anything.
-                </p>
-                <CommandBlock label="Docker run" lines={dockerRunCommand} />
-                <div className="mt-auto pt-1">
-                  <Button
-                    asChild
-                    variant="secondary"
-                    className="w-full border-2 border-border"
-                  >
-                    <a href={dockerDocsUrl} target="_blank" rel="noreferrer">
-                      Docker docs
-                    </a>
-                  </Button>
-                </div>
-              </div>
-
               {/* Kubernetes */}
               <div className="panel-card flex h-full flex-col gap-4 rounded-[16px] bg-foreground p-6 text-primary-foreground">
                 <div className="flex items-start justify-between gap-3">
                   <div className="space-y-2">
                     <span className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-primary-foreground/55">
-                      03 · Remote · any size
+                      02 · Remote · any size
                     </span>
                     <h3 className="font-serif text-2xl font-black uppercase leading-tight tracking-[0.04em]">
                       Helm on Kubernetes
@@ -1498,7 +1437,7 @@ export default function HomePage() {
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                   <div className="space-y-2">
                     <span className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
-                      04 · When it becomes infrastructure
+                      03 · When it becomes infrastructure
                     </span>
                     <h3 className="font-serif text-3xl font-black uppercase leading-[0.95] tracking-[0.04em] sm:text-4xl">
                       A partnership,
@@ -1592,8 +1531,8 @@ export default function HomePage() {
                 </span>
               </h2>
               <p className="max-w-xl text-base leading-7 text-white/70">
-                Download the desktop app — or run one Docker command — point
-                it at a system you already run, and see what the investigator
+                Download the desktop app — or run one Docker command — point it
+                at a system you already run, and see what the investigator
                 finds. Everything stays on your machine, and everything you
                 build carries over when you go remote with Helm.
               </p>

@@ -15,7 +15,7 @@ interface SourceTypeSelectorProps {
 
 // Source types that scan the machine the API runs on. Only safe to expose in
 // the desktop (Electron) app or local development — never in a hosted /
-// kubernetes / docker deployment. Kept data-driven so filtering doesn't need
+// Kubernetes deployment. Kept data-driven so filtering doesn't need
 // per-type string checks scattered around the UI.
 const DESKTOP_ONLY_SOURCE_TYPES = new Set<string>(["LOCAL_FOLDER"]);
 
