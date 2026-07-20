@@ -49,6 +49,7 @@ describe('AssetService', () => {
     },
     runnerAsset: {
       findMany: jest.fn(),
+      findUnique: jest.fn(),
       updateMany: jest.fn(),
     },
     $transaction: jest.fn(),
@@ -95,6 +96,62 @@ describe('AssetService', () => {
 
   it('should be defined', () => {
     expect(service).toBeDefined();
+  });
+
+  describe('getAssetById status (R-11)', () => {
+    const baseAsset = {
+      id: 'asset-1',
+      hash: 'hash-1',
+      checksum: 'chk-1',
+      name: 'memo.txt',
+      runnerId: 'runner-1',
+      status: AssetStatus.UNCHANGED,
+      links: [],
+      metadata: {},
+    };
+
+    beforeEach(() => {
+      mockPrismaService.asset.findUnique.mockResolvedValue(baseAsset);
+    });
+
+    it('reports NEW for a first-seen asset whose run change_type is CREATED', async () => {
+      // Stored status is a stale UNCHANGED (second ingest pass), but the run
+      // recorded CREATED — get_asset must agree with the run summary.
+      mockPrismaService.runnerAsset.findUnique.mockResolvedValue({
+        changeType: 'CREATED',
+      });
+
+      const result = await service.getAssetById('asset-1');
+
+      expect(result?.status).toBe(AssetStatus.NEW);
+      expect(mockPrismaService.runnerAsset.findUnique).toHaveBeenCalledWith({
+        where: {
+          runnerId_assetHash: { runnerId: 'runner-1', assetHash: 'hash-1' },
+        },
+        select: { changeType: true },
+      });
+    });
+
+    it('falls back to the stored status when there is no runner_asset change_type', async () => {
+      mockPrismaService.runnerAsset.findUnique.mockResolvedValue(null);
+
+      const result = await service.getAssetById('asset-1');
+
+      expect(result?.status).toBe(AssetStatus.UNCHANGED);
+    });
+
+    it('does not query runner_assets for an asset that was never scanned', async () => {
+      mockPrismaService.asset.findUnique.mockResolvedValue({
+        ...baseAsset,
+        runnerId: null,
+        status: AssetStatus.NEW,
+      });
+
+      const result = await service.getAssetById('asset-1');
+
+      expect(result?.status).toBe(AssetStatus.NEW);
+      expect(mockPrismaService.runnerAsset.findUnique).not.toHaveBeenCalled();
+    });
   });
 
   describe('searchAssets', () => {

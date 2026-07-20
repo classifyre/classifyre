@@ -38,6 +38,19 @@ import { QueryEmbeddingService } from './embedding/query-embedding.service';
 import { EmbeddingQueueService } from './embedding/embedding-queue.service';
 import { SemanticSearchMode } from './dto/search-findings-request.dto';
 
+/**
+ * Maps a run's per-asset change_type onto the asset-level status enum so a
+ * single asset reports the same outcome the run summary counts (R-11). CREATED
+ * has no direct AssetStatus member — a newly created asset's status is NEW.
+ */
+const CHANGE_TYPE_TO_ASSET_STATUS: Record<RunnerAssetChangeType, AssetStatus> =
+  {
+    [RunnerAssetChangeType.CREATED]: AssetStatus.NEW,
+    [RunnerAssetChangeType.UPDATED]: AssetStatus.UPDATED,
+    [RunnerAssetChangeType.UNCHANGED]: AssetStatus.UNCHANGED,
+    [RunnerAssetChangeType.DELETED]: AssetStatus.DELETED,
+  };
+
 const findingForAssetSelect = {
   id: true,
   detectionIdentity: true,
@@ -752,9 +765,41 @@ export class AssetService {
 
     return {
       ...asset,
+      status: await this.effectiveAssetStatus(asset),
       links: this.normalizeLinks(asset.links),
       metadata: this.metadataRecord(asset.metadata),
     };
+  }
+
+  /**
+   * The status to report for a single asset. `Asset.status` is the asset's
+   * *current* row state and can be stale for the very run that created it: the
+   * CLI's two-pass ingest writes a CREATED asset, then the second pass sees an
+   * identical checksum and flips the stored status to UNCHANGED — so a
+   * first-seen asset ends up reporting UNCHANGED while the run summary correctly
+   * reports assetsCreated (R-11). The run summary reads runner_assets.change_type,
+   * which records what a run actually did and is never rewritten by a later run;
+   * derive the reported status from that same per-run fact so the two views
+   * agree. Falls back to the stored status when there is no runner_asset row
+   * (e.g. rows written before change_type existed, or an asset never scanned).
+   */
+  private async effectiveAssetStatus(asset: {
+    runnerId: string | null;
+    hash: string;
+    status: AssetStatus;
+  }): Promise<AssetStatus> {
+    if (!asset.runnerId) return asset.status;
+    const runnerAsset = await this.prisma.runnerAsset.findUnique({
+      where: {
+        runnerId_assetHash: {
+          runnerId: asset.runnerId,
+          assetHash: asset.hash,
+        },
+      },
+      select: { changeType: true },
+    });
+    if (!runnerAsset?.changeType) return asset.status;
+    return CHANGE_TYPE_TO_ASSET_STATUS[runnerAsset.changeType];
   }
 
   assets(params: {

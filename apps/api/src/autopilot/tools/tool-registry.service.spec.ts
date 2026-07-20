@@ -47,6 +47,7 @@ describe('ToolRegistry', () => {
       {} as MaskedConfigCryptoService,
       {} as DecisionApplierService,
       {} as CliRunnerService,
+      {} as NotificationsService,
     ),
     new DetectorToolset(
       {} as CustomDetectorsService,

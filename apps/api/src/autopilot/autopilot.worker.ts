@@ -457,7 +457,49 @@ export class AutopilotWorker implements OnApplicationBootstrap {
       this.logger.error(
         `${agentKind} agent run ${run.id} failed: ${error instanceof Error ? error.message : String(error)}`,
       );
+      // Surface when this kind is failing far more than its siblings — the
+      // signal that the failure is agent-specific (e.g. model/routing scoped to
+      // one kind) rather than a provider-wide outage. Advisory; never blocks.
+      await this.warnOnKindFailureDivergence(agentKind, run.id);
       throw error;
+    }
+  }
+
+  /**
+   * Emit a loud, queryable warning when one agent kind's recent failure rate
+   * diverges from its siblings — e.g. CASE runs failing on "model not found"
+   * while every other kind succeeds on the same provider. Best-effort: a
+   * failure to compute the signal must never mask the original run failure.
+   */
+  private async warnOnKindFailureDivergence(
+    kind: AgentKind,
+    runId: string,
+  ): Promise<void> {
+    try {
+      const d = await this.audit.checkKindFailureDivergence(kind);
+      if (!d) return;
+      const pct = (n: number): string => `${Math.round(n * 100)}%`;
+      await this.log.error(
+        runId,
+        'TECHNICAL',
+        `Agent-kind failure divergence: ${kind} is failing ${pct(d.kindFailureRate)} ` +
+          `of recent runs vs ${pct(d.siblingFailureRate)} for other kinds — likely ` +
+          `an issue scoped to ${kind}, not a provider-wide outage.`,
+        {
+          kind,
+          kindFailureRate: d.kindFailureRate,
+          siblingFailureRate: d.siblingFailureRate,
+          kindRuns: d.kindRuns,
+          siblingRuns: d.siblingRuns,
+        },
+      );
+      this.logger.warn(
+        `Agent-kind failure divergence: ${kind} ${pct(d.kindFailureRate)} vs siblings ${pct(d.siblingFailureRate)}`,
+      );
+    } catch (err) {
+      this.logger.warn(
+        `Failed to compute agent-kind failure divergence for ${kind}: ${err instanceof Error ? err.message : String(err)}`,
+      );
     }
   }
 

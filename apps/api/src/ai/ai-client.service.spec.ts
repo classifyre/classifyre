@@ -3,6 +3,8 @@ import { AiClientService } from './ai-client.service';
 import {
   AiAuthError,
   AiConfigError,
+  AiModelNotFoundError,
+  AiProviderError,
   AiRateLimitError,
   AiSchemaError,
 } from './errors';
@@ -153,6 +155,38 @@ describe('AiClientService', () => {
           rateLimitRetries: 0,
         }),
       ).rejects.toBeInstanceOf(AiRateLimitError);
+      expect(mockProviderComplete).toHaveBeenCalledTimes(1);
+    });
+
+    it('retries a no-body 404 (transient gateway miss) then succeeds', async () => {
+      // Fire the backoff delay immediately so the retry runs without real waits.
+      const timeoutSpy = jest
+        .spyOn(global, 'setTimeout')
+        .mockImplementation(((cb: () => void) => {
+          cb();
+          return 0 as unknown as ReturnType<typeof setTimeout>;
+        }) as typeof setTimeout);
+      mockProviderComplete
+        .mockRejectedValueOnce(new AiProviderError('404 (no body)', 404))
+        .mockResolvedValueOnce('Recovered');
+
+      const result = await service.completeText([
+        { role: 'user', content: 'hi' },
+      ]);
+
+      expect(result.content).toBe('Recovered');
+      expect(mockProviderComplete).toHaveBeenCalledTimes(2);
+      timeoutSpy.mockRestore();
+    });
+
+    it('never retries AiModelNotFoundError (genuine missing model)', async () => {
+      mockProviderComplete.mockRejectedValueOnce(
+        new AiModelNotFoundError('OpenAI model not found.'),
+      );
+
+      await expect(
+        service.completeText([{ role: 'user', content: 'hi' }]),
+      ).rejects.toBeInstanceOf(AiModelNotFoundError);
       expect(mockProviderComplete).toHaveBeenCalledTimes(1);
     });
   });

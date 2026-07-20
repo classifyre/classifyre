@@ -191,6 +191,11 @@ export class AiClientService {
           err instanceof AiRateLimitError ||
           (err instanceof AiProviderError &&
             (err.statusCode === undefined ||
+              // A no-body 404 from an OpenAI-compatible gateway is a transient
+              // routing/cold-start miss (a genuine missing model surfaces as
+              // AiModelNotFoundError, which is never retried). Give it the same
+              // backoff as a 5xx rather than killing the run on first contact.
+              err.statusCode === 404 ||
               err.statusCode === 429 ||
               err.statusCode >= 500));
         if (!retryable || attempt >= retries) throw err;

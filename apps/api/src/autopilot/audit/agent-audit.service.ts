@@ -307,6 +307,70 @@ export class AgentAuditService {
     return true;
   }
 
+  /**
+   * Compare one agent kind's recent failure rate against its siblings. Returns
+   * a divergence report when the kind fails materially more often than the
+   * other kinds over the same recent window — the signal that a failure is
+   * agent-specific (e.g. a model/routing problem scoped to one kind) rather
+   * than a provider-wide outage. Null when there isn't enough evidence or no
+   * meaningful divergence. Advisory only: it never changes run outcome.
+   */
+  async checkKindFailureDivergence(
+    kind: AgentKind,
+    windowSize = 20,
+  ): Promise<{
+    kind: AgentKind;
+    kindFailureRate: number;
+    siblingFailureRate: number;
+    kindRuns: number;
+    siblingRuns: number;
+  } | null> {
+    const terminal = [
+      AgentRunStatus.COMPLETED,
+      AgentRunStatus.FAILED,
+      AgentRunStatus.SKIPPED,
+      AgentRunStatus.CANCELLED,
+    ];
+    const [kindRuns, siblingRuns] = await Promise.all([
+      this.prisma.agentRun.findMany({
+        where: { agentKind: kind, status: { in: terminal } },
+        orderBy: { createdAt: 'desc' },
+        take: windowSize,
+        select: { status: true },
+      }),
+      this.prisma.agentRun.findMany({
+        where: { agentKind: { not: kind }, status: { in: terminal } },
+        orderBy: { createdAt: 'desc' },
+        take: windowSize,
+        select: { status: true },
+      }),
+    ]);
+
+    // Need a few of each to say anything; otherwise noise dominates.
+    if (kindRuns.length < 3 || siblingRuns.length < 3) return null;
+
+    const rate = (rows: { status: AgentRunStatus }[]): number =>
+      rows.filter((r) => r.status === AgentRunStatus.FAILED).length /
+      rows.length;
+    const kindFailureRate = rate(kindRuns);
+    const siblingFailureRate = rate(siblingRuns);
+
+    // Diverges when this kind fails much more than its siblings AND siblings
+    // are largely healthy (a provider-wide outage fails everyone, so it is not
+    // a divergence and stays quiet).
+    const diverges =
+      kindFailureRate - siblingFailureRate >= 0.3 && siblingFailureRate <= 0.2;
+    if (!diverges) return null;
+
+    return {
+      kind,
+      kindFailureRate,
+      siblingFailureRate,
+      kindRuns: kindRuns.length,
+      siblingRuns: siblingRuns.length,
+    };
+  }
+
   async hasDecision(runId: string, dedupeKey: string): Promise<boolean> {
     const found = await this.prisma.agentDecision.findFirst({
       where: { runId, payload: { path: ['_dedupeKey'], equals: dedupeKey } },
