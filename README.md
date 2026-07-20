@@ -1,20 +1,20 @@
 <div align="center">
   <img src=".github/assets/classifyre_icon.png" alt="Classifyre" width="96" />
 
-  # Classifyre
- ## Open-Source Investigation Platform
+# Classifyre
 
-  **Detect. Investigate. Resolve.**
+## Open-Source Investigation Platform
 
-  [![CI](https://img.shields.io/github/actions/workflow/status/classifyre/classifyre/ci.yml?branch=develop&style=flat-square&label=CI&logo=github)](https://github.com/classifyre/classifyre/actions/workflows/ci.yml)
-  [![Release](https://img.shields.io/github/v/release/classifyre/classifyre?sort=semver&style=flat-square&label=release)](https://github.com/classifyre/classifyre/releases/latest)
-  [![License](https://img.shields.io/github/license/classifyre/classifyre?style=flat-square)](LICENSE)
-  [![Docker Pulls](https://img.shields.io/docker/pulls/classifyre/all-in-one?style=flat-square&logo=docker&label=docker%20pulls)](https://hub.docker.com/r/classifyre/all-in-one)
-  [![Docs](https://img.shields.io/badge/docs-classifyre.com-1f6feb?style=flat-square)](https://docs.classifyre.com/)
+**Detect. Investigate. Resolve.**
 
-  Classifyre turns the data scattered across the systems you already run into **investigations you can act on**. Connect a source, let detectors surface the evidence, and work the results like an analyst — standing questions, duplicate detection, cases, and hypotheses — with an **AI autopilot** doing the legwork in between.
+[![CI](https://img.shields.io/github/actions/workflow/status/classifyre/classifyre/ci.yml?branch=develop&style=flat-square&label=CI&logo=github)](https://github.com/classifyre/classifyre/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/classifyre/classifyre?sort=semver&style=flat-square&label=release)](https://github.com/classifyre/classifyre/releases/latest)
+[![License](https://img.shields.io/github/license/classifyre/classifyre?style=flat-square)](LICENSE)
+[![Docs](https://img.shields.io/badge/docs-classifyre.com-1f6feb?style=flat-square)](https://docs.classifyre.com/)
 
-  [Documentation](https://docs.classifyre.com/) · [Live Demo](https://demo.classifyre.com/)
+Classifyre turns the data scattered across the systems you already run into **investigations you can act on**. Connect a source, let detectors surface the evidence, and work the results like an analyst — standing questions, duplicate detection, cases, and hypotheses — with an **AI autopilot** doing the legwork in between.
+
+[Documentation](https://docs.classifyre.com/) · [Live Demo](https://demo.classifyre.com/)
 
 </div>
 
@@ -24,15 +24,15 @@
 
 It's more than a scanner. Detection is the first step; the value is in turning raw findings into resolved investigations.
 
-| Capability | What it means | Docs |
-|---|---|---|
-| **Sources** | Connect databases, lakehouses, storage, collaboration tools, and content platforms — no data migration. Choose sampling while image OCR and audio/video transcription run automatically. | [Sources](https://docs.classifyre.com/sources/) |
-| **Detectors** | Ready-made packs (secrets, PII, security) plus custom detectors you build — from a regex to an LLM, across text and images. | [Detectors](https://docs.classifyre.com/detectors/) |
-| **Findings** | Every signal a detector raises, with severity, confidence, and a lifecycle tracked across scans. | [Findings](https://docs.classifyre.com/detectors/findings/) |
-| **Inquiries** | Saved questions that keep surfacing matching findings, scan after scan. | [Inquiries](https://docs.classifyre.com/flow/investigations/inquiry/) |
-| **Fingerprints** | Deterministic duplicate and similarity detection that links the same entity across systems into clusters. | [Fingerprints](https://docs.classifyre.com/flow/investigations/fingerprints/) |
-| **Cases & hypotheses** | Workspaces that collect evidence, weigh competing explanations, and reach a conclusion. | [Cases](https://docs.classifyre.com/flow/investigations/cases/) |
-| **Autopilot** | AI agents that open inquiries, maintain fingerprints, build cases, and draft hypotheses after every scan — explaining every move. | [Autopilot](https://docs.classifyre.com/flow/investigations/autopilot/) |
+| Capability             | What it means                                                                                                                                                                            | Docs                                                                          |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| **Sources**            | Connect databases, lakehouses, storage, collaboration tools, and content platforms — no data migration. Choose sampling while image OCR and audio/video transcription run automatically. | [Sources](https://docs.classifyre.com/sources/)                               |
+| **Detectors**          | Ready-made packs (secrets, PII, security) plus custom detectors you build — from a regex to an LLM, across text and images.                                                              | [Detectors](https://docs.classifyre.com/detectors/)                           |
+| **Findings**           | Every signal a detector raises, with severity, confidence, and a lifecycle tracked across scans.                                                                                         | [Findings](https://docs.classifyre.com/detectors/findings/)                   |
+| **Inquiries**          | Saved questions that keep surfacing matching findings, scan after scan.                                                                                                                  | [Inquiries](https://docs.classifyre.com/flow/investigations/inquiry/)         |
+| **Fingerprints**       | Deterministic duplicate and similarity detection that links the same entity across systems into clusters.                                                                                | [Fingerprints](https://docs.classifyre.com/flow/investigations/fingerprints/) |
+| **Cases & hypotheses** | Workspaces that collect evidence, weigh competing explanations, and reach a conclusion.                                                                                                  | [Cases](https://docs.classifyre.com/flow/investigations/cases/)               |
+| **Autopilot**          | AI agents that open inquiries, maintain fingerprints, build cases, and draft hypotheses after every scan — explaining every move.                                                        | [Autopilot](https://docs.classifyre.com/flow/investigations/autopilot/)       |
 
 ## How it all connects
 
@@ -52,17 +52,15 @@ for you. The end-to-end journey is documented in [Flow](https://docs.classifyre.
 
 ## Try it locally
 
-Bring up the full product locally in one Docker command. Use it for testing, demos, and first-touch evaluation. Not the production topology — the fastest way to explore everything Classifyre can do.
+Run the production Helm chart locally on k3d with Skaffold:
 
 ```bash
-docker pull classifyre/all-in-one:latest
-docker run --rm -p 3000:3000 \
-  classifyre/all-in-one:latest
+./scripts/dev/create-cluster.sh
+./scripts/dev/start.sh
 ```
 
-Open [http://localhost:3000](http://localhost:3000). Full product, zero config.
-
-> More options: [docs.classifyre.com/deployment/docker](https://docs.classifyre.com/deployment/docker/)
+Open [http://localhost:3000](http://localhost:3000), or install the desktop app
+from the [latest release](https://github.com/classifyre/classifyre/releases/latest).
 
 ## Production deployment
 
@@ -85,15 +83,15 @@ Classifyre is a distributed, decoupled platform: a **Web UI** and **API/Orchestr
 
 This is a [Turborepo](https://turbo.build/) monorepo managed with [bun](https://bun.sh/).
 
-| Path | Stack | Purpose |
-|---|---|---|
-| `apps/web` | Next.js 16 · React 19 | The product Web UI |
-| `apps/api` | NestJS · Fastify | API, orchestrator, and the Autopilot harness |
-| `apps/cli` | Python · `uv` | The scan runner (extraction + detection) |
-| `apps/docs` | Nextra | The documentation site ([docs.classifyre.com](https://docs.classifyre.com/)) |
-| `apps/blog` | Next.js | The marketing site |
-| `packages/schemas` | JSON Schema | Shared source/detector schemas (cross-language) |
-| `packages/ui` | shadcn/ui | Shared UI components |
+| Path               | Stack                 | Purpose                                                                      |
+| ------------------ | --------------------- | ---------------------------------------------------------------------------- |
+| `apps/web`         | Next.js 16 · React 19 | The product Web UI                                                           |
+| `apps/api`         | NestJS · Fastify      | API, orchestrator, and the Autopilot harness                                 |
+| `apps/cli`         | Python · `uv`         | The scan runner (extraction + detection)                                     |
+| `apps/docs`        | Nextra                | The documentation site ([docs.classifyre.com](https://docs.classifyre.com/)) |
+| `apps/blog`        | Next.js               | The marketing site                                                           |
+| `packages/schemas` | JSON Schema           | Shared source/detector schemas (cross-language)                              |
+| `packages/ui`      | shadcn/ui             | Shared UI components                                                         |
 
 ### Development
 
@@ -105,6 +103,10 @@ bun lint         # lint every workspace
 ```
 
 Target a single app with a Turborepo filter, e.g. `bun --filter web dev` or `bun --filter api test`.
+
+For a production-like Kubernetes development loop with k3d, Skaffold, Helm,
+source mounts, and container-native hot reload, see
+[`docs/development/skaffold.md`](docs/development/skaffold.md).
 
 ---
 

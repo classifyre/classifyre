@@ -1213,7 +1213,6 @@ export class CliRunnerService implements OnApplicationBootstrap {
   private getCliPath(environment: string): string {
     const configuredPath = process.env.CLI_PATH;
     const defaultDevelopmentCliPath = path.join(__dirname, '../../../cli');
-    const defaultDockerCliPath = '/app/cli';
 
     const resolveCliPath = (rawPath: string): string => {
       if (path.isAbsolute(rawPath)) {
@@ -1240,10 +1239,8 @@ export class CliRunnerService implements OnApplicationBootstrap {
       case 'development':
       case 'desktop':
         return resolveCliPath(configuredPath || defaultDevelopmentCliPath);
-      case 'docker':
-        return resolveCliPath(configuredPath || defaultDockerCliPath);
       case 'kubernetes':
-        throw new Error('Kubernetes mode not implemented yet');
+        throw new Error('Kubernetes CLI execution must use a Kubernetes Job');
       default:
         throw new Error(`Unknown environment: ${environment}`);
     }
@@ -1373,9 +1370,6 @@ export class CliRunnerService implements OnApplicationBootstrap {
       return explicit;
     }
 
-    if (environment === 'docker') {
-      return 'http://127.0.0.1:8000';
-    }
     if (environment === 'desktop') {
       const port = process.env.PORT || '8000';
       return `http://127.0.0.1:${port}`;

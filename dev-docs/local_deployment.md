@@ -7,7 +7,7 @@ The CI pipeline (`.github/workflows/ci.yml`) has two jobs:
 1. **validate** — installs deps, generates code, lints, typechecks, builds, tests, and uploads
    pre-built artifacts (api-dist, codegen, web-dist) to the artifact server.
 2. **docker** — downloads those artifacts and runs `docker buildx build --push` for each of the
-   four images: `all-in-one`, `web`, `api`, `cli`.
+   three Kubernetes workload images: `web`, `api`, and `cli`.
 
 Images are pushed to GHCR with a tag derived from the branch name (slashes replaced with `-`):
 

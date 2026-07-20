@@ -64,7 +64,7 @@ const START_HERE: Array<{
     blurb:
       "Stand the platform up, connect your first system, and watch the first scan land — on a laptop or in production.",
     links: [
-      { text: "Docker in one container", href: "/deployment/docker/" },
+      { text: "Deploy with Kubernetes", href: "/deployment/kubernetes/" },
       { text: "Connect a source", href: "/sources/" },
       { text: "Your first scan", href: "/flow/" },
     ],
@@ -125,7 +125,7 @@ const DIRECTORY: Array<{ name: string; blurb: string; href: string }> = [
   },
   {
     name: "Deployment",
-    blurb: "Docker for a laptop, Kubernetes for production. Your infra.",
+    blurb: "Helm deployment for local and production Kubernetes clusters.",
     href: "/deployment/",
   },
 ];
@@ -144,7 +144,8 @@ export function DocsHome() {
         >
           Scattered data
           <br />
-          in. <span className="bg-accent px-2 text-accent-foreground">
+          in.{" "}
+          <span className="bg-accent px-2 text-accent-foreground">
             Closed cases
           </span>{" "}
           out.
@@ -163,10 +164,10 @@ export function DocsHome() {
             Start: how it works →
           </Link>
           <Link
-            href="/deployment/docker/"
+            href="/deployment/kubernetes/"
             className="border-2 border-border bg-background px-5 py-2.5 font-mono text-sm font-bold uppercase tracking-[0.12em] text-foreground transition-colors hover:bg-foreground hover:text-background"
           >
-            Install with Docker
+            Install with Helm
           </Link>
         </div>
       </header>

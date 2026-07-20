@@ -138,14 +138,13 @@ const docSections = [
     title: "Setup & Administration",
     badge: "ADMIN",
     description:
-      "Instance settings, AI provider credentials, and the MCP server — plus running Classifyre with Docker on a laptop or Kubernetes in production.",
+      "Instance settings, AI provider credentials, and the MCP server — plus running Classifyre on desktop or Kubernetes.",
     href: "/docs/settings/",
     items: [
       { label: "Settings & AI providers", href: "/docs/settings/" },
       { label: "MCP server", href: "/docs/settings/mcp-server/" },
-      { label: "Docker (try it out)", href: "/docs/deployment/docker/" },
       {
-        label: "Kubernetes (production)",
+        label: "Kubernetes deployment",
         href: "/docs/deployment/kubernetes/",
       },
     ],

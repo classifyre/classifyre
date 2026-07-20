@@ -1,0 +1,597 @@
+# Local k3d overrides. Production defaults and templates remain unchanged.
+api:
+  replicaCount: 1
+  autoscaling:
+    enabled: false
+  pdb:
+    enabled: false
+
+  image:
+    repository: oven/bun
+    tag: latest
+    pullPolicy: Always
+
+  embedding:
+    enabled: false
+
+  command: ["/bin/sh", "-lc"]
+  args:
+    - |
+      set -eu
+      cd /workspace
+      dependency_hash="$(sha256sum bun.lock package.json apps/api/package.json packages/schemas/package.json apps/api/prisma/schema.prisma | sha256sum | cut -d ' ' -f 1)"
+      marker="/var/cache/classifyre/bun/dependencies-${dependency_hash}"
+      if [ ! -f "${marker}" ]; then
+        while ! mkdir /var/cache/classifyre/bun/install.lock 2>/dev/null; do sleep 0.2; done
+        trap 'rmdir /var/cache/classifyre/bun/install.lock 2>/dev/null || true' EXIT
+        if [ ! -f "${marker}" ]; then
+          bun install --frozen-lockfile --filter @classifyre/api
+          cd /workspace/apps/api
+          bun run prisma:generate
+          touch "${marker}"
+          cd /workspace
+        fi
+        rmdir /var/cache/classifyre/bun/install.lock
+        trap - EXIT
+      else
+        while [ -d /var/cache/classifyre/bun/install.lock ]; do sleep 0.2; done
+      fi
+      cd /workspace/apps/api
+      export DATABASE_URL="postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=${DB_SSLMODE}"
+      until bun -e 'const net = require("net"); const socket = net.connect(Number(process.env.DB_PORT), process.env.DB_HOST, () => { socket.end(); process.exit(0); }); socket.on("error", () => process.exit(1)); setTimeout(() => process.exit(1), 1000);'; do
+        echo "Waiting for PostgreSQL at ${DB_HOST}:${DB_PORT}"
+        sleep 1
+      done
+      exec bun --watch src/main.ts
+
+  env:
+    NODE_ENV: development
+    PORT: "8000"
+    ENVIRONMENT: kubernetes
+    HOME: /tmp
+    BUN_INSTALL_CACHE_DIR: /var/cache/classifyre/bun/install
+    TEMP_DIR: /tmp
+    RUNNER_LOGS_DIR: /tmp/classifyre/runner-logs
+    MAX_RUNNERS_PER_SOURCE: "5"
+    MAX_CONCURRENT_RUNNERS: "2"
+    DEMO_MODE: "false"
+
+  extraVolumeMounts:
+    - name: development-source
+      mountPath: /workspace/package.json
+      subPath: package.json
+      readOnly: true
+    - name: development-source
+      mountPath: /workspace/bun.lock
+      subPath: bun.lock
+      readOnly: true
+    - name: development-source
+      mountPath: /workspace/turbo.json
+      subPath: turbo.json
+      readOnly: true
+    - name: development-source
+      mountPath: /workspace/patches
+      subPath: patches
+      readOnly: true
+    - name: development-source
+      mountPath: /workspace/apps/api/package.json
+      subPath: apps/api/package.json
+      readOnly: true
+    - name: development-source
+      mountPath: /workspace/apps/blog/package.json
+      subPath: apps/blog/package.json
+      readOnly: true
+    - name: development-source
+      mountPath: /workspace/apps/cli/package.json
+      subPath: apps/cli/package.json
+      readOnly: true
+    - name: development-source
+      mountPath: /workspace/apps/desktop/package.json
+      subPath: apps/desktop/package.json
+      readOnly: true
+    - name: development-source
+      mountPath: /workspace/apps/docs/package.json
+      subPath: apps/docs/package.json
+      readOnly: true
+    - name: development-source
+      mountPath: /workspace/apps/e2e/package.json
+      subPath: apps/e2e/package.json
+      readOnly: true
+    - name: development-source
+      mountPath: /workspace/apps/web/package.json
+      subPath: apps/web/package.json
+      readOnly: true
+    - name: development-source
+      mountPath: /workspace/packages/api-client/package.json
+      subPath: packages/api-client/package.json
+      readOnly: true
+    - name: development-source
+      mountPath: /workspace/packages/devops/package.json
+      subPath: packages/devops/package.json
+      readOnly: true
+    - name: development-source
+      mountPath: /workspace/packages/eslint-config/package.json
+      subPath: packages/eslint-config/package.json
+      readOnly: true
+    - name: development-source
+      mountPath: /workspace/packages/schemas/package.json
+      subPath: packages/schemas/package.json
+      readOnly: true
+    - name: development-source
+      mountPath: /workspace/packages/typescript-config/package.json
+      subPath: packages/typescript-config/package.json
+      readOnly: true
+    - name: development-source
+      mountPath: /workspace/packages/ui/package.json
+      subPath: packages/ui/package.json
+      readOnly: true
+    - name: development-source
+      mountPath: /workspace/apps/api/src
+      subPath: apps/api/src
+      readOnly: true
+    - name: development-source
+      mountPath: /workspace/apps/api/prisma
+      subPath: apps/api/prisma
+      readOnly: true
+    - name: development-source
+      mountPath: /workspace/apps/api/prisma.config.ts
+      subPath: apps/api/prisma.config.ts
+      readOnly: true
+    - name: development-source
+      mountPath: /workspace/apps/api/nest-cli.json
+      subPath: apps/api/nest-cli.json
+      readOnly: true
+    - name: development-source
+      mountPath: /workspace/apps/api/tsconfig.json
+      subPath: apps/api/tsconfig.json
+      readOnly: true
+    - name: development-source
+      mountPath: /workspace/apps/api/tsconfig.build.json
+      subPath: apps/api/tsconfig.build.json
+      readOnly: true
+    - name: development-source
+      mountPath: /workspace/packages/schemas/src
+      subPath: packages/schemas/src
+      readOnly: true
+    - name: development-source
+      mountPath: /workspace/packages/eslint-config/base.js
+      subPath: packages/eslint-config/base.js
+      readOnly: true
+    - name: development-source
+      mountPath: /workspace/packages/typescript-config/base.json
+      subPath: packages/typescript-config/base.json
+      readOnly: true
+    - name: api-root-node-modules
+      mountPath: /workspace/node_modules
+    - name: api-node-modules
+      mountPath: /workspace/apps/api/node_modules
+    - name: api-schemas-node-modules
+      mountPath: /workspace/packages/schemas/node_modules
+    - name: api-eslint-node-modules
+      mountPath: /workspace/packages/eslint-config/node_modules
+    - name: api-typescript-config-node-modules
+      mountPath: /workspace/packages/typescript-config/node_modules
+    - name: api-bun-cache
+      mountPath: /var/cache/classifyre/bun
+  extraVolumes:
+    - name: development-source
+      hostPath:
+        path: /var/lib/classifyre/source
+        type: Directory
+    - name: api-root-node-modules
+      hostPath:
+        path: /var/lib/classifyre/cache/api/root-node-modules
+        type: Directory
+    - name: api-node-modules
+      hostPath:
+        path: /var/lib/classifyre/cache/api/api-node-modules
+        type: Directory
+    - name: api-schemas-node-modules
+      hostPath:
+        path: /var/lib/classifyre/cache/api/schemas-node-modules
+        type: Directory
+    - name: api-eslint-node-modules
+      hostPath:
+        path: /var/lib/classifyre/cache/api/eslint-node-modules
+        type: Directory
+    - name: api-typescript-config-node-modules
+      hostPath:
+        path: /var/lib/classifyre/cache/api/typescript-config-node-modules
+        type: Directory
+    - name: api-bun-cache
+      hostPath:
+        path: /var/lib/classifyre/cache/api/bun
+        type: Directory
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: "2"
+      memory: 4Gi
+
+  affinity: {}
+  topologySpreadConstraints: []
+  livenessProbe:
+    enabled: false
+  readinessProbe:
+    enabled: true
+    initialDelaySeconds: 2
+    periodSeconds: 5
+  startupProbe:
+    enabled: true
+    periodSeconds: 2
+    failureThreshold: 90
+
+  # With the init-container disabled, the API's existing Kubernetes startup
+  # path applies pending migrations using the same source-mounted runtime.
+  migration:
+    enabled: false
+
+  cliJobs:
+    enabled: true
+    image:
+      repository: classifyre/cli
+      tag: latest
+      pullPolicy: Always
+    workDir: /app/apps/cli
+    cleanupPolicy: failed
+    backoffLimit: 0
+    extraVolumeMounts:
+      - name: cli-development-source
+        mountPath: /app/apps/cli/src
+        readOnly: true
+      - name: schemas-development-source
+        mountPath: /app/packages/schemas/src
+        readOnly: true
+    extraVolumes:
+      - name: cli-development-source
+        hostPath:
+          path: /var/lib/classifyre/source/apps/cli/src
+          type: Directory
+      - name: schemas-development-source
+        hostPath:
+          path: /var/lib/classifyre/source/packages/schemas/src
+          type: Directory
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+        ephemeral-storage: 1Gi
+      limits:
+        cpu: "2"
+        memory: 4Gi
+        ephemeral-storage: 10Gi
+    uvCache:
+      enabled: true
+      accessModes: [ReadWriteOnce]
+      size: 5Gi
+      prune:
+        enabled: false
+
+worker:
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: "2"
+      memory: 4Gi
+
+frontend:
+  replicaCount: 1
+  autoscaling:
+    enabled: false
+  pdb:
+    enabled: false
+
+  image:
+    repository: oven/bun
+    tag: latest
+    pullPolicy: Always
+
+  command: ["/bin/sh", "-lc"]
+  args:
+    - |
+      set -eu
+      cd /workspace
+      dependency_hash="$(sha256sum bun.lock package.json apps/web/package.json packages/api-client/package.json packages/schemas/package.json packages/ui/package.json | sha256sum | cut -d ' ' -f 1)"
+      marker="/var/cache/classifyre/bun/dependencies-${dependency_hash}"
+      if [ ! -f "${marker}" ]; then
+        bun install --frozen-lockfile --filter @classifyre/web
+        touch "${marker}"
+      fi
+      cd /workspace/apps/web
+      exec bun --bun next dev --turbopack --hostname 0.0.0.0 --port 3000
+
+  service:
+    type: ClusterIP
+    port: 3000
+
+  env:
+    NODE_ENV: development
+    PORT: "3000"
+    HOSTNAME: 0.0.0.0
+    NEXT_PUBLIC_API_URL: /api
+
+  extraEnv:
+    - name: HOME
+      value: /tmp
+    - name: BUN_INSTALL_CACHE_DIR
+      value: /var/cache/classifyre/bun/install
+    - name: WATCHPACK_POLLING
+      value: "true"
+    - name: NEXT_TELEMETRY_DISABLED
+      value: "1"
+  extraVolumeMounts:
+    - name: development-source
+      mountPath: /workspace/package.json
+      subPath: package.json
+      readOnly: true
+    - name: development-source
+      mountPath: /workspace/bun.lock
+      subPath: bun.lock
+      readOnly: true
+    - name: development-source
+      mountPath: /workspace/turbo.json
+      subPath: turbo.json
+      readOnly: true
+    - name: development-source
+      mountPath: /workspace/patches
+      subPath: patches
+      readOnly: true
+    - name: development-source
+      mountPath: /workspace/apps/api/package.json
+      subPath: apps/api/package.json
+      readOnly: true
+    - name: development-source
+      mountPath: /workspace/apps/blog/package.json
+      subPath: apps/blog/package.json
+      readOnly: true
+    - name: development-source
+      mountPath: /workspace/apps/cli/package.json
+      subPath: apps/cli/package.json
+      readOnly: true
+    - name: development-source
+      mountPath: /workspace/apps/desktop/package.json
+      subPath: apps/desktop/package.json
+      readOnly: true
+    - name: development-source
+      mountPath: /workspace/apps/docs/package.json
+      subPath: apps/docs/package.json
+      readOnly: true
+    - name: development-source
+      mountPath: /workspace/apps/e2e/package.json
+      subPath: apps/e2e/package.json
+      readOnly: true
+    - name: development-source
+      mountPath: /workspace/apps/web/package.json
+      subPath: apps/web/package.json
+      readOnly: true
+    - name: development-source
+      mountPath: /workspace/packages/api-client/package.json
+      subPath: packages/api-client/package.json
+      readOnly: true
+    - name: development-source
+      mountPath: /workspace/packages/devops/package.json
+      subPath: packages/devops/package.json
+      readOnly: true
+    - name: development-source
+      mountPath: /workspace/packages/eslint-config/package.json
+      subPath: packages/eslint-config/package.json
+      readOnly: true
+    - name: development-source
+      mountPath: /workspace/packages/schemas/package.json
+      subPath: packages/schemas/package.json
+      readOnly: true
+    - name: development-source
+      mountPath: /workspace/packages/typescript-config/package.json
+      subPath: packages/typescript-config/package.json
+      readOnly: true
+    - name: development-source
+      mountPath: /workspace/packages/ui/package.json
+      subPath: packages/ui/package.json
+      readOnly: true
+    - name: development-source
+      mountPath: /workspace/apps/web/app
+      subPath: apps/web/app
+      readOnly: true
+    - name: development-source
+      mountPath: /workspace/apps/web/components
+      subPath: apps/web/components
+      readOnly: true
+    - name: development-source
+      mountPath: /workspace/apps/web/hooks
+      subPath: apps/web/hooks
+      readOnly: true
+    - name: development-source
+      mountPath: /workspace/apps/web/i18n
+      subPath: apps/web/i18n
+      readOnly: true
+    - name: development-source
+      mountPath: /workspace/apps/web/lib
+      subPath: apps/web/lib
+      readOnly: true
+    - name: development-source
+      mountPath: /workspace/apps/web/public
+      subPath: apps/web/public
+      readOnly: true
+    - name: development-source
+      mountPath: /workspace/apps/web/types
+      subPath: apps/web/types
+      readOnly: true
+    - name: development-source
+      mountPath: /workspace/apps/web/instrumentation.ts
+      subPath: apps/web/instrumentation.ts
+      readOnly: true
+    - name: development-source
+      mountPath: /workspace/apps/web/next.config.mjs
+      subPath: apps/web/next.config.mjs
+      readOnly: true
+    - name: development-source
+      mountPath: /workspace/apps/web/postcss.config.mjs
+      subPath: apps/web/postcss.config.mjs
+      readOnly: true
+    - name: development-source
+      mountPath: /workspace/apps/web/tsconfig.json
+      subPath: apps/web/tsconfig.json
+      readOnly: true
+    - name: development-source
+      mountPath: /workspace/packages/api-client/src
+      subPath: packages/api-client/src
+      readOnly: true
+    - name: development-source
+      mountPath: /workspace/packages/api-client/tsconfig.json
+      subPath: packages/api-client/tsconfig.json
+      readOnly: true
+    - name: development-source
+      mountPath: /workspace/packages/schemas/src
+      subPath: packages/schemas/src
+      readOnly: true
+    - name: development-source
+      mountPath: /workspace/packages/ui/src
+      subPath: packages/ui/src
+      readOnly: true
+    - name: development-source
+      mountPath: /workspace/packages/ui/tsconfig.json
+      subPath: packages/ui/tsconfig.json
+      readOnly: true
+    - name: development-source
+      mountPath: /workspace/packages/ui/postcss.config.mjs
+      subPath: packages/ui/postcss.config.mjs
+      readOnly: true
+    - name: development-source
+      mountPath: /workspace/packages/typescript-config/base.json
+      subPath: packages/typescript-config/base.json
+      readOnly: true
+    - name: development-source
+      mountPath: /workspace/packages/typescript-config/nextjs.json
+      subPath: packages/typescript-config/nextjs.json
+      readOnly: true
+    - name: development-source
+      mountPath: /workspace/packages/typescript-config/react-library.json
+      subPath: packages/typescript-config/react-library.json
+      readOnly: true
+    - name: web-root-node-modules
+      mountPath: /workspace/node_modules
+    - name: web-node-modules
+      mountPath: /workspace/apps/web/node_modules
+    - name: web-api-client-node-modules
+      mountPath: /workspace/packages/api-client/node_modules
+    - name: web-schemas-node-modules
+      mountPath: /workspace/packages/schemas/node_modules
+    - name: web-ui-node-modules
+      mountPath: /workspace/packages/ui/node_modules
+    - name: web-eslint-node-modules
+      mountPath: /workspace/packages/eslint-config/node_modules
+    - name: web-typescript-config-node-modules
+      mountPath: /workspace/packages/typescript-config/node_modules
+    - name: web-bun-cache
+      mountPath: /var/cache/classifyre/bun
+    - name: web-next
+      mountPath: /workspace/apps/web/.next
+    - name: web-next-env
+      mountPath: /workspace/apps/web/next-env.d.ts
+  extraVolumes:
+    - name: development-source
+      hostPath:
+        path: /var/lib/classifyre/source
+        type: Directory
+    - name: web-root-node-modules
+      hostPath:
+        path: /var/lib/classifyre/cache/web/root-node-modules
+        type: Directory
+    - name: web-node-modules
+      hostPath:
+        path: /var/lib/classifyre/cache/web/web-node-modules
+        type: Directory
+    - name: web-api-client-node-modules
+      hostPath:
+        path: /var/lib/classifyre/cache/web/api-client-node-modules
+        type: Directory
+    - name: web-schemas-node-modules
+      hostPath:
+        path: /var/lib/classifyre/cache/web/schemas-node-modules
+        type: Directory
+    - name: web-ui-node-modules
+      hostPath:
+        path: /var/lib/classifyre/cache/web/ui-node-modules
+        type: Directory
+    - name: web-eslint-node-modules
+      hostPath:
+        path: /var/lib/classifyre/cache/web/eslint-node-modules
+        type: Directory
+    - name: web-typescript-config-node-modules
+      hostPath:
+        path: /var/lib/classifyre/cache/web/typescript-config-node-modules
+        type: Directory
+    - name: web-bun-cache
+      hostPath:
+        path: /var/lib/classifyre/cache/web/bun
+        type: Directory
+    - name: web-next
+      hostPath:
+        path: /var/lib/classifyre/cache/web/next
+        type: Directory
+    - name: web-next-env
+      hostPath:
+        path: /var/lib/classifyre/cache/web/next-env.d.ts
+        type: File
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: "2"
+      memory: 4Gi
+
+  affinity: {}
+  topologySpreadConstraints: []
+  livenessProbe:
+    enabled: false
+  readinessProbe:
+    enabled: true
+    initialDelaySeconds: 2
+    periodSeconds: 5
+  startupProbe:
+    enabled: true
+    periodSeconds: 2
+    failureThreshold: 90
+
+ingress:
+  enabled: true
+  className: nginx
+  host: classifyre.localhost
+
+postgres:
+  mode: embedded
+  embedded:
+    database: classifyre
+    username: postgres
+    password: postgres
+    persistence:
+      enabled: false
+    parameters:
+      shared_buffers: 128MB
+      work_mem: 8MB
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: "1"
+        memory: 1Gi
+
+networkPolicy:
+  enabled: false
+priorityClasses:
+  create: false
+telemetry:
+  enabled: false
+  instanceId:
+    enabled: false
+objectStorage:
+  enabled: false
