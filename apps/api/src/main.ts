@@ -15,19 +15,38 @@ import { McpServerFactoryService } from './mcp-server.factory';
 import { McpTokenService } from './mcp-token.service';
 import { InstanceSettingsService } from './instance-settings.service';
 import { PrismaExceptionFilter } from './filters/prisma-exception.filter';
-import { applyPendingDatabaseMigrations } from './database-migrations';
+import { applyAllPendingMigrations } from './database-migrations';
+import { ClsService } from 'nestjs-cls';
+import { NamespaceRegistryService } from './registry/namespace-registry.service';
+import {
+  namespaceRewriteUrl,
+  registerNamespaceHook,
+  type NamespaceRawRequest,
+} from './namespace/namespace-request.hook';
+import {
+  CLS_NAMESPACE_ID,
+  CLS_SCHEMA,
+  CLS_SLUG,
+} from './namespace/namespace.constants';
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
   const port = process.env.PORT ?? 8000;
 
-  await applyPendingDatabaseMigrations();
+  await applyAllPendingMigrations();
 
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule,
     // Leave room for multipart framing while @fastify/multipart enforces the
     // exact 50 MiB per-file limit below.
-    new FastifyAdapter({ bodyLimit: 51 * 1024 * 1024 }),
+    //
+    // `rewriteUrl` runs pre-routing and strips a leading `/<namespace-slug>` so
+    // the existing (namespace-blind) routes keep matching; the slug is resolved
+    // to a tenant schema by the onRequest hook registered below.
+    new FastifyAdapter({
+      bodyLimit: 51 * 1024 * 1024,
+      rewriteUrl: namespaceRewriteUrl,
+    }),
   );
 
   app.enableCors({
@@ -116,55 +135,82 @@ async function bootstrap() {
   const mcpServerFactory = app.get(McpServerFactoryService);
   const mcpTokenService = app.get(McpTokenService);
   const instanceSettingsService = app.get(InstanceSettingsService);
+  const cls = app.get(ClsService);
+  const namespaceRegistry = app.get(NamespaceRegistryService);
+
+  // Resolve the leading `/<slug>` into a tenant context (404 on unknown slug)
+  // before any route runs. `/<slug>/mcp` was already rewritten to `/mcp`.
+  registerNamespaceHook(fastify, namespaceRegistry, cls);
 
   const mcpHandler = async (request: any, reply: any) => {
-    const settings = await instanceSettingsService.getSettings();
-    if (!settings.mcpEnabled) {
-      reply.code(503).send({
-        error: 'Service Unavailable',
-        message: 'MCP is disabled. Enable it in Settings.',
+    // MCP requires a namespace: `/<slug>/mcp` (rewritten to `/mcp` with the
+    // context set). A bare `/mcp` (no slug) has no tenant to serve.
+    const ns = (request.raw as NamespaceRawRequest).classifyreNs;
+    if (!ns) {
+      reply.code(404).send({
+        error: 'Not Found',
+        message: 'MCP requires a namespace: POST /<namespace>/mcp',
       });
       return;
     }
 
-    try {
-      await mcpTokenService.authorizeBearerToken(request.headers.authorization);
-    } catch {
-      reply
-        .code(401)
-        .header('WWW-Authenticate', 'Bearer realm="classifyre-mcp"')
-        .send({
-          error: 'Unauthorized',
-          message: 'Provide a valid MCP bearer token from Settings.',
+    // Everything below (settings, token auth, tool callbacks) resolves
+    // per-namespace services off CLS, so run it inside the tenant context.
+    await cls.run(async () => {
+      cls.set(CLS_SCHEMA, ns.schemaName);
+      cls.set(CLS_NAMESPACE_ID, ns.namespaceId);
+      cls.set(CLS_SLUG, ns.slug);
+
+      const settings = await instanceSettingsService.getSettings();
+      if (!settings.mcpEnabled) {
+        reply.code(503).send({
+          error: 'Service Unavailable',
+          message: 'MCP is disabled. Enable it in Settings.',
         });
-      return;
-    }
-
-    reply.hijack();
-
-    try {
-      const server = mcpServerFactory.createServer();
-      const transport = new StreamableHTTPServerTransport({
-        sessionIdGenerator: undefined,
-        enableJsonResponse: true,
-      });
-      await server.connect(transport);
-      await transport.handleRequest(request.raw, reply.raw, request.body);
-    } catch (error) {
-      logger.error(`MCP request failed: ${String(error)}`);
-      if (!reply.raw.headersSent) {
-        reply.raw.statusCode = 500;
-        reply.raw.setHeader('content-type', 'application/json');
+        return;
       }
-      if (!reply.raw.writableEnded) {
-        reply.raw.end(
-          JSON.stringify({
-            error: 'Internal Server Error',
-            message: 'Failed to process MCP request.',
-          }),
+
+      try {
+        await mcpTokenService.authorizeBearerToken(
+          request.headers.authorization,
         );
+      } catch {
+        reply
+          .code(401)
+          .header('WWW-Authenticate', 'Bearer realm="classifyre-mcp"')
+          .send({
+            error: 'Unauthorized',
+            message: 'Provide a valid MCP bearer token from Settings.',
+          });
+        return;
       }
-    }
+
+      reply.hijack();
+
+      try {
+        const server = mcpServerFactory.createServer();
+        const transport = new StreamableHTTPServerTransport({
+          sessionIdGenerator: undefined,
+          enableJsonResponse: true,
+        });
+        await server.connect(transport);
+        await transport.handleRequest(request.raw, reply.raw, request.body);
+      } catch (error) {
+        logger.error(`MCP request failed: ${String(error)}`);
+        if (!reply.raw.headersSent) {
+          reply.raw.statusCode = 500;
+          reply.raw.setHeader('content-type', 'application/json');
+        }
+        if (!reply.raw.writableEnded) {
+          reply.raw.end(
+            JSON.stringify({
+              error: 'Internal Server Error',
+              message: 'Failed to process MCP request.',
+            }),
+          );
+        }
+      }
+    });
   };
 
   fastify.post('/mcp', mcpHandler);

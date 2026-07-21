@@ -1,5 +1,6 @@
 "use client";
 
+import { nsPath } from "@/lib/ns-path";
 import * as React from "react";
 import { ExternalLink, Layers } from "lucide-react";
 import type { GraphNodeDto } from "@workspace/api-client";
@@ -74,7 +75,7 @@ export function FingerprintsGraphSelectionRail({
           </p>
           <div className="flex flex-wrap gap-1">
             {selectedDetail.assetIds.map((id) => (
-              <a key={id} href={`/assets/${id}`} target="_blank" rel="noreferrer">
+              <a key={id} href={nsPath(`/assets/${id}`)} target="_blank" rel="noreferrer">
                 <Badge variant="secondary" className="max-w-[220px] truncate">
                   {assetLabel(id)}
                 </Badge>
@@ -116,7 +117,7 @@ export function FingerprintsGraphSelectionRail({
             {selectedNode.label}
           </p>
           <Button size="sm" variant="outline" asChild className="w-full">
-            <a href={`/assets/${selectedNode.id}`} target="_blank" rel="noreferrer">
+            <a href={nsPath(`/assets/${selectedNode.id}`)} target="_blank" rel="noreferrer">
               <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
               {t("correlation.fingerprints.openAsset")}
             </a>

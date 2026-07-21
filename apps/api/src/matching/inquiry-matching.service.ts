@@ -1,11 +1,10 @@
-import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import type { Job } from 'pg-boss';
 import { DetectorType, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
 import { PgBossService } from '../scheduler/pg-boss.service';
 import { CompiledMatcher, InquiryMatchers } from './inquiry-matcher';
 import { INQUIRY_MATCH_QUEUE } from './matching.constants';
-import { runsBackgroundWorkers } from '../service-role';
 import {
   PreviewResponseDto,
   InquiryMatchDto,
@@ -56,7 +55,7 @@ const PREVIEW_CAP = 50;
  * instead of persisting individual match rows.
  */
 @Injectable()
-export class InquiryMatchingService implements OnApplicationBootstrap {
+export class InquiryMatchingService {
   private readonly logger = new Logger(InquiryMatchingService.name);
 
   constructor(
@@ -64,14 +63,15 @@ export class InquiryMatchingService implements OnApplicationBootstrap {
     private readonly pgBoss: PgBossService,
   ) {}
 
-  async onApplicationBootstrap(): Promise<void> {
-    if (!runsBackgroundWorkers()) return;
+  /**
+   * Registers this worker on the CURRENT namespace's pg-boss (invoked by the
+   * NamespaceWorkerManager inside the namespace's CLS context).
+   */
+  async registerForNamespace(): Promise<void> {
     const boss = await this.pgBoss.getBossAsync();
     await boss.createQueue(INQUIRY_MATCH_QUEUE);
-    await boss.work(
-      INQUIRY_MATCH_QUEUE,
-      { localConcurrency: 1 },
-      (jobs: Job[]) => this.handle(jobs),
+    await this.pgBoss.work(INQUIRY_MATCH_QUEUE, { localConcurrency: 1 }, (jobs) =>
+      this.handle(jobs as Job[]),
     );
     this.logger.log(`Registered worker for queue ${INQUIRY_MATCH_QUEUE}`);
   }

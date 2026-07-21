@@ -1,5 +1,6 @@
 "use client";
 
+import { nsPath } from "@/lib/ns-path";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { formatDate, formatRelative, formatShortUTC } from "@/lib/date";
@@ -570,7 +571,7 @@ export function RunnersTable({
                     <TableRow
                       key={runner.id}
                       className="align-top cursor-pointer hover:bg-muted/40"
-                      onClick={() => router.push(`/scans/${runner.id}`)}
+                      onClick={() => router.push(nsPath(`/scans/${runner.id}`))}
                     >
                       <TableCell className="py-2">
                         <div className="text-sm">

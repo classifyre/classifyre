@@ -1,5 +1,6 @@
 "use client";
 
+import { nsPath } from "@/lib/ns-path";
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -701,7 +702,7 @@ export function CaseGraphView({
         edgeCount={visibleEdges.length}
         path={path}
         onClearPath={() => setPath(null)}
-        onAddEvidence={() => router.push(`/investigations/${caseId}/evidence/add`)}
+        onAddEvidence={() => router.push(nsPath(`/investigations/${caseId}/evidence/add`))}
         onNewHypothesis={() => setNewHypNode({ open: true, node: null })}
         onZoomToFit={zoomToFit}
         onReload={onReload}

@@ -38,8 +38,14 @@ describe('EmbeddingQueueService', () => {
     putVectors: jest.fn(),
     recalibrateSpace: jest.fn(),
   };
-  const pgBoss = { getBossAsync: jest.fn() };
+  const pgBoss = { getBossAsync: jest.fn(), work: jest.fn() };
   const capability = { ensureReady: jest.fn() };
+  // Simple CLS stub: a single fixed namespace, synchronous run().
+  const cls = {
+    get: () => 'ns_test',
+    set: () => undefined,
+    run: (fn: () => unknown) => fn(),
+  };
 
   const service = new EmbeddingQueueService(
     prisma as never,
@@ -48,12 +54,16 @@ describe('EmbeddingQueueService', () => {
     embeddings as never,
     pgBoss as never,
     capability as never,
+    cls as never,
   );
 
   beforeEach(() => {
     jest.clearAllMocks();
     capability.ensureReady.mockResolvedValue(undefined);
     pgBoss.getBossAsync.mockResolvedValue(boss);
+    // The worker registers handlers via PgBossService.work(); delegate to the
+    // underlying boss.work mock so existing call-inspection assertions hold.
+    pgBoss.work.mockImplementation((q, o, h) => boss.work(q, o, h));
     boss.createQueue.mockResolvedValue(undefined);
     boss.work.mockResolvedValue(undefined);
     boss.insert.mockResolvedValue([]);
@@ -77,7 +87,7 @@ describe('EmbeddingQueueService', () => {
   });
 
   it('probes pgvector before registering the persistent distributed worker', async () => {
-    await service.onApplicationBootstrap();
+    await service.registerForNamespace();
 
     expect(capability.ensureReady).toHaveBeenCalledTimes(1);
     expect(boss.createQueue).toHaveBeenCalledWith(
@@ -99,7 +109,7 @@ describe('EmbeddingQueueService', () => {
   });
 
   it('persists one deduplicated job per content hash', async () => {
-    await service.onApplicationBootstrap();
+    await service.registerForNamespace();
     service.enqueue([
       { hash: 'a'.repeat(64), text: '  repeated   text ' },
       { hash: 'a'.repeat(64), text: 'repeated text' },
@@ -123,7 +133,7 @@ describe('EmbeddingQueueService', () => {
   });
 
   it('batches missing jobs through the provider and content-addressed store', async () => {
-    await service.onApplicationBootstrap();
+    await service.registerForNamespace();
     const handler = boss.work.mock.calls[0][2] as (
       jobs: Array<{
         data: { spaceId: string; hash: string; text: string };
@@ -161,7 +171,7 @@ describe('EmbeddingQueueService', () => {
   });
 
   it('ignores jobs from another model space', async () => {
-    await service.onApplicationBootstrap();
+    await service.registerForNamespace();
     const handler = boss.work.mock.calls[0][2] as (
       jobs: Array<{
         data: { spaceId: string; hash: string; text: string };
@@ -183,7 +193,7 @@ describe('EmbeddingQueueService', () => {
   });
 
   it('schedules a debounced recalibration after new vectors are stored', async () => {
-    await service.onApplicationBootstrap();
+    await service.registerForNamespace();
     const handler = boss.work.mock.calls[0][2] as (
       jobs: Array<{
         data: { spaceId: string; hash: string; text: string };
@@ -214,7 +224,7 @@ describe('EmbeddingQueueService', () => {
   });
 
   it('defers recalibration while inference jobs are still pending', async () => {
-    await service.onApplicationBootstrap();
+    await service.registerForNamespace();
     const recalibrate = boss.work.mock.calls[1][2] as () => Promise<void>;
     boss.getQueueStats.mockResolvedValue({
       queuedCount: 3,
@@ -235,7 +245,7 @@ describe('EmbeddingQueueService', () => {
   });
 
   it('reports whether recalibration was actually scheduled', async () => {
-    await service.onApplicationBootstrap();
+    await service.registerForNamespace();
     expect(await service.scheduleRecalibration()).toBe(true);
 
     boss.send.mockResolvedValueOnce(null);
@@ -250,6 +260,7 @@ describe('EmbeddingQueueService', () => {
       embeddings as never,
       pgBoss as never,
       capability as never,
+      cls as never,
     );
 
     expect(await uninitialized.scheduleRecalibration()).toBe(false);
@@ -257,7 +268,7 @@ describe('EmbeddingQueueService', () => {
   });
 
   it('recalibrates the whole space once the inference queue drains', async () => {
-    await service.onApplicationBootstrap();
+    await service.registerForNamespace();
     const recalibrate = boss.work.mock.calls[1][2] as () => Promise<void>;
 
     await recalibrate();
@@ -269,7 +280,7 @@ describe('EmbeddingQueueService', () => {
   });
 
   it('backfills existing glossary terms into the active embedding space', async () => {
-    await service.onApplicationBootstrap();
+    await service.registerForNamespace();
     prisma.glossaryTerm.findMany
       .mockResolvedValueOnce([
         {

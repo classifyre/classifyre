@@ -1,7 +1,9 @@
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
+import { ClsModule } from 'nestjs-cls';
 import { CliBackpressureGuard } from './guards/cli-backpressure.guard';
 import { PrismaService } from './prisma.service';
+import { PrismaCoreModule } from './prisma/prisma-core.module';
 import { DemoModeService } from './demo-mode.service';
 import { DemoModeGuard } from './demo-mode.guard';
 import { SourceService } from './source.service';
@@ -50,6 +52,9 @@ import { CaseLeadsController } from './controllers/case-leads.controller';
 import { CaseEventsController } from './controllers/case-events.controller';
 import { CaseLeadsService } from './case-leads.service';
 import { CaseEventsService } from './case-events.service';
+import { NamespaceRegistryService } from './registry/namespace-registry.service';
+import { NamespacesController } from './registry/namespaces.controller';
+import { NamespaceWorkerManager } from './namespace/namespace-worker-manager';
 
 // Import organized controllers
 import {
@@ -80,6 +85,11 @@ import {
 
 @Module({
   imports: [
+    // The CLS context is entered and populated by the Fastify onRequest hook
+    // in main.ts (registerNamespaceHook) via cls.enter()+set — the mounted
+    // middleware would run before the namespace is resolved, so we don't use it.
+    ClsModule.forRoot({ global: true }),
+    PrismaCoreModule,
     CliRunnerModule,
     WebSocketModule,
     SchedulerModule,
@@ -116,6 +126,7 @@ import {
     GlossaryController,
     CaseLeadsController,
     CaseEventsController,
+    NamespacesController,
   ],
   providers: [
     { provide: APP_GUARD, useClass: DemoModeGuard },
@@ -159,6 +170,8 @@ import {
     GlossaryService,
     CaseLeadsService,
     CaseEventsService,
+    NamespaceRegistryService,
+    NamespaceWorkerManager,
   ],
 })
 export class AppModule {}

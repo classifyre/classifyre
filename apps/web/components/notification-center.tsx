@@ -1,5 +1,6 @@
 "use client";
 
+import { nsPath } from "@/lib/ns-path";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import {
@@ -372,7 +373,7 @@ export function NotificationCenter() {
             size="sm"
             className="h-8 rounded-[4px] border-2 border-border px-3"
           >
-            <Link href="/notifications" onClick={() => setOpen(false)}>
+            <Link href={nsPath("/notifications")} onClick={() => setOpen(false)}>
               {t("notifications.goToNotifications")}
             </Link>
           </Button>

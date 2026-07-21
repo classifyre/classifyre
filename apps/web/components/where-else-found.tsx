@@ -1,5 +1,6 @@
 "use client";
 
+import { nsPath } from "@/lib/ns-path";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Radar } from "lucide-react";
@@ -102,7 +103,7 @@ export function WhereElseFound({
                 <div className="flex min-w-0 items-center gap-2">
                   <SourceIcon source={a.sourceType} size="sm" />
                   <Link
-                    href={`/assets/${a.assetId}`}
+                    href={nsPath(`/assets/${a.assetId}`)}
                     className="truncate text-sm font-semibold underline-offset-4 hover:underline"
                     title={a.name || a.externalUrl}
                   >

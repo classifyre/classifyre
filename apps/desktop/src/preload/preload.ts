@@ -1,20 +1,24 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
+// Single shared API base for the whole app. The namespace is now a concept
+// INSIDE the web app (its landing page + `/<slug>/...` routes), not a
+// per-process port, so the desktop exposes one base URL and the web app scopes
+// every request to the active namespace itself. `--api-base` is the new arg;
+// `--api-port` is kept for backward compatibility with older bundles.
+const apiBase = process.argv
+  .find((arg) => arg.startsWith('--api-base='))
+  ?.split('=')[1];
+
 const apiPort = process.argv
   .find((arg) => arg.startsWith('--api-port='))
   ?.split('=')[1];
 
-const namespaceId = process.argv
-  .find((arg) => arg.startsWith('--namespace-id='))
-  ?.split('=')[1];
+const apiBaseUrl = apiBase ?? (apiPort ? `http://127.0.0.1:${apiPort}` : undefined);
 
-if (apiPort) {
-  const apiBaseUrl = `http://127.0.0.1:${apiPort}`;
-
+if (apiBaseUrl) {
   contextBridge.exposeInMainWorld('__CLASSIFYRE_DESKTOP__', {
     apiBaseUrl,
     wsBaseUrl: apiBaseUrl,
-    namespaceId,
   });
 }
 

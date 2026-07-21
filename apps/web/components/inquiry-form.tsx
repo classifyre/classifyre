@@ -1,5 +1,6 @@
 "use client";
 
+import { nsPath } from "@/lib/ns-path";
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -238,13 +239,13 @@ export const InquiryForm = React.forwardRef<InquiryFormHandle, InquiryFormProps>
           updateInquiryDto: { title: title.trim(), description: description.trim() || undefined, ...matchers },
         });
         toast.success("Inquiry updated");
-        router.push(`/investigations/inquiries/${inquiryId}`);
+        router.push(nsPath(`/investigations/inquiries/${inquiryId}`));
       } else {
         const created = await api.inquiries.inquiriesControllerCreate({
           createInquiryDto: { title: title.trim(), description: description.trim() || undefined, ...matchers },
         });
         toast.success("Inquiry created");
-        router.push(`/investigations/inquiries/${created.id}`);
+        router.push(nsPath(`/investigations/inquiries/${created.id}`));
       }
     } catch (err) {
       console.error(err);
@@ -253,8 +254,8 @@ export const InquiryForm = React.forwardRef<InquiryFormHandle, InquiryFormProps>
   };
 
   const back = () => {
-    if (isEdit && inquiryId) router.push(`/investigations/inquiries/${inquiryId}`);
-    else router.push("/investigations");
+    if (isEdit && inquiryId) router.push(nsPath(`/investigations/inquiries/${inquiryId}`));
+    else router.push(nsPath("/investigations"));
   };
 
   const filteredTypes = (options?.findingTypes ?? []).filter((t) =>

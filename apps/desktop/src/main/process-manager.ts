@@ -170,6 +170,12 @@ export interface ApiRuntimeOptions {
   memoryLimitMb?: number;
   /** Custom env vars (already validated against RESERVED_ENV_KEYS at save time). */
   env?: Record<string, string>;
+  /**
+   * Let the API apply pending migrations itself at boot (multi-tenant shared
+   * API: it bootstraps the namespace registry and migrates every namespace
+   * schema). When false (legacy per-namespace model) the caller migrates first.
+   */
+  autoMigrate?: boolean;
 }
 
 interface ManagedProcess {
@@ -434,10 +440,10 @@ export class ProcessManager {
         ELECTRON_RUN_AS_NODE: "1",
         PORT: String(port),
         DATABASE_URL: databaseUrl,
-        // NamespaceRuntime has already completed migrate deploy before this
-        // process is spawned. Keep the API's standalone migration fallback off
-        // here so every workspace open does not invoke Prisma twice.
-        CLASSIFYRE_AUTO_MIGRATE: "false",
+        // Shared multi-tenant API: it migrates the registry + every namespace
+        // schema itself at boot (autoMigrate). Legacy per-namespace model:
+        // NamespaceRuntime migrate-deploys before spawn, so keep this off.
+        CLASSIFYRE_AUTO_MIGRATE: options.autoMigrate ? "true" : "false",
         ENVIRONMENT: "desktop",
         CLI_PATH: cliPath,
         VENV_PATH: venvPath,

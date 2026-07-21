@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConflictException } from '@nestjs/common';
+import { ClsService } from 'nestjs-cls';
 import { TriggerType } from '@prisma/client';
 import { SchedulerService } from './scheduler.service';
 import { PgBossService } from './pg-boss.service';
@@ -16,6 +17,17 @@ const mockBoss = {
 
 const mockPgBossService = {
   getBoss: jest.fn().mockReturnValue(mockBoss),
+  getBossAsync: jest.fn().mockResolvedValue(mockBoss),
+  // Worker registration routes through PgBossService.work(); delegate so the
+  // existing mockBoss.work assertions keep working.
+  work: jest.fn((q, o, h) => mockBoss.work(q, o, h)),
+};
+
+// Fixed single-namespace CLS stub for the scheduler under test.
+const mockCls = {
+  get: () => 'ns_test',
+  set: () => undefined,
+  run: (fn: () => unknown) => fn(),
 };
 
 const mockPrisma = {
@@ -42,6 +54,7 @@ describe('SchedulerService', () => {
         { provide: PgBossService, useValue: mockPgBossService },
         { provide: PrismaService, useValue: mockPrisma },
         { provide: CliRunnerService, useValue: mockCliRunnerService },
+        { provide: ClsService, useValue: mockCls },
       ],
     }).compile();
 
@@ -55,7 +68,7 @@ describe('SchedulerService', () => {
         { id: sourceId, scheduleCron: '0 * * * *', scheduleTimezone: 'UTC' },
       ]);
 
-      await service.onApplicationBootstrap();
+      await service.registerForNamespace();
 
       expect(mockBoss.createQueue).toHaveBeenCalledWith(
         `ingest-source-${sourceId}`,
@@ -68,7 +81,7 @@ describe('SchedulerService', () => {
     });
 
     it('does not register any worker when no sources are enabled', async () => {
-      await service.onApplicationBootstrap();
+      await service.registerForNamespace();
       expect(mockBoss.work).not.toHaveBeenCalled();
     });
 
@@ -79,7 +92,7 @@ describe('SchedulerService', () => {
       ]);
       mockBoss.getSchedules.mockResolvedValueOnce([]);
 
-      await service.onApplicationBootstrap();
+      await service.registerForNamespace();
 
       expect(mockBoss.schedule).toHaveBeenCalledWith(
         `ingest-source-${sourceId}`,
@@ -98,7 +111,7 @@ describe('SchedulerService', () => {
         { name: `ingest-source-${sourceId}` },
       ]);
 
-      await service.onApplicationBootstrap();
+      await service.registerForNamespace();
 
       expect(mockBoss.schedule).not.toHaveBeenCalled();
     });
@@ -110,7 +123,7 @@ describe('SchedulerService', () => {
         { name: `ingest-source-${staleSourceId}` },
       ]);
 
-      await service.onApplicationBootstrap();
+      await service.registerForNamespace();
 
       expect(mockBoss.unschedule).toHaveBeenCalledWith(
         `ingest-source-${staleSourceId}`,
@@ -123,8 +136,8 @@ describe('SchedulerService', () => {
         { id: sourceId, scheduleCron: '0 * * * *', scheduleTimezone: 'UTC' },
       ]);
 
-      await service.onApplicationBootstrap();
-      await service.onApplicationBootstrap();
+      await service.registerForNamespace();
+      await service.registerForNamespace();
 
       // worker should only be registered once despite two bootstrap calls
       expect(mockBoss.work).toHaveBeenCalledTimes(1);

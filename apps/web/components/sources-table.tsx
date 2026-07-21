@@ -1,5 +1,6 @@
 "use client";
 
+import { nsPath } from "@/lib/ns-path";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { formatDate, formatRelative, formatShortUTC } from "@/lib/date";
@@ -597,7 +598,7 @@ export function SourcesTable({ onTotalsChange }: SourcesTableProps) {
                               size="sm"
                               className="h-auto max-w-[260px] justify-start p-0 text-left"
                               onClick={() =>
-                                router.push(`/sources/${source.id}`)
+                                router.push(nsPath(`/sources/${source.id}`))
                               }
                             >
                               <span className="truncate text-sm font-semibold">
@@ -661,7 +662,7 @@ export function SourcesTable({ onTotalsChange }: SourcesTableProps) {
                             variant="ghost"
                             size="sm"
                             className="h-auto justify-start p-0 hover:bg-transparent"
-                            onClick={() => router.push(`/scans/${runner.id}`)}
+                            onClick={() => router.push(nsPath(`/scans/${runner.id}`))}
                           >
                             <RunnerStatusBadge status={source.runnerStatus} />
                           </Button>
@@ -810,8 +811,8 @@ export function SourcesTable({ onTotalsChange }: SourcesTableProps) {
                                 className="h-8 rounded-[4px] border-2 border-border bg-black text-white hover:bg-black/90"
                                 onClick={() =>
                                   runner?.id
-                                    ? router.push(`/scans/${runner.id}`)
-                                    : router.push("/scans")
+                                    ? router.push(nsPath(`/scans/${runner.id}`))
+                                    : router.push(nsPath("/scans"))
                                 }
                               >
                                 <ScanSearch className="h-3.5 w-3.5" />
@@ -852,7 +853,7 @@ export function SourcesTable({ onTotalsChange }: SourcesTableProps) {
                             variant="outline"
                             className="h-8 rounded-[4px] border-2 border-border"
                             onClick={() =>
-                              router.push(`/sources/${source.id}/edit`)
+                              router.push(nsPath(`/sources/${source.id}/edit`))
                             }
                           >
                             <Settings className="h-3.5 w-3.5" />

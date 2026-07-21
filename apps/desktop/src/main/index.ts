@@ -1,4 +1,4 @@
-import { app, autoUpdater, BrowserWindow, WebContentsView, dialog, protocol } from 'electron';
+import { app, autoUpdater, BrowserWindow, WebContentsView, dialog, protocol, shell } from 'electron';
 import path from 'path';
 import { PostgresManager } from './postgres-manager.js';
 import { NamespaceManager } from './namespace-manager.js';
@@ -13,6 +13,10 @@ import { UpdateChecker } from './update-checker.js';
 import { initFileLogging } from './logger.js';
 import { buildApplicationMenu } from './menu.js';
 import { AppTray } from './tray.js';
+import { getAvailablePort } from './port-manager.js';
+
+/** Fixed process id for the single shared API in the ProcessManager map. */
+const SHARED_API_ID = '__shared__';
 
 // embedded-postgres registers an async-exit-hook that calls done() on process
 // exit, but Electron's quit path doesn't always provide the callback. Suppress
@@ -48,6 +52,8 @@ let processManager: ProcessManager;
 let runtime: NamespaceRuntime;
 let sessionStore: SessionStore;
 let updateChecker: UpdateChecker;
+/** Base URL of the single shared API, injected into the web view's preload. */
+let sharedApiBaseUrl = '';
 let tray: AppTray | null = null;
 let isQuitting = false;
 let shutdownStarted = false;
@@ -92,7 +98,15 @@ function lockDownChrome(contents: Electron.WebContents): void {
   contents.on('will-navigate', (e) => e.preventDefault());
 }
 
+/**
+ * Single-instance window: ONE web view loading the web app. The web app owns
+ * the namespace concept now (its landing page lists/creates workspaces and
+ * routes under `/<slug>/...`), talking to the single shared API whose base URL
+ * is injected via the preload. No more tab bar / native selector / per-
+ * namespace views.
+ */
 function createMainWindow(): BrowserWindow {
+  const apiBaseUrl = sharedApiBaseUrl;
   const win = new BrowserWindow({
     width: 1400,
     height: 900,
@@ -104,77 +118,59 @@ function createMainWindow(): BrowserWindow {
       nodeIntegration: false,
     },
   });
-
-  // --- Tab bar view (thin strip at top) ---
-  const tabBarView = new WebContentsView({
-    webPreferences: {
-      contextIsolation: true,
-      nodeIntegration: false,
-      preload: getPreloadPath(),
-    },
-  });
   lockDownChrome(win.webContents);
-  lockDownChrome(tabBarView.webContents);
-  win.contentView.addChildView(tabBarView);
 
-  const tabBarHtml = isDev
-    ? path.join(__dirname, '../../src/renderer/tab-bar/tab-bar.html')
-    : path.join(__dirname, 'tab-bar/tab-bar.html');
-  void tabBarView.webContents.loadFile(tabBarHtml);
-
-  // --- Selector view (namespace picker, fills content area) ---
-  const selectorView = new WebContentsView({
+  const webView = new WebContentsView({
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
       preload: getPreloadPath(),
+      additionalArguments: [`--api-base=${apiBaseUrl}`],
     },
   });
-  lockDownChrome(selectorView.webContents);
-  win.contentView.addChildView(selectorView);
+  win.contentView.addChildView(webView);
 
-  if (typeof NAMESPACE_SELECTOR_VITE_DEV_SERVER_URL !== 'undefined' && NAMESPACE_SELECTOR_VITE_DEV_SERVER_URL) {
-    void selectorView.webContents.loadURL(NAMESPACE_SELECTOR_VITE_DEV_SERVER_URL);
-  } else if (typeof NAMESPACE_SELECTOR_VITE_NAME !== 'undefined' && NAMESPACE_SELECTOR_VITE_NAME) {
-    void selectorView.webContents.loadFile(
-      path.join(__dirname, `../renderer/${NAMESPACE_SELECTOR_VITE_NAME}/index.html`),
-    );
+  const fit = () => {
+    const { width, height } = win.getContentBounds();
+    webView.setBounds({ x: 0, y: 0, width, height });
+  };
+  fit();
+  win.on('resize', fit);
+
+  // Allow in-app navigation within the web app only; outbound links open in the
+  // system browser.
+  webView.webContents.setWindowOpenHandler(({ url }) => {
+    void shell.openExternal(url);
+    return { action: 'deny' };
+  });
+  webView.webContents.on('will-navigate', (e, target) => {
+    const inApp = isDev
+      ? target.startsWith('http://localhost:3000')
+      : target.startsWith('app://classifyre');
+    if (!inApp) {
+      e.preventDefault();
+      void shell.openExternal(target);
+    }
+  });
+
+  if (isDev) {
+    void webView.webContents.loadURL('http://localhost:3000');
   } else {
-    void selectorView.webContents.loadFile(
-      path.join(__dirname, '../../index.html'),
-    );
+    // Served by the 'app' scheme (registerAppProtocol) — NOT file:// — so the
+    // Next static export's absolute asset paths and client routing resolve.
+    void webView.webContents.loadURL('app://classifyre/index.html');
   }
 
-  runtime.setMainWindow(win);
-  runtime.setTabBarView(tabBarView);
-  runtime.setSelectorView(selectorView);
-  runtime.showSelector();
-
-  updateChecker.setTabBarView(tabBarView);
-  tabBarView.webContents.on('did-finish-load', () => {
+  updateChecker.setTabBarView(webView);
+  webView.webContents.on('did-finish-load', () => {
     void updateChecker.checkForUpdates();
   });
 
-  // Background mode: closing the window hides it instead, keeping running
-  // workspaces (and their WebContentsViews) alive. The tray/dock/second
-  // launch brings it back. Real quit goes through before-quit (isQuitting).
+  // Background mode: closing the window hides it instead of quitting.
   win.on('close', (e) => {
     if (isQuitting || !settingsManager.get().runInBackground) return;
     e.preventDefault();
     win.hide();
-  });
-
-  // Without background mode a closed window means "stop": tear down the
-  // running workspaces so a recreated window doesn't hold destroyed views.
-  // The session snapshot from before the close survives (saves suppressed
-  // during teardown), so the next launch restores what was open.
-  win.on('closed', () => {
-    if (isQuitting) return;
-    sessionStore.suppress();
-    void runtime
-      .closeAll()
-      .catch((err) => console.error('Teardown after window close failed:', err))
-      .finally(() => sessionStore.resume());
   });
 
   return win;
@@ -216,16 +212,11 @@ app.on('ready', async () => {
     getPreloadPath(),
   );
 
-  // Snapshot the previous session before the state-change hook below starts
-  // rewriting it, then keep it continuously up to date.
-  const previousSession = sessionStore.load();
-  runtime.onStateChange(() => {
-    sessionStore.save({
-      openIds: [...runtime.getRunning().keys()],
-      activeTabId: runtime.getActiveTabId(),
-    });
-  });
-
+  // NOTE: the per-namespace tab/selector runtime, its IPC, and the Workspaces
+  // menu/tray are now vestigial — the web app owns namespace selection and
+  // talks to the single shared API directly. They remain wired (harmless, never
+  // invoked by the single web view) pending a follow-up cleanup that also
+  // repoints notification deep-links at the single web view.
   updateChecker = new UpdateChecker();
   registerIpcHandlers(runtime, namespaceManager, settingsManager, updateChecker, pg);
   registerNotificationHandlers({ runtime, settingsManager, showWindow: showMainWindow });
@@ -265,36 +256,36 @@ app.on('ready', async () => {
     return;
   }
 
+  // Start the ONE shared, namespace-aware API. It connects with a schema-less
+  // DATABASE_URL and resolves the tenant schema per request from the `/<slug>/`
+  // URL segment; it migrates the registry + every namespace schema itself
+  // (autoMigrate). Namespaces are created from the web app's landing page (a
+  // POST to the API's /namespaces), which provisions the schema on the fly.
+  try {
+    const apiPort = await getAvailablePort();
+    sharedApiBaseUrl = `http://127.0.0.1:${apiPort}`;
+    await processManager.startApi(
+      SHARED_API_ID,
+      apiPort,
+      pg.getConnectionString(),
+      { autoMigrate: true },
+    );
+    console.log(`Shared Classifyre API started on ${sharedApiBaseUrl}`);
+  } catch (err) {
+    console.error('Failed to start the Classifyre API:', err);
+    dialog.showErrorBox(
+      'Classifyre could not start',
+      `The Classifyre API failed to start.\n\n${err instanceof Error ? err.message : String(err)}`,
+    );
+    app.quit();
+    return;
+  }
+
   mainWindow = createMainWindow();
 
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
-
-  // Bring last session back: reopen every workspace that was running when the
-  // app was last closed, then land on the tab the user was looking at.
-  // Sequential on purpose — concurrent first opens would race Prisma's
-  // database-level migration advisory lock. Selector cards animate each open
-  // via the namespace:open-progress events.
-  const restoreIds = previousSession.openIds.filter((id) => namespaceManager.get(id));
-  if (restoreIds.length > 0) {
-    void (async () => {
-      for (const id of restoreIds) {
-        try {
-          // Background start: don't flip through tabs while restoring.
-          await runtime.open(id, { activate: false });
-        } catch (err) {
-          console.error(`[session-restore] failed to reopen workspace ${id}:`, err);
-        }
-      }
-      const { activeTabId } = previousSession;
-      if (activeTabId === '__selector__') {
-        runtime.showSelector();
-      } else if (activeTabId && runtime.isOpen(activeTabId)) {
-        runtime.switchToTab(activeTabId);
-      }
-    })();
-  }
 });
 
 app.on('second-instance', () => {

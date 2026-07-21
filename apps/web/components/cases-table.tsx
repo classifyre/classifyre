@@ -1,5 +1,6 @@
 "use client";
 
+import { nsPath } from "@/lib/ns-path";
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { formatDate, formatRelative, formatShortUTC } from "@/lib/date";
@@ -331,7 +332,7 @@ export function CasesTable() {
                   <Fragment key={c.id}>
                     <TableRow
                       className="cursor-pointer hover:bg-muted/40"
-                      onClick={() => router.push(`/investigations/${c.id}`)}
+                      onClick={() => router.push(nsPath(`/investigations/${c.id}`))}
                     >
                       <TableCell className="font-medium">
                         <span className="inline-flex items-center gap-2">
