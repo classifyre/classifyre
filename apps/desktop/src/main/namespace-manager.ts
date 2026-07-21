@@ -50,6 +50,15 @@ const ENV_KEY_PATTERN = /^[A-Za-z_][A-Za-z0-9_]{0,63}$/;
 const ENV_MAX_VARS = 50;
 const ENV_MAX_VALUE_LENGTH = 4096;
 
+// New local workspaces get a fixed API port so their MCP URL stays stable
+// across restarts (a dynamically allocated port changes on every open, which
+// breaks any MCP client pinned to it). The range sits above the usual dev-tool
+// ports (3000/5432/8000/8080…) and below the IANA ephemeral range (49152+), so
+// collisions with other software are unlikely. If the chosen port is busy at
+// open time the runtime surfaces a clear error rather than silently moving it.
+const API_PORT_RANGE_START = 8790;
+const API_PORT_RANGE_END = 8990;
+
 export function validateCustomEnv(env: Record<string, string>): void {
   const entries = Object.entries(env);
   if (entries.length > ENV_MAX_VARS) {
@@ -129,6 +138,23 @@ export class NamespaceManager {
     return [...this.namespaces];
   }
 
+  /**
+   * Smallest port in the reserved range not already claimed by another
+   * workspace, so a fresh workspace gets a stable, non-colliding API port.
+   * Returns undefined if the range is exhausted (fall back to dynamic
+   * allocation at open time). Whether the port is actually free on the host is
+   * only known at open — the runtime checks it then and errors if it's busy.
+   */
+  private allocateStablePort(): number | undefined {
+    const taken = new Set(
+      this.namespaces.map((n) => n.apiPort).filter((p): p is number => typeof p === 'number'),
+    );
+    for (let port = API_PORT_RANGE_START; port <= API_PORT_RANGE_END; port++) {
+      if (!taken.has(port)) return port;
+    }
+    return undefined;
+  }
+
   create(name: string, remoteUrl?: string): Namespace {
     const id = randomUUID();
     const isRemote = !!remoteUrl;
@@ -147,7 +173,7 @@ export class NamespaceManager {
       name,
       type: isRemote ? 'remote' : 'local',
       schemaName,
-      ...(isRemote ? { remoteUrl } : {}),
+      ...(isRemote ? { remoteUrl } : { apiPort: this.allocateStablePort() }),
       createdAt: new Date().toISOString(),
       lastOpenedAt: new Date().toISOString(),
     };

@@ -41,6 +41,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onOpenProgress: (cb: (data: { namespaceId: string; stage: string }) => void) => {
     ipcRenderer.on('namespace:open-progress', (_event, data) => cb(data));
   },
+  // Running state changed (e.g. a workspace closed from the tab bar) — the
+  // selector re-renders its cards so power toggles/ports never go stale.
+  onNamespaceStateChanged: (cb: () => void) => {
+    ipcRenderer.on('namespace:state-changed', () => cb());
+  },
 
   // Tab operations
   switchTab: (id: string) => ipcRenderer.invoke('tab:switch', id),

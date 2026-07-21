@@ -9,7 +9,16 @@ import path from 'path';
 // file in userData/logs so the log is always available (and referenced in
 // error messages). Launch failures can then be diagnosed from the log alone.
 
+// Rotate once the active log passes this size, keeping only one previous file,
+// so a long-lived install stays bounded at ~2×MAX regardless of how chatty the
+// API children are.
+const MAX_LOG_BYTES = 5 * 1024 * 1024;
+
 let logStream: fs.WriteStream | null = null;
+let logFilePath: string | null = null;
+let prevLogFilePath: string | null = null;
+let bytesWritten = 0;
+let rotating = false;
 
 export function getLogFilePath(): string | null {
   try {
@@ -19,24 +28,56 @@ export function getLogFilePath(): string | null {
   }
 }
 
+// Rotate mid-session, not just at startup — a desktop app that stays open for
+// days would otherwise grow main.log without bound (the startup-only size
+// check never fires while running). Renaming by path is safe on POSIX: the
+// ended stream's fd keeps flushing to the renamed inode while the new stream
+// opens a fresh file.
+function rotateIfNeeded(): void {
+  if (rotating || bytesWritten < MAX_LOG_BYTES || !logFilePath || !prevLogFilePath) return;
+  rotating = true;
+  try {
+    const old = logStream;
+    logStream = null;
+    old?.end();
+    fs.renameSync(logFilePath, prevLogFilePath);
+    logStream = fs.createWriteStream(logFilePath, { flags: 'a' });
+    bytesWritten = 0;
+  } catch {
+    // Rotation is best-effort (e.g. Windows won't rename an open file). Make
+    // sure a usable stream remains so logging keeps working either way.
+    if (!logStream && logFilePath) {
+      try {
+        logStream = fs.createWriteStream(logFilePath, { flags: 'a' });
+        bytesWritten = 0;
+      } catch {
+        // give up on file logging; console still works
+      }
+    }
+  } finally {
+    rotating = false;
+  }
+}
+
 export function initFileLogging(): string | null {
   if (logStream) return getLogFilePath();
   try {
     const logsDir = path.join(app.getPath('userData'), 'logs');
     fs.mkdirSync(logsDir, { recursive: true });
-    const logFile = path.join(logsDir, 'main.log');
+    logFilePath = path.join(logsDir, 'main.log');
+    prevLogFilePath = path.join(logsDir, 'main.prev.log');
 
-    // Keep one previous log around; rotate once the active file passes ~5 MB so
-    // a long-lived install doesn't grow it without bound.
+    // Rotate a large log left over from the previous run before appending.
     try {
-      if (fs.statSync(logFile).size > 5 * 1024 * 1024) {
-        fs.renameSync(logFile, path.join(logsDir, 'main.prev.log'));
+      if (fs.statSync(logFilePath).size > MAX_LOG_BYTES) {
+        fs.renameSync(logFilePath, prevLogFilePath);
       }
     } catch {
       // no existing log yet
     }
 
-    logStream = fs.createWriteStream(logFile, { flags: 'a' });
+    logStream = fs.createWriteStream(logFilePath, { flags: 'a' });
+    bytesWritten = 0;
     logStream.write(
       `\n===== Classifyre ${app.getVersion()} started ${new Date().toISOString()} =====\n`,
     );
@@ -48,7 +89,10 @@ export function initFileLogging(): string | null {
       const original = stream.write.bind(stream);
       stream.write = ((chunk: unknown, ...rest: unknown[]): boolean => {
         try {
-          logStream?.write(chunk as string | Buffer);
+          const data = chunk as string | Buffer;
+          logStream?.write(data);
+          bytesWritten += typeof data === 'string' ? Buffer.byteLength(data) : data.length;
+          rotateIfNeeded();
         } catch {
           // never let logging break the app
         }
@@ -56,7 +100,7 @@ export function initFileLogging(): string | null {
       }) as typeof stream.write;
     }
 
-    return logFile;
+    return logFilePath;
   } catch (err) {
     // Logging must never crash startup.
     console.error('Failed to initialise file logging:', err);
