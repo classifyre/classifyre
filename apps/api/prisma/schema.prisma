@@ -139,6 +139,14 @@ model Finding {
   // in ContentEmbedding so repeated evidence is stored only once.
   embedContentHash   String?      @map("embed_content_hash") @db.VarChar(64)
 
+  // Denormalized copy of FindingEvidenceAnalysis.importanceScore, kept in sync
+  // by a DB trigger (see migration add_finding_importance_and_detected_at_index).
+  // Lets the default "sort by importance" search use a single-table index scan
+  // instead of a full join+sort across the whole findings/evidence tables.
+  // Defaults to 0 so a finding with no evidence analysis yet sorts last under a
+  // plain DESC order (no NULLS-ordering needed, so the @@index matches the DB).
+  importanceScore    Float        @default(0) @map("importance_score")
+
   status           FindingStatus @default(OPEN)
   resolutionReason String?       @map("resolution_reason") @db.Text
   comment          String?       @db.Text
@@ -176,6 +184,11 @@ model Finding {
   @@index([embedContentHash])
   @@index([assetId, lastDetectedAt(sort: Desc)])
   @@index([assetId, status, severity, detectorType, findingType])
+  // Default search ordering: importance desc, then recency.
+  @@index([importanceScore(sort: Desc), lastDetectedAt(sort: Desc)])
+  // Discovery/charts window queries filter on detectedAt (+ status).
+  @@index([detectedAt])
+  @@index([status, detectedAt])
   @@map("findings")
 }
 

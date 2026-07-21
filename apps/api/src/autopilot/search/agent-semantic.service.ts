@@ -86,7 +86,10 @@ export class AgentSemanticService {
         where: { ...where, evidenceAnalysis: { isNot: null } },
         include: { evidenceAnalysis: true },
         orderBy: [
-          { evidenceAnalysis: { importanceScore: 'desc' } },
+          // Denormalized column (trigger-synced with evidenceAnalysis) so the
+          // sort uses the findings importance index; the isNot-null filter above
+          // still restricts to analyzed findings.
+          { importanceScore: 'desc' },
           { id: 'asc' },
         ],
         skip,

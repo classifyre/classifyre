@@ -15,6 +15,49 @@ This chart deploys Classifyre API and Web services with Kubernetes-native CLI jo
 5. Configure ingress TLS, resource requests/limits, and scheduling policy per environment.
 6. Configure `CLASSIFYRE_MASKED_CONFIG_KEY` through Helm-managed or existing Kubernetes Secret.
 
+## Memory & JS Heap Sizing
+
+The API and worker run on Node.js, which caps its V8 **old-space (JS heap) at
+~512 MB by default regardless of the container memory limit**. Left unset, the
+process throws `FATAL ERROR: Ineffective mark-compacts near heap limit —
+JavaScript heap out of memory` and SIGSEGV-restarts (exit 139) far below the
+memory it was granted — while GC thrashing near the ceiling also makes requests
+slow. The chart avoids this by setting `--max-old-space-size` via `NODE_OPTIONS`.
+
+Two knobs, wired together in `templates/_helpers.tpl`:
+
+| Value | Default | Purpose |
+| --- | --- | --- |
+| `api.maxOldSpaceSizeMb` | `1536` | V8 heap cap (MB), applied to **both** the API and worker via `NODE_OPTIONS`. |
+| `api.resources.limits.memory` | `2Gi` | Container hard limit. Must exceed the heap plus native memory. |
+
+**Sizing rule:** keep `maxOldSpaceSizeMb` at roughly **0.75 ×** the memory
+limit (in MB). The container also holds allocations that live *outside* the V8
+heap — Prisma, Buffers, and the transformers.js/onnxruntime embedding model —
+so `heap + native` must fit under the limit or the kernel OOM-kills the pod
+(exit 137). Example ratios:
+
+| `limits.memory` | `maxOldSpaceSizeMb` |
+| --- | --- |
+| `2Gi` | `1536` (default) |
+| `3Gi` | `2304` |
+| `4Gi` | `3072` |
+
+**Graceful shedding (no lost batches).** The chart also sets
+`UNDER_PRESSURE_MAX_HEAP_USED_BYTES` to **85%** of the heap cap. When the API
+heap crosses that line, `CliBackpressureGuard` returns `503` on the six CLI
+ingestion endpoints only; the CLI's retry policy re-sends the batch later, so
+ingestion is throttled rather than lost and the pod sheds load instead of
+crashing. Serving traffic (UI/API reads) is never blocked by this guard. Raise
+the memory limit and `maxOldSpaceSizeMb` together to give ingestion more room;
+both env vars can be overridden per-environment through `api.env`.
+
+> Embedding **inference** only runs in the `SERVICE_ROLE=worker` deployment; the
+> `SERVICE_ROLE=api` pods only *enqueue* embedding jobs (pg-boss). Give the
+> worker enough memory headroom for the model — `worker.resources` is separate
+> from `api.resources`. `api.embedding.batchSize` bounds how many rows the
+> worker embeds per inference batch (lower = smaller memory spikes).
+
 ## Masked Config Encryption Key (Production)
 
 The API requires `CLASSIFYRE_MASKED_CONFIG_KEY` to encrypt/decrypt source `masked` fields.

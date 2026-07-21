@@ -573,7 +573,11 @@ export class FindingsService {
             : params?.ranking?.sort === FindingsRankingSort.SEVERITY
               ? [{ severity: 'asc' }, { lastDetectedAt: 'desc' }]
               : [
-                  { evidenceAnalysis: { importanceScore: 'desc' } },
+                  // Denormalized column (synced by DB trigger) so this uses the
+                  // findings_importance_score_last_detected_at_idx single-table
+                  // index scan instead of a full join+sort across the whole
+                  // findings/finding_evidence_analyses tables.
+                  { importanceScore: 'desc' },
                   { lastDetectedAt: 'desc' },
                 ],
       }),
