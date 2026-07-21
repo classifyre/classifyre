@@ -9,12 +9,18 @@
 -- 2. Add detected_at indexes that the windowed discovery/charts aggregations
 --    filter on (previously only first/last_detected_at were indexed).
 --
--- Every statement is idempotent, and the historical backfill is batched with
--- FOR UPDATE ... SKIP LOCKED committing per batch. Migrations here run
--- non-transactionally and this file may execute during a rolling deploy while
--- the old pods + an active scan are still writing findings; a single bulk
--- UPDATE deadlocks against that live traffic (error 40P01). The trigger is
--- created BEFORE the backfill so no concurrent write is missed in between.
+-- prisma migrate runs each migration inside a transaction, so this file must NOT
+-- use COMMIT / transaction control (that raises 2D000) and cannot use CREATE
+-- INDEX CONCURRENTLY. Every statement is idempotent so a partially-applied
+-- migration can be re-run. The trigger is created BEFORE the backfill so no
+-- concurrent write is missed in between.
+--
+-- NOTE: the single backfill UPDATE below is safe on a fresh/seed DB and during a
+-- maintenance window, but on a large PRODUCTION table under live write load
+-- (rolling deploy with an active scan) it can deadlock against concurrent
+-- finding writes (error 40P01). In that case pause ingestion for the upgrade,
+-- or run the batched FOR UPDATE ... SKIP LOCKED backfill runbook in
+-- helm/operations/README.md and mark this migration applied.
 
 -- AlterTable. NOT NULL DEFAULT 0 so unanalyzed findings sort last under a plain
 -- DESC order (no NULLS-FIRST/LAST handling needed, so the Prisma @@index and the
@@ -43,35 +49,12 @@ CREATE TRIGGER trg_sync_finding_importance_score
 AFTER INSERT OR DELETE OR UPDATE OF "importance_score" ON "finding_evidence_analyses"
 FOR EACH ROW EXECUTE FUNCTION sync_finding_importance_score();
 
--- Deadlock-proof historical backfill: small batches, skipping rows currently
--- locked by live ingestion (they are caught on a later sweep, or synced by the
--- trigger once ingestion commits), committing each batch so locks are released.
-CREATE OR REPLACE PROCEDURE pg_temp_backfill_finding_importance() AS $$
-DECLARE
-  updated integer;
-BEGIN
-  LOOP
-    WITH todo AS (
-      SELECT f."id", e."importance_score" AS score
-      FROM "findings" f
-      JOIN "finding_evidence_analyses" e ON e."finding_id" = f."id"
-      WHERE f."importance_score" IS DISTINCT FROM e."importance_score"
-      FOR UPDATE OF f SKIP LOCKED
-      LIMIT 5000
-    )
-    UPDATE "findings" f
-    SET "importance_score" = todo.score
-    FROM todo
-    WHERE f."id" = todo."id";
-    GET DIAGNOSTICS updated = ROW_COUNT;
-    COMMIT;
-    EXIT WHEN updated = 0;
-  END LOOP;
-END;
-$$ LANGUAGE plpgsql;
-
-CALL pg_temp_backfill_finding_importance();
-DROP PROCEDURE pg_temp_backfill_finding_importance();
+-- Historical backfill. IS DISTINCT FROM keeps it idempotent and cheap on re-run.
+UPDATE "findings" f
+SET "importance_score" = e."importance_score"
+FROM "finding_evidence_analyses" e
+WHERE e."finding_id" = f."id"
+  AND f."importance_score" IS DISTINCT FROM e."importance_score";
 
 -- CreateIndex
 CREATE INDEX IF NOT EXISTS "findings_importance_score_last_detected_at_idx" ON "findings" ("importance_score" DESC, "last_detected_at" DESC);
