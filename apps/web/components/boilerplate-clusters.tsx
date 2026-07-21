@@ -1,5 +1,6 @@
 "use client";
 
+import { nsPath } from "@/lib/ns-path";
 import * as React from "react";
 import { Copy, RotateCw, SlidersHorizontal } from "lucide-react";
 import { api, type BoilerplateClusterDto } from "@workspace/api-client";
@@ -238,7 +239,7 @@ export function BoilerplateClusters({
                   {c.findingIds[0] && (
                     <div className="flex items-center justify-end border-t border-border/60 px-3 py-1.5">
                       <a
-                        href={`/findings/${c.findingIds[0]}`}
+                        href={nsPath(`/findings/${c.findingIds[0]}`)}
                         target="_blank"
                         rel="noreferrer"
                         className="text-[11px] text-muted-foreground underline-offset-2 hover:underline"

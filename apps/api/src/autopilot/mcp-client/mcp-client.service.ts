@@ -1,9 +1,4 @@
-import {
-  Injectable,
-  Logger,
-  OnApplicationBootstrap,
-  OnModuleDestroy,
-} from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
@@ -28,9 +23,7 @@ interface RegisteredTool {
  * breaks the harness. Call refresh() after any server config change.
  */
 @Injectable()
-export class McpClientService
-  implements OnApplicationBootstrap, OnModuleDestroy
-{
+export class McpClientService implements OnModuleDestroy {
   private readonly logger = new Logger(McpClientService.name);
   /** toolName → metadata, for scoping per mission. */
   private readonly tools = new Map<string, RegisteredTool>();
@@ -44,13 +37,9 @@ export class McpClientService
     private readonly registry: ToolRegistry,
   ) {}
 
-  async onApplicationBootstrap(): Promise<void> {
-    await this.refresh().catch((e) =>
-      this.logger.warn(
-        `Initial MCP refresh failed: ${e instanceof Error ? e.message : String(e)}`,
-      ),
-    );
-  }
+  // No boot-time refresh: there is no namespace context at startup, and the
+  // outbound-MCP server list is per-namespace. refresh() is invoked at request
+  // time (in a namespace context) when a server config changes.
 
   async onModuleDestroy(): Promise<void> {
     await this.closeAll();

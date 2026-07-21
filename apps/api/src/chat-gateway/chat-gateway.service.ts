@@ -1,11 +1,7 @@
-import {
-  Injectable,
-  Logger,
-  OnApplicationBootstrap,
-  OnModuleDestroy,
-} from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { WebClient } from '@slack/web-api';
 import { ChatPlatform, type ChatBot } from '@prisma/client';
+import { ClsService } from 'nestjs-cls';
 import { PrismaService } from '../prisma.service';
 import { MaskedConfigCryptoService } from '../masked-config-crypto.service';
 import type {
@@ -20,6 +16,18 @@ import { SlackConnector } from './connectors/slack.connector';
 import { TelegramConnector } from './connectors/telegram.connector';
 import { runsBackgroundWorkers } from '../service-role';
 import { stableJsonHash } from '../utils/stable-json';
+import {
+  CLS_SCHEMA,
+  CLS_NAMESPACE_ID,
+  CLS_SLUG,
+} from '../namespace/namespace.constants';
+
+/** Captured namespace context so detached connector callbacks can re-enter CLS. */
+interface NsCtx {
+  schema?: string;
+  namespaceId?: string;
+  slug?: string;
+}
 
 interface ActivityEntry {
   at: Date;
@@ -61,43 +69,61 @@ const CONFIG_WATCH_INTERVAL_MS = 60_000;
  * check instead of a direct refresh() call.
  */
 @Injectable()
-export class ChatGatewayService
-  implements OnApplicationBootstrap, OnModuleDestroy
-{
+export class ChatGatewayService implements OnModuleDestroy {
   private readonly logger = new Logger(ChatGatewayService.name);
   private readonly connectors = new Map<string, ChatConnector>();
   private readonly runtimes = new Map<string, BotRuntime>();
-  private refreshing = false;
-  private configWatchTimer?: NodeJS.Timeout;
-  private lastConfigRevision?: string;
+  /** Bot ids per namespace schema, for per-namespace teardown. */
+  private readonly schemaBots = new Map<string, Set<string>>();
+  private readonly refreshing = new Set<string>();
+  private readonly lastConfigRevision = new Map<string, string>();
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly crypto: MaskedConfigCryptoService,
     private readonly agent: ChatAgentService,
+    private readonly cls: ClsService,
   ) {}
 
-  async onApplicationBootstrap(): Promise<void> {
-    if (!runsBackgroundWorkers()) {
-      this.logger.log(
-        'SERVICE_ROLE=api: chat connectors left to the worker deployment',
-      );
-      return;
-    }
-    await this.refresh().catch((e) =>
-      this.logger.warn(
-        `Initial chat gateway refresh failed: ${e instanceof Error ? e.message : String(e)}`,
-      ),
-    );
-    this.configWatchTimer = setInterval(() => {
-      void this.refreshIfConfigChanged().catch(() => undefined);
-    }, CONFIG_WATCH_INTERVAL_MS);
-    this.configWatchTimer.unref();
+  async onModuleDestroy(): Promise<void> {
+    await this.stopAll();
   }
 
-  async onModuleDestroy(): Promise<void> {
-    if (this.configWatchTimer) clearInterval(this.configWatchTimer);
-    await this.stopAll();
+  private captureCtx(): NsCtx {
+    return {
+      schema: this.cls.get<string>(CLS_SCHEMA),
+      namespaceId: this.cls.get<string>(CLS_NAMESPACE_ID),
+      slug: this.cls.get<string>(CLS_SLUG),
+    };
+  }
+
+  /** Re-enter a captured namespace context (for detached connector callbacks). */
+  private runCtx<T>(ctx: NsCtx, fn: () => T): T {
+    return this.cls.run(() => {
+      if (ctx.schema) this.cls.set(CLS_SCHEMA, ctx.schema);
+      if (ctx.namespaceId) this.cls.set(CLS_NAMESPACE_ID, ctx.namespaceId);
+      if (ctx.slug) this.cls.set(CLS_SLUG, ctx.slug);
+      return fn();
+    });
+  }
+
+  /** Poll interval used by the worker manager's config-watch loop. */
+  static readonly CONFIG_WATCH_INTERVAL_MS = CONFIG_WATCH_INTERVAL_MS;
+
+  /** Stop every connector belonging to a namespace schema (on ns delete/stop). */
+  async stopForSchema(schema: string): Promise<void> {
+    const botIds = this.schemaBots.get(schema);
+    if (!botIds) return;
+    const stopping: Promise<void>[] = [];
+    for (const botId of botIds) {
+      const connector = this.connectors.get(botId);
+      if (connector) stopping.push(connector.stop().catch(() => undefined));
+      this.connectors.delete(botId);
+      this.runtimes.delete(botId);
+    }
+    this.schemaBots.delete(schema);
+    this.lastConfigRevision.delete(schema);
+    await Promise.all(stopping);
   }
 
   /**
@@ -123,24 +149,36 @@ export class ChatGatewayService
     return stableJsonHash(bots);
   }
 
-  private async refreshIfConfigChanged(): Promise<void> {
+  /** Re-refresh the CURRENT namespace's connectors if its bot config changed. */
+  async refreshIfConfigChanged(): Promise<void> {
+    const schema = this.cls.get<string>(CLS_SCHEMA);
+    if (!schema) return;
     const revision = await this.configRevision();
-    if (revision === this.lastConfigRevision) return;
+    if (revision === this.lastConfigRevision.get(schema)) return;
     await this.refresh();
   }
 
-  /** Rebuild every connector from the current ChatBot rows. */
+  /**
+   * Rebuild every connector for the CURRENT namespace from its ChatBot rows.
+   * Invoked by the NamespaceWorkerManager inside the namespace's CLS context.
+   */
   async refresh(): Promise<void> {
     if (!runsBackgroundWorkers()) return;
-    if (this.refreshing) return;
-    this.refreshing = true;
+    const schema = this.cls.get<string>(CLS_SCHEMA);
+    if (!schema) return;
+    if (this.refreshing.has(schema)) return;
+    this.refreshing.add(schema);
+    const ctx = this.captureCtx();
     try {
-      await this.stopAll();
-      this.lastConfigRevision = await this.configRevision();
+      await this.stopForSchema(schema);
+      this.lastConfigRevision.set(schema, await this.configRevision());
       const bots = await this.prisma.chatBot.findMany({
         where: { enabled: true },
       });
+      const botIds = new Set<string>();
+      this.schemaBots.set(schema, botIds);
       for (const bot of bots) {
+        botIds.add(bot.id);
         this.runtimes.set(bot.id, {
           connectedAt: null,
           lastEventAt: null,
@@ -150,7 +188,7 @@ export class ChatGatewayService
           activity: [],
         });
         try {
-          const connector = this.buildConnector(bot);
+          const connector = this.buildConnector(bot, ctx);
           await connector.start();
           this.connectors.set(bot.id, connector);
           const runtime = this.runtimes.get(bot.id);
@@ -168,7 +206,7 @@ export class ChatGatewayService
         }
       }
     } finally {
-      this.refreshing = false;
+      this.refreshing.delete(schema);
     }
   }
 
@@ -282,13 +320,16 @@ export class ChatGatewayService
     return checks;
   }
 
-  private buildConnector(bot: ChatBot): ChatConnector {
+  private buildConnector(bot: ChatBot, ctx: NsCtx): ChatConnector {
     const botToken = this.crypto.decryptString(bot.botTokenEnc);
     const logActivity = (
       level: 'INFO' | 'ERROR',
       code: ChatEventCode,
       params?: Record<string, string>,
     ) => this.recordActivity(bot.id, level, code, params);
+    // Connector poll loops fire these callbacks OUTSIDE any request context, so
+    // every callback that touches tenant data must re-enter this namespace's
+    // CLS context (captured when the connector was built).
     if (bot.platform === ChatPlatform.SLACK) {
       if (!bot.appTokenEnc) {
         throw new Error(
@@ -297,27 +338,34 @@ export class ChatGatewayService
       }
       const appToken = this.crypto.decryptString(bot.appTokenEnc);
       return new SlackConnector(bot, botToken, appToken, {
-        handleMessage: (b, m) => this.handleMessage(b, m),
-        saveStatus: (botId, error) => this.saveStatus(botId, error),
+        handleMessage: (b, m) => this.runCtx(ctx, () => this.handleMessage(b, m)),
+        saveStatus: (botId, error) =>
+          this.runCtx(ctx, () => this.saveStatus(botId, error)),
         logActivity,
-        hasSession: async (botId, chatKey) =>
-          (await this.prisma.chatSession.findUnique({
-            where: {
-              botId_externalChatKey: { botId, externalChatKey: chatKey },
-            },
-            select: { id: true },
-          })) !== null,
+        hasSession: (botId, chatKey) =>
+          this.runCtx(
+            ctx,
+            async () =>
+              (await this.prisma.chatSession.findUnique({
+                where: {
+                  botId_externalChatKey: { botId, externalChatKey: chatKey },
+                },
+                select: { id: true },
+              })) !== null,
+          ),
       });
     }
     return new TelegramConnector(bot, botToken, {
-      handleMessage: (b, m) => this.handleMessage(b, m),
-      saveOffset: async (botId, lastUpdateId) => {
-        await this.prisma.chatBot.update({
-          where: { id: botId },
-          data: { telegramLastUpdateId: lastUpdateId },
-        });
-      },
-      saveStatus: (botId, error) => this.saveStatus(botId, error),
+      handleMessage: (b, m) => this.runCtx(ctx, () => this.handleMessage(b, m)),
+      saveOffset: (botId, lastUpdateId) =>
+        this.runCtx(ctx, async () => {
+          await this.prisma.chatBot.update({
+            where: { id: botId },
+            data: { telegramLastUpdateId: lastUpdateId },
+          });
+        }),
+      saveStatus: (botId, error) =>
+        this.runCtx(ctx, () => this.saveStatus(botId, error)),
       logActivity,
     });
   }

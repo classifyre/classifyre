@@ -22,6 +22,7 @@ import { Button } from "@workspace/ui/components/button";
 import { Eye, Settings } from "lucide-react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
+import { useNamespace } from "@/components/namespace-provider";
 import { api } from "@workspace/api-client";
 import { ThemeToggle } from "./theme-toggle";
 import {
@@ -107,6 +108,7 @@ export function DashboardLayout({
 }) {
   const pathname = usePathname();
   const { t } = useTranslation();
+  const { nsHref } = useNamespace();
   const { demoMode } = serverConfig;
 
   const segmentLabelMap: Record<string, string> = {
@@ -128,8 +130,11 @@ export function DashboardLayout({
   const [findingAssetCrumbs, setFindingAssetCrumbs] = React.useState<
     Record<string, FindingAssetCrumb>
   >({});
+  // Route segments AFTER the leading `[namespaceSlug]` segment, so breadcrumbs
+  // and dynamic-label resolution operate on the real app path (e.g. sources,
+  // assets/:id) and never treat the namespace slug as a route.
   const segments = React.useMemo(
-    () => pathname.split("/").filter(Boolean),
+    () => pathname.split("/").filter(Boolean).slice(1),
     [pathname],
   );
 
@@ -196,7 +201,7 @@ export function DashboardLayout({
                   response.asset?.externalUrl?.trim() ||
                   `Asset ${assetId.slice(0, 8)}`;
                 findingAssetUpdates[segment] = {
-                  href: `/assets/${assetId}`,
+                  href: nsHref(`/assets/${assetId}`),
                   label: assetLabel,
                 };
               }
@@ -235,7 +240,7 @@ export function DashboardLayout({
 
   const breadcrumbs = React.useMemo<BreadcrumbEntry[]>(() => {
     const baseCrumbs = segments.map((segment, index) => ({
-      href: `/${segments.slice(0, index + 1).join("/")}`,
+      href: nsHref(`/${segments.slice(0, index + 1).join("/")}`),
       label:
         resolvedDynamicLabels[`${segments[index - 1]}:${segment}`] ||
         formatSegmentLabel(segment, segmentLabelMap, t, segments[index - 1]),
@@ -286,7 +291,7 @@ export function DashboardLayout({
                   <BreadcrumbList>
                     <BreadcrumbItem>
                       <BreadcrumbLink asChild>
-                        <Link href="/">{t("breadcrumb.home")}</Link>
+                        <Link href={nsHref("/")}>{t("breadcrumb.home")}</Link>
                       </BreadcrumbLink>
                     </BreadcrumbItem>
                     {breadcrumbs.map((crumb) => (

@@ -1,5 +1,6 @@
 "use client";
 
+import { nsPath } from "@/lib/ns-path";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { formatDate, formatRelative } from "@/lib/date";
@@ -470,7 +471,7 @@ export function RunnerAssetsTable({
                     <RunnerAssetRow
                       key={`${item.runnerId}-${item.assetHash}`}
                       item={item}
-                      onAssetClick={(id) => router.push(`/assets/${id}`)}
+                      onAssetClick={(id) => router.push(nsPath(`/assets/${id}`))}
                       t={t}
                     />
                   ))}

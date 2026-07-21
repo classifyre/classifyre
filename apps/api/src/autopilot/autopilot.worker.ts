@@ -1,4 +1,4 @@
-import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import type { Job } from 'pg-boss';
 import { AgentKind, AgentRunStatus, InstanceSettings } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
@@ -9,7 +9,6 @@ import { AgentAuditService } from './audit/agent-audit.service';
 import { AgentLoggerService } from './audit/agent-logger.service';
 import { AgentSearchService } from './search/agent-search.service';
 import { HarnessService } from './harness/harness.service';
-import { runsBackgroundWorkers } from '../service-role';
 import { AgentRunCancelledError } from './agent-runtime';
 import type { ApplySummary } from './decision-applier.service';
 import {
@@ -46,7 +45,7 @@ interface CycleInput {
  *    open data with an operator instruction, both agents treated as enabled.
  */
 @Injectable()
-export class AutopilotWorker implements OnApplicationBootstrap {
+export class AutopilotWorker {
   private readonly logger = new Logger(AutopilotWorker.name);
 
   constructor(
@@ -58,12 +57,15 @@ export class AutopilotWorker implements OnApplicationBootstrap {
     private readonly harness: HarnessService,
   ) {}
 
-  async onApplicationBootstrap(): Promise<void> {
-    if (!runsBackgroundWorkers()) return;
+  /**
+   * Registers this worker on the CURRENT namespace's pg-boss (invoked by the
+   * NamespaceWorkerManager inside the namespace's CLS context).
+   */
+  async registerForNamespace(): Promise<void> {
     const boss = await this.pgBoss.getBossAsync();
     await boss.createQueue(AUTOPILOT_QUEUE);
-    await boss.work(AUTOPILOT_QUEUE, { localConcurrency: 1 }, (jobs: Job[]) =>
-      this.handle(jobs),
+    await this.pgBoss.work(AUTOPILOT_QUEUE, { localConcurrency: 1 }, (jobs) =>
+      this.handle(jobs as Job[]),
     );
     // Every-other-day "dreaming": memory consolidation on a pg-boss schedule.
     try {
@@ -110,19 +112,9 @@ export class AutopilotWorker implements OnApplicationBootstrap {
       ).filter((k) => typeof k === 'string' && k in AgentKind);
       const only: AgentKind[] | null = requested.length > 0 ? requested : null;
       if (!sourceId && !manual && !only) continue;
-      // Namespace-isolation guard: pg-boss queues can be shared across
-      // namespace deployments (and were, before the per-namespace pg-boss
-      // schema), so a dequeued job may reference a source/runner from another
-      // namespace. Executing it would persist foreign agent runs into this
-      // namespace's provenance — drop it loudly instead.
-      if (!(await this.jobBelongsToThisNamespace(sourceId, runnerId))) {
-        this.logger.warn(
-          `Skipping autopilot job for unknown source/runner ` +
-            `(sourceId=${sourceId}, runnerId=${runnerId}) — ` +
-            `not found in this namespace; likely enqueued by another namespace.`,
-        );
-        continue;
-      }
+      // Per-namespace pg-boss (schema pgboss_<slug>) guarantees a job can only
+      // be dequeued by its own namespace's worker, so the previous
+      // cross-namespace source/runner existence guard is no longer needed.
       await this.runCycle({
         sourceId,
         runnerId,
@@ -137,31 +129,6 @@ export class AutopilotWorker implements OnApplicationBootstrap {
         trigger: manual ? 'manual' : 'scan_completed',
       });
     }
-  }
-
-  /**
-   * True when the job's source/runner (if any) exist in this deployment's
-   * schema. A miss means the job belongs to a different namespace.
-   */
-  private async jobBelongsToThisNamespace(
-    sourceId: string | null,
-    runnerId: string | null,
-  ): Promise<boolean> {
-    if (sourceId) {
-      const source = await this.prisma.source.findUnique({
-        where: { id: sourceId },
-        select: { id: true },
-      });
-      if (!source) return false;
-    }
-    if (runnerId) {
-      const runner = await this.prisma.runner.findUnique({
-        where: { id: runnerId },
-        select: { id: true },
-      });
-      if (!runner) return false;
-    }
-    return true;
   }
 
   /** Scheduled or manually requested dream (memory consolidation) cycle. */

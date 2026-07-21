@@ -1,5 +1,6 @@
 "use client";
 
+import { nsPath } from "@/lib/ns-path";
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -123,7 +124,7 @@ export function FingerprintsCaseDialog({
         }),
       );
       onOpenChange(false);
-      router.push(`/investigations/${res.caseId}`);
+      router.push(nsPath(`/investigations/${res.caseId}`));
     } catch (e) {
       toast.error(e instanceof Error ? e.message : t("correlation.caseAction.failed"));
     } finally {

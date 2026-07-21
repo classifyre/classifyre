@@ -1,5 +1,6 @@
 "use client";
 
+import { nsPath } from "@/lib/ns-path";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { formatDate, formatRelative, formatShortUTC } from "@/lib/date";
@@ -1102,7 +1103,7 @@ export function AssetsTable({
                                   size="sm"
                                   className="h-auto max-w-[280px] justify-start p-0 text-left"
                                   onClick={() =>
-                                    router.push(`/assets/${asset.id}`)
+                                    router.push(nsPath(`/assets/${asset.id}`))
                                   }
                                   data-testid="asset-name"
                                 >
@@ -1131,7 +1132,7 @@ export function AssetsTable({
                               size="sm"
                               className="h-auto justify-start p-0 text-left text-sm"
                               onClick={() =>
-                                router.push(`/sources/${asset.sourceId}`)
+                                router.push(nsPath(`/sources/${asset.sourceId}`))
                               }
                             >
                               {sourceName}
@@ -1271,7 +1272,7 @@ export function AssetsTable({
                             <FindingsSubTable
                               findings={item.findings}
                               onFindingClick={(findingId) =>
-                                router.push(`/findings/${findingId}`)
+                                router.push(nsPath(`/findings/${findingId}`))
                               }
                               t={t}
                             />

@@ -3,11 +3,13 @@ import {
   Injectable,
   Logger,
   NotFoundException,
-  OnApplicationBootstrap,
+  Optional,
 } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { FindingStatus, Prisma } from '@prisma/client';
+import { ClsService } from 'nestjs-cls';
 import { PrismaService } from '../prisma.service';
+import { CLS_SCHEMA } from '../namespace/namespace.constants';
 import { UnionFind } from '../utils/union-find';
 import { mapBounded } from '../utils/map-bounded';
 import { EmbeddingCapabilityService } from './embedding-capability.service';
@@ -44,24 +46,28 @@ const OUTLIER_BONUS_THRESHOLD = 0.55;
 const RECALIBRATE_BATCH_SIZE = 500;
 
 @Injectable()
-export class EmbeddingService implements OnApplicationBootstrap {
+export class EmbeddingService {
   private readonly logger = new Logger(EmbeddingService.name);
   private readonly config: EmbeddingConfigService;
-  private configuredSpacePromise?: ReturnType<EmbeddingService['ensureSpace']>;
-  private configuredSpaceId?: string;
+  // Per-namespace-schema caches — each tenant has its own embedding space row.
+  private readonly configuredSpacePromises = new Map<
+    string,
+    ReturnType<EmbeddingService['ensureSpace']>
+  >();
+  private readonly configuredSpaceIds = new Map<string, string>();
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly capability: EmbeddingCapabilityService,
     private readonly analysis: EmbeddingAnalysisService,
     config?: EmbeddingConfigService,
+    @Optional() private readonly cls?: ClsService,
   ) {
     this.config = config ?? new EmbeddingConfigService();
   }
 
-  async onApplicationBootstrap(): Promise<void> {
-    await this.capability.ensureReady();
-    await this.configuredSpace();
+  private schemaKey(): string {
+    return this.cls?.get<string>(CLS_SCHEMA) ?? '__default__';
   }
 
   status() {
@@ -73,20 +79,21 @@ export class EmbeddingService implements OnApplicationBootstrap {
       provider: this.config.provider,
       model: this.config.model,
       dimensions: this.config.dimensions,
-      spaceId: this.configuredSpaceId,
+      spaceId: this.configuredSpaceIds.get(this.schemaKey()),
     };
   }
 
   configuredSpace() {
-    if (!this.configuredSpacePromise) {
-      this.configuredSpacePromise = this.ensureSpace(this.config.space()).then(
-        (space) => {
-          this.configuredSpaceId = space.id;
-          return space;
-        },
-      );
+    const key = this.schemaKey();
+    let promise = this.configuredSpacePromises.get(key);
+    if (!promise) {
+      promise = this.ensureSpace(this.config.space()).then((space) => {
+        this.configuredSpaceIds.set(key, space.id);
+        return space;
+      });
+      this.configuredSpacePromises.set(key, promise);
     }
-    return this.configuredSpacePromise;
+    return promise;
   }
 
   async ensureSpace(

@@ -359,7 +359,7 @@ describe('CliRunnerService', () => {
     prisma.runner.update.mockResolvedValue({});
     prisma.source.updateMany.mockResolvedValue({ count: 1 });
 
-    await service.onApplicationBootstrap();
+    await service.reconcileOnStartup();
 
     expect(prisma.runner.findMany).toHaveBeenCalledWith({
       where: { status: { in: ['PENDING', 'RUNNING'] } },
@@ -413,7 +413,7 @@ describe('CliRunnerService', () => {
     prisma.runner.findUnique.mockResolvedValue(null);
     prisma.source.update.mockResolvedValue({});
 
-    await service.onApplicationBootstrap();
+    await service.reconcileOnStartup();
 
     expect(prisma.source.update).toHaveBeenCalledWith({
       where: { id: 'source-1' },

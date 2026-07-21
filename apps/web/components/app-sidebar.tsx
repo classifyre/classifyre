@@ -4,6 +4,7 @@ import * as React from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useNamespace } from "@/components/namespace-provider";
 
 import {
   Sidebar,
@@ -38,6 +39,11 @@ import {
 export function AppSidebar() {
   const pathname = usePathname();
   const { t } = useTranslation();
+  const { nsHref } = useNamespace();
+  const isActivePath = (href: string) => {
+    const full = nsHref(href);
+    return pathname === full || pathname.startsWith(full + "/");
+  };
 
   const mainNavigation: { title: string; href: string; icon: LucideIcon }[] = [
     { title: t("nav.overview"), href: "/discovery", icon: LayoutDashboard },
@@ -62,7 +68,7 @@ export function AppSidebar() {
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild>
-              <Link href="/">
+              <Link href={nsHref("/")}>
                 <div className="flex aspect-square size-8 items-center justify-center overflow-hidden rounded-lg">
                   <Image
                     src="/clasifyre_icon.png"
@@ -91,8 +97,7 @@ export function AppSidebar() {
             <SidebarMenu>
               {mainNavigation.map((item) => {
                 const isActive =
-                  pathname === item.href ||
-                  pathname.startsWith(item.href + "/");
+                  isActivePath(item.href);
                 return (
                   <SidebarMenuItem key={item.href}>
                     <SidebarMenuButton
@@ -100,7 +105,7 @@ export function AppSidebar() {
                       isActive={isActive}
                       tooltip={item.title}
                     >
-                      <Link href={item.href}>
+                      <Link href={nsHref(item.href)}>
                         <item.icon className="size-5" />
                         <span>{item.title}</span>
                       </Link>
@@ -117,8 +122,7 @@ export function AppSidebar() {
             <SidebarMenu>
               {operationsNavigation.map((item) => {
                 const isActive =
-                  pathname === item.href ||
-                  pathname.startsWith(item.href + "/");
+                  isActivePath(item.href);
                 return (
                   <SidebarMenuItem key={item.href}>
                     <SidebarMenuButton
@@ -126,7 +130,7 @@ export function AppSidebar() {
                       isActive={isActive}
                       tooltip={item.title}
                     >
-                      <Link href={item.href}>
+                      <Link href={nsHref(item.href)}>
                         <item.icon className="size-5" />
                         <span>{item.title}</span>
                       </Link>
@@ -145,11 +149,11 @@ export function AppSidebar() {
             <SidebarMenuButton
               asChild
               isActive={
-                pathname === "/harness" || pathname.startsWith("/harness/")
+                isActivePath("/harness")
               }
               tooltip={t("nav.harness")}
             >
-              <Link href="/harness">
+              <Link href={nsHref("/harness")}>
                 <Bot className="size-6 text-[#d97706]" />
                 <span>{t("nav.harness")}</span>
               </Link>
@@ -159,11 +163,11 @@ export function AppSidebar() {
             <SidebarMenuButton
               asChild
               isActive={
-                pathname === "/settings" || pathname.startsWith("/settings/")
+                isActivePath("/settings")
               }
               tooltip={t("nav.settings")}
             >
-              <Link href="/settings">
+              <Link href={nsHref("/settings")}>
                 <Settings className="size-6" />
                 <span>{t("nav.settings")}</span>
               </Link>

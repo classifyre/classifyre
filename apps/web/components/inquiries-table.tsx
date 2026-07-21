@@ -1,5 +1,6 @@
 "use client";
 
+import { nsPath } from "@/lib/ns-path";
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { formatDate, formatRelative, formatShortUTC } from "@/lib/date";
@@ -301,7 +302,7 @@ export function InquiriesTable() {
                     <Fragment key={q.id}>
                       <TableRow
                         className={`cursor-pointer hover:bg-muted/40 ${archived ? "opacity-60" : ""}`}
-                        onClick={() => router.push(`/investigations/inquiries/${q.id}`)}
+                        onClick={() => router.push(nsPath(`/investigations/inquiries/${q.id}`))}
                       >
                         <TableCell className="max-w-[420px]">
                           <div className="flex items-center gap-2">

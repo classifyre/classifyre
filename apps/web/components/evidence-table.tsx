@@ -1,5 +1,6 @@
 "use client";
 
+import { nsPath } from "@/lib/ns-path";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { formatDate, formatRelative, formatShortUTC } from "@/lib/date";
@@ -349,7 +350,7 @@ function FindingsSubTable({
                   <Fingerprint className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                   <button
                     className="text-left hover:underline"
-                    onClick={() => router.push(`/findings/${f.findingId}`)}
+                    onClick={() => router.push(nsPath(`/findings/${f.findingId}`))}
                   >
                     {f.findingLabel}
                   </button>
@@ -748,7 +749,7 @@ export function EvidenceTable({
                               {isAsset ? (
                                 <button
                                   className="block max-w-[260px] truncate text-left text-sm font-medium hover:underline"
-                                  onClick={() => router.push(`/assets/${e.entityId}`)}
+                                  onClick={() => router.push(nsPath(`/assets/${e.entityId}`))}
                                 >
                                   {label}
                                 </button>

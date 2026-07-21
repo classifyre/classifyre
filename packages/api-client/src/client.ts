@@ -990,13 +990,116 @@ function getBaseUrl(): string {
   return getServerApiBaseUrl();
 }
 
+// The active namespace (tenant) slug. Every REST call is rewritten to
+// `<basePath>/<slug>/<path>` so the API resolves the tenant from the leading
+// path segment (the same contract the CLI and MCP use). Set by the web app's
+// NamespaceProvider from the current route; unset outside a namespace (e.g. the
+// landing page and the /namespaces registry endpoints, which must NOT be
+// prefixed).
+let activeNamespaceSlug: string | undefined;
+
+export function setActiveNamespaceSlug(slug: string | undefined): void {
+  activeNamespaceSlug = slug || undefined;
+}
+
+export function getActiveNamespaceSlug(): string | undefined {
+  return activeNamespaceSlug;
+}
+
+/** Requests to these top-level paths are never namespace-scoped. */
+function isReservedApiPath(pathAfterBase: string): boolean {
+  const first = pathAfterBase.replace(/^\/+/, "").split("/")[0] ?? "";
+  return first === "namespaces" || first === "health" || first === "ping";
+}
+
 // API configuration
 function createConfiguration(baseUrl?: string): Configuration {
   const basePath = baseUrl || getBaseUrl();
+  const trimmedBase = basePath.replace(/\/+$/, "");
 
   return new Configuration({
     basePath,
+    middleware: [
+      {
+        pre: async (context) => {
+          const slug = activeNamespaceSlug;
+          if (!slug || !context.url.startsWith(basePath)) return;
+          const rest = context.url.slice(basePath.length);
+          const normalized = rest.startsWith("/") ? rest : `/${rest}`;
+          if (isReservedApiPath(normalized)) return;
+          return {
+            url: `${trimmedBase}/${slug}${normalized}`,
+            init: context.init,
+          };
+        },
+      },
+    ],
   });
+}
+
+// Namespace (tenant) registry. Hand-written (not in the OpenAPI spec) and
+// deliberately NOT namespace-prefixed — these run against the `public` registry.
+export interface Namespace {
+  id: string;
+  name: string;
+  slug: string;
+  schemaName: string;
+  description: string | null;
+  type: "local" | "remote";
+  remoteUrl: string | null;
+  thumbnail: string | null;
+  settings: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+  lastOpenedAt: string | null;
+}
+
+export interface CreateNamespaceInput {
+  name: string;
+  slug?: string;
+  description?: string;
+  type?: "local" | "remote";
+  remoteUrl?: string;
+}
+
+class NamespacesApi {
+  constructor(private readonly basePath: string) {}
+
+  private url(suffix = ""): string {
+    return `${this.basePath.replace(/\/+$/, "")}/namespaces${suffix}`;
+  }
+
+  async list(): Promise<Namespace[]> {
+    const res = await fetch(this.url(), { cache: "no-store" });
+    if (!res.ok) throw new Error(`Failed to list namespaces (${res.status})`);
+    return (await res.json()) as Namespace[];
+  }
+
+  async create(input: CreateNamespaceInput): Promise<Namespace> {
+    const res = await fetch(this.url(), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    });
+    if (!res.ok) {
+      let message = `Failed to create namespace (${res.status})`;
+      try {
+        const body = (await res.json()) as { message?: string };
+        if (body?.message) message = body.message;
+      } catch {
+        // keep default
+      }
+      throw new Error(message);
+    }
+    return (await res.json()) as Namespace;
+  }
+
+  async remove(id: string): Promise<void> {
+    const res = await fetch(this.url(`/${id}`), { method: "DELETE" });
+    if (!res.ok && res.status !== 204) {
+      throw new Error(`Failed to delete namespace (${res.status})`);
+    }
+  }
 }
 
 // API client singleton
@@ -1020,9 +1123,11 @@ class ApiClient {
   public chatBots: ChatBotsApi;
   public embeddings: EmbeddingsApi;
   public glossary: GlossaryApi;
+  public namespaces: NamespacesApi;
 
   constructor(baseUrl?: string) {
     this.config = createConfiguration(baseUrl);
+    this.namespaces = new NamespacesApi(this.config.basePath);
 
     this.sources = new SourcesApi(this.config);
     this.assets = new AssetsApi(this.config);
@@ -1043,10 +1148,20 @@ class ApiClient {
     this.glossary = new GlossaryApi(this.config);
   }
 
+  /**
+   * Base URL for the hand-written `search/*` fetches, namespace-scoped like the
+   * generated APIs (which get the slug via the request middleware). These raw
+   * fetches bypass that middleware, so the slug is appended here instead.
+   */
+  private searchBase(): string {
+    const base = this.config.basePath.replace(/\/+$/, "");
+    return activeNamespaceSlug ? `${base}/${activeNamespaceSlug}` : base;
+  }
+
   async searchAssets(
     request: SearchAssetsRequestInputDto,
   ): Promise<GeneratedSearchAssetsResponseDto> {
-    const basePath = this.config.basePath.replace(/\/$/, "");
+    const basePath = this.searchBase();
     const response = await fetch(`${basePath}/search/assets`, {
       method: "POST",
       headers: {
@@ -1068,7 +1183,7 @@ class ApiClient {
   async searchAssetsCharts(
     request: SearchAssetsChartsRequestInputDto = {},
   ): Promise<GeneratedSearchAssetsChartsResponseDto> {
-    const basePath = this.config.basePath.replace(/\/$/, "");
+    const basePath = this.searchBase();
     const response = await fetch(`${basePath}/search/assets/charts`, {
       method: "POST",
       headers: {
@@ -1090,7 +1205,7 @@ class ApiClient {
   async searchFindingsCharts(
     request: GeneratedSearchFindingsChartsRequestDto = {},
   ): Promise<GeneratedSearchFindingsChartsResponseDto> {
-    const basePath = this.config.basePath.replace(/\/$/, "");
+    const basePath = this.searchBase();
     const response = await fetch(`${basePath}/search/findings/charts`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -1110,7 +1225,7 @@ class ApiClient {
   async searchSources(
     request: GeneratedSearchSourcesRequestDto = {},
   ): Promise<GeneratedSearchSourcesResponseDto> {
-    const basePath = this.config.basePath.replace(/\/$/, "");
+    const basePath = this.searchBase();
     const response = await fetch(`${basePath}/search/sources`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -1130,7 +1245,7 @@ class ApiClient {
   async searchRunners(
     request: SearchRunnersRequestInputDto = {},
   ): Promise<SearchRunnersResponseDto> {
-    const basePath = this.config.basePath.replace(/\/$/, "");
+    const basePath = this.searchBase();
     const response = await fetch(`${basePath}/search/runners`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -1150,7 +1265,7 @@ class ApiClient {
   async searchRunnersCharts(
     request: SearchRunnersChartsRequestInputDto = {},
   ): Promise<SearchRunnersChartsResponseDto> {
-    const basePath = this.config.basePath.replace(/\/$/, "");
+    const basePath = this.searchBase();
     const response = await fetch(`${basePath}/search/runners/charts`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -1170,7 +1285,7 @@ class ApiClient {
   async searchRunnerAssets(
     request: SearchRunnerAssetsRequestInputDto,
   ): Promise<SearchRunnerAssetsResponseDto> {
-    const basePath = this.config.basePath.replace(/\/$/, "");
+    const basePath = this.searchBase();
     const response = await fetch(`${basePath}/search/runner-assets`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -1190,7 +1305,7 @@ class ApiClient {
   async listCustomDetectors(params?: {
     includeInactive?: boolean;
   }): Promise<CustomDetectorResponseDto[]> {
-    const basePath = this.config.basePath.replace(/\/$/, "");
+    const basePath = this.searchBase();
     const query = new URLSearchParams();
     if (params?.includeInactive) {
       query.set("includeInactive", "true");
@@ -1212,7 +1327,7 @@ class ApiClient {
   }
 
   async listCustomDetectorExamples(): Promise<CustomDetectorExampleDto[]> {
-    const basePath = this.config.basePath.replace(/\/$/, "");
+    const basePath = this.searchBase();
     const response = await fetch(`${basePath}/custom-detectors/examples`);
 
     if (!response.ok) {
@@ -1226,7 +1341,7 @@ class ApiClient {
   }
 
   async getCustomDetector(id: string): Promise<CustomDetectorResponseDto> {
-    const basePath = this.config.basePath.replace(/\/$/, "");
+    const basePath = this.searchBase();
     const response = await fetch(`${basePath}/custom-detectors/${id}`);
 
     if (!response.ok) {
@@ -1242,7 +1357,7 @@ class ApiClient {
   async createCustomDetector(
     payload: CreateCustomDetectorDto,
   ): Promise<CustomDetectorResponseDto> {
-    const basePath = this.config.basePath.replace(/\/$/, "");
+    const basePath = this.searchBase();
     const response = await fetch(`${basePath}/custom-detectors`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -1263,7 +1378,7 @@ class ApiClient {
     id: string,
     payload: UpdateCustomDetectorDto,
   ): Promise<CustomDetectorResponseDto> {
-    const basePath = this.config.basePath.replace(/\/$/, "");
+    const basePath = this.searchBase();
     const response = await fetch(`${basePath}/custom-detectors/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -1284,7 +1399,7 @@ class ApiClient {
     id: string,
     payload: TrainCustomDetectorDto = {},
   ): Promise<CustomDetectorTrainingRunDto> {
-    const basePath = this.config.basePath.replace(/\/$/, "");
+    const basePath = this.searchBase();
     const response = await fetch(`${basePath}/custom-detectors/${id}/train`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -1306,7 +1421,7 @@ class ApiClient {
     fileName?: string,
     opts: { labelColumn?: string; textColumn?: string } = {},
   ): Promise<ParseTrainingExamplesResponseDto> {
-    const basePath = this.config.basePath.replace(/\/$/, "");
+    const basePath = this.searchBase();
     const formData = new FormData();
     const fallbackName =
       fileName ??
@@ -1339,7 +1454,7 @@ class ApiClient {
     id: string,
     take = 20,
   ): Promise<CustomDetectorTrainingRunDto[]> {
-    const basePath = this.config.basePath.replace(/\/$/, "");
+    const basePath = this.searchBase();
     const response = await fetch(
       `${basePath}/custom-detectors/${id}/training-history?take=${take}`,
     );
@@ -1357,7 +1472,7 @@ class ApiClient {
   async getFindingExtraction(
     findingId: string,
   ): Promise<CustomDetectorExtractionDto | null> {
-    const basePath = this.config.basePath.replace(/\/$/, "");
+    const basePath = this.searchBase();
     const response = await fetch(
       `${basePath}/findings/${findingId}/extraction`,
     );
@@ -1375,7 +1490,7 @@ class ApiClient {
     detectorId: string,
     params: SearchExtractionsParamsDto = {},
   ): Promise<SearchExtractionsResponseDto> {
-    const basePath = this.config.basePath.replace(/\/$/, "");
+    const basePath = this.searchBase();
     const query = new URLSearchParams();
     if (params.sourceId) query.set("sourceId", params.sourceId);
     if (params.assetId) query.set("assetId", params.assetId);
@@ -1399,7 +1514,7 @@ class ApiClient {
   async getExtractionCoverage(
     detectorId: string,
   ): Promise<ExtractionCoverageDto> {
-    const basePath = this.config.basePath.replace(/\/$/, "");
+    const basePath = this.searchBase();
     const response = await fetch(
       `${basePath}/custom-detectors/${detectorId}/extractions/coverage`,
     );
@@ -1413,7 +1528,7 @@ class ApiClient {
   }
 
   async getSchedule(sourceId: string): Promise<SourceScheduleDto> {
-    const basePath = this.config.basePath.replace(/\/$/, "");
+    const basePath = this.searchBase();
     const response = await fetch(`${basePath}/sources/${sourceId}/schedule`);
 
     if (!response.ok) {
@@ -1427,7 +1542,7 @@ class ApiClient {
   }
 
   async aiComplete(messages: AiMessageDto[]): Promise<AiCompleteResponseDto> {
-    const basePath = this.config.basePath.replace(/\/$/, "");
+    const basePath = this.searchBase();
     const response = await fetch(`${basePath}/ai/complete`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -1447,7 +1562,7 @@ class ApiClient {
   async assistantRespond(
     payload: AssistantChatRequest,
   ): Promise<AssistantChatResponse> {
-    const basePath = this.config.basePath.replace(/\/$/, "");
+    const basePath = this.searchBase();
     const response = await fetch(`${basePath}/assistant/respond`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -1468,7 +1583,7 @@ class ApiClient {
     file: File | Blob,
     fileName?: string,
   ): Promise<AssistantParsedUpload> {
-    const basePath = this.config.basePath.replace(/\/$/, "");
+    const basePath = this.searchBase();
     const formData = new FormData();
     const fallbackName =
       fileName ??
@@ -1493,7 +1608,7 @@ class ApiClient {
   }
 
   async listTestScenarios(detectorId: string): Promise<TestScenarioDto[]> {
-    const basePath = this.config.basePath.replace(/\/$/, "");
+    const basePath = this.searchBase();
     const response = await fetch(
       `${basePath}/custom-detectors/${detectorId}/test-scenarios`,
     );
@@ -1510,7 +1625,7 @@ class ApiClient {
     detectorId: string,
     payload: CreateTestScenarioDto,
   ): Promise<TestScenarioDto> {
-    const basePath = this.config.basePath.replace(/\/$/, "");
+    const basePath = this.searchBase();
     const response = await fetch(
       `${basePath}/custom-detectors/${detectorId}/test-scenarios`,
       {
@@ -1532,7 +1647,7 @@ class ApiClient {
     detectorId: string,
     scenarioId: string,
   ): Promise<void> {
-    const basePath = this.config.basePath.replace(/\/$/, "");
+    const basePath = this.searchBase();
     const response = await fetch(
       `${basePath}/custom-detectors/${detectorId}/test-scenarios/${scenarioId}`,
       { method: "DELETE" },
@@ -1549,7 +1664,7 @@ class ApiClient {
     detectorId: string,
     triggeredBy: TestTrigger = "MANUAL",
   ): Promise<RunTestsResponseDto> {
-    const basePath = this.config.basePath.replace(/\/$/, "");
+    const basePath = this.searchBase();
     const response = await fetch(
       `${basePath}/custom-detectors/${detectorId}/test-scenarios/run?triggeredBy=${triggeredBy}`,
       { method: "POST" },
@@ -1564,7 +1679,7 @@ class ApiClient {
   }
 
   async deleteCustomDetector(id: string): Promise<{ deleted: true }> {
-    const basePath = this.config.basePath.replace(/\/$/, "");
+    const basePath = this.searchBase();
     const response = await fetch(`${basePath}/custom-detectors/${id}`, {
       method: "DELETE",
     });
@@ -1582,7 +1697,7 @@ class ApiClient {
   async listTrainingExamples(
     detectorId: string,
   ): Promise<TrainingExampleDto[]> {
-    const basePath = this.config.basePath.replace(/\/$/, "");
+    const basePath = this.searchBase();
     const response = await fetch(
       `${basePath}/custom-detectors/${detectorId}/training-examples`,
     );
@@ -1600,7 +1715,7 @@ class ApiClient {
     examples: TrainingExampleItem[],
     clearExisting = false,
   ): Promise<{ saved: number }> {
-    const basePath = this.config.basePath.replace(/\/$/, "");
+    const basePath = this.searchBase();
     const response = await fetch(
       `${basePath}/custom-detectors/${detectorId}/training-examples`,
       {
@@ -1622,7 +1737,7 @@ class ApiClient {
     detectorId: string,
     exampleId: string,
   ): Promise<{ deleted: true }> {
-    const basePath = this.config.basePath.replace(/\/$/, "");
+    const basePath = this.searchBase();
     const response = await fetch(
       `${basePath}/custom-detectors/${detectorId}/training-examples/${exampleId}`,
       { method: "DELETE" },
@@ -1639,7 +1754,7 @@ class ApiClient {
   async clearTrainingExamples(
     detectorId: string,
   ): Promise<{ deleted: number }> {
-    const basePath = this.config.basePath.replace(/\/$/, "");
+    const basePath = this.searchBase();
     const response = await fetch(
       `${basePath}/custom-detectors/${detectorId}/training-examples`,
       { method: "DELETE" },
@@ -1661,7 +1776,7 @@ class ApiClient {
       scheduleTimezone?: string;
     },
   ): Promise<SourceScheduleDto> {
-    const basePath = this.config.basePath.replace(/\/$/, "");
+    const basePath = this.searchBase();
     const response = await fetch(`${basePath}/sources/${sourceId}/schedule`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
