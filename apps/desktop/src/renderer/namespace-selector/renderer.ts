@@ -27,6 +27,7 @@ interface ElectronAPI {
   isNamespaceOpen(id: string): Promise<boolean>;
   getNamespaceThumbnail(id: string): Promise<string | null>;
   onOpenProgress(cb: (data: { namespaceId: string; stage: string }) => void): void;
+  onNamespaceStateChanged(cb: () => void): void;
   getSettings(): Promise<AppSettings>;
   updateSettings(patch: Partial<AppSettings>): Promise<AppSettings>;
   getApiPort(namespaceId: string): Promise<number | null>;
@@ -728,5 +729,17 @@ settingsSaveBtn.addEventListener('click', async () => {
 });
 
 // ---------- Boot ----------
+
+// Re-render when the main process reports a running-state change (e.g. a tab
+// closed from the tab bar), so a card's power toggle can't stay stuck "On"
+// after its workspace was shut down elsewhere. Debounced because a single tab
+// switch fires several state-change notifications, and skipped while a card is
+// mid-open so its progress overlay isn't interrupted.
+let stateChangeTimer: number | undefined;
+api.onNamespaceStateChanged(() => {
+  if (openingCards.size > 0) return;
+  window.clearTimeout(stateChangeTimer);
+  stateChangeTimer = window.setTimeout(() => void render(), 150);
+});
 
 void render();

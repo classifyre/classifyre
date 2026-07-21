@@ -152,11 +152,18 @@ export class UpdateChecker {
           assets?: ReleaseAsset[];
         };
         const tag = release.tag_name;
+        const assets = release.assets ?? [];
+        // Only advertise an update the user can actually install here: a newer
+        // release whose assets include a downloadable build for THIS platform +
+        // arch. A release that only carries, say, the macOS DMG must not light
+        // up the "download" button for a Linux user — the button downloads and
+        // installs in place, it never falls back to opening the GitHub page.
+        const hasInstallableAsset = pickAsset(assets, process.platform, process.arch) !== null;
         if (!tag || release.draft) {
           result = { status: 'not-available' };
-        } else if (isNewer(tag, app.getVersion())) {
+        } else if (isNewer(tag, app.getVersion()) && hasInstallableAsset) {
           this.latestVersion = tag.replace(/^v/, '');
-          this.assets = release.assets ?? [];
+          this.assets = assets;
           result = { status: 'available', version: this.latestVersion };
         } else {
           result = { status: 'not-available' };

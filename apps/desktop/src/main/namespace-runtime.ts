@@ -8,6 +8,14 @@ import { captureViewThumbnail } from './thumbnails.js';
 
 const TAB_BAR_HEIGHT = 44;
 
+/** Resolves when `promise` settles or `ms` elapses, whichever comes first. */
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | void> {
+  return Promise.race([
+    promise,
+    new Promise<void>((resolve) => setTimeout(resolve, ms)),
+  ]);
+}
+
 /** Lifecycle stages of a workspace open, streamed to the selector page. */
 export type OpenStage = 'db' | 'schema' | 'migrate' | 'api' | 'interface' | 'done' | 'error';
 
@@ -154,6 +162,12 @@ export class NamespaceRuntime {
   private emitOpenProgress(namespaceId: string, stage: OpenStage): void {
     if (!this.selectorView || this.selectorView.webContents.isDestroyed()) return;
     this.selectorView.webContents.send('namespace:open-progress', { namespaceId, stage });
+  }
+
+  /** Tells the selector page that running state changed so it re-renders. */
+  private notifySelectorStateChanged(): void {
+    if (!this.selectorView || this.selectorView.webContents.isDestroyed()) return;
+    this.selectorView.webContents.send('namespace:state-changed');
   }
 
   /** Registers a listener fired whenever tabs/running state changes. */
@@ -376,21 +390,34 @@ export class NamespaceRuntime {
     const entry = this.running.get(namespaceId);
     if (!entry) return;
 
-    // Snapshot before teardown so a stopped workspace still shows its last
-    // state on the selector card. Only the active view is reliably painted.
-    if (this.activeTabId === namespaceId) {
-      await captureViewThumbnail(namespaceId, entry.view);
-    }
+    const wasActive = this.activeTabId === namespaceId;
 
+    // Drop from bookkeeping first so the tab counts as closed immediately —
+    // even if a teardown step below throws or is slow, the UI won't be stuck
+    // showing a workspace that's on its way out.
     this.running.delete(namespaceId);
 
-    if (this.mainWindow && !this.mainWindow.isDestroyed()) {
-      this.mainWindow.contentView.removeChildView(entry.view);
+    // Snapshot before teardown so a stopped workspace still shows its last
+    // state on the selector card. Only the active view is reliably painted.
+    // Bounded: capturePage can hang on a wedged renderer, which used to leave
+    // the whole close stuck (the tab became un-closable without a restart).
+    if (wasActive) {
+      await withTimeout(captureViewThumbnail(namespaceId, entry.view), 2500);
     }
 
-    await this.processManager.stopApi(namespaceId);
+    // Detach + destroy the view synchronously so it can never linger on screen
+    // overlapping the remaining workspace.
+    if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+      entry.view.setVisible(false);
+      this.mainWindow.contentView.removeChildView(entry.view);
+    }
+    if (!entry.view.webContents.isDestroyed()) {
+      entry.view.webContents.close();
+    }
 
-    if (this.activeTabId === namespaceId) {
+    // Switch away right away so the UI is responsive while the API is torn
+    // down below.
+    if (wasActive) {
       const remaining = [...this.running.keys()];
       if (remaining.length > 0) {
         this.switchToTab(remaining[remaining.length - 1]!);
@@ -400,6 +427,12 @@ export class NamespaceRuntime {
     }
 
     this.notifyTabBar();
+
+    // Kill the API last; stopApi has its own force-kill timeout, so this
+    // cannot hang the close. Errors are logged, never thrown to the caller.
+    await this.processManager
+      .stopApi(namespaceId)
+      .catch((err) => console.error(`[runtime] stopApi failed for ${namespaceId}:`, err));
   }
 
   async closeAll(): Promise<void> {
@@ -431,6 +464,11 @@ export class NamespaceRuntime {
 
   private notifyTabBar(): void {
     for (const listener of this.stateChangeListeners) listener();
+    // Keep the selector's cards (power toggles, live-port rows) in sync with
+    // the real running state. Without this a workspace closed from the tab bar
+    // left its selector card stuck showing "On", because the selector only
+    // re-rendered from its own actions.
+    this.notifySelectorStateChanged();
     if (!this.tabBarView || this.tabBarView.webContents.isDestroyed()) return;
 
     const data = this.getTabState();

@@ -15,7 +15,6 @@ import {
 import { assistantContexts } from "@workspace/schemas/assistant";
 import { AssistantWorkflowPanel, Button } from "@workspace/ui/components";
 import { toast } from "sonner";
-import { Rnd } from "react-rnd";
 import { usePathname, useRouter } from "next/navigation";
 import { useInstanceSettings } from "@/components/instance-settings-provider";
 
@@ -67,65 +66,6 @@ function formatBytes(value: number) {
   return `${size >= 10 ? size.toFixed(0) : size.toFixed(1)} ${units[unitIndex]}`;
 }
 
-type AssistantWindowState = {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-};
-
-const DESKTOP_WINDOW_WIDTH = 520;
-const MIN_WINDOW_WIDTH = 340;
-const MIN_WINDOW_HEIGHT = 420;
-const MOBILE_BREAKPOINT = 760;
-
-function createAssistantWindowState(
-  viewportWidth: number,
-  viewportHeight: number,
-): AssistantWindowState {
-  const mobileWidth = Math.max(280, viewportWidth - 16);
-  const mobileHeight = Math.max(360, viewportHeight - 86);
-
-  if (viewportWidth < MOBILE_BREAKPOINT) {
-    return {
-      x: 8,
-      y: 72,
-      width: mobileWidth,
-      height: mobileHeight,
-    };
-  }
-
-  const width = Math.min(
-    DESKTOP_WINDOW_WIDTH,
-    Math.max(MIN_WINDOW_WIDTH, viewportWidth - 48),
-  );
-  const height = Math.min(780, Math.max(520, viewportHeight - 112));
-
-  return {
-    x: Math.max(8, viewportWidth - width - 24),
-    y: Math.max(16, viewportHeight - height - 24),
-    width,
-    height,
-  };
-}
-
-function clampAssistantWindowState(
-  state: AssistantWindowState,
-  viewportWidth: number,
-  viewportHeight: number,
-): AssistantWindowState {
-  const maxWidth = Math.max(280, viewportWidth - 8);
-  const maxHeight = Math.max(320, viewportHeight - 8);
-  const width = Math.min(state.width, maxWidth);
-  const height = Math.min(state.height, maxHeight);
-  const x = Math.min(Math.max(0, state.x), Math.max(0, viewportWidth - width));
-  const y = Math.min(
-    Math.max(0, state.y),
-    Math.max(0, viewportHeight - height),
-  );
-  return { x, y, width, height };
-}
-
 export function AssistantWorkflowProvider({
   children,
 }: {
@@ -147,39 +87,7 @@ export function AssistantWorkflowProvider({
   const [uploadedFiles, setUploadedFiles] = React.useState<
     AssistantParsedUpload[]
   >([]);
-  const [viewport, setViewport] = React.useState({ width: 0, height: 0 });
-  const [assistantWindow, setAssistantWindow] =
-    React.useState<AssistantWindowState | null>(null);
   const uploadInputRef = React.useRef<HTMLInputElement | null>(null);
-
-  const isCompactViewport =
-    viewport.width > 0 && viewport.width < MOBILE_BREAKPOINT;
-  const minWindowWidth = isCompactViewport
-    ? Math.max(280, viewport.width - 16)
-    : MIN_WINDOW_WIDTH;
-  const minWindowHeight = Math.min(
-    MIN_WINDOW_HEIGHT,
-    Math.max(320, viewport.height - 96),
-  );
-  const maxWindowWidth = Math.max(280, viewport.width - 8);
-  const maxWindowHeight = Math.max(320, viewport.height - 8);
-  const effectiveViewport = React.useMemo(() => {
-    if (viewport.width > 0 && viewport.height > 0) {
-      return viewport;
-    }
-
-    if (typeof window !== "undefined") {
-      return {
-        width: window.innerWidth,
-        height: window.innerHeight,
-      };
-    }
-
-    return {
-      width: 1280,
-      height: 800,
-    };
-  }, [viewport]);
 
   // Reset the conversation only when the assistant context actually changes
   // (e.g. navigating from source.create to detector.create). Incidental bridge
@@ -199,65 +107,6 @@ export function AssistantWorkflowProvider({
     setUploadedFiles([]);
     setOpen(false);
   }, [contextKey]);
-
-  React.useEffect(() => {
-    if (typeof window === "undefined") {
-      return;
-    }
-
-    const updateViewport = () => {
-      setViewport({
-        width: window.innerWidth,
-        height: window.innerHeight,
-      });
-    };
-
-    updateViewport();
-    window.addEventListener("resize", updateViewport);
-    return () => window.removeEventListener("resize", updateViewport);
-  }, []);
-
-  React.useEffect(() => {
-    if (!open) {
-      return;
-    }
-
-    // Fall back to the effective viewport so the panel still initializes its
-    // geometry on first open even if the resize listener hasn't fired yet.
-    const vw = viewport.width || effectiveViewport.width;
-    const vh = viewport.height || effectiveViewport.height;
-
-    setAssistantWindow((current) => {
-      const baseState = current;
-      const next = baseState
-        ? clampAssistantWindowState(baseState, vw, vh)
-        : createAssistantWindowState(vw, vh);
-
-      if (
-        current &&
-        current.x === next.x &&
-        current.y === next.y &&
-        current.width === next.width &&
-        current.height === next.height
-      ) {
-        return current;
-      }
-
-      return next;
-    });
-  }, [
-    open,
-    viewport.height,
-    viewport.width,
-    effectiveViewport.height,
-    effectiveViewport.width,
-  ]);
-
-  React.useEffect(() => {
-    if (!open) {
-      setAssistantWindow(null);
-    }
-  }, [open]);
 
   const registerBridge = React.useCallback(
     (nextBridge: AssistantPageBridge | null) => {
@@ -513,113 +362,59 @@ export function AssistantWorkflowProvider({
     });
   }, [active, introMessage, open]);
 
-  const resolvedAssistantWindow = React.useMemo(() => {
-    if (!open) {
-      return null;
-    }
-
-    if (assistantWindow) {
-      return assistantWindow;
-    }
-
-    const baseState = createAssistantWindowState(
-      effectiveViewport.width,
-      effectiveViewport.height,
-    );
-    return clampAssistantWindowState(
-      baseState,
-      effectiveViewport.width,
-      effectiveViewport.height,
-    );
-  }, [
-    assistantWindow,
-    effectiveViewport.height,
-    effectiveViewport.width,
-    open,
-  ]);
-
   return (
     <AssistantWorkflowContext.Provider value={contextValue}>
       {children}
       <AssistantWorkflowFab />
-      {active && open && resolvedAssistantWindow ? (
-        <Rnd
-          size={{
-            width: resolvedAssistantWindow.width,
-            height: resolvedAssistantWindow.height,
-          }}
-          position={{
-            x: resolvedAssistantWindow.x,
-            y: resolvedAssistantWindow.y,
-          }}
-          minWidth={minWindowWidth}
-          minHeight={minWindowHeight}
-          maxWidth={maxWindowWidth}
-          maxHeight={maxWindowHeight}
-          bounds="window"
-          dragHandleClassName="assistant-drag-handle"
-          disableDragging={isCompactViewport}
-          enableResizing={!isCompactViewport}
-          onDragStop={(_event, data) => {
-            setAssistantWindow((current) =>
-              current ? { ...current, x: data.x, y: data.y } : current,
-            );
-          }}
-          onResizeStop={(_event, _direction, ref, _delta, position) => {
-            setAssistantWindow({
-              x: position.x,
-              y: position.y,
-              width: ref.offsetWidth,
-              height: ref.offsetHeight,
-            });
-          }}
-          style={{ zIndex: 60, position: "fixed" }}
+      {active && open ? (
+        // Anchored to the bottom-right; on narrow viewports it stretches to
+        // fill the screen. Fixed placement (no drag/resize) means it can never
+        // open off-screen.
+        <div
+          className="fixed inset-x-3 bottom-3 top-16 z-[60] flex flex-col sm:inset-x-auto sm:bottom-4 sm:right-4 sm:top-auto sm:h-[min(680px,calc(100dvh-6rem))] sm:w-[min(440px,calc(100vw-2rem))]"
         >
-          <>
-            <input
-              ref={uploadInputRef}
-              type="file"
-              accept=".csv,.tsv,.txt,.md,.log,.json,.xlsx,text/plain,text/csv,application/json,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-              className="hidden"
-              onChange={(event) => void handleFileUpload(event)}
-            />
-            <AssistantWorkflowPanel
-              title={contextMeta?.title ?? "Assistant"}
-              messages={messages}
-              pendingConfirmation={pendingConfirmation}
-              onConfirm={() => void sendMessage("Confirm", "confirm")}
-              onCancelConfirmation={() => {
-                setPendingConfirmation(null);
-                toast("Assistant action cancelled");
-              }}
-              input={input}
-              onInputChange={setInput}
-              onSend={() => void sendMessage(input)}
-              canSend={active && !submitting && Boolean(input.trim())}
-              disabled={!active || submitting}
-              submitting={submitting}
-              placeholder={
-                active
-                  ? "Ask about your data or describe what to do — I can fill forms, run MCP tools, and navigate for you…"
-                  : "Assistant is unavailable for this page."
-              }
-              uploadedFiles={uploadedFiles.map((file, index) => ({
-                id: `${file.fileName}-${index}`,
-                label: `${file.fileName} · ${formatBytes(file.bytes)}`,
-              }))}
-              onUploadClick={() => uploadInputRef.current?.click()}
-              uploadDisabled={!active || submitting || uploadingFile}
-              uploadingFile={uploadingFile}
-              footerNote={
-                active
-                  ? "Patches apply locally first. MCP mutations stay behind confirmation."
-                  : "Enable AI in settings to activate the assistant."
-              }
-              onClose={() => setOpen(false)}
-              headerClassName="assistant-drag-handle cursor-grab active:cursor-grabbing select-none"
-            />
-          </>
-        </Rnd>
+          <input
+            ref={uploadInputRef}
+            type="file"
+            accept=".csv,.tsv,.txt,.md,.log,.json,.xlsx,text/plain,text/csv,application/json,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            className="hidden"
+            onChange={(event) => void handleFileUpload(event)}
+          />
+          <AssistantWorkflowPanel
+            title={contextMeta?.title ?? "Assistant"}
+            messages={messages}
+            pendingConfirmation={pendingConfirmation}
+            onConfirm={() => void sendMessage("Confirm", "confirm")}
+            onCancelConfirmation={() => {
+              setPendingConfirmation(null);
+              toast("Assistant action cancelled");
+            }}
+            input={input}
+            onInputChange={setInput}
+            onSend={() => void sendMessage(input)}
+            canSend={active && !submitting && Boolean(input.trim())}
+            disabled={!active || submitting}
+            submitting={submitting}
+            placeholder={
+              active
+                ? "Ask about your data or describe what to do — I can fill forms, run MCP tools, and navigate for you…"
+                : "Assistant is unavailable for this page."
+            }
+            uploadedFiles={uploadedFiles.map((file, index) => ({
+              id: `${file.fileName}-${index}`,
+              label: `${file.fileName} · ${formatBytes(file.bytes)}`,
+            }))}
+            onUploadClick={() => uploadInputRef.current?.click()}
+            uploadDisabled={!active || submitting || uploadingFile}
+            uploadingFile={uploadingFile}
+            footerNote={
+              active
+                ? "Patches apply locally first. MCP mutations stay behind confirmation."
+                : "Enable AI in settings to activate the assistant."
+            }
+            onClose={() => setOpen(false)}
+          />
+        </div>
       ) : null}
     </AssistantWorkflowContext.Provider>
   );
