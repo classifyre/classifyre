@@ -2,15 +2,18 @@ import type { AssistantContextKey } from '@workspace/schemas/assistant';
 
 /**
  * Server-side definition of one assistant context ("module"). A module scopes
- * the agent loop to a page domain: which MCP tools it may call, which UI
+ * the agent loop to a page domain: which MCP tools are its FOCUS, which UI
  * actions it may emit, and the domain knowledge injected into its prompt.
  *
- * Tool allowlists are intersected with the live MCP catalog at request time,
- * so a module may reference tools that ship later — they simply don't appear
- * in the prompt until the MCP server registers them.
+ * The assistant exposes the FULL live MCP catalog in every context (it is a
+ * 1:1 front-end for the MCP server). `tools` is therefore a focus set, not an
+ * allowlist: those tools are listed first with full input schemas and flagged
+ * as primary for the page, while every other catalog tool remains callable and
+ * is listed compactly. Read tools run immediately; mutating tools always route
+ * through user confirmation regardless of focus.
  */
 export interface AssistantContextModule {
-  /** MCP tool names this context may call (read tools run immediately, mutating tools require user confirmation). */
+  /** MCP tool names to foreground for this page (rendered with full schemas). */
   tools: string[];
   /** UI action types the model may emit for this context. */
   uiActions: Array<'patch_fields' | 'navigate' | 'show_toast'>;

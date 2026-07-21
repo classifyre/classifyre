@@ -459,16 +459,46 @@ describe('AssistantService', () => {
     expect(response.reply).toContain('Cancelled');
   });
 
-  it('refuses to confirm tools outside the context allowlist', async () => {
+  it('confirms a mutating tool from any context (full MCP catalog)', async () => {
+    // The catalog is exposed 1:1 in every context, so a mutation the page does
+    // not "focus" (create_source in app.global) is still confirmable.
+    callTool.mockResolvedValueOnce({ ok: true, result: { id: 'src-1' } });
+    completeJson.mockResolvedValueOnce({
+      content: { reply: 'Created the source.', proposeOperation: null },
+      raw: '{"reply":"Created the source."}',
+    });
+
+    const response = await service.respond({
+      messages: [{ role: 'user', content: 'Confirm' }],
+      context: { ...baseContext, key: 'app.global' as const },
+      pendingConfirmation: {
+        tool: 'create_source',
+        input: { type: 'JIRA', config: {} },
+        title: 'Create source via MCP',
+        detail: 'create the source',
+      },
+      confirmationDecision: 'confirm',
+    });
+
+    expect(callTool).toHaveBeenCalledWith('create_source', {
+      type: 'JIRA',
+      config: {},
+    });
+    expect(response.toolCalls).toEqual([
+      expect.objectContaining({ name: 'create_source', status: 'success' }),
+    ]);
+  });
+
+  it('refuses to confirm an unknown or read-only tool', async () => {
     await expect(
       service.respond({
         messages: [{ role: 'user', content: 'Confirm' }],
-        context: { ...baseContext, key: 'app.global' as const },
+        context: baseContext,
         pendingConfirmation: {
-          tool: 'create_source',
+          tool: 'list_source_types', // read-only — must never route through confirm
           input: {},
-          title: 'Create source via MCP',
-          detail: 'create the source',
+          title: 'Run read tool',
+          detail: 'run it',
         },
         confirmationDecision: 'confirm',
       }),

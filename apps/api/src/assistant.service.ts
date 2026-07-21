@@ -140,7 +140,14 @@ interface LoopState {
   messages: AiMessage[];
   actions: AssistantUiAction[];
   toolCalls: AssistantToolCallSummary[];
+  /** The full live MCP catalog — the assistant may call any of these. */
   tools: AssistantMcpTool[];
+  /**
+   * Names of the context's "focus" tools (from context-modules). These are
+   * rendered with full input schemas and flagged as the primary tools for the
+   * page; every other catalog tool is still callable, just rendered compactly.
+   */
+  focusToolNames: Set<string>;
   context: AssistantPageContext;
 }
 
@@ -191,13 +198,16 @@ export class AssistantService {
     request: AssistantChatRequest,
   ): Promise<LoopState> {
     const module = assistantContextModules[request.context.key];
-    const allTools = await this.assistantMcp.listTools();
-    const tools = allTools.filter((tool) => module.tools.includes(tool.name));
+    // Expose the FULL live MCP catalog in every context — the assistant is a
+    // 1:1 front-end for the MCP server. The per-context list is a "focus set"
+    // (rendered with full schemas + flagged primary), not an allowlist.
+    const tools = await this.assistantMcp.listTools();
+    const focusToolNames = new Set(module.tools);
 
     const messages: AiMessage[] = [
       {
         role: 'system',
-        content: buildSystemPrompt(request.context, tools),
+        content: buildSystemPrompt(request.context, tools, focusToolNames),
       },
       { role: 'user', content: buildUserMessage(request) },
     ];
@@ -207,6 +217,7 @@ export class AssistantService {
       actions: [],
       toolCalls: [],
       tools,
+      focusToolNames,
       context: request.context,
     };
   }
@@ -383,12 +394,9 @@ export class AssistantService {
       throw new BadRequestException('No pending assistant confirmation found');
     }
 
-    const module = assistantContextModules[request.context.key];
-    if (!module.tools.includes(pending.tool)) {
-      throw new BadRequestException(
-        `Tool "${pending.tool}" is not available in context ${request.context.key}`,
-      );
-    }
+    // Any live MCP tool may be confirmed — the catalog is exposed in full. The
+    // only guard is that it exists and actually mutates (read tools never need
+    // confirmation and must not be routed through this path).
     const tool = await this.assistantMcp.getTool(pending.tool);
     if (!tool || tool.readOnly) {
       throw new BadRequestException(
@@ -600,6 +608,7 @@ function getLatestUserMessage(request: AssistantChatRequest): string {
 function buildSystemPrompt(
   context: AssistantPageContext,
   tools: AssistantMcpTool[],
+  focusToolNames: Set<string>,
 ): string {
   const definition = assistantContexts[context.key];
   const module = assistantContextModules[context.key];
@@ -657,34 +666,67 @@ function buildSystemPrompt(
     schemaSection,
     knowledge ? `\n${knowledge}` : '',
     '',
-    '## Tools available in this context',
-    renderToolCatalog(tools),
+    renderToolCatalog(tools, focusToolNames),
   ]
     .filter((section) => section !== '')
     .join('\n');
 }
 
-function renderToolCatalog(tools: AssistantMcpTool[]): string {
-  if (tools.length === 0) {
-    return '(no tools available — answer from context only)';
-  }
-  return tools
-    .map((tool) => {
-      const marker = tool.readOnly
-        ? 'read'
-        : tool.destructive
-          ? 'MUTATE, destructive'
-          : 'MUTATE';
-      const description = tool.description.split('\n')[0]?.slice(0, 180) ?? '';
-      const inputSummary = summarizeSchemaForPrompt(tool.inputSchema);
-      return [
-        `- ${tool.name} (${marker}): ${description}`,
-        inputSummary ? inputSummary : null,
-      ]
-        .filter(Boolean)
-        .join('\n');
-    })
+/** One tool line, optionally with its input-schema summary indented below. */
+function renderToolLine(tool: AssistantMcpTool, withSchema: boolean): string {
+  const marker = tool.readOnly
+    ? 'read'
+    : tool.destructive
+      ? 'MUTATE, destructive'
+      : 'MUTATE';
+  const description = tool.description.split('\n')[0]?.slice(0, 180) ?? '';
+  const inputSummary = withSchema
+    ? summarizeSchemaForPrompt(tool.inputSchema)
+    : '';
+  return [`- ${tool.name} (${marker}): ${description}`, inputSummary || null]
+    .filter(Boolean)
     .join('\n');
+}
+
+/**
+ * The whole MCP catalog is callable in every context. Tools in the page's
+ * focus set are listed first with full input schemas; the rest follow as a
+ * compact reference (name + one-line description) so the model can still reach
+ * for them — e.g. change a source's sampling strategy from the global chat —
+ * without paying the schema cost for all ~100 tools on every turn. The model
+ * can inspect any tool's exact arguments with the schema/`get_*` tools before
+ * proposing it.
+ */
+function renderToolCatalog(
+  tools: AssistantMcpTool[],
+  focusToolNames: Set<string>,
+): string {
+  if (tools.length === 0) {
+    return '## Tools\n(no tools available — answer from context only)';
+  }
+  const focus = tools.filter((tool) => focusToolNames.has(tool.name));
+  const rest = tools.filter((tool) => !focusToolNames.has(tool.name));
+
+  const sections: string[] = [];
+  if (focus.length > 0) {
+    sections.push(
+      [
+        '## Primary tools for this page (full input schemas)',
+        ...focus.map((tool) => renderToolLine(tool, true)),
+      ].join('\n'),
+    );
+  }
+  if (rest.length > 0) {
+    sections.push(
+      [
+        focus.length > 0
+          ? '## Every other MCP tool (also callable — inspect its schema before proposing a mutation)'
+          : '## Tools available (inspect a tool schema before proposing a mutation)',
+        ...rest.map((tool) => renderToolLine(tool, focus.length === 0)),
+      ].join('\n'),
+    );
+  }
+  return sections.join('\n\n');
 }
 
 function buildUserMessage(request: AssistantChatRequest): string {
