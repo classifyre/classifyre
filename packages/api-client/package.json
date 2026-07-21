@@ -1,6 +1,6 @@
 {
   "name": "@workspace/api-client",
-  "version": "0.4.64-SNAPSHOT",
+  "version": "0.4.64",
   "private": true,
   "type": "module",
   "main": "./src/index.ts",
