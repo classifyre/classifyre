@@ -240,6 +240,17 @@ which each deployment sets on its own after including this block.
       key: {{ include "classifyre.apiMaskedConfigSecretKey" . }}
 - name: CLASSIFYRE_AUTO_MIGRATE
   value: {{ ternary "false" "true" .Values.api.migration.enabled | quote }}
+{{- /* ── Node heap + backpressure ─────────────────────────────
+     Node's default old-space cap (~512 MB) ignores the container memory
+     limit, so the process OOM-crashes far below its granted memory. Raise the
+     cap and set the Fastify under-pressure heap guard just below it (85%), so
+     the CLI ingestion endpoints shed with 503 (CLI retries → no lost batches)
+     before V8 hard-crashes. Both are overridable via `.Values.api.env`, which
+     is spread after this block. */}}
+- name: NODE_OPTIONS
+  value: "--max-old-space-size={{ .Values.api.maxOldSpaceSizeMb }}"
+- name: UNDER_PRESSURE_MAX_HEAP_USED_BYTES
+  value: {{ div (mul (int .Values.api.maxOldSpaceSizeMb) 1024 1024 85) 100 | quote }}
 {{- if and (eq .Values.postgres.mode "external") .Values.postgres.external.existingSecret .Values.postgres.external.existingSecretUrlKey }}
 - name: DATABASE_URL
   valueFrom:

@@ -11,12 +11,16 @@ api:
 
   env:
     DEMO_MODE: "false"
-    # Single-node VPS: heap/RSS are always close to limits (pods idle at ~300 MB RSS).
-    # Disable heap and RSS checks — they fire constantly and block all requests.
-    # Only use event-loop delay (2 s) as the backpressure signal: it triggers
-    # only when Node is CPU-starved and genuinely cannot process requests.
+    # Backpressure strategy (see chart values `api.maxOldSpaceSizeMb`):
+    #   * Heap guard: left at the chart default (85% of the JS heap cap). Now
+    #     that the heap is raised to 1536 MB inside a 2Gi pod, the guard sheds
+    #     ingestion (CLI 503 → retry, never lost) BEFORE V8 hard-crashes.
+    #     Previously this was disabled because the old 1Gi/512 MB-heap pods sat
+    #     permanently near the limit and the guard false-fired on every request.
+    #   * RSS guard: still disabled — native onnxruntime/embedding memory makes
+    #     RSS noisy, and the heap + event-loop signals cover the real failures.
+    #   * Event-loop delay (2 s): fires only when Node is CPU-starved.
     # DB-level backpressure (P2028/P2034 → 503) is handled by PrismaExceptionFilter.
-    UNDER_PRESSURE_MAX_HEAP_USED_BYTES: "0" # 0 = disabled
     UNDER_PRESSURE_MAX_RSS_BYTES: "0" # 0 = disabled
     UNDER_PRESSURE_MAX_EVENT_LOOP_DELAY: "2000" # 2 s event-loop lag = genuinely stuck
 

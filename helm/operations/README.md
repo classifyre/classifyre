@@ -176,6 +176,43 @@ kubectl -n classifyre get events --sort-by=.lastTimestamp
 helm status classifyre -n classifyre
 ```
 
+## Postgres Collation Version Mismatch
+
+Symptom in the Postgres logs / on connect:
+
+```
+WARNING: database "classifyre" has a collation version mismatch
+DETAIL:  The database was created using collation version 2.41, but the
+         operating system provides version 2.36.
+```
+
+This means the Postgres container's glibc changed (e.g. the embedded-Postgres
+image was rebuilt on a different base) since the database was created. The
+recorded collation version no longer matches the OS library.
+
+**This is not fixed by a Prisma migration.** Migrations run automatically on API
+startup (`CLASSIFYRE_AUTO_MIGRATE`) inside a transaction and on every
+deployment including fresh desktop databases — `REINDEX DATABASE` is far too
+heavy and takes locks that must not run at boot, and `REFRESH COLLATION
+VERSION` alone only silences the warning without repairing any index whose sort
+order actually shifted. Run it as a deliberate one-off operation instead:
+
+```bash
+PGPOD=$(kubectl -n classifyre get pod -l app.kubernetes.io/component=postgres -o name | head -1)
+
+# 1. Rebuild indexes that use the affected collation (safe; takes locks — run
+#    during a maintenance window, ideally with ingestion paused).
+kubectl -n classifyre exec "$PGPOD" -- psql -U postgres -d classifyre -c "REINDEX DATABASE classifyre;"
+
+# 2. Record the current OS collation version so the warning clears.
+kubectl -n classifyre exec "$PGPOD" -- psql -U postgres -d classifyre -c "ALTER DATABASE classifyre REFRESH COLLATION VERSION;"
+```
+
+If the environment cannot afford a full `REINDEX DATABASE`, reindex only the
+text/collation-sensitive indexes (e.g. the trigram index on
+`findings.matched_content`) with `REINDEX INDEX CONCURRENTLY <name>;` first, then
+run the `REFRESH COLLATION VERSION` step.
+
 ## Repo Workflow Notes
 
 - keep Helm values under version control

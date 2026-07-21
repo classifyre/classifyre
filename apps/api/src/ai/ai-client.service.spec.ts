@@ -160,12 +160,12 @@ describe('AiClientService', () => {
 
     it('retries a no-body 404 (transient gateway miss) then succeeds', async () => {
       // Fire the backoff delay immediately so the retry runs without real waits.
-      const timeoutSpy = jest
-        .spyOn(global, 'setTimeout')
-        .mockImplementation(((cb: () => void) => {
-          cb();
-          return 0 as unknown as ReturnType<typeof setTimeout>;
-        }) as typeof setTimeout);
+      const timeoutSpy = jest.spyOn(global, 'setTimeout').mockImplementation(((
+        cb: () => void,
+      ) => {
+        cb();
+        return 0 as unknown as ReturnType<typeof setTimeout>;
+      }) as typeof setTimeout);
       mockProviderComplete
         .mockRejectedValueOnce(new AiProviderError('404 (no body)', 404))
         .mockResolvedValueOnce('Recovered');

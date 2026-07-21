@@ -407,16 +407,25 @@ export class ProcessManager {
       ? `${venvBin}${path.delimiter}${baseEnv["PATH"] ?? ""}`
       : (baseEnv["PATH"] ?? "");
 
-    const nodeArgs: string[] = [];
-    if (options.memoryLimitMb && options.memoryLimitMb > 0) {
-      nodeArgs.push(
-        `--max-old-space-size=${Math.floor(options.memoryLimitMb)}`,
-      );
-    } else {
-      // Default heap cap: Node's ~4GB default lets a runaway API squeeze the
-      // whole machine before dying; fail (and get auto-restarted) earlier.
-      nodeArgs.push("--max-old-space-size=2048");
-    }
+    // JS heap cap. Node's ~512 MB default (or ~4 GB on large machines) ignores
+    // what else the laptop is running, so size it to a fraction of installed
+    // RAM: enough headroom to avoid heap-OOM crashes during scans, but never so
+    // much that the API can squeeze the UI, embedded Postgres, and the user's
+    // other apps. A workspace can override with an explicit memoryLimitMb.
+    const heapMb =
+      options.memoryLimitMb && options.memoryLimitMb > 0
+        ? Math.floor(options.memoryLimitMb)
+        : (() => {
+            const totalMb = Math.floor(os.totalmem() / (1024 * 1024));
+            // ~25% of RAM, clamped so tiny machines still get a workable heap
+            // and big machines don't hand the API multiple GB it rarely needs.
+            return Math.max(1024, Math.min(2048, Math.floor(totalMb * 0.25)));
+          })();
+    const nodeArgs: string[] = [`--max-old-space-size=${heapMb}`];
+    // Fastify under-pressure heap guard, just below the cap (85%): the API
+    // sheds ingestion (CLI 503 → retry, no lost batches) before V8 hard-crashes
+    // — the same graceful-degradation contract the server deployment uses.
+    const heapGuardBytes = Math.floor(heapMb * 1024 * 1024 * 0.85);
 
     const child = spawn(process.execPath, [...nodeArgs, entryPath], {
       env: {
@@ -456,6 +465,7 @@ export class ProcessManager {
           : {}),
         CORS_ORIGIN: "*",
         NODE_ENV: app.isPackaged ? "production" : "development",
+        UNDER_PRESSURE_MAX_HEAP_USED_BYTES: String(heapGuardBytes),
         ...(options.maxParallelScans && options.maxParallelScans > 0
           ? {
               // MAX_CONCURRENT_RUNNERS is the name the API actually reads;

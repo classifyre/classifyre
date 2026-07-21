@@ -256,7 +256,7 @@ describe('AgentAuditService.checkKindFailureDivergence (R-5)', () => {
         runs(['COMPLETED', 'COMPLETED', 'COMPLETED', 'COMPLETED', 'COMPLETED']),
       );
 
-    const result = await service.checkKindFailureDivergence('CASE' as never);
+    const result = await service.checkKindFailureDivergence('CASE');
 
     expect(result).not.toBeNull();
     expect(result?.kind).toBe('CASE');
@@ -269,7 +269,7 @@ describe('AgentAuditService.checkKindFailureDivergence (R-5)', () => {
       .mockResolvedValueOnce(runs(['FAILED', 'FAILED', 'FAILED']))
       .mockResolvedValueOnce(runs(['FAILED', 'FAILED', 'FAILED', 'FAILED']));
 
-    const result = await service.checkKindFailureDivergence('CASE' as never);
+    const result = await service.checkKindFailureDivergence('CASE');
 
     expect(result).toBeNull();
   });
@@ -279,7 +279,7 @@ describe('AgentAuditService.checkKindFailureDivergence (R-5)', () => {
       .mockResolvedValueOnce(runs(['FAILED', 'FAILED']))
       .mockResolvedValueOnce(runs(['COMPLETED', 'COMPLETED', 'COMPLETED']));
 
-    const result = await service.checkKindFailureDivergence('CASE' as never);
+    const result = await service.checkKindFailureDivergence('CASE');
 
     expect(result).toBeNull();
   });

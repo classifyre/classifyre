@@ -58,7 +58,10 @@ api:
     localModelPath: ""
     cacheDir: /var/cache/classifyre/transformers
     cacheSizeLimit: 2Gi
-    batchSize: 32
+    # -- Rows embedded per inference batch on the worker. Larger batches are
+    # -- faster but hold more tensors in memory at once; keep this modest so a
+    # -- backfill burst cannot spike the worker heap into an OOM.
+    batchSize: 16
     retrySeconds: 30
     # -- Reconcile all stored findings and asset chunks into the configured
     # -- embedding space on API startup. Existing vectors are hash-skipped.
@@ -85,6 +88,19 @@ api:
   workingDir: ""
   # -- Default API process command when `command/args` are not set.
   startCommand: node dist/src/main.js
+
+  # -- V8 old-space (JS heap) cap in MB, applied via NODE_OPTIONS
+  # -- (`--max-old-space-size`) to both the API and worker deployments.
+  # --
+  # -- Node caps the old-space heap at ~512 MB by default regardless of the
+  # -- container memory limit, so without this the process hits
+  # -- `FATAL ERROR: JavaScript heap out of memory` and SIGSEGV-restarts long
+  # -- before it uses the memory the pod was granted. Keep this comfortably
+  # -- below `resources.limits.memory`: the container also holds native
+  # -- allocations (Prisma, the transformers.js/onnxruntime embedding model,
+  # -- Buffers) that live outside the V8 heap, so `heap + native` must fit the
+  # -- limit. Rule of thumb: heap ≈ 0.75 × the memory limit (in MB).
+  maxOldSpaceSizeMb: 1536
 
   # -- Additional pod labels for API deployment.
   podLabels: {}
@@ -151,11 +167,14 @@ api:
     # -- API resource requests.
     requests:
       cpu: 250m
-      memory: 512Mi
-    # -- API resource limits.
+      memory: 768Mi
+    # -- API resource limits. Must leave headroom above `maxOldSpaceSizeMb`
+    # -- (the JS heap) for native allocations — Prisma, the embedding model,
+    # -- and Buffers all live outside the V8 heap. With a 1536 MB heap, 2Gi
+    # -- leaves ~512 MB for native memory before the kernel OOM-kills the pod.
     limits:
       cpu: "1"
-      memory: 1Gi
+      memory: 2Gi
 
   # -- API scheduling: node selector.
   nodeSelector: {}
