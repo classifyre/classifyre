@@ -7,6 +7,7 @@
  * Postgres schema `ns_<slug>` (dashes → underscores, since dashes are not legal
  * in a bare SQL identifier), while pg-boss jobs live in `pgboss_<slug>`.
  */
+import { createHash } from 'node:crypto';
 
 /**
  * First path segments that are NEVER a namespace slug and must pass through the
@@ -20,9 +21,12 @@
 export const RESERVED_PREFIXES = new Set<string>([
   '', // bare `/`
   'api', // Swagger UI + `/api/health/pressure` + `/api/mcp`
+  'api-json', // Swagger's generated OpenAPI JSON document
+  'api-yaml', // Swagger's generated OpenAPI YAML document
   'ping', // health probe
   'health', // health endpoints
   'namespaces', // namespace registry CRUD
+  'socket.io', // Socket.IO transport handshake path
   'favicon.ico',
 ]);
 
@@ -40,7 +44,16 @@ export function schemaForSlug(slug: string): string {
 
 /** Postgres schema that holds a namespace's pg-boss job tables. */
 export function pgBossSchemaForSlug(slug: string): string {
-  return `pgboss_${slug.replace(/[^a-z0-9_]/g, '_')}`.slice(0, 50);
+  const normalized = slug.replace(/[^a-z0-9_]/g, '_');
+  const candidate = `pgboss_${normalized}`;
+  if (candidate.length <= 50) return candidate;
+
+  // pg-boss limits schema identifiers to 50 characters. Plain truncation
+  // aliases distinct long slugs onto the same job schema, which lets one
+  // tenant consume another tenant's jobs. Keep a stable 64-bit digest suffix
+  // so the shortened identifier remains effectively collision-free.
+  const suffix = createHash('sha256').update(slug).digest('hex').slice(0, 16);
+  return `pgboss_${normalized.slice(0, 26)}_${suffix}`;
 }
 
 /**

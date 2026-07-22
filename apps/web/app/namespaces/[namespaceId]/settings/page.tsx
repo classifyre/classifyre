@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { ArrowLeft, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -17,9 +17,10 @@ import { Skeleton } from "@workspace/ui/components/skeleton";
 import { Textarea } from "@workspace/ui/components/textarea";
 import { WorkspaceHeader } from "@/components/namespace/workspace-header";
 import { useTranslation } from "@/hooks/use-translation";
+import { useStaticRouteParam } from "@/lib/use-route-id";
 
 export default function NamespaceSettingsPage() {
-  const { namespaceId } = useParams<{ namespaceId: string }>();
+  const namespaceId = useStaticRouteParam("namespaceId", "namespaces");
   const router = useRouter();
   const { t } = useTranslation();
   const [namespace, setNamespace] = React.useState<Namespace | null>(null);
@@ -34,6 +35,7 @@ export default function NamespaceSettingsPage() {
   }, []);
 
   const load = React.useCallback(async () => {
+    if (!namespaceId) return;
     setLoading(true);
     setError(null);
     try {

@@ -70,8 +70,10 @@ export class InquiryMatchingService {
   async registerForNamespace(): Promise<void> {
     const boss = await this.pgBoss.getBossAsync();
     await boss.createQueue(INQUIRY_MATCH_QUEUE);
-    await this.pgBoss.work(INQUIRY_MATCH_QUEUE, { localConcurrency: 1 }, (jobs) =>
-      this.handle(jobs as Job[]),
+    await this.pgBoss.work(
+      INQUIRY_MATCH_QUEUE,
+      { localConcurrency: 1 },
+      (jobs) => this.handle(jobs as Job[]),
     );
     this.logger.log(`Registered worker for queue ${INQUIRY_MATCH_QUEUE}`);
   }

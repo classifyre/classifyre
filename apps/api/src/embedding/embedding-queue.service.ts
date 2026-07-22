@@ -37,6 +37,7 @@ interface NsCtx {
 /** Per-namespace embedding-queue state (was single-instance). */
 interface EmbeddingRuntime {
   ctx: NsCtx;
+  disposed: boolean;
   pendingWrites: number;
   workerRegistered: boolean;
   recoveryTimer?: NodeJS.Timeout;
@@ -83,6 +84,7 @@ export class EmbeddingQueueService {
     if (!rt) {
       rt = {
         ctx: this.captureCtx(),
+        disposed: false,
         pendingWrites: 0,
         workerRegistered: false,
         recalibrationRunning: false,
@@ -137,6 +139,7 @@ export class EmbeddingQueueService {
   async registerForNamespace(): Promise<void> {
     if (!this.config.enabled) return;
     const rt = await this.ensureRuntime();
+    rt.disposed = false;
     if (!runsBackgroundWorkers()) return;
 
     await this.pgBoss.work(
@@ -161,6 +164,16 @@ export class EmbeddingQueueService {
       const ctx = rt.ctx;
       setImmediate(() => this.runCtx(ctx, () => this.requestBackfill()));
     }
+  }
+
+  /** Cancel detached recovery work and wait for an active backfill on delete. */
+  async stopForSchema(schema: string): Promise<void> {
+    const rt = this.runtimes.get(schema);
+    if (!rt) return;
+    rt.disposed = true;
+    if (rt.recoveryTimer) clearTimeout(rt.recoveryTimer);
+    await rt.backfillPromise?.catch(() => undefined);
+    this.runtimes.delete(schema);
   }
 
   enqueue(contents: QueuedContent[]): void {
@@ -328,6 +341,7 @@ export class EmbeddingQueueService {
 
   private async persist(contents: QueuedContent[]): Promise<void> {
     const rt = await this.ensureRuntime();
+    if (rt.disposed) return;
     if (!rt.queueName || !rt.spaceId) {
       throw new Error('Embedding queue is not initialized');
     }
@@ -427,17 +441,20 @@ export class EmbeddingQueueService {
 
   private async backfillStoredContent(rt: EmbeddingRuntime): Promise<void> {
     try {
+      if (rt.disposed) return;
       await this.backfillFindings(rt);
+      if (rt.disposed) return;
       await this.backfillAssetChunks(rt);
+      if (rt.disposed) return;
       await this.backfillGlossaryTerms(rt);
+      if (rt.disposed) return;
       rt.backfillCompletedAt = new Date().toISOString();
       void this.scheduleRecalibration();
       this.logger.log(
         `Embedding reconciliation queued for space ${rt.spaceId}`,
       );
     } catch (error) {
-      rt.backfillError =
-        error instanceof Error ? error.message : String(error);
+      rt.backfillError = error instanceof Error ? error.message : String(error);
       this.logger.error(`Embedding backfill failed: ${rt.backfillError}`);
       this.scheduleRecovery();
     }
@@ -459,6 +476,7 @@ export class EmbeddingQueueService {
   private async backfillFindings(rt: EmbeddingRuntime): Promise<void> {
     let cursor: string | undefined;
     do {
+      if (rt.disposed) return;
       const findings = await this.prisma.finding.findMany({
         ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
         orderBy: { id: 'asc' },
@@ -505,6 +523,7 @@ export class EmbeddingQueueService {
   private async backfillAssetChunks(rt: EmbeddingRuntime): Promise<void> {
     let cursor: string | undefined;
     do {
+      if (rt.disposed) return;
       const chunks = await this.prisma.assetChunk.findMany({
         ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
         orderBy: { id: 'asc' },
@@ -527,6 +546,7 @@ export class EmbeddingQueueService {
   private async backfillGlossaryTerms(rt: EmbeddingRuntime): Promise<void> {
     let cursor: string | undefined;
     do {
+      if (rt.disposed) return;
       const terms = await this.prisma.glossaryTerm.findMany({
         ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
         orderBy: { id: 'asc' },

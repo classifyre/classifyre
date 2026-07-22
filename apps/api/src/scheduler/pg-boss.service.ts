@@ -1,8 +1,4 @@
-import {
-  Injectable,
-  Logger,
-  OnApplicationShutdown,
-} from '@nestjs/common';
+import { Injectable, Logger, OnApplicationShutdown } from '@nestjs/common';
 import { ClsService } from 'nestjs-cls';
 import {
   CLS_SCHEMA,

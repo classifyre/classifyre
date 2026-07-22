@@ -98,4 +98,9 @@ export class EmbeddingCapabilityService {
   version(): string | undefined {
     return this.vectorVersions.get(this.schemaKey());
   }
+
+  clearForSchema(schema: string): void {
+    this.vectorVersions.delete(schema);
+    this.readinessProbes.delete(schema);
+  }
 }

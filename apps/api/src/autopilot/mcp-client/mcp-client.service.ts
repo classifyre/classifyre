@@ -6,6 +6,8 @@ import { PrismaService } from '../../prisma.service';
 import { MaskedConfigCryptoService } from '../../masked-config-crypto.service';
 import { ToolRegistry } from '../tools/tool-registry.service';
 import { adaptMcpTool, type RemoteTool } from './mcp-tool-adapter';
+import { ClsService } from 'nestjs-cls';
+import { CLS_SCHEMA } from '../../namespace/namespace.constants';
 
 const CONNECT_TIMEOUT_MS = 15_000;
 const CALL_TIMEOUT_MS = 60_000;
@@ -14,6 +16,15 @@ interface RegisteredTool {
   serverId: string;
   agentKinds: string[];
   trusted: boolean;
+}
+
+interface NamespaceMcpRuntime {
+  tools: Map<string, RegisteredTool>;
+  clients: Map<string, Client>;
+  refreshing: boolean;
+  refreshDone?: Promise<void>;
+  finishRefresh?: () => void;
+  disposed: boolean;
 }
 
 /**
@@ -25,16 +36,13 @@ interface RegisteredTool {
 @Injectable()
 export class McpClientService implements OnModuleDestroy {
   private readonly logger = new Logger(McpClientService.name);
-  /** toolName → metadata, for scoping per mission. */
-  private readonly tools = new Map<string, RegisteredTool>();
-  /** serverId → live client (kept open for callTool). */
-  private readonly clients = new Map<string, Client>();
-  private refreshing = false;
+  private readonly runtimes = new Map<string, NamespaceMcpRuntime>();
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly crypto: MaskedConfigCryptoService,
     private readonly registry: ToolRegistry,
+    private readonly cls: ClsService,
   ) {}
 
   // No boot-time refresh: there is no namespace context at startup, and the
@@ -42,13 +50,15 @@ export class McpClientService implements OnModuleDestroy {
   // time (in a namespace context) when a server config changes.
 
   async onModuleDestroy(): Promise<void> {
-    await this.closeAll();
+    await Promise.all(
+      [...this.runtimes.keys()].map((schema) => this.stopForSchema(schema)),
+    );
   }
 
   /** Tool names a mission of `kind` may call (server agentKinds empty = all). */
   toolNamesForKind(kind: string): string[] {
     const out: string[] = [];
-    for (const [name, meta] of this.tools) {
+    for (const [name, meta] of this.runtime().tools) {
       if (meta.agentKinds.length === 0 || meta.agentKinds.includes(kind)) {
         out.push(name);
       }
@@ -61,13 +71,18 @@ export class McpClientService implements OnModuleDestroy {
    * Updates each server's status row (discoveredTools / lastError / lastConnectedAt).
    */
   async refresh(): Promise<void> {
-    if (this.refreshing) return;
-    this.refreshing = true;
+    const schema = this.requireSchema();
+    const runtime = this.runtime();
+    if (runtime.refreshing) return;
+    runtime.refreshing = true;
+    runtime.refreshDone = new Promise<void>((resolve) => {
+      runtime.finishRefresh = resolve;
+    });
     try {
       // Tear down previous registrations + clients.
-      for (const name of this.tools.keys()) this.registry.unregister(name);
-      this.tools.clear();
-      await this.closeAll();
+      for (const name of runtime.tools.keys()) this.registry.unregister(name);
+      runtime.tools.clear();
+      await this.closeRuntime(runtime);
 
       const servers = await this.prisma.mcpServerConfig.findMany({
         where: { enabled: true },
@@ -89,17 +104,17 @@ export class McpClientService implements OnModuleDestroy {
               trusted: server.trusted,
               remote: rt,
               call: (toolName, args) =>
-                this.callTool(server.id, toolName, args),
+                this.callTool(schema, server.id, toolName, args),
             });
             this.registry.register(tool);
-            this.tools.set(tool.name, {
+            runtime.tools.set(tool.name, {
               serverId: server.id,
               agentKinds: server.agentKinds,
               trusted: server.trusted,
             });
           }
 
-          this.clients.set(server.id, client);
+          runtime.clients.set(server.id, client);
           await this.prisma.mcpServerConfig.update({
             where: { id: server.id },
             data: {
@@ -124,7 +139,10 @@ export class McpClientService implements OnModuleDestroy {
         }
       }
     } finally {
-      this.refreshing = false;
+      runtime.refreshing = false;
+      runtime.finishRefresh?.();
+      runtime.finishRefresh = undefined;
+      runtime.refreshDone = undefined;
     }
   }
 
@@ -154,11 +172,12 @@ export class McpClientService implements OnModuleDestroy {
   }
 
   private async callTool(
+    schema: string,
     serverId: string,
     name: string,
     args: Record<string, unknown>,
   ): Promise<unknown> {
-    const client = this.clients.get(serverId);
+    const client = this.runtimes.get(schema)?.clients.get(serverId);
     if (!client) {
       throw new Error(
         'MCP server is not connected — refresh the harness tools.',
@@ -180,10 +199,41 @@ export class McpClientService implements OnModuleDestroy {
     }
   }
 
-  private async closeAll(): Promise<void> {
-    for (const client of this.clients.values()) {
+  async stopForSchema(schema: string): Promise<void> {
+    const runtime = this.runtimes.get(schema);
+    if (!runtime) return;
+    runtime.disposed = true;
+    await runtime.refreshDone;
+    this.runtimes.delete(schema);
+    this.registry.clearScope(schema);
+    await this.closeRuntime(runtime);
+  }
+
+  private async closeRuntime(runtime: NamespaceMcpRuntime): Promise<void> {
+    for (const client of runtime.clients.values()) {
       await client.close().catch(() => undefined);
     }
-    this.clients.clear();
+    runtime.clients.clear();
+  }
+
+  private requireSchema(): string {
+    const schema = this.cls.get<string>(CLS_SCHEMA);
+    if (!schema) throw new Error('MCP client used outside a namespace context');
+    return schema;
+  }
+
+  private runtime(): NamespaceMcpRuntime {
+    const schema = this.requireSchema();
+    let runtime = this.runtimes.get(schema);
+    if (!runtime) {
+      runtime = {
+        tools: new Map(),
+        clients: new Map(),
+        refreshing: false,
+        disposed: false,
+      };
+      this.runtimes.set(schema, runtime);
+    }
+    return runtime;
   }
 }

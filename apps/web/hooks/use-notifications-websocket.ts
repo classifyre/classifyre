@@ -2,13 +2,14 @@
 
 import { useEffect, useRef, useState } from "react";
 import { io, type Socket } from "socket.io-client";
+import { useNamespace } from "@/components/namespace-provider";
 
 const getWebSocketUrl = () => {
   if (
     typeof window !== "undefined" &&
-    (window as any).__CLASSIFYRE_DESKTOP__?.apiBaseUrl
+    window.__CLASSIFYRE_DESKTOP__?.apiBaseUrl
   ) {
-    return (window as any).__CLASSIFYRE_DESKTOP__.apiBaseUrl as string;
+    return window.__CLASSIFYRE_DESKTOP__.apiBaseUrl;
   }
 
   if (process.env.NEXT_PUBLIC_WS_URL) {
@@ -41,6 +42,7 @@ export function useNotificationsWebSocket({
   onCreated?: (notification: Record<string, unknown>) => void;
 } = {}) {
   const socketRef = useRef<Socket | null>(null);
+  const { slug: namespaceSlug } = useNamespace();
   const callbackRef = useRef<(() => void) | undefined>(onChange);
   const createdRef = useRef<typeof onCreated>(onCreated);
   const [isConnected, setIsConnected] = useState(false);
@@ -52,6 +54,7 @@ export function useNotificationsWebSocket({
 
   useEffect(() => {
     const socket = io(`${WS_URL}/notifications`, {
+      auth: { namespaceSlug },
       transports: ["websocket", "polling"],
       reconnection: true,
       reconnectionDelay: 1000,
@@ -83,10 +86,13 @@ export function useNotificationsWebSocket({
       socket.emit("subscribe:notifications");
     });
 
-    socket.on("notification:created", (notification: Record<string, unknown>) => {
-      createdRef.current?.(notification);
-      handleChange();
-    });
+    socket.on(
+      "notification:created",
+      (notification: Record<string, unknown>) => {
+        createdRef.current?.(notification);
+        handleChange();
+      },
+    );
     socket.on("notification:updated", handleChange);
     socket.on("notification:deleted", handleChange);
     socket.on("notifications:changed", handleChange);
@@ -98,7 +104,7 @@ export function useNotificationsWebSocket({
       socket.disconnect();
       socketRef.current = null;
     };
-  }, []);
+  }, [namespaceSlug]);
 
   return {
     isConnected,

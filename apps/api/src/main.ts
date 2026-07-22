@@ -28,6 +28,7 @@ import {
   CLS_SCHEMA,
   CLS_SLUG,
 } from './namespace/namespace.constants';
+import { PrismaClientManager } from './prisma/prisma-client-manager';
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
@@ -137,10 +138,11 @@ async function bootstrap() {
   const instanceSettingsService = app.get(InstanceSettingsService);
   const cls = app.get(ClsService);
   const namespaceRegistry = app.get(NamespaceRegistryService);
+  const prismaClientManager = app.get(PrismaClientManager);
 
   // Resolve the leading `/<slug>` into a tenant context (404 on unknown slug)
   // before any route runs. `/<slug>/mcp` was already rewritten to `/mcp`.
-  registerNamespaceHook(fastify, namespaceRegistry, cls);
+  registerNamespaceHook(fastify, namespaceRegistry, cls, prismaClientManager);
 
   const mcpHandler = async (request: any, reply: any) => {
     // MCP requires a namespace: `/<slug>/mcp` (rewritten to `/mcp` with the

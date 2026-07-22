@@ -20,7 +20,9 @@ export class PrismaClientManager implements OnModuleDestroy {
   private readonly logger = new Logger(PrismaClientManager.name);
   /** Insertion-ordered → iteration yields least-recently-used first. */
   private readonly clients = new Map<string, PrismaClient>();
-  private readonly pinned = new Set<string>();
+  /** Active worker/request references per schema; referenced clients cannot LRU-evict. */
+  private readonly pins = new Map<string, number>();
+  private readonly idleWaiters = new Map<string, Set<() => void>>();
   private readonly poolMax = Number(process.env.PRISMA_POOL_MAX ?? 3);
   private readonly maxResident = Number(process.env.PRISMA_MAX_RESIDENT ?? 20);
 
@@ -53,12 +55,44 @@ export class PrismaClientManager implements OnModuleDestroy {
 
   /** Prevent LRU eviction of a schema (e.g. it has active workers). */
   pin(schema: string): void {
-    this.pinned.add(schema);
-    this.get(schema); // ensure it exists and is warm
+    this.pins.set(schema, (this.pins.get(schema) ?? 0) + 1);
+    try {
+      this.get(schema); // ensure it exists and is warm
+    } catch (error) {
+      this.unpin(schema);
+      throw error;
+    }
   }
 
   unpin(schema: string): void {
-    this.pinned.delete(schema);
+    const count = this.pins.get(schema) ?? 0;
+    if (count <= 1) {
+      this.pins.delete(schema);
+      for (const resolve of this.idleWaiters.get(schema) ?? []) resolve();
+      this.idleWaiters.delete(schema);
+    } else this.pins.set(schema, count - 1);
+  }
+
+  residentSchemas(): string[] {
+    return [...this.clients.keys()];
+  }
+
+  /** Wait for active requests/workers to release the client, then disconnect. */
+  async dropWhenIdle(schema: string, timeoutMs = 15_000): Promise<void> {
+    if (this.pins.has(schema)) {
+      await new Promise<void>((resolve) => {
+        const waiters = this.idleWaiters.get(schema) ?? new Set<() => void>();
+        waiters.add(resolve);
+        this.idleWaiters.set(schema, waiters);
+        const timer = setTimeout(() => {
+          waiters.delete(resolve);
+          if (waiters.size === 0) this.idleWaiters.delete(schema);
+          resolve();
+        }, timeoutMs);
+        timer.unref?.();
+      });
+    }
+    await this.drop(schema);
   }
 
   /** Disconnect and forget a schema's client (called on namespace delete). */
@@ -66,7 +100,7 @@ export class PrismaClientManager implements OnModuleDestroy {
     const client = this.clients.get(schema);
     if (!client) return;
     this.clients.delete(schema);
-    this.pinned.delete(schema);
+    this.pins.delete(schema);
     try {
       await client.$disconnect();
     } catch (error) {
@@ -81,6 +115,11 @@ export class PrismaClientManager implements OnModuleDestroy {
       [...this.clients.values()].map((c) => c.$disconnect().catch(() => {})),
     );
     this.clients.clear();
+    this.pins.clear();
+    for (const waiters of this.idleWaiters.values()) {
+      for (const resolve of waiters) resolve();
+    }
+    this.idleWaiters.clear();
   }
 
   private touch(schema: string): void {
@@ -94,7 +133,7 @@ export class PrismaClientManager implements OnModuleDestroy {
     if (this.clients.size <= this.maxResident) return;
     for (const schema of [...this.clients.keys()]) {
       if (this.clients.size <= this.maxResident) break;
-      if (this.pinned.has(schema)) continue;
+      if (this.pins.has(schema)) continue;
       void this.drop(schema);
     }
   }

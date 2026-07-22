@@ -114,6 +114,7 @@ import { AutopilotController } from './autopilot.controller';
     ToolDispatcherService,
     AgentAuditService,
     AgentLoggerService,
+    McpClientService,
   ],
 })
 export class AutopilotModule {}

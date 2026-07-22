@@ -16,8 +16,12 @@ describe('Bulk Ingest (e2e)', () => {
     // external Python process. Keep the fire-and-forget execution inside the
     // test lifecycle so it cannot mutate the database after Jest teardown.
     const cliRunner = ctx.app!.get(CliRunnerService);
-    jest.spyOn(cliRunner, 'executeCliAsync').mockResolvedValue();
-    jest.spyOn(cliRunner, 'pruneOldRunners').mockResolvedValue();
+    const runnerInternals = cliRunner as unknown as {
+      executeCliAsync: () => Promise<void>;
+      pruneOldRunners: () => Promise<void>;
+    };
+    jest.spyOn(runnerInternals, 'executeCliAsync').mockResolvedValue();
+    jest.spyOn(runnerInternals, 'pruneOldRunners').mockResolvedValue();
   });
 
   beforeEach(async () => {

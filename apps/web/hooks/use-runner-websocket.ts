@@ -4,13 +4,14 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { io, type Socket } from "socket.io-client";
 import type { RunnerDto, RunnerLogEntryDto } from "@workspace/api-client";
 import { parseRunnerSocketPayload } from "@/lib/runner-ws-merge";
+import { useNamespace } from "@/components/namespace-provider";
 
 const getWebSocketUrl = () => {
   if (
     typeof window !== "undefined" &&
-    (window as any).__CLASSIFYRE_DESKTOP__?.apiBaseUrl
+    window.__CLASSIFYRE_DESKTOP__?.apiBaseUrl
   ) {
-    return (window as any).__CLASSIFYRE_DESKTOP__.apiBaseUrl as string;
+    return window.__CLASSIFYRE_DESKTOP__.apiBaseUrl;
   }
 
   if (process.env.NEXT_PUBLIC_WS_URL) {
@@ -49,6 +50,7 @@ export type UseRunnerWebSocketOptions = {
 };
 
 export function useRunnerWebSocket(options?: UseRunnerWebSocketOptions) {
+  const { slug: namespaceSlug } = useNamespace();
   const enabled = options?.enabled ?? true;
   const optsRef = useRef(options);
   optsRef.current = options;
@@ -65,6 +67,7 @@ export function useRunnerWebSocket(options?: UseRunnerWebSocketOptions) {
 
     const socketUrl = `${WS_URL}/runners`;
     const socket = io(socketUrl, {
+      auth: { namespaceSlug },
       transports: ["websocket", "polling"],
       reconnection: true,
       reconnectionDelay: 1000,
@@ -163,7 +166,7 @@ export function useRunnerWebSocket(options?: UseRunnerWebSocketOptions) {
       socket.disconnect();
       socketRef.current = null;
     };
-  }, [enabled]);
+  }, [enabled, namespaceSlug]);
 
   const subscribeToRunner = useCallback((runnerId: string) => {
     if (socketRef.current?.connected) {
