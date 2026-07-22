@@ -177,7 +177,13 @@ export default function LandingPage() {
     <div className="min-h-svh bg-background">
       <WorkspaceHeader />
 
-      <main className="mx-auto max-w-6xl px-5 py-10 sm:px-8 sm:py-14">
+      <main
+        className="mx-auto max-w-6xl px-5 py-10 sm:px-8 sm:py-14"
+        data-testid="workspace-directory"
+        data-app-state={
+          namespaces !== null ? "ready" : error ? "error" : "loading"
+        }
+      >
         <div className="mb-9 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
           <div className="max-w-2xl">
             <h1 className="font-serif text-3xl uppercase tracking-[0.04em] sm:text-4xl">

@@ -1,4 +1,5 @@
 import { app, autoUpdater, BrowserWindow, WebContentsView, dialog, protocol, shell } from 'electron';
+import fs from 'fs';
 import path from 'path';
 import { PostgresManager } from './postgres-manager.js';
 import { NamespaceManager } from './namespace-manager.js';
@@ -17,6 +18,18 @@ import { getAvailablePort } from './port-manager.js';
 
 /** Fixed process id for the single shared API in the ProcessManager map. */
 const SHARED_API_ID = '__shared__';
+
+// Tests and managed installations can override the application data root.
+// Apply it to Electron itself before any manager or logger reads userData so
+// API extraction, Python state, logs, settings, and PostgreSQL are all kept in
+// the same isolated location.
+const configuredDataDir = process.env['CLASSIFYRE_DATA_DIR'];
+if (configuredDataDir) {
+  const dataDirOverride = path.resolve(configuredDataDir);
+  fs.mkdirSync(dataDirOverride, { recursive: true });
+  process.env['CLASSIFYRE_DATA_DIR'] = dataDirOverride;
+  app.setPath('userData', dataDirOverride);
+}
 
 // embedded-postgres registers an async-exit-hook that calls done() on process
 // exit, but Electron's quit path doesn't always provide the callback. Suppress
@@ -345,6 +358,10 @@ app.on('before-quit', (e) => {
   sessionStore?.suppress();
   Promise.resolve()
     .then(() => runtime?.closeAll())
+    // The shared namespace-aware API is not owned by the legacy per-workspace
+    // runtime. Stop it explicitly before Postgres so its registry/Prisma pools
+    // close cleanly instead of receiving administrator-shutdown errors.
+    .then(() => processManager?.stopApi(SHARED_API_ID))
     .then(() => pg?.stop())
     .catch((err) => console.error('Shutdown error:', err))
     .finally(() => {

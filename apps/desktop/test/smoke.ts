@@ -1,7 +1,8 @@
 /**
  * Smoke test for a PACKAGED desktop build. Launches the real binary, waits
- * for the namespace selector to render (which requires embedded PostgreSQL to
- * have started), and exits 0 on success.
+ * for the workspace directory to finish its first API-backed load (which
+ * requires the renderer, shared API, and embedded PostgreSQL), and exits 0 on
+ * success.
  *
  * Usage:
  *   CLASSIFYRE_APP_PATH=/path/to/binary npx tsx test/smoke.ts
@@ -117,16 +118,19 @@ async function main(): Promise<void> {
   );
 
   try {
-    // The selector view shows up as a Playwright "window". Postgres must be
-    // running before the main window is created, so a visible selector proves
-    // the embedded database booted on a clean machine profile.
+    // The shared web view shows up as a Playwright "window". Its state changes
+    // from loading to ready only after client hydration and a successful
+    // namespace-registry request, proving the renderer, API, and database all
+    // work in the packaged application.
     const deadline = Date.now() + 120_000;
     let found = false;
     while (Date.now() < deadline && !found) {
       for (const win of app.windows()) {
         try {
-          const heading = await win.locator('h1').textContent({ timeout: 2000 });
-          if (heading?.trim() === 'Classifyre') {
+          const directory = win.locator(
+            '[data-testid="workspace-directory"][data-app-state="ready"]',
+          );
+          if (await directory.isVisible({ timeout: 2000 })) {
             found = true;
             break;
           }
@@ -141,10 +145,14 @@ async function main(): Promise<void> {
 
     if (!found) {
       const urls = app.windows().map((w) => w.url());
-      throw new Error(`Selector never rendered. Windows: ${urls.join(', ') || '(none)'}`);
+      throw new Error(
+        `Workspace directory never became ready. Windows: ${urls.join(', ') || '(none)'}`,
+      );
     }
 
-    console.log('Smoke test passed: app booted and selector rendered.');
+    console.log(
+      'Smoke test passed: packaged renderer, shared API, and database are ready.',
+    );
   } finally {
     await app.close().catch(() => {});
     fs.rmSync(dataDir, { recursive: true, force: true });
