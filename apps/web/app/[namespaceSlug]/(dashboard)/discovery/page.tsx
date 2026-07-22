@@ -276,7 +276,11 @@ export default function DiscoveryPage() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-96">
+      <div
+        className="flex items-center justify-center h-96"
+        data-testid="namespace-workspace"
+        data-app-state="loading"
+      >
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
       </div>
     );
@@ -284,7 +288,11 @@ export default function DiscoveryPage() {
 
   if (error) {
     return (
-      <div className="space-y-6">
+      <div
+        className="space-y-6"
+        data-testid="namespace-workspace"
+        data-app-state="error"
+      >
         <div className="flex items-center justify-between">
           <div>
             <h1 className="font-serif text-3xl font-black uppercase tracking-[0.08em]">
@@ -332,7 +340,11 @@ export default function DiscoveryPage() {
           });
 
   return (
-    <div className="min-w-0 space-y-6 overflow-x-hidden">
+    <div
+      className="min-w-0 space-y-6 overflow-x-hidden"
+      data-testid="namespace-workspace"
+      data-app-state="ready"
+    >
       {/* ── Bento Grid ─────────────────────────────────────────── */}
       <div className="min-w-0 grid auto-rows-[minmax(120px,auto)] grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-3.5 xl:grid-cols-12">
         {/* ── HERO: Total Findings ─── */}
