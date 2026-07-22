@@ -16,6 +16,7 @@ import { Button } from "@workspace/ui/components/button";
 import { Input } from "@workspace/ui/components/input";
 import { Label } from "@workspace/ui/components/label";
 import { Textarea } from "@workspace/ui/components/textarea";
+import { useTranslation } from "@/hooks/use-translation";
 
 function slugify(name: string): string {
   return name
@@ -36,6 +37,7 @@ export function CreateNamespaceDialog({
   onOpenChange: (open: boolean) => void;
   onCreated: (namespace: Namespace) => void;
 }) {
+  const { t } = useTranslation();
   const [name, setName] = React.useState("");
   const [description, setDescription] = React.useState("");
   const [submitting, setSubmitting] = React.useState(false);
@@ -57,13 +59,13 @@ export function CreateNamespaceDialog({
         name: name.trim(),
         description: description.trim() || undefined,
       });
-      toast.success(`Workspace "${namespace.name}" created`);
+      toast.success(t("workspaces.createSuccess", { name: namespace.name }));
       onCreated(namespace);
       onOpenChange(false);
       reset();
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : "Failed to create workspace",
+        error instanceof Error ? error.message : t("workspaces.createFailed"),
       );
       setSubmitting(false);
     }
@@ -80,36 +82,37 @@ export function CreateNamespaceDialog({
       <DialogContent>
         <form onSubmit={handleSubmit}>
           <DialogHeader>
-            <DialogTitle>Create a workspace</DialogTitle>
+            <DialogTitle>{t("workspaces.createTitle")}</DialogTitle>
             <DialogDescription>
-              Each workspace is an isolated tenant with its own sources, scans
-              and findings.
+              {t("workspaces.createDescription")}
             </DialogDescription>
           </DialogHeader>
 
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
-              <Label htmlFor="ns-name">Name</Label>
+              <Label htmlFor="ns-name">{t("common.name")}</Label>
               <Input
                 id="ns-name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="Acme Corp"
+                placeholder={t("workspaces.namePlaceholder")}
                 autoFocus
               />
               {slug && (
                 <p className="text-muted-foreground text-xs">
-                  URL: <span className="font-mono">/{slug}</span>
+                  {t("workspaces.url")}: <span className="font-mono">/{slug}</span>
                 </p>
               )}
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="ns-description">Description (optional)</Label>
+              <Label htmlFor="ns-description">
+                {t("workspaces.descriptionOptional")}
+              </Label>
               <Textarea
                 id="ns-description"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="What this workspace is for"
+                placeholder={t("workspaces.descriptionPlaceholder")}
                 rows={2}
               />
             </div>
@@ -122,11 +125,15 @@ export function CreateNamespaceDialog({
               onClick={() => onOpenChange(false)}
               disabled={submitting}
             >
-              Cancel
+              {t("common.cancel")}
             </Button>
-            <Button type="submit" disabled={!name.trim() || submitting}>
+            <Button
+              type="submit"
+              variant="default"
+              disabled={!name.trim() || submitting}
+            >
               {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Create workspace
+              {t("workspaces.createAction")}
             </Button>
           </DialogFooter>
         </form>

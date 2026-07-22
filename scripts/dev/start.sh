@@ -19,4 +19,6 @@ if [[ -z "${skaffold_version}" || -z "${skaffold_latest_version}" || "${skaffold
 fi
 
 kubectl config use-context k3d-classifyre >/dev/null
-exec skaffold dev --profile dev --kube-context k3d-classifyre
+# --cleanup=false leaves the Helm release (and the persistent Postgres PVC)
+# running when you Ctrl-C, so the database survives across dev sessions.
+exec skaffold dev --profile dev --kube-context k3d-classifyre --cleanup=false

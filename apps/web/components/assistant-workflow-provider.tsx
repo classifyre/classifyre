@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Sparkles, Wand2 } from "lucide-react";
+import { Sparkles } from "lucide-react";
 import {
   api,
   type AssistantChatMessage,
@@ -365,7 +365,6 @@ export function AssistantWorkflowProvider({
   return (
     <AssistantWorkflowContext.Provider value={contextValue}>
       {children}
-      <AssistantWorkflowFab />
       {active && open ? (
         // Anchored to the bottom-right; on narrow viewports it stretches to
         // fill the screen. Fixed placement (no drag/resize) means it can never
@@ -417,37 +416,6 @@ export function AssistantWorkflowProvider({
         </div>
       ) : null}
     </AssistantWorkflowContext.Provider>
-  );
-}
-
-function AssistantWorkflowFab() {
-  const context = useAssistantWorkflow();
-  // `context.active` already accounts for aiEnabled + demoMode.
-  if (!context.active) {
-    return null;
-  }
-
-  return (
-    // Sticky bottom toolbars publish their height as --assistant-fab-offset
-    // (see StickyActionToolbar), so the FAB rides above them instead of
-    // covering Save/Test/Run — which lets it stay visible on mobile too.
-    <div
-      className="pointer-events-none fixed right-4 z-40 md:right-6"
-      style={{
-        bottom:
-          "calc(1rem + env(safe-area-inset-bottom, 0px) + var(--assistant-fab-offset, 0px))",
-      }}
-    >
-      <Button
-        type="button"
-        onClick={() => context.setOpen(true)}
-        aria-label="Open assistant"
-        className="pointer-events-auto h-12 w-12 rounded-[6px] border-2 border-border bg-[var(--color-accent)] p-0 text-[var(--color-accent-foreground)] shadow-[6px_6px_0_var(--color-border)] transition-[transform,color] hover:-translate-y-[1px] hover:text-[var(--color-primary-foreground)] md:h-14 md:w-auto md:px-4"
-      >
-        <Wand2 className="h-4 w-4 md:mr-2" />
-        <span className="hidden md:inline">Assistant</span>
-      </Button>
-    </div>
   );
 }
 
