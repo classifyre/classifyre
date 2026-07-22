@@ -89,6 +89,11 @@ const TERMINAL_RUNNER_STATUSES = new Set<RunnerStatus>([
 export class CliRunnerService {
   private readonly logger = new Logger(CliRunnerService.name);
   private runningProcessesByRunnerId = new Map<string, ChildProcess>();
+  private readonly activeExecutions = new Map<
+    string,
+    { schema?: string; done: Promise<void> }
+  >();
+  private readonly stoppingSchemas = new Set<string>();
 
   constructor(
     private prisma: PrismaService,
@@ -126,6 +131,75 @@ export class CliRunnerService {
     } catch {
       return undefined;
     }
+  }
+
+  /** Allow work again when a namespace with this schema is (re)provisioned. */
+  activateForSchema(schema: string): void {
+    this.stoppingSchemas.delete(schema);
+  }
+
+  /**
+   * Stop scan processes/jobs owned by the current tenant before its schema is
+   * dropped. This prevents detached CLI callbacks from querying a deleted (or
+   * later re-created) schema.
+   */
+  async stopForSchema(schema: string): Promise<void> {
+    this.stoppingSchemas.add(schema);
+    const runners = await this.prisma.runner.findMany({
+      where: { status: RunnerStatus.RUNNING },
+      select: {
+        id: true,
+        executionMode: true,
+        jobName: true,
+        jobNamespace: true,
+      },
+    });
+
+    for (const runner of runners) {
+      if (runner.executionMode === RunnerExecutionMode.KUBERNETES) {
+        await this.stopKubernetesJobSafely(runner.id, runner);
+      } else if (runner.executionMode !== RunnerExecutionMode.EXTERNAL) {
+        const child = this.runningProcessesByRunnerId.get(runner.id);
+        if (child) this.stopLocalRunnerProcess(runner.id);
+      }
+    }
+
+    const completions = [...this.activeExecutions.values()]
+      .filter((execution) => execution.schema === schema)
+      .map((execution) => execution.done);
+    if (completions.length === 0) return;
+
+    await Promise.race([
+      Promise.allSettled(completions).then(() => undefined),
+      new Promise<void>((resolve) => {
+        const timer = setTimeout(resolve, 8_000);
+        timer.unref?.();
+      }),
+    ]);
+  }
+
+  private startTrackedExecution(
+    runnerId: string,
+    source: unknown,
+    hasSuccessfulRuns: boolean,
+  ): void {
+    const schema = this.cls?.get<string>(CLS_SCHEMA);
+    if (schema && this.stoppingSchemas.has(schema)) return;
+    const done = this.executeCliAsync(
+      runnerId,
+      source,
+      hasSuccessfulRuns,
+    ).catch((error) => {
+      this.logger.error(
+        `Unhandled runner execution failure for ${runnerId}: ${String(error)}`,
+      );
+    });
+    this.activeExecutions.set(runnerId, { schema, done });
+    void done.finally(() => {
+      if (this.activeExecutions.get(runnerId)?.done === done) {
+        this.activeExecutions.delete(runnerId);
+      }
+    });
   }
 
   /**
@@ -631,7 +705,7 @@ export class CliRunnerService {
       `Starting ${triggerType.toLowerCase()} run ${runner.id} for source ${sourceId} in ${executionMode.toLowerCase()} mode`,
     );
 
-    void this.executeCliAsync(
+    this.startTrackedExecution(
       runner.id,
       sourceWithDecryptedConfig,
       hasSuccessfulRuns,
@@ -3479,6 +3553,8 @@ export class CliRunnerService {
   }
 
   private async dequeueNextPendingRunner(): Promise<void> {
+    const schema = this.cls?.get<string>(CLS_SCHEMA);
+    if (schema && this.stoppingSchemas.has(schema)) return;
     if (!(await this.canStartNewRunner())) return;
 
     const pending = await this.prisma.runner.findFirst({
@@ -3516,7 +3592,7 @@ export class CliRunnerService {
         `Dequeued pending runner ${pending.id} for source ${source.id}`,
       );
 
-      void this.executeCliAsync(
+      this.startTrackedExecution(
         pending.id,
         sourceWithDecryptedConfig,
         hasSuccessfulRuns,

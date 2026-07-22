@@ -536,6 +536,20 @@ export class NamespaceRuntime {
     return undefined;
   }
 
+  /** Whether a message came from the single shared, namespace-aware web app. */
+  isSelectorWebContents(wc: Electron.WebContents): boolean {
+    return this.selectorView?.webContents === wc;
+  }
+
+  /** Bring the shared web app forward and deliver a namespace-qualified URL. */
+  navigateSelector(url: string): boolean {
+    const contents = this.selectorView?.webContents;
+    if (!contents || contents.isDestroyed()) return false;
+    this.showSelector();
+    contents.send('desktop-notification:navigate', url);
+    return true;
+  }
+
   getApiPort(namespaceId: string): number | undefined {
     return this.running.get(namespaceId)?.apiPort;
   }

@@ -90,6 +90,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   showNotification: (payload: Record<string, unknown>) =>
     ipcRenderer.send('notification:show', payload),
   onNotificationNavigate: (cb: (url: string) => void) => {
-    ipcRenderer.on('desktop-notification:navigate', (_event, url: string) => cb(url));
+    const listener = (_event: Electron.IpcRendererEvent, url: string) => cb(url);
+    ipcRenderer.on('desktop-notification:navigate', listener);
+    return () =>
+      ipcRenderer.removeListener('desktop-notification:navigate', listener);
   },
 });
