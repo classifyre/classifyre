@@ -87,9 +87,6 @@ function getPreloadPath(): string {
   return path.join(__dirname, 'preload.js');
 }
 
-declare const NAMESPACE_SELECTOR_VITE_DEV_SERVER_URL: string | undefined;
-declare const NAMESPACE_SELECTOR_VITE_NAME: string | undefined;
-
 // The app-chrome views (window shell, tab bar, selector) only ever display
 // their own bundled pages. Deny window.open and in-place navigation so a
 // compromised or buggy page can't turn app chrome into an arbitrary browser.

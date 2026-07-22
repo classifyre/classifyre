@@ -1,9 +1,11 @@
 import { Test, TestingModuleBuilder } from '@nestjs/testing';
-import { INestApplication } from '@nestjs/common';
+import { INestApplication, Type } from '@nestjs/common';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import type { NextFunction, Request, Response } from 'express';
 import { ClsService } from 'nestjs-cls';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/prisma.service';
+import { PrismaClientManager } from '../src/prisma/prisma-client-manager';
 import { NamespaceRegistryService } from '../src/registry/namespace-registry.service';
 import type { Namespace } from '../src/registry/namespace.types';
 import {
@@ -34,6 +36,8 @@ export type TestApp = {
   isRemote: boolean;
   /** Namespace provisioned once for the API test process. */
   namespace: Namespace;
+  /** Resolve a provider whose method calls run inside the test namespace. */
+  get<T extends object>(token: Type<T>): T;
 };
 
 /**
@@ -58,6 +62,7 @@ export type TestApp = {
  */
 export async function createTestApp(
   configure?: (builder: TestingModuleBuilder) => TestingModuleBuilder,
+  listenPort = 0,
 ): Promise<TestApp> {
   const remoteUrl = process.env.TEST_API_URL?.trim();
 
@@ -70,6 +75,9 @@ export async function createTestApp(
       app: null,
       isRemote: true,
       namespace,
+      get() {
+        throw new Error('Nest providers are unavailable in remote test mode');
+      },
       async close() {},
     };
   }
@@ -84,64 +92,88 @@ export async function createTestApp(
   }
 
   const moduleFixture = await builder.compile();
-  const app = moduleFixture.createNestApplication();
-  const prisma = moduleFixture.get<PrismaService>(PrismaService);
+  const app = moduleFixture.createNestApplication<NestExpressApplication>();
+  app.useBodyParser('json', { limit: '50mb' });
+  app.useBodyParser('urlencoded', { limit: '50mb', extended: true });
   const cls = moduleFixture.get(ClsService);
   const registry = moduleFixture.get(NamespaceRegistryService);
+  const prismaManager = moduleFixture.get(PrismaClientManager);
 
   // The production server performs this work in Fastify's rewriteUrl/onRequest
   // hooks. E2E tests use Nest's default Express adapter, so install the same
   // namespace resolution semantics as an early middleware.
-  app.use(
-    async (request: Request, response: Response, next: NextFunction) => {
-      cls.enter();
-      const rewrittenUrl = namespaceRewriteUrl(request);
-      const slug = (request as NamespaceRawRequest).classifyreSlug;
+  app.use(async (request: Request, response: Response, next: NextFunction) => {
+    cls.enter();
+    const rewrittenUrl = namespaceRewriteUrl(request);
+    const slug = (request as NamespaceRawRequest).classifyreSlug;
 
-      if (!slug) {
-        next();
-        return;
-      }
-
-      const resolved = await registry.resolve(slug);
-      if (!resolved) {
-        response.status(404).json({
-          error: 'Not Found',
-          message: `Unknown namespace '${slug}'`,
-        });
-        return;
-      }
-
-      cls.set(CLS_SCHEMA, resolved.schemaName);
-      cls.set(CLS_NAMESPACE_ID, resolved.namespaceId);
-      cls.set(CLS_SLUG, resolved.slug);
-      request.url = rewrittenUrl;
+    if (!slug) {
       next();
-    },
-  );
+      return;
+    }
 
-  await app.listen(0, '127.0.0.1');
+    const resolved = await registry.resolve(slug);
+    if (!resolved) {
+      response.status(404).json({
+        error: 'Not Found',
+        message: `Unknown namespace '${slug}'`,
+      });
+      return;
+    }
+
+    cls.set(CLS_SCHEMA, resolved.schemaName);
+    cls.set(CLS_NAMESPACE_ID, resolved.namespaceId);
+    cls.set(CLS_SLUG, resolved.slug);
+    request.url = rewrittenUrl;
+    next();
+  });
+
+  await app.listen(listenPort, '127.0.0.1');
   const namespace = await ensureLocalNamespace(registry);
 
-  // Direct service calls and Prisma seeding in the existing integration tests
-  // also need a tenant context. HTTP requests get their own context above.
-  cls.enter();
-  cls.set(CLS_SCHEMA, namespace.schemaName);
-  cls.set(CLS_NAMESPACE_ID, namespace.id);
-  cls.set(CLS_SLUG, namespace.slug);
+  // Seeding gets a concrete tenant client. Namespace-bound provider proxies
+  // below establish CLS for direct service calls; HTTP requests get their own
+  // context in the middleware above.
+  const tenantPrisma = prismaManager.get(
+    namespace.schemaName,
+  ) as unknown as PrismaService;
 
   const baseUrl = (await app.getUrl()).replace(/\/+$/, '');
 
   return {
     httpTarget: `${baseUrl}/${namespace.slug}`,
-    prisma,
+    prisma: tenantPrisma,
     app,
     isRemote: false,
     namespace,
+    get<T extends object>(token: Type<T>): T {
+      return bindToNamespace(app.get(token), cls, namespace);
+    },
     async close() {
       await app.close();
     },
   };
+}
+
+function bindToNamespace<T extends object>(
+  provider: T,
+  cls: ClsService,
+  namespace: Namespace,
+): T {
+  return new Proxy(provider, {
+    get(target, property, receiver) {
+      const value = Reflect.get(target, property, receiver) as unknown;
+      if (typeof value !== 'function') return value;
+
+      return (...args: unknown[]) =>
+        cls.run(() => {
+          cls.set(CLS_SCHEMA, namespace.schemaName);
+          cls.set(CLS_NAMESPACE_ID, namespace.id);
+          cls.set(CLS_SLUG, namespace.slug);
+          return Reflect.apply(value, target, args);
+        });
+    },
+  });
 }
 
 async function ensureLocalNamespace(
