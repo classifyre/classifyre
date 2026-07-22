@@ -1,17 +1,21 @@
-import type { Metadata } from "next";
-import { redirect } from "next/navigation";
-import enTranslations from "@/i18n/en";
-import { translate } from "@/i18n";
+"use client";
 
-export const metadata: Metadata = {
-  title: translate(enTranslations, "discovery.title"),
-};
+import * as React from "react";
+import { useRouter } from "next/navigation";
+import { useNamespace } from "@/components/namespace-provider";
 
-export default async function HomePage({
-  params,
-}: {
-  params: Promise<{ namespaceSlug: string }>;
-}) {
-  const { namespaceSlug } = await params;
-  redirect(`/${namespaceSlug}/discovery`);
+/**
+ * Route a namespace root to its discovery page after the runtime namespace
+ * slug has been recovered. A server redirect would bake the static-export
+ * sentinel (`__id__`) into the desktop build and lose the real tenant slug.
+ */
+export default function HomePage() {
+  const router = useRouter();
+  const { nsHref } = useNamespace();
+
+  React.useEffect(() => {
+    router.replace(nsHref("/discovery"));
+  }, [nsHref, router]);
+
+  return null;
 }
