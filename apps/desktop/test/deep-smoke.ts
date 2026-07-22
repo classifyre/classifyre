@@ -1,8 +1,8 @@
 /**
  * Deep smoke test for a PACKAGED desktop build, run from OUTSIDE the repo.
- * Boots the app, waits for the namespace selector (PG up), creates a
- * namespace, and waits for the workspace window (API up = prisma migrate ran,
- * venv relocated, api node_modules resolved).
+ * Boots the app, waits for the shared workspace directory, creates a local
+ * namespace through the web-owned flow, and waits for its first scoped API
+ * request to succeed (registry + schema migration + tenant routing).
  *
  * CLASSIFYRE_APP_PATH=/path/to/binary npx tsx deep-smoke.ts
  */
@@ -45,78 +45,49 @@ async function main(): Promise<void> {
     } as Record<string, string>,
   });
   const proc = app.process();
-  let appOutput = '';
-  proc.stdout?.on('data', (d) => { appOutput += d; process.stdout.write(`[app] ${d}`); });
-  proc.stderr?.on('data', (d) => { appOutput += d; process.stderr.write(`[app!] ${d}`); });
+  proc.stdout?.on('data', (d) => process.stdout.write(`[app] ${d}`));
+  proc.stderr?.on('data', (d) => process.stderr.write(`[app!] ${d}`));
 
   try {
-    // 1. selector renders (embedded PG booted)
-    let selector = null as Awaited<ReturnType<typeof app.firstWindow>> | null;
+    // 1. The directory reaches ready only after hydration and a successful
+    // registry request through the shared API.
+    let webView = null as Awaited<ReturnType<typeof app.firstWindow>> | null;
     const deadline = Date.now() + 120_000;
-    while (Date.now() < deadline && !selector) {
+    while (Date.now() < deadline && !webView) {
       for (const win of app.windows()) {
         try {
-          const h1 = await win.locator('h1').textContent({ timeout: 1500 });
-          if (h1?.trim() === 'Classifyre') { selector = win; break; }
+          const directory = win.locator(
+            '[data-testid="workspace-directory"][data-app-state="ready"]',
+          );
+          if (await directory.isVisible({ timeout: 1500 })) {
+            webView = win;
+            break;
+          }
         } catch { /* not ready */ }
       }
-      if (!selector) await new Promise((r) => setTimeout(r, 1000));
+      if (!webView) await new Promise((r) => setTimeout(r, 1000));
     }
-    if (!selector) throw new Error('selector never rendered (PG boot failed?)');
-    console.log('STEP 1 OK: namespace selector rendered (PostgreSQL up)');
+    if (!webView) throw new Error('workspace directory never became ready');
+    console.log('STEP 1 OK: shared API and namespace registry are ready');
 
-    // 2. create a namespace → workspace window opens once the API is healthy.
-    // The selector lives in a WebContentsView, whose native visibility defeats
-    // Playwright's actionability checks — drive the DOM directly instead.
-    // Wait for the workspace list to finish loading (the create section is
-    // hidden until then), then walk the create flow: new workspace → local →
-    // name → create.
-    await selector.waitForFunction(
-      () => !document.getElementById('new-workspace-section')?.classList.contains('hidden'),
-      undefined,
-      { timeout: 30_000 },
+    // 2. Exercise the actual first-run UI. A successful submit creates the
+    // registry row/schema and navigates directly to /smoketest/discovery.
+    await webView
+      .locator('[data-testid="workspace-empty-state"] button')
+      .first()
+      .click({ timeout: 30_000 });
+    await webView.locator('#ns-name').fill('smoketest');
+    await webView.locator('form button[type="submit"]').click();
+    console.log('Creating namespace… (schema migration + tenant routing)');
+
+    const workspace = webView.locator(
+      '[data-testid="namespace-workspace"][data-app-state="ready"]',
     );
-    await selector.evaluate(() => {
-      // Opens the create dialog (or re-opens it in local mode on first run).
-      (document.getElementById('new-workspace-btn') as HTMLButtonElement).click();
-      const input = document.getElementById('new-name') as HTMLInputElement;
-      input.value = 'smoketest';
-      input.dispatchEvent(new Event('input', { bubbles: true }));
-      (document.getElementById('create-btn') as HTMLButtonElement).click();
-    });
-
-    // Creation only adds the workspace to the list — opening it is what boots
-    // the API. Wait for the item, then click it.
-    await selector.waitForFunction(
-      () => !!document.querySelector('.namespace-item'),
-      undefined,
-      { timeout: 60_000 },
-    );
-    await selector.evaluate(() => {
-      (document.querySelector('.namespace-item') as HTMLElement).click();
-    });
-    console.log('Creating namespace… (prisma migrate + API boot + venv relocation)');
-
-    // The workspace UI renders inside a WebContentsView, which Playwright
-    // does not list under app.windows() — detect success from the main
-    // process's own logs instead: the API must report "successfully started"
-    // AND the runtime must make the namespace view visible.
-    const bootDeadline = Date.now() + 300_000;
-    let workspaceUp = false;
-    while (Date.now() < bootDeadline && !workspaceUp) {
-      const apiStarted = /Nest application successfully started/.test(appOutput);
-      const viewVisible = /namespace .* view\.setVisible\(true\)/.test(appOutput);
-      if (apiStarted && viewVisible) {
-        workspaceUp = true;
-        console.log('STEP 2 OK: API booted and workspace view is visible');
-        break;
-      }
-      if (/Error occurred in handler/.test(appOutput)) {
-        throw new Error('main process reported a handler error during namespace open');
-      }
-      await new Promise((r) => setTimeout(r, 2000));
+    await workspace.waitFor({ state: 'visible', timeout: 120_000 });
+    if (!webView.url().includes('/smoketest/discovery')) {
+      throw new Error(`unexpected workspace URL after creation: ${webView.url()}`);
     }
-    if (!workspaceUp) throw new Error('workspace never opened — API boot failed');
+    console.log('STEP 2 OK: namespace-scoped discovery API request succeeded');
 
     console.log('DEEP SMOKE PASSED');
   } finally {

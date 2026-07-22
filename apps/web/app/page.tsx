@@ -234,7 +234,10 @@ export default function LandingPage() {
             ))}
           </div>
         ) : !hasWorkspaces ? (
-          <Card className="bg-card/90 shadow-none">
+          <Card
+            className="bg-card/90 shadow-none"
+            data-testid="workspace-empty-state"
+          >
             <EmptyState
               icon={FolderOpen}
               title={t("workspaces.emptyTitle")}
