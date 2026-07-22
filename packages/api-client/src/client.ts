@@ -1062,6 +1062,11 @@ export interface CreateNamespaceInput {
   remoteUrl?: string;
 }
 
+export interface UpdateNamespaceInput {
+  name?: string;
+  description?: string;
+}
+
 class NamespacesApi {
   constructor(private readonly basePath: string) {}
 
@@ -1075,6 +1080,14 @@ class NamespacesApi {
     return (await res.json()) as Namespace[];
   }
 
+  async get(id: string): Promise<Namespace> {
+    const res = await fetch(this.url(`/${encodeURIComponent(id)}`), {
+      cache: "no-store",
+    });
+    if (!res.ok) throw new Error(`Failed to load namespace (${res.status})`);
+    return (await res.json()) as Namespace;
+  }
+
   async create(input: CreateNamespaceInput): Promise<Namespace> {
     const res = await fetch(this.url(), {
       method: "POST",
@@ -1083,6 +1096,25 @@ class NamespacesApi {
     });
     if (!res.ok) {
       let message = `Failed to create namespace (${res.status})`;
+      try {
+        const body = (await res.json()) as { message?: string };
+        if (body?.message) message = body.message;
+      } catch {
+        // keep default
+      }
+      throw new Error(message);
+    }
+    return (await res.json()) as Namespace;
+  }
+
+  async update(id: string, input: UpdateNamespaceInput): Promise<Namespace> {
+    const res = await fetch(this.url(`/${encodeURIComponent(id)}`), {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    });
+    if (!res.ok) {
+      let message = `Failed to update namespace (${res.status})`;
       try {
         const body = (await res.json()) as { message?: string };
         if (body?.message) message = body.message;

@@ -33,13 +33,14 @@ import {
   ScanSearch,
   Settings,
   Bot,
+  ArrowLeft,
   type LucideIcon,
 } from "lucide-react";
 
 export function AppSidebar() {
   const pathname = usePathname();
   const { t } = useTranslation();
-  const { nsHref } = useNamespace();
+  const { nsHref, displayName, slug } = useNamespace();
   const isActivePath = (href: string) => {
     const full = nsHref(href);
     return pathname === full || pathname.startsWith(full + "/");
@@ -80,12 +81,20 @@ export function AppSidebar() {
                 </div>
                 <div className="grid flex-1 text-left text-sm leading-tight">
                   <span className="truncate font-serif font-bold">
-                    {t("app.name")}
+                    {displayName}
                   </span>
                   <span className="truncate text-xs text-muted-foreground">
-                    {t("app.tagline")}
+                    /{slug}
                   </span>
                 </div>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarMenuButton asChild tooltip={t("workspaces.all")}>
+              <Link href="/">
+                <ArrowLeft className="size-5" />
+                <span>{t("workspaces.all")}</span>
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>

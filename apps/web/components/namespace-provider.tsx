@@ -1,11 +1,19 @@
 "use client";
 
 import * as React from "react";
-import { setActiveNamespaceSlug } from "@workspace/api-client";
+import {
+  api,
+  setActiveNamespaceSlug,
+  type Namespace,
+} from "@workspace/api-client";
 
 interface NamespaceContextValue {
   /** Active namespace slug from the route (e.g. "acme-corp"). */
   slug: string;
+  /** Registry metadata for the active namespace; null while it resolves. */
+  namespace: Namespace | null;
+  /** Human-readable name with the route slug as a no-flash fallback. */
+  displayName: string;
   /** Build a namespace-scoped href: nsHref("/settings") → "/acme-corp/settings". */
   nsHref: (path: string) => string;
 }
@@ -34,15 +42,40 @@ export function NamespaceProvider({
     return () => setActiveNamespaceSlug(undefined);
   }, [slug]);
 
+  const [namespace, setNamespace] = React.useState<Namespace | null>(null);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    setNamespace(null);
+
+    void api.namespaces
+      .list()
+      .then((items) => {
+        if (!cancelled) {
+          setNamespace(items.find((item) => item.slug === slug) ?? null);
+        }
+      })
+      .catch(() => {
+        // The route slug remains a useful fallback when registry metadata is
+        // temporarily unavailable.
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [slug]);
+
   const value = React.useMemo<NamespaceContextValue>(
     () => ({
       slug,
+      namespace,
+      displayName: namespace?.name || slug,
       nsHref: (path: string) => {
         const normalized = path.startsWith("/") ? path : `/${path}`;
         return `/${slug}${normalized === "/" ? "" : normalized}`;
       },
     }),
-    [slug],
+    [namespace, slug],
   );
 
   return (
