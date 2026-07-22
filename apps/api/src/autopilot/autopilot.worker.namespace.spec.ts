@@ -24,6 +24,13 @@ describe('pgBossSchemaForSlug (per-namespace pg-boss isolation)', () => {
   it('caps the schema name at 50 characters', () => {
     expect(pgBossSchemaForSlug('a'.repeat(80)).length).toBeLessThanOrEqual(50);
   });
+
+  it('does not alias long slugs that share the same prefix', () => {
+    const prefix = 'a'.repeat(49);
+    expect(pgBossSchemaForSlug(`${prefix}b`)).not.toBe(
+      pgBossSchemaForSlug(`${prefix}c`),
+    );
+  });
 });
 
 describe('AutopilotWorker.handle (no cross-namespace guard needed)', () => {
@@ -43,7 +50,9 @@ describe('AutopilotWorker.handle (no cross-namespace guard needed)', () => {
       .spyOn(worker as any, 'runCycle')
       .mockResolvedValue(undefined);
 
-    await (worker as any).handle([{ data: { sourceId: 's1', runnerId: 'r1' } }]);
+    await (worker as any).handle([
+      { data: { sourceId: 's1', runnerId: 'r1' } },
+    ]);
 
     expect(runCycle).toHaveBeenCalledTimes(1);
   });

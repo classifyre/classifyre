@@ -8,6 +8,7 @@ import {
   publicConnectionString,
   PUBLIC_SEARCH_PATH_OPTION,
 } from './registry/namespace-registry.sql';
+import { pgBossSchemaForSlug } from './namespace/namespace.constants';
 
 const logger = new Logger('DatabaseMigrations');
 
@@ -173,13 +174,41 @@ export async function applyAllPendingMigrations(): Promise<void> {
     connectionString: publicConnectionString(),
     options: PUBLIC_SEARCH_PATH_OPTION,
   });
-  let schemas: string[] = [];
+  let schemas: Array<{
+    id: string;
+    schemaName: string;
+    provisioning: boolean;
+  }> = [];
   try {
     await pool.query(REGISTRY_TABLE_DDL);
-    const { rows } = await pool.query<{ schema_name: string }>(
-      'SELECT schema_name FROM namespaces ORDER BY created_at ASC',
+    const deleting = await pool.query<{
+      id: string;
+      slug: string;
+      schema_name: string;
+    }>(
+      "SELECT id, slug, schema_name FROM namespaces WHERE status = 'deleting'",
     );
-    schemas = rows.map((r) => r.schema_name);
+    for (const namespace of deleting.rows) {
+      await pool.query(
+        `DROP SCHEMA IF EXISTS ${quoteIdentifier(namespace.schema_name)} CASCADE`,
+      );
+      await pool.query(
+        `DROP SCHEMA IF EXISTS ${quoteIdentifier(pgBossSchemaForSlug(namespace.slug))} CASCADE`,
+      );
+      await pool.query('DELETE FROM namespaces WHERE id = $1', [namespace.id]);
+    }
+    const { rows } = await pool.query<{
+      id: string;
+      schema_name: string;
+      status: string;
+    }>(
+      "SELECT id, schema_name, status FROM namespaces WHERE type = 'local' AND status IN ('active', 'provisioning') ORDER BY created_at ASC",
+    );
+    schemas = rows.map((r) => ({
+      id: r.id,
+      schemaName: r.schema_name,
+      provisioning: r.status === 'provisioning',
+    }));
   } finally {
     await pool.end();
   }
@@ -188,8 +217,26 @@ export async function applyAllPendingMigrations(): Promise<void> {
     `Namespace registry ready; migrating ${schemas.length} namespace schema(s)`,
   );
   for (const schema of schemas) {
-    await deployForSchema(schema);
+    await deployForSchema(schema.schemaName);
+    if (schema.provisioning) {
+      const activationPool = new Pool({
+        connectionString: publicConnectionString(),
+        options: PUBLIC_SEARCH_PATH_OPTION,
+      });
+      try {
+        await activationPool.query(
+          "UPDATE namespaces SET status = 'active', updated_at = now() WHERE id = $1 AND status = 'provisioning'",
+          [schema.id],
+        );
+      } finally {
+        await activationPool.end();
+      }
+    }
   }
+}
+
+function quoteIdentifier(value: string): string {
+  return `"${value.replace(/"/g, '""')}"`;
 }
 
 /**

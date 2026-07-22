@@ -96,6 +96,11 @@ export class EmbeddingService {
     return promise;
   }
 
+  clearForSchema(schema: string): void {
+    this.configuredSpacePromises.delete(schema);
+    this.configuredSpaceIds.delete(schema);
+  }
+
   async ensureSpace(
     input: Omit<ReturnType<EmbeddingConfigService['space']>, 'provider'> & {
       provider?: ReturnType<EmbeddingConfigService['space']>['provider'];

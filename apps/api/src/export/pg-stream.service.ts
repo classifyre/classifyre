@@ -49,6 +49,13 @@ export class PgStreamService implements OnModuleDestroy {
     this.pools.clear();
   }
 
+  async dropForSchema(schema: string): Promise<void> {
+    const pool = this.pools.get(schema);
+    if (!pool) return;
+    this.pools.delete(schema);
+    await pool.end().catch(() => undefined);
+  }
+
   /** Resolve (or lazily create) the pool for the current namespace schema. */
   private getPool(): Pool {
     const schema = this.cls.get<string>(CLS_SCHEMA);

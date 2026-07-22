@@ -38,6 +38,13 @@ export class SchedulerService {
     await this.syncSchedulesFromDatabase();
   }
 
+  clearForSchema(schema: string): void {
+    const prefix = `${schema}:`;
+    for (const key of this.registeredQueues) {
+      if (key.startsWith(prefix)) this.registeredQueues.delete(key);
+    }
+  }
+
   private getBoss() {
     return this.pgBossService.getBossAsync();
   }

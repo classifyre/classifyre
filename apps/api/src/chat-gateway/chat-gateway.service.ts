@@ -76,6 +76,8 @@ export class ChatGatewayService implements OnModuleDestroy {
   /** Bot ids per namespace schema, for per-namespace teardown. */
   private readonly schemaBots = new Map<string, Set<string>>();
   private readonly refreshing = new Set<string>();
+  private readonly refreshDone = new Map<string, Promise<void>>();
+  private readonly finishRefresh = new Map<string, () => void>();
   private readonly lastConfigRevision = new Map<string, string>();
 
   constructor(
@@ -111,7 +113,8 @@ export class ChatGatewayService implements OnModuleDestroy {
   static readonly CONFIG_WATCH_INTERVAL_MS = CONFIG_WATCH_INTERVAL_MS;
 
   /** Stop every connector belonging to a namespace schema (on ns delete/stop). */
-  async stopForSchema(schema: string): Promise<void> {
+  async stopForSchema(schema: string, waitForRefresh = true): Promise<void> {
+    if (waitForRefresh) await this.refreshDone.get(schema);
     const botIds = this.schemaBots.get(schema);
     if (!botIds) return;
     const stopping: Promise<void>[] = [];
@@ -168,9 +171,13 @@ export class ChatGatewayService implements OnModuleDestroy {
     if (!schema) return;
     if (this.refreshing.has(schema)) return;
     this.refreshing.add(schema);
+    this.refreshDone.set(
+      schema,
+      new Promise<void>((resolve) => this.finishRefresh.set(schema, resolve)),
+    );
     const ctx = this.captureCtx();
     try {
-      await this.stopForSchema(schema);
+      await this.stopForSchema(schema, false);
       this.lastConfigRevision.set(schema, await this.configRevision());
       const bots = await this.prisma.chatBot.findMany({
         where: { enabled: true },
@@ -207,6 +214,9 @@ export class ChatGatewayService implements OnModuleDestroy {
       }
     } finally {
       this.refreshing.delete(schema);
+      this.finishRefresh.get(schema)?.();
+      this.finishRefresh.delete(schema);
+      this.refreshDone.delete(schema);
     }
   }
 
@@ -338,7 +348,8 @@ export class ChatGatewayService implements OnModuleDestroy {
       }
       const appToken = this.crypto.decryptString(bot.appTokenEnc);
       return new SlackConnector(bot, botToken, appToken, {
-        handleMessage: (b, m) => this.runCtx(ctx, () => this.handleMessage(b, m)),
+        handleMessage: (b, m) =>
+          this.runCtx(ctx, () => this.handleMessage(b, m)),
         saveStatus: (botId, error) =>
           this.runCtx(ctx, () => this.saveStatus(botId, error)),
         logActivity,

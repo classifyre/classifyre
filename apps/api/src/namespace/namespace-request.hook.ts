@@ -11,6 +11,7 @@ import {
   CLS_SLUG,
   type NamespaceContext,
 } from './namespace.constants';
+import { PrismaClientManager } from '../prisma/prisma-client-manager';
 
 /**
  * Fastify raw request augmented by the namespace pipeline.
@@ -20,6 +21,7 @@ import {
 export interface NamespaceRawRequest extends IncomingMessage {
   classifyreSlug?: string;
   classifyreNs?: NamespaceContext;
+  classifyrePrismaPinned?: boolean;
 }
 
 /**
@@ -60,6 +62,7 @@ export function registerNamespaceHook(
   fastify: FastifyInstance,
   registry: NamespaceRegistryService,
   cls: ClsService,
+  prismaManager: PrismaClientManager,
 ): void {
   const logger = new Logger('NamespaceHook');
 
@@ -112,5 +115,25 @@ export function registerNamespaceHook(
     raw.classifyreNs = ns;
     (request as unknown as { classifyreNs?: NamespaceContext }).classifyreNs =
       ns;
+    // Protect the tenant client from LRU eviction until this request has
+    // completely finished (important on API-only pods with many tenants).
+    prismaManager.pin(ns.schemaName);
+    raw.classifyrePrismaPinned = true;
   });
+
+  fastify.addHook('onResponse', (request) => {
+    releasePrismaPin(request.raw, prismaManager);
+  });
+  fastify.addHook('onRequestAbort', (request) => {
+    releasePrismaPin(request.raw, prismaManager);
+  });
+}
+
+function releasePrismaPin(
+  raw: NamespaceRawRequest,
+  prismaManager: PrismaClientManager,
+): void {
+  if (!raw.classifyrePrismaPinned || !raw.classifyreNs) return;
+  raw.classifyrePrismaPinned = false;
+  prismaManager.unpin(raw.classifyreNs.schemaName);
 }

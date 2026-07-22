@@ -22,10 +22,13 @@ CREATE TABLE IF NOT EXISTS public.namespaces (
   remote_url     text,
   thumbnail      text,
   settings       jsonb NOT NULL DEFAULT '{}'::jsonb,
+  status         text NOT NULL DEFAULT 'active',
   created_at     timestamptz NOT NULL DEFAULT now(),
   updated_at     timestamptz NOT NULL DEFAULT now(),
   last_opened_at timestamptz
 );
+ALTER TABLE public.namespaces
+  ADD COLUMN IF NOT EXISTS status text NOT NULL DEFAULT 'active';
 `;
 
 /** libpq `options` value that pins a connection's search_path to `public`. */

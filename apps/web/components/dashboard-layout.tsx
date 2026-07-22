@@ -111,18 +111,21 @@ export function DashboardLayout({
   const { nsHref } = useNamespace();
   const { demoMode } = serverConfig;
 
-  const segmentLabelMap: Record<string, string> = {
-    dashboard: t("breadcrumb.dashboard"),
-    discovery: t("breadcrumb.discovery"),
-    findings: t("breadcrumb.findings"),
-    scans: t("breadcrumb.scans"),
-    sources: t("breadcrumb.sources"),
-    assets: t("breadcrumb.assets"),
-    notifications: t("breadcrumb.notifications"),
-    settings: t("breadcrumb.settings"),
-    detectors: t("breadcrumb.detectors"),
-    harness: t("nav.harness"),
-  };
+  const segmentLabelMap = React.useMemo<Record<string, string>>(
+    () => ({
+      dashboard: t("breadcrumb.dashboard"),
+      discovery: t("breadcrumb.discovery"),
+      findings: t("breadcrumb.findings"),
+      scans: t("breadcrumb.scans"),
+      sources: t("breadcrumb.sources"),
+      assets: t("breadcrumb.assets"),
+      notifications: t("breadcrumb.notifications"),
+      settings: t("breadcrumb.settings"),
+      detectors: t("breadcrumb.detectors"),
+      harness: t("nav.harness"),
+    }),
+    [t],
+  );
 
   const [resolvedDynamicLabels, setResolvedDynamicLabels] = React.useState<
     Record<string, string>
@@ -236,7 +239,7 @@ export function DashboardLayout({
     return () => {
       isMounted = false;
     };
-  }, [findingAssetCrumbs, resolvedDynamicLabels, segments]);
+  }, [findingAssetCrumbs, nsHref, resolvedDynamicLabels, segments]);
 
   const breadcrumbs = React.useMemo<BreadcrumbEntry[]>(() => {
     const baseCrumbs = segments.map((segment, index) => ({
@@ -274,8 +277,14 @@ export function DashboardLayout({
           ]
         : [crumb],
     );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [findingAssetCrumbs, resolvedDynamicLabels, segments, t]);
+  }, [
+    findingAssetCrumbs,
+    nsHref,
+    resolvedDynamicLabels,
+    segmentLabelMap,
+    segments,
+    t,
+  ]);
 
   return (
     <ServerConfigContext.Provider value={serverConfig}>
@@ -384,7 +393,7 @@ export function DashboardLayout({
                   asChild
                   className="relative rounded-[4px] border-2 border-transparent hover:border-border"
                 >
-                  <Link href="/settings">
+                  <Link href={nsHref("/settings")}>
                     <Settings className="h-5 w-5" />
                     <span className="sr-only">Settings</span>
                   </Link>

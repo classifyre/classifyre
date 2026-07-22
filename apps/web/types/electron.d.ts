@@ -38,6 +38,8 @@ declare global {
       id: string,
       options?: { activate?: boolean },
     ) => Promise<{ apiPort: number; namespaceId: string }>;
+    showNotification: (payload: Record<string, unknown>) => void;
+    onNotificationNavigate: (callback: (url: string) => void) => () => void;
     showSelector: () => Promise<void>;
     [key: string]: unknown;
   }

@@ -17,6 +17,7 @@ import { AssistantWorkflowPanel, Button } from "@workspace/ui/components";
 import { toast } from "sonner";
 import { usePathname, useRouter } from "next/navigation";
 import { useInstanceSettings } from "@/components/instance-settings-provider";
+import { nsPath } from "@/lib/ns-path";
 
 type AssistantAttachment = Extract<
   AssistantUiAction,
@@ -144,7 +145,7 @@ export function AssistantWorkflowProvider({
         // without a page bridge. Only app-internal paths are accepted.
         if (action.type === "navigate") {
           if (action.route.startsWith("/") && !action.route.startsWith("//")) {
-            router.push(action.route);
+            router.push(nsPath(action.route));
           }
           continue;
         }
@@ -169,22 +170,21 @@ export function AssistantWorkflowProvider({
 
   // Pages without a bridge still get a context-aware assistant: read-only
   // tools plus navigation, keyed to the current route.
-  const buildGlobalContext =
-    React.useCallback((): AssistantPageContext => {
-      return {
-        key: "app.global",
-        route: pathname || "/",
-        title:
-          typeof document !== "undefined" && document.title
-            ? document.title
-            : "Classifyre",
-        entityId: null,
-        values: {},
-        schema: null,
-        validation: { isValid: true, missingFields: [], errors: [] },
-        metadata: {},
-      };
-    }, [pathname]);
+  const buildGlobalContext = React.useCallback((): AssistantPageContext => {
+    return {
+      key: "app.global",
+      route: pathname || "/",
+      title:
+        typeof document !== "undefined" && document.title
+          ? document.title
+          : "Classifyre",
+      entityId: null,
+      values: {},
+      schema: null,
+      validation: { isValid: true, missingFields: [], errors: [] },
+      metadata: {},
+    };
+  }, [pathname]);
 
   const sendMessage = React.useCallback(
     async (
@@ -369,9 +369,7 @@ export function AssistantWorkflowProvider({
         // Anchored to the bottom-right; on narrow viewports it stretches to
         // fill the screen. Fixed placement (no drag/resize) means it can never
         // open off-screen.
-        <div
-          className="fixed inset-x-3 bottom-3 top-16 z-[60] flex flex-col sm:inset-x-auto sm:bottom-4 sm:right-4 sm:top-auto sm:h-[min(680px,calc(100dvh-6rem))] sm:w-[min(440px,calc(100vw-2rem))]"
-        >
+        <div className="fixed inset-x-3 bottom-3 top-16 z-[60] flex flex-col sm:inset-x-auto sm:bottom-4 sm:right-4 sm:top-auto sm:h-[min(680px,calc(100dvh-6rem))] sm:w-[min(440px,calc(100vw-2rem))]">
           <input
             ref={uploadInputRef}
             type="file"

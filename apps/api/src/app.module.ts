@@ -52,7 +52,6 @@ import { CaseLeadsController } from './controllers/case-leads.controller';
 import { CaseEventsController } from './controllers/case-events.controller';
 import { CaseLeadsService } from './case-leads.service';
 import { CaseEventsService } from './case-events.service';
-import { NamespaceRegistryService } from './registry/namespace-registry.service';
 import { NamespacesController } from './registry/namespaces.controller';
 import { NamespaceWorkerManager } from './namespace/namespace-worker-manager';
 
@@ -170,7 +169,6 @@ import {
     GlossaryService,
     CaseLeadsService,
     CaseEventsService,
-    NamespaceRegistryService,
     NamespaceWorkerManager,
   ],
 })

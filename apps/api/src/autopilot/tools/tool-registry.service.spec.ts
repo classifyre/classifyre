@@ -110,4 +110,24 @@ describe('ToolRegistry', () => {
     expect(catalog).toContain('[mutate]');
     expect(catalog).toContain('[read]');
   });
+
+  it('isolates runtime tools by the current namespace schema', () => {
+    let schema = 'ns_alpha';
+    (registry as any).cls = { get: () => schema };
+    registry.register({
+      name: 'mcp.remote.lookup',
+      description: 'test',
+      inputSchema: { type: 'object' },
+      sideEffect: 'read',
+      handler: () => Promise.resolve({}),
+    });
+
+    expect(registry.get('mcp.remote.lookup')).toBeDefined();
+    schema = 'ns_beta';
+    expect(registry.get('mcp.remote.lookup')).toBeUndefined();
+    schema = 'ns_alpha';
+    registry.clearScope(schema);
+    expect(registry.get('mcp.remote.lookup')).toBeUndefined();
+    (registry as any).cls = undefined;
+  });
 });
