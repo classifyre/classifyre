@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import {
   ArrowRight,
   FolderOpen,
+  Globe2,
   Plus,
   RefreshCw,
   Settings,
@@ -35,6 +36,7 @@ import {
 import { CreateNamespaceDialog } from "@/components/namespace/create-namespace-dialog";
 import { useTranslation } from "@/hooks/use-translation";
 import { WorkspaceHeader } from "@/components/namespace/workspace-header";
+import { AddRemoteWorkspaceDialog } from "@/components/namespace/add-remote-workspace-dialog";
 
 function WorkspaceSkeleton() {
   return (
@@ -59,16 +61,41 @@ export default function LandingPage() {
   const [namespaces, setNamespaces] = React.useState<Namespace[] | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [createOpen, setCreateOpen] = React.useState(false);
+  const [remoteCreateOpen, setRemoteCreateOpen] = React.useState(false);
+  const [isDesktop, setIsDesktop] = React.useState(false);
+  const [remoteNamespaces, setRemoteNamespaces] = React.useState<
+    ElectronNamespace[]
+  >([]);
   const [pendingDelete, setPendingDelete] = React.useState<Namespace | null>(
     null,
   );
   const [deleting, setDeleting] = React.useState(false);
+  const [pendingRemoteDelete, setPendingRemoteDelete] =
+    React.useState<ElectronNamespace | null>(null);
+  const [deletingRemote, setDeletingRemote] = React.useState(false);
 
   // The landing page is outside any namespace — clear the active slug so the
   // registry calls below are not namespace-prefixed.
   React.useEffect(() => {
     setActiveNamespaceSlug(undefined);
   }, []);
+
+  const loadRemoteNamespaces = React.useCallback(async () => {
+    const electron = window.electronAPI;
+    if (!electron) return;
+    const stored = await electron.listNamespaces();
+    setRemoteNamespaces(
+      stored.filter(
+        (workspace) => workspace.type === "remote" && workspace.remoteUrl,
+      ),
+    );
+  }, []);
+
+  React.useEffect(() => {
+    if (!window.__CLASSIFYRE_DESKTOP__ || !window.electronAPI) return;
+    setIsDesktop(true);
+    void loadRemoteNamespaces();
+  }, [loadRemoteNamespaces]);
 
   const load = React.useCallback(async () => {
     try {
@@ -91,6 +118,18 @@ export default function LandingPage() {
     router.push(`/${ns.slug}`);
   };
 
+  const openRemote = async (workspace: ElectronNamespace) => {
+    try {
+      await window.electronAPI?.openNamespace(workspace.id);
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : t("workspaces.remoteOpenFailed"),
+      );
+    }
+  };
+
   const confirmDelete = async () => {
     if (!pendingDelete) return;
     setDeleting(true);
@@ -108,6 +147,32 @@ export default function LandingPage() {
     }
   };
 
+  const confirmRemoteDelete = async () => {
+    if (!pendingRemoteDelete || !window.electronAPI) return;
+    setDeletingRemote(true);
+    try {
+      await window.electronAPI.deleteNamespace(pendingRemoteDelete.id);
+      toast.success(
+        t("workspaces.remoteDeleteSuccess", {
+          name: pendingRemoteDelete.name,
+        }),
+      );
+      setPendingRemoteDelete(null);
+      await loadRemoteNamespaces();
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : t("workspaces.remoteDeleteFailed"),
+      );
+    } finally {
+      setDeletingRemote(false);
+    }
+  };
+
+  const hasWorkspaces =
+    (namespaces?.length ?? 0) + remoteNamespaces.length > 0;
+
   return (
     <div className="min-h-svh bg-background">
       <WorkspaceHeader />
@@ -122,11 +187,22 @@ export default function LandingPage() {
               {t("workspaces.subtitle")}
             </p>
           </div>
-          {namespaces && namespaces.length > 0 && (
-            <Button variant="default" onClick={() => setCreateOpen(true)}>
-              <Plus className="mr-2 h-4 w-4" />
-              {t("workspaces.new")}
-            </Button>
+          {namespaces && hasWorkspaces && (
+            <div className="flex flex-wrap gap-2">
+              {isDesktop && (
+                <Button
+                  variant="outline"
+                  onClick={() => setRemoteCreateOpen(true)}
+                >
+                  <Globe2 className="mr-2 h-4 w-4" />
+                  {t("workspaces.addRemote")}
+                </Button>
+              )}
+              <Button variant="default" onClick={() => setCreateOpen(true)}>
+                <Plus className="mr-2 h-4 w-4" />
+                {t("workspaces.new")}
+              </Button>
+            </div>
           )}
         </div>
 
@@ -151,7 +227,7 @@ export default function LandingPage() {
               <WorkspaceSkeleton key={index} />
             ))}
           </div>
-        ) : namespaces.length === 0 ? (
+        ) : !hasWorkspaces ? (
           <Card className="bg-card/90 shadow-none">
             <EmptyState
               icon={FolderOpen}
@@ -161,6 +237,14 @@ export default function LandingPage() {
                 label: t("workspaces.createAction"),
                 onClick: () => setCreateOpen(true),
               }}
+              secondaryAction={
+                isDesktop
+                  ? {
+                      label: t("workspaces.addRemote"),
+                      onClick: () => setRemoteCreateOpen(true),
+                    }
+                  : undefined
+              }
             />
           </Card>
         ) : (
@@ -258,6 +342,64 @@ export default function LandingPage() {
                 </Card>
               );
             })}
+            {remoteNamespaces.map((workspace) => (
+              <Card
+                key={`remote-${workspace.id}`}
+                clickable
+                role="button"
+                tabIndex={0}
+                onClick={() => void openRemote(workspace)}
+                onKeyDown={(event) => {
+                  if (event.target !== event.currentTarget) return;
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    void openRemote(workspace);
+                  }
+                }}
+                aria-label={t("workspaces.openAria", {
+                  name: workspace.name,
+                })}
+                className="group gap-0 overflow-hidden bg-card/95 py-0 shadow-none hover:translate-x-0 hover:translate-y-0 hover:shadow-none"
+              >
+                <div className="relative flex aspect-[16/8.5] items-center justify-center border-b bg-secondary">
+                  <Globe2 className="size-12 text-muted-foreground/30" />
+                </div>
+                <CardContent className="flex min-h-40 flex-1 flex-col p-5">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <h2 className="truncate font-semibold uppercase tracking-[0.06em]">
+                        {workspace.name}
+                      </h2>
+                      <p className="mt-1 truncate font-mono text-xs text-muted-foreground">
+                        {workspace.remoteUrl}
+                      </p>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="-mr-2 -mt-2 shrink-0 text-muted-foreground hover:text-destructive"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        setPendingRemoteDelete(workspace);
+                      }}
+                      aria-label={t("workspaces.deleteAria", {
+                        name: workspace.name,
+                      })}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <p className="mt-4 min-h-10 text-sm leading-relaxed text-muted-foreground">
+                    {t("workspaces.remoteCardDescription")}
+                  </p>
+                  <div className="mt-auto flex justify-end pt-4">
+                    <span className="flex items-center gap-1 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground transition-colors group-hover:text-foreground">
+                      {t("common.open")} <ArrowRight className="size-3.5" />
+                    </span>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
           </div>
         )}
 
@@ -265,6 +407,13 @@ export default function LandingPage() {
           open={createOpen}
           onOpenChange={setCreateOpen}
           onCreated={(ns) => open(ns)}
+        />
+        <AddRemoteWorkspaceDialog
+          open={remoteCreateOpen}
+          onOpenChange={setRemoteCreateOpen}
+          onCreated={(workspace) =>
+            setRemoteNamespaces((current) => [...current, workspace])
+          }
         />
 
         <AlertDialog
@@ -295,6 +444,41 @@ export default function LandingPage() {
                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               >
                 {deleting ? t("common.deleting") : t("common.delete")}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        <AlertDialog
+          open={pendingRemoteDelete !== null}
+          onOpenChange={(next) => !next && setPendingRemoteDelete(null)}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>
+                {t("workspaces.remoteDeleteTitle", {
+                  name: pendingRemoteDelete?.name ?? "",
+                })}
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                {t("workspaces.remoteDeleteDescription")}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={deletingRemote}>
+                {t("common.cancel")}
+              </AlertDialogCancel>
+              <AlertDialogAction
+                onClick={(event) => {
+                  event.preventDefault();
+                  void confirmRemoteDelete();
+                }}
+                disabled={deletingRemote}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                {deletingRemote
+                  ? t("common.deleting")
+                  : t("common.delete")}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

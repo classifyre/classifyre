@@ -27,6 +27,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   listNamespaces: () => ipcRenderer.invoke('namespace:list'),
   createNamespace: (name: string, remoteUrl?: string) =>
     ipcRenderer.invoke('namespace:create', name, remoteUrl),
+  verifyRemoteInstance: (remoteUrl: string) =>
+    ipcRenderer.invoke('remote:verify', remoteUrl),
   deleteNamespace: (id: string) =>
     ipcRenderer.invoke('namespace:delete', id),
   updateNamespace: (id: string, patch: Record<string, unknown>) =>

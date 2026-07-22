@@ -5,6 +5,7 @@ import { ProcessManager } from './process-manager.js';
 import { NamespaceManager, assertValidRemoteUrl, type Namespace } from './namespace-manager.js';
 import { getAvailablePort } from './port-manager.js';
 import { captureViewThumbnail } from './thumbnails.js';
+import { verifyClassifyreRemote } from './remote-instance.js';
 
 const TAB_BAR_HEIGHT = 44;
 
@@ -89,6 +90,11 @@ export class NamespaceRuntime {
 
     if (ns.type === 'remote' && ns.remoteUrl) {
       this.emitOpenProgress(namespaceId, 'interface');
+      // Re-check on every open so a saved URL that was replaced, downgraded,
+      // or edited by hand never gets presented as a trusted Classifyre tab.
+      // This also loads the remote namespace registry before entering the
+      // remote web app, which will then use the same relative /api endpoint.
+      await verifyClassifyreRemote(ns.remoteUrl);
       ({ view, loaded } = this.createRemoteView(ns));
     } else {
       if (!this.pg.isRunning()) {
