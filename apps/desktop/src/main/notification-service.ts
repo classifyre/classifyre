@@ -13,6 +13,8 @@ export interface DesktopNotificationPayload {
   message?: string;
   /** Relative web-app route, e.g. /scans/:id — resolved by the sending tab. */
   actionUrl?: string;
+  /** Display name captured by the namespace-scoped shared web view. */
+  namespaceName?: string;
   severity?: string;
 }
 
@@ -30,11 +32,16 @@ export function registerNotificationHandlers(deps: NotificationServiceDeps): voi
     if (!Notification.isSupported()) return;
     if (!payload || typeof payload !== 'object') return;
 
-    // Resolve which workspace tab sent this — the sender's WebContentsView
-    // identifies the namespace, so clicks can jump back to the right tab.
+    // The new desktop architecture has one shared web view for all local
+    // namespaces. Keep support for legacy remote/per-workspace views too.
     const namespaceId = runtime.findNamespaceIdByWebContents(event.sender);
-    if (!namespaceId) return;
-    const namespaceName = runtime.getRunning().get(namespaceId)?.namespace.name;
+    const isSharedView = runtime.isSelectorWebContents(event.sender);
+    if (!namespaceId && !isSharedView) return;
+    const namespaceName =
+      (typeof payload.namespaceName === 'string' && payload.namespaceName) ||
+      (namespaceId
+        ? runtime.getRunning().get(namespaceId)?.namespace.name
+        : undefined);
 
     // The in-app notification center already surfaces it when the user is
     // looking at that workspace — only toast when the app is unfocused/hidden
@@ -42,7 +49,11 @@ export function registerNotificationHandlers(deps: NotificationServiceDeps): voi
     const appFocused = BrowserWindow.getAllWindows().some(
       (w) => !w.isDestroyed() && w.isVisible() && w.isFocused(),
     );
-    if (appFocused && runtime.getActiveTabId() === namespaceId) return;
+    if (
+      appFocused &&
+      (isSharedView || runtime.getActiveTabId() === namespaceId)
+    )
+      return;
 
     const title = typeof payload.title === 'string' && payload.title ? payload.title : 'Classifyre';
     const body = typeof payload.message === 'string' ? payload.message : '';
@@ -59,6 +70,14 @@ export function registerNotificationHandlers(deps: NotificationServiceDeps): voi
 
     notification.on('click', () => {
       showWindow();
+      if (isSharedView) {
+        if (actionUrl) runtime.navigateSelector(actionUrl);
+        else runtime.showSelector();
+        return;
+      }
+
+      // namespaceId is present for the legacy-view branch above.
+      if (!namespaceId) return;
       const entry = runtime.getRunning().get(namespaceId);
       if (entry) {
         runtime.switchToTab(namespaceId);

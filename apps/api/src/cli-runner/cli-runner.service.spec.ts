@@ -1191,4 +1191,33 @@ describe('CliRunnerService', () => {
       },
     ]);
   });
+
+  it('terminates tracked local runners before a namespace schema is dropped', async () => {
+    const { service, prisma } = createService();
+    prisma.runner.findMany.mockResolvedValue([
+      {
+        id: 'runner-local',
+        executionMode: RunnerExecutionMode.LOCAL,
+        jobName: null,
+        jobNamespace: null,
+      },
+    ]);
+    (service as any).runningProcessesByRunnerId.set('runner-local', {});
+    const stop = jest
+      .spyOn(service as any, 'stopLocalRunnerProcess')
+      .mockImplementation(() => undefined);
+
+    await service.stopForSchema('ns_acme');
+
+    expect(stop).toHaveBeenCalledWith('runner-local');
+    expect(prisma.runner.findMany).toHaveBeenCalledWith({
+      where: { status: RunnerStatus.RUNNING },
+      select: {
+        id: true,
+        executionMode: true,
+        jobName: true,
+        jobNamespace: true,
+      },
+    });
+  });
 });
