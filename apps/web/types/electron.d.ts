@@ -9,12 +9,36 @@
 export {};
 
 declare global {
+  interface ElectronNamespace {
+    id: string;
+    name: string;
+    type: "local" | "remote";
+    schemaName: string;
+    remoteUrl?: string;
+    createdAt: string;
+    lastOpenedAt: string;
+  }
+
   interface ElectronDesktopAPI {
     /**
      * Opens the native OS folder picker. Resolves with the chosen absolute
      * path, or `path: null` if the user canceled the dialog.
      */
     selectFolder: () => Promise<{ canceled: boolean; path: string | null }>;
+    listNamespaces: () => Promise<ElectronNamespace[]>;
+    createNamespace: (
+      name: string,
+      remoteUrl?: string,
+    ) => Promise<ElectronNamespace>;
+    verifyRemoteInstance: (
+      remoteUrl: string,
+    ) => Promise<{ normalizedUrl: string; namespaceCount: number }>;
+    deleteNamespace: (id: string) => Promise<void>;
+    openNamespace: (
+      id: string,
+      options?: { activate?: boolean },
+    ) => Promise<{ apiPort: number; namespaceId: string }>;
+    showSelector: () => Promise<void>;
     [key: string]: unknown;
   }
 

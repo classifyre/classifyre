@@ -120,6 +120,25 @@ function createMainWindow(): BrowserWindow {
   });
   lockDownChrome(win.webContents);
 
+  // Keep the lightweight native tab strip above the web-owned workspace
+  // directory. Local workspaces stay inside the main web app; remote
+  // workspaces open in isolated, sandboxed WebContentsViews managed by the
+  // legacy runtime, and the home tab is the safe way back to the directory.
+  const tabBarView = new WebContentsView({
+    webPreferences: {
+      contextIsolation: true,
+      nodeIntegration: false,
+      preload: getPreloadPath(),
+    },
+  });
+  lockDownChrome(tabBarView.webContents);
+  win.contentView.addChildView(tabBarView);
+
+  const tabBarHtml = isDev
+    ? path.join(__dirname, '../../src/renderer/tab-bar/tab-bar.html')
+    : path.join(__dirname, 'tab-bar/tab-bar.html');
+  void tabBarView.webContents.loadFile(tabBarHtml);
+
   const webView = new WebContentsView({
     webPreferences: {
       contextIsolation: true,
@@ -129,13 +148,6 @@ function createMainWindow(): BrowserWindow {
     },
   });
   win.contentView.addChildView(webView);
-
-  const fit = () => {
-    const { width, height } = win.getContentBounds();
-    webView.setBounds({ x: 0, y: 0, width, height });
-  };
-  fit();
-  win.on('resize', fit);
 
   // Allow in-app navigation within the web app only; outbound links open in the
   // system browser.
@@ -161,8 +173,13 @@ function createMainWindow(): BrowserWindow {
     void webView.webContents.loadURL('app://classifyre/index.html');
   }
 
-  updateChecker.setTabBarView(webView);
-  webView.webContents.on('did-finish-load', () => {
+  runtime.setMainWindow(win);
+  runtime.setTabBarView(tabBarView);
+  runtime.setSelectorView(webView);
+  runtime.showSelector();
+
+  updateChecker.setTabBarView(tabBarView);
+  tabBarView.webContents.on('did-finish-load', () => {
     void updateChecker.checkForUpdates();
   });
 
@@ -171,6 +188,10 @@ function createMainWindow(): BrowserWindow {
     if (isQuitting || !settingsManager.get().runInBackground) return;
     e.preventDefault();
     win.hide();
+  });
+
+  win.on('closed', () => {
+    if (!isQuitting) void runtime.closeAll();
   });
 
   return win;
