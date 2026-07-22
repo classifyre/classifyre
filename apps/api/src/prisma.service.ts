@@ -44,6 +44,7 @@ const FRAMEWORK_PROBES = new Set<string>([
  * must not use this service.
  */
 @Injectable()
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class PrismaService {
   constructor(
     private readonly cls: ClsService,

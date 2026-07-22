@@ -1,10 +1,7 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
-import { App } from 'supertest/types';
 import { randomUUID } from 'crypto';
 import { Client } from 'pg';
-import { AppModule } from '../src/app.module';
+import { createTestApp, TestApp } from './create-test-app';
 
 const SHOULD_RUN = process.env.RUN_CUSTOM_DETECTOR_PG_E2E === '1';
 const describeIfEnabled = SHOULD_RUN ? describe : describe.skip;
@@ -94,18 +91,13 @@ type CustomDetectorBody = {
 describeIfEnabled('Custom Detectors PostgreSQL Runtime (e2e)', () => {
   jest.setTimeout(900_000);
 
-  let app: INestApplication<App>;
+  let ctx: TestApp;
   let dbName: string;
   let sourceId: string | null = null;
   const customDetectorIds: string[] = [];
 
   beforeAll(async () => {
-    const moduleFixture: TestingModule = await Test.createTestingModule({
-      imports: [AppModule],
-    }).compile();
-
-    app = moduleFixture.createNestApplication();
-    await app.init();
+    ctx = await createTestApp();
 
     dbName = `classifyre_e2e_custom_${randomUUID().replace(/-/g, '').slice(0, 12)}`;
     await createDatabase(dbName);
@@ -114,18 +106,18 @@ describeIfEnabled('Custom Detectors PostgreSQL Runtime (e2e)', () => {
 
   afterAll(async () => {
     if (sourceId) {
-      await request(app.getHttpServer()).delete(`/sources/${sourceId}`);
+      await request(ctx.httpTarget).delete(`/sources/${sourceId}`);
     }
 
     for (const id of customDetectorIds) {
-      await request(app.getHttpServer()).delete(`/custom-detectors/${id}`);
+      await request(ctx.httpTarget).delete(`/custom-detectors/${id}`);
     }
 
     if (dbName) {
       await dropDatabase(dbName);
     }
 
-    await app.close();
+    await ctx.close();
   });
 
   it('runs source extraction and matches RULESET + CLASSIFIER + ENTITY custom detectors', async () => {
@@ -135,7 +127,7 @@ describeIfEnabled('Custom Detectors PostgreSQL Runtime (e2e)', () => {
     const classifierKey = `e2e_pg_classifier_${suffix}`;
     const entityKey = `e2e_pg_entity_${suffix}`;
 
-    const ruleset = await request(app.getHttpServer())
+    const ruleset = await request(ctx.httpTarget)
       .post('/custom-detectors')
       .send({
         name: `E2E PG Ruleset ${suffix}`,
@@ -170,7 +162,7 @@ describeIfEnabled('Custom Detectors PostgreSQL Runtime (e2e)', () => {
       })
       .expect(201);
 
-    const classifier = await request(app.getHttpServer())
+    const classifier = await request(ctx.httpTarget)
       .post('/custom-detectors')
       .send({
         name: `E2E PG Classifier ${suffix}`,
@@ -218,7 +210,7 @@ describeIfEnabled('Custom Detectors PostgreSQL Runtime (e2e)', () => {
       })
       .expect(201);
 
-    const entity = await request(app.getHttpServer())
+    const entity = await request(ctx.httpTarget)
       .post('/custom-detectors')
       .send({
         name: `E2E PG Entity ${suffix}`,
@@ -248,7 +240,7 @@ describeIfEnabled('Custom Detectors PostgreSQL Runtime (e2e)', () => {
       entityDetector.id,
     );
 
-    const sourceResponse = await request(app.getHttpServer())
+    const sourceResponse = await request(ctx.httpTarget)
       .post('/sources')
       .send({
         type: 'POSTGRESQL',
@@ -294,7 +286,7 @@ describeIfEnabled('Custom Detectors PostgreSQL Runtime (e2e)', () => {
     sourceId = sourceResponse.body.id as string;
     expect(sourceId).toBeDefined();
 
-    const runResponse = await request(app.getHttpServer())
+    const runResponse = await request(ctx.httpTarget)
       .post(`/sources/${sourceId}/run`)
       .send({})
       .expect(201);
@@ -305,7 +297,7 @@ describeIfEnabled('Custom Detectors PostgreSQL Runtime (e2e)', () => {
     let finalRunner: Record<string, unknown> | null = null;
     for (let attempt = 0; attempt < 180; attempt += 1) {
       await new Promise((resolve) => setTimeout(resolve, 5000));
-      const runnerResponse = await request(app.getHttpServer())
+      const runnerResponse = await request(ctx.httpTarget)
         .get(`/runners/${runnerId}`)
         .expect(200);
 
@@ -319,7 +311,7 @@ describeIfEnabled('Custom Detectors PostgreSQL Runtime (e2e)', () => {
     expect(finalRunner).not.toBeNull();
     expect(finalRunner?.status).toBe('COMPLETED');
 
-    const findingsResponse = await request(app.getHttpServer())
+    const findingsResponse = await request(ctx.httpTarget)
       .post('/search/findings')
       .send({
         filters: {

@@ -1,19 +1,19 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication } from '@nestjs/common';
 import { PrismaService } from '../src/prisma.service';
 import { AssetService } from '../src/asset.service';
 import { CustomDetectorExtractionsService } from '../src/custom-detector-extractions.service';
 import { EmbeddingService } from '../src/embedding/embedding.service';
 import { QueryEmbeddingService } from '../src/embedding/query-embedding.service';
+import { EmbeddingQueueService } from '../src/embedding/embedding-queue.service';
 import {
   AssetStatus,
   AssetType,
   TriggerType,
   RunnerStatus,
 } from '@prisma/client';
+import { createTestApp, TestApp } from './create-test-app';
 
 describe('Asset Versioning (e2e)', () => {
-  let app: INestApplication;
+  let ctx: TestApp;
   let prisma: PrismaService;
   let assetService: AssetService;
   let sourceId: string;
@@ -24,24 +24,20 @@ describe('Asset Versioning (e2e)', () => {
   };
 
   beforeAll(async () => {
-    const moduleFixture: TestingModule = await Test.createTestingModule({
-      providers: [
-        PrismaService,
-        AssetService,
-        {
-          provide: CustomDetectorExtractionsService,
-          useValue: mockCustomDetectorExtractionsService,
-        },
-        { provide: EmbeddingService, useValue: {} },
-        { provide: QueryEmbeddingService, useValue: {} },
-      ],
-    }).compile();
+    ctx = await createTestApp((builder) =>
+      builder
+        .overrideProvider(CustomDetectorExtractionsService)
+        .useValue(mockCustomDetectorExtractionsService)
+        .overrideProvider(EmbeddingService)
+        .useValue({})
+        .overrideProvider(QueryEmbeddingService)
+        .useValue({})
+        .overrideProvider(EmbeddingQueueService)
+        .useValue({ enqueue: jest.fn() }),
+    );
 
-    app = moduleFixture.createNestApplication();
-    await app.init();
-
-    prisma = moduleFixture.get<PrismaService>(PrismaService);
-    assetService = moduleFixture.get<AssetService>(AssetService);
+    prisma = ctx.prisma!;
+    assetService = ctx.get(AssetService);
 
     // Clean up test data
     await prisma.finding.deleteMany({});
@@ -57,7 +53,7 @@ describe('Asset Versioning (e2e)', () => {
     await prisma.runner.deleteMany({});
     await prisma.source.deleteMany({});
 
-    await app.close();
+    await ctx.close();
   });
 
   beforeEach(async () => {

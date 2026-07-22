@@ -298,15 +298,35 @@ async function main() {
   await waitForPort(apiPort, 45_000);
   console.log(`[test] API is ready on port ${apiPort}`);
 
-  // --- Step 5: Verify API responds ---
-  console.log('\n[test] Step 5: Verifying API health...');
+  // --- Step 5: Create the namespace through the public registry API ---
+  console.log('\n[test] Step 5: Registering test namespace...');
+  const namespaceSlug = 'test-workspace';
+  const namespaceRes = await fetch(`http://127.0.0.1:${apiPort}/namespaces`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      name: 'Test workspace',
+      slug: namespaceSlug,
+      description: 'Desktop lifecycle integration test',
+    }),
+  });
+  assert(
+    namespaceRes.ok,
+    `Namespace creation failed: ${namespaceRes.status} ${await namespaceRes.text()}`,
+  );
+  console.log(`[test] Namespace "${namespaceSlug}" registered`);
+
+  // --- Step 6: Verify API responds ---
+  console.log('\n[test] Step 6: Verifying API health...');
   const healthRes = await fetch(`http://127.0.0.1:${apiPort}/`);
   assert(healthRes.ok, `Health check failed: ${healthRes.status}`);
   console.log(`[test] Health check: ${healthRes.status} OK`);
 
-  // --- Step 6: Verify schema isolation ---
-  console.log('\n[test] Step 6: Verifying schema isolation...');
-  const sourcesRes = await fetch(`http://127.0.0.1:${apiPort}/sources`);
+  // --- Step 7: Verify schema isolation through the namespaced route ---
+  console.log('\n[test] Step 7: Verifying schema isolation...');
+  const sourcesRes = await fetch(
+    `http://127.0.0.1:${apiPort}/${namespaceSlug}/sources`,
+  );
   assert(sourcesRes.ok, `Sources endpoint failed: ${sourcesRes.status}`);
   const sources = await sourcesRes.json();
   assert(Array.isArray(sources), 'Sources should be an array');

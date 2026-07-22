@@ -1,31 +1,21 @@
-import { Test } from '@nestjs/testing';
-import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
-import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/prisma.service';
 import { RunnerStatus } from '@prisma/client';
 import { createWordPressSourceConfig } from './helpers/wordpress-test-helper';
+import { createTestApp, TestApp } from './create-test-app';
 
-describe('WordPress Runner Integration (E2E)', () => {
-  let app: INestApplication;
+const describeIfEnabled =
+  process.env.RUN_WORDPRESS_E2E === '1' ? describe : describe.skip;
+
+describeIfEnabled('WordPress Runner Integration (E2E)', () => {
+  let ctx: TestApp;
   let prisma: PrismaService;
   let testSourceId: string;
 
   beforeAll(async () => {
-    const moduleRef = await Test.createTestingModule({
-      imports: [AppModule],
-    }).compile();
-
-    app = moduleRef.createNestApplication();
-    (app as any).useBodyParser?.('json', { limit: '50mb' });
-    (app as any).useBodyParser?.('urlencoded', {
-      limit: '50mb',
-      extended: true,
-    });
-    prisma = app.get(PrismaService);
-    await app.init();
     // Listen on a real port so CLI can connect
-    await app.listen(8000);
+    ctx = await createTestApp(undefined, 8000);
+    prisma = ctx.prisma!;
   });
 
   afterAll(async () => {
@@ -35,7 +25,7 @@ describe('WordPress Runner Integration (E2E)', () => {
         where: { id: testSourceId },
       });
     }
-    await app.close();
+    await ctx.close();
   });
 
   describe('WordPress extraction without detectors', () => {
@@ -43,7 +33,7 @@ describe('WordPress Runner Integration (E2E)', () => {
       // 1. Create source
       const config = createWordPressSourceConfig(false);
 
-      const createResponse = await request(app.getHttpServer())
+      const createResponse = await request(ctx.httpTarget)
         .post('/sources')
         .send({ type: 'WORDPRESS', name: 'Test WordPress', config })
         .expect(201);
@@ -52,7 +42,7 @@ describe('WordPress Runner Integration (E2E)', () => {
       expect(testSourceId).toBeDefined();
 
       // 2. Start runner
-      const runResponse = await request(app.getHttpServer())
+      const runResponse = await request(ctx.httpTarget)
         .post(`/sources/${testSourceId}/run`)
         .send({ triggeredBy: 'test-user', triggerType: 'MANUAL' })
         .expect(201);
@@ -68,7 +58,7 @@ describe('WordPress Runner Integration (E2E)', () => {
       while (attempts < maxAttempts) {
         await new Promise((resolve) => setTimeout(resolve, 1000));
 
-        const statusResponse = await request(app.getHttpServer())
+        const statusResponse = await request(ctx.httpTarget)
           .get(`/runners/${runnerId}`)
           .expect(200);
 
@@ -89,7 +79,7 @@ describe('WordPress Runner Integration (E2E)', () => {
       expect(runner.assetsCreated).toBeGreaterThan(0);
 
       // 4. Verify assets were ingested
-      const assetsResponse = await request(app.getHttpServer())
+      const assetsResponse = await request(ctx.httpTarget)
         .get(`/sources/${testSourceId}/assets`)
         .expect(200);
 
@@ -110,7 +100,7 @@ describe('WordPress Runner Integration (E2E)', () => {
       // 1. Create source with detectors
       const config = createWordPressSourceConfig(true);
 
-      const createResponse = await request(app.getHttpServer())
+      const createResponse = await request(ctx.httpTarget)
         .post('/sources')
         .send({
           type: 'WORDPRESS',
@@ -126,7 +116,7 @@ describe('WordPress Runner Integration (E2E)', () => {
       const sourceId = createResponse.body.id;
 
       // 2. Start runner
-      const runResponse = await request(app.getHttpServer())
+      const runResponse = await request(ctx.httpTarget)
         .post(`/sources/${sourceId}/run`)
         .send({ triggeredBy: 'test-user' })
         .expect(201);
@@ -141,7 +131,7 @@ describe('WordPress Runner Integration (E2E)', () => {
         // Detectors take longer
         await new Promise((resolve) => setTimeout(resolve, 1000));
 
-        const statusResponse = await request(app.getHttpServer())
+        const statusResponse = await request(ctx.httpTarget)
           .get(`/runners/${runnerId}`)
           .expect(200);
 
@@ -161,7 +151,7 @@ describe('WordPress Runner Integration (E2E)', () => {
       expect(runner.assetsCreated).toBeGreaterThan(0);
 
       // 4. Verify assets have detector findings
-      const assetsResponse = await request(app.getHttpServer())
+      const assetsResponse = await request(ctx.httpTarget)
         .get(`/sources/${sourceId}/assets`)
         .expect(200);
 
@@ -191,7 +181,7 @@ describe('WordPress Runner Integration (E2E)', () => {
 
   describe('Runner management', () => {
     it('should list runners with filtering', async () => {
-      const response = await request(app.getHttpServer())
+      const response = await request(ctx.httpTarget)
         .get('/runners')
         .query({ skip: 0, take: 10 })
         .expect(200);
@@ -203,7 +193,7 @@ describe('WordPress Runner Integration (E2E)', () => {
     });
 
     it('should filter runners by status', async () => {
-      const response = await request(app.getHttpServer())
+      const response = await request(ctx.httpTarget)
         .get('/runners')
         .query({ status: RunnerStatus.COMPLETED })
         .expect(200);
@@ -219,7 +209,7 @@ describe('WordPress Runner Integration (E2E)', () => {
 
     it('should list runners for specific source', async () => {
       if (testSourceId) {
-        const response = await request(app.getHttpServer())
+        const response = await request(ctx.httpTarget)
           .get(`/sources/${testSourceId}/runners`)
           .expect(200);
 

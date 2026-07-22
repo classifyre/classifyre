@@ -57,7 +57,9 @@ export async function verifyClassifyreRemote(
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    throw new Error(`Could not verify the Classifyre instance: ${message}`);
+    throw new Error(`Could not verify the Classifyre instance: ${message}`, {
+      cause: error,
+    });
   }
 
   let namespaces: unknown;
