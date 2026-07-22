@@ -25,6 +25,20 @@ const launchArgs =
 
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'classifyre-deep-smoke-'));
 
+async function removeTemporaryDirectory(directory: string): Promise<void> {
+  try {
+    await fs.promises.rm(directory, {
+      recursive: true,
+      force: true,
+      maxRetries: 20,
+      retryDelay: 250,
+    });
+  } catch (error) {
+    // A delayed Chromium file lock should not replace the real smoke result.
+    console.warn(`Unable to remove temporary directory ${directory}:`, error);
+  }
+}
+
 async function main(): Promise<void> {
   console.log(`Launching ${appPath}`);
   const app = await electron.launch({
@@ -92,7 +106,7 @@ async function main(): Promise<void> {
     console.log('DEEP SMOKE PASSED');
   } finally {
     await app.close().catch(() => {});
-    fs.rmSync(dataDir, { recursive: true, force: true });
+    await removeTemporaryDirectory(dataDir);
   }
 }
 
