@@ -309,6 +309,13 @@ api:
 
     # -- Service account for CLI jobs. Empty uses API service account.
     serviceAccountName: ""
+    # -- CA bundle the API/worker trusts when calling the in-cluster Kubernetes
+    # API to create/delete CLI Jobs. The kube-apiserver serves a cert signed by
+    # the cluster CA, which every pod mounts at this path; exposing it via
+    # NODE_EXTRA_CA_CERTS makes Node's TLS trust it (fixes the
+    # SELF_SIGNED_CERT_IN_CHAIN error against self-signed clusters like k3d).
+    # Set to "" to disable (e.g. if the cluster CA is already in the system store).
+    kubeApiCaCertPath: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
     # -- Retry attempts for failed CLI jobs.
     backoffLimit: 2
     # -- Max runtime per CLI job (seconds). Increase for large data sources.
