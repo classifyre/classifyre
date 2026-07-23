@@ -141,7 +141,7 @@ export class NamespaceWorkerManager
     try {
       this.cliRunner.activateForSchema(e.schemaName);
       this.prismaManager.pin(e.schemaName);
-      await this.pgBoss.startForNamespace(e.schemaName, e.slug);
+      await this.pgBoss.startForNamespace(e.schemaName, e.namespaceId);
 
       const ctx = this.store(e);
       await this.runInNamespace(ctx, async () => {

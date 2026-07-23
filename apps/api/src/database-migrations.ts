@@ -8,7 +8,6 @@ import {
   publicConnectionString,
   PUBLIC_SEARCH_PATH_OPTION,
 } from './registry/namespace-registry.sql';
-import { pgBossSchemaForSlug } from './namespace/namespace.constants';
 
 const logger = new Logger('DatabaseMigrations');
 
@@ -181,22 +180,8 @@ export async function applyAllPendingMigrations(): Promise<void> {
   }> = [];
   try {
     await pool.query(REGISTRY_TABLE_DDL);
-    const deleting = await pool.query<{
-      id: string;
-      slug: string;
-      schema_name: string;
-    }>(
-      "SELECT id, slug, schema_name FROM namespaces WHERE status = 'deleting'",
-    );
-    for (const namespace of deleting.rows) {
-      await pool.query(
-        `DROP SCHEMA IF EXISTS ${quoteIdentifier(namespace.schema_name)} CASCADE`,
-      );
-      await pool.query(
-        `DROP SCHEMA IF EXISTS ${quoteIdentifier(pgBossSchemaForSlug(namespace.slug))} CASCADE`,
-      );
-      await pool.query('DELETE FROM namespaces WHERE id = $1', [namespace.id]);
-    }
+    // Namespace deletion is a soft-delete (status = 'deleted'): the tenant
+    // schema and its data are retained, so there is nothing to drop on boot.
     const { rows } = await pool.query<{
       id: string;
       schema_name: string;
@@ -233,10 +218,6 @@ export async function applyAllPendingMigrations(): Promise<void> {
       }
     }
   }
-}
-
-function quoteIdentifier(value: string): string {
-  return `"${value.replace(/"/g, '""')}"`;
 }
 
 /**

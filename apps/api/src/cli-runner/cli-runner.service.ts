@@ -14,7 +14,7 @@ import { PgBossService } from '../scheduler/pg-boss.service';
 import { INQUIRY_MATCH_QUEUE } from '../matching/matching.constants';
 import { CORRELATION_QUEUE } from '../correlation/correlation.constants';
 import { ClsService } from 'nestjs-cls';
-import { CLS_SCHEMA, CLS_SLUG } from '../namespace/namespace.constants';
+import { CLS_SCHEMA, CLS_NAMESPACE_ID } from '../namespace/namespace.constants';
 import {
   AssetType,
   Prisma,
@@ -112,9 +112,9 @@ export class CliRunnerService {
     private cls?: ClsService,
   ) {}
 
-  /** Current namespace slug from CLS, if running within a namespace context. */
-  private currentSlug(): string | undefined {
-    return this.cls?.get<string>(CLS_SLUG);
+  /** Current namespace UUID from CLS, if running within a namespace context. */
+  private currentNamespaceId(): string | undefined {
+    return this.cls?.get<string>(CLS_NAMESPACE_ID);
   }
 
   /**
@@ -185,10 +185,16 @@ export class CliRunnerService {
   ): void {
     const schema = this.cls?.get<string>(CLS_SCHEMA);
     if (schema && this.stoppingSchemas.has(schema)) return;
+    // Capture the namespace UUID now, while CLS is guaranteed live. The CLI
+    // executes as a detached fire-and-forget where the ambient context can be
+    // lost, so we thread the id explicitly into the output URL rather than
+    // re-reading CLS deep inside the execution.
+    const namespaceId = this.currentNamespaceId();
     const done = this.executeCliAsync(
       runnerId,
       source,
       hasSuccessfulRuns,
+      namespaceId,
     ).catch((error) => {
       this.logger.error(
         `Unhandled runner execution failure for ${runnerId}: ${String(error)}`,
@@ -1085,6 +1091,7 @@ export class CliRunnerService {
     runnerId: string,
     source: any,
     hasSuccessfulRuns: boolean,
+    namespaceId?: string,
   ) {
     const runner = await this.prisma.runner.findUnique({
       where: { id: runnerId },
@@ -1113,13 +1120,19 @@ export class CliRunnerService {
 
       const environment = process.env.ENVIRONMENT || 'development';
       if (this.isKubernetesExecutionEnabled(environment)) {
-        await this.executeCliInKubernetes(runnerId, source, hasSuccessfulRuns);
+        await this.executeCliInKubernetes(
+          runnerId,
+          source,
+          hasSuccessfulRuns,
+          namespaceId,
+        );
       } else {
         await this.executeCliLocally(
           runnerId,
           source,
           environment,
           hasSuccessfulRuns,
+          namespaceId,
         );
       }
     } catch (error) {
@@ -1143,6 +1156,7 @@ export class CliRunnerService {
     source: any,
     environment: string,
     hasSuccessfulRuns: boolean,
+    namespaceId?: string,
   ): Promise<void> {
     const cliPath = this.getCliPath(environment);
     const venvPath = this.getVenvPath(environment);
@@ -1150,7 +1164,8 @@ export class CliRunnerService {
 
     try {
       const outputRestUrl =
-        this.resolveOutputRestUrl(environment) || 'http://localhost:8000';
+        this.resolveOutputRestUrl(environment, namespaceId) ||
+        'http://localhost:8000';
       const command = this.buildCliCommand(
         cliPath,
         venvPath,
@@ -1186,6 +1201,7 @@ export class CliRunnerService {
     runnerId: string,
     source: any,
     hasSuccessfulRuns: boolean,
+    namespaceId?: string,
   ): Promise<void> {
     if (!this.kubernetesCliJobService) {
       throw new Error('Kubernetes CLI Job service is not available');
@@ -1195,7 +1211,7 @@ export class CliRunnerService {
       runnerId,
       source.id,
       source.config,
-      this.resolveOutputRestUrl('kubernetes'),
+      this.resolveOutputRestUrl('kubernetes', namespaceId),
       hasSuccessfulRuns,
       (chunk) => this.appendLog(runnerId, chunk, 'combined'),
       ({ jobName, namespace }) =>
@@ -1464,16 +1480,21 @@ export class CliRunnerService {
     );
   }
 
-  private resolveOutputRestUrl(environment: string): string | undefined {
+  private resolveOutputRestUrl(
+    environment: string,
+    namespaceId?: string,
+  ): string | undefined {
     const base = this.resolveOutputRestBase(environment);
     if (!base) return undefined;
-    // The CLI joins relative endpoint paths onto this base, so a namespace slug
-    // segment makes it post findings back to `/<slug>/...` — the API resolves
-    // the tenant from that segment. Without a namespace context (e.g. legacy
-    // single-tenant callers) the base is returned unchanged.
-    const slug = this.currentSlug();
-    if (!slug) return base;
-    return `${base.replace(/\/+$/, '')}/${slug}`;
+    // The CLI joins relative endpoint paths onto this base, so a namespace UUID
+    // segment makes it post findings back to `/<uuid>/...` — the API resolves
+    // the tenant from that segment. The UUID is immutable, so the URL survives a
+    // slug edit mid-scan. Prefer an explicitly-threaded id (the CLI runs
+    // detached, where CLS can be lost); fall back to CLS for synchronous
+    // in-request callers (e.g. testConnection). No namespace → base unchanged.
+    const id = namespaceId ?? this.currentNamespaceId();
+    if (!id) return base;
+    return `${base.replace(/\/+$/, '')}/${id}`;
   }
 
   private resolveOutputRestBase(environment: string): string | undefined {

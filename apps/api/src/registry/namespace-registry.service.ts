@@ -13,8 +13,7 @@ import { deployForSchema } from '../database-migrations';
 import {
   RESERVED_PREFIXES,
   SLUG_RE,
-  schemaForSlug,
-  pgBossSchemaForSlug,
+  schemaForId,
   slugifyName,
 } from '../namespace/namespace.constants';
 import {
@@ -26,9 +25,9 @@ import type {
   CreateNamespaceInput,
   Namespace,
   NamespaceLifecycleEvent,
+  NamespaceStats,
   UpdateNamespaceInput,
 } from './namespace.types';
-import { serviceRole } from '../service-role';
 
 interface NamespaceRow {
   id: string;
@@ -38,12 +37,26 @@ interface NamespaceRow {
   description: string | null;
   type: string;
   remote_url: string | null;
-  thumbnail: string | null;
+  has_thumbnail: boolean;
   settings: Record<string, unknown>;
   created_at: Date;
   updated_at: Date;
   last_opened_at: Date | null;
 }
+
+/**
+ * Columns selected for a {@link Namespace} projection. Deliberately excludes the
+ * potentially large `thumbnail_blob` (bytea) — its presence is surfaced as a
+ * boolean and the bytes are streamed separately by the thumbnail endpoint.
+ */
+const NAMESPACE_COLUMNS = `
+  id, name, slug, schema_name, description, type, remote_url,
+  (thumbnail_blob IS NOT NULL) AS has_thumbnail,
+  settings, created_at, updated_at, last_opened_at
+`;
+
+/** Max accepted decoded thumbnail size (2 MB). */
+const MAX_THUMBNAIL_BYTES = 2 * 1024 * 1024;
 
 interface ResolveCacheEntry {
   context: NamespaceLifecycleEvent;
@@ -51,6 +64,10 @@ interface ResolveCacheEntry {
 }
 
 const RESOLVE_CACHE_TTL_MS = 5_000;
+
+/** Canonical UUID (as used for the immutable, internal namespace address). */
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
  * Source of truth for the list of namespaces (tenants).
@@ -93,14 +110,21 @@ export class NamespaceRegistryService implements OnModuleInit, OnModuleDestroy {
     this.deletingListeners.add(fn);
   }
 
-  /** Cached slug → context resolution used by the request pipeline. */
-  async resolve(slug: string): Promise<NamespaceLifecycleEvent | null> {
-    const hit = this.resolveCache.get(slug);
+  /**
+   * Cached resolution used by the request pipeline. The leading path segment is
+   * either the immutable namespace UUID (internal service-to-service calls) or
+   * the editable slug (web app); both resolve to the same tenant.
+   */
+  async resolve(segment: string): Promise<NamespaceLifecycleEvent | null> {
+    const hit = this.resolveCache.get(segment);
     if (hit && hit.expiresAt > Date.now()) return hit.context;
-    if (hit) this.resolveCache.delete(slug);
+    if (hit) this.resolveCache.delete(segment);
+    const byId = UUID_RE.test(segment);
     const { rows } = await this.pool.query<NamespaceRow>(
-      "SELECT id, slug, schema_name FROM namespaces WHERE slug = $1 AND type = 'local' AND status = 'active'",
-      [slug],
+      `SELECT id, slug, schema_name FROM namespaces
+         WHERE ${byId ? 'id = $1' : 'slug = $1'}
+           AND type = 'local' AND status = 'active'`,
+      [segment],
     );
     const row = rows[0];
     if (!row) return null;
@@ -109,7 +133,7 @@ export class NamespaceRegistryService implements OnModuleInit, OnModuleDestroy {
       slug: row.slug,
       schemaName: row.schema_name,
     };
-    this.resolveCache.set(slug, {
+    this.resolveCache.set(segment, {
       context: ctx,
       expiresAt: Date.now() + RESOLVE_CACHE_TTL_MS,
     });
@@ -118,18 +142,71 @@ export class NamespaceRegistryService implements OnModuleInit, OnModuleDestroy {
 
   async list(): Promise<Namespace[]> {
     const { rows } = await this.pool.query<NamespaceRow>(
-      "SELECT * FROM namespaces WHERE status = 'active' ORDER BY created_at ASC",
+      `SELECT ${NAMESPACE_COLUMNS} FROM namespaces
+         WHERE status = 'active' ORDER BY created_at ASC`,
     );
     return rows.map((r) => this.toNamespace(r));
   }
 
   async get(id: string): Promise<Namespace> {
     const { rows } = await this.pool.query<NamespaceRow>(
-      "SELECT * FROM namespaces WHERE id = $1 AND status = 'active'",
+      `SELECT ${NAMESPACE_COLUMNS} FROM namespaces
+         WHERE id = $1 AND status = 'active'`,
       [id],
     );
     if (!rows[0]) throw new NotFoundException(`Unknown namespace '${id}'`);
     return this.toNamespace(rows[0]);
+  }
+
+  /**
+   * Per-namespace source rollups for the workspace directory cards. One
+   * schema-qualified aggregate per active local namespace (few namespaces on the
+   * landing page); a provisioning/missing schema degrades to zeroes.
+   */
+  async stats(): Promise<NamespaceStats[]> {
+    const namespaces = await this.list();
+    const local = namespaces.filter((ns) => ns.type === 'local');
+    return Promise.all(
+      local.map(async (ns) => {
+        try {
+          const { rows } = await this.pool.query<{
+            total: number;
+            failing: number;
+          }>(
+            `SELECT
+               count(*)::int AS total,
+               count(*) FILTER (WHERE runner_status = 'ERROR')::int AS failing
+             FROM "${ns.schemaName}".sources`,
+          );
+          return {
+            id: ns.id,
+            totalSources: rows[0]?.total ?? 0,
+            failingSources: rows[0]?.failing ?? 0,
+          };
+        } catch {
+          return { id: ns.id, totalSources: 0, failingSources: 0 };
+        }
+      }),
+    );
+  }
+
+  /** Raw thumbnail bytes for the streaming endpoint, or null when unset. */
+  async getThumbnail(
+    id: string,
+  ): Promise<{ blob: Buffer; mime: string } | null> {
+    const { rows } = await this.pool.query<{
+      thumbnail_blob: Buffer | null;
+      thumbnail_mime: string | null;
+    }>(
+      "SELECT thumbnail_blob, thumbnail_mime FROM namespaces WHERE id = $1 AND status = 'active'",
+      [id],
+    );
+    const row = rows[0];
+    if (!row?.thumbnail_blob) return null;
+    return {
+      blob: row.thumbnail_blob,
+      mime: row.thumbnail_mime || 'application/octet-stream',
+    };
   }
 
   async create(input: CreateNamespaceInput): Promise<Namespace> {
@@ -159,14 +236,18 @@ export class NamespaceRegistryService implements OnModuleInit, OnModuleDestroy {
     }
     if (type === 'remote') validateRemoteUrl(input.remoteUrl as string);
 
-    const schemaName = schemaForSlug(slug);
     const id = randomUUID();
+    // Schema names derive from the immutable UUID, never the slug, so a slug can
+    // be edited later without renaming (or breaking access to) any schema.
+    const schemaName = schemaForId(id);
+    const thumbnail = parseThumbnailDataUri(input.thumbnail);
 
     try {
       const { rows } = await this.pool.query<NamespaceRow>(
-        `INSERT INTO namespaces (id, name, slug, schema_name, description, type, remote_url, status)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-         RETURNING *`,
+        `INSERT INTO namespaces
+           (id, name, slug, schema_name, description, type, remote_url, status, thumbnail_blob, thumbnail_mime)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+         RETURNING ${NAMESPACE_COLUMNS}`,
         [
           id,
           name,
@@ -176,6 +257,8 @@ export class NamespaceRegistryService implements OnModuleInit, OnModuleDestroy {
           type,
           input.remoteUrl ?? null,
           type === 'local' ? 'provisioning' : 'active',
+          thumbnail?.blob ?? null,
+          thumbnail?.mime ?? null,
         ],
       );
       let namespace = this.toNamespace(rows[0]);
@@ -187,7 +270,8 @@ export class NamespaceRegistryService implements OnModuleInit, OnModuleDestroy {
           await this.pool.query(`CREATE SCHEMA IF NOT EXISTS "${schemaName}"`);
           await deployForSchema(schemaName);
           const activated = await this.pool.query<NamespaceRow>(
-            "UPDATE namespaces SET status = 'active', updated_at = now() WHERE id = $1 RETURNING *",
+            `UPDATE namespaces SET status = 'active', updated_at = now()
+               WHERE id = $1 RETURNING ${NAMESPACE_COLUMNS}`,
             [id],
           );
           namespace = this.toNamespace(activated.rows[0]);
@@ -245,31 +329,73 @@ export class NamespaceRegistryService implements OnModuleInit, OnModuleDestroy {
       if (!name) throw new BadRequestException('Namespace name is required');
       push('name', name);
     }
+    if (patch.slug !== undefined) {
+      const slug = patch.slug.trim().toLowerCase();
+      if (!SLUG_RE.test(slug)) {
+        throw new BadRequestException(
+          `Invalid namespace slug '${slug}' (use lowercase letters, digits and dashes)`,
+        );
+      }
+      if (RESERVED_PREFIXES.has(slug)) {
+        throw new BadRequestException(
+          `Namespace slug '${slug}' is reserved by the application`,
+        );
+      }
+      push('slug', slug);
+    }
     if (patch.description !== undefined) push('description', patch.description);
     if (patch.remoteUrl !== undefined) {
       validateRemoteUrl(patch.remoteUrl);
       push('remote_url', patch.remoteUrl);
     }
-    if (patch.thumbnail !== undefined) push('thumbnail', patch.thumbnail);
+    if (patch.thumbnail !== undefined) {
+      // `null`/empty clears the image; a data URI replaces it.
+      const thumbnail = parseThumbnailDataUri(patch.thumbnail);
+      push('thumbnail_blob', thumbnail?.blob ?? null);
+      push('thumbnail_mime', thumbnail?.mime ?? null);
+    }
     if (patch.settings !== undefined)
       push('settings', JSON.stringify(patch.settings));
     if (patch.lastOpenedAt !== undefined)
       push('last_opened_at', patch.lastOpenedAt);
 
     if (sets.length === 0) return this.get(id);
+    // Capture the current slug so its (now stale) resolve-cache entry is dropped
+    // even when the slug itself is being changed.
+    const previousSlug = (await this.get(id)).slug;
     sets.push('updated_at = now()');
     values.push(id);
 
-    const { rows } = await this.pool.query<NamespaceRow>(
-      `UPDATE namespaces SET ${sets.join(', ')} WHERE id = $${values.length} RETURNING *`,
-      values,
-    );
+    let rows: NamespaceRow[];
+    try {
+      ({ rows } = await this.pool.query<NamespaceRow>(
+        `UPDATE namespaces SET ${sets.join(', ')}
+           WHERE id = $${values.length} RETURNING ${NAMESPACE_COLUMNS}`,
+        values,
+      ));
+    } catch (error) {
+      if (isUniqueViolation(error)) {
+        throw new ConflictException(
+          `A namespace with slug '${patch.slug}' already exists`,
+        );
+      }
+      throw error;
+    }
     if (!rows[0]) throw new NotFoundException(`Unknown namespace '${id}'`);
     const namespace = this.toNamespace(rows[0]);
+    this.resolveCache.delete(previousSlug);
     this.resolveCache.delete(namespace.slug);
+    this.resolveCache.delete(namespace.id);
     return namespace;
   }
 
+  /**
+   * Soft-delete a namespace: mark it `deleted` so it disappears from listings
+   * and can no longer be resolved (any request to its URL 404s), then stop its
+   * workers, pg-boss instance and scheduling. The tenant's Postgres schema and
+   * all its data are intentionally RETAINED — nothing is dropped — and the slug
+   * stays reserved so it cannot be silently reused.
+   */
   async remove(id: string): Promise<void> {
     const namespace = await this.get(id);
     const ctx: NamespaceLifecycleEvent = {
@@ -277,37 +403,17 @@ export class NamespaceRegistryService implements OnModuleInit, OnModuleDestroy {
       slug: namespace.slug,
       schemaName: namespace.schemaName,
     };
-    // Let workers tear down (stop pg-boss, unpin Prisma client) before the
-    // schemas disappear underneath them.
-    // Await teardown: EventEmitter-style fire-and-forget races worker queries
-    // against DROP SCHEMA and can leave pg-boss/Prisma pools alive afterward.
+    // Flip to `deleted` first so `resolve()`/`list()` (which filter on
+    // status = 'active') immediately stop serving it, then let workers tear
+    // down (stop pg-boss polling + scheduling, unpin the Prisma client).
     this.resolveCache.delete(namespace.slug);
+    this.resolveCache.delete(namespace.id);
     await this.pool.query(
-      "UPDATE namespaces SET status = 'deleting', updated_at = now() WHERE id = $1",
+      "UPDATE namespaces SET status = 'deleted', updated_at = now() WHERE id = $1",
       [id],
     );
     await this.notify(this.deletingListeners, ctx, 'delete');
-
-    // In production, HTTP and background workers run in separate pods, so the
-    // in-process lifecycle hook above cannot reach the worker. Its 2s registry
-    // reconciler sees the `deleting` state and tears down pg-boss/Prisma first.
-    if (namespace.type === 'local' && serviceRole() === 'api') {
-      const graceMs = Number(process.env.NAMESPACE_DELETE_GRACE_MS ?? 20_000);
-      if (Number.isFinite(graceMs) && graceMs > 0) {
-        await new Promise((resolve) => setTimeout(resolve, graceMs));
-      }
-    }
-
-    if (namespace.type === 'local') {
-      await this.pool.query(
-        `DROP SCHEMA IF EXISTS "${namespace.schemaName}" CASCADE`,
-      );
-      await this.pool.query(
-        `DROP SCHEMA IF EXISTS "${pgBossSchemaForSlug(namespace.slug)}" CASCADE`,
-      );
-    }
-    await this.pool.query('DELETE FROM namespaces WHERE id = $1', [id]);
-    this.logger.log(`Removed namespace '${namespace.slug}'`);
+    this.logger.log(`Soft-deleted namespace '${namespace.slug}' (data retained)`);
   }
 
   private async notify(
@@ -338,7 +444,11 @@ export class NamespaceRegistryService implements OnModuleInit, OnModuleDestroy {
       description: row.description,
       type: row.type === 'remote' ? 'remote' : 'local',
       remoteUrl: row.remote_url,
-      thumbnail: row.thumbnail,
+      // A relative path to the streaming endpoint (cache-busted by updated_at);
+      // the web api-client resolves it to an absolute URL. Null when unset.
+      thumbnail: row.has_thumbnail
+        ? `/namespaces/${row.id}/thumbnail?v=${row.updated_at.getTime()}`
+        : null,
       settings: row.settings ?? {},
       createdAt: row.created_at.toISOString(),
       updatedAt: row.updated_at.toISOString(),
@@ -347,6 +457,32 @@ export class NamespaceRegistryService implements OnModuleInit, OnModuleDestroy {
         : null,
     };
   }
+}
+
+/**
+ * Decode a `data:image/...;base64,...` thumbnail into its bytes + MIME type.
+ * `undefined`/`null`/empty means "no image" (clear on update); anything else is
+ * validated as an image data URI within {@link MAX_THUMBNAIL_BYTES}.
+ */
+function parseThumbnailDataUri(
+  value: string | null | undefined,
+): { blob: Buffer; mime: string } | null {
+  if (value === undefined || value === null || value === '') return null;
+  const match = /^data:(image\/[a-z0-9.+-]+);base64,(.+)$/i.exec(value.trim());
+  if (!match) {
+    throw new BadRequestException(
+      'Thumbnail must be a base64 image data URI (data:image/...;base64,...)',
+    );
+  }
+  const [, mime, base64] = match;
+  const blob = Buffer.from(base64, 'base64');
+  if (blob.length === 0) {
+    throw new BadRequestException('Thumbnail image is empty');
+  }
+  if (blob.length > MAX_THUMBNAIL_BYTES) {
+    throw new BadRequestException('Thumbnail image must be 2 MB or smaller');
+  }
+  return { blob, mime: mime.toLowerCase() };
 }
 
 function validateRemoteUrl(value: string): void {

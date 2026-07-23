@@ -9,15 +9,18 @@ import {
   ArrowRight,
   FolderOpen,
   Globe2,
+  Layers,
   Plus,
   RefreshCw,
   Settings,
+  TriangleAlert,
   Trash2,
 } from "lucide-react";
 import {
   api,
   setActiveNamespaceSlug,
   type Namespace,
+  type NamespaceStats,
 } from "@workspace/api-client";
 import { Button } from "@workspace/ui/components/button";
 import { Card, CardContent } from "@workspace/ui/components/card";
@@ -59,6 +62,7 @@ export default function LandingPage() {
   const router = useRouter();
   const { t } = useTranslation();
   const [namespaces, setNamespaces] = React.useState<Namespace[] | null>(null);
+  const [stats, setStats] = React.useState<Record<string, NamespaceStats>>({});
   const [error, setError] = React.useState<string | null>(null);
   const [createOpen, setCreateOpen] = React.useState(false);
   const [remoteCreateOpen, setRemoteCreateOpen] = React.useState(false);
@@ -106,9 +110,21 @@ export default function LandingPage() {
     }
   }, [t]);
 
+  // Source rollups are non-critical: load them separately so a stats failure
+  // never blocks the directory, and index them by namespace id for the cards.
+  const loadStats = React.useCallback(async () => {
+    try {
+      const rows = await api.namespaces.stats();
+      setStats(Object.fromEntries(rows.map((row) => [row.id, row])));
+    } catch {
+      // Cards simply omit counts when stats are unavailable.
+    }
+  }, []);
+
   React.useEffect(() => {
     void load();
-  }, [load]);
+    void loadStats();
+  }, [load, loadStats]);
 
   const open = (ns: Namespace) => {
     if (ns.type === "remote" && ns.remoteUrl) {
@@ -138,6 +154,7 @@ export default function LandingPage() {
       toast.success(t("workspaces.deleteSuccess", { name: pendingDelete.name }));
       setPendingDelete(null);
       await load();
+      void loadStats();
     } catch (e) {
       toast.error(
         e instanceof Error ? e.message : t("workspaces.deleteFailed"),
@@ -260,6 +277,7 @@ export default function LandingPage() {
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {namespaces.map((ns) => {
               const initial = ns.name.trim().charAt(0).toUpperCase() || "?";
+              const s = stats[ns.id];
               return (
                 <Card
                   key={ns.id}
@@ -342,7 +360,32 @@ export default function LandingPage() {
                     <p className="mt-4 line-clamp-2 min-h-10 text-sm leading-relaxed text-muted-foreground">
                       {ns.description || t("workspaces.noDescription")}
                     </p>
-                    <div className="mt-auto flex justify-end pt-4">
+                    <div className="mt-auto flex items-center justify-between gap-3 border-t pt-4">
+                      {s ? (
+                        <div className="flex min-w-0 items-center gap-2.5">
+                          <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                            <Layers className="size-3.5 shrink-0" />
+                            <span>
+                              <span className="font-semibold text-foreground">
+                                {s.totalSources}
+                              </span>{" "}
+                              {t("workspaces.sourcesCount", {
+                                count: s.totalSources,
+                              })}
+                            </span>
+                          </span>
+                          {s.failingSources > 0 && (
+                            <span className="flex items-center gap-1 rounded-sm border border-destructive/40 px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-destructive">
+                              <TriangleAlert className="size-3 shrink-0" />
+                              {t("workspaces.failingCount", {
+                                count: s.failingSources,
+                              })}
+                            </span>
+                          )}
+                        </div>
+                      ) : (
+                        <span aria-hidden="true" />
+                      )}
                       <span className="flex shrink-0 items-center gap-1 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground transition-colors group-hover:text-foreground">
                         {t("common.open")} <ArrowRight className="size-3.5" />
                       </span>

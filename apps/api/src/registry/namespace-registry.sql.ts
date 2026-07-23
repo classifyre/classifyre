@@ -10,7 +10,14 @@
  * tenant migration) is all the "migration tracking" it needs.
  */
 
-/** Idempotent DDL that creates the registry table. Safe to run on every boot. */
+/**
+ * Idempotent DDL that creates + migrates the registry table. Safe to run on
+ * every boot; this doubles as the "migration" for this hand-managed table.
+ *
+ * Thumbnails are stored as a binary BLOB (`thumbnail_blob bytea`) plus its MIME
+ * type, not as a URL/data-URI in a text column, so uploaded workspace images
+ * live in the database and are served by `GET /namespaces/:id/thumbnail`.
+ */
 export const REGISTRY_TABLE_DDL = `
 CREATE TABLE IF NOT EXISTS public.namespaces (
   id             uuid PRIMARY KEY,
@@ -20,7 +27,8 @@ CREATE TABLE IF NOT EXISTS public.namespaces (
   description    text,
   type           text NOT NULL DEFAULT 'local',
   remote_url     text,
-  thumbnail      text,
+  thumbnail_blob bytea,
+  thumbnail_mime text,
   settings       jsonb NOT NULL DEFAULT '{}'::jsonb,
   status         text NOT NULL DEFAULT 'active',
   created_at     timestamptz NOT NULL DEFAULT now(),
@@ -29,6 +37,13 @@ CREATE TABLE IF NOT EXISTS public.namespaces (
 );
 ALTER TABLE public.namespaces
   ADD COLUMN IF NOT EXISTS status text NOT NULL DEFAULT 'active';
+ALTER TABLE public.namespaces
+  ADD COLUMN IF NOT EXISTS thumbnail_blob bytea;
+ALTER TABLE public.namespaces
+  ADD COLUMN IF NOT EXISTS thumbnail_mime text;
+-- Legacy text thumbnail column (pre-blob); dropped so the model stays clean.
+ALTER TABLE public.namespaces
+  DROP COLUMN IF EXISTS thumbnail;
 `;
 
 /** libpq `options` value that pins a connection's search_path to `public`. */

@@ -16,6 +16,7 @@ import { Button } from "@workspace/ui/components/button";
 import { Input } from "@workspace/ui/components/input";
 import { Label } from "@workspace/ui/components/label";
 import { Textarea } from "@workspace/ui/components/textarea";
+import { ThumbnailPicker } from "@/components/namespace/thumbnail-picker";
 import { useTranslation } from "@/hooks/use-translation";
 
 function slugify(name: string): string {
@@ -40,6 +41,7 @@ export function CreateNamespaceDialog({
   const { t } = useTranslation();
   const [name, setName] = React.useState("");
   const [description, setDescription] = React.useState("");
+  const [thumbnail, setThumbnail] = React.useState<string | null>(null);
   const [submitting, setSubmitting] = React.useState(false);
 
   const slug = slugify(name);
@@ -47,6 +49,7 @@ export function CreateNamespaceDialog({
   const reset = () => {
     setName("");
     setDescription("");
+    setThumbnail(null);
     setSubmitting(false);
   };
 
@@ -58,6 +61,7 @@ export function CreateNamespaceDialog({
       const namespace = await api.namespaces.create({
         name: name.trim(),
         description: description.trim() || undefined,
+        thumbnail: thumbnail ?? undefined,
       });
       toast.success(t("workspaces.createSuccess", { name: namespace.name }));
       onCreated(namespace);
@@ -114,6 +118,14 @@ export function CreateNamespaceDialog({
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder={t("workspaces.descriptionPlaceholder")}
                 rows={2}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label>{t("workspaces.thumbnailOptional")}</Label>
+              <ThumbnailPicker
+                value={thumbnail}
+                onChange={setThumbnail}
+                disabled={submitting}
               />
             </div>
           </div>
