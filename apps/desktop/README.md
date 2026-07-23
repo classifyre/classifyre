@@ -4,24 +4,23 @@ Electron app that bundles the full Classifyre stack (API, Web, CLI, PostgreSQL, 
 
 ## Architecture
 
-The desktop app runs an **embedded PostgreSQL** instance and spawns per-workspace API servers. Each workspace (called a "namespace") gets its own database schema and API process. All child processes run on Electron's own Node (`ELECTRON_RUN_AS_NODE`) and the bundled Python venv — nothing from the user's machine is required.
+The desktop app runs an **embedded PostgreSQL** instance and one shared, namespace-aware API. The API owns the namespace registry in PostgreSQL, provisions one schema per local namespace, and scopes requests through `/<slug>/...`. The web app owns namespace CRUD and routing. Child processes run on Electron's own Node (`ELECTRON_RUN_AS_NODE`) and the bundled Python venv — nothing from the user's machine is required.
 
 ```
 ┌─────────────────────────────────────────┐
 │  Electron Main Process                  │
 │  ├─ PostgresManager   (embedded PG)     │
-│  ├─ NamespaceManager  (workspace CRUD)  │
 │  ├─ SettingsManager   (global settings) │
-│  ├─ ProcessManager    (API child procs) │
-│  ├─ NamespaceRuntime  (tab/view mgmt)   │
+│  ├─ ProcessManager    (shared API)       │
+│  ├─ NamespaceStore    (menu API mirror) │
 │  └─ python-env        (venv relocation) │
 ├─────────────────────────────────────────┤
-│  Tab Bar View    (WebContentsView)      │
+│  BrowserWindow                          │
+│  └─ Namespace-aware Next.js web app     │
 ├─────────────────────────────────────────┤
-│  Content Views   (one per open tab)     │
-│  ├─ Local: static Next.js + local API   │
-│  └─ Remote: external URL in sandboxed   │
-│            webview                      │
+│  Shared NestJS API                      │
+│  └─ PostgreSQL namespace registry       │
+│     + per-namespace schemas             │
 └─────────────────────────────────────────┘
 ```
 
@@ -31,36 +30,26 @@ The desktop app runs an **embedded PostgreSQL** instance and spawns per-workspac
 |------|---------|
 | `src/main/index.ts` | App entry point, window creation, lifecycle |
 | `src/main/postgres-manager.ts` | Embedded PostgreSQL lifecycle (start/stop/schema) |
-| `src/main/process-manager.ts` | Spawn/kill per-namespace NestJS API processes; Prisma migrations |
-| `src/main/namespace-manager.ts` | Workspace CRUD + settings, persisted to `namespaces.json` |
+| `src/main/process-manager.ts` | Spawn, monitor, and stop the shared NestJS API |
+| `src/main/namespace-store.ts` | Read-only API namespace snapshot for native menus |
 | `src/main/settings-manager.ts` | App-wide settings (database port), persisted to `settings.json` |
 | `src/main/python-env.ts` | Makes the bundled Python venv relocatable on first launch |
-| `src/main/namespace-runtime.ts` | Tab management, view layout, IPC coordination |
 | `src/main/update-checker.ts` | GitHub Releases version check + in-app download/install |
-| `src/main/tray.ts` | System tray / menu-bar item (workspaces, updates, background mode) |
+| `src/main/tray.ts` | System tray / menu-bar item (API workspaces, updates, background mode) |
 | `src/main/menu.ts` | Application menu (Workspaces, Logs, Check for Updates) + dock menu |
 | `src/main/protocol-handler.ts` | Custom `app://` protocol for serving static web files |
 | `src/preload/preload.ts` | Context bridge exposing `electronAPI` to renderers |
-| `src/renderer/namespace-selector/` | Workspace picker UI + settings dialog |
-| `src/renderer/tab-bar/` | Browser-style tab strip |
 
 ### Data storage
 
 All data is stored under the Electron `userData` directory (or `CLASSIFYRE_DATA_DIR` if set):
 
 - `pgdata/` — PostgreSQL data directory
-- `namespaces.json` — workspace definitions and per-workspace settings
 - `settings.json` — app-wide settings (preferred database port)
 - `python-runtime/` — relocated Python venv (only when the install dir is read-only)
 
-### Workspace settings
-
-Each workspace card has a gear icon opening the settings dialog:
-
-- **Name** — rename the workspace (schema name stays stable)
-- **API port** — fixed backend port for MCP-server or other consumers that need a stable URL; empty = automatic. If the fixed port is busy, opening fails with a clear error instead of silently moving.
-- **Advanced** — max parallel scans (`MAX_PARALLEL_SCANS`), API memory limit (Node `--max-old-space-size`)
-- **Database port** (app-wide) — preferred embedded-Postgres port; if busy the next free port is used
+Namespace definitions and settings are stored in the embedded database's
+`public.namespaces` registry and exposed through the shared API.
 
 ## Development
 
@@ -83,8 +72,7 @@ cd apps/desktop && bun dev   # or: make dev
 ```
 
 In dev mode:
-- The namespace selector is served by Vite HMR
-- Local namespaces connect to `http://localhost:3000` (Next.js dev server)
+- The desktop window loads `http://localhost:3000` (Next.js dev server)
 - The API is spawned from `apps/api/dist/` (run `bun --filter @classifyre/api build` first)
 
 ## Building installers
@@ -191,11 +179,11 @@ CLASSIFYRE_APP_PATH=out/Classifyre-darwin-arm64/Classifyre.app/Contents/MacOS/cl
 | Linux amd64 | `ubuntu-latest` | `.deb` + `.rpm` |
 | Linux arm64 | `ubuntu-24.04-arm` | `.deb` + `.rpm` |
 
-Each job stages resources with the same `stage-resources.sh` as local builds, packages, ad-hoc signs (macOS), **smoke-tests the packaged binary** (boots the app, waits for the workspace selector — which requires embedded PostgreSQL to have started), then creates and uploads installers.
+Each job stages resources with the same `stage-resources.sh` as local builds, packages, ad-hoc signs (macOS), **smoke-tests the packaged binary** (boots the app and waits for the API-backed workspace directory), then creates and uploads installers.
 
 ## Updates
 
-The app checks GitHub Releases on launch (and every 6 hours) and shows an "Update available" badge in the tab bar. Clicking it downloads the update:
+The app checks GitHub Releases on launch and every 6 hours. Available updates are exposed through the application and tray menus:
 
 - **macOS (signed builds)**: the release's darwin zip is handed to Electron's built-in Squirrel.Mac updater via a loopback JSON feed; when downloaded the badge becomes "Restart to update", which installs in place and relaunches. Unsigned/dev builds fall back to a plain DMG download.
 - **Windows/Linux**: the matching zip/deb/rpm is downloaded to `~/Downloads` with progress; the badge then reveals the archive (zip) or opens the system package installer (deb/rpm).
@@ -204,4 +192,4 @@ The same actions are available from the tray menu and "Check for Updates…" in 
 
 ## Background mode & tray
 
-A system-tray (macOS menu-bar) item lists workspaces — running ones are checked — and can open/switch them, trigger updates, and quit. With "Keep Running in Background" enabled (default, persisted in `settings.json` as `runInBackground`), closing the window hides it and keeps running workspaces alive; the tray, dock, or relaunching the app brings it back. When disabled, closing the window stops all workspaces.
+A system-tray (macOS menu-bar) item lists namespaces fetched from the shared API and can open them, trigger updates, and quit. There is no desktop-level active/inactive state: the shared API serves every local namespace for the lifetime of the app. With "Keep Running in Background" enabled (default, persisted in `settings.json` as `runInBackground`), closing the window hides it while the shared services keep running; the tray, dock, or relaunching the app brings it back.

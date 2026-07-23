@@ -2,12 +2,15 @@
  * Namespace (tenant) identity primitives shared across the request pipeline,
  * the registry, and the worker manager.
  *
- * A namespace is identified in every URL by a human **slug** (e.g. `acme-corp`
- * in `/acme-corp/sources` or `/acme-corp/mcp`). Its data lives in a dedicated
- * Postgres schema `ns_<slug>` (dashes → underscores, since dashes are not legal
- * in a bare SQL identifier), while pg-boss jobs live in `pgboss_<slug>`.
+ * A namespace is addressed in URLs by either its immutable **UUID** (used by
+ * all internal service-to-service calls, e.g. the managed CLI posting findings
+ * to `/<uuid>/runners/...`) or a human, editable **slug** (used by the web app,
+ * e.g. `/acme-corp/sources`). Both resolve to the same tenant.
+ *
+ * Tenant data lives in a Postgres schema derived from the immutable UUID
+ * (`ns_<uuid>`), and pg-boss jobs in `pgboss_<uuid>`. Deriving from the UUID
+ * (not the slug) keeps the slug freely editable without touching any schema.
  */
-import { createHash } from 'node:crypto';
 
 /**
  * First path segments that are NEVER a namespace slug and must pass through the
@@ -37,23 +40,27 @@ export const RESERVED_PREFIXES = new Set<string>([
  */
 export const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{0,48}[a-z0-9])?$/;
 
-/** Postgres schema that holds a namespace's application data. */
-export function schemaForSlug(slug: string): string {
-  return `ns_${slug.replace(/-/g, '_')}`;
+/**
+ * Normalize a namespace UUID into a bare SQL identifier fragment: dashes are
+ * not legal in an unquoted identifier, so strip them (a UUID is already
+ * lowercase hex, safe as an identifier body).
+ */
+function idToken(id: string): string {
+  return id.replace(/-/g, '');
 }
 
-/** Postgres schema that holds a namespace's pg-boss job tables. */
-export function pgBossSchemaForSlug(slug: string): string {
-  const normalized = slug.replace(/[^a-z0-9_]/g, '_');
-  const candidate = `pgboss_${normalized}`;
-  if (candidate.length <= 50) return candidate;
+/** Postgres schema that holds a namespace's application data (`ns_<uuid>`). */
+export function schemaForId(id: string): string {
+  return `ns_${idToken(id)}`;
+}
 
-  // pg-boss limits schema identifiers to 50 characters. Plain truncation
-  // aliases distinct long slugs onto the same job schema, which lets one
-  // tenant consume another tenant's jobs. Keep a stable 64-bit digest suffix
-  // so the shortened identifier remains effectively collision-free.
-  const suffix = createHash('sha256').update(slug).digest('hex').slice(0, 16);
-  return `pgboss_${normalized.slice(0, 26)}_${suffix}`;
+/**
+ * Postgres schema that holds a namespace's pg-boss job tables (`pgboss_<uuid>`).
+ * `pgboss_` + 32 hex chars = 39 chars, always within pg-boss's 50-char limit,
+ * and collision-free by construction — no truncation/hashing needed.
+ */
+export function pgBossSchemaForId(id: string): string {
+  return `pgboss_${idToken(id)}`;
 }
 
 /**

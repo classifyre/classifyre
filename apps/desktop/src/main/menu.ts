@@ -2,8 +2,7 @@ import { app, Menu, shell, dialog, clipboard, type MenuItemConstructorOptions } 
 import fs from 'fs';
 import path from 'path';
 import { getLogFilePath } from './logger.js';
-import type { NamespaceRuntime } from './namespace-runtime.js';
-import type { NamespaceManager } from './namespace-manager.js';
+import type { ApiNamespace, NamespaceStore } from './namespace-store.js';
 import type { UpdateChecker } from './update-checker.js';
 
 // The packaged GUI has no attached terminal, so the tee'd log file in userData
@@ -53,29 +52,23 @@ const logsSubmenu: MenuItemConstructorOptions[] = [
 ];
 
 export interface MenuDeps {
-  runtime: NamespaceRuntime;
-  namespaceManager: NamespaceManager;
+  namespaceStore: NamespaceStore;
   updateChecker: UpdateChecker;
-  showMainWindow: () => void;
+  showHome: () => void;
+  openNamespace: (namespace: ApiNamespace) => void;
 }
 
 function workspaceItems(deps: MenuDeps): MenuItemConstructorOptions[] {
-  const { runtime, namespaceManager, showMainWindow } = deps;
-  return namespaceManager.list().map((ns, i) => ({
-    label: ns.name,
-    type: 'checkbox' as const,
-    checked: runtime.isOpen(ns.id),
+  return deps.namespaceStore.list().map((namespace, index) => ({
+    label: namespace.name,
     // Cmd/Ctrl+1..9 jump straight to a workspace (opening it if needed).
-    ...(i < 9 ? { accelerator: `CmdOrCtrl+${i + 1}` } : {}),
-    click: () => {
-      showMainWindow();
-      runtime.open(ns.id).catch((err) => console.error(`[menu] open ${ns.name} failed:`, err));
-    },
+    ...(index < 9 ? { accelerator: `CmdOrCtrl+${index + 1}` } : {}),
+    click: () => deps.openNamespace(namespace),
   }));
 }
 
 export function buildApplicationMenu(deps: MenuDeps): void {
-  const { runtime, updateChecker, showMainWindow } = deps;
+  const { updateChecker, showHome } = deps;
 
   const checkForUpdates: MenuItemConstructorOptions = {
     label: 'Check for Updates…',
@@ -86,13 +79,10 @@ export function buildApplicationMenu(deps: MenuDeps): void {
   const workspacesSubmenu: MenuItemConstructorOptions[] = [
     {
       label: 'Workspaces Home',
-      // Cmd+T = "new tab": the picker is where new workspace tabs come from.
-      // (Cmd+0 stays the View menu's zoom reset.)
+      // Keep the familiar new-workspace shortcut for returning to the
+      // namespace directory. (Cmd+0 remains the View menu's zoom reset.)
       accelerator: 'CmdOrCtrl+T',
-      click: () => {
-        showMainWindow();
-        runtime.showSelector();
-      },
+      click: showHome,
     },
     { type: 'separator' },
     ...workspaceItems(deps),

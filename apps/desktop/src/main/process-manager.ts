@@ -8,20 +8,6 @@ import crypto from "crypto";
 import treeKill from "tree-kill";
 import { ensurePythonRuntime } from "./python-env.js";
 import { getLogFilePath } from "./logger.js";
-import { RESERVED_ENV_KEYS } from "./namespace-manager.js";
-
-function sanitizeCustomEnv(
-  env: Record<string, string> | undefined,
-): Record<string, string> {
-  if (!env) return {};
-  const out: Record<string, string> = {};
-  for (const [key, value] of Object.entries(env)) {
-    if (RESERVED_ENV_KEYS.has(key.toUpperCase())) continue;
-    if (typeof value !== "string") continue;
-    out[key] = value;
-  }
-  return out;
-}
 
 // In dev mode we inherit the developer's login-shell PATH so locally installed
 // tooling (uv, java, node) is visible. In packaged mode we never touch the
@@ -119,12 +105,10 @@ function getUvCacheDir(): string | null {
   return path.join(app.getPath("userData"), "uv-cache");
 }
 
-// Scan (runner) logs are persisted as NDJSON files per run, namespaced so
-// separate workspaces never mix logs. Sits under CLASSIFYRE_DATA_DIR/userData
-// alongside the Postgres data so uninstall/reset wipes it too.
-function getRunnerLogDir(namespaceId: string): string {
+// Scan logs are persisted as NDJSON files per run under userData.
+function getRunnerLogDir(): string {
   const base = process.env["CLASSIFYRE_DATA_DIR"] || app.getPath("userData");
-  return path.join(base, "runner-logs", namespaceId);
+  return path.join(base, "runner-logs");
 }
 
 // Hard cap for the contained uv cache. Once exceeded we wipe it (equivalent to
@@ -165,19 +149,6 @@ async function dirSizeExceeds(dir: string, limit: number): Promise<boolean> {
   return false;
 }
 
-export interface ApiRuntimeOptions {
-  maxParallelScans?: number;
-  memoryLimitMb?: number;
-  /** Custom env vars (already validated against RESERVED_ENV_KEYS at save time). */
-  env?: Record<string, string>;
-  /**
-   * Let the API apply pending migrations itself at boot (multi-tenant shared
-   * API: it bootstraps the namespace registry and migrates every namespace
-   * schema). When false (legacy per-namespace model) the caller migrates first.
-   */
-  autoMigrate?: boolean;
-}
-
 interface ManagedProcess {
   child: ChildProcess;
   port: number;
@@ -186,11 +157,8 @@ interface ManagedProcess {
 // Desktop resource governor: the laptop also runs the UI, embedded Postgres,
 // and the user's other apps, so the scan pipeline must never size itself to
 // the whole machine (the CLI pool auto-sizes to cores-1 when unconstrained,
-// which froze the host during scans). Everything here is a default — a
-// workspace's custom env (spread after this) can raise any of these knobs.
-function resourceDefaultEnv(
-  options: ApiRuntimeOptions,
-): Record<string, string> {
+// which froze the host during scans).
+function resourceDefaultEnv(): Record<string, string> {
   const cores = os.cpus().length;
   const detectorWorkers = Math.max(1, Math.min(4, Math.floor(cores / 2) - 1));
   return {
@@ -202,16 +170,13 @@ function resourceDefaultEnv(
     // less than the machine staying responsive.
     EMBEDDING_BATCH_SIZE: "8",
     EMBEDDING_INTRA_OP_THREADS: cores >= 8 ? "2" : "1",
-    // One scan at a time unless the user raised it in workspace settings
-    // (the API treats 0/unset as unlimited, which is a server default).
-    ...(options.maxParallelScans && options.maxParallelScans > 0
-      ? {}
-      : { MAX_CONCURRENT_RUNNERS: "1" }),
+    // One scan at a time by default on desktop.
+    MAX_CONCURRENT_RUNNERS: "1",
   };
 }
 
 // Unexpected API death (native crash, external kill) is respawned so the
-// workspace heals without the user reopening it — but bounded, so a
+// service heals without the user restarting the app — but bounded, so a
 // crash-on-boot bug degrades to a logged failure instead of a spawn loop.
 const RESTART_WINDOW_MS = 10 * 60 * 1000;
 const MAX_RESTARTS_PER_WINDOW = 3;
@@ -224,11 +189,8 @@ export class ProcessManager {
   private venvPreparation: Promise<void> | null = null;
   private apiDirPromise: Promise<string> | null = null;
 
-  // Rewires the bundled Python venv for this machine. Lazy: runs on the first
-  // workspace open (covered by the loading indicator) rather than at app
-  // startup — the first-launch copy can move gigabytes.
-  // Single-flight: a second workspace opened during the first-launch copy must
-  // await the same preparation, not race ahead with an unpatched venv path.
+  // Rewires the bundled Python venv for this machine before the shared API
+  // starts. Single-flight so crash recovery cannot race the first preparation.
   private prepareVenv(): Promise<void> {
     if (!this.venvPreparation) {
       this.venvPreparation = (async () => {
@@ -246,7 +208,7 @@ export class ProcessManager {
 
   // Keep the contained uv cache under its size cap. Runs once per app launch
   // alongside venv prep (which is already covered by the loading indicator).
-  // Best-effort: cache maintenance must never block or fail a workspace open.
+  // Best-effort: cache maintenance must never fail API startup.
   private async bustUvCacheIfOversized(): Promise<void> {
     const cacheDir = getUvCacheDir();
     if (!cacheDir) return;
@@ -269,15 +231,15 @@ export class ProcessManager {
 
   // On macOS the API tree ships as ONE api.tar.gz (its ~65k node_modules
   // files made Apple's notary scan take hours) and is unpacked to userData on
-  // first workspace open, once per app version. Other platforms bundle the
+  // first API start, once per app version. Other platforms bundle the
   // plain resources/api directory.
   // Single-flight and fully async: the extraction can take tens of seconds and
   // must never run on the main thread synchronously (it froze the whole app —
-  // macOS flagged it unresponsive during the first workspace open).
+  // macOS flagged it unresponsive during first startup).
   private ensureApiDir(): Promise<string> {
     if (!this.apiDirPromise) {
       this.apiDirPromise = this.extractApiDir().catch((err: unknown) => {
-        // Allow a retry on the next workspace open instead of caching failure.
+        // Allow a retry on the next API start instead of caching failure.
         this.apiDirPromise = null;
         throw err;
       });
@@ -362,39 +324,12 @@ export class ProcessManager {
     return path.join(__dirname, "../../../cli/.venv");
   }
 
-  private async getPrismaDir(): Promise<string> {
-    if (app.isPackaged) {
-      // Staged inside the api tree so `prisma generate` at build time and
-      // `prisma migrate deploy` at runtime share one schema location.
-      return path.join(await this.ensureApiDir(), "prisma");
-    }
-    return path.join(__dirname, "../../../api/prisma");
-  }
-
-  private async getApiDir(): Promise<string> {
-    if (app.isPackaged) {
-      return this.ensureApiDir();
-    }
-    return path.join(__dirname, "../../../api");
-  }
-
-  // Runs a script with Electron's embedded Node.js so the packaged app never
-  // depends on a system-wide node installation.
-  private nodeSpawnEnv(extra: Record<string, string>): Record<string, string> {
-    return {
-      ...getBaseEnv(),
-      ...extra,
-      ELECTRON_RUN_AS_NODE: "1",
-    };
-  }
-
   async startApi(
-    namespaceId: string,
+    processId: string,
     port: number,
     databaseUrl: string,
-    options: ApiRuntimeOptions = {},
   ): Promise<void> {
-    if (this.processes.has(namespaceId)) {
+    if (this.processes.has(processId)) {
       return;
     }
 
@@ -417,16 +352,9 @@ export class ProcessManager {
     // what else the laptop is running, so size it to a fraction of installed
     // RAM: enough headroom to avoid heap-OOM crashes during scans, but never so
     // much that the API can squeeze the UI, embedded Postgres, and the user's
-    // other apps. A workspace can override with an explicit memoryLimitMb.
-    const heapMb =
-      options.memoryLimitMb && options.memoryLimitMb > 0
-        ? Math.floor(options.memoryLimitMb)
-        : (() => {
-            const totalMb = Math.floor(os.totalmem() / (1024 * 1024));
-            // ~25% of RAM, clamped so tiny machines still get a workable heap
-            // and big machines don't hand the API multiple GB it rarely needs.
-            return Math.max(1024, Math.min(2048, Math.floor(totalMb * 0.25)));
-          })();
+    // other apps.
+    const totalMb = Math.floor(os.totalmem() / (1024 * 1024));
+    const heapMb = Math.max(1024, Math.min(2048, Math.floor(totalMb * 0.25)));
     const nodeArgs: string[] = [`--max-old-space-size=${heapMb}`];
     // Fastify under-pressure heap guard, just below the cap (85%): the API
     // sheds ingestion (CLI 503 → retry, no lost batches) before V8 hard-crashes
@@ -440,10 +368,8 @@ export class ProcessManager {
         ELECTRON_RUN_AS_NODE: "1",
         PORT: String(port),
         DATABASE_URL: databaseUrl,
-        // Shared multi-tenant API: it migrates the registry + every namespace
-        // schema itself at boot (autoMigrate). Legacy per-namespace model:
-        // NamespaceRuntime migrate-deploys before spawn, so keep this off.
-        CLASSIFYRE_AUTO_MIGRATE: options.autoMigrate ? "true" : "false",
+        // The shared API owns the registry and every namespace schema.
+        CLASSIFYRE_AUTO_MIGRATE: "true",
         ENVIRONMENT: "desktop",
         CLI_PATH: cliPath,
         VENV_PATH: venvPath,
@@ -460,7 +386,7 @@ export class ProcessManager {
         CLASSIFYRE_MASKED_CONFIG_KEY: getMaskedConfigKey(),
         // Persist scan logs on the local filesystem (desktop has no S3).
         // The storage service enforces per-run and total-size caps itself.
-        RUNNER_LOG_DIR: getRunnerLogDir(namespaceId),
+        RUNNER_LOG_DIR: getRunnerLogDir(),
         EMBEDDING_CACHE_DIR: app.isPackaged
           ? path.join(process.resourcesPath, "models", "transformers")
           : path.join(app.getPath("userData"), "transformers-cache"),
@@ -472,144 +398,61 @@ export class ProcessManager {
         CORS_ORIGIN: "*",
         NODE_ENV: app.isPackaged ? "production" : "development",
         UNDER_PRESSURE_MAX_HEAP_USED_BYTES: String(heapGuardBytes),
-        ...(options.maxParallelScans && options.maxParallelScans > 0
-          ? {
-              // MAX_CONCURRENT_RUNNERS is the name the API actually reads;
-              // MAX_PARALLEL_SCANS is kept for older bundled API builds.
-              MAX_PARALLEL_SCANS: String(Math.floor(options.maxParallelScans)),
-              MAX_CONCURRENT_RUNNERS: String(
-                Math.floor(options.maxParallelScans),
-              ),
-            }
-          : {}),
         // Conservative resource defaults sized to this machine; the CLI
         // inherits them through the API's env (uv run passes env through).
-        ...resourceDefaultEnv(options),
-        // Workspace-level custom env (embedding model, runner limits, feature
-        // flags…). Spread last so user overrides win over the tunable defaults
-        // above; keys that would break the runtime are rejected at save time
-        // and defensively stripped here (namespaces.json is hand-editable).
-        ...sanitizeCustomEnv(options.env),
+        ...resourceDefaultEnv(),
       },
       stdio: ["ignore", "pipe", "pipe"],
     });
 
     child.stdout?.on("data", (data: Buffer) => {
-      process.stderr.write(`[API:${namespaceId}] ${data.toString().trim()}\n`);
+      process.stderr.write(`[API:${processId}] ${data.toString().trim()}\n`);
     });
 
     child.stderr?.on("data", (data: Buffer) => {
-      process.stderr.write(`[API:${namespaceId}] ${data.toString().trim()}\n`);
+      process.stderr.write(`[API:${processId}] ${data.toString().trim()}\n`);
     });
 
     child.on("exit", (code, signal) => {
       process.stderr.write(
-        `[API:${namespaceId}] exited with code ${code}${signal ? ` (signal ${signal})` : ""}\n`,
+        `[API:${processId}] exited with code ${code}${signal ? ` (signal ${signal})` : ""}\n`,
       );
       // stopApi removes the entry from the map before killing; if this child
       // is still the registered one, nobody asked it to die — respawn it.
-      const current = this.processes.get(namespaceId);
+      const current = this.processes.get(processId);
       if (!current || current.child !== child) return;
-      this.processes.delete(namespaceId);
-      this.scheduleRestart(namespaceId, port, databaseUrl, options);
+      this.processes.delete(processId);
+      this.scheduleRestart(processId, port, databaseUrl);
     });
 
     // Without an 'error' listener a failed spawn (ENOENT/EACCES from a
     // corrupted install, AV quarantine, missing entry file) throws an uncaught
     // exception in the main process and crashes the whole app. Surface it as a
-    // failed workspace open instead, without waiting out the ready timeout.
+    // failed API startup instead, without waiting out the ready timeout.
     const spawnFailed = new Promise<never>((_, reject) => {
       child.on("error", (err) => {
         process.stderr.write(
-          `[API:${namespaceId}] process error: ${err.message}\n`,
+          `[API:${processId}] process error: ${err.message}\n`,
         );
         reject(new Error(`Failed to launch the API process: ${err.message}`));
       });
     });
     spawnFailed.catch(() => {}); // late errors are logged above, not rethrown
 
-    this.processes.set(namespaceId, { child, port });
+    this.processes.set(processId, { child, port });
 
     try {
       await Promise.race([this.waitForReady(port), spawnFailed]);
     } catch (err) {
-      await this.stopApi(namespaceId);
+      await this.stopApi(processId);
       throw err;
     }
   }
 
-  // Locates the Prisma CLI bundled with the API's node_modules; runs offline
-  // with Electron's Node — no bun, no npx, no network.
-  private async getPrismaCliPath(): Promise<string> {
-    const candidates = [
-      path.join(
-        await this.getApiDir(),
-        "node_modules",
-        "prisma",
-        "build",
-        "index.js",
-      ),
-      // Dev fallback: hoisted install at the monorepo root.
-      path.join(__dirname, "../../../../node_modules/prisma/build/index.js"),
-    ];
-    for (const candidate of candidates) {
-      if (fs.existsSync(candidate)) return candidate;
-    }
-    throw new Error(
-      `Prisma CLI not found (looked in: ${candidates.join(", ")}). ` +
-        "The desktop bundle must include api/node_modules/prisma.",
-    );
-  }
-
-  async runMigrations(databaseUrl: string): Promise<void> {
-    const prismaSchemaPath = path.join(
-      await this.getPrismaDir(),
-      "schema.prisma",
-    );
-    const apiDir = await this.getApiDir();
-    const prismaCli = await this.getPrismaCliPath();
-
-    console.log(
-      `[migrations] Running in ${apiDir} with schema ${prismaSchemaPath}`,
-    );
-
-    return new Promise((resolve, reject) => {
-      const child = spawn(
-        process.execPath,
-        [prismaCli, "migrate", "deploy", "--schema", prismaSchemaPath],
-        {
-          cwd: apiDir,
-          env: this.nodeSpawnEnv({
-            DATABASE_URL: databaseUrl,
-            // Prisma CLI must not try to download engines at runtime.
-            PRISMA_CLI_TELEMETRY_INFORMATION: "disabled",
-            CHECKPOINT_DISABLE: "1",
-          }),
-          stdio: ["ignore", "pipe", "pipe"],
-        },
-      );
-
-      let stderr = "";
-      child.stderr?.on("data", (data: Buffer) => {
-        stderr += data.toString();
-      });
-
-      child.on("exit", (code) => {
-        if (code === 0) {
-          resolve();
-        } else {
-          reject(new Error(`Prisma migrate failed (code ${code}): ${stderr}`));
-        }
-      });
-
-      child.on("error", reject);
-    });
-  }
-
   private waitForReady(
     port: number,
-    // The FIRST workspace open does heavy one-time work before the API binds
-    // its port — pg-boss creates its whole schema, Nest wires every module, and
+    // The first API boot does heavy one-time work before binding its port —
+    // pg-boss creates its schema, Nest wires every module, and
     // on macOS the embedded Postgres runs under Rosetta. 60s was too tight for
     // that cold start (users hit "not ready after 60000ms" on first launch);
     // warm opens are ~2s, so a generous ceiling only affects the cold case and
@@ -655,42 +498,40 @@ export class ProcessManager {
   }
 
   private scheduleRestart(
-    namespaceId: string,
+    processId: string,
     port: number,
     databaseUrl: string,
-    options: ApiRuntimeOptions,
   ): void {
     const now = Date.now();
-    const recent = (this.restartTimestamps.get(namespaceId) ?? []).filter(
+    const recent = (this.restartTimestamps.get(processId) ?? []).filter(
       (at) => now - at < RESTART_WINDOW_MS,
     );
     if (recent.length >= MAX_RESTARTS_PER_WINDOW) {
       process.stderr.write(
-        `[API:${namespaceId}] crashed ${recent.length} times in ${RESTART_WINDOW_MS / 60000} minutes; not restarting again\n`,
+        `[API:${processId}] crashed ${recent.length} times in ${RESTART_WINDOW_MS / 60000} minutes; not restarting again\n`,
       );
       return;
     }
     recent.push(now);
-    this.restartTimestamps.set(namespaceId, recent);
+    this.restartTimestamps.set(processId, recent);
     process.stderr.write(
-      `[API:${namespaceId}] restarting in ${RESTART_DELAY_MS}ms (attempt ${recent.length}/${MAX_RESTARTS_PER_WINDOW})\n`,
+      `[API:${processId}] restarting in ${RESTART_DELAY_MS}ms (attempt ${recent.length}/${MAX_RESTARTS_PER_WINDOW})\n`,
     );
     setTimeout(() => {
-      // The workspace may have been closed or reopened while we waited.
-      if (this.processes.has(namespaceId)) return;
-      this.startApi(namespaceId, port, databaseUrl, options).catch((err) => {
+      if (this.processes.has(processId)) return;
+      this.startApi(processId, port, databaseUrl).catch((err) => {
         process.stderr.write(
-          `[API:${namespaceId}] restart failed: ${err instanceof Error ? err.message : String(err)}\n`,
+          `[API:${processId}] restart failed: ${err instanceof Error ? err.message : String(err)}\n`,
         );
       });
     }, RESTART_DELAY_MS);
   }
 
-  async stopApi(namespaceId: string): Promise<void> {
-    const managed = this.processes.get(namespaceId);
+  async stopApi(processId: string): Promise<void> {
+    const managed = this.processes.get(processId);
     if (!managed) return;
 
-    this.processes.delete(namespaceId);
+    this.processes.delete(processId);
 
     return new Promise<void>((resolve) => {
       const { child } = managed;
@@ -718,15 +559,4 @@ export class ProcessManager {
     await Promise.all(ids.map((id) => this.stopApi(id)));
   }
 
-  getPort(namespaceId: string): number | undefined {
-    return this.processes.get(namespaceId)?.port;
-  }
-
-  isRunning(namespaceId: string): boolean {
-    return this.processes.has(namespaceId);
-  }
-
-  getRunningNamespaces(): string[] {
-    return [...this.processes.keys()];
-  }
 }

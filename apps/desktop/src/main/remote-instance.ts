@@ -1,5 +1,4 @@
 import { net } from 'electron';
-import { assertValidRemoteUrl } from './namespace-manager.js';
 
 export interface VerifiedRemoteInstance {
   normalizedUrl: string;
@@ -8,6 +7,28 @@ export interface VerifiedRemoteInstance {
 
 function endpointUrl(baseUrl: string, path: string): string {
   return new URL(`/${path.replace(/^\/+/, '')}`, baseUrl).toString();
+}
+
+// Remote Classifyre instances must be encrypted except for loopback
+// development servers.
+export function assertValidRemoteUrl(value: string): void {
+  const parsed = new URL(value);
+  if (parsed.protocol === 'https:') return;
+  if (parsed.protocol !== 'http:') {
+    throw new Error(`Unsupported protocol: ${parsed.protocol}`);
+  }
+  const host = parsed.hostname;
+  const isLoopback =
+    host === 'localhost' ||
+    host.endsWith('.localhost') ||
+    /^127(\.\d{1,3}){3}$/.test(host) ||
+    host === '::1' ||
+    host === '[::1]';
+  if (!isLoopback) {
+    throw new Error(
+      'Remote workspaces must use https:// (http:// is only allowed for localhost)',
+    );
+  }
 }
 
 /**

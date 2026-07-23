@@ -16,8 +16,24 @@ import { Label } from "@workspace/ui/components/label";
 import { Skeleton } from "@workspace/ui/components/skeleton";
 import { Textarea } from "@workspace/ui/components/textarea";
 import { WorkspaceHeader } from "@/components/namespace/workspace-header";
+import { ThumbnailPicker } from "@/components/namespace/thumbnail-picker";
 import { useTranslation } from "@/hooks/use-translation";
 import { useStaticRouteParam } from "@/lib/use-route-id";
+
+const SLUG_MAX_LENGTH = 50;
+
+/**
+ * Sanitize free text into a URL-safe slug as the user types: lowercase,
+ * non-alphanumerics collapsed to single dashes, length-capped. A trailing dash
+ * is allowed mid-typing (so "foo-bar" is reachable); it is trimmed on submit.
+ */
+function slugifyInput(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+/, "")
+    .slice(0, SLUG_MAX_LENGTH);
+}
 
 export default function NamespaceSettingsPage() {
   const namespaceId = useStaticRouteParam("namespaceId", "namespaces");
@@ -25,7 +41,10 @@ export default function NamespaceSettingsPage() {
   const { t } = useTranslation();
   const [namespace, setNamespace] = React.useState<Namespace | null>(null);
   const [name, setName] = React.useState("");
+  const [slug, setSlug] = React.useState("");
   const [description, setDescription] = React.useState("");
+  const [thumbnail, setThumbnail] = React.useState<string | null>(null);
+  const [thumbnailChanged, setThumbnailChanged] = React.useState(false);
   const [loading, setLoading] = React.useState(true);
   const [saving, setSaving] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -42,7 +61,10 @@ export default function NamespaceSettingsPage() {
       const result = await api.namespaces.get(namespaceId);
       setNamespace(result);
       setName(result.name);
+      setSlug(result.slug);
       setDescription(result.description ?? "");
+      setThumbnail(result.thumbnail);
+      setThumbnailChanged(false);
     } catch (loadError) {
       setError(
         loadError instanceof Error
@@ -60,17 +82,26 @@ export default function NamespaceSettingsPage() {
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!namespace || !name.trim() || saving) return;
+    const normalizedSlug = slug.replace(/-+$/, "");
+    if (!namespace || !name.trim() || !normalizedSlug || saving) return;
 
     setSaving(true);
     try {
       const updated = await api.namespaces.update(namespace.id, {
         name: name.trim(),
+        slug: normalizedSlug,
         description: description.trim(),
+        // Only send the image when it actually changed; a data URI sets it,
+        // `null` clears it, `undefined` leaves it untouched.
+        ...(thumbnailChanged ? { thumbnail } : {}),
       });
       setNamespace(updated);
       setName(updated.name);
+      setSlug(updated.slug);
       setDescription(updated.description ?? "");
+      setThumbnail(updated.thumbnail);
+      setThumbnailChanged(false);
+      window.electronAPI?.notifyNamespacesChanged();
       toast.success(t("workspaces.settingsSaved"));
       router.refresh();
     } catch (saveError) {
@@ -139,8 +170,32 @@ export default function NamespaceSettingsPage() {
                 disabled={saving}
                 autoFocus
               />
-              <p className="font-mono text-xs text-muted-foreground">
-                /{namespace.slug}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="workspace-slug">
+                {t("workspaces.urlPath")}
+              </Label>
+              <div className="flex items-center">
+                <span className="select-none rounded-l border border-r-0 border-input bg-muted px-2.5 py-2 font-mono text-sm text-muted-foreground">
+                  /
+                </span>
+                <Input
+                  id="workspace-slug"
+                  className="rounded-l-none font-mono"
+                  value={slug}
+                  onChange={(event) =>
+                    setSlug(slugifyInput(event.target.value))
+                  }
+                  disabled={saving}
+                  maxLength={SLUG_MAX_LENGTH}
+                  inputMode="url"
+                  spellCheck={false}
+                  autoCapitalize="none"
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {t("workspaces.urlPathHint")}
               </p>
             </div>
 
@@ -157,11 +212,25 @@ export default function NamespaceSettingsPage() {
               />
             </div>
 
+            <div className="space-y-2">
+              <Label>{t("workspaces.thumbnailLabel")}</Label>
+              <div className="max-w-md">
+                <ThumbnailPicker
+                  value={thumbnail}
+                  onChange={(next) => {
+                    setThumbnail(next);
+                    setThumbnailChanged(true);
+                  }}
+                  disabled={saving}
+                />
+              </div>
+            </div>
+
             <div className="flex justify-end border-t pt-6">
               <Button
                 type="submit"
                 variant="default"
-                disabled={!name.trim() || saving}
+                disabled={!name.trim() || !slug.replace(/-+$/, "") || saving}
               >
                 {saving
                   ? t("workspaces.savingSettings")

@@ -332,6 +332,8 @@ describe('CliRunnerService', () => {
         }),
       }),
       false,
+      // Namespace UUID captured from CLS (undefined outside a namespace context).
+      undefined,
     );
   });
 
@@ -706,6 +708,7 @@ describe('CliRunnerService', () => {
       'runner-2',
       expect.objectContaining({ id: 'source-1' }),
       false,
+      undefined,
     );
   });
 

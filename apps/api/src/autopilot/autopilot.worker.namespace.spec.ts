@@ -1,5 +1,5 @@
 import { AutopilotWorker } from './autopilot.worker';
-import { pgBossSchemaForSlug } from '../scheduler/pg-boss.service';
+import { pgBossSchemaForId } from '../scheduler/pg-boss.service';
 
 /**
  * BUG D (Enron second attempt), now solved structurally. Previously pg-boss
@@ -7,28 +7,27 @@ import { pgBossSchemaForSlug } from '../scheduler/pg-boss.service';
  * schema, so every namespace on the same physical database shared one job
  * table and a worker could execute another namespace's jobs. The multi-tenant
  * model gives EACH namespace its own pg-boss instance in its own
- * `pgboss_<slug>` schema, so a job can only ever be dequeued by its own
- * namespace's worker — the old per-job source/runner guard is no longer needed.
+ * `pgboss_<uuid>` schema (derived from the immutable namespace UUID so a slug
+ * edit never orphans a job schema), so a job can only ever be dequeued by its
+ * own namespace's worker — the old per-job source/runner guard is no longer
+ * needed.
  */
-describe('pgBossSchemaForSlug (per-namespace pg-boss isolation)', () => {
-  it('derives a per-namespace pg-boss schema from the slug', () => {
-    expect(pgBossSchemaForSlug('eron-email-no-2')).toBe(
-      'pgboss_eron_email_no_2',
+describe('pgBossSchemaForId (per-namespace pg-boss isolation)', () => {
+  it('derives a per-namespace pg-boss schema from the UUID', () => {
+    expect(pgBossSchemaForId('3b5c41bc-fb84-4251-985f-0a16d0449c85')).toBe(
+      'pgboss_3b5c41bcfb844251985f0a16d0449c85',
     );
   });
 
-  it('sanitizes exotic slugs into a valid identifier', () => {
-    expect(pgBossSchemaForSlug('ns-weird.name')).toBe('pgboss_ns_weird_name');
+  it('stays within pg-boss 50-character identifier limit', () => {
+    expect(
+      pgBossSchemaForId('3b5c41bc-fb84-4251-985f-0a16d0449c85').length,
+    ).toBeLessThanOrEqual(50);
   });
 
-  it('caps the schema name at 50 characters', () => {
-    expect(pgBossSchemaForSlug('a'.repeat(80)).length).toBeLessThanOrEqual(50);
-  });
-
-  it('does not alias long slugs that share the same prefix', () => {
-    const prefix = 'a'.repeat(49);
-    expect(pgBossSchemaForSlug(`${prefix}b`)).not.toBe(
-      pgBossSchemaForSlug(`${prefix}c`),
+  it('gives distinct schemas to distinct namespaces', () => {
+    expect(pgBossSchemaForId('3b5c41bc-fb84-4251-985f-0a16d0449c85')).not.toBe(
+      pgBossSchemaForId('11111111-2222-3333-4444-555555555555'),
     );
   });
 });

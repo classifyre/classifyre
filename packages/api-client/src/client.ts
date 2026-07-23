@@ -1060,11 +1060,23 @@ export interface CreateNamespaceInput {
   description?: string;
   type?: "local" | "remote";
   remoteUrl?: string;
+  /** Base64 image data URI (`data:image/...;base64,...`), max 2 MB. */
+  thumbnail?: string;
 }
 
 export interface UpdateNamespaceInput {
   name?: string;
+  slug?: string;
   description?: string;
+  /** Base64 image data URI to set, or `null` to clear the thumbnail. */
+  thumbnail?: string | null;
+}
+
+/** Per-namespace source rollups for the workspace directory cards. */
+export interface NamespaceStats {
+  id: string;
+  totalSources: number;
+  failingSources: number;
 }
 
 class NamespacesApi {
@@ -1074,10 +1086,33 @@ class NamespacesApi {
     return `${this.basePath.replace(/\/+$/, "")}/namespaces${suffix}`;
   }
 
+  /**
+   * The API returns `thumbnail` as a root-relative path to its streaming
+   * endpoint; resolve it against the API base so <img>/next-image can load it
+   * cross-origin (the web app is served from a different origin).
+   */
+  private absolutizeThumbnail(ns: Namespace): Namespace {
+    if (ns.thumbnail && ns.thumbnail.startsWith("/")) {
+      return {
+        ...ns,
+        thumbnail: `${this.basePath.replace(/\/+$/, "")}${ns.thumbnail}`,
+      };
+    }
+    return ns;
+  }
+
   async list(): Promise<Namespace[]> {
     const res = await fetch(this.url(), { cache: "no-store" });
     if (!res.ok) throw new Error(`Failed to list namespaces (${res.status})`);
-    return (await res.json()) as Namespace[];
+    const namespaces = (await res.json()) as Namespace[];
+    return namespaces.map((ns) => this.absolutizeThumbnail(ns));
+  }
+
+  async stats(): Promise<NamespaceStats[]> {
+    const res = await fetch(this.url("/stats"), { cache: "no-store" });
+    if (!res.ok)
+      throw new Error(`Failed to load namespace stats (${res.status})`);
+    return (await res.json()) as NamespaceStats[];
   }
 
   async get(id: string): Promise<Namespace> {
@@ -1085,7 +1120,7 @@ class NamespacesApi {
       cache: "no-store",
     });
     if (!res.ok) throw new Error(`Failed to load namespace (${res.status})`);
-    return (await res.json()) as Namespace;
+    return this.absolutizeThumbnail((await res.json()) as Namespace);
   }
 
   async create(input: CreateNamespaceInput): Promise<Namespace> {
@@ -1104,7 +1139,7 @@ class NamespacesApi {
       }
       throw new Error(message);
     }
-    return (await res.json()) as Namespace;
+    return this.absolutizeThumbnail((await res.json()) as Namespace);
   }
 
   async update(id: string, input: UpdateNamespaceInput): Promise<Namespace> {
@@ -1123,7 +1158,7 @@ class NamespacesApi {
       }
       throw new Error(message);
     }
-    return (await res.json()) as Namespace;
+    return this.absolutizeThumbnail((await res.json()) as Namespace);
   }
 
   async remove(id: string): Promise<void> {

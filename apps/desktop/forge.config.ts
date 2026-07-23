@@ -155,12 +155,7 @@ const config: ForgeConfig = {
           target: 'preload',
         },
       ],
-      renderer: [
-        {
-          name: 'namespace_selector',
-          config: 'vite.renderer.config.ts',
-        },
-      ],
+      renderer: [],
     }),
   ],
 };

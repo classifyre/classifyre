@@ -4,7 +4,7 @@ import path from 'path';
 
 // A packaged GUI app has no attached terminal, so everything written to
 // stdout/stderr (main-process console.* AND the piped API child output) is
-// discarded — which is why a failed workspace open left users with an error
+// discarded — which is why a failed startup left users with an error
 // dialog but no way to see WHY. This module tees both streams to a rotating
 // file in userData/logs so the log is always available (and referenced in
 // error messages). Launch failures can then be diagnosed from the log alone.
