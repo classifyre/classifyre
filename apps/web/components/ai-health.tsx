@@ -1,5 +1,6 @@
 "use client";
 
+import { nsPath } from "@/lib/ns-path";
 import * as React from "react";
 import Link from "next/link";
 import { AlertTriangle, Wrench } from "lucide-react";
@@ -151,7 +152,7 @@ export function AiHealthSidebarWarning() {
         tooltip={`${copy.title} — ${copy.description}`}
         className={`h-auto items-start gap-2 border-2 ${colorClasses}`}
       >
-        <Link href="/settings">
+        <Link href={nsPath("/settings")}>
           <AlertTriangle className="size-5 shrink-0" />
           <span className="flex min-w-0 flex-col">
             <span className="truncate text-xs font-semibold">{copy.title}</span>
@@ -184,7 +185,7 @@ export function AiHealthFixButton() {
     <Tooltip>
       <TooltipTrigger asChild>
         <Link
-          href="/settings"
+          href={nsPath("/settings")}
           className={`flex items-center gap-1.5 rounded-[4px] border px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.06em] transition-colors ${colorClasses}`}
         >
           <AlertTriangle className="h-3.5 w-3.5" />

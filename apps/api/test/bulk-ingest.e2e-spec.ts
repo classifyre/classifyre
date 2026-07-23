@@ -1,23 +1,27 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
-import { App } from 'supertest/types';
-import { AppModule } from './../src/app.module';
 import { PrismaService } from '../src/prisma.service';
+import { CliRunnerService } from '../src/cli-runner/cli-runner.service';
+import { createTestApp, TestApp } from './create-test-app';
 
 describe('Bulk Ingest (e2e)', () => {
-  let app: INestApplication<App>;
+  let ctx: TestApp;
   let prisma: PrismaService;
   let sourceId: string;
 
   beforeAll(async () => {
-    const moduleFixture: TestingModule = await Test.createTestingModule({
-      imports: [AppModule],
-    }).compile();
+    ctx = await createTestApp();
+    prisma = ctx.prisma!;
 
-    app = moduleFixture.createNestApplication();
-    prisma = moduleFixture.get<PrismaService>(PrismaService);
-    await app.init();
+    // These tests exercise runner creation and ingest endpoints, not the
+    // external Python process. Keep the fire-and-forget execution inside the
+    // test lifecycle so it cannot mutate the database after Jest teardown.
+    const cliRunner = ctx.app!.get(CliRunnerService);
+    const runnerInternals = cliRunner as unknown as {
+      executeCliAsync: () => Promise<void>;
+      pruneOldRunners: () => Promise<void>;
+    };
+    jest.spyOn(runnerInternals, 'executeCliAsync').mockResolvedValue();
+    jest.spyOn(runnerInternals, 'pruneOldRunners').mockResolvedValue();
   });
 
   beforeEach(async () => {
@@ -26,7 +30,7 @@ describe('Bulk Ingest (e2e)', () => {
     await prisma.source.deleteMany({});
 
     // Create a WordPress source for testing
-    const sourceResponse = await request(app.getHttpServer())
+    const sourceResponse = await request(ctx.httpTarget)
       .post('/sources')
       .send({
         type: 'WORDPRESS',
@@ -46,13 +50,12 @@ describe('Bulk Ingest (e2e)', () => {
   });
 
   afterAll(async () => {
-    await prisma.$disconnect();
-    await app.close();
+    await ctx.close();
   });
 
   it('should successfully ingest assets in bulk using backend-generated runnerId', async () => {
     // 1. Get new runnerId from backend
-    const runnerResponse = await request(app.getHttpServer())
+    const runnerResponse = await request(ctx.httpTarget)
       .post(`/sources/${sourceId}/run`)
       .expect(201);
 
@@ -73,7 +76,7 @@ describe('Bulk Ingest (e2e)', () => {
       },
     ];
 
-    await request(app.getHttpServer())
+    await request(ctx.httpTarget)
       .post(`/sources/${sourceId}/assets/bulk`)
       .send({
         runnerId: runnerId,
@@ -93,13 +96,13 @@ describe('Bulk Ingest (e2e)', () => {
 
   it('should replace assets when a new runner is started', async () => {
     // 1. Start runner A
-    const runnerAResponse = await request(app.getHttpServer())
+    const runnerAResponse = await request(ctx.httpTarget)
       .post(`/sources/${sourceId}/run`)
       .expect(201);
     const runnerAId = runnerAResponse.body.id;
 
     // 2. Ingest asset for runner A
-    await request(app.getHttpServer())
+    await request(ctx.httpTarget)
       .post(`/sources/${sourceId}/assets/bulk`)
       .send({
         runnerId: runnerAId,
@@ -118,21 +121,28 @@ describe('Bulk Ingest (e2e)', () => {
       })
       .expect(201);
 
-    // Ensure runner A is terminal before starting runner B.
-    await request(app.getHttpServer())
-      .patch(`/runners/${runnerAId}/status`)
-      .send({ status: 'COMPLETED' })
-      .expect(200);
+    // The external Python execution is stubbed in this suite, so finish the
+    // runner state directly before exercising creation of the next run.
+    await prisma.$transaction([
+      prisma.runner.update({
+        where: { id: runnerAId },
+        data: { status: 'COMPLETED', completedAt: new Date() },
+      }),
+      prisma.source.update({
+        where: { id: sourceId },
+        data: { runnerStatus: 'COMPLETED', currentRunnerId: null },
+      }),
+    ]);
 
     // 3. Start runner B
-    const runnerBResponse = await request(app.getHttpServer())
+    const runnerBResponse = await request(ctx.httpTarget)
       .post(`/sources/${sourceId}/run`)
       .expect(201);
     const runnerBId = runnerBResponse.body.id;
     expect(runnerBId).not.toBe(runnerAId);
 
     // 4. Ingest asset for runner B - should trigger deletion of runner A assets
-    await request(app.getHttpServer())
+    await request(ctx.httpTarget)
       .post(`/sources/${sourceId}/assets/bulk`)
       .send({
         runnerId: runnerBId,
@@ -163,7 +173,7 @@ describe('Bulk Ingest (e2e)', () => {
 
   it('should handle same asset hash in same runner (idempotency)', async () => {
     // Create a runner first
-    const runnerResponse = await request(app.getHttpServer())
+    const runnerResponse = await request(ctx.httpTarget)
       .post(`/sources/${sourceId}/run`)
       .expect(201);
     const runnerId = runnerResponse.body.id;
@@ -180,7 +190,7 @@ describe('Bulk Ingest (e2e)', () => {
     };
 
     // First time
-    await request(app.getHttpServer())
+    await request(ctx.httpTarget)
       .post(`/sources/${sourceId}/assets/bulk`)
       .send({
         runnerId: runnerId,
@@ -190,7 +200,7 @@ describe('Bulk Ingest (e2e)', () => {
 
     // Second time with same hash but different data
     const updatedAsset = { ...asset, name: 'Updated Name', checksum: 'def' };
-    await request(app.getHttpServer())
+    await request(ctx.httpTarget)
       .post(`/sources/${sourceId}/assets/bulk`)
       .send({
         runnerId: runnerId,

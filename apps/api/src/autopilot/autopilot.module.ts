@@ -106,6 +106,7 @@ import { AutopilotController } from './autopilot.controller';
   ],
   exports: [
     AutopilotService,
+    AutopilotWorker,
     // Shared harness infrastructure consumed by the chat gateway (AppModule):
     // the same registry/dispatcher instances, so tools the gateway bridges are
     // dispatched with identical gating and audit behavior.
@@ -113,6 +114,7 @@ import { AutopilotController } from './autopilot.controller';
     ToolDispatcherService,
     AgentAuditService,
     AgentLoggerService,
+    McpClientService,
   ],
 })
 export class AutopilotModule {}

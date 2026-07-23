@@ -1,5 +1,6 @@
 "use client";
 
+import { nsPath } from "@/lib/ns-path";
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -1237,7 +1238,7 @@ export function FindingsTable({
                             size="sm"
                             className="h-auto justify-start p-0 hover:bg-transparent"
                             onClick={() =>
-                              router.push(`/findings/${finding.id}`)
+                              router.push(nsPath(`/findings/${finding.id}`))
                             }
                           >
                             <Badge
@@ -1270,7 +1271,7 @@ export function FindingsTable({
                                 size="sm"
                                 className="h-auto max-w-[280px] justify-start p-0 text-left"
                                 onClick={() =>
-                                  router.push(`/findings/${finding.id}`)
+                                  router.push(nsPath(`/findings/${finding.id}`))
                                 }
                                 data-testid="finding-type"
                               >
@@ -1293,7 +1294,7 @@ export function FindingsTable({
                                 size="sm"
                                 className="h-auto max-w-[220px] justify-start p-0 text-left"
                                 onClick={() =>
-                                  router.push(`/assets/${finding.assetId}`)
+                                  router.push(nsPath(`/assets/${finding.assetId}`))
                                 }
                               >
                                 <span className="truncate text-sm">
@@ -1313,7 +1314,7 @@ export function FindingsTable({
                             size="sm"
                             className="h-auto max-w-[220px] justify-start p-0 text-left"
                             onClick={() =>
-                              router.push(`/sources/${finding.sourceId}`)
+                              router.push(nsPath(`/sources/${finding.sourceId}`))
                             }
                           >
                             <div className="flex items-center gap-1.5">
@@ -1475,7 +1476,7 @@ export function FindingsTable({
                             variant="outline"
                             className="h-8 rounded-[4px] border-2 border-border"
                             onClick={() =>
-                              router.push(`/findings/${finding.id}`)
+                              router.push(nsPath(`/findings/${finding.id}`))
                             }
                           >
                             <ArrowUpRight className="h-3.5 w-3.5" />

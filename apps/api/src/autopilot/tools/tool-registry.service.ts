@@ -1,4 +1,6 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
+import { ClsService } from 'nestjs-cls';
+import { CLS_SCHEMA } from '../../namespace/namespace.constants';
 import { ObserveToolset } from './observe/observe.toolset';
 import { InvestigationToolset } from './investigation/investigation.toolset';
 import { KnowledgeToolset } from './knowledge/knowledge.toolset';
@@ -26,7 +28,10 @@ export interface ToolProvider {
 @Injectable()
 export class ToolRegistry {
   private readonly logger = new Logger(ToolRegistry.name);
+  /** Static and process-wide runtime tools (built-ins). */
   private readonly tools = new Map<string, Tool>();
+  /** External MCP tools, isolated by tenant schema. */
+  private readonly scopedTools = new Map<string, Map<string, Tool>>();
 
   constructor(
     private readonly observe: ObserveToolset,
@@ -39,6 +44,7 @@ export class ToolRegistry {
     private readonly semantic: SemanticToolset,
     private readonly glossaryTools: GlossaryToolset,
     private readonly caseLeads: CaseLeadsToolset,
+    @Optional() private readonly cls?: ClsService,
   ) {
     this.loadStatic([
       this.observe,
@@ -62,36 +68,66 @@ export class ToolRegistry {
 
   /** Register a tool at runtime (e.g. an adapted MCP tool). Idempotent by name. */
   register(tool: Tool): void {
-    this.add(tool);
+    const scoped = this.currentScopedTools(true);
+    if (scoped) this.add(tool, scoped);
+    else this.add(tool, this.tools);
   }
 
   /** Remove a runtime-registered tool (e.g. on MCP server refresh/disconnect). */
   unregister(name: string): void {
-    this.tools.delete(name);
+    const scoped = this.currentScopedTools(false);
+    if (scoped) scoped.delete(name);
+    else this.tools.delete(name);
+  }
+
+  /** Remove every runtime tool registered for a deleted namespace. */
+  clearScope(schema: string): void {
+    this.scopedTools.delete(schema);
   }
 
   /** All registered tool names (used to scope MCP tools per mission). */
   names(): string[] {
-    return [...this.tools.keys()];
+    return [...this.mergedTools().keys()];
   }
 
-  private add(tool: Tool): void {
-    if (this.tools.has(tool.name)) {
+  private add(tool: Tool, target = this.tools): void {
+    if (target.has(tool.name)) {
       this.logger.warn(`Tool "${tool.name}" already registered — overwriting.`);
     }
-    this.tools.set(tool.name, tool);
+    target.set(tool.name, tool);
   }
 
   get(name: string): Tool | undefined {
-    return this.tools.get(name);
+    return this.currentScopedTools(false)?.get(name) ?? this.tools.get(name);
   }
 
   /** All tools, or just the named subset (preserving registry definitions). */
   list(allowed?: string[]): Tool[] {
-    if (!allowed) return [...this.tools.values()];
+    const tools = this.mergedTools();
+    if (!allowed) return [...tools.values()];
     return allowed
-      .map((name) => this.tools.get(name))
+      .map((name) => tools.get(name))
       .filter((t): t is Tool => t !== undefined);
+  }
+
+  private currentScopedTools(create: boolean): Map<string, Tool> | undefined {
+    const schema = this.cls?.get<string>(CLS_SCHEMA);
+    if (!schema) return undefined;
+    let tools = this.scopedTools.get(schema);
+    if (!tools && create) {
+      tools = new Map<string, Tool>();
+      this.scopedTools.set(schema, tools);
+    }
+    return tools;
+  }
+
+  private mergedTools(): Map<string, Tool> {
+    const merged = new Map(this.tools);
+    const scoped = this.currentScopedTools(false);
+    if (scoped) {
+      for (const [name, tool] of scoped) merged.set(name, tool);
+    }
+    return merged;
   }
 
   /**

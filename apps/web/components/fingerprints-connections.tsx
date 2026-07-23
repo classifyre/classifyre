@@ -1,5 +1,6 @@
 "use client";
 
+import { nsPath } from "@/lib/ns-path";
 import * as React from "react";
 import {
   ArrowDownWideNarrow,
@@ -462,7 +463,7 @@ export function FingerprintsConnections({
                         </ul>
                         <div className="flex items-center gap-2 pt-1">
                           <a
-                            href={`/assets/${row.assetA.id}`}
+                            href={nsPath(`/assets/${row.assetA.id}`)}
                             target="_blank"
                             rel="noreferrer"
                             className="text-[11px] text-muted-foreground underline-offset-2 hover:underline"
@@ -471,7 +472,7 @@ export function FingerprintsConnections({
                           </a>
                           <span className="text-[11px] text-muted-foreground">·</span>
                           <a
-                            href={`/assets/${row.assetB.id}`}
+                            href={nsPath(`/assets/${row.assetB.id}`)}
                             target="_blank"
                             rel="noreferrer"
                             className="text-[11px] text-muted-foreground underline-offset-2 hover:underline"

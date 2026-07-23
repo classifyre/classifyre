@@ -1,128 +1,51 @@
 import { AutopilotWorker } from './autopilot.worker';
-import { pgBossSchemaForDatabaseUrl } from '../scheduler/pg-boss.service';
+import { pgBossSchemaForSlug } from '../scheduler/pg-boss.service';
 
 /**
- * BUG D (Enron second attempt). Autopilot agent cycles executed in a namespace
- * against scan-completed events belonging to a different namespace: pg-boss
- * connects with the raw DATABASE_URL and defaults to one shared `pgboss`
+ * BUG D (Enron second attempt), now solved structurally. Previously pg-boss
+ * connected with the raw DATABASE_URL and defaulted to one shared `pgboss`
  * schema, so every namespace on the same physical database shared one job
- * table, and the worker never checked that a job's source/runner exists in
- * its own schema. Two fixes, both covered here:
- *
- *  1. pg-boss gets a per-namespace schema derived from the Prisma `?schema=`
- *     URL param.
- *  2. The worker drops jobs whose source/runner is unknown in its namespace.
+ * table and a worker could execute another namespace's jobs. The multi-tenant
+ * model gives EACH namespace its own pg-boss instance in its own
+ * `pgboss_<slug>` schema, so a job can only ever be dequeued by its own
+ * namespace's worker — the old per-job source/runner guard is no longer needed.
  */
-describe('pgBossSchemaForDatabaseUrl (BUG D)', () => {
-  it('derives a per-namespace pg-boss schema from the Prisma schema param', () => {
-    expect(
-      pgBossSchemaForDatabaseUrl(
-        'postgresql://u:p@localhost:5432/db?schema=ns_eron_email_no_2',
-      ),
-    ).toBe('pgboss_ns_eron_email_no_2');
+describe('pgBossSchemaForSlug (per-namespace pg-boss isolation)', () => {
+  it('derives a per-namespace pg-boss schema from the slug', () => {
+    expect(pgBossSchemaForSlug('eron-email-no-2')).toBe(
+      'pgboss_eron_email_no_2',
+    );
   });
 
-  it('returns undefined without a schema param (single-tenant default)', () => {
-    expect(
-      pgBossSchemaForDatabaseUrl('postgresql://u:p@localhost:5432/db'),
-    ).toBeUndefined();
+  it('sanitizes exotic slugs into a valid identifier', () => {
+    expect(pgBossSchemaForSlug('ns-weird.name')).toBe('pgboss_ns_weird_name');
   });
 
-  it('returns undefined for missing or unparsable URLs', () => {
-    expect(pgBossSchemaForDatabaseUrl(undefined)).toBeUndefined();
-    expect(pgBossSchemaForDatabaseUrl('not a url')).toBeUndefined();
+  it('caps the schema name at 50 characters', () => {
+    expect(pgBossSchemaForSlug('a'.repeat(80)).length).toBeLessThanOrEqual(50);
   });
 
-  it('sanitizes exotic namespace names into a valid identifier', () => {
-    expect(
-      pgBossSchemaForDatabaseUrl(
-        'postgresql://u:p@localhost:5432/db?schema=ns-weird.name',
-      ),
-    ).toBe('pgboss_ns_weird_name');
+  it('does not alias long slugs that share the same prefix', () => {
+    const prefix = 'a'.repeat(49);
+    expect(pgBossSchemaForSlug(`${prefix}b`)).not.toBe(
+      pgBossSchemaForSlug(`${prefix}c`),
+    );
   });
 });
 
-describe('AutopilotWorker namespace guard (BUG D)', () => {
-  const buildWorker = (opts: {
-    sourceExists: boolean;
-    runnerExists: boolean;
-  }) => {
-    const prisma = {
-      source: {
-        findUnique: jest
-          .fn()
-          .mockResolvedValue(opts.sourceExists ? { id: 's1' } : null),
-      },
-      runner: {
-        findUnique: jest
-          .fn()
-          .mockResolvedValue(opts.runnerExists ? { id: 'r1' } : null),
-      },
-    };
-    const worker = new AutopilotWorker(
-      prisma as any,
+describe('AutopilotWorker.handle (no cross-namespace guard needed)', () => {
+  const buildWorker = () =>
+    new AutopilotWorker(
+      {} as any,
       {} as any,
       {} as any,
       {} as any,
       {} as any,
       {} as any,
     );
-    return { worker, prisma };
-  };
 
-  const belongs = (
-    worker: AutopilotWorker,
-    sourceId: string | null,
-    runnerId: string | null,
-  ) =>
-    (worker as any).jobBelongsToThisNamespace(
-      sourceId,
-      runnerId,
-    ) as Promise<boolean>;
-
-  it('accepts jobs whose source and runner exist in this namespace', async () => {
-    const { worker } = buildWorker({ sourceExists: true, runnerExists: true });
-    await expect(belongs(worker, 's1', 'r1')).resolves.toBe(true);
-  });
-
-  it('rejects jobs referencing a source from another namespace', async () => {
-    const { worker } = buildWorker({ sourceExists: false, runnerExists: true });
-    await expect(belongs(worker, 'foreign-source', 'r1')).resolves.toBe(false);
-  });
-
-  it('rejects jobs referencing a runner from another namespace', async () => {
-    const { worker } = buildWorker({ sourceExists: true, runnerExists: false });
-    await expect(belongs(worker, 's1', 'foreign-runner')).resolves.toBe(false);
-  });
-
-  it('accepts jobs without source/runner (manual and dream cycles)', async () => {
-    const { worker, prisma } = buildWorker({
-      sourceExists: false,
-      runnerExists: false,
-    });
-    await expect(belongs(worker, null, null)).resolves.toBe(true);
-    expect(prisma.source.findUnique).not.toHaveBeenCalled();
-    expect(prisma.runner.findUnique).not.toHaveBeenCalled();
-  });
-
-  it('handle() drops a foreign-namespace job without running a cycle', async () => {
-    const { worker } = buildWorker({
-      sourceExists: false,
-      runnerExists: false,
-    });
-    const runCycle = jest
-      .spyOn(worker as any, 'runCycle')
-      .mockResolvedValue(undefined);
-
-    await (worker as any).handle([
-      { data: { sourceId: 'foreign-source', runnerId: 'foreign-runner' } },
-    ]);
-
-    expect(runCycle).not.toHaveBeenCalled();
-  });
-
-  it('handle() runs the cycle for a job owned by this namespace', async () => {
-    const { worker } = buildWorker({ sourceExists: true, runnerExists: true });
+  it('runs the cycle for a scan-completed job', async () => {
+    const worker = buildWorker();
     const runCycle = jest
       .spyOn(worker as any, 'runCycle')
       .mockResolvedValue(undefined);
@@ -132,5 +55,16 @@ describe('AutopilotWorker namespace guard (BUG D)', () => {
     ]);
 
     expect(runCycle).toHaveBeenCalledTimes(1);
+  });
+
+  it('skips jobs with neither source, manual flag, nor explicit agent list', async () => {
+    const worker = buildWorker();
+    const runCycle = jest
+      .spyOn(worker as any, 'runCycle')
+      .mockResolvedValue(undefined);
+
+    await (worker as any).handle([{ data: {} }]);
+
+    expect(runCycle).not.toHaveBeenCalled();
   });
 });

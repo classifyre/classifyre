@@ -6,7 +6,6 @@ import {
   ConflictException,
   Optional,
   Inject,
-  OnApplicationBootstrap,
 } from '@nestjs/common';
 import { spawn, ChildProcess } from 'child_process';
 import { PrismaService } from '../prisma.service';
@@ -14,6 +13,8 @@ import { RunnerEventsGateway } from '../websocket/runner-events.gateway';
 import { PgBossService } from '../scheduler/pg-boss.service';
 import { INQUIRY_MATCH_QUEUE } from '../matching/matching.constants';
 import { CORRELATION_QUEUE } from '../correlation/correlation.constants';
+import { ClsService } from 'nestjs-cls';
+import { CLS_SCHEMA, CLS_SLUG } from '../namespace/namespace.constants';
 import {
   AssetType,
   Prisma,
@@ -85,9 +86,14 @@ const TERMINAL_RUNNER_STATUSES = new Set<RunnerStatus>([
 ]);
 
 @Injectable()
-export class CliRunnerService implements OnApplicationBootstrap {
+export class CliRunnerService {
   private readonly logger = new Logger(CliRunnerService.name);
   private runningProcessesByRunnerId = new Map<string, ChildProcess>();
+  private readonly activeExecutions = new Map<
+    string,
+    { schema?: string; done: Promise<void> }
+  >();
+  private readonly stoppingSchemas = new Set<string>();
 
   constructor(
     private prisma: PrismaService,
@@ -102,7 +108,99 @@ export class CliRunnerService implements OnApplicationBootstrap {
     private runnerEventsGateway?: RunnerEventsGateway,
     @Optional()
     private pgBossService?: PgBossService,
+    @Optional()
+    private cls?: ClsService,
   ) {}
+
+  /** Current namespace slug from CLS, if running within a namespace context. */
+  private currentSlug(): string | undefined {
+    return this.cls?.get<string>(CLS_SLUG);
+  }
+
+  /**
+   * `DATABASE_URL` scoped to the current namespace schema, for the spawned CLI
+   * (local/desktop) so any direct DB access it does lands in the tenant schema.
+   */
+  private namespacedDatabaseUrl(): string | undefined {
+    const schema = this.cls?.get<string>(CLS_SCHEMA);
+    if (!schema || !process.env.DATABASE_URL) return undefined;
+    try {
+      const url = new URL(process.env.DATABASE_URL);
+      url.searchParams.set('schema', schema);
+      return url.toString();
+    } catch {
+      return undefined;
+    }
+  }
+
+  /** Allow work again when a namespace with this schema is (re)provisioned. */
+  activateForSchema(schema: string): void {
+    this.stoppingSchemas.delete(schema);
+  }
+
+  /**
+   * Stop scan processes/jobs owned by the current tenant before its schema is
+   * dropped. This prevents detached CLI callbacks from querying a deleted (or
+   * later re-created) schema.
+   */
+  async stopForSchema(schema: string): Promise<void> {
+    this.stoppingSchemas.add(schema);
+    const runners = await this.prisma.runner.findMany({
+      where: { status: RunnerStatus.RUNNING },
+      select: {
+        id: true,
+        executionMode: true,
+        jobName: true,
+        jobNamespace: true,
+      },
+    });
+
+    for (const runner of runners) {
+      if (runner.executionMode === RunnerExecutionMode.KUBERNETES) {
+        await this.stopKubernetesJobSafely(runner.id, runner);
+      } else if (runner.executionMode !== RunnerExecutionMode.EXTERNAL) {
+        const child = this.runningProcessesByRunnerId.get(runner.id);
+        if (child) this.stopLocalRunnerProcess(runner.id);
+      }
+    }
+
+    const completions = [...this.activeExecutions.values()]
+      .filter((execution) => execution.schema === schema)
+      .map((execution) => execution.done);
+    if (completions.length === 0) return;
+
+    await Promise.race([
+      Promise.allSettled(completions).then(() => undefined),
+      new Promise<void>((resolve) => {
+        const timer = setTimeout(resolve, 8_000);
+        timer.unref?.();
+      }),
+    ]);
+  }
+
+  private startTrackedExecution(
+    runnerId: string,
+    source: unknown,
+    hasSuccessfulRuns: boolean,
+  ): void {
+    const schema = this.cls?.get<string>(CLS_SCHEMA);
+    if (schema && this.stoppingSchemas.has(schema)) return;
+    const done = this.executeCliAsync(
+      runnerId,
+      source,
+      hasSuccessfulRuns,
+    ).catch((error) => {
+      this.logger.error(
+        `Unhandled runner execution failure for ${runnerId}: ${String(error)}`,
+      );
+    });
+    this.activeExecutions.set(runnerId, { schema, done });
+    void done.finally(() => {
+      if (this.activeExecutions.get(runnerId)?.done === done) {
+        this.activeExecutions.delete(runnerId);
+      }
+    });
+  }
 
   /**
    * Tell the question-matching engine a source finished ingesting. Decoupled from
@@ -143,7 +241,12 @@ export class CliRunnerService implements OnApplicationBootstrap {
     }
   }
 
-  async onApplicationBootstrap(): Promise<void> {
+  /**
+   * Recover orphaned runners and resume pending work for the CURRENT namespace.
+   * Invoked by the NamespaceWorkerManager inside the namespace's CLS context
+   * (was onApplicationBootstrap, which ran without a tenant schema).
+   */
+  async reconcileOnStartup(): Promise<void> {
     const inFlightRunners = await this.prisma.runner.findMany({
       where: {
         status: {
@@ -602,7 +705,7 @@ export class CliRunnerService implements OnApplicationBootstrap {
       `Starting ${triggerType.toLowerCase()} run ${runner.id} for source ${sourceId} in ${executionMode.toLowerCase()} mode`,
     );
 
-    void this.executeCliAsync(
+    this.startTrackedExecution(
       runner.id,
       sourceWithDecryptedConfig,
       hasSuccessfulRuns,
@@ -1362,6 +1465,18 @@ export class CliRunnerService implements OnApplicationBootstrap {
   }
 
   private resolveOutputRestUrl(environment: string): string | undefined {
+    const base = this.resolveOutputRestBase(environment);
+    if (!base) return undefined;
+    // The CLI joins relative endpoint paths onto this base, so a namespace slug
+    // segment makes it post findings back to `/<slug>/...` — the API resolves
+    // the tenant from that segment. Without a namespace context (e.g. legacy
+    // single-tenant callers) the base is returned unchanged.
+    const slug = this.currentSlug();
+    if (!slug) return base;
+    return `${base.replace(/\/+$/, '')}/${slug}`;
+  }
+
+  private resolveOutputRestBase(environment: string): string | undefined {
     const explicit =
       process.env.CLI_OUTPUT_REST_URL ||
       process.env.CLASSIFYRE_OUTPUT_REST_URL ||
@@ -1543,10 +1658,15 @@ export class CliRunnerService implements OnApplicationBootstrap {
     runnerId?: string,
   ): Promise<{ stdout: string; stderr: string; exitCode: number }> {
     return new Promise((resolve, reject) => {
+      const namespacedDbUrl = this.namespacedDatabaseUrl();
       const child = spawn(command, {
         shell: true,
         detached: process.platform !== 'win32',
-        env: { ...process.env },
+        env: {
+          ...process.env,
+          // Point any direct DB access from the CLI at the tenant schema.
+          ...(namespacedDbUrl ? { DATABASE_URL: namespacedDbUrl } : {}),
+        },
       });
 
       let stdout = '';
@@ -3433,6 +3553,8 @@ export class CliRunnerService implements OnApplicationBootstrap {
   }
 
   private async dequeueNextPendingRunner(): Promise<void> {
+    const schema = this.cls?.get<string>(CLS_SCHEMA);
+    if (schema && this.stoppingSchemas.has(schema)) return;
     if (!(await this.canStartNewRunner())) return;
 
     const pending = await this.prisma.runner.findFirst({
@@ -3470,7 +3592,7 @@ export class CliRunnerService implements OnApplicationBootstrap {
         `Dequeued pending runner ${pending.id} for source ${source.id}`,
       );
 
-      void this.executeCliAsync(
+      this.startTrackedExecution(
         pending.id,
         sourceWithDecryptedConfig,
         hasSuccessfulRuns,

@@ -573,7 +573,11 @@ postgres:
     username: postgres
     password: postgres
     persistence:
-      enabled: false
+      # Keep local dev data across pod restarts and Skaffold sessions.
+      enabled: true
+      accessModes:
+        - ReadWriteOnce
+      size: 5Gi
     parameters:
       shared_buffers: 128MB
       work_mem: 8MB

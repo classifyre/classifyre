@@ -22,6 +22,7 @@ import { Button } from "@workspace/ui/components/button";
 import { Eye, Settings } from "lucide-react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
+import { useNamespace } from "@/components/namespace-provider";
 import { api } from "@workspace/api-client";
 import { ThemeToggle } from "./theme-toggle";
 import {
@@ -107,20 +108,24 @@ export function DashboardLayout({
 }) {
   const pathname = usePathname();
   const { t } = useTranslation();
+  const { nsHref } = useNamespace();
   const { demoMode } = serverConfig;
 
-  const segmentLabelMap: Record<string, string> = {
-    dashboard: t("breadcrumb.dashboard"),
-    discovery: t("breadcrumb.discovery"),
-    findings: t("breadcrumb.findings"),
-    scans: t("breadcrumb.scans"),
-    sources: t("breadcrumb.sources"),
-    assets: t("breadcrumb.assets"),
-    notifications: t("breadcrumb.notifications"),
-    settings: t("breadcrumb.settings"),
-    detectors: t("breadcrumb.detectors"),
-    harness: t("nav.harness"),
-  };
+  const segmentLabelMap = React.useMemo<Record<string, string>>(
+    () => ({
+      dashboard: t("breadcrumb.dashboard"),
+      discovery: t("breadcrumb.discovery"),
+      findings: t("breadcrumb.findings"),
+      scans: t("breadcrumb.scans"),
+      sources: t("breadcrumb.sources"),
+      assets: t("breadcrumb.assets"),
+      notifications: t("breadcrumb.notifications"),
+      settings: t("breadcrumb.settings"),
+      detectors: t("breadcrumb.detectors"),
+      harness: t("nav.harness"),
+    }),
+    [t],
+  );
 
   const [resolvedDynamicLabels, setResolvedDynamicLabels] = React.useState<
     Record<string, string>
@@ -128,8 +133,11 @@ export function DashboardLayout({
   const [findingAssetCrumbs, setFindingAssetCrumbs] = React.useState<
     Record<string, FindingAssetCrumb>
   >({});
+  // Route segments AFTER the leading `[namespaceSlug]` segment, so breadcrumbs
+  // and dynamic-label resolution operate on the real app path (e.g. sources,
+  // assets/:id) and never treat the namespace slug as a route.
   const segments = React.useMemo(
-    () => pathname.split("/").filter(Boolean),
+    () => pathname.split("/").filter(Boolean).slice(1),
     [pathname],
   );
 
@@ -196,7 +204,7 @@ export function DashboardLayout({
                   response.asset?.externalUrl?.trim() ||
                   `Asset ${assetId.slice(0, 8)}`;
                 findingAssetUpdates[segment] = {
-                  href: `/assets/${assetId}`,
+                  href: nsHref(`/assets/${assetId}`),
                   label: assetLabel,
                 };
               }
@@ -231,11 +239,11 @@ export function DashboardLayout({
     return () => {
       isMounted = false;
     };
-  }, [findingAssetCrumbs, resolvedDynamicLabels, segments]);
+  }, [findingAssetCrumbs, nsHref, resolvedDynamicLabels, segments]);
 
   const breadcrumbs = React.useMemo<BreadcrumbEntry[]>(() => {
     const baseCrumbs = segments.map((segment, index) => ({
-      href: `/${segments.slice(0, index + 1).join("/")}`,
+      href: nsHref(`/${segments.slice(0, index + 1).join("/")}`),
       label:
         resolvedDynamicLabels[`${segments[index - 1]}:${segment}`] ||
         formatSegmentLabel(segment, segmentLabelMap, t, segments[index - 1]),
@@ -269,8 +277,14 @@ export function DashboardLayout({
           ]
         : [crumb],
     );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [findingAssetCrumbs, resolvedDynamicLabels, segments, t]);
+  }, [
+    findingAssetCrumbs,
+    nsHref,
+    resolvedDynamicLabels,
+    segmentLabelMap,
+    segments,
+    t,
+  ]);
 
   return (
     <ServerConfigContext.Provider value={serverConfig}>
@@ -286,7 +300,7 @@ export function DashboardLayout({
                   <BreadcrumbList>
                     <BreadcrumbItem>
                       <BreadcrumbLink asChild>
-                        <Link href="/">{t("breadcrumb.home")}</Link>
+                        <Link href={nsHref("/")}>{t("breadcrumb.home")}</Link>
                       </BreadcrumbLink>
                     </BreadcrumbItem>
                     {breadcrumbs.map((crumb) => (
@@ -379,7 +393,7 @@ export function DashboardLayout({
                   asChild
                   className="relative rounded-[4px] border-2 border-transparent hover:border-border"
                 >
-                  <Link href="/settings">
+                  <Link href={nsHref("/settings")}>
                     <Settings className="h-5 w-5" />
                     <span className="sr-only">Settings</span>
                   </Link>

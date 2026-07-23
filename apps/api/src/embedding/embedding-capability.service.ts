@@ -1,32 +1,47 @@
-import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
+import { ClsService } from 'nestjs-cls';
 import { PrismaService } from '../prisma.service';
+import { CLS_SCHEMA } from '../namespace/namespace.constants';
 
+/**
+ * Probes pgvector readiness. The extension lives in `public` (shared) but the
+ * `content_embeddings.vec` column check runs against the current namespace's
+ * schema, so readiness is cached per schema. There is no boot-time probe: it
+ * runs lazily on first use within a namespace context (the embedding queue's
+ * ensureRuntime), because no namespace exists at process startup.
+ */
 @Injectable()
-export class EmbeddingCapabilityService implements OnApplicationBootstrap {
+export class EmbeddingCapabilityService {
   private readonly logger = new Logger(EmbeddingCapabilityService.name);
-  private vectorVersion?: string;
-  private readinessProbe?: Promise<void>;
+  private readonly vectorVersions = new Map<string, string>();
+  private readonly readinessProbes = new Map<string, Promise<void>>();
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() private readonly cls?: ClsService,
+  ) {}
 
-  async onApplicationBootstrap(): Promise<void> {
-    await this.ensureReady();
+  private schemaKey(): string {
+    return this.cls?.get<string>(CLS_SCHEMA) ?? '__default__';
   }
 
   async ensureReady(): Promise<void> {
-    if (this.vectorVersion) return;
-    if (this.readinessProbe) return this.readinessProbe;
-    const probe = this.probe();
-    this.readinessProbe = probe;
+    const key = this.schemaKey();
+    if (this.vectorVersions.has(key)) return;
+    const inFlight = this.readinessProbes.get(key);
+    if (inFlight) return inFlight;
+    const probe = this.probe(key);
+    this.readinessProbes.set(key, probe);
     try {
       await probe;
     } catch (error) {
-      if (this.readinessProbe === probe) this.readinessProbe = undefined;
+      if (this.readinessProbes.get(key) === probe)
+        this.readinessProbes.delete(key);
       throw error;
     }
   }
 
-  private async probe(): Promise<void> {
+  private async probe(key: string): Promise<void> {
     const rows = await this.prisma.$queryRaw<
       Array<{
         version: string | null;
@@ -70,17 +85,22 @@ export class EmbeddingCapabilityService implements OnApplicationBootstrap {
         `Classifyre detected pgvector ${result.version}, but content_embeddings.vec is missing or has the wrong type (${result.columnType ?? 'missing'}). The API normally applies pending migrations before this check; verify that DATABASE_URL points to the intended database and that the Prisma migration history is consistent with its schema.`,
       );
     }
-    this.vectorVersion = result.version;
+    this.vectorVersions.set(key, result.version);
     this.logger.log(
       `pgvector ${result.version} ready: semantic queries use per-model HNSW indexes`,
     );
   }
 
   hasVector(): boolean {
-    return this.vectorVersion !== undefined;
+    return this.vectorVersions.has(this.schemaKey());
   }
 
   version(): string | undefined {
-    return this.vectorVersion;
+    return this.vectorVersions.get(this.schemaKey());
+  }
+
+  clearForSchema(schema: string): void {
+    this.vectorVersions.delete(schema);
+    this.readinessProbes.delete(schema);
   }
 }

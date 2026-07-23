@@ -1,5 +1,6 @@
 "use client";
 
+import { nsPath } from "@/lib/ns-path";
 import Link from "next/link";
 import * as React from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -865,7 +866,7 @@ export const SourceScanConfig = React.forwardRef<
             <div className="flex flex-wrap items-center gap-2">
               {selectableCustomDetectors.length > 0 && (
                 <Button type="button" variant="outline" size="sm" asChild>
-                  <Link href="/detectors">
+                  <Link href={nsPath("/detectors")}>
                     <FlaskConical className="mr-1 h-3.5 w-3.5" />
                     {t("sources.scanConfig.manage")}
                   </Link>

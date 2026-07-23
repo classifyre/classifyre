@@ -8,6 +8,12 @@ metadata:
   annotations:
     nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
     nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
+    # Namespace-scoped MCP endpoint: `host/<namespace-slug>/mcp` (and
+    # `/<slug>/api/mcp`). use-regex + NO rewrite-target so the full path
+    # (including the leading slug) reaches the API, whose rewriteUrl strips the
+    # slug and resolves the tenant. A plain `/mcp` (no slug) is intentionally
+    # not routed here — MCP requires a namespace.
+    nginx.ingress.kubernetes.io/use-regex: "true"
     {{- with .Values.ingress.annotations }}
     {{- toYaml . | nindent 4 }}
     {{- end }}
@@ -23,15 +29,8 @@ spec:
     - host: {{ .Values.ingress.host | quote }}
       http:
         paths:
-          - path: /mcp
-            pathType: Prefix
-            backend:
-              service:
-                name: {{ include "classifyre.api.fullname" . }}
-                port:
-                  number: {{ .Values.api.service.port }}
-          - path: /api/mcp
-            pathType: Prefix
+          - path: /[^/]+(/api)?/mcp/?(.*)
+            pathType: ImplementationSpecific
             backend:
               service:
                 name: {{ include "classifyre.api.fullname" . }}

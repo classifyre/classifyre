@@ -13,10 +13,10 @@ describe('EmbeddingCapabilityService', () => {
       { version: null, columnType: null, columnIsVector: null },
     ]);
 
-    await expect(service.onApplicationBootstrap()).rejects.toThrow(
+    await expect(service.ensureReady()).rejects.toThrow(
       'Classifyre cannot start because the PostgreSQL pgvector extension is not installed',
     );
-    await expect(service.onApplicationBootstrap()).rejects.toThrow(
+    await expect(service.ensureReady()).rejects.toThrow(
       'CREATE EXTENSION vector WITH SCHEMA public',
     );
   });
@@ -26,7 +26,7 @@ describe('EmbeddingCapabilityService', () => {
       { version: '0.8.2', columnType: null, columnIsVector: null },
     ]);
 
-    await expect(service.onApplicationBootstrap()).rejects.toThrow(
+    await expect(service.ensureReady()).rejects.toThrow(
       'content_embeddings.vec is missing or has the wrong type',
     );
   });
@@ -40,7 +40,7 @@ describe('EmbeddingCapabilityService', () => {
       },
     ]);
 
-    await service.onApplicationBootstrap();
+    await service.ensureReady();
 
     expect(service.hasVector()).toBe(true);
     expect(service.version()).toBe('0.8.2');

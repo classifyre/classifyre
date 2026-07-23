@@ -24,14 +24,14 @@ profiles:
         resourceName: classifyre-web
         namespace: classifyre-dev
         port: 3000
-        localPort: 3000
+        localPort: 3301
       - resourceType: service
         resourceName: classifyre-api
         namespace: classifyre-dev
         port: 8000
-        localPort: 8000
+        localPort: 8811
       - resourceType: service
         resourceName: classifyre-postgres
         namespace: classifyre-dev
         port: 5432
-        localPort: 5433
+        localPort: 5555

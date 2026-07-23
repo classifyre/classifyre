@@ -7,12 +7,33 @@
  * Usage:
  *   DATABASE_URL=postgresql://... bun scripts/recalibrate-embeddings.ts [spaceId]
  */
-import { PrismaService } from '../src/prisma.service';
+import { PrismaClient } from '@prisma/client';
+import { PrismaPg } from '@prisma/adapter-pg';
+import type { PrismaService } from '../src/prisma.service';
 import { EmbeddingAnalysisService } from '../src/embedding/embedding-analysis.service';
 import { EmbeddingService } from '../src/embedding/embedding.service';
 
+/**
+ * Standalone (non-Nest) Prisma client pinned to the schema in DATABASE_URL.
+ * The runtime API resolves the schema per-request from CLS instead, but this
+ * operator script runs against one explicit `?schema=` connection.
+ */
+function createStandalonePrisma(): PrismaService {
+  const rawUrl = new URL(process.env.DATABASE_URL ?? '');
+  const schema = rawUrl.searchParams.get('schema');
+  rawUrl.searchParams.delete('schema');
+  const adapter = new PrismaPg(
+    {
+      connectionString: rawUrl.toString(),
+      ...(schema ? { options: `-c search_path=${schema},public` } : {}),
+    },
+    { schema: schema ?? undefined },
+  );
+  return new PrismaClient({ adapter }) as unknown as PrismaService;
+}
+
 async function main() {
-  const prisma = new PrismaService();
+  const prisma = createStandalonePrisma();
   await prisma.$connect();
   try {
     const spaceId =

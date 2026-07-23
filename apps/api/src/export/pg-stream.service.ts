@@ -4,6 +4,8 @@ import QueryStream from 'pg-query-stream';
 import { stringify } from 'csv-stringify';
 import { pipeline } from 'node:stream/promises';
 import type { FastifyReply } from 'fastify';
+import { ClsService } from 'nestjs-cls';
+import { CLS_SCHEMA } from '../namespace/namespace.constants';
 
 export interface CsvStreamColumn {
   /** Row key produced by the SQL query. */
@@ -25,29 +27,70 @@ export interface CsvStreamRequest {
  *
  * PrismaPg owns its own internal pg pool (see prisma.service.ts) and the codebase
  * deliberately avoids handing it an external pool, so this service constructs and
- * owns a dedicated pg.Pool — parsing DATABASE_URL the same way PrismaService does
- * (strip the `schema` query param and apply it via the connection `options`).
+ * owns dedicated pg.Pools — one per namespace schema, resolved from the CLS
+ * context of the current request (each with `search_path=<schema>,public`).
+ * A small LRU bounds the number of resident pools.
  */
 @Injectable()
 export class PgStreamService implements OnModuleDestroy {
   private readonly logger = new Logger(PgStreamService.name);
-  private readonly pool: Pool;
+  /** Insertion-ordered → iteration yields least-recently-used first. */
+  private readonly pools = new Map<string, Pool>();
+  private readonly maxResident = Number(
+    process.env.PG_STREAM_MAX_RESIDENT ?? 8,
+  );
 
-  constructor() {
-    const rawUrl = new URL(process.env.DATABASE_URL ?? '');
-    const schema = rawUrl.searchParams.get('schema');
-    rawUrl.searchParams.delete('schema');
-
-    this.pool = new Pool({
-      connectionString: rawUrl.toString(),
-      max: 4,
-      // `public` stays on the path so extension operators keep resolving.
-      ...(schema ? { options: `-c search_path=${schema},public` } : {}),
-    });
-  }
+  constructor(private readonly cls: ClsService) {}
 
   async onModuleDestroy(): Promise<void> {
-    await this.pool.end();
+    await Promise.all(
+      [...this.pools.values()].map((p) => p.end().catch(() => {})),
+    );
+    this.pools.clear();
+  }
+
+  async dropForSchema(schema: string): Promise<void> {
+    const pool = this.pools.get(schema);
+    if (!pool) return;
+    this.pools.delete(schema);
+    await pool.end().catch(() => undefined);
+  }
+
+  /** Resolve (or lazily create) the pool for the current namespace schema. */
+  private getPool(): Pool {
+    const schema = this.cls.get<string>(CLS_SCHEMA);
+    if (!schema) {
+      throw new Error(
+        'PgStreamService used outside a namespace context (no schema in CLS).',
+      );
+    }
+    const existing = this.pools.get(schema);
+    if (existing) {
+      // Mark most-recently-used.
+      this.pools.delete(schema);
+      this.pools.set(schema, existing);
+      return existing;
+    }
+    const rawUrl = new URL(process.env.DATABASE_URL ?? '');
+    rawUrl.searchParams.delete('schema');
+    const pool = new Pool({
+      connectionString: rawUrl.toString(),
+      max: 2,
+      options: `-c search_path=${schema},public`,
+    });
+    this.pools.set(schema, pool);
+    this.evictIfNeeded();
+    return pool;
+  }
+
+  private evictIfNeeded(): void {
+    while (this.pools.size > this.maxResident) {
+      const oldest = this.pools.keys().next().value as string | undefined;
+      if (oldest === undefined) break;
+      const pool = this.pools.get(oldest);
+      this.pools.delete(oldest);
+      void pool?.end().catch(() => {});
+    }
   }
 
   /**
@@ -61,7 +104,7 @@ export class PgStreamService implements OnModuleDestroy {
   ): Promise<void> {
     const { sql, params, columns, filename } = request;
 
-    const client = await this.pool.connect();
+    const client = await this.getPool().connect();
     let released = false;
     const release = (err?: unknown) => {
       if (released) return;

@@ -1,12 +1,9 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication } from '@nestjs/common';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import request from 'supertest';
-import { App } from 'supertest/types';
-import { AppModule } from './../src/app.module';
 import { PrismaService } from '../src/prisma.service';
 import { CliRunnerService } from '../src/cli-runner/cli-runner.service';
+import { createTestApp, TestApp } from './create-test-app';
 
 function resolveMySqlHostPort(): { host: string; port: number } {
   const hostPort = (process.env.MYSQL_TEST_HOST_PORT || '').trim();
@@ -25,28 +22,21 @@ function resolveMySqlHostPort(): { host: string; port: number } {
 }
 
 describe('Source (e2e)', () => {
-  let app: INestApplication<App>;
+  let ctx: TestApp;
   let prisma: PrismaService;
   const mockCliRunnerService = {
     testConnection: jest.fn(),
   };
 
   beforeAll(async () => {
-    const moduleFixture: TestingModule = await Test.createTestingModule({
-      imports: [AppModule],
-    })
-      .overrideProvider(CliRunnerService)
-      .useValue(mockCliRunnerService)
-      .compile();
-
-    app = moduleFixture.createNestApplication();
-    prisma = moduleFixture.get<PrismaService>(PrismaService);
-    await app.init();
+    ctx = await createTestApp((builder) =>
+      builder.overrideProvider(CliRunnerService).useValue(mockCliRunnerService),
+    );
+    prisma = ctx.prisma!;
   });
 
   afterAll(async () => {
-    await prisma.$disconnect();
-    await app.close();
+    await ctx.close();
   });
 
   it('should create a new source and validate it', async () => {
@@ -75,7 +65,7 @@ describe('Source (e2e)', () => {
       },
     };
 
-    const response = await request(app.getHttpServer())
+    const response = await request(ctx.httpTarget)
       .post('/sources')
       .send(createSourceDto)
       .expect(201);
@@ -112,7 +102,7 @@ describe('Source (e2e)', () => {
       },
     };
 
-    const response = await request(app.getHttpServer())
+    const response = await request(ctx.httpTarget)
       .post('/sources')
       .send(invalidDto)
       .expect(400);
@@ -140,12 +130,12 @@ describe('Source (e2e)', () => {
       },
     };
 
-    const response1 = await request(app.getHttpServer())
+    const response1 = await request(ctx.httpTarget)
       .post('/sources')
       .send(createSourceDto)
       .expect(201);
 
-    const response2 = await request(app.getHttpServer())
+    const response2 = await request(ctx.httpTarget)
       .post('/sources')
       .send(createSourceDto)
       .expect(201);
@@ -179,7 +169,7 @@ describe('Source (e2e)', () => {
       },
     };
 
-    const createResponse = await request(app.getHttpServer())
+    const createResponse = await request(ctx.httpTarget)
       .post('/sources')
       .send(createSourceDto)
       .expect(201);
@@ -194,7 +184,7 @@ describe('Source (e2e)', () => {
 
     mockCliRunnerService.testConnection.mockResolvedValueOnce(testPayload);
 
-    const response = await request(app.getHttpServer())
+    const response = await request(ctx.httpTarget)
       .post(`/sources/${sourceId}/test`)
       .expect(200);
 
@@ -233,7 +223,7 @@ describe('Source (e2e)', () => {
       },
     };
 
-    const response = await request(app.getHttpServer())
+    const response = await request(ctx.httpTarget)
       .post('/sources')
       .send(createSourceDto)
       .expect(201);
@@ -273,7 +263,7 @@ describe('Source (e2e)', () => {
       const firstExample = rawExamples[sourceType]?.[0];
       expect(firstExample?.config).toBeDefined();
 
-      const response = await request(app.getHttpServer())
+      const response = await request(ctx.httpTarget)
         .post('/sources')
         .send({
           type: sourceType,

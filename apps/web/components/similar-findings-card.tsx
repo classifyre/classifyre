@@ -1,5 +1,6 @@
 "use client";
 
+import { nsPath } from "@/lib/ns-path";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Layers } from "lucide-react";
@@ -69,7 +70,7 @@ export function SimilarFindingsCard({ findingId }: { findingId: string }) {
             {items.map((item) => (
               <Link
                 key={item.id}
-                href={`/findings/${item.id}`}
+                href={nsPath(`/findings/${item.id}`)}
                 className="block rounded-[4px] border border-border/60 bg-muted/30 p-3 transition-colors hover:border-border"
               >
                 <div className="flex flex-wrap items-center gap-2">

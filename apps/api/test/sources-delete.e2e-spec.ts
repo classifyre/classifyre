@@ -1,7 +1,4 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
-import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/prisma.service';
 import {
   AssetType,
@@ -9,6 +6,7 @@ import {
   Severity,
   DetectorType,
 } from '@prisma/client';
+import { createTestApp, TestApp } from './create-test-app';
 
 /**
  * End-to-end tests for source deletion with cascading deletes
@@ -19,21 +17,16 @@ import {
  * 3. All related findings are deleted from the findings table
  */
 describe('SourcesController Delete (e2e)', () => {
-  let app: INestApplication;
+  let ctx: TestApp;
   let prisma: PrismaService;
 
   beforeAll(async () => {
-    const moduleFixture: TestingModule = await Test.createTestingModule({
-      imports: [AppModule],
-    }).compile();
-
-    app = moduleFixture.createNestApplication();
-    prisma = app.get<PrismaService>(PrismaService);
-    await app.init();
+    ctx = await createTestApp();
+    prisma = ctx.prisma!;
   });
 
   afterAll(async () => {
-    await app.close();
+    await ctx.close();
   });
 
   beforeEach(async () => {
@@ -174,7 +167,7 @@ describe('SourcesController Delete (e2e)', () => {
       expect(findingsBefore).toHaveLength(3);
 
       // 5. Delete the source via API
-      const response = await request(app.getHttpServer())
+      const response = await request(ctx.httpTarget)
         .delete(`/sources/${source.id}`)
         .expect(204);
 
@@ -206,7 +199,7 @@ describe('SourcesController Delete (e2e)', () => {
     });
 
     it('should return 404 when trying to delete non-existent source', async () => {
-      const response = await request(app.getHttpServer())
+      const response = await request(ctx.httpTarget)
         .delete('/sources/non-existent-id')
         .expect(404);
 
@@ -230,9 +223,7 @@ describe('SourcesController Delete (e2e)', () => {
       });
 
       // Delete the source
-      await request(app.getHttpServer())
-        .delete(`/sources/${source.id}`)
-        .expect(204);
+      await request(ctx.httpTarget).delete(`/sources/${source.id}`).expect(204);
 
       // Verify source is deleted
       const sourceAfter = await prisma.source.findUnique({
@@ -284,9 +275,7 @@ describe('SourcesController Delete (e2e)', () => {
       expect(runnersBefore).toHaveLength(3);
 
       // Delete the source
-      await request(app.getHttpServer())
-        .delete(`/sources/${source.id}`)
-        .expect(204);
+      await request(ctx.httpTarget).delete(`/sources/${source.id}`).expect(204);
 
       // Verify all runners are deleted
       const runnersAfter = await prisma.runner.findMany({
@@ -358,9 +347,7 @@ describe('SourcesController Delete (e2e)', () => {
       expect(findingsBefore).toHaveLength(5);
 
       // Delete the source
-      await request(app.getHttpServer())
-        .delete(`/sources/${source.id}`)
-        .expect(204);
+      await request(ctx.httpTarget).delete(`/sources/${source.id}`).expect(204);
 
       // Verify asset is deleted
       const assetAfter = await prisma.asset.findUnique({
@@ -479,7 +466,7 @@ describe('SourcesController Delete (e2e)', () => {
       });
 
       // Delete only source1
-      await request(app.getHttpServer())
+      await request(ctx.httpTarget)
         .delete(`/sources/${source1.id}`)
         .expect(204);
 

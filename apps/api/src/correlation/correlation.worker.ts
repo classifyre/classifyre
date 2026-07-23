@@ -1,4 +1,4 @@
-import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import type { Job } from 'pg-boss';
 import { AgentKind, AgentRunStatus } from '@prisma/client';
 import { PgBossService } from '../scheduler/pg-boss.service';
@@ -8,7 +8,6 @@ import {
   AUTOPILOT_START_AFTER_SECONDS,
 } from '../autopilot/autopilot.constants';
 import { CORRELATION_QUEUE } from './correlation.constants';
-import { runsBackgroundWorkers } from '../service-role';
 import { DuplicatesFinderAgentService } from './duplicates-finder-agent.service';
 
 interface CorrelationJob {
@@ -25,7 +24,7 @@ interface CorrelationJob {
  * results exist before the inquiry/case agents run.
  */
 @Injectable()
-export class CorrelationWorker implements OnApplicationBootstrap {
+export class CorrelationWorker {
   private readonly logger = new Logger(CorrelationWorker.name);
 
   constructor(
@@ -34,14 +33,17 @@ export class CorrelationWorker implements OnApplicationBootstrap {
     private readonly duplicatesFinder: DuplicatesFinderAgentService,
   ) {}
 
-  async onApplicationBootstrap(): Promise<void> {
-    if (!runsBackgroundWorkers()) return;
+  /**
+   * Registers this worker on the CURRENT namespace's pg-boss (invoked by the
+   * NamespaceWorkerManager inside the namespace's CLS context).
+   */
+  async registerForNamespace(): Promise<void> {
     await this.recoverStaleRuns();
 
     const boss = await this.pgBoss.getBossAsync();
     await boss.createQueue(CORRELATION_QUEUE);
-    await boss.work(CORRELATION_QUEUE, { localConcurrency: 1 }, (jobs: Job[]) =>
-      this.handle(jobs),
+    await this.pgBoss.work(CORRELATION_QUEUE, { localConcurrency: 1 }, (jobs) =>
+      this.handle(jobs as Job[]),
     );
     this.logger.log(`Registered worker for queue ${CORRELATION_QUEUE}`);
   }
@@ -78,21 +80,9 @@ export class CorrelationWorker implements OnApplicationBootstrap {
         continue;
       }
       if (!data?.sourceId || !data?.runnerId) continue;
-      // Namespace-isolation guard: pg-boss queues can be shared across
-      // namespace deployments, so a dequeued job may reference a source from
-      // another namespace. Running it would record foreign DUPLICATES agent
-      // runs (and enqueue a foreign autopilot cycle) in this namespace.
-      const source = await this.prisma.source.findUnique({
-        where: { id: data.sourceId },
-        select: { id: true },
-      });
-      if (!source) {
-        this.logger.warn(
-          `Skipping correlation job for unknown source ${data.sourceId} — ` +
-            `not found in this namespace; likely enqueued by another namespace.`,
-        );
-        continue;
-      }
+      // Per-namespace pg-boss (schema pgboss_<slug>) guarantees a job can only
+      // be dequeued by its own namespace's worker, so no cross-namespace guard
+      // is needed here anymore.
       await this.process(data.sourceId, data.runnerId);
     }
   }

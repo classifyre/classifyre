@@ -1,5 +1,6 @@
 "use client";
 
+import { nsPath } from "@/lib/ns-path";
 import {Fragment, useEffect, useMemo, useState} from "react";
 import {useRouter} from "next/navigation";
 import {useTranslation} from "@/hooks/use-translation";
@@ -367,7 +368,7 @@ export function CustomDetectorsTable() {
                                     <TableRow
                                         key={row.id}
                                         className="cursor-pointer"
-                                        onClick={() => router.push(`/detectors/${row.id}`)}
+                                        onClick={() => router.push(nsPath(`/detectors/${row.id}`))}
                                     >
                                         <TableCell>
                                             <div className="space-y-1">

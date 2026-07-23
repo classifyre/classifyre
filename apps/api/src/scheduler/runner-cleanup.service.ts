@@ -1,4 +1,4 @@
-import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import type { Job } from 'pg-boss';
 import { RunnerStatus } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
@@ -37,7 +37,7 @@ const TERMINAL_STATUSES = [
  *   RUNNER_CLEANUP_CRON    — cron expression in UTC (default "0 3 * * *")
  */
 @Injectable()
-export class RunnerCleanupService implements OnApplicationBootstrap {
+export class RunnerCleanupService {
   private readonly logger = new Logger(RunnerCleanupService.name);
 
   constructor(
@@ -46,12 +46,17 @@ export class RunnerCleanupService implements OnApplicationBootstrap {
     private readonly runnerLogStorage: RunnerLogStorageService,
   ) {}
 
-  async onApplicationBootstrap(): Promise<void> {
+  /**
+   * Registers this worker on the CURRENT namespace's pg-boss (invoked by the
+   * NamespaceWorkerManager inside the namespace's CLS context). Job handlers
+   * are re-wrapped in that context by {@link PgBossService.work}.
+   */
+  async registerForNamespace(): Promise<void> {
     const boss = await this.pgBoss.getBossAsync();
     // pg-boss 12.x requires the queue to exist before work()/schedule().
     await boss.createQueue(CLEANUP_QUEUE);
-    await boss.work(CLEANUP_QUEUE, { localConcurrency: 1 }, (jobs: Job[]) =>
-      this.handleCleanupJob(jobs),
+    await this.pgBoss.work(CLEANUP_QUEUE, { localConcurrency: 1 }, (jobs) =>
+      this.handleCleanupJob(jobs as Job[]),
     );
 
     const cron = process.env.RUNNER_CLEANUP_CRON || DEFAULT_CRON;
