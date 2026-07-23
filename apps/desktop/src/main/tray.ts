@@ -1,12 +1,11 @@
 import { app, Menu, Tray, nativeImage, type MenuItemConstructorOptions } from 'electron';
-import type { NamespaceRuntime } from './namespace-runtime.js';
-import type { NamespaceManager } from './namespace-manager.js';
+import type { ApiNamespace, NamespaceStore } from './namespace-store.js';
 import type { SettingsManager } from './settings-manager.js';
 import type { UpdateChecker } from './update-checker.js';
 
 // System tray / macOS menu-bar item. Lets the app keep running with the
-// window closed: shows workspaces (running ones marked), switches/opens them,
-// and exposes update + background-mode controls.
+// window closed: shows API-owned workspaces and exposes update +
+// background-mode controls.
 //
 // Icons are embedded as base64 so no extra file has to survive packaging.
 // macOS gets a monochrome template image (auto-adapts to menu-bar theme).
@@ -36,16 +35,18 @@ function buildTrayIcon(): Electron.NativeImage {
 }
 
 export interface TrayDeps {
-  runtime: NamespaceRuntime;
-  namespaceManager: NamespaceManager;
+  namespaceStore: NamespaceStore;
   settingsManager: SettingsManager;
   updateChecker: UpdateChecker;
   showWindow: () => void;
+  showHome: () => void;
+  openNamespace: (namespace: ApiNamespace) => void;
   quit: () => void;
 }
 
 export class AppTray {
   private tray: Tray | null = null;
+  private unsubscribeNamespaces: (() => void) | null = null;
 
   constructor(private deps: TrayDeps) {}
 
@@ -58,31 +59,28 @@ export class AppTray {
       if (process.platform === 'win32') this.deps.showWindow();
     });
     this.rebuildMenu();
-    this.deps.runtime.onStateChange(() => this.rebuildMenu());
+    this.unsubscribeNamespaces = this.deps.namespaceStore.onChange(() => this.rebuildMenu());
     this.deps.updateChecker.onStatus(() => this.rebuildMenu());
   }
 
   rebuildMenu(): void {
     if (!this.tray) return;
-    const { runtime, namespaceManager, settingsManager, updateChecker, showWindow, quit } = this.deps;
+    const {
+      namespaceStore,
+      settingsManager,
+      updateChecker,
+      showWindow,
+      showHome,
+      openNamespace,
+      quit,
+    } = this.deps;
 
-    const activeId = runtime.getActiveTabId();
-    const namespaceItems: MenuItemConstructorOptions[] = namespaceManager
+    const namespaceItems: MenuItemConstructorOptions[] = namespaceStore
       .list()
-      .map((ns) => {
-        const isRunning = runtime.isOpen(ns.id);
-        return {
-          label: ns.name,
-          type: 'checkbox' as const,
-          checked: isRunning,
-          sublabel: isRunning ? (ns.id === activeId ? 'Running · active' : 'Running') : undefined,
-          click: () => {
-            showWindow();
-            // Open() switches to the tab when already running.
-            runtime.open(ns.id).catch((err) => console.error(`[tray] open ${ns.name} failed:`, err));
-          },
-        };
-      });
+      .map((namespace) => ({
+        label: namespace.name,
+        click: () => openNamespace(namespace),
+      }));
 
     const updateItems: MenuItemConstructorOptions[] = [];
     const status = updateChecker.getStatus();
@@ -110,7 +108,7 @@ export class AppTray {
 
     const menu = Menu.buildFromTemplate([
       { label: 'Show Classifyre', click: showWindow },
-      { label: 'Workspaces Home', click: () => { showWindow(); runtime.showSelector(); } },
+      { label: 'Workspaces Home', click: showHome },
       { type: 'separator' },
       ...(namespaceItems.length > 0
         ? [...namespaceItems, { type: 'separator' } as MenuItemConstructorOptions]
@@ -139,6 +137,8 @@ export class AppTray {
   }
 
   destroy(): void {
+    this.unsubscribeNamespaces?.();
+    this.unsubscribeNamespaces = null;
     this.tray?.destroy();
     this.tray = null;
   }

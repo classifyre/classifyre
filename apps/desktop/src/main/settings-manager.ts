@@ -5,7 +5,7 @@ import fs from 'fs';
 export interface AppSettings {
   /** Preferred embedded-Postgres port; the app skips forward if it's busy. */
   postgresPort: number;
-  /** Keep the app (tray + running workspaces) alive when the window closes. */
+  /** Keep the app services and tray alive when the window closes. */
   runInBackground: boolean;
   /** Show native OS notifications for in-app notifications (scan failures etc.). */
   desktopNotifications: boolean;

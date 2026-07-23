@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { toast } from "sonner";
+import { api, type Namespace } from "@workspace/api-client";
 import { Button } from "@workspace/ui/components/button";
 import {
   Dialog,
@@ -39,7 +40,7 @@ export function AddRemoteWorkspaceDialog({
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onCreated: (workspace: ElectronNamespace) => void;
+  onCreated: (workspace: Namespace) => void;
 }) {
   const { t } = useTranslation();
   const [name, setName] = React.useState("");
@@ -68,10 +69,12 @@ export function AddRemoteWorkspaceDialog({
     setSubmitting(true);
     try {
       const verified = await electron.verifyRemoteInstance(trimmedUrl);
-      const workspace = await electron.createNamespace(
-        trimmedName,
-        verified.normalizedUrl,
-      );
+      const workspace = await api.namespaces.create({
+        name: trimmedName,
+        type: "remote",
+        remoteUrl: verified.normalizedUrl,
+      });
+      electron.notifyNamespacesChanged();
       onCreated(workspace);
       toast.success(
         t("workspaces.remoteCreateSuccess", { name: workspace.name }),

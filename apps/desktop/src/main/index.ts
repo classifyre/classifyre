@@ -1,28 +1,24 @@
-import { app, autoUpdater, BrowserWindow, WebContentsView, dialog, protocol, shell } from 'electron';
+import { app, autoUpdater, BrowserWindow, dialog, protocol, shell } from 'electron';
 import fs from 'fs';
 import path from 'path';
 import { PostgresManager } from './postgres-manager.js';
-import { NamespaceManager } from './namespace-manager.js';
 import { ProcessManager } from './process-manager.js';
-import { NamespaceRuntime } from './namespace-runtime.js';
 import { registerIpcHandlers } from './ipc-handlers.js';
 import { registerNotificationHandlers } from './notification-service.js';
 import { registerAppProtocol } from './protocol-handler.js';
 import { SettingsManager } from './settings-manager.js';
-import { SessionStore } from './session-store.js';
 import { UpdateChecker } from './update-checker.js';
 import { initFileLogging } from './logger.js';
 import { buildApplicationMenu } from './menu.js';
 import { AppTray } from './tray.js';
 import { getAvailablePort } from './port-manager.js';
+import { NamespaceStore, type ApiNamespace } from './namespace-store.js';
 
-/** Fixed process id for the single shared API in the ProcessManager map. */
-const SHARED_API_ID = '__shared__';
+/** Process id for the single shared, namespace-aware API. */
+const SHARED_API_ID = 'shared';
 
 // Tests and managed installations can override the application data root.
-// Apply it to Electron itself before any manager or logger reads userData so
-// API extraction, Python state, logs, settings, and PostgreSQL are all kept in
-// the same isolated location.
+// Apply it before any manager or logger reads userData.
 const configuredDataDir = process.env['CLASSIFYRE_DATA_DIR'];
 if (configuredDataDir) {
   const dataDirOverride = path.resolve(configuredDataDir);
@@ -32,26 +28,27 @@ if (configuredDataDir) {
 }
 
 // embedded-postgres registers an async-exit-hook that calls done() on process
-// exit, but Electron's quit path doesn't always provide the callback. Suppress
-// the resulting unhandled rejection so it doesn't crash the app on quit.
+// exit, but Electron's quit path doesn't always provide the callback.
 process.on('unhandledRejection', (reason) => {
-  if (reason instanceof TypeError && (reason as TypeError).message === 'done is not a function') {
+  if (reason instanceof TypeError && reason.message === 'done is not a function') {
     return;
   }
   console.error('Unhandled rejection:', reason);
 });
 
-// The packaged Next.js static export references assets with ABSOLUTE paths
-// (/_next/static/...). Loading index.html over file:// resolves those against
-// the filesystem root, so every chunk 404s and the window renders blank. They
-// are instead served by the custom 'app' scheme (registerAppProtocol), but that
-// scheme must be declared privileged BEFORE app 'ready' so it behaves as a
-// standard, secure origin — otherwise absolute paths and fetch() don't resolve.
-// Harmless in dev (the app scheme is only loaded when packaged).
+// The packaged Next.js export references assets using absolute paths. The
+// custom scheme must be privileged before app ready for those paths and fetch
+// requests to resolve correctly.
 protocol.registerSchemesAsPrivileged([
   {
     scheme: 'app',
-    privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true, stream: true },
+    privileges: {
+      standard: true,
+      secure: true,
+      supportFetchAPI: true,
+      corsEnabled: true,
+      stream: true,
+    },
   },
 ]);
 
@@ -59,149 +56,125 @@ const isDev = !app.isPackaged;
 
 let mainWindow: BrowserWindow | null = null;
 let pg: PostgresManager;
-let namespaceManager: NamespaceManager;
 let settingsManager: SettingsManager;
 let processManager: ProcessManager;
-let runtime: NamespaceRuntime;
-let sessionStore: SessionStore;
 let updateChecker: UpdateChecker;
-/** Base URL of the single shared API, injected into the web view's preload. */
+let namespaceStore: NamespaceStore;
 let sharedApiBaseUrl = '';
 let tray: AppTray | null = null;
 let isQuitting = false;
 let shutdownStarted = false;
 
-// Squirrel.Mac's quitAndInstall() closes every window BEFORE any before-quit
-// fires. Without this flag the background-mode close handler intercepts that
-// close and just hides the window, so "Restart to update" silently did nothing
-// but hide the app. Marking quit-in-progress here lets the close proceed;
-// graceful shutdown still runs in before-quit, and Squirrel's ShipIt installs
-// the update once the process actually exits.
 autoUpdater.on('before-quit-for-update', () => {
   isQuitting = true;
 });
-
-/** Restores the window, recreating it if it was fully closed. */
-function showMainWindow(): void {
-  if (!runtime) return; // fired before startup finished (or after a failed start)
-  if (mainWindow) {
-    if (mainWindow.isMinimized()) mainWindow.restore();
-    mainWindow.show();
-    mainWindow.focus();
-  } else {
-    mainWindow = createMainWindow();
-    mainWindow.on('closed', () => {
-      mainWindow = null;
-    });
-  }
-}
 
 function getPreloadPath(): string {
   return path.join(__dirname, 'preload.js');
 }
 
-// The app-chrome views (window shell, tab bar, selector) only ever display
-// their own bundled pages. Deny window.open and in-place navigation so a
-// compromised or buggy page can't turn app chrome into an arbitrary browser.
-function lockDownChrome(contents: Electron.WebContents): void {
-  contents.setWindowOpenHandler(() => ({ action: 'deny' }));
-  contents.on('will-navigate', (e) => e.preventDefault());
+function appUrl(route = ''): string {
+  const normalized = route.replace(/^\/+/, '');
+  if (isDev) {
+    return normalized
+      ? `http://localhost:3000/${normalized}`
+      : 'http://localhost:3000';
+  }
+  return normalized
+    ? `app://classifyre/${normalized}`
+    : 'app://classifyre/index.html';
+}
+
+function showMainWindow(): void {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.show();
+    mainWindow.focus();
+    return;
+  }
+  if (!sharedApiBaseUrl) return;
+  mainWindow = createMainWindow();
+}
+
+function showHome(): void {
+  showMainWindow();
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    void mainWindow.loadURL(appUrl());
+  }
+}
+
+function openNamespace(namespace: ApiNamespace): void {
+  if (namespace.type === 'remote' && namespace.remoteUrl) {
+    void shell.openExternal(namespace.remoteUrl);
+    return;
+  }
+  showMainWindow();
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    void mainWindow.loadURL(appUrl(namespace.slug));
+  }
+}
+
+function configureWebContents(win: BrowserWindow): void {
+  const contents = win.webContents;
+  const isAppUrl = (target: string): boolean => {
+    if (isDev) return new URL(target).origin === 'http://localhost:3000';
+    const url = new URL(target);
+    return url.protocol === 'app:' && url.host === 'classifyre';
+  };
+
+  contents.setWindowOpenHandler(({ url }) => {
+    if (/^https?:/.test(url)) void shell.openExternal(url);
+    return { action: 'deny' };
+  });
+  contents.on('will-navigate', (event, target) => {
+    if (isAppUrl(target)) return;
+    event.preventDefault();
+    if (/^https?:/.test(target)) void shell.openExternal(target);
+  });
+  contents.on('did-fail-load', (_event, code, description, url) => {
+    console.error(`[web] did-fail-load ${url || '(main)'}: ${description} (${code})`);
+  });
+  contents.on('render-process-gone', (_event, details) => {
+    console.error(
+      `[web] render process gone: ${details.reason} (exitCode ${details.exitCode})`,
+    );
+  });
+  contents.on('console-message', (details) => {
+    if (details.level !== 'warning' && details.level !== 'error') return;
+    const where = details.sourceId
+      ? ` (${details.sourceId}:${details.lineNumber})`
+      : '';
+    console.log(`[web:${details.level}] ${details.message}${where}`);
+  });
 }
 
 /**
- * Single-instance window: ONE web view loading the web app. The web app owns
- * the namespace concept now (its landing page lists/creates workspaces and
- * routes under `/<slug>/...`), talking to the single shared API whose base URL
- * is injected via the preload. No more tab bar / native selector / per-
- * namespace views.
+ * One window renders the namespace-aware web application. Namespace selection,
+ * creation, settings, and routing all live in that application and use the
+ * shared API injected by the preload.
  */
 function createMainWindow(): BrowserWindow {
-  const apiBaseUrl = sharedApiBaseUrl;
   const win = new BrowserWindow({
     width: 1400,
     height: 900,
     title: 'Classifyre',
-    titleBarStyle: 'hiddenInset',
-    trafficLightPosition: { x: 12, y: 10 },
-    webPreferences: {
-      contextIsolation: true,
-      nodeIntegration: false,
-    },
-  });
-  lockDownChrome(win.webContents);
-
-  // Keep the lightweight native tab strip above the web-owned workspace
-  // directory. Local workspaces stay inside the main web app; remote
-  // workspaces open in isolated, sandboxed WebContentsViews managed by the
-  // legacy runtime, and the home tab is the safe way back to the directory.
-  const tabBarView = new WebContentsView({
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
       preload: getPreloadPath(),
+      additionalArguments: [`--api-base=${sharedApiBaseUrl}`],
     },
   });
-  lockDownChrome(tabBarView.webContents);
-  win.contentView.addChildView(tabBarView);
+  configureWebContents(win);
+  void win.loadURL(appUrl());
 
-  const tabBarHtml = isDev
-    ? path.join(__dirname, '../../src/renderer/tab-bar/tab-bar.html')
-    : path.join(__dirname, 'tab-bar/tab-bar.html');
-  void tabBarView.webContents.loadFile(tabBarHtml);
-
-  const webView = new WebContentsView({
-    webPreferences: {
-      contextIsolation: true,
-      nodeIntegration: false,
-      preload: getPreloadPath(),
-      additionalArguments: [`--api-base=${apiBaseUrl}`],
-    },
-  });
-  win.contentView.addChildView(webView);
-
-  // Allow in-app navigation within the web app only; outbound links open in the
-  // system browser.
-  webView.webContents.setWindowOpenHandler(({ url }) => {
-    void shell.openExternal(url);
-    return { action: 'deny' };
-  });
-  webView.webContents.on('will-navigate', (e, target) => {
-    const inApp = isDev
-      ? target.startsWith('http://localhost:3000')
-      : target.startsWith('app://classifyre');
-    if (!inApp) {
-      e.preventDefault();
-      void shell.openExternal(target);
-    }
-  });
-
-  if (isDev) {
-    void webView.webContents.loadURL('http://localhost:3000');
-  } else {
-    // Served by the 'app' scheme (registerAppProtocol) — NOT file:// — so the
-    // Next static export's absolute asset paths and client routing resolve.
-    void webView.webContents.loadURL('app://classifyre/index.html');
-  }
-
-  runtime.setMainWindow(win);
-  runtime.setTabBarView(tabBarView);
-  runtime.setSelectorView(webView);
-  runtime.showSelector();
-
-  updateChecker.setTabBarView(tabBarView);
-  tabBarView.webContents.on('did-finish-load', () => {
-    void updateChecker.checkForUpdates();
-  });
-
-  // Background mode: closing the window hides it instead of quitting.
-  win.on('close', (e) => {
+  win.on('close', (event) => {
     if (isQuitting || !settingsManager.get().runInBackground) return;
-    e.preventDefault();
+    event.preventDefault();
     win.hide();
   });
-
   win.on('closed', () => {
-    if (!isQuitting) void runtime.closeAll();
+    if (mainWindow === win) mainWindow = null;
   });
 
   return win;
@@ -213,85 +186,39 @@ app.on('ready', async () => {
     return;
   }
 
-  // Windows toast notifications are dropped unless the process carries an
-  // explicit App User Model ID. No-op on macOS/Linux.
   if (process.platform === 'win32') {
     app.setAppUserModelId('com.classifyre.desktop');
   }
 
-  // Tee stdout/stderr to userData/logs/main.log before anything else runs, so
-  // startup and workspace-open failures are diagnosable without launching the
-  // app from a terminal.
   const logFile = initFileLogging();
   if (logFile) console.log(`Logging to ${logFile}`);
 
   if (!isDev) {
-    const webDir = path.join(process.resourcesPath, 'web');
-    registerAppProtocol(webDir);
+    registerAppProtocol(path.join(process.resourcesPath, 'web'));
   }
 
   settingsManager = new SettingsManager();
-  sessionStore = new SessionStore();
   pg = new PostgresManager(settingsManager.get().postgresPort);
-  namespaceManager = new NamespaceManager();
   processManager = new ProcessManager();
-  runtime = new NamespaceRuntime(
-    pg,
-    processManager,
-    namespaceManager,
-    isDev,
-    getPreloadPath(),
-  );
-
-  // NOTE: the per-namespace tab/selector runtime, its IPC, and the Workspaces
-  // menu/tray are now vestigial — the web app owns namespace selection and
-  // talks to the single shared API directly. They remain wired (harmless, never
-  // invoked by the single web view) pending a follow-up cleanup that also
-  // repoints notification deep-links at the single web view.
   updateChecker = new UpdateChecker();
-  registerIpcHandlers(runtime, namespaceManager, settingsManager, updateChecker, pg);
-  registerNotificationHandlers({ runtime, settingsManager, showWindow: showMainWindow });
-
-  // Application menu (Logs menu, Workspaces menu, Check for Updates…);
-  // Electron's bare default menu has none of these. Rebuilt when workspaces
-  // change so the Workspaces menu stays current.
-  const rebuildMenu = () =>
-    buildApplicationMenu({ runtime, namespaceManager, updateChecker, showMainWindow });
-  rebuildMenu();
-  runtime.onStateChange(rebuildMenu);
-
-  tray = new AppTray({
-    runtime,
-    namespaceManager,
-    settingsManager,
-    updateChecker,
-    showWindow: showMainWindow,
-    quit: () => app.quit(),
-  });
-  tray.create();
-
   updateChecker.startPeriodicChecks();
+  void updateChecker.checkForUpdates();
 
   try {
     await pg.start();
     console.log(`Embedded PostgreSQL started on port ${pg.getPort()}`);
-  } catch (err) {
-    console.error('Failed to start embedded PostgreSQL:', err);
-    // Surface the failure — a silent exit looks like a crash and gives users
-    // nothing to report.
+  } catch (error) {
+    console.error('Failed to start embedded PostgreSQL:', error);
     dialog.showErrorBox(
       'Classifyre could not start',
-      `The embedded PostgreSQL database failed to start.\n\n${err instanceof Error ? err.message : String(err)}`,
+      `The embedded PostgreSQL database failed to start.\n\n${
+        error instanceof Error ? error.message : String(error)
+      }`,
     );
     app.quit();
     return;
   }
 
-  // Start the ONE shared, namespace-aware API. It connects with a schema-less
-  // DATABASE_URL and resolves the tenant schema per request from the `/<slug>/`
-  // URL segment; it migrates the registry + every namespace schema itself
-  // (autoMigrate). Namespaces are created from the web app's landing page (a
-  // POST to the API's /namespaces), which provisions the schema on the fly.
   try {
     const apiPort = await getAvailablePort();
     sharedApiBaseUrl = `http://127.0.0.1:${apiPort}`;
@@ -299,71 +226,80 @@ app.on('ready', async () => {
       SHARED_API_ID,
       apiPort,
       pg.getConnectionString(),
-      { autoMigrate: true },
     );
     console.log(`Shared Classifyre API started on ${sharedApiBaseUrl}`);
-  } catch (err) {
-    console.error('Failed to start the Classifyre API:', err);
+  } catch (error) {
+    console.error('Failed to start the Classifyre API:', error);
     dialog.showErrorBox(
       'Classifyre could not start',
-      `The Classifyre API failed to start.\n\n${err instanceof Error ? err.message : String(err)}`,
+      `The Classifyre API failed to start.\n\n${
+        error instanceof Error ? error.message : String(error)
+      }`,
     );
     app.quit();
     return;
   }
 
-  mainWindow = createMainWindow();
+  namespaceStore = new NamespaceStore(sharedApiBaseUrl);
 
-  mainWindow.on('closed', () => {
-    mainWindow = null;
+  const menuDeps = {
+    namespaceStore,
+    updateChecker,
+    showHome,
+    openNamespace,
+  };
+  const rebuildMenu = () => buildApplicationMenu(menuDeps);
+  rebuildMenu();
+  namespaceStore.onChange(rebuildMenu);
+
+  tray = new AppTray({
+    namespaceStore,
+    settingsManager,
+    updateChecker,
+    showWindow: showMainWindow,
+    showHome,
+    openNamespace,
+    quit: () => app.quit(),
   });
+  tray.create();
+
+  registerIpcHandlers(namespaceStore);
+  registerNotificationHandlers({
+    settingsManager,
+    showWindow: showMainWindow,
+    getWebContents: () => mainWindow?.webContents ?? null,
+  });
+
+  await namespaceStore.start();
+  mainWindow = createMainWindow();
 });
 
-app.on('second-instance', () => {
-  showMainWindow();
-});
+app.on('second-instance', showMainWindow);
 
 app.on('window-all-closed', () => {
-  // Background mode keeps the app (tray + workspaces) alive on every
-  // platform; the tray or a relaunch brings the window back.
   if (settingsManager?.get().runInBackground) return;
-  if (process.platform !== 'darwin') {
-    app.quit();
-  }
+  if (process.platform !== 'darwin') app.quit();
 });
 
-app.on('activate', () => {
-  showMainWindow();
-});
+app.on('activate', showMainWindow);
 
-app.on('before-quit', (e) => {
-  // isQuitting may already be true (update restart path) — the graceful
-  // shutdown below must still run exactly once, so it has its own flag.
+app.on('before-quit', (event) => {
   isQuitting = true;
   if (shutdownStarted) return;
-  e.preventDefault();
+  event.preventDefault();
   shutdownStarted = true;
 
-  // If graceful shutdown hangs (e.g. pg_ctl stop blocked on a stuck
-  // connection), quit anyway — otherwise the app appears frozen and the user
-  // force-kills it, which is the unclean shutdown this chain tries to avoid.
   const forceQuitTimer = setTimeout(() => {
     console.error('Shutdown timed out after 30s — quitting anyway');
     app.quit();
   }, 30_000);
 
   tray?.destroy();
-  // Teardown closes every workspace — keep the pre-quit snapshot so the next
-  // launch restores the session instead of starting empty.
-  sessionStore?.suppress();
+  namespaceStore?.stop();
   Promise.resolve()
-    .then(() => runtime?.closeAll())
-    // The shared namespace-aware API is not owned by the legacy per-workspace
-    // runtime. Stop it explicitly before Postgres so its registry/Prisma pools
-    // close cleanly instead of receiving administrator-shutdown errors.
-    .then(() => processManager?.stopApi(SHARED_API_ID))
+    .then(() => processManager?.stopAll())
     .then(() => pg?.stop())
-    .catch((err) => console.error('Shutdown error:', err))
+    .catch((error) => console.error('Shutdown error:', error))
     .finally(() => {
       clearTimeout(forceQuitTimer);
       app.quit();

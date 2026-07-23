@@ -101,6 +101,7 @@ export default function NamespaceSettingsPage() {
       setDescription(updated.description ?? "");
       setThumbnail(updated.thumbnail);
       setThumbnailChanged(false);
+      window.electronAPI?.notifyNamespacesChanged();
       toast.success(t("workspaces.settingsSaved"));
       router.refresh();
     } catch (saveError) {

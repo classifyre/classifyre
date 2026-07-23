@@ -63,6 +63,7 @@ export function CreateNamespaceDialog({
         description: description.trim() || undefined,
         thumbnail: thumbnail ?? undefined,
       });
+      window.electronAPI?.notifyNamespacesChanged();
       toast.success(t("workspaces.createSuccess", { name: namespace.name }));
       onCreated(namespace);
       onOpenChange(false);

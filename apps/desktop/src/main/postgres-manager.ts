@@ -141,10 +141,7 @@ export class PostgresManager {
     if (preferredPort) this.preferredPort = preferredPort;
   }
 
-  // Single-flight: concurrent callers (app boot + an early namespace:open)
-  // share one startup, and none observes "running" until the classifyre
-  // database exists — otherwise a fast createSchema() races ensureDatabase()
-  // and dies with 'database "classifyre" does not exist'.
+  // Single-flight so crash recovery cannot race an in-progress startup.
   async start(): Promise<void> {
     if (!this.startPromise) {
       this.startPromise = this.doStart().catch((err: unknown) => {
