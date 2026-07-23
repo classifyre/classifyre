@@ -1,131 +1,24 @@
-import { ipcMain, app, dialog, BrowserWindow } from 'electron';
-import { NamespaceRuntime } from './namespace-runtime.js';
-import { NamespaceManager, type NamespaceUpdate } from './namespace-manager.js';
-import { SettingsManager, type AppSettings } from './settings-manager.js';
-import { UpdateChecker } from './update-checker.js';
-import { PostgresManager } from './postgres-manager.js';
-import { getThumbnailDataUrl, deleteThumbnail } from './thumbnails.js';
+import { ipcMain, dialog, BrowserWindow, shell } from 'electron';
+import type { NamespaceStore } from './namespace-store.js';
 import { verifyClassifyreRemote } from './remote-instance.js';
 
-export function registerIpcHandlers(
-  runtime: NamespaceRuntime,
-  namespaceManager: NamespaceManager,
-  settingsManager: SettingsManager,
-  updateChecker: UpdateChecker,
-  pg: PostgresManager,
-): void {
-  ipcMain.handle('namespace:list', () => {
-    return namespaceManager.list();
-  });
-
-  ipcMain.handle('namespace:create', (_event, name: string, remoteUrl?: string) => {
-    const ns = namespaceManager.create(name, remoteUrl);
-    runtime.emitStateChange(); // refresh tray + Workspaces menu
-    return ns;
-  });
-
+export function registerIpcHandlers(namespaceStore: NamespaceStore): void {
   ipcMain.handle('remote:verify', (_event, remoteUrl: string) => {
     return verifyClassifyreRemote(remoteUrl);
   });
 
-  ipcMain.handle('namespace:delete', async (_event, id: string) => {
-    const ns = namespaceManager.get(id);
-    if (runtime.isOpen(id)) {
-      await runtime.close(id);
+  // The web app owns namespace CRUD. This signal only asks native menus to
+  // refresh their read-only API snapshot after a mutation.
+  ipcMain.on('namespaces:changed', () => {
+    void namespaceStore.refresh();
+  });
+
+  ipcMain.handle('external:open', async (_event, value: string) => {
+    const url = new URL(value);
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+      throw new Error('Only HTTP(S) URLs can be opened');
     }
-    namespaceManager.delete(id);
-    deleteThumbnail(id);
-    // Drop the workspace's data so deleting actually frees the database.
-    if (ns && ns.type === 'local' && pg.isRunning()) {
-      try {
-        await pg.dropSchema(ns.schemaName);
-      } catch (err) {
-        console.error(`Failed to drop schema ${ns.schemaName}:`, err);
-      }
-    }
-    runtime.emitStateChange();
-  });
-
-  ipcMain.handle('namespace:update', (_event, id: string, patch: NamespaceUpdate) => {
-    const updated = namespaceManager.update(id, patch);
-    runtime.emitStateChange();
-    return updated;
-  });
-
-  ipcMain.handle(
-    'namespace:open',
-    async (_event, id: string, options?: { activate?: boolean }) => {
-      const entry = await runtime.open(id, options ?? {});
-      return { apiPort: entry.apiPort, namespaceId: id };
-    },
-  );
-
-  ipcMain.handle('namespace:close', async (_event, id: string) => {
-    await runtime.close(id);
-  });
-
-  ipcMain.handle('namespace:is-open', (_event, id: string) => {
-    return runtime.isOpen(id);
-  });
-
-  // Last captured screenshot of the workspace view (or null) as a data URL —
-  // the selector page is file://-served, so a filesystem path wouldn't load.
-  ipcMain.handle('namespace:thumbnail', (_event, id: string) => {
-    return getThumbnailDataUrl(id);
-  });
-
-  // Global app settings
-  ipcMain.handle('settings:get', () => {
-    return settingsManager.get();
-  });
-
-  ipcMain.handle('settings:update', (_event, patch: Partial<AppSettings>) => {
-    return settingsManager.update(patch);
-  });
-
-  // Tab operations
-  ipcMain.handle('tab:switch', (_event, id: string) => {
-    runtime.switchToTab(id);
-  });
-
-  ipcMain.handle('tab:show-selector', () => {
-    runtime.showSelector();
-  });
-
-  ipcMain.handle('tab:close', async (_event, id: string) => {
-    await runtime.close(id);
-  });
-
-  ipcMain.handle('tab:get-state', () => {
-    return runtime.getTabState();
-  });
-
-  // Update operations
-  ipcMain.handle('update:check', async () => {
-    await updateChecker.checkForUpdates();
-  });
-
-  ipcMain.handle('update:download', async () => {
-    await updateChecker.downloadUpdate();
-  });
-
-  ipcMain.handle('update:install', () => {
-    updateChecker.restartAndInstall();
-  });
-
-  ipcMain.handle('update:open-download-page', () => {
-    updateChecker.openDownloadPage();
-  });
-
-  // Live API port of a running workspace (undefined port = not running).
-  // Lets the selector show the actual dynamically-allocated port, which is
-  // what an MCP client must be pointed at.
-  ipcMain.handle('runtime:api-port', (_event, id?: string) => {
-    return id ? (runtime.getApiPort(id) ?? null) : null;
-  });
-
-  ipcMain.handle('runtime:version', () => {
-    return app.getVersion();
+    await shell.openExternal(url.toString());
   });
 
   // Native folder picker (used by LOCAL_FOLDER source config forms)

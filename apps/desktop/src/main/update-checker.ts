@@ -1,5 +1,4 @@
 import { app, autoUpdater, dialog, net, shell } from 'electron';
-import type { WebContentsView } from 'electron';
 import fs from 'fs';
 import http from 'http';
 import path from 'path';
@@ -84,7 +83,6 @@ export function pickAsset(
 }
 
 export class UpdateChecker {
-  private tabBarView: WebContentsView | null = null;
   private latestVersion: string | null = null;
   private assets: ReleaseAsset[] = [];
   private lastStatus: UpdateStatus = { status: 'not-available' };
@@ -94,12 +92,6 @@ export class UpdateChecker {
   private squirrelReady = false;
   private listeners = new Set<(status: UpdateStatus) => void>();
   private recheckTimer: NodeJS.Timeout | null = null;
-
-  setTabBarView(view: WebContentsView): void {
-    this.tabBarView = view;
-    // A reloaded tab bar starts with no badge; replay the current state.
-    this.sendStatus(this.lastStatus);
-  }
 
   onStatus(listener: (status: UpdateStatus) => void): void {
     this.listeners.add(listener);
@@ -120,8 +112,8 @@ export class UpdateChecker {
   }
 
   /**
-   * Checks GitHub for a newer release. Background checks stay silent apart
-   * from the tab-bar badge; `interactive` checks (the "Check for Updates…"
+   * Checks GitHub for a newer release. Background checks stay silent;
+   * `interactive` checks (the "Check for Updates…"
    * menu item) always answer with a dialog — including "you're up to date"
    * and check failures, which the badge cannot express.
    */
@@ -353,7 +345,6 @@ export class UpdateChecker {
 
   private sendStatus(status: UpdateStatus): void {
     this.lastStatus = status;
-    this.tabBarView?.webContents.send('update:status', status);
     for (const listener of this.listeners) listener(status);
   }
 }

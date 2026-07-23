@@ -326,6 +326,13 @@ which each deployment sets on its own after including this block.
   value: {{ ternary "1" "0" .Values.api.cliJobs.enabled | quote }}
 - name: K8S_JOBS_NAMESPACE
   value: {{ default .Release.Namespace .Values.api.cliJobs.namespace | quote }}
+{{- if .Values.api.cliJobs.kubeApiCaCertPath }}
+{{- /* Trust the cluster CA so the k8s client can create CLI Jobs over TLS
+       against self-signed API servers (e.g. k3d/k3s). Node reads this at
+       startup and merges it into its trust store. */}}
+- name: NODE_EXTRA_CA_CERTS
+  value: {{ .Values.api.cliJobs.kubeApiCaCertPath | quote }}
+{{- end }}
 - name: K8S_CLI_JOB_TEMPLATE_PATH
   value: /etc/classifyre/cli-job-template/job-template.json
 - name: K8S_CLI_JOB_WAIT_TIMEOUT_SECONDS

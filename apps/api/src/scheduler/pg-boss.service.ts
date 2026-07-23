@@ -4,7 +4,7 @@ import {
   CLS_SCHEMA,
   CLS_NAMESPACE_ID,
   CLS_SLUG,
-  pgBossSchemaForSlug,
+  pgBossSchemaForId,
 } from '../namespace/namespace.constants';
 
 import type { Job } from 'pg-boss';
@@ -12,12 +12,14 @@ import type { Job } from 'pg-boss';
 type PgBossModule = typeof import('pg-boss');
 type PgBossInstance = InstanceType<PgBossModule['PgBoss']>;
 
-export { pgBossSchemaForSlug };
+export { pgBossSchemaForId };
 
 /**
  * Multi-tenant pg-boss: one {@link PgBossInstance} per namespace, each in its
- * own `pgboss_<slug>` Postgres schema so a namespace's worker can only ever
- * dequeue its own jobs (no cross-namespace leakage — the historical "BUG D").
+ * own `pgboss_<uuid>` Postgres schema (derived from the immutable namespace
+ * UUID, so a slug edit never orphans a job schema) so a namespace's worker can
+ * only ever dequeue its own jobs (no cross-namespace leakage — the historical
+ * "BUG D").
  *
  * The correct instance is resolved from the CLS namespace context, so existing
  * request-time enqueue sites (`getBossAsync().send(...)`) keep working — they
@@ -35,7 +37,7 @@ export class PgBossService implements OnApplicationShutdown {
   /** Start (idempotently) the pg-boss instance for a namespace schema. */
   async startForNamespace(
     schema: string,
-    slug: string,
+    namespaceId: string,
   ): Promise<PgBossInstance> {
     const existing = this.bosses.get(schema);
     if (existing) return existing;
@@ -44,7 +46,7 @@ export class PgBossService implements OnApplicationShutdown {
     const boss = new PgBoss({
       connectionString: process.env.DATABASE_URL,
       max: 5,
-      schema: pgBossSchemaForSlug(slug),
+      schema: pgBossSchemaForId(namespaceId),
     });
     boss.on('error', (error) => {
       this.logger.error(`pg-boss error [${schema}]:`, error);
@@ -82,13 +84,13 @@ export class PgBossService implements OnApplicationShutdown {
     const schema = this.requireSchema();
     const existing = this.bosses.get(schema);
     if (existing) return existing;
-    const slug = this.cls.get<string>(CLS_SLUG);
-    if (!slug) {
+    const namespaceId = this.cls.get<string>(CLS_NAMESPACE_ID);
+    if (!namespaceId) {
       throw new Error(
-        `Cannot start pg-boss for schema '${schema}': no slug in CLS context.`,
+        `Cannot start pg-boss for schema '${schema}': no namespaceId in CLS context.`,
       );
     }
-    return this.startForNamespace(schema, slug);
+    return this.startForNamespace(schema, namespaceId);
   }
 
   getBoss(): PgBossInstance {
