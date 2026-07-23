@@ -17,7 +17,7 @@
     },
     "apps/api": {
       "name": "@classifyre/api",
-      "version": "0.4.63-SNAPSHOT",
+      "version": "0.4.64-SNAPSHOT",
       "dependencies": {
         "@ai-sdk/openai-compatible": "^3.0.11",
         "@anthropic-ai/sdk": "^0.111.0",
@@ -59,6 +59,7 @@
         "dotenv": "^17.4.0",
         "fastify": "^5.8.4",
         "natural": "^8.1.1",
+        "nestjs-cls": "^6.2.1",
         "openai": "^6.33.0",
         "pg": "8.22.0",
         "pg-boss": "^12.15.0",
@@ -103,7 +104,7 @@
     },
     "apps/blog": {
       "name": "@classifyre/blog",
-      "version": "0.4.63-SNAPSHOT",
+      "version": "0.4.64-SNAPSHOT",
       "dependencies": {
         "@workspace/schemas": "workspace:*",
         "@workspace/ui": "workspace:*",
@@ -132,11 +133,11 @@
     },
     "apps/cli": {
       "name": "@classifyre/cli",
-      "version": "0.4.63-SNAPSHOT",
+      "version": "0.4.64-SNAPSHOT",
     },
     "apps/desktop": {
       "name": "classifyre-desktop",
-      "version": "0.4.63-SNAPSHOT",
+      "version": "0.4.64-SNAPSHOT",
       "dependencies": {
         "embedded-postgres": "18.4.0-beta.17",
         "get-port": "^7.1.0",
@@ -171,7 +172,7 @@
     },
     "apps/docs": {
       "name": "@classifyre/docs",
-      "version": "0.4.63-SNAPSHOT",
+      "version": "0.4.64-SNAPSHOT",
       "dependencies": {
         "@theguild/remark-mermaid": "^0.3.0",
         "@workspace/schemas": "workspace:*",
@@ -209,7 +210,7 @@
     },
     "apps/web": {
       "name": "@classifyre/web",
-      "version": "0.4.63-SNAPSHOT",
+      "version": "0.4.64-SNAPSHOT",
       "dependencies": {
         "@hookform/resolvers": "^5.2.2",
         "@monaco-editor/react": "^4.7.0",
@@ -262,7 +263,7 @@
     },
     "packages/api-client": {
       "name": "@workspace/api-client",
-      "version": "0.4.63-SNAPSHOT",
+      "version": "0.4.64-SNAPSHOT",
       "devDependencies": {
         "@openapitools/openapi-generator-cli": "2.39.1",
         "@types/node": "^26.1.1",
@@ -271,7 +272,7 @@
     },
     "packages/devops": {
       "name": "@workspace/devops",
-      "version": "0.4.63-SNAPSHOT",
+      "version": "0.4.64-SNAPSHOT",
     },
     "packages/eslint-config": {
       "name": "@workspace/eslint-config",
@@ -295,7 +296,7 @@
     },
     "packages/schemas": {
       "name": "@workspace/schemas",
-      "version": "0.4.63-SNAPSHOT",
+      "version": "0.4.64-SNAPSHOT",
       "dependencies": {
         "zod": "^4.3.6",
       },
@@ -3554,6 +3555,8 @@
     "negotiator": ["negotiator@1.0.0", "", {}, "sha512-8Ofs/AUQh8MaEcrlq5xOX0CQ9ypTF5dl78mjlMNfOK08fzpgTHQRQPBxcPlEtIw0yRpws+Zo/3r+5WRby7u3Gg=="],
 
     "neo-async": ["neo-async@2.6.2", "", {}, "sha512-Yd3UES5mWCSqR+qNT93S3UoYUkqAZ9lLg8a7g9rimsWmYGK8cVToA4/sF3RrshdyV3sAGMXVUmpMYOw+dLpOuw=="],
+
+    "nestjs-cls": ["nestjs-cls@6.2.1", "", { "peerDependencies": { "@nestjs/common": ">= 10 < 12", "@nestjs/core": ">= 10 < 12", "reflect-metadata": "*", "rxjs": ">= 7" } }, "sha512-LTVvreuhH132+rjP4MwnykUS3byBAuN6WQzh2QA3YSYCjy9GfgRyoiSKE5qrzQe+uCB1/TUNHPCxEMYgR3tRlg=="],
 
     "netmask": ["netmask@2.1.1", "", {}, "sha512-eonl3sLUha+S1GzTPxychyhnUzKyeQkZ7jLjKrBagJgPla13F+uQ71HgpFefyHgqrjEbCPkDArxYsjY8/+gLKA=="],
 

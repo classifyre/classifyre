@@ -1,14 +1,11 @@
-import {
-  ConflictException,
-  Injectable,
-  Logger,
-  OnApplicationBootstrap,
-} from '@nestjs/common';
+import { ConflictException, Injectable, Logger } from '@nestjs/common';
 import type { Job } from 'pg-boss';
 import { TriggerType } from '@prisma/client';
+import { ClsService } from 'nestjs-cls';
 import { PrismaService } from '../prisma.service';
 import { PgBossService } from './pg-boss.service';
 import { CliRunnerService } from '../cli-runner/cli-runner.service';
+import { CLS_SCHEMA } from '../namespace/namespace.constants';
 
 const JOB_NAME_PREFIX = 'ingest-source-';
 
@@ -17,51 +14,62 @@ function jobName(sourceId: string): string {
 }
 
 @Injectable()
-export class SchedulerService implements OnApplicationBootstrap {
+export class SchedulerService {
   private readonly logger = new Logger(SchedulerService.name);
-  /** Track which source queues already have a registered worker in this process */
+  /**
+   * Track which source queues already have a registered worker in this process,
+   * keyed by `<schema>:<queue>` so the same source id in different namespaces
+   * (and the per-namespace bosses) are tracked independently.
+   */
   private readonly registeredQueues = new Set<string>();
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly pgBossService: PgBossService,
     private readonly cliRunnerService: CliRunnerService,
+    private readonly cls: ClsService,
   ) {}
 
-  async onApplicationBootstrap(): Promise<void> {
+  /**
+   * Registers all schedule workers for the CURRENT namespace (invoked by the
+   * NamespaceWorkerManager inside the namespace's CLS context).
+   */
+  async registerForNamespace(): Promise<void> {
     await this.syncSchedulesFromDatabase();
   }
 
-  private getBoss() {
-    if ('getBossAsync' in this.pgBossService) {
-      const maybeAsyncGetter = (
-        this.pgBossService as PgBossService & {
-          getBossAsync?: () => Promise<ReturnType<PgBossService['getBoss']>>;
-        }
-      ).getBossAsync;
-      if (maybeAsyncGetter) {
-        return maybeAsyncGetter.call(this.pgBossService);
-      }
+  clearForSchema(schema: string): void {
+    const prefix = `${schema}:`;
+    for (const key of this.registeredQueues) {
+      if (key.startsWith(prefix)) this.registeredQueues.delete(key);
     }
-    return Promise.resolve(this.pgBossService.getBoss());
+  }
+
+  private getBoss() {
+    return this.pgBossService.getBossAsync();
+  }
+
+  private queueKey(name: string): string {
+    return `${this.cls.get<string>(CLS_SCHEMA) ?? ''}:${name}`;
   }
 
   /**
-   * Register a pg-boss worker for a single source queue.
-   * Idempotent — skips registration if the queue already has a worker in this process.
+   * Register a pg-boss worker for a single source queue on the current
+   * namespace's boss. Idempotent per (namespace, queue).
    */
   private async registerWorkerForSource(sourceId: string): Promise<void> {
     const name = jobName(sourceId);
-    if (this.registeredQueues.has(name)) {
+    const key = this.queueKey(name);
+    if (this.registeredQueues.has(key)) {
       return;
     }
     const boss = await this.getBoss();
     // pg-boss 12.x requires queues to exist in the database before work() can poll them
     await boss.createQueue(name);
-    await boss.work(name, { localConcurrency: 1 }, (jobs: Job[]) =>
-      this.handleIngestJob(jobs),
+    await this.pgBossService.work(name, { localConcurrency: 1 }, (jobs) =>
+      this.handleIngestJob(jobs as Job[]),
     );
-    this.registeredQueues.add(name);
+    this.registeredQueues.add(key);
     this.logger.log(`Registered worker for queue ${name}`);
   }
 

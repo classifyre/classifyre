@@ -64,3 +64,24 @@ export function useRouteId(): string {
   if (!mounted || typeof window === "undefined") return "";
   return idFromLocationPath(window.location.pathname);
 }
+
+/** Recover a named static-export route param found after a known parent. */
+export function useStaticRouteParam(
+  paramName: string,
+  parentSegment: string,
+): string {
+  const params = useParams();
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
+  const raw = params?.[paramName];
+  const fromParams = Array.isArray(raw) ? raw[0] : raw;
+  if (fromParams && fromParams !== DYNAMIC_ID_SENTINEL) return fromParams;
+  if (!mounted || typeof window === "undefined") return "";
+
+  const segments = window.location.pathname.split("/").filter(Boolean);
+  const parentIndex = segments.lastIndexOf(parentSegment);
+  return parentIndex >= 0 && parentIndex + 1 < segments.length
+    ? decodeURIComponent(segments[parentIndex + 1]!)
+    : "";
+}

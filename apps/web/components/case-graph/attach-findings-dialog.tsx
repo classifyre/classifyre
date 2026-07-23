@@ -1,5 +1,6 @@
 "use client";
 
+import { nsPath } from "@/lib/ns-path";
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -120,7 +121,11 @@ export function AttachFindingsDialog({
             variant="ghost"
             size="sm"
             onClick={() =>
-              router.push(`/investigations/${caseId}/evidence/add${asset ? `?assetId=${asset.id}` : ""}`)
+              router.push(
+                nsPath(
+                  `/investigations/${caseId}/evidence/add${asset ? `?assetId=${asset.id}` : ""}`,
+                ),
+              )
             }
           >
             {t("caseGraph.attachDialog.openFullPicker")}

@@ -1,93 +1,150 @@
+import { Injectable, Logger, OnApplicationShutdown } from '@nestjs/common';
+import { ClsService } from 'nestjs-cls';
 import {
-  Injectable,
-  Logger,
-  OnApplicationBootstrap,
-  OnApplicationShutdown,
-} from '@nestjs/common';
+  CLS_SCHEMA,
+  CLS_NAMESPACE_ID,
+  CLS_SLUG,
+  pgBossSchemaForSlug,
+} from '../namespace/namespace.constants';
+
+import type { Job } from 'pg-boss';
 
 type PgBossModule = typeof import('pg-boss');
 type PgBossInstance = InstanceType<PgBossModule['PgBoss']>;
 
+export { pgBossSchemaForSlug };
+
 /**
- * Derive the pg-boss schema for this deployment from DATABASE_URL.
+ * Multi-tenant pg-boss: one {@link PgBossInstance} per namespace, each in its
+ * own `pgboss_<slug>` Postgres schema so a namespace's worker can only ever
+ * dequeue its own jobs (no cross-namespace leakage — the historical "BUG D").
  *
- * Namespaces are isolated as Postgres schemas via the Prisma-only `?schema=`
- * URL param. pg-boss never reads that param and defaults to one shared
- * `pgboss` schema, so every namespace on the same physical database would
- * share a single job table — letting one namespace's worker dequeue and
- * execute another namespace's jobs (observed as autopilot agent cycles
- * leaking across namespaces). Give each namespace its own pg-boss schema.
+ * The correct instance is resolved from the CLS namespace context, so existing
+ * request-time enqueue sites (`getBossAsync().send(...)`) keep working — they
+ * already run inside a resolved namespace. Worker registration goes through
+ * {@link work}, which captures the current namespace and re-establishes it
+ * around every job handler (jobs fire long after registration).
  */
-export function pgBossSchemaForDatabaseUrl(
-  databaseUrl: string | undefined,
-): string | undefined {
-  if (!databaseUrl) return undefined;
-  let namespace: string | null;
-  try {
-    namespace = new URL(databaseUrl).searchParams.get('schema');
-  } catch {
-    return undefined;
-  }
-  if (!namespace) return undefined;
-  // pg-boss requires a plain identifier (letters/digits/underscore, <= 50
-  // chars). Sanitize rather than fail so a scan can never be blocked by an
-  // exotic namespace name.
-  const sanitized = namespace.replace(/[^a-zA-Z0-9_]/g, '_');
-  return `pgboss_${sanitized}`.slice(0, 50);
-}
-
 @Injectable()
-export class PgBossService
-  implements OnApplicationBootstrap, OnApplicationShutdown
-{
+export class PgBossService implements OnApplicationShutdown {
   private readonly logger = new Logger(PgBossService.name);
-  private boss: PgBossInstance | null = null;
+  private readonly bosses = new Map<string, PgBossInstance>();
 
-  private async ensureBoss(): Promise<PgBossInstance> {
-    if (this.boss) {
-      return this.boss;
-    }
+  constructor(private readonly cls: ClsService) {}
+
+  /** Start (idempotently) the pg-boss instance for a namespace schema. */
+  async startForNamespace(
+    schema: string,
+    slug: string,
+  ): Promise<PgBossInstance> {
+    const existing = this.bosses.get(schema);
+    if (existing) return existing;
 
     const { PgBoss } = await import('pg-boss');
-    const schema = pgBossSchemaForDatabaseUrl(process.env.DATABASE_URL);
     const boss = new PgBoss({
       connectionString: process.env.DATABASE_URL,
       max: 5,
-      ...(schema ? { schema } : {}),
+      schema: pgBossSchemaForSlug(slug),
     });
-
     boss.on('error', (error) => {
-      this.logger.error('pg-boss error:', error);
+      this.logger.error(`pg-boss error [${schema}]:`, error);
     });
-
-    this.boss = boss;
+    await boss.start();
+    this.bosses.set(schema, boss);
+    this.logger.log(`pg-boss started for namespace schema '${schema}'`);
     return boss;
   }
 
-  async onApplicationBootstrap(): Promise<void> {
-    const boss = await this.ensureBoss();
-    await boss.start();
-    this.logger.log('pg-boss started');
+  /** Stop and forget the pg-boss instance for a namespace schema. */
+  async stopForNamespace(schema: string): Promise<void> {
+    const boss = this.bosses.get(schema);
+    if (!boss) return;
+    this.bosses.delete(schema);
+    await boss.stop({ graceful: true, timeout: 10_000 });
+    this.logger.log(`pg-boss stopped for namespace schema '${schema}'`);
   }
 
   async onApplicationShutdown(): Promise<void> {
-    if (!this.boss) {
-      return;
-    }
-
-    await this.boss.stop({ graceful: true, timeout: 10_000 });
-    this.boss = null;
-    this.logger.log('pg-boss stopped');
+    await Promise.all(
+      [...this.bosses.keys()].map((schema) =>
+        this.stopForNamespace(schema).catch(() => {}),
+      ),
+    );
   }
 
+  /**
+   * Resolve the boss for the current CLS namespace, lazily starting it if
+   * needed. Enqueue sites run on the `api` role too (where the worker manager
+   * never started a boss), so start-on-demand keeps `send`/`insert` working
+   * without registering any workers.
+   */
   async getBossAsync(): Promise<PgBossInstance> {
-    return this.ensureBoss();
+    const schema = this.requireSchema();
+    const existing = this.bosses.get(schema);
+    if (existing) return existing;
+    const slug = this.cls.get<string>(CLS_SLUG);
+    if (!slug) {
+      throw new Error(
+        `Cannot start pg-boss for schema '${schema}': no slug in CLS context.`,
+      );
+    }
+    return this.startForNamespace(schema, slug);
   }
 
   getBoss(): PgBossInstance {
-    if (!this.boss) {
-      throw new Error('pg-boss is not initialized yet');
+    return this.currentBoss();
+  }
+
+  /**
+   * Register a work handler on the current namespace's boss, re-establishing
+   * that namespace's CLS context around every job (so injected services and
+   * PrismaService resolve the right schema when the job later fires).
+   */
+  async work<T = unknown>(
+    queue: string,
+    options: Record<string, unknown>,
+    handler: (jobs: Job<T>[]) => Promise<unknown>,
+  ): Promise<string> {
+    const schema = this.requireSchema();
+    const namespaceId = this.cls.get<string>(CLS_NAMESPACE_ID);
+    const slug = this.cls.get<string>(CLS_SLUG);
+    const boss = this.currentBoss();
+    const wrapped = (jobs: Job<T>[]): Promise<unknown> =>
+      this.cls.run(() => {
+        this.cls.set(CLS_SCHEMA, schema);
+        this.cls.set(CLS_NAMESPACE_ID, namespaceId);
+        this.cls.set(CLS_SLUG, slug);
+        return handler(jobs);
+      });
+    // pg-boss's overloaded work() signatures don't unify with a generic
+    // wrapper; the runtime contract (queue, options, batch handler) is correct.
+    return (
+      boss.work as unknown as (
+        q: string,
+        o: Record<string, unknown>,
+        h: (jobs: Job<T>[]) => Promise<unknown>,
+      ) => Promise<string>
+    )(queue, options, wrapped);
+  }
+
+  private requireSchema(): string {
+    const schema = this.cls.get<string>(CLS_SCHEMA);
+    if (!schema) {
+      throw new Error(
+        'pg-boss accessed outside a namespace context (no schema in CLS).',
+      );
     }
-    return this.boss;
+    return schema;
+  }
+
+  private currentBoss(): PgBossInstance {
+    const schema = this.requireSchema();
+    const boss = this.bosses.get(schema);
+    if (!boss) {
+      throw new Error(
+        `pg-boss is not initialized for namespace schema '${schema}'.`,
+      );
+    }
+    return boss;
   }
 }

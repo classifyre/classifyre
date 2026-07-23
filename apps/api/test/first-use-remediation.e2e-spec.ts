@@ -1,4 +1,3 @@
-import { Test, TestingModule } from '@nestjs/testing';
 import {
   AssetStatus,
   AssetType,
@@ -19,9 +18,11 @@ import { EmbeddingAnalysisService } from '../src/embedding/embedding-analysis.se
 import { EmbeddingConfigService } from '../src/embedding/embedding-config.service';
 import { EmbeddingService } from '../src/embedding/embedding.service';
 import { QueryEmbeddingService } from '../src/embedding/query-embedding.service';
+import { EmbeddingQueueService } from '../src/embedding/embedding-queue.service';
 import { MaskedConfigCryptoService } from '../src/masked-config-crypto.service';
 import { PrismaService } from '../src/prisma.service';
 import { computeScopeFingerprint } from '../src/utils/scope-fingerprint';
+import { createTestApp, TestApp } from './create-test-app';
 
 const assetPayload = (
   hash: string,
@@ -54,7 +55,7 @@ const findingPayload = (key: string, content: string) => ({
 });
 
 describe('Post-first-use store remediation (e2e)', () => {
-  let moduleFixture: TestingModule;
+  let ctx: TestApp;
   let prisma: PrismaService;
   let assets: AssetService;
   let runners: CliRunnerService;
@@ -62,20 +63,19 @@ describe('Post-first-use store remediation (e2e)', () => {
   const embeddingSpaceIds: string[] = [];
 
   beforeAll(async () => {
-    moduleFixture = await Test.createTestingModule({
-      providers: [
-        PrismaService,
-        AssetService,
-        {
-          provide: CustomDetectorExtractionsService,
-          useValue: { createFromIngestion: jest.fn() },
-        },
-        { provide: EmbeddingService, useValue: {} },
-        { provide: QueryEmbeddingService, useValue: {} },
-      ],
-    }).compile();
-    prisma = moduleFixture.get(PrismaService);
-    assets = moduleFixture.get(AssetService);
+    ctx = await createTestApp((builder) =>
+      builder
+        .overrideProvider(CustomDetectorExtractionsService)
+        .useValue({ createFromIngestion: jest.fn() })
+        .overrideProvider(EmbeddingService)
+        .useValue({})
+        .overrideProvider(QueryEmbeddingService)
+        .useValue({})
+        .overrideProvider(EmbeddingQueueService)
+        .useValue({ enqueue: jest.fn() }),
+    );
+    prisma = ctx.prisma!;
+    assets = ctx.get(AssetService);
     runners = new CliRunnerService(
       prisma,
       { create: jest.fn().mockResolvedValue(undefined) } as never,
@@ -102,8 +102,7 @@ describe('Post-first-use store remediation (e2e)', () => {
   });
 
   afterAll(async () => {
-    await prisma.$disconnect();
-    await moduleFixture.close();
+    await ctx.close();
   });
 
   async function createSource(config: Record<string, unknown>) {
@@ -196,6 +195,7 @@ describe('Post-first-use store remediation (e2e)', () => {
       deleted: 0,
       outOfScope: 1,
       resolvedForAbsence: 0,
+      resolvedForRemovedDetectors: 0,
     });
     expect(
       await prisma.asset.findUnique({
@@ -225,7 +225,12 @@ describe('Post-first-use store remediation (e2e)', () => {
 
     expect(
       await assets.finalizeIngestRun(source.id, emptyRun.id, [], true),
-    ).toEqual({ deleted: 0, outOfScope: 0, resolvedForAbsence: 0 });
+    ).toEqual({
+      deleted: 0,
+      outOfScope: 0,
+      resolvedForAbsence: 0,
+      resolvedForRemovedDetectors: 0,
+    });
     expect(
       await prisma.asset.findUnique({
         where: { sourceId_hash: { sourceId: source.id, hash: 'a' } },

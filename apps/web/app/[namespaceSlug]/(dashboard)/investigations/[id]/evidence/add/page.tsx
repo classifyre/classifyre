@@ -1,0 +1,133 @@
+"use client";
+
+import { nsPath } from "@/lib/ns-path";
+import * as React from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useRouteId } from "@/lib/use-route-id";
+import { ArrowLeft, Loader2, Paperclip } from "lucide-react";
+import { toast } from "sonner";
+import { api, type CaseResponseDto } from "@workspace/api-client";
+import { Button } from "@workspace/ui/components/button";
+import { FindingsTable, type FindingSelection } from "@/components/findings-table";
+import { useTranslation } from "@/hooks/use-translation";
+
+/**
+ * Dedicated page for attaching findings to a case as evidence. Reuses the full
+ * findings table (search + filters) instead of a cramped dialog. Attaching a
+ * finding automatically creates the asset evidence row it belongs to.
+ */
+export default function AddCaseEvidencePage() {
+  return (
+    <React.Suspense>
+      <AddCaseEvidencePageInner />
+    </React.Suspense>
+  );
+}
+
+function AddCaseEvidencePageInner() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { t } = useTranslation();
+  const caseId = useRouteId();
+  // Optional asset context (e.g. "add more findings for this evidence row").
+  const assetId = searchParams.get("assetId");
+
+  const [caseData, setCaseData] = React.useState<CaseResponseDto | null>(null);
+  const [selection, setSelection] = React.useState<FindingSelection | null>(null);
+  const [attaching, setAttaching] = React.useState(false);
+
+  const loadCase = React.useCallback(async () => {
+    const data = await api.cases.casesControllerFindOne({ id: caseId });
+    setCaseData(data);
+  }, [caseId]);
+
+  React.useEffect(() => {
+    void loadCase();
+  }, [loadCase]);
+
+  // Findings already in the case are excluded from the table server-side.
+  const attachedFindingIds = React.useMemo(() => {
+    const ids: string[] = [];
+    caseData?.evidence?.forEach((e) => e.findings?.forEach((f) => ids.push(f.findingId)));
+    return ids;
+  }, [caseData]);
+
+  const lockedFilters = React.useMemo(
+    () => ({
+      ...(assetId ? { assetId: [assetId] } : {}),
+      ...(attachedFindingIds.length > 0 ? { excludeIds: attachedFindingIds } : {}),
+    }),
+    [assetId, attachedFindingIds],
+  );
+
+  const selCount = selection?.type === "ids" ? selection.findings.length : 0;
+
+  const attach = async () => {
+    if (!selection || selection.type !== "ids" || selection.findings.length === 0) return;
+    setAttaching(true);
+    try {
+      const res = await api.cases.casesControllerAttachFindings({
+        id: caseId,
+        attachFindingsDto: { findingIds: selection.findings.map((f) => f.id) },
+      });
+      toast.success(t("investigations.addEvidence.attached", { count: String(res.attached) }));
+      router.push(nsPath(`/investigations/${caseId}?tab=evidence`));
+    } catch (err) {
+      console.error(err);
+      toast.error(t("investigations.addEvidence.failedToAttach"));
+      setAttaching(false);
+    }
+  };
+
+  return (
+    <div className="space-y-5">
+      <div>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="-ml-2 mb-2"
+          onClick={() => router.push(nsPath(`/investigations/${caseId}?tab=evidence`))}
+        >
+          <ArrowLeft className="h-4 w-4" /> {t("investigations.addEvidence.backToCase")}
+        </Button>
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h1 className="font-serif text-2xl font-black uppercase tracking-[0.03em]">
+              {t("investigations.addEvidence.title")}
+            </h1>
+            <p className="text-muted-foreground mt-1 max-w-2xl text-sm">
+              {caseData ? (
+                <>
+                  {t("investigations.addEvidence.attachFindingsTo")}{" "}
+                  <span className="font-medium">{caseData.title}</span>.{" "}
+                  {t("investigations.addEvidence.attachFindingsDesc")}
+                </>
+              ) : (
+                t("investigations.addEvidence.loading")
+              )}
+            </p>
+          </div>
+          <Button onClick={attach} disabled={attaching || selCount === 0}>
+            {attaching ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Paperclip className="h-4 w-4" />
+            )}
+            {selCount > 0
+              ? t("investigations.addEvidence.attachCount", { count: String(selCount) })
+              : t("investigations.addEvidence.attachSelected")}
+          </Button>
+        </div>
+      </div>
+
+      {caseData && (
+        <FindingsTable
+          key={attachedFindingIds.join(",") || "all"}
+          lockedFilters={lockedFilters}
+          onSelectionChange={setSelection}
+          disableUrlSync
+        />
+      )}
+    </div>
+  );
+}

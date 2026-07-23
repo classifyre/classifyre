@@ -1,10 +1,6 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
-import { App } from 'supertest/types';
 import { randomUUID } from 'crypto';
-import { AppModule } from '../src/app.module';
-import { PrismaService } from '../src/prisma.service';
+import { createTestApp, TestApp } from './create-test-app';
 
 const PIPELINE_SCHEMA_SUPPORT_TICKET = {
   model: { name: 'fastino/gliner2-base-v1', path: null },
@@ -31,22 +27,14 @@ const PIPELINE_SCHEMA_ENTITY_ONLY = {
 };
 
 describe('Custom Detectors (e2e)', () => {
-  let app: INestApplication<App>;
-  let prisma: PrismaService;
+  let ctx: TestApp;
 
   beforeAll(async () => {
-    const moduleFixture: TestingModule = await Test.createTestingModule({
-      imports: [AppModule],
-    }).compile();
-
-    app = moduleFixture.createNestApplication();
-    prisma = moduleFixture.get<PrismaService>(PrismaService);
-    await app.init();
+    ctx = await createTestApp();
   });
 
   afterAll(async () => {
-    await prisma.$disconnect();
-    await app.close();
+    await ctx.close();
   });
 
   it('creates, lists, trains, and returns history for a GLiNER2 pipeline detector', async () => {
@@ -54,7 +42,7 @@ describe('Custom Detectors (e2e)', () => {
     const key = `cust_e2e_support_${suffix}`;
     const name = `E2E Support Ticket Extractor ${suffix}`;
 
-    const createResponse = await request(app.getHttpServer())
+    const createResponse = await request(ctx.httpTarget)
       .post('/custom-detectors')
       .send({
         name,
@@ -68,7 +56,7 @@ describe('Custom Detectors (e2e)', () => {
     expect(createResponse.body).toHaveProperty('pipelineSchema');
     const detectorId = createResponse.body.id as string;
 
-    const listResponse = await request(app.getHttpServer())
+    const listResponse = await request(ctx.httpTarget)
       .get('/custom-detectors')
       .expect(200);
     expect(Array.isArray(listResponse.body)).toBe(true);
@@ -78,16 +66,17 @@ describe('Custom Detectors (e2e)', () => {
       ),
     ).toBe(true);
 
-    const trainResponse = await request(app.getHttpServer())
+    const trainResponse = await request(ctx.httpTarget)
       .post(`/custom-detectors/${detectorId}/train`)
       .send({})
       .expect(201);
 
     expect(trainResponse.body.customDetectorId).toBe(detectorId);
-    expect(trainResponse.body.status).toBe('SUCCEEDED');
-    expect(trainResponse.body.strategy).toBe('GLINER2_PIPELINE');
+    // Training is intentionally fire-and-forget; the create response reports
+    // the persisted run immediately and history reflects later completion.
+    expect(trainResponse.body.status).toBe('RUNNING');
 
-    const historyResponse = await request(app.getHttpServer())
+    const historyResponse = await request(ctx.httpTarget)
       .get(`/custom-detectors/${detectorId}/training-history`)
       .expect(200);
 
@@ -101,7 +90,7 @@ describe('Custom Detectors (e2e)', () => {
     const key = `cust_e2e_source_selector_${suffix}`;
     const name = `E2E Source Selector Detector ${suffix}`;
 
-    const detector = await request(app.getHttpServer())
+    const detector = await request(ctx.httpTarget)
       .post('/custom-detectors')
       .send({
         name,
@@ -112,7 +101,7 @@ describe('Custom Detectors (e2e)', () => {
 
     const detectorId = detector.body.id as string;
 
-    await request(app.getHttpServer())
+    await request(ctx.httpTarget)
       .post('/sources')
       .send({
         type: 'WORDPRESS',
@@ -127,7 +116,7 @@ describe('Custom Detectors (e2e)', () => {
       })
       .expect(201);
 
-    await request(app.getHttpServer())
+    await request(ctx.httpTarget)
       .post('/sources')
       .send({
         type: 'WORDPRESS',
@@ -145,7 +134,7 @@ describe('Custom Detectors (e2e)', () => {
 
   it('rejects a pipeline schema with no entities and no classification', async () => {
     const suffix = randomUUID().slice(0, 8);
-    await request(app.getHttpServer())
+    await request(ctx.httpTarget)
       .post('/custom-detectors')
       .send({
         name: `E2E Empty Pipeline ${suffix}`,
@@ -165,7 +154,7 @@ describe('Custom Detectors (e2e)', () => {
     const key = `cust_e2e_regex_${suffix}`;
     const name = `E2E Regex Detector ${suffix}`;
 
-    const createResponse = await request(app.getHttpServer())
+    const createResponse = await request(ctx.httpTarget)
       .post('/custom-detectors')
       .send({
         name,
@@ -214,7 +203,7 @@ describe('Custom Detectors (e2e)', () => {
     const detectorId = createResponse.body.id as string;
 
     // GET by ID returns the full schema
-    const getResponse = await request(app.getHttpServer())
+    const getResponse = await request(ctx.httpTarget)
       .get(`/custom-detectors/${detectorId}`)
       .expect(200);
 
@@ -227,7 +216,7 @@ describe('Custom Detectors (e2e)', () => {
   it('updates a REGEX detector — adds and removes patterns', async () => {
     const suffix = randomUUID().slice(0, 8);
 
-    const created = await request(app.getHttpServer())
+    const created = await request(ctx.httpTarget)
       .post('/custom-detectors')
       .send({
         name: `E2E Regex Update ${suffix}`,
@@ -246,7 +235,7 @@ describe('Custom Detectors (e2e)', () => {
 
     const detectorId = created.body.id as string;
 
-    const updated = await request(app.getHttpServer())
+    const updated = await request(ctx.httpTarget)
       .patch(`/custom-detectors/${detectorId}`)
       .send({
         name: `E2E Regex Updated ${suffix}`,
@@ -274,7 +263,7 @@ describe('Custom Detectors (e2e)', () => {
 
   it('rejects a REGEX pipeline schema with no patterns', async () => {
     const suffix = randomUUID().slice(0, 8);
-    await request(app.getHttpServer())
+    await request(ctx.httpTarget)
       .post('/custom-detectors')
       .send({
         name: `E2E Regex Empty ${suffix}`,
@@ -289,7 +278,7 @@ describe('Custom Detectors (e2e)', () => {
   it('lists REGEX detectors alongside GLiNER2 detectors', async () => {
     const suffix = randomUUID().slice(0, 8);
 
-    await request(app.getHttpServer())
+    await request(ctx.httpTarget)
       .post('/custom-detectors')
       .send({
         name: `E2E Regex List ${suffix}`,
@@ -303,7 +292,7 @@ describe('Custom Detectors (e2e)', () => {
       })
       .expect(201);
 
-    const listResponse = await request(app.getHttpServer())
+    const listResponse = await request(ctx.httpTarget)
       .get('/custom-detectors')
       .expect(200);
 
@@ -317,7 +306,7 @@ describe('Custom Detectors (e2e)', () => {
   it('deletes a REGEX detector', async () => {
     const suffix = randomUUID().slice(0, 8);
 
-    const created = await request(app.getHttpServer())
+    const created = await request(ctx.httpTarget)
       .post('/custom-detectors')
       .send({
         name: `E2E Regex Delete ${suffix}`,
@@ -333,11 +322,11 @@ describe('Custom Detectors (e2e)', () => {
 
     const detectorId = created.body.id as string;
 
-    await request(app.getHttpServer())
+    await request(ctx.httpTarget)
       .delete(`/custom-detectors/${detectorId}`)
       .expect(200);
 
-    await request(app.getHttpServer())
+    await request(ctx.httpTarget)
       .get(`/custom-detectors/${detectorId}`)
       .expect(404);
   });

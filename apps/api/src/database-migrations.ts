@@ -2,6 +2,13 @@ import { Logger } from '@nestjs/common';
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import { Pool } from 'pg';
+import {
+  REGISTRY_TABLE_DDL,
+  publicConnectionString,
+  PUBLIC_SEARCH_PATH_OPTION,
+} from './registry/namespace-registry.sql';
+import { pgBossSchemaForSlug } from './namespace/namespace.constants';
 
 const logger = new Logger('DatabaseMigrations');
 
@@ -50,14 +57,16 @@ function resolvePrismaCliPath(schemaPath: string): string {
   ]);
 }
 
-export async function applyPendingDatabaseMigrations(): Promise<void> {
-  if (process.env.CLASSIFYRE_AUTO_MIGRATE === 'false') {
-    logger.warn(
-      'Automatic database migrations are disabled by CLASSIFYRE_AUTO_MIGRATE=false',
-    );
-    return;
-  }
-
+/**
+ * Run `prisma migrate deploy` against a single Postgres schema.
+ *
+ * When `schema` is provided, `DATABASE_URL` is rewritten with `?schema=<schema>`
+ * so Prisma tracks state in an independent `_prisma_migrations` table inside
+ * that schema and creates all (unqualified) tables there via `search_path`.
+ * When omitted, the process `DATABASE_URL` is used verbatim (whatever schema it
+ * already targets, defaulting to `public`).
+ */
+export async function deployForSchema(schema?: string): Promise<void> {
   if (!process.env.DATABASE_URL) {
     throw new Error(
       'Classifyre cannot apply database migrations because DATABASE_URL is not set.',
@@ -68,7 +77,16 @@ export async function applyPendingDatabaseMigrations(): Promise<void> {
   const prismaCliPath = resolvePrismaCliPath(schemaPath);
   const apiDir = path.dirname(path.dirname(schemaPath));
 
-  logger.log('Applying pending database migrations before API startup');
+  let databaseUrl = process.env.DATABASE_URL;
+  if (schema) {
+    const url = new URL(databaseUrl);
+    url.searchParams.set('schema', schema);
+    databaseUrl = url.toString();
+  }
+
+  logger.log(
+    `Applying pending database migrations for schema '${schema ?? 'public'}'`,
+  );
 
   await new Promise<void>((resolve, reject) => {
     const child = spawn(
@@ -78,6 +96,7 @@ export async function applyPendingDatabaseMigrations(): Promise<void> {
         cwd: apiDir,
         env: {
           ...process.env,
+          DATABASE_URL: databaseUrl,
           PRISMA_CLI_TELEMETRY_INFORMATION: 'disabled',
           CHECKPOINT_DISABLE: '1',
         },
@@ -107,7 +126,9 @@ export async function applyPendingDatabaseMigrations(): Promise<void> {
     });
     child.on('exit', (code) => {
       if (code === 0) {
-        logger.log('Database migrations are up to date');
+        logger.log(
+          `Database migrations are up to date for schema '${schema ?? 'public'}'`,
+        );
         resolve();
         return;
       }
@@ -122,4 +143,106 @@ export async function applyPendingDatabaseMigrations(): Promise<void> {
       );
     });
   });
+}
+
+/**
+ * Pre-boot migration orchestrator for the multi-tenant model.
+ *
+ * 1. Bootstraps the `public.namespaces` registry table (idempotent DDL).
+ * 2. Reads every registered namespace and runs `migrate deploy` into its
+ *    `ns_<slug>` schema, sequentially (bounded, one advisory-lock holder at a
+ *    time on the shared database).
+ *
+ * A fresh install has zero namespaces, so no tenant schema is migrated until
+ * the first namespace is created (there is intentionally no default namespace).
+ */
+export async function applyAllPendingMigrations(): Promise<void> {
+  if (process.env.CLASSIFYRE_AUTO_MIGRATE === 'false') {
+    logger.warn(
+      'Automatic database migrations are disabled by CLASSIFYRE_AUTO_MIGRATE=false',
+    );
+    return;
+  }
+
+  if (!process.env.DATABASE_URL) {
+    throw new Error(
+      'Classifyre cannot apply database migrations because DATABASE_URL is not set.',
+    );
+  }
+
+  const pool = new Pool({
+    connectionString: publicConnectionString(),
+    options: PUBLIC_SEARCH_PATH_OPTION,
+  });
+  let schemas: Array<{
+    id: string;
+    schemaName: string;
+    provisioning: boolean;
+  }> = [];
+  try {
+    await pool.query(REGISTRY_TABLE_DDL);
+    const deleting = await pool.query<{
+      id: string;
+      slug: string;
+      schema_name: string;
+    }>(
+      "SELECT id, slug, schema_name FROM namespaces WHERE status = 'deleting'",
+    );
+    for (const namespace of deleting.rows) {
+      await pool.query(
+        `DROP SCHEMA IF EXISTS ${quoteIdentifier(namespace.schema_name)} CASCADE`,
+      );
+      await pool.query(
+        `DROP SCHEMA IF EXISTS ${quoteIdentifier(pgBossSchemaForSlug(namespace.slug))} CASCADE`,
+      );
+      await pool.query('DELETE FROM namespaces WHERE id = $1', [namespace.id]);
+    }
+    const { rows } = await pool.query<{
+      id: string;
+      schema_name: string;
+      status: string;
+    }>(
+      "SELECT id, schema_name, status FROM namespaces WHERE type = 'local' AND status IN ('active', 'provisioning') ORDER BY created_at ASC",
+    );
+    schemas = rows.map((r) => ({
+      id: r.id,
+      schemaName: r.schema_name,
+      provisioning: r.status === 'provisioning',
+    }));
+  } finally {
+    await pool.end();
+  }
+
+  logger.log(
+    `Namespace registry ready; migrating ${schemas.length} namespace schema(s)`,
+  );
+  for (const schema of schemas) {
+    await deployForSchema(schema.schemaName);
+    if (schema.provisioning) {
+      const activationPool = new Pool({
+        connectionString: publicConnectionString(),
+        options: PUBLIC_SEARCH_PATH_OPTION,
+      });
+      try {
+        await activationPool.query(
+          "UPDATE namespaces SET status = 'active', updated_at = now() WHERE id = $1 AND status = 'provisioning'",
+          [schema.id],
+        );
+      } finally {
+        await activationPool.end();
+      }
+    }
+  }
+}
+
+function quoteIdentifier(value: string): string {
+  return `"${value.replace(/"/g, '""')}"`;
+}
+
+/**
+ * @deprecated Kept for callers that still expect the single-schema entrypoint.
+ * Prefer {@link applyAllPendingMigrations}.
+ */
+export async function applyPendingDatabaseMigrations(): Promise<void> {
+  await applyAllPendingMigrations();
 }

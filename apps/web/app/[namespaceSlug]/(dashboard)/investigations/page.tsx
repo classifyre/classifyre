@@ -1,0 +1,68 @@
+"use client";
+
+import { nsPath } from "@/lib/ns-path";
+import * as React from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Plus, Sparkles } from "lucide-react";
+import { Button } from "@workspace/ui/components/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@workspace/ui/components/tabs";
+import { CasesTable } from "@/components/cases-table";
+import { InquiriesTable } from "@/components/inquiries-table";
+import { useTranslation } from "@/hooks/use-translation";
+
+export default function InvestigationsPage() {
+  return (
+    <React.Suspense>
+      <InvestigationsPageInner />
+    </React.Suspense>
+  );
+}
+
+function InvestigationsPageInner() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { t } = useTranslation();
+  const tabParam = searchParams.get("tab");
+  const defaultTab = tabParam === "inquiries" ? tabParam : "cases";
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="font-serif text-3xl font-black uppercase tracking-[0.04em]">
+            {t("nav.investigations")}
+          </h1>
+          <p className="text-muted-foreground mt-1 max-w-xl text-sm">
+            {t("investigations.page.description")}
+          </p>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={() => router.push(nsPath("/investigations/inquiries/new"))}
+          >
+            <Sparkles className="h-4 w-4" /> {t("investigations.page.newInquiry")}
+          </Button>
+          <Button onClick={() => router.push(nsPath("/investigations/cases/new"))}>
+            <Plus className="h-4 w-4" /> {t("investigations.page.newCase")}
+          </Button>
+        </div>
+      </div>
+
+      <Tabs defaultValue={defaultTab}>
+        <TabsList>
+          <TabsTrigger value="cases">{t("investigations.page.tabCases")}</TabsTrigger>
+          <TabsTrigger value="inquiries">{t("investigations.page.tabInquiries")}</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="cases">
+          <CasesTable />
+        </TabsContent>
+
+        <TabsContent value="inquiries">
+          <InquiriesTable />
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}

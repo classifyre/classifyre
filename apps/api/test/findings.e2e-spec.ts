@@ -1,8 +1,5 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { randomUUID } from 'crypto';
-import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/prisma.service';
 import {
   AssetType,
@@ -10,28 +7,24 @@ import {
   Severity,
   FindingStatus,
 } from '@prisma/client';
+import { createTestApp, TestApp } from './create-test-app';
 
 describe('FindingsController (e2e)', () => {
-  let app: INestApplication;
+  let ctx: TestApp;
   let prisma: PrismaService;
 
   beforeAll(async () => {
-    const moduleFixture: TestingModule = await Test.createTestingModule({
-      imports: [AppModule],
-    }).compile();
-
-    app = moduleFixture.createNestApplication();
-    prisma = app.get<PrismaService>(PrismaService);
-    await app.init();
+    ctx = await createTestApp();
+    prisma = ctx.prisma!;
   });
 
   afterAll(async () => {
-    await app.close();
+    await ctx.close();
   });
 
   describe('POST /search/findings', () => {
     it('should return findings with proper structure', async () => {
-      const response = await request(app.getHttpServer())
+      const response = await request(ctx.httpTarget)
         .post('/search/findings')
         .send({ page: { limit: 10 } })
         .expect(200);
@@ -83,7 +76,7 @@ describe('FindingsController (e2e)', () => {
     });
 
     it('should filter by severity', async () => {
-      const response = await request(app.getHttpServer())
+      const response = await request(ctx.httpTarget)
         .post('/search/findings')
         .send({ filters: { severity: ['CRITICAL'] } })
         .expect(200);
@@ -95,7 +88,7 @@ describe('FindingsController (e2e)', () => {
     });
 
     it('should filter by detectorType', async () => {
-      const response = await request(app.getHttpServer())
+      const response = await request(ctx.httpTarget)
         .post('/search/findings')
         .send({ filters: { detectorType: ['SECRETS'] } })
         .expect(200);
@@ -108,7 +101,7 @@ describe('FindingsController (e2e)', () => {
 
     it('should filter by runnerId', async () => {
       // First get a finding to get a valid runnerId
-      const allFindings = await request(app.getHttpServer())
+      const allFindings = await request(ctx.httpTarget)
         .post('/search/findings')
         .send({ page: { limit: 1 } })
         .expect(200);
@@ -116,7 +109,7 @@ describe('FindingsController (e2e)', () => {
       if (allFindings.body.findings.length > 0) {
         const runnerId = allFindings.body.findings[0].runnerId;
 
-        const response = await request(app.getHttpServer())
+        const response = await request(ctx.httpTarget)
           .post('/search/findings')
           .send({ filters: { runnerId } })
           .expect(200);
@@ -129,7 +122,7 @@ describe('FindingsController (e2e)', () => {
     });
 
     it('should respect pagination', async () => {
-      const response = await request(app.getHttpServer())
+      const response = await request(ctx.httpTarget)
         .post('/search/findings')
         .send({ page: { skip: 0, limit: 5 } })
         .expect(200);
@@ -181,7 +174,7 @@ describe('FindingsController (e2e)', () => {
       });
 
       try {
-        const response = await request(app.getHttpServer())
+        const response = await request(ctx.httpTarget)
           .get(`/assets/${asset.id}`)
           .expect(200);
 
@@ -201,7 +194,7 @@ describe('FindingsController (e2e)', () => {
 
   describe('GET /findings/stats', () => {
     it('should return statistics', async () => {
-      const response = await request(app.getHttpServer())
+      const response = await request(ctx.httpTarget)
         .get('/findings/stats')
         .expect(200);
 
@@ -273,7 +266,7 @@ describe('FindingsController (e2e)', () => {
       });
 
       try {
-        const response = await request(app.getHttpServer())
+        const response = await request(ctx.httpTarget)
           .patch(`/findings/${finding.id}`)
           .send({ status: FindingStatus.IGNORED, severity: Severity.HIGH })
           .expect(200);

@@ -1,5 +1,6 @@
 "use client";
 
+import { nsPath } from "@/lib/ns-path";
 import * as React from "react";
 import Link from "next/link";
 import { ArrowRight, Bot } from "lucide-react";
@@ -35,7 +36,7 @@ export function HarnessPointerCard() {
       </CardHeader>
       <CardContent>
         <Button asChild>
-          <Link href="/harness">
+          <Link href={nsPath("/harness")}>
             {t("harness.pointer.cta")}
             <ArrowRight className="h-3.5 w-3.5" />
           </Link>

@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Sparkles, Wand2 } from "lucide-react";
+import { Sparkles } from "lucide-react";
 import {
   api,
   type AssistantChatMessage,
@@ -17,6 +17,7 @@ import { AssistantWorkflowPanel, Button } from "@workspace/ui/components";
 import { toast } from "sonner";
 import { usePathname, useRouter } from "next/navigation";
 import { useInstanceSettings } from "@/components/instance-settings-provider";
+import { nsPath } from "@/lib/ns-path";
 
 type AssistantAttachment = Extract<
   AssistantUiAction,
@@ -144,7 +145,7 @@ export function AssistantWorkflowProvider({
         // without a page bridge. Only app-internal paths are accepted.
         if (action.type === "navigate") {
           if (action.route.startsWith("/") && !action.route.startsWith("//")) {
-            router.push(action.route);
+            router.push(nsPath(action.route));
           }
           continue;
         }
@@ -169,22 +170,21 @@ export function AssistantWorkflowProvider({
 
   // Pages without a bridge still get a context-aware assistant: read-only
   // tools plus navigation, keyed to the current route.
-  const buildGlobalContext =
-    React.useCallback((): AssistantPageContext => {
-      return {
-        key: "app.global",
-        route: pathname || "/",
-        title:
-          typeof document !== "undefined" && document.title
-            ? document.title
-            : "Classifyre",
-        entityId: null,
-        values: {},
-        schema: null,
-        validation: { isValid: true, missingFields: [], errors: [] },
-        metadata: {},
-      };
-    }, [pathname]);
+  const buildGlobalContext = React.useCallback((): AssistantPageContext => {
+    return {
+      key: "app.global",
+      route: pathname || "/",
+      title:
+        typeof document !== "undefined" && document.title
+          ? document.title
+          : "Classifyre",
+      entityId: null,
+      values: {},
+      schema: null,
+      validation: { isValid: true, missingFields: [], errors: [] },
+      metadata: {},
+    };
+  }, [pathname]);
 
   const sendMessage = React.useCallback(
     async (
@@ -365,14 +365,11 @@ export function AssistantWorkflowProvider({
   return (
     <AssistantWorkflowContext.Provider value={contextValue}>
       {children}
-      <AssistantWorkflowFab />
       {active && open ? (
         // Anchored to the bottom-right; on narrow viewports it stretches to
         // fill the screen. Fixed placement (no drag/resize) means it can never
         // open off-screen.
-        <div
-          className="fixed inset-x-3 bottom-3 top-16 z-[60] flex flex-col sm:inset-x-auto sm:bottom-4 sm:right-4 sm:top-auto sm:h-[min(680px,calc(100dvh-6rem))] sm:w-[min(440px,calc(100vw-2rem))]"
-        >
+        <div className="fixed inset-x-3 bottom-3 top-16 z-[60] flex flex-col sm:inset-x-auto sm:bottom-4 sm:right-4 sm:top-auto sm:h-[min(680px,calc(100dvh-6rem))] sm:w-[min(440px,calc(100vw-2rem))]">
           <input
             ref={uploadInputRef}
             type="file"
@@ -417,37 +414,6 @@ export function AssistantWorkflowProvider({
         </div>
       ) : null}
     </AssistantWorkflowContext.Provider>
-  );
-}
-
-function AssistantWorkflowFab() {
-  const context = useAssistantWorkflow();
-  // `context.active` already accounts for aiEnabled + demoMode.
-  if (!context.active) {
-    return null;
-  }
-
-  return (
-    // Sticky bottom toolbars publish their height as --assistant-fab-offset
-    // (see StickyActionToolbar), so the FAB rides above them instead of
-    // covering Save/Test/Run — which lets it stay visible on mobile too.
-    <div
-      className="pointer-events-none fixed right-4 z-40 md:right-6"
-      style={{
-        bottom:
-          "calc(1rem + env(safe-area-inset-bottom, 0px) + var(--assistant-fab-offset, 0px))",
-      }}
-    >
-      <Button
-        type="button"
-        onClick={() => context.setOpen(true)}
-        aria-label="Open assistant"
-        className="pointer-events-auto h-12 w-12 rounded-[6px] border-2 border-border bg-[var(--color-accent)] p-0 text-[var(--color-accent-foreground)] shadow-[6px_6px_0_var(--color-border)] transition-[transform,color] hover:-translate-y-[1px] hover:text-[var(--color-primary-foreground)] md:h-14 md:w-auto md:px-4"
-      >
-        <Wand2 className="h-4 w-4 md:mr-2" />
-        <span className="hidden md:inline">Assistant</span>
-      </Button>
-    </div>
   );
 }
 

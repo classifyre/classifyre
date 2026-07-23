@@ -1,5 +1,6 @@
 "use client";
 
+import { nsPath } from "@/lib/ns-path";
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { Filter } from "lucide-react";
@@ -216,7 +217,7 @@ export function InquiryMatchesTable({
                   <div className="flex items-center gap-2">
                     <button
                       className="truncate text-left text-sm font-medium hover:underline"
-                      onClick={() => router.push(`/findings/${m.findingId}`)}
+                      onClick={() => router.push(nsPath(`/findings/${m.findingId}`))}
                     >
                       {m.label}
                     </button>
@@ -254,7 +255,7 @@ export function InquiryMatchesTable({
                 <TableCell className="max-w-[220px]">
                   <button
                     className="block max-w-[200px] truncate text-left text-sm hover:underline"
-                    onClick={() => router.push(`/assets/${m.assetId}`)}
+                    onClick={() => router.push(nsPath(`/assets/${m.assetId}`))}
                   >
                     {m.assetName ?? m.assetId}
                   </button>

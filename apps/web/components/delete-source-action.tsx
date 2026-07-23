@@ -1,5 +1,6 @@
 "use client";
 
+import { nsPath } from "@/lib/ns-path";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, ShieldAlert, Trash2 } from "lucide-react";
@@ -48,7 +49,7 @@ export function DeleteSourceAction({
       if (onDeleted) {
         onDeleted();
       } else {
-        router.push("/sources");
+        router.push(nsPath("/sources"));
       }
     } catch (error) {
       console.error("Failed to delete source:", error);

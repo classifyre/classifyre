@@ -6,27 +6,31 @@
  *   PATH="$HOME/.nvm/versions/node/v22.22.3/bin:$PATH" npx tsx test/namespace-lifecycle.test.ts
  */
 
-import { execFileSync, spawn, type ChildProcess } from 'child_process';
-import path from 'path';
-import fs from 'fs';
-import os from 'os';
-import http from 'http';
-import net from 'net';
-import { createRequire } from 'module';
+import { execFileSync, spawn, type ChildProcess } from "child_process";
+import path from "path";
+import fs from "fs";
+import os from "os";
+import http from "http";
+import net from "net";
+import { createRequire } from "module";
 
-const MONOREPO_ROOT = path.resolve(__dirname, '../../..');
-const API_DIR = path.join(MONOREPO_ROOT, 'apps/api');
-const PRISMA_SCHEMA = path.join(API_DIR, 'prisma/schema.prisma');
-const TEST_DATA_DIR = path.join(os.tmpdir(), `classifyre-desktop-test-${Date.now()}`);
+const MONOREPO_ROOT = path.resolve(__dirname, "../../..");
+const API_DIR = path.join(MONOREPO_ROOT, "apps/api");
+const PRISMA_SCHEMA = path.join(API_DIR, "prisma/schema.prisma");
+const TEST_DATA_DIR = path.join(
+  os.tmpdir(),
+  `classifyre-desktop-test-${Date.now()}`,
+);
 
-let pgInstance: { stop: () => Promise<void>; getPgClient: () => any } | null = null;
+let pgInstance: { stop: () => Promise<void>; getPgClient: () => any } | null =
+  null;
 let apiProcess: ChildProcess | null = null;
 let pgPort = 0;
 
 function getShellPath(): string {
   try {
-    return execFileSync('/bin/zsh', ['-lc', 'echo $PATH'], {
-      encoding: 'utf-8',
+    return execFileSync("/bin/zsh", ["-lc", "echo $PATH"], {
+      encoding: "utf-8",
       timeout: 5000,
     }).trim();
   } catch {
@@ -35,37 +39,37 @@ function getShellPath(): string {
       `${home}/.bun/bin`,
       `${home}/.local/bin`,
       `${home}/.nvm/versions/node/v22.22.3/bin`,
-      '/usr/local/bin',
-      '/usr/bin',
-      '/bin',
-    ].join(':');
+      "/usr/local/bin",
+      "/usr/bin",
+      "/bin",
+    ].join(":");
   }
 }
 
 function findBun(): string {
   const candidates = [
-    path.join(os.homedir(), '.bun/bin/bun'),
-    '/usr/local/bin/bun',
-    '/opt/homebrew/bin/bun',
+    path.join(os.homedir(), ".bun/bin/bun"),
+    "/usr/local/bin/bun",
+    "/opt/homebrew/bin/bun",
   ];
   for (const c of candidates) {
     if (fs.existsSync(c)) return c;
   }
-  throw new Error('bun not found');
+  throw new Error("bun not found");
 }
 
 function embeddedPostgresNativeRoot(): string {
-  const platform = process.platform === 'win32' ? 'windows' : process.platform;
+  const platform = process.platform === "win32" ? "windows" : process.platform;
   const packageName = `${platform}-${process.arch}`;
   const require = createRequire(__filename);
-  const embeddedPostgresEntry = require.resolve('embedded-postgres');
+  const embeddedPostgresEntry = require.resolve("embedded-postgres");
   const nativeRoot = path.resolve(
     path.dirname(embeddedPostgresEntry),
-    '..',
-    '..',
-    '@embedded-postgres',
+    "..",
+    "..",
+    "@embedded-postgres",
     packageName,
-    'native',
+    "native",
   );
   assert(
     fs.existsSync(nativeRoot),
@@ -78,43 +82,46 @@ function ensurePgvectorRuntime(env: Record<string, string>): void {
   const nativeRoot = embeddedPostgresNativeRoot();
   const controlFile = path.join(
     nativeRoot,
-    'share',
-    'postgresql',
-    'extension',
-    'vector.control',
+    "share",
+    "postgresql",
+    "extension",
+    "vector.control",
   );
   if (fs.existsSync(controlFile)) return;
 
-  console.log('[test] Staging pgvector into embedded PostgreSQL...');
+  console.log("[test] Staging pgvector into embedded PostgreSQL...");
   execFileSync(
-    'bash',
-    [path.join(__dirname, '../scripts/stage-pgvector.sh'), nativeRoot],
+    "bash",
+    [path.join(__dirname, "../scripts/stage-pgvector.sh"), nativeRoot],
     {
       cwd: MONOREPO_ROOT,
       env,
-      stdio: 'inherit',
+      stdio: "inherit",
     },
   );
-  assert(fs.existsSync(controlFile), `pgvector was not staged at ${controlFile}`);
+  assert(
+    fs.existsSync(controlFile),
+    `pgvector was not staged at ${controlFile}`,
+  );
 }
 
 async function getAvailablePort(preferred?: number): Promise<number> {
   return new Promise((resolve, reject) => {
     const server = net.createServer();
-    server.listen(preferred ?? 0, '127.0.0.1', () => {
+    server.listen(preferred ?? 0, "127.0.0.1", () => {
       const addr = server.address();
-      if (!addr || typeof addr === 'string') {
-        server.close(() => reject(new Error('no port')));
+      if (!addr || typeof addr === "string") {
+        server.close(() => reject(new Error("no port")));
         return;
       }
       server.close(() => resolve(addr.port));
     });
-    server.on('error', () => {
+    server.on("error", () => {
       const fallback = net.createServer();
-      fallback.listen(0, '127.0.0.1', () => {
+      fallback.listen(0, "127.0.0.1", () => {
         const addr = fallback.address();
-        if (!addr || typeof addr === 'string') {
-          fallback.close(() => reject(new Error('no port')));
+        if (!addr || typeof addr === "string") {
+          fallback.close(() => reject(new Error("no port")));
           return;
         }
         fallback.close(() => resolve(addr.port));
@@ -136,7 +143,7 @@ function waitForPort(port: number, timeoutMs = 30_000): Promise<void> {
         if (res.statusCode === 200) resolve();
         else setTimeout(check, 500);
       });
-      req.on('error', () => setTimeout(check, 500));
+      req.on("error", () => setTimeout(check, 500));
       req.setTimeout(2000, () => {
         req.destroy();
         setTimeout(check, 500);
@@ -147,11 +154,23 @@ function waitForPort(port: number, timeoutMs = 30_000): Promise<void> {
 }
 
 async function cleanup() {
-  if (apiProcess?.pid) {
+  const child = apiProcess;
+  apiProcess = null;
+  if (child?.pid && child.exitCode === null) {
     try {
-      process.kill(apiProcess.pid, 'SIGTERM');
+      child.kill("SIGTERM");
+      await new Promise<void>((resolve) => {
+        const timer = setTimeout(() => {
+          child.kill("SIGKILL");
+          resolve();
+        }, 10_000);
+        timer.unref?.();
+        child.once("exit", () => {
+          clearTimeout(timer);
+          resolve();
+        });
+      });
     } catch {}
-    apiProcess = null;
   }
   if (pgInstance) {
     try {
@@ -177,19 +196,22 @@ async function main() {
   console.log(`[test] data dir: ${TEST_DATA_DIR}`);
   console.log(`[test] prisma schema: ${PRISMA_SCHEMA}`);
 
-  assert(fs.existsSync(PRISMA_SCHEMA), `Prisma schema not found at ${PRISMA_SCHEMA}`);
+  assert(
+    fs.existsSync(PRISMA_SCHEMA),
+    `Prisma schema not found at ${PRISMA_SCHEMA}`,
+  );
   assert(fs.existsSync(bunPath), `bun not found at ${bunPath}`);
 
   // --- Step 1: Start embedded PostgreSQL ---
-  console.log('\n[test] Step 1: Starting embedded PostgreSQL...');
+  console.log("\n[test] Step 1: Starting embedded PostgreSQL...");
   ensurePgvectorRuntime(env);
   pgPort = await getAvailablePort(54321);
 
-  const { default: EmbeddedPostgres } = await import('embedded-postgres');
+  const { default: EmbeddedPostgres } = await import("embedded-postgres");
   pgInstance = new EmbeddedPostgres({
     databaseDir: TEST_DATA_DIR,
-    user: 'classifyre',
-    password: 'classifyre',
+    user: "classifyre",
+    password: "classifyre",
     port: pgPort,
     persistent: false,
   }) as any;
@@ -199,17 +221,19 @@ async function main() {
   console.log(`[test] PostgreSQL started on port ${pgPort}`);
 
   // --- Step 2: Create database and schema ---
-  console.log('\n[test] Step 2: Creating database and schema...');
+  console.log("\n[test] Step 2: Creating database and schema...");
   const client = pgInstance!.getPgClient();
   await client.connect();
 
-  const dbCheck = await client.query("SELECT 1 FROM pg_database WHERE datname = 'classifyre'");
+  const dbCheck = await client.query(
+    "SELECT 1 FROM pg_database WHERE datname = 'classifyre'",
+  );
   if (dbCheck.rows.length === 0) {
-    await client.query('CREATE DATABASE classifyre');
+    await client.query("CREATE DATABASE classifyre");
   }
   await client.end();
 
-  const schemaName = 'ns_test_workspace';
+  const schemaName = "ns_test_workspace";
   const dbUrl = `postgresql://classifyre:classifyre@127.0.0.1:${pgPort}/classifyre`;
 
   // Create schema via the embedded-postgres default client (connects to default db),
@@ -221,75 +245,99 @@ async function main() {
   const tmpSql = path.join(os.tmpdir(), `create-schema-${Date.now()}.sql`);
   fs.writeFileSync(tmpSql, `CREATE SCHEMA IF NOT EXISTS "${schemaName}";\n`);
 
-  const createSchemaResult = await new Promise<{ code: number; stderr: string }>((resolve) => {
+  const createSchemaResult = await new Promise<{
+    code: number;
+    stderr: string;
+  }>((resolve) => {
     const bun = findBun();
-    const child = spawn(bun, ['x', 'prisma', 'db', 'execute', '--file', tmpSql], {
-      cwd: API_DIR,
-      env: { ...env, DATABASE_URL: dbUrl },
-      stdio: ['ignore', 'pipe', 'pipe'],
+    const child = spawn(
+      bun,
+      ["x", "prisma", "db", "execute", "--file", tmpSql],
+      {
+        cwd: API_DIR,
+        env: { ...env, DATABASE_URL: dbUrl },
+        stdio: ["ignore", "pipe", "pipe"],
+      },
+    );
+    let stderr = "";
+    child.stderr?.on("data", (d: Buffer) => {
+      stderr += d.toString();
     });
-    let stderr = '';
-    child.stderr?.on('data', (d: Buffer) => { stderr += d.toString(); });
-    child.on('exit', (code) => resolve({ code: code ?? 1, stderr }));
-    child.on('error', (err) => resolve({ code: 1, stderr: err.message }));
+    child.on("exit", (code) => resolve({ code: code ?? 1, stderr }));
+    child.on("error", (err) => resolve({ code: 1, stderr: err.message }));
   });
   fs.unlinkSync(tmpSql);
   if (createSchemaResult.code !== 0) {
-    console.error('[test] Schema creation stderr:', createSchemaResult.stderr);
-    throw new Error(`Schema creation failed with code ${createSchemaResult.code}`);
+    console.error("[test] Schema creation stderr:", createSchemaResult.stderr);
+    throw new Error(
+      `Schema creation failed with code ${createSchemaResult.code}`,
+    );
   }
   console.log(`[test] Schema "${schemaName}" created`);
 
   // --- Step 3: Run Prisma migrations ---
-  console.log('\n[test] Step 3: Running Prisma migrations...');
+  console.log("\n[test] Step 3: Running Prisma migrations...");
   const migrateUrl = `${dbUrl}?schema=${schemaName}&options=${encodeURIComponent(`-csearch_path=${schemaName},public`)}`;
 
-  const migrateResult = await new Promise<{ code: number; stdout: string; stderr: string }>((resolve) => {
+  const migrateResult = await new Promise<{
+    code: number;
+    stdout: string;
+    stderr: string;
+  }>((resolve) => {
     const child = spawn(
       bunPath,
-      ['x', 'prisma', 'migrate', 'deploy', '--schema', PRISMA_SCHEMA],
+      ["x", "prisma", "migrate", "deploy", "--schema", PRISMA_SCHEMA],
       {
         cwd: API_DIR,
         env: { ...env, DATABASE_URL: migrateUrl },
-        stdio: ['ignore', 'pipe', 'pipe'],
+        stdio: ["ignore", "pipe", "pipe"],
       },
     );
-    let stdout = '';
-    let stderr = '';
-    child.stdout?.on('data', (d: Buffer) => { stdout += d.toString(); });
-    child.stderr?.on('data', (d: Buffer) => { stderr += d.toString(); });
-    child.on('exit', (code) => resolve({ code: code ?? 1, stdout, stderr }));
-    child.on('error', (err) => resolve({ code: 1, stdout, stderr: err.message }));
+    let stdout = "";
+    let stderr = "";
+    child.stdout?.on("data", (d: Buffer) => {
+      stdout += d.toString();
+    });
+    child.stderr?.on("data", (d: Buffer) => {
+      stderr += d.toString();
+    });
+    child.on("exit", (code) => resolve({ code: code ?? 1, stdout, stderr }));
+    child.on("error", (err) =>
+      resolve({ code: 1, stdout, stderr: err.message }),
+    );
   });
 
   if (migrateResult.code !== 0) {
-    console.error('[test] Migration stdout:', migrateResult.stdout);
-    console.error('[test] Migration stderr:', migrateResult.stderr);
+    console.error("[test] Migration stdout:", migrateResult.stdout);
+    console.error("[test] Migration stderr:", migrateResult.stderr);
     throw new Error(`Prisma migrate failed with code ${migrateResult.code}`);
   }
-  console.log('[test] Migrations applied successfully');
+  console.log("[test] Migrations applied successfully");
 
   // --- Step 4: Start NestJS API ---
-  console.log('\n[test] Step 4: Starting NestJS API...');
-  const apiEntryPath = path.join(API_DIR, 'dist/src/main.js');
-  assert(fs.existsSync(apiEntryPath), `API dist not found at ${apiEntryPath}. Run "bun build" in apps/api first.`);
+  console.log("\n[test] Step 4: Starting NestJS API...");
+  const apiEntryPath = path.join(API_DIR, "dist/src/main.js");
+  assert(
+    fs.existsSync(apiEntryPath),
+    `API dist not found at ${apiEntryPath}. Run "bun build" in apps/api first.`,
+  );
 
   const apiPort = await getAvailablePort();
-  apiProcess = spawn('node', [apiEntryPath], {
+  apiProcess = spawn("node", [apiEntryPath], {
     env: {
       ...env,
       PORT: String(apiPort),
       DATABASE_URL: migrateUrl,
-      ENVIRONMENT: 'desktop',
-      CLI_PATH: path.join(MONOREPO_ROOT, 'apps/cli'),
-      CORS_ORIGIN: '*',
-      CLASSIFYRE_CLI_AUTO_INSTALL_OPTIONAL_DEPS: '0',
-      NODE_ENV: 'development',
+      ENVIRONMENT: "desktop",
+      CLI_PATH: path.join(MONOREPO_ROOT, "apps/cli"),
+      CORS_ORIGIN: "*",
+      CLASSIFYRE_CLI_AUTO_INSTALL_OPTIONAL_DEPS: "0",
+      NODE_ENV: "development",
     },
-    stdio: ['ignore', 'pipe', 'pipe'],
+    stdio: ["ignore", "pipe", "pipe"],
   });
 
-  apiProcess.stderr?.on('data', (d: Buffer) => {
+  apiProcess.stderr?.on("data", (d: Buffer) => {
     const msg = d.toString().trim();
     if (msg) console.log(`  [api stderr] ${msg.substring(0, 200)}`);
   });
@@ -298,26 +346,132 @@ async function main() {
   await waitForPort(apiPort, 45_000);
   console.log(`[test] API is ready on port ${apiPort}`);
 
-  // --- Step 5: Verify API responds ---
-  console.log('\n[test] Step 5: Verifying API health...');
+  // --- Step 5: Create the namespace through the public registry API ---
+  console.log("\n[test] Step 5: Registering test namespace...");
+  const namespaceSlug = "test-workspace";
+  const namespaceRes = await fetch(`http://127.0.0.1:${apiPort}/namespaces`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      name: "Test workspace",
+      slug: namespaceSlug,
+      description: "Desktop lifecycle integration test",
+    }),
+  });
+  const namespaceBody = await namespaceRes.text();
+  assert(
+    namespaceRes.ok,
+    `Namespace creation failed: ${namespaceRes.status} ${namespaceBody}`,
+  );
+  const namespace = JSON.parse(namespaceBody) as { id: string };
+  console.log(`[test] Namespace "${namespaceSlug}" registered`);
+
+  const otherNamespaceSlug = "other-workspace";
+  const otherNamespaceRes = await fetch(
+    `http://127.0.0.1:${apiPort}/namespaces`,
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        name: "Other workspace",
+        slug: otherNamespaceSlug,
+      }),
+    },
+  );
+  assert(
+    otherNamespaceRes.ok,
+    `Second namespace creation failed: ${otherNamespaceRes.status} ${await otherNamespaceRes.text()}`,
+  );
+
+  // --- Step 6: Verify API responds ---
+  console.log("\n[test] Step 6: Verifying API health...");
   const healthRes = await fetch(`http://127.0.0.1:${apiPort}/`);
   assert(healthRes.ok, `Health check failed: ${healthRes.status}`);
   console.log(`[test] Health check: ${healthRes.status} OK`);
 
-  // --- Step 6: Verify schema isolation ---
-  console.log('\n[test] Step 6: Verifying schema isolation...');
-  const sourcesRes = await fetch(`http://127.0.0.1:${apiPort}/sources`);
+  // --- Step 7: Verify schema isolation through the namespaced route ---
+  console.log("\n[test] Step 7: Verifying schema isolation...");
+  const createSourceRes = await fetch(
+    `http://127.0.0.1:${apiPort}/${namespaceSlug}/sources`,
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        type: "WORDPRESS",
+        name: "Tenant A source",
+        config: {
+          type: "WORDPRESS",
+          required: { url: "https://blog.example.com" },
+          masked: {
+            username: "admin",
+            application_password: "test-application-password",
+          },
+          sampling: { strategy: "RANDOM", limit: 5 },
+        },
+      }),
+    },
+  );
+  assert(
+    createSourceRes.ok,
+    `Source creation failed: ${createSourceRes.status} ${await createSourceRes.text()}`,
+  );
+
+  const sourcesRes = await fetch(
+    `http://127.0.0.1:${apiPort}/${namespaceSlug}/sources`,
+  );
   assert(sourcesRes.ok, `Sources endpoint failed: ${sourcesRes.status}`);
   const sources = await sourcesRes.json();
-  assert(Array.isArray(sources), 'Sources should be an array');
-  console.log(`[test] Sources in namespace: ${sources.length} (expected 0 for fresh schema)`);
+  assert(Array.isArray(sources), "Sources should be an array");
+  assert(sources.length === 1, "First namespace should contain its source");
 
-  console.log('\n=== ALL TESTS PASSED ===\n');
+  const otherSourcesRes = await fetch(
+    `http://127.0.0.1:${apiPort}/${otherNamespaceSlug}/sources`,
+  );
+  assert(
+    otherSourcesRes.ok,
+    `Second namespace sources endpoint failed: ${otherSourcesRes.status}`,
+  );
+  const otherSources = await otherSourcesRes.json();
+  assert(Array.isArray(otherSources), "Second namespace sources should be an array");
+  assert(
+    otherSources.length === 0,
+    "A source from the first namespace leaked into the second namespace",
+  );
+  console.log(
+    `[test] Sources isolated: ${sources.length} in first namespace, ${otherSources.length} in second`,
+  );
+
+  // --- Step 8: Verify namespace teardown and route invalidation ---
+  console.log("\n[test] Step 8: Verifying namespace teardown...");
+  const deleteRes = await fetch(
+    `http://127.0.0.1:${apiPort}/namespaces/${namespace.id}`,
+    { method: "DELETE" },
+  );
+  assert(
+    deleteRes.ok,
+    `Namespace deletion failed: ${deleteRes.status} ${await deleteRes.text()}`,
+  );
+  const deletedRouteRes = await fetch(
+    `http://127.0.0.1:${apiPort}/${namespaceSlug}/sources`,
+  );
+  assert(
+    deletedRouteRes.status === 404,
+    `Deleted namespace route should return 404, got ${deletedRouteRes.status}`,
+  );
+  const survivingRouteRes = await fetch(
+    `http://127.0.0.1:${apiPort}/${otherNamespaceSlug}/sources`,
+  );
+  assert(
+    survivingRouteRes.ok,
+    `Surviving namespace failed after peer deletion: ${survivingRouteRes.status}`,
+  );
+
+  console.log("\n=== ALL TESTS PASSED ===\n");
 }
 
 main()
   .catch((err) => {
-    console.error('\n=== TEST FAILED ===');
+    console.error("\n=== TEST FAILED ===");
     console.error(err);
     process.exitCode = 1;
   })

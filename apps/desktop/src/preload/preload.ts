@@ -1,20 +1,24 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
+// Single shared API base for the whole app. The namespace is now a concept
+// INSIDE the web app (its landing page + `/<slug>/...` routes), not a
+// per-process port, so the desktop exposes one base URL and the web app scopes
+// every request to the active namespace itself. `--api-base` is the new arg;
+// `--api-port` is kept for backward compatibility with older bundles.
+const apiBase = process.argv
+  .find((arg) => arg.startsWith('--api-base='))
+  ?.split('=')[1];
+
 const apiPort = process.argv
   .find((arg) => arg.startsWith('--api-port='))
   ?.split('=')[1];
 
-const namespaceId = process.argv
-  .find((arg) => arg.startsWith('--namespace-id='))
-  ?.split('=')[1];
+const apiBaseUrl = apiBase ?? (apiPort ? `http://127.0.0.1:${apiPort}` : undefined);
 
-if (apiPort) {
-  const apiBaseUrl = `http://127.0.0.1:${apiPort}`;
-
+if (apiBaseUrl) {
   contextBridge.exposeInMainWorld('__CLASSIFYRE_DESKTOP__', {
     apiBaseUrl,
     wsBaseUrl: apiBaseUrl,
-    namespaceId,
   });
 }
 
@@ -23,6 +27,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   listNamespaces: () => ipcRenderer.invoke('namespace:list'),
   createNamespace: (name: string, remoteUrl?: string) =>
     ipcRenderer.invoke('namespace:create', name, remoteUrl),
+  verifyRemoteInstance: (remoteUrl: string) =>
+    ipcRenderer.invoke('remote:verify', remoteUrl),
   deleteNamespace: (id: string) =>
     ipcRenderer.invoke('namespace:delete', id),
   updateNamespace: (id: string, patch: Record<string, unknown>) =>
@@ -84,6 +90,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   showNotification: (payload: Record<string, unknown>) =>
     ipcRenderer.send('notification:show', payload),
   onNotificationNavigate: (cb: (url: string) => void) => {
-    ipcRenderer.on('desktop-notification:navigate', (_event, url: string) => cb(url));
+    const listener = (_event: Electron.IpcRendererEvent, url: string) => cb(url);
+    ipcRenderer.on('desktop-notification:navigate', listener);
+    return () =>
+      ipcRenderer.removeListener('desktop-notification:navigate', listener);
   },
 });

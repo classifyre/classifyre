@@ -1,5 +1,6 @@
 "use client";
 
+import { nsPath } from "@/lib/ns-path";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@workspace/ui/components/button";
@@ -89,9 +90,9 @@ export function ScanWizard({ open, onOpenChange }: ScanWizardProps) {
       });
       onOpenChange(false);
       if (runner?.id) {
-        router.push(`/scans/${runner.id}`);
+        router.push(nsPath(`/scans/${runner.id}`));
       } else {
-        router.push(`/scans`);
+        router.push(nsPath(`/scans`));
         router.refresh();
       }
     } catch (err) {

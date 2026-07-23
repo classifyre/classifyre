@@ -217,12 +217,13 @@ test("sandbox renders uploaded files immediately after the source name section",
       );
       return {
         followsName: Boolean(
-          name?.compareDocumentPosition(slot) &
-          Node.DOCUMENT_POSITION_FOLLOWING,
+          name &&
+          name.compareDocumentPosition(slot) & Node.DOCUMENT_POSITION_FOLLOWING,
         ),
         precedesSampling: Boolean(
+          sampling &&
           slot.compareDocumentPosition(sampling) &
-          Node.DOCUMENT_POSITION_FOLLOWING,
+            Node.DOCUMENT_POSITION_FOLLOWING,
         ),
       };
     });

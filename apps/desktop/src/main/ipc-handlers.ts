@@ -5,6 +5,7 @@ import { SettingsManager, type AppSettings } from './settings-manager.js';
 import { UpdateChecker } from './update-checker.js';
 import { PostgresManager } from './postgres-manager.js';
 import { getThumbnailDataUrl, deleteThumbnail } from './thumbnails.js';
+import { verifyClassifyreRemote } from './remote-instance.js';
 
 export function registerIpcHandlers(
   runtime: NamespaceRuntime,
@@ -21,6 +22,10 @@ export function registerIpcHandlers(
     const ns = namespaceManager.create(name, remoteUrl);
     runtime.emitStateChange(); // refresh tray + Workspaces menu
     return ns;
+  });
+
+  ipcMain.handle('remote:verify', (_event, remoteUrl: string) => {
+    return verifyClassifyreRemote(remoteUrl);
   });
 
   ipcMain.handle('namespace:delete', async (_event, id: string) => {

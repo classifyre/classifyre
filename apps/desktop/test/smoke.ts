@@ -1,7 +1,8 @@
 /**
  * Smoke test for a PACKAGED desktop build. Launches the real binary, waits
- * for the namespace selector to render (which requires embedded PostgreSQL to
- * have started), and exits 0 on success.
+ * for the workspace directory to finish its first API-backed load (which
+ * requires the renderer, shared API, and embedded PostgreSQL), and exits 0 on
+ * success.
  *
  * Usage:
  *   CLASSIFYRE_APP_PATH=/path/to/binary npx tsx test/smoke.ts
@@ -27,6 +28,25 @@ const launchArgs =
     : [];
 
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'classifyre-smoke-'));
+
+async function removeTemporaryDirectory(directory: string): Promise<void> {
+  try {
+    // Chromium can keep files such as Network/Trust Tokens locked briefly on
+    // Windows after its parent process closes. Node retries the transient
+    // EBUSY/EPERM/ENOTEMPTY failures before we leave any diagnostic data behind.
+    await fs.promises.rm(directory, {
+      recursive: true,
+      force: true,
+      maxRetries: 20,
+      retryDelay: 250,
+    });
+  } catch (error) {
+    // Temp cleanup must not hide the application result. The operating system
+    // will eventually reclaim its temp directory if a third-party lock outlives
+    // the retry window.
+    console.warn(`Unable to remove temporary directory ${directory}:`, error);
+  }
+}
 
 // Playwright's electron.launch() only resolves after the app is up, so stdout
 // listeners attached to it miss the early boot logs — including the embedded
@@ -55,18 +75,29 @@ async function preflightCapture(): Promise<string> {
     process.stderr.write(`[boot stderr] ${d}`);
   });
   await new Promise<void>((resolve) => {
+    let settled = false;
+    let forcedCloseTimer: ReturnType<typeof setTimeout> | undefined;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      if (forcedCloseTimer) clearTimeout(forcedCloseTimer);
+      resolve();
+    };
     const timer = setTimeout(() => {
       console.log('[boot] still alive after 30s (window likely up); killing preflight');
       child.kill('SIGKILL');
-      resolve();
+      // A close event normally follows immediately. Keep a bounded fallback so
+      // a platform-specific process-handle failure cannot hang the smoke test.
+      forcedCloseTimer = setTimeout(finish, 5_000);
     }, 30_000);
-    child.on('exit', (code, signal) => {
-      clearTimeout(timer);
+    child.once('close', (code, signal) => {
       console.log(`[boot] process exited early: code=${code} signal=${signal}`);
-      resolve();
+      finish();
     });
+    child.once('error', finish);
   });
-  fs.rmSync(diagDir, { recursive: true, force: true });
+  await removeTemporaryDirectory(diagDir);
   console.log('--- end preflight ---');
   return captured;
 }
@@ -84,7 +115,8 @@ async function main(): Promise<void> {
       'Smoke test SKIPPED on Windows: embedded PostgreSQL cannot run under the ' +
         "CI runner's elevated admin account. Not an app defect; skipping.",
     );
-    process.exit(0);
+    await removeTemporaryDirectory(dataDir);
+    return;
   }
 
   console.log(`Launching packaged app: ${appPath}`);
@@ -117,16 +149,19 @@ async function main(): Promise<void> {
   );
 
   try {
-    // The selector view shows up as a Playwright "window". Postgres must be
-    // running before the main window is created, so a visible selector proves
-    // the embedded database booted on a clean machine profile.
+    // The shared web view shows up as a Playwright "window". Its state changes
+    // from loading to ready only after client hydration and a successful
+    // namespace-registry request, proving the renderer, API, and database all
+    // work in the packaged application.
     const deadline = Date.now() + 120_000;
     let found = false;
     while (Date.now() < deadline && !found) {
       for (const win of app.windows()) {
         try {
-          const heading = await win.locator('h1').textContent({ timeout: 2000 });
-          if (heading?.trim() === 'Classifyre') {
+          const directory = win.locator(
+            '[data-testid="workspace-directory"][data-app-state="ready"]',
+          );
+          if (await directory.isVisible({ timeout: 2000 })) {
             found = true;
             break;
           }
@@ -141,13 +176,17 @@ async function main(): Promise<void> {
 
     if (!found) {
       const urls = app.windows().map((w) => w.url());
-      throw new Error(`Selector never rendered. Windows: ${urls.join(', ') || '(none)'}`);
+      throw new Error(
+        `Workspace directory never became ready. Windows: ${urls.join(', ') || '(none)'}`,
+      );
     }
 
-    console.log('Smoke test passed: app booted and selector rendered.');
+    console.log(
+      'Smoke test passed: packaged renderer, shared API, and database are ready.',
+    );
   } finally {
     await app.close().catch(() => {});
-    fs.rmSync(dataDir, { recursive: true, force: true });
+    await removeTemporaryDirectory(dataDir);
   }
 }
 
