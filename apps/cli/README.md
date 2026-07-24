@@ -67,7 +67,7 @@ Extract output options:
 
 - `--output-type rest|file|console`
 - `--output-batch-size <int>`
-- `--output-rest-url <url>`
+- `--output-rest-url <url>` (complete API base, including the namespace path)
 - `--output-file-path <path>`
 - `--source-id <uuid>`
 - `--runner-id <uuid>`
@@ -114,7 +114,7 @@ uv run main.py extract ./wordpress-recipe.json \
 Notes:
 
 - `--runner-id` optional for manual runs. If omitted, CLI creates external runner automatically.
-- `--output-rest-url` is optional. If omitted, CLI uses `CLASSIFYRE_OUTPUT_REST_URL`, then `API_URL`, then `http://localhost:8000`.
+- `--output-rest-url` is optional. If omitted, CLI uses `CLASSIFYRE_OUTPUT_REST_URL`, then `API_URL`, then `http://localhost:8000`. In a namespaced deployment, pass the complete base (for example `https://api.example/ns-id`); the CLI appends all asset, finding, runner, and source endpoints beneath it.
 - `--managed-runner` should be used only for API-orchestrated runs where runner already exists.
 
 ### 4) REST output with explicit runner (managed/orchestrated style)
