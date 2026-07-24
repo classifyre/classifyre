@@ -2,7 +2,7 @@ import { Logger } from '@nestjs/common';
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { Pool } from 'pg';
+import { Pool, type PoolClient } from 'pg';
 import {
   REGISTRY_TABLE_DDL,
   publicConnectionString,
@@ -10,6 +10,55 @@ import {
 } from './registry/namespace-registry.sql';
 
 const logger = new Logger('DatabaseMigrations');
+const MIGRATION_LOCK_SCOPE = 1_127_074_643;
+const MIGRATION_LOCK_ID = 1;
+
+/**
+ * Serialize registry DDL and tenant-schema migrations across every API/worker
+ * process connected to the database. PostgreSQL advisory locks are
+ * session-scoped, so a crashed pod automatically releases ownership.
+ */
+export async function withDatabaseMigrationLock<T>(
+  operation: (client: PoolClient) => Promise<T>,
+): Promise<T> {
+  const pool = new Pool({
+    connectionString: publicConnectionString(),
+    options: PUBLIC_SEARCH_PATH_OPTION,
+    max: 1,
+  });
+  let client: PoolClient | undefined;
+  try {
+    client = await pool.connect();
+    await client.query('SELECT pg_advisory_lock($1::integer, $2::integer)', [
+      MIGRATION_LOCK_SCOPE,
+      MIGRATION_LOCK_ID,
+    ]);
+    return await operation(client);
+  } finally {
+    if (client) {
+      await client
+        .query('SELECT pg_advisory_unlock($1::integer, $2::integer)', [
+          MIGRATION_LOCK_SCOPE,
+          MIGRATION_LOCK_ID,
+        ])
+        .catch(() => undefined);
+      client.release();
+    }
+    await pool.end();
+  }
+}
+
+/** Ensure the global namespace registry exists under the migration lock. */
+export async function ensureNamespaceRegistry(): Promise<void> {
+  if (!process.env.DATABASE_URL) {
+    throw new Error(
+      'Classifyre cannot initialize the namespace registry because DATABASE_URL is not set.',
+    );
+  }
+  await withDatabaseMigrationLock(async (client) => {
+    await client.query(REGISTRY_TABLE_DDL);
+  });
+}
 
 function firstExistingPath(candidates: Array<string | undefined>): string {
   const existing = candidates.find(
@@ -169,20 +218,17 @@ export async function applyAllPendingMigrations(): Promise<void> {
     );
   }
 
-  const pool = new Pool({
-    connectionString: publicConnectionString(),
-    options: PUBLIC_SEARCH_PATH_OPTION,
-  });
-  let schemas: Array<{
-    id: string;
-    schemaName: string;
-    provisioning: boolean;
-  }> = [];
-  try {
-    await pool.query(REGISTRY_TABLE_DDL);
+  await withDatabaseMigrationLock(async (client) => {
+    let schemas: Array<{
+      id: string;
+      schemaName: string;
+      provisioning: boolean;
+    }> = [];
+
+    await client.query(REGISTRY_TABLE_DDL);
     // Namespace deletion is a soft-delete (status = 'deleted'): the tenant
     // schema and its data are retained, so there is nothing to drop on boot.
-    const { rows } = await pool.query<{
+    const { rows } = await client.query<{
       id: string;
       schema_name: string;
       status: string;
@@ -194,30 +240,20 @@ export async function applyAllPendingMigrations(): Promise<void> {
       schemaName: r.schema_name,
       provisioning: r.status === 'provisioning',
     }));
-  } finally {
-    await pool.end();
-  }
 
-  logger.log(
-    `Namespace registry ready; migrating ${schemas.length} namespace schema(s)`,
-  );
-  for (const schema of schemas) {
-    await deployForSchema(schema.schemaName);
-    if (schema.provisioning) {
-      const activationPool = new Pool({
-        connectionString: publicConnectionString(),
-        options: PUBLIC_SEARCH_PATH_OPTION,
-      });
-      try {
-        await activationPool.query(
+    logger.log(
+      `Namespace registry ready; migrating ${schemas.length} namespace schema(s)`,
+    );
+    for (const schema of schemas) {
+      await deployForSchema(schema.schemaName);
+      if (schema.provisioning) {
+        await client.query(
           "UPDATE namespaces SET status = 'active', updated_at = now() WHERE id = $1 AND status = 'provisioning'",
           [schema.id],
         );
-      } finally {
-        await activationPool.end();
       }
     }
-  }
+  });
 }
 
 /**

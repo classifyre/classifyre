@@ -8,6 +8,7 @@ import {
 } from '../namespace/namespace.constants';
 
 import type { Job } from 'pg-boss';
+import { NamespaceJobConcurrencyService } from './namespace-job-concurrency.service';
 
 type PgBossModule = typeof import('pg-boss');
 type PgBossInstance = InstanceType<PgBossModule['PgBoss']>;
@@ -32,7 +33,10 @@ export class PgBossService implements OnApplicationShutdown {
   private readonly logger = new Logger(PgBossService.name);
   private readonly bosses = new Map<string, PgBossInstance>();
 
-  constructor(private readonly cls: ClsService) {}
+  constructor(
+    private readonly cls: ClsService,
+    private readonly namespaceConcurrency: NamespaceJobConcurrencyService,
+  ) {}
 
   /** Start (idempotently) the pg-boss instance for a namespace schema. */
   async startForNamespace(
@@ -72,6 +76,7 @@ export class PgBossService implements OnApplicationShutdown {
         this.stopForNamespace(schema).catch(() => {}),
       ),
     );
+    await this.namespaceConcurrency.close();
   }
 
   /**
@@ -112,12 +117,16 @@ export class PgBossService implements OnApplicationShutdown {
     const slug = this.cls.get<string>(CLS_SLUG);
     const boss = this.currentBoss();
     const wrapped = (jobs: Job<T>[]): Promise<unknown> =>
-      this.cls.run(() => {
-        this.cls.set(CLS_SCHEMA, schema);
-        this.cls.set(CLS_NAMESPACE_ID, namespaceId);
-        this.cls.set(CLS_SLUG, slug);
-        return handler(jobs);
-      });
+      this.namespaceConcurrency.withSlot(
+        { namespaceId, namespaceSlug: slug, queue },
+        () =>
+          this.cls.run(() => {
+            this.cls.set(CLS_SCHEMA, schema);
+            this.cls.set(CLS_NAMESPACE_ID, namespaceId);
+            this.cls.set(CLS_SLUG, slug);
+            return handler(jobs);
+          }),
+      );
     // pg-boss's overloaded work() signatures don't unify with a generic
     // wrapper; the runtime contract (queue, options, batch handler) is correct.
     return (

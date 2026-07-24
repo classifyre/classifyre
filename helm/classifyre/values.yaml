@@ -284,7 +284,7 @@ api:
     # -- API applies pending migrations itself before NestJS startup.
     enabled: true
     # -- Migration command/script.
-    script: npx prisma migrate deploy --schema /app/api/prisma/schema.prisma
+    script: node -e "require('./dist/src/database-migrations.js').applyAllPendingMigrations().catch((error) => { console.error(error); process.exit(1); })"
     # -- Security context for the migration init container.
     # -- Override with runAsUser/runAsNonRoot: false if the migration toolchain requires root (e.g. Prisma on Bun).
     containerSecurityContext:
@@ -467,6 +467,11 @@ worker:
   # -- embedding inference outside the HTTP-serving api pods, so heavy
   # -- background work no longer competes with api pods for their memory limit.
   replicaCount: 1
+
+  # -- Maximum namespace-scoped background job batches executing concurrently
+  # across all worker replicas. All tenant queues remain registered; excess
+  # jobs wait on a PostgreSQL advisory-lock slot. Set 0 for unlimited.
+  maxConcurrentNamespaceJobs: 1
 
   resources:
     # -- Worker resource requests.

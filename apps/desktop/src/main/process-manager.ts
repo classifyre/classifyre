@@ -367,6 +367,9 @@ export class ProcessManager {
         PATH: pathWithVenv,
         ELECTRON_RUN_AS_NODE: "1",
         PORT: String(port),
+        // Child CLI processes receive a complete namespace URL built from this
+        // API-owned base, matching the Kubernetes job contract.
+        CLASSIFYRE_INTERNAL_API_URL: `http://127.0.0.1:${port}`,
         DATABASE_URL: databaseUrl,
         // The shared API owns the registry and every namespace schema.
         CLASSIFYRE_AUTO_MIGRATE: "true",
@@ -558,5 +561,4 @@ export class ProcessManager {
     const ids = [...this.processes.keys()];
     await Promise.all(ids.map((id) => this.stopApi(id)));
   }
-
 }

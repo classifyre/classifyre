@@ -61,7 +61,7 @@ export class KubernetesCliJobService {
     runnerId: string,
     sourceId: string,
     recipe: Record<string, unknown>,
-    outputRestUrl?: string,
+    outputRestUrl: string,
     hasSuccessfulRuns?: boolean,
     onLogChunk?: CliJobLogHandler,
     onJobCreated?: CliJobCreatedHandler,
@@ -83,7 +83,7 @@ export class KubernetesCliJobService {
   async runTestJob(
     sourceId: string,
     recipe: Record<string, unknown>,
-    outputRestUrl?: string,
+    outputRestUrl: string,
   ): Promise<CliJobResult> {
     return this.runJob({
       sourceId,
@@ -653,7 +653,7 @@ export class KubernetesCliJobService {
       prelude.push('RUNNER_ID="${RUNNER_ID:-}"');
       prelude.push('SOURCE_ID="${SOURCE_ID:-}"');
       prelude.push(
-        'OUTPUT_REST_URL="${CLASSIFYRE_OUTPUT_REST_URL:-http://127.0.0.1:8000}"',
+        'OUTPUT_REST_URL="${CLASSIFYRE_OUTPUT_REST_URL:?API did not provide a namespaced callback URL}"',
       );
       prelude.push('OUTPUT_BATCH_SIZE="${CLASSIFYRE_OUTPUT_BATCH_SIZE:-20}"');
       command = [
@@ -668,7 +668,7 @@ export class KubernetesCliJobService {
     } else if (mode === 'test') {
       prelude.push('printf "%s" "$RECIPE_B64" | base64 -d > /tmp/recipe.json');
       prelude.push(
-        'export CLASSIFYRE_OUTPUT_REST_URL="${CLASSIFYRE_OUTPUT_REST_URL:-http://127.0.0.1:8000}"',
+        'export CLASSIFYRE_OUTPUT_REST_URL="${CLASSIFYRE_OUTPUT_REST_URL:?API did not provide a namespaced callback URL}"',
       );
       command = '"$PYTHON_BIN" -m src.main test /tmp/recipe.json';
     } else {
