@@ -128,10 +128,6 @@ data:
                     "value": "1"
                   },
                   {
-                    "name": "CLASSIFYRE_OUTPUT_REST_URL",
-                    "value": "http://classifyre-api.od-product-sw-team-1-c.svc.cluster.local:8000"
-                  },
-                  {
                     "name": "CLASSIFYRE_OUTPUT_BATCH_SIZE",
                     "value": "20"
                   },
@@ -448,6 +444,8 @@ spec:
                   key: CLASSIFYRE_MASKED_CONFIG_KEY
             - name: CLASSIFYRE_AUTO_MIGRATE
               value: "false"
+            - name: CLASSIFYRE_INTERNAL_API_URL
+              value: "http://classifyre-api.od-product-sw-team-1-c.svc.cluster.local:8000"
             - name: EMBEDDING_ENABLED
               value: "true"
             - name: EMBEDDING_PROVIDER

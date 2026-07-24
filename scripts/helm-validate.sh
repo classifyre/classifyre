@@ -46,6 +46,22 @@ assert_not_contains() {
   fi
 }
 
+assert_count_at_least() {
+  local description="$1"
+  local pattern="$2"
+  local minimum="$3"
+  local rendered="$4"
+  local count
+  count="$(grep -cF -- "${pattern}" <<<"${rendered}" || true)"
+  if [[ "${count}" -ge "${minimum}" ]]; then
+    echo "  ✓ ${description}"
+    PASS=$((PASS + 1))
+  else
+    echo "  ✗ ${description} — expected at least ${minimum}, found ${count}: ${pattern}"
+    FAIL=$((FAIL + 1))
+  fi
+}
+
 run_checks() {
   local label="$1"
   local values_file="$2"
@@ -73,6 +89,27 @@ run_checks() {
   assert_contains \
     "CLI job env includes HOME=/tmp" \
     '"HOME"' \
+    "${rendered}"
+
+  assert_contains \
+    "API receives its internal callback base URL" \
+    "CLASSIFYRE_INTERNAL_API_URL" \
+    "${rendered}"
+
+  assert_not_contains \
+    "CLI Job template does not hardcode an unscoped API URL" \
+    '"name": "CLASSIFYRE_OUTPUT_REST_URL"' \
+    "${rendered}"
+
+  assert_count_at_least \
+    "API and worker pods both wait for the migration lock" \
+    "- name: prisma-migrate" \
+    2 \
+    "${rendered}"
+
+  assert_contains \
+    "Namespace background execution has a global concurrency limit" \
+    "MAX_CONCURRENT_NAMESPACE_JOBS" \
     "${rendered}"
 
   # ── Postgres embedded: non-root startup ───────────────────────────────────

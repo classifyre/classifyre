@@ -217,6 +217,60 @@ env, object storage, and telemetry. Both deployments run the exact same image an
 process (`startCommand`), so they must see identical env aside from SERVICE_ROLE,
 which each deployment sets on its own after including this block.
 */}}
+{{- define "classifyre.migrationInitContainer" -}}
+- name: prisma-migrate
+  image: {{ .Values.api.image.repository }}:{{ .Values.api.image.tag | default .Chart.AppVersion }}
+  imagePullPolicy: {{ .Values.api.image.pullPolicy }}
+  {{- with .Values.api.migration.containerSecurityContext }}
+  securityContext:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  command:
+    - /bin/sh
+    - -lc
+  args:
+    - >-
+      set -eu;
+      {{- if .Values.api.workingDir }}
+      cd {{ .Values.api.workingDir | quote }};
+      {{- end }}
+      if [ -d "/app/node_modules" ] && [ ! -e "/node_modules" ]; then
+        ln -s /app/node_modules /node_modules;
+      fi;
+      if [ -z "${DATABASE_URL:-}" ] || [ "${DATABASE_URL}" = "postgresql://postgres@127.0.0.1:5432/classifyre" ]; then
+        export DATABASE_URL="postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=${DB_SSLMODE}";
+      fi;
+      {{ .Values.api.migration.script }}
+  env:
+    - name: DB_HOST
+      value: {{ include "classifyre.databaseHost" . | quote }}
+    - name: DB_PORT
+      value: {{ include "classifyre.databasePort" . | quote }}
+    - name: DB_NAME
+      value: {{ include "classifyre.databaseName" . | quote }}
+    - name: DB_USER
+      value: {{ include "classifyre.databaseUser" . | quote }}
+    - name: DB_SSLMODE
+      value: {{ include "classifyre.databaseSslMode" . | quote }}
+    - name: DB_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: {{ include "classifyre.databaseSecretName" . }}
+          key: {{ include "classifyre.databasePasswordKey" . }}
+    - name: CLASSIFYRE_MASKED_CONFIG_KEY
+      valueFrom:
+        secretKeyRef:
+          name: {{ include "classifyre.apiMaskedConfigSecretName" . }}
+          key: {{ include "classifyre.apiMaskedConfigSecretKey" . }}
+    {{- if and (eq .Values.postgres.mode "external") .Values.postgres.external.existingSecret .Values.postgres.external.existingSecretUrlKey }}
+    - name: DATABASE_URL
+      valueFrom:
+        secretKeyRef:
+          name: {{ include "classifyre.databaseSecretName" . }}
+          key: {{ .Values.postgres.external.existingSecretUrlKey }}
+    {{- end }}
+{{- end -}}
+
 {{- define "classifyre.api.env" -}}
 - name: DB_HOST
   value: {{ include "classifyre.databaseHost" . | quote }}
@@ -240,6 +294,12 @@ which each deployment sets on its own after including this block.
       key: {{ include "classifyre.apiMaskedConfigSecretKey" . }}
 - name: CLASSIFYRE_AUTO_MIGRATE
   value: {{ ternary "false" "true" .Values.api.migration.enabled | quote }}
+- name: MAX_CONCURRENT_NAMESPACE_JOBS
+  value: {{ .Values.worker.maxConcurrentNamespaceJobs | quote }}
+{{- if not (hasKey .Values.api.env "CLASSIFYRE_INTERNAL_API_URL") }}
+- name: CLASSIFYRE_INTERNAL_API_URL
+  value: "http://{{ include "classifyre.api.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.api.service.port }}"
+{{- end }}
 {{- /* ── Node heap + backpressure ─────────────────────────────
      Node's default old-space cap (~512 MB) ignores the container memory
      limit, so the process OOM-crashes far below its granted memory. Raise the

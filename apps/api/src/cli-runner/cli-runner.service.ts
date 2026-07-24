@@ -16,6 +16,10 @@ import { CORRELATION_QUEUE } from '../correlation/correlation.constants';
 import { ClsService } from 'nestjs-cls';
 import { CLS_SCHEMA, CLS_NAMESPACE_ID } from '../namespace/namespace.constants';
 import {
+  buildNamespaceApiBaseUrl,
+  resolveInternalApiBaseUrl,
+} from '../internal-api-url';
+import {
   AssetType,
   Prisma,
   RunnerExecutionMode,
@@ -1163,9 +1167,7 @@ export class CliRunnerService {
     const recipeFile = await this.createTempRecipeFile(source.config);
 
     try {
-      const outputRestUrl =
-        this.resolveOutputRestUrl(environment, namespaceId) ||
-        'http://localhost:8000';
+      const outputRestUrl = this.resolveOutputRestUrl(environment, namespaceId);
       const command = this.buildCliCommand(
         cliPath,
         venvPath,
@@ -1483,37 +1485,13 @@ export class CliRunnerService {
   private resolveOutputRestUrl(
     environment: string,
     namespaceId?: string,
-  ): string | undefined {
-    const base = this.resolveOutputRestBase(environment);
-    if (!base) return undefined;
-    // The CLI joins relative endpoint paths onto this base, so a namespace UUID
-    // segment makes it post findings back to `/<uuid>/...` — the API resolves
-    // the tenant from that segment. The UUID is immutable, so the URL survives a
-    // slug edit mid-scan. Prefer an explicitly-threaded id (the CLI runs
-    // detached, where CLS can be lost); fall back to CLS for synchronous
-    // in-request callers (e.g. testConnection). No namespace → base unchanged.
+  ): string {
+    const base = resolveInternalApiBaseUrl(environment);
+    // Pass one complete callback base to the CLI. It remains namespace-blind:
+    // every output/input endpoint is joined beneath this URL. Prefer the id
+    // captured before detached execution; synchronous callers can use CLS.
     const id = namespaceId ?? this.currentNamespaceId();
-    if (!id) return base;
-    return `${base.replace(/\/+$/, '')}/${id}`;
-  }
-
-  private resolveOutputRestBase(environment: string): string | undefined {
-    const explicit =
-      process.env.CLI_OUTPUT_REST_URL ||
-      process.env.CLASSIFYRE_OUTPUT_REST_URL ||
-      process.env.CLASSIFYRE_INTERNAL_API_URL;
-    if (explicit) {
-      return explicit;
-    }
-
-    if (environment === 'desktop') {
-      const port = process.env.PORT || '8000';
-      return `http://127.0.0.1:${port}`;
-    }
-    if (environment === 'development') {
-      return 'http://localhost:8000';
-    }
-    return undefined;
+    return buildNamespaceApiBaseUrl(base, id);
   }
 
   private shellEscape(value: string): string {

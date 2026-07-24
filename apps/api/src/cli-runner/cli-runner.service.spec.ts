@@ -22,6 +22,7 @@ describe('CliRunnerService', () => {
   beforeEach(() => {
     process.env = { ...originalEnv };
     process.env.NODE_ENV = 'test';
+    process.env.CLASSIFYRE_INTERNAL_API_URL = 'http://api.internal:8000/prefix';
     process.env.CLASSIFYRE_MASKED_CONFIG_KEY = Buffer.alloc(32, 19).toString(
       'base64',
     );
@@ -95,6 +96,11 @@ describe('CliRunnerService', () => {
       }),
     };
     const maskedConfigCryptoService = new MaskedConfigCryptoService();
+    const cls = {
+      get: jest.fn((key: string) =>
+        key === 'namespaceId' ? 'namespace-id' : undefined,
+      ),
+    };
     const service = new CliRunnerService(
       prisma as any,
       notificationsService as any,
@@ -103,6 +109,8 @@ describe('CliRunnerService', () => {
       runnerLogStorage as any,
       options?.kubernetesCliJobService,
       undefined,
+      undefined,
+      cls as any,
     );
 
     return { service, prisma, maskedConfigCryptoService, runnerLogStorage };
@@ -181,7 +189,7 @@ describe('CliRunnerService', () => {
     expect(kubernetesCliJobService.runTestJob).toHaveBeenCalledWith(
       'source-2',
       plainConfig,
-      undefined,
+      'http://api.internal:8000/prefix/namespace-id',
     );
   });
 
@@ -332,8 +340,7 @@ describe('CliRunnerService', () => {
         }),
       }),
       false,
-      // Namespace UUID captured from CLS (undefined outside a namespace context).
-      undefined,
+      'namespace-id',
     );
   });
 

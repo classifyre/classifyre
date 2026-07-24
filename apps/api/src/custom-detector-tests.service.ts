@@ -12,6 +12,13 @@ import { promisify } from 'util';
 import { PrismaService } from './prisma.service';
 import { CustomDetectorsService } from './custom-detectors.service';
 import { KubernetesCliJobService } from './cli-runner/kubernetes-cli-job.service';
+import { ClsService } from 'nestjs-cls';
+import { CLS_NAMESPACE_ID } from './namespace/namespace.constants';
+import {
+  appendApiPath,
+  buildNamespaceApiBaseUrl,
+  resolveInternalApiBaseUrl,
+} from './internal-api-url';
 import {
   createTestScenarioSchema,
   type RunTestsResponseDto,
@@ -31,6 +38,8 @@ export class CustomDetectorTestsService {
     private readonly customDetectorsService: CustomDetectorsService,
     @Optional()
     private readonly kubernetesCliJobService?: KubernetesCliJobService,
+    @Optional()
+    private readonly cls?: ClsService,
   ) {}
 
   // ── CRUD ──────────────────────────────────────────────────────────────────
@@ -287,12 +296,15 @@ export class CustomDetectorTestsService {
     let stdout: string;
 
     if (this.kubernetesCliJobService?.isEnabled() && scenario) {
-      const baseUrl = (
-        process.env.CLASSIFYRE_INTERNAL_API_URL ||
-        process.env.CLASSIFYRE_OUTPUT_REST_URL ||
-        'http://127.0.0.1:8000'
-      ).replace(/\/$/, '');
-      const inputUrl = `${baseUrl}/custom-detectors/${encodeURIComponent(scenario.detectorId)}/test-scenarios/${encodeURIComponent(scenario.scenarioId)}/input`;
+      const environment = process.env.ENVIRONMENT || 'development';
+      const baseUrl = buildNamespaceApiBaseUrl(
+        resolveInternalApiBaseUrl(environment),
+        this.cls?.get<string>(CLS_NAMESPACE_ID),
+      );
+      const inputUrl = appendApiPath(
+        baseUrl,
+        `/custom-detectors/${encodeURIComponent(scenario.detectorId)}/test-scenarios/${encodeURIComponent(scenario.scenarioId)}/input`,
+      );
       const result = await this.kubernetesCliJobService.runFileEvaluationJob({
         evaluationId: scenario.scenarioId,
         inputUrl,
