@@ -4,14 +4,14 @@ type HeldLocks = Set<string>;
 
 function fakePool(held: HeldLocks) {
   return {
-    connect: jest.fn(async () => {
+    connect: jest.fn(() => {
       const owned = new Set<string>();
       return {
         query: jest.fn(
-          async (
+          (
             sql: string,
             params: [number, number, number],
-          ): Promise<{ rows: Array<{ acquired?: boolean }> }> => {
+          ): { rows: Array<{ acquired?: boolean }> } => {
             const key = `${params[0]}:${params[1] + params[2]}`;
             if (sql.includes('pg_try_advisory_lock')) {
               if (held.has(key)) return { rows: [{ acquired: false }] };
@@ -31,7 +31,7 @@ function fakePool(held: HeldLocks) {
         }),
       };
     }),
-    end: jest.fn(async () => undefined),
+    end: jest.fn(() => undefined),
   };
 }
 
@@ -83,7 +83,7 @@ describe('NamespaceJobConcurrencyService', () => {
 
     const second = replicaB.withSlot(
       { namespaceId: 'namespace-b', queue: 'queue-b' },
-      async () => {
+      () => {
         order.push('b:start');
         order.push('b:end');
       },
@@ -179,7 +179,7 @@ describe('NamespaceJobConcurrencyService', () => {
     await expect(
       service.withSlot(
         { namespaceId: 'namespace-a', queue: 'queue' },
-        async () => 'done',
+        () => 'done',
       ),
     ).resolves.toBe('done');
   });
