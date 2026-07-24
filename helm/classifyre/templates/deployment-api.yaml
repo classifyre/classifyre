@@ -56,57 +56,7 @@ spec:
       {{- end }}
       {{- if .Values.api.migration.enabled }}
       initContainers:
-        - name: prisma-migrate
-          image: {{ .Values.api.image.repository }}:{{ .Values.api.image.tag | default .Chart.AppVersion }}
-          imagePullPolicy: {{ .Values.api.image.pullPolicy }}
-          {{- with .Values.api.migration.containerSecurityContext }}
-          securityContext:
-            {{- toYaml . | nindent 12 }}
-          {{- end }}
-          command:
-            - /bin/sh
-            - -lc
-          args:
-            - >-
-              set -eu;
-              {{- if .Values.api.workingDir }}
-              cd {{ .Values.api.workingDir | quote }};
-              {{- end }}
-              if [ -d "/app/node_modules" ] && [ ! -e "/node_modules" ]; then
-                ln -s /app/node_modules /node_modules;
-              fi;
-              if [ -z "${DATABASE_URL:-}" ] || [ "${DATABASE_URL}" = "postgresql://postgres@127.0.0.1:5432/classifyre" ]; then
-                export DATABASE_URL="postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=${DB_SSLMODE}";
-              fi;
-              {{ .Values.api.migration.script }}
-          env:
-            - name: DB_HOST
-              value: {{ include "classifyre.databaseHost" . | quote }}
-            - name: DB_PORT
-              value: {{ include "classifyre.databasePort" . | quote }}
-            - name: DB_NAME
-              value: {{ include "classifyre.databaseName" . | quote }}
-            - name: DB_USER
-              value: {{ include "classifyre.databaseUser" . | quote }}
-            - name: DB_SSLMODE
-              value: {{ include "classifyre.databaseSslMode" . | quote }}
-            - name: DB_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "classifyre.databaseSecretName" . }}
-                  key: {{ include "classifyre.databasePasswordKey" . }}
-            - name: CLASSIFYRE_MASKED_CONFIG_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "classifyre.apiMaskedConfigSecretName" . }}
-                  key: {{ include "classifyre.apiMaskedConfigSecretKey" . }}
-            {{- if and (eq .Values.postgres.mode "external") .Values.postgres.external.existingSecret .Values.postgres.external.existingSecretUrlKey }}
-            - name: DATABASE_URL
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "classifyre.databaseSecretName" . }}
-                  key: {{ .Values.postgres.external.existingSecretUrlKey }}
-            {{- end }}
+        {{- include "classifyre.migrationInitContainer" . | nindent 8 }}
       {{- end }}
       containers:
         - name: api
