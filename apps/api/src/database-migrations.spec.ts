@@ -19,8 +19,8 @@ const fakeClient = () => ({
 
 jest.mock('pg', () => ({
   Pool: jest.fn().mockImplementation(() => ({
-    connect: jest.fn(async () => fakeClient()),
-    end: jest.fn(async () => undefined),
+    connect: jest.fn(() => fakeClient()),
+    end: jest.fn(() => undefined),
   })),
 }));
 
@@ -62,7 +62,7 @@ describe('database migration lock', () => {
     });
     await firstStarted.promise;
 
-    const second = withDatabaseMigrationLock(async () => {
+    const second = withDatabaseMigrationLock(() => {
       order.push('second:start');
       order.push('second:end');
     });
