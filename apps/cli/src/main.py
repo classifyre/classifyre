@@ -612,8 +612,8 @@ def main() -> None:
         "--output-rest-url",
         default=None,
         help=(
-            "REST output base URL (defaults to CLASSIFYRE_OUTPUT_REST_URL, API_URL, "
-            "or http://localhost:8000)"
+            "Complete REST API base URL, including any namespace/path prefix "
+            "(defaults to CLASSIFYRE_OUTPUT_REST_URL, API_URL, or http://localhost:8000)"
         ),
     )
     parser.add_argument(

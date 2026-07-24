@@ -9,7 +9,11 @@ import {
 } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { Pool } from 'pg';
-import { deployForSchema } from '../database-migrations';
+import {
+  deployForSchema,
+  ensureNamespaceRegistry,
+  withDatabaseMigrationLock,
+} from '../database-migrations';
 import {
   RESERVED_PREFIXES,
   SLUG_RE,
@@ -17,7 +21,6 @@ import {
   slugifyName,
 } from '../namespace/namespace.constants';
 import {
-  REGISTRY_TABLE_DDL,
   publicConnectionString,
   PUBLIC_SEARCH_PATH_OPTION,
 } from './namespace-registry.sql';
@@ -94,8 +97,9 @@ export class NamespaceRegistryService implements OnModuleInit, OnModuleDestroy {
   >();
 
   async onModuleInit(): Promise<void> {
-    // Idempotent; the pre-boot orchestrator normally created this already.
-    await this.pool.query(REGISTRY_TABLE_DDL);
+    // The pre-boot orchestrator normally created this already. The same
+    // cross-process lock makes this fallback safe on fresh multi-replica boots.
+    await ensureNamespaceRegistry();
   }
 
   async onModuleDestroy(): Promise<void> {
@@ -267,14 +271,18 @@ export class NamespaceRegistryService implements OnModuleInit, OnModuleDestroy {
       // Classifyre instance — so skip provisioning entirely.
       if (type === 'local') {
         try {
-          await this.pool.query(`CREATE SCHEMA IF NOT EXISTS "${schemaName}"`);
-          await deployForSchema(schemaName);
-          const activated = await this.pool.query<NamespaceRow>(
-            `UPDATE namespaces SET status = 'active', updated_at = now()
-               WHERE id = $1 RETURNING ${NAMESPACE_COLUMNS}`,
-            [id],
-          );
-          namespace = this.toNamespace(activated.rows[0]);
+          await withDatabaseMigrationLock(async () => {
+            await this.pool.query(
+              `CREATE SCHEMA IF NOT EXISTS "${schemaName}"`,
+            );
+            await deployForSchema(schemaName);
+            const activated = await this.pool.query<NamespaceRow>(
+              `UPDATE namespaces SET status = 'active', updated_at = now()
+                 WHERE id = $1 RETURNING ${NAMESPACE_COLUMNS}`,
+              [id],
+            );
+            namespace = this.toNamespace(activated.rows[0]);
+          });
         } catch (provisionError) {
           // Roll back a half-provisioned namespace so it never appears in the
           // list or gets workers started for an incomplete schema.
@@ -413,7 +421,9 @@ export class NamespaceRegistryService implements OnModuleInit, OnModuleDestroy {
       [id],
     );
     await this.notify(this.deletingListeners, ctx, 'delete');
-    this.logger.log(`Soft-deleted namespace '${namespace.slug}' (data retained)`);
+    this.logger.log(
+      `Soft-deleted namespace '${namespace.slug}' (data retained)`,
+    );
   }
 
   private async notify(

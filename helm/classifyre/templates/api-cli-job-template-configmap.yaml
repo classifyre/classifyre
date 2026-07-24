@@ -46,10 +46,6 @@ data:
                     "value": "{{ ternary "1" "0" .Values.api.cliJobs.autoInstallOptionalDeps }}"
                   },
                   {
-                    "name": "CLASSIFYRE_OUTPUT_REST_URL",
-                    "value": "http://{{ include "classifyre.api.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.api.service.port }}"
-                  },
-                  {
                     "name": "CLASSIFYRE_OUTPUT_BATCH_SIZE",
                     "value": "20"
                   },

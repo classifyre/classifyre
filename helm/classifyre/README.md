@@ -217,7 +217,7 @@ helm upgrade --install classifyre ./helm/classifyre \
 | api.maskedConfigEncryption.value | string | `""` | Must be exactly 32 chars when using raw string format. |
 | api.migration.containerSecurityContext | object | `{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]}}` | Override with runAsUser/runAsNonRoot: false if the migration toolchain requires root (e.g. Prisma on Bun). |
 | api.migration.enabled | bool | `true` | API applies pending migrations itself before NestJS startup. |
-| api.migration.script | string | `"npx prisma migrate deploy --schema /app/api/prisma/schema.prisma"` | Migration command/script. |
+| api.migration.script | string | `"node -e \"require('./dist/src/database-migrations.js').applyAllPendingMigrations().catch((error) => { console.error(error); process.exit(1); })\""` | Runs the database-locked registry and per-namespace migration orchestrator. |
 | api.nodeSelector | object | `{}` | API scheduling: node selector. |
 | api.pdb.enabled | bool | `true` | Enable PodDisruptionBudget for API deployment. |
 | api.pdb.minAvailable | int | `1` | API minimum pods available during disruptions. |
@@ -408,3 +408,4 @@ helm upgrade --install classifyre ./helm/classifyre \
 | telemetry.instanceId.existingConfigMap | string | `""` | Use an existing ConfigMap instead of creating one. Must contain instanceId.configMapKey. |
 | telemetry.otlpEndpoint | string | `""` | otlpEndpoint: "http://otel-receiver-opentelemetry-collector.monitoring:4318" |
 | telemetry.otlpProtocol | string | `"http/protobuf"` | OTLP export protocol: "http/protobuf" (default) or "grpc". |
+| worker.maxConcurrentNamespaceJobs | int | `1` | Maximum namespace-scoped job batches executing across all worker replicas. Excess tenant jobs wait on a PostgreSQL advisory-lock slot; `0` is unlimited. |

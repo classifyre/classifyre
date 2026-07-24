@@ -216,6 +216,45 @@ async def test_rest_output_managed_runner_flow(monkeypatch: pytest.MonkeyPatch) 
 
 
 @pytest.mark.asyncio
+async def test_rest_output_keeps_namespace_base_for_discovery_and_finding_batches(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fake_session = _FakeSession(responses=[_FakeResponse({}), _FakeResponse({})])
+    monkeypatch.setattr("src.outputs.rest.requests.Session", lambda: fake_session)
+
+    context = OutputRuntimeContext(
+        source_id="source-1",
+        runner_id="runner-1",
+        managed_runner=True,
+        batch_size=20,
+    )
+    sink = RestOutputSink(
+        context,
+        base_url="http://api.internal/prefix/namespace-id/",
+        timeout_sec=30,
+    )
+
+    await sink.register_discovered_assets(["hash-1", "hash-2"])
+    await sink.emit_batch(
+        [
+            {
+                "hash": "hash-1",
+                "findings": [{"finding_type": "EMAIL", "matched_content": "a@b.test"}],
+            }
+        ]
+    )
+
+    assert fake_session.calls[0]["url"] == (
+        "http://api.internal/prefix/namespace-id/runners/runner-1/assets/discover"
+    )
+    assert fake_session.calls[0]["json"]["assetHashes"] == ["hash-1", "hash-2"]
+    assert fake_session.calls[1]["url"] == (
+        "http://api.internal/prefix/namespace-id/sources/source-1/assets/bulk"
+    )
+    assert fake_session.calls[1]["json"]["assets"][0]["findings"][0]["finding_type"] == "EMAIL"
+
+
+@pytest.mark.asyncio
 async def test_rest_output_finalize_includes_sampling_cursor(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

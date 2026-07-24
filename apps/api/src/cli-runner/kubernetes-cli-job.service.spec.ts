@@ -263,7 +263,7 @@ describe('KubernetesCliJobService', () => {
     );
 
     expect(command).toContain(
-      'OUTPUT_REST_URL="${CLASSIFYRE_OUTPUT_REST_URL:-http://127.0.0.1:8000}"',
+      'OUTPUT_REST_URL="${CLASSIFYRE_OUTPUT_REST_URL:?API did not provide a namespaced callback URL}"',
     );
     expect(command).toContain(
       'OUTPUT_BATCH_SIZE="${CLASSIFYRE_OUTPUT_BATCH_SIZE:-20}"',
@@ -273,6 +273,37 @@ describe('KubernetesCliJobService', () => {
     expect(command).toContain('--source-id');
     expect(command).toContain('--runner-id');
     expect(command).toContain('--managed-runner');
+  });
+
+  it('injects the complete namespaced callback URL into each extract job', async () => {
+    const service = new KubernetesCliJobService(mockInstanceSettings());
+    const job = await (service as any).buildJobFromTemplate(
+      {
+        apiVersion: 'batch/v1',
+        kind: 'Job',
+        spec: {
+          template: {
+            spec: {
+              containers: [{ name: 'cli', image: 'cli:latest' }],
+            },
+          },
+        },
+      },
+      {
+        sourceId: 'source-1',
+        runnerId: 'runner-1',
+        mode: 'extract',
+        recipe: { type: 'POSTGRESQL' },
+        outputRestUrl: 'http://api.svc/prefix/namespace-id',
+      },
+    );
+
+    const env = job.spec.template.spec.containers[0].env;
+    expect(
+      env.find(
+        (item: { name: string }) => item.name === 'CLASSIFYRE_OUTPUT_REST_URL',
+      )?.value,
+    ).toBe('http://api.svc/prefix/namespace-id');
   });
 
   it('builds file-evaluation command reading input from the mounted volume', () => {
