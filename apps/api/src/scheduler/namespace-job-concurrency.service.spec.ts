@@ -7,25 +7,21 @@ function fakePool(held: HeldLocks) {
     connect: jest.fn(() => {
       const owned = new Set<string>();
       return {
-        query: jest.fn(
-          (
-            sql: string,
-            params: [number, number, number],
-          ): { rows: Array<{ acquired?: boolean }> } => {
-            const key = `${params[0]}:${params[1] + params[2]}`;
-            if (sql.includes('pg_try_advisory_lock')) {
-              if (held.has(key)) return { rows: [{ acquired: false }] };
-              held.add(key);
-              owned.add(key);
-              return { rows: [{ acquired: true }] };
-            }
-            if (sql.includes('pg_advisory_unlock')) {
-              held.delete(key);
-              owned.delete(key);
-            }
-            return { rows: [{}] };
-          },
-        ),
+        query: jest.fn((sql: string, params: [number, number, number]) => {
+          const key = `${params[0]}:${params[1] + params[2]}`;
+          if (sql.includes('pg_try_advisory_lock')) {
+            if (held.has(key))
+              return Promise.resolve({ rows: [{ acquired: false }] });
+            held.add(key);
+            owned.add(key);
+            return Promise.resolve({ rows: [{ acquired: true }] });
+          }
+          if (sql.includes('pg_advisory_unlock')) {
+            held.delete(key);
+            owned.delete(key);
+          }
+          return Promise.resolve({ rows: [{}] });
+        }),
         release: jest.fn(() => {
           for (const key of owned) held.delete(key);
         }),
@@ -86,6 +82,7 @@ describe('NamespaceJobConcurrencyService', () => {
       () => {
         order.push('b:start');
         order.push('b:end');
+        return Promise.resolve();
       },
     );
 
@@ -177,9 +174,8 @@ describe('NamespaceJobConcurrencyService', () => {
     process.env.MAX_CONCURRENT_NAMESPACE_JOBS = '0';
     const service = new NamespaceJobConcurrencyService();
     await expect(
-      service.withSlot(
-        { namespaceId: 'namespace-a', queue: 'queue' },
-        () => 'done',
+      service.withSlot({ namespaceId: 'namespace-a', queue: 'queue' }, () =>
+        Promise.resolve('done'),
       ),
     ).resolves.toBe('done');
   });

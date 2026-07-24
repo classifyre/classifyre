@@ -65,6 +65,7 @@ describe('database migration lock', () => {
     const second = withDatabaseMigrationLock(() => {
       order.push('second:start');
       order.push('second:end');
+      return Promise.resolve();
     });
 
     await new Promise((resolve) => setTimeout(resolve, 10));
