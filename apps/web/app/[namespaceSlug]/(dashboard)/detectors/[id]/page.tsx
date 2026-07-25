@@ -1,6 +1,6 @@
 "use client";
 
-import { nsPath } from "@/lib/ns-path";
+import { useNsPath } from "@/lib/ns-path";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useRouteId } from "@/lib/use-route-id";
@@ -55,6 +55,7 @@ type DetectorWithPipeline = CustomDetectorResponseDto & {
 };
 
 export default function CustomDetectorDetailsPage() {
+  const nsPath = useNsPath();
   const router = useRouter();
   const { t } = useTranslation();
   const detectorId = useRouteId();
@@ -113,7 +114,8 @@ export default function CustomDetectorDetailsPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [detectorId, router]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [detectorId, router, nsPath]);
 
   useEffect(() => {
     if (detectorId) {

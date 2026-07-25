@@ -272,9 +272,13 @@ export class NamespaceWorkerManager
       ]);
       for (const schema of knownSchemas) {
         if (local.has(schema)) continue;
+        // A resident schema with no active entry (e.g. a lazily-created Prisma
+        // client on an API-only pod). Schema names derive from the namespace
+        // UUID, so the slug is not recoverable from them — teardown only needs
+        // the schema, and the schema name is the honest label for logs.
         const ctx = this.active.get(schema) ?? {
           namespaceId: '',
-          slug: schema.replace(/^ns_/, '').replace(/_/g, '-'),
+          slug: schema,
           schemaName: schema,
         };
         await this.stop(ctx).catch(() => undefined);

@@ -1,6 +1,6 @@
 "use client";
 
-import { nsPath } from "@/lib/ns-path";
+import { useNsPath } from "@/lib/ns-path";
 import * as React from "react";
 import Link from "next/link";
 import { ArrowRight, Bot } from "lucide-react";
@@ -19,6 +19,7 @@ import { useTranslation } from "@/hooks/use-translation";
  * This card points operators there from the old Settings location.
  */
 export function HarnessPointerCard() {
+  const nsPath = useNsPath();
   const { t } = useTranslation();
   return (
     <Card className="panel-card rounded-[6px]">

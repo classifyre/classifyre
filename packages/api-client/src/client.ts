@@ -990,6 +990,36 @@ function getBaseUrl(): string {
   return getServerApiBaseUrl();
 }
 
+/**
+ * App-route first segments that are never a namespace slug. The web app serves
+ * every tenant page under `/<slug>/…`, so anything else at the top level is a
+ * global route and must not be namespace-prefixed.
+ */
+const RESERVED_ROUTE_PREFIXES = new Set([
+  "api",
+  "namespaces",
+  "docs",
+  "health",
+  "ping",
+  "_next",
+  "classifyre-usr", // analytics proxy route
+]);
+
+/**
+ * The namespace slug encoded in an app pathname, or undefined when the path is
+ * outside any namespace (landing page, `/namespaces/<id>/settings`, a file such
+ * as the desktop shell's `/index.html`).
+ */
+export function namespaceSlugFromPath(pathname: string): string | undefined {
+  const first = pathname.split("/").filter(Boolean)[0];
+  if (!first) return undefined;
+  const decoded = decodeURIComponent(first);
+  if (RESERVED_ROUTE_PREFIXES.has(decoded)) return undefined;
+  // A dot means a file, not a route segment (`/index.html`, `/favicon.ico`).
+  if (decoded.includes(".")) return undefined;
+  return decoded;
+}
+
 // The active namespace (tenant) slug. Every REST call is rewritten to
 // `<basePath>/<slug>/<path>` so the API resolves the tenant from the leading
 // path segment (the same contract the CLI and MCP use). Set by the web app's
@@ -1002,8 +1032,38 @@ export function setActiveNamespaceSlug(slug: string | undefined): void {
   activeNamespaceSlug = slug || undefined;
 }
 
+/**
+ * The tenant every request is scoped to.
+ *
+ * In the browser the URL — not the registered value — is the source of truth,
+ * because React runs effect *cleanups* for the whole tree before any newly
+ * mounted child's effect. On a remount, NamespaceProvider's cleanup clears the
+ * registered slug first, so a table firing its fetch from a mount effect would
+ * otherwise build an unprefixed URL and get `Unknown namespace 'search'`.
+ */
 export function getActiveNamespaceSlug(): string | undefined {
-  return activeNamespaceSlug;
+  if (activeNamespaceSlug) return activeNamespaceSlug;
+  if (typeof window === "undefined") return undefined;
+  return namespaceSlugFromPath(window.location.pathname);
+}
+
+/**
+ * API base for hand-written `fetch` calls that bypass the generated client:
+ * the desktop's injected API origin, the configured URL, or the `/api` proxy.
+ */
+export function getApiBaseUrl(): string {
+  return getBaseUrl().replace(/\/+$/, "");
+}
+
+/**
+ * {@link getApiBaseUrl} with the active tenant appended (`<base>/<slug>`), which
+ * is what every namespace-scoped endpoint expects. Falls back to the bare base
+ * outside a namespace.
+ */
+export function getNamespacedApiBaseUrl(): string {
+  const base = getApiBaseUrl();
+  const slug = getActiveNamespaceSlug();
+  return slug ? `${base}/${slug}` : base;
 }
 
 /** Requests to these top-level paths are never namespace-scoped. */
@@ -1022,7 +1082,7 @@ function createConfiguration(baseUrl?: string): Configuration {
     middleware: [
       {
         pre: async (context) => {
-          const slug = activeNamespaceSlug;
+          const slug = getActiveNamespaceSlug();
           if (!slug || !context.url.startsWith(basePath)) return;
           const rest = context.url.slice(basePath.length);
           const normalized = rest.startsWith("/") ? rest : `/${rest}`;
@@ -1222,7 +1282,8 @@ class ApiClient {
    */
   private searchBase(): string {
     const base = this.config.basePath.replace(/\/+$/, "");
-    return activeNamespaceSlug ? `${base}/${activeNamespaceSlug}` : base;
+    const slug = getActiveNamespaceSlug();
+    return slug ? `${base}/${slug}` : base;
   }
 
   async searchAssets(

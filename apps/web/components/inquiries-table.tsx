@@ -340,9 +340,11 @@ export function InquiriesTable() {
                               onClick={(e) => {
                                 e.stopPropagation();
                                 router.push(
-                                  q.cases.length === 1
-                                    ? `/investigations/${q.cases[0]!.id}`
-                                    : `/investigations/inquiries/${q.id}`,
+                                  nsPath(
+                                    q.cases.length === 1
+                                      ? `/investigations/${q.cases[0]!.id}`
+                                      : `/investigations/inquiries/${q.id}`,
+                                  ),
                                 );
                               }}
                             >
@@ -391,7 +393,9 @@ export function InquiriesTable() {
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       router.push(
-                                        `/investigations/cases/new?inquiryId=${q.id}`,
+                                        nsPath(
+                                          `/investigations/cases/new?inquiryId=${q.id}`,
+                                        ),
                                       );
                                     }}
                                   >
@@ -410,7 +414,9 @@ export function InquiriesTable() {
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       router.push(
-                                        `/investigations/inquiries/${q.id}/edit`,
+                                        nsPath(
+                                          `/investigations/inquiries/${q.id}/edit`,
+                                        ),
                                       );
                                     }}
                                   >

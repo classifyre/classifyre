@@ -1,6 +1,6 @@
 "use client";
 
-import { nsPath } from "@/lib/ns-path";
+import { useNsPath } from "@/lib/ns-path";
 import * as React from "react";
 import { ExternalLink, Globe, Link2 } from "lucide-react";
 import { api, type GraphEdgeDto, type GraphNodeDto } from "@workspace/api-client";
@@ -21,6 +21,7 @@ const EXTERNAL_DECO: NodeDecoration = { ringColor: ACCENT };
  * (external) and can be hidden; lone assets still render. Read-only.
  */
 export function AssetLinksGraph({ sourceId }: { sourceId: string }) {
+  const nsPath = useNsPath();
   const { t } = useTranslation();
   const [nodes, setNodes] = React.useState<GraphNodeDto[]>([]);
   const [edges, setEdges] = React.useState<GraphEdgeDto[]>([]);

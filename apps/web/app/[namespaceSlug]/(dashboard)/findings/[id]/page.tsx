@@ -1,6 +1,6 @@
 "use client";
 
-import { nsPath } from "@/lib/ns-path";
+import { useNsPath } from "@/lib/ns-path";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -176,6 +176,7 @@ function DateCell({ value }: { value?: Date | string | null }) {
 }
 
 export default function FindingDetailPage() {
+  const nsPath = useNsPath();
   const router = useRouter();
   const { t } = useTranslation();
   const findingId = useRouteId();
@@ -310,13 +311,15 @@ export default function FindingDetailPage() {
   const history = finding.history ?? [];
   const sourceHref =
     finding.source?.id || finding.sourceId
-      ? `/sources/${finding.source?.id || finding.sourceId}`
+      ? nsPath(`/sources/${finding.source?.id || finding.sourceId}`)
       : null;
   const assetHref =
     finding.asset?.id || finding.assetId
-      ? `/assets/${finding.asset?.id || finding.assetId}`
+      ? nsPath(`/assets/${finding.asset?.id || finding.assetId}`)
       : null;
-  const runnerHref = finding.runnerId ? `/scans/${finding.runnerId}` : null;
+  const runnerHref = finding.runnerId
+    ? nsPath(`/scans/${finding.runnerId}`)
+    : null;
 
   const wrapperClass = cn(
     "space-y-6 transition-[padding] duration-200",

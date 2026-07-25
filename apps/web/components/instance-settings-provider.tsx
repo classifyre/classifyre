@@ -1,8 +1,10 @@
 "use client";
 
 import * as React from "react";
+import { usePathname } from "next/navigation";
 import {
   api,
+  namespaceSlugFromPath,
   InstanceSettingsResponseDtoLanguageEnum,
   InstanceSettingsResponseDtoTimeFormatEnum,
 } from "@workspace/api-client";
@@ -181,9 +183,19 @@ export function InstanceSettingsProvider({
     });
   }, [resolvedLanguage, resolvedTimezone, resolvedTimeFormat]);
 
+  // Instance settings are per-namespace, and this provider wraps the whole app
+  // — including the workspace directory, which sits outside every namespace.
+  // Fetch only once a tenant is in the route (and refetch when it changes),
+  // otherwise the request 404s as `Unknown namespace 'instance-settings'`.
+  const namespaceSlug = namespaceSlugFromPath(usePathname());
+
   React.useEffect(() => {
+    if (!namespaceSlug) {
+      setLoading(false);
+      return;
+    }
     void refresh();
-  }, [refresh]);
+  }, [refresh, namespaceSlug]);
 
   const value = React.useMemo<InstanceSettingsContextValue>(
     () => ({

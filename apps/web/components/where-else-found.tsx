@@ -1,6 +1,6 @@
 "use client";
 
-import { nsPath } from "@/lib/ns-path";
+import { useNsPath } from "@/lib/ns-path";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Radar } from "lucide-react";
@@ -31,6 +31,7 @@ export function WhereElseFound({
   value: string;
   currentAssetId?: string;
 }) {
+  const nsPath = useNsPath();
   const { t } = useTranslation();
   const [data, setData] = useState<ValueOccurrencesResponseDto | null>(null);
   const [error, setError] = useState<string | null>(null);

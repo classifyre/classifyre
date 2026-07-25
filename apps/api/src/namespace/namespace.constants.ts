@@ -14,12 +14,18 @@
 
 /**
  * First path segments that are NEVER a namespace slug and must pass through the
- * `rewriteUrl` strip + `onRequest` resolver untouched.
+ * `rewriteUrl` strip + `onRequest` resolver untouched. Doubles as the set of
+ * slugs the registry refuses to create, so a workspace can never be given a
+ * name that its own URL cannot address.
  *
  * Keep this in sync with:
  *  - `SwaggerModule.setup('api', …)` in `main.ts` (the `api` prefix),
  *  - the health route (`/ping`, `/health`),
- *  - the registry controller (`@Controller('namespaces')`).
+ *  - the registry controller (`@Controller('namespaces')`),
+ *  - every top-level route of the web app (`apps/web/app/*`) and the matching
+ *    `RESERVED_ROUTE_PREFIXES` in `packages/api-client/src/client.ts` — a slug
+ *    that collides with one of those is shadowed by the static route and the
+ *    workspace becomes unreachable in the UI.
  */
 export const RESERVED_PREFIXES = new Set<string>([
   '', // bare `/`
@@ -31,6 +37,10 @@ export const RESERVED_PREFIXES = new Set<string>([
   'namespaces', // namespace registry CRUD
   'socket.io', // Socket.IO transport handshake path
   'favicon.ico',
+  // Web app top-level routes (apps/web/app/*).
+  'docs', // bundled documentation site
+  'classifyre-usr', // analytics proxy route
+  '_next', // Next.js build assets
 ]);
 
 /**

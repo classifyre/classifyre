@@ -1,6 +1,6 @@
 "use client";
 
-import { nsPath } from "@/lib/ns-path";
+import { useNsPath } from "@/lib/ns-path";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import {
@@ -59,6 +59,7 @@ function formatEnumLabel(value: string) {
 }
 
 export function NotificationCenter() {
+  const nsPath = useNsPath();
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [notifications, setNotifications] = useState<NotificationResponseDto[]>(

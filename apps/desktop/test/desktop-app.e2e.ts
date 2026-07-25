@@ -7,7 +7,7 @@
  *   3. Desktop main/preload built: cd apps/desktop && bun run build
  */
 
-import { test } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 import { _electron as electron, type ElectronApplication, type Page } from 'playwright';
 import fs from 'fs';
 import http from 'http';
@@ -126,4 +126,64 @@ test('creates and opens a namespace through the shared API', async () => {
   await page
     .locator('[data-sidebar="sidebar"]')
     .waitFor({ state: 'visible', timeout: 120_000 });
+});
+
+/**
+ * Every dashboard route must stay inside its workspace. This guards the two
+ * ways that broke after the namespaces refactor:
+ *   - an API call built without the `/<slug>` segment (`Unknown namespace
+ *     'search'`), which happens when a raw fetch reads the slug while
+ *     NamespaceProvider's effect cleanup has it cleared;
+ *   - a rendered link that drops the slug, sending the user to a route whose
+ *     first segment is then read as the tenant.
+ */
+test('keeps every dashboard route scoped to its namespace', async () => {
+  const SLUG = 'e2e-test-workspace';
+  // Top-level paths that are legitimately outside any namespace.
+  const GLOBAL_API = new Set(['namespaces', 'ping', 'health', 'api']);
+  const GLOBAL_ROUTES = ['/namespaces', '/docs'];
+
+  const routes = [
+    '', 'discovery', 'findings', 'assets', 'sources', 'sources/new',
+    'detectors', 'investigations', 'fingerprints', 'glossary', 'scans',
+    'harness', 'notifications', 'settings',
+  ];
+
+  const unprefixedApi = new Set<string>();
+  page.on('request', (request) => {
+    const url = request.url();
+    if (!/^https?:\/\/(127\.0\.0\.1|localhost):\d+\//.test(url)) return;
+    // The web dev server itself is not the API.
+    if (new URL(url).port === '3000') return;
+    const first = new URL(url).pathname.split('/').filter(Boolean)[0] ?? '';
+    if (first !== SLUG && !GLOBAL_API.has(first)) unprefixedApi.add(url);
+  });
+
+  const unprefixedLinks = new Set<string>();
+  for (const route of routes) {
+    await page.goto(`http://localhost:3000/${SLUG}/${route}`);
+    await page
+      .locator('[data-sidebar="sidebar"]')
+      .waitFor({ state: 'visible', timeout: 60_000 });
+    await page.waitForTimeout(1_500);
+
+    const bad = await page.evaluate(
+      ({ slug, globalRoutes }) => {
+        const out: string[] = [];
+        for (const anchor of document.querySelectorAll('a[href^="/"]')) {
+          const href = anchor.getAttribute('href');
+          if (!href || href === '/') continue;
+          if (href === `/${slug}` || href.startsWith(`/${slug}/`)) continue;
+          if (globalRoutes.some((prefix) => href.startsWith(prefix))) continue;
+          out.push(href);
+        }
+        return out;
+      },
+      { slug: SLUG, globalRoutes: GLOBAL_ROUTES },
+    );
+    for (const href of bad) unprefixedLinks.add(`${route || '/'} -> ${href}`);
+  }
+
+  expect([...unprefixedApi]).toEqual([]);
+  expect([...unprefixedLinks]).toEqual([]);
 });

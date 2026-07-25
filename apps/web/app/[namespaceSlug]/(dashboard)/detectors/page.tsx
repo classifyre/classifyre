@@ -1,6 +1,6 @@
 "use client";
 
-import { nsPath } from "@/lib/ns-path";
+import { useNsPath } from "@/lib/ns-path";
 import Link from "next/link";
 import { FlaskConical, Plus } from "lucide-react";
 import { Button } from "@workspace/ui/components/button";
@@ -9,6 +9,7 @@ import { CustomDetectorsTable } from "@/components/custom-detectors-table";
 import { useTranslation } from "@/hooks/use-translation";
 
 export default function CustomDetectorsPage() {
+  const nsPath = useNsPath();
   const { t } = useTranslation();
 
   return (

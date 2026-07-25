@@ -1,6 +1,6 @@
 "use client";
 
-import { nsPath } from "@/lib/ns-path";
+import { useNsPath } from "@/lib/ns-path";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useRouteId } from "@/lib/use-route-id";
@@ -33,6 +33,7 @@ import { DetailBackButton } from "@/components/detail-back-button";
 import { useTranslation } from "@/hooks/use-translation";
 
 export default function AssetDetailPage() {
+  const nsPath = useNsPath();
   const router = useRouter();
   const { t } = useTranslation();
   const assetId = useRouteId();

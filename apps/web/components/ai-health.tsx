@@ -1,6 +1,6 @@
 "use client";
 
-import { nsPath } from "@/lib/ns-path";
+import { useNsPath } from "@/lib/ns-path";
 import * as React from "react";
 import Link from "next/link";
 import { AlertTriangle, Wrench } from "lucide-react";
@@ -135,6 +135,7 @@ function useHealthCopy(status: AiHealthStatus, detail: string | null) {
  * amber icon with a tooltip) linking to Settings. Nothing when AI is healthy.
  */
 export function AiHealthSidebarWarning() {
+  const nsPath = useNsPath();
   const { status, detail } = useAiHealth();
   const { t } = useTranslation();
   const copy = useHealthCopy(status, detail);
@@ -171,6 +172,7 @@ export function AiHealthSidebarWarning() {
  * when the AI stack needs attention.
  */
 export function AiHealthFixButton() {
+  const nsPath = useNsPath();
   const { status, detail } = useAiHealth();
   const copy = useHealthCopy(status, detail);
   const { t } = useTranslation();

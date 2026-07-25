@@ -15,11 +15,14 @@ import {
 } from '@prisma/client';
 import { NotificationType } from './types/notification.types';
 import { NotificationEventsGateway } from './websocket/notification-events.gateway';
+import { ClsService } from 'nestjs-cls';
+import { CLS_SLUG } from './namespace/namespace.constants';
 
 @Injectable()
 export class NotificationsService {
   constructor(
     private readonly prisma: PrismaService,
+    private readonly cls: ClsService,
     @Optional()
     @Inject(NotificationEventsGateway)
     private readonly notificationEventsGateway?: NotificationEventsGateway,
@@ -27,6 +30,24 @@ export class NotificationsService {
 
   private toPrismaType(type: NotificationType): PrismaNotificationType {
     return type;
+  }
+
+  /**
+   * Producers store namespace-relative action URLs (`/scans/<id>`). The web app
+   * routes every tenant page under `/<slug>/…`, so qualify on the way out —
+   * at read time, not write time, because the slug is editable and a stored
+   * prefix would go stale on rename.
+   */
+  private qualifyActionUrl(actionUrl: unknown): string | null {
+    if (typeof actionUrl !== 'string' || !actionUrl.startsWith('/')) {
+      return (actionUrl as string | null) ?? null;
+    }
+    const slug = this.cls.get<string>(CLS_SLUG);
+    if (!slug) return actionUrl;
+    if (actionUrl === `/${slug}` || actionUrl.startsWith(`/${slug}/`)) {
+      return actionUrl;
+    }
+    return `/${slug}${actionUrl}`;
   }
 
   private toResponse(notification: any): NotificationResponseDto {
@@ -37,7 +58,7 @@ export class NotificationsService {
       severity: notification.severity,
       title: notification.title,
       message: notification.message,
-      actionUrl: notification.actionUrl,
+      actionUrl: this.qualifyActionUrl(notification.actionUrl),
       sourceId: notification.sourceId,
       sourceName: notification.source?.name ?? null,
       runnerId: notification.runnerId,

@@ -880,7 +880,7 @@ export default function RunnerDetailPage() {
                   className="rounded-[4px] border-2 border-black"
                   onClick={() =>
                     router.push(
-                      `/sources/${runner.sourceId || runner.source?.id}`,
+                      nsPath(`/sources/${runner.sourceId || runner.source?.id}`),
                     )
                   }
                 >

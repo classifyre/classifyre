@@ -110,8 +110,22 @@ async function bootstrap() {
     .setDescription(
       'Metadata ingestion and detection API for unstructured data sources. ' +
         'Supports WordPress, Slack, S3-Compatible Storage, Azure Blob Storage, Google Cloud Storage, PostgreSQL, MySQL, MSSQL, Oracle, Hive, Databricks, Snowflake, MongoDB, PowerBI, Tableau, Confluence, Jira, and Service Desk sources. ' +
-        'Built-in detectors for secrets, PII, toxic content, image classification, broken links, and security threats.',
+        'Built-in detectors for secrets, PII, toxic content, image classification, broken links, and security threats.\n\n' +
+        '**Every path below is namespace-scoped**: the real URL is ' +
+        '`/{namespace}/<path>`, where `{namespace}` is a workspace slug or its ' +
+        'immutable UUID (see `GET /namespaces`). Set it in the server selector ' +
+        'above so "Try it out" targets a real workspace. The only unscoped ' +
+        'routes are `/namespaces`, `/ping` and `/api/health/pressure`.',
     )
+    // Server variable so the interactive docs prepend the tenant segment that
+    // `namespaceRewriteUrl` strips; without it every "Try it out" call 404s
+    // with `Unknown namespace '<first path segment>'`.
+    .addServer('/{namespace}', 'Namespace-scoped API', {
+      namespace: {
+        default: 'your-workspace-slug',
+        description: 'Workspace slug or namespace UUID',
+      },
+    })
     .setVersion('1.0.0')
     .addTag('Health', 'Health check and API status endpoints')
     .addTag('Sources', 'Data source management and configuration')
