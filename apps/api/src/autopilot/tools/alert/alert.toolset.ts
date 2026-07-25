@@ -152,7 +152,8 @@ export class AlertToolset {
             severity,
             title: String(input.title),
             message: String(input.message),
-            actionUrl: `/cases/${caseId}`,
+            // A case is rendered by the web app at /investigations/<id>.
+            actionUrl: `/investigations/${caseId}`,
             triggeredBy: AI_ACTOR,
             isImportant: important,
             metadata: {

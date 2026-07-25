@@ -1,16 +1,24 @@
 import { Injectable } from '@nestjs/common';
+import { ClsService } from 'nestjs-cls';
 import {
   MCP_CAPABILITY_GROUPS,
   MCP_PROMPTS,
   MCP_TOKEN_PREFIX,
 } from './mcp-catalog';
+import { CLS_SLUG } from './namespace/namespace.constants';
 import { McpOverviewResponseDto } from './dto/mcp-settings.dto';
 
 @Injectable()
 export class McpOverviewService {
+  constructor(private readonly cls: ClsService) {}
+
   getOverview(): McpOverviewResponseDto {
+    // MCP is served per tenant: `POST /<namespace>/mcp`. A bare `/mcp` has no
+    // tenant to serve and is rejected in main.ts, so the path advertised to
+    // clients must carry the namespace this request was resolved to.
+    const slug = this.cls.get<string>(CLS_SLUG);
     return {
-      endpointPath: '/mcp',
+      endpointPath: slug ? `/${slug}/mcp` : '/mcp',
       transport: 'Streamable HTTP (JSON response mode)',
       authScheme: 'Bearer token',
       tokenPrefix: MCP_TOKEN_PREFIX,

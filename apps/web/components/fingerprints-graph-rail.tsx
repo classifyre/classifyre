@@ -1,6 +1,6 @@
 "use client";
 
-import { nsPath } from "@/lib/ns-path";
+import { useNsPath } from "@/lib/ns-path";
 import * as React from "react";
 import { ExternalLink, Layers } from "lucide-react";
 import type { GraphNodeDto } from "@workspace/api-client";
@@ -49,6 +49,7 @@ export function FingerprintsGraphSelectionRail({
   focusCluster: (meta: ClusterMeta) => void;
   assetLabel: (id: string) => string;
 }) {
+  const nsPath = useNsPath();
   const { t } = useTranslation();
   if (!selection) return null;
 

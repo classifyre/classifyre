@@ -1,6 +1,6 @@
 "use client";
 
-import { nsPath } from "@/lib/ns-path";
+import { useNsPath } from "@/lib/ns-path";
 import Link from "next/link";
 import * as React from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -561,6 +561,7 @@ export const SourceScanConfig = React.forwardRef<
   onCustomDetectorsChange,
   mode = "create",
 }, ref) {
+  const nsPath = useNsPath();
   const { t } = useTranslation();
   const detectors = useMemo(
     () => getDetectorSchemas({ includeCustom: false }),

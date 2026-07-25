@@ -14,15 +14,13 @@ import {
 } from "@workspace/ui/components/dialog";
 import { useTranslation } from "@/hooks/use-translation";
 import type { TranslationKey } from "@/i18n";
-import { getActiveNamespaceSlug } from "@workspace/api-client";
+import { getNamespacedApiBaseUrl } from "@workspace/api-client";
 
-// Mirror of api-client getBaseUrl() for the browser: relative /api proxied by
-// Next, with the active namespace slug appended (these export URLs are
-// namespace-scoped, like every other API call).
+// These export URLs are opened directly by the browser rather than fetched
+// through the generated client, so they need the same `<base>/<slug>` prefix
+// (including the desktop's injected API origin) resolved here.
 function getApiBaseUrl(): string {
-  const base = process.env.NEXT_PUBLIC_API_URL || "/api";
-  const slug = getActiveNamespaceSlug();
-  return slug ? `${base.replace(/\/+$/, "")}/${slug}` : base;
+  return getNamespacedApiBaseUrl();
 }
 
 /**

@@ -1,6 +1,6 @@
 "use client";
 
-import { nsPath } from "@/lib/ns-path";
+import { useNsPath } from "@/lib/ns-path";
 import * as React from "react";
 import { Copy, RotateCw, SlidersHorizontal } from "lucide-react";
 import { api, type BoilerplateClusterDto } from "@workspace/api-client";
@@ -48,6 +48,7 @@ export function BoilerplateClusters({
   /** groupHash of the cluster currently focused on the graph, if any. */
   focusedClusterKey?: string | null;
 }) {
+  const nsPath = useNsPath();
   const { t } = useTranslation();
   const [sources, setSources] = React.useState<SourceOption[]>([]);
   const [sourcesLoading, setSourcesLoading] = React.useState(true);

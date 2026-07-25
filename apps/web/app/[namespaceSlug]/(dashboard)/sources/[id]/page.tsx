@@ -22,7 +22,7 @@ import {
   type SourceResponseDto,
   type StartRunnerDto,
   type SearchAssetsChartsResponseDto,
-  getActiveNamespaceSlug,
+  getNamespacedApiBaseUrl,
 } from "@workspace/api-client";
 import { Button } from "@workspace/ui/components/button";
 import { Bot } from "lucide-react";
@@ -95,14 +95,7 @@ const detectorLabelKeys: Partial<Record<DetectorType, string>> = {
   CUSTOM: "findings.categories.custom",
 };
 
-const getApiBase = () => {
-  const base =
-    typeof window !== "undefined"
-      ? (process.env.NEXT_PUBLIC_API_URL ?? "/api")
-      : (process.env.API_URL ?? "http://localhost:8000");
-  const slug = getActiveNamespaceSlug();
-  return slug ? `${base.replace(/\/+$/, "")}/${slug}` : base;
-};
+const getApiBase = () => getNamespacedApiBaseUrl();
 
 export default function SourceViewPage() {
   const { t } = useTranslation();

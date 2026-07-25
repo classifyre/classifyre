@@ -1,24 +1,9 @@
 import type { UploadedFileMetadata } from "@/components/uploaded-files";
-import { getActiveNamespaceSlug } from "@workspace/api-client";
+import { getNamespacedApiBaseUrl } from "@workspace/api-client";
 
-const apiBase = () => {
-  let base: string;
-  if (typeof window !== "undefined") {
-    const desktop = (
-      window as Window & {
-        __CLASSIFYRE_DESKTOP__?: { apiBaseUrl?: string };
-      }
-    ).__CLASSIFYRE_DESKTOP__;
-    base = desktop?.apiBaseUrl
-      ? desktop.apiBaseUrl.replace(/\/$/, "")
-      : (process.env.NEXT_PUBLIC_API_URL ?? "/api").replace(/\/$/, "");
-  } else {
-    base = (process.env.NEXT_PUBLIC_API_URL ?? "/api").replace(/\/$/, "");
-  }
-  // These raw fetches hit namespace-scoped endpoints, so append the active slug.
-  const slug = getActiveNamespaceSlug();
-  return slug ? `${base}/${slug}` : base;
-};
+// These raw fetches bypass the generated client (and its namespace middleware),
+// so they resolve the same `<base>/<slug>` prefix themselves.
+const apiBase = () => getNamespacedApiBaseUrl();
 
 async function requireOk(response: Response): Promise<Response> {
   if (response.ok) return response;

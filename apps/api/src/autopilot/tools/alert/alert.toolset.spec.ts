@@ -60,7 +60,9 @@ describe('AlertToolset — operator.notify', () => {
     const arg = mockNotifications.create.mock.calls[0]![0];
     expect(arg.event).toBe('case.escalated');
     expect(arg.severity).toBe(Severity.CRITICAL);
-    expect(arg.actionUrl).toBe('/cases/c1');
+    // Namespace-relative (NotificationsService prepends the tenant slug on
+    // read); a case is rendered at /investigations/<id>, not /cases/<id>.
+    expect(arg.actionUrl).toBe('/investigations/c1');
     expect(arg.isImportant).toBe(true); // CRITICAL defaults to important
     expect(arg.metadata.caseId).toBe('c1');
     expect(res.notificationId).toBe('n1');

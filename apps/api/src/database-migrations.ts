@@ -255,11 +255,3 @@ export async function applyAllPendingMigrations(): Promise<void> {
     }
   });
 }
-
-/**
- * @deprecated Kept for callers that still expect the single-schema entrypoint.
- * Prefer {@link applyAllPendingMigrations}.
- */
-export async function applyPendingDatabaseMigrations(): Promise<void> {
-  await applyAllPendingMigrations();
-}

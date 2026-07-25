@@ -1,6 +1,6 @@
 "use client";
 
-import { nsPath } from "@/lib/ns-path";
+import { useNsPath } from "@/lib/ns-path";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Layers } from "lucide-react";
@@ -28,6 +28,7 @@ function truncate(text: string, max = 160): string {
  * embedding yet (source not embedding-enabled, or not reindexed).
  */
 export function SimilarFindingsCard({ findingId }: { findingId: string }) {
+  const nsPath = useNsPath();
   const { t } = useTranslation();
   const [items, setItems] = useState<SimilarFindingDto[] | null>(null);
   const [failed, setFailed] = useState(false);

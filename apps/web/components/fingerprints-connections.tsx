@@ -1,6 +1,6 @@
 "use client";
 
-import { nsPath } from "@/lib/ns-path";
+import { useNsPath } from "@/lib/ns-path";
 import * as React from "react";
 import {
   ArrowDownWideNarrow,
@@ -87,6 +87,7 @@ export function FingerprintsConnections({
    *  or null when both dropdowns are back on "All". */
   onFilterFocus?: (assetIds: string[] | null) => void;
 }) {
+  const nsPath = useNsPath();
   const { t } = useTranslation();
   const [expanded, setExpanded] = React.useState<Set<string>>(new Set());
   const [search, setSearch] = React.useState("");

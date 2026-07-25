@@ -21,12 +21,17 @@ Connect Classifyre MCP to Claude, Cursor, Codex CLI, Gemini CLI, Windsurf, VS Co
 | Transport | Streamable HTTP (JSON response mode) |
 | Authorization | Bearer token |
 | Method | `POST` |
-| Endpoint | `https://<your-host>/mcp` |
+| Endpoint | `https://<your-host>/<workspace>/mcp` |
+
+Every endpoint is scoped to one workspace (namespace): `<workspace>` is a
+workspace slug or its immutable UUID, and a client connected to it sees only
+that workspace's data. A bare `POST /mcp` with no workspace returns `404` —
+connect one client per workspace.
 
 ### Request Pattern
 
 ```http
-POST https://<your-host>/mcp
+POST https://<your-host>/<workspace>/mcp
 Authorization: Bearer inmcp_<id>.<secret>
 Content-Type: application/json
 ```
@@ -37,16 +42,16 @@ Content-Type: application/json
 2. Create a token in the same settings page.
 3. Copy the token immediately. Classifyre returns plaintext only once.
 
-If MCP is disabled, `POST /mcp` returns `503`.
+If MCP is disabled, `POST /<workspace>/mcp` returns `503`.
 
 ## How Tokens Are Created
 
-Classifyre exposes MCP token lifecycle endpoints under `instance-settings/mcp/tokens`.
+Classifyre exposes MCP token lifecycle endpoints under `<workspace>/instance-settings/mcp/tokens`.
 
 ### Create Token
 
 ```bash
-curl -X POST https://<your-host>/instance-settings/mcp/tokens \
+curl -X POST https://<your-host>/<workspace>/instance-settings/mcp/tokens \
   -H "Content-Type: application/json" \
   -d '{"name":"Cursor local workspace"}'
 ```
@@ -59,7 +64,7 @@ Response includes:
 ### List Tokens
 
 ```bash
-curl https://<your-host>/instance-settings/mcp/tokens
+curl https://<your-host>/<workspace>/instance-settings/mcp/tokens
 ```
 
 Only masked previews are returned. Raw token values are never returned again.
@@ -67,7 +72,7 @@ Only masked previews are returned. Raw token values are never returned again.
 ### Revoke / Reactivate Token
 
 ```bash
-curl -X PATCH https://<your-host>/instance-settings/mcp/tokens/<token-id> \
+curl -X PATCH https://<your-host>/<workspace>/instance-settings/mcp/tokens/<token-id> \
   -H "Content-Type: application/json" \
   -d '{"isActive":false}'
 ```
@@ -75,7 +80,7 @@ curl -X PATCH https://<your-host>/instance-settings/mcp/tokens/<token-id> \
 ### Delete Token
 
 ```bash
-curl -X DELETE https://<your-host>/instance-settings/mcp/tokens/<token-id>
+curl -X DELETE https://<your-host>/<workspace>/instance-settings/mcp/tokens/<token-id>
 ```
 
 ## Token Format and Validation
@@ -89,6 +94,8 @@ curl -X DELETE https://<your-host>/instance-settings/mcp/tokens/<token-id>
 
 Replace:
 - `<your-host>` with your API host
+- `<workspace>` with the workspace (namespace) slug you want the client to see —
+  the exact URL is shown in `Settings -> MCP Server`
 - `inmcp_<id>.<secret>` with your token
 
 ### Claude Desktop
@@ -105,7 +112,7 @@ Config file:
   "mcpServers": {
     "classifyre-mcp": {
       "type": "http",
-      "url": "https://<your-host>/mcp",
+      "url": "https://<your-host>/<workspace>/mcp",
       "headers": {
         "Authorization": "Bearer inmcp_<id>.<secret>"
       }
@@ -120,7 +127,7 @@ Config file:
 
 ```bash
 claude mcp add --transport http classifyre-mcp \
-  --url https://<your-host>/mcp \
+  --url https://<your-host>/<workspace>/mcp \
   --header "Authorization: Bearer inmcp_<id>.<secret>"
 ```
 
@@ -133,7 +140,7 @@ claude mcp add --transport http classifyre-mcp \
   "mcpServers": {
     "classifyre-mcp": {
       "type": "http",
-      "url": "https://<your-host>/mcp",
+      "url": "https://<your-host>/<workspace>/mcp",
       "headers": {
         "Authorization": "Bearer inmcp_<id>.<secret>"
       }
@@ -153,7 +160,7 @@ claude mcp add --transport http classifyre-mcp \
   "mcpServers": {
     "classifyre-mcp": {
       "type": "http",
-      "url": "https://<your-host>/mcp",
+      "url": "https://<your-host>/<workspace>/mcp",
       "headers": {
         "Authorization": "Bearer inmcp_<id>.<secret>"
       }
@@ -178,7 +185,7 @@ codex --mcp-server classifyre-mcp
 {
   "mcpServers": {
     "classifyre-mcp": {
-      "httpUrl": "https://<your-host>/mcp",
+      "httpUrl": "https://<your-host>/<workspace>/mcp",
       "headers": {
         "Authorization": "Bearer inmcp_<id>.<secret>"
       }
@@ -197,7 +204,7 @@ codex --mcp-server classifyre-mcp
 {
   "mcpServers": {
     "classifyre-mcp": {
-      "serverUrl": "https://<your-host>/mcp",
+      "serverUrl": "https://<your-host>/<workspace>/mcp",
       "headers": {
         "Authorization": "Bearer inmcp_<id>.<secret>"
       }
@@ -217,7 +224,7 @@ codex --mcp-server classifyre-mcp
   "servers": {
     "classifyre-mcp": {
       "type": "http",
-      "url": "https://<your-host>/mcp",
+      "url": "https://<your-host>/<workspace>/mcp",
       "headers": {
         "Authorization": "Bearer inmcp_<id>.<secret>"
       }
@@ -239,7 +246,7 @@ codex --mcp-server classifyre-mcp
       {
         "transport": {
           "type": "http",
-          "url": "https://<your-host>/mcp",
+          "url": "https://<your-host>/<workspace>/mcp",
           "headers": {
             "Authorization": "Bearer inmcp_<id>.<secret>"
           }
@@ -253,7 +260,7 @@ codex --mcp-server classifyre-mcp
 ## Direct API Usage
 
 ```bash
-curl -X POST https://<your-host>/mcp \
+curl -X POST https://<your-host>/<workspace>/mcp \
   -H "Authorization: Bearer inmcp_<id>.<secret>" \
   -H "Content-Type: application/json" \
   -d '{
@@ -327,7 +334,7 @@ When adding new MCP functionality in API code:
 2. Register tool handlers in `apps/api/src/mcp-server.factory.ts`.
 3. Implement execution logic in `apps/api/src/mcp-tool-executor.service.ts`.
 4. If needed, expose supporting API endpoints and DTO updates.
-5. Validate by calling `tools/list` and the new tool through `POST /mcp`.
+5. Validate by calling `tools/list` and the new tool through `POST /<workspace>/mcp`.
 
 ## Security Notes
 

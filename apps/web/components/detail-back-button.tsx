@@ -4,8 +4,10 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@workspace/ui/components/button";
 import { cn } from "@workspace/ui/lib/utils";
+import { nsPath } from "@/lib/ns-path";
 
 type DetailBackButtonProps = {
+  /** Namespace-relative list route, e.g. "/sources". Prefixed with the slug. */
   fallbackHref: string;
   className?: string;
 };
@@ -21,7 +23,7 @@ export function DetailBackButton({
       router.back();
       return;
     }
-    router.push(fallbackHref);
+    router.push(nsPath(fallbackHref));
   };
 
   return (
