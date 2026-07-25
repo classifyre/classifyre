@@ -209,6 +209,7 @@ class MSSQLSource(BaseTabularSource):
         self,
         conn: Any,
         base_query: str,
+        *,
         page_size: int,
         pk_columns: list[str],
         pk_order: str,

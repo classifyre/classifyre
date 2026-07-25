@@ -29,6 +29,7 @@ class FakeMsg:
         uid,
         subject,
         from_,
+        *,
         to=(),
         cc=(),
         date=None,

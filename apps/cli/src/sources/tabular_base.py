@@ -9,6 +9,7 @@ excluded schemas, random function, etc.).
 from __future__ import annotations
 
 import asyncio
+import functools
 import logging
 import threading
 from abc import abstractmethod
@@ -536,6 +537,7 @@ class BaseTabularSource(BaseSource):
         self,
         conn: Any,
         base_query: str,
+        *,
         page_size: int,
         pk_columns: list[str],
         pk_order: str,
@@ -659,7 +661,12 @@ class BaseTabularSource(BaseSource):
             last_pk_values = saved_pk if isinstance(saved_pk, list) and saved_pk else None
             pk_order = ", ".join(self._quote_identifier(c) for c in pk_columns)
             rows, column_names = self._fetch_page_keyset(
-                conn, base_query, rows_per_page, pk_columns, pk_order, last_pk_values
+                conn,
+                base_query,
+                page_size=rows_per_page,
+                pk_columns=pk_columns,
+                pk_order=pk_order,
+                last_pk_values=last_pk_values,
             )
             if not rows or len(rows) < rows_per_page:
                 next_state: dict[str, Any] | None = None  # exhausted → wrap next run
@@ -919,13 +926,15 @@ class BaseTabularSource(BaseSource):
 
                 if use_keyset:
                     rows, column_names = await asyncio.to_thread(
-                        self._fetch_page_keyset,
-                        conn,
-                        query,
-                        rows_per_page,
-                        pk_columns,
-                        pk_order,
-                        last_pk_values,
+                        functools.partial(
+                            self._fetch_page_keyset,
+                            conn,
+                            query,
+                            page_size=rows_per_page,
+                            pk_columns=pk_columns,
+                            pk_order=pk_order,
+                            last_pk_values=last_pk_values,
+                        )
                     )
                 else:
                     rows = await asyncio.to_thread(self._cursor_fetchmany, cursor, rows_per_page)

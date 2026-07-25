@@ -27,7 +27,7 @@ graph TD
     Secrets["Secrets\n• Encryption key\n• DB password\n• S3 credentials"]
 
     Ing -->|"/*"| Web
-    Ing -->|"/api/*  /mcp/*  /socket.io/*"| API
+    Ing -->|"/api/*  /&lt;workspace&gt;/mcp  /socket.io/*"| API
     Web -->|"API_URL (internal DNS)"| API
     API --> PG
     API --> S3
@@ -325,10 +325,20 @@ The chart creates four ingress rules on a single host using the nginx ingress co
 
 | Path | Target |
 |---|---|
-| `/` | Web UI |
+| `/` | Web UI (including `/<workspace>/…` app routes) |
 | `/api/*` | REST API |
-| `/mcp` and `/api/mcp` | MCP protocol endpoint |
+| `/<workspace>/mcp` | MCP protocol endpoint, scoped to one workspace |
 | `/socket.io/*` | WebSocket |
+
+<Callout type="info">
+  **Workspace-scoped paths.** Application and MCP URLs carry the
+  [workspace](/how-it-works/workspaces/) slug as their first segment — e.g.
+  `https://<your-host>/acme-corp/findings` and
+  `https://<your-host>/acme-corp/mcp`. The MCP rule is deliberately regex-based
+  and does **not** rewrite the path, so the workspace segment reaches the API,
+  which resolves the tenant from it. A bare `/mcp` with no workspace is not
+  routed and returns `404`.
+</Callout>
 
 The default class is `nginx`. Change it with:
 

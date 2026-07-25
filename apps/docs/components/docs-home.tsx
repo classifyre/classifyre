@@ -51,6 +51,7 @@ const START_HERE: Array<{
       "The whole platform in plain English — no setup, no jargon, just how a pile of scattered data becomes three leads worth your time.",
     links: [
       { text: "How Classifyre works", href: "/how-it-works/" },
+      { text: "Isolated workspaces", href: "/how-it-works/workspaces/" },
       { text: "A tour of the app", href: "/how-it-works/in-the-app/" },
       {
         text: "From documents to findings",
@@ -85,7 +86,8 @@ const START_HERE: Array<{
 const DIRECTORY: Array<{ name: string; blurb: string; href: string }> = [
   {
     name: "How It Works",
-    blurb: "The plain-English map of the whole platform, screen by screen.",
+    blurb:
+      "The plain-English map of the whole platform, from isolated workspaces down to each screen.",
     href: "/how-it-works/",
   },
   {

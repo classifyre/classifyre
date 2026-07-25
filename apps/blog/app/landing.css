@@ -339,9 +339,40 @@
   animation-delay: var(--cl-delay, 0ms);
 }
 
+/* ── Workspace cabinet (isolated workspaces) ────────────────────── */
+
+/* Each file nudges out of the stack on hover, the way you'd thumb one
+   forward in a real drawer. Transform only, so it never reflows the stack. */
+.cl-file {
+  transition: transform 0.22s cubic-bezier(0.2, 0.9, 0.25, 1);
+}
+
+.cl-file:hover {
+  transform: translateX(6px);
+}
+
+/* Index tabs march across the stack like a real drawer. The offset is set
+   per file as --cl-tab-offset, but a narrow column has no room for it, so
+   the tabs stay flush-left until there is width to spend. */
+.cl-file-tab {
+  padding-left: 0;
+}
+
+@media (min-width: 640px) {
+  .cl-file-tab {
+    padding-left: var(--cl-tab-offset, 0%);
+  }
+}
+
 /* ── Reduced motion ─────────────────────────────────────────────── */
 
 @media (prefers-reduced-motion: reduce) {
+  .cl-file,
+  .cl-file:hover {
+    transform: none;
+    transition: none;
+  }
+
   .cl-reveal {
     opacity: 1;
     transform: none;

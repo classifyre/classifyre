@@ -32,21 +32,21 @@ import "./landing.css";
 export const metadata: Metadata = {
   title: "The Open-Source Investigation Platform for Your Data",
   description:
-    "Classifyre turns raw findings into real investigations. Run the full product as a desktop app or deploy it with Helm at any scale, connect the systems you already run, and let semantic ranking float the evidence that matters while Harness AI opens inquiries, builds cases, tunes sources, and authors detectors with every decision explained.",
+    "Classifyre turns raw findings into real investigations. Run the full product as a desktop app or deploy it with Helm at any scale, keep every client, region, or business unit in its own sealed workspace, connect the systems you already run, and let semantic ranking float the evidence that matters while Harness AI opens inquiries, builds cases, tunes sources, and authors detectors with every decision explained.",
   alternates: {
     canonical: "/",
   },
   openGraph: {
     title: "Classifyre | Every leak leaves a trail",
     description:
-      "An open-source investigation platform: detectors surface evidence, semantic ranking sorts signal from boilerplate, and Harness AI opens inquiries, builds cases, drafts hypotheses, and authors detectors with a full audit trail. Available for desktop and Kubernetes with Helm.",
+      "An open-source investigation platform: detectors surface evidence, semantic ranking sorts signal from boilerplate, isolated workspaces keep every investigation sealed in its own database schema, and Harness AI opens inquiries, builds cases, drafts hypotheses, and authors detectors with a full audit trail. Available for desktop and Kubernetes with Helm.",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
     title: "Classifyre | Every leak leaves a trail",
     description:
-      "Open-source core, importance-ranked evidence with written reasons, Harness AI, custom detectors from regex to any model, and one product that runs on desktop or Kubernetes.",
+      "Open-source core, importance-ranked evidence with written reasons, isolated workspaces on one instance, Harness AI, custom detectors from regex to any model, and one product that runs on desktop or Kubernetes.",
   },
 };
 
@@ -74,10 +74,10 @@ const desktopDownloads = [
 
 const enterprisePillars = [
   {
-    marker: "GOVERNANCE",
-    title: "The org chart, wired in",
+    marker: "GOVERNED WORKSPACES",
+    title: "Who may open which file",
     description:
-      "Authentication, authorization, roles, and governance — the layer the open-source core deliberately leaves out, built for regulated rollouts.",
+      "Workspaces are isolated in the open-source core. Enterprise decides who gets a key: SSO, roles, and per-workspace authorization — the layer the core deliberately leaves out.",
   },
   {
     marker: "CUSTOM MODELS",
@@ -97,6 +97,67 @@ const enterprisePillars = [
     description:
       "From first pilot to global deployment: architecture reviews, upgrade assistance across Kubernetes and OpenShift, and SLA-backed support.",
   },
+] as const;
+
+const workspacePillars = [
+  {
+    marker: "SEALED BY DEFAULT",
+    title: "A schema, not a filter",
+    description:
+      "Each workspace gets its own PostgreSQL schema — assets, findings, cases, detectors, embeddings. Not a tenant column somebody can forget to filter on. A wall.",
+  },
+  {
+    marker: "SEPARATE MEMORY",
+    title: "The autopilot forgets on purpose",
+    description:
+      "Harness AI keeps its own memory, system brief, and glossary per workspace. What it learns working the finance estate never bleeds into the support one.",
+  },
+  {
+    marker: "ITS OWN ADDRESS",
+    title: "/acme-corp, all the way down",
+    description:
+      "The workspace lives in the URL — app, REST API, MCP endpoint, scan callbacks. Point an MCP client at one workspace and that is the only estate it can ever see.",
+  },
+  {
+    marker: "SWITCH, NEVER MIX",
+    title: "One instance, many investigations",
+    description:
+      "A workspace per client, per region, per business unit — on a single deployment. Open one in seconds; retire it without touching another file.",
+  },
+] as const;
+
+/** Illustrative cabinet: separate case files on one instance. */
+const workspaceFiles = [
+  {
+    slug: "/acme-corp",
+    name: "Acme Corp",
+    detail: "12 sources · 3 open cases",
+    active: true,
+  },
+  {
+    slug: "/emea-region",
+    name: "EMEA Region",
+    detail: "5 sources · 1 open case",
+    active: false,
+  },
+  {
+    slug: "/internal-audit",
+    name: "Internal Audit",
+    detail: "8 sources · 6 open cases",
+    active: false,
+  },
+] as const;
+
+/** Everything a workspace owns outright — nothing on this list is shared. */
+const workspaceIsolation = [
+  "Database schema",
+  "Assets & findings",
+  "Cases & inquiries",
+  "Detectors & sources",
+  "Semantic space",
+  "Autopilot memory",
+  "Scan queue",
+  "MCP endpoint",
 ] as const;
 
 const investigationPillars = [
@@ -534,7 +595,7 @@ export default function HomePage() {
     operatingSystem: "macOS, Windows, Linux, Kubernetes",
     url: siteUrl,
     description:
-      "Classifyre is an open-source investigation platform: detectors surface evidence across modern source systems, and Harness AI — a five-agent autopilot (inquiry, case, config, detector-author, and memory) — opens inquiries, builds cases, tunes sources, and authors detectors with a full audit trail. Available as a desktop app for macOS, Windows, and Linux, and as a Helm chart for Kubernetes.",
+      "Classifyre is an open-source investigation platform: detectors surface evidence across modern source systems, isolated workspaces keep every client, region, or business unit in its own PostgreSQL schema on a single deployment, and Harness AI — a five-agent autopilot (inquiry, case, config, detector-author, and memory) — opens inquiries, builds cases, tunes sources, and authors detectors with a full audit trail. Available as a desktop app for macOS, Windows, and Linux, and as a Helm chart for Kubernetes.",
     offers: [
       {
         "@type": "Offer",
@@ -1315,6 +1376,176 @@ export default function HomePage() {
                   </div>
                 </div>
               ))}
+            </div>
+          </div>
+        </LandingSectionShell>
+      </section>
+
+      {/* ── Workspaces ───────────────────────────────────────────────────── */}
+      <section aria-labelledby="workspaces-title">
+        <LandingSectionShell tone="signal">
+          <div className="space-y-10">
+            <div className="space-y-3">
+              <Marker label="Isolated workspaces" inverted />
+              <h2
+                id="workspaces-title"
+                className="font-serif text-4xl font-black uppercase leading-[0.9] tracking-[0.06em] sm:text-5xl"
+              >
+                One instance.
+                <br />
+                <span className="inline-block bg-accent px-[0.14em] text-black">
+                  Sealed case files.
+                </span>
+              </h2>
+              <p className="max-w-3xl text-primary-foreground/72">
+                A client, a region, a business unit, a single sensitive matter —
+                each gets its own workspace, and a workspace is a wall, not a
+                filter. Separate schema, separate evidence, separate AI memory,
+                separate endpoint. Switch between them from the same install;
+                nothing crosses.
+              </p>
+            </div>
+
+            <div className="grid gap-8 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)] lg:items-center">
+              <div className="grid gap-3 sm:grid-cols-2">
+                {workspacePillars.map((pillar, index) => (
+                  <Reveal key={pillar.marker} delayMs={index * 90}>
+                    <div className="flex h-full flex-col gap-2 border-2 border-primary-foreground/30 bg-primary-foreground/8 p-4">
+                      <span className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-accent dark:text-accent-foreground">
+                        {pillar.marker}
+                      </span>
+                      <p className="font-serif text-base font-black uppercase leading-tight tracking-[0.04em]">
+                        {pillar.title}
+                      </p>
+                      <p className="text-sm leading-6 text-primary-foreground/72">
+                        {pillar.description}
+                      </p>
+                    </div>
+                  </Reveal>
+                ))}
+              </div>
+
+              {/* The cabinet: tabbed case files, stacked and sealed. */}
+              <figure className="relative">
+                <div
+                  className="cl-stamp absolute -right-2 -top-4 z-10 border-[3px] border-accent px-2.5 py-1 font-mono text-[11px] font-black uppercase tracking-[0.2em] text-accent dark:border-accent-foreground dark:text-accent-foreground"
+                  style={{ "--cl-delay": "500ms" } as CSSProperties}
+                >
+                  Airtight
+                </div>
+
+                <ol className="flex flex-col">
+                  {workspaceFiles.map((file, index) => (
+                    <Reveal key={file.slug} as="li" delayMs={index * 140}>
+                      {index > 0 ? (
+                        <div
+                          className="flex items-center gap-3 py-3"
+                          aria-hidden="true"
+                        >
+                          <span className="h-px flex-1 border-t-2 border-dashed border-primary-foreground/20" />
+                          <span className="font-mono text-[9px] font-bold uppercase tracking-[0.22em] text-primary-foreground/35">
+                            No crossover
+                          </span>
+                          <span className="h-px flex-1 border-t-2 border-dashed border-primary-foreground/20" />
+                        </div>
+                      ) : null}
+
+                      <div className="cl-file">
+                        {/* Index tab, staggered across the stack. */}
+                        <div
+                          className="cl-file-tab flex"
+                          style={
+                            {
+                              "--cl-tab-offset": `${index * 28}%`,
+                            } as CSSProperties
+                          }
+                        >
+                          <span
+                            className={cn(
+                              "border-2 border-b-0 px-2.5 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.14em]",
+                              file.active
+                                ? "border-accent bg-accent text-black"
+                                : "border-primary-foreground/30 bg-primary-foreground/8 text-primary-foreground/60",
+                            )}
+                          >
+                            {file.slug}
+                          </span>
+                        </div>
+
+                        <div
+                          className={cn(
+                            "flex items-center justify-between gap-3 border-2 p-4",
+                            file.active
+                              ? "border-accent bg-primary-foreground/10"
+                              : "border-primary-foreground/30 bg-primary-foreground/5",
+                          )}
+                        >
+                          <div className="min-w-0">
+                            <p className="truncate font-serif text-lg font-black uppercase leading-tight tracking-[0.04em]">
+                              {file.name}
+                            </p>
+                            <p className="mt-0.5 font-mono text-[11px] uppercase tracking-[0.08em] text-primary-foreground/55">
+                              {file.detail}
+                            </p>
+                          </div>
+                          <span
+                            className={cn(
+                              "shrink-0 border px-1.5 py-0.5 font-mono text-[9px] font-bold uppercase tracking-[0.16em]",
+                              file.active
+                                ? "border-accent text-accent dark:border-accent-foreground/40 dark:text-accent-foreground"
+                                : "border-primary-foreground/25 text-primary-foreground/45",
+                            )}
+                          >
+                            Sealed
+                          </span>
+                        </div>
+                      </div>
+                    </Reveal>
+                  ))}
+                </ol>
+
+                <figcaption className="mt-5 border-t-2 border-primary-foreground/25 pt-3 font-mono text-[10px] uppercase tracking-[0.16em] text-primary-foreground/50">
+                  Three investigations, one deployment. The open file is the
+                  only one this session can read.
+                </figcaption>
+              </figure>
+            </div>
+
+            {/* What a workspace owns outright */}
+            <div className="border-2 border-primary-foreground/25 bg-primary-foreground/4">
+              <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b-2 border-primary-foreground/25 px-4 py-3 sm:px-5">
+                <span className="font-mono text-[11px] font-bold uppercase tracking-[0.2em] text-accent dark:text-accent-foreground">
+                  Not shared. Ever.
+                </span>
+                <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-primary-foreground/50">
+                  Every workspace owns its own
+                </span>
+              </div>
+              <ul className="grid grid-cols-2 gap-px bg-primary-foreground/15 sm:grid-cols-4">
+                {workspaceIsolation.map((item) => (
+                  <li
+                    key={item}
+                    className="bg-foreground px-4 py-3 font-mono text-[11px] uppercase tracking-[0.1em] text-primary-foreground/75"
+                  >
+                    <span className="mr-1.5 text-accent dark:text-accent-foreground">▪</span>
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* Governance handoff to the enterprise section below */}
+            <div className="flex flex-col gap-3 border-l-2 border-accent pl-4 sm:pl-5">
+              <span className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-accent dark:text-accent-foreground">
+                For enterprise · governed
+              </span>
+              <p className="max-w-3xl text-base leading-7 text-primary-foreground/72">
+                Isolation is in the open-source core and always on. What
+                enterprise adds is the lock on the cabinet: SSO, roles, and
+                per-workspace authorization, so an auditor opens the audit file,
+                a regional team opens its own region, and nobody browses the
+                drawer next door.
+              </p>
             </div>
           </div>
         </LandingSectionShell>

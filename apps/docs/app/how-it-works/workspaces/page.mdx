@@ -1,0 +1,135 @@
+---
+title: Workspaces
+description: Isolated workspaces let one Classifyre instance hold many separate investigations — each with its own database schema, evidence, detectors, autopilot memory, and API address, with nothing shared between them.
+---
+
+# Workspaces
+
+A **workspace** is a self-contained Classifyre instance-within-an-instance. One
+deployment can hold many of them: one per client, per region, per business
+unit, or per sensitive matter that must never mix with the rest.
+
+Isolation is not a filter applied to shared tables. Each workspace gets its own
+**PostgreSQL schema**, and every query a workspace makes runs inside it. There
+is no tenant column to forget, and no query path that can read another
+workspace's rows.
+
+> Workspaces are part of the open-source core and always on. They are also
+> sometimes called *namespaces* — that is the term used in the API, the URL,
+> and the database schema names.
+
+---
+
+## What each workspace owns
+
+Nothing in this list is shared between workspaces:
+
+| Owned outright | Notes |
+| --- | --- |
+| Database schema | A dedicated `ns_…` PostgreSQL schema, migrated independently |
+| Sources & scans | Connections, schedules, and run history |
+| Assets & findings | Everything a scan registers or a detector raises |
+| Cases & inquiries | The whole investigation layer, including hypotheses and events |
+| Custom detectors | Definitions, training examples, and test scenarios |
+| Semantic space | Embeddings, importance ranking, and fingerprints |
+| Autopilot memory | Harness AI's memory, system brief, and glossary |
+| Scan queue | Its own job queue, so one busy workspace cannot starve another |
+| MCP endpoint | A distinct URL an MCP client connects to |
+| Notifications | Its own feed and unread state |
+
+Shared across the instance: the workspace registry itself (names, slugs,
+thumbnails), the application version, and the machine or cluster it all runs
+on.
+
+---
+
+## Addressing a workspace
+
+Every workspace has a **slug** and an immutable **UUID**. The slug appears in
+every URL, right after the host:
+
+```
+https://<your-host>/<workspace>/findings
+https://<your-host>/<workspace>/sources/<source-id>
+https://<your-host>/<workspace>/mcp
+```
+
+This is the same contract at every layer — the app, the REST API, the MCP
+endpoint, WebSocket subscriptions, and the callbacks a running scan makes back
+into the API. A request without a workspace segment is rejected; a request with
+an unknown one returns `404 Unknown namespace '<value>'`.
+
+Because the address carries the workspace, an integration is scoped by
+construction: point an MCP client or an API token at `/<workspace>/…` and that
+workspace is the only estate it can ever read.
+
+The slug is **editable** — renaming a workspace changes its URLs but not its
+data, because the underlying schema is derived from the UUID, not the name. A
+handful of names are reserved (`api`, `namespaces`, `docs`, `health`, `ping`)
+and cannot be used as slugs.
+
+---
+
+## Working with workspaces
+
+**Choosing one.** Opening Classifyre lands you on the workspace directory: a
+card per workspace with its name, description, and a live count of sources and
+failing sources. Pick one to enter it; use *All workspaces* in the sidebar to
+come back.
+
+**Creating one.** *New workspace* asks for a name and optional description and
+thumbnail. Classifyre derives a slug, creates the schema, runs migrations into
+it, and starts its workers — usually a few seconds. There is no default
+workspace: a fresh install has none until you create the first.
+
+**Renaming one.** Workspace settings let you edit the name, description,
+thumbnail, and URL slug at any time.
+
+**Retiring one.** Deleting a workspace removes it from the directory and stops
+its workers and scheduling, and any request to its URL then 404s. **The data is
+retained** — the schema is never dropped — and the slug stays reserved so it
+cannot be silently reused by a different investigation.
+
+**Remote workspaces (desktop).** The desktop app can also list a workspace that
+lives on another Classifyre instance. It appears in the directory alongside
+local ones and opens that instance in your browser; no data is copied to your
+machine.
+
+---
+
+## Upgrades and migrations
+
+Every workspace schema is migrated on every start. When Classifyre boots, it
+reads the registry and applies any pending database migrations to each
+workspace in turn, under a lock shared across all API and worker processes, so
+a multi-replica cluster never migrates the same schema twice. Adding a
+workspace later migrates it at creation time.
+
+The practical consequence: upgrading Classifyre upgrades every workspace. There
+is no per-workspace upgrade step and no way for one workspace to drift onto an
+older schema version.
+
+---
+
+## Governance and access control
+
+The open-source core gives you **isolation** — the walls between workspaces.
+What it deliberately does not ship is **authorization**: it has no built-in
+concept of users, roles, or who may open which workspace. Anyone who can reach
+the instance can switch between the workspaces on it.
+
+That is fine for a single investigator on the desktop app, or for a deployment
+that is already behind your own access layer. If you need governed workspaces —
+SSO, roles, and per-workspace authorization so an auditor sees only the audit
+workspace and a regional team only its region — that is part of the enterprise
+offering. See [Deployment](/deployment/) or get in touch at
+`contact@classifyre.com`.
+
+---
+
+## Where to go next
+
+- **[A Tour of the App](/how-it-works/in-the-app/)** — every screen inside a workspace
+- **[MCP Server](/settings/mcp-server/)** — connecting a client to one workspace
+- **[Database](/deployment/database/)** — how schemas and migrations are laid out
+- **[Kubernetes](/deployment/kubernetes/)** — running one instance for many workspaces

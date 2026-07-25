@@ -318,7 +318,14 @@ class EmailSource(BaseSource):
         if self.include_attachments:
             for idx, att in enumerate(msg.attachments or []):
                 asset = self._attachment_to_asset(
-                    att, idx, message_id, email_hash, email_url, folder, msg.uid, created
+                    att,
+                    idx,
+                    message_id=message_id,
+                    email_hash=email_hash,
+                    email_url=email_url,
+                    folder=folder,
+                    uid=msg.uid,
+                    created=created,
                 )
                 attachment_assets.append(asset)
                 attachment_hashes.append(asset.hash)
@@ -376,6 +383,7 @@ class EmailSource(BaseSource):
         self,
         att: Any,
         idx: int,
+        *,
         message_id: str,
         email_hash: str,
         email_url: str,

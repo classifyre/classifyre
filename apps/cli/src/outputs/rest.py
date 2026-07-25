@@ -334,6 +334,7 @@ class RestOutputSink:
         self,
         asset_hash: str,
         status: str,
+        *,
         error_message: str | None = None,
         findings_total: int | None = None,
         findings_by_severity: dict[str, int] | None = None,

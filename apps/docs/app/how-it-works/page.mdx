@@ -17,6 +17,11 @@ Prefer to learn screen by screen? Take **[A Tour of the
 App](/how-it-works/in-the-app/)** — it maps every item in the app's navigation
 to what it's for.
 
+Everything below happens inside a **[workspace](/how-it-works/workspaces/)** —
+an isolated investigation with its own sources, findings, cases, and AI memory.
+One Classifyre instance can hold many of them (a client, a region, a business
+unit), and nothing is shared between them.
+
 ```mermaid
 graph TD
     Sources["Sources<br/>systems you connect"] --> Scans["Scans<br/>crawl each source"]
@@ -25,7 +30,7 @@ graph TD
     Findings --> Ranking["Ranking<br/>importance score"]
     Ranking --> Inquiries["Inquiries<br/>standing questions"]
     Ranking --> Fingerprints["Fingerprints<br/>shared-value links"]
-    Inquiries --> Cases["Cases<br/>investigation workspace"]
+    Inquiries --> Cases["Cases<br/>the investigation case file"]
     Fingerprints --> Cases
     Glossary["Glossary"] -.-> Cases
     Autopilot["Autopilot"] -.-> Ranking

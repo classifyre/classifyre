@@ -17,6 +17,27 @@ Our official Helm chart supports three deployment modes for the database, config
 
 ---
 
+## One Database, One Schema per Workspace
+
+All modes use a **single database**. Isolation between
+[workspaces](/how-it-works/workspaces/) is achieved with **schemas**, not
+separate databases: the `public` schema holds only the workspace registry, and
+each workspace owns a dedicated `ns_<uuid>` schema containing all of its
+application tables, plus a `pgboss_<uuid>` schema for its job queue.
+
+This means you size, back up, and connect to **one** database no matter how
+many workspaces you run. Migrations are applied per schema on every start,
+serialised across all API and worker replicas by a PostgreSQL advisory lock, so
+a rolling upgrade never migrates the same schema twice.
+
+<Callout type="info">
+  **Backups cover everything.** A standard logical or physical backup of the
+  database captures the registry and every workspace schema together. There is
+  no per-workspace backup step.
+</Callout>
+
+---
+
 ## Database Modes
 
 <Tabs items={['Embedded', 'External', 'CNPG']}>
