@@ -48,6 +48,9 @@ frontend:
     host: "/classifyre-usr"
     uiHost: "https://eu.posthog.com"
     ingestHost: "https://eu.i.posthog.com"
+  googleAnalytics:
+    enabled: true
+    measurementId: "G-0RLFLNZDPP"
 
   service:
     type: NodePort

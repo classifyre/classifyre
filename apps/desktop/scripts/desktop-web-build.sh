@@ -46,6 +46,12 @@ echo "[desktop-web-build] Excluding incompatible routes…"
 backup_file "$WEB_DIR/app/api/[...path]/route.ts"
 backup_file "$WEB_DIR/app/classifyre-usr/[...path]/route.ts"
 
+# Runtime analytics config, served by the web container so Helm can set the
+# PostHog/Google Analytics IDs without an image rebuild. Desktop has no server
+# and ships without analytics; the root layout omits the <script> tag when
+# DESKTOP_BUILD=true, so nothing requests this path.
+backup_file "$WEB_DIR/app/classifyre-cfg/route.ts"
+
 # Guard: fail loudly if a dynamic [param] *page* is not covered by a
 # generateStaticParams() somewhere in its segment — the page itself or, more
 # usually, an ancestor layout (a "use client" page cannot export it). Without

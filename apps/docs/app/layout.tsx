@@ -20,6 +20,7 @@ import {
   resolveDocsBasePath,
   safeJsonLdStringify,
 } from "@/lib/seo";
+import { GoogleAnalytics } from "./google-analytics";
 import { PostHogProvider } from "./providers";
 
 import "@workspace/ui/globals.css";
@@ -304,6 +305,7 @@ export default async function RootLayout({
       <body
         className={`${fontSerif.variable} ${fontSans.variable} ${fontMono.variable} ${fontHero.variable} font-sans antialiased`}
       >
+        <GoogleAnalytics />
         <PostHogProvider>
           <Layout
             // banner={banner}

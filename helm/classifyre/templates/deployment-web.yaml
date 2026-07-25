@@ -91,6 +91,10 @@ spec:
             - name: POSTHOG_INGEST_HOST
               value: {{ .Values.frontend.posthog.ingestHost | quote }}
             {{- end }}
+            {{- if .Values.frontend.googleAnalytics.enabled }}
+            - name: GOOGLE_ANALYTICS_MEASUREMENT_ID
+              value: {{ required "frontend.googleAnalytics.measurementId is required when frontend.googleAnalytics.enabled is true" .Values.frontend.googleAnalytics.measurementId | quote }}
+            {{- end }}
             {{- include "classifyre.telemetryEnv" . | nindent 12 }}
             {{- with .Values.frontend.extraEnv }}
             {{- toYaml . | nindent 12 }}

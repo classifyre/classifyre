@@ -4,25 +4,27 @@ import * as React from "react";
 import posthog from "posthog-js";
 import { PostHogProvider as PHProvider } from "posthog-js/react";
 
-const POSTHOG_TOKEN = process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN;
-const POSTHOG_HOST = process.env.NEXT_PUBLIC_POSTHOG_HOST ?? "/classifyre-usr";
-const POSTHOG_UI_HOST =
-  process.env.NEXT_PUBLIC_POSTHOG_UI_HOST ?? "https://us.posthog.com";
+import { readPostHogRuntimeConfig } from "@/lib/analytics-config";
 
 export function PostHogProvider({ children }: { children: React.ReactNode }) {
+  const [initialised, setInitialised] = React.useState(false);
+
   React.useEffect(() => {
-    if (!POSTHOG_TOKEN) return;
-    posthog.init(POSTHOG_TOKEN, {
-      api_host: POSTHOG_HOST,
-      ui_host: POSTHOG_UI_HOST,
+    const config = readPostHogRuntimeConfig();
+    if (!config) return;
+
+    posthog.init(config.token, {
+      api_host: config.apiHost,
+      ui_host: config.uiHost,
       defaults: "2026-01-30",
       capture_pageview: true,
       capture_pageleave: true,
       person_profiles: "identified_only",
     });
+    setInitialised(true);
   }, []);
 
-  if (!POSTHOG_TOKEN) {
+  if (!initialised) {
     return <>{children}</>;
   }
 

@@ -545,6 +545,16 @@ frontend:
     # -- Use https://eu.i.posthog.com for EU Cloud, or your managed proxy CNAME.
     ingestHost: "https://us.i.posthog.com"
 
+  googleAnalytics:
+    # Runs alongside PostHog; the two are independent and can be enabled
+    # separately. The measurement ID is served to the browser at runtime by the
+    # web container (GET /classifyre-cfg/), so changing it needs only a
+    # `helm upgrade` — no image rebuild.
+    # -- Enable Google Analytics (gtag.js) for the web app. When false, no env vars are injected.
+    enabled: false
+    # -- GA4 measurement ID (G-XXXXXXXXXX), injected as GOOGLE_ANALYTICS_MEASUREMENT_ID. Required when enabled=true.
+    measurementId: ""
+
   # -- Extra environment variables for web container.
   extraEnv: []
   # -- Extra envFrom sources for web container.

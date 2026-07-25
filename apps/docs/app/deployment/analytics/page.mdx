@@ -1,22 +1,52 @@
 ---
-sidebarTitle: Analytics (PostHog)
-title: Analytics with PostHog
-description: Enable PostHog product analytics for the Classifyre web app and docs site via the Helm chart.
+sidebarTitle: Analytics
+title: Analytics (PostHog & Google Analytics)
+description: Enable PostHog product analytics and Google Analytics for the Classifyre web app, docs site, and blog.
 ---
 
 import { Callout, Steps, Tabs } from "nextra/components"
 
-# Analytics with PostHog
+# Analytics
 
-Classifyre ships optional [PostHog](https://posthog.com) integration for product analytics. When enabled, the **web app**, **docs site**, and **blog** all report page views and events to your PostHog project.
+Classifyre ships optional integrations for two independent analytics providers:
+
+| Provider | Purpose | Configured by |
+|---|---|---|
+| [PostHog](https://posthog.com) | Product analytics — events, funnels, session behaviour | Helm (`frontend.posthog.*`) |
+| [Google Analytics 4](https://analytics.google.com) | Audience and traffic reporting via `gtag.js` | Helm (`frontend.googleAnalytics.*`) |
+
+Both are **off by default**, can be enabled independently, and coexist without interfering — enabling one does not affect the other.
 
 <Callout type="info">
-Analytics are **off by default**. No data is sent unless you explicitly set `frontend.posthog.enabled: true` and supply a project token.
+No data leaves the browser unless you explicitly enable a provider and supply its ID.
 </Callout>
 
-## How it works
+## How the web app resolves analytics IDs
 
-All PostHog traffic is **proxied through the web container** at `/classifyre-usr`. This path name is intentionally neutral — words like `analytics`, `tracking`, `ingest`, or `posthog` are commonly targeted by ad-blocker filter lists, so using an unrelated path keeps the proxy effective.
+The web container image is built once in CI and configured per-deployment by Helm. That rules out `NEXT_PUBLIC_*` variables for this purpose: **Next.js inlines those into the JavaScript bundle at build time**, so anything Helm sets afterwards is invisible to the browser.
+
+Instead the web container serves the browser-facing analytics config at runtime:
+
+```
+Browser → GET /classifyre-cfg/ → web container reads env → JS assigning window.__CLASSIFYRE_ANALYTICS__
+```
+
+- The root layout loads `/classifyre-cfg/` synchronously, before React hydrates.
+- The response is `Cache-Control: no-store`, so a `helm upgrade` takes effect on the next page load.
+- When Google Analytics is enabled the same response also carries the standard `gtag.js` bootstrap and injects the Google tag.
+- Changing a token or measurement ID needs **no image rebuild** — only a `helm upgrade`.
+
+Like `/classifyre-usr`, the path name is deliberately neutral: paths containing `analytics`, `tracking`, or `gtag` are targeted by ad-blocker filter lists.
+
+<Callout type="warning">
+This applies to the **web app** only. The docs site and blog are static exports built by their own pipeline — see [Docs site and blog](#docs-site-and-blog) below.
+</Callout>
+
+## PostHog
+
+### How it works
+
+All PostHog traffic is **proxied through the web container** at `/classifyre-usr`:
 
 ```
 Browser → /classifyre-usr/* → web container → us.i.posthog.com
@@ -25,11 +55,10 @@ Browser → /classifyre-usr/* → web container → us.i.posthog.com
 - Requests from the browser go to your own domain first, never directly to `posthog.com`.
 - Ad-blockers that block known analytics domains are bypassed.
 - No extra ingress rules or firewall exceptions are needed.
-- The docs site and blog are served by the same ingress, so they use the same proxy automatically.
 
 The server-side proxy route reads `POSTHOG_INGEST_HOST` to determine the upstream endpoint. This env var is **never exposed to the browser**, so you can safely set it to your PostHog region or a managed reverse proxy CNAME.
 
-## Getting a PostHog project token
+### Getting a project token
 
 <Steps>
 
@@ -47,7 +76,7 @@ Navigate to **Settings → Project → Project API key**. The token looks like `
 
 </Steps>
 
-## Enabling via Helm
+### Enabling via Helm
 
 <Tabs items={['values.yaml', 'helm upgrade']}>
 
@@ -75,7 +104,7 @@ helm upgrade classifyre oci://ghcr.io/your-org/classifyre \
 
 </Tabs>
 
-## Configuration reference
+### Configuration reference
 
 | Value | Default | Description |
 |---|---|---|
@@ -85,7 +114,7 @@ helm upgrade classifyre oci://ghcr.io/your-org/classifyre \
 | `frontend.posthog.uiHost` | `"https://us.posthog.com"` | PostHog UI host for toolbar links (`NEXT_PUBLIC_POSTHOG_UI_HOST`). Use `https://eu.posthog.com` for EU Cloud. |
 | `frontend.posthog.ingestHost` | `"https://us.i.posthog.com"` | Server-side upstream endpoint (`POSTHOG_INGEST_HOST`). Never exposed to the browser. Use `https://eu.i.posthog.com` for EU Cloud, or your managed reverse proxy CNAME. |
 
-## EU Cloud
+### EU Cloud
 
 Set both the UI host and the server-side ingest host for EU Cloud:
 
@@ -98,7 +127,7 @@ frontend:
     ingestHost: "https://eu.i.posthog.com"
 ```
 
-## Managed reverse proxy (recommended for production)
+### Managed reverse proxy (recommended for production)
 
 For even higher event capture rates, set up a [PostHog managed reverse proxy](https://posthog.com/docs/advanced/proxy) on your own subdomain (e.g. `e.yourcompany.com`). Point `ingestHost` at the CNAME PostHog provisions for you, and set `host` to the same subdomain so the browser sends events there directly — bypassing the Next.js proxy hop entirely.
 
@@ -116,12 +145,95 @@ frontend:
 Choose a subdomain that does not contain words like `analytics`, `tracking`, `telemetry`, or `posthog` — ad-blockers target these terms.
 </Callout>
 
+## Google Analytics
+
+### Getting a measurement ID
+
+<Steps>
+
+### Create a GA4 property
+
+In [Google Analytics](https://analytics.google.com), go to **Admin → Create → Property** and complete the setup.
+
+### Add a web data stream
+
+Under **Admin → Data streams → Add stream → Web**, enter the site URL.
+
+### Copy the measurement ID
+
+The stream details show a **Measurement ID** of the form `G-XXXXXXXXXX`.
+
+</Steps>
+
+### Enabling via Helm
+
+<Tabs items={['values.yaml', 'helm upgrade']}>
+
+<Tabs.Tab>
+
+```yaml
+frontend:
+  googleAnalytics:
+    enabled: true
+    measurementId: "G-XXXXXXXXXX"
+```
+
+</Tabs.Tab>
+
+<Tabs.Tab>
+
+```bash
+helm upgrade classifyre oci://ghcr.io/your-org/classifyre \
+  --set frontend.googleAnalytics.enabled=true \
+  --set frontend.googleAnalytics.measurementId="G-XXXXXXXXXX"
+```
+
+</Tabs.Tab>
+
+</Tabs>
+
+The chart fails the render with an explicit error if `enabled: true` is set without a measurement ID, so a misconfiguration cannot reach the cluster silently.
+
+### Configuration reference
+
+| Value | Default | Description |
+|---|---|---|
+| `frontend.googleAnalytics.enabled` | `false` | Set to `true` to inject the Google Analytics measurement ID into the web container. |
+| `frontend.googleAnalytics.measurementId` | `""` | GA4 measurement ID (`G-XXXXXXXXXX`), injected as `GOOGLE_ANALYTICS_MEASUREMENT_ID`. Required when `enabled=true`. |
+
+The value is validated against `^G-[A-Z0-9]{4,20}$` before being served to the browser; anything else is ignored and no Google tag is loaded.
+
+<Callout type="info">
+The web app is a single-page app, so most navigations do not reload the page. GA4 counts these through **Enhanced measurement → Page changes based on browser history events**, which is on by default. If you turned Enhanced measurement off, only the first page of each visit is counted.
+</Callout>
+
+### Ad-blockers
+
+Unlike PostHog, Google Analytics is not proxied: `gtag.js` is loaded directly from `googletagmanager.com` and hits go to `google-analytics.com`, both of which are blocked by most ad-blockers and by some corporate DNS. Expect Google Analytics to under-report relative to PostHog. Use PostHog for numbers you intend to rely on.
+
+## Docs site and blog
+
+The docs site and blog are **static exports** deployed separately from the Helm chart (for example on Cloudflare Pages), so their configuration is baked in at build time rather than injected by Helm. Set these variables in the build environment:
+
+| Variable | Purpose |
+|---|---|
+| `NEXT_PUBLIC_GA_MEASUREMENT_ID` | GA4 measurement ID (`G-XXXXXXXXXX`). Leave unset to disable. |
+| `NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN` | PostHog project token. Leave unset to disable. |
+| `NEXT_PUBLIC_POSTHOG_HOST` | PostHog ingest host, e.g. `https://eu.i.posthog.com`. |
+| `NEXT_PUBLIC_POSTHOG_UI_HOST` | PostHog UI host, e.g. `https://eu.posthog.com`. |
+
+See `apps/docs/.env.example` and `apps/blog/.env.example`. Because these are build-time values, **changing them requires a rebuild and redeploy** of the affected site.
+
 ## Disabling analytics
 
-Set `enabled: false` (the default). No PostHog env vars are injected and the SDK will not initialise — no requests are made to any analytics endpoint.
+Set `enabled: false` (the default) for either provider. No env vars are injected, the corresponding SDK never initialises, and no requests are made to any analytics endpoint.
 
 ```yaml
 frontend:
   posthog:
     enabled: false
+  googleAnalytics:
+    enabled: false
 ```
+
+For the docs site and blog, leave the corresponding `NEXT_PUBLIC_*` variables unset at build time.
