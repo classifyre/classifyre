@@ -400,7 +400,7 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
                                     try:
                                         error_msg = str(exc) or type(exc).__name__
                                         await sink.update_asset_status(
-                                            asset_hash, "ERROR", error_msg
+                                            asset_hash, "ERROR", error_message=error_msg
                                         )
                                     except Exception:
                                         pass

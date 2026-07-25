@@ -26,7 +26,7 @@ graph LR
     Finding --> Inquiry["Inquiries<br/>standing questions"]
     Finding --> FP["Fingerprints<br/>duplicates & similarity"]
 
-    Inquiry --> Case["Cases<br/>investigation workspaces"]
+    Inquiry --> Case["Cases<br/>investigation case files"]
     FP --> Case
     Case --> Hyp["Hypotheses<br/>explanations, tested against evidence"]
 
@@ -46,7 +46,7 @@ Reading it left to right:
 3. **[Inquiries](/investigations/inquiry/)** keep watch over findings by
    rule, and **[Fingerprints](/investigations/fingerprints/)** connect them
    by shared identity (duplicates and similar items).
-4. **[Cases](/investigations/cases/)** are the workspaces where evidence is
+4. **[Cases](/investigations/cases/)** are the case files where evidence is
    collected and **[hypotheses](/investigations/cases/hypothesis/)** are
    weighed until you reach a conclusion.
 5. **[Autopilot](/investigations/autopilot/)** wraps the whole right-hand
@@ -74,7 +74,7 @@ graph TD
     Findings["Findings<br/>Raw signals from detectors"]
     Inquiry["Inquiry<br/>A saved question over findings"]
     FP["Fingerprints<br/>Duplicate & similarity clusters"]
-    Case["Case<br/>An investigation workspace"]
+    Case["Case<br/>An investigation case file"]
     Evidence["Evidence<br/>Snapshotted assets attached to a case"]
     CaseFinding["Case Finding<br/>A finding pulled into evidence"]
     Thread["Thread<br/>Hypothesis or discussion"]

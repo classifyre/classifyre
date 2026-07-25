@@ -66,9 +66,9 @@ describe('NotificationsService action URLs', () => {
   });
 
   it('leaves absolute URLs and nulls untouched', async () => {
-    expect((await create(build('acme', 'https://example.com/x'))).actionUrl).toBe(
-      'https://example.com/x',
-    );
+    expect(
+      (await create(build('acme', 'https://example.com/x'))).actionUrl,
+    ).toBe('https://example.com/x');
     expect((await create(build('acme', null))).actionUrl).toBeNull();
   });
 

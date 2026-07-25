@@ -1010,8 +1010,10 @@ const RESERVED_ROUTE_PREFIXES = new Set([
  * outside any namespace (landing page, `/namespaces/<id>/settings`, a file such
  * as the desktop shell's `/index.html`).
  */
-export function namespaceSlugFromPath(pathname: string): string | undefined {
-  const first = pathname.split("/").filter(Boolean)[0];
+export function namespaceSlugFromPath(
+  pathname: string | null | undefined,
+): string | undefined {
+  const first = pathname?.split("/").filter(Boolean)[0];
   if (!first) return undefined;
   const decoded = decodeURIComponent(first);
   if (RESERVED_ROUTE_PREFIXES.has(decoded)) return undefined;
