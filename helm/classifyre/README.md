@@ -136,6 +136,7 @@ helm upgrade --install classifyre ./helm/classifyre \
 | api.cliJobs.image.pullPolicy | string | `"IfNotPresent"` | CLI job image pull policy. |
 | api.cliJobs.image.repository | string | `"classifyre/cli"` | CLI job image repository. |
 | api.cliJobs.image.tag | string | `""` | CLI job image tag. Defaults to the chart appVersion when empty. |
+| api.cliJobs.kubeApiCaCertPath | string | `"/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"` | CA bundle the API/worker trusts when calling the in-cluster Kubernetes API to create/delete CLI Jobs. The kube-apiserver serves a cert signed by the cluster CA, which every pod mounts at this path; exposing it via NODE_EXTRA_CA_CERTS makes Node's TLS trust it (fixes the SELF_SIGNED_CERT_IN_CHAIN error against self-signed clusters like k3d). Set to "" to disable (e.g. if the cluster CA is already in the system store). |
 | api.cliJobs.namespace | string | `""` | Namespace used for CLI jobs. Empty means release namespace. |
 | api.cliJobs.nodeSelector | object | `{}` | CLI job scheduling: node selector. |
 | api.cliJobs.outputRestTimeoutSec | int | `120` | HTTP read timeout (seconds) for CLI→API REST calls (bulk ingest, finalize, status updates). The API processes each batch in a Postgres transaction that can take 30-60 s under load; this must be set higher than the API's transaction timeout to avoid spurious read-timeout failures. |
@@ -166,7 +167,7 @@ helm upgrade --install classifyre ./helm/classifyre \
 | api.containerSecurityContext.readOnlyRootFilesystem | bool | `false` | path the app writes to at runtime (e.g. /tmp, log dirs). Hardening step for advanced users. |
 | api.embedding.allowRemoteModels | bool | `true` |  |
 | api.embedding.autoBackfill | bool | `true` | embedding space on API startup. Existing vectors are hash-skipped. |
-| api.embedding.batchSize | int | `32` |  |
+| api.embedding.batchSize | int | `16` | backfill burst cannot spike the worker heap into an OOM. |
 | api.embedding.cacheDir | string | `"/var/cache/classifyre/transformers"` |  |
 | api.embedding.cacheSizeLimit | string | `"2Gi"` |  |
 | api.embedding.device | string | `"cpu"` |  |
@@ -215,9 +216,10 @@ helm upgrade --install classifyre ./helm/classifyre \
 | api.maskedConfigEncryption.secretKey | string | `"CLASSIFYRE_MASKED_CONFIG_KEY"` | Secret key name used for CLASSIFYRE_MASKED_CONFIG_KEY. |
 | api.maskedConfigEncryption.secretName | string | `""` | Secret name created by this chart when existingSecret is empty. |
 | api.maskedConfigEncryption.value | string | `""` | Must be exactly 32 chars when using raw string format. |
+| api.maxOldSpaceSizeMb | int | `1536` | limit. Rule of thumb: heap ≈ 0.75 × the memory limit (in MB). |
 | api.migration.containerSecurityContext | object | `{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]}}` | Override with runAsUser/runAsNonRoot: false if the migration toolchain requires root (e.g. Prisma on Bun). |
 | api.migration.enabled | bool | `true` | API applies pending migrations itself before NestJS startup. |
-| api.migration.script | string | `"node -e \"require('./dist/src/database-migrations.js').applyAllPendingMigrations().catch((error) => { console.error(error); process.exit(1); })\""` | Runs the database-locked registry and per-namespace migration orchestrator. |
+| api.migration.script | string | `"node -e \"require('./dist/src/database-migrations.js').applyAllPendingMigrations().catch((error) => { console.error(error); process.exit(1); })\""` | Migration command/script. |
 | api.nodeSelector | object | `{}` | API scheduling: node selector. |
 | api.pdb.enabled | bool | `true` | Enable PodDisruptionBudget for API deployment. |
 | api.pdb.minAvailable | int | `1` | API minimum pods available during disruptions. |
@@ -236,8 +238,8 @@ helm upgrade --install classifyre ./helm/classifyre \
 | api.readinessProbe.periodSeconds | int | `10` | API readiness check period. |
 | api.readinessProbe.timeoutSeconds | int | `3` | API readiness check timeout. |
 | api.replicaCount | int | `2` | Number of API replicas when autoscaling is disabled. |
-| api.resources.limits | object | `{"cpu":"1","memory":"1Gi"}` | API resource limits. |
-| api.resources.requests | object | `{"cpu":"250m","memory":"512Mi"}` | API resource requests. |
+| api.resources.limits | object | `{"cpu":"1","memory":"2Gi"}` | leaves ~512 MB for native memory before the kernel OOM-kills the pod. |
+| api.resources.requests | object | `{"cpu":"250m","memory":"768Mi"}` | API resource requests. |
 | api.service.annotations | object | `{}` | Additional API service annotations. |
 | api.service.nodePort | string | `nil` | Fixed nodePort when `type` is `NodePort` or `LoadBalancer`. |
 | api.service.port | int | `8000` | API service port. |
@@ -274,6 +276,8 @@ helm upgrade --install classifyre ./helm/classifyre \
 | frontend.extraEnvFrom | list | `[]` | Extra envFrom sources for web container. |
 | frontend.extraVolumeMounts | list | `[]` | Extra volume mounts for the web container. |
 | frontend.extraVolumes | list | `[]` | Extra volumes for the web pod. |
+| frontend.googleAnalytics.enabled | bool | `false` | Enable Google Analytics (gtag.js) for the web app. When false, no env vars are injected. |
+| frontend.googleAnalytics.measurementId | string | `""` | GA4 measurement ID (G-XXXXXXXXXX), injected as GOOGLE_ANALYTICS_MEASUREMENT_ID. Required when enabled=true. |
 | frontend.image.pullPolicy | string | `"IfNotPresent"` | Web image pull policy. |
 | frontend.image.repository | string | `"classifyre/web"` | Web container image repository. |
 | frontend.image.tag | string | `""` | Web container image tag. Defaults to the chart appVersion when empty. |
@@ -350,6 +354,7 @@ helm upgrade --install classifyre ./helm/classifyre \
 | postgres.cnpg.database | string | `"classifyre"` | Database bootstrapped by CNPG. |
 | postgres.cnpg.imageName | string | `"ghcr.io/cloudnative-pg/postgresql:18-standard-trixie"` | CNPG Postgres image. |
 | postgres.cnpg.instances | int | `3` | Number of CNPG instances. |
+| postgres.cnpg.postgresql.parameters | object | `{"shared_buffers":"512MB","work_mem":"16MB"}` | Postgres itself uses the memory already granted to each instance. |
 | postgres.cnpg.storage.size | string | `"20Gi"` | CNPG storage size per instance. |
 | postgres.cnpg.storage.storageClassName | string | `""` | CNPG storage class name. |
 | postgres.cnpg.superuserSecretName | string | `""` | Existing CNPG superuser secret name. |
@@ -364,6 +369,7 @@ helm upgrade --install classifyre ./helm/classifyre \
 | postgres.embedded.image.repository | string | `"pgvector/pgvector"` | Embedded Postgres image repository. |
 | postgres.embedded.image.tag | string | `"0.8.5-pg18-bookworm"` | Embedded Postgres image tag. |
 | postgres.embedded.nodeSelector | object | `{}` | Embedded Postgres scheduling: node selector. |
+| postgres.embedded.parameters | object | `{"shared_buffers":"512MB","work_mem":"16MB"}` | how Postgres itself uses the memory already granted to it. |
 | postgres.embedded.password | string | `""` | Embedded Postgres password (required when existingSecret is empty). |
 | postgres.embedded.persistence.accessModes | list | `["ReadWriteOnce"]` | Access modes for embedded Postgres PVC. |
 | postgres.embedded.persistence.enabled | bool | `true` | Enable persistent volume for embedded Postgres data. |
@@ -408,4 +414,7 @@ helm upgrade --install classifyre ./helm/classifyre \
 | telemetry.instanceId.existingConfigMap | string | `""` | Use an existing ConfigMap instead of creating one. Must contain instanceId.configMapKey. |
 | telemetry.otlpEndpoint | string | `""` | otlpEndpoint: "http://otel-receiver-opentelemetry-collector.monitoring:4318" |
 | telemetry.otlpProtocol | string | `"http/protobuf"` | OTLP export protocol: "http/protobuf" (default) or "grpc". |
-| worker.maxConcurrentNamespaceJobs | int | `1` | Maximum namespace-scoped job batches executing across all worker replicas. Excess tenant jobs wait on a PostgreSQL advisory-lock slot; `0` is unlimited. |
+| worker.maxConcurrentNamespaceJobs | int | `1` | Maximum namespace-scoped background job batches executing concurrently across all worker replicas. All tenant queues remain registered; excess jobs wait on a PostgreSQL advisory-lock slot. Set 0 for unlimited. |
+| worker.replicaCount | int | `1` | background work no longer competes with api pods for their memory limit. |
+| worker.resources.limits | object | `{"cpu":"1","memory":"2Gi"}` | Worker resource limits. |
+| worker.resources.requests | object | `{"cpu":"100m","memory":"512Mi"}` | Worker resource requests. |
