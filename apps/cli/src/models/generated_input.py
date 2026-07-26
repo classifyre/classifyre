@@ -3333,7 +3333,7 @@ class NotionInput(CoreInput):
 
 class KafkaSecurityProtocol(StrEnum):
     """
-    Kafka client security protocol
+    Kafka client security protocol. Leave unset to derive it from the authentication mode (SASL → SASL_SSL, Client Certificate → SSL, No Authentication → PLAINTEXT); set it only to override, e.g. SASL_PLAINTEXT for a SASL broker without TLS.
     """
 
     PLAINTEXT = 'PLAINTEXT'
@@ -3398,19 +3398,21 @@ class NoAuthentication(BaseModel):
         extra='forbid',
     )
     auth_mode: Literal['NONE']
-    bootstrap_servers: str = Field(
-        ..., description='Comma-separated Kafka bootstrap servers (host:port)'
+    host: str = Field(
+        ..., description='Kafka broker host name or IP (e.g. kafka.example.com)'
     )
+    port: int = Field(..., description='Kafka broker port', ge=1, le=65535)
 
 
-class SASL(BaseModel):
+class SASLUsernamePassword(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
     auth_mode: Literal['SASL']
-    bootstrap_servers: str = Field(
-        ..., description='Comma-separated Kafka bootstrap servers (host:port)'
+    host: str = Field(
+        ..., description='Kafka broker host name or IP (e.g. kafka.example.com)'
     )
+    port: int = Field(..., description='Kafka broker port', ge=1, le=65535)
 
 
 class ClientCertificateMTLS(BaseModel):
@@ -3418,9 +3420,26 @@ class ClientCertificateMTLS(BaseModel):
         extra='forbid',
     )
     auth_mode: Literal['CLIENT_CERT']
-    bootstrap_servers: str = Field(
-        ..., description='Comma-separated Kafka bootstrap servers (host:port)'
+    host: str = Field(
+        ..., description='Kafka broker host name or IP (e.g. kafka.example.com)'
     )
+    port: int = Field(..., description='Kafka broker port', ge=1, le=65535)
+
+
+class KafkaRESTProxyUsernamePassword(BaseModel):
+    """
+    Connect over the Kafka REST Proxy HTTP API (Confluent REST Proxy, Karapace) instead of the native broker protocol.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    auth_mode: Literal['REST']
+    host: str = Field(
+        ...,
+        description='Kafka REST proxy host name or IP (e.g. kafka-rest.example.com)',
+    )
+    port: int = Field(..., description='Kafka REST proxy port', ge=1, le=65535)
 
 
 class NoAuthentication1(BaseModel):
@@ -3429,9 +3448,9 @@ class NoAuthentication1(BaseModel):
     )
 
 
-class SASL1(BaseModel):
+class SASLUsernamePassword1(BaseModel):
     """
-    SASL username/password credentials.
+    SASL credentials. Set the SASL mechanism under connection options (PLAIN by default).
     """
 
     model_config = ConfigDict(
@@ -3439,22 +3458,40 @@ class SASL1(BaseModel):
     )
     sasl_username: str = Field(..., description='SASL username')
     sasl_password: str = Field(..., description='SASL password')
+    ssl_ca: str | None = Field(
+        None,
+        description="PEM-encoded CA certificate used to verify the broker's TLS certificate. Required for private or self-signed CAs; leave empty to trust the system CA bundle.",
+    )
 
 
 class ClientCertificateMTLS1(BaseModel):
     """
-    mTLS client certificate credentials.
+    mTLS credentials: the client certificate and its private key, plus the CA certificate when the broker uses a private CA.
     """
 
     model_config = ConfigDict(
         extra='forbid',
     )
-    ssl_certfile: str = Field(
-        ..., description='PEM-encoded client certificate (access cert)'
-    )
+    ssl_certfile: str = Field(..., description='PEM-encoded client access certificate')
     ssl_keyfile: str = Field(
-        ..., description='PEM-encoded client private key (access key)'
+        ..., description='PEM-encoded client access key (private key)'
     )
+    ssl_ca: str | None = Field(
+        None,
+        description="PEM-encoded CA certificate used to verify the broker's TLS certificate. Required for private or self-signed CAs; leave empty to trust the system CA bundle.",
+    )
+
+
+class KafkaRESTProxyUsernamePassword1(BaseModel):
+    """
+    HTTP basic auth credentials for the REST proxy.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    username: str = Field(..., description='REST proxy username')
+    password: str = Field(..., description='REST proxy password')
 
 
 class KafkaOptionalConnection(BaseModel):
@@ -3465,11 +3502,11 @@ class KafkaOptionalConnection(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
-    security_protocol: KafkaSecurityProtocol | None = 'PLAINTEXT'
+    security_protocol: KafkaSecurityProtocol | None = None
     sasl_mechanism: KafkaSaslMechanism | None = 'PLAIN'
-    ssl_ca: str | None = Field(
-        None,
-        description="PEM-encoded CA certificate for TLS verification (optional for client-certificate auth; validates the broker's certificate)",
+    rest_use_tls: bool | None = Field(
+        True,
+        description='REST proxy only: call the proxy over HTTPS. Turn off for a plain-HTTP proxy (e.g. a local Karapace).',
     )
     request_timeout_ms: int | None = Field(
         30000, description='Client request timeout in milliseconds', ge=1000
@@ -3508,12 +3545,19 @@ class KafkaInput(CoreInput):
     type: Literal['KAFKA'] | None = Field(
         None, description='Type of the asset or source'
     )
-    required: NoAuthentication | SASL | ClientCertificateMTLS = Field(
-        ..., title='KafkaRequired'
-    )
-    masked: NoAuthentication1 | SASL1 | ClientCertificateMTLS1 | None = Field(
-        None, title='KafkaMasked'
-    )
+    required: (
+        NoAuthentication
+        | SASLUsernamePassword
+        | ClientCertificateMTLS
+        | KafkaRESTProxyUsernamePassword
+    ) = Field(..., title='KafkaRequired')
+    masked: (
+        NoAuthentication1
+        | SASLUsernamePassword1
+        | ClientCertificateMTLS1
+        | KafkaRESTProxyUsernamePassword1
+        | None
+    ) = Field(None, title='KafkaMasked')
     optional: KafkaOptional | None = None
     detectors: list[Detector] | None = Field(
         None, description='Detectors to run on ingested content'

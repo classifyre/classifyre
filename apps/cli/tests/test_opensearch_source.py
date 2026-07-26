@@ -66,20 +66,50 @@ def _patch_requests(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
             return _FakeResponse({"status": "yellow"})
         if url.endswith("/_count"):
             return _FakeResponse({"count": len(_DOCS)})
+        if url.endswith("/_settings"):
+            return _FakeResponse({"logs-app": {"settings": {"index": {"max_result_window": 10000}}}})
         raise AssertionError(f"unexpected GET {url}")
 
-    def fake_post(_self: requests.Session, _url: str, **kwargs: Any) -> _FakeResponse:
+    # Scroll state: the cursor lives on the server side, keyed by scroll id.
+    scroll_cursor = {"offset": 0, "size": 0}
+
+    def fake_post(_self: requests.Session, url: str, **kwargs: Any) -> _FakeResponse:
         body = kwargs.get("json") or {}
         calls["search_bodies"].append(body)
         calls["search_body"] = body
+
+        if url.endswith("/_search/scroll"):
+            calls["scroll_ids"].append(body.get("scroll_id"))
+            size = scroll_cursor["size"]
+            page = _DOCS[scroll_cursor["offset"] : scroll_cursor["offset"] + size]
+            scroll_cursor["offset"] += len(page)
+            return _FakeResponse(
+                {"_scroll_id": "scroll-1", "hits": {"hits": [{"_source": d} for d in page]}}
+            )
+
         size = body.get("size", len(_DOCS))
+        if (kwargs.get("params") or {}).get("scroll"):
+            calls["scroll_started"] = True
+            scroll_cursor["size"] = size
+            scroll_cursor["offset"] = min(size, len(_DOCS))
+            page = _DOCS[:size]
+            return _FakeResponse(
+                {"_scroll_id": "scroll-1", "hits": {"hits": [{"_source": d} for d in page]}}
+            )
+
         offset = body.get("from", 0)
         page = _DOCS[offset : offset + size]
         hits = [{"_source": doc} for doc in page]
         return _FakeResponse({"hits": {"hits": hits}})
 
+    def fake_delete(_self: requests.Session, _url: str, **kwargs: Any) -> _FakeResponse:
+        calls["scroll_deleted"] = (kwargs.get("json") or {}).get("scroll_id")
+        return _FakeResponse({"succeeded": True})
+
+    calls["scroll_ids"] = []
     monkeypatch.setattr(requests.Session, "get", fake_get)
     monkeypatch.setattr(requests.Session, "post", fake_post)
+    monkeypatch.setattr(requests.Session, "delete", fake_delete)
     return calls
 
 
@@ -102,6 +132,9 @@ async def test_opensearch_extract_emits_index_assets(_patch_requests: dict[str, 
     assert len(assets) == 1
     asset = assets[0]
     assert asset.asset_kind == "index"
+    # TABLE, not OTHER — OTHER resolves to no text content type and every
+    # text detector is skipped, so the index scans with zero findings.
+    assert asset.asset_type == "TABLE"
     assert asset.name == "logs-app"
     meta = asset.metadata
     assert meta["doc_count"] == 7
@@ -211,7 +244,7 @@ def test_opensearch_automatic_strategy_resumes_and_wraps_on_underfill(
     assert src.current_sampling_cursor() == {"index:logs-app": 0}
 
 
-async def test_opensearch_all_strategy_batches_and_stops_on_underfill(
+async def test_opensearch_all_strategy_scrolls_the_whole_index(
     _patch_requests: dict[str, Any],
 ) -> None:
     src = OpenSearchSource(_recipe(sampling={"strategy": "ALL", "rows_per_page": 10}))
@@ -221,8 +254,9 @@ async def test_opensearch_all_strategy_batches_and_stops_on_underfill(
     assert len(pages) == 12
 
     bodies = _patch_requests["search_bodies"]
-    assert len(bodies) == 2
-    assert bodies[0]["from"] == 0
-    assert bodies[0]["size"] == 10
-    assert bodies[1]["from"] == 10
-    assert bodies[1]["size"] == 10
+    # Scroll, not from/size — offset paging is capped at max_result_window.
+    assert _patch_requests["scroll_started"] is True
+    assert bodies[0] == {"size": 10, "sort": [{"_doc": "asc"}]}
+    assert all("from" not in body for body in bodies)
+    assert _patch_requests["scroll_ids"] == ["scroll-1", "scroll-1"]
+    assert _patch_requests["scroll_deleted"] == ["scroll-1"]

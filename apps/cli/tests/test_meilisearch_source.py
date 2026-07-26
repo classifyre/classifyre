@@ -118,6 +118,9 @@ async def test_meilisearch_extract_emits_index_assets(_patch_requests: dict[str,
     assert names == {"products", "internal_logs"}
     products = next(a for a in assets if a.name == "products")
     assert products.asset_kind == "index"
+    # TABLE, not OTHER — OTHER resolves to no text content type and every
+    # text detector is skipped, so the index scans with zero findings.
+    assert products.asset_type == "TABLE"
     assert products.metadata["doc_count"] == 12
     assert products.metadata["primary_key"] == "id"
     assert products.metadata["is_indexing"] is False

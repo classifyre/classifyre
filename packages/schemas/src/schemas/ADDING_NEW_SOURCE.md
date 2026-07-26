@@ -45,6 +45,13 @@ Reference files for WordPress:
 3. Use streaming batches in `extract` and follow existing patterns for detectors and hashing.
 4. Ensure the module is importable so the auto-discovery in `src/sources/__init__.py` can register it.
 5. Prefer existing libraries already used in the repo over custom clients.
+6. Set `asset_type` on emitted assets to a type the detector pipeline resolves
+   text for (`TXT`, `TABLE`, `URL`, or the derived-text `IMAGE`/`BINARY`/
+   `AUDIO`/`VIDEO`). `OTHER` resolves to no text content type, so every text
+   detector is skipped and the asset always scans with zero findings — reserve
+   it for container assets that carry no content of their own (a drive, a
+   site). The catalog kind shown in the UI comes from `asset_kind`, not this
+   field, so picking `TABLE` does not change how the asset is labelled.
 
 **Step 7: Tests**
 

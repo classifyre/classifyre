@@ -30,3 +30,4 @@ class OpenSearchSource(SearchEngineSourceMixin, BaseSource):
         self.config = OpenSearchInput.model_validate(recipe)
         self.runner_id = runner_id or "local-run"
         self._index_lookup: dict[str, str] = {}
+        self._result_windows: dict[str, int] = {}

@@ -61,6 +61,12 @@ def recipe_uv_groups(recipe: dict[str, Any]) -> set[str]:
     source_type = str(recipe.get("type", "")).upper()
     groups |= SOURCE_TYPE_GROUPS.get(source_type, set())
 
+    # Kafka over the REST Proxy is plain HTTP — no librdkafka wheel needed.
+    if source_type == "KAFKA":
+        required = recipe.get("required")
+        if isinstance(required, dict) and str(required.get("auth_mode", "")).upper() == "REST":
+            groups.discard("kafka")
+
     for detector in recipe.get("detectors") or []:
         if not isinstance(detector, dict) or not detector.get("enabled", True):
             continue

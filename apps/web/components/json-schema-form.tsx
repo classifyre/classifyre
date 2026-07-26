@@ -1983,6 +1983,12 @@ function SchemaField({
           name.toLowerCase().includes("token") ||
           name.toLowerCase().includes("secret") ||
           name.toLowerCase().includes("key"))));
+  // A certificate under `masked` is a secret and has to render as dots like
+  // any other. It stays a <textarea> rather than becoming type="password":
+  // pasting a multi-line PEM into a single-line input strips the newlines and
+  // silently corrupts the certificate. `-webkit-text-security` masks the
+  // glyphs while the real multi-line value is preserved.
+  const isMaskedCert = isCertField && forceMasked;
   const isUrl =
     normalizedSchema.format === "uri" || name.toLowerCase().includes("url");
   const isLongField = isCertField || isLongText(normalizedSchema);
@@ -2021,6 +2027,12 @@ function SchemaField({
                 value={field.value ?? ""}
                 autoComplete="off"
                 disabled={disabled}
+                data-masked={isMaskedCert ? "true" : undefined}
+                style={
+                  isMaskedCert
+                    ? ({ WebkitTextSecurity: "disc" } as React.CSSProperties)
+                    : undefined
+                }
                 data-testid={`input-${fieldName.toLowerCase().replace(/[^a-z0-9]/g, "-")}`}
               />
             ) : isFolderPathField ? (

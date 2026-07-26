@@ -68,3 +68,11 @@ def test_recipe_groups_skips_disabled_detectors() -> None:
 def test_recipe_groups_source_without_driver_is_empty() -> None:
     recipe = {"type": "SLACK", "sampling": {"strategy": "LATEST"}}
     assert recipe_uv_groups(recipe) == set()
+
+
+def test_kafka_rest_recipe_skips_the_librdkafka_group() -> None:
+    """REST Proxy Kafka is plain HTTP — no confluent-kafka install needed."""
+    broker = {"type": "KAFKA", "required": {"auth_mode": "SASL", "host": "b", "port": 9093}}
+    rest = {"type": "KAFKA", "required": {"auth_mode": "REST", "host": "b", "port": 8082}}
+    assert "kafka" in recipe_uv_groups(broker)
+    assert "kafka" not in recipe_uv_groups(rest)
