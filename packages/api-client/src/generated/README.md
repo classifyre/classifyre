@@ -208,6 +208,13 @@ All URIs are relative to *http://localhost*
 *InstanceSettingsApi* | [**mcpSettingsControllerGetTools**](docs/InstanceSettingsApi.md#mcpsettingscontrollergettools) | **GET** /instance-settings/mcp/tools | List MCP tools
 *InstanceSettingsApi* | [**mcpSettingsControllerListTokens**](docs/InstanceSettingsApi.md#mcpsettingscontrollerlisttokens) | **GET** /instance-settings/mcp/tokens | List MCP access tokens
 *InstanceSettingsApi* | [**mcpSettingsControllerUpdateToken**](docs/InstanceSettingsApi.md#mcpsettingscontrollerupdatetoken) | **PATCH** /instance-settings/mcp/tokens/{id} | Update MCP access token
+*NamespacesApi* | [**namespacesControllerCreate**](docs/NamespacesApi.md#namespacescontrollercreate) | **POST** /namespaces | Create a namespace (provisions its Postgres schema + migrations)
+*NamespacesApi* | [**namespacesControllerGet**](docs/NamespacesApi.md#namespacescontrollerget) | **GET** /namespaces/{id} | Get a namespace by id
+*NamespacesApi* | [**namespacesControllerList**](docs/NamespacesApi.md#namespacescontrollerlist) | **GET** /namespaces | List all namespaces
+*NamespacesApi* | [**namespacesControllerRemove**](docs/NamespacesApi.md#namespacescontrollerremove) | **DELETE** /namespaces/{id} | Soft-delete a namespace (hidden from listings; data retained)
+*NamespacesApi* | [**namespacesControllerStats**](docs/NamespacesApi.md#namespacescontrollerstats) | **GET** /namespaces/stats | Per-namespace source rollups (total + failing)
+*NamespacesApi* | [**namespacesControllerThumbnail**](docs/NamespacesApi.md#namespacescontrollerthumbnail) | **GET** /namespaces/{id}/thumbnail | Stream a namespace\&#39;s thumbnail image
+*NamespacesApi* | [**namespacesControllerUpdate**](docs/NamespacesApi.md#namespacescontrollerupdate) | **PATCH** /namespaces/{id} | Update a namespace
 *NotificationsApi* | [**notificationsControllerDeleteNotification**](docs/NotificationsApi.md#notificationscontrollerdeletenotification) | **DELETE** /notifications/{id} | Delete a notification
 *NotificationsApi* | [**notificationsControllerListNotifications**](docs/NotificationsApi.md#notificationscontrollerlistnotifications) | **GET** /notifications | List notifications
 *NotificationsApi* | [**notificationsControllerMarkAllRead**](docs/NotificationsApi.md#notificationscontrollermarkallread) | **PATCH** /notifications/mark-all-read | Mark all notifications as read

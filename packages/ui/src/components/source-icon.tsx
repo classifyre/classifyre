@@ -5,6 +5,7 @@ import {
   siBitbucket,
   siConfluence,
   siDatabricks,
+  siDropbox,
   siElasticsearch,
   siGithub,
   siGoogledocs,
@@ -157,6 +158,7 @@ const SOURCE_SIMPLE_ICON_BY_INGESTION_TYPE: Record<
   [CreateSourceDtoTypeEnum.LocalFolder]: null,
   [CreateSourceDtoTypeEnum.Microsoft365]: null,
   [CreateSourceDtoTypeEnum.GoogleWorkspace]: siGoogledrive,
+  [CreateSourceDtoTypeEnum.Dropbox]: siDropbox,
 };
 
 const SOURCE_CUSTOM_ICON_BY_INGESTION_TYPE: Partial<
@@ -213,6 +215,7 @@ const SOURCE_ICON_BY_INGESTION_TYPE: Record<ApiSourceType, IconComponent> = {
   [CreateSourceDtoTypeEnum.Microsoft365]: Microsoft365Icon,
   [CreateSourceDtoTypeEnum.GoogleWorkspace]:
     createSimpleIconComponent(siGoogledrive),
+  [CreateSourceDtoTypeEnum.Dropbox]: createSimpleIconComponent(siDropbox),
 };
 
 const SOURCE_ICON_BY_INGESTION_TYPE_LOWERCASE: Record<string, IconComponent> =

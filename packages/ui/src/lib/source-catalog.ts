@@ -343,6 +343,20 @@ export const SOURCE_TYPE_CATALOG_META: Record<string, SourceCatalogMetaBase> = {
       "gdrive",
     ],
   },
+  DROPBOX: {
+    description:
+      "Scan documents, spreadsheets, images, and Paper docs stored in a Dropbox account.",
+    icon: CreateSourceDtoTypeEnum.Dropbox,
+    category: "COLLABORATION",
+    keywords: [
+      "dropbox",
+      "files",
+      "cloud storage",
+      "documents",
+      "paper",
+      "shared folders",
+    ],
+  },
 };
 
 export function resolveSourceCatalogMeta(

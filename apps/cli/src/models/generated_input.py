@@ -54,6 +54,7 @@ class AssetType(StrEnum):
     LOCAL_FOLDER = 'LOCAL_FOLDER'
     MICROSOFT_365 = 'MICROSOFT_365'
     GOOGLE_WORKSPACE = 'GOOGLE_WORKSPACE'
+    DROPBOX = 'DROPBOX'
     SANDBOX = 'SANDBOX'
 
 
@@ -354,6 +355,7 @@ class Type(StrEnum):
     LOCAL_FOLDER = 'LOCAL_FOLDER'
     MICROSOFT_365 = 'MICROSOFT_365'
     GOOGLE_WORKSPACE = 'GOOGLE_WORKSPACE'
+    DROPBOX = 'DROPBOX'
     SANDBOX = 'SANDBOX'
 
 
@@ -3067,6 +3069,7 @@ class Type21(StrEnum):
     LOCAL_FOLDER = 'LOCAL_FOLDER'
     MICROSOFT_365 = 'MICROSOFT_365'
     GOOGLE_WORKSPACE = 'GOOGLE_WORKSPACE'
+    DROPBOX = 'DROPBOX'
     SANDBOX = 'SANDBOX'
 
 
@@ -4218,6 +4221,162 @@ class GoogleWorkspaceInput(CoreInput):
     )
 
 
+class DropboxRequiredAccessToken(BaseModel):
+    """
+    Access token issued from the Dropbox App Console. Simplest to set up; short-lived tokens expire after 4 hours.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    auth_method: Literal['access_token']
+
+
+class DropboxRequiredOAuth(BaseModel):
+    """
+    OAuth 2.0 app credentials with a refresh token. Recommended for unattended scans — the client mints a fresh access token on every run.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    auth_method: Literal['oauth']
+    app_key: str = Field(
+        ...,
+        description='Dropbox app key (client ID) of the OAuth app that issued the refresh token',
+    )
+
+
+class DropboxMaskedAccessToken(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    access_token: str = Field(
+        ..., description='Dropbox OAuth 2.0 access token (sl.… for short-lived tokens)'
+    )
+
+
+class DropboxMaskedOAuth(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    app_secret: str = Field(
+        ...,
+        description='Dropbox app secret of the OAuth app that issued the refresh token',
+    )
+    refresh_token: str = Field(
+        ...,
+        description='Dropbox OAuth 2.0 refresh token (obtained with token_access_type=offline)',
+    )
+
+
+class DropboxOptionalScope(BaseModel):
+    """
+    Folder selection and content filtering.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    folder_path: str | None = Field(
+        None,
+        description='Folder to scan, for example /Finance/Exports. Leave empty to scan the whole account root.',
+    )
+    recursive: bool | None = Field(
+        True, description='Descend into subfolders of the selected folder'
+    )
+    include_extensions: list[str] | None = Field(
+        None,
+        description='Optional extension allowlist (for example, .pdf, .csv, .docx)',
+    )
+    exclude_extensions: list[str] | None = Field(
+        None, description='Optional extension denylist'
+    )
+    include_mounted_folders: bool | None = Field(
+        True, description='Include shared folders mounted into the account'
+    )
+    include_empty_objects: bool | None = Field(
+        False, description='Include zero-byte files in extraction results'
+    )
+    include_object_metadata: bool | None = Field(
+        True,
+        description='Attach Dropbox metadata (content hash, size, revision, timestamps) to asset checksums',
+    )
+    include_content_preview: bool | None = Field(
+        True,
+        description='Download file bytes to infer MIME and extract detector-ready text previews',
+    )
+    export_non_downloadable: bool | None = Field(
+        True,
+        description='Export files that have no direct download (Dropbox Paper docs) to Markdown so their text can be scanned',
+    )
+
+
+class DropboxOptionalConnection(BaseModel):
+    """
+    Network and pagination controls for Dropbox API requests.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    max_entries_per_page: int | None = Field(
+        500, description='Maximum entries requested per list_folder call', ge=1, le=2000
+    )
+    max_object_bytes: int | None = Field(
+        5242880,
+        description='Maximum bytes downloaded per file for MIME detection and text extraction',
+        ge=1024,
+        le=52428800,
+    )
+    request_timeout_seconds: float | None = Field(
+        60,
+        description='Network timeout in seconds for list/download operations',
+        ge=1.0,
+        le=300.0,
+    )
+    max_retries: int | None = Field(
+        4,
+        description='Maximum retries on transient Dropbox errors (5xx and rate limits)',
+        ge=0,
+        le=10,
+    )
+
+
+class DropboxOptional(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    scope: DropboxOptionalScope | None = None
+    connection: DropboxOptionalConnection | None = None
+
+
+class DropboxInput(CoreInput):
+    type: Literal['DROPBOX'] | None = Field(
+        None, description='Type of the asset or source'
+    )
+    required: DropboxRequiredAccessToken | DropboxRequiredOAuth = Field(
+        ..., title='DropboxRequired'
+    )
+    masked: DropboxMaskedAccessToken | DropboxMaskedOAuth = Field(
+        ..., title='DropboxMasked'
+    )
+    optional: DropboxOptional | None = None
+    detectors: list[Detector] | None = Field(
+        None, description='Detectors to run on ingested content'
+    )
+    custom_detectors: list[CustomDetectorSelection] | None = Field(
+        None,
+        description='Reusable custom detector IDs selected from the custom detector catalog.',
+    )
+    sampling: SamplingConfig
+    resources: ResourceOverrides | None = None
+    cleanup_removed_detector_findings: bool | None = Field(
+        True,
+        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
+    )
+
+
 class YouTubeInput(CoreInput):
     type: Literal['YOUTUBE'] | None = Field(
         None, description='Type of the asset or source'
@@ -4335,6 +4494,7 @@ class SourceInput(
         | MeilisearchInput
         | Microsoft365Input
         | GoogleWorkspaceInput
+        | DropboxInput
     ]
 ):
     root: (
@@ -4371,6 +4531,7 @@ class SourceInput(
         | MeilisearchInput
         | Microsoft365Input
         | GoogleWorkspaceInput
+        | DropboxInput
     ) = Field(
         ...,
         description='Merged configuration schema with all source types and common definitions',

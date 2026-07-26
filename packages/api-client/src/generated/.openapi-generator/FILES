@@ -178,6 +178,7 @@ docs/McpTokenCreatedResponseDto.md
 docs/McpTokenResponseDto.md
 docs/McpToolParameterDto.md
 docs/McpToolSummaryDto.md
+docs/NamespacesApi.md
 docs/NotificationListResponseDto.md
 docs/NotificationResponseDto.md
 docs/NotificationsApi.md
@@ -326,6 +327,7 @@ src/apis/GraphApi.ts
 src/apis/HealthApi.ts
 src/apis/InquiriesApi.ts
 src/apis/InstanceSettingsApi.ts
+src/apis/NamespacesApi.ts
 src/apis/NotificationsApi.ts
 src/apis/RunnersApi.ts
 src/apis/SourcesApi.ts
