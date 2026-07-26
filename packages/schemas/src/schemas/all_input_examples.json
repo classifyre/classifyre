@@ -2950,6 +2950,82 @@
       }
     },
     {
+      "name": "Dropbox Business team-wide scan",
+      "description": "Scan every active member's folder plus the shared team space with a team-scoped token, using admin privileges",
+      "schedule": {
+        "enabled": true,
+        "preset": "weekly",
+        "cron": "40 2 * * 0",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "DROPBOX",
+        "required": {
+          "auth_method": "oauth",
+          "app_key": "your-dropbox-team-app-key"
+        },
+        "masked": {
+          "app_secret": "your-dropbox-team-app-secret",
+          "refresh_token": "your-dropbox-team-refresh-token"
+        },
+        "optional": {
+          "team": {
+            "enabled": true,
+            "as_admin": true,
+            "include_member_folders": true,
+            "include_team_space": true
+          },
+          "scope": {
+            "include_content_preview": true
+          }
+        },
+        "sampling": {
+          "strategy": "AUTOMATIC",
+          "rows_per_page": 200
+        },
+        "detectors": [
+          {
+            "type": "PII",
+            "enabled": true
+          },
+          {
+            "type": "SECRETS",
+            "enabled": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "Selected team members onboarding review",
+      "description": "Scan only two named Dropbox Business members' own folders, acting as each member",
+      "config": {
+        "type": "DROPBOX",
+        "required": {
+          "auth_method": "access_token"
+        },
+        "masked": {
+          "access_token": "sl.your-dropbox-team-access-token"
+        },
+        "optional": {
+          "team": {
+            "enabled": true,
+            "member_emails": ["ada@your-company.com", "grace@your-company.com"],
+            "include_member_folders": true,
+            "include_team_space": false
+          }
+        },
+        "sampling": {
+          "strategy": "ALL"
+        },
+        "detectors": [
+          {
+            "type": "PII",
+            "enabled": true
+          }
+        ]
+      }
+    },
+    {
       "name": "Recently changed files audit",
       "description": "Review only the most recently modified files across the account, skipping images and archives",
       "schedule": {

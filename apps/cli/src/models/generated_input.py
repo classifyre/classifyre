@@ -4343,11 +4343,42 @@ class DropboxOptionalConnection(BaseModel):
     )
 
 
+class DropboxOptionalTeam(BaseModel):
+    """
+    Dropbox Business team scanning. The credential shape is the same as for an individual account, but the Dropbox app must be created with a team access type ('Team member file access' plus 'Team information'). Leave disabled for individual accounts.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    enabled: bool | None = Field(
+        False,
+        description='Scan the whole Dropbox Business team instead of a single account',
+    )
+    member_emails: list[str] | None = Field(
+        None, description='Only scan these team members (empty = every active member)'
+    )
+    include_member_folders: bool | None = Field(
+        True, description="Scan each selected member's own Dropbox folder"
+    )
+    include_team_space: bool | None = Field(
+        True, description='Scan the shared team folders in the team space'
+    )
+    include_suspended_members: bool | None = Field(
+        False, description='Also scan members whose account is suspended'
+    )
+    as_admin: bool | None = Field(
+        False,
+        description="Traverse team-owned folders with a team administrator's privileges instead of acting as each member. Reaches content a member cannot list themselves and does not mark files as viewed by them. Requires at least one team admin on the team.",
+    )
+
+
 class DropboxOptional(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
     scope: DropboxOptionalScope | None = None
+    team: DropboxOptionalTeam | None = None
     connection: DropboxOptionalConnection | None = None
 
 

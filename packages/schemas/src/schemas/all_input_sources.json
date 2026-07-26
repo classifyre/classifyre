@@ -2090,6 +2090,18 @@
               "type": "string",
               "description": "Browser-accessible Dropbox preview URL, when the API returns one"
             },
+            "team_member_email": {
+              "type": "string",
+              "description": "Email of the Dropbox Business team member whose namespace the file was scanned from"
+            },
+            "team_member_id": {
+              "type": "string",
+              "description": "Dropbox Business team member ID used to reach the file"
+            },
+            "team_namespace": {
+              "type": "string",
+              "description": "Namespace the file lives in: account, member_folder or team_folder"
+            },
             "exported_as": {
               "type": "string",
               "description": "Export MIME type used for non-downloadable files such as Paper docs"
@@ -2132,6 +2144,18 @@
               "type": "string",
               "description": "Browser-accessible Dropbox preview URL, when the API returns one"
             },
+            "team_member_email": {
+              "type": "string",
+              "description": "Email of the Dropbox Business team member whose namespace the file was scanned from"
+            },
+            "team_member_id": {
+              "type": "string",
+              "description": "Dropbox Business team member ID used to reach the file"
+            },
+            "team_namespace": {
+              "type": "string",
+              "description": "Namespace the file lives in: account, member_folder or team_folder"
+            },
             "source_hash": {
               "type": "string",
               "description": "Hash of the parent asset (embedded images and archive members only)"
@@ -2166,6 +2190,18 @@
               "type": "string",
               "description": "Browser-accessible Dropbox preview URL, when the API returns one"
             },
+            "team_member_email": {
+              "type": "string",
+              "description": "Email of the Dropbox Business team member whose namespace the file was scanned from"
+            },
+            "team_member_id": {
+              "type": "string",
+              "description": "Dropbox Business team member ID used to reach the file"
+            },
+            "team_namespace": {
+              "type": "string",
+              "description": "Namespace the file lives in: account, member_folder or team_folder"
+            },
             "source_hash": {
               "type": "string",
               "description": "Hash of the parent asset (embedded images and archive members only)"
@@ -2199,6 +2235,18 @@
             "web_url": {
               "type": "string",
               "description": "Browser-accessible Dropbox preview URL, when the API returns one"
+            },
+            "team_member_email": {
+              "type": "string",
+              "description": "Email of the Dropbox Business team member whose namespace the file was scanned from"
+            },
+            "team_member_id": {
+              "type": "string",
+              "description": "Dropbox Business team member ID used to reach the file"
+            },
+            "team_namespace": {
+              "type": "string",
+              "description": "Namespace the file lives in: account, member_folder or team_folder"
             },
             "source_hash": {
               "type": "string",
@@ -2237,6 +2285,18 @@
             "web_url": {
               "type": "string",
               "description": "Browser-accessible Dropbox preview URL, when the API returns one"
+            },
+            "team_member_email": {
+              "type": "string",
+              "description": "Email of the Dropbox Business team member whose namespace the file was scanned from"
+            },
+            "team_member_id": {
+              "type": "string",
+              "description": "Dropbox Business team member ID used to reach the file"
+            },
+            "team_namespace": {
+              "type": "string",
+              "description": "Namespace the file lives in: account, member_folder or team_folder"
             },
             "source_hash": {
               "type": "string",
@@ -8746,12 +8806,55 @@
       },
       "additionalProperties": false
     },
+    "DropboxOptionalTeam": {
+      "title": "DropboxOptionalTeam",
+      "type": "object",
+      "description": "Dropbox Business team scanning. The credential shape is the same as for an individual account, but the Dropbox app must be created with a team access type ('Team member file access' plus 'Team information'). Leave disabled for individual accounts.",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Scan the whole Dropbox Business team instead of a single account"
+        },
+        "member_emails": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Only scan these team members (empty = every active member)"
+        },
+        "include_member_folders": {
+          "type": "boolean",
+          "default": true,
+          "description": "Scan each selected member's own Dropbox folder"
+        },
+        "include_team_space": {
+          "type": "boolean",
+          "default": true,
+          "description": "Scan the shared team folders in the team space"
+        },
+        "include_suspended_members": {
+          "type": "boolean",
+          "default": false,
+          "description": "Also scan members whose account is suspended"
+        },
+        "as_admin": {
+          "type": "boolean",
+          "default": false,
+          "description": "Traverse team-owned folders with a team administrator's privileges instead of acting as each member. Reaches content a member cannot list themselves and does not mark files as viewed by them. Requires at least one team admin on the team."
+        }
+      },
+      "additionalProperties": false
+    },
     "DropboxOptional": {
       "title": "DropboxOptional",
       "type": "object",
       "properties": {
         "scope": {
           "$ref": "#/definitions/DropboxOptionalScope"
+        },
+        "team": {
+          "$ref": "#/definitions/DropboxOptionalTeam"
         },
         "connection": {
           "$ref": "#/definitions/DropboxOptionalConnection"
