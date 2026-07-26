@@ -113,6 +113,7 @@ export const SearchRunnersFiltersInputDtoSourceTypeEnum = {
     LocalFolder: 'LOCAL_FOLDER',
     Microsoft365: 'MICROSOFT_365',
     GoogleWorkspace: 'GOOGLE_WORKSPACE',
+    Dropbox: 'DROPBOX',
     Sandbox: 'SANDBOX',
     Custom: 'CUSTOM'
 } as const;

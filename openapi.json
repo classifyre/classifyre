@@ -1355,6 +1355,7 @@
                   "LOCAL_FOLDER",
                   "MICROSOFT_365",
                   "GOOGLE_WORKSPACE",
+                  "DROPBOX",
                   "SANDBOX",
                   "CUSTOM"
                 ]
@@ -1708,6 +1709,7 @@
                   "LOCAL_FOLDER",
                   "MICROSOFT_365",
                   "GOOGLE_WORKSPACE",
+                  "DROPBOX",
                   "SANDBOX",
                   "CUSTOM"
                 ]
@@ -2083,6 +2085,7 @@
                   "LOCAL_FOLDER",
                   "MICROSOFT_365",
                   "GOOGLE_WORKSPACE",
+                  "DROPBOX",
                   "SANDBOX",
                   "CUSTOM"
                 ]
@@ -6680,6 +6683,141 @@
         ]
       }
     },
+    "/namespaces": {
+      "get": {
+        "operationId": "NamespacesController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "List all namespaces",
+        "tags": [
+          "Namespaces"
+        ]
+      },
+      "post": {
+        "operationId": "NamespacesController_create",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Create a namespace (provisions its Postgres schema + migrations)",
+        "tags": [
+          "Namespaces"
+        ]
+      }
+    },
+    "/namespaces/stats": {
+      "get": {
+        "operationId": "NamespacesController_stats",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Per-namespace source rollups (total + failing)",
+        "tags": [
+          "Namespaces"
+        ]
+      }
+    },
+    "/namespaces/{id}": {
+      "get": {
+        "operationId": "NamespacesController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Get a namespace by id",
+        "tags": [
+          "Namespaces"
+        ]
+      },
+      "patch": {
+        "operationId": "NamespacesController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Update a namespace",
+        "tags": [
+          "Namespaces"
+        ]
+      },
+      "delete": {
+        "operationId": "NamespacesController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "summary": "Soft-delete a namespace (hidden from listings; data retained)",
+        "tags": [
+          "Namespaces"
+        ]
+      }
+    },
+    "/namespaces/{id}/thumbnail": {
+      "get": {
+        "operationId": "NamespacesController_thumbnail",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Stream a namespace's thumbnail image",
+        "tags": [
+          "Namespaces"
+        ]
+      }
+    },
     "/sources/{sourceId}/run": {
       "post": {
         "operationId": "CliRunnerController_startRunner",
@@ -9125,6 +9263,7 @@
               "LOCAL_FOLDER",
               "MICROSOFT_365",
               "GOOGLE_WORKSPACE",
+              "DROPBOX",
               "SANDBOX"
             ],
             "description": "The type of the source",
@@ -9320,6 +9459,7 @@
               "LOCAL_FOLDER",
               "MICROSOFT_365",
               "GOOGLE_WORKSPACE",
+              "DROPBOX",
               "SANDBOX"
             ],
             "description": "The type of the source",
@@ -9502,6 +9642,7 @@
                 "LOCAL_FOLDER",
                 "MICROSOFT_365",
                 "GOOGLE_WORKSPACE",
+                "DROPBOX",
                 "SANDBOX",
                 "CUSTOM"
               ]
@@ -9820,6 +9961,7 @@
               "LOCAL_FOLDER",
               "MICROSOFT_365",
               "GOOGLE_WORKSPACE",
+              "DROPBOX",
               "SANDBOX",
               "CUSTOM"
             ]
@@ -9967,6 +10109,7 @@
                 "LOCAL_FOLDER",
                 "MICROSOFT_365",
                 "GOOGLE_WORKSPACE",
+                "DROPBOX",
                 "SANDBOX",
                 "CUSTOM"
               ]
@@ -10928,6 +11071,7 @@
               "LOCAL_FOLDER",
               "MICROSOFT_365",
               "GOOGLE_WORKSPACE",
+              "DROPBOX",
               "SANDBOX",
               "CUSTOM"
             ]
@@ -17255,6 +17399,7 @@
                 "LOCAL_FOLDER",
                 "MICROSOFT_365",
                 "GOOGLE_WORKSPACE",
+                "DROPBOX",
                 "SANDBOX",
                 "CUSTOM"
               ]

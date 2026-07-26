@@ -101,6 +101,9 @@
     },
     {
       "$ref": "#/definitions/GoogleWorkspaceInput"
+    },
+    {
+      "$ref": "#/definitions/DropboxInput"
     }
   ],
   "x-asset-metadata": {
@@ -2058,6 +2061,194 @@
           },
           "required": ["drive_id", "drive_name"]
         }
+      },
+      "DROPBOX": {
+        "file": {
+          "use": ["file", "image", "document", "spreadsheet", "text", "json"],
+          "properties": {
+            "provider": {
+              "type": "string",
+              "description": "Storage provider label"
+            },
+            "object_key": {
+              "type": "string",
+              "description": "Display path of the file inside the Dropbox account"
+            },
+            "etag": {
+              "type": "string",
+              "description": "Dropbox content hash (changes only when the bytes change)"
+            },
+            "file_id": {
+              "type": "string",
+              "description": "Immutable Dropbox file ID (id:...), stable across moves and renames"
+            },
+            "rev": {
+              "type": "string",
+              "description": "Dropbox revision identifier of the scanned version"
+            },
+            "web_url": {
+              "type": "string",
+              "description": "Browser-accessible Dropbox preview URL, when the API returns one"
+            },
+            "exported_as": {
+              "type": "string",
+              "description": "Export MIME type used for non-downloadable files such as Paper docs"
+            },
+            "source_hash": {
+              "type": "string",
+              "description": "Hash of the parent asset (embedded images and archive members only)"
+            },
+            "location": {
+              "type": "string",
+              "description": "Location within the parent (embedded image location or archive member path)"
+            }
+          },
+          "required": ["provider", "object_key", "file_id"]
+        },
+        "image": {
+          "use": ["file", "image"],
+          "properties": {
+            "provider": {
+              "type": "string",
+              "description": "Storage provider label"
+            },
+            "object_key": {
+              "type": "string",
+              "description": "Display path of the file inside the Dropbox account"
+            },
+            "etag": {
+              "type": "string",
+              "description": "Dropbox content hash (changes only when the bytes change)"
+            },
+            "file_id": {
+              "type": "string",
+              "description": "Immutable Dropbox file ID (id:...), stable across moves and renames"
+            },
+            "rev": {
+              "type": "string",
+              "description": "Dropbox revision identifier of the scanned version"
+            },
+            "web_url": {
+              "type": "string",
+              "description": "Browser-accessible Dropbox preview URL, when the API returns one"
+            },
+            "source_hash": {
+              "type": "string",
+              "description": "Hash of the parent asset (embedded images and archive members only)"
+            },
+            "location": {
+              "type": "string",
+              "description": "Location within the parent (embedded image location or archive member path)"
+            }
+          },
+          "required": []
+        },
+        "audio": {
+          "use": ["file"],
+          "properties": {
+            "provider": {
+              "type": "string",
+              "description": "Storage provider label"
+            },
+            "object_key": {
+              "type": "string",
+              "description": "Display path of the file inside the Dropbox account"
+            },
+            "file_id": {
+              "type": "string",
+              "description": "Immutable Dropbox file ID (id:...), stable across moves and renames"
+            },
+            "rev": {
+              "type": "string",
+              "description": "Dropbox revision identifier of the scanned version"
+            },
+            "web_url": {
+              "type": "string",
+              "description": "Browser-accessible Dropbox preview URL, when the API returns one"
+            },
+            "source_hash": {
+              "type": "string",
+              "description": "Hash of the parent asset (embedded images and archive members only)"
+            },
+            "location": {
+              "type": "string",
+              "description": "Location within the parent (embedded image location or archive member path)"
+            }
+          },
+          "required": ["provider", "object_key"]
+        },
+        "video": {
+          "use": ["file"],
+          "properties": {
+            "provider": {
+              "type": "string",
+              "description": "Storage provider label"
+            },
+            "object_key": {
+              "type": "string",
+              "description": "Display path of the file inside the Dropbox account"
+            },
+            "file_id": {
+              "type": "string",
+              "description": "Immutable Dropbox file ID (id:...), stable across moves and renames"
+            },
+            "rev": {
+              "type": "string",
+              "description": "Dropbox revision identifier of the scanned version"
+            },
+            "web_url": {
+              "type": "string",
+              "description": "Browser-accessible Dropbox preview URL, when the API returns one"
+            },
+            "source_hash": {
+              "type": "string",
+              "description": "Hash of the parent asset (embedded images and archive members only)"
+            },
+            "location": {
+              "type": "string",
+              "description": "Location within the parent (embedded image location or archive member path)"
+            }
+          },
+          "required": ["provider", "object_key"]
+        },
+        "archive": {
+          "use": ["file"],
+          "properties": {
+            "provider": {
+              "type": "string",
+              "description": "Storage provider label"
+            },
+            "object_key": {
+              "type": "string",
+              "description": "Display path of the file inside the Dropbox account"
+            },
+            "etag": {
+              "type": "string",
+              "description": "Dropbox content hash (changes only when the bytes change)"
+            },
+            "file_id": {
+              "type": "string",
+              "description": "Immutable Dropbox file ID (id:...), stable across moves and renames"
+            },
+            "rev": {
+              "type": "string",
+              "description": "Dropbox revision identifier of the scanned version"
+            },
+            "web_url": {
+              "type": "string",
+              "description": "Browser-accessible Dropbox preview URL, when the API returns one"
+            },
+            "source_hash": {
+              "type": "string",
+              "description": "Hash of the parent asset (embedded images and archive members only)"
+            },
+            "location": {
+              "type": "string",
+              "description": "Location within the parent (embedded image location or archive member path)"
+            }
+          },
+          "required": ["provider", "object_key"]
+        }
       }
     }
   },
@@ -2097,6 +2288,7 @@
         "LOCAL_FOLDER",
         "MICROSOFT_365",
         "GOOGLE_WORKSPACE",
+        "DROPBOX",
         "SANDBOX"
       ],
       "description": "Type of the asset or source"
@@ -8360,6 +8552,234 @@
             },
             "optional": {
               "$ref": "#/definitions/GoogleWorkspaceOptional"
+            },
+            "detectors": {
+              "$ref": "#/definitions/Detectors"
+            },
+            "custom_detectors": {
+              "$ref": "#/definitions/CustomDetectorSelections"
+            },
+            "sampling": {
+              "$ref": "#/definitions/SamplingConfig"
+            },
+            "resources": {
+              "$ref": "#/definitions/ResourceOverrides"
+            },
+            "cleanup_removed_detector_findings": {
+              "type": "boolean",
+              "default": true,
+              "description": "When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set."
+            }
+          },
+          "required": ["required", "masked", "sampling"],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "DropboxRequiredAccessToken": {
+      "title": "DropboxRequiredAccessToken",
+      "type": "object",
+      "description": "Access token issued from the Dropbox App Console. Simplest to set up; short-lived tokens expire after 4 hours.",
+      "properties": {
+        "auth_method": {
+          "const": "access_token"
+        }
+      },
+      "required": ["auth_method"],
+      "additionalProperties": false
+    },
+    "DropboxRequiredOAuth": {
+      "title": "DropboxRequiredOAuth",
+      "type": "object",
+      "description": "OAuth 2.0 app credentials with a refresh token. Recommended for unattended scans — the client mints a fresh access token on every run.",
+      "properties": {
+        "auth_method": {
+          "const": "oauth"
+        },
+        "app_key": {
+          "type": "string",
+          "description": "Dropbox app key (client ID) of the OAuth app that issued the refresh token"
+        }
+      },
+      "required": ["auth_method", "app_key"],
+      "additionalProperties": false
+    },
+    "DropboxRequired": {
+      "title": "DropboxRequired",
+      "oneOf": [
+        {
+          "$ref": "#/definitions/DropboxRequiredAccessToken"
+        },
+        {
+          "$ref": "#/definitions/DropboxRequiredOAuth"
+        }
+      ]
+    },
+    "DropboxMaskedAccessToken": {
+      "title": "DropboxMaskedAccessToken",
+      "type": "object",
+      "properties": {
+        "access_token": {
+          "type": "string",
+          "description": "Dropbox OAuth 2.0 access token (sl.… for short-lived tokens)"
+        }
+      },
+      "required": ["access_token"],
+      "additionalProperties": false
+    },
+    "DropboxMaskedOAuth": {
+      "title": "DropboxMaskedOAuth",
+      "type": "object",
+      "properties": {
+        "app_secret": {
+          "type": "string",
+          "description": "Dropbox app secret of the OAuth app that issued the refresh token"
+        },
+        "refresh_token": {
+          "type": "string",
+          "description": "Dropbox OAuth 2.0 refresh token (obtained with token_access_type=offline)"
+        }
+      },
+      "required": ["app_secret", "refresh_token"],
+      "additionalProperties": false
+    },
+    "DropboxMasked": {
+      "title": "DropboxMasked",
+      "oneOf": [
+        {
+          "$ref": "#/definitions/DropboxMaskedAccessToken"
+        },
+        {
+          "$ref": "#/definitions/DropboxMaskedOAuth"
+        }
+      ]
+    },
+    "DropboxOptionalScope": {
+      "title": "DropboxOptionalScope",
+      "type": "object",
+      "description": "Folder selection and content filtering.",
+      "properties": {
+        "folder_path": {
+          "type": "string",
+          "description": "Folder to scan, for example /Finance/Exports. Leave empty to scan the whole account root."
+        },
+        "recursive": {
+          "type": "boolean",
+          "default": true,
+          "description": "Descend into subfolders of the selected folder"
+        },
+        "include_extensions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Optional extension allowlist (for example, .pdf, .csv, .docx)"
+        },
+        "exclude_extensions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Optional extension denylist"
+        },
+        "include_mounted_folders": {
+          "type": "boolean",
+          "default": true,
+          "description": "Include shared folders mounted into the account"
+        },
+        "include_empty_objects": {
+          "type": "boolean",
+          "default": false,
+          "description": "Include zero-byte files in extraction results"
+        },
+        "include_object_metadata": {
+          "type": "boolean",
+          "default": true,
+          "description": "Attach Dropbox metadata (content hash, size, revision, timestamps) to asset checksums"
+        },
+        "include_content_preview": {
+          "type": "boolean",
+          "default": true,
+          "description": "Download file bytes to infer MIME and extract detector-ready text previews"
+        },
+        "export_non_downloadable": {
+          "type": "boolean",
+          "default": true,
+          "description": "Export files that have no direct download (Dropbox Paper docs) to Markdown so their text can be scanned"
+        }
+      },
+      "additionalProperties": false
+    },
+    "DropboxOptionalConnection": {
+      "title": "DropboxOptionalConnection",
+      "type": "object",
+      "description": "Network and pagination controls for Dropbox API requests.",
+      "properties": {
+        "max_entries_per_page": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2000,
+          "default": 500,
+          "description": "Maximum entries requested per list_folder call"
+        },
+        "max_object_bytes": {
+          "type": "integer",
+          "minimum": 1024,
+          "maximum": 52428800,
+          "default": 5242880,
+          "description": "Maximum bytes downloaded per file for MIME detection and text extraction"
+        },
+        "request_timeout_seconds": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 300,
+          "default": 60,
+          "description": "Network timeout in seconds for list/download operations"
+        },
+        "max_retries": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10,
+          "default": 4,
+          "description": "Maximum retries on transient Dropbox errors (5xx and rate limits)"
+        }
+      },
+      "additionalProperties": false
+    },
+    "DropboxOptional": {
+      "title": "DropboxOptional",
+      "type": "object",
+      "properties": {
+        "scope": {
+          "$ref": "#/definitions/DropboxOptionalScope"
+        },
+        "connection": {
+          "$ref": "#/definitions/DropboxOptionalConnection"
+        }
+      },
+      "additionalProperties": false
+    },
+    "DropboxInput": {
+      "title": "DropboxInput",
+      "label": "Dropbox",
+      "allOf": [
+        {
+          "$ref": "#/definitions/CoreInput"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "DROPBOX"
+            },
+            "required": {
+              "$ref": "#/definitions/DropboxRequired"
+            },
+            "masked": {
+              "$ref": "#/definitions/DropboxMasked"
+            },
+            "optional": {
+              "$ref": "#/definitions/DropboxOptional"
             },
             "detectors": {
               "$ref": "#/definitions/Detectors"

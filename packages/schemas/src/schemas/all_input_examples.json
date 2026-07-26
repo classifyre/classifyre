@@ -2874,5 +2874,119 @@
         ]
       }
     }
+  ],
+  "DROPBOX": [
+    {
+      "name": "Whole-account incremental scan",
+      "description": "Walk every file in the Dropbox account with an App Console access token, ingesting a new slice on each run",
+      "schedule": {
+        "enabled": true,
+        "preset": "nightly",
+        "cron": "23 1 * * *",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "DROPBOX",
+        "required": {
+          "auth_method": "access_token"
+        },
+        "masked": {
+          "access_token": "sl.your-dropbox-access-token"
+        },
+        "optional": {
+          "scope": {
+            "include_content_preview": true
+          }
+        },
+        "sampling": {
+          "strategy": "AUTOMATIC",
+          "rows_per_page": 100
+        }
+      }
+    },
+    {
+      "name": "Finance folder compliance scan",
+      "description": "Scan one folder tree for PII and secrets using OAuth refresh-token credentials that never expire",
+      "schedule": {
+        "enabled": true,
+        "preset": "weekday_morning",
+        "cron": "35 7 * * 1-5",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "DROPBOX",
+        "required": {
+          "auth_method": "oauth",
+          "app_key": "your-dropbox-app-key"
+        },
+        "masked": {
+          "app_secret": "your-dropbox-app-secret",
+          "refresh_token": "your-dropbox-refresh-token"
+        },
+        "optional": {
+          "scope": {
+            "folder_path": "/Finance/Exports",
+            "recursive": true,
+            "include_extensions": [".pdf", ".docx", ".xlsx", ".csv"],
+            "include_content_preview": true
+          },
+          "connection": {
+            "max_object_bytes": 10485760
+          }
+        },
+        "sampling": {
+          "strategy": "ALL"
+        },
+        "detectors": [
+          {
+            "type": "PII",
+            "enabled": true
+          },
+          {
+            "type": "SECRETS",
+            "enabled": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "Recently changed files audit",
+      "description": "Review only the most recently modified files across the account, skipping images and archives",
+      "schedule": {
+        "enabled": true,
+        "preset": "daily",
+        "cron": "10 9 * * *",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "DROPBOX",
+        "required": {
+          "auth_method": "oauth",
+          "app_key": "your-dropbox-app-key"
+        },
+        "masked": {
+          "app_secret": "your-dropbox-app-secret",
+          "refresh_token": "your-dropbox-refresh-token"
+        },
+        "optional": {
+          "scope": {
+            "folder_path": "/Shared/Team",
+            "exclude_extensions": [".png", ".jpg", ".zip"],
+            "include_mounted_folders": true,
+            "export_non_downloadable": true
+          }
+        },
+        "sampling": {
+          "strategy": "LATEST",
+          "rows_per_page": 50
+        },
+        "detectors": [
+          {
+            "type": "PII",
+            "enabled": true
+          }
+        ]
+      }
+    }
   ]
 }

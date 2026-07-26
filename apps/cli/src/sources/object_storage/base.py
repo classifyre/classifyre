@@ -363,6 +363,13 @@ class ObjectStorageSourceBase(BaseSource, ABC):
             return "archive"
         return cls._asset_kind_for_asset_type(asset_type)
 
+    def _extra_asset_metadata(self, ref: ObjectRef) -> dict[str, Any]:
+        """Provider-specific normalized metadata merged into every asset built
+        from ``ref`` — the object itself and any embedded-image or archive-member
+        child derived from it. Keys must be declared in the provider's
+        ``x-asset-metadata`` catalog entry. Default: nothing extra."""
+        return {}
+
     def _ensure_file_processing_dependencies(self) -> None:
         if self._file_processing_deps_checked:
             return
@@ -478,6 +485,7 @@ class ObjectStorageSourceBase(BaseSource, ABC):
             "object_key": ref.key,
             "size_bytes": ref.size,
             "mime_type": snapshot.mime_type,
+            **self._extra_asset_metadata(ref),
         }
         if ref.etag:
             asset_metadata["etag"] = ref.etag
@@ -570,6 +578,7 @@ class ObjectStorageSourceBase(BaseSource, ABC):
             "location": image.location,
             "mime_type": image.mime_type,
             "size_bytes": len(image.image_bytes),
+            **self._extra_asset_metadata(ref),
         }
         # Serve the image bytes from cache (keyed by both hash and url) so the
         # binary-detector path resolves them with no extra network round-trip.
@@ -631,6 +640,7 @@ class ObjectStorageSourceBase(BaseSource, ABC):
             "location": member.location,
             "mime_type": member.mime_type,
             "size_bytes": len(member.member_bytes),
+            **self._extra_asset_metadata(ref),
         }
         file_meta = extract_file_metadata(
             member.member_bytes,

@@ -227,6 +227,9 @@ google-workspace = [
 google-cloud-storage = [
     "google-cloud-storage>=3.10.1,<4.0.0",
 ]
+dropbox = [
+    "dropbox>=12.2.1,<13.0.0",
+]
 email = [
     "imap-tools>=1.10.0,<2.0.0",
 ]
@@ -377,6 +380,7 @@ module = [
     "confluent_kafka.*",
     "boto3.*",
     "botocore.*",
+    "dropbox.*",
 ]
 ignore_missing_imports = true
 

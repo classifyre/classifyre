@@ -67,7 +67,9 @@ def _patch_requests(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
         if url.endswith("/_count"):
             return _FakeResponse({"count": len(_DOCS)})
         if url.endswith("/_settings"):
-            return _FakeResponse({"logs-app": {"settings": {"index": {"max_result_window": 10000}}}})
+            return _FakeResponse(
+                {"logs-app": {"settings": {"index": {"max_result_window": 10000}}}}
+            )
         raise AssertionError(f"unexpected GET {url}")
 
     # Scroll state: the cursor lives on the server side, keyed by scroll id.

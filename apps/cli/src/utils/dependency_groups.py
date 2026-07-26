@@ -51,6 +51,7 @@ SOURCE_TYPE_GROUPS: dict[str, set[str]] = {
     "KAFKA": {"kafka"},
     "MICROSOFT_365": {"microsoft-graph"},
     "GOOGLE_WORKSPACE": {"google-workspace"},
+    "DROPBOX": {"dropbox"},
 }
 
 
