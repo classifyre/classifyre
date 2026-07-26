@@ -9,7 +9,7 @@ import pytest
 
 from src.models.generated_single_asset_scan_results import AssetType as OutputAssetType
 from src.sources.asset_metadata import resolve_fields
-from src.sources.dropbox.source import DropboxObjectRef, DropboxSource
+from src.sources.dropbox.source import DropboxObjectRef, DropboxScanTarget, DropboxSource
 from src.sources.object_storage.base import ContentSnapshot
 
 
@@ -524,6 +524,335 @@ def test_dropbox_non_downloadable_entry_skipped_when_export_disabled(monkeypatch
     assert list(source._list_objects()) == []
 
 
+# ── Dropbox Business team ────────────────────────────────────────────────
+
+
+def _team_recipe(team: dict, **kwargs) -> dict:
+    return _recipe(optional={"team": team}, **kwargs)
+
+
+def _member(email: str, member_id: str, *, admin: bool = False, suspended: bool = False):
+    status = SimpleNamespace(
+        is_active=lambda: not suspended,
+        is_suspended=lambda: suspended,
+    )
+    roles = [SimpleNamespace(role_id="pid_dbtmr:team_admin", name="Team admin")] if admin else []
+    return SimpleNamespace(
+        profile=SimpleNamespace(team_member_id=member_id, email=email, status=status),
+        roles=roles,
+    )
+
+
+def _namespace(namespace_id: str, kind: str, *, name: str = "", member_id: str | None = None):
+    namespace_type = SimpleNamespace(
+        **{f"is_{option}": (lambda option=option: option == kind) for option in _NAMESPACE_KINDS}
+    )
+    return SimpleNamespace(
+        namespace_id=namespace_id,
+        namespace_type=namespace_type,
+        name=name,
+        team_member_id=member_id,
+    )
+
+
+_NAMESPACE_KINDS = ("team_folder", "team_member_folder", "shared_folder", "app_folder")
+
+
+class _FakeTeamClient:
+    """DropboxTeam stand-in: member/namespace listing plus impersonation."""
+
+    def __init__(self, members, namespaces=(), file_pages=None) -> None:
+        self._members = list(members)
+        self._namespaces = list(namespaces)
+        self._file_pages = file_pages or {}
+        self.as_user_calls: list[str] = []
+        self.as_admin_calls: list[str] = []
+        self.impersonated: list[_FakeMemberClient] = []
+
+    def team_members_list_v2(self, limit=1000):
+        return SimpleNamespace(members=self._members, has_more=False, cursor="c")
+
+    def team_namespaces_list(self, limit=1000):
+        return SimpleNamespace(namespaces=self._namespaces, has_more=False, cursor="c")
+
+    def team_get_info(self):
+        return SimpleNamespace(name="Acme Inc")
+
+    def as_user(self, team_member_id):
+        self.as_user_calls.append(team_member_id)
+        return self._impersonate(team_member_id)
+
+    def as_admin(self, team_member_id):
+        self.as_admin_calls.append(team_member_id)
+        return self._impersonate(team_member_id)
+
+    def _impersonate(self, team_member_id: str):
+        client = _FakeMemberClient(team_member_id, self._file_pages)
+        self.impersonated.append(client)
+        return client
+
+
+class _FakeMemberClient:
+    def __init__(self, member_id: str, file_pages: dict, namespace_id: str | None = None) -> None:
+        self.member_id = member_id
+        self.namespace_id = namespace_id
+        self._file_pages = file_pages
+        self.list_calls: list[dict] = []
+
+    def with_path_root(self, path_root):
+        clone = _FakeMemberClient(self.member_id, self._file_pages, path_root.namespace)
+        return clone
+
+    def users_get_current_account(self):
+        return SimpleNamespace(
+            root_info=SimpleNamespace(
+                root_namespace_id="ns:ROOT",
+                home_namespace_id=f"ns:HOME-{self.member_id}",
+            )
+        )
+
+    def files_list_folder(self, **kwargs):
+        self.list_calls.append(kwargs)
+        key = self.namespace_id or self.member_id
+        return SimpleNamespace(entries=self._file_pages.get(key, []), has_more=False, cursor="c")
+
+
+def _fake_sdk(team_client):
+    class _PathRoot:
+        def __init__(self, namespace: str) -> None:
+            self.namespace = namespace
+
+        @staticmethod
+        def namespace_id(namespace: str):
+            return _PathRoot(namespace)
+
+    return SimpleNamespace(
+        DropboxTeam=lambda **_kw: team_client,
+        Dropbox=lambda **_kw: team_client,
+        common=SimpleNamespace(PathRoot=_PathRoot),
+    )
+
+
+def _install_team_sdk(monkeypatch, team_client):
+    monkeypatch.setattr(
+        "src.sources.dropbox.source.require_module",
+        lambda **_kw: _fake_sdk(team_client),
+    )
+
+
+def test_dropbox_team_scans_each_member_as_that_user(monkeypatch):
+    source = DropboxSource(
+        _team_recipe({"enabled": True, "include_team_space": False}),
+    )
+    team = _FakeTeamClient(
+        members=[_member("ada@acme.com", "dbmid:ADA"), _member("grace@acme.com", "dbmid:GRACE")],
+        file_pages={
+            "dbmid:ADA": [_file_entry("/notes.txt", file_id="id:ADA1")],
+            "dbmid:GRACE": [_file_entry("/plan.txt", file_id="id:GRACE1")],
+        },
+    )
+    _install_team_sdk(monkeypatch, team)
+
+    refs = list(source._list_objects())
+
+    assert team.as_user_calls == ["dbmid:ADA", "dbmid:GRACE"]
+    assert team.as_admin_calls == []
+    assert [ref.file_id for ref in refs] == ["id:ADA1", "id:GRACE1"]
+    assert [ref.target.member_email for ref in refs] == ["ada@acme.com", "grace@acme.com"]
+    assert {ref.target.kind for ref in refs} == {"member_folder"}
+
+
+def test_dropbox_team_filters_members_by_email_and_status(monkeypatch):
+    source = DropboxSource(
+        _team_recipe(
+            {
+                "enabled": True,
+                "include_team_space": False,
+                "member_emails": ["ADA@acme.com", "sus@acme.com"],
+            }
+        ),
+    )
+    team = _FakeTeamClient(
+        members=[
+            _member("ada@acme.com", "dbmid:ADA"),
+            _member("grace@acme.com", "dbmid:GRACE"),
+            _member("sus@acme.com", "dbmid:SUS", suspended=True),
+        ],
+    )
+    _install_team_sdk(monkeypatch, team)
+
+    assert [target.member_email for target in source._scan_targets()] == ["ada@acme.com"]
+
+
+def test_dropbox_team_includes_suspended_members_when_enabled(monkeypatch):
+    source = DropboxSource(
+        _team_recipe(
+            {
+                "enabled": True,
+                "include_team_space": False,
+                "include_suspended_members": True,
+            }
+        ),
+    )
+    team = _FakeTeamClient(
+        members=[
+            _member("ada@acme.com", "dbmid:ADA"),
+            _member("sus@acme.com", "dbmid:SUS", suspended=True),
+        ],
+    )
+    _install_team_sdk(monkeypatch, team)
+
+    assert [target.member_email for target in source._scan_targets()] == [
+        "ada@acme.com",
+        "sus@acme.com",
+    ]
+
+
+def test_dropbox_team_space_target_pins_root_namespace(monkeypatch):
+    source = DropboxSource(
+        _team_recipe({"enabled": True, "include_member_folders": False}),
+    )
+    team = _FakeTeamClient(members=[_member("ada@acme.com", "dbmid:ADA")])
+    _install_team_sdk(monkeypatch, team)
+
+    targets = source._scan_targets()
+
+    assert len(targets) == 1
+    assert targets[0].kind == "team_folder"
+    assert targets[0].namespace_id == "ns:ROOT"
+    assert source._client_for(targets[0]).namespace_id == "ns:ROOT"
+
+
+def test_dropbox_admin_mode_walks_team_namespaces(monkeypatch):
+    source = DropboxSource(
+        _team_recipe({"enabled": True, "as_admin": True}),
+    )
+    team = _FakeTeamClient(
+        members=[
+            _member("root@acme.com", "dbmid:ROOTADMIN", admin=True),
+            _member("ada@acme.com", "dbmid:ADA"),
+        ],
+        namespaces=[
+            _namespace("ns:TEAM", "team_folder", name="Legal"),
+            _namespace("ns:ADA", "team_member_folder", name="Ada", member_id="dbmid:ADA"),
+            _namespace("ns:OTHER", "team_member_folder", name="Bob", member_id="dbmid:BOB"),
+            _namespace("ns:SHARED", "shared_folder", name="Shared"),
+        ],
+    )
+    _install_team_sdk(monkeypatch, team)
+
+    targets = source._scan_targets()
+
+    # Every target is opened with the admin identity, pinned to one namespace.
+    assert {target.member_id for target in targets} == {"dbmid:ROOTADMIN"}
+    assert [(target.kind, target.namespace_id) for target in targets] == [
+        ("team_folder", "ns:TEAM"),
+        ("member_folder", "ns:ADA"),
+    ]
+    source._client_for(targets[0])
+    assert team.as_admin_calls == ["dbmid:ROOTADMIN"]
+    assert team.as_user_calls == []
+
+
+def test_dropbox_admin_mode_requires_a_team_admin(monkeypatch):
+    source = DropboxSource(_team_recipe({"enabled": True, "as_admin": True}))
+    team = _FakeTeamClient(members=[_member("ada@acme.com", "dbmid:ADA")])
+    _install_team_sdk(monkeypatch, team)
+
+    with pytest.raises(ValueError, match="requires a team administrator"):
+        source._scan_targets()
+
+
+def test_dropbox_team_scan_with_no_matching_members_fails_loudly(monkeypatch):
+    source = DropboxSource(
+        _team_recipe({"enabled": True, "member_emails": ["nobody@acme.com"]}),
+    )
+    team = _FakeTeamClient(members=[_member("ada@acme.com", "dbmid:ADA")])
+    _install_team_sdk(monkeypatch, team)
+
+    with pytest.raises(ValueError, match="No Dropbox Business team members matched"):
+        source._scan_targets()
+
+
+@pytest.mark.asyncio
+async def test_dropbox_team_assets_carry_member_attribution(monkeypatch):
+    source = DropboxSource(
+        _team_recipe(
+            {"enabled": True, "include_team_space": False},
+            strategy="ALL",
+        ),
+    )
+    team = _FakeTeamClient(
+        members=[_member("ada@acme.com", "dbmid:ADA")],
+        file_pages={"dbmid:ADA": [_file_entry("/notes.txt", file_id="id:ADA1")]},
+    )
+    _install_team_sdk(monkeypatch, team)
+    monkeypatch.setattr(
+        source,
+        "_build_snapshot",
+        lambda _ref: ContentSnapshot(
+            mime_type="text/plain",
+            raw_content="",
+            text_content="",
+            parse_error=None,
+            downloaded_bytes=0,
+        ),
+    )
+
+    assets = []
+    async for batch in source.extract():
+        assets.extend(batch)
+
+    assert len(assets) == 1
+    assert assets[0].metadata["team_member_email"] == "ada@acme.com"
+    assert assets[0].metadata["team_member_id"] == "dbmid:ADA"
+    assert assets[0].metadata["team_namespace"] == "member_folder"
+
+
+def test_dropbox_team_download_reuses_the_listing_identity(monkeypatch):
+    source = DropboxSource(_team_recipe({"enabled": True, "include_team_space": False}))
+    team = _FakeTeamClient(
+        members=[_member("ada@acme.com", "dbmid:ADA"), _member("grace@acme.com", "dbmid:GRACE")],
+        file_pages={"dbmid:GRACE": [_file_entry("/plan.txt", file_id="id:GRACE1")]},
+    )
+    _install_team_sdk(monkeypatch, team)
+
+    ref = next(iter(source._list_objects()))
+    downloads: list[str] = []
+
+    def _files_download(path):
+        downloads.append(f"{ref.target.member_id}:{path}")
+        return SimpleNamespace(), _FakeResponse(b"plan", "text/plain")
+
+    client = source._client_for(ref.target)
+    monkeypatch.setattr(client, "files_download", _files_download, raising=False)
+
+    source._download_object(ref)
+
+    assert downloads == ["dbmid:GRACE:id:GRACE1"]
+
+
+def test_dropbox_team_test_connection_reports_team_and_members(monkeypatch):
+    source = DropboxSource(_team_recipe({"enabled": True}))
+    team = _FakeTeamClient(
+        members=[_member("ada@acme.com", "dbmid:ADA"), _member("grace@acme.com", "dbmid:GRACE")],
+    )
+    _install_team_sdk(monkeypatch, team)
+
+    result = source.test_connection()
+
+    assert result["status"] == "SUCCESS"
+    assert "Acme Inc" in result["message"]
+    assert "2 member(s)" in result["message"]
+
+
+def test_dropbox_team_disabled_by_default():
+    source = DropboxSource(_recipe())
+
+    assert source._team_enabled() is False
+    assert source._scan_targets() == [DropboxScanTarget()]
+
+
 # ── client construction ──────────────────────────────────────────────────
 
 
@@ -602,4 +931,12 @@ def test_dropbox_asset_metadata_catalog_declares_every_kind():
     for asset_kind in ("file", "image", "audio", "video", "archive"):
         fields = resolve_fields("dropbox", asset_kind)
         names = {field["name"] for field in fields}
-        assert {"provider", "object_key", "file_id", "rev"} <= names, asset_kind
+        assert {
+            "provider",
+            "object_key",
+            "file_id",
+            "rev",
+            "team_member_email",
+            "team_member_id",
+            "team_namespace",
+        } <= names, asset_kind
