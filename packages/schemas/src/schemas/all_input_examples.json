@@ -2161,7 +2161,8 @@
         "type": "KAFKA",
         "required": {
           "auth_mode": "NONE",
-          "bootstrap_servers": "broker1:9092,broker2:9092"
+          "host": "localhost",
+          "port": 9092
         },
         "optional": {
           "connection": {
@@ -2187,7 +2188,8 @@
         "type": "KAFKA",
         "required": {
           "auth_mode": "SASL",
-          "bootstrap_servers": "broker:9093"
+          "host": "broker.internal.example.com",
+          "port": 9093
         },
         "masked": {
           "sasl_username": "your-username",
@@ -2220,7 +2222,7 @@
     },
     {
       "name": "Managed Kafka (Aiven/Confluent Cloud) with CA cert",
-      "description": "Connect to a managed SASL_SSL Kafka service (e.g. Aiven, Confluent Cloud) using a broker-issued CA certificate for TLS verification",
+      "description": "Connect to a managed SASL_SSL Kafka service (e.g. Aiven, Confluent Cloud) using the service's CA certificate for TLS verification",
       "schedule": {
         "enabled": true,
         "preset": "nightly",
@@ -2231,17 +2233,18 @@
         "type": "KAFKA",
         "required": {
           "auth_mode": "SASL",
-          "bootstrap_servers": "kafka-example-1234.example-cloud.com:12345"
+          "host": "kafka-example-1234.example-cloud.com",
+          "port": 12345
         },
         "masked": {
           "sasl_username": "avnadmin",
-          "sasl_password": "your-service-password"
+          "sasl_password": "your-service-password",
+          "ssl_ca": "-----BEGIN CERTIFICATE-----\nMIIDazCCAlOgAwIBAgIUfakefakefakefakefakefakefakefakewDQYJKoZIhvcNAQEL\nBQAwRTELMAkGA1UEBhMCQVUxEzARBgNVBAgMClNvbWUtU3RhdGUxITAfBgNVBAoM\nGEludGVybmV0IFdpZGdpdHMgUHR5IEx0ZDAeFw0yNjAxMDEwMDAwMDBaFw0zNjAx\n-----END CERTIFICATE-----\n"
         },
         "optional": {
           "connection": {
             "security_protocol": "SASL_SSL",
-            "sasl_mechanism": "PLAIN",
-            "ssl_ca": "-----BEGIN CERTIFICATE-----\nMIIDazCCAlOgAwIBAgIUfakefakefakefakefakefakefakefakewDQYJKoZIhvcNAQEL\nBQAwRTELMAkGA1UEBhMCQVUxEzARBgNVBAgMClNvbWUtU3RhdGUxITAfBgNVBAoM\nGEludGVybmV0IFdpZGdpdHMgUHR5IEx0ZDAeFw0yNjAxMDEwMDAwMDBaFw0zNjAx\nMDEwMDAwMDBaMEUxCzAJBgNVBAYTAkFVMRMwEQYDVQQIDApTb21lLVN0YXRlMSEw\nHwYDVQQKDBhJbnRlcm5ldCBXaWRnaXRzIFB0eSBMdGQwggEiMA0GCSqGSIb3DQEB\nAQUAA4IBDwAwggEKAoIBAQDFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEF\nAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEF\n-----END CERTIFICATE-----\n"
+            "sasl_mechanism": "PLAIN"
           },
           "scope": {
             "include_internal": false
@@ -2255,7 +2258,7 @@
     },
     {
       "name": "Mutual TLS (client certificate) authentication",
-      "description": "Authenticate to a Kafka broker using a client certificate and private key instead of SASL — no username/password required",
+      "description": "Authenticate to a Kafka broker with a client access certificate and access key instead of SASL — no username/password required",
       "schedule": {
         "enabled": true,
         "preset": "nightly",
@@ -2266,21 +2269,62 @@
         "type": "KAFKA",
         "required": {
           "auth_mode": "CLIENT_CERT",
-          "bootstrap_servers": "broker.internal:9094"
+          "host": "broker.internal",
+          "port": 9094
         },
         "masked": {
           "ssl_certfile": "-----BEGIN CERTIFICATE-----\nMIIDCTCCAfGgAwIBAgIUfakefakefakefakefakefakefakefakewDQYJKoZIhvcNAQEL\nBQAwFDESMBAGA1UEAwwJY2xpZW50LWNhMB4XDTI2MDEwMTAwMDAwMFoXDTI3MDEw\nMTAwMDAwMFowFDESMBAGA1UEAwwJY2xpZW50LWNhMIIBIjANBgkqhkiG9w0BAQEF\n-----END CERTIFICATE-----\n",
-          "ssl_keyfile": "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDFAKEFAKEFAKEF\nAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEF\n-----END PRIVATE KEY-----\n"
+          "ssl_keyfile": "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDFAKEFAKEFAKEF\nAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEF\n-----END PRIVATE KEY-----\n",
+          "ssl_ca": "-----BEGIN CERTIFICATE-----\nMIIDazCCAlOgAwIBAgIUfakefakefakefakefakefakefakefakewDQYJKoZIhvcNAQEL\nBQAwRTELMAkGA1UEBhMCQVUxEzARBgNVBAgMClNvbWUtU3RhdGUxITAfBgNVBAoM\nGEludGVybmV0IFdpZGdpdHMgUHR5IEx0ZDAeFw0yNjAxMDEwMDAwMDBaFw0zNjAx\n-----END CERTIFICATE-----\n"
         },
         "optional": {
           "connection": {
-            "security_protocol": "SSL",
-            "ssl_ca": "-----BEGIN CERTIFICATE-----\nMIIDazCCAlOgAwIBAgIUfakefakefakefakefakefakefakefakewDQYJKoZIhvcNAQEL\nBQAwRTELMAkGA1UEBhMCQVUxEzARBgNVBAgMClNvbWUtU3RhdGUxITAfBgNVBAoM\n-----END CERTIFICATE-----\n"
+            "security_protocol": "SSL"
           }
         },
         "sampling": {
           "strategy": "AUTOMATIC",
           "rows_per_page": 50
+        },
+        "detectors": [
+          {
+            "type": "PII",
+            "enabled": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "Kafka REST Proxy scan",
+      "description": "Scan topics through a Kafka REST Proxy (Confluent REST Proxy, Karapace) with HTTP basic auth — no broker protocol access required",
+      "schedule": {
+        "enabled": true,
+        "preset": "daily",
+        "cron": "25 7 * * *",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "KAFKA",
+        "required": {
+          "auth_mode": "REST",
+          "host": "kafka-rest.example.com",
+          "port": 8082
+        },
+        "masked": {
+          "username": "your-username",
+          "password": "your-password"
+        },
+        "optional": {
+          "connection": {
+            "rest_use_tls": true
+          },
+          "scope": {
+            "include_internal": false
+          }
+        },
+        "sampling": {
+          "strategy": "AUTOMATIC",
+          "rows_per_page": 100
         },
         "detectors": [
           {

@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import json
 import logging
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Iterator
 from datetime import UTC, datetime
 from typing import Any
 
@@ -33,6 +33,11 @@ from ..models.generated_single_asset_scan_results import (
 )
 
 logger = logging.getLogger(__name__)
+
+# Both engines reject from+size beyond index.max_result_window; 10 000 is the
+# out-of-the-box value on Elasticsearch and OpenSearch alike.
+_DEFAULT_MAX_RESULT_WINDOW = 10_000
+_SCROLL_TTL = "2m"
 
 
 class SearchEngineSourceMixin:
@@ -156,7 +161,11 @@ class SearchEngineSourceMixin:
             name=index_name,
             external_url=self._build_external_url(index_name),
             links=[],
-            asset_type=OutputAssetType.OTHER,
+            # TABLE (not OTHER): an index asset carries sampled documents as
+            # text. OTHER resolves to no text content type in the detector
+            # pipeline, so every text detector is skipped and the asset scans
+            # with zero findings.
+            asset_type=OutputAssetType.TABLE,
             source_id=self.source_id,
             created_at=now,
             updated_at=now,
@@ -209,6 +218,29 @@ class SearchEngineSourceMixin:
         except Exception:
             return None
 
+    def _max_result_window(self, index_name: str) -> int:
+        """``index.max_result_window`` for this index (default 10 000).
+
+        ``from`` + ``size`` beyond this limit is rejected by both engines with
+        a ``Result window is too large`` error, so every offset-paged read has
+        to stay inside it.
+        """
+        cached = self._result_windows.get(index_name)
+        if cached is not None:
+            return cached
+        window = _DEFAULT_MAX_RESULT_WINDOW
+        try:
+            session = self._session()
+            data = self._get(session, f"/{index_name}/_settings")
+            settings = ((data.get(index_name) or {}).get("settings") or {}).get("index") or {}
+            raw = settings.get("max_result_window")
+            if raw not in (None, ""):
+                window = int(raw)
+        except Exception as exc:
+            logger.debug("Could not read max_result_window for %s: %s", index_name, exc)
+        self._result_windows[index_name] = window
+        return window
+
     def _order_by_field(self) -> str | None:
         order = getattr(self.config.sampling, "order_by_column", None)
         return order.strip() if isinstance(order, str) and order.strip() else None
@@ -227,6 +259,11 @@ class SearchEngineSourceMixin:
         if strategy == SamplingStrategy.AUTOMATIC:
             key = f"index:{index_name}"
             offset = self.automatic_offset(key)
+            # An offset cursor cannot page past index.max_result_window — the
+            # engine rejects the search outright. Wrap to the start instead of
+            # failing every run once the cursor reaches the ceiling.
+            if offset + max_count > self._max_result_window(index_name):
+                offset = 0
             docs = self._execute_search(
                 index_name, {"size": max_count, "from": offset, "sort": [{"_doc": "asc"}]}
             )
@@ -249,6 +286,51 @@ class SearchEngineSourceMixin:
         return self._execute_search(
             index_name, {"size": max_count, "from": 0, "sort": [{"_doc": "asc"}]}
         )
+
+    def _scroll_documents(self, index_name: str, page_size: int) -> Iterator[list[dict[str, Any]]]:
+        """Yield every document in the index, one scroll batch at a time.
+
+        Uses the scroll API (available on both Elasticsearch and OpenSearch)
+        so a full scan is not bounded by ``index.max_result_window``. The
+        scroll context is always released, including on abort or error.
+        """
+        session = self._session()
+        timeout = self._request_timeout()
+        scroll_id: str | None = None
+        try:
+            response = session.post(
+                f"{self._base_url()}/{index_name}/_search",
+                params={"scroll": _SCROLL_TTL},
+                json={"size": page_size, "sort": [{"_doc": "asc"}]},
+                timeout=timeout,
+            )
+            response.raise_for_status()
+            data = response.json()
+            while True:
+                scroll_id = data.get("_scroll_id") or scroll_id
+                hits = ((data.get("hits") or {}).get("hits")) or []
+                if not hits:
+                    return
+                yield [hit.get("_source", {}) for hit in hits]
+                if self._aborted or not scroll_id:
+                    return
+                response = session.post(
+                    f"{self._base_url()}/_search/scroll",
+                    json={"scroll": _SCROLL_TTL, "scroll_id": scroll_id},
+                    timeout=timeout,
+                )
+                response.raise_for_status()
+                data = response.json()
+        finally:
+            if scroll_id:
+                try:
+                    session.delete(
+                        f"{self._base_url()}/_search/scroll",
+                        json={"scroll_id": [scroll_id]},
+                        timeout=timeout,
+                    )
+                except Exception as exc:
+                    logger.debug("Releasing scroll context for %s failed: %s", index_name, exc)
 
     @staticmethod
     def _format_documents(
@@ -302,18 +384,17 @@ class SearchEngineSourceMixin:
 
         offset = 0
         page_num = 1
-        while not self._aborted:
+        # Scroll rather than from/size: offset paging is capped at
+        # index.max_result_window (10 000 by default), so a full scan of any
+        # real index errors out partway through. Scroll is supported by both
+        # engines and has no such ceiling.
+        for docs in self._scroll_documents(index_name, max_count):
+            if self._aborted:
+                break
             if total_batches is not None:
                 logger.debug("%s batch %d/%d", index_name, page_num, total_batches)
-            docs = self._execute_search(
-                index_name, {"size": max_count, "from": offset, "sort": [{"_doc": "asc"}]}
-            )
-            if not docs:
-                break
             for i, doc in enumerate(docs):
                 yield self._format_documents(index_name, [doc], offset=offset + i)
-            if len(docs) < max_count:
-                break
             offset += len(docs)
             page_num += 1
 

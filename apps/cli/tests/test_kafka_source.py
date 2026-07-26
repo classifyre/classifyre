@@ -157,7 +157,7 @@ class _FakeKafkaModule:
 def _recipe(**overrides: Any) -> dict[str, Any]:
     base: dict[str, Any] = {
         "type": "KAFKA",
-        "required": {"auth_mode": "NONE", "bootstrap_servers": "broker:9092"},
+        "required": {"auth_mode": "NONE", "host": "broker", "port": 9092},
         "optional": {"connection": {"security_protocol": "PLAINTEXT"}},
         "sampling": {"strategy": "RANDOM", "rows_per_page": 10},
     }
@@ -230,8 +230,12 @@ def test_kafka_sasl_credentials_wire_into_client_config(
 ) -> None:
     src = KafkaSource(
         _recipe(
-            required={"auth_mode": "SASL", "bootstrap_servers": "broker:9093"},
-            masked={"sasl_username": "avnadmin", "sasl_password": "secret"},
+            required={"auth_mode": "SASL", "host": "broker", "port": 9093},
+            masked={
+                "sasl_username": "avnadmin",
+                "sasl_password": "secret",
+                "ssl_ca": "fake-ca-pem",
+            },
             optional={"connection": {"security_protocol": "SASL_SSL", "sasl_mechanism": "PLAIN"}},
         )
     )
@@ -241,15 +245,21 @@ def test_kafka_sasl_credentials_wire_into_client_config(
     assert conf["sasl.mechanism"] == "PLAIN"
     assert conf["sasl.username"] == "avnadmin"
     assert conf["sasl.password"] == "secret"
+    # The CA travels with the credentials, not in unmasked connection options.
+    assert conf["ssl.ca.pem"] == "fake-ca-pem"
     assert "ssl.certificate.pem" not in conf
 
 
 def test_kafka_client_cert_auth_wires_pem_config(_patch_kafka: _FakeKafkaModule) -> None:
     src = KafkaSource(
         _recipe(
-            required={"auth_mode": "CLIENT_CERT", "bootstrap_servers": "broker:9094"},
-            masked={"ssl_certfile": "fake-cert-pem", "ssl_keyfile": "fake-key-pem"},
-            optional={"connection": {"security_protocol": "SSL", "ssl_ca": "fake-ca-pem"}},
+            required={"auth_mode": "CLIENT_CERT", "host": "broker", "port": 9094},
+            masked={
+                "ssl_certfile": "fake-cert-pem",
+                "ssl_keyfile": "fake-key-pem",
+                "ssl_ca": "fake-ca-pem",
+            },
+            optional={"connection": {"security_protocol": "SSL"}},
         )
     )
     conf = src._client_config()
@@ -348,3 +358,213 @@ def test_kafka_automatic_stale_cursor_below_low_clamps_to_low(
     assert module.last_assigned[0].offset == 20  # clamped up to low, not the stale 5
     assert [m["offset"] for m in out] == [20, 21, 22, 23, 24]
     assert src.current_sampling_cursor() == {"payments:0": 25}
+
+
+# ── REST Proxy transport ─────────────────────────────────────────────────
+
+
+class _FakeRestResponse:
+    def __init__(self, payload: Any, status: int = 200) -> None:
+        self._payload = payload
+        self.status_code = status
+        self.content = b"" if payload is None else b"{}"
+
+    def raise_for_status(self) -> None:
+        pass
+
+    def json(self) -> Any:
+        return self._payload
+
+
+@pytest.fixture
+def _patch_rest(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
+    """Serve the REST Proxy v2 endpoints the connector uses."""
+    calls: dict[str, Any] = {"requests": [], "records_cursor": 0}
+    records = [
+        {
+            "partition": 0,
+            "offset": i,
+            "key": base64.b64encode(f"k{i}".encode()).decode(),
+            "value": base64.b64encode(f"value-{i}".encode()).decode(),
+        }
+        for i in range(12)
+    ]
+
+    def fake_request(self: Any, method: str, url: str, **kwargs: Any) -> _FakeRestResponse:
+        calls["requests"].append((method, url, kwargs.get("json")))
+        calls["auth"] = self.auth
+        if url.endswith("/topics"):
+            return _FakeRestResponse(["payments", "__consumer_offsets"])
+        if url.endswith("/topics/payments"):
+            return _FakeRestResponse(
+                {
+                    "name": "payments",
+                    "configs": {"retention.ms": "604800000", "cleanup.policy": "delete"},
+                    "partitions": [{"partition": 0, "replicas": [{}, {}, {}]}],
+                }
+            )
+        if url.endswith("/topics/payments/partitions"):
+            return _FakeRestResponse([{"partition": 0, "replicas": [{}, {}, {}]}])
+        if url.endswith("/partitions/0/offsets"):
+            return _FakeRestResponse({"beginning_offset": 0, "end_offset": 12})
+        if "/records" in url:
+            start = calls["records_cursor"]
+            calls["records_cursor"] = len(records)
+            return _FakeRestResponse(records[start:] if start < len(records) else [])
+        if method == "DELETE":
+            calls["deleted_instance"] = url
+            return _FakeRestResponse(None)
+        if url.endswith("/consumers/classifyre-scan-local-run"):
+            return _FakeRestResponse(
+                {"instance_id": "inst-1", "base_uri": "http://internal:8082/x"}
+            )
+        # assignments / positions
+        return _FakeRestResponse(None)
+
+    monkeypatch.setattr("requests.Session.request", fake_request)
+    return calls
+
+
+def _rest_recipe(**overrides: Any) -> dict[str, Any]:
+    base: dict[str, Any] = {
+        "type": "KAFKA",
+        "required": {"auth_mode": "REST", "host": "kafka-rest.example.com", "port": 8082},
+        "masked": {"username": "user", "password": "secret"},
+        "sampling": {"strategy": "ALL", "rows_per_page": 10},
+    }
+    base.update(overrides)
+    return base
+
+
+def test_kafka_rest_needs_no_confluent_kafka(
+    _patch_rest: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def _explode(**_kwargs: Any) -> Any:
+        raise AssertionError("REST transport must not require confluent-kafka")
+
+    monkeypatch.setattr("src.sources.kafka.source.require_module", _explode)
+    src = KafkaSource(_rest_recipe())
+    assert src.is_rest is True
+    assert src.test_connection()["status"] == "SUCCESS"
+
+
+async def test_kafka_rest_extract_emits_topic_assets(_patch_rest: dict[str, Any]) -> None:
+    src = KafkaSource(_rest_recipe())
+    assets = [a async for batch in src.extract_raw() for a in batch]
+
+    assert [a.name for a in assets] == ["payments"]
+    asset = assets[0]
+    assert asset.asset_type == "TABLE"
+    assert asset.external_url == "https://kafka-rest.example.com:8082/topics/payments"
+    assert asset.metadata["partition_count"] == 1
+    assert asset.metadata["replication_factor"] == 3
+    assert asset.metadata["retention_ms"] == 604800000
+    assert asset.metadata["latest_offset"] == 12
+    assert _patch_rest["auth"] == ("user", "secret")
+
+
+async def test_kafka_rest_fetch_content_decodes_records(_patch_rest: dict[str, Any]) -> None:
+    src = KafkaSource(_rest_recipe())
+    assets = [a async for batch in src.extract_raw() for a in batch]
+    result = await src.fetch_content(assets[0].hash)
+
+    assert result is not None
+    _raw, text = result
+    # capped at rows_per_page (10) even though 12 records are available
+    assert text.count("message_") == 10
+    assert "value-0" in text  # base64 payloads are decoded to text
+    # The consumer instance is always cleaned up.
+    assert _patch_rest["deleted_instance"].endswith("/instances/inst-1")
+
+
+def test_kafka_rest_automatic_positions_from_saved_cursor(
+    _patch_rest: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv(CURSOR_ENV, _encode_cursor({"payments:0": 5}))
+    src = KafkaSource(_rest_recipe(sampling={"strategy": "AUTOMATIC", "rows_per_page": 10}))
+    src._consume("payments", 10)
+
+    positions = [
+        body for method, url, body in _patch_rest["requests"] if url.endswith("/positions")
+    ]
+    assert positions == [{"offsets": [{"topic": "payments", "partition": 0, "offset": 5}]}]
+
+
+def test_kafka_rest_plain_http_when_tls_disabled(_patch_rest: dict[str, Any]) -> None:
+    src = KafkaSource(_rest_recipe(optional={"connection": {"rest_use_tls": False}}))
+    assert src._rest_base_url() == "http://kafka-rest.example.com:8082"
+
+
+# ── Security protocol resolution ─────────────────────────────────────────
+
+
+def test_kafka_sasl_forces_a_sasl_security_protocol(_patch_kafka: _FakeKafkaModule) -> None:
+    """SASL credentials over a non-SASL protocol fail with an opaque transport
+    error, so the auth mode wins over the override."""
+    src = KafkaSource(
+        _recipe(
+            required={"auth_mode": "SASL", "host": "broker", "port": 9093},
+            masked={"sasl_username": "u", "sasl_password": "p"},
+            optional={"connection": {"security_protocol": "SSL", "sasl_mechanism": "PLAIN"}},
+        )
+    )
+    conf = src._client_config()
+    assert conf["security.protocol"] == "SASL_SSL"
+    assert conf["sasl.mechanism"] == "PLAIN"
+
+
+def test_kafka_sasl_defaults_to_sasl_ssl_without_an_override(
+    _patch_kafka: _FakeKafkaModule,
+) -> None:
+    src = KafkaSource(
+        _recipe(
+            required={"auth_mode": "SASL", "host": "broker", "port": 9093},
+            masked={"sasl_username": "u", "sasl_password": "p"},
+            optional={},
+        )
+    )
+    assert src._client_config()["security.protocol"] == "SASL_SSL"
+
+
+def test_kafka_sasl_plaintext_override_is_honoured(_patch_kafka: _FakeKafkaModule) -> None:
+    src = KafkaSource(
+        _recipe(
+            required={"auth_mode": "SASL", "host": "broker", "port": 9093},
+            masked={"sasl_username": "u", "sasl_password": "p"},
+            optional={"connection": {"security_protocol": "SASL_PLAINTEXT"}},
+        )
+    )
+    assert src._client_config()["security.protocol"] == "SASL_PLAINTEXT"
+
+
+def test_kafka_plaintext_override_upgrades_to_sasl_plaintext(
+    _patch_kafka: _FakeKafkaModule,
+) -> None:
+    src = KafkaSource(
+        _recipe(
+            required={"auth_mode": "SASL", "host": "broker", "port": 9093},
+            masked={"sasl_username": "u", "sasl_password": "p"},
+            optional={"connection": {"security_protocol": "PLAINTEXT"}},
+        )
+    )
+    assert src._client_config()["security.protocol"] == "SASL_PLAINTEXT"
+
+
+def test_kafka_client_cert_always_uses_ssl(_patch_kafka: _FakeKafkaModule) -> None:
+    src = KafkaSource(
+        _recipe(
+            required={"auth_mode": "CLIENT_CERT", "host": "broker", "port": 9094},
+            masked={"ssl_certfile": "cert", "ssl_keyfile": "key"},
+            optional={"connection": {"security_protocol": "PLAINTEXT"}},
+        )
+    )
+    conf = src._client_config()
+    assert conf["security.protocol"] == "SSL"
+    assert "sasl.mechanism" not in conf
+
+
+def test_kafka_no_auth_defaults_to_plaintext(_patch_kafka: _FakeKafkaModule) -> None:
+    src = KafkaSource(
+        _recipe(required={"auth_mode": "NONE", "host": "broker", "port": 9092}, optional={})
+    )
+    assert src._client_config()["security.protocol"] == "PLAINTEXT"

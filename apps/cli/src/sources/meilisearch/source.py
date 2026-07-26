@@ -184,7 +184,10 @@ class MeilisearchSource(BaseSource):
             name=index_uid,
             external_url=self._build_external_url(index_uid),
             links=[],
-            asset_type=OutputAssetType.OTHER,
+            # TABLE (not OTHER): sampled documents are the asset's text payload.
+            # OTHER resolves to no text content type in the detector pipeline,
+            # so every text detector is skipped and nothing is ever found.
+            asset_type=OutputAssetType.TABLE,
             source_id=self.source_id,
             created_at=now,
             updated_at=now,

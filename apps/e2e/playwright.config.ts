@@ -18,6 +18,10 @@ if (fs.existsSync(envFile)) {
 
 export default defineConfig({
   testDir: "./tests",
+  // One namespace is provisioned for the whole run and shared by every spec;
+  // teardown deletes it unless E2E_DELETE_NAMESPACE=false.
+  globalSetup: "./tests/global-setup.ts",
+  globalTeardown: "./tests/global-teardown.ts",
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,

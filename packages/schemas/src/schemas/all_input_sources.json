@@ -127,7 +127,7 @@
       },
       "image": {
         "type": "object",
-        "description": "Image dimensions (png, jpg, gif, webp, heic, \u2026)",
+        "description": "Image dimensions (png, jpg, gif, webp, heic, …)",
         "properties": {
           "image_width": {
             "type": "integer",
@@ -2126,7 +2126,7 @@
     "SamplingStrategy": {
       "type": "string",
       "enum": ["AUTOMATIC", "RANDOM", "LATEST", "ALL"],
-      "description": "Sampling strategy. AUTOMATIC (recommended default) incrementally ingests a new slice of not-yet-seen data on every run, remembering its position between runs and wrapping around to re-scan from the start once everything has been covered \u2014 eventually ingesting everything at a bounded cost per run. RANDOM samples items randomly. LATEST prioritises the most recently modified/created items. ALL scans every item with no limit."
+      "description": "Sampling strategy. AUTOMATIC (recommended default) incrementally ingests a new slice of not-yet-seen data on every run, remembering its position between runs and wrapping around to re-scan from the start once everything has been covered — eventually ingesting everything at a bounded cost per run. RANDOM samples items randomly. LATEST prioritises the most recently modified/created items. ALL scans every item with no limit."
     },
     "SamplingConfig": {
       "title": "SamplingConfig",
@@ -4394,7 +4394,7 @@
         "cluster_host": {
           "type": "string",
           "minLength": 1,
-          "description": "Atlas SRV cluster host or full mongodb+srv:// URI (for example, cluster.abc123.mongodb.net or mongodb+srv://cluster.abc123.mongodb.net). If a full URI is supplied, the host is extracted and credentials are discarded \u2014 set them in masked fields instead."
+          "description": "Atlas SRV cluster host or full mongodb+srv:// URI (for example, cluster.abc123.mongodb.net or mongodb+srv://cluster.abc123.mongodb.net). If a full URI is supplied, the host is extracted and credentials are discarded — set them in masked fields instead."
         }
       },
       "required": ["deployment", "cluster_host"],
@@ -6844,8 +6844,7 @@
       "title": "KafkaSecurityProtocol",
       "type": "string",
       "enum": ["PLAINTEXT", "SSL", "SASL_PLAINTEXT", "SASL_SSL"],
-      "default": "PLAINTEXT",
-      "description": "Kafka client security protocol"
+      "description": "Kafka client security protocol. Leave unset to derive it from the authentication mode (SASL → SASL_SSL, Client Certificate → SSL, No Authentication → PLAINTEXT); set it only to override, e.g. SASL_PLAINTEXT for a SASL broker without TLS."
     },
     "KafkaSaslMechanism": {
       "title": "KafkaSaslMechanism",
@@ -6860,7 +6859,7 @@
       "properties": {
         "bucket": {
           "type": "string",
-          "description": "Bucket holding the tables \u2014 AWS S3, MinIO, Cloudflare R2, Backblaze B2, Garage, and other S3-compatible endpoints"
+          "description": "Bucket holding the tables — AWS S3, MinIO, Cloudflare R2, Backblaze B2, Garage, and other S3-compatible endpoints"
         }
       },
       "required": ["bucket"],
@@ -6954,7 +6953,7 @@
       "properties": {
         "bucket": {
           "type": "string",
-          "description": "Bucket holding the tables \u2014 AWS S3, MinIO, Cloudflare R2, Backblaze B2, Garage, and other S3-compatible endpoints"
+          "description": "Bucket holding the tables — AWS S3, MinIO, Cloudflare R2, Backblaze B2, Garage, and other S3-compatible endpoints"
         }
       },
       "required": ["bucket"],
@@ -7025,29 +7024,41 @@
         "auth_mode": {
           "const": "NONE"
         },
-        "bootstrap_servers": {
+        "host": {
           "type": "string",
-          "description": "Comma-separated Kafka bootstrap servers (host:port)",
-          "default": "localhost:9092"
+          "description": "Kafka broker host name or IP (e.g. kafka.example.com)"
+        },
+        "port": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535,
+          "default": 9092,
+          "description": "Kafka broker port"
         }
       },
-      "required": ["auth_mode", "bootstrap_servers"],
+      "required": ["auth_mode", "host", "port"],
       "additionalProperties": false
     },
     "KafkaRequiredSasl": {
-      "title": "SASL",
+      "title": "SASL (Username/Password)",
       "type": "object",
       "properties": {
         "auth_mode": {
           "const": "SASL"
         },
-        "bootstrap_servers": {
+        "host": {
           "type": "string",
-          "description": "Comma-separated Kafka bootstrap servers (host:port)",
-          "default": "localhost:9092"
+          "description": "Kafka broker host name or IP (e.g. kafka.example.com)"
+        },
+        "port": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535,
+          "default": 9092,
+          "description": "Kafka broker port"
         }
       },
-      "required": ["auth_mode", "bootstrap_servers"],
+      "required": ["auth_mode", "host", "port"],
       "additionalProperties": false
     },
     "KafkaRequiredClientCert": {
@@ -7057,13 +7068,42 @@
         "auth_mode": {
           "const": "CLIENT_CERT"
         },
-        "bootstrap_servers": {
+        "host": {
           "type": "string",
-          "description": "Comma-separated Kafka bootstrap servers (host:port)",
-          "default": "localhost:9092"
+          "description": "Kafka broker host name or IP (e.g. kafka.example.com)"
+        },
+        "port": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535,
+          "default": 9092,
+          "description": "Kafka broker port"
         }
       },
-      "required": ["auth_mode", "bootstrap_servers"],
+      "required": ["auth_mode", "host", "port"],
+      "additionalProperties": false
+    },
+    "KafkaRequiredRest": {
+      "title": "Kafka REST Proxy (Username/Password)",
+      "type": "object",
+      "description": "Connect over the Kafka REST Proxy HTTP API (Confluent REST Proxy, Karapace) instead of the native broker protocol.",
+      "properties": {
+        "auth_mode": {
+          "const": "REST"
+        },
+        "host": {
+          "type": "string",
+          "description": "Kafka REST proxy host name or IP (e.g. kafka-rest.example.com)"
+        },
+        "port": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535,
+          "default": 8082,
+          "description": "Kafka REST proxy port"
+        }
+      },
+      "required": ["auth_mode", "host", "port"],
       "additionalProperties": false
     },
     "KafkaRequired": {
@@ -7077,6 +7117,9 @@
         },
         {
           "$ref": "#/definitions/KafkaRequiredClientCert"
+        },
+        {
+          "$ref": "#/definitions/KafkaRequiredRest"
         }
       ]
     },
@@ -7087,9 +7130,9 @@
       "additionalProperties": false
     },
     "KafkaMaskedSasl": {
-      "title": "SASL",
+      "title": "SASL (Username/Password)",
       "type": "object",
-      "description": "SASL username/password credentials.",
+      "description": "SASL credentials. Set the SASL mechanism under connection options (PLAIN by default).",
       "properties": {
         "sasl_username": {
           "type": "string",
@@ -7098,6 +7141,10 @@
         "sasl_password": {
           "type": "string",
           "description": "SASL password"
+        },
+        "ssl_ca": {
+          "type": "string",
+          "description": "PEM-encoded CA certificate used to verify the broker's TLS certificate. Required for private or self-signed CAs; leave empty to trust the system CA bundle."
         }
       },
       "required": ["sasl_username", "sasl_password"],
@@ -7106,18 +7153,39 @@
     "KafkaMaskedClientCert": {
       "title": "Client Certificate (mTLS)",
       "type": "object",
-      "description": "mTLS client certificate credentials.",
+      "description": "mTLS credentials: the client certificate and its private key, plus the CA certificate when the broker uses a private CA.",
       "properties": {
         "ssl_certfile": {
           "type": "string",
-          "description": "PEM-encoded client certificate (access cert)"
+          "description": "PEM-encoded client access certificate"
         },
         "ssl_keyfile": {
           "type": "string",
-          "description": "PEM-encoded client private key (access key)"
+          "description": "PEM-encoded client access key (private key)"
+        },
+        "ssl_ca": {
+          "type": "string",
+          "description": "PEM-encoded CA certificate used to verify the broker's TLS certificate. Required for private or self-signed CAs; leave empty to trust the system CA bundle."
         }
       },
       "required": ["ssl_certfile", "ssl_keyfile"],
+      "additionalProperties": false
+    },
+    "KafkaMaskedRest": {
+      "title": "Kafka REST Proxy (Username/Password)",
+      "type": "object",
+      "description": "HTTP basic auth credentials for the REST proxy.",
+      "properties": {
+        "username": {
+          "type": "string",
+          "description": "REST proxy username"
+        },
+        "password": {
+          "type": "string",
+          "description": "REST proxy password"
+        }
+      },
+      "required": ["username", "password"],
       "additionalProperties": false
     },
     "KafkaMasked": {
@@ -7131,6 +7199,9 @@
         },
         {
           "$ref": "#/definitions/KafkaMaskedClientCert"
+        },
+        {
+          "$ref": "#/definitions/KafkaMaskedRest"
         }
       ]
     },
@@ -7145,9 +7216,10 @@
         "sasl_mechanism": {
           "$ref": "#/definitions/KafkaSaslMechanism"
         },
-        "ssl_ca": {
-          "type": "string",
-          "description": "PEM-encoded CA certificate for TLS verification (optional for client-certificate auth; validates the broker's certificate)"
+        "rest_use_tls": {
+          "type": "boolean",
+          "default": true,
+          "description": "REST proxy only: call the proxy over HTTPS. Turn off for a plain-HTTP proxy (e.g. a local Karapace)."
         },
         "request_timeout_ms": {
           "type": "integer",
