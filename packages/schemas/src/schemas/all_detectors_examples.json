@@ -243,7 +243,7 @@
           "IT_PASSPORT",
           "IT_DRIVER_LICENSE",
           "IT_IDENTITY_CARD",
-          "IT_VAR_CODE",
+          "IT_VAT_CODE",
           "PERSON",
           "EMAIL_ADDRESS",
           "PHONE_NUMBER",
@@ -315,8 +315,8 @@
       }
     },
     {
-      "name": "Nordic (Finland & Poland)",
-      "description": "Finnish personal identity codes (HETU) and Polish PESEL numbers for local privacy law compliance.",
+      "name": "Finland & Poland",
+      "description": "Finnish personal identity codes (HETU) and Polish PESEL numbers for local privacy law compliance. Both are validated by check digit, so false positives are rare.",
       "config": {
         "enabled_patterns": [
           "FI_PERSONAL_IDENTITY_CODE",

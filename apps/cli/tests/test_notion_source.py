@@ -225,3 +225,80 @@ async def test_notion_file_asset_refetches_fresh_signed_url(
     assert fetched["block_id"] == FILE_BLOCK_ID
     assert fetched["download_url"].endswith("fresh=1")
     assert fetched["authed"] is False
+
+
+@pytest.mark.asyncio
+async def test_notion_textless_asset_is_not_processed_twice(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """An asset that yields no text must not be downloaded and parsed again.
+
+    ParsedContentProvider falls back to fetch_content_bytes + iter_asset_pages
+    whenever fetch_content_pages produced no text, which for an image-only asset
+    means a second download and a second OCR pass. Recording the asset in
+    _content_pages_processed is what suppresses that fallback.
+    """
+    source = NotionSource(_notion_recipe())
+    _install_page_workspace(source, monkeypatch)
+
+    assets = await _collect_assets(source)
+    file_asset = next(a for a in assets if a.asset_type == OutputAssetType.BINARY)
+
+    download_count = {"n": 0}
+
+    def _get_block(block_id: str) -> dict[str, Any]:
+        return {
+            "id": block_id,
+            "type": "file",
+            "file": {"type": "file", "file": {"url": "https://s3.notion.so/signed/i.png"}},
+        }
+
+    def _get_bytes(url: str, *, authed: bool = False) -> tuple[bytes, str]:
+        _ = url, authed
+        download_count["n"] += 1
+        # A 1x1 PNG: no text to extract, so fetch_content returns None.
+        return b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR" + (1).to_bytes(4, "big") * 2, "image/png"
+
+    monkeypatch.setattr(source.client, "get_block", _get_block)
+    monkeypatch.setattr(source.client, "get_bytes", _get_bytes)
+
+    assert await source.fetch_content(file_asset.hash) is None
+    assert download_count["n"] == 1
+    assert file_asset.hash in source._content_pages_processed
+
+
+@pytest.mark.asyncio
+async def test_notion_provider_skips_fallback_for_processed_asset(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """End-to-end: the pipeline's provider honours Notion's processed marker."""
+    from src.pipeline.parsed_content_provider import ParsedContentProvider
+
+    source = NotionSource(_notion_recipe())
+    _install_page_workspace(source, monkeypatch)
+
+    assets = await _collect_assets(source)
+    file_asset = next(a for a in assets if a.asset_type == OutputAssetType.BINARY)
+
+    download_count = {"n": 0}
+
+    def _get_block(block_id: str) -> dict[str, Any]:
+        return {
+            "id": block_id,
+            "type": "file",
+            "file": {"type": "file", "file": {"url": "https://s3.notion.so/signed/i.png"}},
+        }
+
+    def _get_bytes(url: str, *, authed: bool = False) -> tuple[bytes, str]:
+        _ = url, authed
+        download_count["n"] += 1
+        return b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR" + (1).to_bytes(4, "big") * 2, "image/png"
+
+    monkeypatch.setattr(source.client, "get_block", _get_block)
+    monkeypatch.setattr(source.client, "get_bytes", _get_bytes)
+
+    provider = ParsedContentProvider(source)
+    pages = [page async for page in provider.fetch_text_pages(file_asset.hash)]
+
+    assert pages == []
+    assert download_count["n"] == 1, "the asset was downloaded more than once"

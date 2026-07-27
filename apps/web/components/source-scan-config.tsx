@@ -85,6 +85,26 @@ function formatDetectorName(title: string) {
     .trim();
 }
 
+/**
+ * Preset seeded when a detector is switched on while still carrying nothing but
+ * its bare schema defaults. Picked so enabling several detectors yields
+ * complementary coverage rather than the same findings three times over:
+ * SECRETS sweeps structured credentials plus entropy, PII covers the globally
+ * recognized identifiers, and YARA looks for malware behaviour instead of
+ * repeating the credential rules SECRETS already runs. CODE_SECURITY and
+ * BROKEN_LINKS stay on their plain baselines.
+ *
+ * Matched by preset name against `all_detectors_examples.json`; a name that no
+ * longer exists simply means no preset is seeded.
+ */
+const DEFAULT_PRESET_NAME_BY_DETECTOR_TYPE: Record<string, string> = {
+  PII: "Global Coverage",
+  SECRETS: "Enterprise Full Sweep",
+  YARA: "Malware Indicators",
+  CODE_SECURITY: "Code Security Baseline",
+  BROKEN_LINKS: "Default Broken Links",
+};
+
 
 function deepEqual(a: unknown, b: unknown): boolean {
   if (a === b) return true;
@@ -215,6 +235,23 @@ function DetectorConfigRow({
     return match ? match.id : null;
   }, [enabled, normalizedCurrentConfig, presetOptions]);
 
+  // Bare schema defaults — what a detector holds before anyone has chosen
+  // anything. Used to tell "untouched" apart from "deliberately configured", so
+  // seeding the recommended preset can never overwrite a real choice (an
+  // example template's config, or an edited source's saved config).
+  const pristineConfig = useMemo(
+    () => buildFormDefaults(detector.schema, {}),
+    [detector.schema],
+  );
+  const recommendedPreset = useMemo(
+    () =>
+      presetOptions.find(
+        (preset) =>
+          preset.name === DEFAULT_PRESET_NAME_BY_DETECTOR_TYPE[detector.type],
+      ) ?? null,
+    [detector.type, presetOptions],
+  );
+
   const [selectedPreset, setSelectedPreset] = useState<string | null>(() => {
     if (!enabled) return null;
     return matchingPresetId ?? "custom";
@@ -330,8 +367,24 @@ function DetectorConfigRow({
           onPressedChange={(pressed) => {
             if (!pressed) {
               setIsEditOpen(false);
+              onStateChange({ enabled: false });
+              return;
             }
-            onStateChange({ enabled: pressed });
+
+            // Switching a detector on seeds its recommended preset (unless the
+            // config was already chosen) and opens the editor, so the settings
+            // that will actually run are visible and changeable right away
+            // instead of hidden behind a second click.
+            if (recommendedPreset && deepEqual(normalizedCurrentConfig, pristineConfig)) {
+              form.reset(recommendedPreset.normalizedConfig);
+              onStateChange({
+                enabled: true,
+                config: recommendedPreset.normalizedConfig,
+              });
+            } else {
+              onStateChange({ enabled: true });
+            }
+            setIsEditOpen(true);
           }}
           className="shrink-0 cursor-pointer"
           data-testid={`detector-toggle-${detector.type}`}
@@ -360,7 +413,11 @@ function DetectorConfigRow({
                       <SelectPrimitive.Item
                         key={preset.id}
                         value={preset.id}
-                        className="relative flex w-full cursor-default select-none flex-col rounded-sm py-2 pr-8 pl-2 text-sm outline-none focus:bg-accent data-[disabled]:pointer-events-none data-[disabled]:opacity-50"
+                        // focus:text-accent-foreground is required alongside
+                        // focus:bg-accent: the accent is bright lime, so the
+                        // inherited popover foreground (near-white in dark mode)
+                        // left the highlighted row unreadable.
+                        className="relative flex w-full cursor-default select-none flex-col rounded-sm py-2 pr-8 pl-2 text-sm outline-none focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50"
                       >
                         <span className="absolute right-2 top-2 flex size-3.5 items-center justify-center">
                           <SelectPrimitive.ItemIndicator>
@@ -371,7 +428,9 @@ function DetectorConfigRow({
                           <span className="text-xs font-medium">{preset.name}</span>
                         </SelectPrimitive.ItemText>
                         {preset.description && (
-                          <span className="text-[10px] text-muted-foreground leading-tight mt-0.5 whitespace-normal max-w-[280px]">
+                          // Dimmed by opacity rather than text-muted-foreground so
+                          // it follows the row's foreground colour on highlight.
+                          <span className="text-[10px] leading-tight mt-0.5 whitespace-normal max-w-[280px] opacity-70">
                             {preset.description}
                           </span>
                         )}
@@ -379,7 +438,7 @@ function DetectorConfigRow({
                     ))}
                     <SelectPrimitive.Item
                       value="custom"
-                      className="relative flex w-full cursor-default select-none rounded-sm py-1.5 pr-8 pl-2 text-sm outline-none focus:bg-accent data-[disabled]:pointer-events-none data-[disabled]:opacity-50"
+                      className="relative flex w-full cursor-default select-none rounded-sm py-1.5 pr-8 pl-2 text-sm outline-none focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50"
                     >
                       <span className="absolute right-2 top-1/2 -translate-y-1/2 flex size-3.5 items-center justify-center">
                         <SelectPrimitive.ItemIndicator>

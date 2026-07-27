@@ -107,7 +107,7 @@ class PIIDetector(BaseDetector):
         # Italy
         "IT_FISCAL_CODE",
         "IT_DRIVER_LICENSE",
-        "IT_VAR_CODE",
+        "IT_VAT_CODE",
         "IT_PASSPORT",
         "IT_IDENTITY_CARD",
         # Singapore
@@ -314,6 +314,7 @@ class PIIDetector(BaseDetector):
             else:
                 self.analyzer = AnalyzerEngine()
 
+            self._register_regional_recognizers(presidio_module)
             self._register_custom_recognizers(presidio_module)
             self._probe_phone_recognizer()
 
@@ -395,6 +396,129 @@ class PIIDetector(BaseDetector):
         nlp_engine.nlp = {"en": nlp}
         logger.debug("Loaded spaCy model '%s'", cfg_model)
         return nlp_engine
+
+    # Regional recognizers Presidio ships but scopes to their own language, so an
+    # `supported_languages=["en"]` registry silently drops them (the "Recognizer
+    # not added to registry" warning is filtered out by _PresidioNoiseFilter).
+    # Every entity advertised in _ALL_SUPPORTED_ENTITIES has to be re-registered
+    # against "en" or it can never produce a finding, no matter what the preset
+    # asks for. Analysis always runs with language="en".
+    _REGIONAL_RECOGNIZER_CLASS_NAMES: ClassVar[tuple[str, ...]] = (
+        # Spain
+        "EsNifRecognizer",
+        "EsNieRecognizer",
+        # Italy
+        "ItFiscalCodeRecognizer",
+        "ItDriverLicenseRecognizer",
+        "ItVatCodeRecognizer",
+        "ItPassportRecognizer",
+        "ItIdentityCardRecognizer",
+        # Singapore
+        "SgFinRecognizer",
+        "SgUenRecognizer",
+        # Australia
+        "AuAbnRecognizer",
+        "AuAcnRecognizer",
+        "AuTfnRecognizer",
+        "AuMedicareRecognizer",
+        # India
+        "InPanRecognizer",
+        "InAadhaarRecognizer",
+        "InVehicleRegistrationRecognizer",
+        "InVoterRecognizer",
+        # Finland
+        "FiPersonalIdentityCodeRecognizer",
+        # Poland
+        "PlPeselRecognizer",
+    )
+
+    # DACH and EU identifiers Presidio has no recognizer for at all. Each pattern
+    # is deliberately anchored on a checkable structure and paired with context
+    # words, because a bare run of digits is far too common to flag on its own.
+    #
+    # Scores are chosen against Presidio's LemmaContextAwareEnhancer, which adds
+    # 0.35 when a context word sits near the match, and the detector's default
+    # confidence_threshold of 0.7. A structurally weak pattern therefore scores
+    # 0.4: on its own it stays below the threshold and is suppressed, and only a
+    # nearby context word lifts it to 0.75 and reports it. Anything lower could
+    # never surface at all; anything higher would fire on bare digit runs.
+    _DACH_PATTERN_SPECS: ClassVar[
+        tuple[tuple[str, str, tuple[tuple[str, str, float], ...], tuple[str, ...]], ...]
+    ] = (
+        (
+            "AT_SVNR",
+            "Austrian social insurance number (SVNR)",
+            # NNNN DDMMYY — a 4-digit serial (last digit is a check digit)
+            # followed by the holder's date of birth.
+            (("svnr (needs context)", r"\b\d{4}[ /]?\d{2}[01]\d{3}\b", 0.4),),
+            ("svnr", "sozialversicherung", "sozialversicherungsnummer", "versicherungsnummer"),
+        ),
+        (
+            "CH_AHV",
+            "Swiss social security number (AHV/AVS)",
+            # Always begins with the 756 country prefix, so this one is safe to
+            # score highly on structure alone.
+            (("ahv (strong)", r"\b756[.\s]?\d{4}[.\s]?\d{4}[.\s]?\d{2}\b", 0.7),),
+            ("ahv", "avs", "ahv-nummer", "sozialversicherung", "versichertennummer"),
+        ),
+        (
+            "DE_TAX_ID",
+            "German tax identification number (Steuer-IdNr)",
+            # 11 digits, never leading zero.
+            (("steuer-idnr (needs context)", r"\b[1-9]\d{2}[ /]?\d{4}[ /]?\d{4}\b", 0.4),),
+            ("steuer", "steuernummer", "steuer-idnr", "steueridentifikationsnummer", "tax id"),
+        ),
+        (
+            "EU_NATIONAL_ID",
+            "Generic EU national identity number",
+            (("eu national id (needs context)", r"\b[A-Z]{2}[ -]?\d{6,12}\b", 0.4),),
+            ("national id", "identity card", "personalausweis", "ausweisnummer", "id number"),
+        ),
+    )
+
+    def _register_regional_recognizers(self, presidio_module: Any) -> None:
+        """Re-register language-scoped and missing regional recognizers under "en"."""
+        if self.analyzer is None:
+            return
+
+        predefined = importlib.import_module("presidio_analyzer.predefined_recognizers")
+        already_supported = set(self.analyzer.get_supported_entities())
+
+        for class_name in self._REGIONAL_RECOGNIZER_CLASS_NAMES:
+            recognizer_class = getattr(predefined, class_name, None)
+            if recognizer_class is None:
+                logger.debug("Presidio recognizer %s not available; skipping", class_name)
+                continue
+            try:
+                recognizer = recognizer_class(supported_language="en")
+            except Exception as exc:
+                logger.debug("Could not instantiate %s: %s", class_name, exc)
+                continue
+            # Never double-register: a duplicate recognizer reports every match twice.
+            if already_supported.issuperset(recognizer.supported_entities):
+                continue
+            self.analyzer.registry.add_recognizer(recognizer)
+            already_supported.update(recognizer.supported_entities)
+
+        PatternRecognizer = presidio_module.PatternRecognizer  # noqa: N806
+        Pattern = presidio_module.Pattern  # noqa: N806
+
+        for entity, name, pattern_specs, context in self._DACH_PATTERN_SPECS:
+            if entity in already_supported:
+                continue
+            self.analyzer.registry.add_recognizer(
+                PatternRecognizer(
+                    supported_entity=entity,
+                    name=name,
+                    supported_language="en",
+                    patterns=[
+                        Pattern(name=pattern_name, regex=regex, score=score)
+                        for pattern_name, regex, score in pattern_specs
+                    ],
+                    context=list(context),
+                )
+            )
+            already_supported.add(entity)
 
     def _register_custom_recognizers(self, presidio_module: Any) -> None:
         """Add ad-hoc recognizers from config to the analyzer registry."""
@@ -826,7 +950,7 @@ class PIIDetector(BaseDetector):
             "AU_ABN",
             "AU_ACN",
             "SG_UEN",
-            "IT_VAR_CODE",
+            "IT_VAT_CODE",
             "IN_VOTER",
             "IN_VEHICLE_REGISTRATION",
         }:

@@ -40,6 +40,23 @@ test("optional number can be fully cleared without snapping back to template def
   await expect(timeoutInput).toHaveValue("");
 });
 
+test("optional parameters are expanded on mount", async ({ mount }) => {
+  const component = await mount(
+    <JsonSchemaForm
+      schema={timeoutSchema}
+      defaultValues={{}}
+      onSubmit={() => {}}
+      showCancel={false}
+    />,
+  );
+
+  // The optional block holds the settings that shape a scan, so it must not be
+  // hidden behind a click the user never makes.
+  await expect(
+    component.getByRole("spinbutton", { name: /request timeout seconds/i }),
+  ).toBeVisible();
+});
+
 test("schema defaults are applied in create mode", async ({ mount }) => {
   const component = await mount(
     <JsonSchemaForm
@@ -50,7 +67,6 @@ test("schema defaults are applied in create mode", async ({ mount }) => {
     />,
   );
 
-  await component.getByRole("button", { name: /optional parameters/i }).click();
   await expect(
     component.getByRole("spinbutton", { name: /request timeout seconds/i }),
   ).toHaveValue("30");
@@ -69,7 +85,6 @@ test("schema defaults are not re-applied in edit mode when value is missing", as
     />,
   );
 
-  await component.getByRole("button", { name: /optional parameters/i }).click();
   await expect(
     component.getByRole("spinbutton", { name: /request timeout seconds/i }),
   ).toHaveValue("");
@@ -206,9 +221,72 @@ test("free-form object fields render a JSON editor", async ({ mount }) => {
     />,
   );
 
-  await component.getByRole("button", { name: /optional parameters/i }).click();
   await expect(component.getByTestId("connect_args-json-editor")).toBeVisible();
   await expect(
     component.getByText(/no configurable fields available/i),
   ).toHaveCount(0);
+});
+
+test("service-account JSON renders as a masked textarea, not a cleartext input", async ({
+  mount,
+}) => {
+  const gcsSchema: JSONSchema7 = {
+    type: "object",
+    properties: {
+      masked: {
+        type: "object",
+        properties: {
+          gcp_credentials_json: {
+            type: "string",
+            description: "Google service account credentials JSON as inline string",
+          },
+        },
+      },
+    },
+  };
+
+  const component = await mount(
+    <JsonSchemaForm
+      schema={gcsSchema}
+      defaultValues={{}}
+      onSubmit={() => {}}
+      showCancel={false}
+    />,
+  );
+
+  // A whole JSON key cannot live in a single-line input, and it must not be
+  // readable on screen either.
+  const field = component.getByTestId("input-masked-gcp-credentials-json");
+  await expect(field).toBeVisible();
+  await expect(field).toHaveAttribute("data-masked", "true");
+  expect(await field.evaluate((node) => node.tagName)).toBe("TEXTAREA");
+});
+
+test("an empty credentials block is not rendered at all", async ({ mount }) => {
+  const noAuthSchema: JSONSchema7 = {
+    type: "object",
+    properties: {
+      required: {
+        type: "object",
+        properties: {
+          path: { type: "string", description: "Absolute path" },
+        },
+        required: ["path"],
+      },
+      // LOCAL_FOLDER and SQLITE declare masked with nothing in it.
+      masked: { type: "object", properties: {} },
+    },
+  };
+
+  const component = await mount(
+    <JsonSchemaForm
+      schema={noAuthSchema}
+      defaultValues={{}}
+      onSubmit={() => {}}
+      showCancel={false}
+    />,
+  );
+
+  await expect(component.getByRole("textbox", { name: /path/i })).toBeVisible();
+  await expect(component.getByText(/^Authentication$/)).toHaveCount(0);
 });

@@ -66,8 +66,14 @@ def test_recipe_groups_skips_disabled_detectors() -> None:
 
 
 def test_recipe_groups_source_without_driver_is_empty() -> None:
-    recipe = {"type": "SLACK", "sampling": {"strategy": "LATEST"}}
+    """WORDPRESS talks plain HTTP over the default dependencies."""
+    recipe = {"type": "WORDPRESS", "sampling": {"strategy": "LATEST"}}
     assert recipe_uv_groups(recipe) == set()
+
+
+def test_slack_recipe_requires_the_slack_sdk_group() -> None:
+    recipe = {"type": "SLACK", "sampling": {"strategy": "LATEST"}}
+    assert recipe_uv_groups(recipe) == {"slack"}
 
 
 def test_kafka_rest_recipe_skips_the_librdkafka_group() -> None:

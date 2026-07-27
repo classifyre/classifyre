@@ -11,6 +11,7 @@ import {
   type StartRunnerDto,
 } from "@workspace/api-client";
 import { useRegisterAssistantBridge } from "@/components/assistant-workflow-provider";
+import { getSourceLabel } from "@workspace/schemas/source-labels";
 import { SourceTypeSelector } from "@/components/source-type-selector";
 import {
   SourceForm,
@@ -537,7 +538,11 @@ export default function NewSourcePage() {
           {t("sources.new.backToSources")}
         </Button>
         <h1 className="font-serif text-3xl font-black uppercase tracking-[0.08em]">
-          {t("sources.new.title")}
+          {selectedSourceType
+            ? t("sources.new.titleForSource", {
+                source: getSourceLabel(selectedSourceType),
+              })
+            : t("sources.new.title")}
         </h1>
         <p className="text-muted-foreground mt-2">
           {t("sources.new.description")}

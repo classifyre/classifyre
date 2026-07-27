@@ -85,7 +85,7 @@ class PostStatus(StrEnum):
 
 class SlackChannelType(StrEnum):
     """
-    Slack conversation types to include
+    Slack conversation types to include. public_channel and private_channel are named channels, mpim is a group direct message, im is a one-to-one direct message.
     """
 
     public_channel = 'public_channel'
@@ -439,104 +439,91 @@ class SlackRequired(BaseModel):
         extra='forbid',
     )
     workspace: str | None = Field(
-        None, description='Slack workspace name or domain (for display and stable IDs)'
+        None,
+        description='Slack workspace name or domain, used for permalinks and stable asset IDs (example: acme or acme.slack.com)',
     )
 
 
-class SlackMaskedBotToken(BaseModel):
-    model_config = ConfigDict(
-        extra='forbid',
-    )
-    bot_token: str = Field(..., description='Slack bot token (starts with xoxb-)')
-
-
-class SlackMaskedUserToken(BaseModel):
-    model_config = ConfigDict(
-        extra='forbid',
-    )
-    user_token: str = Field(..., description='Slack user token (starts with xoxp-)')
-
-
-class TokenType(StrEnum):
+class SlackMasked(BaseModel):
     """
-    Token type hint
+    Bot-token authentication. Install the app into the workspace and copy its bot token; user tokens are not supported.
     """
 
-    bot = 'bot'
-    user = 'user'
-
-
-class SlackMaskedToken(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
-    token: str = Field(..., description='Slack token (bot or user)')
-    token_type: TokenType | None = Field(None, description='Token type hint')
+    bot_token: str = Field(
+        ...,
+        description='Slack bot token, starts with xoxb-. Needs the scopes channels:read, groups:read, im:read, mpim:read, channels:history, groups:history, im:history, mpim:history, users:read and files:read.',
+    )
 
 
 class SlackOptionalChannels(BaseModel):
     """
-    Channel discovery and targeting controls.
+    Which conversations to discover and scan.
     """
 
     model_config = ConfigDict(
         extra='forbid',
     )
     channel_types: list[SlackChannelType] | None = Field(
-        ['public_channel'],
-        description='Slack conversation types to include when listing channels',
+        ['public_channel', 'private_channel', 'mpim', 'im'],
+        description='Conversation types to include when listing channels. The bot only sees private channels and group DMs it has been invited to.',
     )
     channel_ids: list[str] | None = Field(
         None,
-        description='Explicit channel IDs to scan. If provided, channel_types is ignored.',
+        description='Explicit conversation IDs to scan (example: C0123456789). When set, channel_types is ignored.',
     )
     exclude_archived: bool | None = Field(
-        True, description='Exclude archived channels when listing'
+        True, description='Skip archived channels when listing'
+    )
+    auto_join_public_channels: bool | None = Field(
+        False,
+        description='Join public channels the bot is not a member of before reading them. conversations.history returns not_in_channel otherwise. Requires the channels:join scope.',
     )
 
 
 class SlackOptionalTimeRange(BaseModel):
     """
-    Time window filters for message ingestion.
+    Limit ingestion to messages inside a time window.
     """
 
     model_config = ConfigDict(
         extra='forbid',
     )
     oldest: str | None = Field(
-        None, description='Start of date range (Slack timestamp or ISO 8601)'
+        None,
+        description='Start of the range, as a Slack timestamp or an ISO 8601 datetime',
     )
     latest: str | None = Field(
-        None, description='End of date range (Slack timestamp or ISO 8601)'
+        None,
+        description='End of the range, as a Slack timestamp or an ISO 8601 datetime',
     )
 
 
 class SlackOptionalIngestion(BaseModel):
     """
-    Throughput and payload controls for Slack ingestion.
+    Throughput and message-content controls.
     """
 
     model_config = ConfigDict(
         extra='forbid',
     )
     batch_size: int | None = Field(
-        200, description='Messages per API call (max 200)', ge=1, le=200
+        200,
+        description='Messages requested per API call (Slack caps this at 200)',
+        ge=1,
+        le=200,
     )
     rate_limit_delay_seconds: float | None = Field(
-        1, description='Delay between API calls to avoid rate limits', ge=0.0
+        1,
+        description="Extra pause between API calls. Slack's 429 responses are retried automatically; this only smooths out sustained traffic.",
+        ge=0.0,
     )
     include_thread_replies: bool | None = Field(
-        False, description='Include thread replies in fetched content for detectors'
+        True,
+        description="Fetch each thread's replies and scan them alongside the parent message. Costs one extra API call per threaded message.",
     )
-
-
-class SlackOptional(BaseModel):
-    model_config = ConfigDict(
-        extra='forbid',
-    )
-    channels: SlackOptionalChannels | None = None
-    time_range: SlackOptionalTimeRange | None = None
-    ingestion: SlackOptionalIngestion | None = None
 
 
 class ObjectStorageOptionalScope(BaseModel):
@@ -2115,30 +2102,6 @@ class TableauOptional(BaseModel):
 
 class CoreInput(BaseModel):
     type: AssetType
-    detectors: list[Detector] | None = Field(
-        None, description='Detectors to run on ingested content'
-    )
-    custom_detectors: list[CustomDetectorSelection] | None = Field(
-        None,
-        description='Reusable custom detector IDs selected from the custom detector catalog.',
-    )
-    sampling: SamplingConfig
-    resources: ResourceOverrides | None = None
-    cleanup_removed_detector_findings: bool | None = Field(
-        True,
-        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
-    )
-
-
-class SlackInput(CoreInput):
-    type: Literal['SLACK'] | None = Field(
-        None, description='Type of the asset or source'
-    )
-    required: SlackRequired
-    masked: SlackMaskedBotToken | SlackMaskedUserToken | SlackMaskedToken = Field(
-        ..., title='SlackMasked'
-    )
-    optional: SlackOptional | None = None
     detectors: list[Detector] | None = Field(
         None, description='Detectors to run on ingested content'
     )
@@ -4437,6 +4400,32 @@ class DropboxInput(CoreInput):
     )
 
 
+class SlackOptionalAttachments(BaseModel):
+    """
+    Files shared in messages. Each file becomes its own asset, and its text is extracted with the same parser used for local files (PDF, Office, images via OCR, audio and video transcription).
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    include_attachments: bool | None = Field(
+        True, description='Emit files shared in messages as scannable assets'
+    )
+    max_attachment_bytes: int | None = Field(
+        26214400,
+        description='Skip files larger than this many bytes (default 25 MB)',
+        ge=1024,
+        le=524288000,
+    )
+    include_file_extensions: list[str] | None = Field(
+        None,
+        description='Only download files with these extensions (example: .pdf, .docx). Empty means all extensions.',
+    )
+    exclude_file_extensions: list[str] | None = Field(
+        None, description='Skip files with these extensions (example: .mp4, .zip)'
+    )
+
+
 class YouTubeInput(CoreInput):
     type: Literal['YOUTUBE'] | None = Field(
         None, description='Type of the asset or source'
@@ -4444,6 +4433,38 @@ class YouTubeInput(CoreInput):
     required: YouTubeRequired
     masked: YouTubeMasked | None = None
     optional: YouTubeOptional | None = None
+    detectors: list[Detector] | None = Field(
+        None, description='Detectors to run on ingested content'
+    )
+    custom_detectors: list[CustomDetectorSelection] | None = Field(
+        None,
+        description='Reusable custom detector IDs selected from the custom detector catalog.',
+    )
+    sampling: SamplingConfig
+    resources: ResourceOverrides | None = None
+    cleanup_removed_detector_findings: bool | None = Field(
+        True,
+        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
+    )
+
+
+class SlackOptional(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    channels: SlackOptionalChannels | None = None
+    time_range: SlackOptionalTimeRange | None = None
+    ingestion: SlackOptionalIngestion | None = None
+    attachments: SlackOptionalAttachments | None = None
+
+
+class SlackInput(CoreInput):
+    type: Literal['SLACK'] | None = Field(
+        None, description='Type of the asset or source'
+    )
+    required: SlackRequired
+    masked: SlackMasked
+    optional: SlackOptional | None = None
     detectors: list[Detector] | None = Field(
         None, description='Detectors to run on ingested content'
     )

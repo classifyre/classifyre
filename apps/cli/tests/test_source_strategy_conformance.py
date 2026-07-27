@@ -48,16 +48,7 @@ from src.sources import BaseSource, _discover_sources, _registry
 # Keyed per invariant (not per source) since a source can fail one invariant
 # while satisfying the other — e.g. a source can have a real AUTOMATIC cursor
 # but still fail to distinguish RANDOM from LATEST.
-KNOWN_STRATEGY_BRANCHING_GAPS: dict[str, str] = {
-    "slack": (
-        "_iter_channel_messages() (src/sources/slack/source.py) branches on "
-        "SamplingStrategy.ALL vs. everything else to decide whether to cap "
-        "`max_total`, but RANDOM and LATEST are never distinguished from each "
-        "other or from AUTOMATIC: all three just paginate from the oldest message "
-        "up to rows_per_page. RANDOM does not sample randomly and LATEST does not "
-        "fetch the most recent messages first. Needs real per-strategy handling."
-    ),
-}
+KNOWN_STRATEGY_BRANCHING_GAPS: dict[str, str] = {}
 
 KNOWN_AUTOMATIC_CURSOR_GAPS: dict[str, str] = {
     # Populate only if the corresponding invariant test still fails for a

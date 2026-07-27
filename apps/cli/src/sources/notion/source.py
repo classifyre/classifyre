@@ -228,6 +228,12 @@ class NotionSource(BaseSource):
         self._external_file_url_by_hash: dict[str, str] = {}
         self._notion_signed_url_by_hash: dict[str, str] = {}
         self._file_block_id_by_hash: dict[str, str] = {}
+        # Asset IDs whose bytes have already been downloaded and put through the
+        # full extraction pipeline. Read by ParsedContentProvider and
+        # DetectorPipeline to suppress their fallback path — without it every
+        # asset that yields no text (an icon, a cover, a diagram) is downloaded
+        # and OCR'd a second time.
+        self._content_pages_processed: set[str] = set()
 
     # ------------------------------------------------------------------ config
     def _optional(self) -> NotionOptional:
@@ -297,6 +303,7 @@ class NotionSource(BaseSource):
         self._notion_signed_url_by_hash = {}
         self._file_block_id_by_hash = {}
         self._attachment_name_by_hash = {}
+        self._content_pages_processed = set()
 
     # --------------------------------------------------------------- discovery
     def _discover_refs(self) -> list[dict[str, Any]]:
@@ -826,6 +833,10 @@ class NotionSource(BaseSource):
             declared_mime_type=mime,
             file_name=self._attachment_file_name(asset_id, asset_id),
         )
+        # Record the asset as processed even when extraction produced nothing:
+        # the download and the extraction pass both already happened, and a
+        # second identical attempt costs exactly as much to return nothing again.
+        self._content_pages_processed.add(asset_id)
         if parsed.text_content:
             self._asset_content_cache[asset_id] = (parsed.raw_content, parsed.text_content)
             return parsed.raw_content, parsed.text_content

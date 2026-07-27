@@ -464,6 +464,7 @@
     },
     "new": {
       "title": "Add New Source",
+      "titleForSource": "Add New {{source}} Source",
       "description": "Connect a new data source to start scanning for issues",
       "backToSources": "Back to Sources",
       "testingConnection": "Testing source connection. Please wait...",
