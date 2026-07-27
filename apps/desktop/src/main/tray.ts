@@ -94,6 +94,8 @@ export class AppTray {
         label: status.percent === null ? 'Downloading update…' : `Downloading update… ${status.percent}%`,
         enabled: false,
       });
+    } else if (status.status === 'applying') {
+      updateItems.push({ label: 'Preparing update…', enabled: false });
     } else if (status.status === 'available') {
       updateItems.push({
         label: `Download Update ${status.version}`,
