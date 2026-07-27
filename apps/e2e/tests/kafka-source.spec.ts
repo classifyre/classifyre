@@ -79,7 +79,7 @@ function brokerConfig() {
     masked: {
       sasl_username: KAFKA_USERNAME,
       sasl_password: KAFKA_PASSWORD,
-      ssl_ca: KAFKA_CA,
+      ca_certificate: KAFKA_CA,
     },
     optional: {
       connection: { sasl_mechanism: "PLAIN" },

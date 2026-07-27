@@ -2239,7 +2239,7 @@
         "masked": {
           "sasl_username": "avnadmin",
           "sasl_password": "your-service-password",
-          "ssl_ca": "-----BEGIN CERTIFICATE-----\nMIIDazCCAlOgAwIBAgIUfakefakefakefakefakefakefakefakewDQYJKoZIhvcNAQEL\nBQAwRTELMAkGA1UEBhMCQVUxEzARBgNVBAgMClNvbWUtU3RhdGUxITAfBgNVBAoM\nGEludGVybmV0IFdpZGdpdHMgUHR5IEx0ZDAeFw0yNjAxMDEwMDAwMDBaFw0zNjAx\n-----END CERTIFICATE-----\n"
+          "ca_certificate": "-----BEGIN CERTIFICATE-----\nMIIDazCCAlOgAwIBAgIUfakefakefakefakefakefakefakefakewDQYJKoZIhvcNAQEL\nBQAwRTELMAkGA1UEBhMCQVUxEzARBgNVBAgMClNvbWUtU3RhdGUxITAfBgNVBAoM\nGEludGVybmV0IFdpZGdpdHMgUHR5IEx0ZDAeFw0yNjAxMDEwMDAwMDBaFw0zNjAx\n-----END CERTIFICATE-----\n"
         },
         "optional": {
           "connection": {
@@ -2273,9 +2273,9 @@
           "port": 9094
         },
         "masked": {
-          "ssl_certfile": "-----BEGIN CERTIFICATE-----\nMIIDCTCCAfGgAwIBAgIUfakefakefakefakefakefakefakefakewDQYJKoZIhvcNAQEL\nBQAwFDESMBAGA1UEAwwJY2xpZW50LWNhMB4XDTI2MDEwMTAwMDAwMFoXDTI3MDEw\nMTAwMDAwMFowFDESMBAGA1UEAwwJY2xpZW50LWNhMIIBIjANBgkqhkiG9w0BAQEF\n-----END CERTIFICATE-----\n",
-          "ssl_keyfile": "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDFAKEFAKEFAKEF\nAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEF\n-----END PRIVATE KEY-----\n",
-          "ssl_ca": "-----BEGIN CERTIFICATE-----\nMIIDazCCAlOgAwIBAgIUfakefakefakefakefakefakefakefakewDQYJKoZIhvcNAQEL\nBQAwRTELMAkGA1UEBhMCQVUxEzARBgNVBAgMClNvbWUtU3RhdGUxITAfBgNVBAoM\nGEludGVybmV0IFdpZGdpdHMgUHR5IEx0ZDAeFw0yNjAxMDEwMDAwMDBaFw0zNjAx\n-----END CERTIFICATE-----\n"
+          "access_key": "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDFAKEFAKEFAKEF\nAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEFAKEF\n-----END PRIVATE KEY-----\n",
+          "access_certificate": "-----BEGIN CERTIFICATE-----\nMIIDCTCCAfGgAwIBAgIUfakefakefakefakefakefakefakefakewDQYJKoZIhvcNAQEL\nBQAwFDESMBAGA1UEAwwJY2xpZW50LWNhMB4XDTI2MDEwMTAwMDAwMFoXDTI3MDEw\nMTAwMDAwMFowFDESMBAGA1UEAwwJY2xpZW50LWNhMIIBIjANBgkqhkiG9w0BAQEF\n-----END CERTIFICATE-----\n",
+          "ca_certificate": "-----BEGIN CERTIFICATE-----\nMIIDazCCAlOgAwIBAgIUfakefakefakefakefakefakefakefakewDQYJKoZIhvcNAQEL\nBQAwRTELMAkGA1UEBhMCQVUxEzARBgNVBAgMClNvbWUtU3RhdGUxITAfBgNVBAoM\nGEludGVybmV0IFdpZGdpdHMgUHR5IEx0ZDAeFw0yNjAxMDEwMDAwMDBaFw0zNjAx\n-----END CERTIFICATE-----\n"
         },
         "optional": {
           "connection": {
@@ -2878,7 +2878,7 @@
   "DROPBOX": [
     {
       "name": "Whole-account incremental scan",
-      "description": "Walk every file in the Dropbox account with an App Console access token, ingesting a new slice on each run",
+      "description": "Walk every file in the Dropbox account, ingesting a new slice on each run. Uses a refresh token so scheduled runs keep working.",
       "schedule": {
         "enabled": true,
         "preset": "nightly",
@@ -2888,10 +2888,12 @@
       "config": {
         "type": "DROPBOX",
         "required": {
-          "auth_method": "access_token"
+          "auth_method": "oauth",
+          "app_key": "your-dropbox-app-key"
         },
         "masked": {
-          "access_token": "sl.your-dropbox-access-token"
+          "app_secret": "your-dropbox-app-secret",
+          "refresh_token": "your-dropbox-refresh-token"
         },
         "optional": {
           "scope": {
@@ -2997,14 +2999,15 @@
     },
     {
       "name": "Selected team members onboarding review",
-      "description": "Scan only two named Dropbox Business members' own folders, acting as each member",
+      "description": "Scan only two named Dropbox Business members' own folders, acting as each member. Uses a PKCE app, which needs no app secret.",
       "config": {
         "type": "DROPBOX",
         "required": {
-          "auth_method": "access_token"
+          "auth_method": "oauth_pkce",
+          "app_key": "your-dropbox-team-app-key"
         },
         "masked": {
-          "access_token": "sl.your-dropbox-team-access-token"
+          "refresh_token": "your-dropbox-team-refresh-token"
         },
         "optional": {
           "team": {
@@ -3023,6 +3026,31 @@
             "enabled": true
           }
         ]
+      }
+    },
+    {
+      "name": "One-off connection test",
+      "description": "Quick manual check with a short-lived App Console token. The token stops working a few hours after it is generated, so do not schedule this.",
+      "schedule": {
+        "enabled": false
+      },
+      "config": {
+        "type": "DROPBOX",
+        "required": {
+          "auth_method": "access_token"
+        },
+        "masked": {
+          "access_token": "sl.your-short-lived-dropbox-access-token"
+        },
+        "optional": {
+          "scope": {
+            "folder_path": "/Finance"
+          }
+        },
+        "sampling": {
+          "strategy": "LATEST",
+          "rows_per_page": 10
+        }
       }
     },
     {

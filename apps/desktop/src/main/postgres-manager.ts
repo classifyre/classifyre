@@ -135,7 +135,12 @@ export class PostgresManager {
   private dataDir: string;
   private startPromise: Promise<void> | null = null;
 
-  constructor(preferredPort?: number) {
+  // `initdb` on a cold data dir takes a while (longer still under Rosetta), so
+  // the caller can surface what the database is doing during first launch.
+  constructor(
+    preferredPort?: number,
+    private readonly onProgress: (detail: string) => void = () => {},
+  ) {
     const base = process.env["CLASSIFYRE_DATA_DIR"] || app.getPath("userData");
     this.dataDir = path.join(base, "pgdata");
     if (preferredPort) this.preferredPort = preferredPort;
@@ -183,8 +188,10 @@ export class PostgresManager {
 
     const pgVersionFile = path.join(this.dataDir, "PG_VERSION");
     if (!fs.existsSync(pgVersionFile)) {
+      this.onProgress("Creating the local database for the first time…");
       await this.pg.initialise();
     }
+    this.onProgress("Starting the database server…");
     await this.pg.start();
     await this.ensureDatabase();
     this.running = true;
