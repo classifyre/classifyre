@@ -52,6 +52,7 @@ SOURCE_TYPE_GROUPS: dict[str, set[str]] = {
     "MICROSOFT_365": {"microsoft-graph"},
     "GOOGLE_WORKSPACE": {"google-workspace"},
     "DROPBOX": {"dropbox"},
+    "SLACK": {"slack"},
 }
 
 

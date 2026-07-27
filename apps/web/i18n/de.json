@@ -464,6 +464,7 @@
     },
     "new": {
       "title": "Neue Quelle hinzufügen",
+      "titleForSource": "Neue {{source}}-Quelle hinzufügen",
       "description": "Neue Datenquelle verbinden und Scan starten",
       "backToSources": "Zurück zu Quellen",
       "testingConnection": "Verbindung wird getestet. Bitte warten...",

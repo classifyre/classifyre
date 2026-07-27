@@ -230,6 +230,9 @@ google-cloud-storage = [
 dropbox = [
     "dropbox>=12.2.1,<13.0.0",
 ]
+slack = [
+    "slack-sdk>=3.43.0,<4.0.0",
+]
 email = [
     "imap-tools>=1.10.0,<2.0.0",
 ]

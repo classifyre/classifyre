@@ -1252,9 +1252,43 @@
             "thread_ts": {
               "type": "string",
               "description": "Parent thread timestamp"
+            },
+            "reply_count": {
+              "type": "integer",
+              "description": "Number of replies in this message's thread"
             }
           },
           "required": ["channel_id", "ts"]
+        },
+        "attachment": {
+          "use": ["attachment"],
+          "properties": {
+            "channel_id": {
+              "type": "string",
+              "description": "Slack channel id the file was shared in"
+            },
+            "file_id": {
+              "type": "string",
+              "description": "Slack file id"
+            },
+            "file_name": {
+              "type": "string",
+              "description": "Original file name"
+            },
+            "message_ts": {
+              "type": "string",
+              "description": "Timestamp of the message the file was shared in"
+            },
+            "channel_name": {
+              "type": "string",
+              "description": "Channel name"
+            },
+            "author": {
+              "type": "string",
+              "description": "User id that shared the file"
+            }
+          },
+          "required": ["channel_id", "file_id", "file_name"]
         }
       },
       "CONFLUENCE": {
@@ -2373,7 +2407,7 @@
     "SlackChannelType": {
       "type": "string",
       "enum": ["public_channel", "private_channel", "mpim", "im"],
-      "description": "Slack conversation types to include"
+      "description": "Slack conversation types to include. public_channel and private_channel are named channels, mpim is a group direct message, im is a one-to-one direct message."
     },
     "SamplingStrategy": {
       "type": "string",
@@ -2382,6 +2416,7 @@
     },
     "SamplingConfig": {
       "title": "SamplingConfig",
+      "label": "Sampling",
       "type": "object",
       "description": "Controls how content is extracted from each source. For tabular sources rows_per_page controls both sample size for AUTOMATIC/RANDOM/LATEST and pagination batch size for ALL.",
       "properties": {
@@ -2421,6 +2456,7 @@
     },
     "ResourceOverrides": {
       "title": "ResourceOverrides",
+      "label": "Resource Limits",
       "type": "object",
       "description": "Override K8s job resources and timeout for this source.",
       "properties": {
@@ -2506,6 +2542,7 @@
     },
     "WordPressRequired": {
       "title": "WordPressRequired",
+      "label": "WordPress Settings",
       "type": "object",
       "properties": {
         "url": {
@@ -2519,6 +2556,7 @@
     },
     "WordPressMasked": {
       "title": "WordPressMasked",
+      "label": "WordPress Credentials",
       "type": "object",
       "properties": {
         "username": {
@@ -2534,6 +2572,7 @@
     },
     "WordPressOptionalContent": {
       "title": "WordPressOptionalContent",
+      "label": "WordPress Content",
       "type": "object",
       "description": "Content scope and filters for WordPress ingestion.",
       "properties": {
@@ -2560,6 +2599,7 @@
     },
     "WordPressOptional": {
       "title": "WordPressOptional",
+      "label": "WordPress Options",
       "type": "object",
       "properties": {
         "content": {
@@ -2570,6 +2610,7 @@
     },
     "EmailRequired": {
       "title": "EmailRequired",
+      "label": "Email Settings",
       "type": "object",
       "properties": {
         "host": {
@@ -2589,6 +2630,7 @@
     },
     "EmailMasked": {
       "title": "EmailMasked",
+      "label": "Email Credentials",
       "type": "object",
       "properties": {
         "username": {
@@ -2605,6 +2647,7 @@
     },
     "EmailOptionalConnection": {
       "title": "EmailOptionalConnection",
+      "label": "Email Connection",
       "type": "object",
       "description": "Transport-level connection controls.",
       "properties": {
@@ -2624,6 +2667,7 @@
     },
     "EmailOptionalScope": {
       "title": "EmailOptionalScope",
+      "label": "Email Scope",
       "type": "object",
       "description": "Which messages and attachments to ingest.",
       "properties": {
@@ -2663,6 +2707,7 @@
     },
     "EmailOptional": {
       "title": "EmailOptional",
+      "label": "Email Options",
       "type": "object",
       "properties": {
         "connection": {
@@ -2721,6 +2766,7 @@
     },
     "YouTubeRequired": {
       "title": "YouTubeRequired",
+      "label": "YouTube Settings",
       "type": "object",
       "description": "Provide at least one of channels or video_urls (enforced at runtime).",
       "properties": {
@@ -2743,6 +2789,7 @@
     },
     "YouTubeMasked": {
       "title": "YouTubeMasked",
+      "label": "YouTube Credentials",
       "type": "object",
       "description": "Optional credentials. Leave empty for public videos.",
       "properties": {
@@ -2755,6 +2802,7 @@
     },
     "YouTubeOptionalTranscript": {
       "title": "YouTubeOptionalTranscript",
+      "label": "YouTube Transcript",
       "type": "object",
       "description": "Transcript/caption fetching controls.",
       "properties": {
@@ -2770,6 +2818,7 @@
     },
     "YouTubeOptionalConnection": {
       "title": "YouTubeOptionalConnection",
+      "label": "YouTube Connection",
       "type": "object",
       "description": "Network controls for yt-dlp and transcript fetching.",
       "properties": {
@@ -2794,6 +2843,7 @@
     },
     "YouTubeOptional": {
       "title": "YouTubeOptional",
+      "label": "YouTube Options",
       "type": "object",
       "properties": {
         "transcript": {
@@ -2807,134 +2857,111 @@
     },
     "SlackRequired": {
       "title": "SlackRequired",
+      "label": "Slack Workspace",
       "type": "object",
       "properties": {
         "workspace": {
           "type": "string",
-          "description": "Slack workspace name or domain (for display and stable IDs)"
+          "description": "Slack workspace name or domain, used for permalinks and stable asset IDs (example: acme or acme.slack.com)"
         }
       },
       "additionalProperties": false
     },
     "SlackMasked": {
       "title": "SlackMasked",
+      "label": "Slack Bot Token",
       "type": "object",
-      "oneOf": [
-        {
-          "title": "SlackMaskedBotToken",
-          "type": "object",
-          "properties": {
-            "bot_token": {
-              "type": "string",
-              "description": "Slack bot token (starts with xoxb-)"
-            }
-          },
-          "required": ["bot_token"],
-          "additionalProperties": false
-        },
-        {
-          "title": "SlackMaskedUserToken",
-          "type": "object",
-          "properties": {
-            "user_token": {
-              "type": "string",
-              "description": "Slack user token (starts with xoxp-)"
-            }
-          },
-          "required": ["user_token"],
-          "additionalProperties": false
-        },
-        {
-          "title": "SlackMaskedToken",
-          "type": "object",
-          "properties": {
-            "token": {
-              "type": "string",
-              "description": "Slack token (bot or user)"
-            },
-            "token_type": {
-              "type": "string",
-              "enum": ["bot", "user"],
-              "description": "Token type hint"
-            }
-          },
-          "required": ["token"],
-          "additionalProperties": false
+      "description": "Bot-token authentication. Install the app into the workspace and copy its bot token; user tokens are not supported.",
+      "properties": {
+        "bot_token": {
+          "type": "string",
+          "description": "Slack bot token, starts with xoxb-. Needs the scopes channels:read, groups:read, im:read, mpim:read, channels:history, groups:history, im:history, mpim:history, users:read and files:read."
         }
-      ]
+      },
+      "required": ["bot_token"],
+      "additionalProperties": false
     },
     "SlackOptionalChannels": {
       "title": "SlackOptionalChannels",
+      "label": "Channels",
       "type": "object",
-      "description": "Channel discovery and targeting controls.",
+      "description": "Which conversations to discover and scan.",
       "properties": {
         "channel_types": {
           "type": "array",
           "items": {
             "$ref": "#/definitions/SlackChannelType"
           },
-          "default": ["public_channel"],
-          "description": "Slack conversation types to include when listing channels"
+          "default": ["public_channel", "private_channel", "mpim", "im"],
+          "description": "Conversation types to include when listing channels. The bot only sees private channels and group DMs it has been invited to."
         },
         "channel_ids": {
           "type": "array",
           "items": {
             "type": "string"
           },
-          "description": "Explicit channel IDs to scan. If provided, channel_types is ignored."
+          "description": "Explicit conversation IDs to scan (example: C0123456789). When set, channel_types is ignored."
         },
         "exclude_archived": {
           "type": "boolean",
           "default": true,
-          "description": "Exclude archived channels when listing"
+          "description": "Skip archived channels when listing"
+        },
+        "auto_join_public_channels": {
+          "type": "boolean",
+          "default": false,
+          "description": "Join public channels the bot is not a member of before reading them. conversations.history returns not_in_channel otherwise. Requires the channels:join scope."
         }
       },
       "additionalProperties": false
     },
     "SlackOptionalTimeRange": {
       "title": "SlackOptionalTimeRange",
+      "label": "Time Range",
       "type": "object",
-      "description": "Time window filters for message ingestion.",
+      "description": "Limit ingestion to messages inside a time window.",
       "properties": {
         "oldest": {
           "type": "string",
-          "description": "Start of date range (Slack timestamp or ISO 8601)"
+          "description": "Start of the range, as a Slack timestamp or an ISO 8601 datetime"
         },
         "latest": {
           "type": "string",
-          "description": "End of date range (Slack timestamp or ISO 8601)"
+          "description": "End of the range, as a Slack timestamp or an ISO 8601 datetime"
         }
       },
       "additionalProperties": false
     },
     "SlackOptionalIngestion": {
       "title": "SlackOptionalIngestion",
+      "label": "Ingestion",
       "type": "object",
-      "description": "Throughput and payload controls for Slack ingestion.",
+      "description": "Throughput and message-content controls.",
       "properties": {
         "batch_size": {
           "type": "integer",
           "minimum": 1,
           "maximum": 200,
           "default": 200,
-          "description": "Messages per API call (max 200)"
+          "description": "Messages requested per API call (Slack caps this at 200)"
         },
         "rate_limit_delay_seconds": {
           "type": "number",
           "minimum": 0,
           "default": 1,
-          "description": "Delay between API calls to avoid rate limits"
+          "description": "Extra pause between API calls. Slack's 429 responses are retried automatically; this only smooths out sustained traffic."
         },
         "include_thread_replies": {
           "type": "boolean",
-          "default": false,
-          "description": "Include thread replies in fetched content for detectors"
+          "default": true,
+          "description": "Fetch each thread's replies and scan them alongside the parent message. Costs one extra API call per threaded message."
         }
       },
       "additionalProperties": false
     },
     "SlackOptional": {
       "title": "SlackOptional",
+      "label": "Slack Options",
       "type": "object",
       "properties": {
         "channels": {
@@ -2945,12 +2972,16 @@
         },
         "ingestion": {
           "$ref": "#/definitions/SlackOptionalIngestion"
+        },
+        "attachments": {
+          "$ref": "#/definitions/SlackOptionalAttachments"
         }
       },
       "additionalProperties": false
     },
     "ObjectStorageOptionalScope": {
       "title": "ObjectStorageOptionalScope",
+      "label": "Object Storage Scope",
       "type": "object",
       "description": "Object scope and filtering controls.",
       "properties": {
@@ -2992,6 +3023,7 @@
     },
     "S3CompatibleStorageRequired": {
       "title": "S3CompatibleStorageRequired",
+      "label": "S3-Compatible Storage Settings",
       "type": "object",
       "properties": {
         "bucket": {
@@ -3004,6 +3036,7 @@
     },
     "S3CompatibleStorageMasked": {
       "title": "S3CompatibleStorageMasked",
+      "label": "S3-Compatible Storage Credentials",
       "type": "object",
       "description": "Optional static credentials. Leave empty to use ambient AWS credentials chain.",
       "properties": {
@@ -3024,6 +3057,7 @@
     },
     "S3CompatibleStorageOptionalConnection": {
       "title": "S3CompatibleStorageOptionalConnection",
+      "label": "S3-Compatible Storage Connection",
       "type": "object",
       "properties": {
         "region_name": {
@@ -3066,6 +3100,7 @@
     },
     "S3CompatibleStorageOptional": {
       "title": "S3CompatibleStorageOptional",
+      "label": "S3-Compatible Storage Options",
       "type": "object",
       "properties": {
         "connection": {
@@ -3079,6 +3114,7 @@
     },
     "LocalFolderRequired": {
       "title": "LocalFolderRequired",
+      "label": "Local Folder Settings",
       "type": "object",
       "properties": {
         "path": {
@@ -3091,6 +3127,7 @@
     },
     "SandboxRequired": {
       "title": "SandboxRequired",
+      "label": "Sandbox Settings",
       "type": "object",
       "description": "Sandbox files are uploaded separately through the source files API.",
       "properties": {},
@@ -3098,6 +3135,7 @@
     },
     "SandboxMasked": {
       "title": "SandboxMasked",
+      "label": "Sandbox Credentials",
       "type": "object",
       "description": "Sandbox sources do not require credentials.",
       "properties": {},
@@ -3105,12 +3143,14 @@
     },
     "SandboxOptional": {
       "title": "SandboxOptional",
+      "label": "Sandbox Options",
       "type": "object",
       "properties": {},
       "additionalProperties": false
     },
     "LocalFolderMasked": {
       "title": "LocalFolderMasked",
+      "label": "Local Folder Credentials",
       "type": "object",
       "description": "Local folder scans run with the desktop application's filesystem permissions; no credentials are required.",
       "properties": {},
@@ -3118,6 +3158,7 @@
     },
     "LocalFolderOptionalTraversal": {
       "title": "LocalFolderOptionalTraversal",
+      "label": "Local Folder Traversal",
       "type": "object",
       "description": "Directory traversal controls.",
       "properties": {
@@ -3149,6 +3190,7 @@
     },
     "LocalFolderOptional": {
       "title": "LocalFolderOptional",
+      "label": "Local Folder Options",
       "type": "object",
       "properties": {
         "traversal": {
@@ -3162,6 +3204,7 @@
     },
     "AzureBlobStorageRequired": {
       "title": "AzureBlobStorageRequired",
+      "label": "Azure Blob Storage Settings",
       "type": "object",
       "properties": {
         "account_url": {
@@ -3179,6 +3222,7 @@
     },
     "AzureBlobStorageMasked": {
       "title": "AzureBlobStorageMasked",
+      "label": "Azure Blob Storage Credentials",
       "type": "object",
       "description": "Optional Azure credentials. Leave empty to use managed identity/default credential chain.",
       "properties": {
@@ -3211,6 +3255,7 @@
     },
     "AzureBlobStorageOptionalConnection": {
       "title": "AzureBlobStorageOptionalConnection",
+      "label": "Azure Blob Storage Connection",
       "type": "object",
       "properties": {
         "request_timeout_seconds": {
@@ -3239,6 +3284,7 @@
     },
     "AzureBlobStorageOptional": {
       "title": "AzureBlobStorageOptional",
+      "label": "Azure Blob Storage Options",
       "type": "object",
       "properties": {
         "connection": {
@@ -3252,6 +3298,7 @@
     },
     "GoogleCloudStorageRequired": {
       "title": "GoogleCloudStorageRequired",
+      "label": "Google Cloud Storage Settings",
       "type": "object",
       "properties": {
         "bucket": {
@@ -3264,6 +3311,7 @@
     },
     "GoogleCloudStorageMasked": {
       "title": "GoogleCloudStorageMasked",
+      "label": "Google Cloud Storage Credentials",
       "type": "object",
       "description": "Optional inline service account credentials JSON. Leave empty to use ADC/workload identity.",
       "properties": {
@@ -3276,6 +3324,7 @@
     },
     "GoogleCloudStorageOptionalConnection": {
       "title": "GoogleCloudStorageOptionalConnection",
+      "label": "Google Cloud Storage Connection",
       "type": "object",
       "properties": {
         "project_id": {
@@ -3312,6 +3361,7 @@
     },
     "GoogleCloudStorageOptional": {
       "title": "GoogleCloudStorageOptional",
+      "label": "Google Cloud Storage Options",
       "type": "object",
       "properties": {
         "connection": {
@@ -3338,6 +3388,7 @@
     },
     "PostgreSQLRequired": {
       "title": "PostgreSQLRequired",
+      "label": "PostgreSQL Settings",
       "type": "object",
       "properties": {
         "host": {
@@ -3358,6 +3409,7 @@
     },
     "PostgreSQLMasked": {
       "title": "PostgreSQLMasked",
+      "label": "PostgreSQL Credentials",
       "type": "object",
       "properties": {
         "username": {
@@ -3374,6 +3426,7 @@
     },
     "PostgreSQLOptionalConnection": {
       "title": "PostgreSQLOptionalConnection",
+      "label": "PostgreSQL Connection",
       "type": "object",
       "description": "Connection tuning and SSL behavior.",
       "properties": {
@@ -3392,6 +3445,7 @@
     },
     "PostgreSQLOptionalScope": {
       "title": "PostgreSQLOptionalScope",
+      "label": "PostgreSQL Scope",
       "type": "object",
       "description": "Database, schema, and table selection scope.",
       "properties": {
@@ -3441,6 +3495,7 @@
     },
     "PostgreSQLOptional": {
       "title": "PostgreSQLOptional",
+      "label": "PostgreSQL Options",
       "type": "object",
       "properties": {
         "connection": {
@@ -3466,6 +3521,7 @@
     },
     "MySQLRequired": {
       "title": "MySQLRequired",
+      "label": "MySQL Settings",
       "type": "object",
       "properties": {
         "host": {
@@ -3486,6 +3542,7 @@
     },
     "MySQLMasked": {
       "title": "MySQLMasked",
+      "label": "MySQL Credentials",
       "type": "object",
       "properties": {
         "username": {
@@ -3506,6 +3563,7 @@
     },
     "MySQLOptionalConnection": {
       "title": "MySQLOptionalConnection",
+      "label": "MySQL Connection",
       "type": "object",
       "description": "Connection tuning for MySQL.",
       "properties": {
@@ -3529,6 +3587,7 @@
     },
     "MySQLOptionalScope": {
       "title": "MySQLOptionalScope",
+      "label": "MySQL Scope",
       "type": "object",
       "description": "Database and table selection scope.",
       "properties": {
@@ -3571,6 +3630,7 @@
     },
     "MySQLOptional": {
       "title": "MySQLOptional",
+      "label": "MySQL Options",
       "type": "object",
       "properties": {
         "connection": {
@@ -3584,6 +3644,7 @@
     },
     "MSSQLRequired": {
       "title": "MSSQLRequired",
+      "label": "Microsoft SQL Server Settings",
       "type": "object",
       "properties": {
         "host": {
@@ -3604,6 +3665,7 @@
     },
     "MSSQLMasked": {
       "title": "MSSQLMasked",
+      "label": "Microsoft SQL Server Credentials",
       "type": "object",
       "properties": {
         "username": {
@@ -3620,6 +3682,7 @@
     },
     "MSSQLOptionalConnection": {
       "title": "MSSQLOptionalConnection",
+      "label": "Microsoft SQL Server Connection",
       "type": "object",
       "description": "Connection tuning for SQL Server.",
       "properties": {
@@ -3649,6 +3712,7 @@
     },
     "MSSQLOptionalExtraction": {
       "title": "MSSQLOptionalExtraction",
+      "label": "Microsoft SQL Server Extraction",
       "type": "object",
       "description": "Lineage and advanced metadata extraction controls for SQL Server.",
       "properties": {
@@ -3718,6 +3782,7 @@
     },
     "MSSQLOptionalScope": {
       "title": "MSSQLOptionalScope",
+      "label": "Microsoft SQL Server Scope",
       "type": "object",
       "description": "Database, schema, and object selection scope.",
       "properties": {
@@ -3780,6 +3845,7 @@
     },
     "MSSQLOptional": {
       "title": "MSSQLOptional",
+      "label": "Microsoft SQL Server Options",
       "type": "object",
       "properties": {
         "connection": {
@@ -3796,6 +3862,7 @@
     },
     "OracleRequired": {
       "title": "OracleRequired",
+      "label": "Oracle Settings",
       "type": "object",
       "properties": {
         "host": {
@@ -3820,6 +3887,7 @@
     },
     "OracleMasked": {
       "title": "OracleMasked",
+      "label": "Oracle Credentials",
       "type": "object",
       "properties": {
         "username": {
@@ -3836,6 +3904,7 @@
     },
     "OracleOptionalConnection": {
       "title": "OracleOptionalConnection",
+      "label": "Oracle Connection",
       "type": "object",
       "description": "Connection tuning for Oracle.",
       "properties": {
@@ -3851,6 +3920,7 @@
     },
     "OracleOptionalScope": {
       "title": "OracleOptionalScope",
+      "label": "Oracle Scope",
       "type": "object",
       "description": "Schema, object, and lineage extraction scope.",
       "properties": {
@@ -3917,6 +3987,7 @@
     },
     "OracleOptional": {
       "title": "OracleOptional",
+      "label": "Oracle Options",
       "type": "object",
       "properties": {
         "connection": {
@@ -3930,6 +4001,7 @@
     },
     "HiveScheme": {
       "title": "HiveScheme",
+      "label": "Apache Hive Scheme",
       "type": "string",
       "enum": [
         "hive",
@@ -3942,6 +4014,7 @@
     },
     "HiveRequired": {
       "title": "HiveRequired",
+      "label": "Apache Hive Settings",
       "type": "object",
       "properties": {
         "host": {
@@ -3962,6 +4035,7 @@
     },
     "HiveMasked": {
       "title": "HiveMasked",
+      "label": "Apache Hive Credentials",
       "type": "object",
       "properties": {
         "username": {
@@ -3978,6 +4052,7 @@
     },
     "HiveOptionalConnection": {
       "title": "HiveOptionalConnection",
+      "label": "Apache Hive Connection",
       "type": "object",
       "description": "Hive connection transport and authentication options.",
       "properties": {
@@ -3995,6 +4070,7 @@
     },
     "HiveOptionalScope": {
       "title": "HiveOptionalScope",
+      "label": "Apache Hive Scope",
       "type": "object",
       "description": "Hive database and object selection scope.",
       "properties": {
@@ -4042,6 +4118,7 @@
     },
     "HiveOptional": {
       "title": "HiveOptional",
+      "label": "Apache Hive Options",
       "type": "object",
       "properties": {
         "connection": {
@@ -4055,6 +4132,7 @@
     },
     "DatabricksAuthMode": {
       "title": "DatabricksAuthMode",
+      "label": "Databricks Auth Mode",
       "type": "string",
       "enum": ["PAT_TOKEN", "SERVICE_PRINCIPAL", "AZURE_SERVICE_PRINCIPAL"],
       "description": "Databricks authentication mode"
@@ -4139,6 +4217,7 @@
     },
     "DatabricksRequired": {
       "title": "DatabricksRequired",
+      "label": "Databricks Settings",
       "oneOf": [
         {
           "$ref": "#/definitions/DatabricksRequiredPat"
@@ -4153,6 +4232,7 @@
     },
     "DatabricksMaskedPat": {
       "title": "DatabricksMaskedPat",
+      "label": "Databricks PAT",
       "type": "object",
       "properties": {
         "token": {
@@ -4165,6 +4245,7 @@
     },
     "DatabricksMaskedServicePrincipal": {
       "title": "DatabricksMaskedServicePrincipal",
+      "label": "Databricks Service Principal",
       "type": "object",
       "properties": {
         "client_secret": {
@@ -4177,6 +4258,7 @@
     },
     "DatabricksMaskedAzureServicePrincipal": {
       "title": "DatabricksMaskedAzureServicePrincipal",
+      "label": "Databricks Azure Service Principal",
       "type": "object",
       "properties": {
         "client_secret": {
@@ -4189,6 +4271,7 @@
     },
     "DatabricksMasked": {
       "title": "DatabricksMasked",
+      "label": "Databricks Credentials",
       "oneOf": [
         {
           "$ref": "#/definitions/DatabricksMaskedPat"
@@ -4200,6 +4283,7 @@
     },
     "DatabricksOptionalConnection": {
       "title": "DatabricksOptionalConnection",
+      "label": "Databricks Connection",
       "type": "object",
       "description": "Databricks API and SQL statement execution tuning options.",
       "properties": {
@@ -4229,6 +4313,7 @@
     },
     "DatabricksOptionalScope": {
       "title": "DatabricksOptionalScope",
+      "label": "Databricks Scope",
       "type": "object",
       "description": "Databricks Unity Catalog scope filters.",
       "properties": {
@@ -4284,6 +4369,7 @@
     },
     "DatabricksOptionalExtraction": {
       "title": "DatabricksOptionalExtraction",
+      "label": "Databricks Extraction",
       "type": "object",
       "description": "Databricks Unity Catalog extraction feature flags.",
       "properties": {
@@ -4312,6 +4398,7 @@
     },
     "DatabricksOptional": {
       "title": "DatabricksOptional",
+      "label": "Databricks Options",
       "type": "object",
       "properties": {
         "connection": {
@@ -4328,6 +4415,7 @@
     },
     "SnowflakeAuthenticationType": {
       "title": "SnowflakeAuthenticationType",
+      "label": "Snowflake Authentication Type",
       "type": "string",
       "enum": [
         "DEFAULT_AUTHENTICATOR",
@@ -4339,6 +4427,7 @@
     },
     "SnowflakeRequiredDefaultAuthenticator": {
       "title": "SnowflakeRequiredDefaultAuthenticator",
+      "label": "Snowflake Default Authenticator",
       "type": "object",
       "properties": {
         "authentication_type": {
@@ -4354,6 +4443,7 @@
     },
     "SnowflakeRequiredExternalBrowserAuthenticator": {
       "title": "SnowflakeRequiredExternalBrowserAuthenticator",
+      "label": "Snowflake External Browser",
       "type": "object",
       "properties": {
         "authentication_type": {
@@ -4369,6 +4459,7 @@
     },
     "SnowflakeRequiredKeyPairAuthenticator": {
       "title": "SnowflakeRequiredKeyPairAuthenticator",
+      "label": "Snowflake Key-Pair Authentication",
       "type": "object",
       "properties": {
         "authentication_type": {
@@ -4384,6 +4475,7 @@
     },
     "SnowflakeRequiredOauthAuthenticatorToken": {
       "title": "SnowflakeRequiredOauthAuthenticatorToken",
+      "label": "Snowflake OAuth Token",
       "type": "object",
       "properties": {
         "authentication_type": {
@@ -4399,6 +4491,7 @@
     },
     "SnowflakeRequired": {
       "title": "SnowflakeRequired",
+      "label": "Snowflake Settings",
       "oneOf": [
         {
           "$ref": "#/definitions/SnowflakeRequiredDefaultAuthenticator"
@@ -4416,6 +4509,7 @@
     },
     "SnowflakeMaskedDefaultAuthenticator": {
       "title": "SnowflakeMaskedDefaultAuthenticator",
+      "label": "Snowflake Default Authenticator",
       "type": "object",
       "properties": {
         "username": {
@@ -4432,6 +4526,7 @@
     },
     "SnowflakeMaskedExternalBrowserAuthenticator": {
       "title": "SnowflakeMaskedExternalBrowserAuthenticator",
+      "label": "Snowflake External Browser",
       "type": "object",
       "properties": {
         "username": {
@@ -4444,6 +4539,7 @@
     },
     "SnowflakeMaskedKeyPairAuthenticator": {
       "title": "SnowflakeMaskedKeyPairAuthenticator",
+      "label": "Snowflake Key-Pair Authentication",
       "type": "object",
       "properties": {
         "username": {
@@ -4464,6 +4560,7 @@
     },
     "SnowflakeMaskedOauthAuthenticatorToken": {
       "title": "SnowflakeMaskedOauthAuthenticatorToken",
+      "label": "Snowflake OAuth Token",
       "type": "object",
       "properties": {
         "username": {
@@ -4480,6 +4577,7 @@
     },
     "SnowflakeMasked": {
       "title": "SnowflakeMasked",
+      "label": "Snowflake Credentials",
       "oneOf": [
         {
           "$ref": "#/definitions/SnowflakeMaskedDefaultAuthenticator"
@@ -4497,6 +4595,7 @@
     },
     "SnowflakeOptionalConnection": {
       "title": "SnowflakeOptionalConnection",
+      "label": "Snowflake Connection",
       "type": "object",
       "description": "Snowflake connection and session tuning options.",
       "properties": {
@@ -4531,6 +4630,7 @@
     },
     "SnowflakeOptionalScope": {
       "title": "SnowflakeOptionalScope",
+      "label": "Snowflake Scope",
       "type": "object",
       "description": "Database, schema, and object selection scope.",
       "properties": {
@@ -4593,6 +4693,7 @@
     },
     "SnowflakeOptionalExtraction": {
       "title": "SnowflakeOptionalExtraction",
+      "label": "Snowflake Extraction",
       "type": "object",
       "description": "Lineage extraction controls for Snowflake metadata ingestion.",
       "properties": {
@@ -4616,6 +4717,7 @@
     },
     "SnowflakeOptional": {
       "title": "SnowflakeOptional",
+      "label": "Snowflake Options",
       "type": "object",
       "properties": {
         "connection": {
@@ -4632,12 +4734,14 @@
     },
     "MongoDBDeployment": {
       "title": "MongoDBDeployment",
+      "label": "MongoDB Deployment",
       "type": "string",
       "enum": ["ATLAS", "ON_PREM"],
       "description": "MongoDB deployment mode"
     },
     "MongoDBRequiredAtlas": {
       "title": "MongoDBRequiredAtlas",
+      "label": "MongoDB Atlas",
       "type": "object",
       "properties": {
         "deployment": {
@@ -4654,6 +4758,7 @@
     },
     "MongoDBRequiredOnPrem": {
       "title": "MongoDBRequiredOnPrem",
+      "label": "MongoDB On Prem",
       "type": "object",
       "properties": {
         "deployment": {
@@ -4677,6 +4782,7 @@
     },
     "MongoDBRequired": {
       "title": "MongoDBRequired",
+      "label": "MongoDB Settings",
       "oneOf": [
         {
           "$ref": "#/definitions/MongoDBRequiredAtlas"
@@ -4688,6 +4794,7 @@
     },
     "MongoDBMaskedUsernamePassword": {
       "title": "MongoDBMaskedUsernamePassword",
+      "label": "MongoDB Username Password",
       "type": "object",
       "properties": {
         "username": {
@@ -4704,6 +4811,7 @@
     },
     "MongoDBMaskedNone": {
       "title": "MongoDBMaskedNone",
+      "label": "MongoDB No Authentication",
       "type": "object",
       "description": "Use when the MongoDB endpoint allows anonymous/no-auth access.",
       "maxProperties": 0,
@@ -4711,6 +4819,7 @@
     },
     "MongoDBMasked": {
       "title": "MongoDBMasked",
+      "label": "MongoDB Credentials",
       "oneOf": [
         {
           "$ref": "#/definitions/MongoDBMaskedUsernamePassword"
@@ -4722,6 +4831,7 @@
     },
     "MongoDBAuthMechanism": {
       "title": "MongoDBAuthMechanism",
+      "label": "MongoDB Auth Mechanism",
       "type": "string",
       "enum": [
         "DEFAULT",
@@ -4736,6 +4846,7 @@
     },
     "MongoDBOptionalConnection": {
       "title": "MongoDBOptionalConnection",
+      "label": "MongoDB Connection",
       "type": "object",
       "description": "MongoDB connection and authentication tuning options.",
       "properties": {
@@ -4780,6 +4891,7 @@
     },
     "MongoDBOptionalScope": {
       "title": "MongoDBOptionalScope",
+      "label": "MongoDB Scope",
       "type": "object",
       "description": "MongoDB database and collection selection scope.",
       "properties": {
@@ -4829,6 +4941,7 @@
     },
     "MongoDBOptional": {
       "title": "MongoDBOptional",
+      "label": "MongoDB Options",
       "type": "object",
       "properties": {
         "connection": {
@@ -4842,12 +4955,14 @@
     },
     "PowerBIAuthMode": {
       "title": "PowerBIAuthMode",
+      "label": "Power BI Auth Mode",
       "type": "string",
       "enum": ["SERVICE_PRINCIPAL", "ACCESS_TOKEN"],
       "description": "PowerBI authentication mode"
     },
     "PowerBIRequiredServicePrincipal": {
       "title": "PowerBIRequiredServicePrincipal",
+      "label": "Power BI Service Principal",
       "type": "object",
       "properties": {
         "auth_mode": {
@@ -4869,6 +4984,7 @@
     },
     "PowerBIRequiredAccessToken": {
       "title": "PowerBIRequiredAccessToken",
+      "label": "Power BI Access Token",
       "type": "object",
       "properties": {
         "auth_mode": {
@@ -4880,6 +4996,7 @@
     },
     "PowerBIRequired": {
       "title": "PowerBIRequired",
+      "label": "Power BI Settings",
       "oneOf": [
         {
           "$ref": "#/definitions/PowerBIRequiredServicePrincipal"
@@ -4891,6 +5008,7 @@
     },
     "PowerBIMaskedClientSecret": {
       "title": "PowerBIMaskedClientSecret",
+      "label": "Power BI Client Secret",
       "type": "object",
       "properties": {
         "client_secret": {
@@ -4903,6 +5021,7 @@
     },
     "PowerBIMaskedAccessToken": {
       "title": "PowerBIMaskedAccessToken",
+      "label": "Power BI Access Token",
       "type": "object",
       "properties": {
         "access_token": {
@@ -4915,6 +5034,7 @@
     },
     "PowerBIMasked": {
       "title": "PowerBIMasked",
+      "label": "Power BI Credentials",
       "oneOf": [
         {
           "$ref": "#/definitions/PowerBIMaskedClientSecret"
@@ -4926,6 +5046,7 @@
     },
     "PowerBIOptionalConnection": {
       "title": "PowerBIOptionalConnection",
+      "label": "Power BI Connection",
       "type": "object",
       "description": "PowerBI API endpoint and timeout controls.",
       "properties": {
@@ -4953,6 +5074,7 @@
     },
     "PowerBIOptionalScope": {
       "title": "PowerBIOptionalScope",
+      "label": "Power BI Scope",
       "type": "object",
       "description": "Workspace scope controls for PowerBI ingestion.",
       "properties": {
@@ -4980,6 +5102,7 @@
     },
     "PowerBIOptionalExtraction": {
       "title": "PowerBIOptionalExtraction",
+      "label": "Power BI Extraction",
       "type": "object",
       "description": "Feature flags that control PowerBI entities to extract.",
       "properties": {
@@ -5018,6 +5141,7 @@
     },
     "PowerBIOptional": {
       "title": "PowerBIOptional",
+      "label": "Power BI Options",
       "type": "object",
       "properties": {
         "connection": {
@@ -5034,12 +5158,14 @@
     },
     "TableauAuthMode": {
       "title": "TableauAuthMode",
+      "label": "Tableau Auth Mode",
       "type": "string",
       "enum": ["USERNAME_PASSWORD", "PERSONAL_ACCESS_TOKEN"],
       "description": "Tableau authentication mode"
     },
     "TableauRequiredUsernamePassword": {
       "title": "TableauRequiredUsernamePassword",
+      "label": "Tableau Username Password",
       "type": "object",
       "properties": {
         "auth_mode": {
@@ -5061,6 +5187,7 @@
     },
     "TableauRequiredPersonalAccessToken": {
       "title": "TableauRequiredPersonalAccessToken",
+      "label": "Tableau Personal Access Token",
       "type": "object",
       "properties": {
         "auth_mode": {
@@ -5086,6 +5213,7 @@
     },
     "TableauRequired": {
       "title": "TableauRequired",
+      "label": "Tableau Settings",
       "oneOf": [
         {
           "$ref": "#/definitions/TableauRequiredUsernamePassword"
@@ -5097,6 +5225,7 @@
     },
     "TableauMaskedUsernamePassword": {
       "title": "TableauMaskedUsernamePassword",
+      "label": "Tableau Username Password",
       "type": "object",
       "properties": {
         "username": {
@@ -5113,6 +5242,7 @@
     },
     "TableauMaskedPersonalAccessToken": {
       "title": "TableauMaskedPersonalAccessToken",
+      "label": "Tableau Personal Access Token",
       "type": "object",
       "properties": {
         "token_value": {
@@ -5125,6 +5255,7 @@
     },
     "TableauMasked": {
       "title": "TableauMasked",
+      "label": "Tableau Credentials",
       "oneOf": [
         {
           "$ref": "#/definitions/TableauMaskedUsernamePassword"
@@ -5136,6 +5267,7 @@
     },
     "TableauOptionalConnection": {
       "title": "TableauOptionalConnection",
+      "label": "Tableau Connection",
       "type": "object",
       "description": "Tableau API connection and retry settings.",
       "properties": {
@@ -5168,6 +5300,7 @@
     },
     "TableauOptionalScope": {
       "title": "TableauOptionalScope",
+      "label": "Tableau Scope",
       "type": "object",
       "description": "Optional Tableau project/workbook/datasource scope filters.",
       "properties": {
@@ -5207,6 +5340,7 @@
     },
     "TableauOptionalExtraction": {
       "title": "TableauOptionalExtraction",
+      "label": "Tableau Extraction",
       "type": "object",
       "description": "Tableau metadata extraction feature flags.",
       "properties": {
@@ -5230,6 +5364,7 @@
     },
     "TableauOptional": {
       "title": "TableauOptional",
+      "label": "Tableau Options",
       "type": "object",
       "properties": {
         "connection": {
@@ -5992,6 +6127,7 @@
     },
     "Neo4jRequired": {
       "title": "Neo4jRequired",
+      "label": "Neo4j Settings",
       "type": "object",
       "description": "Neo4j connection endpoint. Accepts bolt://, neo4j://, or neo4j+s:// URIs.",
       "properties": {
@@ -6009,6 +6145,7 @@
     },
     "Neo4jMaskedUsernamePassword": {
       "title": "Neo4jMaskedUsernamePassword",
+      "label": "Neo4j Username Password",
       "type": "object",
       "description": "Neo4j basic auth credentials.",
       "properties": {
@@ -6026,6 +6163,7 @@
     },
     "Neo4jMaskedNone": {
       "title": "Neo4jMaskedNone",
+      "label": "Neo4j No Authentication",
       "type": "object",
       "description": "No authentication (local dev / anonymous access).",
       "properties": {},
@@ -6033,6 +6171,7 @@
     },
     "Neo4jMasked": {
       "title": "Neo4jMasked",
+      "label": "Neo4j Credentials",
       "oneOf": [
         {
           "$ref": "#/definitions/Neo4jMaskedUsernamePassword"
@@ -6044,6 +6183,7 @@
     },
     "Neo4jOptionalConnection": {
       "title": "Neo4jOptionalConnection",
+      "label": "Neo4j Connection",
       "type": "object",
       "description": "Neo4j driver connection tuning options.",
       "properties": {
@@ -6076,6 +6216,7 @@
     },
     "Neo4jOptionalScope": {
       "title": "Neo4jOptionalScope",
+      "label": "Neo4j Scope",
       "type": "object",
       "description": "Controls which node labels and relationships are included.",
       "properties": {
@@ -6108,6 +6249,7 @@
     },
     "Neo4jOptional": {
       "title": "Neo4jOptional",
+      "label": "Neo4j Options",
       "type": "object",
       "properties": {
         "connection": {
@@ -6256,6 +6398,7 @@
     },
     "ConfluenceRequired": {
       "title": "ConfluenceRequired",
+      "label": "Confluence Settings",
       "type": "object",
       "properties": {
         "base_url": {
@@ -6274,6 +6417,7 @@
     },
     "ConfluenceMasked": {
       "title": "ConfluenceMasked",
+      "label": "Confluence Credentials",
       "type": "object",
       "properties": {
         "api_token": {
@@ -6286,6 +6430,7 @@
     },
     "ConfluenceOptionalConnection": {
       "title": "ConfluenceOptionalConnection",
+      "label": "Confluence Connection",
       "type": "object",
       "description": "HTTP and retry settings for Confluence API calls.",
       "properties": {
@@ -6313,6 +6458,7 @@
     },
     "ConfluenceOptionalScopeSpaces": {
       "title": "ConfluenceOptionalScopeSpaces",
+      "label": "Confluence Scope Spaces",
       "type": "object",
       "description": "Space-level filters passed to Confluence /spaces endpoint.",
       "properties": {
@@ -6363,6 +6509,7 @@
     },
     "ConfluenceOptionalScope": {
       "title": "ConfluenceOptionalScope",
+      "label": "Confluence Scope",
       "type": "object",
       "properties": {
         "spaces": {
@@ -6373,6 +6520,7 @@
     },
     "ConfluenceOptionalContent": {
       "title": "ConfluenceOptionalContent",
+      "label": "Confluence Content",
       "type": "object",
       "description": "Confluence content extraction controls.",
       "properties": {
@@ -6407,6 +6555,7 @@
     },
     "ConfluenceOptional": {
       "title": "ConfluenceOptional",
+      "label": "Confluence Options",
       "type": "object",
       "properties": {
         "connection": {
@@ -6423,6 +6572,7 @@
     },
     "JiraRequired": {
       "title": "JiraRequired",
+      "label": "Jira Settings",
       "type": "object",
       "properties": {
         "base_url": {
@@ -6441,6 +6591,7 @@
     },
     "JiraMasked": {
       "title": "JiraMasked",
+      "label": "Jira Credentials",
       "type": "object",
       "properties": {
         "api_token": {
@@ -6453,6 +6604,7 @@
     },
     "JiraOptionalConnection": {
       "title": "JiraOptionalConnection",
+      "label": "Jira Connection",
       "type": "object",
       "description": "HTTP and retry settings for Jira API calls.",
       "properties": {
@@ -6480,6 +6632,7 @@
     },
     "JiraOptionalScope": {
       "title": "JiraOptionalScope",
+      "label": "Jira Scope",
       "type": "object",
       "description": "Optional Jira scope filters. When omitted, all visible issues are eligible for sampling.",
       "properties": {
@@ -6511,6 +6664,7 @@
     },
     "JiraOptionalContent": {
       "title": "JiraOptionalContent",
+      "label": "Jira Content",
       "type": "object",
       "description": "Jira issue content extraction controls.",
       "properties": {
@@ -6535,6 +6689,7 @@
     },
     "JiraOptional": {
       "title": "JiraOptional",
+      "label": "Jira Options",
       "type": "object",
       "properties": {
         "connection": {
@@ -6551,6 +6706,7 @@
     },
     "ServiceDeskRequired": {
       "title": "ServiceDeskRequired",
+      "label": "Jira Service Management Settings",
       "type": "object",
       "properties": {
         "base_url": {
@@ -6569,6 +6725,7 @@
     },
     "ServiceDeskMasked": {
       "title": "ServiceDeskMasked",
+      "label": "Jira Service Management Credentials",
       "type": "object",
       "properties": {
         "api_token": {
@@ -6581,6 +6738,7 @@
     },
     "ServiceDeskOptionalConnection": {
       "title": "ServiceDeskOptionalConnection",
+      "label": "Jira Service Management Connection",
       "type": "object",
       "description": "HTTP and retry settings for Jira Service Management API calls.",
       "properties": {
@@ -6608,6 +6766,7 @@
     },
     "ServiceDeskOptionalScope": {
       "title": "ServiceDeskOptionalScope",
+      "label": "Jira Service Management Scope",
       "type": "object",
       "description": "Optional Service Desk scope filters. When omitted, all visible requests are eligible for sampling.",
       "properties": {
@@ -6654,6 +6813,7 @@
     },
     "ServiceDeskOptionalContent": {
       "title": "ServiceDeskOptionalContent",
+      "label": "Jira Service Management Content",
       "type": "object",
       "description": "Service Desk request extraction controls.",
       "properties": {
@@ -6678,6 +6838,7 @@
     },
     "ServiceDeskOptional": {
       "title": "ServiceDeskOptional",
+      "label": "Jira Service Management Options",
       "type": "object",
       "properties": {
         "connection": {
@@ -6829,6 +6990,7 @@
     },
     "SQLiteRequired": {
       "title": "SQLiteRequired",
+      "label": "SQLite Settings",
       "type": "object",
       "properties": {
         "database_path": {
@@ -6841,6 +7003,7 @@
     },
     "SQLiteOptionalScope": {
       "title": "SQLiteOptionalScope",
+      "label": "SQLite Scope",
       "type": "object",
       "description": "Table selection scope.",
       "properties": {
@@ -6861,6 +7024,7 @@
     },
     "SQLiteOptional": {
       "title": "SQLiteOptional",
+      "label": "SQLite Options",
       "type": "object",
       "properties": {
         "scope": {
@@ -6919,6 +7083,7 @@
     },
     "NotionRequired": {
       "title": "NotionRequired",
+      "label": "Notion Settings",
       "type": "object",
       "description": "Notion has no required connection fields; the integration token lives in the masked section.",
       "properties": {},
@@ -6926,6 +7091,7 @@
     },
     "NotionMasked": {
       "title": "NotionMasked",
+      "label": "Notion Credentials",
       "type": "object",
       "properties": {
         "notion_token": {
@@ -6938,6 +7104,7 @@
     },
     "NotionOptionalConnection": {
       "title": "NotionOptionalConnection",
+      "label": "Notion Connection",
       "type": "object",
       "description": "HTTP, version, and retry settings for Notion API calls.",
       "properties": {
@@ -6970,6 +7137,7 @@
     },
     "NotionOptionalScope": {
       "title": "NotionOptionalScope",
+      "label": "Notion Scope",
       "type": "object",
       "description": "Optional Notion scope filters. When omitted, all content shared with the integration is eligible for sampling.",
       "properties": {
@@ -6999,6 +7167,7 @@
     },
     "NotionOptionalContent": {
       "title": "NotionOptionalContent",
+      "label": "Notion Content",
       "type": "object",
       "description": "Notion content extraction controls.",
       "properties": {
@@ -7033,6 +7202,7 @@
     },
     "NotionOptional": {
       "title": "NotionOptional",
+      "label": "Notion Options",
       "type": "object",
       "properties": {
         "connection": {
@@ -7094,12 +7264,14 @@
     },
     "KafkaSecurityProtocol": {
       "title": "KafkaSecurityProtocol",
+      "label": "Apache Kafka Security Protocol",
       "type": "string",
       "enum": ["PLAINTEXT", "SSL", "SASL_PLAINTEXT", "SASL_SSL"],
       "description": "Kafka client security protocol. Leave unset to derive it from the authentication mode (SASL → SASL_SSL, Client Certificate → SSL, No Authentication → PLAINTEXT); set it only to override, e.g. SASL_PLAINTEXT for a SASL broker without TLS."
     },
     "KafkaSaslMechanism": {
       "title": "KafkaSaslMechanism",
+      "label": "Apache Kafka SASL Mechanism",
       "type": "string",
       "enum": ["PLAIN", "SCRAM-SHA-256", "SCRAM-SHA-512"],
       "default": "PLAIN",
@@ -7107,6 +7279,7 @@
     },
     "DeltaLakeRequired": {
       "title": "DeltaLakeRequired",
+      "label": "Delta Lake Settings",
       "type": "object",
       "properties": {
         "bucket": {
@@ -7119,6 +7292,7 @@
     },
     "DeltaLakeOptionalScope": {
       "title": "DeltaLakeOptionalScope",
+      "label": "Delta Lake Scope",
       "type": "object",
       "description": "Delta Lake table selection scope within the bucket.",
       "properties": {
@@ -7143,6 +7317,7 @@
     },
     "DeltaLakeOptional": {
       "title": "DeltaLakeOptional",
+      "label": "Delta Lake Options",
       "type": "object",
       "properties": {
         "connection": {
@@ -7201,6 +7376,7 @@
     },
     "IcebergRequired": {
       "title": "IcebergRequired",
+      "label": "Apache Iceberg Settings",
       "type": "object",
       "properties": {
         "bucket": {
@@ -7213,6 +7389,7 @@
     },
     "IcebergOptional": {
       "title": "IcebergOptional",
+      "label": "Apache Iceberg Options",
       "type": "object",
       "properties": {
         "connection": {
@@ -7360,6 +7537,7 @@
     },
     "KafkaRequired": {
       "title": "KafkaRequired",
+      "label": "Apache Kafka Settings",
       "oneOf": [
         {
           "$ref": "#/definitions/KafkaRequiredNone"
@@ -7442,6 +7620,7 @@
     },
     "KafkaMasked": {
       "title": "KafkaMasked",
+      "label": "Apache Kafka Credentials",
       "oneOf": [
         {
           "$ref": "#/definitions/KafkaMaskedNone"
@@ -7459,6 +7638,7 @@
     },
     "KafkaOptionalConnection": {
       "title": "KafkaOptionalConnection",
+      "label": "Apache Kafka Connection",
       "type": "object",
       "description": "Kafka client connection and security options.",
       "properties": {
@@ -7484,6 +7664,7 @@
     },
     "KafkaOptionalScope": {
       "title": "KafkaOptionalScope",
+      "label": "Apache Kafka Scope",
       "type": "object",
       "description": "Kafka topic selection scope.",
       "properties": {
@@ -7516,6 +7697,7 @@
     },
     "KafkaOptional": {
       "title": "KafkaOptional",
+      "label": "Apache Kafka Options",
       "type": "object",
       "properties": {
         "connection": {
@@ -7658,6 +7840,7 @@
     },
     "SearchEngineOptionalConnection": {
       "title": "SearchEngineOptionalConnection",
+      "label": "Search Engine Connection",
       "type": "object",
       "description": "Cluster connection controls.",
       "properties": {
@@ -7678,6 +7861,7 @@
     },
     "SearchEngineOptionalScope": {
       "title": "SearchEngineOptionalScope",
+      "label": "Search Engine Scope",
       "type": "object",
       "description": "Index selection scope.",
       "properties": {
@@ -7710,6 +7894,7 @@
     },
     "ElasticsearchRequired": {
       "title": "ElasticsearchRequired",
+      "label": "Elasticsearch Settings",
       "oneOf": [
         {
           "$ref": "#/definitions/SearchEngineRequiredNone"
@@ -7724,6 +7909,7 @@
     },
     "ElasticsearchMasked": {
       "title": "ElasticsearchMasked",
+      "label": "Elasticsearch Credentials",
       "oneOf": [
         {
           "$ref": "#/definitions/SearchEngineMaskedNone"
@@ -7738,6 +7924,7 @@
     },
     "ElasticsearchOptional": {
       "title": "ElasticsearchOptional",
+      "label": "Elasticsearch Options",
       "type": "object",
       "properties": {
         "connection": {
@@ -7796,6 +7983,7 @@
     },
     "OpenSearchRequired": {
       "title": "OpenSearchRequired",
+      "label": "OpenSearch Settings",
       "oneOf": [
         {
           "$ref": "#/definitions/SearchEngineRequiredNone"
@@ -7810,6 +7998,7 @@
     },
     "OpenSearchMasked": {
       "title": "OpenSearchMasked",
+      "label": "OpenSearch Credentials",
       "oneOf": [
         {
           "$ref": "#/definitions/SearchEngineMaskedNone"
@@ -7824,6 +8013,7 @@
     },
     "OpenSearchOptional": {
       "title": "OpenSearchOptional",
+      "label": "OpenSearch Options",
       "type": "object",
       "properties": {
         "connection": {
@@ -7914,6 +8104,7 @@
     },
     "MeilisearchRequired": {
       "title": "MeilisearchRequired",
+      "label": "Meilisearch Settings",
       "oneOf": [
         {
           "$ref": "#/definitions/MeilisearchRequiredNone"
@@ -7944,6 +8135,7 @@
     },
     "MeilisearchMasked": {
       "title": "MeilisearchMasked",
+      "label": "Meilisearch Credentials",
       "oneOf": [
         {
           "$ref": "#/definitions/MeilisearchMaskedNone"
@@ -7955,6 +8147,7 @@
     },
     "MeilisearchOptionalScope": {
       "title": "MeilisearchOptionalScope",
+      "label": "Meilisearch Scope",
       "type": "object",
       "description": "Index selection scope.",
       "properties": {
@@ -7982,6 +8175,7 @@
     },
     "MeilisearchOptional": {
       "title": "MeilisearchOptional",
+      "label": "Meilisearch Options",
       "type": "object",
       "properties": {
         "connection": {
@@ -8040,6 +8234,7 @@
     },
     "LakehouseStorageConnection": {
       "title": "LakehouseStorageConnection",
+      "label": "Lakehouse Storage Connection",
       "type": "object",
       "description": "S3-compatible storage connection options (AWS S3, MinIO, Cloudflare R2, Backblaze B2, Garage, ...). Mirrors the S3 Compatible Storage source connection settings.",
       "properties": {
@@ -8076,6 +8271,7 @@
     },
     "IcebergOptionalScope": {
       "title": "IcebergOptionalScope",
+      "label": "Apache Iceberg Scope",
       "type": "object",
       "description": "Apache Iceberg table selection scope within the bucket.",
       "properties": {
@@ -8105,6 +8301,7 @@
     },
     "Microsoft365RequiredClientSecret": {
       "title": "Microsoft365RequiredClientSecret",
+      "label": "Microsoft 365 Client Secret",
       "type": "object",
       "properties": {
         "auth_mode": {
@@ -8124,6 +8321,7 @@
     },
     "Microsoft365RequiredCertificate": {
       "title": "Microsoft365RequiredCertificate",
+      "label": "Microsoft 365 Certificate",
       "type": "object",
       "properties": {
         "auth_mode": {
@@ -8143,6 +8341,7 @@
     },
     "Microsoft365RequiredManagedIdentity": {
       "title": "Microsoft365RequiredManagedIdentity",
+      "label": "Microsoft 365 Managed Identity",
       "type": "object",
       "properties": {
         "auth_mode": {
@@ -8158,6 +8357,7 @@
     },
     "Microsoft365Required": {
       "title": "Microsoft365Required",
+      "label": "Microsoft 365 Settings",
       "oneOf": [
         {
           "$ref": "#/definitions/Microsoft365RequiredClientSecret"
@@ -8172,6 +8372,7 @@
     },
     "Microsoft365MaskedClientSecret": {
       "title": "Microsoft365MaskedClientSecret",
+      "label": "Microsoft 365 Client Secret",
       "type": "object",
       "properties": {
         "client_secret": {
@@ -8184,6 +8385,7 @@
     },
     "Microsoft365MaskedCertificate": {
       "title": "Microsoft365MaskedCertificate",
+      "label": "Microsoft 365 Certificate",
       "type": "object",
       "properties": {
         "certificate_pem": {
@@ -8200,12 +8402,14 @@
     },
     "Microsoft365MaskedManagedIdentity": {
       "title": "Microsoft365MaskedManagedIdentity",
+      "label": "Microsoft 365 Managed Identity",
       "type": "object",
       "properties": {},
       "additionalProperties": false
     },
     "Microsoft365Masked": {
       "title": "Microsoft365Masked",
+      "label": "Microsoft 365 Credentials",
       "oneOf": [
         {
           "$ref": "#/definitions/Microsoft365MaskedClientSecret"
@@ -8220,6 +8424,7 @@
     },
     "Microsoft365OptionalScope": {
       "title": "Microsoft365OptionalScope",
+      "label": "Microsoft 365 Scope",
       "type": "object",
       "description": "Ecosystem selection and content filtering.",
       "properties": {
@@ -8274,6 +8479,7 @@
     },
     "Microsoft365OptionalConnection": {
       "title": "Microsoft365OptionalConnection",
+      "label": "Microsoft 365 Connection",
       "type": "object",
       "description": "Network and throttle controls for Graph API requests.",
       "properties": {
@@ -8309,6 +8515,7 @@
     },
     "Microsoft365OptionalExtraction": {
       "title": "Microsoft365OptionalExtraction",
+      "label": "Microsoft 365 Extraction",
       "type": "object",
       "description": "Controls which structural assets to emit beyond files.",
       "properties": {
@@ -8332,6 +8539,7 @@
     },
     "Microsoft365Optional": {
       "title": "Microsoft365Optional",
+      "label": "Microsoft 365 Options",
       "type": "object",
       "properties": {
         "scope": {
@@ -8393,6 +8601,7 @@
     },
     "GoogleWorkspaceRequiredServiceAccount": {
       "title": "GoogleWorkspaceRequiredServiceAccount",
+      "label": "Google Workspace Service Account",
       "type": "object",
       "properties": {
         "auth_method": {
@@ -8408,6 +8617,7 @@
     },
     "GoogleWorkspaceRequiredOAuth": {
       "title": "GoogleWorkspaceRequiredOAuth",
+      "label": "Google Workspace OAuth",
       "type": "object",
       "properties": {
         "auth_method": {
@@ -8423,6 +8633,7 @@
     },
     "GoogleWorkspaceRequired": {
       "title": "GoogleWorkspaceRequired",
+      "label": "Google Workspace Settings",
       "oneOf": [
         {
           "$ref": "#/definitions/GoogleWorkspaceRequiredServiceAccount"
@@ -8434,6 +8645,7 @@
     },
     "GoogleWorkspaceMaskedServiceAccount": {
       "title": "GoogleWorkspaceMaskedServiceAccount",
+      "label": "Google Workspace Service Account",
       "type": "object",
       "properties": {
         "service_account_json": {
@@ -8446,6 +8658,7 @@
     },
     "GoogleWorkspaceMaskedOAuth": {
       "title": "GoogleWorkspaceMaskedOAuth",
+      "label": "Google Workspace OAuth",
       "type": "object",
       "properties": {
         "client_secret": {
@@ -8462,6 +8675,7 @@
     },
     "GoogleWorkspaceMasked": {
       "title": "GoogleWorkspaceMasked",
+      "label": "Google Workspace Credentials",
       "oneOf": [
         {
           "$ref": "#/definitions/GoogleWorkspaceMaskedServiceAccount"
@@ -8473,6 +8687,7 @@
     },
     "GoogleWorkspaceOptionalScope": {
       "title": "GoogleWorkspaceOptionalScope",
+      "label": "Google Workspace Scope",
       "type": "object",
       "description": "Drive/folder selection and content filtering.",
       "properties": {
@@ -8524,6 +8739,7 @@
     },
     "GoogleWorkspaceOptionalConnection": {
       "title": "GoogleWorkspaceOptionalConnection",
+      "label": "Google Workspace Connection",
       "type": "object",
       "description": "Network and pagination controls for Drive API requests.",
       "properties": {
@@ -8559,6 +8775,7 @@
     },
     "GoogleWorkspaceOptionalExtraction": {
       "title": "GoogleWorkspaceOptionalExtraction",
+      "label": "Google Workspace Extraction",
       "type": "object",
       "description": "Controls which structural assets to emit and how Google-native files are handled.",
       "properties": {
@@ -8577,6 +8794,7 @@
     },
     "GoogleWorkspaceOptional": {
       "title": "GoogleWorkspaceOptional",
+      "label": "Google Workspace Options",
       "type": "object",
       "properties": {
         "scope": {
@@ -8682,6 +8900,7 @@
     },
     "DropboxRequired": {
       "title": "DropboxRequired",
+      "label": "Dropbox Settings",
       "oneOf": [
         {
           "$ref": "#/definitions/DropboxRequiredOAuth"
@@ -8696,6 +8915,7 @@
     },
     "DropboxMaskedOAuth": {
       "title": "DropboxMaskedOAuth",
+      "label": "Dropbox OAuth",
       "type": "object",
       "properties": {
         "app_secret": {
@@ -8712,6 +8932,7 @@
     },
     "DropboxMaskedOAuthPkce": {
       "title": "DropboxMaskedOAuthPkce",
+      "label": "Dropbox OAuth (PKCE)",
       "type": "object",
       "properties": {
         "refresh_token": {
@@ -8724,6 +8945,7 @@
     },
     "DropboxMaskedAccessToken": {
       "title": "DropboxMaskedAccessToken",
+      "label": "Dropbox Access Token",
       "type": "object",
       "properties": {
         "access_token": {
@@ -8736,6 +8958,7 @@
     },
     "DropboxMasked": {
       "title": "DropboxMasked",
+      "label": "Dropbox Credentials",
       "oneOf": [
         {
           "$ref": "#/definitions/DropboxMaskedOAuth"
@@ -8750,6 +8973,7 @@
     },
     "DropboxOptionalScope": {
       "title": "DropboxOptionalScope",
+      "label": "Dropbox Scope",
       "type": "object",
       "description": "Folder selection and content filtering.",
       "properties": {
@@ -8806,6 +9030,7 @@
     },
     "DropboxOptionalConnection": {
       "title": "DropboxOptionalConnection",
+      "label": "Dropbox Connection",
       "type": "object",
       "description": "Network and pagination controls for Dropbox API requests.",
       "properties": {
@@ -8842,6 +9067,7 @@
     },
     "DropboxOptionalTeam": {
       "title": "DropboxOptionalTeam",
+      "label": "Dropbox Team",
       "type": "object",
       "description": "Dropbox Business team scanning. The credential shape is the same as for an individual account, but the Dropbox app must be created with a team access type ('Team member file access' plus 'Team information'). Leave disabled for individual accounts.",
       "properties": {
@@ -8882,6 +9108,7 @@
     },
     "DropboxOptional": {
       "title": "DropboxOptional",
+      "label": "Dropbox Options",
       "type": "object",
       "properties": {
         "scope": {
@@ -8940,6 +9167,41 @@
           "additionalProperties": false
         }
       ]
+    },
+    "SlackOptionalAttachments": {
+      "title": "SlackOptionalAttachments",
+      "label": "Attachments",
+      "type": "object",
+      "description": "Files shared in messages. Each file becomes its own asset, and its text is extracted with the same parser used for local files (PDF, Office, images via OCR, audio and video transcription).",
+      "properties": {
+        "include_attachments": {
+          "type": "boolean",
+          "default": true,
+          "description": "Emit files shared in messages as scannable assets"
+        },
+        "max_attachment_bytes": {
+          "type": "integer",
+          "minimum": 1024,
+          "maximum": 524288000,
+          "default": 26214400,
+          "description": "Skip files larger than this many bytes (default 25 MB)"
+        },
+        "include_file_extensions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Only download files with these extensions (example: .pdf, .docx). Empty means all extensions."
+        },
+        "exclude_file_extensions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Skip files with these extensions (example: .mp4, .zip)"
+        }
+      },
+      "additionalProperties": false
     }
   }
 }

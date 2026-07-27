@@ -115,10 +115,10 @@
         },
         "required": {
           "title": "Required",
-          "summary": "Workspace helps stable naming and links, but token auth is what enables ingestion.",
+          "summary": "Workspace is only used for permalinks and stable asset IDs; the bot token is what enables ingestion.",
           "suggestions": [
             "Set workspace to the short name or domain (example: acme).",
-            "You can still ingest without workspace, but URLs and IDs are cleaner when it is set."
+            "Ingestion works without workspace, but message permalinks are only correct when it is set."
           ],
           "questions": [
             "What is the Slack workspace name or domain?"
@@ -126,25 +126,28 @@
         },
         "masked": {
           "title": "Authentication",
-          "summary": "Choose the token type based on which channels you need.",
+          "summary": "A Slack bot token (xoxb-) is the only supported credential. Install your app into the workspace and copy its bot token.",
           "suggestions": [
-            "Bot tokens (xoxb-) are best for public channels.",
-            "User tokens (xoxp-) are required for DMs or private channels.",
-            "If you use token + token_type, set token_type to bot or user."
+            "Grant the read scopes for every conversation type you want: channels:history, groups:history, im:history, mpim:history.",
+            "Add the matching list scopes (channels:read, groups:read, im:read, mpim:read) or channel discovery returns nothing.",
+            "Add files:read to download and scan files shared in messages.",
+            "Invite the bot to each private channel and group DM you want scanned; a bot cannot read conversations it is not a member of."
           ],
           "questions": [
-            "Do you need private channels/DMs? If yes, use a user token.",
-            "Which token do you want to use?"
+            "Has the app been installed into the workspace and is the xoxb- token available?",
+            "Which private channels should the bot be invited to?"
           ]
         },
         "optional": {
           "title": "Optional",
-          "summary": "Use optional.channels, optional.time_range, and optional.ingestion to tune scope and performance.",
+          "summary": "Use optional.channels, optional.time_range, optional.ingestion and optional.attachments to tune scope, performance and file handling.",
           "suggestions": [
-            "Use channel_types to discover channels; set channel_ids for an explicit list.",
-            "Use oldest/latest to limit date range in optional.time_range.",
-            "Tune optional.ingestion.batch_size and rate_limit_delay_seconds for API limits.",
-            "Enable optional.ingestion.include_thread_replies for full context (more API calls)."
+            "channel_types defaults to every conversation type; narrow it for a faster first run.",
+            "Set channel_ids for an explicit list; it overrides channel_types.",
+            "Use oldest/latest in optional.time_range to bound the window.",
+            "include_thread_replies is on by default and costs one extra API call per threaded message.",
+            "optional.attachments controls file downloads: size cap and extension allow/deny lists.",
+            "Enable auto_join_public_channels if the bot is not yet a member of the public channels you want read."
           ]
         },
         "sampling": {

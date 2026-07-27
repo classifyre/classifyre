@@ -533,6 +533,68 @@ def _supports_docling_ocr(mime_type: str, file_name: str) -> bool:
     return _file_extension(file_name) in _DOCLING_EXTENSIONS
 
 
+# Images this small on either axis hold no legible text: tracking pixels, spacer
+# images, favicons, Notion page icons. Handing one to docling loads the ~1 GB OCR
+# pipeline and spends seconds to return zero characters, and a source that emits
+# hundreds of them (every Notion page can carry an icon and a cover) drives the
+# worker into an OOMKill. Dimensions are read straight from the format header —
+# no decode, no Pillow dependency.
+_MIN_OCR_IMAGE_PIXELS = 32
+
+# Byte-size floor used only when the dimensions cannot be read (JPEG, WebP, HEIC).
+# Deliberately low: a large image of mostly one colour compresses to a few hundred
+# bytes and may still carry a line of text, so this must not stand in for the
+# dimension check.
+_MIN_OCR_IMAGE_BYTES = 256
+
+
+def _image_dimensions(file_bytes: bytes, mime_type: str) -> tuple[int, int] | None:
+    """Read pixel dimensions from an image header, or None if not derivable."""
+    try:
+        if mime_type == "image/png" and len(file_bytes) >= 24:
+            # IHDR is always the first chunk: width and height are big-endian
+            # uint32 at offsets 16 and 20.
+            return (
+                int.from_bytes(file_bytes[16:20], "big"),
+                int.from_bytes(file_bytes[20:24], "big"),
+            )
+        if mime_type == "image/gif" and len(file_bytes) >= 10:
+            return (
+                int.from_bytes(file_bytes[6:8], "little"),
+                int.from_bytes(file_bytes[8:10], "little"),
+            )
+        if mime_type == "image/bmp" and len(file_bytes) >= 26:
+            return (
+                int.from_bytes(file_bytes[18:22], "little"),
+                int.from_bytes(file_bytes[22:26], "little"),
+            )
+    except Exception as exc:
+        logger.debug("Image dimension read failed for %s: %s", mime_type, exc)
+    return None
+
+
+def _ocr_skip_reason(file_bytes: bytes, mime_type: str) -> str | None:
+    """Return why OCR should be skipped for this image, or None to proceed."""
+    normalized = _normalize_mime_type(mime_type)
+    if not normalized.startswith("image/"):
+        return None
+
+    dimensions = _image_dimensions(file_bytes, normalized)
+    if dimensions is not None:
+        # Dimensions are authoritative when available: byte size says nothing
+        # about legibility, since a mostly-uniform 1000x1000 scan can compress
+        # smaller than a noisy thumbnail.
+        width, height = dimensions
+        if 0 < min(width, height) < _MIN_OCR_IMAGE_PIXELS:
+            return f"image is {width}x{height} (< {_MIN_OCR_IMAGE_PIXELS}px on one axis)"
+        return None
+
+    if len(file_bytes) < _MIN_OCR_IMAGE_BYTES:
+        return f"image is {len(file_bytes)} bytes with unreadable dimensions"
+
+    return None
+
+
 def _convert_image_to_png(file_bytes: bytes, mime_type: str) -> tuple[bytes | None, str | None]:
     """Convert a GIF (first frame) or HEIC/HEIF image to PNG bytes for OCR."""
     import io
@@ -638,7 +700,14 @@ def extract_text(
         (text_content, error_message_or_None)
     """
     ocr_error: str | None = None
-    if _supports_docling_ocr(mime_type, file_name):
+    ocr_skip_reason = _ocr_skip_reason(file_bytes, mime_type)
+    if ocr_skip_reason:
+        logger.debug(
+            "Skipping OCR for %s: %s",
+            file_name or mime_type,
+            ocr_skip_reason,
+        )
+    if not ocr_skip_reason and _supports_docling_ocr(mime_type, file_name):
         # PDFs: try cheap native text extraction first.  Only hand off to the
         # heavy docling pipeline when the native path yields too little text,
         # which indicates a scanned or image-only PDF that genuinely needs OCR.

@@ -22,6 +22,23 @@ from src.utils.file_parser import (
     parse_file,
 )
 
+
+def png_stub(width: int = 640, height: int = 480, payload_bytes: int = 4096) -> bytes:
+    """A PNG-shaped byte string big enough to be worth OCR-ing.
+
+    extract_text skips OCR for images that are too small or too few bytes to
+    carry legible text, so stub images in these tests have to declare plausible
+    dimensions and carry a realistic amount of payload.
+    """
+    header = (
+        b"\x89PNG\r\n\x1a\n"
+        + b"\x00\x00\x00\rIHDR"
+        + width.to_bytes(4, "big")
+        + height.to_bytes(4, "big")
+    )
+    return header + b"stub-image-payload" * (payload_bytes // 18 + 1)
+
+
 # ---------------------------------------------------------------------------
 # detect_mime_type
 # ---------------------------------------------------------------------------
@@ -108,7 +125,7 @@ class TestExtractText:
             "src.utils.file_parser._extract_docling_markdown",
             lambda *_args, **_kwargs: ("", None),
         )
-        text, err = extract_text(b"\x89PNG\r\n\x1a\n", "image/png")
+        text, err = extract_text(png_stub(), "image/png")
         assert text == ""
         assert err is None
 
@@ -123,7 +140,7 @@ class TestExtractText:
         with pytest.raises(TextExtractionCoverageError) as error:
             list(
                 iter_file_pages(
-                    b"\x89PNG\r\n\x1a\n",
+                    png_stub(),
                     "image/png",
                     file_name="receipt.png",
                 )
@@ -210,7 +227,7 @@ class TestExtractText:
         )
 
         text, err = extract_text(
-            b"\x89PNG\r\n\x1a\nfake-image",
+            png_stub(),
             "image/png",
             file_name="receipt.png",
         )
@@ -430,8 +447,8 @@ class TestDoclingConverterSingleton:
         init_count: list[int] = []
         self._install_fake_docling(monkeypatch, init_count)
 
-        text1, _ = extract_text(b"\x89PNG\r\n\x1a\nfake", "image/png", file_name="a.png")
-        text2, _ = extract_text(b"\x89PNG\r\n\x1a\nfake", "image/png", file_name="b.png")
+        text1, _ = extract_text(png_stub(), "image/png", file_name="a.png")
+        text2, _ = extract_text(png_stub(), "image/png", file_name="b.png")
 
         assert text1 == text2 == "ocr output"
         assert len(init_count) == 1, "DocumentConverter() must not be re-instantiated per file"
@@ -516,7 +533,7 @@ class TestParseBytes:
         )
 
         parsed = parse_bytes(
-            b"\x89PNG\r\n\x1a\nimage-bytes",
+            png_stub(),
             declared_mime_type="image/png",
             file_name="photo.png",
         )
@@ -536,7 +553,7 @@ class TestParseBytes:
 
         pages = list(
             iter_file_pages(
-                b"\x89PNG\r\n\x1a\nimage-bytes",
+                png_stub(),
                 "image/png",
                 batch_size=1,
                 file_name="photo.png",
@@ -770,6 +787,74 @@ class TestLegacyOfficeExtraction:
         assert error == "soffice missing"
 
 
+class TestOcrSizeGuard:
+    """Images too small to carry legible text must never reach docling.
+
+    Loading the docling pipeline costs roughly a gigabyte of model weights; a
+    source that emits one decorative icon per page (Notion) otherwise pays that
+    cost repeatedly to extract zero characters and gets OOMKilled for it.
+    """
+
+    def _forbid_docling(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        def fail_if_called(*_args: Any, **_kwargs: Any) -> tuple[str, None]:
+            raise AssertionError("docling must not be invoked for a tiny image")
+
+        monkeypatch.setattr("src.utils.file_parser._extract_docling_markdown", fail_if_called)
+
+    def test_tracking_pixel_png_skips_ocr(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        self._forbid_docling(monkeypatch)
+        text, err = extract_text(png_stub(width=1, height=1), "image/png")
+        assert text == ""
+        assert err is None
+
+    def test_icon_sized_png_skips_ocr(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        self._forbid_docling(monkeypatch)
+        text, err = extract_text(png_stub(width=16, height=16), "image/png", file_name="icon.png")
+        assert text == ""
+        assert err is None
+
+    def test_full_size_png_still_runs_ocr(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(
+            "src.utils.file_parser._extract_docling_markdown",
+            lambda *_args, **_kwargs: ("real text", None),
+        )
+        text, err = extract_text(png_stub(width=800, height=600), "image/png")
+        assert text == "real text"
+        assert err is None
+
+    def test_small_but_wide_enough_gif_still_runs_ocr(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A flat image compresses to very few bytes yet may still carry text."""
+        pytest.importorskip("PIL")
+        import io
+
+        from PIL import Image
+
+        buffer = io.BytesIO()
+        Image.new("RGB", (400, 300), (255, 255, 255)).save(buffer, format="GIF")
+        assert len(buffer.getvalue()) < 1024
+
+        monkeypatch.setattr(
+            "src.utils.file_parser._extract_docling_markdown",
+            lambda *_args, **_kwargs: ("banner text", None),
+        )
+        text, err = extract_text(buffer.getvalue(), "image/gif", file_name="banner.gif")
+        assert text == "banner text"
+        assert err is None
+
+    def test_tiny_image_does_not_raise_coverage_error(self) -> None:
+        """A skipped icon is not an extraction failure — it has no text to find."""
+        pages = list(
+            iter_file_pages(
+                png_stub(width=8, height=8),
+                "image/png",
+                file_name="icon.png",
+            )
+        )
+        assert pages == []
+
+
 class TestOcrImageConversion:
     def test_gif_supported_for_ocr(self) -> None:
         assert _supports_docling_ocr("image/gif", "animation.gif")
@@ -782,7 +867,7 @@ class TestOcrImageConversion:
         from PIL import Image
 
         buffer = io.BytesIO()
-        Image.new("RGB", (10, 10), (255, 0, 0)).save(buffer, format="GIF")
+        Image.new("RGB", (320, 240), (255, 0, 0)).save(buffer, format="GIF")
 
         received: dict[str, Any] = {}
 

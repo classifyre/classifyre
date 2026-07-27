@@ -69,8 +69,24 @@ import { SamplingCard, type SamplingValue } from "@/components/sampling-card";
 
 const LONG_TEXT_THRESHOLD = 120;
 
+/**
+ * Human-facing name for a schema node.
+ *
+ * `title` is not it: the Python model generator turns each definition's `title`
+ * into a class name, so titles have to stay unique PascalCase identifiers
+ * ("MongoDBRequiredAtlas"). The schema therefore carries a separate `label`
+ * ("MongoDB Atlas") for display, and it wins wherever present.
+ */
+function getSchemaLabel(schema: JSONSchema7): string | undefined {
+  const label = (schema as { label?: unknown }).label;
+  if (typeof label === "string" && label.trim().length > 0) {
+    return label;
+  }
+  return schema.title;
+}
+
 function formatLabel(name: string, schema: JSONSchema7): string {
-  const base = schema.title ?? name;
+  const base = getSchemaLabel(schema) ?? name;
   return base.replace(/_/g, " ").replace(/-/g, " ");
 }
 
@@ -146,6 +162,27 @@ function isPemField(name: string): boolean {
   return PEM_FIELD_NAMES.has(name.toLowerCase());
 }
 
+/**
+ * Secrets whose value is a whole blob rather than a single opaque token: a
+ * service-account JSON key, a storage connection string, a cookie jar. None of
+ * them match the password/token/secret/key name heuristic, so without this list
+ * they render as plain cleartext single-line inputs.
+ *
+ * They get the same treatment as PEM blocks — a masked <textarea> — because a
+ * single-line <input type="password"> cannot show a multi-hundred-character
+ * JSON key, and pasting multi-line content into one strips the newlines.
+ */
+const BLOB_SECRET_FIELD_NAMES = new Set([
+  "gcp_credentials_json",
+  "service_account_json",
+  "azure_connection_string",
+  "cookies",
+]);
+
+function isBlobSecretField(name: string): boolean {
+  return BLOB_SECRET_FIELD_NAMES.has(name.toLowerCase());
+}
+
 function hasNullType(schema: JSONSchema7): boolean {
   if (schema.type === "null") return true;
   if (schema.anyOf && Array.isArray(schema.anyOf)) {
@@ -171,10 +208,11 @@ function normalizeAnyOfSchema(schema: JSONSchema7): JSONSchema7 {
       ...schema,
       ...first,
       title: schema.title ?? first.title,
+      label: getSchemaLabel(schema) ?? getSchemaLabel(first),
       description: schema.description ?? first.description,
       default: schema.default ?? first.default,
       anyOf: undefined,
-    };
+    } as JSONSchema7;
   }
 
   return {
@@ -186,26 +224,6 @@ function normalizeAnyOfSchema(schema: JSONSchema7): JSONSchema7 {
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === "object" && !Array.isArray(value);
-}
-
-function hasConfiguredValue(value: unknown): boolean {
-  if (value === undefined || value === null) {
-    return false;
-  }
-
-  if (typeof value === "string") {
-    return value.trim().length > 0;
-  }
-
-  if (Array.isArray(value)) {
-    return value.some((entry) => hasConfiguredValue(entry));
-  }
-
-  if (isPlainObject(value)) {
-    return Object.values(value).some((entry) => hasConfiguredValue(entry));
-  }
-
-  return true;
 }
 
 function isObjectSchema(schema: JSONSchema7): boolean {
@@ -288,6 +306,32 @@ function hasRequiredFields(schema: JSONSchema7): boolean {
   }
 
   return false;
+}
+
+/**
+ * Whether a schema block would render at least one control. Sources with no
+ * credentials (LOCAL_FOLDER, SQLITE) or no required settings (NOTION, SANDBOX)
+ * declare an empty `masked` / `required` object; without this check the form
+ * shows an "Authentication" or "Required fields" card whose only content is a
+ * "nothing to configure" placeholder.
+ *
+ * A `oneOf` always counts as renderable — even when every branch is nothing but
+ * a discriminator, the mode dropdown itself is the control the user needs.
+ */
+function hasRenderableFields(schema: JSONSchema7): boolean {
+  const normalized = normalizeAnyOfSchema(schema);
+
+  if (Array.isArray(normalized.oneOf) && normalized.oneOf.length > 0) {
+    return true;
+  }
+
+  if (isStructuredObjectSchema(normalized) && normalized.properties) {
+    return Object.values(normalized.properties).some(
+      (value) => !isConstField(value as JSONSchema7),
+    );
+  }
+
+  return true;
 }
 
 function hasValidationErrors(value: unknown): boolean {
@@ -685,8 +729,9 @@ function getOneOfOptionIdentity(option: JSONSchema7, index: number): string {
 
 function getOneOfOptionLabel(option: JSONSchema7, index: number): string {
   const discriminator = getOneOfDiscriminator(option);
-  if (option.title) {
-    return option.title;
+  const label = getSchemaLabel(option);
+  if (label) {
+    return label;
   }
   if (discriminator) {
     return `${formatLabel(discriminator.key, option)}: ${String(discriminator.value)}`;
@@ -1997,23 +2042,28 @@ function SchemaField({
   }
 
   const isCertField = isPemField(name);
+  const isBlobSecretFieldName = isBlobSecretField(name);
+  // PEM blocks and blob secrets (service-account JSON, connection strings,
+  // cookie jars) always stay <textarea>s, so they never become type="password".
+  const isBlobField = isCertField || isBlobSecretFieldName;
   const isPassword =
-    !isCertField &&
+    !isBlobField &&
     (forceMasked ||
       (autoDetectSensitiveFields &&
         (name.toLowerCase().includes("password") ||
           name.toLowerCase().includes("token") ||
           name.toLowerCase().includes("secret") ||
           name.toLowerCase().includes("key"))));
-  // A certificate under `masked` is a secret and has to render as dots like
-  // any other. It stays a <textarea> rather than becoming type="password":
-  // pasting a multi-line PEM into a single-line input strips the newlines and
-  // silently corrupts the certificate. `-webkit-text-security` masks the
-  // glyphs while the real multi-line value is preserved.
-  const isMaskedCert = isCertField && forceMasked;
+  // A certificate or JSON key under `masked` is a secret and has to render as
+  // dots like any other. It stays a <textarea> rather than becoming
+  // type="password": pasting a multi-line PEM into a single-line input strips
+  // the newlines and silently corrupts the value. `-webkit-text-security` masks
+  // the glyphs while the real multi-line value is preserved. Blob secrets are
+  // masked by name alone — they are credentials wherever they appear.
+  const isMaskedCert = isBlobSecretFieldName || (isCertField && forceMasked);
   const isUrl =
     normalizedSchema.format === "uri" || name.toLowerCase().includes("url");
-  const isLongField = isCertField || isLongText(normalizedSchema);
+  const isLongField = isBlobField || isLongText(normalizedSchema);
   const isFolderPathField = isDesktopFolderPathField(
     fieldPath,
     normalizedSchema,
@@ -2391,6 +2441,16 @@ export const JsonSchemaForm = React.forwardRef<
   // Detect coupled auth: both required and masked are parallel oneOf unions where
   // every required option has a const discriminator (auth_mode, authentication_type, …).
   // When detected, render them as a single card with one dropdown instead of two.
+  // Blocks a source declares but leaves empty (NOTION has no required settings,
+  // LOCAL_FOLDER and SQLITE have no credentials) are dropped entirely rather
+  // than rendered as a card containing only a placeholder line. The block keys
+  // stay reserved either way, so an empty block can never fall through to the
+  // legacy top-level field renderer.
+  const showRequiredBlock =
+    requiredBlock !== null && hasRenderableFields(requiredBlock.schema);
+  const showMaskedBlock =
+    maskedBlock !== null && hasRenderableFields(maskedBlock.schema);
+
   const requiredOneOf = (requiredBlock?.schema.oneOf ?? []) as JSONSchema7[];
   const maskedOneOf = (maskedBlock?.schema.oneOf ?? []) as JSONSchema7[];
   const hasCoupledAuth =
@@ -2492,24 +2552,14 @@ export const JsonSchemaForm = React.forwardRef<
 
   const optionalBlockEntries = optionalBlock?.schema.properties
     ? Object.entries(optionalBlock.schema.properties).filter(
-        ([, value]) => !isConstField(value as JSONSchema7),
+        ([, value]) =>
+          !isConstField(value as JSONSchema7) &&
+          hasRenderableFields(value as JSONSchema7),
       )
     : [];
   const optionalRequiredKeys = new Set(optionalBlock?.schema.required || []);
   const hasOptionalParameters =
     optionalBlockEntries.length > 0 || legacyOptionalEntries.length > 0;
-  const shouldExpandOptionalParametersByDefault = React.useMemo(() => {
-    const rawDefaults = defaultValues || {};
-
-    const hasOptionalBlockValues =
-      optionalBlock && hasConfiguredValue(rawDefaults[optionalBlock.key]);
-
-    const hasLegacyOptionalValues = legacyOptionalEntries.some(({ key }) =>
-      hasConfiguredValue(rawDefaults[key]),
-    );
-
-    return Boolean(hasOptionalBlockValues || hasLegacyOptionalValues);
-  }, [defaultValues, legacyOptionalEntries, optionalBlock]);
   const shouldShowValidationBanner =
     form.formState.submitCount > 0 &&
     hasValidationErrors(form.formState.errors);
@@ -2593,6 +2643,7 @@ export const JsonSchemaForm = React.forwardRef<
         )}
 
         {!hasCoupledAuth &&
+          showRequiredBlock &&
           requiredBlock &&
           (() => {
             const section = resolveKnowledge(
@@ -2635,6 +2686,7 @@ export const JsonSchemaForm = React.forwardRef<
           })()}
 
         {!hasCoupledAuth &&
+          showMaskedBlock &&
           maskedBlock &&
           (() => {
             const section = resolveKnowledge(
@@ -2678,14 +2730,10 @@ export const JsonSchemaForm = React.forwardRef<
           })()}
 
         {hasOptionalParameters && (
-          <Accordion
-            type="multiple"
-            defaultValue={
-              shouldExpandOptionalParametersByDefault
-                ? ["optional-parameters"]
-                : undefined
-            }
-          >
+          // Expanded on mount: the optional block is where the settings that
+          // actually shape a scan live (scope, filters, throughput), and
+          // collapsing it by default hid them behind a click users never made.
+          <Accordion type="multiple" defaultValue={["optional-parameters"]}>
             <AccordionItem
               value="optional-parameters"
               className="border-border/70 shadow-[6px_6px_0_var(--color-border)]"

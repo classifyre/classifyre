@@ -117,8 +117,8 @@
   ],
   "SLACK": [
     {
-      "name": "Public channels compliance scan",
-      "description": "Scan all public channels for PII and secrets exposure using a bot token",
+      "name": "Workspace-wide compliance scan",
+      "description": "Scan public and private channels, group DMs and direct messages for PII and secrets, including thread replies and shared files",
       "schedule": {
         "enabled": true,
         "preset": "weekday_morning",
@@ -135,11 +135,21 @@
         },
         "optional": {
           "channels": {
-            "channel_types": ["public_channel"],
+            "channel_types": [
+              "public_channel",
+              "private_channel",
+              "mpim",
+              "im"
+            ],
             "exclude_archived": true
           },
           "ingestion": {
+            "include_thread_replies": true,
             "rate_limit_delay_seconds": 1
+          },
+          "attachments": {
+            "include_attachments": true,
+            "max_attachment_bytes": 26214400
           }
         },
         "sampling": {
@@ -158,8 +168,8 @@
       }
     },
     {
-      "name": "Private channels and DMs audit",
-      "description": "Audit private channels and direct messages for sensitive data using a user token",
+      "name": "Public channels only",
+      "description": "Lower-risk baseline that reads public channels and skips file downloads — useful for a first run against a large workspace",
       "schedule": {
         "enabled": true,
         "preset": "weekday_morning",
@@ -172,22 +182,35 @@
           "workspace": "your-workspace"
         },
         "masked": {
-          "user_token": "xoxp-your-user-token"
+          "bot_token": "xoxb-your-bot-token"
         },
         "optional": {
           "channels": {
-            "channel_types": ["private_channel", "mpim", "im"],
-            "exclude_archived": true
+            "channel_types": ["public_channel"],
+            "exclude_archived": true,
+            "auto_join_public_channels": true
+          },
+          "ingestion": {
+            "include_thread_replies": false
+          },
+          "attachments": {
+            "include_attachments": false
           }
         },
         "sampling": {
           "strategy": "AUTOMATIC"
-        }
+        },
+        "detectors": [
+          {
+            "type": "SECRETS",
+            "enabled": true
+          }
+        ]
       }
     },
     {
       "name": "Targeted channel scan with date range",
-      "description": "Scan specific channels within a time window — useful for incident response or focused audits",
+      "description": "Scan specific conversations inside a time window — for incident response or a focused audit",
       "schedule": {
         "enabled": true,
         "preset": "weekly",
@@ -213,10 +236,14 @@
           "ingestion": {
             "batch_size": 200,
             "include_thread_replies": true
+          },
+          "attachments": {
+            "include_attachments": true,
+            "exclude_file_extensions": [".mp4", ".mov", ".zip"]
           }
         },
         "sampling": {
-          "strategy": "AUTOMATIC"
+          "strategy": "ALL"
         }
       }
     }
