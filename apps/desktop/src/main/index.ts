@@ -202,7 +202,6 @@ app.on('ready', async () => {
   processManager = new ProcessManager();
   updateChecker = new UpdateChecker();
   updateChecker.startPeriodicChecks();
-  void updateChecker.checkForUpdates();
 
   try {
     await pg.start();
@@ -272,6 +271,10 @@ app.on('ready', async () => {
 
   await namespaceStore.start();
   mainWindow = createMainWindow();
+
+  // Startup update check runs once the window exists, so the "update available"
+  // prompt doesn't arrive before the app itself does.
+  setTimeout(() => void updateChecker.backgroundCheck(), 10_000).unref?.();
 });
 
 app.on('second-instance', showMainWindow);
