@@ -124,6 +124,28 @@ function isDesktopFolderPathField(
   return fieldPath === "required.path" && schema.type === "string";
 }
 
+/**
+ * Fields that carry a whole PEM block — certificates, private keys, CA
+ * bundles. They must render as a <textarea>: pasting a multi-line PEM into a
+ * single-line input strips the newlines and silently corrupts it.
+ *
+ * An explicit list rather than a name or description heuristic, so that a
+ * passphrase field sitting next to a key ("Password for encrypted private key
+ * PEM") is never mistaken for the key itself.
+ */
+const PEM_FIELD_NAMES = new Set([
+  "ssl_ca",
+  "ca_certificate",
+  "access_certificate",
+  "access_key",
+  "certificate_pem",
+  "private_key",
+]);
+
+function isPemField(name: string): boolean {
+  return PEM_FIELD_NAMES.has(name.toLowerCase());
+}
+
 function hasNullType(schema: JSONSchema7): boolean {
   if (schema.type === "null") return true;
   if (schema.anyOf && Array.isArray(schema.anyOf)) {
@@ -1974,7 +1996,7 @@ function SchemaField({
     );
   }
 
-  const isCertField = name.toLowerCase().includes("ssl_ca");
+  const isCertField = isPemField(name);
   const isPassword =
     !isCertField &&
     (forceMasked ||

@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import logging
 import random
+import re
 from collections.abc import AsyncGenerator
 from datetime import UTC, datetime
 from typing import Any
@@ -47,6 +48,56 @@ from .rest import KafkaRestClient
 logger = logging.getLogger(__name__)
 
 _CONSUME_TIMEOUT_SECONDS = 5.0
+
+_PEM_BEGIN = re.compile(r"-----BEGIN ([A-Z0-9 ]+)-----")
+
+
+def _normalize_pem(value: str | None) -> str | None:
+    """Accept a PEM however it survived the trip through a form or an env var.
+
+    Values copied out of JSON or a shell variable often arrive with literal
+    ``\\n`` escapes instead of real newlines; OpenSSL rejects those outright.
+    """
+    if not value:
+        return None
+    text = value.strip()
+    if "\\n" in text and "\n" not in text:
+        text = text.replace("\\n", "\n")
+    return text or None
+
+
+def _pem_block_kinds(value: str | None) -> list[str]:
+    """The PEM block types present, e.g. ``["CERTIFICATE"]``."""
+    return _PEM_BEGIN.findall(value or "")
+
+
+def _has_certificate(kinds: list[str]) -> bool:
+    return any(kind.strip() == "CERTIFICATE" for kind in kinds)
+
+
+def _has_private_key(kinds: list[str]) -> bool:
+    return any(kind.strip().endswith("PRIVATE KEY") for kind in kinds)
+
+
+class _BrokerLogCollector(logging.Handler):
+    """Captures what librdkafka logs during one connection attempt."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.messages: list[str] = []
+
+    def emit(self, record: logging.LogRecord) -> None:
+        self.messages.append(record.getMessage())
+
+
+def _last_broker_error(messages: list[str]) -> str | None:
+    """The most recent broker log line that explains a failure."""
+    for message in reversed(messages):
+        if any(marker in message for marker in ("FAIL", "SSL", "ERROR", "Disconnected")):
+            # librdkafka prefixes every line with "[rdkafka#...] [thrd:...]:";
+            # the part after the last colon-space is the readable bit.
+            return message.split("]: ", 1)[-1].strip()[:300]
+    return None
 
 
 class KafkaSource(BaseSource):
@@ -131,28 +182,38 @@ class KafkaSource(BaseSource):
         with plain ``SSL``, say) fails at connect time with an opaque
         transport error, so the mode wins and the override only picks within
         its family — SASL_PLAINTEXT for a SASL broker without TLS.
+
+        A supplied CA certificate also forces TLS: a CA exists only to verify
+        a TLS handshake, so pairing one with a plaintext protocol is always a
+        misconfiguration (and managed brokers, which is where CAs come from,
+        are TLS-only).
         """
         connection = self._connection()
         raw = getattr(connection, "security_protocol", None) if connection else None
         override = (raw.value if hasattr(raw, "value") else str(raw)) if raw is not None else None
         auth_mode = str(getattr(self.config.required, "auth_mode", "") or "")
+        has_ca = bool(getattr(self.config.masked, "ca_certificate", None))
 
         if auth_mode == "SASL":
             resolved = override if override in ("SASL_SSL", "SASL_PLAINTEXT") else "SASL_SSL"
             if override == "PLAINTEXT":
                 resolved = "SASL_PLAINTEXT"
+            if has_ca and resolved == "SASL_PLAINTEXT":
+                resolved = "SASL_SSL"
         elif auth_mode == "CLIENT_CERT":
             resolved = "SSL"
         else:
             resolved = override or "PLAINTEXT"
+            if has_ca and resolved == "PLAINTEXT":
+                resolved = "SSL"
 
         if override is not None and override != resolved:
-            logger.info(
-                "security_protocol %s is not usable with %s authentication; using %s.",
-                override,
-                auth_mode,
-                resolved,
+            reason = (
+                "a CA certificate was supplied, which requires TLS"
+                if has_ca and override in ("PLAINTEXT", "SASL_PLAINTEXT")
+                else f"it is not usable with {auth_mode} authentication"
             )
+            logger.info("security_protocol %s ignored (%s); using %s.", override, reason, resolved)
         return resolved
 
     def _client_config(self) -> dict[str, Any]:
@@ -179,17 +240,81 @@ class KafkaSource(BaseSource):
             conf["sasl.username"] = masked.sasl_username
         if getattr(masked, "sasl_password", None):
             conf["sasl.password"] = masked.sasl_password
-        ssl_certfile = getattr(masked, "ssl_certfile", None)
-        ssl_keyfile = getattr(masked, "ssl_keyfile", None)
-        if ssl_certfile:
-            conf["ssl.certificate.pem"] = ssl_certfile
-        if ssl_keyfile:
-            conf["ssl.key.pem"] = ssl_keyfile
+
+        access_certificate = _normalize_pem(getattr(masked, "access_certificate", None))
+        access_key = _normalize_pem(getattr(masked, "access_key", None))
         # The CA lives with the credentials it validates, not in plain config.
-        ssl_ca = getattr(masked, "ssl_ca", None)
-        if ssl_ca:
-            conf["ssl.ca.pem"] = ssl_ca
+        ca_certificate = _normalize_pem(getattr(masked, "ca_certificate", None))
+        self._check_pem_fields(
+            access_certificate=access_certificate,
+            access_key=access_key,
+            ca_certificate=ca_certificate,
+        )
+        if access_certificate:
+            conf["ssl.certificate.pem"] = access_certificate
+        if access_key:
+            conf["ssl.key.pem"] = access_key
+        if ca_certificate:
+            conf["ssl.ca.pem"] = ca_certificate
         return conf
+
+    @staticmethod
+    def _check_pem_fields(
+        *,
+        access_certificate: str | None,
+        access_key: str | None,
+        ca_certificate: str | None,
+    ) -> None:
+        """Reject PEM values that are in the wrong field, while we still know
+        which field they came from.
+
+        librdkafka only reports ``ssl.certificate.pem failed: not in PEM
+        format?``, which names an internal setting rather than anything on the
+        form, and says nothing about the usual cause: the access key and access
+        certificate pasted into each other's boxes.
+        """
+        cert_kinds = _pem_block_kinds(access_certificate)
+        key_kinds = _pem_block_kinds(access_key)
+        ca_kinds = _pem_block_kinds(ca_certificate)
+
+        if _has_private_key(cert_kinds) and _has_certificate(key_kinds):
+            raise ValueError(
+                "Access certificate and access key are swapped: the access certificate "
+                "field holds a private key and the access key field holds a certificate. "
+                "Swap them — the access certificate is the -----BEGIN CERTIFICATE----- "
+                "block, the access key the -----BEGIN PRIVATE KEY----- block."
+            )
+
+        for label, value, kinds, expected, ok in (
+            (
+                "Access certificate",
+                access_certificate,
+                cert_kinds,
+                "-----BEGIN CERTIFICATE-----",
+                _has_certificate(cert_kinds),
+            ),
+            (
+                "Access key",
+                access_key,
+                key_kinds,
+                "-----BEGIN PRIVATE KEY-----",
+                _has_private_key(key_kinds),
+            ),
+            (
+                "CA certificate",
+                ca_certificate,
+                ca_kinds,
+                "-----BEGIN CERTIFICATE-----",
+                _has_certificate(ca_kinds),
+            ),
+        ):
+            if not value or ok:
+                continue
+            found = f"a {', '.join(kinds)} block" if kinds else "no PEM block at all"
+            raise ValueError(
+                f"{label} is not a {expected} block — it contains {found}. "
+                "Paste the whole PEM, including its BEGIN and END lines."
+            )
 
     def _make_consumer(self) -> Any:
         conf = {
@@ -620,6 +745,11 @@ class KafkaSource(BaseSource):
             "source_type": self.recipe.get("type"),
         }
         transport = "Kafka REST Proxy" if self.is_rest else "Kafka"
+        # librdkafka reports the *reason* (TLS alerts, rejected certificates,
+        # refused connections) through its log callback and returns only a
+        # generic error object, so collect the log while the attempt runs.
+        broker_log = _BrokerLogCollector()
+        logger.addHandler(broker_log)
         try:
             topics = self._list_topics()
             result["status"] = "SUCCESS"
@@ -628,8 +758,57 @@ class KafkaSource(BaseSource):
             )
         except Exception as exc:
             result["status"] = "FAILURE"
-            result["message"] = f"Failed to connect to {transport}: {exc}"
+            result["message"] = (
+                f"Failed to connect to {transport}: {exc}"
+                f"{self._failure_hint(exc, broker_log.messages)}"
+            )
+        finally:
+            logger.removeHandler(broker_log)
         return result
+
+    def _failure_hint(self, exc: Exception, broker_messages: list[str]) -> str:
+        """Turn librdkafka's opaque transport error into something actionable.
+
+        ``Broker transport failure`` only means nothing came back that looked
+        like the Kafka protocol. What actually went wrong is in the broker log
+        — a TLS alert, a rejected client certificate — plus a couple of
+        configuration mistakes that are invisible in either.
+        """
+        if self.is_rest or "_TRANSPORT" not in str(exc):
+            return ""
+
+        joined = " ".join(broker_messages)
+        auth_mode = str(getattr(self.config.required, "auth_mode", "") or "")
+
+        if "not sending any client certificates" in joined or "certificate required" in joined:
+            hint = (
+                " The broker asked for a client certificate and rejected the one supplied: "
+                "it is not issued by a CA the broker trusts. Use the access certificate and "
+                "access key issued by this Kafka service itself (Aiven: service.cert and "
+                "service.key), not a self-signed or unrelated pair."
+            )
+        elif "certificate verify failed" in joined or "unable to get local issuer" in joined:
+            hint = (
+                " The broker's own TLS certificate could not be verified. Paste the service's "
+                "CA certificate (Aiven: ca.pem) into the CA certificate field."
+            )
+        else:
+            hint = (
+                f" Nothing answered the Kafka protocol at {self._bootstrap_servers()} over "
+                f"{self._security_protocol()}. Check that the port is the broker's — an HTTP "
+                "REST proxy port will not answer it, and needs the 'Kafka REST Proxy' "
+                "authentication mode instead"
+                + (
+                    " — and that the security protocol matches the broker (managed services "
+                    "such as Aiven and Confluent Cloud are TLS-only, so they need SASL_SSL, "
+                    "not SASL_PLAINTEXT)."
+                    if auth_mode == "SASL"
+                    else "."
+                )
+            )
+
+        last = _last_broker_error(broker_messages)
+        return f"{hint} Broker reported: {last}" if last else hint
 
     def cleanup(self) -> None:
         if self._rest_client is not None:

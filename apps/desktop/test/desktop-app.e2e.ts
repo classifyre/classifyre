@@ -96,8 +96,30 @@ test.beforeAll(async () => {
       CLASSIFYRE_DATA_DIR: testDataDir,
     },
   });
-  page = await electronApp.firstWindow({ timeout: 180_000 });
+  page = await waitForAppWindow(electronApp);
 });
+
+/**
+ * The first window Electron opens is the startup progress window (a data: URL
+ * shown while Postgres/API boot), so the test must wait for the window that
+ * actually renders the web application.
+ */
+async function waitForAppWindow(
+  application: ElectronApplication,
+  timeoutMs = 180_000,
+): Promise<Page> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    for (const window of application.windows()) {
+      if (window.url().startsWith('http://localhost:3000')) return window;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+  const urls = application.windows().map((window) => window.url());
+  throw new Error(
+    `Application window never opened. Windows: ${urls.join(', ') || '(none)'}`,
+  );
+}
 
 test.afterAll(async () => {
   await electronApp?.close().catch(() => {});

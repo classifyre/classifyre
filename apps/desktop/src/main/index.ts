@@ -8,11 +8,12 @@ import { registerNotificationHandlers } from './notification-service.js';
 import { registerAppProtocol } from './protocol-handler.js';
 import { SettingsManager } from './settings-manager.js';
 import { UpdateChecker } from './update-checker.js';
-import { initFileLogging } from './logger.js';
+import { getLogFilePath, initFileLogging } from './logger.js';
 import { buildApplicationMenu } from './menu.js';
 import { AppTray } from './tray.js';
 import { getAvailablePort } from './port-manager.js';
 import { NamespaceStore, type ApiNamespace } from './namespace-store.js';
+import { StartupWindow, type StartupStep } from './startup-window.js';
 
 /** Process id for the single shared, namespace-aware API. */
 const SHARED_API_ID = 'shared';
@@ -65,6 +66,13 @@ let tray: AppTray | null = null;
 let isQuitting = false;
 let shutdownStarted = false;
 
+// The web UI is only usable once the shared API answers. Until then every
+// activation path (dock click, tray, second instance, deep link) must land on
+// the startup window instead of loading the real UI against a dead API — that
+// produced a window full of empty skeletons and "Failed to fetch".
+let startupState: 'starting' | 'ready' | 'failed' = 'starting';
+let startupWindow: StartupWindow | null = null;
+
 autoUpdater.on('before-quit-for-update', () => {
   isQuitting = true;
 });
@@ -86,6 +94,12 @@ function appUrl(route = ''): string {
 }
 
 function showMainWindow(): void {
+  // Before the API is up there is nothing worth rendering: show progress
+  // instead of a UI whose every request would fail.
+  if (startupState !== 'ready') {
+    startupWindow?.focus();
+    return;
+  }
   if (mainWindow && !mainWindow.isDestroyed()) {
     if (mainWindow.isMinimized()) mainWindow.restore();
     mainWindow.show();
@@ -94,6 +108,33 @@ function showMainWindow(): void {
   }
   if (!sharedApiBaseUrl) return;
   mainWindow = createMainWindow();
+}
+
+/**
+ * Terminal startup failure: the startup window stays up with the reason (and
+ * the log path) instead of vanishing behind a modal, and the user is offered
+ * the log before the app exits.
+ */
+async function failStartup(summary: string, error: unknown): Promise<void> {
+  startupState = 'failed';
+  const detail = error instanceof Error ? error.message : String(error);
+  console.error(`${summary} ${detail}`);
+  startupWindow?.showError(`${summary}\n\n${detail}`);
+
+  const logFile = getLogFilePath();
+  const buttons = logFile ? ['Quit', 'Open Log'] : ['Quit'];
+  const { response } = await dialog.showMessageBox({
+    type: 'error',
+    title: 'Classifyre could not start',
+    message: summary,
+    detail,
+    buttons,
+    defaultId: 0,
+  });
+  if (logFile && buttons[response] === 'Open Log') {
+    await shell.openPath(logFile);
+  }
+  app.quit();
 }
 
 function showHome(): void {
@@ -149,6 +190,30 @@ function configureWebContents(win: BrowserWindow): void {
 }
 
 /**
+ * Shows the window once its first page has painted and retires the startup
+ * window at the same moment. A failed or slow load still reveals the window —
+ * an error the user can see beats an indefinite splash.
+ */
+function revealWhenLoaded(win: BrowserWindow): void {
+  let revealed = false;
+  const reveal = (): void => {
+    if (revealed) return;
+    revealed = true;
+    clearTimeout(fallback);
+    if (!win.isDestroyed()) win.show();
+    startupWindow?.close();
+    startupWindow = null;
+  };
+  const fallback = setTimeout(reveal, 30_000);
+  fallback.unref?.();
+  // `did-finish-load`, not `ready-to-show`: the latter fires on the first paint
+  // of an empty document, which would hand off to a blank window.
+  win.webContents.once('did-finish-load', reveal);
+  win.webContents.once('did-fail-load', reveal);
+  win.once('closed', () => clearTimeout(fallback));
+}
+
+/**
  * One window renders the namespace-aware web application. Namespace selection,
  * creation, settings, and routing all live in that application and use the
  * shared API injected by the preload.
@@ -158,6 +223,9 @@ function createMainWindow(): BrowserWindow {
     width: 1400,
     height: 900,
     title: 'Classifyre',
+    // Stay hidden until the page has actually rendered, so the handoff from the
+    // startup window is a swap rather than a flash of blank chrome.
+    show: false,
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
@@ -166,6 +234,7 @@ function createMainWindow(): BrowserWindow {
     },
   });
   configureWebContents(win);
+  revealWhenLoaded(win);
   void win.loadURL(appUrl());
 
   win.on('close', (event) => {
@@ -197,28 +266,35 @@ app.on('ready', async () => {
     registerAppProtocol(path.join(process.resourcesPath, 'web'));
   }
 
+  // On screen before any of the slow work starts, so the app never sits in the
+  // dock with nothing to show.
+  startupWindow = new StartupWindow({ onCancel: () => app.quit() });
+  startupWindow.show();
+  // Later crash-recovery restarts reuse the same callbacks; ignore them once
+  // the app is up so a background restart cannot resurrect startup UI.
+  const reportProgress = (detail: string, phase?: StartupStep): void => {
+    if (startupState !== 'starting') return;
+    if (phase) startupWindow?.setStep(phase, detail);
+    else startupWindow?.setDetail(detail);
+  };
+
   settingsManager = new SettingsManager();
-  pg = new PostgresManager(settingsManager.get().postgresPort);
-  processManager = new ProcessManager();
+  pg = new PostgresManager(settingsManager.get().postgresPort, reportProgress);
+  processManager = new ProcessManager(reportProgress);
   updateChecker = new UpdateChecker();
   updateChecker.startPeriodicChecks();
 
   try {
+    startupWindow.setStep('database');
     await pg.start();
     console.log(`Embedded PostgreSQL started on port ${pg.getPort()}`);
   } catch (error) {
-    console.error('Failed to start embedded PostgreSQL:', error);
-    dialog.showErrorBox(
-      'Classifyre could not start',
-      `The embedded PostgreSQL database failed to start.\n\n${
-        error instanceof Error ? error.message : String(error)
-      }`,
-    );
-    app.quit();
+    await failStartup('The embedded PostgreSQL database failed to start.', error);
     return;
   }
 
   try {
+    startupWindow.setStep('runtime');
     const apiPort = await getAvailablePort();
     sharedApiBaseUrl = `http://127.0.0.1:${apiPort}`;
     await processManager.startApi(
@@ -228,14 +304,7 @@ app.on('ready', async () => {
     );
     console.log(`Shared Classifyre API started on ${sharedApiBaseUrl}`);
   } catch (error) {
-    console.error('Failed to start the Classifyre API:', error);
-    dialog.showErrorBox(
-      'Classifyre could not start',
-      `The Classifyre API failed to start.\n\n${
-        error instanceof Error ? error.message : String(error)
-      }`,
-    );
-    app.quit();
+    await failStartup('The Classifyre API failed to start.', error);
     return;
   }
 
@@ -269,7 +338,16 @@ app.on('ready', async () => {
     getWebContents: () => mainWindow?.webContents ?? null,
   });
 
+  startupWindow.setStep('interface', 'Opening the workspace directory…');
   await namespaceStore.start();
+
+  // Closing the startup window mid-boot quits the app; don't pop a main window
+  // open on top of a shutdown that is already running.
+  if (isQuitting) return;
+
+  // Only now may any activation path open the real UI: everything it talks to
+  // is live. createMainWindow closes the startup window once the page loads.
+  startupState = 'ready';
   mainWindow = createMainWindow();
 
   // Startup update check runs once the window exists, so the "update available"

@@ -19,14 +19,18 @@ def _recipe(
     rows_per_page: int | None = 10,
     optional: dict | None = None,
     oauth: bool = False,
+    pkce: bool = False,
 ) -> dict:
     sampling: dict[str, object] = {"strategy": strategy}
     if rows_per_page is not None:
         sampling["rows_per_page"] = rows_per_page
 
-    if oauth:
-        required: dict[str, object] = {"auth_method": "oauth", "app_key": "app-key"}
-        masked: dict[str, object] = {
+    if pkce:
+        required: dict[str, object] = {"auth_method": "oauth_pkce", "app_key": "app-key"}
+        masked: dict[str, object] = {"refresh_token": "refresh-token"}
+    elif oauth:
+        required = {"auth_method": "oauth", "app_key": "app-key"}
+        masked = {
             "app_secret": "app-secret",
             "refresh_token": "refresh-token",
         }
@@ -876,6 +880,40 @@ def test_dropbox_client_uses_refresh_token_for_oauth(monkeypatch):
     assert "oauth2_access_token" not in captured
 
 
+def test_dropbox_client_refreshes_with_app_key_only_for_pkce(monkeypatch):
+    """PKCE apps hold no secret; the SDK refreshes with the app key alone, so
+    app_secret must be absent rather than empty."""
+    source = DropboxSource(_recipe(pkce=True))
+    captured: dict[str, object] = {}
+
+    class _FakeSdk:
+        @staticmethod
+        def Dropbox(**kwargs):  # noqa: N802 - mirrors the SDK class name
+            captured.update(kwargs)
+            return SimpleNamespace()
+
+    monkeypatch.setattr("src.sources.dropbox.source.require_module", lambda **_kw: _FakeSdk)
+
+    source._build_client()
+
+    assert captured["oauth2_refresh_token"] == "refresh-token"
+    assert captured["app_key"] == "app-key"
+    assert "app_secret" not in captured
+    assert "oauth2_access_token" not in captured
+
+
+def test_dropbox_oauth_without_app_secret_is_rejected():
+    source = DropboxSource(
+        {
+            **_recipe(oauth=True),
+            "masked": {"app_secret": "", "refresh_token": "refresh-token"},
+        }
+    )
+
+    with pytest.raises(ValueError, match="oauth_pkce"):
+        source._credential_kwargs()
+
+
 def test_dropbox_client_uses_access_token(monkeypatch):
     source = DropboxSource(_recipe())
     captured: dict[str, object] = {}
@@ -910,18 +948,49 @@ def test_dropbox_test_connection_reports_account(monkeypatch):
     assert "/Finance" in result["message"]
 
 
-def test_dropbox_test_connection_reports_failure(monkeypatch):
+def test_dropbox_expired_short_lived_token_explains_the_fix(monkeypatch):
+    """The App Console token dies after ~4h; the raw SDK error does not say so."""
     source = DropboxSource(_recipe())
 
     def _boom():
-        raise RuntimeError("invalid_access_token")
+        raise RuntimeError("AuthError('...', AuthError('invalid_access_token', None))")
 
     monkeypatch.setattr(source, "_client", _boom)
 
     result = source.test_connection()
 
     assert result["status"] == "FAILURE"
-    assert "invalid_access_token" in result["message"]
+    assert "short-lived" in result["message"]
+    assert "dropbox-auth" in result["message"]
+
+
+def test_dropbox_rejected_refresh_token_explains_the_fix(monkeypatch):
+    source = DropboxSource(_recipe(oauth=True))
+
+    def _boom():
+        raise RuntimeError("AuthError('...', AuthError('invalid_access_token', None))")
+
+    monkeypatch.setattr(source, "_client", _boom)
+
+    result = source.test_connection()
+
+    assert result["status"] == "FAILURE"
+    assert "revoked" in result["message"]
+    assert "short-lived" not in result["message"]
+
+
+def test_dropbox_missing_scope_error_points_at_reauthorization(monkeypatch):
+    source = DropboxSource(_recipe(oauth=True))
+
+    def _boom():
+        raise RuntimeError("missing_scope: files.content.read")
+
+    monkeypatch.setattr(source, "_client", _boom)
+
+    result = source.test_connection()
+
+    assert result["status"] == "FAILURE"
+    assert "--scope" in result["message"]
 
 
 # ── asset metadata catalog ───────────────────────────────────────────────

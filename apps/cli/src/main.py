@@ -10,6 +10,7 @@ from typing import Any, cast
 
 from .outputs import create_output_sink
 from .sources import get_source, list_available_sources
+from .sources.dropbox.auth import add_dropbox_auth_arguments, run_dropbox_auth_command
 from .utils.validation import validate_input, validate_test_connection
 
 logger = logging.getLogger(__name__)
@@ -586,7 +587,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Classifyre Metadata Extraction CLI")
     parser.add_argument(
         "command",
-        choices=["test", "extract", "discover", "evaluate-file", "train"],
+        choices=["test", "extract", "discover", "evaluate-file", "train", "dropbox-auth"],
         help="Command to run",
     )
     parser.add_argument(
@@ -667,6 +668,7 @@ def main() -> None:
         default=None,
         help="Max assets processed concurrently in Phase 2. Controls DB connection usage. Defaults to pool_workers*2 (env: CLASSIFYRE_MAX_CONCURRENT_ASSETS)",
     )
+    add_dropbox_auth_arguments(parser)
 
     args = parser.parse_args()
 
@@ -694,6 +696,9 @@ def main() -> None:
 
     if args.debug:
         logging.getLogger().setLevel(logging.DEBUG)
+
+    if args.command == "dropbox-auth":
+        sys.exit(run_dropbox_auth_command(args))
 
     if args.command == "evaluate-file":
         run_evaluate_file_command(args)

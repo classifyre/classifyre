@@ -11,6 +11,12 @@ from src.sources.kafka.source import KafkaSource
 
 CURSOR_ENV = "CLASSIFYRE_SAMPLING_CURSOR"
 
+# Structurally valid PEM blocks — the connector checks the BEGIN/END markers
+# so that a key pasted into the certificate box is caught by name.
+_CERT_PEM = "-----BEGIN CERTIFICATE-----\nZmFrZS1jZXJ0\n-----END CERTIFICATE-----"
+_KEY_PEM = "-----BEGIN PRIVATE KEY-----\nZmFrZS1rZXk=\n-----END PRIVATE KEY-----"
+_CA_PEM = "-----BEGIN CERTIFICATE-----\nZmFrZS1jYQ==\n-----END CERTIFICATE-----"
+
 
 def _encode_cursor(cursor: dict[str, Any]) -> str:
     return base64.b64encode(json.dumps(cursor).encode()).decode()
@@ -234,7 +240,7 @@ def test_kafka_sasl_credentials_wire_into_client_config(
             masked={
                 "sasl_username": "avnadmin",
                 "sasl_password": "secret",
-                "ssl_ca": "fake-ca-pem",
+                "ca_certificate": _CA_PEM,
             },
             optional={"connection": {"security_protocol": "SASL_SSL", "sasl_mechanism": "PLAIN"}},
         )
@@ -246,7 +252,7 @@ def test_kafka_sasl_credentials_wire_into_client_config(
     assert conf["sasl.username"] == "avnadmin"
     assert conf["sasl.password"] == "secret"
     # The CA travels with the credentials, not in unmasked connection options.
-    assert conf["ssl.ca.pem"] == "fake-ca-pem"
+    assert conf["ssl.ca.pem"] == _CA_PEM
     assert "ssl.certificate.pem" not in conf
 
 
@@ -255,18 +261,18 @@ def test_kafka_client_cert_auth_wires_pem_config(_patch_kafka: _FakeKafkaModule)
         _recipe(
             required={"auth_mode": "CLIENT_CERT", "host": "broker", "port": 9094},
             masked={
-                "ssl_certfile": "fake-cert-pem",
-                "ssl_keyfile": "fake-key-pem",
-                "ssl_ca": "fake-ca-pem",
+                "access_certificate": _CERT_PEM,
+                "access_key": _KEY_PEM,
+                "ca_certificate": _CA_PEM,
             },
             optional={"connection": {"security_protocol": "SSL"}},
         )
     )
     conf = src._client_config()
     assert conf["security.protocol"] == "SSL"
-    assert conf["ssl.ca.pem"] == "fake-ca-pem"
-    assert conf["ssl.certificate.pem"] == "fake-cert-pem"
-    assert conf["ssl.key.pem"] == "fake-key-pem"
+    assert conf["ssl.ca.pem"] == _CA_PEM
+    assert conf["ssl.certificate.pem"] == _CERT_PEM
+    assert conf["ssl.key.pem"] == _KEY_PEM
     assert "sasl.username" not in conf
 
 
@@ -550,11 +556,50 @@ def test_kafka_plaintext_override_upgrades_to_sasl_plaintext(
     assert src._client_config()["security.protocol"] == "SASL_PLAINTEXT"
 
 
+def test_kafka_ca_certificate_forces_tls_over_a_plaintext_choice(
+    _patch_kafka: _FakeKafkaModule,
+) -> None:
+    """A CA only exists to verify a TLS handshake, so plaintext + CA is always
+    a misconfiguration — and it is how a managed broker gets an unexplained
+    transport failure."""
+    src = KafkaSource(
+        _recipe(
+            required={"auth_mode": "SASL", "host": "broker", "port": 9093},
+            masked={"sasl_username": "u", "sasl_password": "p", "ca_certificate": _CA_PEM},
+            optional={"connection": {"security_protocol": "SASL_PLAINTEXT"}},
+        )
+    )
+    conf = src._client_config()
+    assert conf["security.protocol"] == "SASL_SSL"
+    assert conf["ssl.ca.pem"] == _CA_PEM
+
+
+def test_kafka_transport_failure_explains_port_and_protocol(
+    _patch_kafka: _FakeKafkaModule, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    src = KafkaSource(
+        _recipe(
+            required={"auth_mode": "SASL", "host": "broker", "port": 10222},
+            masked={"sasl_username": "u", "sasl_password": "p"},
+            optional={"connection": {"security_protocol": "SASL_PLAINTEXT"}},
+        )
+    )
+
+    def _explode() -> list[str]:
+        raise RuntimeError('KafkaError{code=_TRANSPORT,val=-195,str="Broker transport failure"}')
+
+    monkeypatch.setattr(src, "_list_topics", _explode)
+    message = src.test_connection()["message"]
+    assert "broker:10222" in message
+    assert "SASL_PLAINTEXT" in message
+    assert "REST Proxy" in message
+
+
 def test_kafka_client_cert_always_uses_ssl(_patch_kafka: _FakeKafkaModule) -> None:
     src = KafkaSource(
         _recipe(
             required={"auth_mode": "CLIENT_CERT", "host": "broker", "port": 9094},
-            masked={"ssl_certfile": "cert", "ssl_keyfile": "key"},
+            masked={"access_certificate": _CERT_PEM, "access_key": _KEY_PEM},
             optional={"connection": {"security_protocol": "PLAINTEXT"}},
         )
     )
@@ -568,3 +613,81 @@ def test_kafka_no_auth_defaults_to_plaintext(_patch_kafka: _FakeKafkaModule) -> 
         _recipe(required={"auth_mode": "NONE", "host": "broker", "port": 9092}, optional={})
     )
     assert src._client_config()["security.protocol"] == "PLAINTEXT"
+
+
+# ── PEM field validation ─────────────────────────────────────────────────
+
+
+def test_kafka_swapped_key_and_certificate_is_named_as_such(
+    _patch_kafka: _FakeKafkaModule,
+) -> None:
+    """The two boxes sit next to each other and providers list the key first,
+    so pasting them the wrong way round is the common mistake. librdkafka only
+    says 'ssl.certificate.pem failed: not in PEM format?'."""
+    src = KafkaSource(
+        _recipe(
+            required={"auth_mode": "CLIENT_CERT", "host": "broker", "port": 9094},
+            masked={"access_certificate": _KEY_PEM, "access_key": _CERT_PEM},
+        )
+    )
+    with pytest.raises(ValueError, match="swapped"):
+        src._client_config()
+
+
+def test_kafka_certificate_field_holding_junk_names_the_field(
+    _patch_kafka: _FakeKafkaModule,
+) -> None:
+    src = KafkaSource(
+        _recipe(
+            required={"auth_mode": "CLIENT_CERT", "host": "broker", "port": 9094},
+            masked={"access_certificate": "MIIEYTCCAsm...", "access_key": _KEY_PEM},
+        )
+    )
+    with pytest.raises(ValueError, match=r"Access certificate .*no PEM block at all"):
+        src._client_config()
+
+
+def test_kafka_key_field_holding_a_certificate_names_the_field(
+    _patch_kafka: _FakeKafkaModule,
+) -> None:
+    src = KafkaSource(
+        _recipe(
+            required={"auth_mode": "CLIENT_CERT", "host": "broker", "port": 9094},
+            masked={"access_certificate": _CERT_PEM, "access_key": _CA_PEM},
+        )
+    )
+    with pytest.raises(ValueError, match=r"Access key is not a -----BEGIN PRIVATE KEY"):
+        src._client_config()
+
+
+def test_kafka_pem_with_escaped_newlines_is_normalized(
+    _patch_kafka: _FakeKafkaModule,
+) -> None:
+    """PEMs pasted out of JSON or an env var arrive with literal \\n; OpenSSL
+    rejects those outright."""
+    src = KafkaSource(
+        _recipe(
+            required={"auth_mode": "CLIENT_CERT", "host": "broker", "port": 9094},
+            masked={
+                "access_certificate": _CERT_PEM.replace("\n", "\\n"),
+                "access_key": _KEY_PEM.replace("\n", "\\n"),
+            },
+        )
+    )
+    conf = src._client_config()
+    assert conf["ssl.certificate.pem"] == _CERT_PEM
+    assert conf["ssl.key.pem"] == _KEY_PEM
+
+
+def test_kafka_ec_private_key_is_accepted(_patch_kafka: _FakeKafkaModule) -> None:
+    """Providers hand out PKCS#1/SEC1 keys too, not only PKCS#8."""
+    src = KafkaSource(
+        _recipe(
+            required={"auth_mode": "CLIENT_CERT", "host": "broker", "port": 9094},
+            masked={
+                "access_certificate": _CERT_PEM,
+                "access_key": "-----BEGIN RSA PRIVATE KEY-----\nZmFrZQ==\n-----END RSA PRIVATE KEY-----",
+            },
+        )
+    )
+    assert "ssl.key.pem" in src._client_config()

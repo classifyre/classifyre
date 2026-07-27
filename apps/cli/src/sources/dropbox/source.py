@@ -7,7 +7,21 @@ from datetime import UTC, datetime
 from typing import Any
 from urllib.parse import quote
 
-from ...models.generated_input import DropboxInput, DropboxRequiredOAuth
+# The generated model names come from each auth branch's schema `title`, which
+# is also what the source form shows in its auth dropdown. Alias them back to
+# stable names so renaming a label never churns this module.
+from ...models.generated_input import (
+    DropboxAccessTokenShortLivedTestingOnly as DropboxRequiredAccessToken,
+)
+from ...models.generated_input import (
+    DropboxInput,
+)
+from ...models.generated_input import (
+    DropboxOAuthRefreshTokenRecommended as DropboxRequiredOAuth,
+)
+from ...models.generated_input import (
+    DropboxOAuthWithPKCENoAppSecret as DropboxRequiredOAuthPkce,
+)
 from ...models.generated_single_asset_scan_results import SingleAssetScanResults
 from ..dependencies import require_module
 from ..object_storage.base import ObjectRef, ObjectStorageSourceBase
@@ -178,6 +192,11 @@ class DropboxSource(ObjectStorageSourceBase):
         Both client classes take the same credentials; what differs between an
         individual and a Business scan is the access type granted to the app,
         not the shape of the secret.
+
+        Refresh-token modes are the only ones that survive a scheduled run: the
+        SDK exchanges the refresh token for a new access token on every call
+        that needs one. PKCE apps refresh with the app key alone, so
+        ``app_secret`` is omitted rather than empty.
         """
         common: dict[str, Any] = {
             "timeout": self._request_timeout_seconds(),
@@ -187,26 +206,63 @@ class DropboxSource(ObjectStorageSourceBase):
         }
 
         required = self.config.required
-        if isinstance(required, DropboxRequiredOAuth):
+
+        if isinstance(required, DropboxRequiredOAuth | DropboxRequiredOAuthPkce):
             app_key = str(required.app_key or "").strip()
-            app_secret = self._masked_value("app_secret")
             refresh_token = self._masked_value("refresh_token")
-            if not app_key or not app_secret or not refresh_token:
+            if not app_key or not refresh_token:
                 raise ValueError(
-                    "Dropbox OAuth authentication requires required.app_key, "
-                    "masked.app_secret and masked.refresh_token"
+                    "Dropbox refresh-token authentication requires required.app_key "
+                    "and masked.refresh_token. Run "
+                    "`classifyre dropbox-auth --app-key <key>` to obtain one."
                 )
-            return {
+            credentials: dict[str, Any] = {
                 "oauth2_refresh_token": refresh_token,
                 "app_key": app_key,
-                "app_secret": app_secret,
                 **common,
             }
+            if isinstance(required, DropboxRequiredOAuth):
+                app_secret = self._masked_value("app_secret")
+                if not app_secret:
+                    raise ValueError(
+                        "Dropbox OAuth authentication requires masked.app_secret. "
+                        "Use auth_method 'oauth_pkce' for an app that holds no secret."
+                    )
+                credentials["app_secret"] = app_secret
+            return credentials
 
         access_token = self._masked_value("access_token")
         if not access_token:
             raise ValueError("Dropbox access token authentication requires masked.access_token")
         return {"oauth2_access_token": access_token, **common}
+
+    def _uses_short_lived_token(self) -> bool:
+        return isinstance(self.config.required, DropboxRequiredAccessToken)
+
+    def _explain_auth_failure(self, exc: Exception) -> str:
+        """Turn Dropbox's opaque auth errors into something actionable."""
+        text = str(exc)
+        if "invalid_access_token" in text and self._uses_short_lived_token():
+            return (
+                "the access token is no longer valid. App Console tokens are "
+                "short-lived and stop working a few hours after they are generated. "
+                "Switch this source to auth_method 'oauth' (or 'oauth_pkce') and run "
+                "`classifyre dropbox-auth --app-key <key> --app-secret <secret>` to "
+                "get a refresh token that does not expire."
+            )
+        if "invalid_access_token" in text:
+            return (
+                "the refresh token was rejected. It may have been revoked, or it may "
+                "belong to a different Dropbox app than the configured app key. "
+                "Re-run `classifyre dropbox-auth` to issue a new one."
+            )
+        if "missing_scope" in text:
+            return (
+                f"{text} — the refresh token was issued without a scope this scan needs. "
+                "Re-run `classifyre dropbox-auth` with the required --scope values so the "
+                "authorization covers them."
+            )
+        return text
 
     def _build_client(self) -> Any:
         return self._sdk().Dropbox(**self._credential_kwargs())
@@ -655,7 +711,7 @@ class DropboxSource(ObjectStorageSourceBase):
             )
         except Exception as exc:
             result["status"] = "FAILURE"
-            result["message"] = f"Failed to connect to Dropbox: {exc}"
+            result["message"] = f"Failed to connect to Dropbox: {self._explain_auth_failure(exc)}"
         return result
 
     async def extract_raw(self) -> AsyncGenerator[list[SingleAssetScanResults], None]:

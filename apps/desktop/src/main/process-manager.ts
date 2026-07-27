@@ -182,12 +182,33 @@ const RESTART_WINDOW_MS = 10 * 60 * 1000;
 const MAX_RESTARTS_PER_WINDOW = 3;
 const RESTART_DELAY_MS = 2000;
 
+/**
+ * Coarse phase an API start is in: local preparation work (relocating the
+ * bundled venv, unpacking the API tree) versus the service itself booting.
+ */
+export type ApiStartupPhase = "runtime" | "service";
+
+export type ApiStartupProgress = (
+  detail: string,
+  phase: ApiStartupPhase,
+) => void;
+
 export class ProcessManager {
   private processes = new Map<string, ManagedProcess>();
   private restartTimestamps = new Map<string, number[]>();
   private venvPathOverride: string | null = null;
   private venvPreparation: Promise<void> | null = null;
   private apiDirPromise: Promise<string> | null = null;
+  private started = new Set<string>();
+  private reportProgress = true;
+
+  // First-launch preparation (venv relocation, API unpacking) runs for minutes
+  // with nothing else to show for it, so the caller can surface it to the user.
+  constructor(private readonly onProgress: ApiStartupProgress = () => {}) {}
+
+  private progress(detail: string, phase: ApiStartupPhase): void {
+    if (this.reportProgress) this.onProgress(detail, phase);
+  }
 
   // Rewires the bundled Python venv for this machine before the shared API
   // starts. Single-flight so crash recovery cannot race the first preparation.
@@ -195,6 +216,7 @@ export class ProcessManager {
     if (!this.venvPreparation) {
       this.venvPreparation = (async () => {
         try {
+          this.progress("Preparing the bundled Python runtime…", "runtime");
           const venvPath = await ensurePythonRuntime();
           if (venvPath) this.venvPathOverride = venvPath;
         } catch (err) {
@@ -218,6 +240,7 @@ export class ProcessManager {
         return;
       }
       if (await dirSizeExceeds(cacheDir, UV_CACHE_MAX_BYTES)) {
+        this.progress("Clearing the package cache…", "runtime");
         console.log(
           `[uv-cache] ${cacheDir} exceeds ${UV_CACHE_MAX_BYTES} bytes — clearing`,
         );
@@ -276,6 +299,7 @@ export class ProcessManager {
       // no valid extraction yet
     }
 
+    this.progress("Unpacking application components…", "runtime");
     console.log(`[api-runtime] Extracting bundled API to ${root}…`);
     await fs.promises.rm(root, { recursive: true, force: true });
     await fs.promises.mkdir(root, { recursive: true });
@@ -332,6 +356,12 @@ export class ProcessManager {
     if (this.processes.has(processId)) {
       return;
     }
+
+    // A crash-restart runs concurrently with the original start's readiness
+    // wait, so only the first attempt reports progress — otherwise two elapsed
+    // counters interleave and the UI appears to count backwards.
+    if (this.started.has(processId)) this.reportProgress = false;
+    this.started.add(processId);
 
     await this.prepareVenv();
     const entryPath = await this.getApiEntryPath();
@@ -444,6 +474,7 @@ export class ProcessManager {
 
     this.processes.set(processId, { child, port });
 
+    this.progress("Waiting for the service to accept connections…", "service");
     try {
       await Promise.race([this.waitForReady(port), spawnFailed]);
     } catch (err) {
@@ -465,10 +496,29 @@ export class ProcessManager {
   ): Promise<void> {
     const start = Date.now();
     return new Promise((resolve, reject) => {
+      // A silent 3-minute wait reads as a hang; report the elapsed time so the
+      // startup window can show that something is still happening.
+      const heartbeat = setInterval(() => {
+        const seconds = Math.round((Date.now() - start) / 1000);
+        this.progress(
+          `Starting the service — first launch runs database migrations (${seconds}s)`,
+          "service",
+        );
+      }, 10_000);
+      heartbeat.unref?.();
+      const done = (): void => {
+        clearInterval(heartbeat);
+        resolve();
+      };
+      const fail = (error: Error): void => {
+        clearInterval(heartbeat);
+        reject(error);
+      };
+
       const check = () => {
         if (Date.now() - start > timeoutMs) {
           const logFile = getLogFilePath();
-          reject(
+          fail(
             new Error(
               `API on port ${port} not ready after ${timeoutMs}ms` +
                 (logFile ? ` — see log for details: ${logFile}` : ""),
@@ -479,7 +529,7 @@ export class ProcessManager {
 
         const req = http.get(`http://127.0.0.1:${port}/`, (res) => {
           if (res.statusCode === 200) {
-            resolve();
+            done();
           } else {
             setTimeout(check, intervalMs);
           }
