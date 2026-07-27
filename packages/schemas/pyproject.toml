@@ -4,7 +4,7 @@ version = "0.4.71.dev0"
 description = "Shared JSON schemas for Classifyre monorepo"
 requires-python = ">=3.12"
 dependencies = [
-    "fastjsonschema==2.21.2",
+    "fastjsonschema==2.22.0",
 ]
 
 [tool.uv]
