@@ -142,6 +142,37 @@ class TestConvertLegacyOffice:
         # The operator has to be able to act on it without reading our source.
         assert "CLASSIFYRE_SOFFICE_PATH" in str(excinfo.value)
 
+    @pytest.mark.parametrize(
+        ("platform", "expected_hint"),
+        [
+            ("darwin", "brew install --cask libreoffice"),
+            ("win32", "libreoffice.org/download"),
+            ("linux", "apt install libreoffice-writer"),
+        ],
+    )
+    def test_install_hint_matches_the_platform(
+        self, monkeypatch: pytest.MonkeyPatch, platform: str, expected_hint: str
+    ) -> None:
+        """The desktop app ships no LibreOffice, so this message is the user's
+        whole remediation path — a macOS user must not be told to run apt."""
+        monkeypatch.setattr(legacy_office.sys, "platform", platform)
+
+        message = legacy_office.soffice_missing_error()
+
+        assert expected_hint in message
+        # Keeps the ENGINE_UNAVAILABLE classification working (see iter_file_pages).
+        assert "unavailable" in message.casefold()
+
+    def test_install_hint_falls_back_on_unknown_platform(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(legacy_office.sys, "platform", "freebsd14")
+
+        message = legacy_office.soffice_missing_error()
+
+        assert "install LibreOffice" in message
+        assert "unavailable" in message.casefold()
+
 
 # Fixture bodies chosen so LibreOffice can genuinely *import* them: Writer reads
 # plain text, Calc reads CSV, Impress reads flat ODF. (Feeding .txt to Calc or

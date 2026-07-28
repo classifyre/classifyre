@@ -7,11 +7,15 @@ is fed back through the existing docx/xlsx/pptx extraction paths:
     .doc / .xls / .ppt → soffice --headless --convert-to → .docx / .xlsx / .pptx
 
 The CLI container image ships LibreOffice (the ``libreoffice-*-nogui`` Debian
-packages, which install ``/usr/bin/soffice``), so conversion works out of the
-box under Kubernetes. Elsewhere — the desktop app, developer machines — it is an
-*optional system dependency*: when no ``soffice`` binary is found the conversion
-returns a structured error and callers degrade gracefully (the file stays a
-binary asset with a ``parse_error``).
+packages, which install ``/usr/bin/soffice``), so conversion works out of the box
+under Kubernetes. The desktop app deliberately does NOT bundle it — ~550 MB even
+stripped, and slimming the upstream bundle breaks its code signature — so there
+it is a system dependency the user installs.
+
+When no binary is found the file is **not** quietly reported as empty: the error
+from :func:`soffice_missing_error` propagates as an ENGINE_UNAVAILABLE text
+extraction coverage failure, which fails that asset's text scan and tells the
+user, per platform, how to install LibreOffice.
 """
 
 from __future__ import annotations
@@ -51,15 +55,35 @@ LEGACY_OFFICE_MIME_TYPES = frozenset(_CONVERSION_TARGETS)
 
 _SOFFICE_TIMEOUT_SECONDS = 120
 
-# Returned when no binary can be found. The wording is load-bearing: the word
-# "unavailable" is what makes iter_file_pages classify this as
-# ENGINE_UNAVAILABLE rather than a per-document FAILED, which is the difference
-# between "this deployment cannot read .doc at all" and "this one file is
-# broken". test_legacy_office.py pins that mapping so the two cannot drift.
-SOFFICE_MISSING_ERROR = (
-    "LibreOffice (soffice) is unavailable, so .doc/.xls/.ppt content was NOT scanned. "
-    "Install LibreOffice or point CLASSIFYRE_SOFFICE_PATH at an existing binary."
-)
+# How to actually get LibreOffice, per platform. The desktop app does not bundle
+# it, so this message is the entire remediation path a user gets — a generic
+# "install LibreOffice" would leave them guessing which package to install.
+_INSTALL_HINTS: dict[str, str] = {
+    "darwin": "install it with `brew install --cask libreoffice`, or from libreoffice.org",
+    "win32": "install it from https://www.libreoffice.org/download/",
+    "linux": (
+        "install it with "
+        "`apt install libreoffice-writer libreoffice-calc libreoffice-impress` "
+        "(or the equivalent for your distribution)"
+    ),
+}
+
+
+def soffice_missing_error() -> str:
+    """Actionable message for a deployment with no LibreOffice.
+
+    The word "unavailable" is load-bearing: it is what makes iter_file_pages
+    classify this as ENGINE_UNAVAILABLE rather than a per-document FAILED — the
+    difference between "this install cannot read .doc at all" and "this one file
+    is broken". test_legacy_office.py pins that mapping so the two cannot drift.
+    """
+    hint = _INSTALL_HINTS.get(sys.platform, "install LibreOffice")
+    return (
+        "LibreOffice is unavailable, so this .doc/.xls/.ppt file was NOT scanned. "
+        f"To scan legacy Office documents, {hint} — "
+        "or set CLASSIFYRE_SOFFICE_PATH to an existing soffice binary."
+    )
+
 
 # Explicit override, checked before anything else. The desktop app rebuilds a
 # minimal PATH for the processes it spawns, so an installation it discovered
@@ -142,7 +166,7 @@ def convert_legacy_office(
 
     soffice = find_soffice()
     if soffice is None:
-        return None, target_mime, SOFFICE_MISSING_ERROR
+        return None, target_mime, soffice_missing_error()
 
     try:
         with tempfile.TemporaryDirectory(prefix="classifyre-soffice-") as temp_dir:

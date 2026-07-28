@@ -449,12 +449,9 @@ export class ProcessManager {
         // Inherited by every CLI process the API spawns via `uv run`, which is
         // how scan jobs authenticate their write-backs.
         CLASSIFYRE_INTERNAL_KEY: getInternalApiKey(),
-        // Legacy Office (.doc/.xls/.ppt) extraction shells out to the
-        // LibreOffice staged into resources/ (see soffice-env.ts).
-        ...sofficeEnv({
-          resourcesPath: process.resourcesPath,
-          isPackaged: app.isPackaged,
-        }),
+        // Legacy Office (.doc/.xls/.ppt) extraction shells out to a system
+        // LibreOffice, which the desktop bundle does not ship (see soffice-env.ts).
+        ...sofficeEnv(),
         // Persist scan logs on the local filesystem (desktop has no S3).
         // The storage service enforces per-run and total-size caps itself.
         RUNNER_LOG_DIR: getRunnerLogDir(),
