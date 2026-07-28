@@ -61,6 +61,37 @@ class ParsedBytes:
     parse_error: str | None = None
 
 
+OCTET_STREAM = "application/octet-stream"
+
+# Spellings of "I don't know what these bytes are". Only the first is the
+# registered type, but object stores are inconsistent: S3-compatible services
+# (Backblaze B2 among them) label every upload `binary/octet-stream`. Because
+# that is not the IANA spelling, treating it as a *real* content type made it
+# win over magic-byte detection and filename inference — so every object served
+# that way skipped MIME resolution entirely, matched no branch in extract_text,
+# and returned no text AND no error. Assets were then recorded as scanned and
+# empty, which is indistinguishable from a genuinely empty file.
+_GENERIC_BINARY_MIME_TYPES = frozenset(
+    {
+        OCTET_STREAM,
+        "binary/octet-stream",
+        "application/binary",
+        "application/unknown",
+        "unknown/unknown",
+    }
+)
+
+
+def _canonical_mime_type(mime_type: str) -> str:
+    """Collapse every "unknown bytes" spelling onto the registered one.
+
+    Downstream code compares against ``application/octet-stream`` in a dozen
+    places (is_binary, archive handling, detector content-type matching); mapping
+    aliases here means none of those have to know the alias list.
+    """
+    return OCTET_STREAM if mime_type in _GENERIC_BINARY_MIME_TYPES else mime_type
+
+
 _TEXT_RAW_MIME_TYPES = {
     "application/json",
     "application/xml",
@@ -327,10 +358,21 @@ def _require_file_processing(module_name: str) -> object:
     return require_module(module_name, "file parser", ["file-processing"])
 
 
-def _normalize_mime_type(mime_type: str | None) -> str:
+def normalize_mime_type(mime_type: str | None) -> str:
+    """Strip parameters, lower-case, and collapse "unknown bytes" aliases.
+
+    The single place MIME strings are normalized. Sources must use this rather
+    than an inline ``split(";")[0].strip().lower()``: that idiom looks equivalent
+    but skips the alias collapsing, which is exactly how `binary/octet-stream`
+    from S3-compatible stores slipped through as a real content type.
+    """
     if not mime_type:
         return ""
-    return str(mime_type).split(";", 1)[0].strip().lower()
+    return _canonical_mime_type(str(mime_type).split(";", 1)[0].strip().lower())
+
+
+# Internal alias kept so the many call sites in this module stay unchanged.
+_normalize_mime_type = normalize_mime_type
 
 
 def _file_extension(file_name: str) -> str:
@@ -357,7 +399,7 @@ def normalize_detected_mime_type(detected_mime_type: str, file_name: str) -> str
     mime = _normalize_mime_type(detected_mime_type)
     inferred_mime = infer_mime_type_from_file_name(file_name)
 
-    if not mime or mime == "application/octet-stream":
+    if not mime or mime == OCTET_STREAM:
         return inferred_mime
 
     if mime == "text/plain" and inferred_mime in _TABULAR_MIME_TYPES:
@@ -1015,17 +1057,17 @@ def resolve_mime_type(
     detected_mime = _normalize_mime_type(detect_mime_type(file_bytes))
     inferred_mime = infer_mime_type_from_file_name(file_name)
 
-    if declared_mime and declared_mime != "application/octet-stream":
+    if declared_mime and declared_mime != OCTET_STREAM:
         mime_type = declared_mime
-    elif detected_mime and detected_mime != "application/octet-stream":
+    elif detected_mime and detected_mime != OCTET_STREAM:
         mime_type = detected_mime
-    elif inferred_mime and inferred_mime != "application/octet-stream":
+    elif inferred_mime and inferred_mime != OCTET_STREAM:
         mime_type = inferred_mime
     else:
-        mime_type = declared_mime or detected_mime or inferred_mime or "application/octet-stream"
+        mime_type = declared_mime or detected_mime or inferred_mime or OCTET_STREAM
 
     mime_type = normalize_detected_mime_type(mime_type, file_name)
-    if mime_type == "application/octet-stream" and inferred_mime != "application/octet-stream":
+    if mime_type == OCTET_STREAM and inferred_mime != OCTET_STREAM:
         mime_type = inferred_mime
 
     # A text-like claim (declared upload header or file extension) must survive
@@ -1033,10 +1075,10 @@ def resolve_mime_type(
     # control-character garbage that poisons every text consumer downstream.
     if (
         file_bytes
-        and detected_mime == "application/octet-stream"
+        and detected_mime == OCTET_STREAM
         and (mime_type.startswith("text/") or mime_type in ("application/json", "application/xml"))
     ):
-        return "application/octet-stream"
+        return OCTET_STREAM
 
     return mime_type
 

@@ -11,6 +11,7 @@ from urllib.parse import urljoin, urlsplit, urlunsplit
 
 import requests
 
+from ..utils.file_parser import normalize_mime_type
 from ..utils.hashing import normalize_http_url
 
 logger = logging.getLogger(__name__)
@@ -86,7 +87,7 @@ def extract_urls_from_text(text: str) -> list[str]:
 
 
 def is_tabular_mime_type(mime_type: str) -> bool:
-    normalized = mime_type.split(";", 1)[0].strip().lower()
+    normalized = normalize_mime_type(mime_type)
     return normalized in TABULAR_MIME_TYPES
 
 
@@ -206,7 +207,7 @@ class AtlassianCloudClient:
         for chunk in response.iter_content(chunk_size=8192):
             if chunk:
                 chunks.append(chunk)
-        mime = response.headers.get("Content-Type", "").split(";")[0].strip().lower()
+        mime = normalize_mime_type(response.headers.get("Content-Type", ""))
         return b"".join(chunks), mime
 
     def iter_confluence_results(
