@@ -70,7 +70,7 @@ download_and_verify() {
   local url="$1" out="$2" want_sha="$3" got_sha
 
   echo "Downloading $(basename "$out") …"
-  curl -fSL --retry 3 --retry-delay 5 -o "$out" "$url"
+  curl -fSL --no-progress-meter --retry 3 --retry-delay 5 -o "$out" "$url"
 
   if command -v sha256sum >/dev/null; then
     got_sha="$(sha256sum "$out" | cut -d' ' -f1)"
@@ -87,14 +87,19 @@ download_and_verify() {
   echo "Checksum OK: $got_sha"
 }
 
-# Locale help, clipart, templates and sample wizards are pure UI surface. The
-# app only ever runs `--headless --convert-to`, which never reads any of them,
-# and they are ~90 MB that would otherwise be signed, notarized and shipped.
-# Import/export filters, fonts and configuration are NOT touched.
-strip_unused() {
-  local root="$1" dir
-  for dir in help gallery template wizards; do
-    rm -rf "${root:?}/$dir"
+# Help, clipart galleries, document templates, sample wizards and the bundled
+# extensions (MediaWiki publisher, presentation minimizer, …) are UI surface the
+# app never reaches: it only ever runs `--headless --convert-to`. Dropping them
+# saves ~150 MB that would otherwise be signed, notarized and shipped.
+# Import/export filters, fonts, registry and configuration are NOT touched.
+#
+# Removals are not taken on trust — the smoke test at the end of this script
+# converts all three legacy formats with the stripped tree, on the build machine
+# for that platform, and fails the build if any of them stops working.
+strip_paths() {
+  local relative
+  for relative in "$@"; do
+    rm -rf "${DEST:?}/$relative"
   done
 }
 
@@ -125,8 +130,27 @@ case "$HOST_OS" in
     hdiutil detach "$MOUNT_POINT" >/dev/null
     trap "rm -rf '$TMP'" EXIT
 
-    strip_unused "$DEST/LibreOffice.app/Contents/Resources"
-    SOFFICE="$DEST/LibreOffice.app/Contents/MacOS/soffice"
+    APP_CONTENTS="$DEST/LibreOffice.app/Contents"
+    strip_paths \
+      "LibreOffice.app/Contents/Resources/help" \
+      "LibreOffice.app/Contents/Resources/gallery" \
+      "LibreOffice.app/Contents/Resources/template" \
+      "LibreOffice.app/Contents/Resources/wizards" \
+      "LibreOffice.app/Contents/Resources/extensions" \
+      "LibreOffice.app/Contents/Frameworks/LibreOfficePython.framework"
+
+    # --headless keeps LibreOffice from drawing windows, but on macOS the process
+    # still registers with the window server and bounces a Dock icon — the user
+    # sees "LibreOffice" launch every time a .doc is scanned. LSUIElement makes
+    # the bundled copy an agent (no Dock tile, no menu bar, never focus-steals).
+    # Safe to patch: we re-sign this bundle with our own Developer ID anyway, so
+    # editing Info.plist does not break a signature we were preserving.
+    /usr/libexec/PlistBuddy -c "Add :LSUIElement bool true" "$APP_CONTENTS/Info.plist" 2>/dev/null \
+      || /usr/libexec/PlistBuddy -c "Set :LSUIElement true" "$APP_CONTENTS/Info.plist"
+    /usr/libexec/PlistBuddy -c "Print :LSUIElement" "$APP_CONTENTS/Info.plist" >/dev/null \
+      || { echo "Failed to set LSUIElement on bundled LibreOffice" >&2; exit 1; }
+
+    SOFFICE="$APP_CONTENTS/MacOS/soffice"
     ;;
 
   win)
@@ -150,7 +174,7 @@ case "$HOST_OS" in
 
     mkdir -p "$DEST"
     cp -R "$(dirname "$PROGRAM_DIR")/." "$DEST/"
-    strip_unused "$DEST/share"
+    strip_paths share/gallery share/template share/wizards share/extensions
     SOFFICE="$DEST/program/soffice.exe"
     ;;
 
@@ -187,7 +211,7 @@ case "$HOST_OS" in
 
     mkdir -p "$DEST"
     cp -R "$(dirname "$PROGRAM_DIR")/." "$DEST/"
-    strip_unused "$DEST/share"
+    strip_paths share/gallery share/template share/wizards share/extensions
     SOFFICE="$DEST/program/soffice"
     chmod +x "$SOFFICE"
     ;;
@@ -195,21 +219,61 @@ esac
 
 [ -x "$SOFFICE" ] || { echo "Staged soffice is not executable: $SOFFICE" >&2; exit 1; }
 
-echo "=== Smoke-test the staged binary ==="
-# Proves the extracted tree is self-contained and can actually convert, on this
-# machine, before it is signed and shipped. A bundle that merely *contains*
-# soffice but cannot run it is the exact failure this staging step exists to
-# prevent, and it is invisible until a user scans a .doc.
+echo "=== Smoke-test the staged binary (all three legacy formats) ==="
+# Proves the extracted, stripped tree is self-contained and can actually convert
+# — on this machine, for this platform, before it is signed and shipped. A bundle
+# that merely *contains* soffice but cannot run it is the exact failure this
+# staging step exists to prevent, and it is invisible until a user scans a .doc.
+#
+# All three formats are exercised because each needs its own import filter, and
+# the strip lists above differ per platform: this is what catches a removal that
+# is harmless on macOS but fatal on Linux or Windows.
 SMOKE="$TMP/smoke"
-mkdir -p "$SMOKE"
+mkdir -p "$SMOKE/out"
+
+# Source documents LibreOffice can genuinely import: Writer reads plain text,
+# Calc reads CSV, Impress reads flat ODF.
 printf 'Legacy document body text.\n' > "$SMOKE/sample.txt"
-"$SOFFICE" --headless --norestore \
-  -env:UserInstallation="file://$SMOKE/profile" \
-  --convert-to doc --outdir "$SMOKE" "$SMOKE/sample.txt" >/dev/null
-[ -s "$SMOKE/sample.doc" ] || { echo "Staged LibreOffice could not produce a .doc" >&2; exit 1; }
-"$SOFFICE" --headless --norestore \
-  -env:UserInstallation="file://$SMOKE/profile2" \
-  --convert-to docx --outdir "$SMOKE/out" "$SMOKE/sample.doc" >/dev/null
-[ -s "$SMOKE/out/sample.docx" ] || { echo "Staged LibreOffice could not convert .doc → .docx" >&2; exit 1; }
+printf 'name,ssn\nAlice,123-45-6789\n' > "$SMOKE/sample.csv"
+cat > "$SMOKE/sample.fodp" <<'FODP'
+<?xml version="1.0" encoding="UTF-8"?>
+<office:document xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+ xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0"
+ xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"
+ xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0"
+ office:version="1.2"
+ office:mimetype="application/vnd.oasis.opendocument.presentation">
+ <office:body><office:presentation>
+  <draw:page draw:name="page1">
+   <draw:frame svg:width="10cm" svg:height="2cm" svg:x="1cm" svg:y="1cm">
+    <draw:text-box><text:p>Legacy slide body text.</text:p></draw:text-box>
+   </draw:frame>
+  </draw:page>
+ </office:presentation></office:body>
+</office:document>
+FODP
+
+convert() {
+  local source="$1" target_ext="$2" out_dir="$3"
+  "$SOFFICE" --headless --invisible --nologo --nodefault --nolockcheck --norestore \
+    -env:UserInstallation="file://$SMOKE/profile_$target_ext" \
+    --convert-to "$target_ext" --outdir "$out_dir" "$source" >/dev/null
+}
+
+for pair in "txt doc" "csv xls" "fodp ppt"; do
+  set -- $pair
+  convert "$SMOKE/sample.$1" "$2" "$SMOKE"
+  [ -s "$SMOKE/sample.$2" ] || { echo "Staged LibreOffice could not produce a .$2" >&2; exit 1; }
+done
+
+for pair in "doc docx" "xls xlsx" "ppt pptx"; do
+  set -- $pair
+  convert "$SMOKE/sample.$1" "$2" "$SMOKE/out"
+  [ -s "$SMOKE/out/sample.$2" ] || {
+    echo "Staged LibreOffice could not convert .$1 to .$2 — check the strip list" >&2
+    exit 1
+  }
+done
+echo "doc→docx, xls→xlsx, ppt→pptx all OK"
 
 echo "=== LibreOffice staged: $(du -sh "$DEST" | cut -f1) at $DEST ==="

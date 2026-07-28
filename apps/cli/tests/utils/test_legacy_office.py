@@ -117,6 +117,31 @@ class TestConvertLegacyOffice:
         assert target_mime == _DOCX_MIME
         assert error is not None and "LibreOffice" in error
 
+    def test_missing_soffice_is_reported_as_engine_unavailable(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A missing binary is a broken deployment, not a broken document.
+
+        iter_file_pages must raise — a silent empty result would let the asset be
+        recorded as scanned-and-empty, which is indistinguishable from a genuinely
+        empty file. The ENGINE_UNAVAILABLE code is what separates "this install
+        cannot read .doc at all" from "this one file failed".
+        """
+        from src.utils.file_parser import (
+            TextExtractionCoverageCode,
+            TextExtractionCoverageError,
+            iter_file_pages,
+        )
+
+        monkeypatch.setattr(legacy_office, "find_soffice", lambda: None)
+
+        with pytest.raises(TextExtractionCoverageError) as excinfo:
+            list(iter_file_pages(b"\xd0\xcf\x11\xe0", "application/msword", file_name="x.doc"))
+
+        assert excinfo.value.code is TextExtractionCoverageCode.ENGINE_UNAVAILABLE
+        # The operator has to be able to act on it without reading our source.
+        assert "CLASSIFYRE_SOFFICE_PATH" in str(excinfo.value)
+
 
 # Fixture bodies chosen so LibreOffice can genuinely *import* them: Writer reads
 # plain text, Calc reads CSV, Impress reads flat ODF. (Feeding .txt to Calc or
