@@ -26,19 +26,23 @@ docx|xlsx|pptx` and feeds the result through the normal OOXML extractors. Withou
 it those files scan as *"no content available"* — a silent coverage gap, not an
 error.
 
-- **Kubernetes**: installed in the CLI image (`libreoffice-*-nogui`).
-- **Desktop**: bundled in the installer under `resources/libreoffice`
-  (`apps/desktop/scripts/stage-libreoffice.sh`); the app passes its location to
-  the CLI via `CLASSIFYRE_SOFFICE_PATH`. Nothing for the user to install.
-- **Local dev** (running the CLI directly): install it yourself —
-  `brew install --cask libreoffice` (macOS), or
-  `apt install libreoffice-writer libreoffice-calc libreoffice-impress`.
-  The CLI checks `CLASSIFYRE_SOFFICE_PATH`, then `PATH`, then the standard
-  macOS, Windows, and Linux-tarball install locations.
+- **Kubernetes**: installed in the CLI image (`libreoffice-*-nogui`), so this
+  works out of the box.
+- **Desktop and local dev**: install it yourself — `brew install --cask libreoffice`
+  (macOS), `apt install libreoffice-writer libreoffice-calc libreoffice-impress`
+  (Debian/Ubuntu), or libreoffice.org on Windows. The desktop app deliberately
+  does not bundle LibreOffice: it is ~550 MB even stripped, and slimming the
+  upstream bundle breaks its code signature, which Apple Silicon punishes by
+  killing the process on launch.
+- **Non-standard install**: set `CLASSIFYRE_SOFFICE_PATH` to the binary. The CLI
+  checks that first, then `PATH`, then the standard macOS, Windows, and
+  Linux-tarball install locations.
 
-When no binary is found the asset is **not** silently reported as empty: the scan
-raises an `ENGINE_UNAVAILABLE` text-extraction coverage error, which lands in the
-asset's `scan_stats.errors` and the run's text-coverage counters.
+When no binary is found the file is **not** silently reported as empty. The scan
+raises an `ENGINE_UNAVAILABLE` text-extraction coverage error that fails that
+asset's text scan, lands in `scan_stats.errors` and the run's text-coverage
+counters, and carries a platform-specific message telling the user how to install
+LibreOffice.
 
 `tests/utils/test_legacy_office.py` skips its round-trip tests when no LibreOffice
 is found, so a green local run does not by itself prove this path works.

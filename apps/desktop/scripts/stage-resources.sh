@@ -16,13 +16,17 @@ set -euo pipefail
 #   resources/python/  — standalone CPython (python-build-standalone via uv)
 #   resources/venv/    — pre-baked BASE venv (optional groups install on demand)
 #   resources/prisma/  — Prisma schema + migrations
-#   resources/libreoffice/ — headless LibreOffice for .doc/.xls/.ppt extraction
-#                            (see stage-libreoffice.sh)
+#
+# LibreOffice is deliberately NOT bundled: it is ~550 MB even stripped, and
+# modifying the upstream bundle to slim it breaks its code signature (Apple
+# Silicon then SIGKILLs it). Legacy Office (.doc/.xls/.ppt) instead requires a
+# system install, and the CLI reports a clear, actionable error when it is
+# missing rather than scanning those files as empty — see
+# apps/cli/src/utils/legacy_office.py.
 #
 # Env toggles:
 #   SKIP_APP_BUILD=1  — skip rebuilding API/web (reuse existing dist/out)
 #   SKIP_PYTHON=1     — skip Python/venv baking (dev iteration)
-#   SKIP_LIBREOFFICE=1 — skip the LibreOffice download (dev iteration)
 #   PYTHON_VERSION    — standalone CPython version (default 3.12)
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -317,12 +321,6 @@ if [ "${SKIP_PYTHON:-0}" != "1" ]; then
     exit 1
   fi
 fi
-
-# --- LibreOffice: legacy Office (.doc/.xls/.ppt) conversion ------------------
-# Downloaded, checksum-verified and smoke-tested by its own script; must run
-# after the `rm -rf "$RESOURCES"` above, and before the macOS packing/signing
-# below so the staged .app is part of the signed bundle.
-bash "$SCRIPT_DIR/stage-libreoffice.sh"
 
 # --- macOS: sign the API's Mach-O binaries, then collapse into one archive ----
 # Even after esbuild bundling, the external node_modules (Prisma engines, the
