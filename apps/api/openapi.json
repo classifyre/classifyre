@@ -4080,6 +4080,44 @@
         ]
       }
     },
+    "/ai-provider-configs/{id}/capability-test": {
+      "post": {
+        "description": "Runs a graded probe suite against the model using the real harness turn contract, the real tool catalog and the real mission prompts, then reports per-agent readiness and context headroom. Unlike /test (which proves the key and model id work), this measures whether the model can actually drive the agent loop: strict JSON, tool selection, schema-valid arguments, and chaining a tool observation into a dependent call.\n\nNo tool handler is invoked — every observation fed to the model is a fixture, so the run has no side effects. Selection is never gated on the result.",
+        "operationId": "AiProviderConfigController_capabilityTest",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssistantCapabilityReportDto"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "AI provider returned an error"
+          },
+          "503": {
+            "description": "AI provider not configured or rate limit hit"
+          }
+        },
+        "summary": "Grade a credential against what the agent harness requires",
+        "tags": [
+          "AI Provider Configs"
+        ]
+      }
+    },
     "/ai/complete": {
       "post": {
         "description": "Sends messages to the configured AI provider and returns a plain-text response.",
@@ -13774,6 +13812,263 @@
         "required": [
           "provider",
           "model"
+        ]
+      },
+      "CapabilityProbeResultDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Stable probe identifier.",
+            "example": "chain.two_step"
+          },
+          "tier": {
+            "type": "string",
+            "enum": [
+              "PROTOCOL",
+              "TOOL_USE",
+              "CHAINING",
+              "JUDGMENT",
+              "CAPACITY"
+            ],
+            "example": "CHAINING"
+          },
+          "title": {
+            "type": "string",
+            "example": "Carries an id from an observation into the next call"
+          },
+          "whatItProves": {
+            "type": "string",
+            "description": "Which harness requirement this probe stands in for."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PASS",
+              "FAIL",
+              "SKIPPED",
+              "ERROR"
+            ],
+            "example": "PASS"
+          },
+          "reason": {
+            "type": "string",
+            "description": "The grader’s explanation — always populated, pass or fail."
+          },
+          "prompt": {
+            "type": "string",
+            "description": "Final user-turn text sent to the model. Null for probes with no LLM call.",
+            "nullable": true
+          },
+          "rawOutput": {
+            "type": "string",
+            "description": "Verbatim model output, so the grade can be audited.",
+            "nullable": true
+          },
+          "latencyMs": {
+            "type": "number",
+            "example": 1840
+          },
+          "inputTokens": {
+            "type": "number",
+            "nullable": true,
+            "example": 2310
+          },
+          "outputTokens": {
+            "type": "number",
+            "nullable": true,
+            "example": 96
+          }
+        },
+        "required": [
+          "id",
+          "tier",
+          "title",
+          "whatItProves",
+          "status",
+          "reason",
+          "prompt",
+          "rawOutput",
+          "latencyMs",
+          "inputTokens",
+          "outputTokens"
+        ]
+      },
+      "AgentCapacityReportDto": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "example": "DETECTOR_AUTHOR"
+          },
+          "readiness": {
+            "type": "string",
+            "enum": [
+              "READY",
+              "DEGRADED",
+              "WILL_FAIL",
+              "UNKNOWN"
+            ],
+            "example": "READY"
+          },
+          "reason": {
+            "type": "string",
+            "description": "Operator-facing explanation of the verdict."
+          },
+          "maxIterations": {
+            "type": "number",
+            "example": 16
+          },
+          "toolCount": {
+            "type": "number",
+            "description": "Tools this agent may call, including scoped MCP tools."
+          },
+          "systemPromptTokens": {
+            "type": "number",
+            "description": "Estimated tokens in the rendered system prompt."
+          },
+          "projectedPeakTokens": {
+            "type": "number",
+            "description": "Estimated tokens at the final iteration."
+          },
+          "contextSize": {
+            "type": "number",
+            "nullable": true,
+            "description": "Configured context window."
+          },
+          "headroomPct": {
+            "type": "number",
+            "nullable": true,
+            "description": "Fraction of the window still free at peak (0–1)."
+          }
+        },
+        "required": [
+          "kind",
+          "readiness",
+          "reason",
+          "maxIterations",
+          "toolCount",
+          "systemPromptTokens",
+          "projectedPeakTokens",
+          "contextSize",
+          "headroomPct"
+        ]
+      },
+      "CapabilityCostProjectionDto": {
+        "type": "object",
+        "properties": {
+          "avgInputTokensPerTurn": {
+            "type": "number",
+            "nullable": true
+          },
+          "avgOutputTokensPerTurn": {
+            "type": "number",
+            "nullable": true
+          },
+          "estimatedCostPerRunUsd": {
+            "type": "number",
+            "nullable": true,
+            "description": "Projected USD for one full run of the heaviest agent."
+          },
+          "basedOnAgent": {
+            "type": "string",
+            "nullable": true,
+            "description": "Agent the projection is based on."
+          }
+        },
+        "required": [
+          "avgInputTokensPerTurn",
+          "avgOutputTokensPerTurn",
+          "estimatedCostPerRunUsd",
+          "basedOnAgent"
+        ]
+      },
+      "AssistantCapabilityReportDto": {
+        "type": "object",
+        "properties": {
+          "configId": {
+            "type": "string"
+          },
+          "configName": {
+            "type": "string"
+          },
+          "provider": {
+            "type": "string",
+            "example": "CLAUDE"
+          },
+          "model": {
+            "type": "string",
+            "example": "claude-sonnet-4-5"
+          },
+          "verdict": {
+            "type": "string",
+            "enum": [
+              "READY",
+              "DEGRADED",
+              "UNUSABLE"
+            ],
+            "example": "READY"
+          },
+          "headline": {
+            "type": "string",
+            "description": "Plain-language summary of the verdict."
+          },
+          "abortedEarly": {
+            "type": "boolean",
+            "description": "True when the turn-contract probes failed and later tiers were skipped."
+          },
+          "probes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CapabilityProbeResultDto"
+            }
+          },
+          "agents": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AgentCapacityReportDto"
+            }
+          },
+          "cost": {
+            "$ref": "#/components/schemas/CapabilityCostProjectionDto"
+          },
+          "totalInputTokens": {
+            "type": "number"
+          },
+          "totalOutputTokens": {
+            "type": "number"
+          },
+          "totalDurationMs": {
+            "type": "number"
+          },
+          "ranAt": {
+            "type": "string",
+            "example": "2026-07-28T10:15:00.000Z"
+          },
+          "assumptions": {
+            "description": "Assumptions the capacity arithmetic rests on, surfaced so the numbers can be argued with.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "configId",
+          "configName",
+          "provider",
+          "model",
+          "verdict",
+          "headline",
+          "abortedEarly",
+          "probes",
+          "agents",
+          "cost",
+          "totalInputTokens",
+          "totalOutputTokens",
+          "totalDurationMs",
+          "ranAt",
+          "assumptions"
         ]
       },
       "AiMessageDto": {

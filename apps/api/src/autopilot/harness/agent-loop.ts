@@ -20,13 +20,13 @@ const logger = new Logger('AgentLoop');
 const PROGRESS_KEY = 'reason-act:progress';
 
 /** One turn the model emits in the ReAct loop. */
-interface LoopTurn {
+export interface LoopTurn {
   thought: string;
   toolCalls: Array<{ tool: string; input: unknown; rationale: string }>;
   finish?: { summary: string };
 }
 
-const loopTurnSchema: JsonSchema = {
+export const loopTurnSchema: JsonSchema = {
   type: 'object',
   properties: {
     thought: { type: 'string' },
@@ -347,12 +347,22 @@ function buildSystemPrompt(
     guidance,
     '\n## Tools you may call',
     registry.catalog(allowed),
-    '\n## How to respond',
-    'Each turn, return JSON: {"thought": "...", "toolCalls": [{"tool": "name", "input": {...}, "rationale": "why"}]}.',
-    'Call read tools to gather what you need before mutating. When you are done, return {"thought":"...","finish":{"summary":"what you did"}} with an empty or omitted toolCalls.',
-    'Only call tools from the list above. Keep rationale short and specific.',
+    ...RESPONSE_PROTOCOL,
   ].join('\n');
 }
+
+/**
+ * The turn contract every model driving this loop must obey. Exported so the
+ * assistant capability probes exercise the SAME text the harness sends — a
+ * probe suite that tested a copy of this would silently stop being a test of
+ * the harness the moment either side was edited.
+ */
+export const RESPONSE_PROTOCOL: readonly string[] = [
+  '\n## How to respond',
+  'Each turn, return JSON: {"thought": "...", "toolCalls": [{"tool": "name", "input": {...}, "rationale": "why"}]}.',
+  'Call read tools to gather what you need before mutating. When you are done, return {"thought":"...","finish":{"summary":"what you did"}} with an empty or omitted toolCalls.',
+  'Only call tools from the list above. Keep rationale short and specific.',
+];
 
 function buildUserPrompt(ctx: AgentContext, mission: Mission): string {
   const scope = ctx.sourceId
@@ -369,7 +379,7 @@ function buildUserPrompt(ctx: AgentContext, mission: Mission): string {
 }
 
 /** Tolerate common shape drift in the model's turn output. */
-function repairTurn(value: unknown): unknown {
+export function repairTurn(value: unknown): unknown {
   if (!value || typeof value !== 'object') return { thought: String(value) };
   const v = value as Record<string, unknown>;
   if (v.toolCalls && !Array.isArray(v.toolCalls)) v.toolCalls = [v.toolCalls];

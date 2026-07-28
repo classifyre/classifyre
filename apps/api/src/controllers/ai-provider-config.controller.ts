@@ -26,6 +26,8 @@ import {
   CreateAiProviderConfigDto,
   UpdateAiProviderConfigDto,
 } from '../dto/ai-provider-config.dto';
+import { AssistantCapabilityReportDto } from '../dto/assistant-capability.dto';
+import { AssistantCapabilityService } from '../autopilot/capability/assistant-capability.service';
 
 const TEST_MESSAGES = [
   {
@@ -46,6 +48,7 @@ export class AiProviderConfigController {
   constructor(
     private readonly service: AiProviderConfigService,
     private readonly aiClient: AiClientService,
+    private readonly capability: AssistantCapabilityService,
   ) {}
 
   @Get()
@@ -125,6 +128,48 @@ export class AiProviderConfigController {
       });
       return { provider: result.provider, model: result.model };
     } catch (err) {
+      if (err instanceof AiConfigError || err instanceof AiRateLimitError) {
+        throw new ServiceUnavailableException(err.message);
+      }
+      if (
+        err instanceof AiAuthError ||
+        err instanceof AiModelNotFoundError ||
+        err instanceof AiProviderError
+      ) {
+        throw new BadGatewayException(err.message);
+      }
+      throw err;
+    }
+  }
+
+  @Post(':id/capability-test')
+  @ApiOperation({
+    summary: 'Grade a credential against what the agent harness requires',
+    description:
+      'Runs a graded probe suite against the model using the real harness turn ' +
+      'contract, the real tool catalog and the real mission prompts, then reports ' +
+      'per-agent readiness and context headroom. Unlike /test (which proves the key ' +
+      'and model id work), this measures whether the model can actually drive the ' +
+      'agent loop: strict JSON, tool selection, schema-valid arguments, and chaining ' +
+      'a tool observation into a dependent call.\n\n' +
+      'No tool handler is invoked — every observation fed to the model is a fixture, ' +
+      'so the run has no side effects. Selection is never gated on the result.',
+  })
+  @ApiResponse({ status: 200, type: AssistantCapabilityReportDto })
+  @ApiResponse({
+    status: 503,
+    description: 'AI provider not configured or rate limit hit',
+  })
+  @ApiResponse({ status: 502, description: 'AI provider returned an error' })
+  @HttpCode(200)
+  async capabilityTest(
+    @Param('id') id: string,
+  ): Promise<AssistantCapabilityReportDto> {
+    try {
+      return await this.capability.run(id);
+    } catch (err) {
+      // Individual probe failures are graded, not thrown — reaching here means
+      // the suite could not run at all (bad credential, provider down).
       if (err instanceof AiConfigError || err instanceof AiRateLimitError) {
         throw new ServiceUnavailableException(err.message);
       }

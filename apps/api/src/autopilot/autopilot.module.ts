@@ -46,6 +46,7 @@ import { McpServersController } from './mcp-client/mcp-servers.controller';
 import { AutopilotWorker } from './autopilot.worker';
 import { AutopilotService } from './autopilot.service';
 import { AutopilotController } from './autopilot.controller';
+import { AssistantCapabilityService } from './capability/assistant-capability.service';
 
 /**
  * Investigation autopilot: autonomous background agents that manage inquiries
@@ -101,6 +102,7 @@ import { AutopilotController } from './autopilot.controller';
     McpServersService,
     AgentConfigService,
     HarnessService,
+    AssistantCapabilityService,
     AutopilotWorker,
     AutopilotService,
   ],
@@ -115,6 +117,10 @@ import { AutopilotController } from './autopilot.controller';
     AgentAuditService,
     AgentLoggerService,
     McpClientService,
+    // Consumed by AiProviderConfigController (AppModule) so the Settings →
+    // Assistant capability test grades the model against these same
+    // registry/mission/brief instances.
+    AssistantCapabilityService,
   ],
 })
 export class AutopilotModule {}

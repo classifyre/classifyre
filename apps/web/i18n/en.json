@@ -284,7 +284,41 @@
       "createNew": "New provider",
       "disabledHint": "Enable the assistant to choose a model.",
       "usingNone": "No model selected",
-      "loading": "Loading assistant settings…"
+      "loading": "Loading assistant settings…",
+      "capability": {
+        "title": "Capability test",
+        "description": "The connection test proves the key and model id work. This grades the model against what the agent harness actually requires: strict JSON turns, tool selection, schema-valid arguments, and chaining a tool result into the next call. It runs against fixtures — no tool is executed and nothing in your instance changes.",
+        "run": "Run capability test",
+        "running": "Running…",
+        "runningHint": "Running graded probes against the model. This makes several real completions and can take a minute.",
+        "failed": "The capability test could not run.",
+        "probesPassed": "probes passed",
+        "perRun": "per run",
+        "agentsTitle": "Agent readiness",
+        "agentsDesc": "Each agent's effective configuration — your goal, tool and iteration overrides — measured against this model's context window.",
+        "colAgent": "Agent",
+        "colStatus": "Status",
+        "colTools": "Tools",
+        "colPrompt": "Prompt",
+        "colHeadroom": "Headroom",
+        "probesTitle": "Probe results",
+        "whatItProves": "What this proves",
+        "promptSent": "Prompt sent",
+        "modelOutput": "Model output",
+        "assumptionsTitle": "Assumptions",
+        "verdict": {
+          "READY": "Ready",
+          "DEGRADED": "Degraded",
+          "UNUSABLE": "Unusable"
+        },
+        "tier": {
+          "PROTOCOL": "Turn contract",
+          "TOOL_USE": "Tool use",
+          "CHAINING": "Chaining",
+          "JUDGMENT": "Judgment",
+          "CAPACITY": "Capacity"
+        }
+      }
     },
     "autopilot": {
       "subtitle": "Investigation Autopilot",
