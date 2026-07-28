@@ -6,16 +6,21 @@ is fed back through the existing docx/xlsx/pptx extraction paths:
 
     .doc / .xls / .ppt → soffice --headless --convert-to → .docx / .xlsx / .pptx
 
-LibreOffice is an *optional system dependency*: when no ``soffice`` binary is
-found the conversion returns a structured error and callers degrade gracefully
-(the file stays a binary asset with a ``parse_error``).
+The CLI container image ships LibreOffice (the ``libreoffice-*-nogui`` Debian
+packages, which install ``/usr/bin/soffice``), so conversion works out of the
+box under Kubernetes. Elsewhere — the desktop app, developer machines — it is an
+*optional system dependency*: when no ``soffice`` binary is found the conversion
+returns a structured error and callers degrade gracefully (the file stays a
+binary asset with a ``parse_error``).
 """
 
 from __future__ import annotations
 
 import logging
+import os
 import shutil
 import subprocess
+import sys
 import tempfile
 import threading
 from functools import cache
@@ -46,13 +51,28 @@ LEGACY_OFFICE_MIME_TYPES = frozenset(_CONVERSION_TARGETS)
 
 _SOFFICE_TIMEOUT_SECONDS = 120
 
-# Non-PATH install locations checked after shutil.which().
-_SOFFICE_FALLBACK_PATHS = (
-    "/Applications/LibreOffice.app/Contents/MacOS/soffice",
-    "/usr/lib/libreoffice/program/soffice",
-    "/opt/libreoffice/program/soffice",
-    "C:\\Program Files\\LibreOffice\\program\\soffice.exe",
-)
+# Explicit override, checked before anything else. The desktop app rebuilds a
+# minimal PATH for the processes it spawns, so an installation it discovered
+# itself is handed down through this variable rather than through PATH.
+SOFFICE_PATH_ENV = "CLASSIFYRE_SOFFICE_PATH"
+
+# Install locations to check when PATH comes up empty, keyed by sys.platform.
+# macOS and Windows always need these: their installers drop the binary inside an
+# app bundle / Program Files without touching PATH, and the packaged desktop app
+# rebuilds a minimal PATH that cannot see either. Linux only needs them for an
+# upstream tarball install — the distro packages (including the
+# libreoffice-*-nogui ones in the CLI image) all land on /usr/bin/soffice.
+_SOFFICE_FALLBACK_PATHS: dict[str, tuple[str, ...]] = {
+    "darwin": ("/Applications/LibreOffice.app/Contents/MacOS/soffice",),
+    "linux": (
+        "/opt/libreoffice/program/soffice",
+        "/usr/lib/libreoffice/program/soffice",
+    ),
+    "win32": (
+        "C:\\Program Files\\LibreOffice\\program\\soffice.exe",
+        "C:\\Program Files (x86)\\LibreOffice\\program\\soffice.exe",
+    ),
+}
 
 # One conversion at a time: each soffice launch is a full process spinning up
 # ~200 MB; serializing keeps peak memory bounded alongside detector workloads.
@@ -61,14 +81,36 @@ _conversion_lock = threading.Lock()
 
 @cache
 def find_soffice() -> str | None:
-    """Locate the LibreOffice binary, or None when it is not installed."""
+    """Locate the LibreOffice binary, or None when it is not installed.
+
+    Resolution order, most explicit first:
+
+    1. ``CLASSIFYRE_SOFFICE_PATH`` — an operator/desktop-supplied absolute path.
+    2. ``PATH`` — the CLI container, Linux hosts, and dev shells.
+    3. Platform install locations — macOS/Windows only (see the table above).
+
+    Cached: the answer cannot change within a process. Tests that manipulate the
+    environment must call ``find_soffice.cache_clear()``.
+    """
+    override = os.environ.get(SOFFICE_PATH_ENV, "").strip()
+    if override:
+        if Path(override).is_file():
+            return override
+        logger.warning(
+            "%s=%s does not point at an existing file; falling back to PATH lookup",
+            SOFFICE_PATH_ENV,
+            override,
+        )
+
     for name in ("soffice", "libreoffice"):
         path = shutil.which(name)
         if path:
             return path
-    for candidate in _SOFFICE_FALLBACK_PATHS:
-        if Path(candidate).exists():
+
+    for candidate in _SOFFICE_FALLBACK_PATHS.get(sys.platform, ()):
+        if Path(candidate).is_file():
             return candidate
+
     return None
 
 

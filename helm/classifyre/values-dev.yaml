@@ -54,7 +54,7 @@ api:
     RUNNER_LOGS_DIR: /tmp/classifyre/runner-logs
     MAX_RUNNERS_PER_SOURCE: "5"
     MAX_CONCURRENT_RUNNERS: "2"
-    DEMO_MODE: "false"
+    DEMO_MODE: "true"
 
   extraVolumeMounts:
     - name: development-source
@@ -304,7 +304,46 @@ frontend:
         touch "${marker}"
       fi
       cd /workspace/apps/web
-      exec bun --bun next dev --turbopack --hostname 0.0.0.0 --port 3000
+
+      # The .next cache (including Turbopack's persistent cache) lives on a
+      # hostPath volume and survives pod restarts. If a previous run was
+      # SIGKILLed mid-write (e.g. a failed startup probe), that cache can be
+      # left corrupt: the server prints "Ready" and accepts connections but
+      # never answers a request, which just gets the container killed again
+      # in the same corrupt state. Detect that here and self-heal once
+      # before the k8s startup probe would otherwise crash-loop forever.
+      bun --bun next dev --turbopack --hostname 0.0.0.0 --port 3000 &
+      pid=$!
+      trap 'kill -TERM "$pid" 2>/dev/null || true' TERM INT
+
+      healthy=0
+      i=0
+      while [ "$i" -lt 25 ]; do
+        if bun -e '
+          try {
+            await fetch("http://127.0.0.1:3000/", { signal: AbortSignal.timeout(2000) });
+            process.exit(0);
+          } catch {
+            process.exit(1);
+          }
+        ' >/dev/null 2>&1; then
+          healthy=1
+          break
+        fi
+        kill -0 "$pid" 2>/dev/null || break
+        i=$((i + 1))
+        sleep 1
+      done
+
+      if [ "$healthy" -eq 0 ]; then
+        echo "web dev server did not respond within ${i}s, clearing Turbopack persistent cache and restarting once" >&2
+        kill "$pid" 2>/dev/null || true
+        wait "$pid" 2>/dev/null || true
+        rm -rf .next/cache/turbopack .next/dev/lock
+        exec bun --bun next dev --turbopack --hostname 0.0.0.0 --port 3000
+      fi
+
+      wait "$pid"
 
   service:
     type: ClusterIP
@@ -575,6 +614,11 @@ postgres:
     persistence:
       # Keep local dev data across pod restarts and Skaffold sessions.
       enabled: true
+      # scripts/dev/stop.sh runs `skaffold delete`, which uninstalls the Helm
+      # release. Without this, the PVC (and the local-path storage class's
+      # underlying volume data) gets deleted along with it. This keeps the
+      # PVC around so `start.sh` reattaches to the same data next time.
+      keepOnUninstall: true
       accessModes:
         - ReadWriteOnce
       size: 5Gi

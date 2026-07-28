@@ -154,6 +154,31 @@ api:
     # -- Generated key is persisted via Kubernetes Secret lookup across upgrades.
     autoGenerate: true
 
+  # -- Shared secret proving a request comes from a process the API launched
+  # -- (CLI scan jobs, detector-evaluation jobs) rather than from public traffic.
+  # --
+  # -- The API has no user authentication, so the CLI's write-back endpoints
+  # -- (bulk asset ingest, runner status, discovered assets, graph edges,
+  # -- embedding chunks) are restricted to callers presenting this key. It is
+  # -- injected into the API and worker pods, forwarded by them into every CLI
+  # -- job's environment, and stripped from inbound requests by the web proxy so
+  # -- a browser can never present it. It also exempts those CLI callbacks from
+  # -- the demo-mode read-only guard, which is what lets scheduled scans and the
+  # -- autopilot agents keep working on a demo instance.
+  internalApiKey:
+    # -- Existing secret name that contains the internal API key.
+    # -- When set, chart will not create or manage this secret.
+    existingSecret: ""
+    # -- Secret name created by this chart when existingSecret is empty.
+    secretName: ""
+    # -- Secret key name used for CLASSIFYRE_INTERNAL_KEY.
+    secretKey: CLASSIFYRE_INTERNAL_KEY
+    # -- Explicit key value to store in the chart-managed secret.
+    value: ""
+    # -- Generate a random 48-character key when value is empty.
+    # -- Generated key is persisted via Kubernetes Secret lookup across upgrades.
+    autoGenerate: true
+
   # -- Extra environment variables for API container.
   extraEnv: []
   # -- Extra envFrom sources for API container.
@@ -760,6 +785,11 @@ postgres:
         - ReadWriteOnce
       # -- Requested size for embedded Postgres PVC.
       size: 20Gi
+      # -- Keep the PVC (and its data) when the release is uninstalled, via the
+      # -- helm.sh/resource-policy annotation. The default storage class's
+      # -- reclaim policy otherwise deletes the underlying volume's data along
+      # -- with the PVC on `helm uninstall`.
+      keepOnUninstall: false
     # -- postgresql.conf parameters passed to the server as `-c key=value` container
     # -- args. Tune these for the workload rather than raising Postgres resource
     # -- limits (see postgres.embedded.resources) — shared_buffers/work_mem control

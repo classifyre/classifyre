@@ -8,6 +8,10 @@ metadata:
   labels:
     {{- include "classifyre.commonLabels" . | nindent 4 }}
     app.kubernetes.io/component: postgres
+  {{- if .Values.postgres.embedded.persistence.keepOnUninstall }}
+  annotations:
+    helm.sh/resource-policy: keep
+  {{- end }}
 spec:
   accessModes:
     {{- toYaml .Values.postgres.embedded.persistence.accessModes | nindent 4 }}

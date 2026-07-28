@@ -44,6 +44,7 @@ import { SearchAssetsResponseDto } from '../dto/search-assets-response.dto';
 import { SearchAssetsChartsRequestDto } from '../dto/search-assets-charts-request.dto';
 import { SearchAssetsChartsResponseDto } from '../dto/search-assets-charts-response.dto';
 import { AllowInDemoMode } from '../demo-mode.decorator';
+import { InternalOnly } from '../internal-only.decorator';
 import { CliBackpressureGuard } from '../guards/cli-backpressure.guard';
 import { SearchFindingsRequestDto } from '../dto/search-findings-request.dto';
 import { SearchFindingsResponseDto } from '../dto/search-findings-response.dto';
@@ -332,7 +333,7 @@ export class SourceAssetsController {
   }
 
   @UseGuards(CliBackpressureGuard)
-  @AllowInDemoMode()
+  @InternalOnly()
   @Post('bulk')
   @ApiOperation({
     summary: 'Bulk ingest assets',
@@ -455,7 +456,7 @@ export class SourceAssetsController {
   }
 
   @UseGuards(CliBackpressureGuard)
-  @AllowInDemoMode()
+  @InternalOnly()
   @Post('finalize')
   @ApiOperation({
     summary: 'Finalize ingest run',

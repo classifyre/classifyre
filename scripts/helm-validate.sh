@@ -9,6 +9,9 @@ CHART_DIR="${CHART_DIR:-${REPO_ROOT}/helm/classifyre}"
 HELM_COMMON_ARGS=(
   --set "postgres.external.password=${POSTGRES_EXTERNAL_PASSWORD:-snapshot-password}"
   --set "api.maskedConfigEncryption.value=${CLASSIFYRE_MASKED_CONFIG_KEY:-snapshot-classifyre-masked-key-0001}"
+  # Pinned so the rendered output stays deterministic: the chart otherwise
+  # generates a random key on every render.
+  --set "api.internalApiKey.value=${CLASSIFYRE_INTERNAL_KEY:-snapshot-classifyre-internal-key-0001}"
   --set "ingress.host=validate.example.com"
 )
 
@@ -94,6 +97,20 @@ run_checks() {
   assert_contains \
     "API receives its internal callback base URL" \
     "CLASSIFYRE_INTERNAL_API_URL" \
+    "${rendered}"
+
+  # Without this the API cannot distinguish CLI write-backs from public
+  # traffic, leaving the ingest endpoints open on an unauthenticated instance.
+  assert_contains \
+    "API and worker receive the internal API key" \
+    "CLASSIFYRE_INTERNAL_KEY" \
+    "${rendered}"
+
+  # The key must never be baked into the job template on disk; the API injects
+  # it per job so desktop and non-Helm launches carry the same value.
+  assert_not_contains \
+    "CLI Job template does not hardcode the internal API key" \
+    '"name": "CLASSIFYRE_INTERNAL_KEY"' \
     "${rendered}"
 
   assert_not_contains \

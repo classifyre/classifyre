@@ -6,7 +6,12 @@ metadata:
 profiles:
   - name: dev
     activation:
+      # An explicit `--profile` does not suppress auto-activation, so without
+      # the env guard this profile would also activate during a dev-vps-db run
+      # and the two `classifyre` releases would fight over the deploy config.
+      # start-vps-db.sh sets CLASSIFYRE_VPS_DB_HOST; start.sh does not.
       - kubeContext: k3d-classifyre
+        env: CLASSIFYRE_VPS_DB_HOST=
     deploy:
       helm:
         releases:
@@ -35,3 +40,40 @@ profiles:
         namespace: classifyre-dev
         port: 5432
         localPort: 5555
+
+  # Same local cluster, but writable and pointed at the VPS demo instance's
+  # database — so the public instance can stay in read-only demo mode while you
+  # create sources and change settings for it. Deployed into its own namespace
+  # so it cannot collide with a plain `dev` release.
+  #
+  # Do not run directly: scripts/dev/start-vps-db.sh opens the database tunnel
+  # and exports the values the templates below read.
+  - name: dev-vps-db
+    deploy:
+      helm:
+        releases:
+          - name: classifyre
+            chartPath: helm/classifyre
+            namespace: classifyre-vps-db
+            createNamespace: true
+            valuesFiles:
+              - helm/classifyre/values-dev.yaml
+              - helm/classifyre/values-dev-vps-db.yaml
+            setValueTemplates:
+              postgres.external.host: "{{.CLASSIFYRE_VPS_DB_HOST}}"
+              postgres.external.password: "{{.CLASSIFYRE_VPS_DB_PASSWORD}}"
+              api.env.CLASSIFYRE_AUTO_MIGRATE: "{{.CLASSIFYRE_VPS_AUTO_MIGRATE}}"
+            skipBuildDependencies: true
+            wait: false
+
+    portForward:
+      - resourceType: service
+        resourceName: classifyre-web
+        namespace: classifyre-vps-db
+        port: 3000
+        localPort: 3302
+      - resourceType: service
+        resourceName: classifyre-api
+        namespace: classifyre-vps-db
+        port: 8000
+        localPort: 8812

@@ -27,6 +27,7 @@ import {
   SimilarFindingsQueryDto,
 } from './dto/embedding.dto';
 import { EmbeddingQueueService } from './embedding-queue.service';
+import { InternalOnly } from '../internal-only.decorator';
 
 @ApiTags('embeddings')
 @Controller()
@@ -54,6 +55,7 @@ export class EmbeddingController {
     return this.queue.requestBackfill();
   }
 
+  @InternalOnly()
   @Post('sources/:sourceId/embeddings/chunks')
   @ApiOperation({ summary: 'Store asset chunk-to-content mappings' })
   async chunks(

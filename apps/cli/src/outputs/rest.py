@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import random
 from typing import Any, Literal, cast
 from urllib.parse import urljoin
@@ -14,6 +15,18 @@ from ..pipeline.text_artifact import TextArtifact
 from .base import OutputRuntimeContext, OutputType
 
 logger = logging.getLogger(__name__)
+
+# Proves to the API that these write-backs come from a scan job it launched.
+# The API has no user authentication, so the ingest endpoints are restricted to
+# callers holding this shared secret; the API injects it into every CLI job's
+# environment (Kubernetes job env, or inherited from the parent process on
+# desktop). Absent locally, where the API leaves the restriction disabled.
+INTERNAL_KEY_HEADER = "X-Classifyre-Internal-Key"
+
+
+def _internal_key_headers() -> dict[str, str]:
+    key = os.environ.get("CLASSIFYRE_INTERNAL_KEY", "").strip()
+    return {INTERNAL_KEY_HEADER: key} if key else {}
 
 
 class _JitteredRetry(Retry):
@@ -164,6 +177,7 @@ class RestOutputSink:
         # a pod restart or server-side keep-alive timeout.  Each request opens
         # a fresh TCP connection, which is cheap enough for our batch cadence.
         self.session.headers.update({"Connection": "close"})
+        self.session.headers.update(_internal_key_headers())
         adapter = HTTPAdapter(max_retries=_RETRY_POLICY)
         self.session.mount("http://", adapter)
         self.session.mount("https://", adapter)

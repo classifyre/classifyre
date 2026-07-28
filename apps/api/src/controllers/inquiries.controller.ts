@@ -31,6 +31,7 @@ import {
   InquiryResponseDto,
   UpdateInquiryDto,
 } from '../dto/inquiry.dto';
+import { AllowInDemoMode } from '../demo-mode.decorator';
 
 class RematchResponseDto {
   @ApiProperty({ description: 'Findings newly recorded as matches' })
@@ -52,6 +53,7 @@ export class InquiriesController {
     return this.inquiries.create(dto);
   }
 
+  @AllowInDemoMode()
   @Post('preview')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({

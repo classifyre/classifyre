@@ -3,6 +3,10 @@
 Local development runs the production Helm chart on k3d. There are no separate
 development manifests and no locally built application images.
 
+For the day-to-day command reference, see
+[`scripts/dev/README.md`](../../scripts/dev/README.md). This page covers why the
+setup is shaped the way it is.
+
 ## Start
 
 Install Docker, the latest stable k3d, kubectl, Helm, and the latest stable
@@ -20,10 +24,14 @@ The second runs `skaffold dev --profile dev`.
 
 | Component     | Endpoint                           |
 | ------------- | ---------------------------------- |
-| Next.js       | <http://localhost:3000>            |
-| NestJS API    | <http://localhost:8000>            |
-| PostgreSQL    | `localhost:5433`                   |
+| Next.js       | <http://localhost:3301>            |
+| NestJS API    | <http://localhost:8811>            |
+| PostgreSQL    | `localhost:5555`                   |
 | NGINX ingress | <http://classifyre.localhost:8080> |
+
+These are the local ports Skaffold forwards, which differ from the in-cluster
+ports the services listen on (3000, 8000, 5432). `portForward` in
+`skaffold.yaml` is the source of truth.
 
 ## How development runs
 
@@ -61,6 +69,25 @@ and worker installations are serialized through a shared lock directory.
 
 Source changes never trigger image builds. Skaffold sync is not used because
 the source is already visible through the k3d mount.
+
+## The `dev-vps-db` profile
+
+The public VPS instance runs with `DEMO_MODE=true`, so its own UI cannot create
+sources or change settings. The `dev-vps-db` profile installs the chart into
+`classifyre-vps-db` with `DEMO_MODE=false` against that instance's database, so
+it can be administered without taking the public instance out of demo mode.
+
+The profile is not meant to be run directly — `scripts/dev/start-vps-db.sh`
+opens the database tunnel and exports the values its `setValueTemplates` read.
+Commands, environment overrides and the safeguards that apply when a second
+writer attaches to a live database are documented in
+[`scripts/dev/README.md`](../../scripts/dev/README.md).
+
+One Skaffold detail worth knowing: an explicit `--profile` does not suppress
+auto-activation, so the `dev` profile is gated on `CLASSIFYRE_VPS_DB_HOST` being
+empty in addition to its kube-context match. Without that guard both profiles
+would activate during a `dev-vps-db` run and their two `classifyre` releases
+would fight over the deploy config.
 
 ## Operations
 

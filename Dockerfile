@@ -178,15 +178,35 @@ COPY --from=cli-builder /app/apps/cli/uv.lock /app/apps/cli/uv.lock
 COPY --from=cli-builder /app/apps/cli/README.md /app/apps/cli/README.md
 COPY --from=cli-builder /app/packages/schemas /app/packages/schemas
 COPY --from=api-builder /repo/packages/schemas/node_modules /app/packages/schemas/node_modules
+# HOME=/tmp: LibreOffice resolves a profile/config dir from HOME. uid 10001 is
+# created with useradd -r, so its /home/classifyre never exists and soffice logs
+# dconf/fontconfig failures against it. /tmp is writable in every deployment
+# (readOnlyRootFilesystem is false and the job prelude already writes there).
 ENV UV_LINK_MODE=copy \
     UV_CACHE_DIR=/cache/uv \
     CLASSIFYRE_CLI_AUTO_INSTALL_OPTIONAL_DEPS=1 \
-    PATH="/app/apps/cli/.venv/bin:${PATH}"
-# libgl1 + libglib2.0-0 required by opencv-python (pulled in by rapidocr-onnxruntime for docling OCR).
+    PATH="/app/apps/cli/.venv/bin:${PATH}" \
+    HOME=/tmp
+# System dependencies that cannot come from uv:
+#   libgl1 + libglib2.0-0  — opencv-python (via rapidocr-onnxruntime, docling OCR)
+#   libreoffice-*-nogui    — legacy Office extraction (.doc/.xls/.ppt), which
+#     src/utils/legacy_office.py shells out to as `soffice --headless
+#     --convert-to docx|xlsx|pptx`. The -nogui variants are the headless build
+#     (no GTK/X11/Java): +397 MB measured, against roughly double for the full
+#     desktop suite. -core carries the conversion engine; writer/calc/impress
+#     carry the .doc / .xls / .ppt import filters respectively — dropping any
+#     one of them turns that format back into a silent "no content" asset.
+#     Deliberately unpinned: no dependency bot tracks apt packages, so these
+#     refresh to the current Debian security build on every image rebuild.
 RUN set -eux; \
     apt-get update; \
-    apt-get install -y --no-install-recommends libgl1 libglib2.0-0 ca-certificates; \
-    rm -rf /var/lib/apt/lists/*
+    apt-get install -y --no-install-recommends \
+        libgl1 libglib2.0-0 ca-certificates \
+        libreoffice-core-nogui libreoffice-writer-nogui \
+        libreoffice-calc-nogui libreoffice-impress-nogui \
+        fonts-dejavu-core; \
+    rm -rf /var/lib/apt/lists/*; \
+    soffice --version
 # Match uid 10001 from helm podSecurityContext so uv sync can modify the venv at runtime
 RUN groupadd -g 10001 classifyre && useradd -u 10001 -g 10001 -r classifyre \
     && chown -R 10001:10001 /app

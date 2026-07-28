@@ -6,6 +6,8 @@ import { PrismaService } from './prisma.service';
 import { PrismaCoreModule } from './prisma/prisma-core.module';
 import { DemoModeService } from './demo-mode.service';
 import { DemoModeGuard } from './demo-mode.guard';
+import { InternalApiKeyService } from './internal-api-key.service';
+import { InternalApiKeyGuard } from './internal-api-key.guard';
 import { SourceService } from './source.service';
 import { SourceFilesService } from './source-files.service';
 import { AssetService } from './asset.service';
@@ -128,9 +130,11 @@ import {
     NamespacesController,
   ],
   providers: [
+    { provide: APP_GUARD, useClass: InternalApiKeyGuard },
     { provide: APP_GUARD, useClass: DemoModeGuard },
     CliBackpressureGuard,
     DemoModeService,
+    InternalApiKeyService,
     PrismaService,
     SourceService,
     SourceFilesService,
