@@ -26,15 +26,22 @@ docx|xlsx|pptx` and feeds the result through the normal OOXML extractors. Withou
 it those files scan as *"no content available"* — a silent coverage gap, not an
 error.
 
-- **Kubernetes**: already installed in the CLI image (`libreoffice-*-nogui`).
-- **Desktop / local dev**: install it yourself — `brew install --cask libreoffice`
-  (macOS), `apt install libreoffice-writer libreoffice-calc libreoffice-impress`
-  (Debian/Ubuntu). The CLI checks `PATH` first, then the standard macOS, Windows,
-  and Linux-tarball install locations.
-- **Non-standard install**: point at the binary with `CLASSIFYRE_SOFFICE_PATH`.
+- **Kubernetes**: installed in the CLI image (`libreoffice-*-nogui`).
+- **Desktop**: bundled in the installer under `resources/libreoffice`
+  (`apps/desktop/scripts/stage-libreoffice.sh`); the app passes its location to
+  the CLI via `CLASSIFYRE_SOFFICE_PATH`. Nothing for the user to install.
+- **Local dev** (running the CLI directly): install it yourself —
+  `brew install --cask libreoffice` (macOS), or
+  `apt install libreoffice-writer libreoffice-calc libreoffice-impress`.
+  The CLI checks `CLASSIFYRE_SOFFICE_PATH`, then `PATH`, then the standard
+  macOS, Windows, and Linux-tarball install locations.
+
+When no binary is found the asset is **not** silently reported as empty: the scan
+raises an `ENGINE_UNAVAILABLE` text-extraction coverage error, which lands in the
+asset's `scan_stats.errors` and the run's text-coverage counters.
 
 `tests/utils/test_legacy_office.py` skips its round-trip tests when no LibreOffice
-is found, so a green local run does not prove this path works.
+is found, so a green local run does not by itself prove this path works.
 
 ## Command Syntax
 

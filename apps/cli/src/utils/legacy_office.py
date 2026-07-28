@@ -51,6 +51,16 @@ LEGACY_OFFICE_MIME_TYPES = frozenset(_CONVERSION_TARGETS)
 
 _SOFFICE_TIMEOUT_SECONDS = 120
 
+# Returned when no binary can be found. The wording is load-bearing: the word
+# "unavailable" is what makes iter_file_pages classify this as
+# ENGINE_UNAVAILABLE rather than a per-document FAILED, which is the difference
+# between "this deployment cannot read .doc at all" and "this one file is
+# broken". test_legacy_office.py pins that mapping so the two cannot drift.
+SOFFICE_MISSING_ERROR = (
+    "LibreOffice (soffice) is unavailable, so .doc/.xls/.ppt content was NOT scanned. "
+    "Install LibreOffice or point CLASSIFYRE_SOFFICE_PATH at an existing binary."
+)
+
 # Explicit override, checked before anything else. The desktop app rebuilds a
 # minimal PATH for the processes it spawns, so an installation it discovered
 # itself is handed down through this variable rather than through PATH.
@@ -132,12 +142,7 @@ def convert_legacy_office(
 
     soffice = find_soffice()
     if soffice is None:
-        return (
-            None,
-            target_mime,
-            "LibreOffice (soffice) not found; install LibreOffice to enable "
-            ".doc/.xls/.ppt extraction",
-        )
+        return None, target_mime, SOFFICE_MISSING_ERROR
 
     try:
         with tempfile.TemporaryDirectory(prefix="classifyre-soffice-") as temp_dir:
