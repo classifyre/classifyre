@@ -14,7 +14,17 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // 'api' is a directory on Linux/Windows but a single api.tar.gz on macOS
 // (65k loose node_modules files made Apple's notary scan take hours); the
 // existsSync filter below picks whichever the staging script produced.
-const allResources = ['api', 'api.tar.gz', 'web', 'pg', 'venv', 'python', 'pyapp', 'models'];
+const allResources = [
+  'api',
+  'api.tar.gz',
+  'web',
+  'pg',
+  'venv',
+  'python',
+  'pyapp',
+  'models',
+  'libreoffice',
+];
 const extraResource = allResources
   .map((name) => path.resolve(__dirname, 'resources', name))
   .filter((abs) => fs.existsSync(abs));
@@ -33,15 +43,20 @@ const signingEnabled = process.env['MACOS_SIGN'] === '1' || !!signingIdentity;
 // our Developer ID-signed python3.12 ("different Team IDs"). Sign the Python
 // binaries with disable-library-validation so runtime-installed extensions load;
 // every other file keeps @electron/osx-sign's stricter per-file defaults.
+//
+// Bundled LibreOffice (resources/libreoffice) needs the same relaxation for the
+// same reason: soffice dlopens its UNO component libraries and its own embedded
+// Python framework at runtime, and its launcher sets DYLD_* variables.
 const pythonEntitlements = path.resolve(__dirname, 'build/entitlements.python.plist');
-const isPythonResource = (filePath: string): boolean =>
+const isRelaxedRuntimeResource = (filePath: string): boolean =>
   filePath.includes('/Contents/Resources/python/') ||
-  filePath.includes('/Contents/Resources/venv/');
+  filePath.includes('/Contents/Resources/venv/') ||
+  filePath.includes('/Contents/Resources/libreoffice/');
 const osxSign = signingEnabled
   ? {
       ...(signingIdentity ? { identity: signingIdentity } : {}),
       optionsForFile: (filePath: string) =>
-        isPythonResource(filePath) ? { entitlements: pythonEntitlements } : {},
+        isRelaxedRuntimeResource(filePath) ? { entitlements: pythonEntitlements } : {},
     }
   : undefined;
 // Notarization is deliberately NOT done through Forge (no osxNotarize):
@@ -81,6 +96,9 @@ function findMissingStagedResources(): string[] {
     ['python'],
     ['pyapp'],
     ['models'],
+    // Without it, .doc/.xls/.ppt scan as "no content available" — a silent
+    // coverage gap that looks identical to an empty document.
+    ['libreoffice'],
     ['api', 'api.tar.gz'], // directory on Linux/Windows, tarball on macOS
   ];
   return required

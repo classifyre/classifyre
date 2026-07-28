@@ -12,6 +12,7 @@ import type {
   V1PodList,
 } from '@kubernetes/client-node';
 import { InstanceSettingsService } from '../instance-settings.service';
+import { InternalApiKeyService } from '../internal-api-key.service';
 
 type KubernetesModule = typeof import('@kubernetes/client-node');
 
@@ -51,7 +52,10 @@ export class KubernetesCliJobService {
   private readonly runningJobsByRunnerId = new Map<string, JobRef>();
   private cachedTemplate: V1Job | null = null;
 
-  constructor(private readonly instanceSettings: InstanceSettingsService) {}
+  constructor(
+    private readonly instanceSettings: InstanceSettingsService,
+    private readonly internalApiKey: InternalApiKeyService,
+  ) {}
 
   isEnabled(): boolean {
     return this.enabled;
@@ -525,6 +529,15 @@ export class KubernetesCliJobService {
 
     if (process.env.UV_CACHE_DIR) {
       this.setEnvValue(envMap, 'UV_CACHE_DIR', process.env.UV_CACHE_DIR);
+    }
+
+    // Proves to the API that the callbacks this job makes (asset ingest,
+    // runner status, graph edges) come from a job the API itself launched.
+    // Injected here rather than in the Helm job template so every launch path
+    // — chart, desktop, local dev — carries the same key the API validates.
+    const internalKey = this.internalApiKey.value;
+    if (internalKey) {
+      this.setEnvValue(envMap, 'CLASSIFYRE_INTERNAL_KEY', internalKey);
     }
 
     // If the job template does NOT carry an instance-level HF_TOKEN (provided via

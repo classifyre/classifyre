@@ -23,12 +23,15 @@ import {
   RelationTypesResponseDto,
   UpdateEdgeDto,
 } from '../dto/graph.dto';
+import { InternalOnly } from '../internal-only.decorator';
+import { AllowInDemoMode } from '../demo-mode.decorator';
 
 @ApiTags('graph')
 @Controller('graph')
 export class GraphController {
   constructor(private readonly graphService: GraphService) {}
 
+  @AllowInDemoMode()
   @Post('expand')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
@@ -39,6 +42,7 @@ export class GraphController {
     return this.graphService.expand(dto);
   }
 
+  @AllowInDemoMode()
   @Post('pivot')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
@@ -50,6 +54,7 @@ export class GraphController {
     return this.graphService.pivot(dto);
   }
 
+  @InternalOnly()
   @Post('edges')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({

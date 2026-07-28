@@ -31,6 +31,7 @@ import {
 import { CliRunnerService } from './cli-runner.service';
 import { RunnerStatus } from '@prisma/client';
 import { AllowInDemoMode } from '../demo-mode.decorator';
+import { InternalOnly } from '../internal-only.decorator';
 import { CliBackpressureGuard } from '../guards/cli-backpressure.guard';
 import {
   StartRunnerDto,
@@ -79,6 +80,7 @@ export class CliRunnerController {
   }
 
   @UseGuards(CliBackpressureGuard)
+  @InternalOnly()
   @Post('sources/:sourceId/runners/external')
   @ApiOperation({
     summary: 'Create runner record for external CLI REST ingestion',
@@ -117,7 +119,7 @@ export class CliRunnerController {
   }
 
   @UseGuards(CliBackpressureGuard)
-  @AllowInDemoMode()
+  @InternalOnly()
   @Patch('runners/:runnerId/status')
   @ApiOperation({ summary: 'Update runner status' })
   @ApiBody({
@@ -140,6 +142,7 @@ export class CliRunnerController {
   }
 
   @UseGuards(CliBackpressureGuard)
+  @InternalOnly()
   @Post('runners/:runnerId/assets/discover')
   @ApiOperation({ summary: 'Register discovered asset hashes for a runner' })
   @ApiBody({ type: RegisterDiscoveredAssetsDto })
@@ -155,6 +158,7 @@ export class CliRunnerController {
   }
 
   @UseGuards(CliBackpressureGuard)
+  @InternalOnly()
   @Patch('runners/:runnerId/assets/status')
   @ApiOperation({ summary: 'Update processing status of runner assets' })
   @ApiBody({ type: UpdateRunnerAssetStatusDto })
@@ -182,6 +186,9 @@ export class CliRunnerController {
     return this.cliRunnerService.getRunnerStatus(runnerId);
   }
 
+  // POST only because the filter set does not fit a query string — this reads
+  // logs, so it stays available on a read-only demo instance.
+  @AllowInDemoMode()
   @Post('runners/:runnerId/logs')
   @ApiOperation({
     summary:

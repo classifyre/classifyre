@@ -39,9 +39,10 @@ if (!appPath) {
 
 // Keep in sync with forge.config.ts.
 const pythonEntitlements = path.resolve(__dirname, '..', 'build/entitlements.python.plist');
-const isPythonResource = (filePath) =>
+const isRelaxedRuntimeResource = (filePath) =>
   filePath.includes('/Contents/Resources/python/') ||
-  filePath.includes('/Contents/Resources/venv/');
+  filePath.includes('/Contents/Resources/venv/') ||
+  filePath.includes('/Contents/Resources/libreoffice/');
 
 // Pin the identity when provided (APPLE_SIGNING_IDENTITY); otherwise let
 // osx-sign auto-discover the "Developer ID Application" identity from the
@@ -53,7 +54,7 @@ await sign({
   platform: 'darwin',
   ...(signingIdentity ? { identity: signingIdentity } : {}),
   optionsForFile: (filePath) =>
-    isPythonResource(filePath) ? { entitlements: pythonEntitlements } : {},
+    isRelaxedRuntimeResource(filePath) ? { entitlements: pythonEntitlements } : {},
 });
 
 console.log(`Re-signed ${appPath}`);

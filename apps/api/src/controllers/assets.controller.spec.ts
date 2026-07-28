@@ -4,6 +4,7 @@ import { AssetService } from '../asset.service';
 import { SourceService } from '../source.service';
 import { ValidationService } from '../validation.service';
 import { ALLOW_IN_DEMO_MODE_KEY } from '../demo-mode.decorator';
+import { INTERNAL_ONLY_KEY } from '../internal-only.decorator';
 
 describe('SourceAssetsController', () => {
   let controller: SourceAssetsController;
@@ -129,7 +130,10 @@ describe('SourceAssetsController', () => {
     );
   });
 
-  it('allows scheduler ingestion callbacks in demo mode', () => {
+  it('reserves ingestion callbacks for internal callers', () => {
+    // Scheduled and autopilot-triggered scans still write back on a demo
+    // instance, but only from a CLI job the API launched: the internal key
+    // both satisfies this guard and exempts the call from DemoModeGuard.
     const bulkIngest = Object.getOwnPropertyDescriptor(
       SourceAssetsController.prototype,
       'bulkIngest',
@@ -139,9 +143,14 @@ describe('SourceAssetsController', () => {
       'finalizeIngest',
     )?.value;
 
-    expect(Reflect.getMetadata(ALLOW_IN_DEMO_MODE_KEY, bulkIngest)).toBe(true);
-    expect(Reflect.getMetadata(ALLOW_IN_DEMO_MODE_KEY, finalizeIngest)).toBe(
-      true,
-    );
+    expect(Reflect.getMetadata(INTERNAL_ONLY_KEY, bulkIngest)).toBe(true);
+    expect(Reflect.getMetadata(INTERNAL_ONLY_KEY, finalizeIngest)).toBe(true);
+
+    expect(
+      Reflect.getMetadata(ALLOW_IN_DEMO_MODE_KEY, bulkIngest),
+    ).toBeUndefined();
+    expect(
+      Reflect.getMetadata(ALLOW_IN_DEMO_MODE_KEY, finalizeIngest),
+    ).toBeUndefined();
   });
 });

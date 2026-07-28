@@ -18,6 +18,24 @@ uv sync --group detectors
 # or specific groups: --group secrets --group pii --group threat ...
 ```
 
+### System dependency: LibreOffice
+
+Legacy Office formats (`.doc`, `.xls`, `.ppt`) have no usable pure-Python parser,
+so `src/utils/legacy_office.py` shells out to `soffice --headless --convert-to
+docx|xlsx|pptx` and feeds the result through the normal OOXML extractors. Without
+it those files scan as *"no content available"* — a silent coverage gap, not an
+error.
+
+- **Kubernetes**: already installed in the CLI image (`libreoffice-*-nogui`).
+- **Desktop / local dev**: install it yourself — `brew install --cask libreoffice`
+  (macOS), `apt install libreoffice-writer libreoffice-calc libreoffice-impress`
+  (Debian/Ubuntu). The CLI checks `PATH` first, then the standard macOS, Windows,
+  and Linux-tarball install locations.
+- **Non-standard install**: point at the binary with `CLASSIFYRE_SOFFICE_PATH`.
+
+`tests/utils/test_legacy_office.py` skips its round-trip tests when no LibreOffice
+is found, so a green local run does not prove this path works.
+
 ## Command Syntax
 
 Use the thin wrapper:

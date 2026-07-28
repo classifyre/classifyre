@@ -1,0 +1,54 @@
+# Local k3d overlay that runs the app against the VPS demo instance's database.
+#
+# Purpose: the VPS instance is deployed with DEMO_MODE=true, so its own UI is
+# read-only. This overlay gives you a *local* deployment of the same chart, in
+# NON-demo mode, whose Postgres is the VPS one — so you can create sources,
+# change instance settings and tune the autopilot against the real demo data
+# while the public instance stays read-only.
+#
+# Layered on top of values-dev.yaml. Not usable on its own: the database host
+# and password are injected at deploy time by scripts/dev/start-vps-db.sh,
+# which opens the tunnel and reads the password out of the VPS cluster.
+#
+#   ./scripts/dev/start-vps-db.sh
+#
+# Everything here is scoped to making a second writer safe against a database
+# another cluster is actively serving.
+
+api:
+  env:
+    # The whole point of this overlay: full write access locally.
+    DEMO_MODE: "false"
+
+    # The VPS cluster owns this schema. Never let a local checkout — which may
+    # sit on a feature branch with unreleased migrations — rewrite it on boot.
+    # Overridden to "true" by scripts/dev/start-vps-db.sh --migrate.
+    CLASSIFYRE_AUTO_MIGRATE: "false"
+
+  # Applying migrations is the VPS release's job, not this overlay's.
+  migration:
+    enabled: false
+
+  embedding:
+    # A backfill pass would re-embed the VPS instance's findings and chunks
+    # from a local pod, competing with the deployment that owns them.
+    autoBackfill: false
+
+# Background execution stays with the VPS cluster. Two independent pg-boss
+# consumers on one database means scheduled scans and autopilot cycles can be
+# picked up twice; the local pod would also launch CLI jobs into k3d for work
+# the VPS already claimed. The API pod runs SERVICE_ROLE=api and starts no
+# namespace workers, so the UI is fully usable with the worker at zero.
+worker:
+  replicaCount: 0
+
+postgres:
+  mode: external
+  external:
+    # host and password are injected by the dev-vps-db skaffold profile's
+    # setValueTemplates (see scripts/dev/start-vps-db.sh).
+    port: 5432
+    database: classifyre
+    username: postgres
+  connection:
+    sslMode: disable

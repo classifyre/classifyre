@@ -37,6 +37,11 @@ import { LanguageSwitcher } from "./language-switcher";
 import { useTranslation } from "@/hooks/use-translation";
 import type { TranslationKey } from "@/i18n";
 import type { ServerConfig } from "@/lib/server-config";
+import {
+  DEFAULT_SERVER_CONFIG,
+  ServerConfigContext,
+  useServerConfig,
+} from "./server-config-provider";
 
 function formatSegmentLabel(
   segment: string,
@@ -84,21 +89,10 @@ type FindingAssetCrumb = {
   label: string;
 };
 
-// ── Server config context ─────────────────────────────────────────────────
-// Populated once by the server layout (getServerConfig()) and distributed to
-// all client components via this context. Default to safe values so that UI
-// does not flash incorrect states before the first render.
-const DEFAULT_SERVER_CONFIG: ServerConfig = {
-  s3Configured: true,
-  demoMode: false,
-};
-const ServerConfigContext = React.createContext<ServerConfig>(
-  DEFAULT_SERVER_CONFIG,
-);
-
-export function useServerConfig(): ServerConfig {
-  return React.useContext(ServerConfigContext);
-}
+// The server config context lives in ./server-config-provider so components
+// rendered by this layout can consume it without importing back into here.
+// Re-exported for the existing call sites that import it from this module.
+export { useServerConfig };
 
 export function DashboardLayout({
   children,

@@ -138,6 +138,29 @@ password
 {{- default "CLASSIFYRE_MASKED_CONFIG_KEY" .Values.api.maskedConfigEncryption.secretKey -}}
 {{- end -}}
 
+{{- define "classifyre.apiInternalKeySecretName" -}}
+{{- if .Values.api.internalApiKey.existingSecret -}}
+{{- .Values.api.internalApiKey.existingSecret -}}
+{{- else -}}
+{{- default (printf "%s-api-internal-key" (include "classifyre.fullname" .)) .Values.api.internalApiKey.secretName -}}
+{{- end -}}
+{{- end -}}
+
+{{- define "classifyre.apiInternalKeySecretKey" -}}
+{{- default "CLASSIFYRE_INTERNAL_KEY" .Values.api.internalApiKey.secretKey -}}
+{{- end -}}
+
+{{/*
+True when an internal API key is available to mount. Empty string (falsey)
+when the operator has explicitly turned generation off and supplied no value,
+in which case the API leaves the internal-only restriction disabled.
+*/}}
+{{- define "classifyre.apiInternalKeyEnabled" -}}
+{{- if or .Values.api.internalApiKey.existingSecret .Values.api.internalApiKey.value .Values.api.internalApiKey.autoGenerate -}}
+true
+{{- end -}}
+{{- end -}}
+
 {{/*
 Resolved OTLP endpoint. Empty string when telemetry is disabled or no endpoint configured.
 */}}
@@ -292,6 +315,16 @@ which each deployment sets on its own after including this block.
     secretKeyRef:
       name: {{ include "classifyre.apiMaskedConfigSecretName" . }}
       key: {{ include "classifyre.apiMaskedConfigSecretKey" . }}
+{{- if include "classifyre.apiInternalKeyEnabled" . }}
+{{- /* Restricts the CLI write-back endpoints to jobs this pod launched, and
+     exempts those jobs from the demo-mode read-only guard. The API forwards it
+     into each CLI job's environment. */}}
+- name: CLASSIFYRE_INTERNAL_KEY
+  valueFrom:
+    secretKeyRef:
+      name: {{ include "classifyre.apiInternalKeySecretName" . }}
+      key: {{ include "classifyre.apiInternalKeySecretKey" . }}
+{{- end }}
 - name: CLASSIFYRE_AUTO_MIGRATE
   value: {{ ternary "false" "true" .Values.api.migration.enabled | quote }}
 - name: MAX_CONCURRENT_NAMESPACE_JOBS

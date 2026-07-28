@@ -24,6 +24,9 @@ HELM_COMMON_ARGS=(
   --set "postgres.external.password=${POSTGRES_EXTERNAL_PASSWORD:-snapshot-password}"
   --set "postgres.embedded.password=${POSTGRES_EMBEDDED_PASSWORD:-snapshot-password}"
   --set "api.maskedConfigEncryption.value=${CLASSIFYRE_MASKED_CONFIG_KEY:-snapshot-classifyre-masked-key-0001}"
+  # Pinned so the rendered output stays deterministic: the chart otherwise
+  # generates a random key on every render.
+  --set "api.internalApiKey.value=${CLASSIFYRE_INTERNAL_KEY:-snapshot-classifyre-internal-key-0001}"
 )
 
 while [[ $# -gt 0 ]]; do

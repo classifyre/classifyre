@@ -8,6 +8,7 @@ import crypto from "crypto";
 import treeKill from "tree-kill";
 import { ensurePythonRuntime } from "./python-env.js";
 import { getLogFilePath } from "./logger.js";
+import { sofficeEnv } from "./soffice-env.js";
 
 // In dev mode we inherit the developer's login-shell PATH so locally installed
 // tooling (uv, java, node) is visible. In packaged mode we never touch the
@@ -91,6 +92,34 @@ function getMaskedConfigKey(): string {
   fs.mkdirSync(path.dirname(keyFile), { recursive: true });
   fs.writeFileSync(keyFile, `${key}\n`, { mode: 0o600 });
   cachedMaskedConfigKey = key;
+  return key;
+}
+
+// Shared secret the API uses to tell its own CLI scan jobs apart from any other
+// caller, gating the ingest write-back endpoints. On desktop the API binds to
+// loopback, so this is defence in depth rather than the primary boundary — but
+// the CLI is spawned as a child of the API and inherits its environment, so
+// wiring it here costs nothing and keeps every deployment on one code path.
+// Persisted per install: it need not survive, but a stable value avoids
+// invalidating a scan that is running across a restart.
+let cachedInternalKey: string | null = null;
+
+function getInternalApiKey(): string {
+  if (cachedInternalKey) return cachedInternalKey;
+  const keyFile = path.join(app.getPath("userData"), "internal-api.key");
+  try {
+    const existing = fs.readFileSync(keyFile, "utf-8").trim();
+    if (existing) {
+      cachedInternalKey = existing;
+      return existing;
+    }
+  } catch {
+    // first run — generate below
+  }
+  const key = crypto.randomBytes(32).toString("hex");
+  fs.mkdirSync(path.dirname(keyFile), { recursive: true });
+  fs.writeFileSync(keyFile, `${key}\n`, { mode: 0o600 });
+  cachedInternalKey = key;
   return key;
 }
 
@@ -417,6 +446,15 @@ export class ProcessManager {
         // inherit this env, so pinning it here covers every child uv invocation.
         ...(getUvCacheDir() ? { UV_CACHE_DIR: getUvCacheDir() as string } : {}),
         CLASSIFYRE_MASKED_CONFIG_KEY: getMaskedConfigKey(),
+        // Inherited by every CLI process the API spawns via `uv run`, which is
+        // how scan jobs authenticate their write-backs.
+        CLASSIFYRE_INTERNAL_KEY: getInternalApiKey(),
+        // Legacy Office (.doc/.xls/.ppt) extraction shells out to the
+        // LibreOffice staged into resources/ (see soffice-env.ts).
+        ...sofficeEnv({
+          resourcesPath: process.resourcesPath,
+          isPackaged: app.isPackaged,
+        }),
         // Persist scan logs on the local filesystem (desktop has no S3).
         // The storage service enforces per-run and total-size caps itself.
         RUNNER_LOG_DIR: getRunnerLogDir(),

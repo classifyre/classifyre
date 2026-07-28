@@ -20,6 +20,17 @@ const HOP_BY_HOP_HEADERS = new Set([
   "upgrade",
 ]);
 
+/**
+ * Headers a browser must never be able to set on the upstream API.
+ *
+ * This proxy is the public entrance to an API that has no user authentication,
+ * and it otherwise forwards request headers verbatim. The internal key marks a
+ * caller as one of the CLI jobs the API launched, which exempts it from the
+ * demo-mode read-only guard and unlocks the ingest endpoints — so stripping it
+ * here means a visitor cannot forge that claim even if the secret leaks.
+ */
+const STRIPPED_REQUEST_HEADERS = ["x-classifyre-internal-key"];
+
 function normalizeAbsoluteUrl(value?: string | null): string | null {
   const trimmed = value?.trim();
   if (!trimmed) {
@@ -68,6 +79,9 @@ async function proxy(request: NextRequest, context: RouteContext) {
   const headers = new Headers(request.headers);
   headers.delete("host");
   for (const header of HOP_BY_HOP_HEADERS) {
+    headers.delete(header);
+  }
+  for (const header of STRIPPED_REQUEST_HEADERS) {
     headers.delete(header);
   }
   headers.set("x-forwarded-host", request.headers.get("host") ?? "");

@@ -1,5 +1,6 @@
 import { KubernetesCliJobService } from './kubernetes-cli-job.service';
 import type { InstanceSettingsService } from '../instance-settings.service';
+import { InternalApiKeyService } from '../internal-api-key.service';
 
 jest.mock('@kubernetes/client-node', () => ({
   KubeConfig: class {
@@ -36,7 +37,10 @@ describe('KubernetesCliJobService', () => {
 
   function makeService(cleanupPolicy: 'none' | 'failed' | 'always') {
     process.env.K8S_CLI_JOB_CLEANUP_POLICY = cleanupPolicy;
-    const service = new KubernetesCliJobService(mockInstanceSettings());
+    const service = new KubernetesCliJobService(
+      mockInstanceSettings(),
+      new InternalApiKeyService(),
+    );
     const batchApi = {
       deleteNamespacedJob: jest.fn().mockResolvedValue(undefined),
     };
@@ -168,7 +172,10 @@ describe('KubernetesCliJobService', () => {
     process.env.K8S_JOBS_ENABLED = '1';
     process.env.K8S_CLI_JOB_POLL_INTERVAL_MS = '1';
 
-    const service = new KubernetesCliJobService(mockInstanceSettings()) as any;
+    const service = new KubernetesCliJobService(
+      mockInstanceSettings(),
+      new InternalApiKeyService(),
+    ) as any;
     const batchApi = {
       readNamespacedJob: jest
         .fn()
@@ -207,7 +214,10 @@ describe('KubernetesCliJobService', () => {
     process.env.K8S_JOBS_ENABLED = '1';
     process.env.K8S_CLI_JOB_POLL_INTERVAL_MS = '1';
 
-    const service = new KubernetesCliJobService(mockInstanceSettings()) as any;
+    const service = new KubernetesCliJobService(
+      mockInstanceSettings(),
+      new InternalApiKeyService(),
+    ) as any;
     const batchApi = {
       readNamespacedJob: jest
         .fn()
@@ -251,12 +261,18 @@ describe('KubernetesCliJobService', () => {
     delete process.env.K8S_CLI_JOB_CLEANUP_POLICY;
     delete process.env.CLASSIFYRE_K8S_CLI_JOB_CLEANUP_POLICY;
 
-    const service = new KubernetesCliJobService(mockInstanceSettings());
+    const service = new KubernetesCliJobService(
+      mockInstanceSettings(),
+      new InternalApiKeyService(),
+    );
     expect((service as any).cleanupPolicy).toBe('always');
   });
 
   it('builds extract command with REST output flags', () => {
-    const service = new KubernetesCliJobService(mockInstanceSettings());
+    const service = new KubernetesCliJobService(
+      mockInstanceSettings(),
+      new InternalApiKeyService(),
+    );
     const command = (service as any).buildJobCommand(
       'extract',
       '/app/apps/cli',
@@ -276,7 +292,10 @@ describe('KubernetesCliJobService', () => {
   });
 
   it('injects the complete namespaced callback URL into each extract job', async () => {
-    const service = new KubernetesCliJobService(mockInstanceSettings());
+    const service = new KubernetesCliJobService(
+      mockInstanceSettings(),
+      new InternalApiKeyService(),
+    );
     const job = await (service as any).buildJobFromTemplate(
       {
         apiVersion: 'batch/v1',
@@ -307,7 +326,10 @@ describe('KubernetesCliJobService', () => {
   });
 
   it('builds file-evaluation command reading input from the mounted volume', () => {
-    const service = new KubernetesCliJobService(mockInstanceSettings());
+    const service = new KubernetesCliJobService(
+      mockInstanceSettings(),
+      new InternalApiKeyService(),
+    );
     const command = (service as any).buildJobCommand(
       'evaluation',
       '/app/apps/cli',
@@ -327,7 +349,10 @@ describe('KubernetesCliJobService', () => {
   });
 
   it('transports evaluation input via an init-container and emptyDir volume', async () => {
-    const service = new KubernetesCliJobService(mockInstanceSettings());
+    const service = new KubernetesCliJobService(
+      mockInstanceSettings(),
+      new InternalApiKeyService(),
+    );
     const detectors = [{ type: 'BUILTIN_EMAIL', enabled: true }];
     const job = await (service as any).buildJobFromTemplate(
       {
@@ -406,7 +431,10 @@ describe('KubernetesCliJobService', () => {
   });
 
   it('strips server-generated identity fields from a captured-job template', async () => {
-    const service = new KubernetesCliJobService(mockInstanceSettings());
+    const service = new KubernetesCliJobService(
+      mockInstanceSettings(),
+      new InternalApiKeyService(),
+    );
     // Simulates K8S_CLI_JOB_TEMPLATE_PATH pointing at a dumped live Job, which
     // carries a prior job's selector + controller-uid/job-name pod labels.
     const job = await (service as any).buildJobFromTemplate(
@@ -461,7 +489,10 @@ describe('KubernetesCliJobService', () => {
   });
 
   it('injects successful-run state env var into extract jobs', async () => {
-    const service = new KubernetesCliJobService(mockInstanceSettings());
+    const service = new KubernetesCliJobService(
+      mockInstanceSettings(),
+      new InternalApiKeyService(),
+    );
     const job = await (service as any).buildJobFromTemplate(
       {
         apiVersion: 'batch/v1',
