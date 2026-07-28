@@ -25,7 +25,11 @@ from ...models.generated_single_asset_scan_results import (
 from ...utils.archive_extraction import ArchiveMember, is_archive_mime, iter_archive_members
 from ...utils.embedded_images import EmbeddedImage, has_embedded_images, iter_embedded_images
 from ...utils.file_metadata import extract_file_metadata
-from ...utils.file_parser import infer_mime_type_from_file_name, resolve_mime_type
+from ...utils.file_parser import (
+    infer_mime_type_from_file_name,
+    normalize_mime_type,
+    resolve_mime_type,
+)
 from ...utils.hashing import hash_id, unhash_id
 from ..base import BaseSource
 from ..dependencies import require_module
@@ -325,7 +329,7 @@ class ObjectStorageSourceBase(BaseSource, ABC):
         return ref.key
 
     def _asset_type_from_mime_or_key(self, mime_type: str | None, key: str) -> OutputAssetType:
-        normalized_mime = (mime_type or "").split(";", maxsplit=1)[0].strip().lower()
+        normalized_mime = normalize_mime_type(mime_type)
         extension = self._file_extension(key)
 
         if normalized_mime in _TABULAR_MIME_TYPES:
@@ -397,7 +401,7 @@ class ObjectStorageSourceBase(BaseSource, ABC):
 
     def _build_snapshot(self, ref: ObjectRef) -> ContentSnapshot:
         if self._discovery_only or not self._include_content_preview():
-            mime = (ref.content_type_hint or "").split(";", maxsplit=1)[0].strip().lower()
+            mime = normalize_mime_type(ref.content_type_hint)
             if not mime:
                 mime = infer_mime_type_from_file_name(self._object_file_name(ref))
             return ContentSnapshot(
@@ -426,7 +430,7 @@ class ObjectStorageSourceBase(BaseSource, ABC):
             declared_mime_type=content_type_hint or ref.content_type_hint or "",
             file_name=self._object_file_name(ref),
         )
-        normalized_mime = mime_type.split(";", 1)[0].strip().lower()
+        normalized_mime = normalize_mime_type(mime_type)
 
         # Images and audio/video are extractable automatically. Opaque binaries
         # remain available to binary detectors but have no text page stream.

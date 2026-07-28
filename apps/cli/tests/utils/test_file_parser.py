@@ -665,6 +665,79 @@ class TestOleMimeResolution:
         assert resolve_mime_type(ole, file_name="blob") == "application/x-ole-storage"
 
 
+class TestGenericBinaryMimeAliases:
+    """S3-compatible stores declare `binary/octet-stream`, not the IANA spelling.
+
+    Treating that as a real content type let it outrank magic bytes and the file
+    extension, so every object from Backblaze B2 resolved to a type no extractor
+    handles — producing no text AND no error, which recorded the asset as
+    scanned-and-empty. Covers all formats, not just legacy Office.
+    """
+
+    OLE = b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1" + b"\x00" * 512
+
+    @pytest.mark.parametrize(
+        "declared",
+        [
+            "binary/octet-stream",
+            "application/octet-stream",
+            "application/binary",
+            "application/unknown",
+            "unknown/unknown",
+            "BINARY/OCTET-STREAM",
+            "binary/octet-stream; charset=binary",
+            "",
+        ],
+    )
+    def test_generic_declaration_never_outranks_content(self, declared: str) -> None:
+        from src.utils.file_parser import resolve_mime_type
+
+        assert (
+            resolve_mime_type(self.OLE, declared_mime_type=declared, file_name="Cert.doc")
+            == "application/msword"
+        )
+
+    @pytest.mark.parametrize(
+        ("file_bytes", "file_name", "expected"),
+        [
+            (b"%PDF-1.4\n" + b"x" * 200, "a.pdf", "application/pdf"),
+            (b"\x89PNG\r\n\x1a\n" + b"\x00" * 64, "c.png", "image/png"),
+            (OLE, "b.xls", "application/vnd.ms-excel"),
+            (OLE, "d.ppt", "application/vnd.ms-powerpoint"),
+        ],
+    )
+    def test_every_format_survives_a_generic_declaration(
+        self, file_bytes: bytes, file_name: str, expected: str
+    ) -> None:
+        from src.utils.file_parser import resolve_mime_type
+
+        resolved = resolve_mime_type(
+            file_bytes, declared_mime_type="binary/octet-stream", file_name=file_name
+        )
+        assert resolved == expected
+
+    def test_normalize_mime_type_collapses_aliases(self) -> None:
+        from src.utils.file_parser import normalize_mime_type
+
+        for alias in ("binary/octet-stream", "application/binary", "unknown/unknown"):
+            assert normalize_mime_type(alias) == "application/octet-stream"
+        # A real type is left alone.
+        assert normalize_mime_type("application/pdf; charset=utf-8") == "application/pdf"
+
+    def test_real_declared_type_still_wins(self) -> None:
+        """The alias collapsing must not make us ignore genuine declarations."""
+        from src.utils.file_parser import resolve_mime_type
+
+        assert (
+            resolve_mime_type(
+                b"nothing recognisable here",
+                declared_mime_type="text/csv",
+                file_name="rows.bin",
+            )
+            == "text/csv"
+        )
+
+
 class TestRtfExtraction:
     def test_text_extracted(self) -> None:
         pytest.importorskip("striprtf")

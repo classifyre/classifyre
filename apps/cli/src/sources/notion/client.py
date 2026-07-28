@@ -6,6 +6,8 @@ from typing import Any
 
 import requests
 
+from ...utils.file_parser import normalize_mime_type
+
 logger = logging.getLogger(__name__)
 
 NOTION_API_BASE = "https://api.notion.com/v1"
@@ -154,7 +156,7 @@ class NotionClient:
         for chunk in response.iter_content(chunk_size=8192):
             if chunk:
                 chunks.append(chunk)
-        mime = response.headers.get("Content-Type", "").split(";")[0].strip().lower()
+        mime = normalize_mime_type(response.headers.get("Content-Type", ""))
         return b"".join(chunks), mime
 
     def get_page(self, page_id: str) -> dict[str, Any]:

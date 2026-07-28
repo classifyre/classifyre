@@ -25,7 +25,7 @@ from ...models.generated_single_asset_scan_results import (
 )
 from ...utils.content_extraction import html_to_text
 from ...utils.file_metadata import extract_file_metadata
-from ...utils.file_parser import resolve_mime_type
+from ...utils.file_parser import normalize_mime_type, resolve_mime_type
 from ...utils.hashing import hash_id
 from ..base import BaseSource
 from ..dependencies import require_module
@@ -488,7 +488,7 @@ class EmailSource(BaseSource):
 
     @staticmethod
     def _asset_type_from_mime(mime: str) -> OutputAssetType:
-        normalized = (mime or "").split(";", 1)[0].strip().lower()
+        normalized = normalize_mime_type(mime)
         if normalized.startswith("image/"):
             return OutputAssetType.IMAGE
         if normalized.startswith("audio/"):
