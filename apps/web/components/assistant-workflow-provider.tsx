@@ -13,10 +13,11 @@ import {
   type AssistantPageContext,
 } from "@workspace/api-client";
 import { assistantContexts } from "@workspace/schemas/assistant";
-import { AssistantWorkflowPanel, Button } from "@workspace/ui/components";
+import { AssistantWorkflowPanel } from "@workspace/ui/components";
 import { toast } from "sonner";
 import { usePathname, useRouter } from "next/navigation";
 import { useInstanceSettings } from "@/components/instance-settings-provider";
+import { useTranslation } from "@/hooks/use-translation";
 import { nsPath } from "@/lib/ns-path";
 
 type AssistantAttachment = Extract<
@@ -417,25 +418,35 @@ export function AssistantWorkflowProvider({
   );
 }
 
-export function AssistantWorkflowTrigger() {
+/**
+ * Floating action button for the assistant. Lives at the bottom-right of the
+ * dashboard shell — not in the top bar, so the assistant stays reachable from
+ * anywhere on the page without competing with the header's utility icons.
+ * Disappears while the panel is open (the panel occupies the same corner).
+ */
+export function AssistantFab() {
   const context = useAssistantWorkflow();
+  const { t } = useTranslation();
 
   // `context.active` already accounts for aiEnabled + demoMode.
-  if (!context.active) {
+  if (!context.active || context.open) {
     return null;
   }
 
+  const label = t("assistant.open");
+
   return (
-    <Button
+    <button
       type="button"
-      variant="ghost"
-      size="icon"
-      className="relative rounded-[4px] border-2 border-transparent hover:border-border"
+      aria-label={label}
       onClick={() => context.setOpen(true)}
+      className="group fixed bottom-5 right-5 z-50 flex h-12 items-center gap-2 rounded-full bg-[#d97706] px-3.5 text-white shadow-[0_6px_20px_rgba(217,119,6,0.32)] transition-all duration-200 hover:bg-[#b45309] hover:shadow-[0_10px_28px_rgba(217,119,6,0.42)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d97706] focus-visible:ring-offset-2 focus-visible:ring-offset-background active:scale-95"
     >
-      <Sparkles className="h-5 w-5" />
-      <span className="sr-only">Open MCP assistant</span>
-    </Button>
+      <Sparkles className="size-5 shrink-0" />
+      <span className="max-w-0 overflow-hidden whitespace-nowrap text-sm font-medium tracking-tight opacity-0 transition-all duration-200 group-hover:max-w-[14rem] group-hover:opacity-100 group-focus-visible:max-w-[14rem] group-focus-visible:opacity-100">
+        {label}
+      </span>
+    </button>
   );
 }
 

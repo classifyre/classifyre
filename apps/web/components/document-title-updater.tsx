@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { usePathname } from "next/navigation";
 import { useTranslation } from "@/hooks/use-translation";
+import { useOptionalNamespace } from "@/components/namespace-provider";
 
 const ROUTE_TITLE_KEYS: Record<string, string> = {
   "/discovery": "discovery.title",
@@ -15,6 +16,10 @@ const ROUTE_TITLE_KEYS: Record<string, string> = {
   "/scans": "scans.title",
   "/notifications": "notifications.title",
   "/settings": "settings.title",
+  "/investigations": "nav.investigations",
+  "/fingerprints": "nav.fingerprints",
+  "/glossary": "glossary.title",
+  "/harness": "nav.harness",
 };
 
 function getTitleKey(pathname: string): string | null {
@@ -46,6 +51,9 @@ function getTitleKey(pathname: string): string | null {
   if (pathname.startsWith("/detectors/")) {
     return "detectors.detail.title";
   }
+  if (pathname.startsWith("/harness/")) {
+    return "nav.harness";
+  }
 
   return null;
 }
@@ -53,15 +61,42 @@ function getTitleKey(pathname: string): string | null {
 export function DocumentTitleUpdater() {
   const { t } = useTranslation();
   const pathname = usePathname();
+  const namespace = useOptionalNamespace();
+  const workspaceName = namespace?.displayName ?? null;
 
   useEffect(() => {
-    const key = getTitleKey(pathname);
-    if (key) {
-      const pageTitle = t(key as Parameters<typeof t>[0]);
-      const appName = t("app.name");
-      document.title = `${pageTitle} | ${appName}`;
+    // Inside a workspace every route is prefixed with `/<namespaceSlug>`;
+    // the title map is keyed on the app-relative path underneath it.
+    const appPath = namespace
+      ? "/" + pathname.split("/").filter(Boolean).slice(1).join("/")
+      : pathname;
+
+    const key = getTitleKey(appPath);
+    if (!key) {
+      return;
     }
-  }, [pathname, t]);
+
+    const pageTitle = t(key as Parameters<typeof t>[0]);
+    const appName = t("app.name");
+    const desired = workspaceName
+      ? `${pageTitle} - ${workspaceName} | ${appName}`
+      : `${pageTitle} | ${appName}`;
+
+    document.title = desired;
+
+    // Route metadata is streamed in its own boundary, so React can write the
+    // server-rendered <title> *after* this effect has run. Reassert ours until
+    // the route changes; setting an identical title is a no-op, so the
+    // observer settles immediately instead of looping.
+    const observer = new MutationObserver(() => {
+      if (document.title !== desired) {
+        document.title = desired;
+      }
+    });
+    observer.observe(document.head, { childList: true, subtree: true });
+
+    return () => observer.disconnect();
+  }, [namespace, pathname, t, workspaceName]);
 
   return null;
 }
