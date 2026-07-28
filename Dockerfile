@@ -178,15 +178,21 @@ COPY --from=cli-builder /app/apps/cli/uv.lock /app/apps/cli/uv.lock
 COPY --from=cli-builder /app/apps/cli/README.md /app/apps/cli/README.md
 COPY --from=cli-builder /app/packages/schemas /app/packages/schemas
 COPY --from=api-builder /repo/packages/schemas/node_modules /app/packages/schemas/node_modules
-# HOME=/tmp: LibreOffice resolves a profile/config dir from HOME. uid 10001 is
-# created with useradd -r, so its /home/classifyre never exists and soffice logs
-# dconf/fontconfig failures against it. /tmp is writable in every deployment
-# (readOnlyRootFilesystem is false and the job prelude already writes there).
+# Runtime user, created before anything can write into $HOME. Matches uid 10001
+# from the helm podSecurityContext so uv sync can modify the venv at runtime.
+RUN groupadd -g 10001 classifyre \
+    && useradd -u 10001 -g 10001 -r -m -d /home/classifyre classifyre
+# HOME must be a directory uid 10001 owns. LibreOffice, fontconfig and tldextract
+# all resolve a cache/profile dir from it. It must NOT be /tmp: the root-run
+# `soffice --version` gate below creates $HOME/.cache as root:root 0700, and uid
+# 10001 then cannot create anything under it — which made tldextract refetch the
+# Public Suffix List over HTTP on every start ("Permission denied:
+# /tmp/.cache/python-tldextract") and disabled fontconfig caching entirely.
 ENV UV_LINK_MODE=copy \
     UV_CACHE_DIR=/cache/uv \
     CLASSIFYRE_CLI_AUTO_INSTALL_OPTIONAL_DEPS=1 \
     PATH="/app/apps/cli/.venv/bin:${PATH}" \
-    HOME=/tmp
+    HOME=/home/classifyre
 # System dependencies that cannot come from uv:
 #   libgl1 + libglib2.0-0  — opencv-python (via rapidocr-onnxruntime, docling OCR)
 #   libreoffice-*-nogui    — legacy Office extraction (.doc/.xls/.ppt), which
@@ -206,10 +212,11 @@ RUN set -eux; \
         libreoffice-calc-nogui libreoffice-impress-nogui \
         fonts-dejavu-core; \
     rm -rf /var/lib/apt/lists/*; \
-    soffice --version
-# Match uid 10001 from helm podSecurityContext so uv sync can modify the venv at runtime
-RUN groupadd -g 10001 classifyre && useradd -u 10001 -g 10001 -r classifyre \
-    && chown -R 10001:10001 /app
+    # Throwaway HOME for the gate so this root-run check cannot leave
+    # root-owned cache directories behind in the real one.
+    HOME=/tmp/soffice-build-check soffice --version; \
+    rm -rf /tmp/soffice-build-check
+RUN chown -R 10001:10001 /app /home/classifyre
 WORKDIR /app/apps/cli
 USER 10001
 ENTRYPOINT ["/app/apps/cli/.venv/bin/python", "-m", "src.main"]
