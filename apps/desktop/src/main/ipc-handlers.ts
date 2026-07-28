@@ -1,10 +1,18 @@
 import { ipcMain, dialog, BrowserWindow, shell } from 'electron';
 import type { NamespaceStore } from './namespace-store.js';
-import { verifyClassifyreRemote } from './remote-instance.js';
+import {
+  countRemoteNamespaces,
+  verifyClassifyreRemote,
+} from './remote-instance.js';
 
 export function registerIpcHandlers(namespaceStore: NamespaceStore): void {
   ipcMain.handle('remote:verify', (_event, remoteUrl: string) => {
     return verifyClassifyreRemote(remoteUrl);
+  });
+
+  // Cross-origin, so the renderer cannot read it directly.
+  ipcMain.handle('remote:namespace-count', (_event, remoteUrl: string) => {
+    return countRemoteNamespaces(remoteUrl);
   });
 
   // The web app owns namespace CRUD. This signal only asks native menus to
