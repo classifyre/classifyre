@@ -39,6 +39,7 @@ export const RESERVED_PREFIXES = new Set<string>([
   'favicon.ico',
   // Web app top-level routes (apps/web/app/*).
   'docs', // bundled documentation site
+  'remote', // desktop's embedded remote-workspace browser
   'classifyre-usr', // analytics proxy route
   '_next', // Next.js build assets
 ]);

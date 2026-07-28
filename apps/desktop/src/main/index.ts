@@ -145,14 +145,39 @@ function showHome(): void {
 }
 
 function openNamespace(namespace: ApiNamespace): void {
-  if (namespace.type === 'remote' && namespace.remoteUrl) {
-    void shell.openExternal(namespace.remoteUrl);
-    return;
-  }
   showMainWindow();
-  if (mainWindow && !mainWindow.isDestroyed()) {
-    void mainWindow.loadURL(appUrl(namespace.slug));
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  // A remote workspace opens in the embedded browser view (app route
+  // `/remote/<id>`), never the system browser: the user stays in the app and
+  // can walk back to the local workspace directory.
+  const route =
+    namespace.type === 'remote' ? `remote/${namespace.id}` : namespace.slug;
+  void mainWindow.loadURL(appUrl(route));
+}
+
+function safeOrigin(value: string): string | null {
+  try {
+    return new URL(value).origin;
+  } catch {
+    return null;
   }
+}
+
+/**
+ * Whether `target` belongs to a remote workspace the user has registered.
+ * Guest views may only be *attached* to a known remote origin; once attached
+ * they browse that site freely (including an identity provider's login
+ * redirect), the same as a browser tab would.
+ */
+function isRegisteredRemoteOrigin(target: string): boolean {
+  const origin = safeOrigin(target);
+  if (!origin) return false;
+  return (namespaceStore?.list() ?? []).some(
+    (namespace) =>
+      namespace.type === 'remote' &&
+      namespace.remoteUrl !== null &&
+      safeOrigin(namespace.remoteUrl) === origin,
+  );
 }
 
 function configureWebContents(win: BrowserWindow): void {
@@ -171,6 +196,30 @@ function configureWebContents(win: BrowserWindow): void {
     if (isAppUrl(target)) return;
     event.preventDefault();
     if (/^https?:/.test(target)) void shell.openExternal(target);
+  });
+  // Embedded remote workspaces (<webview> in the /remote/<id> route). The guest
+  // renders a server we do not control, so it gets no preload and no Node —
+  // only a persistent, per-remote session partition for its cookies.
+  contents.on('will-attach-webview', (event, webPreferences, params) => {
+    delete webPreferences.preload;
+    webPreferences.nodeIntegration = false;
+    webPreferences.contextIsolation = true;
+    // An empty/blank src means the attribute has not been applied yet — the
+    // guest navigates itself a tick later. Anything else must be a workspace
+    // the user registered.
+    const src = params['src'] ?? '';
+    if (src && src !== 'about:blank' && !isRegisteredRemoteOrigin(src)) {
+      console.error(`[web] refused to attach webview to ${src}`);
+      event.preventDefault();
+    }
+  });
+  contents.on('did-attach-webview', (_event, guest) => {
+    // A popup has no chrome to show where it came from — hand those to the
+    // system browser. In-page navigation stays inside the guest.
+    guest.setWindowOpenHandler(({ url }) => {
+      if (/^https?:/.test(url)) void shell.openExternal(url);
+      return { action: 'deny' };
+    });
   });
   contents.on('did-fail-load', (_event, code, description, url) => {
     console.error(`[web] did-fail-load ${url || '(main)'}: ${description} (${code})`);
@@ -230,6 +279,10 @@ function createMainWindow(): BrowserWindow {
       contextIsolation: true,
       nodeIntegration: false,
       preload: getPreloadPath(),
+      // Remote workspaces are browsed inside the app rather than handed to the
+      // system browser; the guest's own preferences are locked down in
+      // configureWebContents' will-attach-webview handler.
+      webviewTag: true,
       additionalArguments: [`--api-base=${sharedApiBaseUrl}`],
     },
   });

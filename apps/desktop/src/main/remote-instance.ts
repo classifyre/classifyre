@@ -31,65 +31,37 @@ export function assertValidRemoteUrl(value: string): void {
   }
 }
 
-/**
- * Proves that a URL is a namespace-aware Classifyre web installation, not
- * merely an arbitrary HTTPS page. Requests run in Electron's main process so
- * browser CORS cannot block a legitimate cross-origin verification.
- */
-export async function verifyClassifyreRemote(
-  inputUrl: string,
-): Promise<VerifiedRemoteInstance> {
+/** The origin a Classifyre installation is rooted at, from any URL into it. */
+function normalizeRemoteUrl(inputUrl: string): string {
   const candidateUrl = inputUrl.trim().replace(/\/+$/, '');
   assertValidRemoteUrl(candidateUrl);
   // The Classifyre web client deliberately uses the origin-relative `/api`
   // proxy, so a remote installation is rooted at its origin as well.
-  const normalizedUrl = new URL(candidateUrl).origin;
+  return new URL(candidateUrl).origin;
+}
 
-  const signal = AbortSignal.timeout(10_000);
-  let pingResponse: Response;
-  let namespacesResponse: Response;
-
-  try {
-    pingResponse = await net.fetch(endpointUrl(normalizedUrl, 'api/ping'), {
-      headers: { accept: 'text/plain, application/json' },
-      redirect: 'follow',
-      signal,
-    });
-    if (!pingResponse.ok) {
-      throw new Error(`/api/ping returned HTTP ${pingResponse.status}`);
-    }
-    const ping = (await pingResponse.text()).trim().replace(/^"|"$/g, '');
-    if (ping.toLowerCase() !== 'pong') {
-      throw new Error('/api/ping did not return pong');
-    }
-
-    namespacesResponse = await net.fetch(
-      endpointUrl(normalizedUrl, 'api/namespaces'),
-      {
-        headers: { accept: 'application/json' },
-        redirect: 'follow',
-        signal,
-      },
-    );
-    if (!namespacesResponse.ok) {
-      throw new Error(
-        `/api/namespaces returned HTTP ${namespacesResponse.status}`,
-      );
-    }
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    throw new Error(`Could not verify the Classifyre instance: ${message}`, {
-      cause: error,
-    });
+/**
+ * The remote's namespace registry. Runs in Electron's main process so browser
+ * CORS cannot block a legitimate cross-origin read, and validates the shape so
+ * an arbitrary JSON-returning page cannot pass for a Classifyre instance.
+ */
+async function fetchRemoteNamespaces(
+  normalizedUrl: string,
+  signal: AbortSignal,
+): Promise<unknown[]> {
+  const response = await net.fetch(
+    endpointUrl(normalizedUrl, 'api/namespaces'),
+    { headers: { accept: 'application/json' }, redirect: 'follow', signal },
+  );
+  if (!response.ok) {
+    throw new Error(`/api/namespaces returned HTTP ${response.status}`);
   }
 
   let namespaces: unknown;
   try {
-    namespaces = await namespacesResponse.json();
+    namespaces = await response.json();
   } catch {
-    throw new Error(
-      'Could not verify the Classifyre instance: /api/namespaces did not return JSON',
-    );
+    throw new Error('/api/namespaces did not return JSON');
   }
 
   if (
@@ -103,10 +75,62 @@ export async function verifyClassifyreRemote(
         typeof (item as Record<string, unknown>)['slug'] === 'string',
     )
   ) {
-    throw new Error(
-      'Could not verify the Classifyre instance: /api/namespaces returned an unexpected response',
-    );
+    throw new Error('/api/namespaces returned an unexpected response');
   }
 
-  return { normalizedUrl, namespaceCount: namespaces.length };
+  return namespaces;
+}
+
+/**
+ * Proves that a URL is a namespace-aware Classifyre web installation, not
+ * merely an arbitrary HTTPS page.
+ */
+export async function verifyClassifyreRemote(
+  inputUrl: string,
+): Promise<VerifiedRemoteInstance> {
+  const normalizedUrl = normalizeRemoteUrl(inputUrl);
+  const signal = AbortSignal.timeout(10_000);
+
+  try {
+    const pingResponse = await net.fetch(
+      endpointUrl(normalizedUrl, 'api/ping'),
+      {
+        headers: { accept: 'text/plain, application/json' },
+        redirect: 'follow',
+        signal,
+      },
+    );
+    if (!pingResponse.ok) {
+      throw new Error(`/api/ping returned HTTP ${pingResponse.status}`);
+    }
+    const ping = (await pingResponse.text()).trim().replace(/^"|"$/g, '');
+    if (ping.toLowerCase() !== 'pong') {
+      throw new Error('/api/ping did not return pong');
+    }
+
+    const namespaces = await fetchRemoteNamespaces(normalizedUrl, signal);
+    return { normalizedUrl, namespaceCount: namespaces.length };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`Could not verify the Classifyre instance: ${message}`, {
+      cause: error,
+    });
+  }
+}
+
+/**
+ * How many workspaces a registered remote is currently offering, for the
+ * directory card. Read live rather than stored at add-time: the count is the
+ * one thing about a remote that changes without this desktop knowing. A short
+ * timeout keeps an unreachable server from holding the card's row.
+ */
+export async function countRemoteNamespaces(
+  inputUrl: string,
+): Promise<number> {
+  const normalizedUrl = normalizeRemoteUrl(inputUrl);
+  const namespaces = await fetchRemoteNamespaces(
+    normalizedUrl,
+    AbortSignal.timeout(6_000),
+  );
+  return namespaces.length;
 }

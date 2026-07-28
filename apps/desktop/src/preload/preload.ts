@@ -16,6 +16,8 @@ if (apiBase) {
 contextBridge.exposeInMainWorld('electronAPI', {
   verifyRemoteInstance: (remoteUrl: string) =>
     ipcRenderer.invoke('remote:verify', remoteUrl),
+  remoteNamespaceCount: (remoteUrl: string) =>
+    ipcRenderer.invoke('remote:namespace-count', remoteUrl),
   notifyNamespacesChanged: () => ipcRenderer.send('namespaces:changed'),
   openExternal: (url: string) => ipcRenderer.invoke('external:open', url),
 

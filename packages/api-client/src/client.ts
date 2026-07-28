@@ -998,6 +998,7 @@ function getBaseUrl(): string {
 const RESERVED_ROUTE_PREFIXES = new Set([
   "api",
   "namespaces",
+  "remote", // embedded remote-workspace browser (desktop)
   "docs",
   "health",
   "ping",

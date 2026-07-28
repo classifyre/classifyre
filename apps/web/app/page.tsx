@@ -58,11 +58,24 @@ function WorkspaceSkeleton() {
   );
 }
 
+/** Host of a stored remote URL; the raw value if it somehow isn't a URL. */
+function remoteHost(remoteUrl: string): string {
+  try {
+    return new URL(remoteUrl).host;
+  } catch {
+    return remoteUrl;
+  }
+}
+
 export default function LandingPage() {
   const router = useRouter();
   const { t } = useTranslation();
   const [namespaces, setNamespaces] = React.useState<Namespace[] | null>(null);
   const [stats, setStats] = React.useState<Record<string, NamespaceStats>>({});
+  // Remote workspace id → its own namespace count (null once unreachable).
+  const [remoteCounts, setRemoteCounts] = React.useState<
+    Record<string, number | null>
+  >({});
   const [error, setError] = React.useState<string | null>(null);
   const [createOpen, setCreateOpen] = React.useState(false);
   const [remoteCreateOpen, setRemoteCreateOpen] = React.useState(false);
@@ -107,10 +120,40 @@ export default function LandingPage() {
     void loadStats();
   }, [load, loadStats]);
 
+  // A remote's own workspace count, read live through the desktop bridge (the
+  // renderer cannot reach another origin's API). Each remote resolves on its
+  // own, so one unreachable server never delays the others' cards; a failure
+  // leaves the count absent rather than showing a wrong number.
+  React.useEffect(() => {
+    const bridge = window.electronAPI?.remoteNamespaceCount;
+    if (!bridge || !namespaces) return;
+    let cancelled = false;
+    for (const ns of namespaces) {
+      if (ns.type !== "remote" || !ns.remoteUrl) continue;
+      void bridge(ns.remoteUrl)
+        .then((count) => {
+          if (!cancelled) {
+            setRemoteCounts((current) => ({ ...current, [ns.id]: count }));
+          }
+        })
+        .catch(() => {
+          if (!cancelled) {
+            setRemoteCounts((current) => ({ ...current, [ns.id]: null }));
+          }
+        });
+    }
+    return () => {
+      cancelled = true;
+    };
+  }, [namespaces]);
+
   const open = (ns: Namespace) => {
     if (ns.type === "remote" && ns.remoteUrl) {
-      if (window.electronAPI?.openExternal) {
-        void window.electronAPI.openExternal(ns.remoteUrl);
+      // In the desktop shell the remote's own UI is browsed in-app (its
+      // workspace directory, then its namespaces) with a way back to here.
+      // A plain browser has no embedded view, so it just follows the link.
+      if (window.__CLASSIFYRE_DESKTOP__) {
+        router.push(`/remote/${ns.id}`);
         return;
       }
       window.location.href = ns.remoteUrl;
@@ -228,6 +271,9 @@ export default function LandingPage() {
             {namespaces.map((ns) => {
               const initial = ns.name.trim().charAt(0).toUpperCase() || "?";
               const s = stats[ns.id];
+              const isRemote = ns.type === "remote" && !!ns.remoteUrl;
+              // undefined while in flight, null once the remote didn't answer.
+              const remoteCount = remoteCounts[ns.id];
               return (
                 <Card
                   key={ns.id}
@@ -270,9 +316,18 @@ export default function LandingPage() {
                         <h2 className="truncate font-semibold uppercase tracking-[0.06em]">
                           {ns.name}
                         </h2>
-                        <p className="mt-1 truncate font-mono text-xs text-muted-foreground">
-                          /{ns.slug}
-                        </p>
+                        {ns.type === "remote" && ns.remoteUrl ? (
+                          // A remote card opens that server's own directory,
+                          // not a workspace — say so before the click.
+                          <p className="mt-1 flex items-center gap-1.5 truncate font-mono text-xs text-muted-foreground">
+                            <Globe2 className="size-3 shrink-0" />
+                            {remoteHost(ns.remoteUrl)}
+                          </p>
+                        ) : (
+                          <p className="mt-1 truncate font-mono text-xs text-muted-foreground">
+                            /{ns.slug}
+                          </p>
+                        )}
                       </div>
                       <div className="-mr-2 -mt-2 flex shrink-0 items-center">
                         <Button
@@ -311,7 +366,33 @@ export default function LandingPage() {
                       {ns.description || t("workspaces.noDescription")}
                     </p>
                     <div className="mt-auto flex items-center justify-between gap-3 border-t pt-4">
-                      {s ? (
+                      {/* Only the desktop shell can read another origin's
+                          registry; a browser leaves the row empty rather than
+                          waiting on a count that will never arrive. */}
+                      {isRemote && isDesktop ? (
+                        <span className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+                          {remoteCount === undefined ? (
+                            <Skeleton className="h-4 w-24 bg-muted" />
+                          ) : remoteCount === null ? (
+                            <>
+                              <TriangleAlert className="size-3.5 shrink-0" />
+                              {t("workspaces.remoteUnavailable")}
+                            </>
+                          ) : (
+                            <>
+                              <Layers className="size-3.5 shrink-0" />
+                              <span>
+                                <span className="font-semibold text-foreground">
+                                  {remoteCount}
+                                </span>{" "}
+                                {t("workspaces.remoteWorkspacesCount", {
+                                  count: remoteCount,
+                                })}
+                              </span>
+                            </>
+                          )}
+                        </span>
+                      ) : s ? (
                         <div className="flex min-w-0 items-center gap-2.5">
                           <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
                             <Layers className="size-3.5 shrink-0" />
