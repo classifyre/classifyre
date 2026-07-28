@@ -9,6 +9,7 @@ docs/AddFindingDto.md
 docs/AddThreadEntryDto.md
 docs/AgentActivityItemDto.md
 docs/AgentActivityListResponseDto.md
+docs/AgentCapacityReportDto.md
 docs/AgentConfigDto.md
 docs/AgentConfigListResponseDto.md
 docs/AgentDecisionDto.md
@@ -41,6 +42,7 @@ docs/AssetResponseDto.md
 docs/AssetSimilarityDto.md
 docs/AssetsApi.md
 docs/AssistantApi.md
+docs/AssistantCapabilityReportDto.md
 docs/AssistantControllerRespond200Response.md
 docs/AssistantControllerRespondRequest.md
 docs/AssistantControllerRespondRequestMessagesInner.md
@@ -56,6 +58,8 @@ docs/BulkIngestEdgesDto.md
 docs/BulkIngestEdgesResponseDto.md
 docs/BulkUpdateFindingsDto.md
 docs/BulkUpdateFindingsResponseDto.md
+docs/CapabilityCostProjectionDto.md
+docs/CapabilityProbeResultDto.md
 docs/CaseActionRequestDto.md
 docs/CaseActionResponseDto.md
 docs/CaseActivityDto.md
@@ -340,6 +344,7 @@ src/models/AddFindingDto.ts
 src/models/AddThreadEntryDto.ts
 src/models/AgentActivityItemDto.ts
 src/models/AgentActivityListResponseDto.ts
+src/models/AgentCapacityReportDto.ts
 src/models/AgentConfigDto.ts
 src/models/AgentConfigListResponseDto.ts
 src/models/AgentDecisionDto.ts
@@ -370,6 +375,7 @@ src/models/AssetListItemDto.ts
 src/models/AssetListResponseDto.ts
 src/models/AssetResponseDto.ts
 src/models/AssetSimilarityDto.ts
+src/models/AssistantCapabilityReportDto.ts
 src/models/AssistantControllerRespond200Response.ts
 src/models/AssistantControllerRespondRequest.ts
 src/models/AssistantControllerRespondRequestMessagesInner.ts
@@ -384,6 +390,8 @@ src/models/BulkIngestEdgesDto.ts
 src/models/BulkIngestEdgesResponseDto.ts
 src/models/BulkUpdateFindingsDto.ts
 src/models/BulkUpdateFindingsResponseDto.ts
+src/models/CapabilityCostProjectionDto.ts
+src/models/CapabilityProbeResultDto.ts
 src/models/CaseActionRequestDto.ts
 src/models/CaseActionResponseDto.ts
 src/models/CaseActivityDto.ts

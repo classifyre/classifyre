@@ -284,7 +284,41 @@
       "createNew": "Neuer Anbieter",
       "disabledHint": "Aktivieren Sie den Assistenten, um ein Modell zu wählen.",
       "usingNone": "Kein Modell ausgewählt",
-      "loading": "Assistenteneinstellungen werden geladen…"
+      "loading": "Assistenteneinstellungen werden geladen…",
+      "capability": {
+        "title": "Fähigkeitstest",
+        "description": "Der Verbindungstest belegt nur, dass Schlüssel und Modell-ID funktionieren. Dieser Test bewertet das Modell an dem, was die Agenten-Harness wirklich verlangt: strikte JSON-Turns, Werkzeugauswahl, schemakonforme Argumente und die Verkettung eines Werkzeugergebnisses in den nächsten Aufruf. Er läuft gegen Fixtures — kein Werkzeug wird ausgeführt, nichts in Ihrer Instanz ändert sich.",
+        "run": "Fähigkeitstest starten",
+        "running": "Läuft…",
+        "runningHint": "Bewertete Proben laufen gegen das Modell. Dabei entstehen mehrere echte Completions; das kann eine Minute dauern.",
+        "failed": "Der Fähigkeitstest konnte nicht ausgeführt werden.",
+        "probesPassed": "Proben bestanden",
+        "perRun": "pro Lauf",
+        "agentsTitle": "Agenten-Bereitschaft",
+        "agentsDesc": "Die effektive Konfiguration jedes Agenten — Ihre Ziel-, Werkzeug- und Iterationsüberschreibungen — gemessen am Kontextfenster dieses Modells.",
+        "colAgent": "Agent",
+        "colStatus": "Status",
+        "colTools": "Werkzeuge",
+        "colPrompt": "Prompt",
+        "colHeadroom": "Reserve",
+        "probesTitle": "Proben-Ergebnisse",
+        "whatItProves": "Was das belegt",
+        "promptSent": "Gesendeter Prompt",
+        "modelOutput": "Modellausgabe",
+        "assumptionsTitle": "Annahmen",
+        "verdict": {
+          "READY": "Bereit",
+          "DEGRADED": "Eingeschränkt",
+          "UNUSABLE": "Unbrauchbar"
+        },
+        "tier": {
+          "PROTOCOL": "Turn-Vertrag",
+          "TOOL_USE": "Werkzeugnutzung",
+          "CHAINING": "Verkettung",
+          "JUDGMENT": "Urteilsvermögen",
+          "CAPACITY": "Kapazität"
+        }
+      }
     },
     "autopilot": {
       "subtitle": "Ermittlungs-Autopilot",

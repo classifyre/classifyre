@@ -17,6 +17,7 @@ import * as runtime from '../runtime';
 import type {
   AiProviderConfigResponseDto,
   AiProviderConfigTestResultDto,
+  AssistantCapabilityReportDto,
   CreateAiProviderConfigDto,
   UpdateAiProviderConfigDto,
 } from '../models/index';
@@ -25,11 +26,17 @@ import {
     AiProviderConfigResponseDtoToJSON,
     AiProviderConfigTestResultDtoFromJSON,
     AiProviderConfigTestResultDtoToJSON,
+    AssistantCapabilityReportDtoFromJSON,
+    AssistantCapabilityReportDtoToJSON,
     CreateAiProviderConfigDtoFromJSON,
     CreateAiProviderConfigDtoToJSON,
     UpdateAiProviderConfigDtoFromJSON,
     UpdateAiProviderConfigDtoToJSON,
 } from '../models/index';
+
+export interface AiProviderConfigControllerCapabilityTestRequest {
+    id: string;
+}
 
 export interface AiProviderConfigControllerCreateRequest {
     createAiProviderConfigDto: CreateAiProviderConfigDto;
@@ -56,6 +63,45 @@ export interface AiProviderConfigControllerUpdateRequest {
  * 
  */
 export class AIProviderConfigsApi extends runtime.BaseAPI {
+
+    /**
+     * Runs a graded probe suite against the model using the real harness turn contract, the real tool catalog and the real mission prompts, then reports per-agent readiness and context headroom. Unlike /test (which proves the key and model id work), this measures whether the model can actually drive the agent loop: strict JSON, tool selection, schema-valid arguments, and chaining a tool observation into a dependent call.  No tool handler is invoked — every observation fed to the model is a fixture, so the run has no side effects. Selection is never gated on the result.
+     * Grade a credential against what the agent harness requires
+     */
+    async aiProviderConfigControllerCapabilityTestRaw(requestParameters: AiProviderConfigControllerCapabilityTestRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<AssistantCapabilityReportDto>> {
+        if (requestParameters['id'] == null) {
+            throw new runtime.RequiredError(
+                'id',
+                'Required parameter "id" was null or undefined when calling aiProviderConfigControllerCapabilityTest().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/ai-provider-configs/{id}/capability-test`;
+        urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => AssistantCapabilityReportDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Runs a graded probe suite against the model using the real harness turn contract, the real tool catalog and the real mission prompts, then reports per-agent readiness and context headroom. Unlike /test (which proves the key and model id work), this measures whether the model can actually drive the agent loop: strict JSON, tool selection, schema-valid arguments, and chaining a tool observation into a dependent call.  No tool handler is invoked — every observation fed to the model is a fixture, so the run has no side effects. Selection is never gated on the result.
+     * Grade a credential against what the agent harness requires
+     */
+    async aiProviderConfigControllerCapabilityTest(requestParameters: AiProviderConfigControllerCapabilityTestRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<AssistantCapabilityReportDto> {
+        const response = await this.aiProviderConfigControllerCapabilityTestRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
 
     /**
      * Create a reusable credential. The API key is sent in plaintext and stored encrypted.

@@ -4,6 +4,7 @@ All URIs are relative to *http://localhost*
 
 | Method | HTTP request | Description |
 |------------- | ------------- | -------------|
+| [**aiProviderConfigControllerCapabilityTest**](AIProviderConfigsApi.md#aiproviderconfigcontrollercapabilitytest) | **POST** /ai-provider-configs/{id}/capability-test | Grade a credential against what the agent harness requires |
 | [**aiProviderConfigControllerCreate**](AIProviderConfigsApi.md#aiproviderconfigcontrollercreate) | **POST** /ai-provider-configs | Create an AI provider configuration |
 | [**aiProviderConfigControllerGet**](AIProviderConfigsApi.md#aiproviderconfigcontrollerget) | **GET** /ai-provider-configs/{id} | Get a single AI provider configuration |
 | [**aiProviderConfigControllerList**](AIProviderConfigsApi.md#aiproviderconfigcontrollerlist) | **GET** /ai-provider-configs | List AI provider configurations |
@@ -11,6 +12,75 @@ All URIs are relative to *http://localhost*
 | [**aiProviderConfigControllerTest**](AIProviderConfigsApi.md#aiproviderconfigcontrollertest) | **POST** /ai-provider-configs/{id}/test | Test an AI provider configuration |
 | [**aiProviderConfigControllerUpdate**](AIProviderConfigsApi.md#aiproviderconfigcontrollerupdate) | **PUT** /ai-provider-configs/{id} | Update an AI provider configuration |
 
+
+
+## aiProviderConfigControllerCapabilityTest
+
+> AssistantCapabilityReportDto aiProviderConfigControllerCapabilityTest(id)
+
+Grade a credential against what the agent harness requires
+
+Runs a graded probe suite against the model using the real harness turn contract, the real tool catalog and the real mission prompts, then reports per-agent readiness and context headroom. Unlike /test (which proves the key and model id work), this measures whether the model can actually drive the agent loop: strict JSON, tool selection, schema-valid arguments, and chaining a tool observation into a dependent call.  No tool handler is invoked — every observation fed to the model is a fixture, so the run has no side effects. Selection is never gated on the result.
+
+### Example
+
+```ts
+import {
+  Configuration,
+  AIProviderConfigsApi,
+} from '@workspace/api-client';
+import type { AiProviderConfigControllerCapabilityTestRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new AIProviderConfigsApi();
+
+  const body = {
+    // string
+    id: id_example,
+  } satisfies AiProviderConfigControllerCapabilityTestRequest;
+
+  try {
+    const data = await api.aiProviderConfigControllerCapabilityTest(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **id** | `string` |  | [Defaults to `undefined`] |
+
+### Return type
+
+[**AssistantCapabilityReportDto**](AssistantCapabilityReportDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+| **502** | AI provider returned an error |  -  |
+| **503** | AI provider not configured or rate limit hit |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
 
 
 ## aiProviderConfigControllerCreate

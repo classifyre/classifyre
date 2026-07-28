@@ -1,8 +1,14 @@
 "use client";
 
 import * as React from "react";
-import type { AiProviderConfigResponseDto } from "@workspace/api-client";
 import {
+  api,
+  type AiProviderConfigResponseDto,
+  type AssistantCapabilityReportDto,
+} from "@workspace/api-client";
+import {
+  Alert,
+  AlertDescription,
   Button,
   Card,
   CardContent,
@@ -20,12 +26,22 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  Separator,
   Switch,
 } from "@workspace/ui/components";
-import { BrainCircuit, Cpu, Loader2, Plus, Sparkles } from "lucide-react";
+import {
+  AlertCircle,
+  BrainCircuit,
+  Cpu,
+  FlaskConical,
+  Loader2,
+  Plus,
+  Sparkles,
+} from "lucide-react";
 import { toast } from "sonner";
 import { useInstanceSettings } from "@/components/instance-settings-provider";
 import { AiProviderForm } from "@/components/ai-provider-form";
+import { AssistantCapabilityReport } from "@/components/assistant-capability-report";
 import { useAiProviderConfigs } from "@/hooks/use-ai-provider-configs";
 import { useTranslation } from "@/hooks/use-translation";
 import type { TranslationKey } from "@/i18n";
@@ -40,6 +56,14 @@ export function AiAssistantSettingsCard() {
   const [toggling, setToggling] = React.useState(false);
   const [savingModel, setSavingModel] = React.useState(false);
   const [createOpen, setCreateOpen] = React.useState(false);
+
+  // Capability probe state. Deliberately advisory: a failing report never
+  // blocks selection, it just tells the operator what will break.
+  const [probing, setProbing] = React.useState(false);
+  const [report, setReport] = React.useState<AssistantCapabilityReportDto | null>(
+    null,
+  );
+  const [probeError, setProbeError] = React.useState<string | null>(null);
 
   const aiEnabled = settings.aiEnabled;
   const selectedId = settings.aiProviderConfigId ?? null;
@@ -76,6 +100,10 @@ export function AiAssistantSettingsCard() {
       const next = value === NONE_VALUE ? null : value;
       try {
         setSavingModel(true);
+        // The report describes the previous model — drop it rather than let it
+        // be read as a verdict on the newly selected one.
+        setReport(null);
+        setProbeError(null);
         await updateSettings({ aiProviderConfigId: next });
       } catch (updateError) {
         toast.error(
@@ -106,6 +134,28 @@ export function AiAssistantSettingsCard() {
     },
     [refresh, updateSettings, t],
   );
+
+  const handleCapabilityTest = React.useCallback(async () => {
+    if (!selectedId) return;
+    try {
+      setProbing(true);
+      setProbeError(null);
+      setReport(null);
+      const result =
+        await api.aiProviderConfigs.aiProviderConfigControllerCapabilityTest({
+          id: selectedId,
+        });
+      setReport(result);
+    } catch (error) {
+      setProbeError(
+        error instanceof Error
+          ? error.message
+          : t("settings.assistant.capability.failed"),
+      );
+    } finally {
+      setProbing(false);
+    }
+  }, [selectedId, t]);
 
   const busy = toggling || saving || savingModel;
 
@@ -225,6 +275,58 @@ export function AiAssistantSettingsCard() {
             </>
           )}
         </div>
+
+        {/* Capability probe — separate from the credential test: this one
+            grades the model against what the agent harness actually needs. */}
+        {selected ? (
+          <>
+            <Separator />
+            <div className="space-y-3">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <FlaskConical className="h-3.5 w-3.5" />
+                    <Label>{t("settings.assistant.capability.title")}</Label>
+                  </div>
+                  <p className="max-w-[62ch] text-xs text-muted-foreground">
+                    {t("settings.assistant.capability.description")}
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => void handleCapabilityTest()}
+                  disabled={!aiEnabled || probing}
+                  data-testid="run-capability-test"
+                >
+                  {probing ? (
+                    <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <FlaskConical className="mr-2 h-3.5 w-3.5" />
+                  )}
+                  {probing
+                    ? t("settings.assistant.capability.running")
+                    : t("settings.assistant.capability.run")}
+                </Button>
+              </div>
+
+              {probing ? (
+                <p className="text-xs text-muted-foreground">
+                  {t("settings.assistant.capability.runningHint")}
+                </p>
+              ) : null}
+
+              {probeError ? (
+                <Alert variant="destructive">
+                  <AlertCircle />
+                  <AlertDescription>{probeError}</AlertDescription>
+                </Alert>
+              ) : null}
+
+              {report ? <AssistantCapabilityReport report={report} /> : null}
+            </div>
+          </>
+        ) : null}
       </CardContent>
 
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>

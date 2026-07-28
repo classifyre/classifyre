@@ -51,6 +51,7 @@ All URIs are relative to *http://localhost*
 | Class | Method | HTTP request | Description
 | ----- | ------ | ------------ | -------------
 *AIApi* | [**aiControllerComplete**](docs/AIApi.md#aicontrollercomplete) | **POST** /ai/complete | Generate a text completion
+*AIProviderConfigsApi* | [**aiProviderConfigControllerCapabilityTest**](docs/AIProviderConfigsApi.md#aiproviderconfigcontrollercapabilitytest) | **POST** /ai-provider-configs/{id}/capability-test | Grade a credential against what the agent harness requires
 *AIProviderConfigsApi* | [**aiProviderConfigControllerCreate**](docs/AIProviderConfigsApi.md#aiproviderconfigcontrollercreate) | **POST** /ai-provider-configs | Create an AI provider configuration
 *AIProviderConfigsApi* | [**aiProviderConfigControllerGet**](docs/AIProviderConfigsApi.md#aiproviderconfigcontrollerget) | **GET** /ai-provider-configs/{id} | Get a single AI provider configuration
 *AIProviderConfigsApi* | [**aiProviderConfigControllerList**](docs/AIProviderConfigsApi.md#aiproviderconfigcontrollerlist) | **GET** /ai-provider-configs | List AI provider configurations
@@ -273,6 +274,7 @@ All URIs are relative to *http://localhost*
 - [AddThreadEntryDto](docs/AddThreadEntryDto.md)
 - [AgentActivityItemDto](docs/AgentActivityItemDto.md)
 - [AgentActivityListResponseDto](docs/AgentActivityListResponseDto.md)
+- [AgentCapacityReportDto](docs/AgentCapacityReportDto.md)
 - [AgentConfigDto](docs/AgentConfigDto.md)
 - [AgentConfigListResponseDto](docs/AgentConfigListResponseDto.md)
 - [AgentDecisionDto](docs/AgentDecisionDto.md)
@@ -303,6 +305,7 @@ All URIs are relative to *http://localhost*
 - [AssetListResponseDto](docs/AssetListResponseDto.md)
 - [AssetResponseDto](docs/AssetResponseDto.md)
 - [AssetSimilarityDto](docs/AssetSimilarityDto.md)
+- [AssistantCapabilityReportDto](docs/AssistantCapabilityReportDto.md)
 - [AssistantControllerRespond200Response](docs/AssistantControllerRespond200Response.md)
 - [AssistantControllerRespondRequest](docs/AssistantControllerRespondRequest.md)
 - [AssistantControllerRespondRequestMessagesInner](docs/AssistantControllerRespondRequestMessagesInner.md)
@@ -317,6 +320,8 @@ All URIs are relative to *http://localhost*
 - [BulkIngestEdgesResponseDto](docs/BulkIngestEdgesResponseDto.md)
 - [BulkUpdateFindingsDto](docs/BulkUpdateFindingsDto.md)
 - [BulkUpdateFindingsResponseDto](docs/BulkUpdateFindingsResponseDto.md)
+- [CapabilityCostProjectionDto](docs/CapabilityCostProjectionDto.md)
+- [CapabilityProbeResultDto](docs/CapabilityProbeResultDto.md)
 - [CaseActionRequestDto](docs/CaseActionRequestDto.md)
 - [CaseActionResponseDto](docs/CaseActionResponseDto.md)
 - [CaseActivityDto](docs/CaseActivityDto.md)
