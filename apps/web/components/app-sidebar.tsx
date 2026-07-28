@@ -17,8 +17,10 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarSeparator,
 } from "@workspace/ui/components/sidebar";
 import { useTranslation } from "@/hooks/use-translation";
+import type { TranslationKey } from "@/i18n";
 import { VersionSidebarNotifier } from "./version-update-notifier";
 import { AiHealthSidebarWarning } from "./ai-health";
 import {
@@ -31,11 +33,52 @@ import {
   Fingerprint,
   BookOpen,
   ScanSearch,
-  Settings,
   Bot,
   ArrowLeft,
   type LucideIcon,
 } from "lucide-react";
+
+type NavItem = { titleKey: TranslationKey; href: string; icon: LucideIcon };
+type NavGroup = { labelKey: TranslationKey; items: NavItem[] };
+
+// Grouped by what the operator is doing, not by data model:
+//   Intelligence — what the platform found for you.
+//   Casework     — what you are actively working on.
+//   Pipeline     — what feeds and shapes the two above.
+const NAV_GROUPS: NavGroup[] = [
+  {
+    labelKey: "nav.group.intelligence",
+    items: [
+      { titleKey: "nav.overview", href: "/discovery", icon: LayoutDashboard },
+      { titleKey: "nav.findings", href: "/findings", icon: SearchCheck },
+      { titleKey: "nav.assets", href: "/assets", icon: FileText },
+    ],
+  },
+  {
+    labelKey: "nav.group.casework",
+    items: [
+      {
+        titleKey: "nav.investigations",
+        href: "/investigations",
+        icon: Search,
+      },
+      {
+        titleKey: "nav.fingerprints",
+        href: "/fingerprints",
+        icon: Fingerprint,
+      },
+    ],
+  },
+  {
+    labelKey: "nav.group.pipeline",
+    items: [
+      { titleKey: "nav.sources", href: "/sources", icon: Database },
+      { titleKey: "nav.detectors", href: "/detectors", icon: FlaskConical },
+      { titleKey: "nav.glossary", href: "/glossary", icon: BookOpen },
+      { titleKey: "nav.scans", href: "/scans", icon: ScanSearch },
+    ],
+  },
+];
 
 export function AppSidebar() {
   const pathname = usePathname();
@@ -45,23 +88,6 @@ export function AppSidebar() {
     const full = nsHref(href);
     return pathname === full || pathname.startsWith(full + "/");
   };
-
-  const mainNavigation: { title: string; href: string; icon: LucideIcon }[] = [
-    { title: t("nav.overview"), href: "/discovery", icon: LayoutDashboard },
-    { title: t("nav.findings"), href: "/findings", icon: SearchCheck },
-    { title: t("nav.assets"), href: "/assets", icon: FileText },
-    { title: t("nav.sources"), href: "/sources", icon: Database },
-    { title: t("nav.detectors"), href: "/detectors", icon: FlaskConical },
-    { title: t("nav.investigations"), href: "/investigations", icon: Search },
-    { title: t("nav.fingerprints"), href: "/fingerprints", icon: Fingerprint },
-    { title: t("nav.glossary"), href: "/glossary", icon: BookOpen },
-  ];
-
-  const operationsNavigation: {
-    title: string;
-    href: string;
-    icon: LucideIcon;
-  }[] = [{ title: t("nav.scans"), href: "/scans", icon: ScanSearch }];
 
   return (
     <Sidebar collapsible="icon">
@@ -90,66 +116,37 @@ export function AppSidebar() {
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
-          <SidebarMenuItem>
-            <SidebarMenuButton asChild tooltip={t("workspaces.all")}>
-              <Link href="/">
-                <ArrowLeft className="size-5" />
-                <span>{t("workspaces.all")}</span>
-              </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {mainNavigation.map((item) => {
-                const isActive =
-                  isActivePath(item.href);
-                return (
-                  <SidebarMenuItem key={item.href}>
-                    <SidebarMenuButton
-                      asChild
-                      isActive={isActive}
-                      tooltip={item.title}
-                    >
-                      <Link href={nsHref(item.href)}>
-                        <item.icon className="size-5" />
-                        <span>{item.title}</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                );
-              })}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-        <SidebarGroup>
-          <SidebarGroupLabel>{t("nav.operations")}</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {operationsNavigation.map((item) => {
-                const isActive =
-                  isActivePath(item.href);
-                return (
-                  <SidebarMenuItem key={item.href}>
-                    <SidebarMenuButton
-                      asChild
-                      isActive={isActive}
-                      tooltip={item.title}
-                    >
-                      <Link href={nsHref(item.href)}>
-                        <item.icon className="size-5" />
-                        <span>{item.title}</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                );
-              })}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        {NAV_GROUPS.map((group) => (
+          <SidebarGroup key={group.labelKey}>
+            <SidebarGroupLabel className="text-[10px] font-semibold uppercase tracking-[0.14em] text-sidebar-foreground/50">
+              {t(group.labelKey)}
+            </SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {group.items.map((item) => {
+                  const title = t(item.titleKey);
+                  return (
+                    <SidebarMenuItem key={item.href}>
+                      <SidebarMenuButton
+                        asChild
+                        isActive={isActivePath(item.href)}
+                        tooltip={title}
+                      >
+                        <Link href={nsHref(item.href)}>
+                          <item.icon className="size-5" />
+                          <span>{title}</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  );
+                })}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        ))}
       </SidebarContent>
       <SidebarFooter>
         <SidebarMenu>
@@ -157,9 +154,7 @@ export function AppSidebar() {
           <SidebarMenuItem>
             <SidebarMenuButton
               asChild
-              isActive={
-                isActivePath("/harness")
-              }
+              isActive={isActivePath("/harness")}
               tooltip={t("nav.harness")}
             >
               <Link href={nsHref("/harness")}>
@@ -168,17 +163,20 @@ export function AppSidebar() {
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
+        </SidebarMenu>
+        <SidebarSeparator className="mx-0" />
+        <SidebarMenu>
+          {/* Leaving the workspace is the last thing on the rail — a way out,
+              not a destination competing with the navigation above. */}
           <SidebarMenuItem>
             <SidebarMenuButton
               asChild
-              isActive={
-                isActivePath("/settings")
-              }
-              tooltip={t("nav.settings")}
+              tooltip={t("workspaces.all")}
+              className="text-sidebar-foreground/70 hover:text-sidebar-foreground"
             >
-              <Link href={nsHref("/settings")}>
-                <Settings className="size-6" />
-                <span>{t("nav.settings")}</span>
+              <Link href="/">
+                <ArrowLeft className="size-5" />
+                <span>{t("workspaces.all")}</span>
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>

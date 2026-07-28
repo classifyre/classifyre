@@ -3,6 +3,10 @@
     "name": "Classifyre",
     "tagline": "Erkennungsplattform"
   },
+  "assistant": {
+    "open": "Assistent fragen",
+    "close": "Assistent schließen"
+  },
   "workspaces": {
     "directory": "Arbeitsbereichsübersicht",
     "eyebrow": "Ermittlungsbereiche",
@@ -93,7 +97,12 @@
     "scans": "Scans",
     "operations": "Operationen",
     "settings": "Einstellungen",
-    "harness": "Harness AI"
+    "harness": "Harness AI",
+    "group": {
+      "intelligence": "Erkenntnisse",
+      "casework": "Fallarbeit",
+      "pipeline": "Pipeline"
+    }
   },
   "glossary": {
     "title": "Glossar",

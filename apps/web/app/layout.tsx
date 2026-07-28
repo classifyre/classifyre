@@ -8,7 +8,6 @@ import {
 
 import "@workspace/ui/globals.css";
 import { Providers } from "@/components/providers";
-import { DocumentTitleUpdater } from "@/components/document-title-updater";
 import { ANALYTICS_CONFIG_PATH } from "@/lib/analytics-config";
 import enTranslations from "@/i18n/en";
 import { translate } from "@/i18n";
@@ -67,10 +66,7 @@ export default function RootLayout({
             a small same-origin script that must run before hydration so the
             PostHog provider sees its config on first effect. */}
         {!isDesktopBuild && <script src={ANALYTICS_CONFIG_PATH} />}
-        <Providers>
-          <DocumentTitleUpdater />
-          {children}
-        </Providers>
+        <Providers>{children}</Providers>
       </body>
     </html>
   );

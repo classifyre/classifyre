@@ -3,6 +3,10 @@
     "name": "Classifyre",
     "tagline": "Detection Platform"
   },
+  "assistant": {
+    "open": "Ask the assistant",
+    "close": "Close the assistant"
+  },
   "workspaces": {
     "directory": "Workspace directory",
     "eyebrow": "Investigation spaces",
@@ -93,7 +97,12 @@
     "scans": "Scans",
     "operations": "Operations",
     "settings": "Settings",
-    "harness": "Harness AI"
+    "harness": "Harness AI",
+    "group": {
+      "intelligence": "Intelligence",
+      "casework": "Casework",
+      "pipeline": "Pipeline"
+    }
   },
   "glossary": {
     "title": "Glossary",

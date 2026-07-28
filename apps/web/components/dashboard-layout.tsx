@@ -30,7 +30,8 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@workspace/ui/components/tooltip";
-import { AssistantWorkflowTrigger } from "./assistant-workflow-provider";
+import { AssistantFab } from "./assistant-workflow-provider";
+import { DocumentTitleUpdater } from "./document-title-updater";
 import { AiHealthProvider, AiHealthFixButton } from "./ai-health";
 import { LanguageSwitcher } from "./language-switcher";
 import { useTranslation } from "@/hooks/use-translation";
@@ -290,6 +291,9 @@ export function DashboardLayout({
     <ServerConfigContext.Provider value={serverConfig}>
       <SidebarProvider>
         <AiHealthProvider>
+          {/* Mounted here (not in the root layout) so the document title can
+              name the active workspace. */}
+          <DocumentTitleUpdater />
           <AppSidebar />
           <SidebarInset className="min-w-0 overflow-x-clip">
             <header className="flex h-16 shrink-0 items-center justify-between gap-2 border-b px-4">
@@ -382,7 +386,6 @@ export function DashboardLayout({
                     </TooltipContent>
                   </Tooltip>
                 )}
-                <AssistantWorkflowTrigger />
                 <LanguageSwitcher />
                 <ThemeToggle />
                 <NotificationCenter />
@@ -404,6 +407,7 @@ export function DashboardLayout({
               {children}
             </div>
           </SidebarInset>
+          <AssistantFab />
         </AiHealthProvider>
       </SidebarProvider>
     </ServerConfigContext.Provider>
