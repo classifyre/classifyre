@@ -2,7 +2,6 @@ import { AgentKind, RunnerStatus } from '@prisma/client';
 import { CorrelationWorker } from './correlation.worker';
 import {
   AI_ACTOR,
-  AUTOPILOT_COALESCE_MAX_DIRTY,
   AUTOPILOT_COALESCE_WINDOW_SECONDS,
   AUTOPILOT_CORPUS_SINGLETON_KEY,
 } from '../autopilot/autopilot.constants';
@@ -112,12 +111,32 @@ describe('CorrelationWorker autopilot hand-off', () => {
       expect(sent[0].opts.startAfter).toBe(AUTOPILOT_COALESCE_WINDOW_SECONDS);
     });
 
-    it('fires immediately once the backlog reaches the cap', async () => {
-      build({ dirtyCount: AUTOPILOT_COALESCE_MAX_DIRTY });
+    // The load-bearing detail, and the one that is easy to get wrong: in
+    // pg-boss 12 every single-job-per-key index is predicated on the queue
+    // POLICY (short/singleton/stately/exclusive), and this queue is created
+    // with the default `standard`. A bare singletonKey therefore dedupes
+    // nothing — each scan would still get its own cycle, just corpus-scoped
+    // instead of source-scoped, which is strictly worse. `singletonSeconds`
+    // drives the policy-independent `job_i4 (name, singleton_on,
+    // singleton_key)` index instead, with ON CONFLICT DO NOTHING.
+    it('sets singletonSeconds — a bare singletonKey is inert on this queue', async () => {
+      build();
 
       await handOff();
 
-      expect(sent[0].opts.startAfter).toBe(0);
+      expect(sent[0].opts.singletonSeconds).toBe(
+        AUTOPILOT_COALESCE_WINDOW_SECONDS,
+      );
+    });
+
+    it('throttles express cycles per source as well', async () => {
+      build({ finding: { id: 'f1', importanceScore: 0.95 } });
+
+      await handOff();
+
+      expect(sent[0].opts.singletonSeconds).toBe(
+        AUTOPILOT_COALESCE_WINDOW_SECONDS,
+      );
     });
   });
 

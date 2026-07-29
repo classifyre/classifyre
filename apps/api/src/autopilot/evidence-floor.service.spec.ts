@@ -20,17 +20,7 @@ describe('EvidenceFloorService', () => {
     inquiry: { findMany: jest.fn(), findFirst: jest.fn() },
     finding: { findMany: jest.fn() },
   };
-  const mockMatching = { preview: jest.fn() };
-
-  const findingRef = (id: string) => ({
-    findingId: id,
-    label: 'x',
-    severity: 'LOW',
-    detectorType: 'REGEX',
-    assetId: 'a1',
-    matchedAt: new Date(),
-    isNew: false,
-  });
+  const mockMatching = { probeMatches: jest.fn() };
 
   /** A finding row whose analysis says it is genuine evidence. */
   const strong = (id: string) => ({
@@ -77,7 +67,11 @@ describe('EvidenceFloorService', () => {
     // "Rangel person references" — all created with match_count 0, all
     // rationalised from knowledge of the Enron scandal rather than a finding.
     it('refuses a matcher that selects nothing', async () => {
-      mockMatching.preview.mockResolvedValue({ total: 0, sample: [] });
+      mockMatching.probeMatches.mockResolvedValue({
+        findingIds: [],
+        scanned: 1,
+        exhausted: true,
+      });
 
       await expect(
         service.assertInquiryIsWarranted({
@@ -88,7 +82,11 @@ describe('EvidenceFloorService', () => {
     });
 
     it('tells the model what to do instead of creating it', async () => {
-      mockMatching.preview.mockResolvedValue({ total: 0, sample: [] });
+      mockMatching.probeMatches.mockResolvedValue({
+        findingIds: [],
+        scanned: 1,
+        exhausted: true,
+      });
 
       await expect(
         service.assertInquiryIsWarranted({ title: 'Speculative' }),
@@ -96,9 +94,10 @@ describe('EvidenceFloorService', () => {
     });
 
     it('allows a matcher backed by real findings', async () => {
-      mockMatching.preview.mockResolvedValue({
-        total: 3,
-        sample: [findingRef('f1'), findingRef('f2')],
+      mockMatching.probeMatches.mockResolvedValue({
+        findingIds: ['f1', 'f2'],
+        scanned: 2,
+        exhausted: true,
       });
       mockPrisma.finding.findMany.mockResolvedValue([strong('f1'), weak('f2')]);
 
@@ -108,9 +107,10 @@ describe('EvidenceFloorService', () => {
     });
 
     it('refuses an inquiry over a pure boilerplate cluster', async () => {
-      mockMatching.preview.mockResolvedValue({
-        total: 794,
-        sample: [findingRef('f1'), findingRef('f2')],
+      mockMatching.probeMatches.mockResolvedValue({
+        findingIds: ['f1', 'f2'],
+        scanned: 2,
+        exhausted: true,
       });
       mockPrisma.finding.findMany.mockResolvedValue([weak('f1'), weak('f2')]);
 
@@ -123,9 +123,10 @@ describe('EvidenceFloorService', () => {
     // unscored as weak would let a lagging embedding queue silently block every
     // legitimate inquiry — the floor must fail open on ignorance.
     it('does not judge findings the analyzer has not scored yet', async () => {
-      mockMatching.preview.mockResolvedValue({
-        total: 5,
-        sample: [findingRef('f1'), findingRef('f2')],
+      mockMatching.probeMatches.mockResolvedValue({
+        findingIds: ['f1', 'f2'],
+        scanned: 2,
+        exhausted: true,
       });
       mockPrisma.finding.findMany.mockResolvedValue([
         weak('f1'),
@@ -138,20 +139,87 @@ describe('EvidenceFloorService', () => {
     });
   });
 
+  /**
+   * The floor runs inside an LLM tool call, so it uses a bounded probe rather
+   * than the operator-facing `preview`, which loads every candidate row before
+   * regex-filtering in app code. Unbounded, that was up to six full-table loads
+   * of a ~100k-finding corpus per `inquiries.create`, on a service with a heap
+   * ceiling.
+   */
+  describe('bounded probing', () => {
+    it('does not report a scan-cap miss as a definitive zero', async () => {
+      mockMatching.probeMatches.mockResolvedValue({
+        findingIds: [],
+        scanned: 2000,
+        exhausted: false,
+      });
+
+      await expect(
+        service.assertInquiryIsWarranted({ title: 'Very sparse' }),
+      ).rejects.toThrow(/first 2000 findings scanned/);
+    });
+
+    it('still says "selects 0" when the set really was exhausted', async () => {
+      mockMatching.probeMatches.mockResolvedValue({
+        findingIds: [],
+        scanned: 12,
+        exhausted: true,
+      });
+
+      await expect(
+        service.assertInquiryIsWarranted({ title: 'Empty' }),
+      ).rejects.toThrow(/selects 0 open findings/);
+    });
+
+    // Containment of a bounded sample in another bounded sample proves nothing:
+    // two large sets can overlap entirely and still share no sampled id. A
+    // false duplicate refusal is worse than a missed one, so the set-overlap
+    // fallback is skipped and structural similarity carries the check alone.
+    it('skips the set-overlap fallback when the proposal was truncated', async () => {
+      mockMatching.probeMatches.mockResolvedValue({
+        findingIds: ['f1'],
+        scanned: 2000,
+        exhausted: false,
+      });
+      mockPrisma.finding.findMany.mockResolvedValue([strong('f1')]);
+      mockPrisma.inquiry.findMany.mockResolvedValue([
+        {
+          id: 'q1',
+          title: 'Unrelated',
+          matchAllSources: true,
+          sourceIds: [],
+          detectorTypes: [],
+          customDetectorKeys: [],
+          findingTypes: [],
+          findingTypeRegex: [],
+          findingValueRegex: [],
+        },
+      ]);
+
+      await expect(
+        service.assertInquiryIsWarranted({ title: 'Broad' }),
+      ).resolves.toBeUndefined();
+      // One probe for the proposal; no second probe for the candidate.
+      expect(mockMatching.probeMatches).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe('one phenomenon, one inquiry', () => {
     // The first run created five "HTML email artifact noise" inquiries, one per
     // mailbox, its own fifth rationale reading "same pattern as 5 other
     // sources". The titles all differed, so only the selected finding sets
     // reveal them as one monitor.
     it('refuses a per-source copy of an existing inquiry and names it', async () => {
-      mockMatching.preview
+      mockMatching.probeMatches
         .mockResolvedValueOnce({
-          total: 3,
-          sample: [findingRef('f1'), findingRef('f2'), findingRef('f3')],
+          findingIds: ['f1', 'f2', 'f3'],
+          scanned: 3,
+          exhausted: true,
         })
         .mockResolvedValueOnce({
-          total: 40,
-          sample: [findingRef('f1'), findingRef('f2'), findingRef('f9')],
+          findingIds: ['f1', 'f2', 'f9'],
+          scanned: 40,
+          exhausted: true,
         });
       mockPrisma.finding.findMany.mockResolvedValue([strong('f1')]);
       mockPrisma.inquiry.findMany.mockResolvedValue([
@@ -176,9 +244,17 @@ describe('EvidenceFloorService', () => {
     });
 
     it('points at inquiries.enrich rather than just saying no', async () => {
-      mockMatching.preview
-        .mockResolvedValueOnce({ total: 2, sample: [findingRef('f1')] })
-        .mockResolvedValueOnce({ total: 9, sample: [findingRef('f1')] });
+      mockMatching.probeMatches
+        .mockResolvedValueOnce({
+          findingIds: ['f1'],
+          scanned: 2,
+          exhausted: true,
+        })
+        .mockResolvedValueOnce({
+          findingIds: ['f1'],
+          scanned: 9,
+          exhausted: true,
+        });
       mockPrisma.finding.findMany.mockResolvedValue([strong('f1')]);
       mockPrisma.inquiry.findMany.mockResolvedValue([
         {
@@ -200,14 +276,16 @@ describe('EvidenceFloorService', () => {
     });
 
     it('allows a genuinely distinct inquiry through', async () => {
-      mockMatching.preview
+      mockMatching.probeMatches
         .mockResolvedValueOnce({
-          total: 2,
-          sample: [findingRef('f1'), findingRef('f2')],
+          findingIds: ['f1', 'f2'],
+          scanned: 2,
+          exhausted: true,
         })
         .mockResolvedValueOnce({
-          total: 2,
-          sample: [findingRef('f8'), findingRef('f9')],
+          findingIds: ['f8', 'f9'],
+          scanned: 2,
+          exhausted: true,
         });
       mockPrisma.finding.findMany.mockResolvedValue([strong('f1')]);
       mockPrisma.inquiry.findMany.mockResolvedValue([
@@ -233,14 +311,16 @@ describe('EvidenceFloorService', () => {
     // duplicate even though the corpus-wide one is far larger — which is why
     // this compares containment rather than Jaccard similarity.
     it('catches a small proposal swallowed by a much larger inquiry', async () => {
-      mockMatching.preview
+      mockMatching.probeMatches
         .mockResolvedValueOnce({
-          total: 2,
-          sample: [findingRef('f1'), findingRef('f2')],
+          findingIds: ['f1', 'f2'],
+          scanned: 2,
+          exhausted: true,
         })
         .mockResolvedValueOnce({
-          total: 500,
-          sample: Array.from({ length: 50 }, (_, i) => findingRef(`f${i + 1}`)),
+          findingIds: Array.from({ length: 50 }, (_, i) => `f${i + 1}`),
+          scanned: 50,
+          exhausted: true,
         });
       mockPrisma.finding.findMany.mockResolvedValue([strong('f1')]);
       mockPrisma.inquiry.findMany.mockResolvedValue([
@@ -309,9 +389,10 @@ describe('EvidenceFloorService', () => {
     });
 
     it('refuses the sixth clone and names the first', async () => {
-      mockMatching.preview.mockResolvedValue({
-        total: 296,
-        sample: [findingRef('f1')],
+      mockMatching.probeMatches.mockResolvedValue({
+        findingIds: ['f1'],
+        scanned: 1,
+        exhausted: true,
       });
       mockPrisma.finding.findMany.mockResolvedValue([strong('f1')]);
       mockPrisma.inquiry.findMany.mockResolvedValue([

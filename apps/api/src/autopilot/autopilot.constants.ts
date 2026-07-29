@@ -30,16 +30,16 @@ export const AUTOPILOT_MAX_ATTEMPTS = 3;
  * produced 151 independent cycles of five agents apiece — each reasoning over
  * whatever fraction of the corpus had landed by then, and none of them able to
  * see the others. Instead, a completed scan now marks its source *dirty* and
- * enqueues a single globally-keyed job; every scan finishing inside the window
- * folds into that one pending job, and the cycle that eventually runs sees the
+ * enqueues a single job per window, and the cycle that eventually runs sees the
  * whole batch at once.
+ *
+ * This value doubles as the pg-boss `singletonSeconds` slot width, which is
+ * what actually performs the coalescing — a bare `singletonKey` is inert on a
+ * `standard` queue; see the note at the enqueue site. A backlog is neither
+ * capped nor fast-tracked: a bigger batch is the intended outcome, and the
+ * window is a fixed upper bound on how long a scan waits to be looked at.
  */
 export const AUTOPILOT_COALESCE_WINDOW_SECONDS = 600;
-/**
- * Fire the batch early once this many sources are waiting, so a large backlog
- * is not held hostage by the window on a corpus that is still loading.
- */
-export const AUTOPILOT_COALESCE_MAX_DIRTY = 20;
 /** pg-boss singleton key for the coalesced corpus-wide cycle. */
 export const AUTOPILOT_CORPUS_SINGLETON_KEY = 'autopilot:corpus';
 
