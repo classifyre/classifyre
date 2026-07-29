@@ -14,6 +14,7 @@ describe('InquiryMatchingService', () => {
 
   const inquiry = (over: Record<string, unknown> = {}) => ({
     id: 'q1',
+    title: 'Board travel',
     matchAllSources: false,
     sourceIds: ['s1'],
     detectorTypes: [],
@@ -195,6 +196,95 @@ describe('InquiryMatchingService', () => {
           data: expect.objectContaining({ matchCount: 1, newMatchCount: 0 }),
         }),
       );
+    });
+  });
+
+  describe('runner-scoped express inquiry matching', () => {
+    const seenAt = new Date('2026-07-15T12:00:00Z');
+
+    it('returns an inquiry only when this runner produced a matching new finding', async () => {
+      mockPrisma.inquiry.findMany.mockResolvedValue([
+        inquiry({
+          title: 'Board travel',
+          findingTypes: ['email'],
+          matchesSeenAt: seenAt,
+          newMatchCount: 50,
+        }),
+      ]);
+      mockPrisma.finding.findMany.mockResolvedValue([
+        finding({ createdAt: new Date('2026-07-15T13:00:00Z') }),
+      ]);
+
+      await expect(
+        service.findNewInquiryMatchForRunner({
+          sourceId: 's1',
+          runnerId: 'run-current',
+          createdByNot: 'ai-autopilot',
+        }),
+      ).resolves.toEqual({ id: 'q1', title: 'Board travel' });
+
+      expect(mockPrisma.inquiry.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            createdBy: { not: 'ai-autopilot' },
+            OR: [{ matchAllSources: true }, { sourceIds: { has: 's1' } }],
+          }),
+        }),
+      );
+      expect(mockPrisma.finding.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            sourceId: 's1',
+            runnerId: 'run-current',
+            status: 'OPEN',
+          },
+        }),
+      );
+    });
+
+    it('ignores a globally unread inquiry when this runner has no new match', async () => {
+      mockPrisma.inquiry.findMany.mockResolvedValue([
+        inquiry({
+          findingTypes: ['email'],
+          matchesSeenAt: seenAt,
+          newMatchCount: 50,
+        }),
+      ]);
+      mockPrisma.finding.findMany.mockResolvedValue([
+        finding({ createdAt: new Date('2026-07-15T09:00:00Z') }),
+      ]);
+
+      await expect(
+        service.findNewInquiryMatchForRunner({
+          sourceId: 's1',
+          runnerId: 'run-current',
+          createdByNot: 'ai-autopilot',
+        }),
+      ).resolves.toBeNull();
+    });
+
+    it('uses the canonical matcher rather than treating every runner finding as a hit', async () => {
+      mockPrisma.inquiry.findMany.mockResolvedValue([
+        inquiry({
+          findingTypes: ['ssn'],
+          matchesSeenAt: seenAt,
+          newMatchCount: 1,
+        }),
+      ]);
+      mockPrisma.finding.findMany.mockResolvedValue([
+        finding({
+          findingType: 'email',
+          createdAt: new Date('2026-07-15T13:00:00Z'),
+        }),
+      ]);
+
+      await expect(
+        service.findNewInquiryMatchForRunner({
+          sourceId: 's1',
+          runnerId: 'run-current',
+          createdByNot: 'ai-autopilot',
+        }),
+      ).resolves.toBeNull();
     });
   });
 

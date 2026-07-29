@@ -15,7 +15,7 @@ import {
   NotificationType,
 } from '../../../types/notification.types';
 import { DecisionApplierService } from '../../decision-applier.service';
-import { AI_ACTOR } from '../../autopilot.constants';
+import { AI_ACTOR, MAX_COVERAGE_SOURCE_ROWS } from '../../autopilot.constants';
 import type { Tool, ToolContext, ToolGate } from '../tool.types';
 
 /** Config sub-keys the autopilot may change. Base connection is excluded. */
@@ -154,7 +154,9 @@ export class ConfigToolset {
               consecutiveFailures: true,
             },
             orderBy: { updatedAt: 'desc' },
-            take: 100,
+            // Was 100, which silently truncated against a 151-source instance:
+            // the agent saw a subset and had no way to know it was one.
+            take: MAX_COVERAGE_SOURCE_ROWS,
           });
           return rows.map((r) => ({
             id: r.id,

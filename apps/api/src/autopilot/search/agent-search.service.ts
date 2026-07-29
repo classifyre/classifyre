@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { AssetStatus, Prisma } from '@prisma/client';
+import { AssetStatus, Prisma, RunnerStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma.service';
 import { InquiryMatchingService } from '../../matching/inquiry-matching.service';
 import {
@@ -11,6 +11,7 @@ import {
   MAX_ASSET_TYPE_BUCKETS,
   MAX_CANDIDATE_INQUIRIES,
   MAX_CASE_SUMMARIES,
+  MAX_COVERAGE_SOURCE_ROWS,
   MAX_DUPLICATE_CLUSTERS,
   MAX_DUPLICATE_PAIRS,
   MAX_FINDING_GROUPS,
@@ -25,6 +26,7 @@ import type {
   AssetMetadataProfile,
   AssetSampleSummary,
   CaseSummary,
+  CorpusCoverage,
   DetectorPrecisionSummary,
   DuplicateSummary,
   FindingGroupSummary,
@@ -356,6 +358,90 @@ export class AgentSearchService {
       this.prisma.finding.count({ where: { sourceId, status: 'OPEN' } }),
     ]);
     return { activeAssets, openFindings };
+  }
+
+  /**
+   * How much of the corpus has actually been scanned, per source.
+   *
+   * The investigation missions had no tool that could answer this: `sources.list`
+   * lives in the config toolset, so INQUIRY, CASE and ESCALATION — the three
+   * that create artifacts and page humans — could not see that 121 of 151
+   * sources had never been scanned. `textCoverage` is included because a run can
+   * report success while having read none of its assets' actual content, and
+   * nothing in the harness exposed that either.
+   */
+  async corpusCoverage(): Promise<CorpusCoverage> {
+    const [sources, findingsOpen, findingsAnalyzed] = await Promise.all([
+      this.prisma.source.findMany({
+        select: {
+          id: true,
+          name: true,
+          lastRunAt: true,
+          lastRunStatus: true,
+          runnerStatus: true,
+          consecutiveFailures: true,
+          runners: {
+            where: {
+              status: { in: [RunnerStatus.COMPLETED, RunnerStatus.WARNING] },
+            },
+            orderBy: { completedAt: 'desc' },
+            take: 1,
+            select: {
+              completedAt: true,
+              status: true,
+              assetsWithoutText: true,
+              textCoverage: true,
+            },
+          },
+        },
+        orderBy: { name: 'asc' },
+        take: MAX_COVERAGE_SOURCE_ROWS,
+      }),
+      this.prisma.finding.count({ where: { status: 'OPEN' } }),
+      this.prisma.finding.count({
+        where: { status: 'OPEN', importanceScore: { gt: 0 } },
+      }),
+    ]);
+
+    // WARNING counts as scanned: partial OCR failure still ingested assets and
+    // still fired a cycle, so excluding it would understate coverage.
+    const rows = sources.map((s) => {
+      const last = s.runners[0] ?? null;
+      return {
+        sourceId: s.id,
+        name: s.name,
+        scanned: last != null,
+        lastRunAt: s.lastRunAt,
+        lastRunStatus: s.lastRunStatus ? String(s.lastRunStatus) : null,
+        runnerStatus: s.runnerStatus ? String(s.runnerStatus) : null,
+        consecutiveFailures: s.consecutiveFailures,
+        assetsWithoutText: last?.assetsWithoutText ?? null,
+        textCoverage: last?.textCoverage ?? null,
+      };
+    });
+
+    const scanned = rows.filter((r) => r.scanned).length;
+    return {
+      totalSources: rows.length,
+      scannedSources: scanned,
+      neverScanned: rows.filter((r) => r.lastRunAt == null).length,
+      inFlight: rows.filter(
+        (r) =>
+          r.runnerStatus === RunnerStatus.PENDING ||
+          r.runnerStatus === RunnerStatus.RUNNING,
+      ).length,
+      failing: rows.filter((r) => r.lastRunStatus === RunnerStatus.ERROR)
+        .length,
+      coverageRatio:
+        rows.length > 0 ? Math.round((scanned / rows.length) * 1000) / 1000 : 0,
+      findingsOpen,
+      findingsAnalyzed,
+      note:
+        findingsAnalyzed < findingsOpen
+          ? 'Evidence analysis is still catching up; unscored findings are pending, not unimportant.'
+          : 'Every open finding has an evidence score.',
+      sources: rows,
+    };
   }
 
   /** All ACTIVE inquiries (capped) as compact summaries for dedupe/enrichment. */

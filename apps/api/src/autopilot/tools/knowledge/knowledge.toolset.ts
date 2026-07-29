@@ -2,7 +2,11 @@ import { Injectable } from '@nestjs/common';
 import { AgentDecisionAction, AiManagementMode } from '@prisma/client';
 import { AgentMemoryService } from '../../memory/agent-memory.service';
 import { SystemBriefService } from '../../harness/system-brief.service';
-import { AI_ACTOR } from '../../autopilot.constants';
+import {
+  AI_ACTOR,
+  DEFERRED_KEY_PREFIX,
+  DEFERRED_TAG,
+} from '../../autopilot.constants';
 import type { MemoryWrite } from '../../autopilot.types';
 import type { Tool } from '../tool.types';
 
@@ -13,6 +17,12 @@ const MEMORY_KINDS = [
   'DETECTOR_INSIGHT',
   'OPERATOR_DIRECTIVE',
 ] as const;
+
+const DEFAULT_REVISIT_COVERAGE = 0.9;
+
+function clamp01(n: number): number {
+  return Math.max(0, Math.min(1, n));
+}
 
 /**
  * Tools for the agent's own knowledge: writing long-lived memory and
@@ -29,6 +39,64 @@ export class KnowledgeToolset {
 
   list(): Tool[] {
     return [
+      {
+        name: 'agenda.defer',
+        description:
+          'Park something for a later cycle that will have more of the corpus. Use when you have noticed a pattern worth pursuing but cannot justify acting on it yet — too little coverage, evidence still being scored, or a hypothesis needing sources that have not been scanned. This is the correct move for "I expect this to recur elsewhere": it records the intent without creating an inquiry that would have to be reconciled later. Deferred items are surfaced back to you once coverage reaches revisitAtCoverage.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            topic: {
+              type: 'string',
+              description:
+                'Short stable identifier for what is being deferred.',
+            },
+            reason: {
+              type: 'string',
+              description:
+                'What you observed and what is missing before it can be acted on.',
+            },
+            revisitAtCoverage: {
+              type: 'number',
+              description:
+                'Scanned-source fraction (0–1) at which this is worth revisiting. Defaults to 0.9.',
+            },
+          },
+          required: ['topic', 'reason'],
+          additionalProperties: false,
+        },
+        sideEffect: 'mutate',
+        domain: 'memory',
+        decisionAction: AgentDecisionAction.NO_ACTION,
+        resolveGate: () =>
+          Promise.resolve({
+            mode: AiManagementMode.MANAGED,
+            entityType: 'memory',
+          }),
+        handler: async (input, tc) => {
+          const revisitAtCoverage = clamp01(
+            typeof input.revisitAtCoverage === 'number'
+              ? input.revisitAtCoverage
+              : DEFAULT_REVISIT_COVERAGE,
+          );
+          const topic = String(input.topic);
+          await this.memory.writeMany(
+            [
+              {
+                kind: 'DECISION_PRECEDENT',
+                key: `${DEFERRED_KEY_PREFIX}${topic}`,
+                content: `${String(input.reason)} (revisit at ${Math.round(revisitAtCoverage * 100)}% corpus coverage)`,
+                tags: [DEFERRED_TAG, `revisit-at:${revisitAtCoverage}`],
+                verified: false,
+              },
+            ],
+            undefined,
+            'AGENT',
+            String(tc.ctx.run.agentKind),
+          );
+          return { deferred: topic, revisitAtCoverage };
+        },
+      },
       {
         name: 'memory.write',
         description:

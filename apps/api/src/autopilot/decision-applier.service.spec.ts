@@ -7,6 +7,7 @@ import { CasesService } from '../cases.service';
 import { CaseThreadsService } from '../case-threads.service';
 import { GraphService } from '../graph.service';
 import { AgentSearchService } from './search/agent-search.service';
+import { EvidenceFloorService } from './evidence-floor.service';
 import { AI_ACTOR } from './autopilot.constants';
 
 describe('DecisionApplierService', () => {
@@ -38,6 +39,13 @@ describe('DecisionApplierService', () => {
   };
   const mockGraph = { createManualEdge: jest.fn(), deleteEdge: jest.fn() };
   const mockSearch = { existingIds: jest.fn() };
+  // The evidence floor has its own suite; here it always passes, so these
+  // tests keep testing the mutation primitives rather than the gate.
+  const mockEvidence = {
+    assertInquiryIsWarranted: jest.fn().mockResolvedValue(undefined),
+    assertCaseIsWarranted: jest.fn().mockResolvedValue(undefined),
+    assessFindings: jest.fn(),
+  };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -49,10 +57,13 @@ describe('DecisionApplierService', () => {
         { provide: CaseThreadsService, useValue: mockThreads },
         { provide: GraphService, useValue: mockGraph },
         { provide: AgentSearchService, useValue: mockSearch },
+        { provide: EvidenceFloorService, useValue: mockEvidence },
       ],
     }).compile();
     service = module.get(DecisionApplierService);
     jest.clearAllMocks();
+    mockEvidence.assertInquiryIsWarranted.mockResolvedValue(undefined);
+    mockEvidence.assertCaseIsWarranted.mockResolvedValue(undefined);
   });
 
   describe('effectiveMode', () => {

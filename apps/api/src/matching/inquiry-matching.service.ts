@@ -49,6 +49,13 @@ const FINDING_SELECT = {
 const PREVIEW_CAP = 50;
 
 /**
+ * Candidate rows a bounded probe will pull before giving up. Sized so the
+ * autopilot's evidence floor stays cheap enough to run inside a tool call while
+ * still being decisive for any matcher narrow enough to be worth monitoring.
+ */
+const PROBE_SCAN_LIMIT = 2000;
+
+/**
  * Background engine: an Inquiry is a saved query. After a source finishes
  * ingesting, the run's new findings are matched against every ACTIVE inquiry for
  * that source. Counts are stored on the Inquiry row (matchCount + newMatchCount)
@@ -163,6 +170,62 @@ export class InquiryMatchingService {
         `Recorded ${landed} new match(es) for source ${sourceId}`,
       );
     return { landed };
+  }
+
+  /**
+   * Find an inquiry with a genuinely new match in one completed runner.
+   *
+   * Stored `newMatchCount` is corpus-wide and remains positive until an
+   * operator marks the inquiry seen. It therefore cannot decide whether this
+   * particular scan should bypass corpus coalescing. This live check applies
+   * the canonical matcher to only this runner's findings and uses the same
+   * createdAt > matchesSeenAt definition as the matching counters and API.
+   */
+  async findNewInquiryMatchForRunner(args: {
+    sourceId: string;
+    runnerId: string;
+    createdByNot: string;
+  }): Promise<{ id: string; title: string } | null> {
+    const inquiries = await this.prisma.inquiry.findMany({
+      where: {
+        status: 'ACTIVE',
+        createdBy: { not: args.createdByNot },
+        matchesSeenAt: { not: null },
+        OR: [{ matchAllSources: true }, { sourceIds: { has: args.sourceId } }],
+      },
+      select: {
+        ...this.matcherSelect,
+        title: true,
+        matchesSeenAt: true,
+      },
+      orderBy: { updatedAt: 'desc' },
+    });
+    if (inquiries.length === 0) return null;
+
+    const findings = await this.prisma.finding.findMany({
+      where: {
+        sourceId: args.sourceId,
+        runnerId: args.runnerId,
+        status: 'OPEN',
+      },
+      select: FINDING_SELECT,
+    });
+    if (findings.length === 0) return null;
+
+    for (const inquiry of inquiries) {
+      const seenAt = inquiry.matchesSeenAt;
+      if (
+        seenAt &&
+        findings.some(
+          (finding) =>
+            (finding.createdAt?.getTime() ?? 0) > seenAt.getTime() &&
+            new CompiledMatcher(inquiry).matches(finding),
+        )
+      ) {
+        return { id: inquiry.id, title: inquiry.title };
+      }
+    }
+    return null;
   }
 
   /**
@@ -293,6 +356,33 @@ export class InquiryMatchingService {
     return rows.map((r) => r.id);
   }
 
+  /**
+   * Bounded "what would this matcher select?" probe.
+   *
+   * `preview` loads every candidate row before regex-filtering in app code —
+   * fine for a one-off operator request, not fine for the autopilot's evidence
+   * floor, which runs this on every `inquiries.create` and again per duplicate
+   * candidate. On a corpus with ~100k open findings that was up to six
+   * unbounded full-table loads inside a single LLM tool call, on a service with
+   * a heap ceiling.
+   *
+   * `exhausted` is the honest part: false means the scan cap was hit and the
+   * answer is "no match in the first `scanLimit` candidates", NOT "no match".
+   * Callers must not report a bounded miss as a definitive zero.
+   */
+  async probeMatches(
+    matchers: InquiryMatchers,
+    scanLimit = PROBE_SCAN_LIMIT,
+  ): Promise<{ findingIds: string[]; scanned: number; exhausted: boolean }> {
+    const rows = await this.candidateFindings(matchers, false, scanLimit);
+    const matcher = new CompiledMatcher(matchers);
+    return {
+      findingIds: rows.filter((f) => matcher.matches(f)).map((f) => f.id),
+      scanned: rows.length,
+      exhausted: rows.length < scanLimit,
+    };
+  }
+
   /** Compute (without persisting) the findings a matcher config currently selects. */
   async preview(matchers: InquiryMatchers): Promise<PreviewResponseDto> {
     const rows = await this.candidateFindings(matchers, true);
@@ -328,6 +418,7 @@ export class InquiryMatchingService {
   private async candidateFindings(
     m: InquiryMatchers,
     withAsset: boolean,
+    scanLimit?: number,
   ): Promise<FindingRow[]> {
     const hasDetectorFilter =
       m.detectorTypes.length > 0 || m.customDetectorKeys.length > 0;
@@ -354,6 +445,11 @@ export class InquiryMatchingService {
 
     const rows = (await this.prisma.finding.findMany({
       where,
+      // Deterministic order so a bounded probe scans the same window twice and
+      // its answers do not flicker between calls.
+      ...(scanLimit != null
+        ? { take: scanLimit, orderBy: { id: 'asc' as const } }
+        : {}),
       select: withAsset
         ? {
             ...FINDING_SELECT,

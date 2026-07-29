@@ -55,9 +55,10 @@ export class AgentMemoryService {
           weight: number;
           origin: string;
           verified_at: Date | null;
+          tags: string[] | null;
         }>
       >`
-        SELECT kind::text, key, content, weight, origin::text, verified_at
+        SELECT kind::text, key, content, weight, origin::text, verified_at, tags
         FROM agent_memories
         WHERE kind::text IN (${Prisma.join(kinds.map(String))})
           AND (
@@ -73,6 +74,7 @@ export class AgentMemoryService {
         key: r.key,
         content: r.content,
         weight: Number(r.weight),
+        tags: r.tags ?? [],
         origin: r.origin,
         verified: r.verified_at !== null,
       }));
@@ -265,12 +267,16 @@ export class AgentMemoryService {
     weight: number;
     origin: AgentMemoryOrigin;
     verifiedAt: Date | null;
+    tags?: string[];
   }): RecalledMemory {
     return {
       kind: String(r.kind),
       key: r.key,
       content: r.content,
       weight: r.weight,
+      // Carried through so callers can tell a deferral from an ordinary
+      // precedent: agenda.defer records its revisit threshold as a tag.
+      tags: r.tags ?? [],
       origin: String(r.origin),
       verified: r.verifiedAt !== null,
     };
