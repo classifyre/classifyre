@@ -185,30 +185,68 @@ export class NamespaceWorkerManager
     this.logger.log(`Started workers for namespace '${e.slug}'`);
   }
 
+  /**
+   * Best-effort teardown of one namespace's workers.
+   *
+   * Every step is isolated, because `start()` calls this from its own catch
+   * block: a step that throws here does not just skip its own cleanup, it
+   * REPLACES the error that caused the start to fail. `.catch(() => undefined)`
+   * on each call was not enough — it handles rejections, but a synchronous
+   * throw happens before there is a promise to attach to, so a provider missing
+   * the method (a partial test double, a half-constructed provider) surfaced as
+   * `TypeError: this.cliRunner.stopForSchema is not a function` and buried the
+   * real cause. The trailing sync calls had no protection at all.
+   */
   private async stop(e: NamespaceLifecycleEvent): Promise<void> {
     const wasActive = this.active.delete(e.schemaName);
+    const settle = async (label: string, fn: () => unknown): Promise<void> => {
+      try {
+        await fn();
+      } catch (error) {
+        this.logger.warn(
+          `Teardown step '${label}' failed for schema '${e.schemaName}': ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+      }
+    };
+
     // Independent resource families stop concurrently so distributed deletion
     // stays within the API pod's grace period even when pg-boss or a connector
     // needs its full shutdown timeout.
     await Promise.all([
       this.runInNamespace(this.store(e), () =>
         Promise.all([
-          this.cliRunner.stopForSchema(e.schemaName).catch(() => undefined),
-          this.chat.stopForSchema(e.schemaName).catch(() => undefined),
-          this.embedding.stopForSchema(e.schemaName).catch(() => undefined),
-          this.mcpClient.stopForSchema(e.schemaName).catch(() => undefined),
+          settle('cliRunner', () => this.cliRunner.stopForSchema(e.schemaName)),
+          settle('chat', () => this.chat.stopForSchema(e.schemaName)),
+          settle('embedding', () => this.embedding.stopForSchema(e.schemaName)),
+          settle('mcpClient', () => this.mcpClient.stopForSchema(e.schemaName)),
         ]),
       ),
-      this.pgBoss.stopForNamespace(e.schemaName).catch(() => undefined),
-      this.pgStream.dropForSchema(e.schemaName).catch(() => undefined),
+      settle('pgBoss', () => this.pgBoss.stopForNamespace(e.schemaName)),
+      settle('pgStream', () => this.pgStream.dropForSchema(e.schemaName)),
     ]);
-    this.runnerEvents.stopForSchema(e.schemaName);
-    this.notificationEvents.stopForSchema(e.schemaName);
-    this.scheduler.clearForSchema(e.schemaName);
-    this.embeddingService.clearForSchema(e.schemaName);
-    this.embeddingCapability.clearForSchema(e.schemaName);
-    if (wasActive) this.prismaManager.unpin(e.schemaName);
-    await this.prismaManager.dropWhenIdle(e.schemaName).catch(() => undefined);
+    await settle('runnerEvents', () =>
+      this.runnerEvents.stopForSchema(e.schemaName),
+    );
+    await settle('notificationEvents', () =>
+      this.notificationEvents.stopForSchema(e.schemaName),
+    );
+    await settle('scheduler', () =>
+      this.scheduler.clearForSchema(e.schemaName),
+    );
+    await settle('embeddingService', () =>
+      this.embeddingService.clearForSchema(e.schemaName),
+    );
+    await settle('embeddingCapability', () =>
+      this.embeddingCapability.clearForSchema(e.schemaName),
+    );
+    if (wasActive) {
+      await settle('prismaUnpin', () => this.prismaManager.unpin(e.schemaName));
+    }
+    await settle('prismaDrop', () =>
+      this.prismaManager.dropWhenIdle(e.schemaName),
+    );
     if (wasActive) {
       this.logger.log(`Stopped workers for namespace schema '${e.schemaName}'`);
     }

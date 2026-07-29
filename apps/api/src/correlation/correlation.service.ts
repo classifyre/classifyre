@@ -1664,6 +1664,16 @@ export class CorrelationService {
     };
   }
 
+  /** Of the given asset ids, those that actually exist. For case actions. */
+  async existingAssetIds(assetIds: string[]): Promise<string[]> {
+    if (assetIds.length === 0) return [];
+    const rows = await this.prisma.asset.findMany({
+      where: { id: { in: assetIds } },
+      select: { id: true },
+    });
+    return rows.map((r) => r.id);
+  }
+
   /** Finding ids belonging to the given assets (bounded), for case actions. */
   async findingIdsForAssets(assetIds: string[], cap = 2000): Promise<string[]> {
     if (assetIds.length === 0) return [];

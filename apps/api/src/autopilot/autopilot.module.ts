@@ -17,6 +17,7 @@ import { AgentSemanticService } from './search/agent-semantic.service';
 import { AgentAuditService } from './audit/agent-audit.service';
 import { AgentLoggerService } from './audit/agent-logger.service';
 import { DecisionApplierService } from './decision-applier.service';
+import { EvidenceFloorService } from './evidence-floor.service';
 import { ValidationService } from '../validation.service';
 import { CustomDetectorsService } from '../custom-detectors.service';
 import { CustomDetectorTestsService } from '../custom-detector-tests.service';
@@ -78,6 +79,7 @@ import { AssistantCapabilityService } from './capability/assistant-capability.se
     AgentAuditService,
     AgentLoggerService,
     DecisionApplierService,
+    EvidenceFloorService,
     ValidationService,
     CustomDetectorsService,
     CustomDetectorTestsService,

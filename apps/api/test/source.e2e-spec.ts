@@ -24,8 +24,17 @@ function resolveMySqlHostPort(): { host: string; port: number } {
 describe('Source (e2e)', () => {
   let ctx: TestApp;
   let prisma: PrismaService;
+  // `testConnection` is what this suite exercises; the rest are the lifecycle
+  // methods NamespaceWorkerManager calls when it starts and stops a namespace's
+  // workers. Without them the manager threw `activateForSchema is not a
+  // function` on boot, and its own teardown then threw `stopForSchema is not a
+  // function` on top — burying the first error and reporting neither as a test
+  // failure, just two ERROR lines in the log.
   const mockCliRunnerService = {
     testConnection: jest.fn(),
+    activateForSchema: jest.fn(),
+    stopForSchema: jest.fn().mockResolvedValue(undefined),
+    reconcileOnStartup: jest.fn().mockResolvedValue(undefined),
   };
 
   beforeAll(async () => {

@@ -41,6 +41,7 @@ describe('AutopilotWorker.handle (no cross-namespace guard needed)', () => {
       {} as any,
       {} as any,
       {} as any,
+      {} as any,
     );
 
   it('runs the cycle for a scan-completed job', async () => {

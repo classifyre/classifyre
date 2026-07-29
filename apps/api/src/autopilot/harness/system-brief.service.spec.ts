@@ -10,6 +10,7 @@ describe('SystemBriefService', () => {
   const mockPrisma = {
     agentSystemBrief: { findUnique: jest.fn(), upsert: jest.fn() },
     source: { count: jest.fn() },
+    runner: { groupBy: jest.fn() },
     asset: { count: jest.fn(), groupBy: jest.fn() },
     customDetector: { count: jest.fn() },
     inquiry: { count: jest.fn() },
@@ -35,6 +36,11 @@ describe('SystemBriefService', () => {
     }).compile();
     service = module.get(SystemBriefService);
     jest.clearAllMocks();
+
+    // Coverage is recomputed on every compose(), so every path needs these.
+    mockPrisma.source.count.mockResolvedValue(0);
+    mockPrisma.runner.groupBy.mockResolvedValue([]);
+    mockPrisma.finding.count.mockResolvedValue(0);
 
     mockPrisma.glossaryTerm.findMany.mockResolvedValue([
       { term: 'pii', aliases: [], entityType: 'TERM', notes: 'personal data' },
@@ -105,6 +111,7 @@ describe('SystemBriefService', () => {
       glossary: [{ key: 'pii', content: 'personal data', weight: 3 }],
       topics: [{ key: 'leaks', content: 'maps to inquiry 1', weight: 2 }],
       gaps: [{ key: 'detector-author:iban', content: 'abandoned', weight: 1 }],
+      deferred: [],
       setup: [
         {
           status: 'ok',
@@ -156,6 +163,69 @@ describe('SystemBriefService', () => {
       expect(c.glossary.map((g) => g.key)).toContain('pii');
       expect(c.topics.map((t) => t.key)).toContain('leaks');
       expect(c.gaps.map((g) => g.key)).toContain('detector-author:iban');
+    });
+
+    // agenda.defer exists so "I expect this pattern to recur in the sources
+    // still to be scanned" has an expression other than creating the inquiry
+    // anyway. Resurfacing a deferral before its threshold would recreate
+    // exactly the pressure to act early that deferring it relieved.
+    describe('deferred items', () => {
+      const parked = (revisitAt: string) => [
+        {
+          kind: 'DECISION_PRECEDENT',
+          key: 'deferred:html-noise',
+          content: 'Seen in symes-k; expect it elsewhere',
+          weight: 1,
+          tags: ['deferred', `revisit-at:${revisitAt}`],
+          origin: 'AGENT',
+          verified: false,
+        },
+      ];
+
+      const atCoverage = (scanned: number, total: number) => {
+        mockPrisma.source.count.mockResolvedValue(total);
+        mockPrisma.runner.groupBy.mockResolvedValue(
+          Array.from({ length: scanned }, (_, i) => ({ sourceId: `s${i}` })),
+        );
+      };
+
+      it('stays silent below its coverage threshold', async () => {
+        mockMemory.topByWeight.mockImplementation((kind: AgentMemoryKind) =>
+          Promise.resolve(
+            kind === AgentMemoryKind.DECISION_PRECEDENT ? parked('0.9') : [],
+          ),
+        );
+        atCoverage(12, 151);
+
+        const c = await service.compose();
+        expect(c.deferred).toHaveLength(0);
+      });
+
+      it('resurfaces once coverage reaches the threshold', async () => {
+        mockMemory.topByWeight.mockImplementation((kind: AgentMemoryKind) =>
+          Promise.resolve(
+            kind === AgentMemoryKind.DECISION_PRECEDENT ? parked('0.5') : [],
+          ),
+        );
+        atCoverage(151, 151);
+
+        const c = await service.compose();
+        expect(c.deferred.map((d) => d.key)).toContain('deferred:html-noise');
+      });
+
+      // Deferrals are DECISION_PRECEDENTs too, and would otherwise read among
+      // the gaps as "already decided". They are the opposite: open questions.
+      it('keeps deferrals out of the known-gaps section', async () => {
+        mockMemory.topByWeight.mockImplementation((kind: AgentMemoryKind) =>
+          Promise.resolve(
+            kind === AgentMemoryKind.DECISION_PRECEDENT ? parked('0.5') : [],
+          ),
+        );
+        atCoverage(151, 151);
+
+        const c = await service.compose();
+        expect(c.gaps.map((g) => g.key)).not.toContain('deferred:html-noise');
+      });
     });
 
     it('derives a setup checklist that flags cold-start sources', async () => {

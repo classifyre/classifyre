@@ -16,16 +16,40 @@ describe('formatSummary (G-032)', () => {
     failed: 0,
     createdInquiries: [],
     createdCases: [],
-    caseReadyInquiryIds: [],
     ...over,
   });
 
-  it('reports a read-only run as zero applied', () => {
+  // A run that read 11 things and changed nothing must never read as work
+  // done. It now says so in words rather than as "0 applied" — restraint is a
+  // result, and reporting it as a row of zeros taught both the operator and
+  // the model reading its own history that the cycle had been wasted.
+  it('names a read-only run as deliberate, never as applied work', () => {
     const text = formatSummary(summary({ applied: 0, readOk: 11 }));
 
-    expect(text).toContain('0 applied');
+    expect(text).toContain('observed only');
     expect(text).toContain('11 read');
     expect(text).not.toContain('11 applied');
+    expect(text).not.toContain('1 applied');
+  });
+
+  it('carries the reason when the model gave one', () => {
+    const text = formatSummary(
+      summary({
+        applied: 0,
+        readOk: 6,
+        finishSummary: 'all matches are boilerplate; nothing warranted action',
+      }),
+    );
+
+    expect(text).toContain('boilerplate');
+  });
+
+  // A run that failed has not "observed only" — it has a problem to report.
+  it('does not dress a failed run up as restraint', () => {
+    const text = formatSummary(summary({ applied: 0, readOk: 3, failed: 2 }));
+
+    expect(text).toContain('2 failed');
+    expect(text).not.toContain('observed only');
   });
 
   it('counts only mutations as applied', () => {
