@@ -37,6 +37,18 @@ export interface FinalizeIngestRunDto {
      * @memberof FinalizeIngestRunDto
      */
     samplingCursor?: { [key: string]: any; };
+    /**
+     * Assets this run skipped entirely on scan-cache evidence — content and every applicable detector configuration unchanged since their last completed scan.
+     * @type {number}
+     * @memberof FinalizeIngestRunDto
+     */
+    assetsSkippedCached?: number;
+    /**
+     * Individual detector runs avoided across all assets, counting the partial skips on assets where only some detectors had to re-run.
+     * @type {number}
+     * @memberof FinalizeIngestRunDto
+     */
+    detectorRunsSkipped?: number;
 }
 
 /**
@@ -61,6 +73,8 @@ export function FinalizeIngestRunDtoFromJSONTyped(json: any, ignoreDiscriminator
         'runnerId': json['runnerId'],
         'seenHashes': json['seenHashes'],
         'samplingCursor': json['samplingCursor'] == null ? undefined : json['samplingCursor'],
+        'assetsSkippedCached': json['assetsSkippedCached'] == null ? undefined : json['assetsSkippedCached'],
+        'detectorRunsSkipped': json['detectorRunsSkipped'] == null ? undefined : json['detectorRunsSkipped'],
     };
 }
 
@@ -78,6 +92,8 @@ export function FinalizeIngestRunDtoToJSONTyped(value?: FinalizeIngestRunDto | n
         'runnerId': value['runnerId'],
         'seenHashes': value['seenHashes'],
         'samplingCursor': value['samplingCursor'],
+        'assetsSkippedCached': value['assetsSkippedCached'],
+        'detectorRunsSkipped': value['detectorRunsSkipped'],
     };
 }
 

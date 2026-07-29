@@ -29,6 +29,12 @@ class LocalFolderSource(ObjectStorageSourceBase):
 
     DEFAULT_MAX_FILE_BYTES = 10 * 1024 * 1024
 
+    # The local "ETag" is mtime_ns + size, which a restore from backup or a
+    # size-preserving edit under a preserved mtime reproduces exactly. Hash the
+    # bytes before trusting the cache; the read is local and cheap next to the
+    # parsing, OCR and detection it lets us skip.
+    SCAN_CACHE_VERIFY = "content"
+
     _resolved_root: Path | None = None
 
     def _root(self) -> Path:

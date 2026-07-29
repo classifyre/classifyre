@@ -25,6 +25,12 @@ export interface RegisterDiscoveredAssetsDto {
      * @memberof RegisterDiscoveredAssetsDto
      */
     assetHashes: Array<string>;
+    /**
+     * Return each asset's persisted scan-cache state alongside the registration. The CLI uses it to skip assets whose content and detector configuration are unchanged. It must be read here, before the discovery ingest overwrites the stored checksum with the incoming one.
+     * @type {boolean}
+     * @memberof RegisterDiscoveredAssetsDto
+     */
+    includeScanCache?: boolean;
 }
 
 /**
@@ -46,6 +52,7 @@ export function RegisterDiscoveredAssetsDtoFromJSONTyped(json: any, ignoreDiscri
     return {
         
         'assetHashes': json['assetHashes'],
+        'includeScanCache': json['includeScanCache'] == null ? undefined : json['includeScanCache'],
     };
 }
 
@@ -61,6 +68,7 @@ export function RegisterDiscoveredAssetsDtoToJSONTyped(value?: RegisterDiscovere
     return {
         
         'assetHashes': value['assetHashes'],
+        'includeScanCache': value['includeScanCache'],
     };
 }
 

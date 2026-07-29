@@ -2454,6 +2454,30 @@
       },
       "additionalProperties": false
     },
+    "ScanCacheConfig": {
+      "title": "ScanCacheConfig",
+      "label": "Scan Cache",
+      "type": "object",
+      "description": "Skips re-processing assets whose content and applicable detector configuration are unchanged since their last fully-successful scan. Supported by file-like sources only (local folders, object storage, cloud drives, email); ignored elsewhere, because a database row can change under the same key with no change signal to compare against. A detector whose configuration changed is always re-run — and only that detector.",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "When enabled (default), an asset whose content and per-detector configuration fingerprints all match its last successful scan is skipped, and its existing findings are carried forward untouched. Disable to re-scan everything on every run."
+        },
+        "verify": {
+          "type": "string",
+          "enum": ["auto", "metadata", "content"],
+          "default": "auto",
+          "description": "How strongly to prove the payload is unchanged. metadata trusts the source-reported checksum (provider ETag/MD5) and skips the download entirely. content downloads the bytes and compares a SHA-256 digest, still skipping parsing, OCR, transcription and detection. auto (default) picks per source: content where the checksum is only mtime and size (local folders), metadata where the provider supplies a content-derived digest."
+        }
+      },
+      "default": {
+        "enabled": true,
+        "verify": "auto"
+      },
+      "additionalProperties": false
+    },
     "ResourceOverrides": {
       "title": "ResourceOverrides",
       "label": "Resource Limits",
@@ -2749,6 +2773,9 @@
             },
             "sampling": {
               "$ref": "#/definitions/SamplingConfig"
+            },
+            "scan_cache": {
+              "$ref": "#/definitions/ScanCacheConfig"
             },
             "resources": {
               "$ref": "#/definitions/ResourceOverrides"
@@ -5394,6 +5421,9 @@
         "sampling": {
           "$ref": "#/definitions/SamplingConfig"
         },
+        "scan_cache": {
+          "$ref": "#/definitions/ScanCacheConfig"
+        },
         "resources": {
           "$ref": "#/definitions/ResourceOverrides"
         },
@@ -5435,6 +5465,9 @@
             },
             "sampling": {
               "$ref": "#/definitions/SamplingConfig"
+            },
+            "scan_cache": {
+              "$ref": "#/definitions/ScanCacheConfig"
             },
             "resources": {
               "$ref": "#/definitions/ResourceOverrides"
@@ -5481,6 +5514,9 @@
             "sampling": {
               "$ref": "#/definitions/SamplingConfig"
             },
+            "scan_cache": {
+              "$ref": "#/definitions/ScanCacheConfig"
+            },
             "resources": {
               "$ref": "#/definitions/ResourceOverrides"
             },
@@ -5525,6 +5561,9 @@
             },
             "sampling": {
               "$ref": "#/definitions/SamplingConfig"
+            },
+            "scan_cache": {
+              "$ref": "#/definitions/ScanCacheConfig"
             },
             "resources": {
               "$ref": "#/definitions/ResourceOverrides"
@@ -5571,6 +5610,9 @@
             "sampling": {
               "$ref": "#/definitions/SamplingConfig"
             },
+            "scan_cache": {
+              "$ref": "#/definitions/ScanCacheConfig"
+            },
             "resources": {
               "$ref": "#/definitions/ResourceOverrides"
             },
@@ -5615,6 +5657,9 @@
             },
             "sampling": {
               "$ref": "#/definitions/SamplingConfig"
+            },
+            "scan_cache": {
+              "$ref": "#/definitions/ScanCacheConfig"
             },
             "resources": {
               "$ref": "#/definitions/ResourceOverrides"
@@ -5661,6 +5706,9 @@
             "sampling": {
               "$ref": "#/definitions/SamplingConfig"
             },
+            "scan_cache": {
+              "$ref": "#/definitions/ScanCacheConfig"
+            },
             "resources": {
               "$ref": "#/definitions/ResourceOverrides"
             },
@@ -5705,6 +5753,9 @@
             },
             "sampling": {
               "$ref": "#/definitions/SamplingConfig"
+            },
+            "scan_cache": {
+              "$ref": "#/definitions/ScanCacheConfig"
             },
             "resources": {
               "$ref": "#/definitions/ResourceOverrides"
@@ -5751,6 +5802,9 @@
             "sampling": {
               "$ref": "#/definitions/SamplingConfig"
             },
+            "scan_cache": {
+              "$ref": "#/definitions/ScanCacheConfig"
+            },
             "resources": {
               "$ref": "#/definitions/ResourceOverrides"
             },
@@ -5795,6 +5849,9 @@
             },
             "sampling": {
               "$ref": "#/definitions/SamplingConfig"
+            },
+            "scan_cache": {
+              "$ref": "#/definitions/ScanCacheConfig"
             },
             "resources": {
               "$ref": "#/definitions/ResourceOverrides"
@@ -5841,6 +5898,9 @@
             "sampling": {
               "$ref": "#/definitions/SamplingConfig"
             },
+            "scan_cache": {
+              "$ref": "#/definitions/ScanCacheConfig"
+            },
             "resources": {
               "$ref": "#/definitions/ResourceOverrides"
             },
@@ -5885,6 +5945,9 @@
             },
             "sampling": {
               "$ref": "#/definitions/SamplingConfig"
+            },
+            "scan_cache": {
+              "$ref": "#/definitions/ScanCacheConfig"
             },
             "resources": {
               "$ref": "#/definitions/ResourceOverrides"
@@ -5931,6 +5994,9 @@
             "sampling": {
               "$ref": "#/definitions/SamplingConfig"
             },
+            "scan_cache": {
+              "$ref": "#/definitions/ScanCacheConfig"
+            },
             "resources": {
               "$ref": "#/definitions/ResourceOverrides"
             },
@@ -5975,6 +6041,9 @@
             },
             "sampling": {
               "$ref": "#/definitions/SamplingConfig"
+            },
+            "scan_cache": {
+              "$ref": "#/definitions/ScanCacheConfig"
             },
             "resources": {
               "$ref": "#/definitions/ResourceOverrides"
@@ -6021,6 +6090,9 @@
             "sampling": {
               "$ref": "#/definitions/SamplingConfig"
             },
+            "scan_cache": {
+              "$ref": "#/definitions/ScanCacheConfig"
+            },
             "resources": {
               "$ref": "#/definitions/ResourceOverrides"
             },
@@ -6066,6 +6138,9 @@
             "sampling": {
               "$ref": "#/definitions/SamplingConfig"
             },
+            "scan_cache": {
+              "$ref": "#/definitions/ScanCacheConfig"
+            },
             "resources": {
               "$ref": "#/definitions/ResourceOverrides"
             },
@@ -6110,6 +6185,9 @@
             },
             "sampling": {
               "$ref": "#/definitions/SamplingConfig"
+            },
+            "scan_cache": {
+              "$ref": "#/definitions/ScanCacheConfig"
             },
             "resources": {
               "$ref": "#/definitions/ResourceOverrides"
@@ -6292,6 +6370,9 @@
             "sampling": {
               "$ref": "#/definitions/SamplingConfig"
             },
+            "scan_cache": {
+              "$ref": "#/definitions/ScanCacheConfig"
+            },
             "resources": {
               "$ref": "#/definitions/ResourceOverrides"
             },
@@ -6337,6 +6418,9 @@
             "sampling": {
               "$ref": "#/definitions/SamplingConfig"
             },
+            "scan_cache": {
+              "$ref": "#/definitions/ScanCacheConfig"
+            },
             "resources": {
               "$ref": "#/definitions/ResourceOverrides"
             },
@@ -6381,6 +6465,9 @@
             },
             "sampling": {
               "$ref": "#/definitions/SamplingConfig"
+            },
+            "scan_cache": {
+              "$ref": "#/definitions/ScanCacheConfig"
             },
             "resources": {
               "$ref": "#/definitions/ResourceOverrides"
@@ -6884,6 +6971,9 @@
             "sampling": {
               "$ref": "#/definitions/SamplingConfig"
             },
+            "scan_cache": {
+              "$ref": "#/definitions/ScanCacheConfig"
+            },
             "resources": {
               "$ref": "#/definitions/ResourceOverrides"
             },
@@ -6929,6 +7019,9 @@
             "sampling": {
               "$ref": "#/definitions/SamplingConfig"
             },
+            "scan_cache": {
+              "$ref": "#/definitions/ScanCacheConfig"
+            },
             "resources": {
               "$ref": "#/definitions/ResourceOverrides"
             },
@@ -6973,6 +7066,9 @@
             },
             "sampling": {
               "$ref": "#/definitions/SamplingConfig"
+            },
+            "scan_cache": {
+              "$ref": "#/definitions/ScanCacheConfig"
             },
             "resources": {
               "$ref": "#/definitions/ResourceOverrides"
@@ -7066,6 +7162,9 @@
             },
             "sampling": {
               "$ref": "#/definitions/SamplingConfig"
+            },
+            "scan_cache": {
+              "$ref": "#/definitions/ScanCacheConfig"
             },
             "resources": {
               "$ref": "#/definitions/ResourceOverrides"
@@ -7248,6 +7347,9 @@
             "sampling": {
               "$ref": "#/definitions/SamplingConfig"
             },
+            "scan_cache": {
+              "$ref": "#/definitions/ScanCacheConfig"
+            },
             "resources": {
               "$ref": "#/definitions/ResourceOverrides"
             },
@@ -7360,6 +7462,9 @@
             "sampling": {
               "$ref": "#/definitions/SamplingConfig"
             },
+            "scan_cache": {
+              "$ref": "#/definitions/ScanCacheConfig"
+            },
             "resources": {
               "$ref": "#/definitions/ResourceOverrides"
             },
@@ -7431,6 +7536,9 @@
             },
             "sampling": {
               "$ref": "#/definitions/SamplingConfig"
+            },
+            "scan_cache": {
+              "$ref": "#/definitions/ScanCacheConfig"
             },
             "resources": {
               "$ref": "#/definitions/ResourceOverrides"
@@ -7740,6 +7848,9 @@
             "sampling": {
               "$ref": "#/definitions/SamplingConfig"
             },
+            "scan_cache": {
+              "$ref": "#/definitions/ScanCacheConfig"
+            },
             "resources": {
               "$ref": "#/definitions/ResourceOverrides"
             },
@@ -7967,6 +8078,9 @@
             "sampling": {
               "$ref": "#/definitions/SamplingConfig"
             },
+            "scan_cache": {
+              "$ref": "#/definitions/ScanCacheConfig"
+            },
             "resources": {
               "$ref": "#/definitions/ResourceOverrides"
             },
@@ -8055,6 +8169,9 @@
             },
             "sampling": {
               "$ref": "#/definitions/SamplingConfig"
+            },
+            "scan_cache": {
+              "$ref": "#/definitions/ScanCacheConfig"
             },
             "resources": {
               "$ref": "#/definitions/ResourceOverrides"
@@ -8217,6 +8334,9 @@
             },
             "sampling": {
               "$ref": "#/definitions/SamplingConfig"
+            },
+            "scan_cache": {
+              "$ref": "#/definitions/ScanCacheConfig"
             },
             "resources": {
               "$ref": "#/definitions/ResourceOverrides"
@@ -8585,6 +8705,9 @@
             "sampling": {
               "$ref": "#/definitions/SamplingConfig"
             },
+            "scan_cache": {
+              "$ref": "#/definitions/ScanCacheConfig"
+            },
             "resources": {
               "$ref": "#/definitions/ResourceOverrides"
             },
@@ -8839,6 +8962,9 @@
             },
             "sampling": {
               "$ref": "#/definitions/SamplingConfig"
+            },
+            "scan_cache": {
+              "$ref": "#/definitions/ScanCacheConfig"
             },
             "resources": {
               "$ref": "#/definitions/ResourceOverrides"
@@ -9153,6 +9279,9 @@
             },
             "sampling": {
               "$ref": "#/definitions/SamplingConfig"
+            },
+            "scan_cache": {
+              "$ref": "#/definitions/ScanCacheConfig"
             },
             "resources": {
               "$ref": "#/definitions/ResourceOverrides"

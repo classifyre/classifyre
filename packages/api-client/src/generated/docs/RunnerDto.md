@@ -23,6 +23,8 @@ Name | Type
 `assetsUnchanged` | number
 `assetsDeleted` | number
 `assetsOutOfScope` | number
+`assetsSkippedCached` | number
+`detectorRunsSkipped` | number
 `scopeFingerprint` | string
 `totalFindings` | number
 `findingsCreated` | number
@@ -60,6 +62,8 @@ const example = {
   "assetsUnchanged": null,
   "assetsDeleted": null,
   "assetsOutOfScope": null,
+  "assetsSkippedCached": null,
+  "detectorRunsSkipped": null,
   "scopeFingerprint": null,
   "totalFindings": null,
   "findingsCreated": null,

@@ -224,3 +224,65 @@ def test_source_implements_automatic_cursor(entry: _SourceEntry) -> None:
         "AUTOMATIC sampling needs a real incremental cursor — see base.py's "
         "'AUTOMATIC sampling cursor' section for the available primitives."
     )
+
+
+# ---------------------------------------------------------------------------
+# Scan-cache eligibility
+# ---------------------------------------------------------------------------
+#
+# Opting into the scan cache is a correctness claim, not a performance tweak:
+# it asserts that an unchanged ``checksum`` genuinely proves the payload is
+# unchanged. That holds for files, whose identity is their bytes. It does not
+# hold for a database row or a paged API response, which can change under the
+# same key with nothing in the metadata to compare — caching those would
+# silently under-scan, and nothing at runtime would say so.
+#
+# Adding a source here is the deliberate step that makes the claim reviewable.
+SCAN_CACHE_ELIGIBLE_SOURCE_TYPES: frozenset[str] = frozenset(
+    {
+        "local_folder",
+        "s3_compatible_storage",
+        "google_cloud_storage",
+        "azure_blob_storage",
+        "dropbox",
+        "sandbox",
+        "google_workspace",
+        "microsoft_365",
+        "email",
+    }
+)
+
+
+@pytest.mark.parametrize("entry", _params({}))
+def test_scan_cache_opt_in_is_declared(entry: _SourceEntry) -> None:
+    """A source may only enable the scan cache if it is on the reviewed list.
+
+    Catches the silent-widening failure: a new connector inherits from
+    ``ObjectStorageSourceBase`` (which opts in) without anyone checking that its
+    provider actually reports a content-derived digest, and starts skipping
+    assets whose bytes changed.
+    """
+    opted_in = bool(getattr(entry.source_class, "SUPPORTS_SCAN_CACHE", False))
+    expected = entry.source_type in SCAN_CACHE_ELIGIBLE_SOURCE_TYPES
+    assert opted_in == expected, (
+        f"Source '{entry.source_type}' ({entry.source_class.__qualname__}) has "
+        f"SUPPORTS_SCAN_CACHE={opted_in} but the reviewed list says {expected}. "
+        "If this source's checksum genuinely proves its content is unchanged, add it to "
+        "SCAN_CACHE_ELIGIBLE_SOURCE_TYPES; otherwise set SUPPORTS_SCAN_CACHE = False on "
+        "the class (it may be inheriting the opt-in from a base)."
+    )
+
+
+@pytest.mark.parametrize("entry", _params({}))
+def test_scan_cache_verify_mode_is_valid(entry: _SourceEntry) -> None:
+    """The declared verification strength must be one the cache understands.
+
+    A typo here would silently fall back to the strict mode rather than fail,
+    so assert it directly.
+    """
+    verify = getattr(entry.source_class, "SCAN_CACHE_VERIFY", "content")
+    assert verify in {"metadata", "content"}, (
+        f"Source '{entry.source_type}' declares SCAN_CACHE_VERIFY={verify!r}; "
+        "expected 'metadata' (provider supplies a content-derived digest) or "
+        "'content' (hash the bytes before trusting the cache)."
+    )

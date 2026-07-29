@@ -194,6 +194,7 @@ export * from './RunnersChartsTimelineBucketDto';
 export * from './RunnersChartsTopSourceDto';
 export * from './RunnersChartsTotalsDto';
 export * from './SaveTrainingExamplesDto';
+export * from './ScanCacheEntryDto';
 export * from './SearchAssetFindingDto';
 export * from './SearchAssetItemDto';
 export * from './SearchAssetsChartsOptionsDto';

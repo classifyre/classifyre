@@ -39,6 +39,26 @@ class BaseSource(ABC):
     # because every source schema sets ``additionalProperties: false``.
     SAMPLING_CURSOR_ENV = "CLASSIFYRE_SAMPLING_CURSOR"
 
+    # ── Scan cache opt-in ────────────────────────────────────────────────
+    #
+    # Off by default. A source may only opt in when an unchanged ``checksum``
+    # genuinely proves the payload is unchanged. That holds for files, whose
+    # identity is their bytes; it does not hold for a database row or a paged
+    # API response, which can change under the same key with nothing in the
+    # metadata to compare — so those sources keep re-scanning.
+    #
+    # ``SCAN_CACHE_VERIFY`` picks the default strength when the recipe says
+    # ``auto``:
+    #   "metadata" — the provider supplies a content-derived digest (S3/GCS/Azure
+    #                ETag, Drive md5, Dropbox content hash), so an unchanged
+    #                checksum is proof and the download can be skipped entirely.
+    #   "content"  — the checksum is only mtime and size (local folders), which a
+    #                restore-from-backup or a size-preserving edit can reproduce.
+    #                Read the bytes and compare a SHA-256; parsing, OCR and
+    #                detection are still skipped, which is where the cost is.
+    SUPPORTS_SCAN_CACHE: bool = False
+    SCAN_CACHE_VERIFY: str = "content"
+
     def __init__(
         self,
         recipe: dict[str, Any],
@@ -186,6 +206,10 @@ class BaseSource(ABC):
 
     def set_discovery_only(self, value: bool) -> None:
         self._discovery_only = value
+
+    def scan_cache_verification_mode(self) -> str:
+        """Return the safe default verification mode for this source instance."""
+        return self.SCAN_CACHE_VERIFY
 
     def evict_asset_cache(self, asset_hash: str) -> None:
         """Free cached content for a processed asset. Override in subclasses."""

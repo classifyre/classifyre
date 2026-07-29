@@ -58,6 +58,14 @@ import {
   SearchRunnersAssetsSortOrder,
 } from '../dto/search-runners-assets-request.dto';
 import { SearchRunnersAssetsResponseDto } from '../dto/search-runners-assets-response.dto';
+import { ScanCacheEntryDto } from './dto';
+
+/** Narrow a JSONB column to a plain object, or null when it is anything else. */
+function asJsonRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
 
 type SourceRunSnapshot = {
   runnerStatus: RunnerStatus | null;
@@ -623,6 +631,7 @@ export class CliRunnerService {
     sourceId: string,
     triggerType: TriggerType = TriggerType.MANUAL,
     triggeredBy?: string,
+    forceFullRescan = false,
   ) {
     const executionMode = this.resolveManagedExecutionMode();
     const { source, runner, hasSuccessfulRuns, previousSourceState } =
@@ -679,7 +688,14 @@ export class CliRunnerService {
       );
       sourceWithDecryptedConfig = {
         ...source,
-        config: recipeWithFeedback,
+        // A forced full rescan is expressed as a recipe override rather than a
+        // flag threaded through the execution chain: the recipe already reaches
+        // both the local and the Kubernetes path, and disabling the cache there
+        // is exactly what "ignore the cache for this run" means. The source's
+        // stored config is untouched, so the next run caches again.
+        config: forceFullRescan
+          ? { ...recipeWithFeedback, scan_cache: { enabled: false } }
+          : recipeWithFeedback,
       };
       await this.runnerLogStorage.initializeRunner(sourceId, runner.id);
     } catch (error) {
@@ -2658,16 +2674,29 @@ export class CliRunnerService {
   async registerDiscoveredAssets(
     runnerId: string,
     assetHashes: string[],
-  ): Promise<{ registered: number }> {
+    includeScanCache = false,
+  ): Promise<{ registered: number; cache?: ScanCacheEntryDto[] }> {
     if (!assetHashes.length) return { registered: 0 };
 
     const runner = await this.prisma.runner.findUnique({
       where: { id: runnerId },
-      select: { id: true },
+      select: { id: true, sourceId: true, scopeFingerprint: true },
     });
     if (!runner) {
       throw new NotFoundException(`Runner ${runnerId} not found`);
     }
+
+    // Read prior state before registering, not after. This endpoint is the only
+    // point in the run where the stored checksum still describes the *previous*
+    // scan: the discovery ingest that immediately follows overwrites it with the
+    // incoming value, after which every asset would compare equal to itself.
+    const cache = includeScanCache
+      ? await this.collectScanCacheState(
+          runner.sourceId,
+          assetHashes,
+          runner.scopeFingerprint,
+        )
+      : undefined;
 
     const result = await this.prisma.runnerAsset.createMany({
       data: assetHashes.map((hash) => ({
@@ -2678,7 +2707,96 @@ export class CliRunnerService {
       skipDuplicates: true,
     });
 
-    return { registered: result.count };
+    return cache
+      ? { registered: result.count, cache }
+      : { registered: result.count };
+  }
+
+  /**
+   * Prior scan-cache state for the given hashes, as the CLI needs to read it.
+   *
+   * Only complete state bound to this runner's scope is returned. The checksum
+   * and scope inside the JSON were stored atomically with that completed payload;
+   * the mutable Asset columns may already describe a later failed discovery pass.
+   */
+  private async collectScanCacheState(
+    sourceId: string,
+    assetHashes: string[],
+    currentScopeFingerprint: string | null,
+  ): Promise<ScanCacheEntryDto[]> {
+    const assets = await this.prisma.asset.findMany({
+      where: {
+        sourceId,
+        hash: { in: assetHashes },
+        scanCache: { not: Prisma.DbNull },
+      },
+      select: {
+        hash: true,
+        scanCache: true,
+      },
+    });
+
+    const entries: ScanCacheEntryDto[] = [];
+    for (const asset of assets) {
+      const state = asJsonRecord(asset.scanCache);
+      if (!state || state.complete !== true) continue;
+
+      const completedChecksum =
+        typeof state.completed_checksum === 'string'
+          ? state.completed_checksum
+          : null;
+      const completedScopeFingerprint =
+        typeof state.scope_fingerprint === 'string'
+          ? state.scope_fingerprint
+          : null;
+      // The mutable Asset columns may describe a later discovery pass that
+      // failed before phase 2. Only facts stored atomically with complete=true
+      // prove which content and scope actually finished.
+      if (
+        !completedChecksum ||
+        !currentScopeFingerprint ||
+        completedScopeFingerprint !== currentScopeFingerprint
+      ) {
+        continue;
+      }
+
+      const detectors: Record<string, string> = {};
+      const rawDetectors = asJsonRecord(state.detectors);
+      for (const [key, value] of Object.entries(rawDetectors ?? {})) {
+        if (typeof value === 'string') detectors[key] = value;
+      }
+
+      entries.push({
+        hash: asset.hash,
+        checksum: completedChecksum,
+        contentHash:
+          typeof state.content_hash === 'string' ? state.content_hash : null,
+        scopeFingerprint: completedScopeFingerprint,
+        detectors,
+        findingsTotal:
+          typeof state.findings_total === 'number'
+            ? state.findings_total
+            : null,
+        findingsBySeverity:
+          (asJsonRecord(state.findings_by_severity) as Record<
+            string,
+            number
+          > | null) ?? null,
+        findingsByDetector:
+          (asJsonRecord(state.findings_by_detector) as Record<
+            string,
+            Record<string, number>
+          > | null) ?? null,
+        emptyText:
+          typeof state.empty_text === 'boolean' ? state.empty_text : null,
+        textExtractionStatus:
+          typeof state.text_extraction_status === 'string'
+            ? state.text_extraction_status
+            : null,
+      });
+    }
+
+    return entries;
   }
 
   async updateRunnerAssetStatuses(
@@ -2690,6 +2808,7 @@ export class CliRunnerService {
       findingsTotal?: number;
       findingsBySeverity?: object;
       findingsByDetector?: object;
+      cacheHit?: boolean;
     }>,
   ): Promise<void> {
     if (!updates.length) return;
@@ -2732,6 +2851,9 @@ export class CliRunnerService {
             ...(update.findingsByDetector !== undefined && {
               findingsByDetector: update.findingsByDetector,
             }),
+            // Left alone unless the CLI asserts a hit, so an asset that reports
+            // PROCESSING then PROCESSED cannot clear its own flag mid-run.
+            ...(update.cacheHit === true && { cacheHit: true }),
           },
         });
       }),
@@ -3685,6 +3807,7 @@ export class CliRunnerService {
           change_type: RunnerAssetChangeType | null;
           empty_text: boolean | null;
           text_extraction_status: TextExtractionStatus | null;
+          cache_hit: boolean;
           created_at: Date;
         }>
       >(
@@ -3709,6 +3832,7 @@ export class CliRunnerService {
         changeType: row.change_type,
         emptyText: row.empty_text,
         textExtractionStatus: row.text_extraction_status,
+        cacheHit: row.cache_hit,
         createdAt: row.created_at,
       }));
     } else {

@@ -216,6 +216,7 @@ docs/RunnersChartsTimelineBucketDto.md
 docs/RunnersChartsTopSourceDto.md
 docs/RunnersChartsTotalsDto.md
 docs/SaveTrainingExamplesDto.md
+docs/ScanCacheEntryDto.md
 docs/SearchAssetFindingDto.md
 docs/SearchAssetItemDto.md
 docs/SearchAssetsChartsOptionsDto.md
@@ -532,6 +533,7 @@ src/models/RunnersChartsTimelineBucketDto.ts
 src/models/RunnersChartsTopSourceDto.ts
 src/models/RunnersChartsTotalsDto.ts
 src/models/SaveTrainingExamplesDto.ts
+src/models/ScanCacheEntryDto.ts
 src/models/SearchAssetFindingDto.ts
 src/models/SearchAssetItemDto.ts
 src/models/SearchAssetsChartsOptionsDto.ts

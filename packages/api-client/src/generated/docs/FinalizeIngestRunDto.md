@@ -9,6 +9,8 @@ Name | Type
 `runnerId` | string
 `seenHashes` | Array&lt;string&gt;
 `samplingCursor` | { [key: string]: any; }
+`assetsSkippedCached` | number
+`detectorRunsSkipped` | number
 
 ## Example
 
@@ -20,6 +22,8 @@ const example = {
   "runnerId": runner-123-abc,
   "seenHashes": ["hash-1","hash-2"],
   "samplingCursor": null,
+  "assetsSkippedCached": null,
+  "detectorRunsSkipped": null,
 } satisfies FinalizeIngestRunDto
 
 console.log(example)

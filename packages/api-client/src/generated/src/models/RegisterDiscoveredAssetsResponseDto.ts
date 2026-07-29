@@ -13,6 +13,14 @@
  */
 
 import { mapValues } from '../runtime';
+import type { ScanCacheEntryDto } from './ScanCacheEntryDto';
+import {
+    ScanCacheEntryDtoFromJSON,
+    ScanCacheEntryDtoFromJSONTyped,
+    ScanCacheEntryDtoToJSON,
+    ScanCacheEntryDtoToJSONTyped,
+} from './ScanCacheEntryDto';
+
 /**
  * 
  * @export
@@ -25,6 +33,12 @@ export interface RegisterDiscoveredAssetsResponseDto {
      * @memberof RegisterDiscoveredAssetsResponseDto
      */
     registered: number;
+    /**
+     * Present only when includeScanCache was requested. An asset appears here only if its last scan completed cleanly enough to persist scan-cache state, so an absent hash always means "process this in full".
+     * @type {Array<ScanCacheEntryDto>}
+     * @memberof RegisterDiscoveredAssetsResponseDto
+     */
+    cache?: Array<ScanCacheEntryDto>;
 }
 
 /**
@@ -46,6 +60,7 @@ export function RegisterDiscoveredAssetsResponseDtoFromJSONTyped(json: any, igno
     return {
         
         'registered': json['registered'],
+        'cache': json['cache'] == null ? undefined : ((json['cache'] as Array<any>).map(ScanCacheEntryDtoFromJSON)),
     };
 }
 
@@ -61,6 +76,7 @@ export function RegisterDiscoveredAssetsResponseDtoToJSONTyped(value?: RegisterD
     return {
         
         'registered': value['registered'],
+        'cache': value['cache'] == null ? undefined : ((value['cache'] as Array<any>).map(ScanCacheEntryDtoToJSON)),
     };
 }
 
