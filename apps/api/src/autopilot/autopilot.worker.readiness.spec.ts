@@ -1,3 +1,4 @@
+import { AgentKind } from '@prisma/client';
 import { AutopilotWorker } from './autopilot.worker';
 import {
   AUTOPILOT_CORPUS_SINGLETON_KEY,
@@ -15,6 +16,7 @@ import {
  * the ranking the agent is told to trust.
  */
 describe('AutopilotWorker readiness and batch consumption', () => {
+  const DIRTY_AT = new Date('2026-07-29T12:00:00.000Z');
   let prisma: any;
   let sent: Array<{ data: any; opts: any }>;
   let worker: AutopilotWorker;
@@ -154,10 +156,52 @@ describe('AutopilotWorker readiness and batch consumption', () => {
       expect(prisma.source.updateMany).not.toHaveBeenCalled();
     });
 
+    it('preserves targeted agent scope and focus when re-queueing', async () => {
+      build({ matchQueue: 1 });
+      prisma.instanceSettings = {
+        findUnique: jest.fn().mockResolvedValue({
+          aiEnabled: true,
+          autopilotInquiryEnabled: true,
+          autopilotCaseEnabled: true,
+          autopilotConfigEnabled: true,
+          autopilotDetectorEnabled: true,
+          autopilotEscalationEnabled: true,
+        }),
+      };
+
+      await (worker as any).runCycle({
+        sourceId: 's1',
+        runnerId: 'r1',
+        corpus: false,
+        cycleKey: 'scan:s1:r1',
+        trigger: 'express',
+        manual: false,
+        instruction: 'inspect extraction failure',
+        caseId: 'case-1',
+        only: [AgentKind.CONFIG],
+        expressReason: 'scan failed',
+        readinessAttempts: 0,
+      });
+
+      expect(sent[0].data).toMatchObject({
+        sourceId: 's1',
+        runnerId: 'r1',
+        cycleKey: 'scan:s1:r1',
+        agentKinds: [AgentKind.CONFIG],
+        caseId: 'case-1',
+        instruction: 'inspect extraction failure',
+        expressReason: 'scan failed',
+        readinessAttempts: 1,
+      });
+    });
+
     // A permanently backed-up embedding queue must degrade the run, never
     // deadlock the autopilot outright.
     it('gives up waiting and proceeds after the requeue budget', async () => {
-      build({ pendingEmbedJobs: 50, dirty: [{ id: 's1', name: 'A' }] });
+      build({
+        pendingEmbedJobs: 50,
+        dirty: [{ id: 's1', name: 'A', autopilotDirtyAt: DIRTY_AT }],
+      });
       withSettings();
       prisma.instanceSettings.findUnique.mockResolvedValue({
         aiEnabled: true,
@@ -177,47 +221,131 @@ describe('AutopilotWorker readiness and batch consumption', () => {
     });
   });
 
-  describe('consuming the dirty set', () => {
-    const consume = () =>
-      (worker as any).consumeDirtySources() as Promise<
-        Array<{ id: string; name: string }>
+  describe('acknowledging the dirty set', () => {
+    const read = () =>
+      (worker as any).readDirtySources() as Promise<
+        Array<{ id: string; name: string; autopilotDirtyAt: Date }>
       >;
+    const acknowledge = (
+      dirty: Array<{ id: string; name: string; autopilotDirtyAt: Date }>,
+    ) => (worker as any).acknowledgeDirtySources(dirty) as Promise<void>;
 
-    it('returns the batch and clears it', async () => {
+    it('reads the batch without clearing it, then acknowledges it explicitly', async () => {
+      const secondDirtyAt = new Date('2026-07-29T12:00:01.000Z');
       build({
         dirty: [
-          { id: 's1', name: 'A' },
-          { id: 's2', name: 'B' },
+          { id: 's1', name: 'A', autopilotDirtyAt: DIRTY_AT },
+          { id: 's2', name: 'B', autopilotDirtyAt: secondDirtyAt },
         ],
       });
 
-      await expect(consume()).resolves.toEqual([
-        { id: 's1', name: 'A' },
-        { id: 's2', name: 'B' },
+      const dirty = await read();
+
+      expect(dirty).toEqual([
+        { id: 's1', name: 'A', autopilotDirtyAt: DIRTY_AT },
+        { id: 's2', name: 'B', autopilotDirtyAt: secondDirtyAt },
       ]);
+      expect(prisma.source.updateMany).not.toHaveBeenCalled();
+
+      await acknowledge(dirty);
+
       expect(prisma.source.updateMany).toHaveBeenCalledWith({
-        where: { id: { in: ['s1', 's2'] } },
+        where: {
+          OR: [
+            { id: 's1', autopilotDirtyAt: DIRTY_AT },
+            { id: 's2', autopilotDirtyAt: secondDirtyAt },
+          ],
+        },
         data: { autopilotDirtyAt: null },
       });
     });
 
-    // Clearing by id, not with a blanket `WHERE autopilot_dirty_at IS NOT
-    // NULL`: a scan finishing mid-cycle must enrol in the NEXT batch rather
-    // than being silently swallowed by this one.
-    it('clears exactly the ids it read, never everything dirty', async () => {
-      build({ dirty: [{ id: 's1', name: 'A' }] });
+    it('uses the observed timestamp so a newer scan cannot be cleared', async () => {
+      build({
+        dirty: [{ id: 's1', name: 'A', autopilotDirtyAt: DIRTY_AT }],
+      });
 
-      await consume();
+      await acknowledge(await read());
 
       const where = prisma.source.updateMany.mock.calls[0][0].where;
-      expect(where).toEqual({ id: { in: ['s1'] } });
+      expect(where).toEqual({
+        OR: [{ id: 's1', autopilotDirtyAt: DIRTY_AT }],
+      });
     });
 
     it('does not issue a write when nothing is dirty', async () => {
       build({ dirty: [] });
 
-      await expect(consume()).resolves.toEqual([]);
+      const dirty = await read();
+      await acknowledge(dirty);
+
+      expect(dirty).toEqual([]);
       expect(prisma.source.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('does not acknowledge a batch when an agent fails transiently', async () => {
+      build({
+        dirty: [{ id: 's1', name: 'A', autopilotDirtyAt: DIRTY_AT }],
+      });
+      prisma.instanceSettings = {
+        findUnique: jest.fn().mockResolvedValue({
+          aiEnabled: true,
+          autopilotInquiryEnabled: true,
+          autopilotCaseEnabled: false,
+          autopilotConfigEnabled: false,
+          autopilotDetectorEnabled: false,
+          autopilotEscalationEnabled: false,
+        }),
+      };
+      (worker as any).runAgent = jest
+        .fn()
+        .mockRejectedValue(new Error('provider unavailable'));
+
+      await expect(
+        (worker as any).runCycle({
+          sourceId: null,
+          runnerId: null,
+          corpus: true,
+          cycleKey: 'corpus:x',
+          trigger: 'corpus',
+          manual: false,
+          instruction: null,
+        }),
+      ).rejects.toThrow('provider unavailable');
+
+      expect(prisma.source.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('acknowledges the observed batch after every enabled agent succeeds', async () => {
+      build({
+        dirty: [{ id: 's1', name: 'A', autopilotDirtyAt: DIRTY_AT }],
+      });
+      prisma.instanceSettings = {
+        findUnique: jest.fn().mockResolvedValue({
+          aiEnabled: true,
+          autopilotInquiryEnabled: true,
+          autopilotCaseEnabled: false,
+          autopilotConfigEnabled: false,
+          autopilotDetectorEnabled: false,
+          autopilotEscalationEnabled: false,
+        }),
+      };
+      (worker as any).runAgent = jest.fn().mockResolvedValue(undefined);
+
+      await (worker as any).runCycle({
+        sourceId: null,
+        runnerId: null,
+        corpus: true,
+        cycleKey: 'corpus:x',
+        trigger: 'corpus',
+        manual: false,
+        instruction: null,
+      });
+
+      expect(prisma.source.updateMany).toHaveBeenCalledWith({
+        where: { OR: [{ id: 's1', autopilotDirtyAt: DIRTY_AT }] },
+        data: { autopilotDirtyAt: null },
+      });
     });
 
     // A readiness requeue always inserts (it must, or a deferred cycle is

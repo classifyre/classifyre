@@ -49,6 +49,12 @@ interface CycleScope {
   evidenceAnalysisPending?: boolean;
 }
 
+interface DirtySource {
+  id: string;
+  name: string;
+  autopilotDirtyAt: Date;
+}
+
 /**
  * Consumes AUTOPILOT_QUEUE jobs and orchestrates one autopilot cycle:
  * inquiry agent first, then case agent — each with its own resumable
@@ -243,6 +249,9 @@ export class AutopilotWorker {
           runnerId: cycle.runnerId ?? undefined,
           corpus: cycle.corpus,
           expressReason: cycle.expressReason ?? undefined,
+          agentKinds: cycle.only ?? undefined,
+          caseId: cycle.caseId ?? undefined,
+          instruction: cycle.instruction ?? undefined,
           cycleKey: cycle.cycleKey,
           readinessAttempts: attempts + 1,
         },
@@ -266,10 +275,12 @@ export class AutopilotWorker {
       );
     }
 
-    // A corpus cycle consumes the dirty set: read it, then clear exactly those
-    // rows, so sources scanned while this cycle runs enrol in the next batch
-    // rather than being silently dropped.
-    const batchSources = cycle.corpus ? await this.consumeDirtySources() : [];
+    // A corpus cycle reads the dirty set without acknowledging it. The exact
+    // timestamps are cleared only after every enabled agent finishes, giving
+    // the job at-least-once delivery: a provider failure leaves the batch for
+    // pg-boss's retry, and a newer scan timestamp cannot be erased by this run.
+    const dirtySources = cycle.corpus ? await this.readDirtySources() : [];
+    const batchSources = dirtySources.map(({ id, name }) => ({ id, name }));
     // Nothing new since the last batch. A readiness requeue always inserts (it
     // must, or a deferred cycle would be lost), so a corpus job can outlive the
     // batch it was queued for — and running five agents over "all sources" to
@@ -353,6 +364,10 @@ export class AutopilotWorker {
         sourceName,
         scope,
       );
+    }
+
+    if (cycle.corpus) {
+      await this.acknowledgeDirtySources(dirtySources);
     }
   }
 
@@ -608,27 +623,46 @@ export class AutopilotWorker {
     }
   }
 
-  /**
-   * Read the sources marked dirty by completed scans and clear exactly those
-   * rows. Clearing by id rather than with a blanket `WHERE autopilot_dirty_at
-   * IS NOT NULL` matters: a scan finishing while this cycle runs must enrol in
-   * the NEXT batch, not be silently swallowed by this one.
-   */
-  private async consumeDirtySources(): Promise<
-    Array<{ id: string; name: string }>
-  > {
-    const dirty = await this.prisma.source.findMany({
+  /** Snapshot the pending batch without acknowledging it. */
+  private async readDirtySources(): Promise<DirtySource[]> {
+    const rows = await this.prisma.source.findMany({
       where: { autopilotDirtyAt: { not: null } },
-      select: { id: true, name: true },
+      select: { id: true, name: true, autopilotDirtyAt: true },
       orderBy: { autopilotDirtyAt: 'asc' },
     });
-    if (dirty.length > 0) {
-      await this.prisma.source.updateMany({
-        where: { id: { in: dirty.map((s) => s.id) } },
-        data: { autopilotDirtyAt: null },
-      });
-    }
-    return dirty;
+    // Prisma does not narrow nullable fields from a `not: null` filter in the
+    // generated TypeScript type. Keep the runtime boundary honest as well.
+    return rows.flatMap((source) =>
+      source.autopilotDirtyAt
+        ? [
+            {
+              id: source.id,
+              name: source.name,
+              autopilotDirtyAt: source.autopilotDirtyAt,
+            },
+          ]
+        : [],
+    );
+  }
+
+  /**
+   * Acknowledge only the exact scan timestamps this cycle processed.
+   *
+   * Each source has one dirty timestamp rather than a queue row. Matching both
+   * id and timestamp is therefore the compare-and-set that prevents a scan
+   * finishing during this cycle from being cleared with the older batch.
+   */
+  private async acknowledgeDirtySources(dirty: DirtySource[]): Promise<void> {
+    if (dirty.length === 0) return;
+    await this.prisma.source.updateMany({
+      where: {
+        OR: dirty.map((source) => ({
+          id: source.id,
+          autopilotDirtyAt: source.autopilotDirtyAt,
+        })),
+      },
+      data: { autopilotDirtyAt: null },
+    });
   }
 }
 

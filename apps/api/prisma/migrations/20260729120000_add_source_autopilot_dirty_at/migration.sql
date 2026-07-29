@@ -6,10 +6,10 @@
 -- whatever fraction of the corpus happened to have landed, and none of them
 -- aware of the others.
 --
--- `autopilot_dirty_at` is stamped when a scan completes and cleared when a
--- corpus-wide cycle consumes the source. The set of non-null rows IS the
--- pending batch, so the window needs no separate cycle-state table and no
--- second writer to keep in sync.
+-- `autopilot_dirty_at` is stamped when a scan completes and acknowledged after
+-- a corpus-wide cycle succeeds. The set of non-null rows IS the pending batch,
+-- so the window needs no separate cycle-state table and no second writer to
+-- keep in sync.
 --
 -- prisma migrate runs each migration inside a transaction, so no transaction
 -- control and no CREATE INDEX CONCURRENTLY here. Every statement is idempotent
@@ -19,9 +19,10 @@
 -- first scan to complete after the upgrade enrolls its source in a batch.
 ALTER TABLE "sources" ADD COLUMN IF NOT EXISTS "autopilot_dirty_at" TIMESTAMP(3);
 
--- CreateIndex. The cycle reads and clears the dirty set on every run; a partial
--- index would be tighter but Prisma cannot express one, and drift between the
--- schema and the DB costs more than the few pages this index takes.
+-- CreateIndex. The cycle reads the dirty set on every run and acknowledges it
+-- after success; a partial index would be tighter but Prisma cannot express
+-- one, and drift between the schema and the DB costs more than the few pages
+-- this index takes.
 CREATE INDEX IF NOT EXISTS "sources_autopilot_dirty_at_idx" ON "sources" ("autopilot_dirty_at");
 
 -- CreateIndex. Corpus-coverage facts count never-scanned sources with
