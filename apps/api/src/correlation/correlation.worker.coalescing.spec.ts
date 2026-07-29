@@ -22,6 +22,7 @@ import {
 describe('CorrelationWorker autopilot hand-off', () => {
   let sent: Array<{ queue: string; data: any; opts: any }>;
   let prisma: any;
+  let matching: any;
   let worker: CorrelationWorker;
 
   const build = (over: Partial<Record<string, any>> = {}) => {
@@ -43,8 +44,12 @@ describe('CorrelationWorker autopilot hand-off', () => {
           },
         ),
       },
-      inquiry: { findFirst: jest.fn().mockResolvedValue(over.inquiry ?? null) },
       finding: { findFirst: jest.fn().mockResolvedValue(over.finding ?? null) },
+    };
+    matching = {
+      findNewInquiryMatchForRunner: jest
+        .fn()
+        .mockResolvedValue(over.inquiry ?? null),
     };
     const pgBoss = {
       getBossAsync: jest.fn().mockResolvedValue({
@@ -54,7 +59,7 @@ describe('CorrelationWorker autopilot hand-off', () => {
         },
       }),
     };
-    worker = new CorrelationWorker(pgBoss as any, prisma, {} as any);
+    worker = new CorrelationWorker(pgBoss as any, prisma, {} as any, matching);
   };
 
   const handOff = (sourceId = 's1') =>
@@ -215,16 +220,16 @@ describe('CorrelationWorker autopilot hand-off', () => {
       expect(sent[0].data.agentKinds).toBeUndefined();
     });
 
-    it('only counts inquiries the operator wrote, never the agent’s own', async () => {
+    it('checks only new operator inquiry matches from this runner', async () => {
       build({ inquiry: null });
 
       await handOff();
 
-      expect(prisma.inquiry.findFirst).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: expect.objectContaining({ createdBy: { not: AI_ACTOR } }),
-        }),
-      );
+      expect(matching.findNewInquiryMatchForRunner).toHaveBeenCalledWith({
+        sourceId: 's1',
+        runnerId: 'r1',
+        createdByNot: AI_ACTOR,
+      });
     });
 
     it('expedites a finding the analyzer scored as important', async () => {

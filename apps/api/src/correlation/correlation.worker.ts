@@ -3,6 +3,7 @@ import type { Job } from 'pg-boss';
 import { AgentKind, AgentRunStatus, RunnerStatus } from '@prisma/client';
 import { PgBossService } from '../scheduler/pg-boss.service';
 import { PrismaService } from '../prisma.service';
+import { InquiryMatchingService } from '../matching/inquiry-matching.service';
 import {
   AI_ACTOR,
   AUTOPILOT_COALESCE_WINDOW_SECONDS,
@@ -36,6 +37,7 @@ export class CorrelationWorker {
     private readonly pgBoss: PgBossService,
     private readonly prisma: PrismaService,
     private readonly duplicatesFinder: DuplicatesFinderAgentService,
+    private readonly matching: InquiryMatchingService,
   ) {}
 
   /**
@@ -276,17 +278,13 @@ export class CorrelationWorker {
     //    and is in any case the more direct expression of "tell me when this
     //    appears".
     //
-    //    Inquiry matching runs on its own queue in parallel with correlation,
-    //    so this can read a set that has not been refreshed yet. That only ever
-    //    loses an express trigger — the source is already enrolled in the batch
-    //    — which is the right direction to fail in.
-    const operatorInquiry = await this.prisma.inquiry.findFirst({
-      where: {
-        status: 'ACTIVE',
-        createdBy: { not: AI_ACTOR },
-        newMatchCount: { gt: 0 },
-      },
-      select: { id: true, title: true },
+    //    Stored newMatchCount is corpus-wide and may describe an unread match
+    //    from a different source. Prove that THIS runner produced a new live
+    //    match, otherwise one unread inquiry would expedite every source.
+    const operatorInquiry = await this.matching.findNewInquiryMatchForRunner({
+      sourceId,
+      runnerId,
+      createdByNot: AI_ACTOR,
     });
     if (operatorInquiry) {
       return {

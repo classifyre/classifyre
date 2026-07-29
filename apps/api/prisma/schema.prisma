@@ -32,10 +32,11 @@ model Source {
   // unless INHERIT. OBSERVE_ONLY blocks the config-tuning agent from changing
   // this source's config.
   aiMode                     AiManagementMode            @default(INHERIT) @map("ai_mode")
-  // Set when a scan of this source completes, cleared when a corpus-wide
-  // autopilot cycle consumes it. The set of non-null rows IS the pending batch,
-  // so the coalescing window needs no separate cycle-state table: many scans
-  // finishing inside one window fold into a single cycle that sees them all.
+  // Set when a scan of this source completes, cleared after a corpus-wide
+  // autopilot cycle successfully processes that exact timestamp. The set of
+  // non-null rows IS the pending batch, so the coalescing window needs no
+  // separate cycle-state table: many scans finishing inside one window fold
+  // into a single cycle that sees them all.
   autopilotDirtyAt           DateTime?                   @map("autopilot_dirty_at")
   assets                     Asset[]
   findings                   Finding[]

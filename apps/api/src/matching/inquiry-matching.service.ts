@@ -173,6 +173,62 @@ export class InquiryMatchingService {
   }
 
   /**
+   * Find an inquiry with a genuinely new match in one completed runner.
+   *
+   * Stored `newMatchCount` is corpus-wide and remains positive until an
+   * operator marks the inquiry seen. It therefore cannot decide whether this
+   * particular scan should bypass corpus coalescing. This live check applies
+   * the canonical matcher to only this runner's findings and uses the same
+   * createdAt > matchesSeenAt definition as the matching counters and API.
+   */
+  async findNewInquiryMatchForRunner(args: {
+    sourceId: string;
+    runnerId: string;
+    createdByNot: string;
+  }): Promise<{ id: string; title: string } | null> {
+    const inquiries = await this.prisma.inquiry.findMany({
+      where: {
+        status: 'ACTIVE',
+        createdBy: { not: args.createdByNot },
+        matchesSeenAt: { not: null },
+        OR: [{ matchAllSources: true }, { sourceIds: { has: args.sourceId } }],
+      },
+      select: {
+        ...this.matcherSelect,
+        title: true,
+        matchesSeenAt: true,
+      },
+      orderBy: { updatedAt: 'desc' },
+    });
+    if (inquiries.length === 0) return null;
+
+    const findings = await this.prisma.finding.findMany({
+      where: {
+        sourceId: args.sourceId,
+        runnerId: args.runnerId,
+        status: 'OPEN',
+      },
+      select: FINDING_SELECT,
+    });
+    if (findings.length === 0) return null;
+
+    for (const inquiry of inquiries) {
+      const seenAt = inquiry.matchesSeenAt;
+      if (
+        seenAt &&
+        findings.some(
+          (finding) =>
+            (finding.createdAt?.getTime() ?? 0) > seenAt.getTime() &&
+            new CompiledMatcher(inquiry).matches(finding),
+        )
+      ) {
+        return { id: inquiry.id, title: inquiry.title };
+      }
+    }
+    return null;
+  }
+
+  /**
    * Re-evaluate ALL current OPEN findings against a single inquiry. Seeds a newly
    * created inquiry with existing findings and refreshes its match set. Resets
    * newMatchCount to 0 (fresh baseline).
