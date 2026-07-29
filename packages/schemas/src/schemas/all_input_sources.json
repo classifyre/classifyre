@@ -3418,10 +3418,10 @@
         },
         "password": {
           "type": "string",
-          "description": "Database password"
+          "description": "Database password (leave empty for public databases like RNAcentral)"
         }
       },
-      "required": ["username", "password"],
+      "required": ["username"],
       "additionalProperties": false
     },
     "PostgreSQLOptionalConnection": {
@@ -3551,14 +3551,14 @@
         },
         "password": {
           "type": "string",
-          "description": "Database password"
+          "description": "Database password (leave empty for public databases like Rfam/Ensembl/UCSC Genome Browser)"
         },
         "ssl_ca": {
           "type": "string",
           "description": "PEM-encoded CA certificate for SSL/TLS verification. Paste the full certificate content (-----BEGIN CERTIFICATE----- ... -----END CERTIFICATE-----). Required when ssl_mode is VERIFY_CA or VERIFY_IDENTITY."
         }
       },
-      "required": ["username", "password"],
+      "required": ["username"],
       "additionalProperties": false
     },
     "MySQLOptionalConnection": {
