@@ -111,17 +111,32 @@ class DetectorPipeline:
         *,
         on_findings_flushed: Callable[[list[DetectionResult]], Awaitable[None]] | None = None,
         findings_flush_size: int = 50,
+        only: frozenset[str] | None = None,
     ) -> SingleAssetScanResults:
-        """Process a single asset through detectors."""
+        """Process a single asset through detectors.
+
+        ``only`` restricts the run to the given scan-cache detector keys, used
+        when the cache proved the remaining detectors would repeat themselves.
+        The detectors left out report no outcome, which is precisely what stops
+        the API from resolving their existing findings for absence.
+        """
         scan_started = datetime.now(UTC)
         text_content_type = self._text_content_type_for_asset(asset.asset_type)
         link_content = self._build_links_payload(asset.links)
+
+        active_detectors = self.detectors
+        if only is not None:
+            active_detectors = [
+                detector
+                for detector in self.detectors
+                if self.detector_cache_key(detector) in only
+            ]
 
         text_detectors = []
         if text_content_type:
             text_detectors = [
                 detector
-                for detector in self.detectors
+                for detector in active_detectors
                 if self._supports_content_type(
                     detector.get_supported_content_types(),
                     text_content_type,
@@ -130,7 +145,7 @@ class DetectorPipeline:
         asset_has_binary_primary = self._asset_has_binary_primary_payload(asset.asset_type)
         binary_detectors = [
             detector
-            for detector in self.detectors
+            for detector in active_detectors
             if self._is_binary_detector(detector)
             and (
                 asset_has_binary_primary
@@ -143,7 +158,7 @@ class DetectorPipeline:
         ]
         link_detectors = [
             detector
-            for detector in self.detectors
+            for detector in active_detectors
             if link_content
             and self._supports_content_type(
                 detector.get_supported_content_types(),
@@ -929,6 +944,20 @@ class DetectorPipeline:
 
         custom_key = getattr(getattr(detector, "custom_config", None), "custom_detector_key", None)
         return detector_type, custom_key if isinstance(custom_key, str) else None
+
+    @classmethod
+    def detector_cache_key(cls, detector: BaseDetector) -> str | None:
+        """Scan-cache identity for a detector, matching ``pipeline.scan_cache``.
+
+        Same shape as the detector identity used for outcomes, flattened to the
+        string the cache stores its configuration fingerprints under.
+        """
+        identity = cls._detector_identity(detector)
+        if identity is None:
+            return None
+        detector_type, custom_key = identity
+        type_value = detector_type.value.upper()
+        return f"CUSTOM::{custom_key}" if type_value == "CUSTOM" and custom_key else type_value
 
     @classmethod
     def _record_outcome(

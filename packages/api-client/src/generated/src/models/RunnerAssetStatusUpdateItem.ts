@@ -63,6 +63,12 @@ export interface RunnerAssetStatusUpdateItem {
      * @memberof RunnerAssetStatusUpdateItem
      */
     findingsByDetector?: object;
+    /**
+     * The run skipped this asset on scan-cache evidence instead of scanning it. Its finding counts are carried forward from the previous scan.
+     * @type {boolean}
+     * @memberof RunnerAssetStatusUpdateItem
+     */
+    cacheHit?: boolean;
 }
 
 
@@ -102,6 +108,7 @@ export function RunnerAssetStatusUpdateItemFromJSONTyped(json: any, ignoreDiscri
         'findingsTotal': json['findingsTotal'] == null ? undefined : json['findingsTotal'],
         'findingsBySeverity': json['findingsBySeverity'] == null ? undefined : FindingsBySeverityDtoFromJSON(json['findingsBySeverity']),
         'findingsByDetector': json['findingsByDetector'] == null ? undefined : json['findingsByDetector'],
+        'cacheHit': json['cacheHit'] == null ? undefined : json['cacheHit'],
     };
 }
 
@@ -122,6 +129,7 @@ export function RunnerAssetStatusUpdateItemToJSONTyped(value?: RunnerAssetStatus
         'findingsTotal': value['findingsTotal'],
         'findingsBySeverity': FindingsBySeverityDtoToJSON(value['findingsBySeverity']),
         'findingsByDetector': value['findingsByDetector'],
+        'cacheHit': value['cacheHit'],
     };
 }
 

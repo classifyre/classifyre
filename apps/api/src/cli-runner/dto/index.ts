@@ -7,6 +7,7 @@ import {
 } from '@prisma/client';
 import {
   IsOptional,
+  IsBoolean,
   IsEnum,
   IsString,
   IsInt,
@@ -45,6 +46,16 @@ export class StartRunnerDto {
   @IsOptional()
   @IsEnum(TriggerType)
   triggerType?: TriggerType = TriggerType.MANUAL;
+
+  @ApiProperty({
+    required: false,
+    default: false,
+    description:
+      'Ignore the scan cache for this run and re-process every asset with every detector. The source\'s stored configuration is untouched, so subsequent runs cache again.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  forceFullRescan?: boolean;
 }
 
 export class CreateExternalRunnerDto {
@@ -175,6 +186,23 @@ export class RunnerDto {
       'value means the scope moved and those assets are no longer covered.',
   })
   assetsOutOfScope: number;
+
+  @ApiProperty({
+    default: 0,
+    description:
+      'Assets this run skipped entirely because their content and every ' +
+      'applicable detector configuration were unchanged since their last ' +
+      'completed scan. Their findings were carried forward, not re-detected.',
+  })
+  assetsSkippedCached: number;
+
+  @ApiProperty({
+    default: 0,
+    description:
+      'Individual detector runs the scan cache avoided across all assets, ' +
+      'including partial skips where only some detectors had to re-run.',
+  })
+  detectorRunsSkipped: number;
 
   @ApiProperty({
     required: false,
@@ -393,6 +421,53 @@ export class RegisterDiscoveredAssetsDto {
   @IsString({ each: true })
   @ArrayMinSize(1)
   assetHashes: string[];
+
+  @ApiProperty({
+    required: false,
+    default: false,
+    description:
+      'Return each asset\'s persisted scan-cache state alongside the registration. The CLI uses it to skip assets whose content and detector configuration are unchanged. It must be read here, before the discovery ingest overwrites the stored checksum with the incoming one.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  includeScanCache?: boolean;
+}
+
+export class ScanCacheEntryDto {
+  @ApiProperty()
+  hash: string;
+
+  @ApiProperty({ nullable: true })
+  checksum: string | null;
+
+  @ApiProperty({ nullable: true })
+  contentHash: string | null;
+
+  @ApiProperty({ nullable: true })
+  scopeFingerprint: string | null;
+
+  @ApiProperty({
+    type: 'object',
+    additionalProperties: { type: 'string' },
+    description:
+      'Configuration fingerprint each detector last succeeded with, keyed by detector type or CUSTOM::<key>',
+  })
+  detectors: Record<string, string>;
+
+  @ApiProperty({ nullable: true })
+  findingsTotal: number | null;
+
+  @ApiProperty({ type: 'object', additionalProperties: true, nullable: true })
+  findingsBySeverity: Record<string, number> | null;
+
+  @ApiProperty({ type: 'object', additionalProperties: true, nullable: true })
+  findingsByDetector: Record<string, Record<string, number>> | null;
+
+  @ApiProperty({ nullable: true })
+  emptyText: boolean | null;
+
+  @ApiProperty({ nullable: true })
+  textExtractionStatus: string | null;
 }
 
 export class FindingsBySeverityDto {
@@ -472,6 +547,16 @@ export class RunnerAssetStatusUpdateItem {
     string,
     { total: number } & Partial<FindingsBySeverityDto>
   >;
+
+  @ApiProperty({
+    required: false,
+    default: false,
+    description:
+      'The run skipped this asset on scan-cache evidence instead of scanning it. Its finding counts are carried forward from the previous scan.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  cacheHit?: boolean;
 }
 
 export class UpdateRunnerAssetStatusDto {
@@ -486,6 +571,14 @@ export class UpdateRunnerAssetStatusDto {
 export class RegisterDiscoveredAssetsResponseDto {
   @ApiProperty()
   registered: number;
+
+  @ApiProperty({
+    type: [ScanCacheEntryDto],
+    required: false,
+    description:
+      'Present only when includeScanCache was requested. An asset appears here only if its last scan completed cleanly enough to persist scan-cache state, so an absent hash always means "process this in full".',
+  })
+  cache?: ScanCacheEntryDto[];
 }
 
 export class RunnerAssetProgressDto {

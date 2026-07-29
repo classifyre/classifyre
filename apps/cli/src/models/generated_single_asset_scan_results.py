@@ -211,6 +211,23 @@ class DetectorOutcome(BaseModel):
     )
 
 
+class ScanCacheState(BaseModel):
+    """
+    What a later run needs in order to prove this asset can be skipped. Written only for detectors that completed with status OK — a detector that raised is omitted so it is retried next run rather than silently trusted.
+    """
+
+    content_hash: str | None = Field(
+        None,
+        description='SHA-256 of the bytes that were actually scanned. Null when the source proved sameness from a provider-supplied digest without downloading.',
+        title='Content Hash',
+    )
+    detectors: dict[str, str] | None = Field(
+        {},
+        description='Fingerprint of the configuration each detector last succeeded with, keyed by detector type or CUSTOM::<custom_detector_key>. A key whose fingerprint still matches on a later run means that detector would produce identical findings and can be skipped.',
+        title='Detectors',
+    )
+
+
 class ScanStats(BaseModel):
     """
     Statistics about detector scan for an asset
@@ -306,4 +323,9 @@ class SingleAssetScanResults(BaseModel):
         None,
         description='Source-specific asset metadata using normalized keys (size_bytes, row_count, etc.) where applicable',
         title='Metadata',
+    )
+    scan_cache: ScanCacheState | None = Field(
+        None,
+        description='Scan-cache state to persist for this asset, letting a later run skip work that would produce identical results',
+        title='Scan Cache',
     )

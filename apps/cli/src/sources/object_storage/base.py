@@ -130,6 +130,13 @@ class ObjectStorageSourceBase(BaseSource, ABC):
     provider_label = "OBJECT_STORAGE"
     input_model: Any = None
 
+    # An object's identity is its bytes, and every backing provider here reports
+    # a digest of them as the ETag, which is folded into the checksum. An
+    # unchanged checksum is therefore proof enough to skip the download outright.
+    # LocalFolderSource overrides this: its "ETag" is only mtime and size.
+    SUPPORTS_SCAN_CACHE = True
+    SCAN_CACHE_VERIFY = "metadata"
+
     def __init__(
         self,
         recipe: dict[str, Any],

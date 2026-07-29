@@ -1,5 +1,12 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsArray, IsObject, IsOptional, IsString } from 'class-validator';
+import {
+  IsArray,
+  IsInt,
+  IsObject,
+  IsOptional,
+  IsString,
+  Min,
+} from 'class-validator';
 
 export class FinalizeIngestRunDto {
   @ApiProperty({
@@ -28,4 +35,27 @@ export class FinalizeIngestRunDto {
   @IsOptional()
   @IsObject()
   samplingCursor?: Record<string, unknown>;
+
+  @ApiPropertyOptional({
+    description:
+      'Assets this run skipped entirely on scan-cache evidence — content and ' +
+      'every applicable detector configuration unchanged since their last ' +
+      'completed scan.',
+    minimum: 0,
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  assetsSkippedCached?: number;
+
+  @ApiPropertyOptional({
+    description:
+      'Individual detector runs avoided across all assets, counting the ' +
+      'partial skips on assets where only some detectors had to re-run.',
+    minimum: 0,
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  detectorRunsSkipped?: number;
 }

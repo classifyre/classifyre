@@ -265,6 +265,16 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
                             worker_pool=worker_pool,
                         )
 
+                    from .pipeline.scan_cache import ScanCache
+
+                    scan_cache = ScanCache(recipe, source)
+                    if scan_cache.enabled:
+                        logger.info(
+                            "Scan cache active (verify=%s): unchanged assets and"
+                            " unchanged detectors will be skipped",
+                            scan_cache.verify,
+                        )
+
                     # --- Phase 1: Discovery ---
                     source.set_discovery_only(True)
                     all_stubs: list[Any] = []
@@ -286,9 +296,17 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
                         # change_type onto runner_assets rows during ingest, so
                         # the row must exist or the CREATED stamp is lost and
                         # first-run counters report every asset as unchanged.
+                        #
+                        # This is also the only point where the stored checksum
+                        # still describes the *previous* scan — the ingest below
+                        # overwrites it — so the scan cache reads prior state here
+                        # or not at all.
                         hashes = [s["hash"] for s in stub_batch if s.get("hash")]
                         if hasattr(sink, "register_discovered_assets") and hashes:
-                            await sink.register_discovered_assets(hashes)
+                            prior = await sink.register_discovered_assets(
+                                hashes, include_scan_cache=scan_cache.enabled
+                            )
+                            scan_cache.record_prior(prior)
 
                         await sink.emit_batch(stub_batch, skip_findings=True)
                         output_batch_count += 1
@@ -317,6 +335,8 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
                             max_concurrent,
                         )
                         error_count = 0
+                        skipped_assets = 0
+                        skipped_detector_runs = 0
                         chunk_errors: list[str] = []
 
                         async def _process_one(asset: Any) -> None:
@@ -325,8 +345,45 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
 
                         async def _process_one_inner(asset: Any) -> None:
                             nonlocal processed_count, error_count
+                            nonlocal skipped_assets, skipped_detector_runs
                             asset_hash = getattr(asset, "hash", None) or ""
                             try:
+                                plan = await scan_cache.plan(asset)
+                                skipped_detector_runs += scan_cache.skipped_detector_runs(plan)
+
+                                if plan.mode == "skip":
+                                    # Report no detector outcomes at all. The API
+                                    # may only resolve a finding whose detector
+                                    # reported OK on this asset, so an empty
+                                    # outcome set is what preserves the findings
+                                    # this run deliberately did not re-check.
+                                    skipped_assets += 1
+                                    processed_count += 1
+                                    logger.info("Cached %s: %s", asset.name, plan.reason)
+                                    prior = plan.prior
+                                    if hasattr(sink, "update_asset_status"):
+                                        await sink.update_asset_status(
+                                            asset_hash,
+                                            "PROCESSED",
+                                            findings_total=prior.findings_total if prior else None,
+                                            findings_by_severity=(
+                                                prior.findings_by_severity if prior else None
+                                            ),
+                                            findings_by_detector=(
+                                                prior.findings_by_detector if prior else None
+                                            ),
+                                            cache_hit=True,
+                                        )
+                                    source.evict_asset_cache(asset_hash)
+                                    return
+
+                                if plan.mode == "partial":
+                                    logger.info(
+                                        "Partially cached %s: running %s",
+                                        asset.name,
+                                        ", ".join(sorted(plan.run_detector_keys)),
+                                    )
+
                                 if hasattr(sink, "update_asset_status"):
                                     await sink.update_asset_status(asset_hash, "PROCESSING")
 
@@ -355,9 +412,19 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
                                     asset,
                                     on_findings_flushed=_on_findings_flushed,
                                     findings_flush_size=args.detector_flush_batch_size,
+                                    only=(
+                                        plan.run_detector_keys
+                                        if plan.mode == "partial"
+                                        else None
+                                    ),
                                 )
-                                payload = _asset_to_payload(result)
-                                await sink.emit_batch([payload], skip_findings=False)
+
+                                # Chunks first, then the payload that carries the
+                                # scan-cache state. A later run reads that state's
+                                # presence as "this asset finished", so it must not
+                                # be written while the asset's embeddings are still
+                                # missing — that would strand them permanently.
+                                chunks_ok = True
                                 if hasattr(sink, "emit_text_chunks"):
                                     artifact = pipeline.take_text_artifact(asset_hash)
                                     if artifact is not None:
@@ -371,6 +438,7 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
                                             # The run fails after phase 2 so operators
                                             # cannot mistake missing embeddings for a
                                             # healthy completed scan.
+                                            chunks_ok = False
                                             detail = f"{asset_hash}: {chunk_exc}"
                                             chunk_errors.append(detail)
                                             logger.error(
@@ -380,10 +448,37 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
                                                 chunk_exc,
                                             )
 
-                                if hasattr(sink, "update_asset_status"):
-                                    f_total, f_by_sev, f_by_det = _compute_findings_counts(
-                                        result.findings or []
+                                f_total, f_by_sev, f_by_det = _compute_findings_counts(
+                                    result.findings or []
+                                )
+                                payload = _asset_to_payload(result)
+
+                                content_hash = plan.content_hash
+                                if scan_cache.tracks_content_hash and content_hash is None:
+                                    # Bytes are still cached from the detector run,
+                                    # so this digest costs no extra fetch.
+                                    content_hash = await scan_cache.content_digest(asset)
+
+                                if chunks_ok:
+                                    state = scan_cache.build_state(
+                                        plan,
+                                        content_hash=content_hash,
+                                        detector_outcomes=(
+                                            result.scan_stats.detector_outcomes
+                                            if result.scan_stats
+                                            else None
+                                        ),
+                                        scan_stats=result.scan_stats,
+                                        findings_total=f_total,
+                                        findings_by_severity=f_by_sev,
+                                        findings_by_detector=f_by_det,
                                     )
+                                    if state is not None:
+                                        payload["scan_cache"] = state
+
+                                await sink.emit_batch([payload], skip_findings=False)
+
+                                if hasattr(sink, "update_asset_status"):
                                     await sink.update_asset_status(
                                         asset_hash,
                                         "PROCESSED",
@@ -409,10 +504,17 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
                         tasks = [asyncio.create_task(_process_one(a)) for a in all_stubs]
                         await asyncio.gather(*tasks, return_exceptions=True)
                         logger.info(
-                            "Phase 2 complete: %d processed, %d errors",
+                            "Phase 2 complete: %d processed (%d cached), %d errors,"
+                            " %d detector run(s) skipped",
                             processed_count,
+                            skipped_assets,
                             error_count,
+                            skipped_detector_runs,
                         )
+                        if hasattr(sink, "set_scan_cache_savings"):
+                            sink.set_scan_cache_savings(
+                                skipped_assets, skipped_detector_runs
+                            )
                         if chunk_errors:
                             preview = "; ".join(chunk_errors[:3])
                             remaining = len(chunk_errors) - 3
