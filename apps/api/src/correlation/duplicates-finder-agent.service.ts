@@ -163,6 +163,21 @@ export class DuplicatesFinderAgentService {
     try {
       if (assetIds.length === 0) throw new Error('No assets selected.');
 
+      // Resolve the selection BEFORE creating anything. The case used to be
+      // created first and `addEvidence` failures were swallowed below, so ids
+      // that resolve to nothing produced an empty case reported as a success —
+      // an ungated route around the evidence floor that gates cases.create.
+      // An operator selecting assets in the fingerprints graph passes this
+      // trivially; only invented ids fail.
+      const known = await this.correlation.existingAssetIds(assetIds);
+      if (known.length === 0) {
+        throw new Error(
+          `None of the ${assetIds.length} selected asset id(s) exist, so there is ` +
+            `nothing to build a case from. Cite ids returned by ` +
+            `fingerprints.similar_assets or duplicates.summary.`,
+        );
+      }
+
       let caseId = input.caseId ?? null;
       let caseTitle = '';
       let created = false;

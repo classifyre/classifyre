@@ -279,6 +279,10 @@ export const CONFIG_MISSION: Mission = {
     'fingerprints.value_occurrences',
     'fingerprints.similar_assets',
     'fingerprints.tune_config',
+    // Carries per-source text coverage, which `sources.list` does not — the
+    // signal for "this source scanned successfully but no content was read",
+    // which is a config problem and this mission's job.
+    'corpus.coverage',
     ...KNOWLEDGE_TOOLS,
   ],
   maxIterations: 14,
@@ -398,6 +402,11 @@ export const ESCALATION_MISSION: Mission = {
     'findings.explain',
     'memory.search',
     'system_brief.get',
+    // This mission is the one that wakes a human up. It builds its own tool
+    // list rather than including OBSERVE_TOOLS, so coverage has to be named
+    // explicitly — without it, "no other case looks worse than this one" is a
+    // statement about the fraction of the corpus that happens to be scanned.
+    'corpus.coverage',
     'alerts.recent',
     'operator.notify',
     ...KNOWLEDGE_TOOLS,
