@@ -213,9 +213,34 @@ class DetectorOutcome(BaseModel):
 
 class ScanCacheState(BaseModel):
     """
-    What a later run needs in order to prove this asset can be skipped. Written only for detectors that completed with status OK — a detector that raised is omitted so it is retried next run rather than silently trusted.
+    What a later run needs in order to prove this asset can be skipped, and what it should report when it does. Emitted only once everything for the asset succeeded — its presence is itself the proof that the previous scan completed cleanly. A detector that raised is omitted from the fingerprint map so it is retried next run rather than silently trusted.
     """
 
+    findings_total: int | None = Field(
+        None,
+        description='Findings this scan saw on the asset, carried forward so a later skipped run reports the same total instead of zero',
+        title='Findings Total',
+    )
+    findings_by_severity: dict[str, int] | None = Field(
+        None,
+        description='Finding counts per severity, carried forward to a skipped run',
+        title='Findings By Severity',
+    )
+    findings_by_detector: dict[str, dict[str, int]] | None = Field(
+        None,
+        description='Finding counts per detector and severity, carried forward to a skipped run',
+        title='Findings By Detector',
+    )
+    empty_text: bool | None = Field(
+        None,
+        description='Whether text extraction yielded nothing, carried forward so a skipped run does not distort text-coverage reporting',
+        title='Empty Text',
+    )
+    text_extraction_status: str | None = Field(
+        None,
+        description='Text extraction outcome, carried forward to a skipped run',
+        title='Text Extraction Status',
+    )
     content_hash: str | None = Field(
         None,
         description='SHA-256 of the bytes that were actually scanned. Null when the source proved sameness from a provider-supplied digest without downloading.',
