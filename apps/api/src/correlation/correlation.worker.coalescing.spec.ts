@@ -3,6 +3,7 @@ import { CorrelationWorker } from './correlation.worker';
 import {
   AI_ACTOR,
   AUTOPILOT_COALESCE_WINDOW_SECONDS,
+  AUTOPILOT_START_AFTER_SECONDS,
   AUTOPILOT_CORPUS_SINGLETON_KEY,
 } from '../autopilot/autopilot.constants';
 
@@ -28,7 +29,7 @@ describe('CorrelationWorker autopilot hand-off', () => {
     prisma = {
       source: {
         update: jest.fn().mockResolvedValue({}),
-        count: jest.fn().mockResolvedValue(over.dirtyCount ?? 1),
+        count: jest.fn().mockResolvedValue(over.inFlight ?? 0),
         findUnique: jest
           .fn()
           .mockResolvedValue(over.source ?? { consecutiveFailures: 0 }),
@@ -103,12 +104,34 @@ describe('CorrelationWorker autopilot hand-off', () => {
       expect(sent[0].data.sourceId).toBeUndefined();
     });
 
-    it('waits out the coalescing window', async () => {
-      build({ dirtyCount: 3 });
+    it('waits out the window while other sources are still scanning', async () => {
+      build({ inFlight: 4 });
 
       await handOff();
 
       expect(sent[0].opts.startAfter).toBe(AUTOPILOT_COALESCE_WINDOW_SECONDS);
+    });
+
+    // A lone source has nothing to batch with. Making it sit out the full
+    // window would turn a 2-minute wait into a 10-minute one for every
+    // single-source and desktop instance, buying nothing.
+    it('keeps the short delay when nothing else is in flight', async () => {
+      build({ inFlight: 0 });
+
+      await handOff();
+
+      expect(sent[0].opts.startAfter).toBe(AUTOPILOT_START_AFTER_SECONDS);
+    });
+
+    // Collisions must defer, not vanish: a scan finishing after its slot's job
+    // already ran would otherwise leave its source dirty with nothing queued to
+    // consume it — permanently, on an instance where no further scan arrives.
+    it('defers a collision to the next slot instead of dropping it', async () => {
+      build();
+
+      await handOff();
+
+      expect(sent[0].opts.singletonNextSlot).toBe(true);
     });
 
     // The load-bearing detail, and the one that is easy to get wrong: in

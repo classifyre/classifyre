@@ -167,15 +167,26 @@ export class CorrelationWorker {
       // nothing and each scan would still get its own cycle. `singletonSeconds`
       // is the policy-independent path: it buckets `singleton_on` into
       // fixed-width slots and the unique index `job_i4 (name, singleton_on,
-      // singleton_key)` applies regardless of policy, with `ON CONFLICT DO
-      // NOTHING`. The first scan in a slot creates the job; every later one in
-      // that slot is silently dropped, having already marked its source dirty.
+      // singleton_key)` applies regardless of policy.
+      //
+      // The window is only worth waiting out when something else is still
+      // scanning — that is the whole point of accumulating. A lone source has
+      // nothing to batch with, so it keeps the original short delay rather than
+      // sitting idle for ten minutes.
+      const inFlight = await this.prisma.source.count({
+        where: {
+          runnerStatus: { in: [RunnerStatus.PENDING, RunnerStatus.RUNNING] },
+        },
+      });
       await this.enqueue(
         { corpus: true, cycleKey: `corpus:${new Date().toISOString()}` },
         {
           singletonKey: AUTOPILOT_CORPUS_SINGLETON_KEY,
           singletonSeconds: AUTOPILOT_COALESCE_WINDOW_SECONDS,
-          startAfter: AUTOPILOT_COALESCE_WINDOW_SECONDS,
+          startAfter:
+            inFlight > 0
+              ? AUTOPILOT_COALESCE_WINDOW_SECONDS
+              : AUTOPILOT_START_AFTER_SECONDS,
         },
       );
     } catch (error) {
@@ -196,6 +207,13 @@ export class CorrelationWorker {
     const boss = await this.pgBoss.getBossAsync();
     await boss.send(AUTOPILOT_QUEUE, data, {
       ...opts,
+      // Collisions must DEFER, not vanish. Without this a scan finishing after
+      // its slot's job had already run left its source marked dirty with no
+      // job to consume it — stranded until some later scan happened to land in
+      // a new slot, and on a single-source instance (scan twice inside one
+      // window) that meant never. pg-boss retries the insert with
+      // `singletonOffset = singletonSeconds`, moving the job to the next slot.
+      singletonNextSlot: true,
       retryLimit: 2,
       retryDelay: 120,
       retryBackoff: true,
