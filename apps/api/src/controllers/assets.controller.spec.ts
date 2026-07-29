@@ -13,6 +13,7 @@ describe('SourceAssetsController', () => {
     listAssets: jest.fn(),
     bulkIngest: jest.fn(),
     finalizeIngestRun: jest.fn(),
+    recordScanCacheSavings: jest.fn(),
   };
   const sourceService = {
     source: jest.fn(),

@@ -462,6 +462,7 @@ All URIs are relative to *http://localhost*
 - [RunnersChartsTopSourceDto](docs/RunnersChartsTopSourceDto.md)
 - [RunnersChartsTotalsDto](docs/RunnersChartsTotalsDto.md)
 - [SaveTrainingExamplesDto](docs/SaveTrainingExamplesDto.md)
+- [ScanCacheEntryDto](docs/ScanCacheEntryDto.md)
 - [SearchAssetFindingDto](docs/SearchAssetFindingDto.md)
 - [SearchAssetItemDto](docs/SearchAssetItemDto.md)
 - [SearchAssetsChartsOptionsDto](docs/SearchAssetsChartsOptionsDto.md)

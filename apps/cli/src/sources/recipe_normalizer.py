@@ -4,6 +4,7 @@ from copy import deepcopy
 from typing import Any
 
 _VALID_SAMPLING_STRATEGIES = {"AUTOMATIC", "RANDOM", "LATEST", "ALL"}
+_VALID_SCAN_CACHE_VERIFY = {"auto", "metadata", "content"}
 
 
 def _as_dict(value: Any) -> dict[str, Any]:
@@ -150,6 +151,16 @@ def normalize_source_recipe(
     sampling.pop("fetch_all_until_first_success", None)
 
     normalized["sampling"] = sampling
+
+    # Fill the scan-cache block so sources can read it without re-deriving
+    # defaults. Absent means "on", matching the schema default: recipes written
+    # before the block existed should still benefit from the cache.
+    scan_cache = _as_dict(normalized.get("scan_cache"))
+    enabled = _as_bool(scan_cache.get("enabled"))
+    scan_cache["enabled"] = True if enabled is None else enabled
+    verify = scan_cache.get("verify")
+    scan_cache["verify"] = verify if verify in _VALID_SCAN_CACHE_VERIFY else "auto"
+    normalized["scan_cache"] = scan_cache
 
     optional.pop("sampling", None)
 

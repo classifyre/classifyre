@@ -472,7 +472,13 @@ export class SourceAssetsController {
     @Param('sourceId') sourceId: string,
     @Body() finalizeDto: FinalizeIngestRunDto,
   ) {
-    const { runnerId, seenHashes, samplingCursor } = finalizeDto;
+    const {
+      runnerId,
+      seenHashes,
+      samplingCursor,
+      assetsSkippedCached,
+      detectorRunsSkipped,
+    } = finalizeDto;
     if (!runnerId) {
       throw new BadRequestException('runnerId is required');
     }
@@ -498,6 +504,14 @@ export class SourceAssetsController {
     if (samplingCursor !== undefined) {
       await this.sourceService.updateSamplingCursor(sourceId, samplingCursor);
     }
+
+    // Recorded here rather than inside finalizeIngestRun, which returns early
+    // for every strategy but ALL — the cache saves work on sampled runs too and
+    // that saving should still show up on the run.
+    await this.assetService.recordScanCacheSavings(runnerId, {
+      assetsSkippedCached,
+      detectorRunsSkipped,
+    });
 
     return this.assetService.finalizeIngestRun(
       sourceId,

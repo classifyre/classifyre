@@ -11615,6 +11615,16 @@
             "type": "object",
             "description": "Opaque, source-defined AUTOMATIC sampling cursor to persist on the source for the next run. Omitted for non-AUTOMATIC strategies so the stored cursor is left unchanged.",
             "additionalProperties": true
+          },
+          "assetsSkippedCached": {
+            "type": "number",
+            "description": "Assets this run skipped entirely on scan-cache evidence — content and every applicable detector configuration unchanged since their last completed scan.",
+            "minimum": 0
+          },
+          "detectorRunsSkipped": {
+            "type": "number",
+            "description": "Individual detector runs avoided across all assets, counting the partial skips on assets where only some detectors had to re-run.",
+            "minimum": 0
           }
         },
         "required": [
@@ -17066,6 +17076,11 @@
               "AUTOPILOT"
             ],
             "default": "MANUAL"
+          },
+          "forceFullRescan": {
+            "type": "boolean",
+            "default": false,
+            "description": "Ignore the scan cache for this run and re-process every asset with every detector. The source's stored configuration is untouched, so subsequent runs cache again."
           }
         },
         "required": [
@@ -17221,6 +17236,16 @@
             "default": 0,
             "description": "Assets absent from this run but retained because they were ingested under a different source scope. Their findings remain OPEN. A non-zero value means the scope moved and those assets are no longer covered."
           },
+          "assetsSkippedCached": {
+            "type": "number",
+            "default": 0,
+            "description": "Assets this run skipped entirely because their content and every applicable detector configuration were unchanged since their last completed scan. Their findings were carried forward, not re-detected."
+          },
+          "detectorRunsSkipped": {
+            "type": "number",
+            "default": 0,
+            "description": "Individual detector runs the scan cache avoided across all assets, including partial skips where only some detectors had to re-run."
+          },
           "scopeFingerprint": {
             "type": "string",
             "nullable": true,
@@ -17292,6 +17317,8 @@
           "assetsUnchanged",
           "assetsDeleted",
           "assetsOutOfScope",
+          "assetsSkippedCached",
+          "detectorRunsSkipped",
           "totalFindings",
           "findingsCreated",
           "findingsResolved",
@@ -17338,10 +17365,76 @@
             "items": {
               "type": "string"
             }
+          },
+          "includeScanCache": {
+            "type": "boolean",
+            "default": false,
+            "description": "Return each asset's persisted scan-cache state alongside the registration. The CLI uses it to skip assets whose content and detector configuration are unchanged. It must be read here, before the discovery ingest overwrites the stored checksum with the incoming one."
           }
         },
         "required": [
           "assetHashes"
+        ]
+      },
+      "ScanCacheEntryDto": {
+        "type": "object",
+        "properties": {
+          "hash": {
+            "type": "string"
+          },
+          "checksum": {
+            "type": "string",
+            "nullable": true
+          },
+          "contentHash": {
+            "type": "string",
+            "nullable": true
+          },
+          "scopeFingerprint": {
+            "type": "string",
+            "nullable": true
+          },
+          "detectors": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Configuration fingerprint each detector last succeeded with, keyed by detector type or CUSTOM::<key>"
+          },
+          "findingsTotal": {
+            "type": "number",
+            "nullable": true
+          },
+          "findingsBySeverity": {
+            "type": "object",
+            "additionalProperties": true,
+            "nullable": true
+          },
+          "findingsByDetector": {
+            "type": "object",
+            "additionalProperties": true,
+            "nullable": true
+          },
+          "emptyText": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "textExtractionStatus": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "hash",
+          "checksum",
+          "contentHash",
+          "scopeFingerprint",
+          "detectors",
+          "findingsTotal",
+          "findingsBySeverity",
+          "findingsByDetector",
+          "emptyText",
+          "textExtractionStatus"
         ]
       },
       "RegisterDiscoveredAssetsResponseDto": {
@@ -17349,6 +17442,13 @@
         "properties": {
           "registered": {
             "type": "number"
+          },
+          "cache": {
+            "description": "Present only when includeScanCache was requested. An asset appears here only if its last scan completed cleanly enough to persist scan-cache state, so an absent hash always means \"process this in full\".",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ScanCacheEntryDto"
+            }
           }
         },
         "required": [
@@ -17414,6 +17514,11 @@
           "findingsByDetector": {
             "type": "object",
             "description": "Finding counts per detector: { [detectorType]: { total, critical?, high?, … } }"
+          },
+          "cacheHit": {
+            "type": "boolean",
+            "default": false,
+            "description": "The run skipped this asset on scan-cache evidence instead of scanning it. Its finding counts are carried forward from the previous scan."
           }
         },
         "required": [
@@ -17866,6 +17971,16 @@
             "default": 0,
             "description": "Assets absent from this run but retained because they were ingested under a different source scope. Their findings remain OPEN. A non-zero value means the scope moved and those assets are no longer covered."
           },
+          "assetsSkippedCached": {
+            "type": "number",
+            "default": 0,
+            "description": "Assets this run skipped entirely because their content and every applicable detector configuration were unchanged since their last completed scan. Their findings were carried forward, not re-detected."
+          },
+          "detectorRunsSkipped": {
+            "type": "number",
+            "default": 0,
+            "description": "Individual detector runs the scan cache avoided across all assets, including partial skips where only some detectors had to re-run."
+          },
           "scopeFingerprint": {
             "type": "string",
             "nullable": true,
@@ -17936,6 +18051,8 @@
           "assetsUnchanged",
           "assetsDeleted",
           "assetsOutOfScope",
+          "assetsSkippedCached",
+          "detectorRunsSkipped",
           "totalFindings",
           "findingsCreated",
           "findingsResolved",

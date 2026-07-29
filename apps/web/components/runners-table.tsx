@@ -656,6 +656,12 @@ export function RunnersTable({
                               {runner.assetsDeleted.toLocaleString()}
                             </div>
                           )}
+                          {runner.assetsSkippedCached > 0 && (
+                            <div className="font-sans text-[#4a7c00]">
+                              {t("runners.delta.cached")}{" "}
+                              {runner.assetsSkippedCached.toLocaleString()}
+                            </div>
+                          )}
                           {runner.assetsWithoutText > 0 && (
                             <div className="font-sans text-amber-700 dark:text-amber-400">
                               {t("runners.delta.withoutText")}{" "}

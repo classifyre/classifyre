@@ -127,6 +127,11 @@ class DriveItemRef:
 class Microsoft365Source(BaseSource):
     source_type = "microsoft_365"
 
+    # Graph's eTag changes on every edit to a drive item and is folded into the
+    # checksum, so an unchanged checksum means unchanged bytes without a download.
+    SUPPORTS_SCAN_CACHE = True
+    SCAN_CACHE_VERIFY = "metadata"
+
     def __init__(
         self,
         recipe: dict[str, Any],
