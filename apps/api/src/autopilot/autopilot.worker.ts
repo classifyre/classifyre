@@ -270,6 +270,16 @@ export class AutopilotWorker {
     // rows, so sources scanned while this cycle runs enrol in the next batch
     // rather than being silently dropped.
     const batchSources = cycle.corpus ? await this.consumeDirtySources() : [];
+    // Nothing new since the last batch. A readiness requeue always inserts (it
+    // must, or a deferred cycle would be lost), so a corpus job can outlive the
+    // batch it was queued for — and running five agents over "all sources" to
+    // rediscover nothing is precisely the churn this cadence exists to remove.
+    if (cycle.corpus && batchSources.length === 0 && !cycle.manual) {
+      this.logger.debug(
+        'Corpus cycle skipped: no sources have been scanned since the last one.',
+      );
+      return;
+    }
 
     const sourceName = cycle.sourceId
       ? await this.search.sourceName(cycle.sourceId)

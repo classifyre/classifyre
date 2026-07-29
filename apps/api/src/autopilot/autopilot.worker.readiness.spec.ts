@@ -219,5 +219,63 @@ describe('AutopilotWorker readiness and batch consumption', () => {
       await expect(consume()).resolves.toEqual([]);
       expect(prisma.source.updateMany).not.toHaveBeenCalled();
     });
+
+    // A readiness requeue always inserts (it must, or a deferred cycle is
+    // lost), so a corpus job can outlive the batch it was queued for. Running
+    // five agents over "all sources" to rediscover nothing is exactly the churn
+    // this cadence exists to remove.
+    it('skips a corpus cycle that has no newly scanned sources', async () => {
+      build({ dirty: [] });
+      prisma.instanceSettings = {
+        findUnique: jest.fn().mockResolvedValue({
+          aiEnabled: true,
+          autopilotInquiryEnabled: true,
+          autopilotCaseEnabled: true,
+          autopilotConfigEnabled: false,
+          autopilotDetectorEnabled: false,
+          autopilotEscalationEnabled: false,
+        }),
+      };
+      (worker as any).runAgent = jest.fn().mockResolvedValue(undefined);
+
+      await (worker as any).runCycle({
+        sourceId: null,
+        runnerId: null,
+        corpus: true,
+        cycleKey: 'corpus:x',
+        trigger: 'corpus',
+        manual: false,
+        instruction: null,
+      });
+
+      expect((worker as any).runAgent).not.toHaveBeenCalled();
+    });
+
+    it('still runs a manual all-sources review with an empty batch', async () => {
+      build({ dirty: [] });
+      prisma.instanceSettings = {
+        findUnique: jest.fn().mockResolvedValue({
+          aiEnabled: true,
+          autopilotInquiryEnabled: true,
+          autopilotCaseEnabled: false,
+          autopilotConfigEnabled: false,
+          autopilotDetectorEnabled: false,
+          autopilotEscalationEnabled: false,
+        }),
+      };
+      (worker as any).runAgent = jest.fn().mockResolvedValue(undefined);
+
+      await (worker as any).runCycle({
+        sourceId: null,
+        runnerId: null,
+        corpus: true,
+        cycleKey: 'manual:x',
+        trigger: 'manual',
+        manual: true,
+        instruction: 'look at everything',
+      });
+
+      expect((worker as any).runAgent).toHaveBeenCalled();
+    });
   });
 });

@@ -5,7 +5,6 @@ import { PgBossService } from '../scheduler/pg-boss.service';
 import { PrismaService } from '../prisma.service';
 import {
   AI_ACTOR,
-  AUTOPILOT_COALESCE_MAX_DIRTY,
   AUTOPILOT_COALESCE_WINDOW_SECONDS,
   AUTOPILOT_CORPUS_SINGLETON_KEY,
   AUTOPILOT_QUEUE,
@@ -147,27 +146,37 @@ export class CorrelationWorker {
             agentKinds: express.agentKinds,
           },
           {
+            // Throttled per source for the same reason as the corpus job — a
+            // bare singletonKey is inert on a `standard` queue. A source that
+            // is rescanning in a tight loop gets one express cycle per window,
+            // not one per scan.
             singletonKey: `autopilot:express:${sourceId}`,
+            singletonSeconds: AUTOPILOT_COALESCE_WINDOW_SECONDS,
             startAfter: AUTOPILOT_START_AFTER_SECONDS,
           },
         );
         return;
       }
 
-      // One globally-keyed job: pg-boss permits a single queued job per
-      // singleton key, so every scan finishing inside the window folds into the
-      // one already pending. That IS the coalescing mechanism.
-      const dirty = await this.prisma.source.count({
-        where: { autopilotDirtyAt: { not: null } },
-      });
-      const startAfter =
-        dirty >= AUTOPILOT_COALESCE_MAX_DIRTY
-          ? 0
-          : AUTOPILOT_COALESCE_WINDOW_SECONDS;
-
+      // One corpus job per window, whatever the scan rate.
+      //
+      // `singletonKey` ALONE does not do this. In pg-boss 12 every
+      // single-job-per-key index is predicated on the queue's policy
+      // (`short`/`singleton`/`stately`/`exclusive`), and this queue is created
+      // with the default `standard` policy — so a bare singletonKey dedupes
+      // nothing and each scan would still get its own cycle. `singletonSeconds`
+      // is the policy-independent path: it buckets `singleton_on` into
+      // fixed-width slots and the unique index `job_i4 (name, singleton_on,
+      // singleton_key)` applies regardless of policy, with `ON CONFLICT DO
+      // NOTHING`. The first scan in a slot creates the job; every later one in
+      // that slot is silently dropped, having already marked its source dirty.
       await this.enqueue(
         { corpus: true, cycleKey: `corpus:${new Date().toISOString()}` },
-        { singletonKey: AUTOPILOT_CORPUS_SINGLETON_KEY, startAfter },
+        {
+          singletonKey: AUTOPILOT_CORPUS_SINGLETON_KEY,
+          singletonSeconds: AUTOPILOT_COALESCE_WINDOW_SECONDS,
+          startAfter: AUTOPILOT_COALESCE_WINDOW_SECONDS,
+        },
       );
     } catch (error) {
       this.logger.warn(
@@ -178,7 +187,11 @@ export class CorrelationWorker {
 
   private async enqueue(
     data: Record<string, unknown>,
-    opts: { singletonKey: string; startAfter: number },
+    opts: {
+      singletonKey: string;
+      singletonSeconds: number;
+      startAfter: number;
+    },
   ): Promise<void> {
     const boss = await this.pgBoss.getBossAsync();
     await boss.send(AUTOPILOT_QUEUE, data, {

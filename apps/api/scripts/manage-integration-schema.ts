@@ -74,6 +74,33 @@ async function main() {
 
   if (command === 'cleanup') {
     await withClient(databaseUrl, async (client) => {
+      // Namespace schemas first. The suite provisions a namespace per run, and
+      // each one creates its own `ns_<uuid>` schema OUTSIDE the integration
+      // schema — dropping only the integration schema takes the `namespaces`
+      // registry row with it and orphans the tenant schema, so a shared CI
+      // database accumulated one dead `ns_*` schema (55 tables) per run with
+      // nothing left pointing at it. Read the registry before it is dropped.
+      const { rows } = await client.query<{ schema_name: string }>(
+        `SELECT n.schema_name
+           FROM ${quoteIdentifier(schema)}.namespaces n
+          WHERE n.type = 'local'`,
+      ).catch(() => ({ rows: [] as Array<{ schema_name: string }> }));
+
+      for (const row of rows) {
+        // Belt and braces: only ever drop something that looks like a tenant
+        // schema, never whatever a corrupted registry row happens to contain.
+        if (!/^ns_[0-9a-f]{32}$/.test(row.schema_name)) continue;
+        await client.query(
+          `DROP SCHEMA IF EXISTS ${quoteIdentifier(row.schema_name)} CASCADE`,
+        );
+        // pg-boss keeps its own schema per namespace alongside the tenant one.
+        await client.query(
+          `DROP SCHEMA IF EXISTS ${quoteIdentifier(
+            row.schema_name.replace(/^ns_/, 'pgboss_'),
+          )} CASCADE`,
+        );
+      }
+
       await client.query(
         `DROP SCHEMA IF EXISTS ${quoteIdentifier(schema)} CASCADE`,
       );

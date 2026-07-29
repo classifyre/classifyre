@@ -52,19 +52,27 @@ export class EvidenceFloorService {
     proposal: InquiryMatcherProposal,
   ): Promise<void> {
     const matchers = toMatchers(proposal);
-    const { total, sample } = await this.matching.preview(matchers);
+    const probe = await this.matching.probeMatches(matchers);
 
-    if (total < MIN_INQUIRY_MATCHES) {
+    if (probe.findingIds.length < MIN_INQUIRY_MATCHES) {
+      // Distinguish "matches nothing" from "matched nothing in the window we
+      // were willing to scan". Reporting a bounded miss as a definitive zero
+      // would be a lie the agent cannot check.
       throw new Error(
-        `Refused: this matcher selects ${total} open findings. An inquiry is a saved ` +
-          `monitor over evidence that exists, not a hypothesis — a title you expect to ` +
-          `become true is not an inquiry. Either narrow to findings you can see in ` +
-          `findings.search / findings.ranked, or record the idea with memory.write and ` +
-          `let a later cycle create the inquiry once evidence appears.`,
+        probe.exhausted
+          ? `Refused: this matcher selects 0 open findings. An inquiry is a saved ` +
+              `monitor over evidence that exists, not a hypothesis — a title you expect ` +
+              `to become true is not an inquiry. Either narrow to findings you can see ` +
+              `in findings.search / findings.ranked, or record the idea with ` +
+              `memory.write and let a later cycle create the inquiry once evidence ` +
+              `appears.`
+          : `Refused: no match in the first ${probe.scanned} findings scanned, so this ` +
+              `matcher is at best extremely sparse. Narrow it using ids from ` +
+              `findings.search / findings.ranked rather than guessing at a pattern.`,
       );
     }
 
-    const verdict = await this.assessFindings(sample.map((s) => s.findingId));
+    const verdict = await this.assessFindings(probe.findingIds);
     if (verdict.provablyWeak) {
       throw new Error(
         `Refused: every one of the ${verdict.analyzed} scored findings this matcher ` +
@@ -77,7 +85,11 @@ export class EvidenceFloorService {
 
     const duplicate = await this.findDuplicateInquiry(
       matchers,
-      sample.map((s) => s.findingId),
+      // Only a fully-enumerated proposal can be tested for containment: a
+      // bounded sample of a large set may miss an overlap that exists, and a
+      // false "duplicate" refusal is worse than a missed one. When the cap was
+      // hit, structural matcher similarity carries the check on its own.
+      probe.exhausted ? probe.findingIds : [],
     );
     if (duplicate) {
       throw new Error(
@@ -264,7 +276,7 @@ export class EvidenceFloorService {
     // since two matchers phrased entirely differently can still select the
     // same findings, which is precisely what this second check is for.
     for (const { candidate } of scored.slice(0, MAX_DUPLICATE_PREVIEWS)) {
-      const { sample } = await this.matching.preview({
+      const { findingIds } = await this.matching.probeMatches({
         matchAllSources: candidate.matchAllSources,
         sourceIds: candidate.sourceIds,
         detectorTypes: candidate.detectorTypes,
@@ -273,7 +285,7 @@ export class EvidenceFloorService {
         findingTypeRegex: candidate.findingTypeRegex,
         findingValueRegex: candidate.findingValueRegex,
       });
-      const existing = new Set(sample.map((s) => s.findingId));
+      const existing = new Set(findingIds);
       if (existing.size === 0) continue;
 
       // Containment, not Jaccard: a per-source proposal whose findings all sit

@@ -18,6 +18,7 @@
       <excludeFolder url="file://$MODULE_DIR$/.claude/worktrees/hopeful-cohen/packages/schemas/.venv" />
       <excludeFolder url="file://$MODULE_DIR$/.claude/worktrees/code-review-workflow-580237/apps/cli/.venv" />
       <excludeFolder url="file://$MODULE_DIR$/apps/cli/.claude/worktrees/sleepy-mendeleev-4e1d80/apps/cli/.venv" />
+      <excludeFolder url="file://$MODULE_DIR$/.claude/worktrees/asset-hash-scan-cache-ebdd20/apps/cli/.venv" />
     </content>
     <orderEntry type="sourceFolder" forTests="false" />
   </component>
