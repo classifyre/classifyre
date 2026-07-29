@@ -78,7 +78,6 @@ interface LoopProgress {
   failed: number;
   createdInquiries: Array<{ id: string; title: string }>;
   createdCases: Array<{ id: string; title: string }>;
-  caseReadyInquiryIds: string[];
   done: boolean;
   summary: string;
 }
@@ -216,7 +215,9 @@ export async function runAgentLoop(
       failed: progress.failed,
       createdInquiries: progress.createdInquiries,
       createdCases: progress.createdCases,
-      caseReadyInquiryIds: progress.caseReadyInquiryIds,
+      // Carried so a cycle that deliberately changed nothing can say why,
+      // rather than reporting as "0 applied" and reading like a failure.
+      finishSummary: progress.summary,
     },
     narrative: progress.summary,
     iterations: progress.iteration,
@@ -259,7 +260,6 @@ function loadProgress(
     failed: 0,
     createdInquiries: [],
     createdCases: [],
-    caseReadyInquiryIds: [],
     done: false,
     summary: '',
   };
@@ -361,6 +361,7 @@ export const RESPONSE_PROTOCOL: readonly string[] = [
   '\n## How to respond',
   'Each turn, return JSON: {"thought": "...", "toolCalls": [{"tool": "name", "input": {...}, "rationale": "why"}]}.',
   'Call read tools to gather what you need before mutating. When you are done, return {"thought":"...","finish":{"summary":"what you did"}} with an empty or omitted toolCalls.',
+  'Finishing without having called a single mutating tool is a valid and often correct outcome. When that is the right answer, say so in the summary and give the reason ("read N findings across 3 sources; all boilerplate; nothing warranted an inquiry") rather than acting to have acted.',
   'Only call tools from the list above. Keep rationale short and specific.',
 ];
 
@@ -371,11 +372,40 @@ function buildUserPrompt(ctx: AgentContext, mission: Mission): string {
   const mode = ctx.manual
     ? 'This is a manual review of existing open data.'
     : 'This is a post-scan review of the latest findings.';
-  return [
-    `Mission: ${mission.kind}.`,
-    `Scope: ${scope}. ${mode}`,
+
+  const lines = [`Mission: ${mission.kind}.`, `Scope: ${scope}. ${mode}`];
+
+  // Name the batch explicitly. A coalesced cycle covers every source scanned
+  // since the last one, and an agent told only "all sources" would reasonably
+  // read that as the whole corpus.
+  const batch = ctx.batchSources ?? [];
+  if (batch.length > 0) {
+    const names = batch
+      .slice(0, 20)
+      .map((s) => s.name)
+      .join(', ');
+    lines.push(
+      `Scanned since the last cycle (${batch.length}): ${names}${batch.length > 20 ? ', …' : ''}. ` +
+        'These are what is NEW — not the whole corpus. Call corpus.coverage for that.',
+    );
+  }
+  if (ctx.expressReason) {
+    lines.push(
+      `This cycle was expedited rather than batched because: ${ctx.expressReason}.`,
+    );
+  }
+  if (ctx.evidenceAnalysisPending) {
+    lines.push(
+      'WARNING: evidence analysis has not finished. Importance scores are incomplete, ' +
+        'and an unscored finding is indistinguishable from an unimportant one. Treat ' +
+        'findings.ranked as partial and prefer deferring to concluding.',
+    );
+  }
+
+  lines.push(
     'Begin by observing the relevant state, then take the minimal correct actions.',
-  ].join('\n');
+  );
+  return lines.join('\n');
 }
 
 /** Tolerate common shape drift in the model's turn output. */

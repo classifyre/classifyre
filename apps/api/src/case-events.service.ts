@@ -51,6 +51,15 @@ export class CaseEventsService {
   ) {
     await this.ensureCase(caseId);
     const verified = origin === 'OPERATOR';
+    // An agent-proposed chronology event used to be able to cite finding ids
+    // that do not exist: the ids were written straight through, and `origin:
+    // AGENT` only meant the event stayed unverified — not that its citations
+    // were real. A date is the most quotable thing a case produces, so a
+    // fabricated one is the most expensive thing to leave unchecked. Operator
+    // events keep their existing behaviour.
+    if (origin === 'AGENT') {
+      await this.assertCitationsExist(input.findingIds, input.evidenceIds);
+    }
     const event = await this.prisma.caseEvent.create({
       data: {
         caseId,
@@ -152,6 +161,46 @@ export class CaseEventsService {
       select: { id: true },
     });
     if (!exists) throw new NotFoundException(`Case ${caseId} not found`);
+  }
+
+  /** Every cited finding/evidence id must resolve, or the event is refused. */
+  private async assertCitationsExist(
+    findingIds: string[] | undefined,
+    evidenceIds: string[] | undefined,
+  ): Promise<void> {
+    const findings = findingIds ?? [];
+    const evidence = evidenceIds ?? [];
+    if (findings.length === 0 && evidence.length === 0) return;
+
+    const [knownFindings, knownEvidence] = await Promise.all([
+      findings.length
+        ? this.prisma.finding
+            .findMany({
+              where: { id: { in: findings } },
+              select: { id: true },
+            })
+            .then((rows) => rows.map((r) => r.id))
+        : Promise.resolve<string[]>([]),
+      evidence.length
+        ? this.prisma.caseEvidence
+            .findMany({
+              where: { id: { in: evidence } },
+              select: { id: true },
+            })
+            .then((rows) => rows.map((r) => r.id))
+        : Promise.resolve<string[]>([]),
+    ]);
+
+    const missing = [
+      ...findings.filter((id) => !knownFindings.includes(id)),
+      ...evidence.filter((id) => !knownEvidence.includes(id)),
+    ];
+    if (missing.length > 0) {
+      throw new BadRequestException(
+        `Refused: these cited ids do not exist: ${missing.join(', ')}. A chronology ` +
+          `event must cite evidence you actually read — never construct ids.`,
+      );
+    }
   }
 
   private toDto(event: CaseEvent) {

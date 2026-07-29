@@ -1,8 +1,13 @@
 import { Injectable } from '@nestjs/common';
-import { AgentMemoryKind, Prisma } from '@prisma/client';
+import { AgentMemoryKind, Prisma, RunnerStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma.service';
 import { AgentMemoryService } from '../memory/agent-memory.service';
-import { MAX_GLOSSARY_ENTRIES } from '../autopilot.constants';
+import {
+  CORPUS_SAMPLE_COVERAGE_THRESHOLD,
+  DEFERRED_TAG,
+  MAX_DEFERRED_ENTRIES,
+  MAX_GLOSSARY_ENTRIES,
+} from '../autopilot.constants';
 import type { RecalledMemory } from '../autopilot.types';
 
 const BRIEF_ID = 1;
@@ -48,6 +53,8 @@ export interface ComposedBrief {
   glossary: BriefMemoryEntry[];
   topics: BriefMemoryEntry[];
   gaps: BriefMemoryEntry[];
+  /** Items parked by agenda.defer whose coverage threshold has now been met. */
+  deferred: BriefMemoryEntry[];
   setup: BriefSetupItem[];
   version: number;
   updatedBy: string | null;
@@ -138,18 +145,28 @@ export class SystemBriefService {
         ),
       ]);
 
-    const facts = Object.keys(brief.facts ?? {}).length
+    // Stored facts are a snapshot; coverage is always recomputed and overlaid.
+    // A brief that understates how much of the corpus has been scanned is
+    // exactly the failure this section exists to prevent, and compose() runs
+    // once per agent run, so the handful of extra counts is cheap insurance.
+    const stored = Object.keys(brief.facts ?? {}).length
       ? brief.facts
       : await this.computeFacts();
+    const facts = { ...stored, ...(await this.computeCoverage()) };
 
     return {
       overview: brief.content.trim(),
       facts,
       glossary,
       topics: entityMaps.map(toEntry).slice(0, MAX_TOPIC_ENTRIES),
+      // Deferred items are DECISION_PRECEDENTs too, so they would otherwise
+      // read as "already decided" among the gaps. They are the opposite: open
+      // questions waiting on coverage.
       gaps: [...detectorInsights, ...precedents]
+        .filter((m) => !isDeferred(m))
         .map(toEntry)
         .slice(0, MAX_GAP_ENTRIES),
+      deferred: dueDeferrals(precedents, numVal(facts.coverageRatio)),
       setup: await this.computeSetup(facts),
       version: brief.version,
       updatedBy: brief.updatedBy,
@@ -176,6 +193,8 @@ export class SystemBriefService {
           `Assets: ${num(f.assets)} · Custom detectors: ${num(f.customDetectors)} · ` +
           `Active inquiries: ${num(f.activeInquiries)} · Open cases: ${num(f.openCases)} · ` +
           `Open findings: ${num(f.openFindings)} · Clusters: ${num(f.clusters)}.`,
+        heading('Corpus coverage'),
+        renderCoverage(f),
       );
     }
 
@@ -189,6 +208,13 @@ export class SystemBriefService {
       sections.push(
         heading("What's been tried / known gaps"),
         bullets(brief.gaps),
+      );
+    }
+    if (brief.deferred.length > 0) {
+      sections.push(
+        heading('Deferred, now due'),
+        'Coverage has reached the threshold these were parked at. Re-examine them:',
+        bullets(brief.deferred),
       );
     }
     if (brief.setup.length > 0) {
@@ -245,7 +271,68 @@ export class SystemBriefService {
       openFindings,
       clusters,
       sourcesWithoutFindings,
+      ...(await this.computeCoverage()),
       refreshedAt: new Date().toISOString(),
+    };
+  }
+
+  /**
+   * How much of the corpus the agent has actually seen.
+   *
+   * `sourcesWithoutFindings` above is derived from sources that HAVE assets, so
+   * a source that has never been scanned is invisible to it. On the first real
+   * run that meant the brief reported "Sources: 151" while 121 of them had
+   * never been scanned at all — the agent drew corpus-wide conclusions from
+   * 8% of the data and had no way to know it.
+   *
+   * WARNING runs count as scanned: a run with partial OCR failure still
+   * ingested assets and still fired a cycle, so excluding it would understate
+   * coverage in exactly the direction that matters least.
+   */
+  async computeCoverage(): Promise<Record<string, unknown>> {
+    const [
+      sources,
+      scannedGroups,
+      sourcesNeverScanned,
+      sourcesInFlight,
+      sourcesFailing,
+      findingsOpen,
+      findingsAnalyzed,
+    ] = await Promise.all([
+      this.prisma.source.count(),
+      this.prisma.runner.groupBy({
+        by: ['sourceId'],
+        where: {
+          status: { in: [RunnerStatus.COMPLETED, RunnerStatus.WARNING] },
+        },
+      }),
+      this.prisma.source.count({ where: { lastRunAt: null } }),
+      this.prisma.source.count({
+        where: {
+          runnerStatus: { in: [RunnerStatus.PENDING, RunnerStatus.RUNNING] },
+        },
+      }),
+      this.prisma.source.count({
+        where: { lastRunStatus: RunnerStatus.ERROR },
+      }),
+      this.prisma.finding.count({ where: { status: 'OPEN' } }),
+      // Denormalized by a DB trigger, so this needs no join. Unanalyzed
+      // findings sit at exactly 0 and are "pending, not unimportant".
+      this.prisma.finding.count({
+        where: { status: 'OPEN', importanceScore: { gt: 0 } },
+      }),
+    ]);
+
+    const sourcesScanned = scannedGroups.length;
+    return {
+      sources,
+      sourcesScanned,
+      sourcesNeverScanned,
+      sourcesInFlight,
+      sourcesFailing,
+      coverageRatio: sources > 0 ? sourcesScanned / sources : 0,
+      findingsOpen,
+      findingsAnalyzed,
     };
   }
 
@@ -394,6 +481,32 @@ function toEntry(m: RecalledMemory): BriefMemoryEntry {
   };
 }
 
+function isDeferred(m: RecalledMemory): boolean {
+  return (m.tags ?? []).includes(DEFERRED_TAG);
+}
+
+/**
+ * Deferred items whose recorded coverage threshold the corpus has now reached.
+ * Below it they stay silent — resurfacing them every cycle would recreate the
+ * pressure to act early that deferring them was meant to relieve.
+ */
+function dueDeferrals(
+  memories: RecalledMemory[],
+  coverageRatio: number,
+): BriefMemoryEntry[] {
+  return memories
+    .filter(isDeferred)
+    .filter((m) => coverageRatio >= revisitThreshold(m))
+    .map(toEntry)
+    .slice(0, MAX_DEFERRED_ENTRIES);
+}
+
+function revisitThreshold(m: RecalledMemory): number {
+  const tag = (m.tags ?? []).find((t) => t.startsWith('revisit-at:'));
+  const parsed = tag ? Number(tag.slice('revisit-at:'.length)) : NaN;
+  return Number.isFinite(parsed) ? parsed : 1;
+}
+
 function bullets(entries: BriefMemoryEntry[]): string {
   return entries.map((e) => `- ${e.key}: ${e.content}`).join('\n');
 }
@@ -404,6 +517,45 @@ function heading(title: string): string {
 
 function num(v: unknown): string {
   return typeof v === 'number' ? String(v) : '?';
+}
+
+/**
+ * The corpus-coverage paragraph, stated so it cannot be skimmed past.
+ *
+ * This exists because the agent's first real run created inquiries like "Grand
+ * Cayman offshore references" (0 matches) and opened cases scoped to a single
+ * mailbox while 121 of 151 sources had never been scanned. It had the counts in
+ * front of it and no reason to read them as a limit. Saying the percentage out
+ * loud, next to what it forbids, is the cheapest available correction.
+ */
+export function renderCoverage(f: Record<string, unknown>): string {
+  const sources = numVal(f.sources);
+  const scanned = numVal(f.sourcesScanned);
+  const ratio = sources > 0 ? scanned / sources : 0;
+  const pct = Math.round(ratio * 100);
+
+  const state = [
+    `${scanned} of ${sources} sources scanned (${pct}%).`,
+    `${num(f.sourcesNeverScanned)} never scanned,`,
+    `${num(f.sourcesInFlight)} in flight,`,
+    `${num(f.sourcesFailing)} failing.`,
+    `Evidence analysis: ${num(f.findingsAnalyzed)} of ${num(f.findingsOpen)} open findings scored`,
+    `(unscored findings are pending, not unimportant).`,
+  ].join(' ');
+
+  if (sources === 0 || ratio >= CORPUS_SAMPLE_COVERAGE_THRESHOLD) {
+    return state;
+  }
+
+  return [
+    state,
+    '',
+    `YOU ARE SEEING ${pct}% OF THIS CORPUS. Any claim about "the corpus", about the`,
+    'absence of something, or about a pattern holding across sources is unsupported at',
+    'this coverage. Scope every conclusion to the sources you actually observed, and name',
+    'them. A pattern you expect to recur in the sources still to be scanned is an',
+    'observation for memory.write, not an inquiry.',
+  ].join('\n');
 }
 
 function numVal(v: unknown): number {

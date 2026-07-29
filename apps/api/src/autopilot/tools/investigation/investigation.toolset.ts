@@ -220,13 +220,25 @@ export class InvestigationToolset {
       {
         name: 'cases.create',
         description:
-          'Open a new investigation case. Returns the new caseId for follow-up operations.',
+          'Open a new investigation case. Requires the evidence it starts from: inquiryIds of an inquiry that is already matching, or findingIds you verified this cycle. A case with neither is refused — "investigate this source" is not an investigation. Returns the new caseId for follow-up operations.',
         inputSchema: {
           type: 'object',
           properties: {
             title: { type: 'string' },
             description: { type: 'string' },
             severity: { type: 'string', enum: [...SEVERITY] },
+            inquiryIds: {
+              type: 'array',
+              items: { type: 'string' },
+              description:
+                'Inquiries this case investigates. At least one must have matches.',
+            },
+            findingIds: {
+              type: 'array',
+              items: { type: 'string' },
+              description:
+                'Findings substantiating the case. Must exist and not be all boilerplate.',
+            },
           },
           required: ['title'],
           additionalProperties: false,
@@ -247,6 +259,8 @@ export class InvestigationToolset {
             title: String(input.title),
             description: input.description as string | undefined,
             severity: input.severity as never,
+            inquiryIds: asStringArray(input.inquiryIds),
+            findingIds: asStringArray(input.findingIds),
           }),
       },
       {
@@ -497,4 +511,11 @@ export class InvestigationToolset {
       ),
     ];
   }
+}
+
+/** Tolerant array coercion: the model occasionally sends a bare string. */
+function asStringArray(v: unknown): string[] {
+  if (Array.isArray(v))
+    return v.filter((x): x is string => typeof x === 'string');
+  return typeof v === 'string' && v ? [v] : [];
 }

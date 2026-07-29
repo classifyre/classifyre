@@ -51,6 +51,7 @@ describe('AutopilotWorker agent gating (G-027/G-029)', () => {
       {} as any,
       {} as any,
       {} as any,
+      {} as any,
     );
   };
 

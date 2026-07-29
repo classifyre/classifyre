@@ -24,6 +24,16 @@ export interface AutopilotJob {
   >;
   /** Focus the case agent on one case (full case detail in context). */
   caseId?: string;
+  /**
+   * Coalesced corpus-wide cycle: scoped to every source marked dirty since the
+   * last one rather than to a single scan. This is the ordinary post-scan shape
+   * now; a per-source cycle means an express run or explicit operator intent.
+   */
+  corpus?: boolean;
+  /** Why an express cycle skipped the coalescing window. */
+  expressReason?: string;
+  /** How many times the readiness gate has already pushed this cycle back. */
+  readinessAttempts?: number;
 }
 
 /** Aggregated view of one group of new findings (token-bounded). */
@@ -81,6 +91,36 @@ export interface DuplicateSummary {
     relationType: string;
     matchPercent: number;
     reasons: string[];
+  }>;
+}
+
+/**
+ * How much of the corpus has been scanned, and how much of what was scanned has
+ * an evidence score yet. Answers "am I looking at the corpus or at a sample?" —
+ * a question the investigation missions previously had no tool to ask.
+ */
+export interface CorpusCoverage {
+  totalSources: number;
+  scannedSources: number;
+  neverScanned: number;
+  inFlight: number;
+  failing: number;
+  /** scannedSources / totalSources, 0–1. */
+  coverageRatio: number;
+  findingsOpen: number;
+  findingsAnalyzed: number;
+  note: string;
+  sources: Array<{
+    sourceId: string;
+    name: string;
+    scanned: boolean;
+    lastRunAt: Date | null;
+    lastRunStatus: string | null;
+    runnerStatus: string | null;
+    consecutiveFailures: number;
+    /** Assets that should have carried text but yielded none. */
+    assetsWithoutText: number | null;
+    textCoverage: unknown;
   }>;
 }
 
@@ -166,6 +206,8 @@ export interface RecalledMemory {
   key: string;
   content: string;
   weight: number;
+  /** Free-form labels; `deferred` + `revisit-at:<ratio>` mark a parked item. */
+  tags: string[];
   /** AGENT-authored memory is a hypothesis until verified; OPERATOR is authoritative. */
   origin: string;
   verified: boolean;
@@ -236,6 +278,19 @@ export interface AgentContext {
   instruction: string | null;
   /** Case-focused run: the case agent works on exactly this case. */
   caseId?: string | null;
+  /**
+   * Sources scanned since the last cycle, for a coalesced corpus run. Named so
+   * the mission can say which sources are new this batch without implying they
+   * are the whole corpus — `corpus.coverage` is what answers that.
+   */
+  batchSources?: Array<{ id: string; name: string }>;
+  /** Why this cycle skipped the coalescing window, if it did. */
+  expressReason?: string | null;
+  /**
+   * Evidence analysis had not drained when the readiness gate gave up waiting.
+   * Importance scores in this run are partial and the missions are told so.
+   */
+  evidenceAnalysisPending?: boolean;
   /** Validated output of each completed step, keyed by step name. */
   state: Record<string, unknown>;
 }
