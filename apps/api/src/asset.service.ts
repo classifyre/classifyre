@@ -228,6 +228,41 @@ export class AssetService {
     return undefined;
   }
 
+  /**
+   * Extract the scan-cache state the CLI wants persisted for this asset.
+   *
+   * Returns undefined when the payload carries none, so the Phase 1 discovery
+   * stub — which is sent before anything has been scanned — leaves the stored
+   * state untouched rather than erasing the evidence a later run depends on.
+   *
+   * The state replaces rather than merges: only the CLI knows which detectors
+   * errored this run and must therefore be dropped so they retry next time.
+   */
+  private normalizeScanCache(
+    asset: Record<string, any>,
+    scopeFingerprint?: string,
+  ):
+    | { scanCache: Prisma.InputJsonValue; contentHash: string | null }
+    | undefined {
+    const state = asset?.scan_cache;
+    if (state == null || typeof state !== 'object' || Array.isArray(state)) {
+      return undefined;
+    }
+    const contentHash = (state as Record<string, unknown>).content_hash;
+    // Bind the reusable state to the immutable facts of the completed payload.
+    // Asset.checksum/scopeFingerprint are updated by the discovery stub before
+    // phase 2 succeeds and therefore cannot serve as completion evidence.
+    const normalizedState = {
+      ...(state as Record<string, unknown>),
+      completed_checksum: String(asset.checksum),
+      ...(scopeFingerprint ? { scope_fingerprint: scopeFingerprint } : {}),
+    } as Prisma.InputJsonValue;
+    return {
+      scanCache: normalizedState,
+      contentHash: typeof contentHash === 'string' ? contentHash : null,
+    };
+  }
+
   /** Read-side: coerce a JSONB column into a plain object for response DTOs. */
   private metadataRecord(value: unknown): Record<string, unknown> | undefined {
     if (value != null && typeof value === 'object' && !Array.isArray(value)) {
@@ -292,6 +327,30 @@ export class AssetService {
     return allowed.has(normalized)
       ? (normalized as TextExtractionStatus)
       : undefined;
+  }
+
+  /**
+   * Record what the scan cache saved on this run.
+   *
+   * Silently ignored when the CLI reported nothing, so runs from a CLI that
+   * predates the cache leave the counters at zero rather than failing.
+   */
+  async recordScanCacheSavings(
+    runnerId: string,
+    savings: { assetsSkippedCached?: number; detectorRunsSkipped?: number },
+  ): Promise<void> {
+    const assetsSkippedCached = Number(savings.assetsSkippedCached);
+    const detectorRunsSkipped = Number(savings.detectorRunsSkipped);
+    const data: Prisma.RunnerUpdateInput = {};
+    if (Number.isFinite(assetsSkippedCached) && assetsSkippedCached >= 0) {
+      data.assetsSkippedCached = Math.trunc(assetsSkippedCached);
+    }
+    if (Number.isFinite(detectorRunsSkipped) && detectorRunsSkipped >= 0) {
+      data.detectorRunsSkipped = Math.trunc(detectorRunsSkipped);
+    }
+    if (Object.keys(data).length === 0) return;
+
+    await this.prisma.runner.update({ where: { id: runnerId }, data });
   }
 
   /**
@@ -2096,6 +2155,15 @@ export class AssetService {
           id: string;
           metadata: Prisma.InputJsonValue;
         }[] = [];
+        // Same reasoning for scan-cache state: an asset can be UNCHANGED and
+        // still owe a fresh fingerprint map, because a detector that re-ran
+        // (its config changed) has a new fingerprint to record even though the
+        // content did not move.
+        const unchangedScanCacheUpdates: {
+          id: string;
+          scanCache: Prisma.InputJsonValue;
+          contentHash: string | null;
+        }[] = [];
 
         for (const asset of batch) {
           const { hash, checksum, name, external_url, links, asset_type } =
@@ -2117,6 +2185,9 @@ export class AssetService {
           // JsonValue. Added only to the DB create/update payloads below.
           const metadata = this.normalizeMetadata(asset.metadata);
           const metadataPayload = metadata !== undefined ? { metadata } : {};
+
+          const scanCache = this.normalizeScanCache(asset, scopeFingerprint);
+          const scanCachePayload = scanCache ?? {};
 
           const assetData = {
             checksum: String(checksum),
@@ -2140,6 +2211,7 @@ export class AssetService {
               hash: assetHash,
               ...assetData,
               ...metadataPayload,
+              ...scanCachePayload,
               status: AssetStatus.NEW,
             });
           } else if (existingAsset.checksum !== String(checksum)) {
@@ -2150,6 +2222,7 @@ export class AssetService {
               data: {
                 ...assetData,
                 ...metadataPayload,
+                ...scanCachePayload,
                 status: AssetStatus.UPDATED,
               },
             });
@@ -2166,6 +2239,12 @@ export class AssetService {
             assetsUnchanged.push(existingAsset.id);
             if (metadata !== undefined) {
               unchangedMetadataUpdates.push({ id: existingAsset.id, metadata });
+            }
+            if (scanCache !== undefined) {
+              unchangedScanCacheUpdates.push({
+                id: existingAsset.id,
+                ...scanCache,
+              });
             }
             existingAssetsMap.set(assetHash, {
               ...existingAsset,
@@ -2217,6 +2296,18 @@ export class AssetService {
         // Backfill metadata on UNCHANGED assets (per-asset, since values differ).
         for (const { id, metadata } of unchangedMetadataUpdates) {
           await tx.asset.update({ where: { id }, data: { metadata } });
+        }
+
+        // Same for scan-cache state on UNCHANGED assets.
+        for (const {
+          id,
+          scanCache,
+          contentHash,
+        } of unchangedScanCacheUpdates) {
+          await tx.asset.update({
+            where: { id },
+            data: { scanCache, contentHash },
+          });
         }
 
         // Denormalize metadata onto the runner_asset row (keyed by runnerId +

@@ -125,6 +125,18 @@ export interface SearchRunnerItemDto {
      */
     assetsOutOfScope: number;
     /**
+     * Assets this run skipped entirely because their content and every applicable detector configuration were unchanged since their last completed scan. Their findings were carried forward, not re-detected.
+     * @type {number}
+     * @memberof SearchRunnerItemDto
+     */
+    assetsSkippedCached: number;
+    /**
+     * Individual detector runs the scan cache avoided across all assets, including partial skips where only some detectors had to re-run.
+     * @type {number}
+     * @memberof SearchRunnerItemDto
+     */
+    detectorRunsSkipped: number;
+    /**
      * Fingerprint of the scope-determining config this run covered. Runs sharing a fingerprint are directly comparable.
      * @type {string}
      * @memberof SearchRunnerItemDto
@@ -248,6 +260,8 @@ export function instanceOfSearchRunnerItemDto(value: object): value is SearchRun
     if (!('assetsUnchanged' in value) || value['assetsUnchanged'] === undefined) return false;
     if (!('assetsDeleted' in value) || value['assetsDeleted'] === undefined) return false;
     if (!('assetsOutOfScope' in value) || value['assetsOutOfScope'] === undefined) return false;
+    if (!('assetsSkippedCached' in value) || value['assetsSkippedCached'] === undefined) return false;
+    if (!('detectorRunsSkipped' in value) || value['detectorRunsSkipped'] === undefined) return false;
     if (!('totalFindings' in value) || value['totalFindings'] === undefined) return false;
     if (!('findingsCreated' in value) || value['findingsCreated'] === undefined) return false;
     if (!('findingsResolved' in value) || value['findingsResolved'] === undefined) return false;
@@ -281,6 +295,8 @@ export function SearchRunnerItemDtoFromJSONTyped(json: any, ignoreDiscriminator:
         'assetsUnchanged': json['assetsUnchanged'],
         'assetsDeleted': json['assetsDeleted'],
         'assetsOutOfScope': json['assetsOutOfScope'],
+        'assetsSkippedCached': json['assetsSkippedCached'],
+        'detectorRunsSkipped': json['detectorRunsSkipped'],
         'scopeFingerprint': json['scopeFingerprint'] == null ? undefined : json['scopeFingerprint'],
         'totalFindings': json['totalFindings'],
         'findingsCreated': json['findingsCreated'],
@@ -322,6 +338,8 @@ export function SearchRunnerItemDtoToJSONTyped(value?: SearchRunnerItemDto | nul
         'assetsUnchanged': value['assetsUnchanged'],
         'assetsDeleted': value['assetsDeleted'],
         'assetsOutOfScope': value['assetsOutOfScope'],
+        'assetsSkippedCached': value['assetsSkippedCached'],
+        'detectorRunsSkipped': value['detectorRunsSkipped'],
         'scopeFingerprint': value['scopeFingerprint'],
         'totalFindings': value['totalFindings'],
         'findingsCreated': value['findingsCreated'],

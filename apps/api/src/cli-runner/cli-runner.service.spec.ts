@@ -57,12 +57,14 @@ describe('CliRunnerService', () => {
       },
       asset: {
         count: jest.fn(),
+        findMany: jest.fn().mockResolvedValue([]),
       },
       finding: {
         count: jest.fn(),
       },
       runnerAsset: {
         count: jest.fn().mockResolvedValue(0),
+        createMany: jest.fn().mockResolvedValue({ count: 0 }),
         groupBy: jest.fn().mockResolvedValue([]),
         findFirst: jest.fn().mockResolvedValue(null),
         updateMany: jest.fn().mockResolvedValue({ count: 0 }),
@@ -150,6 +152,88 @@ describe('CliRunnerService', () => {
       where: { id: 'source-1' },
     });
     expect(createTempRecipeFileSpy).toHaveBeenCalledWith(plainConfig);
+  });
+
+  describe('registerDiscoveredAssets scan cache', () => {
+    const runnerId = 'runner-cache';
+    const sourceId = 'source-cache';
+    const scopeFingerprint = 'scope-current';
+
+    it('returns the checksum atomically bound to the completed state', async () => {
+      const { service, prisma } = createService();
+      prisma.runner.findUnique.mockResolvedValue({
+        id: runnerId,
+        sourceId,
+        scopeFingerprint,
+      });
+      prisma.asset.findMany.mockResolvedValue([
+        {
+          hash: 'asset-1',
+          // These mutable columns were advanced by a later discovery pass that
+          // failed. They must not be presented as completed cache evidence.
+          checksum: 'checksum-from-failed-run',
+          contentHash: 'content-from-column',
+          scopeFingerprint,
+          scanCache: {
+            complete: true,
+            completed_checksum: 'checksum-from-successful-run',
+            scope_fingerprint: scopeFingerprint,
+            content_hash: 'content-from-successful-run',
+            detectors: { PII: 'fingerprint-1' },
+          },
+        },
+      ]);
+
+      const result = await service.registerDiscoveredAssets(
+        runnerId,
+        ['asset-1'],
+        true,
+      );
+
+      expect(result.cache).toEqual([
+        expect.objectContaining({
+          hash: 'asset-1',
+          checksum: 'checksum-from-successful-run',
+          contentHash: 'content-from-successful-run',
+          scopeFingerprint,
+        }),
+      ]);
+    });
+
+    it('withholds incomplete and differently scoped states', async () => {
+      const { service, prisma } = createService();
+      prisma.runner.findUnique.mockResolvedValue({
+        id: runnerId,
+        sourceId,
+        scopeFingerprint,
+      });
+      prisma.asset.findMany.mockResolvedValue([
+        {
+          hash: 'incomplete',
+          scanCache: {
+            complete: false,
+            completed_checksum: 'checksum-1',
+            scope_fingerprint: scopeFingerprint,
+          },
+        },
+        {
+          hash: 'old-scope',
+          scanCache: {
+            complete: true,
+            completed_checksum: 'checksum-2',
+            scope_fingerprint: 'scope-old',
+          },
+        },
+      ]);
+
+      const result = await service.registerDiscoveredAssets(
+        runnerId,
+        ['incomplete', 'old-scope'],
+        true,
+      );
+
+      expect(result.cache).toEqual([]);
+    });
   });
 
   it('decrypts masked config before submitting kubernetes test job', async () => {

@@ -7,6 +7,7 @@ from datetime import UTC, datetime, timedelta
 import pytest
 
 from src.models.generated_single_asset_scan_results import AssetType as OutputAssetType
+from src.pipeline.scan_cache import ScanCache
 from src.sources.object_storage.base import ContentSnapshot, ObjectRef
 from src.sources.s3_compatible_storage.source import S3CompatibleStorageSource
 
@@ -57,6 +58,19 @@ def test_s3_storage_sampling_random_is_deterministic():
 
     assert [item.key for item in sampled_once] == [item.key for item in sampled_twice]
     assert len(sampled_once) == 5
+
+
+def test_s3_scan_cache_hashes_content_when_provider_digest_is_excluded():
+    recipe = _recipe()
+    recipe["optional"]["scope"]["include_object_metadata"] = False
+    recipe["scan_cache"] = {"enabled": True, "verify": "auto"}
+    recipe["detectors"] = [{"type": "PII", "enabled": True}]
+    source = S3CompatibleStorageSource(recipe)
+
+    cache = ScanCache(recipe, source)
+
+    assert cache.enabled
+    assert cache.verify == "content"
 
 
 @pytest.mark.asyncio
@@ -275,6 +289,50 @@ async def test_s3_storage_spools_archive_members_until_processing(monkeypatch):
     source.evict_asset_cache(child.hash)
 
     assert not member_path.exists()
+    source.cleanup()
+
+
+def test_s3_archive_child_checksum_changes_with_parent_revision(monkeypatch):
+    source = S3CompatibleStorageSource(_recipe(strategy="ALL"))
+    archive_buffer = io.BytesIO()
+    with zipfile.ZipFile(archive_buffer, "w") as archive:
+        archive.writestr("inside/report.txt", b"same-size member")
+    archive_bytes = archive_buffer.getvalue()
+    monkeypatch.setattr(
+        source,
+        "_build_snapshot",
+        lambda _ref: ContentSnapshot(
+            mime_type="application/zip",
+            raw_content="",
+            text_content="",
+            parse_error=None,
+            downloaded_bytes=len(archive_bytes),
+            raw_bytes=archive_bytes,
+        ),
+    )
+    modified = datetime.now(UTC)
+    first_ref = ObjectRef(
+        key="exports/documents.zip",
+        size=len(archive_bytes),
+        last_modified=modified,
+        etag="etag-first",
+    )
+    second_ref = ObjectRef(
+        key=first_ref.key,
+        size=first_ref.size,
+        last_modified=modified,
+        etag="etag-second",
+    )
+
+    source._pending_child_assets = []
+    source._to_asset(first_ref)
+    first_child = source._pending_child_assets[0]
+    source._pending_child_assets = []
+    source._to_asset(second_ref)
+    second_child = source._pending_child_assets[0]
+
+    assert first_child.hash == second_child.hash
+    assert first_child.checksum != second_child.checksum
     source.cleanup()
 
 

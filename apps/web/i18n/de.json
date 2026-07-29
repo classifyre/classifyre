@@ -621,7 +621,9 @@
       "noSourcesHint": "Zuerst eine Quelle hinzufügen, bevor ein Scan erstellt wird.",
       "starting": "Wird gestartet...",
       "runScan": "Scan starten",
-      "selectSource": "{{name}} auswählen"
+      "selectSource": "{{name}} auswählen",
+      "fullRescan": "Vollständiger Neuscan",
+      "fullRescanHint": "Den Scan-Cache ignorieren und jedes Asset mit jedem Detektor erneut verarbeiten. Langsamer und teurer — sinnvoll, wenn die Ergebnisse von Grund auf neu aufgebaut werden sollen."
     },
     "purgeFindings": {
       "button": "Findings bereinigen",
@@ -1472,7 +1474,9 @@
       "unchanged": "Unverändert",
       "deleted": "Gelöscht",
       "withoutText": "Text nicht gescannt",
-      "outOfScope": "Außerhalb des Umfangs beibehalten"
+      "outOfScope": "Außerhalb des Umfangs beibehalten",
+      "cached": "Zwischengespeichert (übersprungen)",
+      "cachedHint": "Inhalt und jede zutreffende Detektorkonfiguration waren seit dem letzten abgeschlossenen Scan dieser Assets unverändert, sodass {{detectorRuns}} Detektorlauf/-läufe entfielen. Bestehende Funde wurden übernommen, nicht neu erkannt."
     },
     "coverage": {
       "title": "Abdeckung muss geprüft werden",
@@ -1574,6 +1578,7 @@
       "deleted": "Gelöscht",
       "withoutText": "Text nicht gescannt",
       "outOfScope": "Außerhalb des Umfangs",
+      "cached": "Zwischengespeichert",
       "findingsNew": "Neu",
       "findingsKept": "Beibehalten",
       "findingsResolved": "Behoben"

@@ -211,6 +211,53 @@ class DetectorOutcome(BaseModel):
     )
 
 
+class ScanCacheState(BaseModel):
+    """
+    What a later run needs in order to prove this asset can be skipped, and what it should report when it does. Only a state with complete=true is eligible for reuse. A detector that raised or failed to initialize is omitted from the fingerprint map so it is retried next run rather than silently trusted.
+    """
+
+    complete: bool = Field(
+        ...,
+        description='True only after findings, extraction and text chunks all completed. False is an explicit tombstone that invalidates older reusable state.',
+        title='Complete',
+    )
+    findings_total: int | None = Field(
+        None,
+        description='Findings this scan saw on the asset, carried forward so a later skipped run reports the same total instead of zero',
+        title='Findings Total',
+    )
+    findings_by_severity: dict[str, int] | None = Field(
+        None,
+        description='Finding counts per severity, carried forward to a skipped run',
+        title='Findings By Severity',
+    )
+    findings_by_detector: dict[str, dict[str, int]] | None = Field(
+        None,
+        description='Finding counts per detector and severity, carried forward to a skipped run',
+        title='Findings By Detector',
+    )
+    empty_text: bool | None = Field(
+        None,
+        description='Whether text extraction yielded nothing, carried forward so a skipped run does not distort text-coverage reporting',
+        title='Empty Text',
+    )
+    text_extraction_status: str | None = Field(
+        None,
+        description='Text extraction outcome, carried forward to a skipped run',
+        title='Text Extraction Status',
+    )
+    content_hash: str | None = Field(
+        None,
+        description='SHA-256 of the bytes that were actually scanned. Null when the source proved sameness from a provider-supplied digest without downloading.',
+        title='Content Hash',
+    )
+    detectors: dict[str, str] | None = Field(
+        {},
+        description='Fingerprint of the configuration each detector last succeeded with, keyed by detector type or CUSTOM::<custom_detector_key>. A key whose fingerprint still matches on a later run means that detector would produce identical findings and can be skipped.',
+        title='Detectors',
+    )
+
+
 class ScanStats(BaseModel):
     """
     Statistics about detector scan for an asset
@@ -306,4 +353,9 @@ class SingleAssetScanResults(BaseModel):
         None,
         description='Source-specific asset metadata using normalized keys (size_bytes, row_count, etc.) where applicable',
         title='Metadata',
+    )
+    scan_cache: ScanCacheState | None = Field(
+        None,
+        description='Scan-cache state to persist for this asset, letting a later run skip work that would produce identical results',
+        title='Scan Cache',
     )

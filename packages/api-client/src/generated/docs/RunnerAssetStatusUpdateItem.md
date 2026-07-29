@@ -12,6 +12,7 @@ Name | Type
 `findingsTotal` | number
 `findingsBySeverity` | [FindingsBySeverityDto](FindingsBySeverityDto.md)
 `findingsByDetector` | object
+`cacheHit` | boolean
 
 ## Example
 
@@ -26,6 +27,7 @@ const example = {
   "findingsTotal": null,
   "findingsBySeverity": null,
   "findingsByDetector": null,
+  "cacheHit": null,
 } satisfies RunnerAssetStatusUpdateItem
 
 console.log(example)

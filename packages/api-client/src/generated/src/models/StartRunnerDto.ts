@@ -31,6 +31,12 @@ export interface StartRunnerDto {
      * @memberof StartRunnerDto
      */
     triggerType: StartRunnerDtoTriggerTypeEnum;
+    /**
+     * Ignore the scan cache for this run and re-process every asset with every detector. The source's stored configuration is untouched, so subsequent runs cache again.
+     * @type {boolean}
+     * @memberof StartRunnerDto
+     */
+    forceFullRescan?: boolean;
 }
 
 
@@ -67,6 +73,7 @@ export function StartRunnerDtoFromJSONTyped(json: any, ignoreDiscriminator: bool
         
         'triggeredBy': json['triggeredBy'] == null ? undefined : json['triggeredBy'],
         'triggerType': json['triggerType'],
+        'forceFullRescan': json['forceFullRescan'] == null ? undefined : json['forceFullRescan'],
     };
 }
 
@@ -83,6 +90,7 @@ export function StartRunnerDtoToJSONTyped(value?: StartRunnerDto | null, ignoreD
         
         'triggeredBy': value['triggeredBy'],
         'triggerType': value['triggerType'],
+        'forceFullRescan': value['forceFullRescan'],
     };
 }
 

@@ -46,6 +46,7 @@ export function ScanWizard({ open, onOpenChange }: ScanWizardProps) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sourceId, setSourceId] = useState("");
+  const [forceFullRescan, setForceFullRescan] = useState(false);
 
   const fetchSources = async () => {
     try {
@@ -66,6 +67,7 @@ export function ScanWizard({ open, onOpenChange }: ScanWizardProps) {
   useEffect(() => {
     if (!open) return;
     setSourceId("");
+    setForceFullRescan(false);
     fetchSources();
   }, [open]);
 
@@ -83,6 +85,7 @@ export function ScanWizard({ open, onOpenChange }: ScanWizardProps) {
       setError(null);
       const startRunnerDto: StartRunnerDto = {
         triggerType: "MANUAL",
+        forceFullRescan,
       };
       const runner = await api.runners.cliRunnerControllerStartRunner({
         sourceId,
@@ -218,6 +221,24 @@ export function ScanWizard({ open, onOpenChange }: ScanWizardProps) {
         ) : null}
 
         <Separator />
+
+        <div className="flex items-start gap-2.5 px-4 pt-3">
+          <Checkbox
+            id="scan-wizard-full-rescan"
+            checked={forceFullRescan}
+            onCheckedChange={(checked) => setForceFullRescan(checked === true)}
+            className="mt-0.5"
+          />
+          <label
+            htmlFor="scan-wizard-full-rescan"
+            className="cursor-pointer text-sm leading-tight"
+          >
+            {t("sources.scanWizard.fullRescan")}
+            <span className="mt-0.5 block text-xs text-muted-foreground">
+              {t("sources.scanWizard.fullRescanHint")}
+            </span>
+          </label>
+        </div>
 
         {/* Navigation Buttons */}
         <div className="flex items-center justify-end gap-2 p-4">

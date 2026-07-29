@@ -144,6 +144,9 @@ class FinalizeIngestRunRequest(BaseModel):
     # AUTOMATIC sampling cursor to persist on the source for the next run.
     # Omitted (None) for other strategies so the stored cursor is left untouched.
     sampling_cursor: dict[str, Any] | None = Field(None, serialization_alias="samplingCursor")
+    # What the scan cache saved, so the run can report it.
+    assets_skipped_cached: int | None = Field(None, serialization_alias="assetsSkippedCached")
+    detector_runs_skipped: int | None = Field(None, serialization_alias="detectorRunsSkipped")
 
 
 class UpdateRunnerStatusRequest(BaseModel):
@@ -184,10 +187,15 @@ class RestOutputSink:
         self._runner_id = context.runner_id
         self._seen_hashes: set[str] = set()
         self._sampling_cursor: dict[str, Any] | None = None
+        self._scan_cache_savings: tuple[int, int] | None = None
 
     def set_sampling_cursor(self, cursor: dict[str, Any] | None) -> None:
         """Record the AUTOMATIC sampling cursor to persist on finalize."""
         self._sampling_cursor = cursor
+
+    def set_scan_cache_savings(self, assets_skipped: int, detector_runs_skipped: int) -> None:
+        """Record what the scan cache saved, to report on finalize."""
+        self._scan_cache_savings = (assets_skipped, detector_runs_skipped)
 
     async def start(self) -> None:
         if not self.context.source_id:
@@ -273,10 +281,13 @@ class RestOutputSink:
         source_id = self._require_source_id()
         runner_id = self._require_runner_id()
 
+        savings = self._scan_cache_savings
         payload = FinalizeIngestRunRequest(
             runner_id=runner_id,
             seen_hashes=sorted(self._seen_hashes),
             sampling_cursor=self._sampling_cursor,
+            assets_skipped_cached=savings[0] if savings else None,
+            detector_runs_skipped=savings[1] if savings else None,
         )
         self._request_json(
             "POST",
@@ -334,15 +345,33 @@ class RestOutputSink:
                 # Edge emission is best-effort: log and continue.
                 logger.warning("Failed to emit edges to graph: %s", exc)
 
-    async def register_discovered_assets(self, hashes: list[str]) -> None:
+    async def register_discovered_assets(
+        self, hashes: list[str], *, include_scan_cache: bool = False
+    ) -> list[dict[str, Any]]:
+        """Register discovered hashes, optionally collecting their prior scan state.
+
+        The prior state has to be read here and nowhere later: the Phase 1 stub
+        ingest that follows overwrites ``Asset.checksum`` with the incoming value,
+        so a comparison made after it would match the new checksum against itself
+        and skip every asset.
+        """
         runner_id = self._require_runner_id()
+        cache: list[dict[str, Any]] = []
         for i in range(0, len(hashes), 500):
             chunk = hashes[i : i + 500]
-            self._request_json(
+            body: dict[str, Any] = {"assetHashes": chunk}
+            if include_scan_cache:
+                body["includeScanCache"] = True
+            response = self._request_json(
                 "POST",
                 f"/runners/{runner_id}/assets/discover",
-                {"assetHashes": chunk},
+                body,
             )
+            if include_scan_cache and isinstance(response, dict):
+                entries = response.get("cache")
+                if isinstance(entries, list):
+                    cache.extend(entry for entry in entries if isinstance(entry, dict))
+        return cache
 
     async def update_asset_status(
         self,
@@ -353,6 +382,7 @@ class RestOutputSink:
         findings_total: int | None = None,
         findings_by_severity: dict[str, int] | None = None,
         findings_by_detector: dict[str, dict[str, int]] | None = None,
+        cache_hit: bool = False,
     ) -> None:
         runner_id = self._require_runner_id()
         item: dict[str, Any] = {"assetHash": asset_hash, "status": status}
@@ -364,6 +394,8 @@ class RestOutputSink:
             item["findingsBySeverity"] = findings_by_severity
         if findings_by_detector is not None:
             item["findingsByDetector"] = findings_by_detector
+        if cache_hit:
+            item["cacheHit"] = True
         self._request_json(
             "PATCH",
             f"/runners/{runner_id}/assets/status",

@@ -621,7 +621,9 @@
       "noSourcesHint": "Add a source first before creating a scan.",
       "starting": "Starting...",
       "runScan": "Run Scan",
-      "selectSource": "Select {{name}}"
+      "selectSource": "Select {{name}}",
+      "fullRescan": "Full rescan",
+      "fullRescanHint": "Ignore the scan cache and re-process every asset with every detector. Slower and more expensive — use when you want results rebuilt from scratch."
     },
     "purgeFindings": {
       "button": "Purge findings",
@@ -1472,7 +1474,9 @@
       "unchanged": "Unchanged",
       "deleted": "Deleted",
       "withoutText": "Text not scanned",
-      "outOfScope": "Retained outside scope"
+      "outOfScope": "Retained outside scope",
+      "cached": "Cached (skipped)",
+      "cachedHint": "Content and every applicable detector configuration were unchanged since these assets' last completed scan, so {{detectorRuns}} detector run(s) were avoided. Existing findings were carried forward, not re-detected."
     },
     "coverage": {
       "title": "Coverage needs review",
@@ -1574,6 +1578,7 @@
       "deleted": "Deleted",
       "withoutText": "Unscanned text",
       "outOfScope": "Out of scope",
+      "cached": "Cached",
       "findingsNew": "New",
       "findingsKept": "Kept",
       "findingsResolved": "Resolved"

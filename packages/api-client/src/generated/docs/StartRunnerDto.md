@@ -8,6 +8,7 @@ Name | Type
 ------------ | -------------
 `triggeredBy` | string
 `triggerType` | string
+`forceFullRescan` | boolean
 
 ## Example
 
@@ -18,6 +19,7 @@ import type { StartRunnerDto } from '@workspace/api-client'
 const example = {
   "triggeredBy": null,
   "triggerType": null,
+  "forceFullRescan": null,
 } satisfies StartRunnerDto
 
 console.log(example)

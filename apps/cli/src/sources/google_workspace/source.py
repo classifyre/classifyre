@@ -151,6 +151,13 @@ class FileRef:
 class GoogleWorkspaceSource(BaseSource):
     source_type = "google_workspace"
 
+    # Drive reports md5Checksum for uploaded files and a server-authoritative
+    # modifiedTime for native docs, both folded into the checksum. Neither can be
+    # reproduced by restoring an old copy the way a local mtime can, so an
+    # unchanged checksum is proof without re-downloading.
+    SUPPORTS_SCAN_CACHE = True
+    SCAN_CACHE_VERIFY = "metadata"
+
     def __init__(
         self,
         recipe: dict[str, Any],

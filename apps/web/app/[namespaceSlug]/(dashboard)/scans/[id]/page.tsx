@@ -849,6 +849,22 @@ export default function RunnerDetailPage() {
                     {runner.assetsOutOfScope.toLocaleString()}
                   </span>
                 </div>
+                {runner.assetsSkippedCached > 0 && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">
+                      {t("scans.assetDelta.cached")}
+                    </span>
+                    <span
+                      className="font-semibold text-[#4a7c00]"
+                      title={t("scans.assetDelta.cachedHint", {
+                        detectorRuns:
+                          runner.detectorRunsSkipped.toLocaleString(),
+                      })}
+                    >
+                      {runner.assetsSkippedCached.toLocaleString()}
+                    </span>
+                  </div>
+                )}
                 <div className="pt-1 flex items-center justify-between border-t">
                   <span className="text-muted-foreground">
                     {t("scans.stats.assets")}

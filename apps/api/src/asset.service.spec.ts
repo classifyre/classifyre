@@ -2237,6 +2237,81 @@ describe('AssetService', () => {
         expect(result.resolvedForAbsence).toBe(0);
         expect(findingUpdate).not.toHaveBeenCalled();
       });
+
+      // The property that makes the scan cache non-destructive. A skipped asset
+      // IS stamped with this run's runnerId by the discovery ingest, so it lands
+      // in the stale-finding candidate query — the absence of outcomes is the
+      // only thing keeping its findings alive. Carrying the previous run's
+      // outcomes forward onto a cache-hit row would look like a reasonable
+      // tidy-up and would silently resolve every finding in the corpus.
+      it('does NOT resolve findings on an asset the scan cache skipped', async () => {
+        mockPrismaService.runnerAsset.findMany.mockResolvedValue([
+          { assetHash: 'scanned-hash', detectorOutcomes: null, cacheHit: true },
+        ]);
+
+        const result = await runFinalize([findingFrom()]);
+
+        expect(result.resolvedForAbsence).toBe(0);
+        expect(findingUpdate).not.toHaveBeenCalled();
+      });
+
+      it('resolves only for the detectors a partially cached asset re-ran', async () => {
+        // PII re-ran because its config changed; SECRETS was cached and never
+        // reported. Only PII may retire its own findings.
+        mockPrismaService.runnerAsset.findMany.mockResolvedValue([
+          {
+            assetHash: 'scanned-hash',
+            detectorOutcomes: [
+              { detector_type: 'PII', custom_detector_key: null, status: 'OK' },
+            ],
+            cacheHit: false,
+          },
+        ]);
+
+        const result = await runFinalize([
+          findingFrom({ id: 'pii-finding', detectorType: DetectorType.PII }),
+          findingFrom({
+            id: 'secrets-finding',
+            detectorType: DetectorType.SECRETS,
+          }),
+        ]);
+
+        expect(result.resolvedForAbsence).toBe(1);
+        expect(findingUpdate).toHaveBeenCalledTimes(1);
+        expect(findingUpdate).toHaveBeenCalledWith(
+          expect.objectContaining({ where: { id: 'pii-finding' } }),
+        );
+      });
+    });
+
+    describe('recordScanCacheSavings', () => {
+      it('records what the cache saved on the run', async () => {
+        await service.recordScanCacheSavings(runnerId, {
+          assetsSkippedCached: 42,
+          detectorRunsSkipped: 84,
+        });
+
+        expect(mockPrismaService.runner.update).toHaveBeenCalledWith({
+          where: { id: runnerId },
+          data: { assetsSkippedCached: 42, detectorRunsSkipped: 84 },
+        });
+      });
+
+      it('leaves the counters alone when the CLI reports nothing', async () => {
+        // An older CLI omits these entirely; that must not fail the finalize.
+        await service.recordScanCacheSavings(runnerId, {});
+
+        expect(mockPrismaService.runner.update).not.toHaveBeenCalled();
+      });
+
+      it('ignores a negative or non-numeric count', async () => {
+        await service.recordScanCacheSavings(runnerId, {
+          assetsSkippedCached: -1,
+          detectorRunsSkipped: Number.NaN,
+        });
+
+        expect(mockPrismaService.runner.update).not.toHaveBeenCalled();
+      });
     });
 
     // Findings from detectors removed (or disabled) in the source config are
@@ -2636,6 +2711,121 @@ describe('AssetService', () => {
         for (const branch of where.OR) {
           expect(branch.changeType?.in ?? []).not.toContain(null);
         }
+      });
+    });
+
+    describe('scan-cache write-back', () => {
+      const cacheState = {
+        complete: true,
+        content_hash: 'c'.repeat(64),
+        detectors: { PII: 'fingerprint-1' },
+        findings_total: 2,
+      };
+      const persistedCacheState = {
+        ...cacheState,
+        completed_checksum: 'checksum-1',
+        scope_fingerprint: computeScopeFingerprint(AssetType.WORDPRESS, {}),
+      };
+
+      const asset = (over: Record<string, unknown> = {}) => ({
+        hash: 'asset-1',
+        checksum: 'checksum-1',
+        name: 'Asset 1',
+        external_url: 'https://example.com/1',
+        links: [],
+        asset_type: 'TXT',
+        findings: [],
+        ...over,
+      });
+
+      let assetCreateMany: jest.Mock;
+      let assetUpdate: jest.Mock;
+
+      beforeEach(() => {
+        assetCreateMany = jest.fn().mockResolvedValue({});
+        assetUpdate = jest.fn().mockResolvedValue({});
+        mockPrismaService.$transaction.mockImplementation((callback: any) =>
+          callback({
+            asset: {
+              createMany: assetCreateMany,
+              update: assetUpdate,
+              updateMany: jest.fn().mockResolvedValue({}),
+              findMany: jest
+                .fn()
+                .mockResolvedValue([{ id: 'db-asset-1', hash: 'asset-1' }]),
+            },
+            finding: {
+              findMany: jest.fn().mockResolvedValue([]),
+              createMany: jest.fn().mockResolvedValue({}),
+              update: jest.fn().mockResolvedValue({}),
+            },
+            runner: { update: jest.fn().mockResolvedValue({}) },
+            runnerAsset: {
+              updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+            },
+          }),
+        );
+      });
+
+      it('persists state and content hash on a newly created asset', async () => {
+        mockPrismaService.asset.findMany.mockResolvedValue([]);
+
+        await service.bulkIngest(sourceId, runnerId, [
+          asset({ scan_cache: cacheState }),
+        ]);
+
+        expect(assetCreateMany).toHaveBeenCalledWith({
+          data: [
+            expect.objectContaining({
+              scanCache: persistedCacheState,
+              contentHash: 'c'.repeat(64),
+            }),
+          ],
+        });
+      });
+
+      it('persists state on an UNCHANGED asset', async () => {
+        // An asset can be UNCHANGED and still owe a fresh fingerprint map: a
+        // detector whose config changed re-ran, so it has a new fingerprint to
+        // record even though the content did not move. Without this the asset
+        // would re-run that detector on every subsequent scan, forever.
+        mockPrismaService.asset.findMany.mockResolvedValue([
+          {
+            id: 'db-asset-1',
+            hash: 'asset-1',
+            checksum: 'checksum-1',
+            links: [],
+          },
+        ]);
+
+        await service.bulkIngest(sourceId, runnerId, [
+          asset({ scan_cache: cacheState }),
+        ]);
+
+        expect(assetUpdate).toHaveBeenCalledWith({
+          where: { id: 'db-asset-1' },
+          data: {
+            scanCache: persistedCacheState,
+            contentHash: 'c'.repeat(64),
+          },
+        });
+      });
+
+      it('leaves stored state untouched when the payload carries none', async () => {
+        // The Phase 1 discovery stub is sent before anything has been scanned.
+        // Treating its silence as "clear the cache" would defeat the feature.
+        mockPrismaService.asset.findMany.mockResolvedValue([
+          {
+            id: 'db-asset-1',
+            hash: 'asset-1',
+            checksum: 'checksum-1',
+            links: [],
+          },
+        ]);
+
+        await service.bulkIngest(sourceId, runnerId, [asset()]);
+
+        expect(assetUpdate).not.toHaveBeenCalled();
       });
     });
   });

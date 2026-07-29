@@ -60,6 +60,12 @@ _TEXT_MIME_TYPES = {
 class EmailSource(BaseSource):
     source_type = "email"
 
+    # A delivered message is immutable: its Message-ID and body never change
+    # under the same identity, and attachments carry a SHA-256 of their payload.
+    # Re-fetching to prove that adds nothing.
+    SUPPORTS_SCAN_CACHE = True
+    SCAN_CACHE_VERIFY = "metadata"
+
     def __init__(
         self,
         recipe: dict[str, Any],
