@@ -240,14 +240,25 @@ export class AssetService {
    */
   private normalizeScanCache(
     asset: Record<string, any>,
-  ): { scanCache: Prisma.InputJsonValue; contentHash: string | null } | undefined {
+    scopeFingerprint?: string,
+  ):
+    | { scanCache: Prisma.InputJsonValue; contentHash: string | null }
+    | undefined {
     const state = asset?.scan_cache;
     if (state == null || typeof state !== 'object' || Array.isArray(state)) {
       return undefined;
     }
     const contentHash = (state as Record<string, unknown>).content_hash;
+    // Bind the reusable state to the immutable facts of the completed payload.
+    // Asset.checksum/scopeFingerprint are updated by the discovery stub before
+    // phase 2 succeeds and therefore cannot serve as completion evidence.
+    const normalizedState = {
+      ...(state as Record<string, unknown>),
+      completed_checksum: String(asset.checksum),
+      ...(scopeFingerprint ? { scope_fingerprint: scopeFingerprint } : {}),
+    } as Prisma.InputJsonValue;
     return {
-      scanCache: state as Prisma.InputJsonValue,
+      scanCache: normalizedState,
       contentHash: typeof contentHash === 'string' ? contentHash : null,
     };
   }
@@ -2175,7 +2186,7 @@ export class AssetService {
           const metadata = this.normalizeMetadata(asset.metadata);
           const metadataPayload = metadata !== undefined ? { metadata } : {};
 
-          const scanCache = this.normalizeScanCache(asset);
+          const scanCache = this.normalizeScanCache(asset, scopeFingerprint);
           const scanCachePayload = scanCache ?? {};
 
           const assetData = {
@@ -2288,8 +2299,15 @@ export class AssetService {
         }
 
         // Same for scan-cache state on UNCHANGED assets.
-        for (const { id, scanCache, contentHash } of unchangedScanCacheUpdates) {
-          await tx.asset.update({ where: { id }, data: { scanCache, contentHash } });
+        for (const {
+          id,
+          scanCache,
+          contentHash,
+        } of unchangedScanCacheUpdates) {
+          await tx.asset.update({
+            where: { id },
+            data: { scanCache, contentHash },
+          });
         }
 
         // Denormalize metadata onto the runner_asset row (keyed by runnerId +

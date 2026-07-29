@@ -239,6 +239,18 @@ class ObjectStorageSourceBase(BaseSource, ABC):
     def _include_content_preview(self) -> bool:
         return bool(self._scope_option("include_content_preview", True))
 
+    def scan_cache_verification_mode(self) -> str:
+        """Do not trust a digest that the configured checksum omits.
+
+        ``include_object_metadata=false`` removes the provider ETag/content hash
+        from the discovery checksum. Existing sources may already carry that
+        setting, so enabling the scan cache by default must conservatively fall
+        back to hashing bytes for them.
+        """
+        if self.SCAN_CACHE_VERIFY == "metadata" and not self._include_object_metadata():
+            return "content"
+        return super().scan_cache_verification_mode()
+
     # Shared cap across the object-storage family (S3-compatible, GCS, Azure Blob)
     # so a single huge object can't OOM the scan pod. Mirrors local_folder's
     # DEFAULT_MAX_FILE_BYTES guard, but sourced from each provider's own
@@ -600,7 +612,10 @@ class ObjectStorageSourceBase(BaseSource, ABC):
         self._hash_to_uri[child_hash] = child_url
         return SingleAssetScanResults(
             hash=child_hash,
-            checksum=self.calculate_checksum(metadata),
+            # The child identity is stable across parent revisions. Include the
+            # parent's content-derived checksum so a same-size replacement at
+            # the same embedded location cannot reuse the child's cached scan.
+            checksum=self.calculate_checksum({**metadata, "parent_checksum": parent.checksum}),
             name=f"{parent.name}#{image.location}",
             external_url=child_url,
             links=[],
@@ -677,7 +692,9 @@ class ObjectStorageSourceBase(BaseSource, ABC):
         self._hash_to_uri[child_hash] = child_url
         return SingleAssetScanResults(
             hash=child_hash,
-            checksum=self.calculate_checksum(metadata),
+            # Member path, MIME type and size can all stay equal while its bytes
+            # change. The parent checksum carries the provider digest/version.
+            checksum=self.calculate_checksum({**metadata, "parent_checksum": parent.checksum}),
             name=f"{parent.name}#{member.location}",
             external_url=child_url,
             links=[],

@@ -207,6 +207,10 @@ class BaseSource(ABC):
     def set_discovery_only(self, value: bool) -> None:
         self._discovery_only = value
 
+    def scan_cache_verification_mode(self) -> str:
+        """Return the safe default verification mode for this source instance."""
+        return self.SCAN_CACHE_VERIFY
+
     def evict_asset_cache(self, asset_hash: str) -> None:
         """Free cached content for a processed asset. Override in subclasses."""
         pass

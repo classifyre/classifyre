@@ -51,7 +51,7 @@ export class StartRunnerDto {
     required: false,
     default: false,
     description:
-      'Ignore the scan cache for this run and re-process every asset with every detector. The source\'s stored configuration is untouched, so subsequent runs cache again.',
+      "Ignore the scan cache for this run and re-process every asset with every detector. The source's stored configuration is untouched, so subsequent runs cache again.",
   })
   @IsOptional()
   @IsBoolean()
@@ -426,7 +426,7 @@ export class RegisterDiscoveredAssetsDto {
     required: false,
     default: false,
     description:
-      'Return each asset\'s persisted scan-cache state alongside the registration. The CLI uses it to skip assets whose content and detector configuration are unchanged. It must be read here, before the discovery ingest overwrites the stored checksum with the incoming one.',
+      "Return each asset's persisted scan-cache state alongside the registration. The CLI uses it to skip assets whose content and detector configuration are unchanged. It must be read here, before the discovery ingest overwrites the stored checksum with the incoming one.",
   })
   @IsOptional()
   @IsBoolean()

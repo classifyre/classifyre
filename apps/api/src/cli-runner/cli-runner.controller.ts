@@ -160,7 +160,8 @@ export class CliRunnerController {
       dto.assetHashes,
       // No global ValidationPipe runs here, so the body arrives untransformed:
       // compare against the wire value rather than trusting a coerced boolean.
-      dto.includeScanCache === true || (dto.includeScanCache as unknown) === 'true',
+      dto.includeScanCache === true ||
+        (dto.includeScanCache as unknown) === 'true',
     );
   }
 

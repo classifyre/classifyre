@@ -213,9 +213,14 @@ class DetectorOutcome(BaseModel):
 
 class ScanCacheState(BaseModel):
     """
-    What a later run needs in order to prove this asset can be skipped, and what it should report when it does. Emitted only once everything for the asset succeeded — its presence is itself the proof that the previous scan completed cleanly. A detector that raised is omitted from the fingerprint map so it is retried next run rather than silently trusted.
+    What a later run needs in order to prove this asset can be skipped, and what it should report when it does. Only a state with complete=true is eligible for reuse. A detector that raised or failed to initialize is omitted from the fingerprint map so it is retried next run rather than silently trusted.
     """
 
+    complete: bool = Field(
+        ...,
+        description='True only after findings, extraction and text chunks all completed. False is an explicit tombstone that invalidates older reusable state.',
+        title='Complete',
+    )
     findings_total: int | None = Field(
         None,
         description='Findings this scan saw on the asset, carried forward so a later skipped run reports the same total instead of zero',

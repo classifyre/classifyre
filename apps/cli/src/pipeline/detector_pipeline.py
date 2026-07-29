@@ -82,6 +82,14 @@ class DetectorPipeline:
     def _get_detector_info(self, detector: BaseDetector) -> _DetectorInfo | None:
         return self._detector_info.get(id(detector))
 
+    def available_detector_cache_keys(self) -> frozenset[str]:
+        """Cache identities that initialized successfully for this run."""
+        return frozenset(
+            key
+            for detector in self.detectors
+            if (key := self.detector_cache_key(detector)) is not None
+        )
+
     def _can_use_pool(self, detector: BaseDetector) -> bool:
         if self._worker_pool is None:
             return False
@@ -127,9 +135,7 @@ class DetectorPipeline:
         active_detectors = self.detectors
         if only is not None:
             active_detectors = [
-                detector
-                for detector in self.detectors
-                if self.detector_cache_key(detector) in only
+                detector for detector in self.detectors if self.detector_cache_key(detector) in only
             ]
 
         text_detectors = []

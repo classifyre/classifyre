@@ -446,6 +446,7 @@ async def test_errored_detector_is_not_recorded_so_it_retries() -> None:
     )
 
     assert state is not None
+    assert state["complete"] is True
     assert "PII" in state["detectors"]
     assert "SECRETS" not in state["detectors"]
 
@@ -468,6 +469,69 @@ async def test_detector_that_reported_no_outcome_is_still_recorded() -> None:
 
     assert state is not None
     assert set(state["detectors"]) == {"PII", "SECRETS"}
+
+
+@pytest.mark.asyncio
+async def test_detector_that_failed_to_initialize_is_not_recorded() -> None:
+    """No runtime outcome exists for an initialization failure, so the cache
+    must use the pipeline's successfully initialized keys as the authority."""
+    recipe = _recipe([{"type": "PII", "enabled": True}, {"type": "SECRETS", "enabled": True}])
+    cache = ScanCache(recipe, _FakeSource())
+    plan = await cache.plan(_FakeAsset("h1", "checksum-1"))
+
+    state = cache.build_state(
+        plan,
+        content_hash=None,
+        detector_outcomes=[_Outcome("PII", "OK")],
+        scan_stats=_Stats(),
+        available_detector_keys=frozenset({"PII"}),
+    )
+
+    assert state is not None
+    assert set(state["detectors"]) == {"PII"}
+
+
+@pytest.mark.asyncio
+async def test_incomplete_extraction_writes_non_reusable_tombstone() -> None:
+    """Omitting state would leave an older successful entry reusable."""
+
+    class _FailedStats:
+        empty_text = True
+        text_extraction_status = "ENGINE_UNAVAILABLE"
+
+    recipe = _recipe()
+    cache = ScanCache(recipe, _FakeSource())
+    plan = await cache.plan(_FakeAsset("h1", "checksum-1"))
+
+    state = cache.build_state(
+        plan,
+        content_hash=None,
+        detector_outcomes=[],
+        scan_stats=_FailedStats(),
+    )
+
+    assert state is not None
+    assert state["complete"] is False
+    assert state["detectors"] == {}
+
+
+@pytest.mark.asyncio
+async def test_failed_chunk_write_writes_non_reusable_tombstone() -> None:
+    recipe = _recipe()
+    cache = ScanCache(recipe, _FakeSource())
+    plan = await cache.plan(_FakeAsset("h1", "checksum-1"))
+
+    state = cache.build_state(
+        plan,
+        content_hash=None,
+        detector_outcomes=[_Outcome("PII", "OK")],
+        scan_stats=_Stats(),
+        completed=False,
+    )
+
+    assert state is not None
+    assert state["complete"] is False
+    assert state["detectors"] == {}
 
 
 @pytest.mark.asyncio

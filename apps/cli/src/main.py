@@ -413,9 +413,7 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
                                     on_findings_flushed=_on_findings_flushed,
                                     findings_flush_size=args.detector_flush_batch_size,
                                     only=(
-                                        plan.run_detector_keys
-                                        if plan.mode == "partial"
-                                        else None
+                                        plan.run_detector_keys if plan.mode == "partial" else None
                                     ),
                                 )
 
@@ -459,22 +457,25 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
                                     # so this digest costs no extra fetch.
                                     content_hash = await scan_cache.content_digest(asset)
 
-                                if chunks_ok:
-                                    state = scan_cache.build_state(
-                                        plan,
-                                        content_hash=content_hash,
-                                        detector_outcomes=(
-                                            result.scan_stats.detector_outcomes
-                                            if result.scan_stats
-                                            else None
-                                        ),
-                                        scan_stats=result.scan_stats,
-                                        findings_total=f_total,
-                                        findings_by_severity=f_by_sev,
-                                        findings_by_detector=f_by_det,
-                                    )
-                                    if state is not None:
-                                        payload["scan_cache"] = state
+                                state = scan_cache.build_state(
+                                    plan,
+                                    content_hash=content_hash,
+                                    detector_outcomes=(
+                                        result.scan_stats.detector_outcomes
+                                        if result.scan_stats
+                                        else None
+                                    ),
+                                    scan_stats=result.scan_stats,
+                                    available_detector_keys=(
+                                        pipeline.available_detector_cache_keys()
+                                    ),
+                                    completed=chunks_ok,
+                                    findings_total=f_total,
+                                    findings_by_severity=f_by_sev,
+                                    findings_by_detector=f_by_det,
+                                )
+                                if state is not None:
+                                    payload["scan_cache"] = state
 
                                 await sink.emit_batch([payload], skip_findings=False)
 
@@ -512,9 +513,7 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
                             skipped_detector_runs,
                         )
                         if hasattr(sink, "set_scan_cache_savings"):
-                            sink.set_scan_cache_savings(
-                                skipped_assets, skipped_detector_runs
-                            )
+                            sink.set_scan_cache_savings(skipped_assets, skipped_detector_runs)
                         if chunk_errors:
                             preview = "; ".join(chunk_errors[:3])
                             remaining = len(chunk_errors) - 3

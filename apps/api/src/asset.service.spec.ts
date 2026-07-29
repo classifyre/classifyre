@@ -2716,9 +2716,15 @@ describe('AssetService', () => {
 
     describe('scan-cache write-back', () => {
       const cacheState = {
+        complete: true,
         content_hash: 'c'.repeat(64),
         detectors: { PII: 'fingerprint-1' },
         findings_total: 2,
+      };
+      const persistedCacheState = {
+        ...cacheState,
+        completed_checksum: 'checksum-1',
+        scope_fingerprint: computeScopeFingerprint(AssetType.WORDPRESS, {}),
       };
 
       const asset = (over: Record<string, unknown> = {}) => ({
@@ -2771,7 +2777,7 @@ describe('AssetService', () => {
         expect(assetCreateMany).toHaveBeenCalledWith({
           data: [
             expect.objectContaining({
-              scanCache: cacheState,
+              scanCache: persistedCacheState,
               contentHash: 'c'.repeat(64),
             }),
           ],
@@ -2798,7 +2804,10 @@ describe('AssetService', () => {
 
         expect(assetUpdate).toHaveBeenCalledWith({
           where: { id: 'db-asset-1' },
-          data: { scanCache: cacheState, contentHash: 'c'.repeat(64) },
+          data: {
+            scanCache: persistedCacheState,
+            contentHash: 'c'.repeat(64),
+          },
         });
       });
 

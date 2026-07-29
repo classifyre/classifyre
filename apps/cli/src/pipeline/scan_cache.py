@@ -47,6 +47,8 @@ FORCE_FULL_RESCAN_ENV = "CLASSIFYRE_FORCE_FULL_RESCAN"
 
 ScanMode = Literal["full", "partial", "skip"]
 
+_INCOMPLETE_TEXT_EXTRACTION_STATUSES = frozenset({"ENGINE_UNAVAILABLE", "ZERO_FRAMES", "FAILED"})
+
 # Credential material the API injects into detector config at dispatch time
 # (``provider_runtime.api_key`` for LLM detectors, for example).  Rotating a
 # secret must not invalidate the corpus, so these are dropped before hashing.
@@ -145,11 +147,9 @@ class PriorScanState:
     overwrites ``Asset.checksum`` with the incoming value, so reading it any later
     compares the new checksum against itself and skips everything.
 
-    Its mere existence is the proof that the last scan of this asset completed
-    cleanly. The API only returns an entry for an asset that carries persisted
-    scan-cache state, and the CLI only emits that state after everything for the
-    asset succeeded — findings ingested, chunks accepted. A run that died partway
-    leaves the previous state in place, so the next run redoes the work.
+    Its mere existence here is proof that the API validated a ``complete=true``
+    state bound to the checksum and scope of the last successful payload. A
+    partial or failed attempt is withheld, so the next run redoes the work.
     """
 
     checksum: str | None = None
@@ -250,7 +250,12 @@ class ScanCache:
 
         verify = config.get("verify") or "auto"
         if verify == "auto":
-            verify = getattr(source, "SCAN_CACHE_VERIFY", "content")
+            resolve_verify = getattr(source, "scan_cache_verification_mode", None)
+            verify = (
+                resolve_verify()
+                if callable(resolve_verify)
+                else getattr(source, "SCAN_CACHE_VERIFY", "content")
+            )
         self._verify: str = verify if verify in {"metadata", "content"} else "content"
 
         self._cacheable, self._always_run = self._build_fingerprints(recipe)
@@ -437,17 +442,18 @@ class ScanCache:
         content_hash: str | None,
         detector_outcomes: Any,
         scan_stats: Any = None,
+        available_detector_keys: frozenset[str] | None = None,
+        completed: bool = True,
         findings_total: int | None = None,
         findings_by_severity: dict[str, int] | None = None,
         findings_by_detector: dict[str, dict[str, int]] | None = None,
     ) -> dict[str, Any] | None:
         """The scan-cache state to persist for this asset, or None when off.
 
-        A detector that raised is left out so the next run retries it rather than
-        trusting a result we never got.  A detector that ran without reporting an
-        outcome — because it does not apply to this content type — is recorded:
-        it will not apply next time either, and withholding it would keep the
-        asset permanently uncacheable.
+        A detector that raised or failed to initialize is left out so the next
+        run retries it rather than trusting a result we never got. A detector
+        that initialized but reported no outcome because it does not apply to
+        this content type is recorded.
 
         The run statistics ride along so a later skipped run can report what this
         scan actually saw, rather than zeroing the asset's finding counts and
@@ -455,6 +461,31 @@ class ScanCache:
         """
         if not self._enabled:
             return None
+
+        extraction_status = getattr(scan_stats, "text_extraction_status", None)
+        extraction_status_value = str(
+            getattr(extraction_status, "value", extraction_status) or ""
+        ).upper()
+        complete = completed and extraction_status_value not in _INCOMPLETE_TEXT_EXTRACTION_STATUSES
+
+        # Persist an explicit tombstone instead of omitting state. Omitting it
+        # would leave an older successful state in place, and a later run could
+        # mistake that state for proof that this failed attempt completed.
+        if not complete:
+            return {
+                "complete": False,
+                "content_hash": content_hash,
+                "detectors": {},
+                "findings_total": findings_total,
+                "findings_by_severity": findings_by_severity,
+                "findings_by_detector": findings_by_detector,
+                "empty_text": getattr(scan_stats, "empty_text", None),
+                "text_extraction_status": (
+                    str(getattr(extraction_status, "value", extraction_status))
+                    if extraction_status
+                    else None
+                ),
+            }
 
         errored: set[str] = set()
         for outcome in detector_outcomes if isinstance(detector_outcomes, list) else []:
@@ -470,7 +501,13 @@ class ScanCache:
             )
 
         detectors = dict(plan.carried_detectors)
-        ran = plan.run_detector_keys if plan.mode == "partial" else frozenset(self._cacheable)
+        requested = plan.run_detector_keys if plan.mode == "partial" else frozenset(self._cacheable)
+        available = available_detector_keys if available_detector_keys is not None else requested
+        # A configured detector that failed during pipeline construction has no
+        # runtime outcome. Only initialized detector keys may be banked.
+        ran = requested & available
+        for key in requested - available:
+            detectors.pop(key, None)
         for key in ran:
             if key in errored:
                 detectors.pop(key, None)
@@ -479,7 +516,11 @@ class ScanCache:
             if fingerprint is not None:
                 detectors[key] = fingerprint
 
-        state: dict[str, Any] = {"content_hash": content_hash, "detectors": detectors}
+        state: dict[str, Any] = {
+            "complete": True,
+            "content_hash": content_hash,
+            "detectors": detectors,
+        }
 
         if plan.mode == "skip" and plan.prior is not None:
             # Nothing ran, so this run has no statistics of its own — repeat the

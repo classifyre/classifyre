@@ -2680,7 +2680,7 @@ export class CliRunnerService {
 
     const runner = await this.prisma.runner.findUnique({
       where: { id: runnerId },
-      select: { id: true, sourceId: true },
+      select: { id: true, sourceId: true, scopeFingerprint: true },
     });
     if (!runner) {
       throw new NotFoundException(`Runner ${runnerId} not found`);
@@ -2691,7 +2691,11 @@ export class CliRunnerService {
     // scan: the discovery ingest that immediately follows overwrites it with the
     // incoming value, after which every asset would compare equal to itself.
     const cache = includeScanCache
-      ? await this.collectScanCacheState(runner.sourceId, assetHashes)
+      ? await this.collectScanCacheState(
+          runner.sourceId,
+          assetHashes,
+          runner.scopeFingerprint,
+        )
       : undefined;
 
     const result = await this.prisma.runnerAsset.createMany({
@@ -2703,28 +2707,31 @@ export class CliRunnerService {
       skipDuplicates: true,
     });
 
-    return cache ? { registered: result.count, cache } : { registered: result.count };
+    return cache
+      ? { registered: result.count, cache }
+      : { registered: result.count };
   }
 
   /**
    * Prior scan-cache state for the given hashes, as the CLI needs to read it.
    *
-   * Only assets carrying persisted state are returned. The CLI writes that state
-   * exclusively after everything for an asset succeeded, so its presence is what
-   * proves the last scan of that asset ran to completion — an asset whose scan
-   * died partway simply does not appear here, and is processed in full.
+   * Only complete state bound to this runner's scope is returned. The checksum
+   * and scope inside the JSON were stored atomically with that completed payload;
+   * the mutable Asset columns may already describe a later failed discovery pass.
    */
   private async collectScanCacheState(
     sourceId: string,
     assetHashes: string[],
+    currentScopeFingerprint: string | null,
   ): Promise<ScanCacheEntryDto[]> {
     const assets = await this.prisma.asset.findMany({
-      where: { sourceId, hash: { in: assetHashes }, scanCache: { not: Prisma.DbNull } },
+      where: {
+        sourceId,
+        hash: { in: assetHashes },
+        scanCache: { not: Prisma.DbNull },
+      },
       select: {
         hash: true,
-        checksum: true,
-        contentHash: true,
-        scopeFingerprint: true,
         scanCache: true,
       },
     });
@@ -2732,7 +2739,26 @@ export class CliRunnerService {
     const entries: ScanCacheEntryDto[] = [];
     for (const asset of assets) {
       const state = asJsonRecord(asset.scanCache);
-      if (!state) continue;
+      if (!state || state.complete !== true) continue;
+
+      const completedChecksum =
+        typeof state.completed_checksum === 'string'
+          ? state.completed_checksum
+          : null;
+      const completedScopeFingerprint =
+        typeof state.scope_fingerprint === 'string'
+          ? state.scope_fingerprint
+          : null;
+      // The mutable Asset columns may describe a later discovery pass that
+      // failed before phase 2. Only facts stored atomically with complete=true
+      // prove which content and scope actually finished.
+      if (
+        !completedChecksum ||
+        !currentScopeFingerprint ||
+        completedScopeFingerprint !== currentScopeFingerprint
+      ) {
+        continue;
+      }
 
       const detectors: Record<string, string> = {};
       const rawDetectors = asJsonRecord(state.detectors);
@@ -2742,12 +2768,15 @@ export class CliRunnerService {
 
       entries.push({
         hash: asset.hash,
-        checksum: asset.checksum,
-        contentHash: asset.contentHash,
-        scopeFingerprint: asset.scopeFingerprint,
+        checksum: completedChecksum,
+        contentHash:
+          typeof state.content_hash === 'string' ? state.content_hash : null,
+        scopeFingerprint: completedScopeFingerprint,
         detectors,
         findingsTotal:
-          typeof state.findings_total === 'number' ? state.findings_total : null,
+          typeof state.findings_total === 'number'
+            ? state.findings_total
+            : null,
         findingsBySeverity:
           (asJsonRecord(state.findings_by_severity) as Record<
             string,
@@ -2758,7 +2787,8 @@ export class CliRunnerService {
             string,
             Record<string, number>
           > | null) ?? null,
-        emptyText: typeof state.empty_text === 'boolean' ? state.empty_text : null,
+        emptyText:
+          typeof state.empty_text === 'boolean' ? state.empty_text : null,
         textExtractionStatus:
           typeof state.text_extraction_status === 'string'
             ? state.text_extraction_status
