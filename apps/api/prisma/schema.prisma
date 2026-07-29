@@ -97,6 +97,20 @@ model Asset {
   // gone. Null for assets ingested before scope fingerprinting existed; they
   // are treated as out-of-scope (retained) until their next ingest.
   scopeFingerprint          String?                    @map("scope_fingerprint") @db.VarChar(64)
+  // SHA-256 of the bytes that were actually scanned. Distinct from `checksum`,
+  // which hashes source-reported *metadata* (for a local folder, just mtime and
+  // size) and so cannot tell a restored backup from an unmodified file.
+  contentHash               String?                    @map("content_hash") @db.VarChar(64)
+  // Scan-cache state written by the CLI once everything for this asset
+  // succeeded: `{ detectors: { <type|CUSTOM::key>: <config fingerprint> },
+  // content_hash, findings_total, findings_by_severity, findings_by_detector,
+  // empty_text, text_extraction_status }`.
+  //
+  // Its presence is the proof that the last scan of this asset completed — a run
+  // that died partway never writes it, so the next run redoes the work. A later
+  // run skips a detector only while its fingerprint still matches, which is what
+  // makes a detector-config edit re-run that detector alone.
+  scanCache                 Json?                      @map("scan_cache") @db.JsonB
   metadata                  Json?                      @db.JsonB
   runner                    Runner?                    @relation(fields: [runnerId], references: [id])
   source                    Source                     @relation(fields: [sourceId], references: [id], onDelete: Cascade)
@@ -117,6 +131,7 @@ model Asset {
   @@index([sourceId])
   @@index([status])
   @@index([sourceId, scopeFingerprint])
+  @@index([sourceId, contentHash])
   @@map("assets")
 }
 
@@ -497,6 +512,14 @@ model Runner {
   // scope moved since they were ingested. They are NOT deleted and their
   // findings stay OPEN — see AssetService.finalizeIngestRun.
   assetsOutOfScope  Int                  @default(0) @map("assets_out_of_scope")
+  // Assets this run skipped entirely because their content and every applicable
+  // detector configuration were unchanged since their last completed scan. Their
+  // findings were carried forward, not re-detected.
+  assetsSkippedCached Int                @default(0) @map("assets_skipped_cached")
+  // Individual detector runs avoided across all assets, including the partial
+  // skips on assets where only some detectors had to re-run. This is the number
+  // that shows what the cache is actually worth.
+  detectorRunsSkipped Int                @default(0) @map("detector_runs_skipped")
   // Fingerprint of the scope-determining config this run covered.
   scopeFingerprint  String?              @map("scope_fingerprint") @db.VarChar(64)
   assets            Asset[]
@@ -538,6 +561,10 @@ model RunnerAsset {
   // emptyText, this distinguishes a genuinely empty result from missing
   // engines, zero decoded video frames, and other extraction failures.
   textExtractionStatus TextExtractionStatus?  @map("text_extraction_status")
+  // This run skipped the asset entirely on scan-cache evidence rather than
+  // scanning it. `detectorOutcomes` is empty for such a row — which is exactly
+  // what keeps the asset's existing findings from being resolved for absence.
+  cacheHit             Boolean                @default(false) @map("cache_hit")
   createdAt            DateTime               @default(now()) @map("created_at")
 
   runner Runner @relation(fields: [runnerId], references: [id], onDelete: Cascade)

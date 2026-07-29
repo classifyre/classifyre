@@ -76,6 +76,10 @@ export class CliRunnerController {
       sourceId,
       dto?.triggerType,
       dto?.triggeredBy,
+      // No global ValidationPipe, so the body is untransformed — accept the
+      // wire form as well as a real boolean.
+      dto?.forceFullRescan === true ||
+        (dto?.forceFullRescan as unknown) === 'true',
     );
   }
 
@@ -154,6 +158,10 @@ export class CliRunnerController {
     return this.cliRunnerService.registerDiscoveredAssets(
       runnerId,
       dto.assetHashes,
+      // No global ValidationPipe runs here, so the body arrives untransformed:
+      // compare against the wire value rather than trusting a coerced boolean.
+      dto.includeScanCache === true ||
+        (dto.includeScanCache as unknown) === 'true',
     );
   }
 

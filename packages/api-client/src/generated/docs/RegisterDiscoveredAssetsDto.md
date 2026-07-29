@@ -7,6 +7,7 @@
 Name | Type
 ------------ | -------------
 `assetHashes` | Array&lt;string&gt;
+`includeScanCache` | boolean
 
 ## Example
 
@@ -16,6 +17,7 @@ import type { RegisterDiscoveredAssetsDto } from '@workspace/api-client'
 // TODO: Update the object below with actual values
 const example = {
   "assetHashes": null,
+  "includeScanCache": null,
 } satisfies RegisterDiscoveredAssetsDto
 
 console.log(example)

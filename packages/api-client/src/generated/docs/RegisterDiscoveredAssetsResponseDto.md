@@ -7,6 +7,7 @@
 Name | Type
 ------------ | -------------
 `registered` | number
+`cache` | [Array&lt;ScanCacheEntryDto&gt;](ScanCacheEntryDto.md)
 
 ## Example
 
@@ -16,6 +17,7 @@ import type { RegisterDiscoveredAssetsResponseDto } from '@workspace/api-client'
 // TODO: Update the object below with actual values
 const example = {
   "registered": null,
+  "cache": null,
 } satisfies RegisterDiscoveredAssetsResponseDto
 
 console.log(example)

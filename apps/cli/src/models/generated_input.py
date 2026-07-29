@@ -134,6 +134,34 @@ class SamplingConfig(BaseModel):
     )
 
 
+class Verify(StrEnum):
+    """
+    How strongly to prove the payload is unchanged. metadata trusts the source-reported checksum (provider ETag/MD5) and skips the download entirely. content downloads the bytes and compares a SHA-256 digest, still skipping parsing, OCR, transcription and detection. auto (default) picks per source: content where the checksum is only mtime and size (local folders), metadata where the provider supplies a content-derived digest.
+    """
+
+    auto = 'auto'
+    metadata = 'metadata'
+    content = 'content'
+
+
+class ScanCacheConfig(BaseModel):
+    """
+    Skips re-processing assets whose content and applicable detector configuration are unchanged since their last fully-successful scan. Supported by file-like sources only (local folders, object storage, cloud drives, email); ignored elsewhere, because a database row can change under the same key with no change signal to compare against. A detector whose configuration changed is always re-run — and only that detector.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    enabled: bool | None = Field(
+        True,
+        description='When enabled (default), an asset whose content and per-detector configuration fingerprints all match its last successful scan is skipped, and its existing findings are carried forward untouched. Disable to re-scan everything on every run.',
+    )
+    verify: Verify | None = Field(
+        'auto',
+        description='How strongly to prove the payload is unchanged. metadata trusts the source-reported checksum (provider ETag/MD5) and skips the download entirely. content downloads the bytes and compares a SHA-256 digest, still skipping parsing, OCR, transcription and detection. auto (default) picks per source: content where the checksum is only mtime and size (local folders), metadata where the provider supplies a content-derived digest.',
+    )
+
+
 class Requests(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
@@ -2110,6 +2138,7 @@ class CoreInput(BaseModel):
         description='Reusable custom detector IDs selected from the custom detector catalog.',
     )
     sampling: SamplingConfig
+    scan_cache: ScanCacheConfig | None = None
     resources: ResourceOverrides | None = None
     cleanup_removed_detector_findings: bool | None = Field(
         True,
@@ -2132,6 +2161,7 @@ class EmailInput(CoreInput):
         description='Reusable custom detector IDs selected from the custom detector catalog.',
     )
     sampling: SamplingConfig
+    scan_cache: ScanCacheConfig | None = None
     resources: ResourceOverrides | None = None
     cleanup_removed_detector_findings: bool | None = Field(
         True,
@@ -2154,6 +2184,7 @@ class S3CompatibleStorageInput(CoreInput):
         description='Reusable custom detector IDs selected from the custom detector catalog.',
     )
     sampling: SamplingConfig
+    scan_cache: ScanCacheConfig | None = None
     resources: ResourceOverrides | None = None
     cleanup_removed_detector_findings: bool | None = Field(
         True,
@@ -2176,6 +2207,7 @@ class LocalFolderInput(CoreInput):
         description='Reusable custom detector IDs selected from the custom detector catalog.',
     )
     sampling: SamplingConfig
+    scan_cache: ScanCacheConfig | None = None
     resources: ResourceOverrides | None = None
     cleanup_removed_detector_findings: bool | None = Field(
         True,
@@ -2198,6 +2230,7 @@ class SandboxInput(CoreInput):
         description='Reusable custom detector IDs selected from the custom detector catalog.',
     )
     sampling: SamplingConfig
+    scan_cache: ScanCacheConfig | None = None
     resources: ResourceOverrides | None = None
     cleanup_removed_detector_findings: bool | None = Field(
         True,
@@ -2220,6 +2253,7 @@ class AzureBlobStorageInput(CoreInput):
         description='Reusable custom detector IDs selected from the custom detector catalog.',
     )
     sampling: SamplingConfig
+    scan_cache: ScanCacheConfig | None = None
     resources: ResourceOverrides | None = None
     cleanup_removed_detector_findings: bool | None = Field(
         True,
@@ -2242,6 +2276,7 @@ class GoogleCloudStorageInput(CoreInput):
         description='Reusable custom detector IDs selected from the custom detector catalog.',
     )
     sampling: SamplingConfig
+    scan_cache: ScanCacheConfig | None = None
     resources: ResourceOverrides | None = None
     cleanup_removed_detector_findings: bool | None = Field(
         True,
@@ -2264,6 +2299,7 @@ class WordPressInput(CoreInput):
         description='Reusable custom detector IDs selected from the custom detector catalog.',
     )
     sampling: SamplingConfig
+    scan_cache: ScanCacheConfig | None = None
     resources: ResourceOverrides | None = None
     cleanup_removed_detector_findings: bool | None = Field(
         True,
@@ -2286,6 +2322,7 @@ class PostgreSQLInput(CoreInput):
         description='Reusable custom detector IDs selected from the custom detector catalog.',
     )
     sampling: SamplingConfig
+    scan_cache: ScanCacheConfig | None = None
     resources: ResourceOverrides | None = None
     cleanup_removed_detector_findings: bool | None = Field(
         True,
@@ -2308,6 +2345,7 @@ class MySQLInput(CoreInput):
         description='Reusable custom detector IDs selected from the custom detector catalog.',
     )
     sampling: SamplingConfig
+    scan_cache: ScanCacheConfig | None = None
     resources: ResourceOverrides | None = None
     cleanup_removed_detector_findings: bool | None = Field(
         True,
@@ -2330,6 +2368,7 @@ class MSSQLInput(CoreInput):
         description='Reusable custom detector IDs selected from the custom detector catalog.',
     )
     sampling: SamplingConfig
+    scan_cache: ScanCacheConfig | None = None
     resources: ResourceOverrides | None = None
     cleanup_removed_detector_findings: bool | None = Field(
         True,
@@ -2352,6 +2391,7 @@ class OracleInput(CoreInput):
         description='Reusable custom detector IDs selected from the custom detector catalog.',
     )
     sampling: SamplingConfig
+    scan_cache: ScanCacheConfig | None = None
     resources: ResourceOverrides | None = None
     cleanup_removed_detector_findings: bool | None = Field(
         True,
@@ -2374,6 +2414,7 @@ class HiveInput(CoreInput):
         description='Reusable custom detector IDs selected from the custom detector catalog.',
     )
     sampling: SamplingConfig
+    scan_cache: ScanCacheConfig | None = None
     resources: ResourceOverrides | None = None
     cleanup_removed_detector_findings: bool | None = Field(
         True,
@@ -2400,6 +2441,7 @@ class DatabricksInput(CoreInput):
         description='Reusable custom detector IDs selected from the custom detector catalog.',
     )
     sampling: SamplingConfig
+    scan_cache: ScanCacheConfig | None = None
     resources: ResourceOverrides | None = None
     cleanup_removed_detector_findings: bool | None = Field(
         True,
@@ -2432,6 +2474,7 @@ class SnowflakeInput(CoreInput):
         description='Reusable custom detector IDs selected from the custom detector catalog.',
     )
     sampling: SamplingConfig
+    scan_cache: ScanCacheConfig | None = None
     resources: ResourceOverrides | None = None
     cleanup_removed_detector_findings: bool | None = Field(
         True,
@@ -2458,6 +2501,7 @@ class MongoDBInput(CoreInput):
         description='Reusable custom detector IDs selected from the custom detector catalog.',
     )
     sampling: SamplingConfig
+    scan_cache: ScanCacheConfig | None = None
     resources: ResourceOverrides | None = None
     cleanup_removed_detector_findings: bool | None = Field(
         True,
@@ -2588,6 +2632,7 @@ class Neo4jInput(CoreInput):
         description='Reusable custom detector IDs selected from the custom detector catalog.',
     )
     sampling: SamplingConfig
+    scan_cache: ScanCacheConfig | None = None
     resources: ResourceOverrides | None = None
     cleanup_removed_detector_findings: bool | None = Field(
         True,
@@ -2614,6 +2659,7 @@ class PowerBIInput(CoreInput):
         description='Reusable custom detector IDs selected from the custom detector catalog.',
     )
     sampling: SamplingConfig
+    scan_cache: ScanCacheConfig | None = None
     resources: ResourceOverrides | None = None
     cleanup_removed_detector_findings: bool | None = Field(
         True,
@@ -2640,6 +2686,7 @@ class TableauInput(CoreInput):
         description='Reusable custom detector IDs selected from the custom detector catalog.',
     )
     sampling: SamplingConfig
+    scan_cache: ScanCacheConfig | None = None
     resources: ResourceOverrides | None = None
     cleanup_removed_detector_findings: bool | None = Field(
         True,
@@ -3051,6 +3098,7 @@ class ConfluenceInput(CoreInput):
         description='Reusable custom detector IDs selected from the custom detector catalog.',
     )
     sampling: SamplingConfig
+    scan_cache: ScanCacheConfig | None = None
     resources: ResourceOverrides | None = None
     cleanup_removed_detector_findings: bool | None = Field(
         True,
@@ -3073,6 +3121,7 @@ class JiraInput(CoreInput):
         description='Reusable custom detector IDs selected from the custom detector catalog.',
     )
     sampling: SamplingConfig
+    scan_cache: ScanCacheConfig | None = None
     resources: ResourceOverrides | None = None
     cleanup_removed_detector_findings: bool | None = Field(
         True,
@@ -3095,6 +3144,7 @@ class ServiceDeskInput(CoreInput):
         description='Reusable custom detector IDs selected from the custom detector catalog.',
     )
     sampling: SamplingConfig
+    scan_cache: ScanCacheConfig | None = None
     resources: ResourceOverrides | None = None
     cleanup_removed_detector_findings: bool | None = Field(
         True,
@@ -3155,6 +3205,7 @@ class SQLiteInput(CoreInput):
         description='Reusable custom detector IDs selected from the custom detector catalog.',
     )
     sampling: SamplingConfig
+    scan_cache: ScanCacheConfig | None = None
     resources: ResourceOverrides | None = None
     cleanup_removed_detector_findings: bool | None = Field(
         True,
@@ -3290,6 +3341,7 @@ class NotionInput(CoreInput):
         description='Reusable custom detector IDs selected from the custom detector catalog.',
     )
     sampling: SamplingConfig
+    scan_cache: ScanCacheConfig | None = None
     resources: ResourceOverrides | None = None
     cleanup_removed_detector_findings: bool | None = Field(
         True,
@@ -3537,6 +3589,7 @@ class KafkaInput(CoreInput):
         description='Reusable custom detector IDs selected from the custom detector catalog.',
     )
     sampling: SamplingConfig
+    scan_cache: ScanCacheConfig | None = None
     resources: ResourceOverrides | None = None
     cleanup_removed_detector_findings: bool | None = Field(
         True,
@@ -3671,6 +3724,7 @@ class ElasticsearchInput(CoreInput):
         description='Reusable custom detector IDs selected from the custom detector catalog.',
     )
     sampling: SamplingConfig
+    scan_cache: ScanCacheConfig | None = None
     resources: ResourceOverrides | None = None
     cleanup_removed_detector_findings: bool | None = Field(
         True,
@@ -3705,6 +3759,7 @@ class OpenSearchInput(CoreInput):
         description='Reusable custom detector IDs selected from the custom detector catalog.',
     )
     sampling: SamplingConfig
+    scan_cache: ScanCacheConfig | None = None
     resources: ResourceOverrides | None = None
     cleanup_removed_detector_findings: bool | None = Field(
         True,
@@ -3797,6 +3852,7 @@ class MeilisearchInput(CoreInput):
         description='Reusable custom detector IDs selected from the custom detector catalog.',
     )
     sampling: SamplingConfig
+    scan_cache: ScanCacheConfig | None = None
     resources: ResourceOverrides | None = None
     cleanup_removed_detector_findings: bool | None = Field(
         True,
@@ -4037,6 +4093,7 @@ class Microsoft365Input(CoreInput):
         description='Reusable custom detector IDs selected from the custom detector catalog.',
     )
     sampling: SamplingConfig
+    scan_cache: ScanCacheConfig | None = None
     resources: ResourceOverrides | None = None
     cleanup_removed_detector_findings: bool | None = Field(
         True,
@@ -4181,6 +4238,7 @@ class GoogleWorkspaceInput(CoreInput):
         description='Reusable custom detector IDs selected from the custom detector catalog.',
     )
     sampling: SamplingConfig
+    scan_cache: ScanCacheConfig | None = None
     resources: ResourceOverrides | None = None
     cleanup_removed_detector_findings: bool | None = Field(
         True,
@@ -4393,6 +4451,7 @@ class DropboxInput(CoreInput):
         description='Reusable custom detector IDs selected from the custom detector catalog.',
     )
     sampling: SamplingConfig
+    scan_cache: ScanCacheConfig | None = None
     resources: ResourceOverrides | None = None
     cleanup_removed_detector_findings: bool | None = Field(
         True,
@@ -4441,6 +4500,7 @@ class YouTubeInput(CoreInput):
         description='Reusable custom detector IDs selected from the custom detector catalog.',
     )
     sampling: SamplingConfig
+    scan_cache: ScanCacheConfig | None = None
     resources: ResourceOverrides | None = None
     cleanup_removed_detector_findings: bool | None = Field(
         True,
@@ -4473,6 +4533,7 @@ class SlackInput(CoreInput):
         description='Reusable custom detector IDs selected from the custom detector catalog.',
     )
     sampling: SamplingConfig
+    scan_cache: ScanCacheConfig | None = None
     resources: ResourceOverrides | None = None
     cleanup_removed_detector_findings: bool | None = Field(
         True,
@@ -4503,6 +4564,7 @@ class DeltaLakeInput(CoreInput):
         description='Reusable custom detector IDs selected from the custom detector catalog.',
     )
     sampling: SamplingConfig
+    scan_cache: ScanCacheConfig | None = None
     resources: ResourceOverrides | None = None
     cleanup_removed_detector_findings: bool | None = Field(
         True,
@@ -4533,6 +4595,7 @@ class IcebergInput(CoreInput):
         description='Reusable custom detector IDs selected from the custom detector catalog.',
     )
     sampling: SamplingConfig
+    scan_cache: ScanCacheConfig | None = None
     resources: ResourceOverrides | None = None
     cleanup_removed_detector_findings: bool | None = Field(
         True,

@@ -1,34 +1,40 @@
 
-# RunnerAssetStatusUpdateItem
+# ScanCacheEntryDto
 
 
 ## Properties
 
 Name | Type
 ------------ | -------------
-`assetHash` | string
-`status` | string
-`errorMessage` | string
+`hash` | string
+`checksum` | string
+`contentHash` | string
+`scopeFingerprint` | string
+`detectors` | { [key: string]: string; }
 `findingsTotal` | number
-`findingsBySeverity` | [FindingsBySeverityDto](FindingsBySeverityDto.md)
-`findingsByDetector` | object
-`cacheHit` | boolean
+`findingsBySeverity` | { [key: string]: any; }
+`findingsByDetector` | { [key: string]: any; }
+`emptyText` | boolean
+`textExtractionStatus` | string
 
 ## Example
 
 ```typescript
-import type { RunnerAssetStatusUpdateItem } from '@workspace/api-client'
+import type { ScanCacheEntryDto } from '@workspace/api-client'
 
 // TODO: Update the object below with actual values
 const example = {
-  "assetHash": null,
-  "status": null,
-  "errorMessage": null,
+  "hash": null,
+  "checksum": null,
+  "contentHash": null,
+  "scopeFingerprint": null,
+  "detectors": null,
   "findingsTotal": null,
   "findingsBySeverity": null,
   "findingsByDetector": null,
-  "cacheHit": null,
-} satisfies RunnerAssetStatusUpdateItem
+  "emptyText": null,
+  "textExtractionStatus": null,
+} satisfies ScanCacheEntryDto
 
 console.log(example)
 
@@ -37,7 +43,7 @@ const exampleJSON: string = JSON.stringify(example)
 console.log(exampleJSON)
 
 // Parse the JSON string back to an object
-const exampleParsed = JSON.parse(exampleJSON) as RunnerAssetStatusUpdateItem
+const exampleParsed = JSON.parse(exampleJSON) as ScanCacheEntryDto
 console.log(exampleParsed)
 ```
 
