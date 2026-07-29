@@ -5,6 +5,7 @@ import { PrismaService } from '../prisma.service';
 import { PgBossService } from '../scheduler/pg-boss.service';
 import { AiSchemaError } from '../ai';
 import { INQUIRY_MATCH_QUEUE } from '../matching/matching.constants';
+import { EmbeddingQueueService } from '../embedding/embedding-queue.service';
 import { AgentAuditService } from './audit/agent-audit.service';
 import { AgentLoggerService } from './audit/agent-logger.service';
 import { AgentSearchService } from './search/agent-search.service';
@@ -12,7 +13,9 @@ import { HarnessService } from './harness/harness.service';
 import { AgentRunCancelledError } from './agent-runtime';
 import type { ApplySummary } from './decision-applier.service';
 import {
+  AUTOPILOT_CORPUS_SINGLETON_KEY,
   AUTOPILOT_DREAM_CRON,
+  AUTOPILOT_MAX_READINESS_REQUEUES,
   AUTOPILOT_QUEUE,
   AUTOPILOT_RETRY_AFTER_SECONDS,
   PIPELINE_KINDS,
@@ -32,6 +35,18 @@ interface CycleInput {
   only?: AgentKind[] | null;
   /** Case-focused run: the case agent works on exactly this case. */
   caseId?: string | null;
+  /** Coalesced batch: every source scanned since the last corpus cycle. */
+  corpus?: boolean;
+  /** Why this cycle skipped the coalescing window, if it did. */
+  expressReason?: string | null;
+  /** Requeue count for the readiness gate; bounded so it cannot spin forever. */
+  readinessAttempts?: number;
+}
+
+/** What this particular cycle turned out to be looking at, resolved at run time. */
+interface CycleScope {
+  batchSources?: Array<{ id: string; name: string }>;
+  evidenceAnalysisPending?: boolean;
 }
 
 /**
@@ -55,6 +70,7 @@ export class AutopilotWorker {
     private readonly log: AgentLoggerService,
     private readonly search: AgentSearchService,
     private readonly harness: HarnessService,
+    private readonly embeddings: EmbeddingQueueService,
   ) {}
 
   /**
@@ -111,22 +127,37 @@ export class AutopilotWorker {
         Array.isArray(data?.agentKinds) ? data.agentKinds : []
       ).filter((k) => typeof k === 'string' && k in AgentKind);
       const only: AgentKind[] | null = requested.length > 0 ? requested : null;
-      if (!sourceId && !manual && !only) continue;
+      const corpus = data?.corpus === true;
+      if (!sourceId && !manual && !only && !corpus) continue;
       // Per-namespace pg-boss (schema pgboss_<slug>) guarantees a job can only
       // be dequeued by its own namespace's worker, so the previous
       // cross-namespace source/runner existence guard is no longer needed.
+      const expressReason =
+        typeof data?.expressReason === 'string' ? data.expressReason : null;
       await this.runCycle({
         sourceId,
         runnerId,
         manual,
         only,
+        corpus,
+        expressReason,
+        readinessAttempts:
+          typeof data?.readinessAttempts === 'number'
+            ? data.readinessAttempts
+            : 0,
         caseId: typeof data?.caseId === 'string' ? data.caseId : null,
         instruction,
         cycleKey:
           typeof data?.cycleKey === 'string' && data.cycleKey
             ? data.cycleKey
             : `scan:${sourceId}:${runnerId ?? 'none'}`,
-        trigger: manual ? 'manual' : 'scan_completed',
+        trigger: manual
+          ? 'manual'
+          : expressReason
+            ? 'express'
+            : corpus
+              ? 'corpus'
+              : 'scan_completed',
       });
     }
   }
@@ -191,11 +222,18 @@ export class AutopilotWorker {
       return;
     }
 
-    // Deterministic ordering for scan cycles: if inquiry matching is still
-    // queued, push the cycle back instead of racing it.
-    if (!cycle.manual && (await this.inquiryMatchingPending())) {
+    // Deterministic ordering for scan cycles: if the work the agents reason
+    // FROM is still in flight, push the cycle back rather than race it.
+    //
+    // This used to wait on inquiry matching alone, so the TRIAGE DOCTRINE
+    // ("start from findings.ranked, read the importance reasons") was routinely
+    // applied to findings that had no importance score yet — every one of them
+    // reading as score 0, indistinguishable from genuinely unimportant.
+    const attempts = cycle.readinessAttempts ?? 0;
+    const blocked = cycle.manual ? null : await this.readinessBlocked();
+    if (blocked && attempts < AUTOPILOT_MAX_READINESS_REQUEUES) {
       this.logger.log(
-        `Inquiry matching still pending — re-queueing autopilot cycle for source ${cycle.sourceId}`,
+        `${blocked} still pending — re-queueing autopilot cycle (attempt ${attempts + 1}) for ${cycle.corpus ? 'corpus' : `source ${cycle.sourceId}`}`,
       );
       const boss = await this.pgBoss.getBossAsync();
       await boss.send(
@@ -203,26 +241,58 @@ export class AutopilotWorker {
         {
           sourceId: cycle.sourceId ?? undefined,
           runnerId: cycle.runnerId ?? undefined,
+          corpus: cycle.corpus,
+          expressReason: cycle.expressReason ?? undefined,
           cycleKey: cycle.cycleKey,
+          readinessAttempts: attempts + 1,
         },
         {
           startAfter: AUTOPILOT_RETRY_AFTER_SECONDS,
-          singletonKey: `autopilot:${cycle.sourceId}`,
+          singletonKey: cycle.corpus
+            ? AUTOPILOT_CORPUS_SINGLETON_KEY
+            : `autopilot:${cycle.sourceId}`,
           expireInSeconds: 3 * 3600,
         },
       );
       return;
     }
+    // Bounded: a permanently backed-up embedding queue degrades the run rather
+    // than deadlocking the autopilot. The missions are told the scores are
+    // partial instead of silently trusting them.
+    const evidenceAnalysisPending = blocked != null;
+    if (evidenceAnalysisPending) {
+      this.logger.warn(
+        `Proceeding with autopilot cycle after ${attempts} readiness requeue(s); ${blocked} is still pending.`,
+      );
+    }
+
+    // A corpus cycle consumes the dirty set: read it, then clear exactly those
+    // rows, so sources scanned while this cycle runs enrol in the next batch
+    // rather than being silently dropped.
+    const batchSources = cycle.corpus ? await this.consumeDirtySources() : [];
 
     const sourceName = cycle.sourceId
       ? await this.search.sourceName(cycle.sourceId)
-      : 'all sources';
+      : cycle.corpus && batchSources.length > 0
+        ? `${batchSources.length} newly scanned source(s)`
+        : 'all sources';
+
+    const scope: CycleScope = {
+      batchSources: cycle.corpus ? batchSources : undefined,
+      evidenceAnalysisPending,
+    };
 
     // An explicit agent set ("only") is operator intent: run exactly those
     // pipeline agents (in canonical order) and skip the rest without a SKIPPED
     // record.
     if (await this.agentEnabled(AgentKind.INQUIRY, cycle)) {
-      await this.runAgent(AgentKind.INQUIRY, settings, cycle, sourceName);
+      await this.runAgent(
+        AgentKind.INQUIRY,
+        settings,
+        cycle,
+        sourceName,
+        scope,
+      );
     } else if (!cycle.only) {
       await this.audit.recordSkippedRun(
         AgentKind.INQUIRY,
@@ -233,7 +303,7 @@ export class AutopilotWorker {
     }
 
     if (await this.agentEnabled(AgentKind.CASE, cycle)) {
-      await this.runAgent(AgentKind.CASE, settings, cycle, sourceName);
+      await this.runAgent(AgentKind.CASE, settings, cycle, sourceName, scope);
     } else if (!cycle.only) {
       await this.audit.recordSkippedRun(
         AgentKind.CASE,
@@ -247,7 +317,7 @@ export class AutopilotWorker {
     // investigation agents (it reacts to the finding landscape they observed).
     // Skipped silently when disabled (no SKIPPED-run noise on every scan).
     if (await this.agentEnabled(AgentKind.CONFIG, cycle)) {
-      await this.runAgent(AgentKind.CONFIG, settings, cycle, sourceName);
+      await this.runAgent(AgentKind.CONFIG, settings, cycle, sourceName, scope);
     }
 
     // Detector-authoring agent — opt-in, off by default. Runs last so it can
@@ -258,6 +328,7 @@ export class AutopilotWorker {
         settings,
         cycle,
         sourceName,
+        scope,
       );
     }
 
@@ -265,7 +336,13 @@ export class AutopilotWorker {
     // mutation for this cycle has settled, so it alerts operators on the final
     // state of the open high-severity cases.
     if (await this.agentEnabled(AgentKind.ESCALATION, cycle)) {
-      await this.runAgent(AgentKind.ESCALATION, settings, cycle, sourceName);
+      await this.runAgent(
+        AgentKind.ESCALATION,
+        settings,
+        cycle,
+        sourceName,
+        scope,
+      );
     }
   }
 
@@ -318,6 +395,7 @@ export class AutopilotWorker {
     settings: InstanceSettings,
     cycle: CycleInput,
     sourceName: string,
+    scope: CycleScope = {},
   ): Promise<void> {
     const run = await this.audit.openRun(agentKind, {
       sourceId: cycle.sourceId,
@@ -362,6 +440,9 @@ export class AutopilotWorker {
       manual: cycle.manual,
       instruction: cycle.instruction,
       caseId: agentKind === AgentKind.CASE ? (cycle.caseId ?? null) : null,
+      batchSources: scope.batchSources,
+      expressReason: cycle.expressReason ?? null,
+      evidenceAnalysisPending: scope.evidenceAnalysisPending,
       state: {},
     };
     try {
@@ -470,18 +551,86 @@ export class AutopilotWorker {
     }
   }
 
-  private async inquiryMatchingPending(): Promise<boolean> {
+  /**
+   * Name of the pipeline the cycle is still waiting on, or null when ready.
+   *
+   * Inquiry matching decides which inquiries have new matches; evidence
+   * analysis decides which findings are important. The agents' whole triage
+   * doctrine is built on the second, and it was never waited for — an
+   * unanalyzed finding scores 0, exactly like a genuinely unimportant one, so
+   * running early does not merely lose signal, it inverts it.
+   */
+  private async readinessBlocked(): Promise<string | null> {
+    if (await this.queueBusy(INQUIRY_MATCH_QUEUE)) return 'Inquiry matching';
+    if (await this.evidenceAnalysisBusy()) return 'Evidence analysis';
+    return null;
+  }
+
+  private async queueBusy(queue: string): Promise<boolean> {
     try {
       const boss = await this.pgBoss.getBossAsync();
-      const stats = await boss.getQueueStats(INQUIRY_MATCH_QUEUE);
+      const stats = await boss.getQueueStats(queue);
       return stats.queuedCount + stats.activeCount + stats.deferredCount > 0;
     } catch {
+      // A queue that has never been created has no stats. Treating that as
+      // "busy" would stall every cycle on a fresh instance.
       return false;
     }
+  }
+
+  /**
+   * Embedding inference feeds FindingEvidenceAnalysis, which is what
+   * findings.ranked and findings.explain read. The recalibration pass is
+   * included because scores are only corpus-relative once it has run — the
+   * same reason EmbeddingQueueService.handleRecalibration defers itself while
+   * inference is draining.
+   */
+  private async evidenceAnalysisBusy(): Promise<boolean> {
+    try {
+      const status = await this.embeddings.status();
+      return (
+        (status.pendingEmbedJobs ?? 0) > 0 || status.recalibrationScheduled
+      );
+    } catch {
+      // Embeddings unconfigured or not ready is not a reason to hold the
+      // cycle: an instance with no semantic stack still needs its agents.
+      return false;
+    }
+  }
+
+  /**
+   * Read the sources marked dirty by completed scans and clear exactly those
+   * rows. Clearing by id rather than with a blanket `WHERE autopilot_dirty_at
+   * IS NOT NULL` matters: a scan finishing while this cycle runs must enrol in
+   * the NEXT batch, not be silently swallowed by this one.
+   */
+  private async consumeDirtySources(): Promise<
+    Array<{ id: string; name: string }>
+  > {
+    const dirty = await this.prisma.source.findMany({
+      where: { autopilotDirtyAt: { not: null } },
+      select: { id: true, name: true },
+      orderBy: { autopilotDirtyAt: 'asc' },
+    });
+    if (dirty.length > 0) {
+      await this.prisma.source.updateMany({
+        where: { id: { in: dirty.map((s) => s.id) } },
+        data: { autopilotDirtyAt: null },
+      });
+    }
+    return dirty;
   }
 }
 
 export function formatSummary(s: ApplySummary): string {
+  // A cycle that correctly changed nothing used to read "0 applied; 6 read" —
+  // indistinguishable from a wasted run, both to the operator scanning the run
+  // list and to the model reading its own history and inferring what a good
+  // cycle looks like. Restraint is an outcome; name it as one.
+  if (s.applied === 0 && s.failed === 0 && (s.readOk ?? 0) > 0) {
+    const why = s.finishSummary?.trim();
+    return `observed only, nothing warranted a change${why ? ` — ${why}` : ''} (${s.readOk} read)`;
+  }
   // "applied" counts mutations only. Reads are reported separately rather than
   // inflating it — a run that read 11 things and changed nothing used to say
   // "11 applied" while persisting zero decisions.
@@ -499,11 +648,6 @@ export function formatSummary(s: ApplySummary): string {
   if (s.createdCases.length > 0) {
     parts.push(
       `created cases: ${s.createdCases.map((c) => c.title).join(', ')}`,
-    );
-  }
-  if (s.caseReadyInquiryIds.length > 0) {
-    parts.push(
-      `${s.caseReadyInquiryIds.length} inquiry(ies) flagged case-ready`,
     );
   }
   return parts.join('; ');

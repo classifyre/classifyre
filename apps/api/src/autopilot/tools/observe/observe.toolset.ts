@@ -176,6 +176,14 @@ export class ObserveToolset {
           ),
       },
       {
+        name: 'corpus.coverage',
+        description:
+          'How much of the corpus has actually been scanned: scanned/never-scanned/in-flight/failing source counts, per-source scan state and text coverage, and how many open findings have an evidence score yet. Call this before making any claim about "the corpus", about the absence of something, or about a pattern holding across sources — a conclusion drawn at low coverage is a conclusion about a sample.',
+        inputSchema: EMPTY_INPUT,
+        sideEffect: 'read',
+        handler: async () => this.search.corpusCoverage(),
+      },
+      {
         name: 'memory.search',
         description:
           'Recall long-lived agent memory (decision precedents, topic→entity maps) by free-text query. For shared vocabulary (names, orgs, codenames) use glossary.lookup instead.',

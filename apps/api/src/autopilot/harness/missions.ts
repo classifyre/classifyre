@@ -14,6 +14,10 @@ export interface Mission {
 }
 
 const OBSERVE_TOOLS = [
+  // First in the list deliberately: the investigation missions used to have no
+  // tool that could tell them how much of the corpus had been scanned, and drew
+  // corpus-wide conclusions from 8% of it.
+  'corpus.coverage',
   'findings.search',
   'inquiries.list',
   'inquiries.archived',
@@ -28,7 +32,7 @@ const OBSERVE_TOOLS = [
 ];
 
 /** Learning tools available to every mission. */
-const KNOWLEDGE_TOOLS = ['memory.write', 'glossary.propose'];
+const KNOWLEDGE_TOOLS = ['memory.write', 'glossary.propose', 'agenda.defer'];
 
 /**
  * Semantic evidence tools: corpus-relative importance ranking with reasons,
@@ -52,6 +56,40 @@ const TRIAGE_DOCTRINE = [
   'repeated-noise clusters and never build an investigation on them. findings.similar and',
   'findings.semantic_search expand a confirmed lead across the corpus — similarity is a lead to verify,',
   'never proof of a connection.',
+].join(' ');
+
+/**
+ * The correction for concluding from a sample as though it were the corpus.
+ *
+ * On the first full run the agent had 12 of 151 sources scanned and produced,
+ * within three seconds of each other, four inquiries matching nothing at all —
+ * "Grand Cayman offshore references", "Louise Kitchen correspondence" — whose
+ * recorded rationales cite the Enron scandal rather than any finding. It was
+ * not reading the corpus; it was recalling a story about the corpus and
+ * generating monitors that would fit. The evidence floor now refuses those
+ * outright, but a refusal only stops the artifact, not the reasoning that
+ * produced it.
+ */
+const COVERAGE_DOCTRINE = [
+  '\nCOVERAGE DOCTRINE: the Corpus coverage section of the system brief tells you what',
+  'fraction of the sources have actually been scanned; corpus.coverage gives you the',
+  'detail. Below full coverage you are looking at a sample, and a conclusion about a',
+  'sample stated as a conclusion about the corpus is simply false. Never claim an',
+  'absence ("no evidence of X") at partial coverage — you have not looked. Never',
+  'generalise a pattern across sources you have not seen: if you notice something in',
+  'one source and expect it to recur, that is an OBSERVATION for memory.write, not an',
+  'inquiry, and agenda.defer records it for the cycle that will have the coverage to',
+  'judge it. Scope what you do write to the sources you actually observed, and name them.',
+  '\nWHAT YOU KNOW vs WHAT YOU RECALL: you may recognise the organisations, people and',
+  'events in this corpus from training. That recognition is not evidence and must never',
+  'be the reason for an action. If you cannot point at a finding id you read this cycle,',
+  'you do not have a basis — say so and move on.',
+  '\nDOING NOTHING IS A RESULT: finishing a cycle having created nothing is correct and',
+  'complete whenever the evidence does not warrant more, and it is the right answer far',
+  'more often than not. Say so plainly in your finish summary and give the reason. You',
+  'are judged on whether your conclusions survive the rest of the corpus arriving — not',
+  'on how much you did. A cycle that adds one well-evidenced thing, or nothing, beats one',
+  'that adds six speculative ones.',
 ].join(' ');
 
 const GLOSSARY_DOCTRINE = [
@@ -119,10 +157,23 @@ export const INQUIRY_MISSION: Mission = {
   kind: AgentKind.INQUIRY,
   goal: [
     DOMAIN_PRIMER,
-    '\nYour mission: review the new/open findings and keep the set of inquiries healthy.',
-    'Avoid duplicates — prefer enriching an existing inquiry over creating a near-duplicate.',
+    // Phrased as a question with a valid null answer, not as a job to perform.
+    // "Keep the set of inquiries healthy" plus a 12-iteration budget is a task,
+    // and an agent given a task will complete it — which is how five separate
+    // "HTML email artifact noise" inquiries came to exist, one per mailbox, the
+    // fifth rationale reading "same pattern as 5 other sources".
+    '\nYour mission: decide whether the findings in scope warrant any change to the set of',
+    'inquiries — and often they will not. An inquiry is a saved monitor over evidence that',
+    'already exists, so before creating one, establish that it matches real findings you',
+    'have read this cycle.',
+    '\nONE PHENOMENON, ONE INQUIRY. If a pattern appears in a second source, widen the',
+    'existing inquiry with inquiries.enrich — add the source to its sourceIds, or set',
+    'matchAllSources — instead of creating a per-source copy. Six near-identical inquiries',
+    'are not six findings; they are one finding an operator now has to reconcile six times.',
+    'Check inquiries.list first, every time.',
     'Do not recreate intentionally archived inquiries. Use memory.search to recall precedents.',
     TRIAGE_DOCTRINE,
+    COVERAGE_DOCTRINE,
     GLOSSARY_DOCTRINE,
     '\nAim inquiries at what findings.ranked says matters: high-importance recurring evidence,',
     'not high-severity noise. An inquiry that would match a boilerplate cluster is a bad inquiry.',
@@ -148,7 +199,12 @@ export const CASE_MISSION: Mission = {
     '\nYour mission: build and maintain investigation cases from inquiries with new matches.',
     'Create a case only when a coherent investigation is warranted; otherwise enrich an open case',
     'with hypotheses, evidence, attached findings, notes and links. Be conservative and specific.',
+    '\nA case must start from evidence: cases.create takes inquiryIds of an inquiry that is',
+    'already matching, or findingIds you verified this cycle, and is refused without either.',
+    '"Investigate this mailbox" is a scope, not an investigation — a case needs something',
+    'that happened, not somewhere to look.',
     TRIAGE_DOCTRINE,
+    COVERAGE_DOCTRINE,
     GLOSSARY_DOCTRINE,
     '\nLEADS vs EVIDENCE: cases.attach_findings is ONLY for findings you verified against source',
     'evidence this cycle. For everything else that MIGHT belong — semantic neighbours, unreviewed',

@@ -15,6 +15,7 @@ import { CasesService } from '../cases.service';
 import { CaseThreadsService } from '../case-threads.service';
 import { GraphService } from '../graph.service';
 import { AgentSearchService } from './search/agent-search.service';
+import { EvidenceFloorService } from './evidence-floor.service';
 import { AI_ACTOR } from './autopilot.constants';
 import type { CaseOperation, InquiryMatcherProposal } from './autopilot.types';
 
@@ -30,7 +31,8 @@ export interface ApplySummary {
   failed: number;
   createdInquiries: Array<{ id: string; title: string }>;
   createdCases: Array<{ id: string; title: string }>;
-  caseReadyInquiryIds: string[];
+  /** The model's own closing statement, used to explain a deliberate no-op. */
+  finishSummary?: string;
 }
 
 /**
@@ -48,6 +50,7 @@ export class DecisionApplierService {
     private readonly threads: CaseThreadsService,
     private readonly graph: GraphService,
     private readonly search: AgentSearchService,
+    private readonly evidence: EvidenceFloorService,
   ) {}
 
   // ── Gates ────────────────────────────────────────────────────────────────
@@ -123,6 +126,10 @@ export class DecisionApplierService {
     const invalid = invalidRegexes(proposal);
     if (!proposal.title) throw new Error('title required');
     if (invalid.length > 0) throw new Error(invalid.join('; '));
+    // Evidence floor: refuses matchers that select nothing, matchers that select
+    // only boilerplate, and near-duplicates of an active inquiry. Throws, so the
+    // dispatcher records FAILED and the model reads the correction next turn.
+    await this.evidence.assertInquiryIsWarranted(proposal);
     const created = await this.inquiries.create({
       title: proposal.title,
       description: proposal.description,
@@ -188,14 +195,35 @@ export class DecisionApplierService {
     title: string;
     description?: string;
     severity?: SeverityLiteral;
+    inquiryIds?: string[];
+    findingIds?: string[];
   }): Promise<{ id: string; title: string }> {
     if (!input.title) throw new Error('title required');
+    await this.evidence.assertCaseIsWarranted(input);
     const created = await this.cases.create({
       title: input.title,
       description: input.description,
       severity: input.severity ? Severity[input.severity] : undefined,
       createdBy: AI_ACTOR,
     });
+    // Link the evidence the case was justified with, so the case starts life
+    // pointing at it rather than requiring a second call the agent may not make.
+    const inquiryIds = input.inquiryIds ?? [];
+    if (inquiryIds.length > 0) {
+      await this.applyCaseOperationCore(created.id, {
+        op: 'LINK_INQUIRY',
+        rationale: 'Evidence this case was opened on.',
+        inquiryIds,
+      });
+    }
+    const findingIds = input.findingIds ?? [];
+    if (findingIds.length > 0) {
+      await this.applyCaseOperationCore(created.id, {
+        op: 'ATTACH_FINDINGS',
+        rationale: 'Evidence this case was opened on.',
+        findingIds,
+      });
+    }
     return { id: created.id, title: created.title };
   }
 
@@ -331,6 +359,17 @@ export class DecisionApplierService {
           findingIds: valid,
           addedBy: AI_ACTOR,
         });
+        // Invented ids used to be dropped in silence as long as one was real,
+        // so a case could be attached to two findings while the model believed
+        // it had attached six — and nothing told it otherwise.
+        const unknown = ids.filter((id) => !existing.has(id));
+        if (unknown.length > 0) {
+          throw new Error(
+            `Attached ${valid.length} finding(s), but ${unknown.length} of the ids you ` +
+              `cited do not exist: ${unknown.join(', ')}. Cite ids returned by ` +
+              `findings.search / findings.ranked in this run.`,
+          );
+        }
         return;
       }
       case 'ADD_NOTE': {

@@ -1,11 +1,17 @@
 import { Injectable, Logger } from '@nestjs/common';
 import type { Job } from 'pg-boss';
-import { AgentKind, AgentRunStatus } from '@prisma/client';
+import { AgentKind, AgentRunStatus, RunnerStatus } from '@prisma/client';
 import { PgBossService } from '../scheduler/pg-boss.service';
 import { PrismaService } from '../prisma.service';
 import {
+  AI_ACTOR,
+  AUTOPILOT_COALESCE_MAX_DIRTY,
+  AUTOPILOT_COALESCE_WINDOW_SECONDS,
+  AUTOPILOT_CORPUS_SINGLETON_KEY,
   AUTOPILOT_QUEUE,
   AUTOPILOT_START_AFTER_SECONDS,
+  EXPRESS_CONSECUTIVE_FAILURES,
+  EXPRESS_IMPORTANCE_SCORE,
 } from '../autopilot/autopilot.constants';
 import { CORRELATION_QUEUE } from './correlation.constants';
 import { DuplicatesFinderAgentService } from './duplicates-finder-agent.service';
@@ -99,37 +105,183 @@ export class CorrelationWorker {
         sourceName,
       });
     } finally {
-      // Always hand off to the autopilot cycle, even if correlation failed —
-      // the AI agents are independently valuable. Mirrors the previous
-      // cli-runner enqueue (singletonKey debounce, delayed start).
-      await this.enqueueAutopilot(sourceId, runnerId, cycleKey);
+      // Always hand off to the autopilot, even if correlation failed — the AI
+      // agents are independently valuable.
+      await this.handOffToAutopilot(sourceId, runnerId, cycleKey);
     }
   }
 
-  private async enqueueAutopilot(
+  /**
+   * Enrol the scanned source in the next corpus-wide cycle, and decide whether
+   * anything about this scan is urgent enough to skip the wait.
+   *
+   * Each completed scan used to enqueue its own cycle, debounced per source. On
+   * a 151-source corpus that produced 151 independent cycles of five agents
+   * apiece, each reasoning over whatever had landed so far and none aware of
+   * the others — which is how five separate "HTML email artifact noise"
+   * inquiries came to exist, one per mailbox.
+   */
+  private async handOffToAutopilot(
     sourceId: string,
     runnerId: string,
     cycleKey: string,
   ): Promise<void> {
     try {
-      const boss = await this.pgBoss.getBossAsync();
-      await boss.send(
-        AUTOPILOT_QUEUE,
-        { sourceId, runnerId, cycleKey },
-        {
-          singletonKey: `autopilot:${sourceId}`,
-          startAfter: AUTOPILOT_START_AFTER_SECONDS,
-          retryLimit: 2,
-          retryDelay: 120,
-          retryBackoff: true,
-          expireInSeconds: 3 * 3600,
-        },
+      await this.prisma.source.update({
+        where: { id: sourceId },
+        data: { autopilotDirtyAt: new Date() },
+      });
+
+      const express = await this.expressReason(sourceId, runnerId);
+      if (express) {
+        this.logger.log(
+          `Express autopilot cycle for source ${sourceId}: ${express.reason}`,
+        );
+        await this.enqueue(
+          {
+            sourceId,
+            runnerId,
+            cycleKey,
+            trigger: 'express',
+            expressReason: express.reason,
+            agentKinds: express.agentKinds,
+          },
+          {
+            singletonKey: `autopilot:express:${sourceId}`,
+            startAfter: AUTOPILOT_START_AFTER_SECONDS,
+          },
+        );
+        return;
+      }
+
+      // One globally-keyed job: pg-boss permits a single queued job per
+      // singleton key, so every scan finishing inside the window folds into the
+      // one already pending. That IS the coalescing mechanism.
+      const dirty = await this.prisma.source.count({
+        where: { autopilotDirtyAt: { not: null } },
+      });
+      const startAfter =
+        dirty >= AUTOPILOT_COALESCE_MAX_DIRTY
+          ? 0
+          : AUTOPILOT_COALESCE_WINDOW_SECONDS;
+
+      await this.enqueue(
+        { corpus: true, cycleKey: `corpus:${new Date().toISOString()}` },
+        { singletonKey: AUTOPILOT_CORPUS_SINGLETON_KEY, startAfter },
       );
     } catch (error) {
       this.logger.warn(
         `Failed to enqueue autopilot cycle for source ${sourceId}: ${error instanceof Error ? error.message : String(error)}`,
       );
     }
+  }
+
+  private async enqueue(
+    data: Record<string, unknown>,
+    opts: { singletonKey: string; startAfter: number },
+  ): Promise<void> {
+    const boss = await this.pgBoss.getBossAsync();
+    await boss.send(AUTOPILOT_QUEUE, data, {
+      ...opts,
+      retryLimit: 2,
+      retryDelay: 120,
+      retryBackoff: true,
+      expireInSeconds: 3 * 3600,
+    });
+  }
+
+  /**
+   * Whether this scan produced something that should not wait for the window.
+   * Batching must not mean a real hit sits unnoticed for ten minutes.
+   *
+   * Checked in cost order, cheapest first. Returns null when nothing is urgent
+   * — the ordinary case — so the source simply joins the next batch.
+   */
+  private async expressReason(
+    sourceId: string,
+    runnerId: string,
+  ): Promise<{ reason: string; agentKinds?: AgentKind[] } | null> {
+    // 1. Operational failure. Routed to CONFIG + notification, deliberately NOT
+    //    to the investigation agents: a source that will not scan is an
+    //    operator problem, and 60 of the first run's 82 scans errored while the
+    //    agents drew conclusions from the 14 that worked and said nothing about
+    //    the rest.
+    const runner = await this.prisma.runner.findUnique({
+      where: { id: runnerId },
+      select: { status: true, assetsWithoutText: true, assetsCreated: true },
+    });
+    const source = await this.prisma.source.findUnique({
+      where: { id: sourceId },
+      select: { consecutiveFailures: true },
+    });
+    if (runner?.status === RunnerStatus.ERROR) {
+      return {
+        reason: 'scan failed',
+        agentKinds: [AgentKind.CONFIG],
+      };
+    }
+    if ((source?.consecutiveFailures ?? 0) >= EXPRESS_CONSECUTIVE_FAILURES) {
+      return {
+        reason: `source has failed ${source?.consecutiveFailures} scans in a row`,
+        agentKinds: [AgentKind.CONFIG],
+      };
+    }
+    // A run can report success having read none of its assets' actual content.
+    const created = runner?.assetsCreated ?? 0;
+    const withoutText = runner?.assetsWithoutText ?? 0;
+    if (created > 0 && withoutText >= created) {
+      return {
+        reason: 'scan produced assets but extracted no text from any of them',
+        agentKinds: [AgentKind.CONFIG],
+      };
+    }
+
+    // 2. A hit on something the operator explicitly asked to watch. Operator
+    //    intent outranks the batch by definition.
+    //
+    //    Read from inquiries, not detectors: CustomDetector has no authorship
+    //    column, so an operator-written detector is indistinguishable from one
+    //    the detector-authoring agent wrote. An Inquiry records `createdBy`,
+    //    and is in any case the more direct expression of "tell me when this
+    //    appears".
+    //
+    //    Inquiry matching runs on its own queue in parallel with correlation,
+    //    so this can read a set that has not been refreshed yet. That only ever
+    //    loses an express trigger — the source is already enrolled in the batch
+    //    — which is the right direction to fail in.
+    const operatorInquiry = await this.prisma.inquiry.findFirst({
+      where: {
+        status: 'ACTIVE',
+        createdBy: { not: AI_ACTOR },
+        newMatchCount: { gt: 0 },
+      },
+      select: { id: true, title: true },
+    });
+    if (operatorInquiry) {
+      return {
+        reason: `operator-authored inquiry "${operatorInquiry.title}" has new matches`,
+      };
+    }
+
+    // 3. A finding the evidence analyzer scored as genuinely important. Read
+    //    from the denormalized score, so an unanalyzed backlog simply yields no
+    //    express trigger rather than a guess — the batch is the safe default.
+    const important = await this.prisma.finding.findFirst({
+      where: {
+        runnerId,
+        status: 'OPEN',
+        importanceScore: { gte: EXPRESS_IMPORTANCE_SCORE },
+      },
+      orderBy: { importanceScore: 'desc' },
+      select: { id: true, importanceScore: true },
+    });
+    if (important) {
+      return {
+        reason: `high-importance finding scored ${important.importanceScore}`,
+      };
+    }
+
+    return null;
   }
 
   private async sourceName(sourceId: string): Promise<string> {
