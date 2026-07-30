@@ -230,6 +230,12 @@ google-cloud-storage = [
 dropbox = [
     "dropbox>=12.2.1,<13.0.0",
 ]
+hugging-face = [
+    # Hub client for listing repository trees and resolving file URLs. File bytes
+    # are streamed with `requests` (a base dependency) rather than
+    # `hf_hub_download`, so nothing is ever written to the HF cache directory.
+    "huggingface-hub>=1.25.1,<2.0.0",
+]
 slack = [
     "slack-sdk>=3.43.0,<4.0.0",
 ]
@@ -384,6 +390,7 @@ module = [
     "boto3.*",
     "botocore.*",
     "dropbox.*",
+    "huggingface_hub.*",
 ]
 ignore_missing_imports = true
 

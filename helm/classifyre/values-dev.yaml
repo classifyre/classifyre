@@ -54,7 +54,7 @@ api:
     RUNNER_LOGS_DIR: /tmp/classifyre/runner-logs
     MAX_RUNNERS_PER_SOURCE: "5"
     MAX_CONCURRENT_RUNNERS: "2"
-    DEMO_MODE: "true"
+    DEMO_MODE: "false"
 
   extraVolumeMounts:
     - name: development-source
@@ -305,13 +305,34 @@ frontend:
       fi
       cd /workspace/apps/web
 
-      # The .next cache (including Turbopack's persistent cache) lives on a
-      # hostPath volume and survives pod restarts. If a previous run was
-      # SIGKILLed mid-write (e.g. a failed startup probe), that cache can be
-      # left corrupt: the server prints "Ready" and accepts connections but
-      # never answers a request, which just gets the container killed again
-      # in the same corrupt state. Detect that here and self-heal once
-      # before the k8s startup probe would otherwise crash-loop forever.
+      # The .next cache (including Turbopack's persistent cache and its
+      # route manifests) lives on a hostPath volume and survives pod
+      # restarts. That manifest is never invalidated on its own: if a route
+      # is added, renamed, or moved after the cache was last written, the
+      # dev server keeps trusting the stale manifest and 404s that route
+      # forever, even though the source on disk is correct (it never even
+      # attempts to compile it). Guard against that by fingerprinting the
+      # route tree and wiping the cache whenever it drifts from the last
+      # run, before Turbopack gets a chance to boot against stale state.
+      route_tree_hash="$(
+        { find app -type f \( -name 'page.tsx' -o -name 'layout.tsx' -o -name 'route.ts' \) | sort | xargs -r sha256sum; \
+          sha256sum next.config.mjs; } | sha256sum | cut -d ' ' -f 1
+      )"
+      route_tree_marker=".next/route-tree-hash"
+      if [ ! -f "${route_tree_marker}" ] || [ "$(cat "${route_tree_marker}")" != "${route_tree_hash}" ]; then
+        echo "route tree changed since the cache was last written, clearing persistent Next.js cache" >&2
+        rm -rf .next
+        mkdir -p .next
+        echo "${route_tree_hash}" > "${route_tree_marker}"
+      fi
+
+      # Even with a fresh manifest, a previous run can still have been
+      # SIGKILLed mid-write (e.g. a failed startup probe), leaving
+      # Turbopack's persistent cache corrupt: the server prints "Ready" and
+      # accepts connections but never answers a request, which just gets
+      # the container killed again in the same corrupt state. Detect that
+      # here and self-heal once before the k8s startup probe would
+      # otherwise crash-loop forever.
       bun --bun next dev --turbopack --hostname 0.0.0.0 --port 3000 &
       pid=$!
       trap 'kill -TERM "$pid" 2>/dev/null || true' TERM INT

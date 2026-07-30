@@ -245,6 +245,9 @@ SCAN_CACHE_ELIGIBLE_SOURCE_TYPES: frozenset[str] = frozenset(
         "google_cloud_storage",
         "azure_blob_storage",
         "dropbox",
+        # Hub file entries carry a content-derived digest: the Git LFS SHA-256 for
+        # LFS-backed files (every large data file) and the Git blob OID otherwise.
+        "hugging_face",
         "sandbox",
         "google_workspace",
         "microsoft_365",
