@@ -1,10 +1,18 @@
 # Local Kubernetes development
 
 These scripts run the **production Helm chart** on a local k3d cluster. There
-are no separate development manifests and no locally built application images —
-the same `helm/classifyre` chart that ships to the VPS is installed with a
-`values-dev.yaml` overlay that swaps the built images for official Bun
-containers running your working copy from a read-only mount.
+are no separate development manifests — the same `helm/classifyre` chart that
+ships to the VPS is installed with a `values-dev.yaml` overlay.
+
+The API and worker run from official Bun containers with your working copy
+bind-mounted read-only, so TypeScript source edits restart the pod in place.
+The **web app runs a locally built production image**, same as CI: no bind
+mount, no dev server, no hot reload. Run `./scripts/dev/rebuild-web.sh` after
+web changes and restart the deployment to see them. This used to run
+`next dev --turbopack` against the bind-mounted source too, but Turbopack's
+persistent dev cache (needed to survive pod restarts) kept drifting from the
+actual route tree and serving stale 404s — a built image can't drift, because
+there's no cache to go stale.
 
 Two modes:
 
@@ -106,6 +114,7 @@ the environment, so it is never written to a file in the repo.
 | ------------------- | ------------------------------------------------------------------ |
 | `create-cluster.sh` | One-time: create k3d cluster, mount source, install ingress-nginx  |
 | `start.sh`          | `skaffold dev` on the `dev` profile (embedded database)            |
+| `rebuild-web.sh`    | Production `next build` → Docker image → import into k3d → restart |
 | `stop.sh`           | Uninstall the release; keeps the cluster, caches, and Postgres PVC |
 | `delete-cluster.sh` | Delete the cluster, its database, and all container-owned caches   |
 | `start-vps-db.sh`   | Writable local deploy against the VPS database (opens the tunnel)  |
@@ -128,12 +137,13 @@ sets it, `start.sh` does not. Without that guard both profiles would activate
 during a `dev-vps-db` run and their two `classifyre` releases would fight over
 the deploy config.
 
-Because the checkout is mounted into the node, source edits never trigger an
-image build:
+Because the checkout is mounted into the API/worker/CLI containers, most
+source edits never trigger an image build — web is the one exception, since it
+now runs a locally built image instead of a bind mount:
 
 | Change                          | Result                                                       |
 | ------------------------------- | ------------------------------------------------------------ |
-| Web or shared frontend source   | Next.js Fast Refresh                                         |
+| Web or shared frontend source   | Nothing until you run `rebuild-web.sh` and restart the pod    |
 | API TypeScript source           | Bun restarts API and worker in their existing pods           |
 | CLI or Python schema source     | The next CLI Job picks up the changed files                  |
 | `bun.lock` / `package.json`     | Pods restart; dependencies reinstall into k3d-owned caches   |

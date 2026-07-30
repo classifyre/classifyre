@@ -9221,6 +9221,282 @@
           "embeddings"
         ]
       }
+    },
+    "/data-transfer/scopes": {
+      "get": {
+        "operationId": "DataTransferController_scopes",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TransferScopeDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "List the kinds of data that can be exported, with row counts",
+        "tags": [
+          "data-transfer"
+        ]
+      }
+    },
+    "/data-transfer/jobs": {
+      "get": {
+        "operationId": "DataTransferController_jobs",
+        "parameters": [
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataTransferJobListDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "List recent export and import jobs",
+        "tags": [
+          "data-transfer"
+        ]
+      }
+    },
+    "/data-transfer/jobs/{id}": {
+      "get": {
+        "operationId": "DataTransferController_job",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataTransferJobDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Poll one transfer job for progress",
+        "tags": [
+          "data-transfer"
+        ]
+      },
+      "delete": {
+        "operationId": "DataTransferController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeleteDataTransferJobResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Delete a finished job and its archive",
+        "tags": [
+          "data-transfer"
+        ]
+      }
+    },
+    "/data-transfer/exports": {
+      "post": {
+        "operationId": "DataTransferController_startExport",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartExportDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataTransferJobDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Start an export of the selected scopes",
+        "tags": [
+          "data-transfer"
+        ]
+      }
+    },
+    "/data-transfer/exports/{id}/download": {
+      "get": {
+        "operationId": "DataTransferController_download",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Download a completed export archive",
+        "tags": [
+          "data-transfer"
+        ]
+      }
+    },
+    "/data-transfer/imports/upload": {
+      "post": {
+        "operationId": "DataTransferController_upload",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "file"
+                ],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArchivePreviewDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Upload an archive and read its manifest without importing it",
+        "tags": [
+          "data-transfer"
+        ]
+      }
+    },
+    "/data-transfer/imports": {
+      "post": {
+        "operationId": "DataTransferController_startImport",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartImportDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataTransferJobDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Import selected scopes from an uploaded archive",
+        "tags": [
+          "data-transfer"
+        ]
+      }
+    },
+    "/data-transfer/jobs/{id}/cancel": {
+      "post": {
+        "operationId": "DataTransferController_cancel",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataTransferJobDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Ask a running transfer to stop",
+        "tags": [
+          "data-transfer"
+        ]
+      }
     }
   },
   "info": {
@@ -20594,6 +20870,397 @@
         },
         "required": [
           "scheduled"
+        ]
+      },
+      "TransferScopeDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "enum": [
+              "sources",
+              "sourceFiles",
+              "assets",
+              "findings",
+              "customDetectors",
+              "glossary",
+              "fingerprints",
+              "investigations",
+              "scanData",
+              "harness",
+              "instanceConfig"
+            ],
+            "example": "findings"
+          },
+          "label": {
+            "type": "string",
+            "example": "Findings"
+          },
+          "description": {
+            "type": "string"
+          },
+          "dependsOn": {
+            "type": "array",
+            "description": "Scopes this one references. Importing without them skips orphaned rows.",
+            "items": {
+              "type": "string",
+              "enum": [
+                "sources",
+                "sourceFiles",
+                "assets",
+                "findings",
+                "customDetectors",
+                "glossary",
+                "fingerprints",
+                "investigations",
+                "scanData",
+                "harness",
+                "instanceConfig"
+              ]
+            }
+          },
+          "heavy": {
+            "type": "boolean",
+            "description": "Large or binary payload — off by default in the UI."
+          },
+          "redactsSecrets": {
+            "type": "boolean",
+            "description": "Contains configuration whose credentials are stripped."
+          },
+          "rows": {
+            "type": "number",
+            "description": "Rows currently in this namespace for this scope.",
+            "example": 4312
+          }
+        },
+        "required": [
+          "id",
+          "label",
+          "description",
+          "dependsOn",
+          "heavy",
+          "redactsSecrets",
+          "rows"
+        ]
+      },
+      "DataTransferJobDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "EXPORT",
+              "IMPORT"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "RUNNING",
+              "COMPLETED",
+              "FAILED",
+              "CANCELLED"
+            ]
+          },
+          "scopes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "sources",
+                "sourceFiles",
+                "assets",
+                "findings",
+                "customDetectors",
+                "glossary",
+                "fingerprints",
+                "investigations",
+                "scanData",
+                "harness",
+                "instanceConfig"
+              ]
+            }
+          },
+          "conflictMode": {
+            "type": "string",
+            "enum": [
+              "SKIP",
+              "OVERWRITE"
+            ]
+          },
+          "fileName": {
+            "type": "string",
+            "nullable": true
+          },
+          "fileSize": {
+            "type": "number",
+            "description": "Compressed archive size in bytes; null until it is written.",
+            "nullable": true
+          },
+          "checksum": {
+            "type": "string",
+            "description": "SHA-256 of the compressed archive.",
+            "nullable": true
+          },
+          "downloadAvailable": {
+            "type": "boolean",
+            "description": "True while the archive is still on disk and downloadable."
+          },
+          "totalRows": {
+            "type": "number",
+            "description": "Estimated total rows for this transfer."
+          },
+          "processedRows": {
+            "type": "number"
+          },
+          "skippedRows": {
+            "type": "number",
+            "description": "Rows not written: already present, or referencing an excluded scope."
+          },
+          "percent": {
+            "type": "number",
+            "description": "0–100, clamped to 99 until the job finishes."
+          },
+          "currentTable": {
+            "type": "string",
+            "description": "Model currently being read or written.",
+            "nullable": true
+          },
+          "counts": {
+            "type": "object",
+            "description": "Rows transferred per model.",
+            "example": {
+              "sources": 4,
+              "findings": 5120
+            }
+          },
+          "warnings": {
+            "description": "Operator-facing notes — stripped credentials, skipped rows, version drift.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "errorMessage": {
+            "type": "string",
+            "nullable": true
+          },
+          "cancelRequested": {
+            "type": "boolean"
+          },
+          "startedAt": {
+            "type": "string",
+            "nullable": true
+          },
+          "finishedAt": {
+            "type": "string",
+            "nullable": true
+          },
+          "expiresAt": {
+            "type": "string",
+            "description": "When the archive is deleted from disk.",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "status",
+          "scopes",
+          "conflictMode",
+          "fileName",
+          "fileSize",
+          "checksum",
+          "downloadAvailable",
+          "totalRows",
+          "processedRows",
+          "skippedRows",
+          "percent",
+          "currentTable",
+          "counts",
+          "warnings",
+          "errorMessage",
+          "cancelRequested",
+          "startedAt",
+          "finishedAt",
+          "expiresAt",
+          "createdAt"
+        ]
+      },
+      "DataTransferJobListDto": {
+        "type": "object",
+        "properties": {
+          "jobs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DataTransferJobDto"
+            }
+          }
+        },
+        "required": [
+          "jobs"
+        ]
+      },
+      "StartExportDto": {
+        "type": "object",
+        "properties": {
+          "scopes": {
+            "type": "array",
+            "description": "Scopes to include in the archive.",
+            "example": [
+              "sources",
+              "findings"
+            ],
+            "items": {
+              "type": "string",
+              "enum": [
+                "sources",
+                "sourceFiles",
+                "assets",
+                "findings",
+                "customDetectors",
+                "glossary",
+                "fingerprints",
+                "investigations",
+                "scanData",
+                "harness",
+                "instanceConfig"
+              ]
+            }
+          }
+        },
+        "required": [
+          "scopes"
+        ]
+      },
+      "ArchivePreviewDto": {
+        "type": "object",
+        "properties": {
+          "uploadId": {
+            "type": "string",
+            "description": "Pass back to the import endpoint."
+          },
+          "fileName": {
+            "type": "string"
+          },
+          "fileSize": {
+            "type": "number",
+            "description": "Compressed size in bytes."
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "When the archive was exported."
+          },
+          "appVersion": {
+            "type": "string",
+            "description": "Classifyre version that wrote the archive."
+          },
+          "sourceNamespace": {
+            "type": "string",
+            "description": "Namespace the archive was exported from."
+          },
+          "scopes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "sources",
+                "sourceFiles",
+                "assets",
+                "findings",
+                "customDetectors",
+                "glossary",
+                "fingerprints",
+                "investigations",
+                "scanData",
+                "harness",
+                "instanceConfig"
+              ]
+            }
+          },
+          "rowsByScope": {
+            "type": "object",
+            "description": "Rows per scope, keyed by scope id.",
+            "example": {
+              "sources": 4,
+              "findings": 5120
+            }
+          },
+          "totalRows": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "uploadId",
+          "fileName",
+          "fileSize",
+          "createdAt",
+          "appVersion",
+          "sourceNamespace",
+          "scopes",
+          "rowsByScope",
+          "totalRows"
+        ]
+      },
+      "StartImportDto": {
+        "type": "object",
+        "properties": {
+          "uploadId": {
+            "type": "string",
+            "description": "Handle returned by the upload endpoint for the staged archive."
+          },
+          "scopes": {
+            "type": "array",
+            "description": "Scopes to take from the archive. May be a subset of what it holds.",
+            "items": {
+              "type": "string",
+              "enum": [
+                "sources",
+                "sourceFiles",
+                "assets",
+                "findings",
+                "customDetectors",
+                "glossary",
+                "fingerprints",
+                "investigations",
+                "scanData",
+                "harness",
+                "instanceConfig"
+              ]
+            }
+          },
+          "conflictMode": {
+            "type": "string",
+            "description": "What to do about an entry that already exists. Imported rows always get fresh ids, so this only applies where identity is natural rather than generated — glossary terms, MCP server slugs — and to singleton configuration. SKIP keeps what is there; OVERWRITE replaces it.",
+            "enum": [
+              "SKIP",
+              "OVERWRITE"
+            ],
+            "default": "SKIP"
+          }
+        },
+        "required": [
+          "uploadId",
+          "scopes"
+        ]
+      },
+      "DeleteDataTransferJobResponseDto": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "example": true
+          }
+        },
+        "required": [
+          "deleted"
         ]
       }
     }
