@@ -12,6 +12,7 @@ import {
   siGoogledrive,
   siGooglesheets,
   siGoogleslides,
+  siHuggingface,
   siJira,
   siMeilisearch,
   siMongodb,
@@ -159,6 +160,7 @@ const SOURCE_SIMPLE_ICON_BY_INGESTION_TYPE: Record<
   [CreateSourceDtoTypeEnum.Microsoft365]: null,
   [CreateSourceDtoTypeEnum.GoogleWorkspace]: siGoogledrive,
   [CreateSourceDtoTypeEnum.Dropbox]: siDropbox,
+  [CreateSourceDtoTypeEnum.HuggingFace]: siHuggingface,
 };
 
 const SOURCE_CUSTOM_ICON_BY_INGESTION_TYPE: Partial<
@@ -216,6 +218,8 @@ const SOURCE_ICON_BY_INGESTION_TYPE: Record<ApiSourceType, IconComponent> = {
   [CreateSourceDtoTypeEnum.GoogleWorkspace]:
     createSimpleIconComponent(siGoogledrive),
   [CreateSourceDtoTypeEnum.Dropbox]: createSimpleIconComponent(siDropbox),
+  [CreateSourceDtoTypeEnum.HuggingFace]:
+    createSimpleIconComponent(siHuggingface),
 };
 
 const SOURCE_ICON_BY_INGESTION_TYPE_LOWERCASE: Record<string, IconComponent> =
