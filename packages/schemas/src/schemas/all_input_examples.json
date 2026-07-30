@@ -3119,5 +3119,132 @@
         ]
       }
     }
+  ],
+  "HUGGING_FACE": [
+    {
+      "name": "Dataset parquet shards PII scan",
+      "description": "Stream only the parquet shards under data/ from a Hugging Face dataset and scan the rows for personal data — the repository is never cloned",
+      "schedule": {
+        "enabled": true,
+        "preset": "nightly",
+        "cron": "23 1 * * *",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "HUGGING_FACE",
+        "required": {
+          "repo_id": "your-org/your-dataset",
+          "repo_type": "dataset"
+        },
+        "masked": {
+          "token": "hf_your-access-token"
+        },
+        "optional": {
+          "scope": {
+            "revision": "main",
+            "paths": ["data"],
+            "allow_patterns": ["**/*.parquet"],
+            "include_content_preview": true
+          }
+        },
+        "sampling": {
+          "strategy": "AUTOMATIC",
+          "rows_per_page": 50
+        },
+        "detectors": [
+          {
+            "type": "PII",
+            "enabled": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "Dataset documents and images audit",
+      "description": "Scan documents, csv exports and images in specific dataset folders while skipping model weights and archives",
+      "schedule": {
+        "enabled": true,
+        "preset": "weekly",
+        "cron": "48 2 * * 0",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "HUGGING_FACE",
+        "required": {
+          "repo_id": "your-org/your-dataset",
+          "repo_type": "dataset"
+        },
+        "masked": {
+          "token": "hf_your-access-token"
+        },
+        "optional": {
+          "scope": {
+            "paths": ["data/train", "data/validation"],
+            "exclude_extensions": [".safetensors", ".bin", ".gguf", ".zip"],
+            "include_last_commit": true,
+            "include_content_preview": true
+          },
+          "connection": {
+            "max_object_bytes": 52428800,
+            "request_timeout_seconds": 120
+          }
+        },
+        "sampling": {
+          "strategy": "LATEST",
+          "rows_per_page": 100
+        },
+        "detectors": [
+          {
+            "type": "PII",
+            "enabled": true
+          },
+          {
+            "type": "SECRETS",
+            "enabled": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "Model repository secrets sweep",
+      "description": "Scan the configuration, tokenizer and card files of a model repository for hardcoded credentials, ignoring the weight files entirely",
+      "schedule": {
+        "enabled": true,
+        "preset": "weekday_morning",
+        "cron": "35 7 * * 1-5",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "HUGGING_FACE",
+        "required": {
+          "repo_id": "your-org/your-model",
+          "repo_type": "model"
+        },
+        "masked": {
+          "token": "hf_your-access-token"
+        },
+        "optional": {
+          "scope": {
+            "ignore_patterns": [
+              "*.safetensors",
+              "*.bin",
+              "*.gguf",
+              "*.onnx",
+              "*.h5"
+            ],
+            "include_content_preview": true
+          }
+        },
+        "sampling": {
+          "strategy": "ALL"
+        },
+        "detectors": [
+          {
+            "type": "SECRETS",
+            "enabled": true
+          }
+        ]
+      }
+    }
   ]
 }

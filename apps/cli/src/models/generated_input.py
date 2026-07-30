@@ -55,6 +55,7 @@ class AssetType(StrEnum):
     MICROSOFT_365 = 'MICROSOFT_365'
     GOOGLE_WORKSPACE = 'GOOGLE_WORKSPACE'
     DROPBOX = 'DROPBOX'
+    HUGGING_FACE = 'HUGGING_FACE'
     SANDBOX = 'SANDBOX'
 
 
@@ -384,6 +385,7 @@ class Type(StrEnum):
     MICROSOFT_365 = 'MICROSOFT_365'
     GOOGLE_WORKSPACE = 'GOOGLE_WORKSPACE'
     DROPBOX = 'DROPBOX'
+    HUGGING_FACE = 'HUGGING_FACE'
     SANDBOX = 'SANDBOX'
 
 
@@ -3080,6 +3082,7 @@ class Type21(StrEnum):
     MICROSOFT_365 = 'MICROSOFT_365'
     GOOGLE_WORKSPACE = 'GOOGLE_WORKSPACE'
     DROPBOX = 'DROPBOX'
+    HUGGING_FACE = 'HUGGING_FACE'
     SANDBOX = 'SANDBOX'
 
 
@@ -4459,6 +4462,149 @@ class DropboxInput(CoreInput):
     )
 
 
+class HuggingFaceRepoType(StrEnum):
+    """
+    Repository kind on the Hub. Datasets hold the data files (parquet, csv, images, audio); models hold weights and configuration; spaces hold app source code.
+    """
+
+    dataset = 'dataset'
+    model = 'model'
+    space = 'space'
+
+
+class HuggingFaceRequired(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    repo_id: str = Field(
+        ...,
+        description='Repository to scan, as namespace/name (for example openai/gsm8k or my-org/internal-corpus)',
+    )
+    repo_type: HuggingFaceRepoType
+
+
+class HuggingFaceMasked(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    token: str = Field(
+        ...,
+        description='Hugging Face user access token (starts with hf_). Create one under Settings → Access Tokens with at least read permission on the repository. The token is always passed explicitly — no environment variable or locally cached login is ever used.',
+    )
+
+
+class HuggingFaceOptionalScope(BaseModel):
+    """
+    Which files inside the repository are listed and read. The repository is never cloned or fully downloaded: the file tree is listed first, then each selected file is streamed one at a time.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    revision: str | None = Field(
+        None,
+        description="Branch, tag or commit SHA to read (for example main, refs/convert/parquet, or v1.0). Defaults to the repository's default branch.",
+    )
+    paths: list[str] | None = Field(
+        None,
+        description='Folders inside the repository to list, for example data/ or data/train. Each folder is walked recursively. Leave empty to list the whole repository.',
+    )
+    allow_patterns: list[str] | None = Field(
+        None,
+        description='Glob allowlist applied to file paths, for example data/*.parquet or **/*.csv. A file is kept when it matches at least one pattern. Empty means every file is kept.',
+    )
+    ignore_patterns: list[str] | None = Field(
+        None,
+        description='Glob denylist applied to file paths, for example *.safetensors or **/checkpoints/*. Files matching any pattern are skipped.',
+    )
+    include_extensions: list[str] | None = Field(
+        None,
+        description='Optional extension allowlist (for example, .parquet, .csv, .png)',
+    )
+    exclude_extensions: list[str] | None = Field(
+        None,
+        description='Optional extension denylist (for example, .safetensors, .bin, .gguf)',
+    )
+    include_last_commit: bool | None = Field(
+        False,
+        description="Fetch each file's last-commit date while listing. Needed for accurate LATEST and AUTOMATIC ordering, but makes listing noticeably slower on large repositories. When off, every file inherits the repository's last-modified date.",
+    )
+    include_empty_objects: bool | None = Field(
+        False, description='Include zero-byte files in extraction results'
+    )
+    include_object_metadata: bool | None = Field(
+        True,
+        description='Attach Hub metadata (content digest, size, timestamps) to asset checksums',
+    )
+    include_content_preview: bool | None = Field(
+        True,
+        description='Stream file bytes to infer MIME and extract detector-ready text previews. Turn off for a metadata-only inventory of the repository.',
+    )
+
+
+class HuggingFaceOptionalConnection(BaseModel):
+    """
+    Network and resource controls for Hub requests. Files are streamed one at a time and capped, so a large repository never has to fit in memory or on disk.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    endpoint: str | None = Field(
+        None,
+        description='Hub endpoint to use. Defaults to https://huggingface.co; set this for a self-hosted Enterprise Hub.',
+    )
+    max_object_bytes: int | None = Field(
+        26214400,
+        description='Maximum bytes streamed per file for MIME detection and text extraction (default 25 MB). Larger files are read up to this cap and then the connection is dropped.',
+        ge=1024,
+        le=104857600,
+    )
+    request_timeout_seconds: float | None = Field(
+        60,
+        description='Network timeout in seconds for list and download requests',
+        ge=1.0,
+        le=300.0,
+    )
+    max_retries: int | None = Field(
+        3,
+        description='Maximum retries on transient Hub errors (5xx and rate limits)',
+        ge=0,
+        le=10,
+    )
+
+
+class HuggingFaceOptional(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    scope: HuggingFaceOptionalScope | None = None
+    connection: HuggingFaceOptionalConnection | None = None
+
+
+class HuggingFaceInput(CoreInput):
+    type: Literal['HUGGING_FACE'] | None = Field(
+        None, description='Type of the asset or source'
+    )
+    required: HuggingFaceRequired
+    masked: HuggingFaceMasked
+    optional: HuggingFaceOptional | None = None
+    detectors: list[Detector] | None = Field(
+        None, description='Detectors to run on ingested content'
+    )
+    custom_detectors: list[CustomDetectorSelection] | None = Field(
+        None,
+        description='Reusable custom detector IDs selected from the custom detector catalog.',
+    )
+    sampling: SamplingConfig
+    scan_cache: ScanCacheConfig | None = None
+    resources: ResourceOverrides | None = None
+    cleanup_removed_detector_findings: bool | None = Field(
+        True,
+        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
+    )
+
+
 class SlackOptionalAttachments(BaseModel):
     """
     Files shared in messages. Each file becomes its own asset, and its text is extracted with the same parser used for local files (PDF, Office, images via OCR, audio and video transcription).
@@ -4639,6 +4785,7 @@ class SourceInput(
         | Microsoft365Input
         | GoogleWorkspaceInput
         | DropboxInput
+        | HuggingFaceInput
     ]
 ):
     root: (
@@ -4676,6 +4823,7 @@ class SourceInput(
         | Microsoft365Input
         | GoogleWorkspaceInput
         | DropboxInput
+        | HuggingFaceInput
     ) = Field(
         ...,
         description='Merged configuration schema with all source types and common definitions',

@@ -965,7 +965,13 @@
           "transcript_available": "Transcript Available",
           "transcript_language": "Transcript Language",
           "transcript_is_generated": "Auto-generated Transcript",
-          "caption_tracks": "Caption Languages"
+          "caption_tracks": "Caption Languages",
+          "repo_id": "Repository",
+          "repo_type": "Repository Type",
+          "revision": "Commit",
+          "blob_id": "Git Object ID",
+          "lfs_sha256": "LFS SHA-256",
+          "web_url": "Web URL"
         }
       },
       "unknownSource": "Unknown source",

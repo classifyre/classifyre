@@ -104,6 +104,9 @@
     },
     {
       "$ref": "#/definitions/DropboxInput"
+    },
+    {
+      "$ref": "#/definitions/HuggingFaceInput"
     }
   ],
   "x-asset-metadata": {
@@ -2343,6 +2346,258 @@
           },
           "required": ["provider", "object_key"]
         }
+      },
+      "HUGGING_FACE": {
+        "file": {
+          "use": ["file", "image", "document", "spreadsheet", "text", "json"],
+          "properties": {
+            "provider": {
+              "type": "string",
+              "description": "Storage provider label"
+            },
+            "object_key": {
+              "type": "string",
+              "description": "File path relative to the repository root"
+            },
+            "repo_id": {
+              "type": "string",
+              "description": "Repository the file belongs to (namespace/name)"
+            },
+            "repo_type": {
+              "type": "string",
+              "description": "Repository kind the file was read from: model, dataset or space"
+            },
+            "revision": {
+              "type": "string",
+              "description": "Commit SHA the file was read at (resolved from the configured revision)"
+            },
+            "etag": {
+              "type": "string",
+              "description": "Content digest of the file: the Git LFS SHA-256 when present, otherwise the Git blob OID"
+            },
+            "blob_id": {
+              "type": "string",
+              "description": "Git object ID (OID) of the file blob"
+            },
+            "lfs_sha256": {
+              "type": "string",
+              "description": "SHA-256 recorded in the Git LFS pointer, for files stored in LFS"
+            },
+            "web_url": {
+              "type": "string",
+              "description": "Browser-accessible Hugging Face URL for the file"
+            },
+            "source_hash": {
+              "type": "string",
+              "description": "Hash of the parent asset (embedded images and archive members only)"
+            },
+            "location": {
+              "type": "string",
+              "description": "Location within the parent (embedded image location or archive member path)"
+            }
+          },
+          "required": ["provider", "object_key", "repo_id", "repo_type"]
+        },
+        "image": {
+          "use": ["file", "image"],
+          "properties": {
+            "provider": {
+              "type": "string",
+              "description": "Storage provider label"
+            },
+            "object_key": {
+              "type": "string",
+              "description": "File path relative to the repository root"
+            },
+            "repo_id": {
+              "type": "string",
+              "description": "Repository the file belongs to (namespace/name)"
+            },
+            "repo_type": {
+              "type": "string",
+              "description": "Repository kind the file was read from: model, dataset or space"
+            },
+            "revision": {
+              "type": "string",
+              "description": "Commit SHA the file was read at (resolved from the configured revision)"
+            },
+            "etag": {
+              "type": "string",
+              "description": "Content digest of the file: the Git LFS SHA-256 when present, otherwise the Git blob OID"
+            },
+            "blob_id": {
+              "type": "string",
+              "description": "Git object ID (OID) of the file blob"
+            },
+            "lfs_sha256": {
+              "type": "string",
+              "description": "SHA-256 recorded in the Git LFS pointer, for files stored in LFS"
+            },
+            "web_url": {
+              "type": "string",
+              "description": "Browser-accessible Hugging Face URL for the file"
+            },
+            "source_hash": {
+              "type": "string",
+              "description": "Hash of the parent asset (embedded images and archive members only)"
+            },
+            "location": {
+              "type": "string",
+              "description": "Location within the parent (embedded image location or archive member path)"
+            }
+          },
+          "required": []
+        },
+        "audio": {
+          "use": ["file"],
+          "properties": {
+            "provider": {
+              "type": "string",
+              "description": "Storage provider label"
+            },
+            "object_key": {
+              "type": "string",
+              "description": "File path relative to the repository root"
+            },
+            "repo_id": {
+              "type": "string",
+              "description": "Repository the file belongs to (namespace/name)"
+            },
+            "repo_type": {
+              "type": "string",
+              "description": "Repository kind the file was read from: model, dataset or space"
+            },
+            "revision": {
+              "type": "string",
+              "description": "Commit SHA the file was read at (resolved from the configured revision)"
+            },
+            "etag": {
+              "type": "string",
+              "description": "Content digest of the file: the Git LFS SHA-256 when present, otherwise the Git blob OID"
+            },
+            "blob_id": {
+              "type": "string",
+              "description": "Git object ID (OID) of the file blob"
+            },
+            "lfs_sha256": {
+              "type": "string",
+              "description": "SHA-256 recorded in the Git LFS pointer, for files stored in LFS"
+            },
+            "web_url": {
+              "type": "string",
+              "description": "Browser-accessible Hugging Face URL for the file"
+            },
+            "source_hash": {
+              "type": "string",
+              "description": "Hash of the parent asset (embedded images and archive members only)"
+            },
+            "location": {
+              "type": "string",
+              "description": "Location within the parent (embedded image location or archive member path)"
+            }
+          },
+          "required": ["provider", "object_key", "repo_id", "repo_type"]
+        },
+        "video": {
+          "use": ["file"],
+          "properties": {
+            "provider": {
+              "type": "string",
+              "description": "Storage provider label"
+            },
+            "object_key": {
+              "type": "string",
+              "description": "File path relative to the repository root"
+            },
+            "repo_id": {
+              "type": "string",
+              "description": "Repository the file belongs to (namespace/name)"
+            },
+            "repo_type": {
+              "type": "string",
+              "description": "Repository kind the file was read from: model, dataset or space"
+            },
+            "revision": {
+              "type": "string",
+              "description": "Commit SHA the file was read at (resolved from the configured revision)"
+            },
+            "etag": {
+              "type": "string",
+              "description": "Content digest of the file: the Git LFS SHA-256 when present, otherwise the Git blob OID"
+            },
+            "blob_id": {
+              "type": "string",
+              "description": "Git object ID (OID) of the file blob"
+            },
+            "lfs_sha256": {
+              "type": "string",
+              "description": "SHA-256 recorded in the Git LFS pointer, for files stored in LFS"
+            },
+            "web_url": {
+              "type": "string",
+              "description": "Browser-accessible Hugging Face URL for the file"
+            },
+            "source_hash": {
+              "type": "string",
+              "description": "Hash of the parent asset (embedded images and archive members only)"
+            },
+            "location": {
+              "type": "string",
+              "description": "Location within the parent (embedded image location or archive member path)"
+            }
+          },
+          "required": ["provider", "object_key", "repo_id", "repo_type"]
+        },
+        "archive": {
+          "use": ["file"],
+          "properties": {
+            "provider": {
+              "type": "string",
+              "description": "Storage provider label"
+            },
+            "object_key": {
+              "type": "string",
+              "description": "File path relative to the repository root"
+            },
+            "repo_id": {
+              "type": "string",
+              "description": "Repository the file belongs to (namespace/name)"
+            },
+            "repo_type": {
+              "type": "string",
+              "description": "Repository kind the file was read from: model, dataset or space"
+            },
+            "revision": {
+              "type": "string",
+              "description": "Commit SHA the file was read at (resolved from the configured revision)"
+            },
+            "etag": {
+              "type": "string",
+              "description": "Content digest of the file: the Git LFS SHA-256 when present, otherwise the Git blob OID"
+            },
+            "blob_id": {
+              "type": "string",
+              "description": "Git object ID (OID) of the file blob"
+            },
+            "lfs_sha256": {
+              "type": "string",
+              "description": "SHA-256 recorded in the Git LFS pointer, for files stored in LFS"
+            },
+            "web_url": {
+              "type": "string",
+              "description": "Browser-accessible Hugging Face URL for the file"
+            },
+            "source_hash": {
+              "type": "string",
+              "description": "Hash of the parent asset (embedded images and archive members only)"
+            },
+            "location": {
+              "type": "string",
+              "description": "Location within the parent (embedded image location or archive member path)"
+            }
+          },
+          "required": ["provider", "object_key", "repo_id", "repo_type"]
+        }
       }
     }
   },
@@ -2383,6 +2638,7 @@
         "MICROSOFT_365",
         "GOOGLE_WORKSPACE",
         "DROPBOX",
+        "HUGGING_FACE",
         "SANDBOX"
       ],
       "description": "Type of the asset or source"
@@ -9270,6 +9526,205 @@
             },
             "optional": {
               "$ref": "#/definitions/DropboxOptional"
+            },
+            "detectors": {
+              "$ref": "#/definitions/Detectors"
+            },
+            "custom_detectors": {
+              "$ref": "#/definitions/CustomDetectorSelections"
+            },
+            "sampling": {
+              "$ref": "#/definitions/SamplingConfig"
+            },
+            "scan_cache": {
+              "$ref": "#/definitions/ScanCacheConfig"
+            },
+            "resources": {
+              "$ref": "#/definitions/ResourceOverrides"
+            },
+            "cleanup_removed_detector_findings": {
+              "type": "boolean",
+              "default": true,
+              "description": "When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set."
+            }
+          },
+          "required": ["required", "masked", "sampling"],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "HuggingFaceRepoType": {
+      "type": "string",
+      "enum": ["dataset", "model", "space"],
+      "default": "dataset",
+      "description": "Repository kind on the Hub. Datasets hold the data files (parquet, csv, images, audio); models hold weights and configuration; spaces hold app source code."
+    },
+    "HuggingFaceRequired": {
+      "title": "HuggingFaceRequired",
+      "label": "Hugging Face Settings",
+      "type": "object",
+      "properties": {
+        "repo_id": {
+          "type": "string",
+          "description": "Repository to scan, as namespace/name (for example openai/gsm8k or my-org/internal-corpus)"
+        },
+        "repo_type": {
+          "$ref": "#/definitions/HuggingFaceRepoType"
+        }
+      },
+      "required": ["repo_id", "repo_type"],
+      "additionalProperties": false
+    },
+    "HuggingFaceMasked": {
+      "title": "HuggingFaceMasked",
+      "label": "Hugging Face Credentials",
+      "type": "object",
+      "properties": {
+        "token": {
+          "type": "string",
+          "description": "Hugging Face user access token (starts with hf_). Create one under Settings → Access Tokens with at least read permission on the repository. The token is always passed explicitly — no environment variable or locally cached login is ever used."
+        }
+      },
+      "required": ["token"],
+      "additionalProperties": false
+    },
+    "HuggingFaceOptionalScope": {
+      "title": "HuggingFaceOptionalScope",
+      "label": "Hugging Face Scope",
+      "type": "object",
+      "description": "Which files inside the repository are listed and read. The repository is never cloned or fully downloaded: the file tree is listed first, then each selected file is streamed one at a time.",
+      "properties": {
+        "revision": {
+          "type": "string",
+          "description": "Branch, tag or commit SHA to read (for example main, refs/convert/parquet, or v1.0). Defaults to the repository's default branch."
+        },
+        "paths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Folders inside the repository to list, for example data/ or data/train. Each folder is walked recursively. Leave empty to list the whole repository."
+        },
+        "allow_patterns": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Glob allowlist applied to file paths, for example data/*.parquet or **/*.csv. A file is kept when it matches at least one pattern. Empty means every file is kept."
+        },
+        "ignore_patterns": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Glob denylist applied to file paths, for example *.safetensors or **/checkpoints/*. Files matching any pattern are skipped."
+        },
+        "include_extensions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Optional extension allowlist (for example, .parquet, .csv, .png)"
+        },
+        "exclude_extensions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Optional extension denylist (for example, .safetensors, .bin, .gguf)"
+        },
+        "include_last_commit": {
+          "type": "boolean",
+          "default": false,
+          "description": "Fetch each file's last-commit date while listing. Needed for accurate LATEST and AUTOMATIC ordering, but makes listing noticeably slower on large repositories. When off, every file inherits the repository's last-modified date."
+        },
+        "include_empty_objects": {
+          "type": "boolean",
+          "default": false,
+          "description": "Include zero-byte files in extraction results"
+        },
+        "include_object_metadata": {
+          "type": "boolean",
+          "default": true,
+          "description": "Attach Hub metadata (content digest, size, timestamps) to asset checksums"
+        },
+        "include_content_preview": {
+          "type": "boolean",
+          "default": true,
+          "description": "Stream file bytes to infer MIME and extract detector-ready text previews. Turn off for a metadata-only inventory of the repository."
+        }
+      },
+      "additionalProperties": false
+    },
+    "HuggingFaceOptionalConnection": {
+      "title": "HuggingFaceOptionalConnection",
+      "label": "Hugging Face Connection",
+      "type": "object",
+      "description": "Network and resource controls for Hub requests. Files are streamed one at a time and capped, so a large repository never has to fit in memory or on disk.",
+      "properties": {
+        "endpoint": {
+          "type": "string",
+          "description": "Hub endpoint to use. Defaults to https://huggingface.co; set this for a self-hosted Enterprise Hub."
+        },
+        "max_object_bytes": {
+          "type": "integer",
+          "minimum": 1024,
+          "maximum": 104857600,
+          "default": 26214400,
+          "description": "Maximum bytes streamed per file for MIME detection and text extraction (default 25 MB). Larger files are read up to this cap and then the connection is dropped."
+        },
+        "request_timeout_seconds": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 300,
+          "default": 60,
+          "description": "Network timeout in seconds for list and download requests"
+        },
+        "max_retries": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10,
+          "default": 3,
+          "description": "Maximum retries on transient Hub errors (5xx and rate limits)"
+        }
+      },
+      "additionalProperties": false
+    },
+    "HuggingFaceOptional": {
+      "title": "HuggingFaceOptional",
+      "label": "Hugging Face Options",
+      "type": "object",
+      "properties": {
+        "scope": {
+          "$ref": "#/definitions/HuggingFaceOptionalScope"
+        },
+        "connection": {
+          "$ref": "#/definitions/HuggingFaceOptionalConnection"
+        }
+      },
+      "additionalProperties": false
+    },
+    "HuggingFaceInput": {
+      "title": "HuggingFaceInput",
+      "label": "Hugging Face",
+      "allOf": [
+        {
+          "$ref": "#/definitions/CoreInput"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "HUGGING_FACE"
+            },
+            "required": {
+              "$ref": "#/definitions/HuggingFaceRequired"
+            },
+            "masked": {
+              "$ref": "#/definitions/HuggingFaceMasked"
+            },
+            "optional": {
+              "$ref": "#/definitions/HuggingFaceOptional"
             },
             "detectors": {
               "$ref": "#/definitions/Detectors"

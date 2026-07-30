@@ -357,6 +357,22 @@ export const SOURCE_TYPE_CATALOG_META: Record<string, SourceCatalogMetaBase> = {
       "shared folders",
     ],
   },
+  HUGGING_FACE: {
+    description:
+      "Stream files from a Hugging Face dataset, model, or space repository without cloning it.",
+    icon: CreateSourceDtoTypeEnum.HuggingFace,
+    category: "WAREHOUSE_LAKEHOUSE",
+    keywords: [
+      "hugging face",
+      "huggingface",
+      "hf",
+      "dataset",
+      "model",
+      "parquet",
+      "hub",
+      "ml",
+    ],
+  },
 };
 
 export function resolveSourceCatalogMeta(

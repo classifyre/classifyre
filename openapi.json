@@ -1356,6 +1356,7 @@
                   "MICROSOFT_365",
                   "GOOGLE_WORKSPACE",
                   "DROPBOX",
+                  "HUGGING_FACE",
                   "SANDBOX",
                   "CUSTOM"
                 ]
@@ -1710,6 +1711,7 @@
                   "MICROSOFT_365",
                   "GOOGLE_WORKSPACE",
                   "DROPBOX",
+                  "HUGGING_FACE",
                   "SANDBOX",
                   "CUSTOM"
                 ]
@@ -2086,6 +2088,7 @@
                   "MICROSOFT_365",
                   "GOOGLE_WORKSPACE",
                   "DROPBOX",
+                  "HUGGING_FACE",
                   "SANDBOX",
                   "CUSTOM"
                 ]
@@ -9302,6 +9305,7 @@
               "MICROSOFT_365",
               "GOOGLE_WORKSPACE",
               "DROPBOX",
+              "HUGGING_FACE",
               "SANDBOX"
             ],
             "description": "The type of the source",
@@ -9498,6 +9502,7 @@
               "MICROSOFT_365",
               "GOOGLE_WORKSPACE",
               "DROPBOX",
+              "HUGGING_FACE",
               "SANDBOX"
             ],
             "description": "The type of the source",
@@ -9681,6 +9686,7 @@
                 "MICROSOFT_365",
                 "GOOGLE_WORKSPACE",
                 "DROPBOX",
+                "HUGGING_FACE",
                 "SANDBOX",
                 "CUSTOM"
               ]
@@ -10000,6 +10006,7 @@
               "MICROSOFT_365",
               "GOOGLE_WORKSPACE",
               "DROPBOX",
+              "HUGGING_FACE",
               "SANDBOX",
               "CUSTOM"
             ]
@@ -10148,6 +10155,7 @@
                 "MICROSOFT_365",
                 "GOOGLE_WORKSPACE",
                 "DROPBOX",
+                "HUGGING_FACE",
                 "SANDBOX",
                 "CUSTOM"
               ]
@@ -11110,6 +11118,7 @@
               "MICROSOFT_365",
               "GOOGLE_WORKSPACE",
               "DROPBOX",
+              "HUGGING_FACE",
               "SANDBOX",
               "CUSTOM"
             ]
@@ -17800,6 +17809,7 @@
                 "MICROSOFT_365",
                 "GOOGLE_WORKSPACE",
                 "DROPBOX",
+                "HUGGING_FACE",
                 "SANDBOX",
                 "CUSTOM"
               ]

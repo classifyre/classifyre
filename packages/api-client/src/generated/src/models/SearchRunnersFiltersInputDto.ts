@@ -114,6 +114,7 @@ export const SearchRunnersFiltersInputDtoSourceTypeEnum = {
     Microsoft365: 'MICROSOFT_365',
     GoogleWorkspace: 'GOOGLE_WORKSPACE',
     Dropbox: 'DROPBOX',
+    HuggingFace: 'HUGGING_FACE',
     Sandbox: 'SANDBOX',
     Custom: 'CUSTOM'
 } as const;
