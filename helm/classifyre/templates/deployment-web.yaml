@@ -1,3 +1,4 @@
+{{- if .Values.frontend.enabled }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -192,3 +193,4 @@ spec:
               {{- include "classifyre.selectorLabels" . | nindent 14 }}
               app.kubernetes.io/component: web
       {{- end }}
+{{- end }}

@@ -281,59 +281,11 @@ worker:
       memory: 4Gi
 
 frontend:
-  replicaCount: 1
-  autoscaling:
-    enabled: false
-  pdb:
-    enabled: false
-
-  # Built once by scripts/dev/rebuild-web.sh (production `next build`, same
-  # Docker image as CI) and imported straight into the k3d node — no bind
-  # mount, no dev server, no live reload. Re-run that script after code
-  # changes and `kubectl rollout restart deployment/classifyre-web` to pick
-  # them up. This trades hot reload for a build that behaves exactly like
-  # production, so it can't drift the way the old bind-mounted Turbopack
-  # dev server repeatedly did (stale/corrupt persistent cache, 404s on
-  # routes the dev server never got around to compiling).
-  image:
-    repository: classifyre/web
-    tag: dev-local
-    pullPolicy: Never
-
-  service:
-    type: ClusterIP
-    port: 3000
-
-  env:
-    NODE_ENV: production
-    PORT: "3000"
-    HOSTNAME: 0.0.0.0
-    NEXT_PUBLIC_API_URL: /api
-
-  extraEnv:
-    - name: NEXT_TELEMETRY_DISABLED
-      value: "1"
-
-  resources:
-    requests:
-      cpu: 100m
-      memory: 256Mi
-    limits:
-      cpu: "2"
-      memory: 4Gi
-
-  affinity: {}
-  topologySpreadConstraints: []
-  livenessProbe:
-    enabled: false
-  readinessProbe:
-    enabled: true
-    initialDelaySeconds: 2
-    periodSeconds: 5
-  startupProbe:
-    enabled: true
-    periodSeconds: 2
-    failureThreshold: 90
+  # Web is not deployed in-cluster for local dev — run it directly on your
+  # machine (cd apps/web && bun install && bun run dev) pointed at this
+  # cluster's API (http://127.0.0.1:8811 via the skaffold port-forward, or
+  # http://classifyre.localhost:8080/api via ingress). See scripts/dev/README.md.
+  enabled: false
 
 ingress:
   enabled: true

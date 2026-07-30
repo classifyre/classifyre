@@ -509,6 +509,10 @@ worker:
       memory: 2Gi
 
 frontend:
+  # -- Deploy the web app in-cluster. Set false to run it externally (e.g. a
+  # local `next dev` pointed at this cluster's API) instead of building and
+  # deploying an image for it.
+  enabled: true
   # -- Number of web replicas when autoscaling is disabled.
   replicaCount: 2
 

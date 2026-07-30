@@ -6,13 +6,27 @@ ships to the VPS is installed with a `values-dev.yaml` overlay.
 
 The API and worker run from official Bun containers with your working copy
 bind-mounted read-only, so TypeScript source edits restart the pod in place.
-The **web app runs a locally built production image**, same as CI: no bind
-mount, no dev server, no hot reload. Run `./scripts/dev/rebuild-web.sh` after
-web changes and restart the deployment to see them. This used to run
-`next dev --turbopack` against the bind-mounted source too, but Turbopack's
-persistent dev cache (needed to survive pod restarts) kept drifting from the
-actual route tree and serving stale 404s — a built image can't drift, because
-there's no cache to go stale.
+
+**Web is not deployed in-cluster** (`frontend.enabled: false` in
+`values-dev.yaml`). Run it directly on your machine instead:
+
+```bash
+cd apps/web
+bun install
+API_URL=http://127.0.0.1:8811 bun run dev
+```
+
+Open <http://localhost:3000>. `API_URL` points the web app's server-side
+`/api/*` proxy at the API's skaffold port-forward — `NEXT_PUBLIC_API_URL`
+stays the in-repo default (`/api`, same-origin) since the browser only ever
+talks to your local Next server.
+
+This used to run `next dev --turbopack` in-cluster against a bind-mounted,
+hostPath-persisted source tree. Turbopack's persistent dev cache (kept around
+specifically so it would survive pod restarts) repeatedly drifted from the
+actual route tree and served stale 404s that no amount of self-healing fully
+fixed. Running web as a normal local process sidesteps the whole class of
+problem — there's no cross-restart cache to go stale in the first place.
 
 Two modes:
 
@@ -46,16 +60,17 @@ mounted — delete and recreate in that case.
 watching but leaves the release and the Postgres PVC running, so your data
 survives between sessions.
 
-| Component     | Address                            |
-| ------------- | ---------------------------------- |
-| Web (Next.js) | <http://localhost:3301>            |
-| API (NestJS)  | <http://localhost:8811>            |
-| PostgreSQL    | `localhost:5555`                   |
-| NGINX ingress | <http://classifyre.localhost:8080> |
+| Component        | Address                                    |
+| ---------------- | ------------------------------------------- |
+| Web (Next.js)    | <http://localhost:3000> (run locally, see above) |
+| API (NestJS)     | <http://localhost:8811>                    |
+| PostgreSQL       | `localhost:5555`                           |
+| NGINX ingress    | <http://classifyre.localhost:8080/api/...> |
 
-Both the port-forwards and the ingress reach the same pods. The ingress path is
-the one that matches production routing; the direct ports are convenient for
-`psql` and API clients.
+The ingress only routes `/api`, `/mcp`, and socket paths now — there's no
+in-cluster web to serve `/`. Both the API port-forward and the ingress reach
+the same API pod; the port-forward is convenient for direct API clients and
+`psql` reaches Postgres the same way.
 
 ## Editing the demo instance
 
@@ -113,8 +128,7 @@ the environment, so it is never written to a file in the repo.
 | Script              | What it does                                                       |
 | ------------------- | ------------------------------------------------------------------ |
 | `create-cluster.sh` | One-time: create k3d cluster, mount source, install ingress-nginx  |
-| `start.sh`          | `skaffold dev` on the `dev` profile (embedded database)            |
-| `rebuild-web.sh`    | Production `next build` → Docker image → import into k3d → restart |
+| `start.sh`          | `skaffold dev` on the `dev` profile (embedded database, API/worker only) |
 | `stop.sh`           | Uninstall the release; keeps the cluster, caches, and Postgres PVC |
 | `delete-cluster.sh` | Delete the cluster, its database, and all container-owned caches   |
 | `start-vps-db.sh`   | Writable local deploy against the VPS database (opens the tunnel)  |
@@ -137,13 +151,14 @@ sets it, `start.sh` does not. Without that guard both profiles would activate
 during a `dev-vps-db` run and their two `classifyre` releases would fight over
 the deploy config.
 
-Because the checkout is mounted into the API/worker/CLI containers, most
-source edits never trigger an image build — web is the one exception, since it
-now runs a locally built image instead of a bind mount:
+Because the checkout is mounted into the API/worker/CLI containers, source
+edits there never trigger an image build. Web isn't part of this cluster at
+all, so its source edits just take effect on your local Next dev server's own
+Fast Refresh — nothing to restart or redeploy:
 
 | Change                          | Result                                                       |
 | ------------------------------- | ------------------------------------------------------------ |
-| Web or shared frontend source   | Nothing until you run `rebuild-web.sh` and restart the pod    |
+| Web or shared frontend source   | Handled entirely by your local `next dev`; not this cluster's concern |
 | API TypeScript source           | Bun restarts API and worker in their existing pods           |
 | CLI or Python schema source     | The next CLI Job picks up the changed files                  |
 | `bun.lock` / `package.json`     | Pods restart; dependencies reinstall into k3d-owned caches   |
@@ -161,7 +176,7 @@ skaffold diagnose -p dev --yaml-only
 Restart workloads after a dependency or Prisma metadata change:
 
 ```bash
-kubectl -n classifyre-dev rollout restart deployment/classifyre-api deployment/classifyre-worker deployment/classifyre-web
+kubectl -n classifyre-dev rollout restart deployment/classifyre-api deployment/classifyre-worker
 ```
 
 Check the database tunnel when `dev-vps-db` pods cannot reach Postgres:
