@@ -17,6 +17,10 @@ api:
     # writable cluster against this same database:
     #   ./scripts/dev/start-vps-db.sh
     DEMO_MODE: "false"
+    # Single-node VPS: node has ~11.4Gi allocatable memory. 3 concurrent CLI
+    # extract jobs at 3Gi request/4Gi limit each (9Gi) left no headroom for
+    # API/postgres/worker, causing OOMKilled restarts and Pending jobs.
+    MAX_CONCURRENT_RUNNERS: "1"
     # Backpressure strategy (see chart values `api.maxOldSpaceSizeMb`):
     #   * Heap guard: left at the chart default (85% of the JS heap cap). Now
     #     that the heap is raised to 1536 MB inside a 2Gi pod, the guard sheds
@@ -34,8 +38,8 @@ api:
   # 10 API pods on one node causes memory pressure → liveness probe failures →
   # RemoteDisconnected errors mid-request → asset failures.
   autoscaling:
-    minReplicas: 2
-    maxReplicas: 4
+    minReplicas: 1
+    maxReplicas: 2
 
   cliJobs:
     image:

@@ -16,6 +16,9 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: process.env.NEXT_IGNORE_BUILD_ERRORS === "1",
   },
+  ...(!isDesktopBuild && {
+    allowedDevOrigins: ["127.0.0.1", "localhost", "classifyre.localhost"],
+  }),
   ...(isDesktopBuild && {
     images: { unoptimized: true },
   }),

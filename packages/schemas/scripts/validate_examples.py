@@ -43,6 +43,7 @@ TYPE_TO_DEFINITION = {
     "MICROSOFT_365": "Microsoft365Input",
     "GOOGLE_WORKSPACE": "GoogleWorkspaceInput",
     "DROPBOX": "DropboxInput",
+    "HUGGING_FACE": "HuggingFaceInput",
 }
 
 SCHEMAS_DIR = Path(__file__).parent.parent / "src" / "schemas"

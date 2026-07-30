@@ -101,6 +101,7 @@ export const UpdateSourceDtoTypeEnum = {
     Microsoft365: 'MICROSOFT_365',
     GoogleWorkspace: 'GOOGLE_WORKSPACE',
     Dropbox: 'DROPBOX',
+    HuggingFace: 'HUGGING_FACE',
     Sandbox: 'SANDBOX'
 } as const;
 export type UpdateSourceDtoTypeEnum = typeof UpdateSourceDtoTypeEnum[keyof typeof UpdateSourceDtoTypeEnum];

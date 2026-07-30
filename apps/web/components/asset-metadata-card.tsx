@@ -58,6 +58,12 @@ const METADATA_KEY_TO_I18N: Record<string, TranslationKey> = {
   transcript_is_generated:
     "assets.detail.assetMetadata.keys.transcript_is_generated",
   caption_tracks: "assets.detail.assetMetadata.keys.caption_tracks",
+  repo_id: "assets.detail.assetMetadata.keys.repo_id",
+  repo_type: "assets.detail.assetMetadata.keys.repo_type",
+  revision: "assets.detail.assetMetadata.keys.revision",
+  blob_id: "assets.detail.assetMetadata.keys.blob_id",
+  lfs_sha256: "assets.detail.assetMetadata.keys.lfs_sha256",
+  web_url: "assets.detail.assetMetadata.keys.web_url",
 };
 
 // Keys that carry a human-readable byte size and should be formatted as such.
