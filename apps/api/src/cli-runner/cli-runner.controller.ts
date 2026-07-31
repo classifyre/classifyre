@@ -162,6 +162,8 @@ export class CliRunnerController {
       // compare against the wire value rather than trusting a coerced boolean.
       dto.includeScanCache === true ||
         (dto.includeScanCache as unknown) === 'true',
+      dto.includePayloadCursor === true ||
+        (dto.includePayloadCursor as unknown) === 'true',
     );
   }
 

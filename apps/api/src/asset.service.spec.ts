@@ -2828,5 +2828,127 @@ describe('AssetService', () => {
         expect(assetUpdate).not.toHaveBeenCalled();
       });
     });
+
+    describe('payload-cursor write-back', () => {
+      // Where a sampling strategy stopped inside one asset's tabular payload.
+      // Kept apart from scan-cache state: that column is proof a scan completed
+      // and only exists for sources that opted into caching, whereas a position
+      // has to be kept either way or the next run restarts the file at row 0.
+      const payloadCursor = {
+        v: 1,
+        kind: 'rows',
+        offset: 400,
+        exhausted: false,
+        checksum: 'checksum-1',
+        strategy: 'AUTOMATIC',
+      };
+
+      const asset = (over: Record<string, unknown> = {}) => ({
+        hash: 'asset-1',
+        checksum: 'checksum-1',
+        name: 'events.parquet',
+        external_url: 'https://example.com/events.parquet',
+        links: [],
+        asset_type: 'TABLE',
+        findings: [],
+        ...over,
+      });
+
+      let assetCreateMany: jest.Mock;
+      let assetUpdate: jest.Mock;
+
+      beforeEach(() => {
+        assetCreateMany = jest.fn().mockResolvedValue({});
+        assetUpdate = jest.fn().mockResolvedValue({});
+        mockPrismaService.$transaction.mockImplementation((callback: any) =>
+          callback({
+            asset: {
+              createMany: assetCreateMany,
+              update: assetUpdate,
+              updateMany: jest.fn().mockResolvedValue({}),
+              findMany: jest
+                .fn()
+                .mockResolvedValue([{ id: 'db-asset-1', hash: 'asset-1' }]),
+            },
+            finding: {
+              findMany: jest.fn().mockResolvedValue([]),
+              createMany: jest.fn().mockResolvedValue({}),
+              update: jest.fn().mockResolvedValue({}),
+            },
+            runner: { update: jest.fn().mockResolvedValue({}) },
+            runnerAsset: {
+              updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+            },
+          }),
+        );
+      });
+
+      it('persists the position on a newly created asset', async () => {
+        mockPrismaService.asset.findMany.mockResolvedValue([]);
+
+        await service.bulkIngest(sourceId, runnerId, [
+          asset({ payload_cursor: payloadCursor }),
+        ]);
+
+        expect(assetCreateMany).toHaveBeenCalledWith({
+          data: [expect.objectContaining({ payloadCursor })],
+        });
+      });
+
+      it('persists the position on an UNCHANGED asset', async () => {
+        // The common case, not the exception: an asset whose file has not
+        // changed is precisely the one whose sweep is advancing a window at a
+        // time, so it lands here as UNCHANGED with a new position to record.
+        mockPrismaService.asset.findMany.mockResolvedValue([
+          {
+            id: 'db-asset-1',
+            hash: 'asset-1',
+            checksum: 'checksum-1',
+            links: [],
+          },
+        ]);
+
+        await service.bulkIngest(sourceId, runnerId, [
+          asset({ payload_cursor: payloadCursor }),
+        ]);
+
+        expect(assetUpdate).toHaveBeenCalledWith({
+          where: { id: 'db-asset-1' },
+          data: { payloadCursor },
+        });
+      });
+
+      it('leaves the stored position untouched when the payload carries none', async () => {
+        // The Phase 1 discovery stub, and every non-AUTOMATIC strategy, send no
+        // cursor. Reading that silence as "reset to row 0" would restart every
+        // sweep on every run.
+        mockPrismaService.asset.findMany.mockResolvedValue([
+          {
+            id: 'db-asset-1',
+            hash: 'asset-1',
+            checksum: 'checksum-1',
+            links: [],
+          },
+        ]);
+
+        await service.bulkIngest(sourceId, runnerId, [asset()]);
+
+        expect(assetUpdate).not.toHaveBeenCalled();
+      });
+
+      it('ignores a malformed cursor rather than writing it', async () => {
+        mockPrismaService.asset.findMany.mockResolvedValue([]);
+
+        await service.bulkIngest(sourceId, runnerId, [
+          asset({ payload_cursor: 'not-a-cursor' }),
+        ]);
+
+        expect(assetCreateMany).toHaveBeenCalledWith({
+          data: [
+            expect.not.objectContaining({ payloadCursor: expect.anything() }),
+          ],
+        });
+      });
+    });
   });
 });

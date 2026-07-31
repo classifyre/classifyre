@@ -211,6 +211,53 @@ class DetectorOutcome(BaseModel):
     )
 
 
+class PayloadCursor(BaseModel):
+    """
+    How far a sampling strategy has read into one asset's tabular payload. The asset is the file; the cursor is the row offset inside it, so a run bounded to rows_per_page rows can resume where the previous run stopped instead of restarting at row 0. Only written by strategies that advance (AUTOMATIC); RANDOM and LATEST reproduce their own window from the strategy alone, and ALL has no position to remember.
+    """
+
+    v: int | None = Field(
+        1,
+        description='Cursor format version. A reader that does not recognise the version restarts from row 0 rather than misreading an offset.',
+        title='V',
+    )
+    kind: str | None = Field(
+        'rows',
+        description='What the offset counts. Only "rows" exists today; the field reserves room for page- or byte-addressed payloads without a second column.',
+        title='Kind',
+    )
+    offset: int = Field(
+        ...,
+        description='Rows already covered by previous runs. The next run starts here.',
+        title='Offset',
+    )
+    rows_seen: int | None = Field(
+        None,
+        description='Total rows in the payload, known only once a pass has run off the end. Null until then.',
+        title='Rows Seen',
+    )
+    passes: int | None = Field(
+        0,
+        description='Completed sweeps of the whole payload. Incremented when the offset wraps back to 0, which is what tells a later run the file has been fully covered.',
+        title='Passes',
+    )
+    exhausted: bool | None = Field(
+        False,
+        description='The last run reached the end of the payload. The scan cache may only skip this asset while this is true — otherwise unread rows would be mistaken for a finished scan.',
+        title='Exhausted',
+    )
+    checksum: str | None = Field(
+        None,
+        description='Asset checksum the offset was measured against. A different checksum means the rows moved, so the offset is discarded and the sweep restarts.',
+        title='Checksum',
+    )
+    strategy: str | None = Field(
+        None,
+        description='Sampling strategy that produced this cursor. A strategy change invalidates it.',
+        title='Strategy',
+    )
+
+
 class ScanCacheState(BaseModel):
     """
     What a later run needs in order to prove this asset can be skipped, and what it should report when it does. Only a state with complete=true is eligible for reuse. A detector that raised or failed to initialize is omitted from the fingerprint map so it is retried next run rather than silently trusted.
@@ -358,4 +405,9 @@ class SingleAssetScanResults(BaseModel):
         None,
         description='Scan-cache state to persist for this asset, letting a later run skip work that would produce identical results',
         title='Scan Cache',
+    )
+    payload_cursor: PayloadCursor | None = Field(
+        None,
+        description="Position reached inside this asset's tabular payload, persisted so the next AUTOMATIC run resumes at the next slice of rows instead of rescanning from the top",
+        title='Payload Cursor',
     )

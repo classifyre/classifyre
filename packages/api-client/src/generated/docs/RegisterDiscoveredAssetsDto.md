@@ -8,6 +8,7 @@ Name | Type
 ------------ | -------------
 `assetHashes` | Array&lt;string&gt;
 `includeScanCache` | boolean
+`includePayloadCursor` | boolean
 
 ## Example
 
@@ -18,6 +19,7 @@ import type { RegisterDiscoveredAssetsDto } from '@workspace/api-client'
 const example = {
   "assetHashes": null,
   "includeScanCache": null,
+  "includePayloadCursor": null,
 } satisfies RegisterDiscoveredAssetsDto
 
 console.log(example)

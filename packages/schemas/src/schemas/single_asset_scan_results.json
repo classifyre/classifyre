@@ -143,6 +143,19 @@
       "default": null,
       "description": "Scan-cache state to persist for this asset, letting a later run skip work that would produce identical results",
       "title": "Scan Cache"
+    },
+    "payload_cursor": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/PayloadCursor"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Position reached inside this asset's tabular payload, persisted so the next AUTOMATIC run resumes at the next slice of rows instead of rescanning from the top",
+      "title": "Payload Cursor"
     }
   },
   "required": [
@@ -585,6 +598,85 @@
         "status"
       ],
       "title": "DetectorOutcome",
+      "type": "object"
+    },
+    "PayloadCursor": {
+      "description": "How far a sampling strategy has read into one asset's tabular payload. The asset is the file; the cursor is the row offset inside it, so a run bounded to rows_per_page rows can resume where the previous run stopped instead of restarting at row 0. Only written by strategies that advance (AUTOMATIC); RANDOM and LATEST reproduce their own window from the strategy alone, and ALL has no position to remember.",
+      "properties": {
+        "v": {
+          "type": "integer",
+          "default": 1,
+          "description": "Cursor format version. A reader that does not recognise the version restarts from row 0 rather than misreading an offset.",
+          "title": "V"
+        },
+        "kind": {
+          "type": "string",
+          "default": "rows",
+          "description": "What the offset counts. Only \"rows\" exists today; the field reserves room for page- or byte-addressed payloads without a second column.",
+          "title": "Kind"
+        },
+        "offset": {
+          "type": "integer",
+          "default": 0,
+          "description": "Rows already covered by previous runs. The next run starts here.",
+          "title": "Offset"
+        },
+        "rows_seen": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Total rows in the payload, known only once a pass has run off the end. Null until then.",
+          "title": "Rows Seen"
+        },
+        "passes": {
+          "type": "integer",
+          "default": 0,
+          "description": "Completed sweeps of the whole payload. Incremented when the offset wraps back to 0, which is what tells a later run the file has been fully covered.",
+          "title": "Passes"
+        },
+        "exhausted": {
+          "type": "boolean",
+          "default": false,
+          "description": "The last run reached the end of the payload. The scan cache may only skip this asset while this is true — otherwise unread rows would be mistaken for a finished scan.",
+          "title": "Exhausted"
+        },
+        "checksum": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Asset checksum the offset was measured against. A different checksum means the rows moved, so the offset is discarded and the sweep restarts.",
+          "title": "Checksum"
+        },
+        "strategy": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Sampling strategy that produced this cursor. A strategy change invalidates it.",
+          "title": "Strategy"
+        }
+      },
+      "required": [
+        "offset"
+      ],
+      "title": "PayloadCursor",
       "type": "object"
     },
     "ScanCacheState": {

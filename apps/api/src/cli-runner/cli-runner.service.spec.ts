@@ -236,6 +236,94 @@ describe('CliRunnerService', () => {
     });
   });
 
+  describe('registerDiscoveredAssets payload cursors', () => {
+    const runnerId = 'runner-cursor';
+    const sourceId = 'source-cursor';
+    const cursor = {
+      v: 1,
+      kind: 'rows',
+      offset: 400,
+      exhausted: false,
+      checksum: 'checksum-1',
+      strategy: 'AUTOMATIC',
+    };
+
+    const withRunner = () => {
+      const created = createService();
+      created.prisma.runner.findUnique.mockResolvedValue({
+        id: runnerId,
+        sourceId,
+        scopeFingerprint: 'scope-current',
+      });
+      return created;
+    };
+
+    it('is absent unless asked for, so older CLIs see the shape they expect', async () => {
+      const { service, prisma } = withRunner();
+      prisma.asset.findMany.mockResolvedValue([]);
+
+      const result = await service.registerDiscoveredAssets(runnerId, ['a']);
+
+      expect(result.payloadCursors).toBeUndefined();
+      expect(prisma.asset.findMany).not.toHaveBeenCalled();
+    });
+
+    it('returns stored positions verbatim', async () => {
+      const { service, prisma } = withRunner();
+      prisma.asset.findMany.mockResolvedValue([
+        { hash: 'asset-1', payloadCursor: cursor },
+      ]);
+
+      const result = await service.registerDiscoveredAssets(
+        runnerId,
+        ['asset-1'],
+        false,
+        true,
+      );
+
+      expect(result.payloadCursors).toEqual([{ hash: 'asset-1', cursor }]);
+      // Only the CLI can decide a cursor no longer applies — it compares the
+      // checksum and strategy stored inside it — so the API does not filter.
+      expect(result.cache).toBeUndefined();
+    });
+
+    it('returns a position even when no scan-cache state exists', async () => {
+      // A cursor records where a sweep stopped, not that anything completed.
+      // Withholding it from a run whose last attempt died would restart that
+      // asset at row 0 and re-scan rows already covered.
+      const { service, prisma } = withRunner();
+      prisma.asset.findMany.mockResolvedValue([
+        { hash: 'asset-1', payloadCursor: cursor, scanCache: null },
+      ]);
+
+      const result = await service.registerDiscoveredAssets(
+        runnerId,
+        ['asset-1'],
+        false,
+        true,
+      );
+
+      expect(result.payloadCursors).toEqual([{ hash: 'asset-1', cursor }]);
+    });
+
+    it('skips assets whose stored cursor is not an object', async () => {
+      const { service, prisma } = withRunner();
+      prisma.asset.findMany.mockResolvedValue([
+        { hash: 'bad', payloadCursor: 'not-a-cursor' },
+        { hash: 'good', payloadCursor: cursor },
+      ]);
+
+      const result = await service.registerDiscoveredAssets(
+        runnerId,
+        ['bad', 'good'],
+        false,
+        true,
+      );
+
+      expect(result.payloadCursors).toEqual([{ hash: 'good', cursor }]);
+    });
+  });
+
   it('decrypts masked config before submitting kubernetes test job', async () => {
     const { maskedConfigCryptoService } = createService();
     const plainConfig = {

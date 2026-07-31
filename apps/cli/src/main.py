@@ -265,9 +265,22 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
                             worker_pool=worker_pool,
                         )
 
+                    from .pipeline.payload_window import PayloadWindowStore
                     from .pipeline.scan_cache import ScanCache
 
-                    scan_cache = ScanCache(recipe, source)
+                    # Bounds how much of each asset a run reads, not just how many
+                    # assets it reads. The scan cache consults it before skipping,
+                    # so a part-scanned payload is never mistaken for a finished one.
+                    payload_windows = PayloadWindowStore.from_recipe(recipe)
+                    if payload_windows.enabled:
+                        logger.info(
+                            "Payload sampling active (%s): tabular assets are read %d rows per run",
+                            payload_windows.strategy,
+                            payload_windows.rows_per_page,
+                        )
+                    source.attach_payload_windows(payload_windows)
+
+                    scan_cache = ScanCache(recipe, source, payload_windows=payload_windows)
                     if scan_cache.enabled:
                         logger.info(
                             "Scan cache active (verify=%s): unchanged assets and"
@@ -292,6 +305,13 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
                         for stub in stub_batch:
                             stub["findings"] = []
 
+                        # Teach the payload windows each asset's ids and checksum
+                        # before any window is built: a stored row offset only
+                        # resumes when it still matches the file it was measured
+                        # against.
+                        for asset in raw_batch:
+                            payload_windows.bind(asset)
+
                         # Register BEFORE ingesting: the API stamps per-run
                         # change_type onto runner_assets rows during ingest, so
                         # the row must exist or the CREATED stamp is lost and
@@ -303,9 +323,15 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
                         # or not at all.
                         hashes = [s["hash"] for s in stub_batch if s.get("hash")]
                         if hasattr(sink, "register_discovered_assets") and hashes:
+                            want_cursors = payload_windows.persists_cursor
                             prior = await sink.register_discovered_assets(
-                                hashes, include_scan_cache=scan_cache.enabled
+                                hashes,
+                                include_scan_cache=scan_cache.enabled,
+                                include_payload_cursor=want_cursors,
                             )
+                            if want_cursors and isinstance(prior, tuple):
+                                prior, payload_cursors = prior
+                                payload_windows.record_prior(payload_cursors)
                             scan_cache.record_prior(prior)
 
                         await sink.emit_batch(stub_batch, skip_findings=True)
@@ -476,6 +502,10 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
                                 )
                                 if state is not None:
                                     payload["scan_cache"] = state
+
+                                cursor = payload_windows.cursor_payload_for(asset)
+                                if cursor is not None:
+                                    payload["payload_cursor"] = cursor
 
                                 await sink.emit_batch([payload], skip_findings=False)
 

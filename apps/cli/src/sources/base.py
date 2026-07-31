@@ -88,6 +88,9 @@ class BaseSource(ABC):
         self._aborted = False
         self._discovery_only = False
         self._attachment_name_by_hash: dict[str, str] = {}
+        # Set by main.py for API runs (see attach_payload_windows). None means
+        # payloads stream whole.
+        self._payload_windows: Any = None
 
     def _apply_initial_sampling_override(self, recipe: dict[str, Any]) -> None:
         pass
@@ -364,6 +367,15 @@ class BaseSource(ABC):
             file_name=file_name,
         )
 
+    def attach_payload_windows(self, store: Any) -> None:
+        """Give this source the run's payload-window store.
+
+        Set by ``main.py`` before phase 2. Without it every payload streams whole,
+        which is the behaviour a source had before payload windows existed — so a
+        source, a test or a local run that never attaches one is unaffected.
+        """
+        self._payload_windows = store
+
     def iter_asset_pages(
         self,
         file_bytes: bytes,
@@ -372,16 +384,63 @@ class BaseSource(ABC):
         include_column_names: bool = True,
         *,
         file_name: str = "",
+        asset_id: str | None = None,
     ) -> Generator[str, None, None]:
-        from ..utils.file_parser import iter_file_pages
+        """Stream an asset's payload as detector-sized pages.
 
-        return iter_file_pages(
-            file_bytes,
-            mime_type,
-            batch_size,
-            include_column_names,
-            file_name=file_name,
+        For a payload with a row axis this is where the sampling strategy stops
+        being about *which assets* and starts being about *which rows*: under
+        AUTOMATIC/RANDOM/LATEST only one window of the file is read, and the
+        position is remembered per asset so the next run continues rather than
+        restarting. ``asset_id`` is what ties the window to a stored cursor;
+        callers must pass it or the payload streams whole.
+
+        Everything else — PDFs, images, audio — has no row axis and streams
+        unchanged.
+        """
+        from ..utils.file_parser import count_tabular_rows, iter_file_pages
+
+        def _pages(start_row: int, max_rows: int | None) -> Generator[str, None, None]:
+            return iter_file_pages(
+                file_bytes,
+                mime_type,
+                batch_size,
+                include_column_names,
+                file_name=file_name,
+                start_row=start_row,
+                max_rows=max_rows,
+            )
+
+        store = getattr(self, "_payload_windows", None)
+        window = store.window_for(asset_id, mime_type) if store is not None else None
+        if window is None:
+            return _pages(0, None)
+
+        return window.iterate(
+            _pages,
+            rows_per_unit=self._payload_rows_per_page_unit(mime_type, batch_size),
+            row_count=count_tabular_rows(file_bytes, mime_type),
+            on_cursor=lambda cursor: store.record(asset_id, cursor),
         )
+
+    @staticmethod
+    def _payload_rows_per_page_unit(mime_type: str, batch_size: int) -> int:
+        """How many payload rows one page from ``iter_file_pages`` carries.
+
+        Record-shaped readers (Parquet, CSV/TSV) emit a page per row. Spreadsheets
+        reach the detectors as extracted text, which is paged in blocks of
+        ``batch_size`` lines — one line per sheet row.
+        """
+        from ..utils.file_parser import normalize_mime_type
+
+        normalized = normalize_mime_type(mime_type)
+        record_shaped = {
+            "application/parquet",
+            "application/vnd.apache.parquet",
+            "text/csv",
+            "text/tab-separated-values",
+        }
+        return 1 if normalized in record_shaped else max(1, batch_size)
 
     async def fetch_content_bytes(self, asset_id: str) -> tuple[bytes, str] | None:
         """

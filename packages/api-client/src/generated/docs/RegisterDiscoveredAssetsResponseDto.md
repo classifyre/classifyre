@@ -8,6 +8,7 @@ Name | Type
 ------------ | -------------
 `registered` | number
 `cache` | [Array&lt;ScanCacheEntryDto&gt;](ScanCacheEntryDto.md)
+`payloadCursors` | [Array&lt;PayloadCursorEntryDto&gt;](PayloadCursorEntryDto.md)
 
 ## Example
 
@@ -18,6 +19,7 @@ import type { RegisterDiscoveredAssetsResponseDto } from '@workspace/api-client'
 const example = {
   "registered": null,
   "cache": null,
+  "payloadCursors": null,
 } satisfies RegisterDiscoveredAssetsResponseDto
 
 console.log(example)

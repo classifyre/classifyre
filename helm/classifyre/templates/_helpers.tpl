@@ -450,8 +450,8 @@ which each deployment sets on its own after including this block.
 - name: DATA_TRANSFER_DIR
   value: {{ .Values.dataTransfer.dir | quote }}
 {{- end }}
-- name: DATA_TRANSFER_TTL_HOURS
-  value: {{ .Values.dataTransfer.ttlHours | quote }}
+- name: DATA_TRANSFER_TTL_MINUTES
+  value: {{ .Values.dataTransfer.ttlMinutes | quote }}
 - name: DATA_TRANSFER_MAX_GB
   value: {{ .Values.dataTransfer.maxSizeGb | quote }}
 {{- /* ── S3 / object-storage configuration ─────────────────── */}}

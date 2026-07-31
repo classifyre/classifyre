@@ -227,6 +227,45 @@ def test_source_implements_automatic_cursor(entry: _SourceEntry) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Payload windows
+# ---------------------------------------------------------------------------
+#
+# ``BaseSource.iter_asset_pages`` is where a tabular payload is bounded to one
+# window of rows, and it can only find the stored position if the caller says
+# which asset the bytes belong to. A source that calls it without ``asset_id``
+# still works — it just reads the whole file every run, which is the failure this
+# whole mechanism exists to prevent, and it fails silently. So the call sites are
+# checked statically rather than left to convention.
+
+
+@pytest.mark.parametrize("entry", _params({}))
+def test_iter_asset_pages_calls_identify_the_asset(entry: _SourceEntry) -> None:
+    text = _combined_source_text(entry.source_class)
+    for call in re.finditer(r"\.iter_asset_pages\s*\(", text):
+        body = _balanced_call_args(text, call.end() - 1)
+        assert "asset_id" in body, (
+            f"Source '{entry.source_type}' ({entry.source_class.__qualname__}) calls "
+            "iter_asset_pages() without asset_id=. Without it the payload window cannot "
+            "resolve this asset's stored cursor, so every run re-reads the whole file "
+            "from row 0 — the exact behaviour payload windows exist to avoid. Pass the "
+            "same identifier the source uses for fetch_content_bytes()."
+        )
+
+
+def _balanced_call_args(text: str, open_paren: int) -> str:
+    """The argument text of the call whose ``(`` is at *open_paren*."""
+    depth = 0
+    for index in range(open_paren, len(text)):
+        if text[index] == "(":
+            depth += 1
+        elif text[index] == ")":
+            depth -= 1
+            if depth == 0:
+                return text[open_paren + 1 : index]
+    return text[open_paren:]
+
+
+# ---------------------------------------------------------------------------
 # Scan-cache eligibility
 # ---------------------------------------------------------------------------
 #

@@ -112,6 +112,18 @@ model Asset {
   // run skips a detector only while its fingerprint still matches, which is what
   // makes a detector-config edit re-run that detector alone.
   scanCache                 Json?                      @map("scan_cache") @db.JsonB
+  // How far a sampling strategy has read into this asset's tabular payload:
+  // `{ v, kind, offset, rows_seen, passes, exhausted, checksum, strategy }`.
+  //
+  // Source-level sampling bounds how many assets a run touches; this bounds how
+  // much of one asset it reads. An AUTOMATIC run resumes at `offset` and wraps
+  // back to 0 once a pass covers the file. Deliberately not folded into
+  // `scanCache`: that column is proof a scan completed and only exists for
+  // sources that opted into caching, whereas a position must be kept either way.
+  //
+  // `checksum` binds the offset to the bytes it was measured against, so an
+  // edited file restarts its sweep instead of resuming into rows that moved.
+  payloadCursor             Json?                      @map("payload_cursor") @db.JsonB
   metadata                  Json?                      @db.JsonB
   runner                    Runner?                    @relation(fields: [runnerId], references: [id])
   source                    Source                     @relation(fields: [sourceId], references: [id], onDelete: Cascade)
@@ -726,6 +738,7 @@ enum AssetType {
   TABLEAU
   EMAIL
   YOUTUBE
+  REDDIT
   DELTA_LAKE
   ICEBERG
   KAFKA

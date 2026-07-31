@@ -983,6 +983,7 @@ export const SourceAssetsControllerListSourceAssetsSourceTypesEnum = {
     Tableau: 'TABLEAU',
     Email: 'EMAIL',
     Youtube: 'YOUTUBE',
+    Reddit: 'REDDIT',
     DeltaLake: 'DELTA_LAKE',
     Iceberg: 'ICEBERG',
     Kafka: 'KAFKA',

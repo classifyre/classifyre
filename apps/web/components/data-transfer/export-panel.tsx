@@ -9,7 +9,7 @@ import { useTranslation } from "@/hooks/use-translation";
 import { useTransferJob } from "@/hooks/use-transfer-job";
 import {
   cancelTransferJob,
-  downloadUrl,
+  downloadArchive,
   formatBytes,
   listTransferScopes,
   startExport,
@@ -36,6 +36,7 @@ export function ExportPanel({
   const [selected, setSelected] = React.useState<Set<TransferScopeId>>(new Set());
   const [starting, setStarting] = React.useState(false);
   const [cancelling, setCancelling] = React.useState(false);
+  const [downloading, setDownloading] = React.useState(false);
   const [jobId, setJobId] = React.useState<string | null>(activeJob?.id ?? null);
 
   const { job, refresh } = useTransferJob(jobId);
@@ -171,16 +172,30 @@ export function ExportPanel({
 
         {current?.downloadAvailable ? (
           <Button
-            asChild
             variant="outline"
+            disabled={downloading}
+            onClick={() => {
+              setDownloading(true);
+              void downloadArchive(current)
+                .catch((error: unknown) =>
+                  toast.error(
+                    error instanceof Error
+                      ? error.message
+                      : t("dataTransfer.downloadFailed"),
+                  ),
+                )
+                .finally(() => setDownloading(false));
+            }}
             className="h-9 gap-1.5 border-2 text-xs"
           >
-            <a href={downloadUrl(current.id)} download>
+            {downloading ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
               <Download className="h-3.5 w-3.5" />
-              {t("dataTransfer.download", {
-                size: formatBytes(current.fileSize),
-              })}
-            </a>
+            )}
+            {t("dataTransfer.download", {
+              size: formatBytes(current.fileSize),
+            })}
           </Button>
         ) : null}
 

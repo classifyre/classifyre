@@ -172,6 +172,11 @@ const cls = {
   get: (key: string) => (key.includes('schema') ? 'ns_test' : 'acme'),
 } as never;
 
+// The archive is named after the workspace's display name, not its slug.
+const registry = {
+  get: () => Promise.resolve({ name: 'Acme Investigations' }),
+} as never;
+
 const baseJob: DataTransferJob = {
   id: '8f14e45f-ce0a-4e0a-9c6b-2b8d3f7a1c22',
   kind: 'EXPORT',
@@ -290,7 +295,12 @@ describe('export → import round trip', () => {
       kind: 'EXPORT',
       scopes,
     });
-    const service = new NamespaceExportService(state.prisma, storage, cls);
+    const service = new NamespaceExportService(
+      state.prisma,
+      storage,
+      cls,
+      registry,
+    );
     await service.run({ ...baseJob, kind: 'EXPORT', scopes });
 
     const files = await fsp.readdir(path.join(dir, 'ns_test'));
@@ -329,6 +339,10 @@ describe('export → import round trip', () => {
     });
     expect(job.status).toBe('COMPLETED');
     expect(job.percent).toBe(100);
+    // Named for the workspace an operator recognises, not its url slug.
+    expect(job.fileName).toMatch(
+      /^Acme-Investigations-\d{4}-\d{2}-\d{2}-\d{4}\.cfyre$/,
+    );
     expect(Number(job.fileSize)).toBeGreaterThan(0);
     expect(job.checksum).toMatch(/^[0-9a-f]{64}$/);
   });

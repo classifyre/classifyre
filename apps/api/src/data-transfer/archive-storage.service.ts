@@ -56,8 +56,15 @@ export class ArchiveStorageService implements OnModuleInit {
   private s3: { client: S3Client; bucket: string; prefix: string } | null =
     null;
 
-  /** How long an archive survives after the job that produced it finishes. */
-  private ttlMs = 24 * 60 * 60 * 1000;
+  /**
+   * How long an archive survives after the job that produced it finishes.
+   *
+   * Short by design: an archive is a full, credential-stripped copy of a
+   * workspace sitting on disk or in a bucket, and its only job is to survive
+   * long enough for the operator who asked for it to click download. An hour
+   * covers that; anything longer is just a copy of the data lying around.
+   */
+  private ttlMs = 60 * 60 * 1000;
 
   /** Refused upload size; also the practical ceiling on an export. */
   private maxBytes = 8 * 1024 * 1024 * 1024;
@@ -66,7 +73,7 @@ export class ArchiveStorageService implements OnModuleInit {
     const configured = process.env.DATA_TRANSFER_DIR;
     if (configured) this.rootDir = path.resolve(configured);
 
-    this.ttlMs = readIntEnv('DATA_TRANSFER_TTL_HOURS', 24) * 60 * 60 * 1000;
+    this.ttlMs = readIntEnv('DATA_TRANSFER_TTL_MINUTES', 60) * 60 * 1000;
     this.maxBytes = readIntEnv('DATA_TRANSFER_MAX_GB', 8) * 1024 * 1024 * 1024;
 
     try {
@@ -101,7 +108,7 @@ export class ArchiveStorageService implements OnModuleInit {
       };
       this.logger.log(
         `Archive storage: s3 bucket=${bucket} prefix=${this.s3.prefix} ` +
-          `ttl=${this.ttlMs / 3_600_000}h maxSize=${gb(this.maxBytes)}GB`,
+          `ttl=${this.ttlMs / 60_000}m maxSize=${gb(this.maxBytes)}GB`,
       );
       return;
     }
@@ -116,7 +123,7 @@ export class ArchiveStorageService implements OnModuleInit {
     }
 
     this.logger.log(
-      `Archive storage: dir=${this.rootDir} ttl=${this.ttlMs / 3_600_000}h ` +
+      `Archive storage: dir=${this.rootDir} ttl=${this.ttlMs / 60_000}m ` +
         `maxSize=${gb(this.maxBytes)}GB`,
     );
   }
@@ -309,10 +316,29 @@ export class ArchiveStorageService implements OnModuleInit {
     } while (token);
   }
 
-  /** Human-facing archive name, e.g. `acme-2026-07-30.cfyre`. */
-  archiveFileName(namespaceSlug: string): string {
-    const stamp = new Date().toISOString().slice(0, 10);
-    return `${sanitizeSegment(namespaceSlug)}-${stamp}${ARCHIVE_EXTENSION}`;
+  /**
+   * Human-facing archive name from the workspace's display name, e.g.
+   * `Acme-Investigations-2026-07-31.cfyre`.
+   *
+   * Kept readable rather than merely path-safe: this is the name that lands in
+   * someone's Downloads folder, so spaces become hyphens instead of
+   * underscores and the timestamp carries the minute, so two exports on the
+   * same day do not look like the same file.
+   */
+  archiveFileName(namespaceName: string): string {
+    const stamp = new Date()
+      .toISOString()
+      .slice(0, 16)
+      .replace('T', '-')
+      .replace(':', '');
+    const label =
+      namespaceName
+        .trim()
+        .replace(/[^a-zA-Z0-9._-]+/g, '-')
+        .replace(/-{2,}/g, '-')
+        .replace(/^-|-$/g, '')
+        .slice(0, 60) || 'workspace';
+    return `${label}-${stamp}${ARCHIVE_EXTENSION}`;
   }
 
   async exists(filePath: string): Promise<boolean> {
