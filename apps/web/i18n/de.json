@@ -76,7 +76,17 @@
     "settingsSaved": "Arbeitsbereichseinstellungen gespeichert",
     "settingsSaveFailed": "Arbeitsbereichseinstellungen konnten nicht gespeichert werden",
     "savingSettings": "Wird gespeichert…",
-    "saveChanges": "Änderungen speichern"
+    "saveChanges": "Änderungen speichern",
+    "seedOptional": "Aus einem Archiv starten (optional)",
+    "seedHint": "Diesen Workspace aus einem exportierten Archiv befüllen",
+    "seedChoose": "Archiv wählen",
+    "seedRemove": "Archiv entfernen",
+    "seedImporting": "Das Archiv wird in den neuen Workspace importiert.",
+    "seedImportingShort": "Import läuft…",
+    "seedContinueInBackground": "Im Hintergrund fortsetzen",
+    "seedOpen": "Workspace öffnen",
+    "seedFailed": "Der Workspace wurde erstellt, das Archiv konnte aber nicht importiert werden",
+    "createAndImport": "Erstellen und importieren"
   },
   "demo": {
     "badge": "Demo",
@@ -263,7 +273,8 @@
       "global": "Allgemein",
       "aiProviders": "KI-Anbieter",
       "mcp": "MCP-Server",
-      "chat": "Chat-Bots"
+      "chat": "Chat-Bots",
+      "data": "Export & Import"
     },
     "version": {
       "heading": "Softwareversion",
@@ -368,6 +379,123 @@
       "removedToast": "Hugging Face-Token entfernt",
       "saveFailedToast": "Hugging Face-Token konnte nicht gespeichert werden",
       "removeFailedToast": "Hugging Face-Token konnte nicht entfernt werden"
+    }
+  },
+  "dataTransfer": {
+    "heading": "Export & Import",
+    "description": "Daten dieses Workspace auf eine andere Classifyre-Instanz übertragen oder ein Archiv einlesen.",
+    "exportHeading": "Export",
+    "exportDesc": "Schreibt die ausgewählten Daten in ein komprimiertes Archiv, das Sie herunterladen und in einen anderen Workspace laden können.",
+    "importHeading": "Import",
+    "importDesc": "Lädt ein aus einem anderen Workspace exportiertes Archiv. Sie wählen, welche Teile übernommen werden.",
+    "secretsHeading": "Zugangsdaten werden nie exportiert",
+    "secretsExportBody": "Passwörter und Token von Quellen, API-Schlüssel von KI-Anbietern, MCP-Anfrage-Header, Chatbot-Token und das Hugging-Face-Token werden aus jedem Archiv entfernt. Wer es importiert, muss eigene eintragen.",
+    "secretsImportBody": "Dieses Archiv enthält keine Zugangsdaten. Importierte Quellen, KI-Anbieter, MCP-Server und Chatbots sind deaktiviert bzw. nicht authentifiziert, bis Sie Zugangsdaten hinterlegen.",
+    "newIdsHeading": "Importierte Datensätze erhalten neue IDs",
+    "newIdsBody": "Alles wird zusätzlich zum vorhandenen Bestand angelegt — nichts wird ersetzt oder überschrieben. Verweise zwischen Datensätzen werden passend umgeschrieben, die Daten bleiben also konsistent. Wird dasselbe Archiv zweimal importiert, entstehen zwei unabhängige Kopien.",
+    "noScheduleNote": "Scan-Zeitpläne werden nicht exportiert. Importierte Quellen kommen ohne Zeitplan und inaktiv an.",
+    "noSecretsChip": "Ohne Secrets",
+    "heavyChip": "Groß",
+    "secretsStrippedHint": "Zugangsdaten in diesen Daten werden vor dem Schreiben des Archivs entfernt.",
+    "selectAll": "Alle auswählen",
+    "selectNone": "Auswahl aufheben",
+    "rowsSelected": "{{count}} Zeilen · {{scopes}} ausgewählt",
+    "noScopes": "Nichts zu übertragen.",
+    "dependencyWarning": "Wählen Sie zusätzlich {{scopes}}, sonst werden Zeilen mit Verweisen darauf übersprungen.",
+    "startExport": "Daten exportieren",
+    "exporting": "Export läuft…",
+    "exportStarted": "Export gestartet",
+    "exportFailed": "Export konnte nicht gestartet werden",
+    "scopesFailed": "Datenkatalog konnte nicht geladen werden",
+    "download": "Herunterladen ({{size}})",
+    "downloadShort": "Herunterladen",
+    "expiresAt": "Archiv wird gelöscht am {{when}}",
+    "archiveSize": "Archivgröße",
+    "dropArchive": "Archiv hierher ziehen",
+    "archiveHint": ".cfyre — aus einem beliebigen Classifyre-Workspace exportiert",
+    "chooseFile": "Datei wählen",
+    "reading": "Archiv wird gelesen…",
+    "uploadFailed": "Dieses Archiv konnte nicht gelesen werden",
+    "archiveFile": "Datei",
+    "archiveFrom": "Exportiert aus",
+    "archiveCreated": "Exportiert am",
+    "archiveEmpty": "Dieses Archiv enthält keine importierbaren Daten.",
+    "discardArchive": "Archiv verwerfen",
+    "conflictMode": "Wenn ein Eintrag bereits existiert",
+    "conflictSkip": "Vorhandenen Eintrag behalten",
+    "conflictOverwrite": "Durch das Archiv ersetzen",
+    "conflictSkipHint": "Importierte Datensätze werden immer als neue Datensätze mit neuen IDs angelegt, es wird also nichts ersetzt. Dies betrifft nur über den Namen zugeordnete Einträge — Glossarbegriffe, MCP-Server — sowie die Instanzeinstellungen: diese bleiben unverändert.",
+    "conflictOverwriteHint": "Importierte Datensätze werden immer als neue Datensätze mit neuen IDs angelegt. Dies betrifft nur über den Namen zugeordnete Einträge — Glossarbegriffe, MCP-Server — sowie die Instanzeinstellungen: diese werden durch das Archiv überschrieben. Das lässt sich nicht rückgängig machen.",
+    "startImport": "Daten importieren",
+    "importStarted": "Import gestartet",
+    "importFailed": "Import konnte nicht gestartet werden",
+    "importAnother": "Weiteres Archiv importieren",
+    "cancel": "Abbrechen",
+    "cancelling": "Wird gestoppt…",
+    "preparing": "Wird vorbereitet…",
+    "processingTable": "{{table}} wird gelesen",
+    "rowsTransferred": "Übertragene Zeilen",
+    "rowsSkipped": "Übersprungene Zeilen",
+    "showManifest": "Manifest anzeigen",
+    "historyHeading": "Verlauf",
+    "historyEmpty": "Noch keine Übertragungen.",
+    "historyRows": "{{rows}} Zeilen",
+    "kindExport": "Export",
+    "kindImport": "Import",
+    "noArchive": "Kein Archiv",
+    "deleteJob": "Übertragung löschen",
+    "status": {
+      "PENDING": "In Warteschlange",
+      "RUNNING": "Läuft",
+      "COMPLETED": "Fertig",
+      "FAILED": "Fehlgeschlagen",
+      "CANCELLED": "Abgebrochen"
+    },
+    "scopes": {
+      "sources": {
+        "label": "Quellen",
+        "description": "Quellendefinitionen, Zeitpläne und Scan-Konfiguration. Verbindungsdaten werden immer entfernt."
+      },
+      "sourceFiles": {
+        "label": "Sandbox-Uploads",
+        "description": "Die Rohdaten der in Sandbox-Quellen hochgeladenen Dateien. Groß — das Archiv wächst etwa um die Größe der Uploads."
+      },
+      "assets": {
+        "label": "Assets",
+        "description": "Eingelesene Dokumente mit Metadaten und extrahiertem Text."
+      },
+      "findings": {
+        "label": "Funde",
+        "description": "Erkennungen mit Belegen, Extraktionsdaten und Prüfer-Feedback."
+      },
+      "customDetectors": {
+        "label": "Eigene Detektoren",
+        "description": "Detektordefinitionen mit Trainingsbeispielen, Trainingsverlauf und Testszenarien."
+      },
+      "glossary": {
+        "label": "Glossar",
+        "description": "Begriffe, Aliase und Entitätsannotationen."
+      },
+      "fingerprints": {
+        "label": "Fingerprints",
+        "description": "Korrelationswerte, Asset-Signaturen, Duplikat-Cluster und der Beziehungsgraph."
+      },
+      "investigations": {
+        "label": "Untersuchungen",
+        "description": "Fälle und Anfragen mit Belegen, Spuren, Chronologie, Notizen und Threads."
+      },
+      "scanData": {
+        "label": "Scan-Verlauf",
+        "description": "Läufe mit Ergebnissen je Asset und Abdeckungsstatistiken. Der größte Bereich in einem gewachsenen Workspace."
+      },
+      "harness": {
+        "label": "KI-Harness",
+        "description": "Agentenläufe, Entscheidungen, Logs, Langzeitgedächtnis, Agentenkonfiguration und verbundene MCP-Server. MCP-Anfrage-Header werden entfernt."
+      },
+      "instanceConfig": {
+        "label": "Instanzkonfiguration",
+        "description": "Regionale Vorgaben, Autopilot-Schalter, KI-Anbieter und Chatbots. API-Schlüssel und Bot-Token werden immer entfernt."
+      }
     }
   },
   "sources": {

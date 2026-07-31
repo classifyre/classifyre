@@ -50,17 +50,7 @@ docker exec k3d-classifyre-server-0 sh -ec '
     /var/lib/classifyre/cache/api/schemas-node-modules \
     /var/lib/classifyre/cache/api/eslint-node-modules \
     /var/lib/classifyre/cache/api/typescript-config-node-modules \
-    /var/lib/classifyre/cache/api/bun \
-    /var/lib/classifyre/cache/web/root-node-modules \
-    /var/lib/classifyre/cache/web/web-node-modules \
-    /var/lib/classifyre/cache/web/api-client-node-modules \
-    /var/lib/classifyre/cache/web/schemas-node-modules \
-    /var/lib/classifyre/cache/web/ui-node-modules \
-    /var/lib/classifyre/cache/web/eslint-node-modules \
-    /var/lib/classifyre/cache/web/typescript-config-node-modules \
-    /var/lib/classifyre/cache/web/bun \
-    /var/lib/classifyre/cache/web/next
-  touch /var/lib/classifyre/cache/web/next-env.d.ts
+    /var/lib/classifyre/cache/api/bun
   chown -R 10001:10001 /var/lib/classifyre/cache
 '
 

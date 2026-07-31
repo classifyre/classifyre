@@ -11,6 +11,7 @@ export { CorrelationApi } from './CorrelationApi';
 export { CustomDetectorExtractionsApi } from './CustomDetectorExtractionsApi';
 export { CustomDetectorTestsApi } from './CustomDetectorTestsApi';
 export { CustomDetectorsApi } from './CustomDetectorsApi';
+export { DataTransferApi } from './DataTransferApi';
 export { EmbeddingsApi } from './EmbeddingsApi';
 export { FindingsApi } from './FindingsApi';
 export { GlossaryApi } from './GlossaryApi';

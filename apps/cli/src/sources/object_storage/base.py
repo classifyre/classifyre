@@ -824,6 +824,25 @@ class ObjectStorageSourceBase(BaseSource, ABC):
                 raw_bytes = member_path.read_bytes()
         mime = self._mime_cache.get(asset_id, "")
 
+        if raw_bytes is None:
+            # Normal phase-2 path: discovery ran with discovery_only=True, so no
+            # bytes were ever cached. Fetch them once here.
+            #
+            # Falling through to fetch_content() instead would download the
+            # object via _build_snapshot() and then discard it (the snapshot
+            # carries no text for object storage), leaving the caller's
+            # fetch_content_bytes() fallback to download the very same object a
+            # second time — 2x egress on every object-storage scan.
+            #
+            # These bytes stay a local of this generator, so they are released
+            # when it finishes whether or not the asset is evicted (the caller
+            # skips eviction on error). Caching them here instead would leak one
+            # object per failed asset, which a memory-capped scan pod cannot
+            # afford.
+            fetched = await self.fetch_content_bytes(asset_id)
+            if fetched is not None:
+                raw_bytes, mime = fetched
+
         logger.info(
             "fetch_content_pages(%s): raw_bytes=%s mime=%s processed=%s",
             asset_id,

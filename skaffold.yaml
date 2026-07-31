@@ -26,11 +26,6 @@ profiles:
 
     portForward:
       - resourceType: service
-        resourceName: classifyre-web
-        namespace: classifyre-dev
-        port: 3000
-        localPort: 3301
-      - resourceType: service
         resourceName: classifyre-api
         namespace: classifyre-dev
         port: 8000

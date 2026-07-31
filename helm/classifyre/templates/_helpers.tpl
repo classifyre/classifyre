@@ -441,6 +441,19 @@ which each deployment sets on its own after including this block.
   value: "1"
 {{- end }}
 {{- end }}
+{{- /* ── Namespace export/import ────────────────────────────── */}}
+{{- /* Archives are written by the worker and downloaded from the API — two
+       separate deployments — so they must go somewhere both can reach. Object
+       storage handles that when enabled; dataTransfer.dir is the escape hatch
+       for installs with a ReadWriteMany volume mounted into both. */}}
+{{- if .Values.dataTransfer.dir }}
+- name: DATA_TRANSFER_DIR
+  value: {{ .Values.dataTransfer.dir | quote }}
+{{- end }}
+- name: DATA_TRANSFER_TTL_HOURS
+  value: {{ .Values.dataTransfer.ttlHours | quote }}
+- name: DATA_TRANSFER_MAX_GB
+  value: {{ .Values.dataTransfer.maxSizeGb | quote }}
 {{- /* ── S3 / object-storage configuration ─────────────────── */}}
 - name: S3_CONFIGURED
   value: {{ .Values.objectStorage.enabled | quote }}
@@ -449,6 +462,8 @@ which each deployment sets on its own after including this block.
   value: {{ .Values.objectStorage.bucket | quote }}
 - name: S3_LOG_PREFIX
   value: {{ .Values.objectStorage.logPrefix | quote }}
+- name: S3_TRANSFER_PREFIX
+  value: {{ .Values.objectStorage.transferPrefix | quote }}
 - name: S3_REGION
   value: {{ .Values.objectStorage.region | quote }}
 - name: S3_FORCE_PATH_STYLE

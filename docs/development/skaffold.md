@@ -22,16 +22,25 @@ The first command creates `k3d-classifyre`, mounts the checkout read-only into
 the k3d node, disables Traefik, and installs the current ingress-nginx chart.
 The second runs `skaffold dev --profile dev`.
 
-| Component     | Endpoint                           |
-| ------------- | ---------------------------------- |
-| Next.js       | <http://localhost:3301>            |
-| NestJS API    | <http://localhost:8811>            |
-| PostgreSQL    | `localhost:5555`                   |
-| NGINX ingress | <http://classifyre.localhost:8080> |
+| Component     | Endpoint                                     |
+| ------------- | --------------------------------------------- |
+| NestJS API    | <http://localhost:8811>                      |
+| PostgreSQL    | `localhost:5555`                             |
+| NGINX ingress | <http://classifyre.localhost:8080/api/...>   |
 
 These are the local ports Skaffold forwards, which differ from the in-cluster
-ports the services listen on (3000, 8000, 5432). `portForward` in
-`skaffold.yaml` is the source of truth.
+ports the services listen on (8000, 5432). `portForward` in `skaffold.yaml` is
+the source of truth.
+
+Web (`frontend.enabled: false` in `values-dev.yaml`) is not deployed to this
+cluster at all — run it locally with `bun run dev` in `apps/web`, pointed at
+the API port-forward above. See
+[`scripts/dev/README.md`](../../scripts/dev/README.md) for the exact command.
+It previously ran as `next dev --turbopack` in-cluster against a
+hostPath-persisted `.next` cache, but that cache repeatedly drifted from the
+actual route tree (stale/missing route manifest entries after restarts,
+producing 404s Turbopack never got around to fixing). Running it as an
+ordinary local process removes that cache entirely.
 
 ## How development runs
 
@@ -40,11 +49,12 @@ changes, streams deployment status, and owns the port-forwards. Its local
 profile intentionally has no build artifacts or file-sync rules.
 
 The k3d node exposes the checkout at `/var/lib/classifyre/source`. Helm mounts
-that source read-only into official Bun containers. Writable dependency and
-framework paths are overlaid from `/var/lib/classifyre/cache` inside the k3d
-node, so host `node_modules` are never used or modified.
+that source read-only into official Bun containers for API and worker.
+Writable dependency and framework paths are overlaid from
+`/var/lib/classifyre/cache` inside the k3d node, so host `node_modules` are
+never used or modified. Web is not part of any of this — it runs as a normal
+local process outside the cluster.
 
-- Web runs `bun --bun next dev --turbopack` with filesystem polling.
 - API and worker run `bun --watch src/main.ts`.
 - PostgreSQL runs as the chart's embedded Kubernetes workload.
 - CLI scans use the production `classifyre/cli` image with only CLI and shared
@@ -58,10 +68,10 @@ and worker installations are serialized through a shared lock directory.
 
 | Change                                | Result                                                                       |
 | ------------------------------------- | ---------------------------------------------------------------------------- |
-| Web or shared frontend source         | Next.js Fast Refresh; no image build or Helm upgrade                         |
+| Web or shared frontend source         | Handled by your local `next dev`; this cluster isn't involved               |
 | API TypeScript source                 | Bun restarts API and worker processes in their existing pods                 |
 | CLI or Python schema source           | The next CLI Job uses the changed files                                      |
-| `bun.lock` or relevant `package.json` | Restart web/API/worker; dependencies reinstall into k3d-owned caches         |
+| `bun.lock` or relevant `package.json` | Restart API/worker; dependencies reinstall into k3d-owned caches            |
 | Prisma schema                         | Restart API/worker; Prisma client regenerates and startup applies migrations |
 | Python dependency files               | Build and publish the normal production CLI image through CI                 |
 | Helm templates or `values-dev.yaml`   | Skaffold upgrades the Helm release                                           |
@@ -96,8 +106,7 @@ Restart workloads after dependency or Prisma metadata changes:
 ```bash
 kubectl -n classifyre-dev rollout restart \
   deployment/classifyre-api \
-  deployment/classifyre-worker \
-  deployment/classifyre-web
+  deployment/classifyre-worker
 ```
 
 Remove the Helm release while keeping the cluster and warm caches:

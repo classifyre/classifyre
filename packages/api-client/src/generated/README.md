@@ -162,6 +162,15 @@ All URIs are relative to *http://localhost*
 *CustomDetectorsApi* | [**customDetectorsControllerTrainingExamplesStats**](docs/CustomDetectorsApi.md#customdetectorscontrollertrainingexamplesstats) | **GET** /custom-detectors/{id}/training-examples/stats | Get training example counts grouped by label
 *CustomDetectorsApi* | [**customDetectorsControllerTrainingHistory**](docs/CustomDetectorsApi.md#customdetectorscontrollertraininghistory) | **GET** /custom-detectors/{id}/training-history | List training history for custom detector
 *CustomDetectorsApi* | [**customDetectorsControllerUpdate**](docs/CustomDetectorsApi.md#customdetectorscontrollerupdate) | **PATCH** /custom-detectors/{id} | Update custom detector
+*DataTransferApi* | [**dataTransferControllerCancel**](docs/DataTransferApi.md#datatransfercontrollercancel) | **POST** /data-transfer/jobs/{id}/cancel | Ask a running transfer to stop
+*DataTransferApi* | [**dataTransferControllerDownload**](docs/DataTransferApi.md#datatransfercontrollerdownload) | **GET** /data-transfer/exports/{id}/download | Download a completed export archive
+*DataTransferApi* | [**dataTransferControllerJob**](docs/DataTransferApi.md#datatransfercontrollerjob) | **GET** /data-transfer/jobs/{id} | Poll one transfer job for progress
+*DataTransferApi* | [**dataTransferControllerJobs**](docs/DataTransferApi.md#datatransfercontrollerjobs) | **GET** /data-transfer/jobs | List recent export and import jobs
+*DataTransferApi* | [**dataTransferControllerRemove**](docs/DataTransferApi.md#datatransfercontrollerremove) | **DELETE** /data-transfer/jobs/{id} | Delete a finished job and its archive
+*DataTransferApi* | [**dataTransferControllerScopes**](docs/DataTransferApi.md#datatransfercontrollerscopes) | **GET** /data-transfer/scopes | List the kinds of data that can be exported, with row counts
+*DataTransferApi* | [**dataTransferControllerStartExport**](docs/DataTransferApi.md#datatransfercontrollerstartexport) | **POST** /data-transfer/exports | Start an export of the selected scopes
+*DataTransferApi* | [**dataTransferControllerStartImport**](docs/DataTransferApi.md#datatransfercontrollerstartimport) | **POST** /data-transfer/imports | Import selected scopes from an uploaded archive
+*DataTransferApi* | [**dataTransferControllerUpload**](docs/DataTransferApi.md#datatransfercontrollerupload) | **POST** /data-transfer/imports/upload | Upload an archive and read its manifest without importing it
 *EmbeddingsApi* | [**embeddingControllerBoilerplate**](docs/EmbeddingsApi.md#embeddingcontrollerboilerplate) | **GET** /sources/{sourceId}/boilerplate-clusters | Near-duplicate finding clusters in a source (repeated boilerplate)
 *EmbeddingsApi* | [**embeddingControllerBoilerplateGlobal**](docs/EmbeddingsApi.md#embeddingcontrollerboilerplateglobal) | **GET** /embeddings/boilerplate-clusters | Near-duplicate finding clusters across the corpus, optionally filtered to specific sources
 *EmbeddingsApi* | [**embeddingControllerChunks**](docs/EmbeddingsApi.md#embeddingcontrollerchunks) | **POST** /sources/{sourceId}/embeddings/chunks | Store asset chunk-to-content mappings
@@ -294,6 +303,7 @@ All URIs are relative to *http://localhost*
 - [AiMessageDto](docs/AiMessageDto.md)
 - [AiProviderConfigResponseDto](docs/AiProviderConfigResponseDto.md)
 - [AiProviderConfigTestResultDto](docs/AiProviderConfigTestResultDto.md)
+- [ArchivePreviewDto](docs/ArchivePreviewDto.md)
 - [AssetChunkDto](docs/AssetChunkDto.md)
 - [AssetFindingDetectorCountDto](docs/AssetFindingDetectorCountDto.md)
 - [AssetFindingSeverityCountDto](docs/AssetFindingSeverityCountDto.md)
@@ -364,6 +374,9 @@ All URIs are relative to *http://localhost*
 - [CustomDetectorResponseDto](docs/CustomDetectorResponseDto.md)
 - [CustomDetectorResponseDtoSourcesUsingInner](docs/CustomDetectorResponseDtoSourcesUsingInner.md)
 - [CustomDetectorTrainingRunDto](docs/CustomDetectorTrainingRunDto.md)
+- [DataTransferJobDto](docs/DataTransferJobDto.md)
+- [DataTransferJobListDto](docs/DataTransferJobListDto.md)
+- [DeleteDataTransferJobResponseDto](docs/DeleteDataTransferJobResponseDto.md)
 - [DeleteGlossaryTermResponseDto](docs/DeleteGlossaryTermResponseDto.md)
 - [DeleteRunnerResponseDto](docs/DeleteRunnerResponseDto.md)
 - [DiscoveryRecentRunDto](docs/DiscoveryRecentRunDto.md)
@@ -515,6 +528,8 @@ All URIs are relative to *http://localhost*
 - [SourceResponseDto](docs/SourceResponseDto.md)
 - [SourcesControllerGetSchedule200Response](docs/SourcesControllerGetSchedule200Response.md)
 - [SourcesControllerUpdateStatusRequest](docs/SourcesControllerUpdateStatusRequest.md)
+- [StartExportDto](docs/StartExportDto.md)
+- [StartImportDto](docs/StartImportDto.md)
 - [StartRunnerDto](docs/StartRunnerDto.md)
 - [StopRunnerResponseDto](docs/StopRunnerResponseDto.md)
 - [TestConnectionResponseDto](docs/TestConnectionResponseDto.md)
@@ -528,6 +543,7 @@ All URIs are relative to *http://localhost*
 - [TrainingExampleItemDto](docs/TrainingExampleItemDto.md)
 - [TrainingExamplesStatsDto](docs/TrainingExamplesStatsDto.md)
 - [TrainingExamplesStatsDtoByLabelValue](docs/TrainingExamplesStatsDtoByLabelValue.md)
+- [TransferScopeDto](docs/TransferScopeDto.md)
 - [TriggerAutopilotDto](docs/TriggerAutopilotDto.md)
 - [TriggerAutopilotResponseDto](docs/TriggerAutopilotResponseDto.md)
 - [UpdateAgentConfigDto](docs/UpdateAgentConfigDto.md)
