@@ -13,6 +13,13 @@
  */
 
 import { mapValues } from '../runtime';
+import type { PayloadCursorEntryDto } from './PayloadCursorEntryDto';
+import {
+    PayloadCursorEntryDtoFromJSON,
+    PayloadCursorEntryDtoFromJSONTyped,
+    PayloadCursorEntryDtoToJSON,
+    PayloadCursorEntryDtoToJSONTyped,
+} from './PayloadCursorEntryDto';
 import type { ScanCacheEntryDto } from './ScanCacheEntryDto';
 import {
     ScanCacheEntryDtoFromJSON,
@@ -39,6 +46,12 @@ export interface RegisterDiscoveredAssetsResponseDto {
      * @memberof RegisterDiscoveredAssetsResponseDto
      */
     cache?: Array<ScanCacheEntryDto>;
+    /**
+     * Present only when includePayloadCursor was requested. An asset appears here if it has a stored payload position, whatever its scan-cache state; an absent hash means the sweep of that payload starts at row 0.
+     * @type {Array<PayloadCursorEntryDto>}
+     * @memberof RegisterDiscoveredAssetsResponseDto
+     */
+    payloadCursors?: Array<PayloadCursorEntryDto>;
 }
 
 /**
@@ -61,6 +74,7 @@ export function RegisterDiscoveredAssetsResponseDtoFromJSONTyped(json: any, igno
         
         'registered': json['registered'],
         'cache': json['cache'] == null ? undefined : ((json['cache'] as Array<any>).map(ScanCacheEntryDtoFromJSON)),
+        'payloadCursors': json['payloadCursors'] == null ? undefined : ((json['payloadCursors'] as Array<any>).map(PayloadCursorEntryDtoFromJSON)),
     };
 }
 
@@ -77,6 +91,7 @@ export function RegisterDiscoveredAssetsResponseDtoToJSONTyped(value?: RegisterD
         
         'registered': value['registered'],
         'cache': value['cache'] == null ? undefined : ((value['cache'] as Array<any>).map(ScanCacheEntryDtoToJSON)),
+        'payloadCursors': value['payloadCursors'] == null ? undefined : ((value['payloadCursors'] as Array<any>).map(PayloadCursorEntryDtoToJSON)),
     };
 }
 

@@ -13,6 +13,9 @@ The decision is a conjunction, and every clause is a veto:
 * the source scope must not have moved,
 * the content must be identical — by the source-reported checksum, and by a
   SHA-256 of the bytes when the source's checksum is only mtime and size,
+* the sampling strategy must not be part-way through the asset's payload — an
+  unchanged Parquet file with four million unread rows is unchanged and unscanned
+  at the same time (see ``pipeline.payload_window``),
 * and a detector re-runs unless its configuration fingerprint is unchanged.
 
 A detector is cached individually, so adding one detector re-runs that detector
@@ -129,11 +132,16 @@ def _content_shape(recipe: dict[str, Any]) -> dict[str, Any]:
     Deliberately over-inclusive: the whole ``optional`` subtree counts, even keys
     that only affect connection behaviour.  A false "changed" costs one run; a
     false "unchanged" silently under-scans, which is the failure that matters.
+
+    ``strategy`` is in here because it selects *which rows* of a payload a
+    detector sees.  Results banked under LATEST describe the top of a file and
+    say nothing about the rest, so switching to AUTOMATIC must not reuse them.
     """
     sampling = recipe.get("sampling")
     sampling = sampling if isinstance(sampling, dict) else {}
     return {
         "optional": recipe.get("optional") or {},
+        "strategy": sampling.get("strategy"),
         "rows_per_page": sampling.get("rows_per_page"),
         "include_column_names": sampling.get("include_column_names"),
     }
@@ -237,9 +245,11 @@ class ScanCache:
         source: Any,
         *,
         scope_fingerprint: str | None = None,
+        payload_windows: Any = None,
     ) -> None:
         self._source = source
         self._scope_fingerprint = scope_fingerprint
+        self._payload_windows = payload_windows
         self._prior: dict[str, PriorScanState] = {}
 
         config = recipe.get("scan_cache")
@@ -363,6 +373,13 @@ class ScanCache:
         checksum = getattr(asset, "checksum", None)
         if not prior.checksum or not checksum or prior.checksum != str(checksum):
             return ScanPlan.full("asset checksum changed")
+
+        # An unchanged checksum is the cache's whole case for skipping, and it is
+        # exactly the wrong answer for a payload that is being read a window at a
+        # time. The file has not moved; the rows nobody has read yet are still
+        # unread. Ask the payload window before trusting sameness.
+        if self._payload_windows is not None and self._payload_windows.advances_for(asset):
+            return ScanPlan.full("payload sampling window still has rows to cover")
 
         content_hash = prior.content_hash
         if self._verify == "content":

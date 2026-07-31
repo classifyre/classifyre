@@ -431,6 +431,29 @@ export class RegisterDiscoveredAssetsDto {
   @IsOptional()
   @IsBoolean()
   includeScanCache?: boolean;
+
+  @ApiProperty({
+    required: false,
+    default: false,
+    description:
+      "Return each asset's stored payload cursor — how far a sampling strategy has read into that asset's tabular payload. The CLI resumes an AUTOMATIC sweep from it instead of restarting at row 0. Requested independently of includeScanCache: a position is not proof that a scan completed, and sources that never opted into the scan cache still page their payloads.",
+  })
+  @IsOptional()
+  @IsBoolean()
+  includePayloadCursor?: boolean;
+}
+
+export class PayloadCursorEntryDto {
+  @ApiProperty({ description: 'Asset hash the cursor belongs to' })
+  hash: string;
+
+  @ApiProperty({
+    type: 'object',
+    additionalProperties: true,
+    description:
+      'Opaque, CLI-defined cursor: `{ v, kind, offset, rows_seen, passes, exhausted, checksum, strategy }`. The API stores and returns it without interpreting it; the CLI discards one whose checksum or strategy no longer matches.',
+  })
+  cursor: Record<string, unknown>;
 }
 
 export class ScanCacheEntryDto {
@@ -579,6 +602,14 @@ export class RegisterDiscoveredAssetsResponseDto {
       'Present only when includeScanCache was requested. An asset appears here only if its last scan completed cleanly enough to persist scan-cache state, so an absent hash always means "process this in full".',
   })
   cache?: ScanCacheEntryDto[];
+
+  @ApiProperty({
+    type: [PayloadCursorEntryDto],
+    required: false,
+    description:
+      'Present only when includePayloadCursor was requested. An asset appears here if it has a stored payload position, whatever its scan-cache state; an absent hash means the sweep of that payload starts at row 0.',
+  })
+  payloadCursors?: PayloadCursorEntryDto[];
 }
 
 export class RunnerAssetProgressDto {

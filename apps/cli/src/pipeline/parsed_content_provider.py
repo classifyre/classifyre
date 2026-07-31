@@ -61,7 +61,7 @@ class ParsedContentProvider:
         )
         pages: list[str] = await asyncio.to_thread(
             list,
-            self._source.iter_asset_pages(raw_bytes, mime),
+            self._source.iter_asset_pages(raw_bytes, mime, asset_id=asset_id),
         )
         for page in pages:
             yield page

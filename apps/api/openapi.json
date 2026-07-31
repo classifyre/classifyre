@@ -17655,6 +17655,11 @@
             "type": "boolean",
             "default": false,
             "description": "Return each asset's persisted scan-cache state alongside the registration. The CLI uses it to skip assets whose content and detector configuration are unchanged. It must be read here, before the discovery ingest overwrites the stored checksum with the incoming one."
+          },
+          "includePayloadCursor": {
+            "type": "boolean",
+            "default": false,
+            "description": "Return each asset's stored payload cursor — how far a sampling strategy has read into that asset's tabular payload. The CLI resumes an AUTOMATIC sweep from it instead of restarting at row 0. Requested independently of includeScanCache: a position is not proof that a scan completed, and sources that never opted into the scan cache still page their payloads."
           }
         },
         "required": [
@@ -17722,6 +17727,24 @@
           "textExtractionStatus"
         ]
       },
+      "PayloadCursorEntryDto": {
+        "type": "object",
+        "properties": {
+          "hash": {
+            "type": "string",
+            "description": "Asset hash the cursor belongs to"
+          },
+          "cursor": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Opaque, CLI-defined cursor: `{ v, kind, offset, rows_seen, passes, exhausted, checksum, strategy }`. The API stores and returns it without interpreting it; the CLI discards one whose checksum or strategy no longer matches."
+          }
+        },
+        "required": [
+          "hash",
+          "cursor"
+        ]
+      },
       "RegisterDiscoveredAssetsResponseDto": {
         "type": "object",
         "properties": {
@@ -17733,6 +17756,13 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/ScanCacheEntryDto"
+            }
+          },
+          "payloadCursors": {
+            "description": "Present only when includePayloadCursor was requested. An asset appears here if it has a stored payload position, whatever its scan-cache state; an absent hash means the sweep of that payload starts at row 0.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PayloadCursorEntryDto"
             }
           }
         },

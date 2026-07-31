@@ -9,6 +9,7 @@ from collections.abc import Generator
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
+from typing import Any
 from urllib.parse import urlsplit
 
 from .legacy_office import LEGACY_OFFICE_MIME_TYPES as _LEGACY_OFFICE_MIME_TYPES
@@ -387,6 +388,28 @@ def infer_mime_type_from_file_name(file_name: str) -> str:
     """Infer MIME type from file name or URL path extension."""
     extension = _file_extension(file_name)
     return _MIME_HINTS_BY_EXTENSION.get(extension, "application/octet-stream")
+
+
+# Public view of the tabular set. A payload in it has a row axis, which is what
+# lets a sampling strategy address "the next 100 rows" of it (see
+# ``pipeline.payload_window``).
+TABULAR_MIME_TYPES = frozenset(_TABULAR_MIME_TYPES)
+
+
+def is_tabular_mime_type(mime_type: str | None) -> bool:
+    """Whether this payload has a row axis a sampling window can address."""
+    return _normalize_mime_type(mime_type) in TABULAR_MIME_TYPES
+
+
+def tabular_mime_type_for_name(file_name: str) -> str | None:
+    """The tabular MIME type a file name implies, or None if it implies none.
+
+    Name-only, so a caller can tell whether an asset is row-shaped without
+    downloading it — which is what the scan cache needs before it decides to
+    skip an asset it would otherwise never fetch.
+    """
+    inferred = infer_mime_type_from_file_name(file_name)
+    return inferred if inferred in TABULAR_MIME_TYPES else None
 
 
 def normalize_detected_mime_type(detected_mime_type: str, file_name: str) -> str:
@@ -1136,6 +1159,8 @@ def iter_file_pages(
     include_column_names: bool = True,
     *,
     file_name: str = "",
+    start_row: int = 0,
+    max_rows: int | None = None,
 ) -> Generator[str, None, None]:
     """
     Iterate over file content in pages of up to batch_size rows or lines.
@@ -1147,13 +1172,31 @@ def iter_file_pages(
     Unknown binary types → yield nothing.
 
     New file formats only need to be added to extract_text() — not here.
+
+    ``start_row``/``max_rows`` bound the sweep to one window of a tabular payload
+    (see ``pipeline.payload_window``). They are pushed down into the reader where
+    the format allows it — a Parquet sweep resuming at row 4,000,000 skips whole
+    row groups without decoding them — and only ever restrict the output, so a
+    caller that leaves them at their defaults sees exactly the previous behaviour.
+    They are ignored for payloads with no row axis, which have no window to apply.
     """
     normalized = _normalize_mime_type(mime_type)
 
     if normalized in ("application/parquet", "application/vnd.apache.parquet"):
-        yield from _iter_parquet_pages(file_bytes, batch_size, include_column_names)
+        yield from _iter_parquet_pages(
+            file_bytes,
+            batch_size,
+            include_column_names,
+            start_row=start_row,
+            max_rows=max_rows,
+        )
     elif normalized in ("text/csv", "text/tab-separated-values"):
-        yield from _iter_csv_pages(file_bytes, include_column_names)
+        yield from _iter_csv_pages(
+            file_bytes,
+            include_column_names,
+            start_row=start_row,
+            max_rows=max_rows,
+        )
     elif normalized.startswith("audio/"):
         # Stream transcript pages directly from the chunked transcription pipeline
         # so the detector receives text as each ~10-min audio chunk completes
@@ -1215,14 +1258,32 @@ def iter_file_pages(
                     ),
                 )
         if text:
-            yield from _iter_text_lines(text, batch_size)
+            yield from _iter_text_lines(
+                text,
+                batch_size,
+                start_row=start_row,
+                max_rows=max_rows,
+            )
 
 
-def _iter_text_lines(text: str, batch_size: int) -> Generator[str, None, None]:
-    """Yield non-empty text in chunks of batch_size lines."""
+def _iter_text_lines(
+    text: str,
+    batch_size: int,
+    *,
+    start_row: int = 0,
+    max_rows: int | None = None,
+) -> Generator[str, None, None]:
+    """Yield non-empty text in chunks of batch_size lines.
+
+    This is the row axis for tabular formats that reach the detectors as text
+    rather than as records — a spreadsheet extracts to one line per row — so the
+    payload window addresses it in lines.
+    """
     lines = text.splitlines(keepends=True)
-    for start in range(0, len(lines), batch_size):
-        chunk = "".join(lines[start : start + batch_size])
+    begin = max(0, start_row)
+    end = len(lines) if max_rows is None else min(len(lines), begin + max(0, max_rows))
+    for start in range(begin, end, batch_size):
+        chunk = "".join(lines[start : min(start + batch_size, end)])
         if chunk.strip():
             yield chunk
 
@@ -1230,10 +1291,62 @@ def _iter_text_lines(text: str, batch_size: int) -> Generator[str, None, None]:
 _PARQUET_MAGIC = b"PAR1"
 
 
+def count_tabular_rows(file_bytes: bytes, mime_type: str) -> int | None:
+    """Total rows in a tabular payload, but only when it is free to ask.
+
+    Parquet stores the count in its footer. CSV does not, and counting it would
+    mean a full pass — so this returns None there and the caller uses a strategy
+    that needs no total (reservoir sampling). None means "unknown", never "zero".
+    """
+    normalized = _normalize_mime_type(mime_type)
+    if normalized not in ("application/parquet", "application/vnd.apache.parquet"):
+        return None
+    if len(file_bytes) < 8 or file_bytes[-4:] != _PARQUET_MAGIC:
+        return None
+    try:
+        import io
+
+        pq = _require_file_processing("pyarrow.parquet")
+        return int(pq.ParquetFile(io.BytesIO(file_bytes)).metadata.num_rows)  # type: ignore[attr-defined]
+    except Exception as exc:
+        logger.debug("Parquet row count unavailable: %s", exc)
+        return None
+
+
+def _parquet_row_group_start(pf: Any, start_row: int) -> tuple[int, int]:
+    """Map a row offset onto (first row group to read, rows to drop inside it).
+
+    Parquet keeps per-row-group counts in the footer, so a sweep resuming deep
+    into a large file can skip entire row groups without decoding a single value.
+    Falls back to (0, start_row) when the metadata is unreadable, which costs a
+    decode-and-drop but never a wrong answer.
+    """
+    try:
+        metadata = pf.metadata
+        num_groups = int(metadata.num_row_groups)
+    except Exception:
+        return 0, start_row
+
+    consumed = 0
+    for index in range(num_groups):
+        try:
+            rows = int(metadata.row_group(index).num_rows)
+        except Exception:
+            return 0, start_row
+        if consumed + rows > start_row:
+            return index, start_row - consumed
+        consumed += rows
+    # start_row is at or past the end: read nothing.
+    return num_groups, 0
+
+
 def _iter_parquet_pages(
     file_bytes: bytes,
     batch_size: int,
     include_column_names: bool,
+    *,
+    start_row: int = 0,
+    max_rows: int | None = None,
 ) -> Generator[str, None, None]:
     # Parquet files begin AND end with the 4-byte magic "PAR1".  If the footer
     # is missing the bytes were truncated mid-download; pyarrow's C++ thread
@@ -1263,10 +1376,37 @@ def _iter_parquet_pages(
 
         image_columns = detect_parquet_image_columns(pf)
 
-        abs_row = 0
-        for batch in pf.iter_batches(batch_size=batch_size):
+        begin = max(0, start_row)
+        first_group, drop_in_group = _parquet_row_group_start(pf, begin)
+        try:
+            total_groups = int(pf.metadata.num_row_groups)
+        except Exception:
+            total_groups = 0
+        if total_groups and first_group >= total_groups:
+            return
+
+        batches = (
+            pf.iter_batches(batch_size=batch_size)
+            if first_group == 0 and drop_in_group == 0
+            else pf.iter_batches(
+                batch_size=batch_size,
+                row_groups=list(range(first_group, total_groups)),
+            )
+        )
+
+        # Row numbering stays absolute across runs: a finding reported on
+        # "row_4000001" means the same row whichever window found it.
+        abs_row = begin
+        skipped = 0
+        emitted = 0
+        for batch in batches:
             col_names = batch.schema.names
             for local_idx in range(batch.num_rows):
+                if skipped < drop_in_group:
+                    skipped += 1
+                    continue
+                if max_rows is not None and emitted >= max_rows:
+                    return
                 lines: list[str] = []
                 lines.append(f"row_{abs_row + 1}:")
                 for col_i, col in enumerate(col_names):
@@ -1282,6 +1422,7 @@ def _iter_parquet_pages(
                     lines.extend(f"    {c}" for c in rest)
                 lines.append("")
                 abs_row += 1
+                emitted += 1
                 if lines:
                     yield "\n".join(lines)
     except Exception as exc:
@@ -1291,6 +1432,9 @@ def _iter_parquet_pages(
 def _iter_csv_pages(
     file_bytes: bytes,
     include_column_names: bool,
+    *,
+    start_row: int = 0,
+    max_rows: int | None = None,
 ) -> Generator[str, None, None]:
     import csv
     import io
@@ -1300,10 +1444,19 @@ def _iter_csv_pages(
         reader = csv.DictReader(io.StringIO(text))
         headers = list(reader.fieldnames or [])
 
+        begin = max(0, start_row)
         total_seen = 0
+        emitted = 0
 
         for row in reader:
             total_seen += 1
+            if total_seen <= begin:
+                # Skipped rows are never formatted. Parsing them is unavoidable
+                # (CSV has no index), but formatting is the expensive half.
+                continue
+            if max_rows is not None and emitted >= max_rows:
+                return
+            emitted += 1
             yield _format_tabular_page([dict(row)], headers, total_seen, include_column_names)
     except Exception as exc:
         logger.warning("CSV page iteration failed: %s", exc)

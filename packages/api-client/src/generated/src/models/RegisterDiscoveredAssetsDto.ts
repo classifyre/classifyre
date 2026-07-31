@@ -31,6 +31,12 @@ export interface RegisterDiscoveredAssetsDto {
      * @memberof RegisterDiscoveredAssetsDto
      */
     includeScanCache?: boolean;
+    /**
+     * Return each asset's stored payload cursor — how far a sampling strategy has read into that asset's tabular payload. The CLI resumes an AUTOMATIC sweep from it instead of restarting at row 0. Requested independently of includeScanCache: a position is not proof that a scan completed, and sources that never opted into the scan cache still page their payloads.
+     * @type {boolean}
+     * @memberof RegisterDiscoveredAssetsDto
+     */
+    includePayloadCursor?: boolean;
 }
 
 /**
@@ -53,6 +59,7 @@ export function RegisterDiscoveredAssetsDtoFromJSONTyped(json: any, ignoreDiscri
         
         'assetHashes': json['assetHashes'],
         'includeScanCache': json['includeScanCache'] == null ? undefined : json['includeScanCache'],
+        'includePayloadCursor': json['includePayloadCursor'] == null ? undefined : json['includePayloadCursor'],
     };
 }
 
@@ -69,6 +76,7 @@ export function RegisterDiscoveredAssetsDtoToJSONTyped(value?: RegisterDiscovere
         
         'assetHashes': value['assetHashes'],
         'includeScanCache': value['includeScanCache'],
+        'includePayloadCursor': value['includePayloadCursor'],
     };
 }
 

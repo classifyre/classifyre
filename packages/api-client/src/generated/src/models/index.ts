@@ -174,6 +174,7 @@ export * from './NotificationsControllerMarkAllRead200Response';
 export * from './ParseTrainingExamplesResponseDto';
 export * from './ParseTrainingExamplesSkippedReasonsDto';
 export * from './ParsedTrainingExampleDto';
+export * from './PayloadCursorEntryDto';
 export * from './PivotGraphDto';
 export * from './PreviewInquiryDto';
 export * from './PreviewResponseDto';

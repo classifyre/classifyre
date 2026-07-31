@@ -157,12 +157,16 @@ def test_s3_storage_iter_asset_pages_passes_media_without_feature_flags(
         include_column_names: bool = True,
         *,
         file_name: str = "",
+        start_row: int = 0,
+        max_rows: int | None = None,
     ):
         captured["file_bytes"] = file_bytes
         captured["mime_type"] = mime_type
         captured["batch_size"] = batch_size
         captured["include_column_names"] = include_column_names
         captured["file_name"] = file_name
+        captured["start_row"] = start_row
+        captured["max_rows"] = max_rows
         yield "ocr page"
 
     monkeypatch.setattr("src.utils.file_parser.iter_file_pages", _iter_file_pages)
@@ -179,6 +183,8 @@ def test_s3_storage_iter_asset_pages_passes_media_without_feature_flags(
 
     assert pages == ["ocr page"]
     assert captured["file_name"] == "scan.pdf"
+    # A PDF has no row axis, so no payload window bounds it.
+    assert (captured["start_row"], captured["max_rows"]) == (0, None)
 
 
 def _hf_parquet_bytes() -> bytes:

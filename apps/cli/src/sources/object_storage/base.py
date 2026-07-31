@@ -878,6 +878,7 @@ class ObjectStorageSourceBase(BaseSource, ABC):
                         batch_size,
                         include_col_names,
                         file_name=file_name,
+                        asset_id=asset_id,
                     ):
                         loop.call_soon_threadsafe(queue.put_nowait, page)
                         page_count += 1

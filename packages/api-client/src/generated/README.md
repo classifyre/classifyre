@@ -451,6 +451,7 @@ All URIs are relative to *http://localhost*
 - [ParseTrainingExamplesResponseDto](docs/ParseTrainingExamplesResponseDto.md)
 - [ParseTrainingExamplesSkippedReasonsDto](docs/ParseTrainingExamplesSkippedReasonsDto.md)
 - [ParsedTrainingExampleDto](docs/ParsedTrainingExampleDto.md)
+- [PayloadCursorEntryDto](docs/PayloadCursorEntryDto.md)
 - [PivotGraphDto](docs/PivotGraphDto.md)
 - [PreviewInquiryDto](docs/PreviewInquiryDto.md)
 - [PreviewResponseDto](docs/PreviewResponseDto.md)

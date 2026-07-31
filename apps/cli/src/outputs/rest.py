@@ -346,32 +346,49 @@ class RestOutputSink:
                 logger.warning("Failed to emit edges to graph: %s", exc)
 
     async def register_discovered_assets(
-        self, hashes: list[str], *, include_scan_cache: bool = False
-    ) -> list[dict[str, Any]]:
-        """Register discovered hashes, optionally collecting their prior scan state.
+        self,
+        hashes: list[str],
+        *,
+        include_scan_cache: bool = False,
+        include_payload_cursor: bool = False,
+    ) -> list[dict[str, Any]] | tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+        """Register discovered hashes, optionally collecting their prior state.
 
         The prior state has to be read here and nowhere later: the Phase 1 stub
         ingest that follows overwrites ``Asset.checksum`` with the incoming value,
         so a comparison made after it would match the new checksum against itself
         and skip every asset.
+
+        Returns the scan-cache entries alone unless payload cursors were also
+        requested, in which case it returns ``(cache, payload_cursors)`` — callers
+        that predate payload windows keep the list they already expect.
         """
         runner_id = self._require_runner_id()
         cache: list[dict[str, Any]] = []
+        cursors: list[dict[str, Any]] = []
         for i in range(0, len(hashes), 500):
             chunk = hashes[i : i + 500]
             body: dict[str, Any] = {"assetHashes": chunk}
             if include_scan_cache:
                 body["includeScanCache"] = True
+            if include_payload_cursor:
+                body["includePayloadCursor"] = True
             response = self._request_json(
                 "POST",
                 f"/runners/{runner_id}/assets/discover",
                 body,
             )
-            if include_scan_cache and isinstance(response, dict):
+            if not isinstance(response, dict):
+                continue
+            if include_scan_cache:
                 entries = response.get("cache")
                 if isinstance(entries, list):
                     cache.extend(entry for entry in entries if isinstance(entry, dict))
-        return cache
+            if include_payload_cursor:
+                entries = response.get("payloadCursors")
+                if isinstance(entries, list):
+                    cursors.extend(entry for entry in entries if isinstance(entry, dict))
+        return (cache, cursors) if include_payload_cursor else cache
 
     async def update_asset_status(
         self,

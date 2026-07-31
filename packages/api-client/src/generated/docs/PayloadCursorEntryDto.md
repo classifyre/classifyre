@@ -1,26 +1,24 @@
 
-# RegisterDiscoveredAssetsDto
+# PayloadCursorEntryDto
 
 
 ## Properties
 
 Name | Type
 ------------ | -------------
-`assetHashes` | Array&lt;string&gt;
-`includeScanCache` | boolean
-`includePayloadCursor` | boolean
+`hash` | string
+`cursor` | { [key: string]: any; }
 
 ## Example
 
 ```typescript
-import type { RegisterDiscoveredAssetsDto } from '@workspace/api-client'
+import type { PayloadCursorEntryDto } from '@workspace/api-client'
 
 // TODO: Update the object below with actual values
 const example = {
-  "assetHashes": null,
-  "includeScanCache": null,
-  "includePayloadCursor": null,
-} satisfies RegisterDiscoveredAssetsDto
+  "hash": null,
+  "cursor": null,
+} satisfies PayloadCursorEntryDto
 
 console.log(example)
 
@@ -29,7 +27,7 @@ const exampleJSON: string = JSON.stringify(example)
 console.log(exampleJSON)
 
 // Parse the JSON string back to an object
-const exampleParsed = JSON.parse(exampleJSON) as RegisterDiscoveredAssetsDto
+const exampleParsed = JSON.parse(exampleJSON) as PayloadCursorEntryDto
 console.log(exampleParsed)
 ```
 
