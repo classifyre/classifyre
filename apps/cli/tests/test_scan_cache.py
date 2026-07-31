@@ -17,6 +17,7 @@ from src.detectors.engine_version import (
     detector_engine_version,
     is_cacheable_detector_type,
 )
+from src.pipeline.payload_window import PayloadWindowStore
 from src.pipeline.scan_cache import (
     ScanCache,
     detector_cache_key,
@@ -178,6 +179,127 @@ def test_custom_detectors_get_distinct_cache_keys() -> None:
     assert detector_cache_key("CUSTOM", {"custom_detector_key": "a"}) == "CUSTOM::a"
     assert detector_cache_key("CUSTOM", {"custom_detector_key": "b"}) == "CUSTOM::b"
     assert detector_cache_key("PII", {}) == "PII"
+
+
+def test_switching_strategy_invalidates_the_cache() -> None:
+    """Results banked over the top 100 rows say nothing about the rest."""
+    latest = _fingerprints(_recipe(sampling={"strategy": "LATEST", "rows_per_page": 100}))
+    automatic = _fingerprints(_recipe(sampling={"strategy": "AUTOMATIC", "rows_per_page": 100}))
+    assert latest["PII"] != automatic["PII"]
+
+
+# ---------------------------------------------------------------------------
+# Payload windows
+#
+# The cache's case for skipping is "the checksum did not move". For an asset
+# being read a window at a time that is true and irrelevant: the file is
+# unchanged and most of it has still never been scanned.
+# ---------------------------------------------------------------------------
+
+
+def _payload_store(strategy: str, cursor: dict[str, Any] | None = None) -> PayloadWindowStore:
+    store = PayloadWindowStore(strategy, 100)
+    asset = _FakeAsset("h1", "checksum-1")
+    asset.name = "events.parquet"
+    store.bind(asset)
+    if cursor is not None:
+        store.record_prior([{"hash": "h1", "cursor": cursor}])
+    return store
+
+
+def _tabular_asset() -> _FakeAsset:
+    asset = _FakeAsset("h1", "checksum-1")
+    asset.name = "events.parquet"
+    return asset
+
+
+@pytest.mark.asyncio
+async def test_part_swept_payload_is_never_skipped() -> None:
+    """The regression this guards: 4.9M unread rows reported as "cached"."""
+    recipe = _recipe(sampling={"strategy": "AUTOMATIC", "rows_per_page": 100})
+    store = _payload_store(
+        "AUTOMATIC", {"v": 1, "offset": 100, "exhausted": False, "checksum": "checksum-1"}
+    )
+    cache = ScanCache(recipe, _FakeSource(), payload_windows=store)
+    cache.record_prior([_entry("h1", _fingerprints(recipe))])
+
+    plan = await cache.plan(_tabular_asset())
+
+    assert plan.mode == "full"
+    assert "payload" in plan.reason
+
+
+@pytest.mark.asyncio
+async def test_fully_swept_payload_is_skipped_again() -> None:
+    """Once a pass covers the file, an unchanged checksum means what it says."""
+    recipe = _recipe(sampling={"strategy": "AUTOMATIC", "rows_per_page": 100})
+    store = _payload_store(
+        "AUTOMATIC",
+        {"v": 1, "offset": 0, "passes": 1, "exhausted": True, "checksum": "checksum-1"},
+    )
+    cache = ScanCache(recipe, _FakeSource(), payload_windows=store)
+    cache.record_prior([_entry("h1", _fingerprints(recipe))])
+
+    plan = await cache.plan(_tabular_asset())
+
+    assert plan.mode == "skip"
+
+
+@pytest.mark.asyncio
+async def test_first_sighting_of_a_tabular_asset_is_never_skipped() -> None:
+    """No cursor yet means no pass has covered the file."""
+    recipe = _recipe(sampling={"strategy": "AUTOMATIC", "rows_per_page": 100})
+    cache = ScanCache(recipe, _FakeSource(), payload_windows=_payload_store("AUTOMATIC"))
+    cache.record_prior([_entry("h1", _fingerprints(recipe))])
+
+    assert (await cache.plan(_tabular_asset())).mode == "full"
+
+
+@pytest.mark.asyncio
+async def test_random_sampling_always_rescans_a_tabular_asset() -> None:
+    """A fresh sample every run is the point of RANDOM."""
+    recipe = _recipe(sampling={"strategy": "RANDOM", "rows_per_page": 100})
+    store = _payload_store(
+        "RANDOM", {"v": 1, "offset": 0, "exhausted": True, "checksum": "checksum-1"}
+    )
+    cache = ScanCache(recipe, _FakeSource(), payload_windows=store)
+    cache.record_prior([_entry("h1", _fingerprints(recipe))])
+
+    assert (await cache.plan(_tabular_asset())).mode == "full"
+
+
+@pytest.mark.asyncio
+async def test_payload_window_does_not_disturb_non_tabular_assets() -> None:
+    """A PDF has no rows left over; it stays skippable."""
+    recipe = _recipe(sampling={"strategy": "AUTOMATIC", "rows_per_page": 100})
+    store = PayloadWindowStore("AUTOMATIC", 100)
+    pdf = _FakeAsset("h1", "checksum-1")
+    pdf.name = "report.pdf"
+    store.bind(pdf)
+
+    cache = ScanCache(recipe, _FakeSource(), payload_windows=store)
+    cache.record_prior([_entry("h1", _fingerprints(recipe))])
+
+    assert (await cache.plan(pdf)).mode == "skip"
+
+
+@pytest.mark.asyncio
+async def test_all_strategy_leaves_the_cache_alone() -> None:
+    """ALL reads the whole payload every run, so nothing is ever left over."""
+    recipe = _recipe(sampling={"strategy": "ALL"})
+    cache = ScanCache(recipe, _FakeSource(), payload_windows=_payload_store("ALL"))
+    cache.record_prior([_entry("h1", _fingerprints(recipe))])
+
+    assert (await cache.plan(_tabular_asset())).mode == "skip"
+
+
+@pytest.mark.asyncio
+async def test_cache_without_a_payload_store_behaves_as_before() -> None:
+    recipe = _recipe()
+    cache = ScanCache(recipe, _FakeSource())
+    cache.record_prior([_entry("h1", _fingerprints(recipe))])
+
+    assert (await cache.plan(_tabular_asset())).mode == "skip"
 
 
 # ---------------------------------------------------------------------------

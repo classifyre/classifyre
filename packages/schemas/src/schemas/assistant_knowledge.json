@@ -49,6 +49,61 @@
         }
       }
     },
+    "REDDIT": {
+      "sections": {
+        "name": {
+          "title": "Source name",
+          "summary": "Name the source after the communities you are scanning.",
+          "suggestions": [
+            "Reference the subreddit set (example: Community subreddits).",
+            "Distinguish multiple Reddit sources by topic or audience."
+          ]
+        },
+        "required": {
+          "title": "Required",
+          "summary": "Pick an auth_mode, list the subreddits, and supply a user_agent.",
+          "suggestions": [
+            "Subreddits accept a bare name, r/name, or a full subreddit URL.",
+            "Reddit's API rules require a descriptive user_agent: <platform>:<app ID>:<version> (by u/<username>).",
+            "Use auth_mode READ_ONLY unless you have a script app or a saved refresh token."
+          ],
+          "questions": [
+            "Which subreddits do you want to scan?",
+            "Which Reddit app did you register \u2014 script, web, or installed?"
+          ]
+        },
+        "masked": {
+          "title": "Authentication",
+          "summary": "Credentials come from https://www.reddit.com/prefs/apps and depend on the auth_mode.",
+          "suggestions": [
+            "READ_ONLY needs client_id and client_secret only.",
+            "SCRIPT adds the username and password of the account that registered the app (append :token when 2FA is on).",
+            "REFRESH_TOKEN needs client_id and refresh_token; installed apps leave client_secret empty.",
+            "Scans always run read-only \u2014 Classifyre never posts, votes or edits."
+          ]
+        },
+        "optional": {
+          "title": "Optional",
+          "summary": "Use optional.scope for what to pull, optional.connection for PRAW rate limiting, and optional.site only for a non-reddit.com instance.",
+          "suggestions": [
+            "Lower optional.scope.max_comments_per_post on busy subreddits \u2014 comment forests are unbounded.",
+            "Turn on optional.scope.expand_more_comments only when you need full threads; each expansion is an extra API call.",
+            "Raise optional.connection.ratelimit_seconds so PRAW waits out Reddit's longer rate limits instead of failing.",
+            "Set optional.scope.include_media or include_external_videos to false to skip downloads and transcription."
+          ]
+        },
+        "sampling": {
+          "title": "Sampling",
+          "summary": "Controls how many submissions are processed per subreddit per run.",
+          "suggestions": [
+            "Use AUTOMATIC to walk each subreddit incrementally, resuming where the last run stopped.",
+            "Use LATEST with rows_per_page for the newest N submissions.",
+            "Use RANDOM for a stable spot check across the hot listing.",
+            "Use ALL only for a full backfill \u2014 Reddit still caps a listing at 1000 submissions."
+          ]
+        }
+      }
+    },
     "EMAIL": {
       "sections": {
         "name": {

@@ -33,6 +33,7 @@ TYPE_TO_DEFINITION = {
     "NOTION": "NotionInput",
     "EMAIL": "EmailInput",
     "YOUTUBE": "YouTubeInput",
+    "REDDIT": "RedditInput",
     "DELTA_LAKE": "DeltaLakeInput",
     "ICEBERG": "IcebergInput",
     "KAFKA": "KafkaInput",

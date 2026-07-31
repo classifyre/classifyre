@@ -3,7 +3,12 @@ import { DataTransferStatus, type DataTransferJob } from '@prisma/client';
 import { ClsService } from 'nestjs-cls';
 
 import { PrismaService } from '../prisma.service';
-import { CLS_SCHEMA, CLS_SLUG } from '../namespace/namespace.constants';
+import { NamespaceRegistryService } from '../registry/namespace-registry.service';
+import {
+  CLS_NAMESPACE_ID,
+  CLS_SCHEMA,
+  CLS_SLUG,
+} from '../namespace/namespace.constants';
 import { ArchiveStorageService } from './archive-storage.service';
 import {
   ARCHIVE_MAGIC,
@@ -43,7 +48,23 @@ export class NamespaceExportService {
     private readonly prisma: PrismaService,
     private readonly storage: ArchiveStorageService,
     private readonly cls: ClsService,
+    private readonly registry: NamespaceRegistryService,
   ) {}
+
+  /**
+   * The workspace's display name, which is what the operator recognises on a
+   * downloaded file. Falls back to the slug if the registry lookup fails —
+   * a worse filename is not a reason to fail an export.
+   */
+  private async namespaceName(slug: string): Promise<string> {
+    const id = this.cls.get<string>(CLS_NAMESPACE_ID);
+    if (!id) return slug;
+    try {
+      return (await this.registry.get(id)).name || slug;
+    } catch {
+      return slug;
+    }
+  }
 
   async run(job: DataTransferJob): Promise<void> {
     const progress = new TransferProgress(this.prisma, job.id);
@@ -51,7 +72,8 @@ export class NamespaceExportService {
 
     const slug = this.cls.get<string>(CLS_SLUG) ?? 'namespace';
     const schema = this.cls.get<string>(CLS_SCHEMA) ?? 'namespace';
-    const fileName = this.storage.archiveFileName(slug);
+    const displayName = await this.namespaceName(slug);
+    const fileName = this.storage.archiveFileName(displayName);
     const localPath = await this.storage.allocate(schema, fileName);
     const storageKey = this.storage.handleFor(localPath);
 
@@ -78,7 +100,7 @@ export class NamespaceExportService {
         v: ARCHIVE_VERSION,
         createdAt: new Date().toISOString(),
         appVersion: process.env.APP_VERSION ?? 'unknown',
-        namespace: { name: slug, slug },
+        namespace: { name: displayName, slug },
         scopes: job.scopes as ArchiveManifest['scopes'],
         estimatedCounts: estimates,
         secretsStripped: true,

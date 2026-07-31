@@ -44,6 +44,7 @@ const assetKindIconMap: Record<string, LucideIcon> = {
   label: Hash,
   item: File,
   video: Video,
+  external_video: Video,
   audio: Music,
   site: Globe,
   drive: HardDrive,

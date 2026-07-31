@@ -157,12 +157,16 @@ def test_s3_storage_iter_asset_pages_passes_media_without_feature_flags(
         include_column_names: bool = True,
         *,
         file_name: str = "",
+        start_row: int = 0,
+        max_rows: int | None = None,
     ):
         captured["file_bytes"] = file_bytes
         captured["mime_type"] = mime_type
         captured["batch_size"] = batch_size
         captured["include_column_names"] = include_column_names
         captured["file_name"] = file_name
+        captured["start_row"] = start_row
+        captured["max_rows"] = max_rows
         yield "ocr page"
 
     monkeypatch.setattr("src.utils.file_parser.iter_file_pages", _iter_file_pages)
@@ -179,9 +183,11 @@ def test_s3_storage_iter_asset_pages_passes_media_without_feature_flags(
 
     assert pages == ["ocr page"]
     assert captured["file_name"] == "scan.pdf"
+    # A PDF has no row axis, so no payload window bounds it.
+    assert (captured["start_row"], captured["max_rows"]) == (0, None)
 
 
-def _hf_parquet_bytes() -> bytes:
+def _hf_parquet_bytes(rows: int = 2) -> bytes:
     import io
 
     pa = pytest.importorskip("pyarrow")
@@ -193,12 +199,13 @@ def _hf_parquet_bytes() -> bytes:
         Image.new("RGB", (8, 8), color).save(buf, format="PNG")
         return buf.getvalue()
 
+    colors = ["red", "blue", "green", "yellow"]
     table = pa.table(
         {
             "image": pa.array(
-                [{"bytes": _png("red"), "path": None}, {"bytes": _png("blue"), "path": None}]
+                [{"bytes": _png(colors[i % len(colors)]), "path": None} for i in range(rows)]
             ),
-            "label": pa.array([6, 7], type=pa.int64()),
+            "label": pa.array(list(range(rows)), type=pa.int64()),
         }
     )
     buf = io.BytesIO()
@@ -206,14 +213,161 @@ def _hf_parquet_bytes() -> bytes:
     return buf.getvalue()
 
 
-@pytest.mark.asyncio
-async def test_s3_storage_emits_child_image_assets_for_parquet(monkeypatch):
-    pytest.importorskip("PIL")
-    source = S3CompatibleStorageSource(_recipe(strategy="LATEST", rows_per_page=10))
+def _parquet_source(monkeypatch, recipe: dict, *, rows: int = 2):
+    """An S3 source whose single object is a HuggingFace-style image parquet."""
+    source = S3CompatibleStorageSource(recipe)
     ref = _ref("exports/dataset.parquet", days_ago=0)
     monkeypatch.setattr(source, "_list_objects", lambda: [ref])
 
-    parquet_bytes = _hf_parquet_bytes()
+    parquet_bytes = _hf_parquet_bytes(rows)
+    monkeypatch.setattr(
+        source,
+        "_build_snapshot",
+        lambda _ref: ContentSnapshot(
+            mime_type="application/parquet",
+            raw_content="",
+            text_content="",
+            parse_error=None,
+            downloaded_bytes=len(parquet_bytes),
+            raw_bytes=parquet_bytes,
+        ),
+    )
+    return source
+
+
+async def _collect(source) -> list:
+    assets = []
+    async for batch in source.extract():
+        assets.extend(batch)
+    return assets
+
+
+@pytest.mark.asyncio
+async def test_s3_storage_emits_child_image_assets_for_parquet(monkeypatch):
+    pytest.importorskip("PIL")
+    source = _parquet_source(monkeypatch, _recipe(strategy="LATEST", rows_per_page=10))
+
+    assets = await _collect(source)
+
+    parents = [a for a in assets if a.asset_type == OutputAssetType.TABLE]
+    children = [a for a in assets if a.asset_type == OutputAssetType.IMAGE]
+
+    assert len(parents) == 1
+    parent = parents[0]
+    # One child IMAGE asset per embedded image, referenced from the parent's links.
+    assert len(children) == 2
+    child_hashes = {c.hash for c in children}
+    assert child_hashes.issubset(set(parent.links))
+    for child in children:
+        # Bytes are served from the spool so the binary-detector path needs no download.
+        fetched = await source.fetch_content_bytes(child.hash)
+        assert fetched is not None
+        image_bytes, mime = fetched
+        assert mime == "image/png"
+        assert image_bytes.startswith(b"\x89PNG")
+    source.cleanup()
+
+
+@pytest.mark.asyncio
+async def test_s3_storage_child_assets_follow_the_payload_window(monkeypatch):
+    """AUTOMATIC materializes one row window of children per run, and advances.
+
+    This is the whole point of deferring expansion: a 1M-row image dataset must not
+    turn into 1M assets on the first run, and the second run must reach rows the
+    first one never read.
+    """
+    pytest.importorskip("PIL")
+    from src.pipeline.payload_window import PayloadWindowStore
+
+    recipe = _recipe(strategy="AUTOMATIC", rows_per_page=10)
+
+    first_source = _parquet_source(monkeypatch, recipe, rows=25)
+    first_source.attach_payload_windows(PayloadWindowStore.from_recipe(recipe))
+    first_run = await _collect(first_source)
+
+    parent = next(a for a in first_run if a.asset_type == OutputAssetType.TABLE)
+    first_children = [a for a in first_run if a.asset_type == OutputAssetType.IMAGE]
+    assert [c.name.split("#")[-1] for c in first_children] == [
+        f"row={n};col=image" for n in range(1, 11)
+    ]
+    first_source.cleanup()
+
+    # Second run, resuming from the cursor the first run's detector pass would store.
+    second_source = _parquet_source(monkeypatch, recipe, rows=25)
+    store = PayloadWindowStore.from_recipe(recipe)
+    store.record_prior(
+        [
+            {
+                "hash": parent.hash,
+                "cursor": {
+                    "v": 1,
+                    "kind": "rows",
+                    "offset": 10,
+                    "exhausted": False,
+                    "strategy": "AUTOMATIC",
+                },
+            }
+        ]
+    )
+    second_source.attach_payload_windows(store)
+    second_run = await _collect(second_source)
+
+    second_children = [a for a in second_run if a.asset_type == OutputAssetType.IMAGE]
+    assert [c.name.split("#")[-1] for c in second_children] == [
+        f"row={n};col=image" for n in range(11, 21)
+    ]
+    # Different rows this run, and no child of run 1 re-created under a new identity.
+    assert {c.hash for c in second_children}.isdisjoint({c.hash for c in first_children})
+    second_source.cleanup()
+
+
+@pytest.mark.asyncio
+async def test_s3_storage_child_identity_is_stable_across_windows(monkeypatch):
+    """The same embedded file keeps one hash, so a later run updates it in place."""
+    pytest.importorskip("PIL")
+    from src.pipeline.payload_window import PayloadWindowStore
+
+    whole_source = _parquet_source(monkeypatch, _recipe(strategy="ALL"), rows=12)
+    whole_run = await _collect(whole_source)
+    by_location = {
+        a.name.split("#")[-1]: a.hash for a in whole_run if a.asset_type == OutputAssetType.IMAGE
+    }
+    assert len(by_location) == 12
+    whole_source.cleanup()
+
+    windowed_recipe = _recipe(strategy="LATEST", rows_per_page=10)
+    windowed_source = _parquet_source(monkeypatch, windowed_recipe, rows=12)
+    windowed_source.attach_payload_windows(PayloadWindowStore.from_recipe(windowed_recipe))
+    windowed_run = await _collect(windowed_source)
+
+    windowed = {
+        a.name.split("#")[-1]: a.hash for a in windowed_run if a.asset_type == OutputAssetType.IMAGE
+    }
+    assert set(windowed) == {f"row={n};col=image" for n in range(1, 11)}
+    assert all(by_location[location] == child_hash for location, child_hash in windowed.items())
+    windowed_source.cleanup()
+
+
+@pytest.mark.asyncio
+async def test_s3_storage_emits_typed_children_for_non_image_columns(monkeypatch):
+    """A parquet column of PDFs becomes PDF child assets, not text-detector garbage."""
+    pa = pytest.importorskip("pyarrow")
+    pq = pytest.importorskip("pyarrow.parquet")
+
+    pdf_bytes = b"%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\ntrailer\n%%EOF\n"
+    table = pa.table(
+        {
+            "doc": pa.array([pdf_bytes], type=pa.binary()),
+            "note": pa.array(["alpha"]),
+        }
+    )
+    buffer = io.BytesIO()
+    pq.write_table(table, buffer)
+    parquet_bytes = buffer.getvalue()
+
+    source = S3CompatibleStorageSource(_recipe(strategy="ALL"))
+    ref = _ref("exports/docs.parquet", days_ago=0)
+    monkeypatch.setattr(source, "_list_objects", lambda: [ref])
     monkeypatch.setattr(
         source,
         "_build_snapshot",
@@ -227,26 +381,13 @@ async def test_s3_storage_emits_child_image_assets_for_parquet(monkeypatch):
         ),
     )
 
-    assets = []
-    async for batch in source.extract():
-        assets.extend(batch)
+    assets = await _collect(source)
 
-    parents = [a for a in assets if a.asset_type == OutputAssetType.TABLE]
-    children = [a for a in assets if a.asset_type == OutputAssetType.IMAGE]
-
-    assert len(parents) == 1
-    parent = parents[0]
-    # One child IMAGE asset per embedded image, referenced from the parent's links.
-    assert len(children) == 2
-    child_hashes = {c.hash for c in children}
-    assert child_hashes.issubset(set(parent.links))
-    for child in children:
-        # Bytes are cached so the binary-detector path serves them with no download.
-        fetched = await source.fetch_content_bytes(child.hash)
-        assert fetched is not None
-        image_bytes, mime = fetched
-        assert mime == "image/png"
-        assert image_bytes.startswith(b"\x89PNG")
+    child = next(a for a in assets if "#row=1;col=doc" in a.name)
+    assert child.asset_type == OutputAssetType.BINARY
+    fetched = await source.fetch_content_bytes(child.hash)
+    assert fetched == (pdf_bytes, "application/pdf")
+    source.cleanup()
 
 
 @pytest.mark.asyncio
@@ -277,7 +418,7 @@ async def test_s3_storage_spools_archive_members_until_processing(monkeypatch):
         assets.extend(batch)
 
     child = next(asset for asset in assets if "#inside/report.txt" in asset.name)
-    member_path = source._archive_bytes_cache[child.hash]
+    member_path = source._member_bytes_cache[child.hash]
     assert child.hash not in source._bytes_cache
     assert member_path.is_file()
     assert len(member_path.name) == 64

@@ -255,6 +255,81 @@ async def test_rest_output_keeps_namespace_base_for_discovery_and_finding_batche
 
 
 @pytest.mark.asyncio
+async def test_register_discovered_assets_returns_a_bare_list_without_payload_cursors(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The pre-payload-window shape is preserved for callers that never ask."""
+    fake_session = _FakeSession(
+        responses=[_FakeResponse({"registered": 2, "cache": [{"hash": "a"}]})]
+    )
+    monkeypatch.setattr("src.outputs.rest.requests.Session", lambda: fake_session)
+
+    sink = RestOutputSink(
+        OutputRuntimeContext(source_id="s", runner_id="r", managed_runner=True, batch_size=20),
+        base_url="http://localhost:8000",
+        timeout_sec=30,
+    )
+
+    result = await sink.register_discovered_assets(["a", "b"], include_scan_cache=True)
+
+    assert result == [{"hash": "a"}]
+    assert "includePayloadCursor" not in fake_session.calls[0]["json"]
+
+
+@pytest.mark.asyncio
+async def test_register_discovered_assets_collects_payload_cursors(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    cursor = {"v": 1, "offset": 300, "checksum": "c1"}
+    fake_session = _FakeSession(
+        responses=[
+            _FakeResponse(
+                {
+                    "registered": 2,
+                    "cache": [{"hash": "a"}],
+                    "payloadCursors": [{"hash": "a", "cursor": cursor}],
+                }
+            )
+        ]
+    )
+    monkeypatch.setattr("src.outputs.rest.requests.Session", lambda: fake_session)
+
+    sink = RestOutputSink(
+        OutputRuntimeContext(source_id="s", runner_id="r", managed_runner=True, batch_size=20),
+        base_url="http://localhost:8000",
+        timeout_sec=30,
+    )
+
+    cache, cursors = await sink.register_discovered_assets(
+        ["a", "b"], include_scan_cache=True, include_payload_cursor=True
+    )
+
+    assert fake_session.calls[0]["json"]["includePayloadCursor"] is True
+    assert cache == [{"hash": "a"}]
+    assert cursors == [{"hash": "a", "cursor": cursor}]
+
+
+@pytest.mark.asyncio
+async def test_asset_payload_carries_the_payload_cursor(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The advanced position rides back on the asset, not on the run."""
+    fake_session = _FakeSession(responses=[_FakeResponse({})])
+    monkeypatch.setattr("src.outputs.rest.requests.Session", lambda: fake_session)
+
+    sink = RestOutputSink(
+        OutputRuntimeContext(source_id="s", runner_id="r", managed_runner=True, batch_size=20),
+        base_url="http://localhost:8000",
+        timeout_sec=30,
+    )
+
+    cursor = {"v": 1, "offset": 300, "exhausted": False, "checksum": "c1"}
+    await sink.emit_batch([{"hash": "h1", "payload_cursor": cursor}])
+
+    assert fake_session.calls[0]["json"]["assets"][0]["payload_cursor"] == cursor
+
+
+@pytest.mark.asyncio
 async def test_rest_output_finalize_includes_sampling_cursor(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

@@ -79,6 +79,9 @@
       "$ref": "#/definitions/YouTubeInput"
     },
     {
+      "$ref": "#/definitions/RedditInput"
+    },
+    {
       "$ref": "#/definitions/DeltaLakeInput"
     },
     {
@@ -315,11 +318,11 @@
             },
             "source_hash": {
               "type": "string",
-              "description": "Hash of the parent asset (embedded images and archive members only)"
+              "description": "Hash of the parent asset (embedded files and archive members only)"
             },
             "location": {
               "type": "string",
-              "description": "Location within the parent (embedded image location or archive member path)"
+              "description": "Location within the parent (embedded file location or archive member path)"
             }
           },
           "required": ["provider", "object_key"]
@@ -341,11 +344,11 @@
             },
             "source_hash": {
               "type": "string",
-              "description": "Hash of the parent asset (embedded images and archive members only)"
+              "description": "Hash of the parent asset (embedded files and archive members only)"
             },
             "location": {
               "type": "string",
-              "description": "Location within the parent (embedded image location or archive member path)"
+              "description": "Location within the parent (embedded file location or archive member path)"
             }
           },
           "required": []
@@ -363,11 +366,11 @@
             },
             "source_hash": {
               "type": "string",
-              "description": "Hash of the parent asset (embedded images and archive members only)"
+              "description": "Hash of the parent asset (embedded files and archive members only)"
             },
             "location": {
               "type": "string",
-              "description": "Location within the parent (embedded image location or archive member path)"
+              "description": "Location within the parent (embedded file location or archive member path)"
             }
           },
           "required": ["provider", "object_key"]
@@ -385,11 +388,11 @@
             },
             "source_hash": {
               "type": "string",
-              "description": "Hash of the parent asset (embedded images and archive members only)"
+              "description": "Hash of the parent asset (embedded files and archive members only)"
             },
             "location": {
               "type": "string",
-              "description": "Location within the parent (embedded image location or archive member path)"
+              "description": "Location within the parent (embedded file location or archive member path)"
             }
           },
           "required": ["provider", "object_key"]
@@ -411,11 +414,11 @@
             },
             "source_hash": {
               "type": "string",
-              "description": "Hash of the parent asset (embedded images and archive members only)"
+              "description": "Hash of the parent asset (embedded files and archive members only)"
             },
             "location": {
               "type": "string",
-              "description": "Location within the parent (embedded image location or archive member path)"
+              "description": "Location within the parent (embedded file location or archive member path)"
             }
           },
           "required": ["provider", "object_key"]
@@ -439,11 +442,11 @@
             },
             "source_hash": {
               "type": "string",
-              "description": "Hash of the parent asset (embedded images and archive members only)"
+              "description": "Hash of the parent asset (embedded files and archive members only)"
             },
             "location": {
               "type": "string",
-              "description": "Location within the parent (embedded image location or archive member path)"
+              "description": "Location within the parent (embedded file location or archive member path)"
             }
           },
           "required": ["provider", "object_key"]
@@ -465,11 +468,11 @@
             },
             "source_hash": {
               "type": "string",
-              "description": "Hash of the parent asset (embedded images and archive members only)"
+              "description": "Hash of the parent asset (embedded files and archive members only)"
             },
             "location": {
               "type": "string",
-              "description": "Location within the parent (embedded image location or archive member path)"
+              "description": "Location within the parent (embedded file location or archive member path)"
             }
           },
           "required": []
@@ -487,11 +490,11 @@
             },
             "source_hash": {
               "type": "string",
-              "description": "Hash of the parent asset (embedded images and archive members only)"
+              "description": "Hash of the parent asset (embedded files and archive members only)"
             },
             "location": {
               "type": "string",
-              "description": "Location within the parent (embedded image location or archive member path)"
+              "description": "Location within the parent (embedded file location or archive member path)"
             }
           },
           "required": ["provider", "object_key"]
@@ -509,11 +512,11 @@
             },
             "source_hash": {
               "type": "string",
-              "description": "Hash of the parent asset (embedded images and archive members only)"
+              "description": "Hash of the parent asset (embedded files and archive members only)"
             },
             "location": {
               "type": "string",
-              "description": "Location within the parent (embedded image location or archive member path)"
+              "description": "Location within the parent (embedded file location or archive member path)"
             }
           },
           "required": ["provider", "object_key"]
@@ -535,11 +538,11 @@
             },
             "source_hash": {
               "type": "string",
-              "description": "Hash of the parent asset (embedded images and archive members only)"
+              "description": "Hash of the parent asset (embedded files and archive members only)"
             },
             "location": {
               "type": "string",
-              "description": "Location within the parent (embedded image location or archive member path)"
+              "description": "Location within the parent (embedded file location or archive member path)"
             }
           },
           "required": ["provider", "object_key"]
@@ -563,11 +566,11 @@
             },
             "source_hash": {
               "type": "string",
-              "description": "Hash of the parent asset (embedded images and archive members only)"
+              "description": "Hash of the parent asset (embedded files and archive members only)"
             },
             "location": {
               "type": "string",
-              "description": "Location within the parent (embedded image location or archive member path)"
+              "description": "Location within the parent (embedded file location or archive member path)"
             }
           },
           "required": ["provider", "object_key"]
@@ -589,11 +592,11 @@
             },
             "source_hash": {
               "type": "string",
-              "description": "Hash of the parent asset (embedded images and archive members only)"
+              "description": "Hash of the parent asset (embedded files and archive members only)"
             },
             "location": {
               "type": "string",
-              "description": "Location within the parent (embedded image location or archive member path)"
+              "description": "Location within the parent (embedded file location or archive member path)"
             }
           },
           "required": []
@@ -615,11 +618,11 @@
             },
             "source_hash": {
               "type": "string",
-              "description": "Hash of the parent asset (embedded images and archive members only)"
+              "description": "Hash of the parent asset (embedded files and archive members only)"
             },
             "location": {
               "type": "string",
-              "description": "Location within the parent (embedded image location or archive member path)"
+              "description": "Location within the parent (embedded file location or archive member path)"
             }
           },
           "required": ["provider", "object_key"]
@@ -641,11 +644,11 @@
             },
             "source_hash": {
               "type": "string",
-              "description": "Hash of the parent asset (embedded images and archive members only)"
+              "description": "Hash of the parent asset (embedded files and archive members only)"
             },
             "location": {
               "type": "string",
-              "description": "Location within the parent (embedded image location or archive member path)"
+              "description": "Location within the parent (embedded file location or archive member path)"
             }
           },
           "required": ["provider", "object_key"]
@@ -667,11 +670,11 @@
             },
             "source_hash": {
               "type": "string",
-              "description": "Hash of the parent asset (embedded images and archive members only)"
+              "description": "Hash of the parent asset (embedded files and archive members only)"
             },
             "location": {
               "type": "string",
-              "description": "Location within the parent (embedded image location or archive member path)"
+              "description": "Location within the parent (embedded file location or archive member path)"
             }
           },
           "required": ["provider", "object_key"]
@@ -695,11 +698,11 @@
             },
             "source_hash": {
               "type": "string",
-              "description": "Hash of the parent asset (embedded images and archive members only)"
+              "description": "Hash of the parent asset (embedded files and archive members only)"
             },
             "location": {
               "type": "string",
-              "description": "Location within the parent (embedded image location or archive member path)"
+              "description": "Location within the parent (embedded file location or archive member path)"
             }
           },
           "required": ["provider", "object_key"]
@@ -721,11 +724,11 @@
             },
             "source_hash": {
               "type": "string",
-              "description": "Hash of the parent asset (embedded images and archive members only)"
+              "description": "Hash of the parent asset (embedded files and archive members only)"
             },
             "location": {
               "type": "string",
-              "description": "Location within the parent (embedded image location or archive member path)"
+              "description": "Location within the parent (embedded file location or archive member path)"
             }
           },
           "required": []
@@ -743,11 +746,11 @@
             },
             "source_hash": {
               "type": "string",
-              "description": "Hash of the parent asset (embedded images and archive members only)"
+              "description": "Hash of the parent asset (embedded files and archive members only)"
             },
             "location": {
               "type": "string",
-              "description": "Location within the parent (embedded image location or archive member path)"
+              "description": "Location within the parent (embedded file location or archive member path)"
             }
           },
           "required": ["provider", "object_key"]
@@ -765,11 +768,11 @@
             },
             "source_hash": {
               "type": "string",
-              "description": "Hash of the parent asset (embedded images and archive members only)"
+              "description": "Hash of the parent asset (embedded files and archive members only)"
             },
             "location": {
               "type": "string",
-              "description": "Location within the parent (embedded image location or archive member path)"
+              "description": "Location within the parent (embedded file location or archive member path)"
             }
           },
           "required": ["provider", "object_key"]
@@ -791,11 +794,11 @@
             },
             "source_hash": {
               "type": "string",
-              "description": "Hash of the parent asset (embedded images and archive members only)"
+              "description": "Hash of the parent asset (embedded files and archive members only)"
             },
             "location": {
               "type": "string",
-              "description": "Location within the parent (embedded image location or archive member path)"
+              "description": "Location within the parent (embedded file location or archive member path)"
             }
           },
           "required": ["provider", "object_key"]
@@ -819,11 +822,11 @@
             },
             "source_hash": {
               "type": "string",
-              "description": "Hash of the parent asset (embedded images and archive members only)"
+              "description": "Hash of the parent asset (embedded files and archive members only)"
             },
             "location": {
               "type": "string",
-              "description": "Location within the parent (embedded image location or archive member path)"
+              "description": "Location within the parent (embedded file location or archive member path)"
             }
           },
           "required": ["provider", "object_key"]
@@ -845,11 +848,11 @@
             },
             "source_hash": {
               "type": "string",
-              "description": "Hash of the parent asset (embedded images and archive members only)"
+              "description": "Hash of the parent asset (embedded files and archive members only)"
             },
             "location": {
               "type": "string",
-              "description": "Location within the parent (embedded image location or archive member path)"
+              "description": "Location within the parent (embedded file location or archive member path)"
             }
           },
           "required": []
@@ -867,11 +870,11 @@
             },
             "source_hash": {
               "type": "string",
-              "description": "Hash of the parent asset (embedded images and archive members only)"
+              "description": "Hash of the parent asset (embedded files and archive members only)"
             },
             "location": {
               "type": "string",
-              "description": "Location within the parent (embedded image location or archive member path)"
+              "description": "Location within the parent (embedded file location or archive member path)"
             }
           },
           "required": ["provider", "object_key"]
@@ -889,11 +892,11 @@
             },
             "source_hash": {
               "type": "string",
-              "description": "Hash of the parent asset (embedded images and archive members only)"
+              "description": "Hash of the parent asset (embedded files and archive members only)"
             },
             "location": {
               "type": "string",
-              "description": "Location within the parent (embedded image location or archive member path)"
+              "description": "Location within the parent (embedded file location or archive member path)"
             }
           },
           "required": ["provider", "object_key"]
@@ -915,11 +918,11 @@
             },
             "source_hash": {
               "type": "string",
-              "description": "Hash of the parent asset (embedded images and archive members only)"
+              "description": "Hash of the parent asset (embedded files and archive members only)"
             },
             "location": {
               "type": "string",
-              "description": "Location within the parent (embedded image location or archive member path)"
+              "description": "Location within the parent (embedded file location or archive member path)"
             }
           },
           "required": ["provider", "object_key"]
@@ -1751,6 +1754,277 @@
           "required": ["video_id", "title"]
         }
       },
+      "REDDIT": {
+        "post": {
+          "properties": {
+            "submission_id": {
+              "type": "string",
+              "description": "Reddit submission id (base-36, without the t3_ prefix)"
+            },
+            "subreddit": {
+              "type": "string",
+              "description": "Subreddit the submission belongs to, without the r/ prefix"
+            },
+            "title": {
+              "type": "string",
+              "description": "Submission title"
+            },
+            "author": {
+              "type": "string",
+              "description": "Redditor who posted, or [deleted]"
+            },
+            "score": {
+              "type": "integer",
+              "description": "Net score at extraction time"
+            },
+            "upvote_ratio": {
+              "type": "number",
+              "description": "Fraction of votes that are upvotes"
+            },
+            "num_comments": {
+              "type": "integer",
+              "description": "Comment count Reddit reports for the submission"
+            },
+            "flair": {
+              "type": "string",
+              "description": "Link flair text"
+            },
+            "is_self": {
+              "type": "boolean",
+              "description": "Whether the submission is a text post rather than a link"
+            },
+            "over_18": {
+              "type": "boolean",
+              "description": "Whether Reddit flags the submission as over-18"
+            },
+            "spoiler": {
+              "type": "boolean",
+              "description": "Whether the submission is marked as a spoiler"
+            },
+            "stickied": {
+              "type": "boolean",
+              "description": "Whether the submission is pinned to the top of the subreddit"
+            },
+            "locked": {
+              "type": "boolean",
+              "description": "Whether the submission is locked to new comments"
+            },
+            "domain": {
+              "type": "string",
+              "description": "Domain of the outbound link, or self.<subreddit> for text posts"
+            },
+            "outbound_url": {
+              "type": "string",
+              "description": "URL a link submission points at"
+            },
+            "listing": {
+              "type": "string",
+              "description": "Subreddit listing this submission was sampled from"
+            },
+            "links_count": {
+              "type": "integer",
+              "description": "Number of linked assets (comments and media)"
+            }
+          },
+          "required": ["submission_id", "subreddit", "title", "links_count"]
+        },
+        "comment": {
+          "properties": {
+            "comment_id": {
+              "type": "string",
+              "description": "Reddit comment id (base-36, without the t1_ prefix)"
+            },
+            "submission_id": {
+              "type": "string",
+              "description": "Submission the comment belongs to"
+            },
+            "subreddit": {
+              "type": "string",
+              "description": "Subreddit the comment belongs to, without the r/ prefix"
+            },
+            "author": {
+              "type": "string",
+              "description": "Redditor who commented, or [deleted]"
+            },
+            "parent_fullname": {
+              "type": "string",
+              "description": "Reddit fullname of the parent (t3_ for a top-level comment, t1_ for a reply)"
+            },
+            "parent_hash": {
+              "type": "string",
+              "description": "Asset hash of the parent submission or comment"
+            },
+            "depth": {
+              "type": "integer",
+              "description": "Nesting depth in the comment forest (0 for top-level)"
+            },
+            "score": {
+              "type": "integer",
+              "description": "Net score at extraction time"
+            },
+            "is_submitter": {
+              "type": "boolean",
+              "description": "Whether the commenter is the submission's author"
+            },
+            "stickied": {
+              "type": "boolean",
+              "description": "Whether the comment is pinned to the top of the thread"
+            },
+            "reply_count": {
+              "type": "integer",
+              "description": "Number of direct replies materialised for this comment"
+            },
+            "links_count": {
+              "type": "integer",
+              "description": "Number of linked assets (parent plus replies)"
+            }
+          },
+          "required": ["comment_id", "submission_id", "links_count"]
+        },
+        "image": {
+          "use": ["attachment", "image"],
+          "properties": {
+            "submission_id": {
+              "type": "string",
+              "description": "Submission the media was attached to"
+            },
+            "subreddit": {
+              "type": "string",
+              "description": "Subreddit the submission belongs to, without the r/ prefix"
+            },
+            "file_name": {
+              "type": "string",
+              "description": "File name derived from the Reddit media URL"
+            },
+            "source_url": {
+              "type": "string",
+              "description": "Reddit-hosted URL the bytes are downloaded from"
+            },
+            "gallery_index": {
+              "type": "integer",
+              "description": "Position within a gallery submission (0-based)"
+            },
+            "parent_hash": {
+              "type": "string",
+              "description": "Asset hash of the submission the media belongs to"
+            }
+          },
+          "required": ["submission_id", "file_name"]
+        },
+        "video": {
+          "use": ["attachment"],
+          "properties": {
+            "submission_id": {
+              "type": "string",
+              "description": "Submission the media was attached to"
+            },
+            "subreddit": {
+              "type": "string",
+              "description": "Subreddit the submission belongs to, without the r/ prefix"
+            },
+            "file_name": {
+              "type": "string",
+              "description": "File name derived from the Reddit media URL"
+            },
+            "source_url": {
+              "type": "string",
+              "description": "Reddit-hosted URL the bytes are downloaded from"
+            },
+            "gallery_index": {
+              "type": "integer",
+              "description": "Position within a gallery submission (0-based)"
+            },
+            "parent_hash": {
+              "type": "string",
+              "description": "Asset hash of the submission the media belongs to"
+            },
+            "duration_seconds": {
+              "type": "integer",
+              "description": "Duration Reddit reports for a hosted video"
+            }
+          },
+          "required": ["submission_id", "file_name"]
+        },
+        "file": {
+          "use": ["attachment"],
+          "properties": {
+            "submission_id": {
+              "type": "string",
+              "description": "Submission the media was attached to"
+            },
+            "subreddit": {
+              "type": "string",
+              "description": "Subreddit the submission belongs to, without the r/ prefix"
+            },
+            "file_name": {
+              "type": "string",
+              "description": "File name derived from the linked URL"
+            },
+            "source_url": {
+              "type": "string",
+              "description": "URL the bytes are downloaded from"
+            },
+            "gallery_index": {
+              "type": "integer",
+              "description": "Position within a gallery submission (0-based)"
+            },
+            "parent_hash": {
+              "type": "string",
+              "description": "Asset hash of the submission the file belongs to"
+            }
+          },
+          "required": ["submission_id", "file_name"]
+        },
+        "external_video": {
+          "properties": {
+            "submission_id": {
+              "type": "string",
+              "description": "Submission that linked the video"
+            },
+            "subreddit": {
+              "type": "string",
+              "description": "Subreddit the submission belongs to, without the r/ prefix"
+            },
+            "video_url": {
+              "type": "string",
+              "description": "URL of the linked video"
+            },
+            "provider": {
+              "type": "string",
+              "description": "Host that serves the video (e.g. youtube.com, vimeo.com)"
+            },
+            "title": {
+              "type": "string",
+              "description": "Video title reported by the provider"
+            },
+            "parent_hash": {
+              "type": "string",
+              "description": "Asset hash of the submission that linked the video"
+            },
+            "duration_seconds": {
+              "type": "integer",
+              "description": "Video duration in seconds"
+            },
+            "transcript_available": {
+              "type": "boolean",
+              "description": "Whether transcript text was obtained for the video"
+            },
+            "transcript_source": {
+              "type": "string",
+              "description": "Origin of the transcript text: 'captions' (caption track) or 'whisper' (audio transcribed with faster-whisper)"
+            },
+            "transcript_language": {
+              "type": "string",
+              "description": "Language code of the fetched transcript"
+            },
+            "transcript_is_generated": {
+              "type": "boolean",
+              "description": "Whether the transcript is auto-generated (vs creator-uploaded)"
+            }
+          },
+          "required": ["submission_id", "video_url"]
+        }
+      },
       "DELTA_LAKE": {
         "table": {
           "use": ["tabularTable"],
@@ -2145,11 +2419,11 @@
             },
             "source_hash": {
               "type": "string",
-              "description": "Hash of the parent asset (embedded images and archive members only)"
+              "description": "Hash of the parent asset (embedded files and archive members only)"
             },
             "location": {
               "type": "string",
-              "description": "Location within the parent (embedded image location or archive member path)"
+              "description": "Location within the parent (embedded file location or archive member path)"
             }
           },
           "required": ["provider", "object_key", "file_id"]
@@ -2195,11 +2469,11 @@
             },
             "source_hash": {
               "type": "string",
-              "description": "Hash of the parent asset (embedded images and archive members only)"
+              "description": "Hash of the parent asset (embedded files and archive members only)"
             },
             "location": {
               "type": "string",
-              "description": "Location within the parent (embedded image location or archive member path)"
+              "description": "Location within the parent (embedded file location or archive member path)"
             }
           },
           "required": []
@@ -2241,11 +2515,11 @@
             },
             "source_hash": {
               "type": "string",
-              "description": "Hash of the parent asset (embedded images and archive members only)"
+              "description": "Hash of the parent asset (embedded files and archive members only)"
             },
             "location": {
               "type": "string",
-              "description": "Location within the parent (embedded image location or archive member path)"
+              "description": "Location within the parent (embedded file location or archive member path)"
             }
           },
           "required": ["provider", "object_key"]
@@ -2287,11 +2561,11 @@
             },
             "source_hash": {
               "type": "string",
-              "description": "Hash of the parent asset (embedded images and archive members only)"
+              "description": "Hash of the parent asset (embedded files and archive members only)"
             },
             "location": {
               "type": "string",
-              "description": "Location within the parent (embedded image location or archive member path)"
+              "description": "Location within the parent (embedded file location or archive member path)"
             }
           },
           "required": ["provider", "object_key"]
@@ -2337,11 +2611,11 @@
             },
             "source_hash": {
               "type": "string",
-              "description": "Hash of the parent asset (embedded images and archive members only)"
+              "description": "Hash of the parent asset (embedded files and archive members only)"
             },
             "location": {
               "type": "string",
-              "description": "Location within the parent (embedded image location or archive member path)"
+              "description": "Location within the parent (embedded file location or archive member path)"
             }
           },
           "required": ["provider", "object_key"]
@@ -2389,11 +2663,11 @@
             },
             "source_hash": {
               "type": "string",
-              "description": "Hash of the parent asset (embedded images and archive members only)"
+              "description": "Hash of the parent asset (embedded files and archive members only)"
             },
             "location": {
               "type": "string",
-              "description": "Location within the parent (embedded image location or archive member path)"
+              "description": "Location within the parent (embedded file location or archive member path)"
             }
           },
           "required": ["provider", "object_key", "repo_id", "repo_type"]
@@ -2439,11 +2713,11 @@
             },
             "source_hash": {
               "type": "string",
-              "description": "Hash of the parent asset (embedded images and archive members only)"
+              "description": "Hash of the parent asset (embedded files and archive members only)"
             },
             "location": {
               "type": "string",
-              "description": "Location within the parent (embedded image location or archive member path)"
+              "description": "Location within the parent (embedded file location or archive member path)"
             }
           },
           "required": []
@@ -2489,11 +2763,11 @@
             },
             "source_hash": {
               "type": "string",
-              "description": "Hash of the parent asset (embedded images and archive members only)"
+              "description": "Hash of the parent asset (embedded files and archive members only)"
             },
             "location": {
               "type": "string",
-              "description": "Location within the parent (embedded image location or archive member path)"
+              "description": "Location within the parent (embedded file location or archive member path)"
             }
           },
           "required": ["provider", "object_key", "repo_id", "repo_type"]
@@ -2539,11 +2813,11 @@
             },
             "source_hash": {
               "type": "string",
-              "description": "Hash of the parent asset (embedded images and archive members only)"
+              "description": "Hash of the parent asset (embedded files and archive members only)"
             },
             "location": {
               "type": "string",
-              "description": "Location within the parent (embedded image location or archive member path)"
+              "description": "Location within the parent (embedded file location or archive member path)"
             }
           },
           "required": ["provider", "object_key", "repo_id", "repo_type"]
@@ -2589,11 +2863,11 @@
             },
             "source_hash": {
               "type": "string",
-              "description": "Hash of the parent asset (embedded images and archive members only)"
+              "description": "Hash of the parent asset (embedded files and archive members only)"
             },
             "location": {
               "type": "string",
-              "description": "Location within the parent (embedded image location or archive member path)"
+              "description": "Location within the parent (embedded file location or archive member path)"
             }
           },
           "required": ["provider", "object_key", "repo_id", "repo_type"]
@@ -2628,6 +2902,7 @@
         "NOTION",
         "EMAIL",
         "YOUTUBE",
+        "REDDIT",
         "DELTA_LAKE",
         "ICEBERG",
         "KAFKA",
@@ -3137,6 +3412,461 @@
         }
       },
       "additionalProperties": false
+    },
+    "RedditAuthMode": {
+      "title": "RedditAuthMode",
+      "label": "Reddit Auth Mode",
+      "type": "string",
+      "enum": ["READ_ONLY", "SCRIPT", "REFRESH_TOKEN"],
+      "description": "PRAW OAuth flow used to obtain credentials. READ_ONLY is application-only (client credentials) and needs no Reddit account. SCRIPT is the password grant for a script app registered by the account itself. REFRESH_TOKEN replays a saved refresh token obtained from the code grant (web and installed apps). Note: whichever flow is configured, Classifyre forces PRAW into read-only mode and does not let you turn it off, so requests are issued with the application's own token — content only a signed-in account can see (private subreddits, for example) is not reachable."
+    },
+    "RedditListing": {
+      "title": "RedditListing",
+      "label": "Reddit Listing",
+      "type": "string",
+      "enum": ["NEW", "HOT", "TOP", "RISING", "CONTROVERSIAL"],
+      "description": "Subreddit listing that supplies candidate submissions. Leave unset to let the sampling strategy pick: LATEST/AUTOMATIC/ALL use NEW (chronological, so cursors stay meaningful) and RANDOM uses HOT."
+    },
+    "RedditTimeFilter": {
+      "title": "RedditTimeFilter",
+      "label": "Reddit Time Filter",
+      "type": "string",
+      "enum": ["ALL", "DAY", "HOUR", "MONTH", "WEEK", "YEAR"],
+      "default": "ALL",
+      "description": "Time window applied to the TOP and CONTROVERSIAL listings. Ignored by the other listings."
+    },
+    "RedditCommentSort": {
+      "title": "RedditCommentSort",
+      "label": "Reddit Comment Sort",
+      "type": "string",
+      "enum": ["TOP", "BEST", "NEW", "OLD", "CONTROVERSIAL", "Q_AND_A"],
+      "default": "TOP",
+      "description": "Order Reddit returns a submission's comment forest in. TOP and BEST surface the most-engaged branches first, which is what a bounded max_comments_per_post should keep."
+    },
+    "RedditKindPrefix": {
+      "title": "RedditKindPrefix",
+      "label": "Reddit Fullname Prefix",
+      "type": "string",
+      "enum": ["t1_", "t2_", "t3_", "t4_", "t5_", "t6_"],
+      "description": "Reddit fullname type prefix. t1_ comments, t2_ redditors, t3_ submissions, t4_ messages, t5_ subreddits, t6_ trophies."
+    },
+    "RedditRequiredReadOnly": {
+      "title": "RedditRequiredReadOnly",
+      "label": "Reddit Read-Only App",
+      "type": "object",
+      "description": "Application-only (client credentials) access. Reads public subreddits without a Reddit account.",
+      "properties": {
+        "auth_mode": {
+          "const": "READ_ONLY"
+        },
+        "subreddits": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "description": "Subreddits to scan, by name (e.g. datasets) or URL (e.g. https://www.reddit.com/r/datasets/)."
+        },
+        "user_agent": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Unique application description required by Reddit's API rules. Recommended format: <platform>:<app ID>:<version string> (by u/<reddit username>)."
+        }
+      },
+      "required": ["auth_mode", "subreddits", "user_agent"],
+      "additionalProperties": false
+    },
+    "RedditRequiredScript": {
+      "title": "RedditRequiredScript",
+      "label": "Reddit Script App",
+      "type": "object",
+      "description": "Password grant for a script app registered by a Reddit account. The account's credentials authenticate the app; the scan itself still runs read-only.",
+      "properties": {
+        "auth_mode": {
+          "const": "SCRIPT"
+        },
+        "subreddits": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "description": "Subreddits to scan, by name (e.g. datasets) or URL (e.g. https://www.reddit.com/r/datasets/)."
+        },
+        "user_agent": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Unique application description required by Reddit's API rules. Recommended format: <platform>:<app ID>:<version string> (by u/<reddit username>)."
+        }
+      },
+      "required": ["auth_mode", "subreddits", "user_agent"],
+      "additionalProperties": false
+    },
+    "RedditRequiredRefreshToken": {
+      "title": "RedditRequiredRefreshToken",
+      "label": "Reddit Web / Installed App",
+      "type": "object",
+      "description": "Code-grant flow replayed from a saved refresh token. Used by web and installed apps; installed apps leave the client secret empty.",
+      "properties": {
+        "auth_mode": {
+          "const": "REFRESH_TOKEN"
+        },
+        "subreddits": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "description": "Subreddits to scan, by name (e.g. datasets) or URL (e.g. https://www.reddit.com/r/datasets/)."
+        },
+        "user_agent": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Unique application description required by Reddit's API rules. Recommended format: <platform>:<app ID>:<version string> (by u/<reddit username>)."
+        }
+      },
+      "required": ["auth_mode", "subreddits", "user_agent"],
+      "additionalProperties": false
+    },
+    "RedditRequired": {
+      "title": "RedditRequired",
+      "label": "Reddit Settings",
+      "oneOf": [
+        {
+          "$ref": "#/definitions/RedditRequiredReadOnly"
+        },
+        {
+          "$ref": "#/definitions/RedditRequiredScript"
+        },
+        {
+          "$ref": "#/definitions/RedditRequiredRefreshToken"
+        }
+      ]
+    },
+    "RedditMaskedReadOnly": {
+      "title": "RedditMaskedReadOnly",
+      "label": "Reddit App Credentials",
+      "type": "object",
+      "description": "Client credentials from https://www.reddit.com/prefs/apps.",
+      "properties": {
+        "client_id": {
+          "type": "string",
+          "description": "App client id — the ~14-character string shown under the app name."
+        },
+        "client_secret": {
+          "type": "string",
+          "description": "App client secret — the ~27-character string shown next to 'secret'."
+        }
+      },
+      "required": ["client_id", "client_secret"],
+      "additionalProperties": false
+    },
+    "RedditMaskedScript": {
+      "title": "RedditMaskedScript",
+      "label": "Reddit Script Credentials",
+      "type": "object",
+      "description": "Client credentials plus the Reddit account that registered the script app. For 2FA accounts append the current token to the password as password:token.",
+      "properties": {
+        "client_id": {
+          "type": "string",
+          "description": "App client id — the ~14-character string shown under 'personal use script'."
+        },
+        "client_secret": {
+          "type": "string",
+          "description": "App client secret — the ~27-character string shown next to 'secret'."
+        },
+        "username": {
+          "type": "string",
+          "description": "Reddit account name that registered the script app."
+        },
+        "password": {
+          "type": "string",
+          "description": "Password for that Reddit account. With 2FA enabled use password:token."
+        }
+      },
+      "required": ["client_id", "client_secret", "username", "password"],
+      "additionalProperties": false
+    },
+    "RedditMaskedRefreshToken": {
+      "title": "RedditMaskedRefreshToken",
+      "label": "Reddit Refresh Token",
+      "type": "object",
+      "description": "Client id plus a refresh token obtained from a completed code-grant authorization. Installed apps have no client secret — leave it empty.",
+      "properties": {
+        "client_id": {
+          "type": "string",
+          "description": "App client id from https://www.reddit.com/prefs/apps."
+        },
+        "client_secret": {
+          "type": "string",
+          "description": "App client secret. Leave empty for installed apps, which are issued no secret."
+        },
+        "refresh_token": {
+          "type": "string",
+          "description": "Long-lived refresh token saved from a previous code-grant authorization."
+        }
+      },
+      "required": ["client_id", "refresh_token"],
+      "additionalProperties": false
+    },
+    "RedditMasked": {
+      "title": "RedditMasked",
+      "label": "Reddit Credentials",
+      "oneOf": [
+        {
+          "$ref": "#/definitions/RedditMaskedReadOnly"
+        },
+        {
+          "$ref": "#/definitions/RedditMaskedScript"
+        },
+        {
+          "$ref": "#/definitions/RedditMaskedRefreshToken"
+        }
+      ]
+    },
+    "RedditOptionalScope": {
+      "title": "RedditOptionalScope",
+      "label": "Reddit Scope",
+      "type": "object",
+      "description": "What is pulled out of each subreddit.",
+      "properties": {
+        "listing": {
+          "$ref": "#/definitions/RedditListing"
+        },
+        "time_filter": {
+          "$ref": "#/definitions/RedditTimeFilter"
+        },
+        "include_comments": {
+          "type": "boolean",
+          "default": true,
+          "description": "Emit each comment as its own asset, linked to its parent submission or comment so the thread is navigable."
+        },
+        "comment_sort": {
+          "$ref": "#/definitions/RedditCommentSort"
+        },
+        "max_comments_per_post": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 5000,
+          "default": 200,
+          "description": "Upper bound on comments materialised per submission. Reddit's comment forest is unbounded and each expansion costs an API call, so this caps both."
+        },
+        "expand_more_comments": {
+          "type": "boolean",
+          "default": false,
+          "description": "Expand the 'load more comments' placeholders. Off by default: each expansion is an extra API round-trip and a busy thread can need hundreds."
+        },
+        "include_media": {
+          "type": "boolean",
+          "default": true,
+          "description": "Download images, video, audio and documents attached to a submission (including gallery items) and emit each as its own asset, parsed by the standard file pipeline."
+        },
+        "include_external_videos": {
+          "type": "boolean",
+          "default": true,
+          "description": "Analyse YouTube/Vimeo-style videos a submission links to using the same captions, Whisper transcription and frame-OCR pipeline as the YouTube source."
+        },
+        "max_media_bytes": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 1
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": 104857600,
+          "description": "Skip attachments larger than this many bytes. Null means no limit."
+        },
+        "include_file_extensions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Only download attachments with these extensions (e.g. ['.pdf', '.png']). Empty means all extensions."
+        },
+        "exclude_file_extensions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Never download attachments with these extensions."
+        },
+        "exclude_nsfw": {
+          "type": "boolean",
+          "default": false,
+          "description": "Skip submissions Reddit flags as over-18."
+        },
+        "exclude_stickied": {
+          "type": "boolean",
+          "default": false,
+          "description": "Skip stickied/announcement submissions."
+        }
+      },
+      "additionalProperties": false
+    },
+    "RedditOptionalConnection": {
+      "title": "RedditOptionalConnection",
+      "label": "Reddit Connection",
+      "type": "object",
+      "description": "PRAW client behaviour: rate limiting, timeouts and startup checks.",
+      "properties": {
+        "check_for_updates": {
+          "type": "boolean",
+          "default": false,
+          "description": "PRAW's own update check, which reports newer PRAW releases on standard error (PRAW default: true). Disabled by default here because it contacts PyPI on every run from an ephemeral scan job."
+        },
+        "check_for_async": {
+          "type": "boolean",
+          "default": true,
+          "description": "Warn when PRAW is used from an asynchronous environment, recommending Async PRAW (PRAW default: true)."
+        },
+        "ratelimit_seconds": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 900,
+          "default": 5,
+          "description": "Longest Reddit-reported ratelimit PRAW will absorb by sleeping rather than raising. PRAW sleeps for the reported value plus one second. Reddit can report up to 14 minutes, so raising this trades run time for fewer failures."
+        },
+        "timeout": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 300,
+          "default": 16,
+          "description": "Seconds PRAW waits for a single Reddit request before raising (PRAW default: 16)."
+        },
+        "window_size": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3600,
+          "default": 600,
+          "description": "Seconds between Reddit rate-limit resets, used by PRAW to pace requests (PRAW default: 600)."
+        }
+      },
+      "additionalProperties": false
+    },
+    "RedditOptionalSite": {
+      "title": "RedditOptionalSite",
+      "label": "Reddit Site",
+      "type": "object",
+      "description": "Endpoints and fullname prefixes of the Reddit instance. Only change these for a self-hosted or third-party Reddit-compatible site.",
+      "properties": {
+        "reddit_url": {
+          "type": "string",
+          "format": "uri",
+          "default": "https://www.reddit.com",
+          "description": "Base URL of the Reddit instance. PRAW assumes the OAuth authorization endpoints live under it."
+        },
+        "oauth_url": {
+          "type": "string",
+          "format": "uri",
+          "default": "https://oauth.reddit.com",
+          "description": "URL used to reach the instance's API."
+        },
+        "short_url": {
+          "type": "string",
+          "format": "uri",
+          "default": "https://redd.it",
+          "description": "URL used to generate short links on the instance."
+        },
+        "comment_kind": {
+          "$ref": "#/definitions/RedditKindPrefix",
+          "default": "t1_",
+          "description": "Type prefix for comments on the instance (default: t1_)."
+        },
+        "redditor_kind": {
+          "$ref": "#/definitions/RedditKindPrefix",
+          "default": "t2_",
+          "description": "Type prefix for redditors on the instance (default: t2_)."
+        },
+        "submission_kind": {
+          "$ref": "#/definitions/RedditKindPrefix",
+          "default": "t3_",
+          "description": "Type prefix for submissions on the instance (default: t3_)."
+        },
+        "message_kind": {
+          "$ref": "#/definitions/RedditKindPrefix",
+          "default": "t4_",
+          "description": "Type prefix for messages on the instance (default: t4_)."
+        },
+        "subreddit_kind": {
+          "$ref": "#/definitions/RedditKindPrefix",
+          "default": "t5_",
+          "description": "Type prefix for subreddits on the instance (default: t5_)."
+        },
+        "trophy_kind": {
+          "$ref": "#/definitions/RedditKindPrefix",
+          "default": "t6_",
+          "description": "Type prefix for trophies on the instance (default: t6_)."
+        }
+      },
+      "additionalProperties": false
+    },
+    "RedditOptional": {
+      "title": "RedditOptional",
+      "label": "Reddit Options",
+      "type": "object",
+      "properties": {
+        "scope": {
+          "$ref": "#/definitions/RedditOptionalScope"
+        },
+        "connection": {
+          "$ref": "#/definitions/RedditOptionalConnection"
+        },
+        "site": {
+          "$ref": "#/definitions/RedditOptionalSite"
+        }
+      },
+      "additionalProperties": false
+    },
+    "RedditInput": {
+      "title": "RedditInput",
+      "label": "Reddit",
+      "allOf": [
+        {
+          "$ref": "#/definitions/CoreInput"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "REDDIT"
+            },
+            "required": {
+              "$ref": "#/definitions/RedditRequired"
+            },
+            "masked": {
+              "$ref": "#/definitions/RedditMasked"
+            },
+            "optional": {
+              "$ref": "#/definitions/RedditOptional"
+            },
+            "detectors": {
+              "$ref": "#/definitions/Detectors"
+            },
+            "custom_detectors": {
+              "$ref": "#/definitions/CustomDetectorSelections"
+            },
+            "sampling": {
+              "$ref": "#/definitions/SamplingConfig"
+            },
+            "scan_cache": {
+              "$ref": "#/definitions/ScanCacheConfig"
+            },
+            "resources": {
+              "$ref": "#/definitions/ResourceOverrides"
+            },
+            "cleanup_removed_detector_findings": {
+              "type": "boolean",
+              "default": true,
+              "description": "When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set."
+            }
+          },
+          "required": ["required", "masked", "sampling"],
+          "additionalProperties": false
+        }
+      ]
     },
     "SlackRequired": {
       "title": "SlackRequired",

@@ -45,6 +45,7 @@ class AssetType(StrEnum):
     NOTION = 'NOTION'
     EMAIL = 'EMAIL'
     YOUTUBE = 'YOUTUBE'
+    REDDIT = 'REDDIT'
     DELTA_LAKE = 'DELTA_LAKE'
     ICEBERG = 'ICEBERG'
     KAFKA = 'KAFKA'
@@ -375,6 +376,7 @@ class Type(StrEnum):
     NOTION = 'NOTION'
     EMAIL = 'EMAIL'
     YOUTUBE = 'YOUTUBE'
+    REDDIT = 'REDDIT'
     DELTA_LAKE = 'DELTA_LAKE'
     ICEBERG = 'ICEBERG'
     KAFKA = 'KAFKA'
@@ -462,6 +464,339 @@ class YouTubeOptional(BaseModel):
     )
     transcript: YouTubeOptionalTranscript | None = None
     connection: YouTubeOptionalConnection | None = None
+
+
+class RedditAuthMode(StrEnum):
+    """
+    PRAW OAuth flow used to obtain credentials. READ_ONLY is application-only (client credentials) and needs no Reddit account. SCRIPT is the password grant for a script app registered by the account itself. REFRESH_TOKEN replays a saved refresh token obtained from the code grant (web and installed apps). Note: whichever flow is configured, Classifyre forces PRAW into read-only mode and does not let you turn it off, so requests are issued with the application's own token — content only a signed-in account can see (private subreddits, for example) is not reachable.
+    """
+
+    READ_ONLY = 'READ_ONLY'
+    SCRIPT = 'SCRIPT'
+    REFRESH_TOKEN = 'REFRESH_TOKEN'
+
+
+class RedditListing(StrEnum):
+    """
+    Subreddit listing that supplies candidate submissions. Leave unset to let the sampling strategy pick: LATEST/AUTOMATIC/ALL use NEW (chronological, so cursors stay meaningful) and RANDOM uses HOT.
+    """
+
+    NEW = 'NEW'
+    HOT = 'HOT'
+    TOP = 'TOP'
+    RISING = 'RISING'
+    CONTROVERSIAL = 'CONTROVERSIAL'
+
+
+class RedditTimeFilter(StrEnum):
+    """
+    Time window applied to the TOP and CONTROVERSIAL listings. Ignored by the other listings.
+    """
+
+    ALL = 'ALL'
+    DAY = 'DAY'
+    HOUR = 'HOUR'
+    MONTH = 'MONTH'
+    WEEK = 'WEEK'
+    YEAR = 'YEAR'
+
+
+class RedditCommentSort(StrEnum):
+    """
+    Order Reddit returns a submission's comment forest in. TOP and BEST surface the most-engaged branches first, which is what a bounded max_comments_per_post should keep.
+    """
+
+    TOP = 'TOP'
+    BEST = 'BEST'
+    NEW = 'NEW'
+    OLD = 'OLD'
+    CONTROVERSIAL = 'CONTROVERSIAL'
+    Q_AND_A = 'Q_AND_A'
+
+
+class RedditKindPrefix(StrEnum):
+    """
+    Reddit fullname type prefix. t1_ comments, t2_ redditors, t3_ submissions, t4_ messages, t5_ subreddits, t6_ trophies.
+    """
+
+    t1_ = 't1_'
+    t2_ = 't2_'
+    t3_ = 't3_'
+    t4_ = 't4_'
+    t5_ = 't5_'
+    t6_ = 't6_'
+
+
+class RedditRequiredReadOnly(BaseModel):
+    """
+    Application-only (client credentials) access. Reads public subreddits without a Reddit account.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    auth_mode: Literal['READ_ONLY']
+    subreddits: list[str] = Field(
+        ...,
+        description='Subreddits to scan, by name (e.g. datasets) or URL (e.g. https://www.reddit.com/r/datasets/).',
+        min_length=1,
+    )
+    user_agent: str = Field(
+        ...,
+        description="Unique application description required by Reddit's API rules. Recommended format: <platform>:<app ID>:<version string> (by u/<reddit username>).",
+        min_length=1,
+    )
+
+
+class RedditRequiredScript(BaseModel):
+    """
+    Password grant for a script app registered by a Reddit account. The account's credentials authenticate the app; the scan itself still runs read-only.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    auth_mode: Literal['SCRIPT']
+    subreddits: list[str] = Field(
+        ...,
+        description='Subreddits to scan, by name (e.g. datasets) or URL (e.g. https://www.reddit.com/r/datasets/).',
+        min_length=1,
+    )
+    user_agent: str = Field(
+        ...,
+        description="Unique application description required by Reddit's API rules. Recommended format: <platform>:<app ID>:<version string> (by u/<reddit username>).",
+        min_length=1,
+    )
+
+
+class RedditRequiredRefreshToken(BaseModel):
+    """
+    Code-grant flow replayed from a saved refresh token. Used by web and installed apps; installed apps leave the client secret empty.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    auth_mode: Literal['REFRESH_TOKEN']
+    subreddits: list[str] = Field(
+        ...,
+        description='Subreddits to scan, by name (e.g. datasets) or URL (e.g. https://www.reddit.com/r/datasets/).',
+        min_length=1,
+    )
+    user_agent: str = Field(
+        ...,
+        description="Unique application description required by Reddit's API rules. Recommended format: <platform>:<app ID>:<version string> (by u/<reddit username>).",
+        min_length=1,
+    )
+
+
+class RedditMaskedReadOnly(BaseModel):
+    """
+    Client credentials from https://www.reddit.com/prefs/apps.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    client_id: str = Field(
+        ...,
+        description='App client id — the ~14-character string shown under the app name.',
+    )
+    client_secret: str = Field(
+        ...,
+        description="App client secret — the ~27-character string shown next to 'secret'.",
+    )
+
+
+class RedditMaskedScript(BaseModel):
+    """
+    Client credentials plus the Reddit account that registered the script app. For 2FA accounts append the current token to the password as password:token.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    client_id: str = Field(
+        ...,
+        description="App client id — the ~14-character string shown under 'personal use script'.",
+    )
+    client_secret: str = Field(
+        ...,
+        description="App client secret — the ~27-character string shown next to 'secret'.",
+    )
+    username: str = Field(
+        ..., description='Reddit account name that registered the script app.'
+    )
+    password: str = Field(
+        ...,
+        description='Password for that Reddit account. With 2FA enabled use password:token.',
+    )
+
+
+class RedditMaskedRefreshToken(BaseModel):
+    """
+    Client id plus a refresh token obtained from a completed code-grant authorization. Installed apps have no client secret — leave it empty.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    client_id: str = Field(
+        ..., description='App client id from https://www.reddit.com/prefs/apps.'
+    )
+    client_secret: str | None = Field(
+        None,
+        description='App client secret. Leave empty for installed apps, which are issued no secret.',
+    )
+    refresh_token: str = Field(
+        ...,
+        description='Long-lived refresh token saved from a previous code-grant authorization.',
+    )
+
+
+class MaxMediaBytes(RootModel[int]):
+    root: int = Field(
+        104857600,
+        description='Skip attachments larger than this many bytes. Null means no limit.',
+        ge=1,
+    )
+
+
+class RedditOptionalScope(BaseModel):
+    """
+    What is pulled out of each subreddit.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    listing: RedditListing | None = None
+    time_filter: RedditTimeFilter | None = 'ALL'
+    include_comments: bool | None = Field(
+        True,
+        description='Emit each comment as its own asset, linked to its parent submission or comment so the thread is navigable.',
+    )
+    comment_sort: RedditCommentSort | None = 'TOP'
+    max_comments_per_post: int | None = Field(
+        200,
+        description="Upper bound on comments materialised per submission. Reddit's comment forest is unbounded and each expansion costs an API call, so this caps both.",
+        ge=0,
+        le=5000,
+    )
+    expand_more_comments: bool | None = Field(
+        False,
+        description="Expand the 'load more comments' placeholders. Off by default: each expansion is an extra API round-trip and a busy thread can need hundreds.",
+    )
+    include_media: bool | None = Field(
+        True,
+        description='Download images, video, audio and documents attached to a submission (including gallery items) and emit each as its own asset, parsed by the standard file pipeline.',
+    )
+    include_external_videos: bool | None = Field(
+        True,
+        description='Analyse YouTube/Vimeo-style videos a submission links to using the same captions, Whisper transcription and frame-OCR pipeline as the YouTube source.',
+    )
+    max_media_bytes: MaxMediaBytes | None = Field(
+        104857600,
+        description='Skip attachments larger than this many bytes. Null means no limit.',
+        validate_default=True,
+    )
+    include_file_extensions: list[str] | None = Field(
+        None,
+        description="Only download attachments with these extensions (e.g. ['.pdf', '.png']). Empty means all extensions.",
+    )
+    exclude_file_extensions: list[str] | None = Field(
+        None, description='Never download attachments with these extensions.'
+    )
+    exclude_nsfw: bool | None = Field(
+        False, description='Skip submissions Reddit flags as over-18.'
+    )
+    exclude_stickied: bool | None = Field(
+        False, description='Skip stickied/announcement submissions.'
+    )
+
+
+class RedditOptionalConnection(BaseModel):
+    """
+    PRAW client behaviour: rate limiting, timeouts and startup checks.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    check_for_updates: bool | None = Field(
+        False,
+        description="PRAW's own update check, which reports newer PRAW releases on standard error (PRAW default: true). Disabled by default here because it contacts PyPI on every run from an ephemeral scan job.",
+    )
+    check_for_async: bool | None = Field(
+        True,
+        description='Warn when PRAW is used from an asynchronous environment, recommending Async PRAW (PRAW default: true).',
+    )
+    ratelimit_seconds: int | None = Field(
+        5,
+        description='Longest Reddit-reported ratelimit PRAW will absorb by sleeping rather than raising. PRAW sleeps for the reported value plus one second. Reddit can report up to 14 minutes, so raising this trades run time for fewer failures.',
+        ge=0,
+        le=900,
+    )
+    timeout: int | None = Field(
+        16,
+        description='Seconds PRAW waits for a single Reddit request before raising (PRAW default: 16).',
+        ge=1,
+        le=300,
+    )
+    window_size: int | None = Field(
+        600,
+        description='Seconds between Reddit rate-limit resets, used by PRAW to pace requests (PRAW default: 600).',
+        ge=1,
+        le=3600,
+    )
+
+
+class RedditOptionalSite(BaseModel):
+    """
+    Endpoints and fullname prefixes of the Reddit instance. Only change these for a self-hosted or third-party Reddit-compatible site.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    reddit_url: AnyUrl | None = Field(
+        'https://www.reddit.com',
+        description='Base URL of the Reddit instance. PRAW assumes the OAuth authorization endpoints live under it.',
+    )
+    oauth_url: AnyUrl | None = Field(
+        'https://oauth.reddit.com', description="URL used to reach the instance's API."
+    )
+    short_url: AnyUrl | None = Field(
+        'https://redd.it',
+        description='URL used to generate short links on the instance.',
+    )
+    comment_kind: RedditKindPrefix | None = Field(
+        't1_', description='Type prefix for comments on the instance (default: t1_).'
+    )
+    redditor_kind: RedditKindPrefix | None = Field(
+        't2_', description='Type prefix for redditors on the instance (default: t2_).'
+    )
+    submission_kind: RedditKindPrefix | None = Field(
+        't3_', description='Type prefix for submissions on the instance (default: t3_).'
+    )
+    message_kind: RedditKindPrefix | None = Field(
+        't4_', description='Type prefix for messages on the instance (default: t4_).'
+    )
+    subreddit_kind: RedditKindPrefix | None = Field(
+        't5_', description='Type prefix for subreddits on the instance (default: t5_).'
+    )
+    trophy_kind: RedditKindPrefix | None = Field(
+        't6_', description='Type prefix for trophies on the instance (default: t6_).'
+    )
+
+
+class RedditOptional(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    scope: RedditOptionalScope | None = None
+    connection: RedditOptionalConnection | None = None
+    site: RedditOptionalSite | None = None
 
 
 class SlackRequired(BaseModel):
@@ -2741,7 +3076,7 @@ class ConfluenceOptionalConnection(BaseModel):
     )
 
 
-class Type20(StrEnum):
+class Type21(StrEnum):
     """
     Filter spaces by space type
     """
@@ -2778,7 +3113,7 @@ class ConfluenceOptionalScopeSpaces(BaseModel):
     keys: list[str] | None = Field(
         None, description='Filter spaces by keys (up to 250)', max_length=250
     )
-    type: Type20 | None = Field(None, description='Filter spaces by space type')
+    type: Type21 | None = Field(None, description='Filter spaces by space type')
     status: Status | None = Field(None, description='Filter spaces by status')
     labels: list[str] | None = Field(
         None,
@@ -3044,7 +3379,7 @@ class ServiceDeskOptional(BaseModel):
     content: ServiceDeskOptionalContent | None = None
 
 
-class Type21(StrEnum):
+class Type22(StrEnum):
     """
     Type of the asset or source
     """
@@ -3072,6 +3407,7 @@ class Type21(StrEnum):
     NOTION = 'NOTION'
     EMAIL = 'EMAIL'
     YOUTUBE = 'YOUTUBE'
+    REDDIT = 'REDDIT'
     DELTA_LAKE = 'DELTA_LAKE'
     ICEBERG = 'ICEBERG'
     KAFKA = 'KAFKA'
@@ -4654,6 +4990,33 @@ class YouTubeInput(CoreInput):
     )
 
 
+class RedditInput(CoreInput):
+    type: Literal['REDDIT'] | None = Field(
+        None, description='Type of the asset or source'
+    )
+    required: (
+        RedditRequiredReadOnly | RedditRequiredScript | RedditRequiredRefreshToken
+    ) = Field(..., title='RedditRequired')
+    masked: RedditMaskedReadOnly | RedditMaskedScript | RedditMaskedRefreshToken = (
+        Field(..., title='RedditMasked')
+    )
+    optional: RedditOptional | None = None
+    detectors: list[Detector] | None = Field(
+        None, description='Detectors to run on ingested content'
+    )
+    custom_detectors: list[CustomDetectorSelection] | None = Field(
+        None,
+        description='Reusable custom detector IDs selected from the custom detector catalog.',
+    )
+    sampling: SamplingConfig
+    scan_cache: ScanCacheConfig | None = None
+    resources: ResourceOverrides | None = None
+    cleanup_removed_detector_findings: bool | None = Field(
+        True,
+        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
+    )
+
+
 class SlackOptional(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
@@ -4776,6 +5139,7 @@ class SourceInput(
         | NotionInput
         | EmailInput
         | YouTubeInput
+        | RedditInput
         | DeltaLakeInput
         | IcebergInput
         | KafkaInput
@@ -4814,6 +5178,7 @@ class SourceInput(
         | NotionInput
         | EmailInput
         | YouTubeInput
+        | RedditInput
         | DeltaLakeInput
         | IcebergInput
         | KafkaInput

@@ -2487,6 +2487,7 @@ export const JsonSchemaForm = React.forwardRef<
     NOTION: false,
     EMAIL: false,
     YOUTUBE: false,
+    REDDIT: false,
     DELTA_LAKE: true,
     ICEBERG: true,
     KAFKA: false,

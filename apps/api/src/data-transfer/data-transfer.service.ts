@@ -120,6 +120,7 @@ export class DataTransferService {
   async startExport(input: StartExportInput): Promise<DataTransferJob> {
     const scopes = this.validateScopes(input.scopes);
     await this.assertNoActiveJob();
+    await this.discardPreviousExports();
 
     const job = await this.prisma.dataTransferJob.create({
       data: {
@@ -366,6 +367,36 @@ export class DataTransferService {
 
     if (stale.length > 0) {
       this.logger.warn(`Failed ${stale.length} interrupted transfer job(s)`);
+    }
+  }
+
+  /**
+   * Drop the archive from any earlier export in this namespace.
+   *
+   * One workspace keeps at most one export archive: the previous one is
+   * superseded the moment a new export is asked for, and leaving it on disk
+   * would mean an operator who exports repeatedly accumulates full copies of
+   * their workspace until each one's TTL happens to expire. The job rows stay
+   * — they are the transfer history — they simply stop pointing at a file.
+   */
+  private async discardPreviousExports(): Promise<void> {
+    const schema = this.schema();
+    const previous = await this.prisma.dataTransferJob.findMany({
+      where: { kind: DataTransferKind.EXPORT, storageKey: { not: null } },
+      select: { id: true, storageKey: true },
+    });
+
+    for (const job of previous) {
+      await this.storage.remove(schema, job.storageKey);
+      await this.prisma.dataTransferJob
+        .update({ where: { id: job.id }, data: { storageKey: null } })
+        .catch(() => undefined);
+    }
+
+    if (previous.length > 0) {
+      this.logger.log(
+        `Discarded ${previous.length} superseded export archive(s)`,
+      );
     }
   }
 

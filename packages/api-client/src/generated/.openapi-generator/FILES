@@ -196,6 +196,7 @@ docs/NotificationsControllerMarkAllRead200Response.md
 docs/ParseTrainingExamplesResponseDto.md
 docs/ParseTrainingExamplesSkippedReasonsDto.md
 docs/ParsedTrainingExampleDto.md
+docs/PayloadCursorEntryDto.md
 docs/PivotGraphDto.md
 docs/PreviewInquiryDto.md
 docs/PreviewResponseDto.md
@@ -522,6 +523,7 @@ src/models/NotificationsControllerMarkAllRead200Response.ts
 src/models/ParseTrainingExamplesResponseDto.ts
 src/models/ParseTrainingExamplesSkippedReasonsDto.ts
 src/models/ParsedTrainingExampleDto.ts
+src/models/PayloadCursorEntryDto.ts
 src/models/PivotGraphDto.ts
 src/models/PreviewInquiryDto.ts
 src/models/PreviewResponseDto.ts

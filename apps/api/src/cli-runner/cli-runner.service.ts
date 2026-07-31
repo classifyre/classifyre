@@ -58,7 +58,7 @@ import {
   SearchRunnersAssetsSortOrder,
 } from '../dto/search-runners-assets-request.dto';
 import { SearchRunnersAssetsResponseDto } from '../dto/search-runners-assets-response.dto';
-import { ScanCacheEntryDto } from './dto';
+import { PayloadCursorEntryDto, ScanCacheEntryDto } from './dto';
 
 /** Narrow a JSONB column to a plain object, or null when it is anything else. */
 function asJsonRecord(value: unknown): Record<string, unknown> | null {
@@ -2675,7 +2675,12 @@ export class CliRunnerService {
     runnerId: string,
     assetHashes: string[],
     includeScanCache = false,
-  ): Promise<{ registered: number; cache?: ScanCacheEntryDto[] }> {
+    includePayloadCursor = false,
+  ): Promise<{
+    registered: number;
+    cache?: ScanCacheEntryDto[];
+    payloadCursors?: PayloadCursorEntryDto[];
+  }> {
     if (!assetHashes.length) return { registered: 0 };
 
     const runner = await this.prisma.runner.findUnique({
@@ -2698,6 +2703,12 @@ export class CliRunnerService {
         )
       : undefined;
 
+    // Read alongside the scan cache and for the same reason: this is the last
+    // moment the stored row offset still describes the *previous* run.
+    const payloadCursors = includePayloadCursor
+      ? await this.collectPayloadCursors(runner.sourceId, assetHashes)
+      : undefined;
+
     const result = await this.prisma.runnerAsset.createMany({
       data: assetHashes.map((hash) => ({
         runnerId,
@@ -2707,9 +2718,41 @@ export class CliRunnerService {
       skipDuplicates: true,
     });
 
-    return cache
-      ? { registered: result.count, cache }
-      : { registered: result.count };
+    return {
+      registered: result.count,
+      ...(cache ? { cache } : {}),
+      ...(payloadCursors ? { payloadCursors } : {}),
+    };
+  }
+
+  /**
+   * Stored payload positions for the given hashes.
+   *
+   * Unlike scan-cache state this is returned unconditionally: a cursor records
+   * where a sweep stopped, not that anything completed, so withholding it from a
+   * run whose last attempt died would silently restart that asset at row 0 and
+   * re-scan rows already covered. The CLI is the one that decides a cursor no
+   * longer applies — it compares the checksum and strategy stored inside it.
+   */
+  private async collectPayloadCursors(
+    sourceId: string,
+    assetHashes: string[],
+  ): Promise<PayloadCursorEntryDto[]> {
+    const assets = await this.prisma.asset.findMany({
+      where: {
+        sourceId,
+        hash: { in: assetHashes },
+        payloadCursor: { not: Prisma.DbNull },
+      },
+      select: { hash: true, payloadCursor: true },
+    });
+
+    const entries: PayloadCursorEntryDto[] = [];
+    for (const asset of assets) {
+      const cursor = asJsonRecord(asset.payloadCursor);
+      if (cursor) entries.push({ hash: asset.hash, cursor });
+    }
+    return entries;
   }
 
   /**

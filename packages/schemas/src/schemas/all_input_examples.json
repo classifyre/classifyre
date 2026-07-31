@@ -2030,6 +2030,131 @@
       }
     }
   ],
+  "REDDIT": [
+    {
+      "name": "Public subreddit sweep",
+      "description": "Read-only app credentials over public subreddits — posts, comments and attached media, incrementally sampled",
+      "schedule": {
+        "enabled": true,
+        "preset": "nightly",
+        "cron": "15 2 * * *",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "REDDIT",
+        "required": {
+          "auth_mode": "READ_ONLY",
+          "subreddits": [
+            "datasets",
+            "https://www.reddit.com/r/MachineLearning/"
+          ],
+          "user_agent": "classifyre:com.example.scanner:v1.0 (by u/example)"
+        },
+        "masked": {
+          "client_id": "SI8pN3DSbt0zor",
+          "client_secret": "xaxkj7HNh8kwg8e5t4m6KvSrbTI"
+        },
+        "optional": {
+          "scope": {
+            "include_comments": true,
+            "max_comments_per_post": 200,
+            "include_media": true
+          }
+        },
+        "sampling": {
+          "strategy": "AUTOMATIC",
+          "rows_per_page": 50
+        },
+        "detectors": [
+          {
+            "type": "PII",
+            "enabled": true
+          },
+          {
+            "type": "SECRETS",
+            "enabled": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "Private subreddit audit (script app)",
+      "description": "Password-grant script app so the scan sees private subreddits the account belongs to; still read-only against Reddit",
+      "config": {
+        "type": "REDDIT",
+        "required": {
+          "auth_mode": "SCRIPT",
+          "subreddits": ["internal_announcements"],
+          "user_agent": "classifyre:com.example.audit:v1.0 (by u/example)"
+        },
+        "masked": {
+          "client_id": "SI8pN3DSbt0zor",
+          "client_secret": "xaxkj7HNh8kwg8e5t4m6KvSrbTI",
+          "username": "example",
+          "password": "1guiwevlfo00esyy"
+        },
+        "optional": {
+          "scope": {
+            "listing": "TOP",
+            "time_filter": "MONTH",
+            "comment_sort": "TOP",
+            "expand_more_comments": true
+          },
+          "connection": {
+            "ratelimit_seconds": 60,
+            "timeout": 30
+          }
+        },
+        "sampling": {
+          "strategy": "LATEST",
+          "rows_per_page": 100
+        },
+        "detectors": [
+          {
+            "type": "PII",
+            "enabled": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "Saved refresh token, transcripts only",
+      "description": "Web/installed app replaying a stored refresh token; skips downloads but still transcribes linked videos",
+      "config": {
+        "type": "REDDIT",
+        "required": {
+          "auth_mode": "REFRESH_TOKEN",
+          "subreddits": ["videos"],
+          "user_agent": "classifyre:com.example.web:v1.0 (by u/example)"
+        },
+        "masked": {
+          "client_id": "SI8pN3DSbt0zor",
+          "refresh_token": "9e8d7c6b5a4f3e2d1c0b9a8f7e6d5c4b3a2f1e0d"
+        },
+        "optional": {
+          "scope": {
+            "include_media": false,
+            "include_external_videos": true,
+            "include_comments": false
+          },
+          "site": {
+            "reddit_url": "https://www.reddit.com",
+            "oauth_url": "https://oauth.reddit.com"
+          }
+        },
+        "sampling": {
+          "strategy": "RANDOM",
+          "rows_per_page": 25
+        },
+        "detectors": [
+          {
+            "type": "PII",
+            "enabled": true
+          }
+        ]
+      }
+    }
+  ],
   "DELTA_LAKE": [
     {
       "name": "Delta warehouse discovery scan",

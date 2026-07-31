@@ -263,6 +263,27 @@ export class AssetService {
     };
   }
 
+  /**
+   * Extract the payload cursor the CLI wants persisted for this asset.
+   *
+   * Returns undefined when the payload carries none — which covers the Phase 1
+   * discovery stub, every non-AUTOMATIC strategy, and any asset with no row axis
+   * — so the stored position survives instead of being reset to the top of the
+   * file by a run that never windowed it.
+   *
+   * Stored verbatim. The cursor is the CLI's format, and the API deliberately
+   * does not interpret the offset: only the CLI knows whether it still applies.
+   */
+  private normalizePayloadCursor(
+    asset: Record<string, any>,
+  ): { payloadCursor: Prisma.InputJsonValue } | undefined {
+    const cursor = asset?.payload_cursor;
+    if (cursor == null || typeof cursor !== 'object' || Array.isArray(cursor)) {
+      return undefined;
+    }
+    return { payloadCursor: cursor as Prisma.InputJsonValue };
+  }
+
   /** Read-side: coerce a JSONB column into a plain object for response DTOs. */
   private metadataRecord(value: unknown): Record<string, unknown> | undefined {
     if (value != null && typeof value === 'object' && !Array.isArray(value)) {
@@ -2164,6 +2185,14 @@ export class AssetService {
           scanCache: Prisma.InputJsonValue;
           contentHash: string | null;
         }[] = [];
+        // And for the payload cursor, which is the common case rather than the
+        // exception: an asset whose file has not changed is precisely the one
+        // whose sweep is being advanced a window at a time, so it lands here as
+        // UNCHANGED with a new position to record.
+        const unchangedPayloadCursorUpdates: {
+          id: string;
+          payloadCursor: Prisma.InputJsonValue;
+        }[] = [];
 
         for (const asset of batch) {
           const { hash, checksum, name, external_url, links, asset_type } =
@@ -2189,6 +2218,9 @@ export class AssetService {
           const scanCache = this.normalizeScanCache(asset, scopeFingerprint);
           const scanCachePayload = scanCache ?? {};
 
+          const payloadCursor = this.normalizePayloadCursor(asset);
+          const payloadCursorPayload = payloadCursor ?? {};
+
           const assetData = {
             checksum: String(checksum),
             name: String(name),
@@ -2212,6 +2244,7 @@ export class AssetService {
               ...assetData,
               ...metadataPayload,
               ...scanCachePayload,
+              ...payloadCursorPayload,
               status: AssetStatus.NEW,
             });
           } else if (existingAsset.checksum !== String(checksum)) {
@@ -2223,6 +2256,7 @@ export class AssetService {
                 ...assetData,
                 ...metadataPayload,
                 ...scanCachePayload,
+                ...payloadCursorPayload,
                 status: AssetStatus.UPDATED,
               },
             });
@@ -2244,6 +2278,12 @@ export class AssetService {
               unchangedScanCacheUpdates.push({
                 id: existingAsset.id,
                 ...scanCache,
+              });
+            }
+            if (payloadCursor !== undefined) {
+              unchangedPayloadCursorUpdates.push({
+                id: existingAsset.id,
+                ...payloadCursor,
               });
             }
             existingAssetsMap.set(assetHash, {
@@ -2308,6 +2348,12 @@ export class AssetService {
             where: { id },
             data: { scanCache, contentHash },
           });
+        }
+
+        // Same for the payload cursor on UNCHANGED assets — the position an
+        // AUTOMATIC sweep reached this run.
+        for (const { id, payloadCursor } of unchangedPayloadCursorUpdates) {
+          await tx.asset.update({ where: { id }, data: { payloadCursor } });
         }
 
         // Denormalize metadata onto the runner_asset row (keyed by runnerId +

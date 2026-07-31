@@ -14,6 +14,10 @@ Both libraries scrape public data and need no API key. ``yt-dlp`` and
 ``youtube-transcript-api`` are optional dependencies (``[youtube]`` group) and
 are imported lazily so the base CLI loads without them. The Whisper fallback
 additionally requires the ``[transcription]`` group (faster-whisper).
+
+The yt-dlp/captions/Whisper/frame-OCR mechanics themselves live in
+``utils/external_video``, shared with every other connector that runs into a
+video link (Reddit submissions, for one).
 """
 
 from __future__ import annotations
@@ -22,7 +26,6 @@ import logging
 import random
 import tempfile
 from collections.abc import AsyncGenerator
-from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -41,6 +44,9 @@ from ...models.generated_single_asset_scan_results import (
     Location,
     SingleAssetScanResults,
 )
+from ...utils import external_video
+from ...utils.external_video import WATCH_URL as _WATCH_URL
+from ...utils.external_video import TranscriptResult as _TranscriptResult
 from ...utils.hashing import hash_id
 from ..base import BaseSource
 from ..dependencies import require_module
@@ -50,18 +56,9 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-_WATCH_URL = "https://www.youtube.com/watch?v={video_id}"
-
-
-@dataclass
-class _TranscriptResult:
-    text: str
-    language: str | None
-    is_generated: bool | None
-    available_languages: list[str] = field(default_factory=list)
-    # Where the text came from: "captions" (youtube-transcript-api) or
-    # "whisper" (downloaded audio transcribed via faster-whisper).
-    source: str = "captions"
+# Declared inline at each call site rather than via a shared constant: the
+# dependency-group conformance test reads these lists statically (AST) to prove
+# the parent process pre-warms the right uv group before the worker pool starts.
 
 
 class YouTubeSource(BaseSource):
@@ -142,24 +139,16 @@ class YouTubeSource(BaseSource):
     # ------------------------------------------------------------------
 
     def _ydl_class(self) -> Any:
-        mod = require_module("yt_dlp", "YouTube", uv_groups=["youtube"])
-        return mod.YoutubeDL
+        module = require_module("yt_dlp", "YouTube", ["youtube"])
+        return module.YoutubeDL
 
     def _base_ydl_opts(self) -> dict[str, Any]:
-        opts: dict[str, Any] = {
-            "skip_download": True,
-            "quiet": True,
-            "no_warnings": True,
-            "ignoreerrors": self._ignore_errors(),
-            "socket_timeout": self._timeout_seconds(),
-        }
-        proxy = self._proxy_url()
-        if proxy:
-            opts["proxy"] = proxy
-        cookiefile = self._cookie_file_path()
-        if cookiefile:
-            opts["cookiefile"] = cookiefile
-        return opts
+        return external_video.base_ydl_opts(
+            timeout_seconds=self._timeout_seconds(),
+            ignore_errors=self._ignore_errors(),
+            proxy_url=self._proxy_url(),
+            cookiefile=self._cookie_file_path(),
+        )
 
     @staticmethod
     def _normalize_channel_url(channel: str) -> str:
@@ -179,26 +168,7 @@ class YouTubeSource(BaseSource):
 
     @staticmethod
     def _video_id_from_url(url: str) -> str | None:
-        from urllib.parse import parse_qs, urlsplit
-
-        value = url.strip()
-        parsed = urlsplit(value)
-        host = parsed.netloc.lower()
-        if "youtu.be" in host:
-            vid = parsed.path.lstrip("/").split("/")[0]
-            return vid or None
-        if "youtube.com" in host:
-            if parsed.path == "/watch":
-                ids = parse_qs(parsed.query).get("v")
-                return ids[0] if ids else None
-            parts = [p for p in parsed.path.split("/") if p]
-            # /shorts/<id>, /embed/<id>, /live/<id>
-            if len(parts) >= 2 and parts[0] in {"shorts", "embed", "live", "v"}:
-                return parts[1]
-        # Otherwise assume the raw value is already an id.
-        if value and "/" not in value and " " not in value:
-            return value
-        return None
+        return external_video.youtube_video_id(url)
 
     def _list_channel_video_ids(self, channel_url: str, limit: int | None) -> list[str]:
         """Cheap flat extraction of a channel's video ids (metadata bypassed)."""
@@ -261,101 +231,47 @@ class YouTubeSource(BaseSource):
         return ordered
 
     def _extract_video_info(self, video_id: str) -> dict[str, Any] | None:
-        opts = self._base_ydl_opts()
-        url = _WATCH_URL.format(video_id=video_id)
-        try:
-            with self._ydl_class()(opts) as ydl:
-                info = ydl.extract_info(url, download=False)
-        except Exception as exc:
-            logger.warning("Failed to extract metadata for video %s: %s", video_id, exc)
-            return None
-        return info or None
+        return external_video.extract_video_info(
+            _WATCH_URL.format(video_id=video_id),
+            self._base_ydl_opts(),
+            caller="YouTube",
+            uv_groups=["youtube"],
+        )
 
     # ------------------------------------------------------------------
     # Transcript helpers (lazy import)
     # ------------------------------------------------------------------
 
     def _transcript_api(self) -> Any:
-        mod = require_module("youtube_transcript_api", "YouTube", uv_groups=["youtube"])
-        proxy = self._proxy_url()
-        proxy_config = None
-        if proxy:
-            proxies_mod = require_module(
-                "youtube_transcript_api.proxies", "YouTube", uv_groups=["youtube"]
-            )
-            proxy_config = proxies_mod.GenericProxyConfig(http_url=proxy, https_url=proxy)
-        return mod.YouTubeTranscriptApi(proxy_config=proxy_config)
+        return external_video.youtube_transcript_api(
+            caller="YouTube",
+            uv_groups=["youtube"],
+            proxy_url=self._proxy_url(),
+        )
 
     def _fetch_transcript(self, video_id: str) -> _TranscriptResult | None:
         """Fetch captions for a video. Returns None when unavailable.
 
-        Handles the documented failure cases (captions disabled, no captions,
-        age-restricted/private, rate limiting) by logging and returning None so
-        the asset is still emitted. When no captions exist, the downloaded video
-        audio is always transcribed by ``_process_video_media``.
+        When no captions exist, the downloaded video audio is always transcribed
+        by ``_process_video_media``.
         """
-        yt_mod = require_module("youtube_transcript_api", "YouTube", uv_groups=["youtube"])
-
-        languages = self._transcript_options().languages or []
-        try:
-            api = self._transcript_api()
-            available: list[str] = []
-            transcript_list = None
-            try:
-                transcript_list = api.list(video_id)
-                available = [t.language_code for t in transcript_list]
-            except Exception:
-                transcript_list = None
-
-            if languages:
-                fetched = api.fetch(video_id, languages=list(languages))
-            elif transcript_list is not None:
-                # Accept any available language: take the first track.
-                transcript = next(iter(transcript_list))
-                fetched = transcript.fetch()
-            else:
-                fetched = api.fetch(video_id)
-
-            text = "\n".join(snippet.text for snippet in fetched.snippets).strip()
-            if not text:
-                return None
-            return _TranscriptResult(
-                text=text,
-                language=fetched.language_code,
-                is_generated=fetched.is_generated,
-                available_languages=available or [fetched.language_code],
-            )
-        except (yt_mod.CouldNotRetrieveTranscript, yt_mod.YouTubeTranscriptApiException) as exc:
-            logger.warning("No transcript for video %s: %s", video_id, exc)
-            return None
-        except Exception as exc:
-            logger.warning("Transcript fetch failed for video %s: %s", video_id, exc)
-            return None
+        return external_video.fetch_youtube_transcript(
+            video_id,
+            caller="YouTube",
+            uv_groups=["youtube"],
+            languages=self._transcript_options().languages or [],
+            proxy_url=self._proxy_url(),
+        )
 
     def _download_video(self, video_id: str, dest_dir: Path) -> Path | None:
         """Download one muxed stream, preferring at most 480p to bound CPU/network."""
-        opts = self._base_ydl_opts()
-        opts["skip_download"] = False
-        # Requiring both codecs avoids yt-dlp's ffmpeg merge path. Visual OCR only
-        # needs readable text, while the audio track remains suitable for Whisper.
-        opts["format"] = (
-            "best[height<=480][acodec!=none][vcodec!=none]/best[acodec!=none][vcodec!=none]"
+        return external_video.download_video(
+            _WATCH_URL.format(video_id=video_id),
+            dest_dir,
+            self._base_ydl_opts(),
+            caller="YouTube",
+            uv_groups=["youtube"],
         )
-        opts["noplaylist"] = True
-        opts["outtmpl"] = str(dest_dir / "%(id)s.%(ext)s")
-        url = _WATCH_URL.format(video_id=video_id)
-        try:
-            with self._ydl_class()(opts) as ydl:
-                ydl.extract_info(url, download=True)
-        except Exception as exc:
-            logger.warning("Failed to download video %s: %s", video_id, exc)
-            return None
-        files = [p for p in dest_dir.iterdir() if p.is_file()]
-        if not files:
-            logger.warning("Video download produced no file for video %s", video_id)
-            return None
-        # The selected format yields one file; pick the largest if a sidecar slipped in.
-        return max(files, key=lambda p: p.stat().st_size)
 
     def _process_video_media(
         self,
@@ -364,37 +280,11 @@ class YouTubeSource(BaseSource):
         transcribe: bool,
     ) -> tuple[_TranscriptResult | None, str]:
         """Download once, then transcribe when needed and always OCR changed frames."""
-        from ...utils.transcription import transcribe_media_path
-        from ...utils.video_processing import extract_video_ocr_path
-
         with tempfile.TemporaryDirectory(prefix="yt_video_") as tmp:
             path = self._download_video(video_id, Path(tmp))
             if path is None:
                 return None, ""
-            visual_text, visual_error = extract_video_ocr_path(path)
-            if visual_error:
-                logger.warning("Visual OCR failed for YouTube video %s: %s", video_id, visual_error)
-
-            transcript: _TranscriptResult | None = None
-            if transcribe:
-                text, error = transcribe_media_path(
-                    path,
-                    mime_type="video/mp4",
-                )
-                if error:
-                    logger.warning("Whisper transcription failed for video %s: %s", video_id, error)
-                elif text:
-                    logger.info(
-                        "Transcribed video %s via faster-whisper (%d chars)", video_id, len(text)
-                    )
-                    transcript = _TranscriptResult(
-                        text=text,
-                        language=None,
-                        is_generated=True,
-                        available_languages=[],
-                        source="whisper",
-                    )
-            return transcript, visual_text
+            return external_video.analyze_video_file(path, transcribe=transcribe)
 
     # ------------------------------------------------------------------
     # Asset construction
