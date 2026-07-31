@@ -14,8 +14,12 @@ interface DataTransferJobPayload {
   jobId: string;
 }
 
-/** Purge expired archives roughly once an hour per namespace. */
-const PURGE_INTERVAL_MS = 60 * 60 * 1000;
+/**
+ * How often expired archives are swept. Well under the archive TTL (an hour by
+ * default), because a sweep at the same cadence as the TTL would let an archive
+ * live up to twice as long as it is supposed to.
+ */
+const PURGE_INTERVAL_MS = 5 * 60 * 1000;
 
 /**
  * Runs one export or import at a time for the namespace it was registered in.

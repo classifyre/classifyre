@@ -409,6 +409,7 @@
     "scopesFailed": "Datenkatalog konnte nicht geladen werden",
     "download": "Herunterladen ({{size}})",
     "downloadShort": "Herunterladen",
+    "downloadFailed": "Archiv konnte nicht heruntergeladen werden",
     "expiresAt": "Archiv wird gelöscht am {{when}}",
     "archiveSize": "Archivgröße",
     "dropArchive": "Archiv hierher ziehen",

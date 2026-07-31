@@ -200,6 +200,50 @@ export function downloadUrl(id: string, base = apiBase()): string {
   return `${base}/data-transfer/exports/${id}/download`;
 }
 
+/**
+ * Fetch an export archive and save it under its own name.
+ *
+ * Deliberately not a plain `<a href download>`. An anchor cannot tell whether
+ * the request succeeded: when the API answers 404 (the archive expired, or the
+ * pod serving the download cannot see the file the worker wrote), the browser
+ * happily saves the JSON error body, names it after the URL's last segment, and
+ * the operator gets a file called `download.json` with no indication anything
+ * went wrong. Reading the response first means a failure surfaces as the error
+ * message the API actually sent, and the saved file always carries the name the
+ * job recorded rather than whatever the browser infers.
+ */
+export async function downloadArchive(
+  job: Pick<TransferJob, "id" | "fileName">,
+  base = apiBase(),
+): Promise<void> {
+  const response = await fetch(downloadUrl(job.id, base));
+  if (!response.ok) {
+    const body = await response.text();
+    let message = body;
+    try {
+      const parsed = JSON.parse(body) as { message?: string };
+      if (parsed.message) message = parsed.message;
+    } catch {
+      // Not a JSON error body — fall through to the raw text.
+    }
+    throw new Error(message || `Download failed with HTTP ${response.status}`);
+  }
+
+  const blob = await response.blob();
+  const objectUrl = URL.createObjectURL(blob);
+  try {
+    const anchor = document.createElement("a");
+    anchor.href = objectUrl;
+    anchor.download = job.fileName ?? "workspace-archive.cfyre";
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+  } finally {
+    // Give the browser a tick to start reading before the blob is released.
+    setTimeout(() => URL.revokeObjectURL(objectUrl), 10_000);
+  }
+}
+
 /** `1.4 GB`, `812 KB`, `—` for an unknown size. */
 export function formatBytes(bytes: number | null | undefined): string {
   if (bytes === null || bytes === undefined) return "—";

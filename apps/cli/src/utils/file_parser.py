@@ -953,7 +953,7 @@ def extract_text(
         return _decode_bytes(file_bytes), None
 
     # Parquet — stream row-by-row (never read_table the whole file into memory)
-    # and reuse the page iterator so image columns get placeholders, not raw bytes.
+    # and reuse the page iterator so file columns get placeholders, not raw bytes.
     if mime_type in ("application/parquet", "application/vnd.apache.parquet"):
         try:
             pages = _iter_parquet_pages(file_bytes, batch_size=1000, include_column_names=True)
@@ -1369,12 +1369,12 @@ def _iter_parquet_pages(
         # (before reading any data) so a bad file can't lock the C++ thread pool.
         pf = pq.ParquetFile(io.BytesIO(file_bytes))  # type: ignore[attr-defined]
 
-        # Image columns (HF Image structs, raw image-byte columns) carry binary
-        # blobs that are useless and wasteful as row text — they're surfaced
-        # separately as child IMAGE assets. Render a compact placeholder instead.
-        from .embedded_images import detect_parquet_image_columns, extract_image_bytes
+        # File columns (HF Image/Audio structs, raw file-byte columns) carry whole
+        # files that are useless and wasteful as row text — they're surfaced
+        # separately as child assets. Render a compact placeholder instead.
+        from .embedded_files import detect_parquet_file_columns, extract_embedded_bytes
 
-        image_columns = detect_parquet_image_columns(pf)
+        file_columns = detect_parquet_file_columns(pf)
 
         begin = max(0, start_row)
         first_group, drop_in_group = _parquet_row_group_start(pf, begin)
@@ -1411,9 +1411,11 @@ def _iter_parquet_pages(
                 lines.append(f"row_{abs_row + 1}:")
                 for col_i, col in enumerate(col_names):
                     cell = batch.column(col_i)[local_idx].as_py()
-                    if col in image_columns:
-                        cell_str = _format_image_placeholder(
-                            extract_image_bytes(cell, image_columns[col])
+                    if col in file_columns:
+                        embedded_column = file_columns[col]
+                        cell_str = _format_embedded_placeholder(
+                            extract_embedded_bytes(cell, embedded_column.kind),
+                            embedded_column.mime_hint,
                         )
                     else:
                         cell_str = "" if cell is None else str(cell)
@@ -1462,10 +1464,15 @@ def _iter_csv_pages(
         logger.warning("CSV page iteration failed: %s", exc)
 
 
-def _format_image_placeholder(raw: bytes | None) -> str:
-    """Compact stand-in for an embedded-image cell, so its bytes never hit text detectors."""
+def _format_embedded_placeholder(raw: bytes | None, mime_hint: str = "") -> str:
+    """Compact stand-in for a cell holding a whole file, so its bytes never hit text detectors.
+
+    The label names what the column holds, since that is the only trace of it left
+    in the row text once the child asset carries the content.
+    """
+    label = "image" if mime_hint.startswith("image/") else (mime_hint or "file")
     if not raw:
-        return "<image>"
+        return f"<{label}>"
     size = len(raw)
     if size >= 1024 * 1024:
         human = f"{size / 1024 / 1024:.1f} MB"
@@ -1473,7 +1480,7 @@ def _format_image_placeholder(raw: bytes | None) -> str:
         human = f"{size / 1024:.0f} KB"
     else:
         human = f"{size} B"
-    return f"<image: {human}>"
+    return f"<{label}: {human}>"
 
 
 def _format_tabular_page(

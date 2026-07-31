@@ -927,8 +927,10 @@ telemetry:
 dataTransfer:
   # -- Shared filesystem path for archives. Empty means use object storage.
   dir: ""
-  # -- Hours an archive is kept before it is deleted.
-  ttlHours: 24
+  # -- Minutes an archive is kept after its export finishes, then it is deleted.
+  # -- An archive is a full credential-stripped copy of the workspace; it only
+  # -- needs to outlive the click that downloads it.
+  ttlMinutes: 60
   # -- Largest archive that may be produced or uploaded, in GB.
   maxSizeGb: 8
 

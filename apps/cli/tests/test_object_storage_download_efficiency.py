@@ -13,6 +13,9 @@ through ``ParsedContentProvider`` under a concurrency semaphore.
 from __future__ import annotations
 
 import asyncio
+import io
+import zipfile
+from dataclasses import replace
 from datetime import UTC, datetime
 
 import pytest
@@ -25,6 +28,22 @@ from src.sources.s3_compatible_storage.source import S3CompatibleStorageSource
 
 CSV_BYTES = b"name,email\nAda,ada@example.com\nGrace,grace@example.com\n"
 MODIFIED = datetime(2026, 6, 1, tzinfo=UTC)
+
+
+def _archive_bytes() -> bytes:
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as archive:
+        archive.writestr("inside/member.txt", b"member content")
+    return buffer.getvalue()
+
+
+ARCHIVE_BYTES = _archive_bytes()
+
+
+def _archive_ref(source, template):
+    """A container ref shaped like this source's own refs (subclass fields intact)."""
+    del source
+    return replace(template, key="data/bundle.zip", size=len(ARCHIVE_BYTES))
 
 
 def _hugging_face(file_count: int):
@@ -161,6 +180,37 @@ async def test_discovery_phase_downloads_nothing(source_name, monkeypatch):
 
     assert len(stubs) == 25
     assert downloads == []
+
+
+@pytest.mark.parametrize("source_name", sorted(SOURCE_FACTORIES))
+@pytest.mark.asyncio
+async def test_discovery_reads_containers_but_not_ordinary_objects(source_name, monkeypatch):
+    """Containers are the sole exception to the metadata-only discovery pass.
+
+    A container's child assets can only be enumerated by reading it, and discovery
+    is the only phase where new assets may appear — so skipping it there means the
+    embedded files and archive members never become assets at all. Everything else
+    must still cost nothing.
+    """
+    source, refs = SOURCE_FACTORIES[source_name](3)
+    archive_ref = _archive_ref(source, refs[0])
+    refs.append(archive_ref)
+    downloads = _instrument(source, refs, monkeypatch)
+
+    def _download(ref):
+        downloads.append(ref.key)
+        return (ARCHIVE_BYTES, "application/zip") if ref is archive_ref else (CSV_BYTES, "text/csv")
+
+    monkeypatch.setattr(source, "_download_object", _download)
+
+    stubs = await _discover(source)
+
+    assert downloads == [archive_ref.key]
+    assert any(stub.name.endswith("#inside/member.txt") for stub in stubs)
+    # The container's bytes are not pinned for the rest of the scan.
+    parent = next(stub for stub in stubs if stub.name.endswith("bundle.zip"))
+    assert parent.hash not in source._bytes_cache
+    source.cleanup()
 
 
 @pytest.mark.parametrize("source_name", sorted(SOURCE_FACTORIES))

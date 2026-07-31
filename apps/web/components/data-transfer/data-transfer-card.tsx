@@ -9,7 +9,7 @@ import { useTranslation } from "@/hooks/use-translation";
 import type { TranslationKey } from "@/i18n";
 import {
   deleteTransferJob,
-  downloadUrl,
+  downloadArchive,
   formatBytes,
   formatRows,
   isTerminal,
@@ -58,6 +58,18 @@ export function DataTransferCard() {
     jobs?.find((job) => job.kind === "IMPORT" && !isTerminal(job.status)) ?? null;
 
   const history = (jobs ?? []).filter((job) => isTerminal(job.status));
+
+  const handleDownload = async (job: TransferJob) => {
+    try {
+      await downloadArchive(job);
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : t("dataTransfer.downloadFailed"),
+      );
+    }
+  };
 
   const handleDelete = async (id: string) => {
     try {
@@ -147,18 +159,13 @@ export function DataTransferCard() {
                   <span className="flex items-center gap-1">
                     {job.downloadAvailable ? (
                       <Button
-                        asChild
                         variant="ghost"
                         size="sm"
+                        onClick={() => void handleDownload(job)}
+                        aria-label={t("dataTransfer.downloadShort")}
                         className="h-7 w-7 p-0"
                       >
-                        <a
-                          href={downloadUrl(job.id)}
-                          download
-                          aria-label={t("dataTransfer.downloadShort")}
-                        >
-                          <Download className="h-3.5 w-3.5" />
-                        </a>
+                        <Download className="h-3.5 w-3.5" />
                       </Button>
                     ) : null}
                     <Button

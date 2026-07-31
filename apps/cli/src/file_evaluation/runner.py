@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from ..models.generated_single_asset_scan_results import DetectionResult, Location
-from ..utils.embedded_images import has_embedded_images, iter_embedded_images
+from ..utils.embedded_files import has_embedded_files, iter_embedded_files
 from ..utils.file_parser import ParsedFile, parse_file
 
 logger = logging.getLogger(__name__)
@@ -148,11 +148,11 @@ class FileEvaluationRunner:
                     file_mime,
                 )
 
-        # Files that embed images (parquet image datasets, office docs) get each
-        # embedded image run through the image/binary detectors directly, with
-        # findings tagged by the embedded-image location so the UI can group them.
-        embedded_images = has_embedded_images(mime_type)
-        if not tasks and not embedded_images:
+        # Files that embed whole other files (parquet file columns, office media)
+        # get each embedded file run through the binary detectors directly, with
+        # findings tagged by the embedded location so the UI can group them.
+        embedded_files = has_embedded_files(mime_type)
+        if not tasks and not embedded_files:
             if not text.strip() and not file_mime:
                 logger.warning(
                     "No text content extracted from %s file; skipping text detectors.",
@@ -186,9 +186,9 @@ class FileEvaluationRunner:
                         )
                     )
 
-        if embedded_images:
+        if embedded_files:
             all_findings.extend(
-                await self._run_embedded_image_detectors(
+                await self._run_embedded_file_detectors(
                     detectors=detectors,
                     file_bytes=_get_raw_bytes(),
                     mime_type=mime_type,
@@ -198,7 +198,7 @@ class FileEvaluationRunner:
 
         return parsed, all_findings
 
-    async def _run_embedded_image_detectors(
+    async def _run_embedded_file_detectors(
         self,
         *,
         detectors: list[Any],
@@ -206,60 +206,65 @@ class FileEvaluationRunner:
         mime_type: str,
         detected_at: datetime,
     ) -> list[DetectionResult]:
-        """Run image/binary detectors over each image embedded in a container file.
+        """Run binary detectors over each file embedded in a container file.
 
-        Sequential by design (one image, one detector at a time) so the job/scan
+        Unwindowed on purpose: file evaluation judges one file the user handed over,
+        so there is no run-to-run cursor to advance. A scan of the same container
+        from a source expands its embedded files into child assets instead, one
+        sampling window at a time.
+
+        Sequential by design (one file, one detector at a time) so the job/scan
         logs read in order and each detector's outcome is attributable.
         """
         binary_detectors = [d for d in detectors if self._is_binary_detector(d)]
         if not binary_detectors:
             logger.info(
-                "File evaluation: %s embeds images but no image-capable detectors are configured; "
-                "skipping embedded-image scan",
+                "File evaluation: %s embeds files but no binary-capable detectors are configured; "
+                "skipping embedded-file scan",
                 mime_type,
             )
             return []
 
         logger.info(
-            "File evaluation: scanning images embedded in %s with image detectors: [%s]",
+            "File evaluation: scanning files embedded in %s with binary detectors: [%s]",
             mime_type,
             ", ".join(self._detector_label(d) for d in binary_detectors),
         )
 
         findings: list[DetectionResult] = []
-        image_count = 0
-        for image in iter_embedded_images(file_bytes, mime_type):
-            image_count += 1
-            size_kb = len(image.image_bytes) / 1024
+        embedded_count = 0
+        for embedded in iter_embedded_files(file_bytes, mime_type):
+            embedded_count += 1
+            size_kb = len(embedded.file_bytes) / 1024
             compatible = [
                 d
                 for d in binary_detectors
-                if self._supports_mime(d.get_supported_content_types(), image.mime_type)
+                if self._supports_mime(d.get_supported_content_types(), embedded.mime_type)
             ]
             if not compatible:
                 logger.info(
-                    "File evaluation: embedded image %s (%s, %.0f KB) — no compatible detector",
-                    image.location,
-                    image.mime_type,
+                    "File evaluation: embedded file %s (%s, %.0f KB) — no compatible detector",
+                    embedded.location,
+                    embedded.mime_type,
                     size_kb,
                 )
                 continue
             logger.info(
-                "File evaluation: embedded image %s (%s, %.0f KB) → dispatching [%s]",
-                image.location,
-                image.mime_type,
+                "File evaluation: embedded file %s (%s, %.0f KB) → dispatching [%s]",
+                embedded.location,
+                embedded.mime_type,
                 size_kb,
                 ", ".join(self._detector_label(d) for d in compatible),
             )
             for detector in compatible:
                 label = self._detector_label(detector)
                 try:
-                    result = await detector.detect(image.image_bytes, image.mime_type)
+                    result = await detector.detect(embedded.file_bytes, embedded.mime_type)
                 except Exception as exc:
                     logger.error(
-                        "File evaluation: '%s' failed on embedded image %s: %s",
+                        "File evaluation: '%s' failed on embedded file %s: %s",
                         label,
-                        image.location,
+                        embedded.location,
                         exc,
                     )
                     continue
@@ -269,17 +274,17 @@ class FileEvaluationRunner:
                     else []
                 )
                 logger.info(
-                    "File evaluation: '%s' on embedded image %s → %d finding(s)",
+                    "File evaluation: '%s' on embedded file %s → %d finding(s)",
                     label,
-                    image.location,
+                    embedded.location,
                     len(detector_findings),
                 )
                 for finding in detector_findings:
-                    findings.append(self._tag_embedded(finding, image.location, detected_at))
+                    findings.append(self._tag_embedded(finding, embedded.location, detected_at))
 
         logger.info(
-            "File evaluation: embedded-image scan complete — %d image(s) scanned, %d finding(s)",
-            image_count,
+            "File evaluation: embedded-file scan complete — %d file(s) scanned, %d finding(s)",
+            embedded_count,
             len(findings),
         )
         return findings
@@ -299,7 +304,7 @@ class FileEvaluationRunner:
     def _tag_embedded(
         finding: DetectionResult, location_label: str, detected_at: datetime
     ) -> DetectionResult:
-        """Attach the embedded-image location to a finding for parent-file grouping."""
+        """Attach the embedded-file location to a finding for parent-file grouping."""
         metadata = dict(finding.metadata or {})
         metadata["embedded_location"] = location_label
         location = finding.location or Location()

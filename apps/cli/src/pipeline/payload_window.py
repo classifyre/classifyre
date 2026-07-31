@@ -180,6 +180,33 @@ class PayloadWindow:
             return self.prior.offset
         return 0
 
+    def row_bounds(self, *, row_count: int | None = None) -> tuple[int, int | None]:
+        """The concrete ``(start_row, max_rows)`` this run covers.
+
+        For consumers that address the payload's rows directly instead of through a
+        ``PageFactory`` — child-asset expansion reads the same rows the detectors
+        will, so the files embedded in row 4,000,001 become assets on the run that
+        scans row 4,000,001, not on every run.
+
+        ``max_rows`` is None only for a strategy that reads the whole payload.
+        Under RANDOM this draws its own window: the two passes then sample the same
+        payload independently, which is within what RANDOM promises.
+        """
+        take = max(1, self.rows_per_page)
+        if self.strategy == STRATEGY_LATEST:
+            return 0, take
+        if self.strategy == STRATEGY_RANDOM:
+            if row_count is not None and row_count > 0:
+                rng = self.rng or random.Random()
+                return rng.randint(0, max(0, row_count - take)), take
+            # Without a row count there is nothing to seek into. Reservoir sampling
+            # is not available to a direct-addressing caller, so read from the top
+            # rather than guess at an offset that may be past the end.
+            return 0, take
+        if self.strategy == STRATEGY_AUTOMATIC:
+            return self.start_row, take
+        return 0, None
+
     def iterate(
         self,
         pages: PageFactory,
@@ -509,6 +536,19 @@ class PayloadWindowStore:
             getattr(asset, "external_url", None),
         ):
             value = str(candidate or "").strip()
-            if value and tabular_mime_type_for_name(value) is not None:
+            if value and tabular_mime_type_for_name(_own_format_name(value)) is not None:
                 return True
         return False
+
+
+def _own_format_name(value: str) -> str:
+    """The part of an asset id whose extension describes *that asset's* format.
+
+    A child extracted from a container is addressed as ``<container>#<location>``,
+    so the container's extension says nothing about the child: an image lifted out
+    of a parquet is not row-shaped just because its parent is. Reading the whole id
+    would mark every such child as tabular, and ``advances_for`` would then keep the
+    scan cache from ever skipping any of them.
+    """
+    _, separator, fragment = value.rpartition("#")
+    return fragment if separator and fragment else value

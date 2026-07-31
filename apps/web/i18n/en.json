@@ -409,6 +409,7 @@
     "scopesFailed": "Could not load the data catalogue",
     "download": "Download ({{size}})",
     "downloadShort": "Download",
+    "downloadFailed": "Could not download the archive",
     "expiresAt": "Archive is deleted {{when}}",
     "archiveSize": "Archive size",
     "dropArchive": "Drop an archive here",

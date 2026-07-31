@@ -433,6 +433,34 @@ def test_advances_for_is_false_for_a_payload_with_no_row_axis() -> None:
     assert store.advances_for(pdf) is False
 
 
+def test_advances_for_is_false_for_a_child_lifted_out_of_a_tabular_parent() -> None:
+    """The container's extension must not make its children look row-shaped.
+
+    An image extracted from a parquet is addressed under the parquet's name; if
+    that counted as a row axis, the cache could never skip any embedded child.
+    """
+    store = PayloadWindowStore("AUTOMATIC", 100)
+    child = _asset(
+        hash="h2",
+        name="data.parquet#row=12;col=image",
+        external_url="s3://bucket/data.parquet#row=12;col=image",
+    )
+    store.bind(child)
+    assert store.advances_for(child) is False
+
+
+def test_advances_for_is_true_for_a_tabular_child_of_a_container() -> None:
+    """A CSV pulled out of an archive does have its own row axis."""
+    store = PayloadWindowStore("AUTOMATIC", 100)
+    child = _asset(
+        hash="h3",
+        name="docs.zip#reports/q3.csv",
+        external_url="s3://bucket/docs.zip#reports/q3.csv",
+    )
+    store.bind(child)
+    assert store.advances_for(child) is True
+
+
 def test_advances_for_trusts_a_stored_cursor_over_an_unhelpful_name() -> None:
     """An extensionless object with a live cursor is still mid-sweep."""
     store = PayloadWindowStore("AUTOMATIC", 100)
@@ -450,3 +478,40 @@ def test_unknown_strategy_reads_everything_rather_than_under_scanning() -> None:
     window = PayloadWindow(strategy="SOMETHING_NEW", rows_per_page=10)
     assert list(window.iterate(_factory(30, calls))) == _rows(30)
     assert calls == [(0, None)]
+
+
+# ── Direct row addressing (row_bounds) ───────────────────────────────────
+
+
+def test_row_bounds_latest_reads_the_top_of_the_payload() -> None:
+    assert PayloadWindow(strategy="LATEST", rows_per_page=10).row_bounds() == (0, 10)
+
+
+def test_row_bounds_automatic_resumes_from_the_stored_offset() -> None:
+    window = PayloadWindow(
+        strategy="AUTOMATIC",
+        rows_per_page=10,
+        prior=PayloadCursor(offset=4000, strategy="AUTOMATIC"),
+    )
+    assert window.row_bounds() == (4000, 10)
+
+
+def test_row_bounds_automatic_starts_at_zero_without_a_cursor() -> None:
+    assert PayloadWindow(strategy="AUTOMATIC", rows_per_page=10).row_bounds() == (0, 10)
+
+
+def test_row_bounds_random_seeks_inside_the_payload() -> None:
+    window = PayloadWindow(strategy="RANDOM", rows_per_page=10, rng=random.Random(7))
+    start, take = window.row_bounds(row_count=100)
+    assert take == 10
+    assert 0 <= start <= 90
+
+
+def test_row_bounds_random_without_a_row_count_reads_from_the_top() -> None:
+    """No total means no safe offset to seek to — guessing could land past the end."""
+    window = PayloadWindow(strategy="RANDOM", rows_per_page=10, rng=random.Random(7))
+    assert window.row_bounds() == (0, 10)
+
+
+def test_row_bounds_unwindowed_strategy_reads_everything() -> None:
+    assert PayloadWindow(strategy="ALL", rows_per_page=10).row_bounds() == (0, None)

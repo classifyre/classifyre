@@ -23,9 +23,10 @@ from ...models.generated_single_asset_scan_results import (
     SingleAssetScanResults,
 )
 from ...utils.archive_extraction import ArchiveMember, is_archive_mime, iter_archive_members
-from ...utils.embedded_images import EmbeddedImage, has_embedded_images, iter_embedded_images
+from ...utils.embedded_files import EmbeddedFile, has_embedded_files, iter_embedded_files
 from ...utils.file_metadata import extract_file_metadata
 from ...utils.file_parser import (
+    count_tabular_rows,
     infer_mime_type_from_file_name,
     normalize_mime_type,
     resolve_mime_type,
@@ -126,6 +127,29 @@ class ContentSnapshot:
     raw_bytes: bytes | None = None
 
 
+# A container's bytes are held from the moment it is discovered until the batch
+# boundary that expands it, because expansion needs the payload cursor that only
+# arrives once its parent has been registered. This caps what that costs: reaching
+# it closes the batch early, which expands the queue and frees it.
+_MAX_PENDING_CONTAINER_BYTES = 256 * 1024 * 1024
+
+
+@dataclass
+class _PendingContainer:
+    """An object whose embedded files still have to become child assets.
+
+    Expansion is deferred to a batch boundary in ``extract_raw`` rather than done
+    inside ``_to_asset``: the row window a parquet's children come from is only
+    knowable once the API has handed back that asset's payload cursor, which
+    happens after the batch carrying the parent has been registered.
+    """
+
+    parent: SingleAssetScanResults
+    ref: ObjectRef
+    file_bytes: bytes
+    mime_type: str
+
+
 class ObjectStorageSourceBase(BaseSource, ABC):
     provider_label = "OBJECT_STORAGE"
     input_model: Any = None
@@ -157,19 +181,21 @@ class ObjectStorageSourceBase(BaseSource, ABC):
         self._file_processing_deps_checked = False
         # Keyed by both asset_hash and external_url for O(1) lookup from either.
         self._bytes_cache: dict[str, bytes] = {}
-        # Archive members can expand to 100 MB per container. Keep their
-        # discovery-to-processing lifetime on disk so many archives cannot
-        # multiply that budget into unbounded resident memory.
-        self._archive_bytes_cache: dict[str, Path] = {}
-        self._archive_cache_dir: tempfile.TemporaryDirectory[str] | None = None
+        # Archive members and embedded files can expand to 100 MB per container.
+        # Keep their discovery-to-processing lifetime on disk so many containers
+        # cannot multiply that budget into unbounded resident memory.
+        self._member_bytes_cache: dict[str, Path] = {}
+        self._member_cache_dir: tempfile.TemporaryDirectory[str] | None = None
         self._mime_cache: dict[str, str] = {}
         # asset_ids for which fetch_content_pages ran the full bytes path
         # (even if it produced no text, e.g. all-silence audio).  Checked by
         # ParsedContentProvider to skip its fallback iter_asset_pages path,
         # which would otherwise re-run an expensive transcription a second time.
         self._content_pages_processed: set[str] = set()
-        # Child IMAGE assets queued while transforming the current object.
+        # Child assets queued while transforming the current object (archive members).
         self._pending_child_assets: list[SingleAssetScanResults] = []
+        # Containers awaiting embedded-file expansion at the next batch boundary.
+        self._pending_containers: list[_PendingContainer] = []
 
     def _asset_type_value(self) -> str:
         type_value = self.config.type
@@ -418,8 +444,43 @@ class ObjectStorageSourceBase(BaseSource, ABC):
                     exc,
                 )
 
+    def _is_container_object(self, ref: ObjectRef) -> bool:
+        """Whether this object may hold child assets, judged without downloading it.
+
+        Name-and-header only: the point is to decide whether reading the object is
+        worth it, so it must not require having read it.
+        """
+        file_name = self._object_file_name(ref)
+        mime = normalize_mime_type(ref.content_type_hint)
+        if not mime or mime == "application/octet-stream":
+            mime = infer_mime_type_from_file_name(file_name)
+        if not (has_embedded_files(mime) or is_archive_mime(mime)):
+            return False
+
+        # An object the downloader would refuse or truncate cannot be expanded
+        # anyway — a partial parquet has no footer, a partial zip no directory — so
+        # reading it during discovery would spend the egress for nothing.
+        max_bytes = self._max_object_bytes()
+        if ref.size and ref.size > max_bytes:
+            logger.info(
+                "Not expanding container %s during discovery: %d bytes exceeds the "
+                "%d-byte object limit, so its embedded assets are skipped",
+                ref.key,
+                ref.size,
+                max_bytes,
+            )
+            return False
+        return True
+
     def _build_snapshot(self, ref: ObjectRef) -> ContentSnapshot:
-        if self._discovery_only or not self._include_content_preview():
+        # Containers are the one exception to the metadata-only discovery pass.
+        # Their children cannot be enumerated without reading them, and discovery
+        # is the only phase where new assets may appear (main.py's B-4 note), so a
+        # container that is not read during discovery never yields child assets at
+        # all. Only containers are fetched: a bucket of ordinary documents still
+        # downloads nothing here, which is the invariant that rule protects.
+        metadata_only = self._discovery_only or not self._include_content_preview()
+        if metadata_only and not self._is_container_object(ref):
             mime = normalize_mime_type(ref.content_type_hint)
             if not mime:
                 mime = infer_mime_type_from_file_name(self._object_file_name(ref))
@@ -477,12 +538,19 @@ class ObjectStorageSourceBase(BaseSource, ABC):
         if snapshot.text_content:
             self._content_cache[asset_hash] = (snapshot.raw_content, snapshot.text_content)
         if snapshot.raw_bytes is not None:
-            # Store under both keys (asset_hash and external_url) so fetch_content_pages()
-            # resolves with O(1) regardless of which candidate_id the pipeline supplies.
-            self._bytes_cache[asset_hash] = snapshot.raw_bytes
-            self._bytes_cache[external_url] = snapshot.raw_bytes
             self._mime_cache[asset_hash] = snapshot.mime_type
             self._mime_cache[external_url] = snapshot.mime_type
+            # Store under both keys (asset_hash and external_url) so fetch_content_pages()
+            # resolves with O(1) regardless of which candidate_id the pipeline supplies.
+            #
+            # Not during discovery: the only bytes that reach here then are a
+            # container's, read solely to enumerate its children. Caching them would
+            # pin every container in the source until phase 2 evicted it, one object
+            # at a time — so they are released once expansion is done and phase 2
+            # re-reads the container it actually processes.
+            if not self._discovery_only:
+                self._bytes_cache[asset_hash] = snapshot.raw_bytes
+                self._bytes_cache[external_url] = snapshot.raw_bytes
 
         metadata: dict[str, Any] = {
             "provider": self.provider_label,
@@ -540,17 +608,19 @@ class ObjectStorageSourceBase(BaseSource, ABC):
         self._hash_to_uri[asset_hash] = external_url
         self._object_ref_by_hash[asset_hash] = ref
 
-        # Files that embed images (parquet image datasets, office docs) yield a
-        # child IMAGE asset per embedded image so each flows through the normal
-        # image-detector path with its own findings. The parent simply references
-        # each child via its links array (no separate parent/child machinery).
-        # Bytes are cached here so fetch_content_bytes() serves them without re-download.
-        if snapshot.raw_bytes is not None and has_embedded_images(snapshot.mime_type):
-            self._queue_child_image_assets(
-                parent=asset,
-                file_bytes=snapshot.raw_bytes,
-                mime_type=snapshot.mime_type,
-                ref=ref,
+        # Files that embed whole other files (parquet image/audio/document columns,
+        # office media) yield one child asset per embedded file, so each is parsed
+        # by utils.file_parser and scanned like any standalone file. The parent
+        # simply references each child via its links array (no separate parent/child
+        # machinery). Expansion itself is deferred — see _PendingContainer.
+        if snapshot.raw_bytes is not None and has_embedded_files(snapshot.mime_type):
+            self._pending_containers.append(
+                _PendingContainer(
+                    parent=asset,
+                    ref=ref,
+                    file_bytes=snapshot.raw_bytes,
+                    mime_type=snapshot.mime_type,
+                )
             )
 
         # Archive containers (zip/tar/gz/7z/rar) expand into one child asset per
@@ -567,65 +637,131 @@ class ObjectStorageSourceBase(BaseSource, ABC):
 
         return asset
 
-    def _queue_child_image_assets(
-        self,
-        *,
-        parent: SingleAssetScanResults,
-        file_bytes: bytes,
-        mime_type: str,
-        ref: ObjectRef,
-    ) -> None:
-        """Extract embedded images, queue each as a child IMAGE asset, and link them
-        from the parent (appended to ``parent.links``, never removing existing links)."""
-        try:
-            for image in iter_embedded_images(file_bytes, mime_type):
-                child = self._build_child_image_asset(parent, image, ref)
-                self._pending_child_assets.append(child)
-                if child.hash not in parent.links:
-                    parent.links.append(child.hash)
-        except Exception as exc:
-            logger.warning(
-                "Failed to extract embedded images from %s: %s", parent.external_url, exc
-            )
+    def _pending_container_bytes(self) -> int:
+        """Bytes held by containers still waiting to be expanded."""
+        return sum(len(container.file_bytes) for container in self._pending_containers)
 
-    def _build_child_image_asset(
+    def _expand_pending_containers(self) -> list[SingleAssetScanResults]:
+        """Turn every queued container's embedded files into child assets.
+
+        Called at batch boundaries in ``extract_raw`` — after the consumer has
+        registered those parents and recorded their payload cursors, which is what
+        lets a parquet's children come from the row window this run actually scans
+        instead of the first N rows of the file on every run.
+        """
+        pending, self._pending_containers = self._pending_containers, []
+        children: list[SingleAssetScanResults] = []
+        for container in pending:
+            start_row, max_rows = self._embedded_row_bounds(container)
+            try:
+                for embedded in iter_embedded_files(
+                    container.file_bytes,
+                    container.mime_type,
+                    start_row=start_row,
+                    max_rows=max_rows,
+                ):
+                    child = self._build_child_embedded_asset(
+                        container.parent, embedded, container.ref
+                    )
+                    # Appended, never replacing: archive members may already be here.
+                    if child.hash not in container.parent.links:
+                        container.parent.links.append(child.hash)
+                    children.append(child)
+            except Exception as exc:
+                logger.warning(
+                    "Failed to extract embedded files from %s: %s",
+                    container.parent.external_url,
+                    exc,
+                )
+        return children
+
+    def _embedded_row_bounds(self, container: _PendingContainer) -> tuple[int, int | None]:
+        """The row slice of a container this run expands, taken from its payload window.
+
+        ``(0, None)`` — the whole container — for the ALL strategy and for anything
+        without a row axis (office documents), matching how those stream.
+        """
+        store = getattr(self, "_payload_windows", None)
+        if store is None:
+            return 0, None
+        window = store.window_for(container.parent.hash, container.mime_type)
+        if window is None:
+            return 0, None
+        return window.row_bounds(
+            row_count=count_tabular_rows(container.file_bytes, container.mime_type)
+        )
+
+    def _build_child_embedded_asset(
         self,
         parent: SingleAssetScanResults,
-        image: EmbeddedImage,
+        embedded: EmbeddedFile,
         ref: ObjectRef,
     ) -> SingleAssetScanResults:
-        child_url = f"{parent.external_url}#{image.location}"
+        # Row numbers in the location are absolute, so the same embedded file keeps
+        # the same url — and therefore the same hash — whichever window found it.
+        # That is what makes a second run update its child rather than duplicate it.
+        child_url = f"{parent.external_url}#{embedded.location}"
         child_hash = self.generate_hash_id(child_url)
-        metadata = {
+        child_type = self._asset_type_from_mime_or_key(embedded.mime_type, embedded.location)
+        metadata: dict[str, Any] = {
+            "provider": self.provider_label,
+            "object_key": f"{ref.key}#{embedded.location}",
             "source_hash": parent.hash,
-            "location": image.location,
-            "mime_type": image.mime_type,
-            "size_bytes": len(image.image_bytes),
+            "location": embedded.location,
+            "mime_type": embedded.mime_type,
+            "size_bytes": len(embedded.file_bytes),
             **self._extra_asset_metadata(ref),
         }
-        # Serve the image bytes from cache (keyed by both hash and url) so the
-        # binary-detector path resolves them with no extra network round-trip.
-        self._bytes_cache[child_hash] = image.image_bytes
-        self._bytes_cache[child_url] = image.image_bytes
-        self._mime_cache[child_hash] = image.mime_type
-        self._mime_cache[child_url] = image.mime_type
-        self._hash_to_uri[child_hash] = child_url
+        file_meta = extract_file_metadata(
+            embedded.file_bytes,
+            embedded.mime_type,
+            file_name=embedded.location,
+        )
+        metadata.update({k: v for k, v in file_meta.items() if v is not None})
+        self._spool_member_bytes(child_hash, child_url, embedded.file_bytes, embedded.mime_type)
         return SingleAssetScanResults(
             hash=child_hash,
             # The child identity is stable across parent revisions. Include the
             # parent's content-derived checksum so a same-size replacement at
             # the same embedded location cannot reuse the child's cached scan.
             checksum=self.calculate_checksum({**metadata, "parent_checksum": parent.checksum}),
-            name=f"{parent.name}#{image.location}",
+            name=f"{parent.name}#{embedded.location}",
             external_url=child_url,
             links=[],
-            asset_type=OutputAssetType.IMAGE,
+            asset_type=child_type,
             source_id=self.source_id,
             created_at=ref.last_modified,
             updated_at=ref.last_modified,
             runner_id=self.runner_id,
-            **self.metadata_fields("image", metadata),
+            **self.metadata_fields(
+                self._asset_kind_for_mime(embedded.mime_type, child_type), metadata
+            ),
         )
+
+    def _spool_member_bytes(
+        self,
+        child_hash: str,
+        child_url: str,
+        data: bytes,
+        mime_type: str,
+    ) -> None:
+        """Park a child's bytes on disk for the discovery-to-processing gap.
+
+        Phase 1 must discover every asset before phase 2 starts (B-4), so holding
+        these in memory would make the per-container extraction cap unbounded across
+        the whole source. Keyed by both hash and url because the pipeline resolves
+        an asset by either.
+        """
+        if self._member_cache_dir is None:
+            self._member_cache_dir = tempfile.TemporaryDirectory(prefix="classifyre-members-")
+        cache_name = hashlib.sha256(child_hash.encode()).hexdigest()
+        member_path = Path(self._member_cache_dir.name) / cache_name
+        member_path.write_bytes(data)
+        self._member_bytes_cache[child_hash] = member_path
+        self._member_bytes_cache[child_url] = member_path
+        self._mime_cache[child_hash] = mime_type
+        self._mime_cache[child_url] = mime_type
+        self._hash_to_uri[child_hash] = child_url
 
     def _queue_child_archive_assets(
         self,
@@ -674,22 +810,7 @@ class ObjectStorageSourceBase(BaseSource, ABC):
             file_name=member.location,
         )
         metadata.update({k: v for k, v in file_meta.items() if v is not None})
-        # Spool member bytes to a per-scan temporary directory. Phase 1 must
-        # discover every asset before phase 2 starts (B-4), so retaining these
-        # bytes in memory would make the per-archive extraction cap unbounded
-        # across the whole source.
-        if self._archive_cache_dir is None:
-            self._archive_cache_dir = tempfile.TemporaryDirectory(
-                prefix="classifyre-archive-members-"
-            )
-        cache_name = hashlib.sha256(child_hash.encode()).hexdigest()
-        member_path = Path(self._archive_cache_dir.name) / cache_name
-        member_path.write_bytes(member.member_bytes)
-        self._archive_bytes_cache[child_hash] = member_path
-        self._archive_bytes_cache[child_url] = member_path
-        self._mime_cache[child_hash] = member.mime_type
-        self._mime_cache[child_url] = member.mime_type
-        self._hash_to_uri[child_hash] = child_url
+        self._spool_member_bytes(child_hash, child_url, member.member_bytes, member.mime_type)
         return SingleAssetScanResults(
             hash=child_hash,
             # Member path, MIME type and size can all stay equal while its bytes
@@ -734,13 +855,23 @@ class ObjectStorageSourceBase(BaseSource, ABC):
         self._hash_to_uri = {}
         self._object_ref_by_hash = {}
         self._bytes_cache = {}
-        self._reset_archive_cache()
+        self._reset_member_cache()
         self._mime_cache = {}
         self._content_pages_processed = set()
         self._pending_child_assets = []
+        self._pending_containers = []
 
         refs = self._list_objects()
         sampled_refs = self._apply_sampling(refs)
+
+        def _admit(candidates: list[SingleAssetScanResults]) -> list[SingleAssetScanResults]:
+            admitted = []
+            for candidate in candidates:
+                if candidate.hash in self._seen_hashes:
+                    continue
+                self._seen_hashes.add(candidate.hash)
+                admitted.append(candidate)
+            return admitted
 
         batch: list[SingleAssetScanResults] = []
         for ref in sampled_refs:
@@ -754,25 +885,36 @@ class ObjectStorageSourceBase(BaseSource, ABC):
                 logger.warning("Skipping object %s due to transformation error: %s", ref.key, exc)
                 continue
 
-            # Parent first, then any child IMAGE assets queued during _to_asset so
-            # the parent always exists before its children when ingested.
-            for candidate in (asset, *self._pending_child_assets):
-                if candidate.hash in self._seen_hashes:
-                    continue
-                self._seen_hashes.add(candidate.hash)
-                batch.append(candidate)
+            # Parent first, then any child assets queued during _to_asset, so the
+            # parent always exists before its children when ingested.
+            batch.extend(_admit([asset, *self._pending_child_assets]))
 
-            if len(batch) >= self.BATCH_SIZE:
+            # Containers awaiting expansion hold their bytes, so the batch closes on
+            # whichever limit is reached first: a full batch, or enough container
+            # content pending that holding more would be the scan's memory ceiling.
+            if len(batch) >= self.BATCH_SIZE or self._pending_container_bytes() >= (
+                _MAX_PENDING_CONTAINER_BYTES
+            ):
                 yield batch
                 batch = []
+                # Control returns here only after the consumer has registered the
+                # batch just yielded, so the payload cursors of those parents are
+                # now known and their embedded files can be windowed against them.
+                children = _admit(self._expand_pending_containers())
+                if children:
+                    yield children
 
         if batch:
             yield batch
 
+        children = _admit(self._expand_pending_containers())
+        if children:
+            yield children
+
     async def fetch_content_bytes(self, asset_id: str) -> tuple[bytes, str] | None:
         raw_bytes = self._bytes_cache.get(asset_id)
         if raw_bytes is None:
-            member_path = self._archive_bytes_cache.get(asset_id)
+            member_path = self._member_bytes_cache.get(asset_id)
             if member_path is not None:
                 raw_bytes = member_path.read_bytes()
         mime = self._mime_cache.get(asset_id, "")
@@ -819,7 +961,7 @@ class ObjectStorageSourceBase(BaseSource, ABC):
     async def fetch_content_pages(self, asset_id: str) -> AsyncGenerator[tuple[str, str], None]:
         raw_bytes = self._bytes_cache.get(asset_id)
         if raw_bytes is None:
-            member_path = self._archive_bytes_cache.get(asset_id)
+            member_path = self._member_bytes_cache.get(asset_id)
             if member_path is not None:
                 raw_bytes = member_path.read_bytes()
         mime = self._mime_cache.get(asset_id, "")
@@ -989,31 +1131,31 @@ class ObjectStorageSourceBase(BaseSource, ABC):
 
     def evict_asset_cache(self, asset_hash: str) -> None:
         external_url = self._hash_to_uri.get(asset_hash)
-        archive_path = self._archive_bytes_cache.pop(asset_hash, None)
+        archive_path = self._member_bytes_cache.pop(asset_hash, None)
         self._content_cache.pop(asset_hash, None)
         self._bytes_cache.pop(asset_hash, None)
         self._mime_cache.pop(asset_hash, None)
         self._object_ref_by_hash.pop(asset_hash, None)
         if external_url:
-            archive_path = self._archive_bytes_cache.pop(external_url, archive_path)
+            archive_path = self._member_bytes_cache.pop(external_url, archive_path)
             self._content_cache.pop(external_url, None)
             self._bytes_cache.pop(external_url, None)
             self._mime_cache.pop(external_url, None)
         if archive_path is not None:
             archive_path.unlink(missing_ok=True)
 
-    def _reset_archive_cache(self) -> None:
-        self._archive_bytes_cache = {}
-        if self._archive_cache_dir is not None:
-            self._archive_cache_dir.cleanup()
-            self._archive_cache_dir = None
+    def _reset_member_cache(self) -> None:
+        self._member_bytes_cache = {}
+        if self._member_cache_dir is not None:
+            self._member_cache_dir.cleanup()
+            self._member_cache_dir = None
 
     def abort(self) -> None:
         logger.info("Aborting object storage extraction...")
         super().abort()
 
     def cleanup(self) -> None:
-        self._reset_archive_cache()
+        self._reset_member_cache()
         client = self._cached_client
         if client is None:
             return
