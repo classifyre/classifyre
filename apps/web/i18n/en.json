@@ -76,7 +76,17 @@
     "settingsSaved": "Workspace settings saved",
     "settingsSaveFailed": "Failed to save workspace settings",
     "savingSettings": "Saving…",
-    "saveChanges": "Save changes"
+    "saveChanges": "Save changes",
+    "seedOptional": "Start from an archive (optional)",
+    "seedHint": "Seed this workspace from an exported archive",
+    "seedChoose": "Choose archive",
+    "seedRemove": "Remove archive",
+    "seedImporting": "Importing the archive into the new workspace.",
+    "seedImportingShort": "Importing…",
+    "seedContinueInBackground": "Continue in background",
+    "seedOpen": "Open workspace",
+    "seedFailed": "The workspace was created, but the archive could not be imported",
+    "createAndImport": "Create and import"
   },
   "demo": {
     "badge": "Demo",
@@ -263,7 +273,8 @@
       "global": "General",
       "aiProviders": "AI Providers",
       "mcp": "MCP Servers",
-      "chat": "Chat Bots"
+      "chat": "Chat Bots",
+      "data": "Export & Import"
     },
     "version": {
       "heading": "Software Version",
@@ -368,6 +379,123 @@
       "removedToast": "Hugging Face token removed",
       "saveFailedToast": "Failed to save Hugging Face token",
       "removeFailedToast": "Failed to remove Hugging Face token"
+    }
+  },
+  "dataTransfer": {
+    "heading": "Export & import",
+    "description": "Move this workspace's data to another Classifyre instance, or load an archive into it.",
+    "exportHeading": "Export",
+    "exportDesc": "Write the selected data to a compressed archive you can download and load into another workspace.",
+    "importHeading": "Import",
+    "importDesc": "Load an archive exported from another workspace. You choose which parts of it to take.",
+    "secretsHeading": "Credentials are never exported",
+    "secretsExportBody": "Source passwords and tokens, AI provider API keys, MCP request headers, chat bot tokens and the Hugging Face token are stripped from every archive. Whoever imports it will have to enter their own.",
+    "secretsImportBody": "This archive carries no credentials. Imported sources, AI providers, MCP servers and chat bots arrive disabled or unauthenticated until you enter secrets for them.",
+    "newIdsHeading": "Imported records get new IDs",
+    "newIdsBody": "Everything is added alongside what is already here — nothing is replaced or renumbered over. Links between records are rewritten to match, so the data stays consistent. Importing the same archive twice creates two independent copies.",
+    "noScheduleNote": "Scan schedules are not exported. Imported sources arrive unscheduled and idle.",
+    "noSecretsChip": "No secrets",
+    "heavyChip": "Large",
+    "secretsStrippedHint": "Credentials in this data are removed before the archive is written.",
+    "selectAll": "Select all",
+    "selectNone": "Select none",
+    "rowsSelected": "{{count}} rows · {{scopes}} selected",
+    "noScopes": "Nothing to transfer.",
+    "dependencyWarning": "Also select {{scopes}}, or rows that reference them will be skipped.",
+    "startExport": "Export data",
+    "exporting": "Exporting…",
+    "exportStarted": "Export started",
+    "exportFailed": "Could not start the export",
+    "scopesFailed": "Could not load the data catalogue",
+    "download": "Download ({{size}})",
+    "downloadShort": "Download",
+    "expiresAt": "Archive is deleted {{when}}",
+    "archiveSize": "Archive size",
+    "dropArchive": "Drop an archive here",
+    "archiveHint": ".cfyre — exported from any Classifyre workspace",
+    "chooseFile": "Choose file",
+    "reading": "Reading archive…",
+    "uploadFailed": "Could not read that archive",
+    "archiveFile": "File",
+    "archiveFrom": "Exported from",
+    "archiveCreated": "Exported on",
+    "archiveEmpty": "This archive contains no importable data.",
+    "discardArchive": "Discard archive",
+    "conflictMode": "If an entry already exists",
+    "conflictSkip": "Keep the existing entry",
+    "conflictOverwrite": "Replace it with the archive",
+    "conflictSkipHint": "Imported records always arrive as new records with new IDs, so nothing here is replaced. This only applies to entries matched by name — glossary terms, MCP servers — and to instance settings: those are left as they are.",
+    "conflictOverwriteHint": "Imported records always arrive as new records with new IDs. This only applies to entries matched by name — glossary terms, MCP servers — and to instance settings: those are overwritten by the archive. That cannot be undone.",
+    "startImport": "Import data",
+    "importStarted": "Import started",
+    "importFailed": "Could not start the import",
+    "importAnother": "Import another archive",
+    "cancel": "Cancel",
+    "cancelling": "Stopping…",
+    "preparing": "Preparing…",
+    "processingTable": "Reading {{table}}",
+    "rowsTransferred": "Rows transferred",
+    "rowsSkipped": "Rows skipped",
+    "showManifest": "Show manifest",
+    "historyHeading": "History",
+    "historyEmpty": "No transfers yet.",
+    "historyRows": "{{rows}} rows",
+    "kindExport": "Export",
+    "kindImport": "Import",
+    "noArchive": "No archive",
+    "deleteJob": "Delete transfer",
+    "status": {
+      "PENDING": "Queued",
+      "RUNNING": "Running",
+      "COMPLETED": "Done",
+      "FAILED": "Failed",
+      "CANCELLED": "Cancelled"
+    },
+    "scopes": {
+      "sources": {
+        "label": "Sources",
+        "description": "Source definitions, schedules and scan configuration. Connection credentials are always stripped."
+      },
+      "sourceFiles": {
+        "label": "Sandbox uploads",
+        "description": "The raw bytes of files uploaded to sandbox sources. Large — the archive grows by roughly the size of the uploads."
+      },
+      "assets": {
+        "label": "Assets",
+        "description": "Ingested documents with their metadata and extracted text."
+      },
+      "findings": {
+        "label": "Findings",
+        "description": "Detections with their evidence, extraction payloads and reviewer feedback."
+      },
+      "customDetectors": {
+        "label": "Custom detectors",
+        "description": "Detector definitions with their training examples, training history and test scenarios."
+      },
+      "glossary": {
+        "label": "Glossary",
+        "description": "Terms, aliases and entity annotations."
+      },
+      "fingerprints": {
+        "label": "Fingerprints",
+        "description": "Correlation values, asset signatures, duplicate clusters and the relationship graph."
+      },
+      "investigations": {
+        "label": "Investigations",
+        "description": "Cases and inquiries with their evidence, leads, chronology, notes and threads."
+      },
+      "scanData": {
+        "label": "Scan history",
+        "description": "Runs with their per-asset outcomes and coverage statistics. The largest scope on a mature workspace."
+      },
+      "harness": {
+        "label": "AI harness",
+        "description": "Agent runs, decisions, logs, long-term memory, per-agent configuration and connected MCP servers. MCP request headers are stripped."
+      },
+      "instanceConfig": {
+        "label": "Instance configuration",
+        "description": "Regional defaults, autopilot switches, AI providers and chat bots. API keys and bot tokens are always stripped."
+      }
     }
   },
   "sources": {

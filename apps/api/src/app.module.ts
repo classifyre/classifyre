@@ -25,6 +25,7 @@ import { AutopilotModule } from './autopilot/autopilot.module';
 import { CorrelationModule } from './correlation/correlation.module';
 import { AgentMemoryService } from './autopilot/memory/agent-memory.service';
 import { ExportModule } from './export/export.module';
+import { DataTransferModule } from './data-transfer/data-transfer.module';
 import { MaskedConfigCryptoService } from './masked-config-crypto.service';
 import { InstanceSettingsService } from './instance-settings.service';
 import { AiProviderConfigService } from './ai-provider-config.service';
@@ -98,6 +99,7 @@ import {
     AutopilotModule,
     CorrelationModule,
     ExportModule,
+    DataTransferModule,
     EmbeddingModule,
   ],
   controllers: [

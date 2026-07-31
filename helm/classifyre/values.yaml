@@ -509,6 +509,10 @@ worker:
       memory: 2Gi
 
 frontend:
+  # -- Deploy the web app in-cluster. Set false to run it externally (e.g. a
+  # local `next dev` pointed at this cluster's API) instead of building and
+  # deploying an image for it.
+  enabled: true
   # -- Number of web replicas when autoscaling is disabled.
   replicaCount: 2
 
@@ -912,6 +916,22 @@ telemetry:
 #   Backblaze B2: endpoint: https://s3.us-west-004.backblazeb2.com
 #   MinIO:        endpoint: http://minio:9000  forcePathStyle: true
 #   Garage:       endpoint: http://garage:3900  forcePathStyle: true
+# Namespace export/import (Settings -> Export & Import).
+#
+# Archives are produced by the worker deployment and downloaded from the API
+# deployment, so they cannot live on a pod's own filesystem. Enable
+# objectStorage above and they are shared through the bucket. If you would
+# rather keep them on a volume, mount the same ReadWriteMany PVC into both
+# deployments and point `dir` at the mount path — that takes precedence over
+# object storage.
+dataTransfer:
+  # -- Shared filesystem path for archives. Empty means use object storage.
+  dir: ""
+  # -- Hours an archive is kept before it is deleted.
+  ttlHours: 24
+  # -- Largest archive that may be produced or uploaded, in GB.
+  maxSizeGb: 8
+
 objectStorage:
   # -- Set to true to enable S3-compatible object storage.
   enabled: false
@@ -919,6 +939,8 @@ objectStorage:
   bucket: classifyre-logs
   # -- S3 object key prefix for runner logs.
   logPrefix: "runner-logs/"
+  # -- S3 object key prefix for namespace export/import archives.
+  transferPrefix: "namespace-archives/"
   # -- AWS region. Required for AWS S3; ignored by most self-hosted providers.
   region: us-east-1
   # -- S3 endpoint URL. Leave empty for AWS S3 (SDK auto-resolves). Required for all other providers.

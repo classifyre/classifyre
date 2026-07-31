@@ -21,6 +21,7 @@ import { ChatGatewayService } from '../chat-gateway/chat-gateway.service';
 import { CliRunnerService } from '../cli-runner/cli-runner.service';
 import { McpClientService } from '../autopilot/mcp-client/mcp-client.service';
 import { PgStreamService } from '../export/pg-stream.service';
+import { DataTransferWorker } from '../data-transfer/data-transfer.worker';
 import { RunnerEventsGateway } from '../websocket/runner-events.gateway';
 import { NotificationEventsGateway } from '../websocket/notification-events.gateway';
 import {
@@ -66,6 +67,7 @@ export class NamespaceWorkerManager
     private readonly cliRunner: CliRunnerService,
     private readonly mcpClient: McpClientService,
     private readonly pgStream: PgStreamService,
+    private readonly dataTransfer: DataTransferWorker,
     private readonly runnerEvents: RunnerEventsGateway,
     private readonly notificationEvents: NotificationEventsGateway,
   ) {}
@@ -151,6 +153,8 @@ export class NamespaceWorkerManager
         await this.correlation.registerForNamespace();
         await this.autopilot.registerForNamespace();
         await this.embedding.registerForNamespace();
+        await this.dataTransfer.registerForNamespace();
+        this.dataTransfer.schedulePurge(e.schemaName);
         await this.mcpClient
           .refresh()
           .catch((error) =>
@@ -221,6 +225,9 @@ export class NamespaceWorkerManager
           settle('chat', () => this.chat.stopForSchema(e.schemaName)),
           settle('embedding', () => this.embedding.stopForSchema(e.schemaName)),
           settle('mcpClient', () => this.mcpClient.stopForSchema(e.schemaName)),
+          settle('dataTransfer', () =>
+            this.dataTransfer.stopForSchema(e.schemaName),
+          ),
         ]),
       ),
       settle('pgBoss', () => this.pgBoss.stopForNamespace(e.schemaName)),

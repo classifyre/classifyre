@@ -21,6 +21,7 @@ import {
 import {
   BrainCircuit,
   Clock3,
+  DatabaseBackup,
   Globe,
   Languages,
   Loader2,
@@ -38,6 +39,7 @@ import { AiAssistantSettingsCard } from "@/components/ai-assistant-settings-card
 import { HarnessPointerCard } from "@/components/harness/harness-pointer-card";
 import { HuggingFaceSettingsCard } from "@/components/huggingface-settings-card";
 import { VersionSettingsSection } from "@/components/version-update-notifier";
+import { DataTransferCard } from "@/components/data-transfer/data-transfer-card";
 
 import { useTranslation } from "@/hooks/use-translation";
 
@@ -197,9 +199,14 @@ export default function SettingsPage() {
       ) : null}
 
       <Tabs defaultValue="general" className="gap-5">
+        {/*
+          Wraps rather than scrolls: the row already overflowed a ~850px pane at
+          five tabs, and an off-screen tab with no scroll affordance is simply
+          an unreachable settings page.
+        */}
         <TabsList
           variant="line"
-          className="h-auto w-full justify-start gap-6 border-b-2 border-border pb-0"
+          className="h-auto w-full flex-wrap justify-start gap-x-6 gap-y-1 border-b-2 border-border pb-0"
         >
           <TabsTrigger value="general" className={TAB_TRIGGER_CLASS}>
             <SlidersHorizontal className="h-3.5 w-3.5" />
@@ -216,6 +223,10 @@ export default function SettingsPage() {
           <TabsTrigger value="chat" className={TAB_TRIGGER_CLASS}>
             <MessageSquare className="h-3.5 w-3.5" />
             {t("settings.tabs.chat")}
+          </TabsTrigger>
+          <TabsTrigger value="data" className={TAB_TRIGGER_CLASS}>
+            <DatabaseBackup className="h-3.5 w-3.5" />
+            {t("settings.tabs.data")}
           </TabsTrigger>
         </TabsList>
 
@@ -389,6 +400,13 @@ export default function SettingsPage() {
           className="duration-300 animate-in fade-in-50 slide-in-from-bottom-1"
         >
           <ChatBotsCard />
+        </TabsContent>
+
+        <TabsContent
+          value="data"
+          className="duration-300 animate-in fade-in-50 slide-in-from-bottom-1"
+        >
+          <DataTransferCard />
         </TabsContent>
       </Tabs>
     </div>

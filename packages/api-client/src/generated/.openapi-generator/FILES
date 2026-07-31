@@ -29,6 +29,7 @@ docs/AiCompleteResponseDto.md
 docs/AiMessageDto.md
 docs/AiProviderConfigResponseDto.md
 docs/AiProviderConfigTestResultDto.md
+docs/ArchivePreviewDto.md
 docs/AssetChunkDto.md
 docs/AssetFindingDetectorCountDto.md
 docs/AssetFindingSeverityCountDto.md
@@ -108,6 +109,10 @@ docs/CustomDetectorResponseDtoSourcesUsingInner.md
 docs/CustomDetectorTestsApi.md
 docs/CustomDetectorTrainingRunDto.md
 docs/CustomDetectorsApi.md
+docs/DataTransferApi.md
+docs/DataTransferJobDto.md
+docs/DataTransferJobListDto.md
+docs/DeleteDataTransferJobResponseDto.md
 docs/DeleteGlossaryTermResponseDto.md
 docs/DeleteRunnerResponseDto.md
 docs/DiscoveryRecentRunDto.md
@@ -270,6 +275,8 @@ docs/SourceResponseDto.md
 docs/SourcesApi.md
 docs/SourcesControllerGetSchedule200Response.md
 docs/SourcesControllerUpdateStatusRequest.md
+docs/StartExportDto.md
+docs/StartImportDto.md
 docs/StartRunnerDto.md
 docs/StopRunnerResponseDto.md
 docs/TestConnectionResponseDto.md
@@ -284,6 +291,7 @@ docs/TrainingExampleDto.md
 docs/TrainingExampleItemDto.md
 docs/TrainingExamplesStatsDto.md
 docs/TrainingExamplesStatsDtoByLabelValue.md
+docs/TransferScopeDto.md
 docs/TriggerAutopilotDto.md
 docs/TriggerAutopilotResponseDto.md
 docs/UpdateAgentConfigDto.md
@@ -325,6 +333,7 @@ src/apis/CorrelationApi.ts
 src/apis/CustomDetectorExtractionsApi.ts
 src/apis/CustomDetectorTestsApi.ts
 src/apis/CustomDetectorsApi.ts
+src/apis/DataTransferApi.ts
 src/apis/EmbeddingsApi.ts
 src/apis/FindingsApi.ts
 src/apis/GlossaryApi.ts
@@ -365,6 +374,7 @@ src/models/AiCompleteResponseDto.ts
 src/models/AiMessageDto.ts
 src/models/AiProviderConfigResponseDto.ts
 src/models/AiProviderConfigTestResultDto.ts
+src/models/ArchivePreviewDto.ts
 src/models/AssetChunkDto.ts
 src/models/AssetFindingDetectorCountDto.ts
 src/models/AssetFindingSeverityCountDto.ts
@@ -435,6 +445,9 @@ src/models/CustomDetectorExampleDto.ts
 src/models/CustomDetectorResponseDto.ts
 src/models/CustomDetectorResponseDtoSourcesUsingInner.ts
 src/models/CustomDetectorTrainingRunDto.ts
+src/models/DataTransferJobDto.ts
+src/models/DataTransferJobListDto.ts
+src/models/DeleteDataTransferJobResponseDto.ts
 src/models/DeleteGlossaryTermResponseDto.ts
 src/models/DeleteRunnerResponseDto.ts
 src/models/DiscoveryRecentRunDto.ts
@@ -586,6 +599,8 @@ src/models/SourceInfoDto.ts
 src/models/SourceResponseDto.ts
 src/models/SourcesControllerGetSchedule200Response.ts
 src/models/SourcesControllerUpdateStatusRequest.ts
+src/models/StartExportDto.ts
+src/models/StartImportDto.ts
 src/models/StartRunnerDto.ts
 src/models/StopRunnerResponseDto.ts
 src/models/TestConnectionResponseDto.ts
@@ -599,6 +614,7 @@ src/models/TrainingExampleDto.ts
 src/models/TrainingExampleItemDto.ts
 src/models/TrainingExamplesStatsDto.ts
 src/models/TrainingExamplesStatsDtoByLabelValue.ts
+src/models/TransferScopeDto.ts
 src/models/TriggerAutopilotDto.ts
 src/models/TriggerAutopilotResponseDto.ts
 src/models/UpdateAgentConfigDto.ts
