@@ -738,6 +738,7 @@ enum AssetType {
   TABLEAU
   EMAIL
   YOUTUBE
+  REDDIT
   DELTA_LAKE
   ICEBERG
   KAFKA

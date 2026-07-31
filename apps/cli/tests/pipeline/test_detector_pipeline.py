@@ -432,8 +432,9 @@ class BinarySource(DummySource):
         include_column_names: bool = True,
         *,
         file_name: str = "",
+        asset_id: str | None = None,
     ):
-        _ = (file_bytes, mime_type, batch_size, include_column_names, file_name)
+        _ = (file_bytes, mime_type, batch_size, include_column_names, file_name, asset_id)
         yield from ()
 
 
@@ -457,8 +458,9 @@ class OcrBinarySource(BinarySource):
         include_column_names: bool = True,
         *,
         file_name: str = "",
+        asset_id: str | None = None,
     ):
-        _ = (file_bytes, mime_type, batch_size, include_column_names, file_name)
+        _ = (file_bytes, mime_type, batch_size, include_column_names, file_name, asset_id)
         yield from self._ocr_pages
 
 

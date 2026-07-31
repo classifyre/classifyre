@@ -46,6 +46,7 @@ SOURCE_TYPE_GROUPS: dict[str, set[str]] = {
     "GOOGLE_CLOUD_STORAGE": {"google-cloud-storage"},
     "EMAIL": {"email"},
     "YOUTUBE": {"youtube"},
+    "REDDIT": {"reddit"},
     "DELTA_LAKE": {"delta-lake"},
     "ICEBERG": {"iceberg"},
     "KAFKA": {"kafka"},

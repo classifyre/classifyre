@@ -258,6 +258,21 @@ export const SOURCE_TYPE_CATALOG_META: Record<string, SourceCatalogMetaBase> = {
       "channel",
     ],
   },
+  REDDIT: {
+    description:
+      "Scan subreddits — posts, threaded comments, attached media, and linked video transcripts. Always read-only.",
+    icon: CreateSourceDtoTypeEnum.Reddit,
+    category: "SOCIAL_MEDIA",
+    keywords: [
+      "social media",
+      "ugc",
+      "forum",
+      "subreddit",
+      "posts",
+      "comments",
+      "threads",
+    ],
+  },
   DELTA_LAKE: {
     description:
       "Scan Delta Lake tables in S3-compatible storage — schema, versions, and row sampling, no Spark required.",

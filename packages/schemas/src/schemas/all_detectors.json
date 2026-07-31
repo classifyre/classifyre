@@ -87,6 +87,7 @@
         "ORACLE",
         "HIVE",
         "POWERBI",
+        "REDDIT",
         "SANDBOX"
       ],
       "description": "Source types where detector execution is supported"

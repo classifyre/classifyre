@@ -246,6 +246,16 @@ youtube = [
     "yt-dlp>=2025.1.0",
     "youtube-transcript-api>=1.0.0",
 ]
+reddit = [
+    # Official Reddit API wrapper. Handles OAuth (all three PRAW flows), token
+    # refresh and Reddit's own ratelimit headers.
+    "praw>=7.8.1,<8.0.0",
+    # Reddit posts routinely embed YouTube/Vimeo links; those are analysed with
+    # the same yt-dlp + captions + Whisper + frame-OCR pipeline the YouTube
+    # source uses (src/utils/external_video.py).
+    "yt-dlp>=2025.1.0",
+    "youtube-transcript-api>=1.0.0",
+]
 delta-lake = [
     # Pure-Python/Rust Delta reader (delta-rs) — no Spark, no JVM. Table metadata
     # and data-file lists come from deltalake; rows are sampled through DuckDB

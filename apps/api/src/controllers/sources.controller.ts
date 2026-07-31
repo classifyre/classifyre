@@ -133,6 +133,35 @@ export class SourcesController {
           },
         },
       },
+      reddit: {
+        summary: 'Reddit Source',
+        value: {
+          type: 'REDDIT',
+          name: 'Community subreddits',
+          config: {
+            type: 'REDDIT',
+            required: {
+              auth_mode: 'READ_ONLY',
+              subreddits: ['datasets', 'MachineLearning'],
+              user_agent: 'classifyre:com.example.scanner:v1.0 (by u/example)',
+            },
+            masked: {
+              client_id: 'your-client-id',
+              client_secret: 'your-client-secret',
+            },
+            optional: {
+              scope: {
+                include_comments: true,
+                max_comments_per_post: 200,
+              },
+            },
+            sampling: {
+              strategy: 'AUTOMATIC',
+              rows_per_page: 50,
+            },
+          },
+        },
+      },
       s3CompatibleStorage: {
         summary: 'S3-Compatible Storage Source',
         value: {
