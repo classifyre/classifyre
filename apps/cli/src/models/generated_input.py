@@ -468,7 +468,7 @@ class YouTubeOptional(BaseModel):
 
 class RedditAuthMode(StrEnum):
     """
-    PRAW OAuth flow. READ_ONLY is application-only (client credentials) and needs no Reddit account. SCRIPT is the password grant for a script app registered by the account itself. REFRESH_TOKEN replays a saved refresh token obtained from the code grant (web and installed apps). Whichever flow is used, the client is always forced into read-only mode — Classifyre never writes to Reddit.
+    PRAW OAuth flow used to obtain credentials. READ_ONLY is application-only (client credentials) and needs no Reddit account. SCRIPT is the password grant for a script app registered by the account itself. REFRESH_TOKEN replays a saved refresh token obtained from the code grant (web and installed apps). Note: whichever flow is configured, Classifyre forces PRAW into read-only mode and does not let you turn it off, so requests are issued with the application's own token — content only a signed-in account can see (private subreddits, for example) is not reachable.
     """
 
     READ_ONLY = 'READ_ONLY'
@@ -550,7 +550,7 @@ class RedditRequiredReadOnly(BaseModel):
 
 class RedditRequiredScript(BaseModel):
     """
-    Password grant for a script app. Sees everything the registered account can see, including private subreddits it belongs to.
+    Password grant for a script app registered by a Reddit account. The account's credentials authenticate the app; the scan itself still runs read-only.
     """
 
     model_config = ConfigDict(
