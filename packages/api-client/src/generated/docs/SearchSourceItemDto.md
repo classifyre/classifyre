@@ -18,6 +18,9 @@ Name | Type
 `scheduleCron` | string
 `scheduleTimezone` | string
 `scheduleNextAt` | Date
+`scheduleMode` | string
+`autoPhase` | string
+`autoReason` | string
 
 ## Example
 
@@ -38,6 +41,9 @@ const example = {
   "scheduleCron": 30 1 * * *,
   "scheduleTimezone": UTC,
   "scheduleNextAt": null,
+  "scheduleMode": OFF,
+  "autoPhase": CATCH_UP,
+  "autoReason": Sweep complete — checking every 15 minutes for new data.,
 } satisfies SearchSourceItemDto
 
 console.log(example)

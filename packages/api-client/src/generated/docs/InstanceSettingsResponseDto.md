@@ -25,6 +25,7 @@ Name | Type
 `autopilotEscalationEnabled` | boolean
 `autopilotEscalationGuidance` | string
 `autopilotMcpEnabled` | boolean
+`autoScheduleEnabled` | boolean
 `demoMode` | boolean
 `hfTokenSet` | boolean
 `hfTokenInstanceSet` | boolean
@@ -57,6 +58,7 @@ const example = {
   "autopilotEscalationEnabled": false,
   "autopilotEscalationGuidance": null,
   "autopilotMcpEnabled": false,
+  "autoScheduleEnabled": true,
   "demoMode": false,
   "hfTokenSet": false,
   "hfTokenInstanceSet": false,

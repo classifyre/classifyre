@@ -121,7 +121,54 @@ export interface SourceResponseDto {
      * @memberof SourceResponseDto
      */
     scheduleNextAt: Date | null;
+    /**
+     * 
+     * @type {string}
+     * @memberof SourceResponseDto
+     */
+    scheduleMode: SourceResponseDtoScheduleModeEnum;
+    /**
+     * Adaptive-schedule phase. Meaningful only when scheduleMode is AUTO.
+     * @type {string}
+     * @memberof SourceResponseDto
+     */
+    autoPhase: SourceResponseDtoAutoPhaseEnum;
+    /**
+     * Current steady-state interval in seconds (AUTO mode).
+     * @type {number}
+     * @memberof SourceResponseDto
+     */
+    autoIntervalSeconds: number | null;
+    /**
+     * Why the scheduler chose the current cadence.
+     * @type {string}
+     * @memberof SourceResponseDto
+     */
+    autoReason: string | null;
 }
+
+
+/**
+ * @export
+ */
+export const SourceResponseDtoScheduleModeEnum = {
+    Off: 'OFF',
+    Cron: 'CRON',
+    Auto: 'AUTO'
+} as const;
+export type SourceResponseDtoScheduleModeEnum = typeof SourceResponseDtoScheduleModeEnum[keyof typeof SourceResponseDtoScheduleModeEnum];
+
+/**
+ * @export
+ */
+export const SourceResponseDtoAutoPhaseEnum = {
+    CatchUp: 'CATCH_UP',
+    Steady: 'STEADY',
+    Backoff: 'BACKOFF',
+    Paused: 'PAUSED'
+} as const;
+export type SourceResponseDtoAutoPhaseEnum = typeof SourceResponseDtoAutoPhaseEnum[keyof typeof SourceResponseDtoAutoPhaseEnum];
+
 
 /**
  * Check if a given object implements the SourceResponseDto interface.
@@ -140,6 +187,10 @@ export function instanceOfSourceResponseDto(value: object): value is SourceRespo
     if (!('scheduleCron' in value) || value['scheduleCron'] === undefined) return false;
     if (!('scheduleTimezone' in value) || value['scheduleTimezone'] === undefined) return false;
     if (!('scheduleNextAt' in value) || value['scheduleNextAt'] === undefined) return false;
+    if (!('scheduleMode' in value) || value['scheduleMode'] === undefined) return false;
+    if (!('autoPhase' in value) || value['autoPhase'] === undefined) return false;
+    if (!('autoIntervalSeconds' in value) || value['autoIntervalSeconds'] === undefined) return false;
+    if (!('autoReason' in value) || value['autoReason'] === undefined) return false;
     return true;
 }
 
@@ -170,6 +221,10 @@ export function SourceResponseDtoFromJSONTyped(json: any, ignoreDiscriminator: b
         'scheduleCron': json['scheduleCron'],
         'scheduleTimezone': json['scheduleTimezone'],
         'scheduleNextAt': (json['scheduleNextAt'] == null ? null : new Date(json['scheduleNextAt'])),
+        'scheduleMode': json['scheduleMode'],
+        'autoPhase': json['autoPhase'],
+        'autoIntervalSeconds': json['autoIntervalSeconds'],
+        'autoReason': json['autoReason'],
     };
 }
 
@@ -201,6 +256,10 @@ export function SourceResponseDtoToJSONTyped(value?: SourceResponseDto | null, i
         'scheduleCron': value['scheduleCron'],
         'scheduleTimezone': value['scheduleTimezone'],
         'scheduleNextAt': value['scheduleNextAt'] == null ? value['scheduleNextAt'] : value['scheduleNextAt'].toISOString(),
+        'scheduleMode': value['scheduleMode'],
+        'autoPhase': value['autoPhase'],
+        'autoIntervalSeconds': value['autoIntervalSeconds'],
+        'autoReason': value['autoReason'],
     };
 }
 

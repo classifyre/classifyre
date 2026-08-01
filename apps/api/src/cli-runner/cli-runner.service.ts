@@ -13,6 +13,7 @@ import { RunnerEventsGateway } from '../websocket/runner-events.gateway';
 import { PgBossService } from '../scheduler/pg-boss.service';
 import { INQUIRY_MATCH_QUEUE } from '../matching/matching.constants';
 import { CORRELATION_QUEUE } from '../correlation/correlation.constants';
+import { AUTO_SCHEDULE_QUEUE } from '../scheduler/auto-schedule.constants';
 import { ClsService } from 'nestjs-cls';
 import { CLS_SCHEMA, CLS_NAMESPACE_ID } from '../namespace/namespace.constants';
 import {
@@ -255,6 +256,39 @@ export class CliRunnerService {
     } catch (error) {
       this.logger.warn(
         `Failed to enqueue question matching for source ${sourceId}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
+  /**
+   * Tell the adaptive scheduler a run reached a terminal state, so it can decide
+   * when this source should run next.
+   *
+   * Sent for EVERY terminal run regardless of what triggered it — a manual run,
+   * a cron run and an autopilot re-scan all count as "the source was just
+   * scanned", which is what stops the scheduler from queuing a redundant one
+   * behind them. Best-effort by design: the scheduler's own one-minute tick
+   * re-derives the due set from the database, so a dropped message costs
+   * latency, never correctness.
+   */
+  private async enqueueAutoScheduleKick(
+    sourceId: string,
+    runnerId: string,
+  ): Promise<void> {
+    if (!this.pgBossService) return;
+    try {
+      const boss = await this.pgBossService.getBossAsync();
+      await boss.send(
+        AUTO_SCHEDULE_QUEUE,
+        { sourceId, runnerId },
+        {
+          singletonKey: `auto-schedule:${sourceId}`,
+          expireInSeconds: 600,
+        },
+      );
+    } catch (error) {
+      this.logger.warn(
+        `Failed to enqueue auto-schedule kick for source ${sourceId}: ${error instanceof Error ? error.message : String(error)}`,
       );
     }
   }
@@ -2212,6 +2246,7 @@ export class CliRunnerService {
 
     // Kick the question-matching engine for this source (fire-and-forget).
     await this.enqueueQuestionMatching(runner.sourceId, runnerId);
+    await this.enqueueAutoScheduleKick(runner.sourceId, runnerId);
 
     if (runner?.source) {
       const sourceName = runner.source.name;
@@ -2468,6 +2503,11 @@ export class CliRunnerService {
           `Failed to create failure notification for runner ${runnerId}`,
         );
       }
+
+      // Sent after consecutiveFailures has been incremented: the adaptive
+      // scheduler sizes its backoff from that counter, so kicking it earlier
+      // would back off one step short every time.
+      await this.enqueueAutoScheduleKick(runner.sourceId, runnerId);
     }
 
     void this.dequeueNextPendingRunner();

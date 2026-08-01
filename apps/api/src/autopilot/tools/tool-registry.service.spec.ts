@@ -34,6 +34,8 @@ import type { AgentSemanticService } from '../search/agent-semantic.service';
 import type { GlossaryService } from '../../glossary/glossary.service';
 import type { CaseLeadsService } from '../../case-leads.service';
 import type { CaseEventsService } from '../../case-events.service';
+import type { AutoScheduleService } from '../../scheduler/auto-schedule.service';
+import { ScheduleToolset } from './schedule/schedule.toolset';
 
 describe('ToolRegistry', () => {
   // list() does not touch deps; safe to pass empty stubs.
@@ -48,6 +50,7 @@ describe('ToolRegistry', () => {
       {} as DecisionApplierService,
       {} as CliRunnerService,
       {} as NotificationsService,
+      {} as AutoScheduleService,
     ),
     new DetectorToolset(
       {} as CustomDetectorsService,
@@ -68,6 +71,12 @@ describe('ToolRegistry', () => {
       {} as CaseLeadsService,
       {} as CaseEventsService,
       {} as DecisionApplierService,
+    ),
+    new ScheduleToolset(
+      {} as PrismaService,
+      {} as AutoScheduleService,
+      {} as DecisionApplierService,
+      {} as NotificationsService,
     ),
   );
 

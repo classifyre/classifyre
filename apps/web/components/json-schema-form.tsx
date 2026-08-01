@@ -64,7 +64,11 @@ import {
   isIngestionSourceType,
   type IngestionSourceType,
 } from "@workspace/ui/components/source-icon";
-import { ScheduleCard, type ScheduleValue } from "@/components/schedule-card";
+import {
+  ScheduleCard,
+  type AutoScheduleStatus,
+  type ScheduleValue,
+} from "@/components/schedule-card";
 import { SamplingCard, type SamplingValue } from "@/components/sampling-card";
 
 const LONG_TEXT_THRESHOLD = 120;
@@ -2229,6 +2233,9 @@ export interface JsonSchemaFormProps {
   assistantSourceType?: string;
   schedule?: ScheduleValue;
   onScheduleChange?: (value: ScheduleValue) => void;
+  /** Live adaptive-schedule state for an existing source. */
+  autoScheduleStatus?: AutoScheduleStatus | null;
+  onResumeSchedule?: () => Promise<void>;
   showActions?: boolean;
   afterNameContent?: React.ReactNode;
 }
@@ -2302,6 +2309,8 @@ export const JsonSchemaForm = React.forwardRef<
     disabled = false,
     assistantSourceType,
     schedule,
+    autoScheduleStatus,
+    onResumeSchedule,
     onScheduleChange,
     showActions = true,
     afterNameContent,
@@ -3174,6 +3183,8 @@ export const JsonSchemaForm = React.forwardRef<
             value={schedule}
             onChange={onScheduleChange}
             disabled={disabled}
+            autoStatus={autoScheduleStatus}
+            onResume={onResumeSchedule}
           />
         )}
 

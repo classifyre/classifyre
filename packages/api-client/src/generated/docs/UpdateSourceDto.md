@@ -13,6 +13,7 @@ Name | Type
 `scheduleEnabled` | boolean
 `scheduleCron` | string
 `scheduleTimezone` | string
+`scheduleMode` | string
 
 ## Example
 
@@ -28,6 +29,7 @@ const example = {
   "scheduleEnabled": true,
   "scheduleCron": 30 1 * * *,
   "scheduleTimezone": UTC,
+  "scheduleMode": null,
 } satisfies UpdateSourceDto
 
 console.log(example)

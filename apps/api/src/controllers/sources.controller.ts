@@ -24,7 +24,16 @@ import { ValidationService } from '../validation.service';
 import { CustomDetectorsService } from '../custom-detectors.service';
 import { CliRunnerService } from '../cli-runner/cli-runner.service';
 import { SchedulerService } from '../scheduler/scheduler.service';
-import { Source as SourceModel, RunnerStatus, Prisma } from '@prisma/client';
+import {
+  AutoScheduleService,
+  type AutoScheduleStatus,
+} from '../scheduler/auto-schedule.service';
+import {
+  Source as SourceModel,
+  RunnerStatus,
+  Prisma,
+  SourceScheduleMode,
+} from '@prisma/client';
 import { CreateSourceDto } from '../dto/create-source.dto';
 import { UpdateSourceDto } from '../dto/update-source.dto';
 import { UpdateRunnerStatusDto } from '../dto/update-runner-status.dto';
@@ -44,6 +53,7 @@ export class SourcesController {
     private readonly customDetectorsService: CustomDetectorsService,
     private readonly cliRunnerService: CliRunnerService,
     private readonly schedulerService: SchedulerService,
+    private readonly autoScheduleService: AutoScheduleService,
     private readonly sourceFilesService: SourceFilesService,
   ) {}
 
@@ -461,18 +471,7 @@ export class SourcesController {
       config: normalizedConfigRecord,
     });
 
-    // Handle schedule (upsert if enabled, no-op if not provided)
-    if (
-      createSourceDto.scheduleEnabled === true &&
-      createSourceDto.scheduleCron
-    ) {
-      this.assertValidCronExpression(createSourceDto.scheduleCron);
-      await this.schedulerService.upsertSchedule(
-        source.id,
-        createSourceDto.scheduleCron,
-        createSourceDto.scheduleTimezone ?? 'UTC',
-      );
-    }
+    await this.applyScheduleMode(source.id, createSourceDto, 'created');
 
     return source;
   }
@@ -625,10 +624,19 @@ export class SourcesController {
 
     // Validate cron expression up-front before any mutations
     if (
-      updateSourceDto.scheduleEnabled === true &&
+      (updateSourceDto.scheduleEnabled === true ||
+        updateSourceDto.scheduleMode === 'CRON') &&
       updateSourceDto.scheduleCron
     ) {
       this.assertValidCronExpression(updateSourceDto.scheduleCron);
+    }
+    if (
+      updateSourceDto.scheduleMode === 'CRON' &&
+      !updateSourceDto.scheduleCron
+    ) {
+      throw new BadRequestException(
+        'scheduleCron is required when scheduleMode is CRON.',
+      );
     }
 
     let updated: SourceModel;
@@ -641,23 +649,11 @@ export class SourcesController {
         config: normalizedConfigRecord ?? normalizedConfig,
       });
 
-      // Handle schedule
-      if (updateSourceDto.scheduleEnabled !== undefined) {
-        if (
-          updateSourceDto.scheduleEnabled === true &&
-          updateSourceDto.scheduleCron
-        ) {
-          await this.schedulerService.upsertSchedule(
-            id,
-            updateSourceDto.scheduleCron,
-            updateSourceDto.scheduleTimezone ?? 'UTC',
-          );
-          scheduleUpdated = true;
-        } else if (updateSourceDto.scheduleEnabled === false) {
-          await this.schedulerService.removeSchedule(id);
-          scheduleUpdated = true;
-        }
-      }
+      scheduleUpdated = await this.applyScheduleMode(
+        id,
+        updateSourceDto,
+        'updated',
+      );
     } catch (error) {
       await this.sourceService.updateSource({
         where: { id },
@@ -677,6 +673,77 @@ export class SourcesController {
     }
 
     return updated;
+  }
+
+  /**
+   * Put a source under exactly one scheduler.
+   *
+   * `scheduleMode` is the modern field; when it is absent the legacy
+   * `scheduleEnabled`/`scheduleCron` pair is honoured unchanged, so existing
+   * API clients and the MCP tools keep working. Returns whether anything about
+   * the schedule changed (the caller re-reads the source when it did).
+   */
+  private async applyScheduleMode(
+    sourceId: string,
+    dto: {
+      scheduleMode?: 'OFF' | 'CRON' | 'AUTO';
+      scheduleEnabled?: boolean;
+      scheduleCron?: string;
+      scheduleTimezone?: string;
+    },
+    verb: 'created' | 'updated',
+  ): Promise<boolean> {
+    const mode =
+      dto.scheduleMode ??
+      (dto.scheduleEnabled === true && dto.scheduleCron
+        ? 'CRON'
+        : dto.scheduleEnabled === false
+          ? 'OFF'
+          : undefined);
+    if (!mode) return false;
+
+    if (mode === 'AUTO') {
+      // Drop any cron schedule first, handing ownership straight to the
+      // adaptive scheduler so the source is never briefly unowned. A source
+      // being created has none, and calling pg-boss for it would put a
+      // needless failure mode in the create path.
+      if (verb === 'updated') {
+        await this.schedulerService.removeSchedule(
+          sourceId,
+          SourceScheduleMode.AUTO,
+        );
+      }
+      await this.autoScheduleService.enable(
+        sourceId,
+        `Automatic scheduling ${verb} by an operator — starting the initial sweep.`,
+      );
+      return true;
+    }
+
+    if (mode === 'CRON') {
+      if (!dto.scheduleCron) {
+        throw new BadRequestException(
+          'scheduleCron is required when scheduleMode is CRON.',
+        );
+      }
+      this.assertValidCronExpression(dto.scheduleCron);
+      await this.schedulerService.upsertSchedule(
+        sourceId,
+        dto.scheduleCron,
+        dto.scheduleTimezone ?? 'UTC',
+      );
+      return true;
+    }
+
+    // OFF is the default for a new source — nothing to unschedule.
+    if (verb === 'updated') {
+      await this.schedulerService.removeSchedule(
+        sourceId,
+        SourceScheduleMode.OFF,
+      );
+      return true;
+    }
+    return false;
   }
 
   private assertValidCronExpression(cron: string): void {
@@ -865,12 +932,49 @@ export class SourcesController {
     enabled: boolean;
     cron: string | null;
     timezone: string | null;
+    mode: SourceScheduleMode;
+    auto: AutoScheduleStatus | null;
   }> {
     const source = await this.sourceService.source({ id });
     if (!source) {
       throw new NotFoundException(`Source with ID ${id} not found`);
     }
-    return this.schedulerService.getSchedule(id);
+    const [schedule, auto] = await Promise.all([
+      this.schedulerService.getSchedule(id),
+      this.autoScheduleService.describe(id),
+    ]);
+    return { ...schedule, auto };
+  }
+
+  @Post(':id/schedule/resume')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Resume automatic scanning',
+    description:
+      'Clear the circuit breaker on a source whose automatic schedule was ' +
+      'paused after repeated scan failures, and queue it to run immediately.',
+  })
+  @ApiParam({ name: 'id', description: 'Source unique identifier' })
+  @ApiResponse({ status: 200, description: 'Automatic scanning resumed' })
+  @ApiResponse({ status: 404, description: 'Source not found' })
+  @ApiResponse({
+    status: 400,
+    description: 'Source is not using automatic scheduling',
+  })
+  async resumeSchedule(
+    @Param('id') id: string,
+  ): Promise<AutoScheduleStatus | null> {
+    const status = await this.autoScheduleService.describe(id);
+    if (!status) {
+      throw new NotFoundException(`Source with ID ${id} not found`);
+    }
+    if (status.mode !== SourceScheduleMode.AUTO) {
+      throw new BadRequestException(
+        'This source does not use automatic scheduling.',
+      );
+    }
+    await this.autoScheduleService.resume(id, 'Resumed by an operator.');
+    return this.autoScheduleService.describe(id);
   }
 
   @Delete(':id')

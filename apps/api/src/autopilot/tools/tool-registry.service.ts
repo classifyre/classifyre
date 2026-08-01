@@ -11,6 +11,7 @@ import { AlertToolset } from './alert/alert.toolset';
 import { SemanticToolset } from './semantic/semantic.toolset';
 import { GlossaryToolset } from './glossary/glossary.toolset';
 import { CaseLeadsToolset } from './leads/case-leads.toolset';
+import { ScheduleToolset } from './schedule/schedule.toolset';
 import type { Tool } from './tool.types';
 
 /** A provider that contributes a set of statically-defined tools. */
@@ -44,6 +45,7 @@ export class ToolRegistry {
     private readonly semantic: SemanticToolset,
     private readonly glossaryTools: GlossaryToolset,
     private readonly caseLeads: CaseLeadsToolset,
+    private readonly schedule: ScheduleToolset,
     @Optional() private readonly cls?: ClsService,
   ) {
     this.loadStatic([
@@ -57,6 +59,7 @@ export class ToolRegistry {
       this.semantic,
       this.glossaryTools,
       this.caseLeads,
+      this.schedule,
     ]);
   }
 

@@ -166,12 +166,17 @@ describe('SchedulerService', () => {
         { sourceId },
         { tz: timezone },
       );
+      // Taking the source for CRON also takes it out of AUTO, so the two
+      // schedulers can never both be starting runs for it.
       expect(mockPrisma.source.update).toHaveBeenCalledWith({
         where: { id: sourceId },
         data: {
           scheduleEnabled: true,
           scheduleCron: cron,
           scheduleTimezone: timezone,
+          scheduleMode: 'CRON',
+          scheduleNextAt: null,
+          autoReason: null,
         },
       });
     });
@@ -192,6 +197,25 @@ describe('SchedulerService', () => {
           scheduleEnabled: false,
           scheduleCron: null,
           scheduleNextAt: null,
+          scheduleMode: 'OFF',
+          autoReason: null,
+        },
+      });
+    });
+
+    it('hands the source to the adaptive scheduler when that is what takes over', async () => {
+      await service.removeSchedule('source-5', 'AUTO');
+
+      // The mode flips in the same write that drops the cron schedule: a
+      // source must never be briefly owned by neither scheduler. autoReason is
+      // left alone — AutoScheduleService.enable writes the real one.
+      expect(mockPrisma.source.update).toHaveBeenCalledWith({
+        where: { id: 'source-5' },
+        data: {
+          scheduleEnabled: false,
+          scheduleCron: null,
+          scheduleNextAt: null,
+          scheduleMode: 'AUTO',
         },
       });
     });

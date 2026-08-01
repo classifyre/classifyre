@@ -15,7 +15,13 @@ import {
   NotificationType,
 } from '../../../types/notification.types';
 import { DecisionApplierService } from '../../decision-applier.service';
-import { AI_ACTOR, MAX_COVERAGE_SOURCE_ROWS } from '../../autopilot.constants';
+import { AutoScheduleService } from '../../../scheduler/auto-schedule.service';
+import {
+  AI_ACTOR,
+  AUTOPILOT_RESCAN_COOLDOWN_SECONDS,
+  AUTOPILOT_RESCANS_PER_DAY,
+  MAX_COVERAGE_SOURCE_ROWS,
+} from '../../autopilot.constants';
 import type { Tool, ToolContext, ToolGate } from '../tool.types';
 
 /** Config sub-keys the autopilot may change. Base connection is excluded. */
@@ -47,6 +53,7 @@ export class ConfigToolset {
     private readonly applier: DecisionApplierService,
     private readonly cliRunner: CliRunnerService,
     private readonly notifications: NotificationsService,
+    private readonly autoSchedule: AutoScheduleService,
   ) {}
 
   private sourceGate = async (
@@ -333,6 +340,14 @@ export class ConfigToolset {
           //    must never be silent (BUG F / R-12). Best-effort: a notification
           //    failure must not fail the mutation that already succeeded.
           await this.notifyConfigChanged(sourceId, source.name, changedKeys);
+          // 8. A detection/sampling change invalidates "there is nothing new to
+          //    read": the existing assets must be looked at again. Restart the
+          //    adaptive sweep so a converged source does not wait out its slow
+          //    interval before the change is tested. No-op for CRON/OFF sources.
+          await this.autoSchedule.resetToCatchUp(
+            sourceId,
+            `Autopilot changed ${changedKeys.join(', ')} — re-sweeping so the change takes effect.`,
+          );
           return { ok: true, changedKeys };
         },
       },
@@ -367,6 +382,47 @@ export class ConfigToolset {
                   'this cycle is already a verification re-scan; not re-scanning again',
               };
             }
+          }
+
+          // The depth-1 guard above reads the runner that triggered THIS cycle
+          // — and a coalesced corpus cycle has none, so on that path (which is
+          // now the common one) it never fires. Without the rate limit below,
+          // re-scan → scan completes → source marked dirty → next corpus cycle
+          // → re-scan is a loop with nothing but mission prose to stop it.
+          const since = new Date(
+            Date.now() - AUTOPILOT_RESCAN_COOLDOWN_SECONDS * 1000,
+          );
+          const dayAgo = new Date(Date.now() - 24 * 3600 * 1000);
+          const [recent, today] = await Promise.all([
+            this.prisma.runner.count({
+              where: {
+                sourceId,
+                triggerType: TriggerType.AUTOPILOT,
+                triggeredAt: { gte: since },
+              },
+            }),
+            this.prisma.runner.count({
+              where: {
+                sourceId,
+                triggerType: TriggerType.AUTOPILOT,
+                triggeredAt: { gte: dayAgo },
+              },
+            }),
+          ]);
+          if (recent > 0) {
+            return {
+              skipped:
+                'this source was already re-scanned by the autopilot within the last ' +
+                `${AUTOPILOT_RESCAN_COOLDOWN_SECONDS / 3600} hours; the findings from that scan ` +
+                'are what you should be evaluating',
+            };
+          }
+          if (today >= AUTOPILOT_RESCANS_PER_DAY) {
+            return {
+              skipped:
+                `this source has already been re-scanned ${today} times by the autopilot today ` +
+                '(daily limit reached); record what you changed and let a later cycle verify it',
+            };
           }
 
           try {

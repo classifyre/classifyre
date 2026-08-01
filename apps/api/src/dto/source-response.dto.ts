@@ -59,4 +59,29 @@ export class SourceResponseDto {
 
   @ApiProperty({ nullable: true, example: null })
   scheduleNextAt: Date | null;
+
+  @ApiProperty({ enum: ['OFF', 'CRON', 'AUTO'], example: 'OFF' })
+  scheduleMode: 'OFF' | 'CRON' | 'AUTO';
+
+  @ApiProperty({
+    enum: ['CATCH_UP', 'STEADY', 'BACKOFF', 'PAUSED'],
+    example: 'CATCH_UP',
+    description:
+      'Adaptive-schedule phase. Meaningful only when scheduleMode is AUTO.',
+  })
+  autoPhase: 'CATCH_UP' | 'STEADY' | 'BACKOFF' | 'PAUSED';
+
+  @ApiProperty({
+    nullable: true,
+    example: 900,
+    description: 'Current steady-state interval in seconds (AUTO mode).',
+  })
+  autoIntervalSeconds: number | null;
+
+  @ApiProperty({
+    nullable: true,
+    example: 'Sweep complete — checking every 15 minutes for new data.',
+    description: 'Why the scheduler chose the current cadence.',
+  })
+  autoReason: string | null;
 }

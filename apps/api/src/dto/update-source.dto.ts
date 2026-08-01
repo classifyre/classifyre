@@ -71,4 +71,16 @@ export class UpdateSourceDto {
     required: false,
   })
   scheduleTimezone?: string;
+
+  @ApiProperty({
+    description:
+      'Which scheduler owns this source. OFF = never runs automatically. ' +
+      'CRON = the fixed cron schedule in scheduleCron. AUTO = adaptive: run ' +
+      'back-to-back while each scan is still ingesting new data, then settle ' +
+      'into a slow interval that only picks up what is new. When omitted, the ' +
+      'legacy scheduleEnabled/scheduleCron pair is used unchanged.',
+    enum: ['OFF', 'CRON', 'AUTO'],
+    required: false,
+  })
+  scheduleMode?: 'OFF' | 'CRON' | 'AUTO';
 }

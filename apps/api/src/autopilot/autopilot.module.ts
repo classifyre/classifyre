@@ -33,6 +33,8 @@ import { SemanticToolset } from './tools/semantic/semantic.toolset';
 import { GlossaryToolset } from './tools/glossary/glossary.toolset';
 import { GlossaryService } from '../glossary/glossary.service';
 import { CaseLeadsToolset } from './tools/leads/case-leads.toolset';
+import { ScheduleToolset } from './tools/schedule/schedule.toolset';
+import { SchedulerModule } from '../scheduler/scheduler.module';
 import { CaseLeadsService } from '../case-leads.service';
 import { CaseEventsService } from '../case-events.service';
 import { NotificationsService } from '../notifications.service';
@@ -61,6 +63,10 @@ import { AssistantCapabilityService } from './capability/assistant-capability.se
     CorrelationModule,
     CliRunnerModule,
     EmbeddingModule,
+    // The config agent can read and (narrowly) tune scan cadence, so the
+    // adaptive scheduler and the agents share one implementation rather than
+    // each having their own idea of when a source should run.
+    SchedulerModule,
   ],
   controllers: [AutopilotController, McpServersController],
   providers: [
@@ -96,6 +102,7 @@ import { AssistantCapabilityService } from './capability/assistant-capability.se
     CaseLeadsService,
     CaseEventsService,
     CaseLeadsToolset,
+    ScheduleToolset,
     NotificationsService,
     ToolRegistry,
     ToolDispatcherService,

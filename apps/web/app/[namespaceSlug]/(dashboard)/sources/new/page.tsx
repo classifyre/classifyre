@@ -37,6 +37,7 @@ import {
 } from "@/components/test-connection-dialog";
 import {
   defaultScheduleValue,
+  scheduleFieldsFor,
   type ScheduleValue,
 } from "@/components/schedule-card";
 import { toast } from "sonner";
@@ -276,14 +277,7 @@ export default function NewSourcePage() {
       ...(detectorPayload.length > 0 ? { detectors: detectorPayload } : {}),
     };
 
-    const scheduleFields =
-      schedule.enabled && schedule.cron
-        ? {
-            scheduleEnabled: true,
-            scheduleCron: schedule.cron,
-            scheduleTimezone: schedule.timezone,
-          }
-        : { scheduleEnabled: false };
+    const scheduleFields = scheduleFieldsFor(schedule);
 
     if (
       selectedSourceType === "SANDBOX" &&

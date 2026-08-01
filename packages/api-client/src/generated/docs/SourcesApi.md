@@ -18,6 +18,7 @@ All URIs are relative to *http://localhost*
 | [**sourcesControllerGetSource**](SourcesApi.md#sourcescontrollergetsource) | **GET** /sources/{id} | Get source by ID |
 | [**sourcesControllerListSources**](SourcesApi.md#sourcescontrollerlistsources) | **GET** /sources | List all data sources |
 | [**sourcesControllerPurgeFindings**](SourcesApi.md#sourcescontrollerpurgefindings) | **DELETE** /sources/{id}/findings | Purge all findings of a data source |
+| [**sourcesControllerResumeSchedule**](SourcesApi.md#sourcescontrollerresumeschedule) | **POST** /sources/{id}/schedule/resume | Resume automatic scanning |
 | [**sourcesControllerStartRun**](SourcesApi.md#sourcescontrollerstartrun) | **POST** /sources/{id}/runs | Start a new ingestion run |
 | [**sourcesControllerTestConnection**](SourcesApi.md#sourcescontrollertestconnection) | **POST** /sources/{id}/test | Test source connection |
 | [**sourcesControllerUpdateSource**](SourcesApi.md#sourcescontrollerupdatesource) | **PUT** /sources/{id} | Update a data source |
@@ -983,6 +984,75 @@ No authorization required
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
 | **200** | Findings purged; returns the number of deleted findings |  -  |
+| **404** | Source not found |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## sourcesControllerResumeSchedule
+
+> sourcesControllerResumeSchedule(id)
+
+Resume automatic scanning
+
+Clear the circuit breaker on a source whose automatic schedule was paused after repeated scan failures, and queue it to run immediately.
+
+### Example
+
+```ts
+import {
+  Configuration,
+  SourcesApi,
+} from '@workspace/api-client';
+import type { SourcesControllerResumeScheduleRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new SourcesApi();
+
+  const body = {
+    // string | Source unique identifier
+    id: id_example,
+  } satisfies SourcesControllerResumeScheduleRequest;
+
+  try {
+    const data = await api.sourcesControllerResumeSchedule(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **id** | `string` | Source unique identifier | [Defaults to `undefined`] |
+
+### Return type
+
+`void` (Empty response body)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: Not defined
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** | Automatic scanning resumed |  -  |
+| **400** | Source is not using automatic scheduling |  -  |
 | **404** | Source not found |  -  |
 
 [[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)

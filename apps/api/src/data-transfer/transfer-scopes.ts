@@ -249,12 +249,31 @@ export const TRANSFER_TABLES: readonly TransferTableSpec[] = [
       'scheduleCron',
       'scheduleTimezone',
       'scheduleNextAt',
+      // The adaptive scheduler's state is a record of what THIS instance
+      // observed while scanning: how far the sweep got, how often it found
+      // nothing, how many times it failed. None of it describes the imported
+      // source, and importing it would have a fresh source arrive already
+      // "converged" and be scanned once a day from the start.
+      'scheduleMode',
+      'autoPhase',
+      'autoIntervalSeconds',
+      'autoNoProgressStreak',
+      'autoCatchUpRuns',
+      'autoReason',
+      'autoLastRunnerId',
     ],
     // A source whose credentials were stripped must not be picked up by the
     // scheduler on the target instance and start failing every cron tick.
     importDefaults: {
       scheduleEnabled: false,
       scheduleNextAt: null,
+      scheduleMode: 'OFF',
+      autoPhase: 'CATCH_UP',
+      autoIntervalSeconds: null,
+      autoNoProgressStreak: 0,
+      autoCatchUpRuns: 0,
+      autoReason: null,
+      autoLastRunnerId: null,
       currentRunnerId: null,
       runnerStatus: 'PENDING',
       consecutiveFailures: 0,

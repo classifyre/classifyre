@@ -895,6 +895,38 @@
         ]
       }
     },
+    "/sources/{id}/schedule/resume": {
+      "post": {
+        "description": "Clear the circuit breaker on a source whose automatic schedule was paused after repeated scan failures, and queue it to run immediately.",
+        "operationId": "SourcesController_resumeSchedule",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Source unique identifier",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Automatic scanning resumed"
+          },
+          "400": {
+            "description": "Source is not using automatic scheduling"
+          },
+          "404": {
+            "description": "Source not found"
+          }
+        },
+        "summary": "Resume automatic scanning",
+        "tags": [
+          "Sources"
+        ]
+      }
+    },
     "/sources/{id}/findings": {
       "delete": {
         "description": "Permanently delete every finding of the source (all statuses, including resolved and false-positive). Case evidence snapshots survive; correlation fingerprints are recomputed in the background. Irreversible.",
@@ -9667,6 +9699,15 @@
             "type": "string",
             "description": "IANA timezone for the cron schedule",
             "example": "UTC"
+          },
+          "scheduleMode": {
+            "type": "string",
+            "description": "Which scheduler owns this source. OFF = never runs automatically. CRON = the fixed cron schedule in scheduleCron. AUTO = adaptive: run back-to-back while each scan is still ingesting new data, then settle into a slow interval that only picks up what is new. When omitted, the legacy scheduleEnabled/scheduleCron pair is used unchanged.",
+            "enum": [
+              "OFF",
+              "CRON",
+              "AUTO"
+            ]
           }
         },
         "required": [
@@ -9757,6 +9798,38 @@
             "type": "string",
             "nullable": true,
             "example": null
+          },
+          "scheduleMode": {
+            "type": "string",
+            "enum": [
+              "OFF",
+              "CRON",
+              "AUTO"
+            ],
+            "example": "OFF"
+          },
+          "autoPhase": {
+            "type": "string",
+            "enum": [
+              "CATCH_UP",
+              "STEADY",
+              "BACKOFF",
+              "PAUSED"
+            ],
+            "example": "CATCH_UP",
+            "description": "Adaptive-schedule phase. Meaningful only when scheduleMode is AUTO."
+          },
+          "autoIntervalSeconds": {
+            "type": "number",
+            "nullable": true,
+            "example": 900,
+            "description": "Current steady-state interval in seconds (AUTO mode)."
+          },
+          "autoReason": {
+            "type": "string",
+            "nullable": true,
+            "example": "Sweep complete — checking every 15 minutes for new data.",
+            "description": "Why the scheduler chose the current cadence."
           }
         },
         "required": [
@@ -9772,7 +9845,11 @@
           "scheduleEnabled",
           "scheduleCron",
           "scheduleTimezone",
-          "scheduleNextAt"
+          "scheduleNextAt",
+          "scheduleMode",
+          "autoPhase",
+          "autoIntervalSeconds",
+          "autoReason"
         ]
       },
       "UpdateSourceDto": {
@@ -9865,6 +9942,15 @@
             "type": "string",
             "description": "IANA timezone for the cron schedule",
             "example": "UTC"
+          },
+          "scheduleMode": {
+            "type": "string",
+            "description": "Which scheduler owns this source. OFF = never runs automatically. CRON = the fixed cron schedule in scheduleCron. AUTO = adaptive: run back-to-back while each scan is still ingesting new data, then settle into a slow interval that only picks up what is new. When omitted, the legacy scheduleEnabled/scheduleCron pair is used unchanged.",
+            "enum": [
+              "OFF",
+              "CRON",
+              "AUTO"
+            ]
           }
         }
       },
@@ -10180,6 +10266,31 @@
             "type": "string",
             "nullable": true,
             "example": null
+          },
+          "scheduleMode": {
+            "type": "string",
+            "enum": [
+              "OFF",
+              "CRON",
+              "AUTO"
+            ],
+            "example": "OFF"
+          },
+          "autoPhase": {
+            "type": "string",
+            "enum": [
+              "CATCH_UP",
+              "STEADY",
+              "BACKOFF",
+              "PAUSED"
+            ],
+            "example": "CATCH_UP",
+            "description": "Adaptive-schedule phase. Meaningful only when scheduleMode is AUTO."
+          },
+          "autoReason": {
+            "type": "string",
+            "nullable": true,
+            "example": "Sweep complete — checking every 15 minutes for new data."
           }
         },
         "required": [
@@ -13381,6 +13492,11 @@
             "description": "When true, the harness may call tools from connected external MCP servers.",
             "example": false
           },
+          "autoScheduleEnabled": {
+            "type": "boolean",
+            "description": "Master switch for adaptive (\"automatic\") source scheduling. When false, no AUTO source is started; each source keeps its phase, so turning this back on resumes exactly where it left off.",
+            "example": true
+          },
           "demoMode": {
             "type": "boolean",
             "description": "Read-only. When true, the instance runs in demo mode and all mutating operations are rejected.",
@@ -13425,6 +13541,7 @@
           "autopilotEscalationEnabled",
           "autopilotEscalationGuidance",
           "autopilotMcpEnabled",
+          "autoScheduleEnabled",
           "demoMode",
           "hfTokenSet",
           "hfTokenInstanceSet",
@@ -13532,6 +13649,11 @@
             "type": "boolean",
             "description": "When true, the harness may call tools from connected external MCP servers.",
             "example": false
+          },
+          "autoScheduleEnabled": {
+            "type": "boolean",
+            "description": "Master switch for adaptive (\"automatic\") source scheduling. Setting it false stops AUTO sources from being started without losing their state.",
+            "example": true
           },
           "hfToken": {
             "type": "string",

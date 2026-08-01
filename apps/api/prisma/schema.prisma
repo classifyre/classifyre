@@ -23,7 +23,35 @@ model Source {
   scheduleEnabled            Boolean                     @default(false) @map("schedule_enabled")
   scheduleCron               String?                     @map("schedule_cron")
   scheduleTimezone           String?                     @default("UTC") @map("schedule_timezone")
+  // When the next automatic run is due. Only AUTO mode writes it; CRON leaves
+  // the timing to pg-boss and OFF clears it.
   scheduleNextAt             DateTime?                   @map("schedule_next_at")
+  // How this source is scheduled. `scheduleEnabled` remains the CRON on/off
+  // switch (pg-boss reads it); this column is what decides WHICH scheduler owns
+  // the source, so the two can never both be driving it.
+  scheduleMode               SourceScheduleMode          @default(OFF) @map("schedule_mode")
+  // AUTO-mode state machine. CATCH_UP re-runs back-to-back while each run is
+  // still ingesting new data; STEADY is the slow "check only what's new"
+  // cadence reached once a run stops making progress; BACKOFF and PAUSED are
+  // the failure paths. See AutoScheduleService.
+  autoPhase                  AutoSchedulePhase           @default(CATCH_UP) @map("auto_phase")
+  // Current STEADY interval in seconds. Doubles on every consecutive
+  // no-progress run (bounded), and resets the moment a run ingests something.
+  autoIntervalSeconds        Int?                        @map("auto_interval_seconds")
+  // Consecutive completed runs that ingested nothing new. The sweep is
+  // considered converged once this crosses the promotion threshold.
+  autoNoProgressStreak       Int                         @default(0) @map("auto_no_progress_streak")
+  // Back-to-back catch-up runs since the last convergence. A source whose
+  // content genuinely changes on every scan would otherwise never converge and
+  // would sit at the catch-up cadence forever; this bounds that.
+  autoCatchUpRuns            Int                         @default(0) @map("auto_catch_up_runs")
+  // Operator-facing explanation of the last scheduling decision, so "why is
+  // this source scanning every 6 hours" is answerable without reading logs.
+  autoReason                 String?                     @map("auto_reason") @db.Text
+  // The last run already folded into the schedule. pg-boss is at-least-once, so
+  // without this a redelivered completion message would advance the phase twice
+  // off one run.
+  autoLastRunnerId           String?                     @map("auto_last_runner_id")
   // Opaque, source-defined cursor for AUTOMATIC sampling. Persisted at the end
   // of each run and injected into the next run so extraction picks up where it
   // left off (incremental ingestion). The API never interprets its contents.
@@ -52,7 +80,35 @@ model Source {
   @@index([scheduleEnabled])
   @@index([autopilotDirtyAt])
   @@index([lastRunAt])
+  // The auto-scheduler's due-set query: "AUTO sources whose next run has come".
+  @@index([scheduleMode, scheduleNextAt])
   @@map("sources")
+}
+
+/**
+ * Which scheduler owns a source.
+ *
+ * OFF   — nothing runs it automatically.
+ * CRON  — a fixed pg-boss cron schedule (the operator picked a wall-clock time).
+ * AUTO  — the adaptive scheduler: run back-to-back while there is still data to
+ *         ingest, then settle into a slow "check only what's new" cadence.
+ */
+enum SourceScheduleMode {
+  OFF
+  CRON
+  AUTO
+}
+
+/** AUTO-mode phase. See AutoScheduleService for the transitions. */
+enum AutoSchedulePhase {
+  /** The last run ingested new data — there is more to sweep, go again soon. */
+  CATCH_UP
+  /** The sweep converged — re-check on a slow, self-widening interval. */
+  STEADY
+  /** The last run failed — exponential backoff, capped. */
+  BACKOFF
+  /** Too many consecutive failures: auto runs stopped until an operator acts. */
+  PAUSED
 }
 
 model UploadedSourceFile {
@@ -655,6 +711,11 @@ model InstanceSettings {
   autopilotEscalationGuidance String? @map("autopilot_escalation_guidance") @db.Text
   // Allow the harness to call tools from connected external MCP servers. Opt-in.
   autopilotMcpEnabled         Boolean @default(false) @map("autopilot_mcp_enabled")
+
+  // Master switch for the adaptive scheduler. Sources stay in AUTO mode when
+  // this is off; the tick simply starts nothing, so flipping it back on resumes
+  // exactly where each source was. The kill switch for "stop scanning now".
+  autoScheduleEnabled Boolean @default(true) @map("auto_schedule_enabled")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")

@@ -6,6 +6,7 @@ import type { MaskedConfigCryptoService } from '../../../masked-config-crypto.se
 import type { CliRunnerService } from '../../../cli-runner/cli-runner.service';
 import type { NotificationsService } from '../../../notifications.service';
 import type { DecisionApplierService } from '../../decision-applier.service';
+import type { AutoScheduleService } from '../../../scheduler/auto-schedule.service';
 import type { Tool, ToolContext } from '../tool.types';
 
 describe('ConfigToolset — config.tune_source', () => {
@@ -30,6 +31,7 @@ describe('ConfigToolset — config.tune_source', () => {
   const mockApplier = { sourceGate: jest.fn() };
   const mockCliRunner = { startRun: jest.fn() };
   const mockNotifications = { create: jest.fn() };
+  const mockAutoSchedule = { resetToCatchUp: jest.fn() };
 
   const toolset = new ConfigToolset(
     mockPrisma as unknown as PrismaService,
@@ -38,6 +40,7 @@ describe('ConfigToolset — config.tune_source', () => {
     mockApplier as unknown as DecisionApplierService,
     mockCliRunner as unknown as CliRunnerService,
     mockNotifications as unknown as NotificationsService,
+    mockAutoSchedule as unknown as AutoScheduleService,
   );
   const tune = toolset
     .list()
@@ -190,11 +193,12 @@ describe('ConfigToolset — config.tune_source', () => {
 describe('ConfigToolset — sources.rescan', () => {
   const mockPrisma = {
     source: { findUnique: jest.fn(), update: jest.fn() },
-    runner: { findUnique: jest.fn() },
+    runner: { findUnique: jest.fn(), count: jest.fn() },
   };
   const mockCliRunner = { startRun: jest.fn() };
   const mockApplier = { sourceGate: jest.fn() };
   const mockNotifications = { create: jest.fn() };
+  const mockAutoSchedule = { resetToCatchUp: jest.fn() };
 
   const toolset = new ConfigToolset(
     mockPrisma as unknown as PrismaService,
@@ -203,6 +207,7 @@ describe('ConfigToolset — sources.rescan', () => {
     mockApplier as unknown as DecisionApplierService,
     mockCliRunner as unknown as CliRunnerService,
     mockNotifications as unknown as NotificationsService,
+    mockAutoSchedule as unknown as AutoScheduleService,
   );
   const rescan = toolset
     .list()
@@ -211,7 +216,12 @@ describe('ConfigToolset — sources.rescan', () => {
   const ctxWith = (runnerId: string | null): ToolContext =>
     ({ ctx: { runnerId, run: { id: 'r1' } } }) as unknown as ToolContext;
 
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+    // No prior autopilot re-scans by default — the rate limit is exercised in
+    // its own tests below.
+    mockPrisma.runner.count.mockResolvedValue(0);
+  });
 
   it('starts an AUTOPILOT-tagged run when not a verification cycle', async () => {
     mockPrisma.runner.findUnique.mockResolvedValue({ triggerType: 'MANUAL' });
@@ -254,6 +264,34 @@ describe('ConfigToolset — sources.rescan', () => {
 
     expect(mockCliRunner.startRun).not.toHaveBeenCalled();
     expect(res.skipped).toMatch(/verification/i);
+  });
+
+  // A coalesced corpus cycle carries no runnerId, so the depth-1 guard above
+  // cannot fire for it. These are what actually stop the rescan→dirty→cycle→
+  // rescan loop on that path.
+  it('refuses a second autopilot rescan inside the cooldown, even with no triggering runner', async () => {
+    // recent = 1, today = 1.
+    mockPrisma.runner.count.mockResolvedValue(1);
+
+    const res = (await rescan.handler({ sourceId: 's1' }, ctxWith(null))) as {
+      skipped?: string;
+    };
+
+    expect(mockPrisma.runner.findUnique).not.toHaveBeenCalled();
+    expect(mockCliRunner.startRun).not.toHaveBeenCalled();
+    expect(res.skipped).toMatch(/within the last/i);
+  });
+
+  it('refuses once the daily autopilot rescan limit is reached', async () => {
+    // Outside the cooldown (recent = 0) but at the daily cap.
+    mockPrisma.runner.count.mockResolvedValueOnce(0).mockResolvedValueOnce(4);
+
+    const res = (await rescan.handler({ sourceId: 's1' }, ctxWith(null))) as {
+      skipped?: string;
+    };
+
+    expect(mockCliRunner.startRun).not.toHaveBeenCalled();
+    expect(res.skipped).toMatch(/daily limit/i);
   });
 
   it('returns a graceful skip when a scan is already running (ConflictException)', async () => {

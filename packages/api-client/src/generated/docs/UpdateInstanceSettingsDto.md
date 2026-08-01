@@ -24,6 +24,7 @@ Name | Type
 `autopilotEscalationEnabled` | boolean
 `autopilotEscalationGuidance` | string
 `autopilotMcpEnabled` | boolean
+`autoScheduleEnabled` | boolean
 `hfToken` | string
 
 ## Example
@@ -51,6 +52,7 @@ const example = {
   "autopilotEscalationEnabled": false,
   "autopilotEscalationGuidance": null,
   "autopilotMcpEnabled": false,
+  "autoScheduleEnabled": true,
   "hfToken": null,
 } satisfies UpdateInstanceSettingsDto
 

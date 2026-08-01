@@ -16,4 +16,9 @@ export enum NotificationEvent {
   SOURCE_CONFIG_CHANGED = 'source.config_changed',
   // Autopilot triggered a re-scan of a source (e.g. to apply a config change).
   SOURCE_AUTOPILOT_RESCAN = 'source.autopilot_rescan',
+  // The adaptive scheduler stopped running a source after repeated failures.
+  SOURCE_SCHEDULE_PAUSED = 'source.schedule_paused',
+  // The adaptive scheduler's cadence for a source changed materially (e.g. a
+  // sweep finished, or an agent pinned a different interval).
+  SOURCE_SCHEDULE_CHANGED = 'source.schedule_changed',
 }

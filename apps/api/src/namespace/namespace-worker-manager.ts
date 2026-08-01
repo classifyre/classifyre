@@ -11,6 +11,7 @@ import { PrismaClientManager } from '../prisma/prisma-client-manager';
 import { NamespaceRegistryService } from '../registry/namespace-registry.service';
 import { SchedulerService } from '../scheduler/scheduler.service';
 import { RunnerCleanupService } from '../scheduler/runner-cleanup.service';
+import { AutoScheduleService } from '../scheduler/auto-schedule.service';
 import { InquiryMatchingService } from '../matching/inquiry-matching.service';
 import { CorrelationWorker } from '../correlation/correlation.worker';
 import { AutopilotWorker } from '../autopilot/autopilot.worker';
@@ -57,6 +58,7 @@ export class NamespaceWorkerManager
     private readonly cls: ClsService,
     private readonly scheduler: SchedulerService,
     private readonly cleanup: RunnerCleanupService,
+    private readonly autoSchedule: AutoScheduleService,
     private readonly matching: InquiryMatchingService,
     private readonly correlation: CorrelationWorker,
     private readonly autopilot: AutopilotWorker,
@@ -148,6 +150,7 @@ export class NamespaceWorkerManager
       const ctx = this.store(e);
       await this.runInNamespace(ctx, async () => {
         await this.scheduler.registerForNamespace();
+        await this.autoSchedule.registerForNamespace();
         await this.cleanup.registerForNamespace();
         await this.matching.registerForNamespace();
         await this.correlation.registerForNamespace();

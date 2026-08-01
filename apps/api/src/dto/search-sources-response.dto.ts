@@ -74,6 +74,23 @@ export class SearchSourceItemDto {
 
   @ApiPropertyOptional({ nullable: true, example: null })
   scheduleNextAt?: Date | null;
+
+  @ApiPropertyOptional({ enum: ['OFF', 'CRON', 'AUTO'], example: 'OFF' })
+  scheduleMode?: 'OFF' | 'CRON' | 'AUTO';
+
+  @ApiPropertyOptional({
+    enum: ['CATCH_UP', 'STEADY', 'BACKOFF', 'PAUSED'],
+    example: 'CATCH_UP',
+    description:
+      'Adaptive-schedule phase. Meaningful only when scheduleMode is AUTO.',
+  })
+  autoPhase?: 'CATCH_UP' | 'STEADY' | 'BACKOFF' | 'PAUSED';
+
+  @ApiPropertyOptional({
+    nullable: true,
+    example: 'Sweep complete — checking every 15 minutes for new data.',
+  })
+  autoReason?: string | null;
 }
 
 export class SearchSourcesTotalsDto {

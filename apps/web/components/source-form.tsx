@@ -5,7 +5,7 @@ import type { JSONSchema7 } from "json-schema";
 import { JsonSchemaForm, type JsonSchemaFormHandle } from "./json-schema-form";
 import { getSourceSchema, type SourceType } from "@/lib/schema-loader";
 import type { DetectorConfigInput } from "./source-scan-config";
-import type { ScheduleValue } from "./schedule-card";
+import type { AutoScheduleStatus, ScheduleValue } from "./schedule-card";
 import { useTranslation } from "@/hooks/use-translation";
 
 export type { SourceType } from "@/lib/schema-loader";
@@ -25,6 +25,8 @@ interface SourceFormProps {
   showCancel?: boolean;
   schedule?: ScheduleValue;
   onScheduleChange?: (value: ScheduleValue) => void;
+  autoScheduleStatus?: AutoScheduleStatus | null;
+  onResumeSchedule?: () => Promise<void>;
   showActions?: boolean;
   afterNameContent?: React.ReactNode;
 }
@@ -50,6 +52,8 @@ export const SourceForm = React.forwardRef<SourceFormHandle, SourceFormProps>(
       showCancel,
       schedule,
       onScheduleChange,
+      autoScheduleStatus,
+      onResumeSchedule,
       showActions = true,
       afterNameContent,
     },
@@ -215,6 +219,8 @@ export const SourceForm = React.forwardRef<SourceFormHandle, SourceFormProps>(
         assistantSourceType={sourceType}
         schedule={schedule}
         onScheduleChange={onScheduleChange}
+        autoScheduleStatus={autoScheduleStatus}
+        onResumeSchedule={onResumeSchedule}
         showActions={showActions}
         afterNameContent={afterNameContent}
       />

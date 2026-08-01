@@ -61,6 +61,12 @@ export interface UpdateSourceDto {
      * @memberof UpdateSourceDto
      */
     scheduleTimezone?: string;
+    /**
+     * Which scheduler owns this source. OFF = never runs automatically. CRON = the fixed cron schedule in scheduleCron. AUTO = adaptive: run back-to-back while each scan is still ingesting new data, then settle into a slow interval that only picks up what is new. When omitted, the legacy scheduleEnabled/scheduleCron pair is used unchanged.
+     * @type {string}
+     * @memberof UpdateSourceDto
+     */
+    scheduleMode?: UpdateSourceDtoScheduleModeEnum;
 }
 
 
@@ -107,6 +113,16 @@ export const UpdateSourceDtoTypeEnum = {
 } as const;
 export type UpdateSourceDtoTypeEnum = typeof UpdateSourceDtoTypeEnum[keyof typeof UpdateSourceDtoTypeEnum];
 
+/**
+ * @export
+ */
+export const UpdateSourceDtoScheduleModeEnum = {
+    Off: 'OFF',
+    Cron: 'CRON',
+    Auto: 'AUTO'
+} as const;
+export type UpdateSourceDtoScheduleModeEnum = typeof UpdateSourceDtoScheduleModeEnum[keyof typeof UpdateSourceDtoScheduleModeEnum];
+
 
 /**
  * Check if a given object implements the UpdateSourceDto interface.
@@ -132,6 +148,7 @@ export function UpdateSourceDtoFromJSONTyped(json: any, ignoreDiscriminator: boo
         'scheduleEnabled': json['scheduleEnabled'] == null ? undefined : json['scheduleEnabled'],
         'scheduleCron': json['scheduleCron'] == null ? undefined : json['scheduleCron'],
         'scheduleTimezone': json['scheduleTimezone'] == null ? undefined : json['scheduleTimezone'],
+        'scheduleMode': json['scheduleMode'] == null ? undefined : json['scheduleMode'],
     };
 }
 
@@ -153,6 +170,7 @@ export function UpdateSourceDtoToJSONTyped(value?: UpdateSourceDto | null, ignor
         'scheduleEnabled': value['scheduleEnabled'],
         'scheduleCron': value['scheduleCron'],
         'scheduleTimezone': value['scheduleTimezone'],
+        'scheduleMode': value['scheduleMode'],
     };
 }
 

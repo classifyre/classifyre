@@ -137,6 +137,15 @@ export class InstanceSettingsResponseDto {
 
   @ApiProperty({
     description:
+      'Master switch for adaptive ("automatic") source scheduling. When false, ' +
+      'no AUTO source is started; each source keeps its phase, so turning this ' +
+      'back on resumes exactly where it left off.',
+    example: true,
+  })
+  autoScheduleEnabled: boolean;
+
+  @ApiProperty({
+    description:
       'Read-only. When true, the instance runs in demo mode and all mutating operations are rejected.',
     example: false,
   })

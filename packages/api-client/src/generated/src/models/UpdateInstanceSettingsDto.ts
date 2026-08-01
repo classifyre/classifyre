@@ -128,6 +128,12 @@ export interface UpdateInstanceSettingsDto {
      */
     autopilotMcpEnabled?: boolean;
     /**
+     * Master switch for adaptive ("automatic") source scheduling. Setting it false stops AUTO sources from being started without losing their state.
+     * @type {boolean}
+     * @memberof UpdateInstanceSettingsDto
+     */
+    autoScheduleEnabled?: boolean;
+    /**
      * Hugging Face token to set. Pass a token value to store (encrypted at rest). Pass null or an empty string to clear the stored token. Ignored when an instance-level HF_TOKEN is configured.
      * @type {string}
      * @memberof UpdateInstanceSettingsDto
@@ -192,6 +198,7 @@ export function UpdateInstanceSettingsDtoFromJSONTyped(json: any, ignoreDiscrimi
         'autopilotEscalationEnabled': json['autopilotEscalationEnabled'] == null ? undefined : json['autopilotEscalationEnabled'],
         'autopilotEscalationGuidance': json['autopilotEscalationGuidance'] == null ? undefined : json['autopilotEscalationGuidance'],
         'autopilotMcpEnabled': json['autopilotMcpEnabled'] == null ? undefined : json['autopilotMcpEnabled'],
+        'autoScheduleEnabled': json['autoScheduleEnabled'] == null ? undefined : json['autoScheduleEnabled'],
         'hfToken': json['hfToken'] == null ? undefined : json['hfToken'],
     };
 }
@@ -225,6 +232,7 @@ export function UpdateInstanceSettingsDtoToJSONTyped(value?: UpdateInstanceSetti
         'autopilotEscalationEnabled': value['autopilotEscalationEnabled'],
         'autopilotEscalationGuidance': value['autopilotEscalationGuidance'],
         'autopilotMcpEnabled': value['autopilotMcpEnabled'],
+        'autoScheduleEnabled': value['autoScheduleEnabled'],
         'hfToken': value['hfToken'],
     };
 }
