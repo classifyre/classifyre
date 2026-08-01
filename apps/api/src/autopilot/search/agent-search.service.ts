@@ -1,5 +1,11 @@
 import { Injectable } from '@nestjs/common';
-import { AssetStatus, Prisma, RunnerStatus } from '@prisma/client';
+import {
+  AssetStatus,
+  AutoSchedulePhase,
+  Prisma,
+  RunnerStatus,
+  SourceScheduleMode,
+} from '@prisma/client';
 import { PrismaService } from '../../prisma.service';
 import { InquiryMatchingService } from '../../matching/inquiry-matching.service';
 import {
@@ -11,6 +17,7 @@ import {
   MAX_ASSET_TYPE_BUCKETS,
   MAX_CANDIDATE_INQUIRIES,
   MAX_CASE_SUMMARIES,
+  COVERAGE_UNAVAILABLE_FAILURE_STREAK,
   MAX_COVERAGE_SOURCE_ROWS,
   MAX_DUPLICATE_CLUSTERS,
   MAX_DUPLICATE_PAIRS,
@@ -380,6 +387,8 @@ export class AgentSearchService {
           lastRunStatus: true,
           runnerStatus: true,
           consecutiveFailures: true,
+          scheduleMode: true,
+          autoPhase: true,
           runners: {
             where: {
               status: { in: [RunnerStatus.COMPLETED, RunnerStatus.WARNING] },
@@ -415,15 +424,32 @@ export class AgentSearchService {
         lastRunStatus: s.lastRunStatus ? String(s.lastRunStatus) : null,
         runnerStatus: s.runnerStatus ? String(s.runnerStatus) : null,
         consecutiveFailures: s.consecutiveFailures,
+        // Nothing will read this source: never scanned successfully AND either
+        // repeatedly failing, paused by the adaptive scheduler, or not
+        // scheduled at all. Reported per row so the config agent can see WHICH
+        // ones, and excluded from the ratio so a handful of dead sources cannot
+        // hold the whole corpus below the threshold forever (see
+        // SystemBriefService.computeCoverage — this must agree with the brief,
+        // or the agent is handed two different coverage numbers).
+        unavailable:
+          last == null &&
+          (s.consecutiveFailures >= COVERAGE_UNAVAILABLE_FAILURE_STREAK ||
+            s.scheduleMode === SourceScheduleMode.OFF ||
+            (s.scheduleMode === SourceScheduleMode.AUTO &&
+              s.autoPhase === AutoSchedulePhase.PAUSED)),
         assetsWithoutText: last?.assetsWithoutText ?? null,
         textCoverage: last?.textCoverage ?? null,
       };
     });
 
     const scanned = rows.filter((r) => r.scanned).length;
+    const unavailable = rows.filter((r) => r.unavailable).length;
+    const reachable = rows.length - unavailable;
     return {
       totalSources: rows.length,
       scannedSources: scanned,
+      unavailableSources: unavailable,
+      reachableSources: reachable,
       neverScanned: rows.filter((r) => r.lastRunAt == null).length,
       inFlight: rows.filter(
         (r) =>
@@ -432,14 +458,21 @@ export class AgentSearchService {
       ).length,
       failing: rows.filter((r) => r.lastRunStatus === RunnerStatus.ERROR)
         .length,
+      // Over REACHABLE sources, not all of them.
       coverageRatio:
-        rows.length > 0 ? Math.round((scanned / rows.length) * 1000) / 1000 : 0,
+        reachable > 0 ? Math.round((scanned / reachable) * 1000) / 1000 : 0,
       findingsOpen,
       findingsAnalyzed,
-      note:
+      note: [
         findingsAnalyzed < findingsOpen
           ? 'Evidence analysis is still catching up; unscored findings are pending, not unimportant.'
           : 'Every open finding has an evidence score.',
+        unavailable > 0
+          ? `${unavailable} source(s) cannot be scanned at all (switched off, paused, or failing every attempt) and are excluded from coverageRatio — see the "unavailable" flag per source. That is a configuration problem to raise, not evidence still on its way.`
+          : '',
+      ]
+        .filter(Boolean)
+        .join(' '),
       sources: rows,
     };
   }

@@ -1,5 +1,10 @@
 import type { AiMessage } from '../../ai';
-import { RESPONSE_PROTOCOL, type LoopTurn } from '../harness/agent-loop';
+import {
+  RESPONSE_PROTOCOL,
+  renderObservations,
+  type LoopTurn,
+  type Observation,
+} from '../harness/agent-loop';
 import { INQUIRY_MISSION } from '../harness/missions';
 import {
   normalizeAgainstSchema,
@@ -53,9 +58,14 @@ function systemPrompt(ctx: ProbeBuildContext): AiMessage {
   };
 }
 
-/** Render a synthetic tool observation exactly as the agent loop feeds it back. */
-function observation(results: unknown[]): AiMessage {
-  return { role: 'user', content: `Tool results:\n${JSON.stringify(results)}` };
+/**
+ * Render a synthetic tool observation exactly as the agent loop feeds it back —
+ * same header, same per-result capping. Shared rather than copied so a change
+ * to the loop's transcript format cannot leave the probes testing a shape no
+ * model is ever sent.
+ */
+function observation(results: Observation[], iteration = 1): AiMessage {
+  return { role: 'user', content: renderObservations(iteration, results) };
 }
 
 /** A scripted prior model turn, serialized the way the loop persists it. */

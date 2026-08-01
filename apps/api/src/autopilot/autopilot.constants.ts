@@ -116,6 +116,29 @@ export const WEAK_EVIDENCE_REASON_CODES = [
 export const CORPUS_SAMPLE_COVERAGE_THRESHOLD = 0.9;
 /** Per-source scan rows returned by the corpus.coverage tool. */
 export const MAX_COVERAGE_SOURCE_ROWS = 200;
+/**
+ * Failed scans in a row, with no successful scan ever, before a source counts
+ * as unavailable rather than merely unread.
+ *
+ * Coverage divided by every source row, which made the ratio a one-way ratchet:
+ * a source that can never scan — dead credentials, a host that no longer exists,
+ * one an operator switched off — sat in the denominator for good. Below 90% the
+ * brief tells the agent it is looking at a sample and the coverage doctrine
+ * tells it to defer rather than act, so a handful of permanently-broken sources
+ * silently put the whole harness into "observe and defer" mode forever, and the
+ * deferrals it wrote could never come back out.
+ *
+ * Unavailable sources are excluded from the ratio and reported on their own
+ * line instead: the gap stays visible (it is the config agent's problem), it
+ * just stops being counted as corpus the investigators are still waiting for.
+ */
+export const COVERAGE_UNAVAILABLE_FAILURE_STREAK = 3;
+/**
+ * A deferred item resurfaces after this long no matter what coverage says.
+ * The coverage trigger alone is a promise the system cannot keep — if coverage
+ * never reaches the threshold, "revisit later" means "never".
+ */
+export const DEFERRAL_MAX_AGE_DAYS = 14;
 
 // ── Deferral ────────────────────────────────────────────────────────────────
 /**

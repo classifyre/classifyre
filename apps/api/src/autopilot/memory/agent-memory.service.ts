@@ -268,6 +268,7 @@ export class AgentMemoryService {
     origin: AgentMemoryOrigin;
     verifiedAt: Date | null;
     tags?: string[];
+    updatedAt?: Date;
   }): RecalledMemory {
     return {
       kind: String(r.kind),
@@ -279,6 +280,10 @@ export class AgentMemoryService {
       tags: r.tags ?? [],
       origin: String(r.origin),
       verified: r.verifiedAt !== null,
+      // Lets a caller age an entry out. Only the Prisma paths select it; the
+      // raw full-text recall does not, and its readers must not assume "no
+      // timestamp" means "old".
+      updatedAt: r.updatedAt,
     };
   }
 }
