@@ -3,7 +3,7 @@
 -- transfer history travels (and is dropped) with the namespace itself.
 
 CREATE TYPE "DataTransferKind" AS ENUM ('EXPORT', 'IMPORT');
-CREATE TYPE "DataTransferStatus" AS ENUM ('PENDING', 'RUNNING', 'COMPLETED', 'FAILED', 'CANCELLED');
+CREATE TYPE "DataTransferStatus" AS ENUM ('STAGED', 'PENDING', 'RUNNING', 'COMPLETED', 'FAILED', 'CANCELLED');
 CREATE TYPE "DataTransferConflict" AS ENUM ('SKIP', 'OVERWRITE');
 
 CREATE TABLE "data_transfer_jobs" (
@@ -13,9 +13,9 @@ CREATE TABLE "data_transfer_jobs" (
   "scopes" TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[],
   "conflict_mode" "DataTransferConflict" NOT NULL DEFAULT 'SKIP',
   "file_name" TEXT,
-  "storage_key" TEXT,
   "file_size" BIGINT,
   "checksum" VARCHAR(64),
+  "archived" BOOLEAN NOT NULL DEFAULT false,
   "total_rows" INTEGER NOT NULL DEFAULT 0,
   "processed_rows" INTEGER NOT NULL DEFAULT 0,
   "skipped_rows" INTEGER NOT NULL DEFAULT 0,
@@ -38,3 +38,16 @@ CREATE TABLE "data_transfer_jobs" (
 CREATE INDEX "data_transfer_jobs_status_idx" ON "data_transfer_jobs"("status");
 CREATE INDEX "data_transfer_jobs_kind_created_at_idx" ON "data_transfer_jobs"("kind", "created_at" DESC);
 CREATE INDEX "data_transfer_jobs_expires_at_idx" ON "data_transfer_jobs"("expires_at");
+
+-- The archive's compressed bytes, split across rows so both writing and reading
+-- stay streaming. The API and the worker are separate deployments sharing only
+-- this database, so an archive on either one's filesystem would be invisible to
+-- the other.
+CREATE TABLE "data_transfer_chunks" (
+  "job_id" TEXT NOT NULL,
+  "ordinal" INTEGER NOT NULL,
+  "data" BYTEA NOT NULL,
+
+  CONSTRAINT "data_transfer_chunks_pkey" PRIMARY KEY ("job_id", "ordinal"),
+  CONSTRAINT "data_transfer_chunks_job_id_fkey" FOREIGN KEY ("job_id") REFERENCES "data_transfer_jobs"("id") ON DELETE CASCADE ON UPDATE CASCADE
+);

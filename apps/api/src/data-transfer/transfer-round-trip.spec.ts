@@ -1,10 +1,8 @@
 import { DataTransferConflict, type DataTransferJob } from '@prisma/client';
-import * as fsp from 'node:fs/promises';
-import * as os from 'node:os';
-import * as path from 'node:path';
+import { Readable } from 'node:stream';
 
 import { ArchiveReader } from './archive';
-import { ArchiveStorageService } from './archive-storage.service';
+import { ArchiveStoreService } from './archive-store.service';
 import { NamespaceExportService } from './namespace-export.service';
 import { NamespaceImportService } from './namespace-import.service';
 import { MASKED_CONFIG_ENCRYPTED_PREFIX } from '../utils/masked-config.utils';
@@ -142,14 +140,48 @@ function makeDelegate(table: FakeTable) {
   };
 }
 
+/**
+ * The chunk table, shared across every fake Prisma in one test so an archive
+ * written by an export can be read back by an import — exactly the handoff the
+ * real deployment makes through the database.
+ */
+type ChunkStore = Map<string, Buffer[]>;
+
 function makePrisma(
   tables: Record<string, FakeTable>,
   job: DataTransferJob,
+  chunkStore: ChunkStore,
 ): { prisma: PrismaService; job: DataTransferJob } {
   const delegates: Record<string, unknown> = {};
   for (const [model, table] of Object.entries(tables)) {
     delegates[model] = makeDelegate(table);
   }
+
+  delegates['dataTransferChunk'] = {
+    create: ({
+      data,
+    }: {
+      data: { jobId: string; ordinal: number; data: Uint8Array };
+    }) => {
+      const held = chunkStore.get(data.jobId) ?? [];
+      held[data.ordinal] = Buffer.from(data.data);
+      chunkStore.set(data.jobId, held);
+      return Promise.resolve(data);
+    },
+    findUnique: ({
+      where,
+    }: {
+      where: { jobId_ordinal: { jobId: string; ordinal: number } };
+    }) => {
+      const { jobId, ordinal } = where.jobId_ordinal;
+      const held = chunkStore.get(jobId)?.[ordinal];
+      return Promise.resolve(held ? { data: held, ordinal } : null);
+    },
+    deleteMany: ({ where }: { where: { jobId: string } }) => {
+      chunkStore.delete(where.jobId);
+      return Promise.resolve({ count: 0 });
+    },
+  };
 
   let current = job;
   delegates['dataTransferJob'] = {
@@ -184,7 +216,7 @@ const baseJob: DataTransferJob = {
   scopes: [],
   conflictMode: DataTransferConflict.SKIP,
   fileName: null,
-  storageKey: null,
+  archived: false,
   fileSize: null,
   checksum: null,
   totalRows: 0,
@@ -260,64 +292,64 @@ function sourceTables() {
   } satisfies Record<string, FakeTable>;
 }
 
-async function makeStorage(dir: string): Promise<ArchiveStorageService> {
-  process.env.DATA_TRANSFER_DIR = dir;
-  const storage = new ArchiveStorageService();
-  await storage.onModuleInit();
-  return storage;
-}
-
 // ── Tests ────────────────────────────────────────────────────────────────────
 
 describe('export → import round trip', () => {
-  let dir: string;
-  let storage: ArchiveStorageService;
-  const originalDir = process.env.DATA_TRANSFER_DIR;
+  let chunkStore: ChunkStore;
+  let store: ArchiveStoreService;
 
-  beforeEach(async () => {
-    dir = await fsp.mkdtemp(path.join(os.tmpdir(), 'cfyre-round-'));
-    storage = await makeStorage(dir);
+  beforeEach(() => {
+    chunkStore = new Map();
+    // The real store, driven by the fake chunk table — so chunking, ordering
+    // and reassembly are genuinely exercised rather than stubbed past.
+    store = new ArchiveStoreService(makePrisma({}, baseJob, chunkStore).prisma);
   });
 
-  afterEach(async () => {
-    await fsp.rm(dir, { recursive: true, force: true });
-    if (originalDir === undefined) delete process.env.DATA_TRANSFER_DIR;
-    else process.env.DATA_TRANSFER_DIR = originalDir;
-  });
+  const importer = (prisma: PrismaService) =>
+    new NamespaceImportService(prisma, store);
 
-  /** Run an export and hand back the archive path plus the finished job row. */
+  /** The archive's bytes as one buffer, for assertions about the file itself. */
+  const archiveBytes = (jobId: string) =>
+    Buffer.concat(chunkStore.get(jobId) ?? []);
+
+  const archiveReader = (jobId: string) =>
+    new ArchiveReader(() => Readable.from(chunkStore.get(jobId) ?? []));
+
+  /**
+   * Mirror the upload endpoint: an archive is stored against the import job
+   * that will read it. Without this the tests would only pass because the
+   * export and the import happened to share a job id.
+   */
+  function stageImport(
+    archiveId: string,
+    job: DataTransferJob,
+  ): DataTransferJob {
+    chunkStore.set(job.id, [...(chunkStore.get(archiveId) ?? [])]);
+    return job;
+  }
+
+  /** Run an export and hand back the finished job row. */
   async function runExport(
     scopes: string[],
     tables: Record<string, FakeTable>,
   ) {
-    const state = makePrisma(tables, {
-      ...baseJob,
-      kind: 'EXPORT',
-      scopes,
-    });
-    const service = new NamespaceExportService(
-      state.prisma,
-      storage,
-      cls,
-      registry,
+    const job = { ...baseJob, kind: 'EXPORT' as const, scopes };
+    const state = makePrisma(tables, job, chunkStore);
+    await new NamespaceExportService(state.prisma, store, cls, registry).run(
+      job,
     );
-    await service.run({ ...baseJob, kind: 'EXPORT', scopes });
 
-    const files = await fsp.readdir(path.join(dir, 'ns_test'));
-    expect(files).toHaveLength(1);
-    return {
-      archive: path.join(dir, 'ns_test', files[0]),
-      job: state.job,
-    };
+    expect(chunkStore.get(job.id)?.length ?? 0).toBeGreaterThan(0);
+    return { archiveId: job.id, job: state.job };
   }
 
   it('walks every row across keyset pages and writes a complete archive', async () => {
-    const { archive, job } = await runExport(
+    const { archiveId, job } = await runExport(
       ['sources', 'assets', 'scanData'],
       sourceTables(),
     );
 
-    const reader = new ArchiveReader(archive);
+    const reader = archiveReader(archiveId);
     const byTable: Record<string, Record<string, unknown>[]> = {};
     for await (const { table, row } of reader.read()) {
       (byTable[table] ??= []).push(row);
@@ -348,14 +380,14 @@ describe('export → import round trip', () => {
   });
 
   it('never writes source credentials into the archive', async () => {
-    const { archive, job } = await runExport(['sources'], sourceTables());
+    const { archiveId, job } = await runExport(['sources'], sourceTables());
 
     // The strongest possible assertion: the ciphertext appears nowhere in the
     // compressed bytes.
-    const raw = await fsp.readFile(archive);
+    const raw = archiveBytes(archiveId);
     expect(raw.includes(Buffer.from(encrypted))).toBe(false);
 
-    const reader = new ArchiveReader(archive);
+    const reader = archiveReader(archiveId);
     const rows: Record<string, unknown>[] = [];
     for await (const { row } of reader.read()) rows.push(row);
 
@@ -369,7 +401,7 @@ describe('export → import round trip', () => {
   });
 
   it('imports an archive into an empty namespace and disarms the sources', async () => {
-    const { archive } = await runExport(
+    const { archiveId } = await runExport(
       ['sources', 'assets', 'scanData'],
       sourceTables(),
     );
@@ -387,18 +419,24 @@ describe('export → import round trip', () => {
       },
     } as unknown as Record<string, FakeTable>;
 
-    const state = makePrisma(target, {
-      ...baseJob,
-      kind: 'IMPORT',
-      storageKey: path.basename(archive),
-      scopes: ['sources', 'assets', 'scanData'],
-    });
-    await new NamespaceImportService(state.prisma, storage, cls).run({
-      ...baseJob,
-      kind: 'IMPORT',
-      storageKey: path.basename(archive),
-      scopes: ['sources', 'assets', 'scanData'],
-    });
+    const state = makePrisma(
+      target,
+      {
+        ...baseJob,
+        kind: 'IMPORT',
+        archived: true,
+        scopes: ['sources', 'assets', 'scanData'],
+      },
+      chunkStore,
+    );
+    await importer(state.prisma).run(
+      stageImport(archiveId, {
+        ...baseJob,
+        kind: 'IMPORT',
+        archived: true,
+        scopes: ['sources', 'assets', 'scanData'],
+      }),
+    );
 
     expect(target['asset'].rows).toHaveLength(1200);
     expect(target['runner'].rows).toHaveLength(1);
@@ -438,9 +476,9 @@ describe('export → import round trip', () => {
   });
 
   it('never carries a source schedule across instances', async () => {
-    const { archive } = await runExport(['sources'], sourceTables());
+    const { archiveId } = await runExport(['sources'], sourceTables());
 
-    const reader = new ArchiveReader(archive);
+    const reader = archiveReader(archiveId);
     const rows: Record<string, unknown>[] = [];
     for await (const { row } of reader.read()) rows.push(row);
 
@@ -453,7 +491,7 @@ describe('export → import round trip', () => {
   });
 
   it('adds to a namespace that already holds data instead of colliding', async () => {
-    const { archive } = await runExport(['sources'], sourceTables());
+    const { archiveId } = await runExport(['sources'], sourceTables());
 
     // The same source id is already present. Before ids were regenerated this
     // was either skipped (losing the import) or overwritten (losing the
@@ -465,14 +503,14 @@ describe('export → import round trip', () => {
       },
     } as unknown as Record<string, FakeTable>;
 
-    const job = {
+    const job = stageImport(archiveId, {
       ...baseJob,
       kind: 'IMPORT' as const,
-      storageKey: path.basename(archive),
+      archived: true,
       scopes: ['sources'],
-    };
-    const state = makePrisma(target, job);
-    await new NamespaceImportService(state.prisma, storage, cls).run(job);
+    });
+    const state = makePrisma(target, job, chunkStore);
+    await importer(state.prisma).run(job);
 
     expect(target['source'].rows).toHaveLength(2);
     expect(target['source'].rows.map((r) => r['name']).sort()).toEqual([
@@ -484,14 +522,14 @@ describe('export → import round trip', () => {
   });
 
   it('reproduces the same ids when the same job is retried', async () => {
-    const { archive } = await runExport(['sources'], sourceTables());
+    const { archiveId } = await runExport(['sources'], sourceTables());
 
-    const job = {
+    const job = stageImport(archiveId, {
       ...baseJob,
       kind: 'IMPORT' as const,
-      storageKey: path.basename(archive),
+      archived: true,
       scopes: ['sources'],
-    };
+    });
 
     const first = { source: { keys: ['id'], rows: [] } } as unknown as Record<
       string,
@@ -502,16 +540,8 @@ describe('export → import round trip', () => {
       FakeTable
     >;
 
-    await new NamespaceImportService(
-      makePrisma(first, job).prisma,
-      storage,
-      cls,
-    ).run(job);
-    await new NamespaceImportService(
-      makePrisma(second, job).prisma,
-      storage,
-      cls,
-    ).run(job);
+    await importer(makePrisma(first, job, chunkStore).prisma).run(job);
+    await importer(makePrisma(second, job, chunkStore).prisma).run(job);
 
     // Retrying an interrupted import must not double the data: the same job id
     // yields the same identities, so the second pass collides and skips.
@@ -519,21 +549,21 @@ describe('export → import round trip', () => {
   });
 
   it('gives different imports of one archive independent identities', async () => {
-    const { archive } = await runExport(['sources'], sourceTables());
+    const { archiveId } = await runExport(['sources'], sourceTables());
 
     const runImport = async (jobId: string) => {
-      const job = {
+      const job = stageImport(archiveId, {
         ...baseJob,
         id: jobId,
         kind: 'IMPORT' as const,
-        storageKey: path.basename(archive),
+        archived: true,
         scopes: ['sources'],
-      };
+      });
       const target = {
         source: { keys: ['id'], rows: [] },
       } as unknown as Record<string, FakeTable>;
-      const state = makePrisma(target, job);
-      await new NamespaceImportService(state.prisma, storage, cls).run(job);
+      const state = makePrisma(target, job, chunkStore);
+      await importer(state.prisma).run(job);
       return target['source'].rows[0]['id'];
     };
 
@@ -543,7 +573,7 @@ describe('export → import round trip', () => {
   });
 
   it('clears optional references into a scope the operator left out', async () => {
-    const { archive } = await runExport(
+    const { archiveId } = await runExport(
       ['sources', 'assets', 'scanData'],
       sourceTables(),
     );
@@ -560,18 +590,24 @@ describe('export → import round trip', () => {
       },
     } as unknown as Record<string, FakeTable>;
 
-    const state = makePrisma(target, {
-      ...baseJob,
-      kind: 'IMPORT',
-      storageKey: path.basename(archive),
-      scopes: ['assets'],
-    });
-    await new NamespaceImportService(state.prisma, storage, cls).run({
-      ...baseJob,
-      kind: 'IMPORT',
-      storageKey: path.basename(archive),
-      scopes: ['assets'],
-    });
+    const state = makePrisma(
+      target,
+      {
+        ...baseJob,
+        kind: 'IMPORT',
+        archived: true,
+        scopes: ['assets'],
+      },
+      chunkStore,
+    );
+    await importer(state.prisma).run(
+      stageImport(archiveId, {
+        ...baseJob,
+        kind: 'IMPORT',
+        archived: true,
+        scopes: ['assets'],
+      }),
+    );
 
     expect(target['asset'].rows).toHaveLength(1200);
     expect(target['asset'].rows.every((row) => row['runnerId'] === null)).toBe(
@@ -584,21 +620,24 @@ describe('export → import round trip', () => {
   });
 
   it('refuses to import a truncated archive', async () => {
-    const { archive } = await runExport(['sources'], sourceTables());
-    // Lop off the gzip trailer and the footer line with it.
-    const raw = await fsp.readFile(archive);
-    await fsp.writeFile(archive, raw.subarray(0, Math.floor(raw.length / 2)));
+    const { archiveId } = await runExport(['sources'], sourceTables());
+    // Drop the tail chunks — the gzip trailer and the footer line with them,
+    // which is what a half-finished upload looks like.
+    const raw = archiveBytes(archiveId);
+    chunkStore.set(archiveId, [raw.subarray(0, Math.floor(raw.length / 2))]);
 
-    const job = {
+    const job = stageImport(archiveId, {
       ...baseJob,
       kind: 'IMPORT' as const,
-      storageKey: path.basename(archive),
+      archived: true,
       scopes: ['sources'],
-    };
-    const state = makePrisma({ source: { keys: ['id'], rows: [] } }, job);
+    });
+    const state = makePrisma(
+      { source: { keys: ['id'], rows: [] } },
+      job,
+      chunkStore,
+    );
 
-    await expect(
-      new NamespaceImportService(state.prisma, storage, cls).run(job),
-    ).rejects.toThrow();
+    await expect(importer(state.prisma).run(job)).rejects.toThrow();
   });
 });

@@ -11,12 +11,9 @@ import {
   type DataTransferJob,
 } from '@prisma/client';
 
-import { ClsService } from 'nestjs-cls';
-
 import { PrismaService } from '../prisma.service';
-import { CLS_SCHEMA } from '../namespace/namespace.constants';
 import { PgBossService } from '../scheduler/pg-boss.service';
-import { ArchiveStorageService } from './archive-storage.service';
+import { ArchiveStoreService } from './archive-store.service';
 import { NamespaceImportService } from './namespace-import.service';
 import { DATA_TRANSFER_QUEUE } from './data-transfer.constants';
 import {
@@ -34,9 +31,7 @@ export interface StartExportInput {
 }
 
 export interface StartImportInput {
-  /** Tenant schema the upload was staged under. */
-  schema: string;
-  /** Opaque handle returned by {@link DataTransferService.previewUpload}. */
+  /** Id of the STAGED job created by {@link DataTransferService.previewUpload}. */
   uploadId: string;
   scopes: string[];
   conflictMode?: DataTransferConflict;
@@ -71,15 +66,9 @@ export class DataTransferService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly pgBoss: PgBossService,
-    private readonly storage: ArchiveStorageService,
+    private readonly store: ArchiveStoreService,
     private readonly importer: NamespaceImportService,
-    private readonly cls: ClsService,
   ) {}
-
-  /** Archives are keyed by tenant schema, both on disk and in the bucket. */
-  private schema(): string {
-    return this.cls.get<string>(CLS_SCHEMA) ?? 'namespace';
-  }
 
   /** The scope catalogue the UI renders, with live row counts per scope. */
   async scopeCatalogue(): Promise<
@@ -120,7 +109,6 @@ export class DataTransferService {
   async startExport(input: StartExportInput): Promise<DataTransferJob> {
     const scopes = this.validateScopes(input.scopes);
     await this.assertNoActiveJob();
-    await this.discardPreviousExports();
 
     const job = await this.prisma.dataTransferJob.create({
       data: {
@@ -141,31 +129,26 @@ export class DataTransferService {
    * and only then starts the import with {@link startImport}.
    */
   async previewUpload(
-    schema: string,
     fileName: string,
     bytes: Buffer,
   ): Promise<ArchivePreview> {
     if (bytes.length === 0) {
       throw new BadRequestException('The uploaded archive is empty');
     }
-    if (bytes.length > this.storage.maxArchiveBytes) {
+    if (bytes.length > this.store.maxArchiveBytes) {
       throw new BadRequestException(
         `Archive is larger than the ${Math.round(
-          this.storage.maxArchiveBytes / 1024 / 1024 / 1024,
-        )} GB limit`,
+          this.store.maxArchiveBytes / 1024 / 1024,
+        )} MB limit`,
       );
     }
 
-    const localPath = await this.storage.allocate(schema, fileName);
-    const storageKey = this.storage.handleFor(localPath);
-    const fsp = await import('node:fs/promises');
-    await fsp.writeFile(localPath, bytes);
-
+    // Validate before storing anything: a file that is not one of our archives
+    // should not leave rows behind.
     let manifest: ArchiveManifest;
     try {
-      manifest = await this.importer.inspect(localPath);
+      manifest = await this.importer.inspect(bytes);
     } catch (error) {
-      await this.storage.remove(schema, storageKey);
       throw new BadRequestException(
         error instanceof ArchiveFormatError
           ? error.message
@@ -173,9 +156,21 @@ export class DataTransferService {
       );
     }
 
-    // Validated, so hand it to shared storage — the worker that will read it
-    // runs in a different pod and cannot see this one's filesystem.
-    await this.storage.publish(schema, localPath);
+    // The job row *is* the upload handle: the archive's chunks hang off it, so
+    // discarding the upload is a single delete and nothing can be orphaned.
+    // STAGED means uploaded but not queued — the operator still has to choose
+    // what to take.
+    const job = await this.prisma.dataTransferJob.create({
+      data: {
+        kind: DataTransferKind.IMPORT,
+        status: DataTransferStatus.STAGED,
+        fileName,
+        fileSize: BigInt(bytes.length),
+        archived: true,
+        expiresAt: this.store.expiryFromNow(),
+      },
+    });
+    await this.store.writeAll(job.id, bytes);
 
     const rowsByScope: Record<string, number> = {};
     let totalRows = 0;
@@ -187,9 +182,7 @@ export class DataTransferService {
     }
 
     return {
-      // An opaque handle, resolved back to a path server-side — never the path
-      // itself, which the client could then point anywhere.
-      uploadId: storageKey,
+      uploadId: job.id,
       fileName,
       fileSize: bytes.length,
       createdAt: manifest.createdAt,
@@ -203,26 +196,29 @@ export class DataTransferService {
 
   async startImport(input: StartImportInput): Promise<DataTransferJob> {
     const scopes = this.validateScopes(input.scopes);
-    const storageKey = this.storage.handleFor(input.uploadId);
-    if (!(await this.storage.available(input.schema, storageKey))) {
+
+    const staged = await this.prisma.dataTransferJob.findUnique({
+      where: { id: input.uploadId },
+    });
+    if (
+      !staged ||
+      staged.kind !== DataTransferKind.IMPORT ||
+      staged.status !== DataTransferStatus.STAGED ||
+      !(await this.store.exists(staged.id))
+    ) {
       throw new BadRequestException(
         'The uploaded archive is no longer available — upload it again',
       );
     }
     await this.assertNoActiveJob();
 
-    const job = await this.prisma.dataTransferJob.create({
+    const job = await this.prisma.dataTransferJob.update({
+      where: { id: staged.id },
       data: {
-        kind: DataTransferKind.IMPORT,
+        status: DataTransferStatus.PENDING,
         scopes,
         conflictMode: input.conflictMode ?? DataTransferConflict.SKIP,
-        // Strip the UUID prefix the staging step added, so the operator sees
-        // the name of the file they picked.
-        fileName: storageKey.replace(/^[0-9a-f-]{36}-/i, ''),
-        storageKey,
-        fileSize: BigInt(await this.storage.size(input.schema, storageKey)),
         createdBy: input.createdBy ?? null,
-        expiresAt: this.storage.expiryFromNow(),
         warnings: this.dependencyWarnings(scopes),
       },
     });
@@ -252,14 +248,17 @@ export class DataTransferService {
     const job = await this.get(id);
     if (isTerminal(job.status)) return job;
 
-    if (job.status === DataTransferStatus.PENDING) {
-      await this.storage.remove(this.schema(), job.storageKey);
+    if (
+      job.status === DataTransferStatus.PENDING ||
+      job.status === DataTransferStatus.STAGED
+    ) {
+      await this.store.remove(id);
       return this.prisma.dataTransferJob.update({
         where: { id },
         data: {
           status: DataTransferStatus.CANCELLED,
           cancelRequested: true,
-          storageKey: null,
+          archived: false,
           finishedAt: new Date(),
         },
       });
@@ -271,68 +270,47 @@ export class DataTransferService {
     });
   }
 
+  /** Delete a finished job and its archive. Chunks cascade with the row. */
   async remove(id: string): Promise<void> {
     const job = await this.get(id);
-    if (!isTerminal(job.status)) {
+    if (!isTerminal(job.status) && job.status !== DataTransferStatus.STAGED) {
       throw new BadRequestException('Cancel the transfer before deleting it');
     }
-    await this.storage.remove(this.schema(), job.storageKey);
     await this.prisma.dataTransferJob.delete({ where: { id } });
   }
 
-  /**
-   * Resolve a completed export's archive to a local file the download endpoint
-   * can stream. On object storage this pulls it into the API pod's staging
-   * directory first — the archive was written by the worker, which this pod
-   * shares no filesystem with.
-   */
+  /** Everything the download endpoint needs to stream a completed export. */
   async downloadable(
     id: string,
-  ): Promise<{ path: string; fileName: string; size: number }> {
+  ): Promise<{ jobId: string; fileName: string; size: number }> {
     const job = await this.get(id);
     if (job.kind !== DataTransferKind.EXPORT) {
       throw new BadRequestException('Only exports produce a downloadable file');
     }
-    if (job.status !== DataTransferStatus.COMPLETED || !job.storageKey) {
+    if (job.status !== DataTransferStatus.COMPLETED) {
       throw new BadRequestException('This export has not finished');
     }
-
-    const schema = this.schema();
-    const localPath = await this.storage.materialize(schema, job.storageKey);
-    if (!localPath) {
+    if (!job.archived || !(await this.store.exists(id))) {
       throw new NotFoundException(
         'The archive has expired and been removed — run the export again',
       );
     }
+
     return {
-      path: localPath,
-      fileName: job.fileName ?? 'namespace-archive.cfyre',
-      size: await this.storage.size(schema, job.storageKey),
+      jobId: id,
+      fileName: job.fileName ?? 'workspace-archive.cfyre',
+      // Trust the stored total over the recorded one: they agree, and a
+      // mismatched Content-Length truncates the download.
+      size: await this.store.size(id),
     };
   }
 
   /**
-   * Delete archives past their TTL and forget the jobs that pointed at them.
-   * Called on worker startup and on a timer.
+   * Drop archives past their retention. The job rows stay as history; only the
+   * bytes go. Runs on worker startup and on a timer.
    */
   async purgeExpired(): Promise<number> {
-    const schema = this.schema();
-    const expired = await this.prisma.dataTransferJob.findMany({
-      where: { expiresAt: { lt: new Date() }, storageKey: { not: null } },
-      select: { id: true, storageKey: true },
-    });
-
-    for (const job of expired) {
-      await this.storage.remove(schema, job.storageKey);
-      await this.prisma.dataTransferJob
-        .update({ where: { id: job.id }, data: { storageKey: null } })
-        .catch(() => undefined);
-    }
-
-    if (expired.length > 0) {
-      this.logger.log(`Purged ${expired.length} expired transfer archive(s)`);
-    }
-    return expired.length;
+    return this.store.purgeExpired();
   }
 
   /**
@@ -341,17 +319,16 @@ export class DataTransferService {
    * it is surfaced as failed and the operator restarts it.
    */
   async recoverStaleJobs(): Promise<void> {
-    const schema = this.schema();
     const stale = await this.prisma.dataTransferJob.findMany({
       where: { status: DataTransferStatus.RUNNING },
-      select: { id: true, storageKey: true, kind: true },
+      select: { id: true, kind: true },
     });
 
     for (const job of stale) {
-      // A half-written export archive is garbage; an import's archive was
-      // uploaded by the operator and is worth keeping so they can retry.
+      // A half-written export archive is garbage. An import's archive was
+      // uploaded by the operator, so it is kept and the run can be retried.
       if (job.kind === DataTransferKind.EXPORT) {
-        await this.storage.remove(schema, job.storageKey);
+        await this.store.remove(job.id);
       }
       await this.prisma.dataTransferJob.update({
         where: { id: job.id },
@@ -360,43 +337,12 @@ export class DataTransferService {
           errorMessage:
             'The transfer was interrupted when the service restarted. Start it again.',
           finishedAt: new Date(),
-          ...(job.kind === DataTransferKind.EXPORT ? { storageKey: null } : {}),
         },
       });
     }
 
     if (stale.length > 0) {
       this.logger.warn(`Failed ${stale.length} interrupted transfer job(s)`);
-    }
-  }
-
-  /**
-   * Drop the archive from any earlier export in this namespace.
-   *
-   * One workspace keeps at most one export archive: the previous one is
-   * superseded the moment a new export is asked for, and leaving it on disk
-   * would mean an operator who exports repeatedly accumulates full copies of
-   * their workspace until each one's TTL happens to expire. The job rows stay
-   * — they are the transfer history — they simply stop pointing at a file.
-   */
-  private async discardPreviousExports(): Promise<void> {
-    const schema = this.schema();
-    const previous = await this.prisma.dataTransferJob.findMany({
-      where: { kind: DataTransferKind.EXPORT, storageKey: { not: null } },
-      select: { id: true, storageKey: true },
-    });
-
-    for (const job of previous) {
-      await this.storage.remove(schema, job.storageKey);
-      await this.prisma.dataTransferJob
-        .update({ where: { id: job.id }, data: { storageKey: null } })
-        .catch(() => undefined);
-    }
-
-    if (previous.length > 0) {
-      this.logger.log(
-        `Discarded ${previous.length} superseded export archive(s)`,
-      );
     }
   }
 
@@ -428,6 +374,8 @@ export class DataTransferService {
   private async assertNoActiveJob(): Promise<void> {
     const active = await this.prisma.dataTransferJob.findFirst({
       where: {
+        // STAGED is deliberately absent: an uploaded archive nobody has
+        // committed to yet is not work in progress.
         status: {
           in: [DataTransferStatus.PENDING, DataTransferStatus.RUNNING],
         },

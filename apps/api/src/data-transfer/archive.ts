@@ -1,9 +1,8 @@
 import { createHash } from 'node:crypto';
-import { createReadStream, createWriteStream } from 'node:fs';
 import { createGzip, createGunzip } from 'node:zlib';
 import { createInterface } from 'node:readline';
 import { pipeline } from 'node:stream/promises';
-import { PassThrough } from 'node:stream';
+import { PassThrough, Readable, Writable } from 'node:stream';
 
 import type { TransferScopeId } from './transfer-scopes';
 
@@ -167,9 +166,17 @@ export function decodeValue(value: unknown): unknown {
 
 // ── Writing ──────────────────────────────────────────────────────────────────
 
+/** Receives the archive's compressed bytes, one fixed-size chunk at a time. */
+export type ChunkSink = (ordinal: number, data: Buffer) => Promise<void>;
+
 /**
- * Appends NDJSON records to a gzipped file, hashing the compressed bytes as
- * they go so the archive carries a checksum without a second read pass.
+ * Appends NDJSON records, gzips them, and hands the compressed bytes to a sink
+ * in fixed-size chunks — hashing as it goes, so the archive carries a checksum
+ * without a second pass over it.
+ *
+ * The sink is what keeps this bounded: gzip output is buffered only until a
+ * chunk is full, then handed off and released. Nothing accumulates the whole
+ * archive.
  */
 export class ArchiveWriter {
   private readonly source = new PassThrough();
@@ -178,16 +185,65 @@ export class ArchiveWriter {
   private bytes = 0;
   private closed = false;
 
-  constructor(private readonly filePath: string) {
+  /** Compressed bytes not yet handed to the sink. */
+  private pending: Buffer[] = [];
+  private pendingBytes = 0;
+  private ordinal = 0;
+
+  constructor(sink: ChunkSink, chunkBytes: number) {
     const gzip = createGzip({ level: 6 });
-    gzip.on('data', (chunk: Buffer) => {
-      this.bytes += chunk.length;
-      this.hash.update(chunk);
+    const collect = new Writable({
+      write: (chunk: Buffer, _encoding, callback) => {
+        this.bytes += chunk.length;
+        this.hash.update(chunk);
+        this.pending.push(chunk);
+        this.pendingBytes += chunk.length;
+
+        if (this.pendingBytes < chunkBytes) {
+          callback();
+          return;
+        }
+        // Backpressure is honoured by not calling back until the chunk lands,
+        // so a fast database read cannot outrun the writes.
+        void this.flushChunks(sink, chunkBytes)
+          .then(() => callback())
+          .catch((error: Error) => callback(error));
+      },
+      final: (callback) => {
+        void this.flushChunks(sink, 0)
+          .then(() => callback())
+          .catch((error: Error) => callback(error));
+      },
     });
-    this.done = pipeline(this.source, gzip, createWriteStream(filePath));
+
+    this.done = pipeline(this.source, gzip, collect);
     // The pipeline rejection is surfaced by `close()`; without a no-op handler
     // an early write failure would be an unhandled rejection first.
     this.done.catch(() => undefined);
+  }
+
+  /** Emit whole chunks while at least `chunkBytes` are buffered (all, at 0). */
+  private async flushChunks(
+    sink: ChunkSink,
+    chunkBytes: number,
+  ): Promise<void> {
+    let buffer = Buffer.concat(this.pending);
+    this.pending = [];
+    this.pendingBytes = 0;
+
+    while (buffer.length >= chunkBytes && buffer.length > 0) {
+      const size =
+        chunkBytes > 0 ? Math.min(chunkBytes, buffer.length) : buffer.length;
+      await sink(this.ordinal, buffer.subarray(0, size));
+      this.ordinal += 1;
+      buffer = buffer.subarray(size);
+      if (chunkBytes === 0) break;
+    }
+
+    if (buffer.length > 0) {
+      this.pending = [buffer];
+      this.pendingBytes = buffer.length;
+    }
   }
 
   writeManifest(manifest: ArchiveManifest): Promise<void> {
@@ -205,21 +261,21 @@ export class ArchiveWriter {
     return this.writeLine({ t: FOOTER_TAG, d: footer });
   }
 
-  /** Flush, finish the gzip trailer and return the file's size + checksum. */
-  async close(): Promise<{ path: string; size: number; checksum: string }> {
+  /** Flush, finish the gzip trailer and report the archive's size + checksum. */
+  async close(): Promise<{ size: number; checksum: string; chunks: number }> {
     if (!this.closed) {
       this.closed = true;
       this.source.end();
     }
     await this.done;
     return {
-      path: this.filePath,
       size: this.bytes,
       checksum: this.hash.digest('hex'),
+      chunks: this.ordinal,
     };
   }
 
-  /** Abandon the archive after a failure; the caller unlinks the file. */
+  /** Abandon the archive after a failure; the caller drops what was written. */
   async destroy(error: Error): Promise<void> {
     this.closed = true;
     this.source.destroy(error);
@@ -259,7 +315,13 @@ export class ArchiveReader {
   private manifestValue?: ArchiveManifest;
   private footerValue?: ArchiveFooter;
 
-  constructor(private readonly filePath: string) {}
+  /** `source` is re-invoked per read, so one reader can be read twice. */
+  constructor(private readonly source: () => Readable) {}
+
+  /** Read an archive held entirely in memory (a fresh upload). */
+  static fromBuffer(bytes: Buffer): ArchiveReader {
+    return new ArchiveReader(() => Readable.from([bytes]));
+  }
 
   get footer(): ArchiveFooter | undefined {
     return this.footerValue;
@@ -320,7 +382,8 @@ export class ArchiveReader {
   }
 
   private async *lines(): AsyncGenerator<string> {
-    const stream = createReadStream(this.filePath).pipe(createGunzip());
+    const raw = this.source();
+    const stream = raw.pipe(createGunzip());
     const reader = createInterface({ input: stream, crlfDelay: Infinity });
     try {
       for await (const line of reader) {
@@ -336,6 +399,7 @@ export class ArchiveReader {
     } finally {
       reader.close();
       stream.destroy();
+      raw.destroy();
     }
   }
 }

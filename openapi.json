@@ -21031,6 +21031,7 @@
           "status": {
             "type": "string",
             "enum": [
+              "STAGED",
               "PENDING",
               "RUNNING",
               "COMPLETED",
@@ -21080,7 +21081,7 @@
           },
           "downloadAvailable": {
             "type": "boolean",
-            "description": "True while the archive is still on disk and downloadable."
+            "description": "True while the archive is still stored and downloadable."
           },
           "totalRows": {
             "type": "number",
@@ -21134,7 +21135,7 @@
           },
           "expiresAt": {
             "type": "string",
-            "description": "When the archive is deleted from disk.",
+            "description": "When the archive is dropped and stops being downloadable.",
             "nullable": true
           },
           "createdAt": {

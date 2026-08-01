@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 
 import { PrismaService } from '../prisma.service';
 import { PgBossModule } from '../scheduler/pg-boss.module';
-import { ArchiveStorageService } from './archive-storage.service';
+import { ArchiveStoreService } from './archive-store.service';
 import { DataTransferController } from './data-transfer.controller';
 import { DataTransferService } from './data-transfer.service';
 import { DataTransferWorker } from './data-transfer.worker';
@@ -18,12 +18,12 @@ import { NamespaceImportService } from './namespace-import.service';
   controllers: [DataTransferController],
   providers: [
     PrismaService,
-    ArchiveStorageService,
+    ArchiveStoreService,
     NamespaceExportService,
     NamespaceImportService,
     DataTransferService,
     DataTransferWorker,
   ],
-  exports: [DataTransferWorker, DataTransferService, ArchiveStorageService],
+  exports: [DataTransferWorker, DataTransferService, ArchiveStoreService],
 })
 export class DataTransferModule {}

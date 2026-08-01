@@ -4,6 +4,7 @@ import { TRANSFER_SCOPE_IDS, type TransferScopeId } from '../transfer-scopes';
 
 export const DATA_TRANSFER_KINDS = ['EXPORT', 'IMPORT'] as const;
 export const DATA_TRANSFER_STATUSES = [
+  'STAGED',
   'PENDING',
   'RUNNING',
   'COMPLETED',
@@ -148,7 +149,7 @@ export class DataTransferJobDto {
   checksum: string | null;
 
   @ApiProperty({
-    description: 'True while the archive is still on disk and downloadable.',
+    description: 'True while the archive is still stored and downloadable.',
   })
   downloadAvailable: boolean;
 
@@ -200,7 +201,7 @@ export class DataTransferJobDto {
   finishedAt: string | null;
 
   @ApiProperty({
-    description: 'When the archive is deleted from disk.',
+    description: 'When the archive is dropped and stops being downloadable.',
     nullable: true,
   })
   expiresAt: string | null;

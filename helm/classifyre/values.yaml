@@ -918,21 +918,17 @@ telemetry:
 #   Garage:       endpoint: http://garage:3900  forcePathStyle: true
 # Namespace export/import (Settings -> Export & Import).
 #
-# Archives are produced by the worker deployment and downloaded from the API
-# deployment, so they cannot live on a pod's own filesystem. Enable
-# objectStorage above and they are shared through the bucket. If you would
-# rather keep them on a volume, mount the same ReadWriteMany PVC into both
-# deployments and point `dir` at the mount path — that takes precedence over
-# object storage.
+# Archives are stored in the tenant's own Postgres schema, so they are visible
+# to both the api and worker deployments with no extra infrastructure, and they
+# are removed with the namespace. Retention is deliberately short: an archive is
+# a full credential-stripped copy of a workspace and only needs to outlive the
+# click that downloads it.
 dataTransfer:
-  # -- Shared filesystem path for archives. Empty means use object storage.
-  dir: ""
   # -- Minutes an archive is kept after its export finishes, then it is deleted.
-  # -- An archive is a full credential-stripped copy of the workspace; it only
-  # -- needs to outlive the click that downloads it.
   ttlMinutes: 60
-  # -- Largest archive that may be produced or uploaded, in GB.
-  maxSizeGb: 8
+  # -- Largest archive accepted on import, in MB. Bounded by the API's
+  # -- multipart upload limit, so raising this alone has no effect.
+  maxSizeMb: 50
 
 objectStorage:
   # -- Set to true to enable S3-compatible object storage.
@@ -941,8 +937,6 @@ objectStorage:
   bucket: classifyre-logs
   # -- S3 object key prefix for runner logs.
   logPrefix: "runner-logs/"
-  # -- S3 object key prefix for namespace export/import archives.
-  transferPrefix: "namespace-archives/"
   # -- AWS region. Required for AWS S3; ignored by most self-hosted providers.
   region: us-east-1
   # -- S3 endpoint URL. Leave empty for AWS S3 (SDK auto-resolves). Required for all other providers.

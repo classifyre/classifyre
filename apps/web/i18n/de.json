@@ -446,6 +446,7 @@
     "noArchive": "Kein Archiv",
     "deleteJob": "Übertragung löschen",
     "status": {
+      "STAGED": "Hochgeladen",
       "PENDING": "In Warteschlange",
       "RUNNING": "Läuft",
       "COMPLETED": "Fertig",
