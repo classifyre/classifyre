@@ -977,12 +977,38 @@ class S3CompatibleStorageOptionalConnection(BaseModel):
     )
     max_object_bytes: int | None = Field(
         5242880,
-        description='Maximum bytes downloaded per object for MIME detection and text extraction',
+        description='Maximum bytes of one object held in memory. Larger objects are streamed to a temporary file (or read by byte range where the provider supports it), so this bounds memory rather than the size of file that can be scanned. See max_file_bytes to refuse large objects outright.',
         ge=1024,
-        le=52428800,
     )
     verify_ssl: bool | None = Field(
         True, description='TLS certificate verification toggle'
+    )
+    max_file_bytes: int | None = Field(
+        None,
+        description='Refuse any object larger than this many bytes. 0 or unset means no limit: an object above max_object_bytes is spooled to disk rather than held in memory, so file size is bounded by free disk, not by RAM.',
+        ge=0,
+    )
+    max_archive_members: int | None = Field(
+        200,
+        description='Maximum member files expanded from one archive into child assets. Bounds fan-out, and is the guard against a zip bomb.',
+        ge=1,
+        le=10000,
+    )
+    max_archive_member_bytes: int | None = Field(
+        10485760,
+        description='Maximum uncompressed bytes read from a single archive member',
+        ge=1024,
+    )
+    max_archive_total_bytes: int | None = Field(
+        104857600,
+        description='Maximum uncompressed bytes read across all members of one archive. The decompression-ratio ceiling: a zip bomb hits this before it hits memory.',
+        ge=1024,
+    )
+    max_embedded_files: int | None = Field(
+        200,
+        description='Maximum embedded files (parquet image/audio columns, office media) expanded from one container into child assets per run',
+        ge=1,
+        le=10000,
     )
 
 
@@ -1129,9 +1155,35 @@ class AzureBlobStorageOptionalConnection(BaseModel):
     )
     max_object_bytes: int | None = Field(
         5242880,
-        description='Maximum bytes downloaded per blob for MIME detection and text extraction',
+        description='Maximum bytes of one object held in memory. Larger objects are streamed to a temporary file (or read by byte range where the provider supports it), so this bounds memory rather than the size of file that can be scanned. See max_file_bytes to refuse large objects outright.',
         ge=1024,
-        le=52428800,
+    )
+    max_file_bytes: int | None = Field(
+        None,
+        description='Refuse any object larger than this many bytes. 0 or unset means no limit: an object above max_object_bytes is spooled to disk rather than held in memory, so file size is bounded by free disk, not by RAM.',
+        ge=0,
+    )
+    max_archive_members: int | None = Field(
+        200,
+        description='Maximum member files expanded from one archive into child assets. Bounds fan-out, and is the guard against a zip bomb.',
+        ge=1,
+        le=10000,
+    )
+    max_archive_member_bytes: int | None = Field(
+        10485760,
+        description='Maximum uncompressed bytes read from a single archive member',
+        ge=1024,
+    )
+    max_archive_total_bytes: int | None = Field(
+        104857600,
+        description='Maximum uncompressed bytes read across all members of one archive. The decompression-ratio ceiling: a zip bomb hits this before it hits memory.',
+        ge=1024,
+    )
+    max_embedded_files: int | None = Field(
+        200,
+        description='Maximum embedded files (parquet image/audio columns, office media) expanded from one container into child assets per run',
+        ge=1,
+        le=10000,
     )
 
 
@@ -1185,9 +1237,35 @@ class GoogleCloudStorageOptionalConnection(BaseModel):
     )
     max_object_bytes: int | None = Field(
         5242880,
-        description='Maximum bytes downloaded per object for MIME detection and text extraction',
+        description='Maximum bytes of one object held in memory. Larger objects are streamed to a temporary file (or read by byte range where the provider supports it), so this bounds memory rather than the size of file that can be scanned. See max_file_bytes to refuse large objects outright.',
         ge=1024,
-        le=52428800,
+    )
+    max_file_bytes: int | None = Field(
+        None,
+        description='Refuse any object larger than this many bytes. 0 or unset means no limit: an object above max_object_bytes is spooled to disk rather than held in memory, so file size is bounded by free disk, not by RAM.',
+        ge=0,
+    )
+    max_archive_members: int | None = Field(
+        200,
+        description='Maximum member files expanded from one archive into child assets. Bounds fan-out, and is the guard against a zip bomb.',
+        ge=1,
+        le=10000,
+    )
+    max_archive_member_bytes: int | None = Field(
+        10485760,
+        description='Maximum uncompressed bytes read from a single archive member',
+        ge=1024,
+    )
+    max_archive_total_bytes: int | None = Field(
+        104857600,
+        description='Maximum uncompressed bytes read across all members of one archive. The decompression-ratio ceiling: a zip bomb hits this before it hits memory.',
+        ge=1024,
+    )
+    max_embedded_files: int | None = Field(
+        200,
+        description='Maximum embedded files (parquet image/audio columns, office media) expanded from one container into child assets per run',
+        ge=1,
+        le=10000,
     )
 
 
@@ -4712,9 +4790,8 @@ class DropboxOptionalConnection(BaseModel):
     )
     max_object_bytes: int | None = Field(
         5242880,
-        description='Maximum bytes downloaded per file for MIME detection and text extraction',
+        description='Maximum bytes of one object held in memory. Larger objects are streamed to a temporary file (or read by byte range where the provider supports it), so this bounds memory rather than the size of file that can be scanned. See max_file_bytes to refuse large objects outright.',
         ge=1024,
-        le=52428800,
     )
     request_timeout_seconds: float | None = Field(
         60,
@@ -4727,6 +4804,33 @@ class DropboxOptionalConnection(BaseModel):
         description='Maximum retries on transient Dropbox errors (5xx and rate limits)',
         ge=0,
         le=10,
+    )
+    max_file_bytes: int | None = Field(
+        None,
+        description='Refuse any object larger than this many bytes. 0 or unset means no limit: an object above max_object_bytes is spooled to disk rather than held in memory, so file size is bounded by free disk, not by RAM.',
+        ge=0,
+    )
+    max_archive_members: int | None = Field(
+        200,
+        description='Maximum member files expanded from one archive into child assets. Bounds fan-out, and is the guard against a zip bomb.',
+        ge=1,
+        le=10000,
+    )
+    max_archive_member_bytes: int | None = Field(
+        10485760,
+        description='Maximum uncompressed bytes read from a single archive member',
+        ge=1024,
+    )
+    max_archive_total_bytes: int | None = Field(
+        104857600,
+        description='Maximum uncompressed bytes read across all members of one archive. The decompression-ratio ceiling: a zip bomb hits this before it hits memory.',
+        ge=1024,
+    )
+    max_embedded_files: int | None = Field(
+        200,
+        description='Maximum embedded files (parquet image/audio columns, office media) expanded from one container into child assets per run',
+        ge=1,
+        le=10000,
     )
 
 
@@ -4892,9 +4996,8 @@ class HuggingFaceOptionalConnection(BaseModel):
     )
     max_object_bytes: int | None = Field(
         26214400,
-        description='Maximum bytes streamed per file for MIME detection and text extraction (default 25 MB). Larger files are read up to this cap and then the connection is dropped.',
+        description='Maximum bytes of one object held in memory. Larger objects are streamed to a temporary file (or read by byte range where the provider supports it), so this bounds memory rather than the size of file that can be scanned. See max_file_bytes to refuse large objects outright.',
         ge=1024,
-        le=104857600,
     )
     request_timeout_seconds: float | None = Field(
         60,
@@ -4907,6 +5010,33 @@ class HuggingFaceOptionalConnection(BaseModel):
         description='Maximum retries on transient Hub errors (5xx and rate limits)',
         ge=0,
         le=10,
+    )
+    max_file_bytes: int | None = Field(
+        None,
+        description='Refuse any object larger than this many bytes. 0 or unset means no limit: an object above max_object_bytes is spooled to disk rather than held in memory, so file size is bounded by free disk, not by RAM.',
+        ge=0,
+    )
+    max_archive_members: int | None = Field(
+        200,
+        description='Maximum member files expanded from one archive into child assets. Bounds fan-out, and is the guard against a zip bomb.',
+        ge=1,
+        le=10000,
+    )
+    max_archive_member_bytes: int | None = Field(
+        10485760,
+        description='Maximum uncompressed bytes read from a single archive member',
+        ge=1024,
+    )
+    max_archive_total_bytes: int | None = Field(
+        104857600,
+        description='Maximum uncompressed bytes read across all members of one archive. The decompression-ratio ceiling: a zip bomb hits this before it hits memory.',
+        ge=1024,
+    )
+    max_embedded_files: int | None = Field(
+        200,
+        description='Maximum embedded files (parquet image/audio columns, office media) expanded from one container into child assets per run',
+        ge=1,
+        le=10000,
     )
 
 

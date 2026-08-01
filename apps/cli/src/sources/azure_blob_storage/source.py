@@ -6,8 +6,8 @@ from typing import Any
 from urllib.parse import quote
 
 from ...models.generated_input import AzureBlobStorageInput
-from ..dependencies import require_module
 from ...utils.range_reader import CallableRangeReader, open_buffered
+from ..dependencies import require_module
 from ..object_storage.base import ObjectRef, ObjectStorageSourceBase
 
 logger = logging.getLogger(__name__)

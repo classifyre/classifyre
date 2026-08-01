@@ -22,8 +22,20 @@ from ...models.generated_single_asset_scan_results import (
     Location,
     SingleAssetScanResults,
 )
-from ...utils.archive_extraction import ArchiveMember, is_archive_mime, iter_archive_members
-from ...utils.embedded_files import EmbeddedFile, has_embedded_files, iter_embedded_files
+from ...utils.archive_extraction import (
+    DEFAULT_MAX_ARCHIVE_MEMBERS,
+    DEFAULT_MAX_MEMBER_BYTES,
+    DEFAULT_MAX_TOTAL_MEMBER_BYTES,
+    ArchiveMember,
+    is_archive_mime,
+    iter_archive_members,
+)
+from ...utils.embedded_files import (
+    DEFAULT_MAX_EMBEDDED_FILES,
+    EmbeddedFile,
+    has_embedded_files,
+    iter_embedded_files,
+)
 from ...utils.file_metadata import extract_file_metadata
 from ...utils.file_parser import (
     count_tabular_rows,
@@ -227,8 +239,12 @@ class ObjectStorageSourceBase(BaseSource, ABC):
 
     def _connection_option(self, key: str, default: Any = None) -> Any:
         optional = self.config.optional
-        if optional and optional.connection:
-            value = getattr(optional.connection, key, None)
+        # Not every source models a `connection` block — the local folder groups
+        # its options under `traversal` — so its absence is a normal shape, not an
+        # error, and must yield the default rather than raise.
+        connection = getattr(optional, "connection", None) if optional else None
+        if connection is not None:
+            value = getattr(connection, key, None)
             if value is not None:
                 return value
         return default
@@ -712,6 +728,7 @@ class ObjectStorageSourceBase(BaseSource, ABC):
                     container.mime_type,
                     start_row=start_row,
                     max_rows=max_rows,
+                    max_files=self._max_embedded_files(),
                 ):
                     child = self._build_child_embedded_asset(
                         container.parent, embedded, container.ref
@@ -839,6 +856,13 @@ class ObjectStorageSourceBase(BaseSource, ABC):
                 file_bytes,
                 mime_type,
                 file_name=self._object_file_name(ref),
+                max_members=self._archive_limit("max_archive_members", DEFAULT_MAX_ARCHIVE_MEMBERS),
+                max_member_bytes=self._archive_limit(
+                    "max_archive_member_bytes", DEFAULT_MAX_MEMBER_BYTES
+                ),
+                max_total_bytes=self._archive_limit(
+                    "max_archive_total_bytes", DEFAULT_MAX_TOTAL_MEMBER_BYTES
+                ),
             ):
                 child = self._build_child_archive_member_asset(parent, member, ref)
                 self._pending_child_assets.append(child)
@@ -1100,6 +1124,26 @@ class ObjectStorageSourceBase(BaseSource, ABC):
         size a scan can handle is free disk.
         """
         return max(0, self._max_object_bytes())
+
+    def _archive_limit(self, option: str, default: int) -> int:
+        """A fan-out ceiling for archive expansion, from config or the default.
+
+        These are the limits that stay: unlike a size cap they are not protecting
+        memory but bounding *how many assets one object may become*, and the
+        decompression ratio they imply is the only thing standing between a scan
+        and a zip bomb. Configurable so a corpus of legitimately large archives
+        can raise them deliberately.
+        """
+        value = self._connection_option(option, default)
+        try:
+            parsed = int(value)  # type: ignore[arg-type]
+        except (TypeError, ValueError):
+            return default
+        return parsed if parsed > 0 else default
+
+    def _max_embedded_files(self) -> int:
+        """How many embedded files one container may expand into per run."""
+        return self._archive_limit("max_embedded_files", DEFAULT_MAX_EMBEDDED_FILES)
 
     def _hard_size_limit_bytes(self) -> int | None:
         """A hard refusal ceiling, or None for no limit (the default).
