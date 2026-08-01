@@ -60,6 +60,9 @@ class HuggingFaceSource(ObjectStorageSourceBase):
     provider_label = "HUGGING_FACE"
     input_model = HuggingFaceInput
 
+    # The Hub's resolve endpoint and its CDN both serve byte ranges.
+    SUPPORTS_RANGE_READS = True
+
     def __init__(
         self,
         recipe: dict[str, Any],

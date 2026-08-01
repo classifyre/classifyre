@@ -268,3 +268,123 @@ async def test_successive_runs_read_successive_windows_over_the_wire() -> None:
     assert covered[2] == list(range(100, 150))
     assert stored is not None and stored["exhausted"] is False
     assert max(served) < len(PAYLOAD) // 4
+
+
+# ── embedded child assets ────────────────────────────────────────────────
+
+IMAGE_ROWS = 2_000
+IMAGE_ROWS_PER_GROUP = 100
+
+
+def _png(index: int) -> bytes:
+    """A PNG header the MIME sniffer recognises, padded so the file has heft."""
+    return (
+        b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR"
+        b"\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89"
+        + f"{index:08d}".encode()
+        + bytes((index + i) % 251 for i in range(2048))
+    )
+
+
+def _image_parquet() -> bytes:
+    """A HuggingFace-shaped ``Image`` column: struct<bytes, path> per row."""
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+
+    table = pa.table(
+        {
+            "id": list(range(IMAGE_ROWS)),
+            "image": [{"bytes": _png(i), "path": f"pictures/{i}.png"} for i in range(IMAGE_ROWS)],
+        }
+    )
+    buffer = io.BytesIO()
+    pq.write_table(table, buffer, row_group_size=IMAGE_ROWS_PER_GROUP, compression="none")
+    return buffer.getvalue()
+
+
+IMAGE_PAYLOAD = _image_parquet()
+
+
+def _locations(children: list[Any]) -> list[str]:
+    return [str(child.external_url).split("#", 1)[1] for child in children]
+
+
+@pytest.mark.asyncio
+async def test_embedded_children_of_an_oversized_parquet_are_extracted_by_range(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The gap this closes: images inside a shard too big to download.
+
+    Discovery used to refuse to expand any container above the object cap, so a
+    repository whose whole point is images-in-parquet produced parent rows and no
+    image assets at all.
+    """
+    session = _RangeSession(IMAGE_PAYLOAD)
+    source, ref, _url = _hf_source(
+        session, size=len(IMAGE_PAYLOAD), max_object_bytes=1024 * 1024, rows_per_page=10
+    )
+    source.attach_payload_windows(
+        PayloadWindowStore.from_recipe({"sampling": {"strategy": "AUTOMATIC", "rows_per_page": 10}})
+    )
+
+    def _refuse(_ref: Any) -> tuple[bytes, str]:
+        raise AssertionError("an object read by range must never be downloaded")
+
+    monkeypatch.setattr(source, "_list_objects", lambda: iter([ref]))
+    monkeypatch.setattr(source, "_ensure_file_processing_dependencies", lambda: None)
+    monkeypatch.setattr(source, "_download_object", _refuse)
+
+    assets: list[Any] = []
+    async for batch in source.extract():
+        assets.extend(batch)
+
+    parent = assets[0]
+    children = [a for a in assets if "#" in str(a.external_url)]
+
+    assert _locations(children) == [f"row={row};col=image" for row in range(1, 11)]
+    assert all(child.hash in parent.links for child in children)
+    assert session.bytes_served < len(IMAGE_PAYLOAD) // 4, (
+        f"transferred {session.bytes_served} of {len(IMAGE_PAYLOAD)} bytes"
+    )
+
+
+def test_embedded_extraction_over_a_stream_honours_the_row_window() -> None:
+    """Children come from the rows this run scans, not the top of the file."""
+    from src.utils.embedded_files import iter_embedded_files
+
+    session = _RangeSession(IMAGE_PAYLOAD)
+    handle = open_buffered(_reader(session))
+
+    embedded = list(
+        iter_embedded_files(handle, PARQUET_MIME, start_row=1_500, max_rows=5),
+    )
+    handle.close()
+
+    assert [item.location for item in embedded] == [
+        f"row={row};col=image" for row in range(1_501, 1_506)
+    ]
+    assert [item.file_bytes for item in embedded] == [_png(i) for i in range(1_500, 1_505)]
+    assert session.bytes_served < len(IMAGE_PAYLOAD) // 4
+
+
+@pytest.mark.asyncio
+async def test_a_stream_backed_container_costs_no_memory_while_it_waits(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Queued containers are capped by resident bytes; a handle holds none."""
+    session = _RangeSession(IMAGE_PAYLOAD)
+    source, ref, _url = _hf_source(
+        session, size=len(IMAGE_PAYLOAD), max_object_bytes=1024 * 1024, rows_per_page=10
+    )
+    monkeypatch.setattr(source, "_ensure_file_processing_dependencies", lambda: None)
+    monkeypatch.setattr(
+        source,
+        "_download_object",
+        lambda _ref: (_ for _ in ()).throw(AssertionError("must not download")),
+    )
+
+    source._to_asset(ref)
+
+    assert len(source._pending_containers) == 1
+    assert source._pending_containers[0].file_bytes is None
+    assert source._pending_container_bytes() == 0

@@ -33,8 +33,12 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 # Big enough that a Parquet footer and its metadata arrive in one request, small
-# enough that a seek into the middle of a file does not drag a row group along.
-DEFAULT_BUFFER_BYTES = 1024 * 1024
+# enough not to inflate the reads that follow. ``BufferedReader`` passes a read
+# larger than its buffer straight through, so this only ever pads *small* reads —
+# which is why an oversized buffer costs bytes rather than saving requests. On a
+# 4 MB shard with 100-row groups, 256 KB transfers 409 KB in 3 requests where
+# 1 MB transfers 1.2 MB in the same 3.
+DEFAULT_BUFFER_BYTES = 256 * 1024
 
 
 class HttpRangeReader(io.RawIOBase):
