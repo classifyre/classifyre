@@ -7,15 +7,20 @@ from urllib.parse import quote
 
 from ...models.generated_input import AzureBlobStorageInput
 from ..dependencies import require_module
+from ...utils.range_reader import CallableRangeReader, open_buffered
 from ..object_storage.base import ObjectRef, ObjectStorageSourceBase
 
 logger = logging.getLogger(__name__)
+
+_STREAM_CHUNK_BYTES = 1024 * 1024
 
 
 class AzureBlobStorageSource(ObjectStorageSourceBase):
     source_type = "azure_blob_storage"
     provider_label = "AZURE_BLOB_STORAGE"
     input_model = AzureBlobStorageInput
+
+    SUPPORTS_RANGE_READS = True
 
     def _required_container(self) -> str:
         container = str(self.config.required.container).strip()
@@ -108,6 +113,33 @@ class AzureBlobStorageSource(ObjectStorageSourceBase):
                     etag=str(getattr(item, "etag", "") or "") or None,
                     content_type_hint=str(content_type_hint) if content_type_hint else None,
                 )
+
+    def _blob_client(self, key: str) -> Any:
+        container_client = self._client().get_container_client(self._required_container())
+        return container_client.get_blob_client(key)
+
+    def _stream_object(self, ref: ObjectRef) -> Iterator[bytes]:
+        """Stream the whole blob in chunks — no cap, nothing held whole."""
+        downloader = self._blob_client(ref.key).download_blob(
+            timeout=self._request_timeout_seconds()
+        )
+        yield from downloader.chunks()
+
+    def _open_object_range_reader(self, ref: ObjectRef) -> Any | None:
+        """Azure takes offset/length, so a columnar blob needs no download."""
+        if not ref.size:
+            return None
+        blob_client = self._blob_client(ref.key)
+        timeout = self._request_timeout_seconds()
+        label = f"{self._required_container()}/{ref.key}"
+
+        def _fetch(start: int, end_inclusive: int) -> bytes:
+            downloader = blob_client.download_blob(
+                offset=start, length=end_inclusive - start + 1, timeout=timeout
+            )
+            return bytes(downloader.readall())
+
+        return open_buffered(CallableRangeReader(_fetch, size=int(ref.size), label=label))
 
     def _download_object(self, ref: ObjectRef) -> tuple[bytes, str | None]:
         blob_service_client = self._client()

@@ -6,16 +6,21 @@ from typing import Any
 from urllib.parse import quote
 
 from ...models.generated_input import S3CompatibleStorageInput
+from ...utils.range_reader import CallableRangeReader, open_buffered
 from ..object_storage.base import ObjectRef, ObjectStorageSourceBase
 from ..s3_client import build_s3_client
 
 logger = logging.getLogger(__name__)
+
+_STREAM_CHUNK_BYTES = 1024 * 1024
 
 
 class S3CompatibleStorageSource(ObjectStorageSourceBase):
     source_type = "s3_compatible_storage"
     provider_label = "S3_COMPATIBLE_STORAGE"
     input_model = S3CompatibleStorageInput
+
+    SUPPORTS_RANGE_READS = True
 
     def _required_bucket(self) -> str:
         bucket = str(self.config.required.bucket).strip()
@@ -83,6 +88,48 @@ class S3CompatibleStorageSource(ObjectStorageSourceBase):
             continuation_token = response.get("NextContinuationToken")
             if not continuation_token:
                 break
+
+    def _stream_object(self, ref: ObjectRef) -> Iterator[bytes]:
+        """Stream the whole object in chunks — no cap, nothing held whole.
+
+        ``_open_object`` spools this, so a 40 GB object costs a temp file rather
+        than 40 GB of heap.
+        """
+        client = self._client()
+        bucket = self._required_bucket()
+        response = client.get_object(Bucket=bucket, Key=ref.key)
+        body = response["Body"]
+        try:
+            yield from body.iter_chunks(chunk_size=_STREAM_CHUNK_BYTES)
+        finally:
+            try:
+                body.close()
+            except Exception:
+                logger.debug("Failed to close S3 response body")
+
+    def _open_object_range_reader(self, ref: ObjectRef) -> Any | None:
+        """S3 serves ranges natively, so a columnar object needs no download."""
+        if not ref.size:
+            return None
+        client = self._client()
+        bucket = self._required_bucket()
+
+        def _fetch(start: int, end_inclusive: int) -> bytes:
+            response = client.get_object(
+                Bucket=bucket, Key=ref.key, Range=f"bytes={start}-{end_inclusive}"
+            )
+            body = response["Body"]
+            try:
+                return bytes(body.read())
+            finally:
+                try:
+                    body.close()
+                except Exception:
+                    logger.debug("Failed to close S3 range body")
+
+        return open_buffered(
+            CallableRangeReader(_fetch, size=int(ref.size), label=f"s3://{bucket}/{ref.key}")
+        )
 
     def _download_object(self, ref: ObjectRef) -> tuple[bytes, str | None]:
         client = self._client()

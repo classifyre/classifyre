@@ -13,6 +13,7 @@ from typing import Any
 from urllib.parse import urlsplit
 
 from .legacy_office import LEGACY_OFFICE_MIME_TYPES as _LEGACY_OFFICE_MIME_TYPES
+from .payload import BinarySource, as_binary_io, header, payload_size, read_all
 
 logger = logging.getLogger(__name__)
 
@@ -63,6 +64,11 @@ class ParsedBytes:
 
 
 OCTET_STREAM = "application/octet-stream"
+
+# How much of a payload MIME detection is allowed to look at. Every magic
+# signature this recognises lives in the first few bytes; the slack is for the
+# text sniffer, which needs a sentence or two to tell JSON from CSV from prose.
+_MIME_HEADER_BYTES = 64 * 1024
 
 # Spellings of "I don't know what these bytes are". Only the first is the
 # registered type, but object stores are inconsistent: S3-compatible services
@@ -444,7 +450,7 @@ def _is_text_like_mime_type(mime_type: str) -> bool:
     return normalized_mime.startswith("text/") or normalized_mime in _TEXT_RAW_MIME_TYPES
 
 
-def _detect_magic_mime_type(file_bytes: bytes) -> str | None:
+def _detect_magic_mime_type(file_bytes: bytes, zip_source: BinarySource | None = None) -> str | None:
     signatures: tuple[tuple[bytes, str], ...] = (
         (b"\x89PNG\r\n\x1a\n", "image/png"),
         (b"%PDF-", "application/pdf"),
@@ -463,7 +469,7 @@ def _detect_magic_mime_type(file_bytes: bytes) -> str | None:
             return mime_type
 
     if file_bytes.startswith(b"PK\x03\x04"):
-        return _refine_zip_mime(file_bytes)
+        return _refine_zip_mime(zip_source if zip_source is not None else file_bytes)
 
     # POSIX tar: "ustar" magic at offset 257 (no leading signature).
     if len(file_bytes) > 262 and file_bytes[257:262] == b"ustar":
@@ -472,18 +478,17 @@ def _detect_magic_mime_type(file_bytes: bytes) -> str | None:
     return None
 
 
-def _refine_zip_mime(file_bytes: bytes) -> str:
+def _refine_zip_mime(source: BinarySource) -> str:
     """Distinguish document formats that are ZIP containers from real archives.
 
     ODF files carry an uncompressed ``mimetype`` entry; OOXML files carry
     ``[Content_Types].xml`` plus a format-specific folder (word/, xl/, ppt/).
     Anything else (or an unreadable/truncated zip) stays ``application/zip``.
     """
-    import io
     import zipfile
 
     try:
-        with zipfile.ZipFile(io.BytesIO(file_bytes)) as archive:
+        with zipfile.ZipFile(as_binary_io(source)) as archive:
             names = set(archive.namelist())
             if "mimetype" in names:
                 declared = archive.read("mimetype").decode("ascii", errors="replace").strip()
@@ -561,30 +566,37 @@ def _sniff_text_mime(file_bytes: bytes) -> str:
     return "text/plain"
 
 
-def detect_mime_type(file_bytes: bytes) -> str:
+def detect_mime_type(source: BinarySource) -> str:
     """
-    Detect MIME type from file bytes.
+    Detect MIME type from a payload.
 
     Uses magic-byte detection first (filetype library), then falls back to
     text-based sniffing for formats that filetype doesn't cover.
+
+    Only a bounded prefix is read. Format identity lives in the first few bytes
+    of every format this recognises, so detection must never be the step that
+    pulls a multi-gigabyte object into memory. The one exception is a ZIP
+    signature, whose refinement needs the archive's directory at the far end —
+    and that is done through the handle, not a copy.
     """
-    if not file_bytes:
+    prefix = header(source, _MIME_HEADER_BYTES)
+    if not prefix:
         return "application/octet-stream"
 
-    magic_mime_type = _detect_magic_mime_type(file_bytes)
+    magic_mime_type = _detect_magic_mime_type(prefix, source)
     if magic_mime_type:
         return magic_mime_type
 
     try:
         filetype = _require_file_processing("filetype")
 
-        kind = filetype.guess(file_bytes)  # type: ignore[attr-defined]
+        kind = filetype.guess(prefix)  # type: ignore[attr-defined]
         if kind is not None:
             return str(kind.mime)
     except Exception as e:
         logger.debug(f"filetype detection failed: {e}")
 
-    return _sniff_text_mime(file_bytes)
+    return _sniff_text_mime(prefix)
 
 
 def _supports_docling_ocr(mime_type: str, file_name: str) -> bool:
@@ -685,14 +697,17 @@ def _convert_image_to_png(file_bytes: bytes, mime_type: str) -> tuple[bytes | No
 _MIN_NATIVE_PDF_CHARS = 50
 
 
-def _extract_pdf_text(file_bytes: bytes) -> tuple[str, str | None]:
-    """Extract text from a PDF using pdfplumber (no ML models required)."""
-    try:
-        import io
+def _extract_pdf_text(source: BinarySource) -> tuple[str, str | None]:
+    """Extract text from a PDF using pdfplumber (no ML models required).
 
+    Driven from a handle: pdfplumber reads the cross-reference table and then the
+    pages it is asked for, so a spooled PDF is paged in from disk rather than
+    copied into the heap.
+    """
+    try:
         pdfplumber = _require_file_processing("pdfplumber")
 
-        with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:  # type: ignore[attr-defined]
+        with pdfplumber.open(as_binary_io(source)) as pdf:  # type: ignore[attr-defined]
             pages = []
             for page in pdf.pages:
                 text = page.extract_text() or ""
@@ -753,19 +768,41 @@ def _extract_docling_markdown(
 
 
 def extract_text(
-    file_bytes: bytes,
+    source: BinarySource,
     mime_type: str,
     *,
     file_name: str = "",
 ) -> tuple[str, str | None]:
     """
-    Extract plain text from file bytes based on MIME type.
+    Extract plain text from a payload based on MIME type.
+
+    ``source`` is the file's bytes or a seekable handle over them. The formats
+    that dominate large corpora — PDF, DOCX, XLSX, ODF, ZIP — are read straight
+    from the handle, so a payload that was spooled to disk is paged in by the OS
+    instead of being copied into the heap; that is what lets a source lift its
+    size cap. The remaining formats (media, images, legacy Office) are read whole
+    because their extractors write the payload to a temp file anyway or are
+    bounded by nature.
 
     Returns:
         (text_content, error_message_or_None)
     """
+    # Materialized only by the branches that cannot work from a handle, and at
+    # most once. Everything above this line — and every ``as_binary_io(source)``
+    # below — leaves a spooled payload on disk where it belongs.
+    resident: list[bytes | None] = [None]
+
+    def file_bytes() -> bytes:
+        if resident[0] is None:
+            resident[0] = read_all(source)
+        return resident[0]
+
     ocr_error: str | None = None
-    ocr_skip_reason = _ocr_skip_reason(file_bytes, mime_type)
+    ocr_skip_reason = (
+        _ocr_skip_reason(file_bytes(), mime_type)
+        if _normalize_mime_type(mime_type).startswith("image/")
+        else None
+    )
     if ocr_skip_reason:
         logger.debug(
             "Skipping OCR for %s: %s",
@@ -779,7 +816,7 @@ def extract_text(
         # This avoids loading the ~1 GB StandardPdfPipeline for the majority of
         # PDFs that already carry a text layer.
         if mime_type == "application/pdf":
-            cheap_text, cheap_error = _extract_pdf_text(file_bytes)
+            cheap_text, cheap_error = _extract_pdf_text(source)
             if len(cheap_text.strip()) >= _MIN_NATIVE_PDF_CHARS:
                 logger.info(
                     "OCR extracted %d chars from %s (%s, native text layer)",
@@ -792,11 +829,11 @@ def extract_text(
         # take their inexpensive native text paths; embedded images are emitted
         # separately as IMAGE assets by sources that materialize containers.
         # GIF/HEIC/HEIF are converted to PNG first — docling can't read them.
-        ocr_bytes: bytes | None = file_bytes
+        ocr_bytes: bytes | None = file_bytes()
         ocr_mime = mime_type
         ocr_name = file_name
         if _normalize_mime_type(mime_type) in _OCR_CONVERTIBLE_IMAGE_MIME_TYPES:
-            ocr_bytes, conversion_error = _convert_image_to_png(file_bytes, mime_type)
+            ocr_bytes, conversion_error = _convert_image_to_png(file_bytes(), mime_type)
             ocr_mime = "image/png"
             ocr_name = "converted.png"
             if conversion_error:
@@ -821,7 +858,7 @@ def extract_text(
         from .transcription import transcribe_media
 
         text, error = transcribe_media(
-            file_bytes,
+            file_bytes(),
             mime_type=mime_type,
             file_name=file_name,
         )
@@ -834,11 +871,11 @@ def extract_text(
         from .video_processing import extract_video_ocr
 
         transcript, transcript_error = transcribe_media(
-            file_bytes,
+            file_bytes(),
             mime_type=mime_type,
             file_name=file_name,
         )
-        visual_text, visual_error = extract_video_ocr(file_bytes, file_name=file_name)
+        visual_text, visual_error = extract_video_ocr(file_bytes(), file_name=file_name)
         sections: list[str] = []
         if transcript:
             sections.append(f"[Transcript]\n{transcript}")
@@ -856,17 +893,15 @@ def extract_text(
 
     # PDF
     if mime_type == "application/pdf":
-        native_text, native_error = _extract_pdf_text(file_bytes)
+        native_text, native_error = _extract_pdf_text(source)
         return native_text, native_error or ocr_error
 
     # DOCX
     if mime_type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
         try:
-            import io
-
             docx = _require_file_processing("docx")
 
-            doc = docx.Document(io.BytesIO(file_bytes))  # type: ignore[attr-defined]
+            doc = docx.Document(as_binary_io(source))  # type: ignore[attr-defined]
             parts: list[str] = []
             for para in doc.paragraphs:
                 if para.text.strip():
@@ -883,12 +918,10 @@ def extract_text(
     # XLSX
     if mime_type == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":
         try:
-            import io
-
             openpyxl = _require_file_processing("openpyxl")
 
             wb = openpyxl.load_workbook(  # type: ignore[attr-defined]
-                io.BytesIO(file_bytes), read_only=True, data_only=True
+                as_binary_io(source), read_only=True, data_only=True
             )
             rows: list[str] = []
             for sheet in wb.worksheets:
@@ -903,27 +936,27 @@ def extract_text(
     # ODF (odt/ods/odp) and Outlook .msg — docling parses these natively.
     if mime_type in _DOCLING_NATIVE_DOCUMENT_MIME_TYPES:
         return _extract_docling_markdown(
-            file_bytes,
+            file_bytes(),
             mime_type=mime_type,
             file_name=file_name,
         )
 
     # EML — stdlib email parser (headers + body; no heavy dependencies).
     if mime_type == "message/rfc822":
-        return _extract_eml_text(file_bytes)
+        return _extract_eml_text(file_bytes())
 
     # RTF (before the generic text/* branch: text/rtf must not pass through raw)
     if mime_type in ("application/rtf", "text/rtf"):
         try:
             striprtf = _require_file_processing("striprtf.striprtf")
 
-            return striprtf.rtf_to_text(_decode_bytes(file_bytes)), None  # type: ignore[attr-defined]
+            return striprtf.rtf_to_text(_decode_bytes(file_bytes())), None  # type: ignore[attr-defined]
         except Exception as e:
             return "", f"RTF extraction failed: {e}"
 
     # Legacy Office (.doc/.xls/.ppt): LibreOffice → OOXML → native extraction.
     if mime_type in _LEGACY_OFFICE_MIME_TYPES:
-        return _extract_legacy_office_text(file_bytes, mime_type, file_name=file_name)
+        return _extract_legacy_office_text(file_bytes(), mime_type, file_name=file_name)
 
     # Archive containers carry no text of their own; object-storage sources
     # expand their members into standalone child assets instead.
@@ -935,28 +968,28 @@ def extract_text(
         try:
             from .content_extraction import html_to_text
 
-            text = _decode_bytes(file_bytes)
+            text = _decode_bytes(file_bytes())
             return html_to_text(text), None
         except Exception as e:
             return "", f"HTML extraction failed: {e}"
 
     # XML — parsed securely with defusedxml (falls back to raw decoded text)
     if mime_type in ("application/xml", "text/xml"):
-        return _extract_xml_text(file_bytes)
+        return _extract_xml_text(file_bytes())
 
     # JSON — decode as-is
     if mime_type == "application/json":
-        return _decode_bytes(file_bytes), None
+        return _decode_bytes(file_bytes()), None
 
     # Plain text, CSV, Markdown, and other text/* types
     if mime_type.startswith("text/"):
-        return _decode_bytes(file_bytes), None
+        return _decode_bytes(file_bytes()), None
 
     # Parquet — stream row-by-row (never read_table the whole file into memory)
     # and reuse the page iterator so file columns get placeholders, not raw bytes.
     if mime_type in ("application/parquet", "application/vnd.apache.parquet"):
         try:
-            pages = _iter_parquet_pages(file_bytes, batch_size=1000, include_column_names=True)
+            pages = _iter_parquet_pages(source, batch_size=1000, include_column_names=True)
             return "\n".join(pages), None
         except Exception as e:
             return "", f"Parquet extraction failed: {e}"
@@ -1049,14 +1082,21 @@ def _extract_legacy_office_text(
     return extract_text(converted, target_mime, file_name=converted_name)
 
 
-def _decode_bytes(file_bytes: bytes) -> str:
-    """Decode bytes to str using chardet for encoding detection."""
+def _detect_encoding(sample: bytes) -> str:
+    """The encoding to read a text payload as, sniffed from a prefix."""
     try:
         chardet = _require_file_processing("chardet")
 
-        detected = chardet.detect(file_bytes[:65536])  # type: ignore[attr-defined]
-        encoding = detected.get("encoding") or "utf-8"
-        decoded = file_bytes.decode(encoding, errors="replace")
+        detected = chardet.detect(sample[:65536])  # type: ignore[attr-defined]
+        return str(detected.get("encoding") or "utf-8")
+    except Exception:
+        return "utf-8"
+
+
+def _decode_bytes(file_bytes: bytes) -> str:
+    """Decode bytes to str using chardet for encoding detection."""
+    try:
+        decoded = file_bytes.decode(_detect_encoding(file_bytes), errors="replace")
     except Exception:
         decoded = file_bytes.decode("utf-8", errors="replace")
     # Postgres TEXT columns reject NUL outright; any that survive decoding
@@ -1111,7 +1151,7 @@ def json_safe_default(value: Any) -> Any:
 
 
 def resolve_mime_type(
-    file_bytes: bytes,
+    source: BinarySource,
     *,
     declared_mime_type: str | None = None,
     file_name: str = "",
@@ -1123,7 +1163,7 @@ def resolve_mime_type(
     paying for text extraction (e.g. when content will be streamed in pages later).
     """
     declared_mime = _normalize_mime_type(declared_mime_type)
-    detected_mime = _normalize_mime_type(detect_mime_type(file_bytes))
+    detected_mime = _normalize_mime_type(detect_mime_type(source))
     inferred_mime = infer_mime_type_from_file_name(file_name)
 
     if declared_mime and declared_mime != OCTET_STREAM:
@@ -1143,7 +1183,7 @@ def resolve_mime_type(
     # content inspection: a binary renamed to .txt otherwise decodes to
     # control-character garbage that poisons every text consumer downstream.
     if (
-        file_bytes
+        payload_size(source) != 0
         and detected_mime == OCTET_STREAM
         and (mime_type.startswith("text/") or mime_type in ("application/json", "application/xml"))
     ):
@@ -1153,29 +1193,29 @@ def resolve_mime_type(
 
 
 def parse_bytes(
-    file_bytes: bytes,
+    source: BinarySource,
     *,
     declared_mime_type: str | None = None,
     file_name: str = "",
 ) -> ParsedBytes:
     """
-    Parse in-memory bytes: resolve MIME type and extract raw/text content.
+    Parse a payload in one shot: resolve MIME type and extract raw/text content.
 
-    Used by file evaluation and any caller that needs a complete ParsedBytes in one shot.
-    Object-storage sources prefer resolve_mime_type() + iter_file_pages() to avoid
-    loading all content into memory before detector scanning.
+    Used by file evaluation and any caller that needs a complete ParsedBytes at
+    once. Object-storage sources prefer resolve_mime_type() + iter_file_pages(),
+    which stream instead of building the whole text in memory.
     """
-    file_size_bytes = len(file_bytes)
+    file_size_bytes = payload_size(source) or 0
     mime_type = resolve_mime_type(
-        file_bytes, declared_mime_type=declared_mime_type, file_name=file_name
+        source, declared_mime_type=declared_mime_type, file_name=file_name
     )
 
     text_content, parse_error = extract_text(
-        file_bytes,
+        source,
         mime_type,
         file_name=file_name,
     )
-    raw_content = _decode_bytes(file_bytes) if _is_text_like_mime_type(mime_type) else ""
+    raw_content = _decode_bytes(read_all(source)) if _is_text_like_mime_type(mime_type) else ""
 
     if mime_type in {"text/html", "application/xhtml+xml"} and raw_content and not text_content:
         from .content_extraction import html_to_text
@@ -1199,7 +1239,7 @@ def parse_bytes(
 
 
 def iter_file_pages(
-    file_bytes: bytes | Any,
+    file_bytes: BinarySource,
     mime_type: str,
     batch_size: int = 100,
     include_column_names: bool = True,
@@ -1226,21 +1266,12 @@ def iter_file_pages(
     caller that leaves them at their defaults sees exactly the previous behaviour.
     They are ignored for payloads with no row axis, which have no window to apply.
 
-    ``file_bytes`` may also be a seekable binary file object, which only the
-    Parquet reader supports — every other format is extracted whole, so there is
-    nothing for a range-reading handle to save.
+    ``file_bytes`` may also be a seekable binary handle. The row-oriented readers
+    (Parquet, CSV/TSV) then read through it, so the payload never has to be held
+    in memory to be paged; the remaining formats extract whole text and only
+    borrow the handle to get at their bytes.
     """
     normalized = _normalize_mime_type(mime_type)
-
-    if not isinstance(file_bytes, bytes | bytearray) and normalized not in (
-        "application/parquet",
-        "application/vnd.apache.parquet",
-    ):
-        raise TextExtractionCoverageError(
-            f"A streaming handle was supplied for {normalized or mime_type}, "
-            "which is only supported for Parquet payloads.",
-            code=TextExtractionCoverageCode.FAILED,
-        )
 
     if normalized in ("application/parquet", "application/vnd.apache.parquet"):
         yield from _iter_parquet_pages(
@@ -1261,10 +1292,12 @@ def iter_file_pages(
         # Stream transcript pages directly from the chunked transcription pipeline
         # so the detector receives text as each ~10-min audio chunk completes
         # instead of waiting for the full file and buffering the entire transcript.
+        # The payload itself is materialized: the transcriber writes it to a temp
+        # file for ffmpeg either way.
         from .transcription import iter_transcription_pages
 
         yield from iter_transcription_pages(
-            file_bytes,
+            read_all(file_bytes),
             mime_type=normalized,
             file_name=file_name,
             segments_per_page=batch_size,
@@ -1277,9 +1310,10 @@ def iter_file_pages(
             iter_video_ocr_segments,
         )
 
+        media_bytes = read_all(file_bytes)
         try:
             yield from iter_transcription_pages(
-                file_bytes,
+                media_bytes,
                 mime_type=normalized,
                 file_name=file_name,
                 segments_per_page=batch_size,
@@ -1287,7 +1321,7 @@ def iter_file_pages(
         except Exception as exc:
             logger.warning("Video transcription failed for %s: %s", file_name or mime_type, exc)
         try:
-            yield from iter_video_ocr_segments(file_bytes, file_name=file_name)
+            yield from iter_video_ocr_segments(media_bytes, file_name=file_name)
         except Exception as exc:
             code = TextExtractionCoverageCode.FAILED
             if isinstance(exc, VideoOCREngineUnavailableError):
@@ -1567,23 +1601,33 @@ def _iter_parquet_pages(
 
 
 def _iter_csv_pages(
-    file_bytes: bytes,
+    source: BinarySource,
     include_column_names: bool,
     *,
     start_row: int = 0,
     max_rows: int | None = None,
 ) -> Generator[str, None, None]:
+    """Yield one page per CSV row, reading the payload incrementally.
+
+    Decoded through a ``TextIOWrapper`` rather than into a string: a CSV is the
+    one big format with no index, so the whole file is unavoidably *read* — but
+    only a row at a time needs to be *held*. Decoding it whole cost the file's
+    size in bytes plus its size again as text plus a list of every line, which is
+    what made a multi-gigabyte CSV impossible rather than merely slow.
+    """
     import csv
     import io
 
+    handle = as_binary_io(source)
+    encoding = _detect_encoding(header(source, 65536)) or "utf-8"
+    stream = io.TextIOWrapper(handle, encoding=encoding, errors="replace", newline="")
+    emitted = 0
     try:
-        text = _decode_bytes(file_bytes)
-        reader = csv.DictReader(io.StringIO(text))
+        reader = csv.DictReader(stream)
         headers = list(reader.fieldnames or [])
 
         begin = max(0, start_row)
         total_seen = 0
-        emitted = 0
 
         for row in reader:
             total_seen += 1
@@ -1604,6 +1648,14 @@ def _iter_csv_pages(
             f"CSV page iteration failed after {emitted} row(s): {exc}",
             code=TextExtractionCoverageCode.FAILED,
         ) from exc
+    finally:
+        # Detach rather than close: the handle belongs to the caller, who may
+        # still need it (the same payload is read again for row counts and
+        # embedded files). A closed TextIOWrapper would take it down with it.
+        try:
+            stream.detach()
+        except Exception:  # pragma: no cover - already detached or closed
+            pass
 
 
 def _format_embedded_placeholder(raw: bytes | None, mime_hint: str = "") -> str:
