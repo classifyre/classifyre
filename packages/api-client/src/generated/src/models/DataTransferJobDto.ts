@@ -68,7 +68,7 @@ export interface DataTransferJobDto {
      */
     checksum: string | null;
     /**
-     * True while the archive is still on disk and downloadable.
+     * True while the archive is still stored and downloadable.
      * @type {boolean}
      * @memberof DataTransferJobDto
      */
@@ -140,7 +140,7 @@ export interface DataTransferJobDto {
      */
     finishedAt: string | null;
     /**
-     * When the archive is deleted from disk.
+     * When the archive is dropped and stops being downloadable.
      * @type {string}
      * @memberof DataTransferJobDto
      */
@@ -167,6 +167,7 @@ export type DataTransferJobDtoKindEnum = typeof DataTransferJobDtoKindEnum[keyof
  * @export
  */
 export const DataTransferJobDtoStatusEnum = {
+    Staged: 'STAGED',
     Pending: 'PENDING',
     Running: 'RUNNING',
     Completed: 'COMPLETED',
