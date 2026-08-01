@@ -19,6 +19,40 @@ const logger = new Logger('AgentLoop');
 /** State key under which mid-loop progress is persisted in AgentRun.stepState. */
 const PROGRESS_KEY = 'reason-act:progress';
 
+// ── Transcript budget ────────────────────────────────────────────────────────
+//
+// The transcript is quadratic by construction: every iteration appends its tool
+// results and every iteration resends the whole thing. Unbounded, a single
+// `findings.search` over a large corpus could put hundreds of kilobytes into
+// turn 2 and then pay for it again on turns 3…16, and the same array is written
+// to AgentRun.stepState after every iteration. So results are capped on the way
+// in, and older ones are reduced to their header once newer turns exist.
+//
+// Both limits are in characters rather than tokens: the transcript is JSON, the
+// ratio is stable enough (~3.5 chars/token), and counting tokens here would
+// mean a tokenizer per provider for a budget that only has to be approximately
+// right.
+
+/** Largest a single tool result may be in the transcript. */
+const MAX_OBSERVATION_CHARS = 8_000;
+/** Largest one turn's whole observation message may be, across all its calls. */
+const MAX_TURN_OBSERVATION_CHARS = 24_000;
+/** Floor per call, so a turn with many calls still shows something of each. */
+const MIN_OBSERVATION_CHARS = 1_000;
+/**
+ * How many turns of tool results stay verbatim. Older ones keep their header
+ * line — which names every tool called and its outcome — and lose the payload.
+ * Three is enough for the "read, then act on what you read" pattern every
+ * mission follows, while a decision made ten iterations ago is represented by
+ * the model's own `thought` for it, which is never elided.
+ */
+const VERBATIM_OBSERVATION_TURNS = 3;
+
+/** Marks a user message as tool output, for capping and eliding. */
+const OBSERVATION_HEADER = 'Tool results';
+const ELIDED_NOTE =
+  '(full results elided to stay within the context budget — re-call the tool if you need them again)';
+
 /** One turn the model emits in the ReAct loop. */
 export interface LoopTurn {
   thought: string;
@@ -167,7 +201,7 @@ export async function runAgentLoop(
       break;
     }
 
-    const observations: unknown[] = [];
+    const observations: Observation[] = [];
     for (const [i, call] of calls.entries()) {
       const tool = allowed.includes(call.tool) && deps.registry.get(call.tool);
       if (!tool) {
@@ -192,8 +226,11 @@ export async function runAgentLoop(
 
     progress.messages.push({
       role: 'user',
-      content: `Tool results:\n${JSON.stringify(observations)}`,
+      content: renderObservations(progress.iteration, observations),
     });
+    // Reduce older turns to their headers before persisting, so both what we
+    // resend and what we store stay bounded.
+    elideOldObservations(progress.messages);
     await persist(ctx, deps.audit, progress);
   }
 
@@ -284,6 +321,97 @@ async function persist(
   ]);
 }
 
+/** One tool's result as it is fed back to the model. */
+export interface Observation {
+  tool: string;
+  outcome: string;
+  result: unknown;
+}
+
+/**
+ * Serialize one turn's tool results for the transcript, within budget.
+ *
+ * The first line is a header naming every call and its outcome. That line is
+ * load-bearing: it is what survives {@link elideOldObservations}, so the model
+ * can still see that it already called `inquiries.list` on iteration 2 and what
+ * came back, long after the payload is gone. Exported so the capability probes
+ * feed models the same shape the loop does — a probe built on a copy of this
+ * would stop testing the harness the moment either side changed.
+ */
+export function renderObservations(
+  iteration: number,
+  observations: Observation[],
+): string {
+  const header = `${OBSERVATION_HEADER} (iteration ${iteration}): ${
+    observations.map((o) => `${o.tool} → ${o.outcome}`).join('; ') || 'none'
+  }`;
+  // Share the turn budget evenly rather than first-come-first-served: a single
+  // huge read must not leave the four calls after it with nothing.
+  const share = observations.length
+    ? Math.floor(MAX_TURN_OBSERVATION_CHARS / observations.length)
+    : MAX_OBSERVATION_CHARS;
+  const budget = Math.min(
+    MAX_OBSERVATION_CHARS,
+    Math.max(MIN_OBSERVATION_CHARS, share),
+  );
+  const capped = observations.map((o) => ({
+    tool: o.tool,
+    outcome: o.outcome,
+    result: capResult(o.result, budget),
+  }));
+  return `${header}\n${JSON.stringify(capped)}`;
+}
+
+/**
+ * Keep a result under `budget` characters, telling the model plainly that it
+ * was cut and by how much — a silently truncated list reads as a complete one,
+ * and an agent that believes it has seen every finding will say so.
+ */
+function capResult(result: unknown, budget: number): unknown {
+  let json: string;
+  try {
+    json = JSON.stringify(result) ?? 'null';
+  } catch {
+    // A tool handed back something JSON cannot express (a cycle, a BigInt).
+    // Return its string form: the alternative is throwing here and failing a
+    // turn over a result the model could still have made some use of.
+    return { unserializable: true, value: String(result) };
+  }
+  if (json.length <= budget) return result;
+  return {
+    truncated: true,
+    originalChars: json.length,
+    shownChars: budget,
+    note:
+      'This result was too large for the context budget and is cut off mid-value. ' +
+      'Narrow the query (fewer items, a specific source, a tighter filter) rather ' +
+      'than treating what you see as the whole result.',
+    preview: json.slice(0, budget),
+  };
+}
+
+/**
+ * Reduce every observation message older than the last
+ * {@link VERBATIM_OBSERVATION_TURNS} to its header line.
+ *
+ * Applied to the persisted array itself, so it bounds the AgentRun.stepState
+ * write as well as the prompt. Idempotent: a message already elided is left
+ * alone, and the assistant's own reasoning turns are never touched.
+ */
+export function elideOldObservations(messages: AiMessage[]): void {
+  let seen = 0;
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const message = messages[i];
+    if (!message || message.role !== 'user') continue;
+    if (!message.content.startsWith(OBSERVATION_HEADER)) continue;
+    seen++;
+    if (seen <= VERBATIM_OBSERVATION_TURNS) continue;
+    if (message.content.endsWith(ELIDED_NOTE)) continue;
+    const header = message.content.split('\n', 1)[0] ?? OBSERVATION_HEADER;
+    messages[i] = { role: 'user', content: `${header}\n${ELIDED_NOTE}` };
+  }
+}
+
 function tallyResult(
   progress: LoopProgress,
   toolName: string,
@@ -363,6 +491,10 @@ export const RESPONSE_PROTOCOL: readonly string[] = [
   'Call read tools to gather what you need before mutating. When you are done, return {"thought":"...","finish":{"summary":"what you did"}} with an empty or omitted toolCalls.',
   'Finishing without having called a single mutating tool is a valid and often correct outcome. When that is the right answer, say so in the summary and give the reason ("read N findings across 3 sources; all boilerplate; nothing warranted an inquiry") rather than acting to have acted.',
   'Only call tools from the list above. Keep rationale short and specific.',
+  'Tool results come back under a header naming every call and its outcome. A very large result ' +
+    'is cut off and says so ("truncated": true) — narrow the query instead of assuming you saw all ' +
+    'of it. Older turns keep only that header line, so if you need a payload again, call the tool ' +
+    'again rather than guessing at what it said.',
 ];
 
 function buildUserPrompt(ctx: AgentContext, mission: Mission): string {

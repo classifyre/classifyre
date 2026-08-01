@@ -102,10 +102,19 @@ export interface DuplicateSummary {
 export interface CorpusCoverage {
   totalSources: number;
   scannedSources: number;
+  /**
+   * Sources nothing will ever read — never scanned successfully AND either
+   * failing every attempt, paused, or not scheduled. Excluded from
+   * `coverageRatio`: left in, they pinned it below the sample threshold for
+   * good, which put the harness into permanent observe-and-defer mode.
+   */
+  unavailableSources: number;
+  /** totalSources - unavailableSources. The ratio's denominator. */
+  reachableSources: number;
   neverScanned: number;
   inFlight: number;
   failing: number;
-  /** scannedSources / totalSources, 0–1. */
+  /** scannedSources / reachableSources, 0–1. */
   coverageRatio: number;
   findingsOpen: number;
   findingsAnalyzed: number;
@@ -118,6 +127,8 @@ export interface CorpusCoverage {
     lastRunStatus: string | null;
     runnerStatus: string | null;
     consecutiveFailures: number;
+    /** True when nothing will ever scan this source as currently configured. */
+    unavailable: boolean;
     /** Assets that should have carried text but yielded none. */
     assetsWithoutText: number | null;
     textCoverage: unknown;
@@ -211,6 +222,13 @@ export interface RecalledMemory {
   /** AGENT-authored memory is a hypothesis until verified; OPERATOR is authoritative. */
   origin: string;
   verified: boolean;
+  /**
+   * When the entry was last written. Optional because the full-text recall path
+   * does not select it; readers must treat its absence as "age unknown" rather
+   * than as "old". Used to give a deferred item a way out that does not depend
+   * on coverage ever reaching its threshold.
+   */
+  updatedAt?: Date;
 }
 
 /**

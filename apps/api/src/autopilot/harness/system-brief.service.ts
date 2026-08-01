@@ -1,9 +1,17 @@
 import { Injectable } from '@nestjs/common';
-import { AgentMemoryKind, Prisma, RunnerStatus } from '@prisma/client';
+import {
+  AgentMemoryKind,
+  AutoSchedulePhase,
+  Prisma,
+  RunnerStatus,
+  SourceScheduleMode,
+} from '@prisma/client';
 import { PrismaService } from '../../prisma.service';
 import { AgentMemoryService } from '../memory/agent-memory.service';
 import {
   CORPUS_SAMPLE_COVERAGE_THRESHOLD,
+  COVERAGE_UNAVAILABLE_FAILURE_STREAK,
+  DEFERRAL_MAX_AGE_DAYS,
   DEFERRED_TAG,
   MAX_DEFERRED_ENTRIES,
   MAX_GLOSSARY_ENTRIES,
@@ -288,6 +296,16 @@ export class SystemBriefService {
    * WARNING runs count as scanned: a run with partial OCR failure still
    * ingested assets and still fired a cycle, so excluding it would understate
    * coverage in exactly the direction that matters least.
+   *
+   * The ratio is scanned / (scanned + reachable-but-unread), NOT scanned / all.
+   * Sources that cannot be scanned — a failure streak with no successful run
+   * ever, a paused adaptive schedule, or scheduling switched off on a source
+   * nobody has ever run — are counted separately and named in the brief. Left in
+   * the denominator they made coverage a ratchet: it could never reach the
+   * threshold, so the agent was permanently told it was seeing a sample and
+   * permanently told to defer instead of act. Excluding them does not hide the
+   * gap; `sourcesUnavailable` is rendered on its own line, and getting those
+   * sources scanning is the config agent's job, not the investigators'.
    */
   async computeCoverage(): Promise<Record<string, unknown>> {
     const [
@@ -324,13 +342,42 @@ export class SystemBriefService {
     ]);
 
     const sourcesScanned = scannedGroups.length;
+    const scannedIds = new Set(scannedGroups.map((g) => g.sourceId));
+
+    // Sources nothing will ever read: never scanned successfully AND either
+    // repeatedly failing, paused by the adaptive scheduler, or not scheduled at
+    // all. `scannedIds` is the guard that keeps a source we HAVE read out of
+    // this set however broken it has become since.
+    const unavailableCandidates = await this.prisma.source.findMany({
+      where: {
+        OR: [
+          { consecutiveFailures: { gte: COVERAGE_UNAVAILABLE_FAILURE_STREAK } },
+          { scheduleMode: SourceScheduleMode.OFF },
+          {
+            autoPhase: AutoSchedulePhase.PAUSED,
+            scheduleMode: SourceScheduleMode.AUTO,
+          },
+        ],
+      },
+      select: { id: true },
+    });
+    const sourcesUnavailable = unavailableCandidates.filter(
+      (s) => !scannedIds.has(s.id),
+    ).length;
+
+    // Everything we could still read: what we have read, plus what is genuinely
+    // waiting. Zero only on an instance where nothing is readable at all, and
+    // then the honest ratio is 0 — not 1.
+    const reachable = Math.max(0, sources - sourcesUnavailable);
     return {
       sources,
       sourcesScanned,
       sourcesNeverScanned,
       sourcesInFlight,
       sourcesFailing,
-      coverageRatio: sources > 0 ? sourcesScanned / sources : 0,
+      sourcesUnavailable,
+      sourcesReachable: reachable,
+      coverageRatio: reachable > 0 ? sourcesScanned / reachable : 0,
       findingsOpen,
       findingsAnalyzed,
     };
@@ -486,25 +533,45 @@ function isDeferred(m: RecalledMemory): boolean {
 }
 
 /**
- * Deferred items whose recorded coverage threshold the corpus has now reached.
- * Below it they stay silent — resurfacing them every cycle would recreate the
- * pressure to act early that deferring them was meant to relieve.
+ * Deferred items that are due: either the corpus has reached the coverage they
+ * were waiting for, or they have simply waited long enough.
+ *
+ * Below that they stay silent — resurfacing them every cycle would recreate the
+ * pressure to act early that deferring them was meant to relieve. But coverage
+ * alone was a promise the system could not keep: on an instance whose ratio
+ * never reached the threshold, "revisit later" meant "never", and everything
+ * the agent parked stayed parked. The age fallback makes deferral a delay
+ * rather than a disposal.
  */
 function dueDeferrals(
   memories: RecalledMemory[],
   coverageRatio: number,
 ): BriefMemoryEntry[] {
+  const now = Date.now();
   return memories
     .filter(isDeferred)
-    .filter((m) => coverageRatio >= revisitThreshold(m))
+    .filter((m) => coverageRatio >= revisitThreshold(m) || isOverdue(m, now))
     .map(toEntry)
     .slice(0, MAX_DEFERRED_ENTRIES);
 }
 
+/**
+ * Default to the coverage threshold rather than 1.0. Requiring a full 100% was
+ * unreachable on any instance with a single unscannable source, so a deferral
+ * whose `revisit-at:` tag was lost — a dream-cycle rewrite drops tags — became
+ * permanent.
+ */
 function revisitThreshold(m: RecalledMemory): number {
   const tag = (m.tags ?? []).find((t) => t.startsWith('revisit-at:'));
   const parsed = tag ? Number(tag.slice('revisit-at:'.length)) : NaN;
-  return Number.isFinite(parsed) ? parsed : 1;
+  return Number.isFinite(parsed) ? parsed : CORPUS_SAMPLE_COVERAGE_THRESHOLD;
+}
+
+/** Waited past {@link DEFERRAL_MAX_AGE_DAYS}, whatever coverage says. */
+function isOverdue(m: RecalledMemory, now: number): boolean {
+  const at = m.updatedAt ? new Date(m.updatedAt).getTime() : NaN;
+  if (!Number.isFinite(at)) return false;
+  return now - at >= DEFERRAL_MAX_AGE_DAYS * 24 * 3600 * 1000;
 }
 
 function bullets(entries: BriefMemoryEntry[]): string {
@@ -531,17 +598,31 @@ function num(v: unknown): string {
 export function renderCoverage(f: Record<string, unknown>): string {
   const sources = numVal(f.sources);
   const scanned = numVal(f.sourcesScanned);
-  const ratio = sources > 0 ? scanned / sources : 0;
+  const unavailable = numVal(f.sourcesUnavailable);
+  // Reachable, not total. A source that cannot be scanned is not corpus the
+  // investigators are still waiting for, and counting it as such pinned the
+  // ratio below the threshold permanently — see computeCoverage.
+  const reachable =
+    numVal(f.sourcesReachable) || Math.max(0, sources - unavailable);
+  const ratio = reachable > 0 ? scanned / reachable : 0;
   const pct = Math.round(ratio * 100);
 
   const state = [
-    `${scanned} of ${sources} sources scanned (${pct}%).`,
+    `${scanned} of ${reachable} reachable sources scanned (${pct}%).`,
     `${num(f.sourcesNeverScanned)} never scanned,`,
     `${num(f.sourcesInFlight)} in flight,`,
     `${num(f.sourcesFailing)} failing.`,
+    // Named rather than folded into the ratio: it is a real gap and somebody
+    // has to fix it, but it is an operator/config problem, not a reason for the
+    // investigation agents to distrust everything they can see.
+    unavailable > 0
+      ? `${unavailable} of ${sources} sources cannot be scanned at all (switched off, paused, or failing every attempt) and are excluded from this percentage — they are a configuration problem, not missing evidence you should wait for.`
+      : '',
     `Evidence analysis: ${num(f.findingsAnalyzed)} of ${num(f.findingsOpen)} open findings scored`,
     `(unscored findings are pending, not unimportant).`,
-  ].join(' ');
+  ]
+    .filter(Boolean)
+    .join(' ');
 
   if (sources === 0 || ratio >= CORPUS_SAMPLE_COVERAGE_THRESHOLD) {
     return state;

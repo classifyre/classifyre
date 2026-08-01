@@ -9,7 +9,7 @@ describe('SystemBriefService', () => {
 
   const mockPrisma = {
     agentSystemBrief: { findUnique: jest.fn(), upsert: jest.fn() },
-    source: { count: jest.fn() },
+    source: { count: jest.fn(), findMany: jest.fn() },
     runner: { groupBy: jest.fn() },
     asset: { count: jest.fn(), groupBy: jest.fn() },
     customDetector: { count: jest.fn() },
@@ -39,6 +39,7 @@ describe('SystemBriefService', () => {
 
     // Coverage is recomputed on every compose(), so every path needs these.
     mockPrisma.source.count.mockResolvedValue(0);
+    mockPrisma.source.findMany.mockResolvedValue([]);
     mockPrisma.runner.groupBy.mockResolvedValue([]);
     mockPrisma.finding.count.mockResolvedValue(0);
 
@@ -170,17 +171,24 @@ describe('SystemBriefService', () => {
     // anyway. Resurfacing a deferral before its threshold would recreate
     // exactly the pressure to act early that deferring it relieved.
     describe('deferred items', () => {
-      const parked = (revisitAt: string) => [
+      const parked = (revisitAt: string | null, updatedAt = new Date()) => [
         {
           kind: 'DECISION_PRECEDENT',
           key: 'deferred:html-noise',
           content: 'Seen in symes-k; expect it elsewhere',
           weight: 1,
-          tags: ['deferred', `revisit-at:${revisitAt}`],
+          tags:
+            revisitAt === null
+              ? ['deferred']
+              : ['deferred', `revisit-at:${revisitAt}`],
           origin: 'AGENT',
           verified: false,
+          updatedAt,
         },
       ];
+
+      const daysAgo = (days: number) =>
+        new Date(Date.now() - days * 24 * 3600 * 1000);
 
       const atCoverage = (scanned: number, total: number) => {
         mockPrisma.source.count.mockResolvedValue(total);
@@ -225,6 +233,99 @@ describe('SystemBriefService', () => {
 
         const c = await service.compose();
         expect(c.gaps.map((g) => g.key)).not.toContain('deferred:html-noise');
+      });
+
+      // Coverage alone was a promise the system could not keep: an instance
+      // whose ratio never reached the threshold parked things permanently.
+      it('resurfaces an item that has simply waited long enough', async () => {
+        mockMemory.topByWeight.mockImplementation((kind: AgentMemoryKind) =>
+          Promise.resolve(
+            kind === AgentMemoryKind.DECISION_PRECEDENT
+              ? parked('0.9', daysAgo(30))
+              : [],
+          ),
+        );
+        atCoverage(12, 151);
+
+        const c = await service.compose();
+        expect(c.deferred.map((d) => d.key)).toContain('deferred:html-noise');
+      });
+
+      it('still waits while the item is young and coverage is low', async () => {
+        mockMemory.topByWeight.mockImplementation((kind: AgentMemoryKind) =>
+          Promise.resolve(
+            kind === AgentMemoryKind.DECISION_PRECEDENT
+              ? parked('0.9', daysAgo(2))
+              : [],
+          ),
+        );
+        atCoverage(12, 151);
+
+        const c = await service.compose();
+        expect(c.deferred).toHaveLength(0);
+      });
+
+      // A dream-cycle rewrite can drop tags. Defaulting to 1.0 made that
+      // deferral permanent, since full coverage is unreachable with a single
+      // unscannable source.
+      it('falls back to the coverage threshold, not 100%, when the tag is lost', async () => {
+        mockMemory.topByWeight.mockImplementation((kind: AgentMemoryKind) =>
+          Promise.resolve(
+            kind === AgentMemoryKind.DECISION_PRECEDENT ? parked(null) : [],
+          ),
+        );
+        atCoverage(95, 100);
+
+        const c = await service.compose();
+        expect(c.deferred.map((d) => d.key)).toContain('deferred:html-noise');
+      });
+    });
+
+    // The ratchet itself: dead sources used to sit in the coverage denominator
+    // forever, pinning the ratio below the threshold and leaving the harness in
+    // permanent observe-and-defer mode.
+    describe('unscannable sources', () => {
+      it('leaves them out of the coverage ratio', async () => {
+        mockPrisma.source.count.mockResolvedValue(100);
+        mockPrisma.runner.groupBy.mockResolvedValue(
+          Array.from({ length: 80 }, (_, i) => ({ sourceId: `s${i}` })),
+        );
+        // 20 sources that cannot be scanned, none of them ever scanned.
+        mockPrisma.source.findMany.mockResolvedValue(
+          Array.from({ length: 20 }, (_, i) => ({ id: `dead${i}` })),
+        );
+
+        const c = await service.compose();
+
+        expect(c.facts.sourcesUnavailable).toBe(20);
+        expect(c.facts.sourcesReachable).toBe(80);
+        // 80/80, not 80/100 — the difference between "act" and "defer".
+        expect(c.facts.coverageRatio).toBe(1);
+      });
+
+      it('keeps a source it has successfully scanned in the ratio, however broken it is now', async () => {
+        mockPrisma.source.count.mockResolvedValue(10);
+        mockPrisma.runner.groupBy.mockResolvedValue([{ sourceId: 's1' }]);
+        // s1 is failing now, but we HAVE read it — it is not unavailable.
+        mockPrisma.source.findMany.mockResolvedValue([{ id: 's1' }]);
+
+        const c = await service.compose();
+
+        expect(c.facts.sourcesUnavailable).toBe(0);
+        expect(c.facts.coverageRatio).toBeCloseTo(0.1);
+      });
+
+      it('reports 0%, not full coverage, when every source is unavailable', async () => {
+        mockPrisma.source.count.mockResolvedValue(5);
+        mockPrisma.runner.groupBy.mockResolvedValue([]);
+        mockPrisma.source.findMany.mockResolvedValue(
+          Array.from({ length: 5 }, (_, i) => ({ id: `dead${i}` })),
+        );
+
+        const c = await service.compose();
+
+        expect(c.facts.sourcesReachable).toBe(0);
+        expect(c.facts.coverageRatio).toBe(0);
       });
     });
 

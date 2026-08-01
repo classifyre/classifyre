@@ -24,7 +24,7 @@ describe('renderCoverage', () => {
   it('states the ratio the agent was previously left to infer', () => {
     const out = renderCoverage(enron);
 
-    expect(out).toContain('12 of 151 sources scanned (8%)');
+    expect(out).toContain('12 of 151 reachable sources scanned (8%)');
     expect(out).toContain('121 never scanned');
     expect(out).toContain('14 failing');
   });
@@ -60,7 +60,7 @@ describe('renderCoverage', () => {
     });
 
     expect(out).not.toContain('YOU ARE SEEING');
-    expect(out).toContain('151 of 151 sources scanned (100%)');
+    expect(out).toContain('151 of 151 reachable sources scanned (100%)');
   });
 
   it('does not shout at a fresh instance with no sources', () => {
@@ -81,6 +81,57 @@ describe('renderCoverage', () => {
     const out = renderCoverage({ ...enron, sources: 2, sourcesScanned: 1 });
 
     expect(out).toContain('YOU ARE SEEING 50% OF THIS CORPUS');
+  });
+
+  // The ratchet: coverage used to divide by every source row, so sources that
+  // can never be scanned held the ratio below the threshold for good. Below it
+  // the brief tells the agent it is looking at a sample and the coverage
+  // doctrine tells it to defer instead of act — which is how a handful of dead
+  // sources put the whole harness into permanent observe-and-defer mode.
+  describe('sources that cannot be scanned', () => {
+    it('excludes them from the ratio instead of holding it down forever', () => {
+      const out = renderCoverage({
+        ...enron,
+        sources: 151,
+        sourcesScanned: 130,
+        sourcesReachable: 131,
+        sourcesUnavailable: 20,
+        sourcesNeverScanned: 21,
+      });
+
+      // 130/131, not 130/151 (86%, which would have kept the warning on).
+      expect(out).toContain('130 of 131 reachable sources scanned (99%)');
+      expect(out).not.toContain('YOU ARE SEEING');
+    });
+
+    it('names them, so the gap is visible rather than quietly dropped', () => {
+      const out = renderCoverage({
+        ...enron,
+        sourcesReachable: 131,
+        sourcesUnavailable: 20,
+      });
+
+      expect(out).toContain('20 of 151 sources cannot be scanned at all');
+      expect(out).toMatch(/configuration problem, not missing evidence/);
+    });
+
+    it('says nothing about them when there are none', () => {
+      const out = renderCoverage(enron);
+
+      expect(out).not.toContain('cannot be scanned at all');
+    });
+
+    it('reports 0%, not 100%, when nothing readable has been read', () => {
+      const out = renderCoverage({
+        ...enron,
+        sources: 10,
+        sourcesScanned: 0,
+        sourcesReachable: 0,
+        sourcesUnavailable: 10,
+      });
+
+      expect(out).toContain('YOU ARE SEEING 0% OF THIS CORPUS');
+    });
   });
 
   it('renders missing facts without producing NaN', () => {
