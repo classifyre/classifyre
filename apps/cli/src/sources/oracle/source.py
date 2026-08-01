@@ -11,6 +11,7 @@ from ...models.generated_input import (
     SamplingConfig,
     SamplingStrategy,
 )
+from ...utils.file_parser import render_bytes_cell
 from ..dependencies import require_module
 from ..tabular_base import BaseTabularSource
 from ..tabular_utils import TableRef
@@ -244,7 +245,10 @@ class OracleSource(BaseTabularSource):
                 value = str(value)
 
         if isinstance(value, (bytes, bytearray)):
-            return f"<{len(value)} bytes>"
+            # A CLOB read through the LOB branch above lands here as bytes; text in
+            # a BLOB is just as common. Both must stay readable — see
+            # ``render_bytes_cell``.
+            return render_bytes_cell(bytes(value))
         if isinstance(value, datetime):
             return value.isoformat()
         return str(value)

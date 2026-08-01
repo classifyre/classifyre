@@ -25,6 +25,7 @@ from ...models.generated_single_asset_scan_results import (
     Location,
     SingleAssetScanResults,
 )
+from ...utils.file_parser import json_safe_default
 from ...utils.hashing import hash_id, unhash_id
 from ..base import BaseSource
 from ..dependencies import require_module
@@ -434,7 +435,10 @@ class MongoDBSource(BaseSource):
         )
 
     def _serialize_document(self, document: dict[str, Any]) -> str:
-        return json.dumps(document, ensure_ascii=False, default=str, sort_keys=True)
+        # json_safe_default, not default=str: a BSON Binary subclasses bytes, so
+        # str() renders its Python repr and a JSON payload stored in one arrived
+        # at the detectors doubly escaped instead of as the document it is.
+        return json.dumps(document, ensure_ascii=False, default=json_safe_default, sort_keys=True)
 
     def _format_collection_content(
         self,

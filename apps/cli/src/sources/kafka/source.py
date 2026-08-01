@@ -40,6 +40,7 @@ from ...models.generated_single_asset_scan_results import (
 from ...models.generated_single_asset_scan_results import (
     SingleAssetScanResults,
 )
+from ...utils.file_parser import render_bytes_cell
 from ...utils.hashing import hash_id
 from ..base import BaseSource
 from ..dependencies import require_module
@@ -519,10 +520,10 @@ class KafkaSource(BaseSource):
         if value is None:
             return "null"
         if isinstance(value, (bytes, bytearray)):
-            try:
-                return bytes(value).decode("utf-8")
-            except UnicodeDecodeError:
-                return f"<{len(bytes(value))} bytes>"
+            # A decode that succeeds is not proof of readability: control bytes
+            # are valid UTF-8, so the old UnicodeDecodeError fallback never fired
+            # for a binary payload and emitted raw control characters instead.
+            return render_bytes_cell(bytes(value))
         return str(value)
 
     def _start_offset(self, strategy: SamplingStrategy, low: int, high: int, per: int) -> int:

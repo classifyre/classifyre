@@ -31,10 +31,10 @@ from typing import Any
 
 from .file_parser import (
     OCTET_STREAM,
-    _is_null_byte_unicode_text,
     _normalize_mime_type,
     _parquet_row_group_start,
     _require_file_processing,
+    is_readable_text,
     resolve_mime_type,
 )
 
@@ -237,7 +237,7 @@ def detect_parquet_payload_columns(parquet_file: Any) -> dict[str, EmbeddedColum
         if (
             content == CONTENT_TEXT
             and sample_bytes is not None
-            and not _is_readable_text(sample_bytes)
+            and not is_readable_text(sample_bytes)
         ):
             content = CONTENT_OPAQUE
         # A struct<bytes, …> column is a *declared* file feature (HuggingFace Image,
@@ -248,19 +248,6 @@ def detect_parquet_payload_columns(parquet_file: Any) -> dict[str, EmbeddedColum
             content = CONTENT_FILE
         columns[name] = EmbeddedColumn(kind=kind, mime_hint=mime, content=content)
     return columns
-
-
-def _is_readable_text(raw: bytes) -> bool:
-    """Whether bytes decode to something a text detector could actually read."""
-    sample = raw[:4096]
-    if not sample:
-        return False
-    if b"\x00" in sample:
-        # UTF-16/32 interleaves a NUL with every character and is still text.
-        return _is_null_byte_unicode_text(sample)
-    decoded = sample.decode("utf-8", errors="replace")
-    printable = sum(1 for char in decoded if char.isprintable() or char.isspace())
-    return printable / len(decoded) >= 0.9
 
 
 def _sample_column_payload(batch: Any, column_name: str, kind: str) -> tuple[str, bytes | None]:
