@@ -99,7 +99,48 @@ export interface SearchSourceItemDto {
      * @memberof SearchSourceItemDto
      */
     scheduleNextAt?: Date | null;
+    /**
+     * 
+     * @type {string}
+     * @memberof SearchSourceItemDto
+     */
+    scheduleMode?: SearchSourceItemDtoScheduleModeEnum;
+    /**
+     * Adaptive-schedule phase. Meaningful only when scheduleMode is AUTO.
+     * @type {string}
+     * @memberof SearchSourceItemDto
+     */
+    autoPhase?: SearchSourceItemDtoAutoPhaseEnum;
+    /**
+     * 
+     * @type {string}
+     * @memberof SearchSourceItemDto
+     */
+    autoReason?: string | null;
 }
+
+
+/**
+ * @export
+ */
+export const SearchSourceItemDtoScheduleModeEnum = {
+    Off: 'OFF',
+    Cron: 'CRON',
+    Auto: 'AUTO'
+} as const;
+export type SearchSourceItemDtoScheduleModeEnum = typeof SearchSourceItemDtoScheduleModeEnum[keyof typeof SearchSourceItemDtoScheduleModeEnum];
+
+/**
+ * @export
+ */
+export const SearchSourceItemDtoAutoPhaseEnum = {
+    CatchUp: 'CATCH_UP',
+    Steady: 'STEADY',
+    Backoff: 'BACKOFF',
+    Paused: 'PAUSED'
+} as const;
+export type SearchSourceItemDtoAutoPhaseEnum = typeof SearchSourceItemDtoAutoPhaseEnum[keyof typeof SearchSourceItemDtoAutoPhaseEnum];
+
 
 /**
  * Check if a given object implements the SearchSourceItemDto interface.
@@ -136,6 +177,9 @@ export function SearchSourceItemDtoFromJSONTyped(json: any, ignoreDiscriminator:
         'scheduleCron': json['scheduleCron'] == null ? undefined : json['scheduleCron'],
         'scheduleTimezone': json['scheduleTimezone'] == null ? undefined : json['scheduleTimezone'],
         'scheduleNextAt': json['scheduleNextAt'] == null ? undefined : (new Date(json['scheduleNextAt'])),
+        'scheduleMode': json['scheduleMode'] == null ? undefined : json['scheduleMode'],
+        'autoPhase': json['autoPhase'] == null ? undefined : json['autoPhase'],
+        'autoReason': json['autoReason'] == null ? undefined : json['autoReason'],
     };
 }
 
@@ -162,6 +206,9 @@ export function SearchSourceItemDtoToJSONTyped(value?: SearchSourceItemDto | nul
         'scheduleCron': value['scheduleCron'],
         'scheduleTimezone': value['scheduleTimezone'],
         'scheduleNextAt': value['scheduleNextAt'] == null ? value['scheduleNextAt'] : value['scheduleNextAt'].toISOString(),
+        'scheduleMode': value['scheduleMode'],
+        'autoPhase': value['autoPhase'],
+        'autoReason': value['autoReason'],
     };
 }
 

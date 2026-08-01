@@ -24,11 +24,32 @@ export type SchedulePreset =
   | "weekly"
   | "custom";
 
+/** Which scheduler owns the source. Mirrors the API's SourceScheduleMode. */
+export type ScheduleMode = "OFF" | "CRON" | "AUTO";
+
 export type ScheduleValue = {
+  /** Kept as the OFF/on switch so existing call sites read the same. */
   enabled: boolean;
+  mode: ScheduleMode;
   preset: SchedulePreset;
   cron: string;
   timezone: string;
+};
+
+export type AutoSchedulePhase = "CATCH_UP" | "STEADY" | "BACKOFF" | "PAUSED";
+
+/** Live adaptive-schedule state, when the source already has one. */
+export type AutoScheduleStatus = {
+  phase: AutoSchedulePhase;
+  nextRunAt?: string | Date | null;
+  reason?: string | null;
+};
+
+const PHASE_TONE: Record<AutoSchedulePhase, string> = {
+  CATCH_UP: "border-accent/50 text-accent bg-accent/10",
+  STEADY: "border-border/40 text-muted-foreground bg-foreground/5",
+  BACKOFF: "border-destructive/40 text-destructive bg-destructive/10",
+  PAUSED: "border-destructive/60 text-destructive bg-destructive/10",
 };
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
@@ -71,6 +92,10 @@ interface ScheduleCardProps {
   disabled?: boolean;
   className?: string;
   error?: string;
+  /** Live phase of an existing automatic schedule, when there is one. */
+  autoStatus?: AutoScheduleStatus | null;
+  /** Clear a PAUSED circuit breaker. Omit to hide the resume action. */
+  onResume?: () => Promise<void>;
 }
 
 // ─── Component ─────────────────────────────────────────────────────────────────
@@ -82,6 +107,8 @@ export function ScheduleCard({
   disabled,
   className,
   error,
+  autoStatus,
+  onResume,
 }: ScheduleCardProps) {
   const { t } = useTranslation();
 
@@ -131,19 +158,36 @@ export function ScheduleCard({
 
   const handleEnabledChange = (enabled: boolean) => {
     if (!enabled) {
-      onChange({ ...value, enabled: false, preset: "none", cron: "" });
-    } else {
-      const preset: Exclude<SchedulePreset, "none" | "custom"> =
-        value.preset === "none" || value.preset === "custom"
-          ? "nightly"
-          : (value.preset as Exclude<SchedulePreset, "none" | "custom">);
       onChange({
         ...value,
-        enabled: true,
-        preset,
-        cron: generateCronForPreset(preset),
+        enabled: false,
+        mode: "OFF",
+        preset: "none",
+        cron: "",
       });
+      return;
     }
+    // Default to automatic: it is right for almost every source, and picking a
+    // wall-clock time is only meaningful once you know how long a scan takes.
+    handleModeChange(value.mode === "CRON" ? "CRON" : "AUTO");
+  };
+
+  const handleModeChange = (mode: Exclude<ScheduleMode, "OFF">) => {
+    if (mode === "AUTO") {
+      onChange({ ...value, enabled: true, mode: "AUTO" });
+      return;
+    }
+    const preset: Exclude<SchedulePreset, "none" | "custom"> =
+      value.preset === "none" || value.preset === "custom"
+        ? "nightly"
+        : (value.preset as Exclude<SchedulePreset, "none" | "custom">);
+    onChange({
+      ...value,
+      enabled: true,
+      mode: "CRON",
+      preset,
+      cron: value.cron || generateCronForPreset(preset),
+    });
   };
 
   const handlePresetSelect = (
@@ -152,6 +196,7 @@ export function ScheduleCard({
     onChange({
       ...value,
       enabled: true,
+      mode: "CRON",
       preset,
       cron: generateCronForPreset(preset),
     });
@@ -184,13 +229,19 @@ export function ScheduleCard({
       setCronError("Fix the cron expression before applying");
       return;
     }
-    onChange({ ...value, preset: "custom", enabled: true, cron: cronInput });
+    onChange({
+      ...value,
+      preset: "custom",
+      enabled: true,
+      mode: "CRON",
+      cron: cronInput,
+    });
     setCronError("");
   };
 
   const handleSave = async () => {
     if (!onSave) return;
-    if (value.enabled && cronInput && !isValidCron(cronInput)) {
+    if (value.mode === "CRON" && cronInput && !isValidCron(cronInput)) {
       setCronError("Fix the cron expression before saving");
       return;
     }
@@ -202,8 +253,27 @@ export function ScheduleCard({
     }
   };
 
+  const [isResuming, setIsResuming] = React.useState(false);
+
+  const PHASE_LABEL: Record<AutoSchedulePhase, string> = {
+    CATCH_UP: t("schedule.phaseCatchUp"),
+    STEADY: t("schedule.phaseSteady"),
+    BACKOFF: t("schedule.phaseBackoff"),
+    PAUSED: t("schedule.phasePaused"),
+  };
+
+  const handleResume = async () => {
+    if (!onResume) return;
+    try {
+      setIsResuming(true);
+      await onResume();
+    } finally {
+      setIsResuming(false);
+    }
+  };
+
   const isPresetActive = (preset: string) =>
-    value.enabled && value.preset === preset;
+    value.enabled && value.mode === "CRON" && value.preset === preset;
 
   const cronDescription = isValidCron(value.cron)
     ? describeCronLocal(value.cron)
@@ -226,14 +296,29 @@ export function ScheduleCard({
           <span className="text-xs font-mono uppercase tracking-[0.12em] font-bold">
             Ingestion Schedule
           </span>
-          {value.enabled && value.cron && (
-            <Badge
-              variant="outline"
-              className="h-5 px-1.5 text-[10px] font-mono border-accent/50 text-accent bg-accent/10 uppercase tracking-wider"
-            >
-              Active
-            </Badge>
-          )}
+          {value.enabled &&
+            (value.mode === "AUTO" ? (
+              <Badge
+                variant="outline"
+                className={cn(
+                  "h-5 px-1.5 text-[10px] font-mono uppercase tracking-wider",
+                  autoStatus
+                    ? PHASE_TONE[autoStatus.phase]
+                    : "border-accent/50 text-accent bg-accent/10",
+                )}
+              >
+                {autoStatus ? PHASE_LABEL[autoStatus.phase] : "Automatic"}
+              </Badge>
+            ) : (
+              value.cron && (
+                <Badge
+                  variant="outline"
+                  className="h-5 px-1.5 text-[10px] font-mono border-accent/50 text-accent bg-accent/10 uppercase tracking-wider"
+                >
+                  Active
+                </Badge>
+              )
+            ))}
         </div>
         <div className="flex items-center gap-2">
           <Label
@@ -253,8 +338,106 @@ export function ScheduleCard({
       </div>
 
       <div className="p-4 space-y-4">
+        {/* ── Mode selector ─────────────────────────────────────────────────── */}
+        {value.enabled && (
+          <div className="grid grid-cols-2 gap-1.5">
+            {(
+              [
+                {
+                  mode: "AUTO" as const,
+                  label: t("schedule.modeAutomatic"),
+                  hint: t("schedule.modeAutomaticHint"),
+                },
+                {
+                  mode: "CRON" as const,
+                  label: t("schedule.modeFixed"),
+                  hint: t("schedule.modeFixedHint"),
+                },
+              ] as const
+            ).map((option) => {
+              const active = value.mode === option.mode;
+              return (
+                <button
+                  key={option.mode}
+                  type="button"
+                  onClick={() => handleModeChange(option.mode)}
+                  disabled={disabled}
+                  className={cn(
+                    "flex flex-col items-start gap-0.5 rounded-[4px] border-2 px-3 py-2 text-left transition-all",
+                    active
+                      ? "border-border bg-foreground text-primary-foreground shadow-[2px_2px_0_var(--color-border)]"
+                      : "border-border/20 hover:border-border hover:bg-foreground/5",
+                  )}
+                >
+                  <span className="text-xs font-semibold leading-tight">
+                    {option.label}
+                  </span>
+                  <span
+                    className={cn(
+                      "text-[10px] font-mono",
+                      active
+                        ? "text-primary-foreground/60"
+                        : "text-muted-foreground",
+                    )}
+                  >
+                    {option.hint}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {/* ── Automatic mode ────────────────────────────────────────────────── */}
+        {value.enabled && value.mode === "AUTO" && (
+          <div className="space-y-3">
+            <p className="text-[11px] leading-relaxed text-muted-foreground">
+              {t("schedule.autoExplainer")}
+            </p>
+            {autoStatus && (
+              <div className="rounded-[4px] border-2 border-border/20 bg-foreground/5 px-3 py-2 space-y-1">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[10px] font-mono uppercase tracking-[0.14em] text-muted-foreground">
+                    {t("schedule.status")}
+                  </span>
+                  <span className="text-[10px] font-mono text-muted-foreground">
+                    {autoStatus.nextRunAt
+                      ? t("schedule.nextScan", {
+                          time: new Date(
+                            autoStatus.nextRunAt,
+                          ).toLocaleString(),
+                        })
+                      : t("schedule.noScanQueued")}
+                  </span>
+                </div>
+                {autoStatus.reason && (
+                  <p className="text-[11px] text-foreground/80">
+                    {autoStatus.reason}
+                  </p>
+                )}
+                {autoStatus.phase === "PAUSED" && onResume && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={handleResume}
+                    disabled={disabled || isResuming}
+                    className="mt-1 h-7 px-2 text-[11px] border-2 border-border rounded-[4px] font-mono bg-foreground text-primary-foreground hover:bg-accent hover:text-accent-foreground"
+                  >
+                    {isResuming ? t("schedule.resuming") : t("schedule.resume")}
+                  </Button>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* ── Preset frequency grid ─────────────────────────────────────────── */}
-        <div className="space-y-2">
+        <div
+          className={cn(
+            "space-y-2",
+            value.enabled && value.mode === "AUTO" && "hidden",
+          )}
+        >
           <p className="text-[10px] font-mono uppercase tracking-[0.14em] text-muted-foreground">
             Frequency
           </p>
@@ -298,10 +481,20 @@ export function ScheduleCard({
           </div>
         </div>
 
-        <Separator className="bg-border/10" />
+        <Separator
+          className={cn(
+            "bg-border/10",
+            value.enabled && value.mode === "AUTO" && "hidden",
+          )}
+        />
 
         {/* ── Cron input row ────────────────────────────────────────────────── */}
-        <div className="space-y-1.5">
+        <div
+          className={cn(
+            "space-y-1.5",
+            value.enabled && value.mode === "AUTO" && "hidden",
+          )}
+        >
           <div className="flex gap-2 items-center">
             <div className="relative flex-1">
               <Input
@@ -324,6 +517,7 @@ export function ScheduleCard({
               />
               {/* Re-roll button for preset modes */}
               {value.enabled &&
+                value.mode === "CRON" &&
                 value.preset !== "none" &&
                 value.preset !== "custom" && (
                   <button
@@ -402,17 +596,60 @@ export function ScheduleCard({
 
 export function defaultScheduleValue(schedule?: {
   enabled?: boolean;
+  mode?: string | null;
   preset?: string;
   cron?: string;
   timezone?: string;
 }): ScheduleValue {
   if (!schedule) {
-    return { enabled: false, preset: "none", cron: "", timezone: "UTC" };
+    return {
+      enabled: false,
+      mode: "OFF",
+      preset: "none",
+      cron: "",
+      timezone: "UTC",
+    };
   }
+  // `mode` is authoritative when the API sent one. Older callers (and the
+  // source examples, which only carry a cron) fall back to the enabled flag, so
+  // anything with a cron is a fixed schedule.
+  const mode: ScheduleMode =
+    schedule.mode === "AUTO" || schedule.mode === "CRON"
+      ? schedule.mode
+      : schedule.mode === "OFF"
+        ? "OFF"
+        : schedule.enabled
+          ? "CRON"
+          : "OFF";
   return {
-    enabled: schedule.enabled ?? false,
+    enabled: mode !== "OFF",
+    mode,
     preset: (schedule.preset as SchedulePreset) ?? "none",
     cron: schedule.cron ?? "",
     timezone: schedule.timezone ?? "UTC",
   };
+}
+
+/**
+ * The source create/update payload for a schedule value. One place, so the new
+ * and edit pages cannot drift on what "automatic" means on the wire.
+ */
+export function scheduleFieldsFor(value: ScheduleValue): {
+  scheduleMode: ScheduleMode;
+  scheduleEnabled: boolean;
+  scheduleCron?: string;
+  scheduleTimezone?: string;
+} {
+  if (value.mode === "AUTO") {
+    return { scheduleMode: "AUTO", scheduleEnabled: false };
+  }
+  if (value.mode === "CRON" && value.cron) {
+    return {
+      scheduleMode: "CRON",
+      scheduleEnabled: true,
+      scheduleCron: value.cron,
+      scheduleTimezone: value.timezone,
+    };
+  }
+  return { scheduleMode: "OFF", scheduleEnabled: false };
 }

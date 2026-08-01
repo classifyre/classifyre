@@ -18,6 +18,10 @@ const OBSERVE_TOOLS = [
   // tool that could tell them how much of the corpus had been scanned, and drew
   // corpus-wide conclusions from 8% of it.
   'corpus.coverage',
+  // Coverage says which sources have been scanned; this says which of them are
+  // still mid-sweep. A source scanned once is not a source read fully, and
+  // without this the two are indistinguishable.
+  'schedule.list',
   'findings.search',
   'inquiries.list',
   'inquiries.archived',
@@ -73,7 +77,10 @@ const TRIAGE_DOCTRINE = [
 const COVERAGE_DOCTRINE = [
   '\nCOVERAGE DOCTRINE: the Corpus coverage section of the system brief tells you what',
   'fraction of the sources have actually been scanned; corpus.coverage gives you the',
-  'detail. Below full coverage you are looking at a sample, and a conclusion about a',
+  'detail, and schedule.list tells you which of the scanned ones are still mid-sweep',
+  '(phase CATCH_UP) — a source being re-scanned back-to-back is still filling up, so',
+  '"scanned" does not mean "read". Below full coverage you are looking at a sample,',
+  'and a conclusion about a',
   'sample stated as a conclusion about the corpus is simply false. Never claim an',
   'absence ("no evidence of X") at partial coverage — you have not looked. Never',
   'generalise a pattern across sources you have not seen: if you notice something in',
@@ -256,6 +263,16 @@ export const CONFIG_MISSION: Mission = {
     'describing what you changed and what you expect — a later cycle confirms whether it helped. First',
     'check memory for your own prior "pending-verification" notes and judge the new finding landscape',
     'against them. If this run is itself a verification re-scan, do NOT re-scan again.',
+    '\nCADENCE: schedule.list tells you how often each source is scanned and where it is in its',
+    'sweep. A source in CATCH_UP has NOT finished ingesting — it is being re-scanned back-to-back',
+    'because each scan is still finding new data, so judge it on what it has produced so far and',
+    'never conclude a source is empty or a detector useless from a partial sweep. A source in',
+    'STEADY has converged: its scans now only pick up what is new. You do NOT need to touch the',
+    'schedule after a config change — config.tune_source restarts the sweep for you. Use',
+    'schedule.tune only for the two cases it names: slow_down when a STEADY source keeps scanning',
+    'and producing nothing worth the cost, and resweep when something outside your config change',
+    'means the existing assets deserve another look. Sources an operator put on a cron schedule',
+    'are not yours to change.',
     '\nFINGERPRINTS: you also own the correlation (fingerprint/duplicate) tuning. Check',
     'duplicates.summary; if clusters look wrong — obvious duplicates missed, or unrelated assets',
     'lumped together — inspect the shared values behind them (fingerprints.value_occurrences,',
@@ -273,6 +290,10 @@ export const CONFIG_MISSION: Mission = {
     'system_brief.get',
     'config.tune_source',
     'sources.rescan',
+    // Scan cadence. Read is unconditional (a source mid-sweep must not be
+    // judged as if it were complete); the write is narrow — see ScheduleToolset.
+    'schedule.list',
+    'schedule.tune',
     // Correlation/fingerprints config is tunable here too — observe cluster
     // quality first (duplicates.summary), then tune.
     'duplicates.summary',

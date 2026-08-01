@@ -36,6 +36,8 @@ import {
 } from "@/components/test-connection-dialog";
 import {
   defaultScheduleValue,
+  scheduleFieldsFor,
+  type AutoScheduleStatus,
   type ScheduleValue,
 } from "@/components/schedule-card";
 import { toast } from "sonner";
@@ -92,6 +94,7 @@ export default function EditSourcePage() {
   const [schedule, setSchedule] = useState<ScheduleValue>(
     defaultScheduleValue(),
   );
+  const [autoStatus, setAutoStatus] = useState<AutoScheduleStatus | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSavingConfig, setIsSavingConfig] = useState(false);
   const [isTestingConfig, setIsTestingConfig] = useState(false);
@@ -132,10 +135,23 @@ export default function EditSourcePage() {
         if (data.type === "SANDBOX") {
           setUploadedFiles(await listSourceFiles(sourceId));
         }
-        // Read schedule fields from source response
-        if (data.scheduleEnabled) {
+        // Read schedule fields from source response. `scheduleMode` is the
+        // authoritative one — an AUTO source has no cron and scheduleEnabled
+        // false, so reading the old pair alone would show it as unscheduled.
+        const mode =
+          typeof data.scheduleMode === "string" ? data.scheduleMode : undefined;
+        if (mode === "AUTO") {
+          setSchedule(defaultScheduleValue({ mode: "AUTO" }));
+          setAutoStatus({
+            phase:
+              (data.autoPhase as AutoScheduleStatus["phase"]) ?? "CATCH_UP",
+            nextRunAt: data.scheduleNextAt ?? null,
+            reason: (data.autoReason as string | null) ?? null,
+          });
+        } else if (data.scheduleEnabled) {
           setSchedule({
             enabled: true,
+            mode: "CRON",
             preset: "custom",
             cron:
               typeof data.scheduleCron === "string" ? data.scheduleCron : "",
@@ -400,14 +416,7 @@ export default function EditSourcePage() {
         ...(detectorPayload.length > 0 ? { detectors: detectorPayload } : {}),
       };
 
-      const scheduleFields =
-        schedule.enabled && schedule.cron
-          ? {
-              scheduleEnabled: true,
-              scheduleCron: schedule.cron,
-              scheduleTimezone: schedule.timezone,
-            }
-          : { scheduleEnabled: false };
+      const scheduleFields = scheduleFieldsFor(schedule);
 
       const updated = await api.sources.sourcesControllerUpdateSource({
         id: sourceId,
@@ -445,6 +454,23 @@ export default function EditSourcePage() {
       return false;
     } finally {
       setIsSavingConfig(false);
+    }
+  };
+
+  /** Clear the circuit breaker on a source whose automatic scanning was paused. */
+  const handleResumeSchedule = async () => {
+    try {
+      await api.sources.sourcesControllerResumeSchedule({ id: sourceId });
+      setAutoStatus({
+        phase: "CATCH_UP",
+        nextRunAt: new Date(),
+        reason: "Resumed by an operator.",
+      });
+      toast.success(t("sources.schedule.resumed"));
+    } catch (error) {
+      toast.error(
+        extractApiErrorMessage(error, "Failed to resume automatic scanning"),
+      );
     }
   };
 
@@ -586,6 +612,8 @@ export default function EditSourcePage() {
         selectedCustomDetectorIds={selectedCustomDetectorIds}
         onCustomDetectorsChange={setSelectedCustomDetectorIds}
         onScheduleChange={setSchedule}
+        autoStatus={autoStatus}
+        onResumeSchedule={handleResumeSchedule}
         uploadedFiles={uploadedFiles}
         pendingFiles={pendingFiles}
         pendingRemovalIds={pendingRemovalIds}
@@ -624,6 +652,8 @@ function SourceEditStepperContent({
   selectedCustomDetectorIds,
   onCustomDetectorsChange,
   onScheduleChange,
+  autoStatus,
+  onResumeSchedule,
   uploadedFiles,
   pendingFiles,
   pendingRemovalIds,
@@ -645,6 +675,8 @@ function SourceEditStepperContent({
   selectedCustomDetectorIds: string[];
   onCustomDetectorsChange: (ids: string[]) => void;
   onScheduleChange: (schedule: ScheduleValue) => void;
+  autoStatus: AutoScheduleStatus | null;
+  onResumeSchedule: () => Promise<void>;
   uploadedFiles: UploadedFileMetadata[];
   pendingFiles: File[];
   pendingRemovalIds: Set<string>;
@@ -762,6 +794,8 @@ function SourceEditStepperContent({
                   showActions={false}
                   schedule={schedule}
                   onScheduleChange={onScheduleChange}
+                  autoScheduleStatus={autoStatus}
+                  onResumeSchedule={onResumeSchedule}
                   afterNameContent={
                     sourceType === "SANDBOX" ? (
                       <UploadedFiles

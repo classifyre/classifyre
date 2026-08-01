@@ -1,6 +1,6 @@
 import { ConflictException, Injectable, Logger } from '@nestjs/common';
 import type { Job } from 'pg-boss';
-import { TriggerType } from '@prisma/client';
+import { SourceScheduleMode, TriggerType } from '@prisma/client';
 import { ClsService } from 'nestjs-cls';
 import { PrismaService } from '../prisma.service';
 import { PgBossService } from './pg-boss.service';
@@ -167,6 +167,12 @@ export class SchedulerService {
         scheduleEnabled: true,
         scheduleCron: cron,
         scheduleTimezone: timezone,
+        // Exactly one scheduler owns a source. Taking CRON also takes the
+        // source out of AUTO and clears the due time the adaptive scheduler
+        // was working from, so the two can never both start runs.
+        scheduleMode: SourceScheduleMode.CRON,
+        scheduleNextAt: null,
+        autoReason: null,
       },
     });
 
@@ -175,7 +181,18 @@ export class SchedulerService {
     );
   }
 
-  async removeSchedule(sourceId: string): Promise<void> {
+  /**
+   * Drop the pg-boss cron schedule for a source.
+   *
+   * `nextMode` is what takes over: OFF for "stop scheduling this source", AUTO
+   * when the caller is handing the source to the adaptive scheduler (which then
+   * sets the phase and due time itself). It is written here rather than by the
+   * caller so a source is never briefly owned by neither scheduler.
+   */
+  async removeSchedule(
+    sourceId: string,
+    nextMode: SourceScheduleMode = SourceScheduleMode.OFF,
+  ): Promise<void> {
     const boss = await this.getBoss();
     const name = jobName(sourceId);
 
@@ -189,6 +206,8 @@ export class SchedulerService {
         // scheduleTimezone is NOT NULL in the DB — preserve the user's timezone
         // so it's retained when the schedule is re-enabled later.
         scheduleNextAt: null,
+        scheduleMode: nextMode,
+        ...(nextMode === SourceScheduleMode.OFF ? { autoReason: null } : {}),
       },
     });
 
@@ -199,6 +218,7 @@ export class SchedulerService {
     enabled: boolean;
     cron: string | null;
     timezone: string | null;
+    mode: SourceScheduleMode;
   }> {
     const source = await this.prisma.source.findUnique({
       where: { id: sourceId },
@@ -206,17 +226,24 @@ export class SchedulerService {
         scheduleEnabled: true,
         scheduleCron: true,
         scheduleTimezone: true,
+        scheduleMode: true,
       },
     });
 
     if (!source) {
-      return { enabled: false, cron: null, timezone: null };
+      return {
+        enabled: false,
+        cron: null,
+        timezone: null,
+        mode: SourceScheduleMode.OFF,
+      };
     }
 
     return {
       enabled: source.scheduleEnabled,
       cron: source.scheduleCron,
       timezone: source.scheduleTimezone,
+      mode: source.scheduleMode,
     };
   }
 }

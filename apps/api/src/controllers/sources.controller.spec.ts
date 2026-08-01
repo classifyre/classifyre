@@ -5,6 +5,7 @@ import { ValidationService } from '../validation.service';
 import { CustomDetectorsService } from '../custom-detectors.service';
 import { CliRunnerService } from '../cli-runner/cli-runner.service';
 import { SchedulerService } from '../scheduler/scheduler.service';
+import { AutoScheduleService } from '../scheduler/auto-schedule.service';
 import { SourceFilesService } from '../source-files.service';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { RunnerStatus } from '@prisma/client';
@@ -66,6 +67,12 @@ describe('SourcesController', () => {
     getSchedule: jest.fn(),
   };
 
+  const mockAutoScheduleService = {
+    enable: jest.fn(),
+    describe: jest.fn(),
+    resume: jest.fn(),
+  };
+
   const mockCustomDetectorsService = {
     assertActiveDetectorIds: jest.fn().mockResolvedValue([]),
   };
@@ -86,6 +93,7 @@ describe('SourcesController', () => {
         },
         { provide: CliRunnerService, useValue: mockCliRunnerService },
         { provide: SchedulerService, useValue: mockSchedulerService },
+        { provide: AutoScheduleService, useValue: mockAutoScheduleService },
         { provide: SourceFilesService, useValue: mockSourceFilesService },
       ],
     }).compile();

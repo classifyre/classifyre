@@ -134,6 +134,12 @@ export interface InstanceSettingsResponseDto {
      */
     autopilotMcpEnabled: boolean;
     /**
+     * Master switch for adaptive ("automatic") source scheduling. When false, no AUTO source is started; each source keeps its phase, so turning this back on resumes exactly where it left off.
+     * @type {boolean}
+     * @memberof InstanceSettingsResponseDto
+     */
+    autoScheduleEnabled: boolean;
+    /**
      * Read-only. When true, the instance runs in demo mode and all mutating operations are rejected.
      * @type {boolean}
      * @memberof InstanceSettingsResponseDto
@@ -210,6 +216,7 @@ export function instanceOfInstanceSettingsResponseDto(value: object): value is I
     if (!('autopilotEscalationEnabled' in value) || value['autopilotEscalationEnabled'] === undefined) return false;
     if (!('autopilotEscalationGuidance' in value) || value['autopilotEscalationGuidance'] === undefined) return false;
     if (!('autopilotMcpEnabled' in value) || value['autopilotMcpEnabled'] === undefined) return false;
+    if (!('autoScheduleEnabled' in value) || value['autoScheduleEnabled'] === undefined) return false;
     if (!('demoMode' in value) || value['demoMode'] === undefined) return false;
     if (!('hfTokenSet' in value) || value['hfTokenSet'] === undefined) return false;
     if (!('hfTokenInstanceSet' in value) || value['hfTokenInstanceSet'] === undefined) return false;
@@ -247,6 +254,7 @@ export function InstanceSettingsResponseDtoFromJSONTyped(json: any, ignoreDiscri
         'autopilotEscalationEnabled': json['autopilotEscalationEnabled'],
         'autopilotEscalationGuidance': json['autopilotEscalationGuidance'],
         'autopilotMcpEnabled': json['autopilotMcpEnabled'],
+        'autoScheduleEnabled': json['autoScheduleEnabled'],
         'demoMode': json['demoMode'],
         'hfTokenSet': json['hfTokenSet'],
         'hfTokenInstanceSet': json['hfTokenInstanceSet'],
@@ -285,6 +293,7 @@ export function InstanceSettingsResponseDtoToJSONTyped(value?: InstanceSettingsR
         'autopilotEscalationEnabled': value['autopilotEscalationEnabled'],
         'autopilotEscalationGuidance': value['autopilotEscalationGuidance'],
         'autopilotMcpEnabled': value['autopilotMcpEnabled'],
+        'autoScheduleEnabled': value['autoScheduleEnabled'],
         'demoMode': value['demoMode'],
         'hfTokenSet': value['hfTokenSet'],
         'hfTokenInstanceSet': value['hfTokenInstanceSet'],

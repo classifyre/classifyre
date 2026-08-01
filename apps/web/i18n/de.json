@@ -764,6 +764,9 @@
       "confirm": "Findings löschen",
       "success": "Findings bereinigt",
       "failed": "Findings konnten nicht bereinigt werden"
+    },
+    "schedule": {
+      "resumed": "Automatische Scans fortgesetzt."
     }
   },
   "findings": {
@@ -2011,7 +2014,21 @@
       "weekdayAm": "Mo–Fr 6–9 Uhr",
       "businessHours": "Mo–Fr 9–17 Uhr",
       "weekly": "Sonntagabend"
-    }
+    },
+    "modeAutomatic": "Automatisch",
+    "modeAutomaticHint": "Passt sich den Daten an",
+    "modeFixed": "Fester Zeitplan",
+    "modeFixedHint": "Sie wählen die Zeiten",
+    "autoExplainer": "Scans laufen direkt hintereinander, solange jeder noch neue Daten liefert — eine große Quelle ist so schnell fertig wie möglich. Sobald ein Scan nichts Neues mehr findet, vergrößert sich der Abstand von selbst (bis zu einmal täglich) und es wird nur noch Neues erfasst. Neue Daten oder eine Änderung an den Detektoren dieser Quelle setzen sie sofort wieder auf volles Tempo.",
+    "status": "Status",
+    "nextScan": "Nächster Scan {time}",
+    "noScanQueued": "Kein Scan geplant",
+    "resume": "Scans fortsetzen",
+    "resuming": "Wird fortgesetzt…",
+    "phaseCatchUp": "Erfasst Daten",
+    "phaseSteady": "Aktuell",
+    "phaseBackoff": "Wiederholung",
+    "phasePaused": "Pausiert"
   },
   "aiProvider": {
     "saved": "KI-Anbietereinstellungen gespeichert",

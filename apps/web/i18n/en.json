@@ -764,6 +764,9 @@
       "confirm": "Purge findings",
       "success": "Findings purged",
       "failed": "Failed to purge findings"
+    },
+    "schedule": {
+      "resumed": "Automatic scanning resumed."
     }
   },
   "findings": {
@@ -2011,7 +2014,21 @@
       "weekdayAm": "Mon–Fri 6–9 am",
       "businessHours": "Mon–Fri 9–5 pm",
       "weekly": "Sunday night"
-    }
+    },
+    "modeAutomatic": "Automatic",
+    "modeAutomaticHint": "Adapts to the data",
+    "modeFixed": "Fixed schedule",
+    "modeFixedHint": "You pick the times",
+    "autoExplainer": "Scans run back to back while each one is still bringing in new data, so a large source finishes as fast as it can. Once a scan comes back with nothing new, the gap widens on its own — up to once a day — and only picks up what has changed since. Any new data, or a change to this source’s detectors, puts it straight back to full speed.",
+    "status": "Status",
+    "nextScan": "Next scan {time}",
+    "noScanQueued": "No scan queued",
+    "resume": "Resume scanning",
+    "resuming": "Resuming…",
+    "phaseCatchUp": "Ingesting",
+    "phaseSteady": "Up to date",
+    "phaseBackoff": "Retrying",
+    "phasePaused": "Paused"
   },
   "aiProvider": {
     "saved": "AI provider settings saved",

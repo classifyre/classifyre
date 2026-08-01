@@ -41,6 +41,7 @@ export class InstanceSettingsService {
       autopilotEscalationEnabled: settings.autopilotEscalationEnabled,
       autopilotEscalationGuidance: settings.autopilotEscalationGuidance,
       autopilotMcpEnabled: settings.autopilotMcpEnabled,
+      autoScheduleEnabled: settings.autoScheduleEnabled,
       hfTokenSet: !!settings.hfTokenEnc,
       hfTokenInstanceSet: isInstanceTokenSet,
       demoMode: this.demoMode.isDemoMode,
@@ -176,6 +177,9 @@ export class InstanceSettingsService {
         : {}),
       ...(updateDto.autopilotMcpEnabled !== undefined
         ? { autopilotMcpEnabled: updateDto.autopilotMcpEnabled }
+        : {}),
+      ...(updateDto.autoScheduleEnabled !== undefined
+        ? { autoScheduleEnabled: updateDto.autoScheduleEnabled }
         : {}),
       ...(aiProviderConfigUpdate ?? {}),
       ...(updateDto.hfToken !== undefined

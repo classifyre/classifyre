@@ -121,6 +121,10 @@ export interface SourcesControllerPurgeFindingsRequest {
     id: string;
 }
 
+export interface SourcesControllerResumeScheduleRequest {
+    id: string;
+}
+
 export interface SourcesControllerStartRunRequest {
     id: string;
 }
@@ -759,6 +763,44 @@ export class SourcesApi extends runtime.BaseAPI {
      */
     async sourcesControllerPurgeFindings(requestParameters: SourcesControllerPurgeFindingsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
         await this.sourcesControllerPurgeFindingsRaw(requestParameters, initOverrides);
+    }
+
+    /**
+     * Clear the circuit breaker on a source whose automatic schedule was paused after repeated scan failures, and queue it to run immediately.
+     * Resume automatic scanning
+     */
+    async sourcesControllerResumeScheduleRaw(requestParameters: SourcesControllerResumeScheduleRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
+        if (requestParameters['id'] == null) {
+            throw new runtime.RequiredError(
+                'id',
+                'Required parameter "id" was null or undefined when calling sourcesControllerResumeSchedule().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/sources/{id}/schedule/resume`;
+        urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.VoidApiResponse(response);
+    }
+
+    /**
+     * Clear the circuit breaker on a source whose automatic schedule was paused after repeated scan failures, and queue it to run immediately.
+     * Resume automatic scanning
+     */
+    async sourcesControllerResumeSchedule(requestParameters: SourcesControllerResumeScheduleRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
+        await this.sourcesControllerResumeScheduleRaw(requestParameters, initOverrides);
     }
 
     /**

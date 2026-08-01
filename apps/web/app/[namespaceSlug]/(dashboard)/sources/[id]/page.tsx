@@ -702,7 +702,25 @@ export default function SourceViewPage() {
                     <p className="text-xs uppercase text-muted-foreground">
                       {t("sources.detail.scheduleSection")}
                     </p>
-                    {source.scheduleEnabled ? (
+                    {source.scheduleMode === "AUTO" ? (
+                      // An automatic source has no cron and scheduleEnabled
+                      // false, so the legacy check below would call it manual.
+                      <div className="flex items-center gap-1.5 text-sm text-[#4a7c00] font-medium">
+                        <CalendarClock className="h-4 w-4 shrink-0" />
+                        <span>{t("schedule.modeAutomatic")}</span>
+                        <span className="text-xs text-muted-foreground font-normal">
+                          ({t(`schedule.phase${
+                            source.autoPhase === "STEADY"
+                              ? "Steady"
+                              : source.autoPhase === "BACKOFF"
+                                ? "Backoff"
+                                : source.autoPhase === "PAUSED"
+                                  ? "Paused"
+                                  : "CatchUp"
+                          }`)})
+                        </span>
+                      </div>
+                    ) : source.scheduleEnabled ? (
                       <div className="flex items-center gap-1.5 text-sm text-[#4a7c00] font-medium">
                         <CalendarClock className="h-4 w-4 shrink-0" />
                         <span className="font-mono text-xs">

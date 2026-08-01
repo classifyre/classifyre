@@ -261,6 +261,7 @@ All URIs are relative to *http://localhost*
 *SourcesApi* | [**sourcesControllerGetSource**](docs/SourcesApi.md#sourcescontrollergetsource) | **GET** /sources/{id} | Get source by ID
 *SourcesApi* | [**sourcesControllerListSources**](docs/SourcesApi.md#sourcescontrollerlistsources) | **GET** /sources | List all data sources
 *SourcesApi* | [**sourcesControllerPurgeFindings**](docs/SourcesApi.md#sourcescontrollerpurgefindings) | **DELETE** /sources/{id}/findings | Purge all findings of a data source
+*SourcesApi* | [**sourcesControllerResumeSchedule**](docs/SourcesApi.md#sourcescontrollerresumeschedule) | **POST** /sources/{id}/schedule/resume | Resume automatic scanning
 *SourcesApi* | [**sourcesControllerStartRun**](docs/SourcesApi.md#sourcescontrollerstartrun) | **POST** /sources/{id}/runs | Start a new ingestion run
 *SourcesApi* | [**sourcesControllerTestConnection**](docs/SourcesApi.md#sourcescontrollertestconnection) | **POST** /sources/{id}/test | Test source connection
 *SourcesApi* | [**sourcesControllerUpdateSource**](docs/SourcesApi.md#sourcescontrollerupdatesource) | **PUT** /sources/{id} | Update a data source

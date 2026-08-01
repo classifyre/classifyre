@@ -177,6 +177,16 @@ export class UpdateInstanceSettingsDto {
 
   @ApiPropertyOptional({
     description:
+      'Master switch for adaptive ("automatic") source scheduling. Setting it ' +
+      'false stops AUTO sources from being started without losing their state.',
+    example: true,
+  })
+  @IsOptional()
+  @IsBoolean()
+  autoScheduleEnabled?: boolean;
+
+  @ApiPropertyOptional({
+    description:
       'Hugging Face token to set. Pass a token value to store (encrypted at rest). ' +
       'Pass null or an empty string to clear the stored token. ' +
       'Ignored when an instance-level HF_TOKEN is configured.',

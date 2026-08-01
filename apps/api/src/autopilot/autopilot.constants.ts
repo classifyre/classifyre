@@ -131,6 +131,23 @@ export const DEFERRED_KEY_PREFIX = 'deferred:';
 /** Deferred items shown in the brief's "Deferred until more coverage" section. */
 export const MAX_DEFERRED_ENTRIES = 10;
 
+// ── Autopilot-triggered re-scans ────────────────────────────────────────────
+/**
+ * The `sources.rescan` depth-1 guard refuses to re-scan from inside a cycle
+ * that was itself triggered by an autopilot re-scan. That guard reads the
+ * triggering runner — and a COALESCED CORPUS CYCLE HAS NO RUNNER, so it was
+ * inert for exactly the cycles that now do most of the work: config agent
+ * re-scans → scan completes → source goes dirty → next corpus cycle → config
+ * agent re-scans again, with nothing but prose in the mission telling it to
+ * stop.
+ *
+ * These bound it in code instead. A source may be re-scanned by the autopilot
+ * at most once per cooldown, and at most this many times a day, whatever the
+ * cycle shape.
+ */
+export const AUTOPILOT_RESCAN_COOLDOWN_SECONDS = 2 * 3600;
+export const AUTOPILOT_RESCANS_PER_DAY = 4;
+
 /**
  * "Dreaming" cadence: every other day at 03:10 the agent consolidates its
  * memory (dedupe, prune noise, distill important notes). Registered as a

@@ -420,6 +420,9 @@ export class SourceService {
         scheduleCron: source.scheduleCron,
         scheduleTimezone: source.scheduleTimezone,
         scheduleNextAt: source.scheduleNextAt,
+        scheduleMode: source.scheduleMode,
+        autoPhase: source.autoPhase,
+        autoReason: source.autoReason,
       };
     });
 
