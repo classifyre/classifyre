@@ -30,6 +30,7 @@ from ...utils.file_parser import (
     infer_mime_type_from_file_name,
     normalize_mime_type,
     resolve_mime_type,
+    tabular_mime_type_for_name,
 )
 from ...utils.hashing import hash_id, unhash_id
 from ..base import BaseSource
@@ -911,6 +912,72 @@ class ObjectStorageSourceBase(BaseSource, ABC):
         if children:
             yield children
 
+    def _object_identity(self, asset_id: str) -> tuple[str, str]:
+        """The (asset hash, external URL) pair an asset id stands for.
+
+        The pipeline addresses an asset by either, and child assets arrive as an
+        encoded ``<parent>_#_<url>`` id, so every lookup has to normalize first.
+        """
+        external_url = self._hash_to_uri.get(asset_id)
+        if external_url is not None:
+            return asset_id, external_url
+
+        decoded = asset_id
+        if "_#_" not in decoded:
+            try:
+                decoded = unhash_id(asset_id)
+            except Exception:
+                decoded = asset_id
+        if "_#_" in decoded:
+            _, candidate = decoded.split("_#_", maxsplit=1)
+            return self.generate_hash_id(candidate), candidate
+        return self.generate_hash_id(asset_id), asset_id
+
+    def _open_object_range_reader(self, ref: ObjectRef) -> Any | None:
+        """A seekable handle over this object, or None when ranges are unavailable.
+
+        Overridden by providers whose backend serves HTTP ``Range`` requests. The
+        default is None, which keeps every other source on the download-and-parse
+        path it has always used.
+        """
+        return None
+
+    def _open_row_reader(self, asset_id: str) -> tuple[Any, str] | None:
+        """A range-reading handle for an object too large to download, if possible.
+
+        Byte-capping a Parquet file does not produce fewer rows, it produces a
+        headless file with no rows at all — the footer that says where the row
+        groups live is the part that gets cut off. So for an oversized Parquet the
+        choice is not "read some of it" but "read it by ranges or not at all", and
+        this is where that decision is made. Everything else still goes down the
+        capped-download path, where truncation costs detail rather than the file.
+        """
+        ref_hash, _ = self._object_identity(asset_id)
+        ref = self._object_ref_by_hash.get(ref_hash)
+        if ref is None or not ref.size or ref.size <= self._max_object_bytes():
+            return None
+
+        file_name = self._object_file_name(ref)
+        mime = tabular_mime_type_for_name(file_name) or ""
+        if mime not in ("application/parquet", "application/vnd.apache.parquet"):
+            return None
+
+        try:
+            handle = self._open_object_range_reader(ref)
+        except Exception as exc:
+            logger.warning("Range reader unavailable for %s: %s", ref.key, exc)
+            return None
+        if handle is None:
+            return None
+
+        logger.info(
+            "Reading %s (%d bytes) by byte range: only the footer and the row "
+            "groups this run's window covers are transferred",
+            ref.key,
+            ref.size,
+        )
+        return handle, mime
+
     async def fetch_content_bytes(self, asset_id: str) -> tuple[bytes, str] | None:
         raw_bytes = self._bytes_cache.get(asset_id)
         if raw_bytes is None:
@@ -921,22 +988,7 @@ class ObjectStorageSourceBase(BaseSource, ABC):
         if raw_bytes is not None and mime:
             return raw_bytes, mime
 
-        external_url = self._hash_to_uri.get(asset_id)
-        asset_hash = asset_id
-        if external_url is None:
-            decoded = asset_id
-            if "_#_" not in decoded:
-                try:
-                    decoded = unhash_id(asset_id)
-                except Exception:
-                    decoded = asset_id
-            if "_#_" in decoded:
-                _, candidate = decoded.split("_#_", maxsplit=1)
-                external_url = candidate
-                asset_hash = self.generate_hash_id(candidate)
-            else:
-                external_url = asset_id
-                asset_hash = self.generate_hash_id(asset_id)
+        asset_hash, external_url = self._object_identity(asset_id)
 
         ref = self._object_ref_by_hash.get(asset_hash)
         if ref is None:
@@ -967,6 +1019,23 @@ class ObjectStorageSourceBase(BaseSource, ABC):
         mime = self._mime_cache.get(asset_id, "")
 
         if raw_bytes is None:
+            # An object too large to download whole is read by byte range instead
+            # of being truncated into an unreadable stub. Checked before the
+            # download below so the capped bytes are never fetched for it.
+            row_reader = self._open_row_reader(asset_id)
+            if row_reader is not None:
+                handle, stream_mime = row_reader
+                try:
+                    async for page in self._pump_pages(asset_id, handle, stream_mime):
+                        yield "", page
+                finally:
+                    try:
+                        handle.close()
+                    except Exception:  # pragma: no cover - close is best effort
+                        pass
+                self._content_pages_processed.add(asset_id)
+                return
+
             # Normal phase-2 path: discovery ran with discovery_only=True, so no
             # bytes were ever cached. Fetch them once here.
             #
@@ -994,66 +1063,82 @@ class ObjectStorageSourceBase(BaseSource, ABC):
         )
 
         if raw_bytes is not None:
-            sampling = self.config.sampling
-            batch_size = int(sampling.rows_per_page or 100)
-            include_col_names = bool(
-                sampling.include_column_names if sampling.include_column_names is not None else True
-            )
-            file_name = self._file_name_for_asset_id(asset_id)
-
-            # Stream pages from a thread instead of materializing via list().
-            # For transcription this lets detectors start working on the first
-            # chunk while later chunks are still being transcribed.
-            loop = asyncio.get_running_loop()
-            queue: asyncio.Queue[str | None] = asyncio.Queue()
-
-            exc_info: list[BaseException | None] = [None]
-
-            page_count: int = 0
-
-            def _produce() -> None:
-                nonlocal page_count
-                try:
-                    for page in self.iter_asset_pages(
-                        raw_bytes,
-                        mime,
-                        batch_size,
-                        include_col_names,
-                        file_name=file_name,
-                        asset_id=asset_id,
-                    ):
-                        loop.call_soon_threadsafe(queue.put_nowait, page)
-                        page_count += 1
-                except BaseException as exc:
-                    exc_info[0] = exc
-                finally:
-                    loop.call_soon_threadsafe(queue.put_nowait, None)
-
-            task = loop.run_in_executor(None, _produce)
-
-            while True:
-                page = await queue.get()
-                if page is None:
-                    break
+            async for page in self._pump_pages(asset_id, raw_bytes, mime):
                 yield "", page
-
-            await task
-            if exc_info[0] is not None:
-                raise exc_info[0]  # type: ignore[misc]
-
-            logger.info(
-                "fetch_content_pages(%s): streamed %d page(s) from %s",
-                asset_id,
-                page_count,
-                file_name,
-            )
-
             self._content_pages_processed.add(asset_id)
             return
 
         result = await self.fetch_content(asset_id)
         if result:
             yield result
+
+    async def _pump_pages(
+        self,
+        asset_id: str,
+        payload: bytes | Any,
+        mime: str,
+    ) -> AsyncGenerator[str, None]:
+        """Yield an asset's pages, produced on a worker thread.
+
+        ``payload`` is either the object's bytes or a seekable handle over them;
+        the page iterator treats both the same, and the sampling window bounds
+        either one.
+
+        Streaming from a thread instead of materializing via ``list()`` lets
+        detectors start on the first page while the rest are still being produced
+        — which for transcription is the difference between minutes of idle time
+        and none.
+        """
+        sampling = self.config.sampling
+        batch_size = int(sampling.rows_per_page or 100)
+        include_col_names = bool(
+            sampling.include_column_names if sampling.include_column_names is not None else True
+        )
+        file_name = self._file_name_for_asset_id(asset_id)
+
+        loop = asyncio.get_running_loop()
+        queue: asyncio.Queue[str | None] = asyncio.Queue()
+
+        exc_info: list[BaseException | None] = [None]
+
+        page_count: int = 0
+
+        def _produce() -> None:
+            nonlocal page_count
+            try:
+                for page in self.iter_asset_pages(
+                    payload,
+                    mime,
+                    batch_size,
+                    include_col_names,
+                    file_name=file_name,
+                    asset_id=asset_id,
+                ):
+                    loop.call_soon_threadsafe(queue.put_nowait, page)
+                    page_count += 1
+            except BaseException as exc:
+                exc_info[0] = exc
+            finally:
+                loop.call_soon_threadsafe(queue.put_nowait, None)
+
+        task = loop.run_in_executor(None, _produce)
+
+        while True:
+            page = await queue.get()
+            if page is None:
+                break
+            yield page
+
+        await task
+        if exc_info[0] is not None:
+            raise exc_info[0]  # type: ignore[misc]
+
+        logger.info(
+            "fetch_content_pages(%s): streamed %d page(s) from %s",
+            asset_id,
+            page_count,
+            file_name,
+        )
 
     def _file_name_for_asset_id(self, asset_id: str) -> str:
         external_url = self._hash_to_uri.get(asset_id)

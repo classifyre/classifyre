@@ -18,7 +18,12 @@ import pytest
 
 from src.pipeline.payload_window import PayloadWindowStore
 from src.sources.base import BaseSource
-from src.utils.file_parser import count_tabular_rows, iter_file_pages
+from src.utils.file_parser import (
+    TextExtractionCoverageCode,
+    TextExtractionCoverageError,
+    count_tabular_rows,
+    iter_file_pages,
+)
 
 pytest.importorskip("pyarrow")
 
@@ -133,9 +138,71 @@ def test_parquet_skips_row_groups_instead_of_decoding_them(
     pages = list(iter_file_pages(_parquet_bytes(), PARQUET_MIME, start_row=800, max_rows=100))
 
     assert _ids(pages) == list(range(800, 900))
-    # 1000 rows in groups of 100: row 800 starts at group 8, so groups 0-7 are
-    # never handed to the decoder.
-    assert seen == [[8, 9]]
+    # 1000 rows in groups of 100: rows 800-899 live entirely in group 8. Both
+    # ends of the span are named, because pyarrow buffers every group it is
+    # given before it yields the first batch — over a range-reading handle an
+    # open-ended span would pull the rest of the object down with it.
+    assert seen == [[8]]
+
+
+def test_a_truncated_parquet_fails_loudly_instead_of_reading_as_empty() -> None:
+    """A byte-capped Parquet has no footer, so it has no rows — and no excuse.
+
+    Yielding nothing here is indistinguishable from an empty file, which the
+    AUTOMATIC cursor banks as a completed sweep; the asset is then skipped by the
+    scan cache on every later run without ever having been read once.
+    """
+    payload = _parquet_bytes()
+    truncated = payload[: len(payload) // 2]
+
+    with pytest.raises(TextExtractionCoverageError) as excinfo:
+        list(iter_file_pages(truncated, PARQUET_MIME))
+    assert excinfo.value.code is TextExtractionCoverageCode.FAILED
+    assert "max_object_bytes" in str(excinfo.value)
+
+
+def test_a_truncated_parquet_leaves_the_cursor_alone() -> None:
+    """The failure must not be recorded as progress through the file."""
+    source, store = _source("AUTOMATIC", 100)
+    asset = _asset()
+    store.bind(asset)
+
+    payload = _parquet_bytes()
+    with pytest.raises(TextExtractionCoverageError):
+        list(
+            source.iter_asset_pages(
+                payload[: len(payload) // 2], PARQUET_MIME, asset_id=asset.external_url
+            )
+        )
+
+    assert store.cursor_payload_for(asset) is None
+
+
+def test_a_parquet_whose_length_divides_evenly_still_completes_its_sweep() -> None:
+    """400 rows at 100 per run: the fourth run must end the pass, not wrap."""
+    payload = _parquet_bytes(rows=400)
+    stored: dict[str, Any] | None = None
+    covered: list[list[int]] = []
+
+    for _ in range(4):
+        source, store = _source("AUTOMATIC", 100)
+        asset = _asset()
+        store.bind(asset)
+        if stored:
+            store.record_prior([{"hash": asset.hash, "cursor": stored}])
+        covered.append(
+            _ids(list(source.iter_asset_pages(payload, PARQUET_MIME, asset_id=asset.external_url)))
+        )
+        stored = store.cursor_payload_for(asset)
+
+    assert covered == [
+        list(range(0, 100)),
+        list(range(100, 200)),
+        list(range(200, 300)),
+        list(range(300, 400)),
+    ]
+    assert stored is not None
+    assert (stored["offset"], stored["exhausted"], stored["rows_seen"]) == (0, True, 400)
 
 
 def test_row_count_is_free_for_parquet_and_unknown_for_csv() -> None:

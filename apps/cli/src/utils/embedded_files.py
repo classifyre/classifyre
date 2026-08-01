@@ -32,7 +32,7 @@ from typing import Any
 from .file_parser import (
     OCTET_STREAM,
     _normalize_mime_type,
-    _parquet_row_group_start,
+    _parquet_row_group_span,
     _require_file_processing,
     is_readable_text,
     resolve_mime_type,
@@ -300,23 +300,23 @@ def _iter_parquet_files(
         return
 
     begin = max(0, start_row)
-    first_group, drop_in_group = _parquet_row_group_start(parquet_file, begin)
+    groups, drop_in_group = _parquet_row_group_span(parquet_file, begin, max_rows)
+    if groups is not None and not groups:
+        return
     try:
         total_groups = int(parquet_file.metadata.num_row_groups)
     except Exception:
         total_groups = 0
-    if total_groups and first_group >= total_groups:
-        return
 
     # Resuming deep into a large file skips whole row groups without decoding them,
     # the same pushdown ``_iter_parquet_pages`` uses for the row text.
+    reads_everything = groups is None or (
+        drop_in_group == 0 and len(groups) == total_groups and max_rows is None
+    )
     batches = (
         parquet_file.iter_batches(batch_size=_ROW_BATCH_SIZE)
-        if first_group == 0 and drop_in_group == 0
-        else parquet_file.iter_batches(
-            batch_size=_ROW_BATCH_SIZE,
-            row_groups=list(range(first_group, total_groups)),
-        )
+        if reads_everything
+        else parquet_file.iter_batches(batch_size=_ROW_BATCH_SIZE, row_groups=groups)
     )
 
     files = 0
