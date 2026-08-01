@@ -32,6 +32,7 @@ from ...models.generated_single_asset_scan_results import (
 from ...models.generated_single_asset_scan_results import (
     SingleAssetScanResults,
 )
+from ...utils.file_parser import render_bytes_cell
 from ..dependencies import require_module
 from ..tabular_base import BaseTabularSource
 from ..tabular_utils import TableRef
@@ -418,7 +419,8 @@ class DatabricksSource(BaseTabularSource):
         if value is None:
             return "null"
         if isinstance(value, (bytes, bytearray, memoryview)):
-            return f"<{len(bytes(value))} bytes>"
+            # Text stored in a BINARY column must still reach the detectors.
+            return render_bytes_cell(bytes(value))
         if isinstance(value, datetime):
             return value.isoformat()
         return str(value)

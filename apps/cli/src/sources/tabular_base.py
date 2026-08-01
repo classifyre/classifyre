@@ -28,6 +28,7 @@ from ..models.generated_single_asset_scan_results import (
     SingleAssetScanResults,
 )
 from ..utils.file_metadata import build_columns
+from ..utils.file_parser import render_bytes_cell
 from ..utils.hashing import hash_id, unhash_id
 from .base import BaseSource
 from .tabular_utils import TableRef, build_tabular_location, format_tabular_sample_content
@@ -484,7 +485,11 @@ class BaseTabularSource(BaseSource):
         if isinstance(value, memoryview):
             value = value.tobytes()
         if isinstance(value, (bytes, bytearray)):
-            return f"<{len(value)} bytes>"
+            # BYTEA/BLOB/VARBINARY columns routinely hold text — a JSON payload, an
+            # encoded document, a note written by an ORM that picked the wrong type.
+            # Summarizing them unconditionally meant no detector ever read a byte of
+            # it. Genuinely binary values still summarize.
+            return render_bytes_cell(bytes(value))
         if isinstance(value, datetime):
             return value.isoformat()
         return str(value)

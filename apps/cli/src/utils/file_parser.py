@@ -1064,6 +1064,52 @@ def _decode_bytes(file_bytes: bytes) -> str:
     return decoded.replace("\x00", "")
 
 
+def is_readable_text(raw: bytes) -> bool:
+    """Whether bytes decode to something a text detector could actually read.
+
+    A successful UTF-8 decode is not the test: ``b"\\x01\\x02\\x03"`` decodes
+    cleanly and reads as nothing. What matters is whether the result is mostly
+    printable, which is what separates a UTF-8 document stored in a BLOB from a
+    packed float array stored in the same column type.
+    """
+    sample = raw[:4096]
+    if not sample:
+        return False
+    if b"\x00" in sample:
+        # UTF-16/32 interleaves a NUL with every character and is still text.
+        return _is_null_byte_unicode_text(sample)
+    decoded = sample.decode("utf-8", errors="replace")
+    printable = sum(1 for char in decoded if char.isprintable() or char.isspace())
+    return printable / len(decoded) >= 0.9
+
+
+def render_bytes_cell(raw: bytes) -> str:
+    """Render a byte-valued field as detector-visible text.
+
+    Sources hand rows and documents to text detectors as strings, so every
+    byte-valued field has to become one. The two obvious ways are both wrong:
+    ``str(value)`` emits a Python repr — ``b'{"email": ...}'``, with the prefix,
+    escaped quotes and ``\\n`` spelled out — and a flat ``<N bytes>`` summary drops
+    the content entirely, so text stored in a BLOB is never scanned by anything.
+
+    This decodes what is readable and summarizes only what isn't.
+    """
+    if is_readable_text(raw):
+        return _decode_bytes(raw)
+    return f"<{len(raw)} bytes>"
+
+
+def json_safe_default(value: Any) -> Any:
+    """``json.dumps(default=...)`` that keeps byte fields readable.
+
+    ``default=str`` is the usual choice and it is how a BSON ``Binary`` holding a
+    JSON document reached the detectors as a doubly-escaped repr string.
+    """
+    if isinstance(value, bytes | bytearray | memoryview):
+        return render_bytes_cell(bytes(value))
+    return str(value)
+
+
 def resolve_mime_type(
     file_bytes: bytes,
     *,

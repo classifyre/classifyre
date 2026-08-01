@@ -21,6 +21,7 @@ from ...models.generated_input import (
     SnowflakeRequiredKeyPairAuthenticator,
     SnowflakeRequiredOauthAuthenticatorToken,
 )
+from ...utils.file_parser import render_bytes_cell
 from ..dependencies import require_module
 from ..tabular_base import BaseTabularSource
 from ..tabular_utils import TableRef
@@ -299,7 +300,8 @@ class SnowflakeSource(BaseTabularSource):
         if isinstance(value, memoryview):
             value = value.tobytes()
         if isinstance(value, (bytes, bytearray)):
-            return f"<{len(value)} bytes>"
+            # Text stored in a BINARY column must still reach the detectors.
+            return render_bytes_cell(bytes(value))
         if isinstance(value, (datetime, date)):
             return value.isoformat()
         if isinstance(value, Decimal):

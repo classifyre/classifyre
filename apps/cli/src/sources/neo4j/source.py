@@ -24,6 +24,7 @@ from ...models.generated_single_asset_scan_results import (
     Location,
     SingleAssetScanResults,
 )
+from ...utils.file_parser import json_safe_default
 from ...utils.hashing import hash_id, unhash_id
 from ..base import BaseSource
 from ..dependencies import require_module
@@ -434,7 +435,9 @@ class Neo4jSource(BaseSource):
         return nodes
 
     def _serialize_node(self, props: dict[str, Any]) -> str:
-        return json.dumps(props, ensure_ascii=False, default=str, sort_keys=True)
+        # Byte-array properties must not fall to str(), which renders
+        # bytearray(b'...') instead of the text the property holds.
+        return json.dumps(props, ensure_ascii=False, default=json_safe_default, sort_keys=True)
 
     def _format_label_content(
         self,
