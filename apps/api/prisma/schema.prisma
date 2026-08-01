@@ -591,6 +591,11 @@ model Runner {
   detectorRunsSkipped Int                @default(0) @map("detector_runs_skipped")
   // Fingerprint of the scope-determining config this run covered.
   scopeFingerprint  String?              @map("scope_fingerprint") @db.VarChar(64)
+  // Fingerprint of the DETECTION-determining config (detectors, custom
+  // detectors, sampling) this run covered. Lets the autopilot answer "has what
+  // we look for changed since I last re-scanned this source?" — the difference
+  // between a legitimate verification re-scan and a runaway loop.
+  detectionFingerprint String?           @map("detection_fingerprint") @db.VarChar(64)
   assets            Asset[]
   runnerAssets      RunnerAsset[]
   source            Source               @relation(fields: [sourceId], references: [id], onDelete: Cascade)

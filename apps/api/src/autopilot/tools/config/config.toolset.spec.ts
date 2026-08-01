@@ -7,6 +7,7 @@ import type { CliRunnerService } from '../../../cli-runner/cli-runner.service';
 import type { NotificationsService } from '../../../notifications.service';
 import type { DecisionApplierService } from '../../decision-applier.service';
 import type { AutoScheduleService } from '../../../scheduler/auto-schedule.service';
+import { computeDetectionFingerprint } from '../../../utils/scope-fingerprint';
 import type { Tool, ToolContext } from '../tool.types';
 
 describe('ConfigToolset — config.tune_source', () => {
@@ -193,8 +194,9 @@ describe('ConfigToolset — config.tune_source', () => {
 describe('ConfigToolset — sources.rescan', () => {
   const mockPrisma = {
     source: { findUnique: jest.fn(), update: jest.fn() },
-    runner: { findUnique: jest.fn(), count: jest.fn() },
+    runner: { findUnique: jest.fn(), findFirst: jest.fn(), count: jest.fn() },
   };
+  const mockMasked = { decryptMaskedConfig: jest.fn((c: unknown) => c) };
   const mockCliRunner = { startRun: jest.fn() };
   const mockApplier = { sourceGate: jest.fn() };
   const mockNotifications = { create: jest.fn() };
@@ -203,7 +205,7 @@ describe('ConfigToolset — sources.rescan', () => {
   const toolset = new ConfigToolset(
     mockPrisma as unknown as PrismaService,
     { validate: jest.fn() } as unknown as ValidationService,
-    {} as unknown as MaskedConfigCryptoService,
+    mockMasked as unknown as MaskedConfigCryptoService,
     mockApplier as unknown as DecisionApplierService,
     mockCliRunner as unknown as CliRunnerService,
     mockNotifications as unknown as NotificationsService,
@@ -218,8 +220,15 @@ describe('ConfigToolset — sources.rescan', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    // No prior autopilot re-scans by default — the rate limit is exercised in
-    // its own tests below.
+    mockMasked.decryptMaskedConfig.mockImplementation((c) => c);
+    // A source whose detection config is whatever the test sets.
+    mockPrisma.source.findUnique.mockResolvedValue({
+      type: 'SLACK',
+      config: { detectors: [{ type: 'PII', enabled: true }] },
+    });
+    // No prior autopilot re-scan by default — the guards are exercised in
+    // their own tests below.
+    mockPrisma.runner.findFirst.mockResolvedValue(null);
     mockPrisma.runner.count.mockResolvedValue(0);
   });
 
@@ -269,29 +278,74 @@ describe('ConfigToolset — sources.rescan', () => {
   // A coalesced corpus cycle carries no runnerId, so the depth-1 guard above
   // cannot fire for it. These are what actually stop the rescan→dirty→cycle→
   // rescan loop on that path.
-  it('refuses a second autopilot rescan inside the cooldown, even with no triggering runner', async () => {
-    // recent = 1, today = 1.
-    mockPrisma.runner.count.mockResolvedValue(1);
+  describe('the detection-fingerprint guard', () => {
+    /** The fingerprint the toolset computes for the default mock source. */
+    const currentFingerprint = () =>
+      computeDetectionFingerprint('SLACK', {
+        detectors: [{ type: 'PII', enabled: true }],
+      });
 
-    const res = (await rescan.handler({ sourceId: 's1' }, ctxWith(null))) as {
-      skipped?: string;
-    };
+    it('refuses when nothing about what the source detects has changed', async () => {
+      mockPrisma.runner.findFirst.mockResolvedValue({
+        detectionFingerprint: currentFingerprint(),
+        triggeredAt: new Date(),
+      });
 
-    expect(mockPrisma.runner.findUnique).not.toHaveBeenCalled();
-    expect(mockCliRunner.startRun).not.toHaveBeenCalled();
-    expect(res.skipped).toMatch(/within the last/i);
-  });
+      const res = (await rescan.handler({ sourceId: 's1' }, ctxWith(null))) as {
+        skipped?: string;
+      };
 
-  it('refuses once the daily autopilot rescan limit is reached', async () => {
-    // Outside the cooldown (recent = 0) but at the daily cap.
-    mockPrisma.runner.count.mockResolvedValueOnce(0).mockResolvedValueOnce(4);
+      expect(mockCliRunner.startRun).not.toHaveBeenCalled();
+      expect(res.skipped).toMatch(/has changed since the autopilot last/i);
+    });
 
-    const res = (await rescan.handler({ sourceId: 's1' }, ctxWith(null))) as {
-      skipped?: string;
-    };
+    // The case a blunt cooldown got wrong: within ONE cycle the config agent
+    // retunes detectors and re-scans, then the detector-authoring agent ships a
+    // new detector and needs its own re-scan to test it.
+    it('allows a second re-scan once detection has actually changed', async () => {
+      mockPrisma.runner.findFirst.mockResolvedValue({
+        detectionFingerprint: computeDetectionFingerprint('SLACK', {
+          detectors: [{ type: 'SECRETS', enabled: true }],
+        }),
+        triggeredAt: new Date(),
+      });
+      mockCliRunner.startRun.mockResolvedValue({ id: 'run-2' });
 
-    expect(mockCliRunner.startRun).not.toHaveBeenCalled();
-    expect(res.skipped).toMatch(/daily limit/i);
+      const res = (await rescan.handler({ sourceId: 's1' }, ctxWith(null))) as {
+        ok?: boolean;
+      };
+
+      expect(res.ok).toBe(true);
+      expect(mockCliRunner.startRun).toHaveBeenCalled();
+    });
+
+    it('allows the first autopilot re-scan of a source', async () => {
+      mockPrisma.runner.findFirst.mockResolvedValue(null);
+      mockCliRunner.startRun.mockResolvedValue({ id: 'run-1' });
+
+      const res = (await rescan.handler({ sourceId: 's1' }, ctxWith(null))) as {
+        ok?: boolean;
+      };
+
+      expect(res.ok).toBe(true);
+    });
+
+    // Backstop: an agent that flaps a setting back and forth passes the
+    // fingerprint test every time.
+    it('refuses once the daily autopilot rescan limit is reached', async () => {
+      mockPrisma.runner.findFirst.mockResolvedValue({
+        detectionFingerprint: 'a-different-fingerprint',
+        triggeredAt: new Date(),
+      });
+      mockPrisma.runner.count.mockResolvedValue(4);
+
+      const res = (await rescan.handler({ sourceId: 's1' }, ctxWith(null))) as {
+        skipped?: string;
+      };
+
+      expect(mockCliRunner.startRun).not.toHaveBeenCalled();
+      expect(res.skipped).toMatch(/daily limit/i);
+    });
   });
 
   it('returns a graceful skip when a scan is already running (ConflictException)', async () => {

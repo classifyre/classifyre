@@ -60,6 +60,12 @@ const TRIAGE_DOCTRINE = [
   'repeated-noise clusters and never build an investigation on them. findings.similar and',
   'findings.semantic_search expand a confirmed lead across the corpus — similarity is a lead to verify,',
   'never proof of a connection.',
+  '\nWHEN RANKING IS UNAVAILABLE: findings.ranked says so in its `coverage` field when nothing in',
+  'scope has been scored (the semantic stack is off, or still warming up) and returns recent',
+  'findings with importance null. That is NOT "there is nothing important here" — it is "nobody has',
+  'judged yet". Do not finish on an empty-handed reading of it. Work from findings.search and the',
+  'underlying evidence instead, hold to a higher bar for acting because you have no corpus-relative',
+  'signal, and say in your summary that ranking was unavailable.',
 ].join(' ');
 
 /**

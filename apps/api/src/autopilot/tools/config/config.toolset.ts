@@ -16,9 +16,9 @@ import {
 } from '../../../types/notification.types';
 import { DecisionApplierService } from '../../decision-applier.service';
 import { AutoScheduleService } from '../../../scheduler/auto-schedule.service';
+import { computeDetectionFingerprint } from '../../../utils/scope-fingerprint';
 import {
   AI_ACTOR,
-  AUTOPILOT_RESCAN_COOLDOWN_SECONDS,
   AUTOPILOT_RESCANS_PER_DAY,
   MAX_COVERAGE_SOURCE_ROWS,
 } from '../../autopilot.constants';
@@ -386,20 +386,35 @@ export class ConfigToolset {
 
           // The depth-1 guard above reads the runner that triggered THIS cycle
           // — and a coalesced corpus cycle has none, so on that path (which is
-          // now the common one) it never fires. Without the rate limit below,
+          // now the common one) it never fires. Without the guards below,
           // re-scan → scan completes → source marked dirty → next corpus cycle
           // → re-scan is a loop with nothing but mission prose to stop it.
-          const since = new Date(
-            Date.now() - AUTOPILOT_RESCAN_COOLDOWN_SECONDS * 1000,
+          //
+          // The test is "would this re-scan detect anything the last autopilot
+          // re-scan did not", answered by comparing detection fingerprints. A
+          // plain cooldown would have been simpler and wrong: within one cycle
+          // the config agent retunes detectors and re-scans, and the
+          // detector-authoring agent then ships a new detector and needs its
+          // own re-scan to test it — a legitimate second re-scan that a time
+          // window cannot distinguish from the loop.
+          const source = await this.prisma.source.findUnique({
+            where: { id: sourceId },
+            select: { type: true, config: true },
+          });
+          if (!source) throw new Error('Unknown sourceId');
+          const detectionNow = computeDetectionFingerprint(
+            String(source.type),
+            this.masked.decryptMaskedConfig(
+              (source.config ?? {}) as Record<string, unknown>,
+            ),
           );
+
           const dayAgo = new Date(Date.now() - 24 * 3600 * 1000);
-          const [recent, today] = await Promise.all([
-            this.prisma.runner.count({
-              where: {
-                sourceId,
-                triggerType: TriggerType.AUTOPILOT,
-                triggeredAt: { gte: since },
-              },
+          const [lastAutopilotRun, today] = await Promise.all([
+            this.prisma.runner.findFirst({
+              where: { sourceId, triggerType: TriggerType.AUTOPILOT },
+              orderBy: { triggeredAt: 'desc' },
+              select: { detectionFingerprint: true, triggeredAt: true },
             }),
             this.prisma.runner.count({
               where: {
@@ -409,14 +424,20 @@ export class ConfigToolset {
               },
             }),
           ]);
-          if (recent > 0) {
+
+          if (
+            lastAutopilotRun?.detectionFingerprint &&
+            lastAutopilotRun.detectionFingerprint === detectionNow
+          ) {
             return {
               skipped:
-                'this source was already re-scanned by the autopilot within the last ' +
-                `${AUTOPILOT_RESCAN_COOLDOWN_SECONDS / 3600} hours; the findings from that scan ` +
-                'are what you should be evaluating',
+                'nothing about what this source detects has changed since the autopilot last ' +
+                're-scanned it, so another scan would produce the same findings. Evaluate the ' +
+                'findings from that scan, or change the configuration first.',
             };
           }
+          // Backstop for flapping: an agent that keeps changing detection back
+          // and forth passes the fingerprint test every time.
           if (today >= AUTOPILOT_RESCANS_PER_DAY) {
             return {
               skipped:

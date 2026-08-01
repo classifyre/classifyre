@@ -65,6 +65,17 @@ export const EXPRESS_CONSECUTIVE_FAILURES = 3;
  * deadlocking the autopilot entirely.
  */
 export const AUTOPILOT_MAX_READINESS_REQUEUES = 5;
+/**
+ * Below this fraction of OPEN findings carrying an importance score, the
+ * missions are told their triage order is partial.
+ *
+ * A threshold, not a boolean on queue state. `evidenceAnalysisPending` was
+ * previously set whenever the readiness gate had found *anything* queued, which
+ * during a sustained ingest was every cycle — so "treat findings.ranked as
+ * partial and prefer deferring to concluding" was in front of the agents
+ * permanently, including when everything in scope was scored.
+ */
+export const EVIDENCE_ANALYSIS_MIN_COVERAGE = 0.8;
 
 // ── Evidence floor (enforced in code, not prose) ─────────────────────────────
 /**
@@ -164,11 +175,13 @@ export const MAX_DEFERRED_ENTRIES = 10;
  * agent re-scans again, with nothing but prose in the mission telling it to
  * stop.
  *
- * These bound it in code instead. A source may be re-scanned by the autopilot
- * at most once per cooldown, and at most this many times a day, whatever the
- * cycle shape.
+ * The primary guard is now the detection fingerprint (see
+ * `computeDetectionFingerprint`): a re-scan is refused when nothing about what
+ * the source detects has changed since the last autopilot re-scan, because that
+ * scan would produce exactly the same findings. This is the daily backstop for
+ * an agent that flaps a setting back and forth and so passes that test every
+ * time.
  */
-export const AUTOPILOT_RESCAN_COOLDOWN_SECONDS = 2 * 3600;
 export const AUTOPILOT_RESCANS_PER_DAY = 4;
 
 /**

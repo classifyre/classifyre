@@ -377,6 +377,23 @@ export class AgentSearchService {
    * report success while having read none of its assets' actual content, and
    * nothing in the harness exposed that either.
    */
+  /**
+   * How many OPEN findings carry an evidence-importance score.
+   *
+   * The honest measure of "can the agents trust findings.ranked right now",
+   * replacing a proxy that read the embedding queue's state and was therefore
+   * true throughout any sustained ingest.
+   */
+  async evidenceCoverage(): Promise<{ open: number; analyzed: number }> {
+    const [open, analyzed] = await Promise.all([
+      this.prisma.finding.count({ where: { status: 'OPEN' } }),
+      this.prisma.finding.count({
+        where: { status: 'OPEN', evidenceAnalysis: { isNot: null } },
+      }),
+    ]);
+    return { open, analyzed };
+  }
+
   async corpusCoverage(): Promise<CorpusCoverage> {
     const [sources, findingsOpen, findingsAnalyzed] = await Promise.all([
       this.prisma.source.findMany({

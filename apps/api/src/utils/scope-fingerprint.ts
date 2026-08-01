@@ -68,3 +68,45 @@ export function computeScopeFingerprint(
     .update(JSON.stringify(canonicalize(scoped)), 'utf8')
     .digest('hex');
 }
+
+/** Config sections that decide WHAT is looked for once an object is in scope. */
+const DETECTION_SECTIONS = ['detectors', 'custom_detectors'] as const;
+
+/**
+ * Fingerprints the detection-determining subset of a source config.
+ *
+ * The complement of {@link computeScopeFingerprint}, which deliberately ignores
+ * these sections because they do not move the scope. This one exists to answer
+ * a different question: "has anything about what we detect changed since the
+ * last time the autopilot re-scanned this source?"
+ *
+ * That question is what makes the re-scan guard precise. A blunt cooldown stops
+ * the runaway loop (re-scan → source dirty → next cycle → re-scan again) but
+ * also stops the legitimate sequence, where the config agent retunes detectors
+ * and re-scans, and the detector-authoring agent then ships a new detector in
+ * the same cycle and needs its own re-scan to test it. Comparing detection
+ * fingerprints permits the second re-scan precisely when there is something new
+ * to detect, and refuses it when there is not.
+ *
+ * `sampling` is included: reading further into a source is a genuine reason to
+ * scan again, and an agent that widened the sample would otherwise be told
+ * nothing had changed.
+ */
+export function computeDetectionFingerprint(
+  sourceType: string,
+  config: unknown,
+): string {
+  const raw =
+    config && typeof config === 'object'
+      ? (config as Record<string, unknown>)
+      : {};
+
+  const detection: Record<string, unknown> = { type: sourceType };
+  for (const key of [...DETECTION_SECTIONS, 'sampling']) {
+    if (key in raw) detection[key] = raw[key];
+  }
+
+  return createHash('sha256')
+    .update(JSON.stringify(canonicalize(detection)), 'utf8')
+    .digest('hex');
+}

@@ -76,6 +76,20 @@ export class AgentSemanticService {
         where: { ...where, evidenceAnalysis: { isNot: null } },
       }),
     ]);
+    // Nothing scored yet, but findings exist. Returning an empty list here is
+    // the worst possible answer: every mission's triage doctrine says to START
+    // from findings.ranked, so an agent that gets `[]` concludes there is
+    // nothing worth looking at — on an instance where the semantic stack is
+    // simply off or still warming up, that silences the harness completely with
+    // no error anywhere. Fall back to unranked findings and say so bluntly, so
+    // the agent can work while knowing exactly what it does not have.
+    if (analyzed === 0 && total > 0) {
+      return this.unrankedFallback(
+        where,
+        Math.min(limit, MAX_RANKED_FINDINGS),
+        total,
+      );
+    }
     const requested = Math.min(limit, MAX_RANKED_FINDINGS);
     const pageSize = Math.max(requested * 3, 25);
     const seenGroups = new Set<string>();
@@ -124,6 +138,50 @@ export class AgentSemanticService {
           ? 'no open findings in scope'
           : `${analyzed}/${total} open findings analyzed; unanalyzed ones are pending, not unimportant`,
       findings,
+    };
+  }
+
+  /**
+   * What to return when no finding in scope has been scored yet.
+   *
+   * Newest first, NOT severity first: severity ordering would look like a
+   * ranking and the doctrine the agents follow is built on severity not being
+   * one. Every row carries `importance: null` so nothing here can be mistaken
+   * for a score, and the coverage string states the limitation in the terms the
+   * missions use.
+   */
+  private async unrankedFallback(
+    where: Prisma.FindingWhereInput,
+    limit: number,
+    total: number,
+  ): Promise<{ coverage: string; findings: CompactRankedFinding[] }> {
+    const rows = await this.prisma.finding.findMany({
+      where,
+      orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
+      take: limit,
+    });
+    return {
+      coverage:
+        `RANKING UNAVAILABLE: 0 of ${total} open findings have an importance score, so this ` +
+        'list is NOT ranked — it is simply the most recent findings, with no judgement applied. ' +
+        'Do not read the order as importance and do not treat severity as a substitute for it. ' +
+        'Verify anything you intend to act on against its actual evidence (findings.search for ' +
+        'context, assets.sample for the source material) before creating an inquiry or a case, ' +
+        'and say in your summary that ranking was unavailable. If the whole corpus is unscored, ' +
+        'the semantic stack is probably disabled or still warming up — that is an operator issue ' +
+        'worth recording with memory.write, not a reason to conclude there is nothing here.',
+      findings: rows.map((row) => ({
+        findingId: row.id,
+        assetId: row.assetId,
+        findingType: row.findingType,
+        severity: String(row.severity),
+        status: String(row.status),
+        value: truncate(row.matchedContent, MAX_SAMPLE_VALUE_LENGTH),
+        importance: null,
+        quality: null,
+        similarCount: 0,
+        reasons: [],
+      })),
     };
   }
 
