@@ -18,6 +18,7 @@ import {
   AUTOPILOT_MAX_READINESS_REQUEUES,
   AUTOPILOT_QUEUE,
   AUTOPILOT_RETRY_AFTER_SECONDS,
+  EVIDENCE_ANALYSIS_MIN_COVERAGE,
   PIPELINE_KINDS,
 } from './autopilot.constants';
 import type { AgentContext, AutopilotJob } from './autopilot.types';
@@ -265,11 +266,15 @@ export class AutopilotWorker {
       );
       return;
     }
-    // Bounded: a permanently backed-up embedding queue degrades the run rather
-    // than deadlocking the autopilot. The missions are told the scores are
-    // partial instead of silently trusting them.
-    const evidenceAnalysisPending = blocked != null;
-    if (evidenceAnalysisPending) {
+    // Measured, not inferred from queue state. This used to be
+    // `blocked != null` — "the queue was busy when we looked" — which on a
+    // busy instance was true on every cycle and put the "scores are partial,
+    // prefer deferring" warning in front of the agents permanently, including
+    // when every finding in scope was in fact scored. What the missions need to
+    // know is whether the findings they are about to triage have importance
+    // scores, and that is a question about the data.
+    const evidenceAnalysisPending = await this.evidenceScoresIncomplete();
+    if (blocked) {
       this.logger.warn(
         `Proceeding with autopilot cycle after ${attempts} readiness requeue(s); ${blocked} is still pending.`,
       );
@@ -591,6 +596,26 @@ export class AutopilotWorker {
     return null;
   }
 
+  /**
+   * Whether enough OPEN findings still lack an importance score that the
+   * missions should be told their triage order is partial.
+   *
+   * Deliberately a data question with an explicit threshold rather than
+   * "is anything queued". A handful of unscored findings among thousands does
+   * not make findings.ranked untrustworthy, and warning about it anyway trained
+   * the agents to discount the one tool their triage doctrine is built on.
+   */
+  private async evidenceScoresIncomplete(): Promise<boolean> {
+    try {
+      const { open, analyzed } = await this.search.evidenceCoverage();
+      if (open === 0) return false;
+      return analyzed / open < EVIDENCE_ANALYSIS_MIN_COVERAGE;
+    } catch {
+      // Never block or mislabel a cycle because a count failed.
+      return false;
+    }
+  }
+
   private async queueBusy(queue: string): Promise<boolean> {
     try {
       const boss = await this.pgBoss.getBossAsync();
@@ -604,18 +629,29 @@ export class AutopilotWorker {
   }
 
   /**
-   * Embedding inference feeds FindingEvidenceAnalysis, which is what
-   * findings.ranked and findings.explain read. The recalibration pass is
-   * included because scores are only corpus-relative once it has run — the
-   * same reason EmbeddingQueueService.handleRecalibration defers itself while
-   * inference is draining.
+   * Embedding INFERENCE feeds FindingEvidenceAnalysis, which is what
+   * findings.ranked and findings.explain read. Only inference is waited for.
+   *
+   * `recalibrationScheduled` used to count too, on the reasoning that scores
+   * are corpus-relative only once the pass has run. In practice that made the
+   * gate permanently closed during any sustained ingest:
+   * `handleRecalibration` re-defers itself by RECALIBRATE_DELAY_SECONDS
+   * whenever inference is still draining, so with scans landing continuously
+   * the recalibrate queue is never empty. Every cycle therefore burned all five
+   * readiness requeues — five minutes of pure delay — and then ran with
+   * `evidenceAnalysisPending` set, which tells the missions to "treat
+   * findings.ranked as partial and prefer deferring to concluding". A cadence
+   * change meant to make the agents better-informed instead made every cycle
+   * during an ingest both slower and more timid.
+   *
+   * Recalibration reorders existing scores; it does not create them. Running a
+   * cycle against scores that are accurate but not yet re-normalised is a far
+   * smaller error than never running a useful cycle at all.
    */
   private async evidenceAnalysisBusy(): Promise<boolean> {
     try {
       const status = await this.embeddings.status();
-      return (
-        (status.pendingEmbedJobs ?? 0) > 0 || status.recalibrationScheduled
-      );
+      return (status.pendingEmbedJobs ?? 0) > 0;
     } catch {
       // Embeddings unconfigured or not ready is not a reason to hold the
       // cycle: an instance with no semantic stack still needs its agents.

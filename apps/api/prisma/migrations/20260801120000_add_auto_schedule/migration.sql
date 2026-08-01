@@ -58,3 +58,16 @@ CREATE INDEX IF NOT EXISTS "sources_schedule_mode_schedule_next_at_idx"
 -- losing each source's phase, so flipping it back on resumes where it left off.
 ALTER TABLE "instance_settings"
   ADD COLUMN IF NOT EXISTS "auto_schedule_enabled" BOOLEAN NOT NULL DEFAULT true;
+
+-- Detection fingerprint per run: detectors + custom detectors + sampling.
+--
+-- The autopilot's re-scan guard needs to tell "the config agent retuned
+-- detection and this re-scan will test it" from "nothing changed and this is
+-- the same re-scan again", which is the loop that made the harness re-scan the
+-- same source every cycle. scope_fingerprint cannot answer it — it deliberately
+-- excludes exactly these sections, because they do not move the scope.
+ALTER TABLE "runners"
+  ADD COLUMN IF NOT EXISTS "detection_fingerprint" VARCHAR(64);
+
+CREATE INDEX IF NOT EXISTS "runners_source_id_trigger_type_triggered_at_idx"
+  ON "runners"("source_id", "trigger_type", "triggered_at" DESC);

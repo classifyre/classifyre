@@ -27,6 +27,8 @@ describe('AutopilotWorker readiness and batch consumption', () => {
       recalibrationScheduled?: boolean;
       matchQueue?: number;
       dirty?: any[];
+      openFindings?: number;
+      analyzedFindings?: number;
     } = {},
   ) => {
     sent = [];
@@ -60,7 +62,13 @@ describe('AutopilotWorker readiness and batch consumption', () => {
       pgBoss as any,
       { recordSkippedRun: jest.fn() } as any,
       {} as any,
-      { sourceName: jest.fn().mockResolvedValue('a source') } as any,
+      {
+        sourceName: jest.fn().mockResolvedValue('a source'),
+        evidenceCoverage: jest.fn().mockResolvedValue({
+          open: over.openFindings ?? 0,
+          analyzed: over.analyzedFindings ?? 0,
+        }),
+      } as any,
       {} as any,
       embeddings as any,
     );
@@ -85,11 +93,15 @@ describe('AutopilotWorker readiness and batch consumption', () => {
       await expect(blocked()).resolves.toBe('Evidence analysis');
     });
 
-    // Scores are only corpus-relative once recalibration has run, which is why
-    // EmbeddingQueueService defers its own pass while inference drains.
-    it('waits for a scheduled recalibration too', async () => {
+    // It used to. And that closed the gate permanently on any busy instance:
+    // handleRecalibration re-defers itself while inference drains, so with
+    // scans landing continuously the recalibrate queue is never empty. Every
+    // cycle burned all five requeues — five minutes of delay — and then ran
+    // flagged as degraded. Recalibration re-normalises existing scores; it does
+    // not create them, so it is not worth holding a cycle for.
+    it('does NOT wait for a scheduled recalibration', async () => {
       build({ recalibrationScheduled: true });
-      await expect(blocked()).resolves.toBe('Evidence analysis');
+      await expect(blocked()).resolves.toBeNull();
     });
 
     it('treats an unconfigured semantic stack as ready, not as blocked', async () => {
@@ -200,6 +212,10 @@ describe('AutopilotWorker readiness and batch consumption', () => {
     it('gives up waiting and proceeds after the requeue budget', async () => {
       build({
         pendingEmbedJobs: 50,
+        // Measured coverage, not the gate, is what flags the run as degraded:
+        // 10 of 100 open findings scored.
+        openFindings: 100,
+        analyzedFindings: 10,
         dirty: [{ id: 's1', name: 'A', autopilotDirtyAt: DIRTY_AT }],
       });
       withSettings();
@@ -218,6 +234,34 @@ describe('AutopilotWorker readiness and batch consumption', () => {
       expect(sent).toHaveLength(0);
       const scope = (worker as any).runAgent.mock.calls[0][4];
       expect(scope.evidenceAnalysisPending).toBe(true);
+    });
+
+    // The flag used to be `blocked != null` — "a queue was busy when we
+    // looked". On a busy instance that was every cycle, so the missions were
+    // permanently told to "treat findings.ranked as partial and prefer
+    // deferring to concluding" even when every finding in scope was scored.
+    it('does not flag a run as degraded when the findings are actually scored', async () => {
+      build({
+        pendingEmbedJobs: 50,
+        openFindings: 100,
+        analyzedFindings: 100,
+        dirty: [{ id: 's1', name: 'A', autopilotDirtyAt: DIRTY_AT }],
+      });
+      withSettings();
+      prisma.instanceSettings.findUnique.mockResolvedValue({
+        aiEnabled: true,
+        autopilotInquiryEnabled: true,
+        autopilotCaseEnabled: false,
+        autopilotConfigEnabled: false,
+        autopilotDetectorEnabled: false,
+        autopilotEscalationEnabled: false,
+      });
+      (worker as any).runAgent = jest.fn().mockResolvedValue(undefined);
+
+      await runCycle(AUTOPILOT_MAX_READINESS_REQUEUES);
+
+      const scope = (worker as any).runAgent.mock.calls[0][4];
+      expect(scope.evidenceAnalysisPending).toBe(false);
     });
   });
 

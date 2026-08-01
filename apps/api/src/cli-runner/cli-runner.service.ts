@@ -46,7 +46,10 @@ import { KubernetesCliJobService } from './kubernetes-cli-job.service';
 import { MaskedConfigCryptoService } from '../masked-config-crypto.service';
 import { RunnerLogStorageService } from './runner-log-storage.service';
 import { CustomDetectorsService } from '../custom-detectors.service';
-import { computeScopeFingerprint } from '../utils/scope-fingerprint';
+import {
+  computeDetectionFingerprint,
+  computeScopeFingerprint,
+} from '../utils/scope-fingerprint';
 import {
   SearchRunnersRequestDto,
   SearchRunnersSortBy,
@@ -692,6 +695,13 @@ export class CliRunnerService {
             status: RunnerStatus.PENDING,
             executionMode,
             scopeFingerprint: computeScopeFingerprint(
+              source.type,
+              source.config,
+            ),
+            // What this run was configured to LOOK FOR, as opposed to where it
+            // looked. The autopilot compares it to decide whether a re-scan it
+            // is about to request would actually test anything new.
+            detectionFingerprint: computeDetectionFingerprint(
               source.type,
               source.config,
             ),
