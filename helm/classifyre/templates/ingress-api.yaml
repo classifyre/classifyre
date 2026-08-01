@@ -8,6 +8,10 @@ metadata:
   annotations:
     nginx.ingress.kubernetes.io/use-regex: "true"
     nginx.ingress.kubernetes.io/rewrite-target: /$1
+    # "0" disables nginx's body cap (default 1m), which would otherwise reject
+    # CLI bulk ingest with 413 long before the request reaches the API.
+    nginx.ingress.kubernetes.io/proxy-body-size: "0"
+    nginx.ingress.kubernetes.io/proxy-request-buffering: "off"
     {{- with .Values.ingress.annotations }}
     {{- toYaml . | nindent 4 }}
     {{- end }}
