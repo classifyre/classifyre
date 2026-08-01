@@ -2,7 +2,7 @@
 
 A scan used to hold every asset it was working on entirely in memory: a source
 downloaded an object into ``bytes``, and every parser took ``bytes``. With
-``pool_workers × 2`` assets in flight that makes resident memory a multiple of
+``pool_workers * 2`` assets in flight that makes resident memory a multiple of
 the largest file in the corpus, which is the real reason every source carries a
 ``max_object_bytes`` cap — and why the caps are 5-25 MB rather than something
 that would actually fit a corpus.

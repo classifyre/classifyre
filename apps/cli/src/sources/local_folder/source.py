@@ -143,7 +143,7 @@ class LocalFolderSource(ObjectStorageSourceBase):
         (binary detectors), not how large a file can be read.
         """
         file_path = self._root() / ref.key
-        handle = open(file_path, "rb")  # noqa: SIM115 - closed by the caller
+        handle = open(file_path, "rb")
         try:
             mime_type = resolve_mime_type(
                 handle,

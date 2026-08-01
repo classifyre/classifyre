@@ -450,7 +450,9 @@ def _is_text_like_mime_type(mime_type: str) -> bool:
     return normalized_mime.startswith("text/") or normalized_mime in _TEXT_RAW_MIME_TYPES
 
 
-def _detect_magic_mime_type(file_bytes: bytes, zip_source: BinarySource | None = None) -> str | None:
+def _detect_magic_mime_type(
+    file_bytes: bytes, zip_source: BinarySource | None = None
+) -> str | None:
     signatures: tuple[tuple[bytes, str], ...] = (
         (b"\x89PNG\r\n\x1a\n", "image/png"),
         (b"%PDF-", "application/pdf"),

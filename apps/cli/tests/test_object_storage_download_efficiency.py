@@ -25,6 +25,7 @@ from src.sources.dropbox.source import DropboxObjectRef, DropboxSource
 from src.sources.hugging_face.source import HuggingFaceObjectRef, HuggingFaceSource
 from src.sources.object_storage.base import ObjectRef
 from src.sources.s3_compatible_storage.source import S3CompatibleStorageSource
+from src.utils.payload import PayloadTooLargeError
 
 CSV_BYTES = b"name,email\nAda,ada@example.com\nGrace,grace@example.com\n"
 MODIFIED = datetime(2026, 6, 1, tzinfo=UTC)
@@ -280,3 +281,67 @@ async def test_failed_objects_leak_no_bytes(source_name, monkeypatch):
     await _run_scan(source, stubs, max_concurrent=5, evict=False)
 
     assert source._bytes_cache == {}
+
+
+@pytest.mark.parametrize("source_name", sorted(SOURCE_FACTORIES))
+@pytest.mark.asyncio
+async def test_an_object_far_larger_than_the_memory_cap_is_still_scanned(source_name, monkeypatch):
+    """The size ceiling is gone: ``max_object_bytes`` bounds memory, not file size.
+
+    It used to bound both, by truncating — which for a text file lost the tail and
+    for a Parquet or a zip lost the file. Now anything past the cap is streamed to
+    a temp file, so the object is read whole and the heap is not.
+    """
+    source, refs = SOURCE_FACTORIES[source_name](1)
+    # One object two orders of magnitude past the in-memory threshold.
+    big_row = b"filler,padding,ada@example.com\n"
+    body = b"a,b,email\n" + big_row * 40_000
+    refs[0] = replace(refs[0], size=len(body))
+
+    monkeypatch.setattr(source, "_list_objects", lambda: iter(refs))
+    monkeypatch.setattr(source, "_ensure_file_processing_dependencies", lambda: None)
+    monkeypatch.setattr(
+        source,
+        "_download_object",
+        lambda _ref: pytest.fail("the streaming path must be used for a large object"),
+    )
+    monkeypatch.setattr(source, "_stream_object", lambda _ref: iter([body]))
+    # A threshold far below the object forces the spill-to-disk path.
+    monkeypatch.setattr(source, "_spool_threshold_bytes", lambda: 4096)
+
+    stubs = await _discover(source)
+    pages_by_asset = await _run_scan(source, stubs, max_concurrent=1)
+
+    pages = next(iter(pages_by_asset.values()))
+    assert len(pages) == 40_000, f"expected every row to be paged, got {len(pages)}"
+    assert all("ada@example.com" in page for page in pages)
+
+
+@pytest.mark.parametrize("source_name", sorted(SOURCE_FACTORIES))
+@pytest.mark.asyncio
+async def test_a_hard_size_limit_refuses_an_object_instead_of_truncating_it(
+    source_name, monkeypatch
+):
+    """``max_file_bytes`` is the deliberate refusal, and it is opt-in.
+
+    The distinction that matters is refusal versus truncation: a partial payload
+    reports success and is recorded as a scanned, near-empty asset, which is the
+    failure mode the old caps had.
+    """
+    source, refs = SOURCE_FACTORIES[source_name](1)
+    body = b"a,b,email\n" + b"filler,padding,ada@example.com\n" * 5_000
+    refs[0] = replace(refs[0], size=len(body))
+
+    monkeypatch.setattr(source, "_list_objects", lambda: iter(refs))
+    monkeypatch.setattr(source, "_ensure_file_processing_dependencies", lambda: None)
+    monkeypatch.setattr(source, "_stream_object", lambda _ref: iter([body]))
+    monkeypatch.setattr(source, "_hard_size_limit_bytes", lambda: 1024)
+
+    stubs = await _discover(source)
+
+    with pytest.raises(PayloadTooLargeError):
+        source._open_object(refs[0])
+
+    # And through the scan, the asset yields nothing rather than a truncated head.
+    pages_by_asset = await _run_scan(source, stubs, max_concurrent=1)
+    assert all(pages == [] for pages in pages_by_asset.values())
