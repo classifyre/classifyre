@@ -12,6 +12,7 @@ import {
   downloadArchive,
   formatBytes,
   formatRows,
+  isRunning,
   isTerminal,
   listTransferJobs,
   type TransferJob,
@@ -54,8 +55,10 @@ export function DataTransferCard() {
     jobs?.find((job) => job.kind === "EXPORT" && !isTerminal(job.status)) ??
     jobs?.find((job) => job.kind === "EXPORT") ??
     null;
+  // A STAGED job is an upload waiting on a scope choice, not a transfer in
+  // flight — the import panel owns that state, so it must not be adopted here.
   const runningImport =
-    jobs?.find((job) => job.kind === "IMPORT" && !isTerminal(job.status)) ?? null;
+    jobs?.find((job) => job.kind === "IMPORT" && isRunning(job.status)) ?? null;
 
   const history = (jobs ?? []).filter((job) => isTerminal(job.status));
 

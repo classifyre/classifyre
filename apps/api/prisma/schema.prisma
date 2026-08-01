@@ -1846,6 +1846,9 @@ enum DataTransferKind {
 }
 
 enum DataTransferStatus {
+  /// An import archive has been uploaded and inspected, but the operator has
+  /// not yet chosen what to take from it. Nothing is queued.
+  STAGED
   PENDING
   RUNNING
   COMPLETED
@@ -1871,14 +1874,14 @@ model DataTransferJob {
 
   conflictMode DataTransferConflict @default(SKIP) @map("conflict_mode")
 
-  /// Archive location. `fileName` is what the operator sees; `storageKey` is
-  /// the opaque handle ArchiveStorageService resolves to a local file or an
-  /// object-storage key — never an absolute path, because the pod that writes
-  /// an archive is not the pod that reads it. Null once the archive is gone.
-  fileName   String? @map("file_name")
-  storageKey String? @map("storage_key")
-  fileSize   BigInt? @map("file_size")
-  checksum   String? @db.VarChar(64)
+  /// The archive itself lives in {@link DataTransferChunk}, keyed by this job.
+  /// `fileName` is what the operator sees on the downloaded file; `fileSize`
+  /// and `checksum` describe the compressed bytes. `archived` says whether the
+  /// chunks are still there — they are dropped once `expiresAt` passes.
+  fileName String? @map("file_name")
+  fileSize BigInt? @map("file_size")
+  checksum String? @db.VarChar(64)
+  archived Boolean @default(false)
 
   /// `totalRows` is an estimate counted before the run starts, so on a busy
   /// namespace `processedRows` can drift against it — `percent` is clamped.
@@ -1904,8 +1907,29 @@ model DataTransferJob {
   createdAt  DateTime  @default(now()) @map("created_at")
   updatedAt  DateTime  @updatedAt @map("updated_at")
 
+  chunks DataTransferChunk[]
+
   @@index([status])
   @@index([kind, createdAt(sort: Desc)])
   @@index([expiresAt])
   @@map("data_transfer_jobs")
+}
+
+/// One slice of an archive's compressed bytes.
+///
+/// The archive lives in Postgres because it is written by the worker and read
+/// by the API, and those are separate deployments that share nothing but the
+/// database. Split across rows rather than held in one `bytea` so both
+/// directions stay streaming and bounded: the export appends a chunk and
+/// forgets it, the download reads them back in order without ever assembling
+/// the whole archive in memory.
+model DataTransferChunk {
+  jobId   String @map("job_id")
+  ordinal Int
+  data    Bytes
+
+  job DataTransferJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@id([jobId, ordinal])
+  @@map("data_transfer_chunks")
 }

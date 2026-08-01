@@ -4,13 +4,10 @@ import { ClsService } from 'nestjs-cls';
 
 import { PrismaService } from '../prisma.service';
 import { NamespaceRegistryService } from '../registry/namespace-registry.service';
+import { CLS_NAMESPACE_ID, CLS_SLUG } from '../namespace/namespace.constants';
+import { ArchiveStoreService, CHUNK_BYTES } from './archive-store.service';
 import {
-  CLS_NAMESPACE_ID,
-  CLS_SCHEMA,
-  CLS_SLUG,
-} from '../namespace/namespace.constants';
-import { ArchiveStorageService } from './archive-storage.service';
-import {
+  ARCHIVE_EXTENSION,
   ARCHIVE_MAGIC,
   ARCHIVE_VERSION,
   ArchiveWriter,
@@ -46,7 +43,7 @@ export class NamespaceExportService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly storage: ArchiveStorageService,
+    private readonly store: ArchiveStoreService,
     private readonly cls: ClsService,
     private readonly registry: NamespaceRegistryService,
   ) {}
@@ -71,11 +68,12 @@ export class NamespaceExportService {
     const tables = tablesForScopes(job.scopes);
 
     const slug = this.cls.get<string>(CLS_SLUG) ?? 'namespace';
-    const schema = this.cls.get<string>(CLS_SCHEMA) ?? 'namespace';
     const displayName = await this.namespaceName(slug);
-    const fileName = this.storage.archiveFileName(displayName);
-    const localPath = await this.storage.allocate(schema, fileName);
-    const storageKey = this.storage.handleFor(localPath);
+    const fileName = this.store.archiveFileName(displayName, ARCHIVE_EXTENSION);
+
+    // A retry of this job would otherwise append to the previous attempt's
+    // chunks and produce an archive that is two gzip streams concatenated.
+    await this.store.remove(job.id);
 
     await this.prisma.dataTransferJob.update({
       where: { id: job.id },
@@ -83,7 +81,6 @@ export class NamespaceExportService {
         status: DataTransferStatus.RUNNING,
         startedAt: new Date(),
         fileName,
-        storageKey,
         errorMessage: null,
       },
     });
@@ -91,7 +88,12 @@ export class NamespaceExportService {
     const estimates = await this.estimate(tables);
     progress.setTotal(Object.values(estimates).reduce((sum, n) => sum + n, 0));
 
-    const writer = new ArchiveWriter(localPath);
+    // Chunks land in Postgres as the gzip stream fills them, so nothing but one
+    // chunk of the archive is ever in memory.
+    const writer = new ArchiveWriter(
+      (ordinal, data) => this.store.writeChunk(job.id, ordinal, data),
+      CHUNK_BYTES,
+    );
     const stripped: Record<string, string[]> = {};
 
     try {
@@ -116,19 +118,13 @@ export class NamespaceExportService {
 
       if (progress.cancelled) {
         await writer.destroy(new Error('cancelled'));
-        await this.storage.remove(schema, storageKey);
+        await this.store.remove(job.id);
         await this.finishCancelled(job.id, progress);
         return;
       }
 
       await writer.writeFooter({ counts: progress.tableCounts, stripped });
       const result = await writer.close();
-
-      // Hand the finished archive to shared storage before the job is marked
-      // complete: the download is served by a different pod than the worker
-      // that produced it, so a COMPLETED job whose archive is still pod-local
-      // would 404 the moment anyone clicked it.
-      await this.storage.publish(schema, localPath);
 
       if (Object.keys(stripped).length > 0) {
         progress.warn(
@@ -149,7 +145,8 @@ export class NamespaceExportService {
           warnings: progress.collectedWarnings,
           fileSize: BigInt(result.size),
           checksum: result.checksum,
-          expiresAt: this.storage.expiryFromNow(),
+          archived: true,
+          expiresAt: this.store.expiryFromNow(),
           finishedAt: new Date(),
         },
       });
@@ -162,7 +159,7 @@ export class NamespaceExportService {
       await writer.destroy(
         error instanceof Error ? error : new Error(String(error)),
       );
-      await this.storage.remove(schema, storageKey);
+      await this.store.remove(job.id);
       throw error;
     }
   }
@@ -242,7 +239,7 @@ export class NamespaceExportService {
       data: {
         status: DataTransferStatus.CANCELLED,
         currentTable: null,
-        storageKey: null,
+        archived: false,
         counts: progress.tableCounts,
         warnings: progress.collectedWarnings,
         finishedAt: new Date(),

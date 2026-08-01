@@ -38,6 +38,8 @@ export type TransferScopeId =
 export type TransferKind = "EXPORT" | "IMPORT";
 
 export type TransferStatus =
+  /** Uploaded and inspected, but nothing queued: the operator is still choosing. */
+  | "STAGED"
   | "PENDING"
   | "RUNNING"
   | "COMPLETED"
@@ -264,4 +266,9 @@ export function formatRows(rows: number): string {
 
 export function isTerminal(status: TransferStatus): boolean {
   return status === "COMPLETED" || status === "FAILED" || status === "CANCELLED";
+}
+
+/** A transfer the server is actually working on, as opposed to one staged or done. */
+export function isRunning(status: TransferStatus): boolean {
+  return status === "PENDING" || status === "RUNNING";
 }

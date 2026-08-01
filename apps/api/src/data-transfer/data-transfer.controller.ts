@@ -18,13 +18,11 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import '@fastify/multipart';
-import { createReadStream } from 'node:fs';
 import { pipeline } from 'node:stream/promises';
-import { ClsService } from 'nestjs-cls';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import type { DataTransferJob } from '@prisma/client';
 
-import { CLS_SCHEMA } from '../namespace/namespace.constants';
+import { ArchiveStoreService } from './archive-store.service';
 import { DataTransferService } from './data-transfer.service';
 import {
   ArchivePreviewDto,
@@ -48,7 +46,7 @@ import {
 export class DataTransferController {
   constructor(
     private readonly transfers: DataTransferService,
-    private readonly cls: ClsService,
+    private readonly store: ArchiveStoreService,
   ) {}
 
   @Get('scopes')
@@ -101,7 +99,7 @@ export class DataTransferController {
       `attachment; filename="${file.fileName.replace(/"/g, '')}"`,
     );
 
-    await pipeline(createReadStream(file.path), reply.raw);
+    await pipeline(this.store.stream(file.jobId), reply.raw);
   }
 
   @Post('imports/upload')
@@ -118,8 +116,6 @@ export class DataTransferController {
   })
   @ApiOkResponse({ type: ArchivePreviewDto })
   async upload(@Req() request: FastifyRequest): Promise<ArchivePreviewDto> {
-    const schema = this.cls.get<string>(CLS_SCHEMA) ?? 'namespace';
-
     let fileName = 'archive.cfyre';
     let bytes: Buffer | undefined;
     for await (const part of request.parts()) {
@@ -133,7 +129,7 @@ export class DataTransferController {
 
     if (!bytes) throw new BadRequestException('No archive was uploaded');
 
-    return this.transfers.previewUpload(schema, fileName, bytes);
+    return this.transfers.previewUpload(fileName, bytes);
   }
 
   @Post('imports')
@@ -150,7 +146,6 @@ export class DataTransferController {
 
     return toDto(
       await this.transfers.startImport({
-        schema: this.cls.get<string>(CLS_SCHEMA) ?? 'namespace',
         uploadId: dto.uploadId,
         scopes: dto.scopes ?? [],
         conflictMode,
@@ -191,9 +186,7 @@ function toDto(job: DataTransferJob): DataTransferJobDto {
     fileSize: job.fileSize === null ? null : Number(job.fileSize),
     checksum: job.checksum,
     downloadAvailable:
-      job.kind === 'EXPORT' &&
-      job.status === 'COMPLETED' &&
-      job.storageKey !== null,
+      job.kind === 'EXPORT' && job.status === 'COMPLETED' && job.archived,
     totalRows: job.totalRows,
     processedRows: job.processedRows,
     skippedRows: job.skippedRows,

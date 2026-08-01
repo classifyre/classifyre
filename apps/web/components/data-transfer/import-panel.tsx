@@ -17,7 +17,9 @@ import { useTranslation } from "@/hooks/use-translation";
 import { useTransferJob } from "@/hooks/use-transfer-job";
 import {
   cancelTransferJob,
+  deleteTransferJob,
   formatBytes,
+  isRunning,
   listTransferScopes,
   startImport,
   uploadArchive,
@@ -87,6 +89,19 @@ export function ImportPanel({
     }
   };
 
+  /**
+   * Drop a staged upload rather than leaving its rows to expire. The upload
+   * created a job holding the archive's bytes, so discarding the preview has to
+   * discard that too.
+   */
+  const handleDiscard = async () => {
+    const staged = preview;
+    setPreview(null);
+    if (!staged) return;
+    await deleteTransferJob(staged.uploadId, apiBase).catch(() => undefined);
+    onJobStarted();
+  };
+
   const handleStart = async () => {
     if (!preview) return;
     setStarting(true);
@@ -126,9 +141,7 @@ export function ImportPanel({
   };
 
   const running =
-    current !== null &&
-    current.kind === "IMPORT" &&
-    (current.status === "PENDING" || current.status === "RUNNING");
+    current !== null && current.kind === "IMPORT" && isRunning(current.status);
 
   return (
     <div className="space-y-4">
@@ -221,7 +234,7 @@ export function ImportPanel({
             </dl>
             <button
               type="button"
-              onClick={() => setPreview(null)}
+              onClick={() => void handleDiscard()}
               className="shrink-0 text-muted-foreground transition-colors hover:text-foreground"
               aria-label={t("dataTransfer.discardArchive")}
             >

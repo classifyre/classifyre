@@ -5,11 +5,8 @@ import {
   type DataTransferJob,
 } from '@prisma/client';
 
-import { ClsService } from 'nestjs-cls';
-
 import { PrismaService } from '../prisma.service';
-import { CLS_SCHEMA } from '../namespace/namespace.constants';
-import { ArchiveStorageService } from './archive-storage.service';
+import { ArchiveStoreService } from './archive-store.service';
 import {
   ArchiveFormatError,
   ArchiveReader,
@@ -52,20 +49,11 @@ export class NamespaceImportService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly storage: ArchiveStorageService,
-    private readonly cls: ClsService,
+    private readonly store: ArchiveStoreService,
   ) {}
 
   async run(job: DataTransferJob): Promise<void> {
-    if (!job.storageKey) {
-      throw new Error('Import job has no uploaded archive');
-    }
-
-    // The upload was accepted by an API pod; this worker is a different pod, so
-    // the archive has to be fetched from shared storage before it can be read.
-    const schema = this.cls.get<string>(CLS_SCHEMA) ?? 'namespace';
-    const localPath = await this.storage.materialize(schema, job.storageKey);
-    if (!localPath) {
+    if (!job.archived || !(await this.store.exists(job.id))) {
       throw new Error(
         'The uploaded archive is no longer available — upload it again',
       );
@@ -73,7 +61,9 @@ export class NamespaceImportService {
 
     const progress = new TransferProgress(this.prisma, job.id);
     const selected = new Set(job.scopes);
-    const reader = new ArchiveReader(localPath);
+    // The upload was accepted by an API pod and this worker is a different one;
+    // the archive is read back out of the database, which is what they share.
+    const reader = new ArchiveReader(() => this.store.stream(job.id));
 
     // Every imported row gets a fresh identity derived from the job id, so an
     // import is purely additive and a retry of this same job reproduces exactly
@@ -179,8 +169,8 @@ export class NamespaceImportService {
    * Read an archive's manifest without importing it, so the operator can see
    * what it holds — and pick a subset — before committing.
    */
-  async inspect(filePath: string): Promise<ArchiveManifest> {
-    return new ArchiveReader(filePath).readManifest();
+  async inspect(bytes: Buffer): Promise<ArchiveManifest> {
+    return ArchiveReader.fromBuffer(bytes).readManifest();
   }
 
   private applyManifestEstimate(

@@ -4,7 +4,6 @@ import type { Job } from 'pg-boss';
 
 import { PgBossService } from '../scheduler/pg-boss.service';
 import { PrismaService } from '../prisma.service';
-import { ArchiveStorageService } from './archive-storage.service';
 import { DataTransferService } from './data-transfer.service';
 import { NamespaceExportService } from './namespace-export.service';
 import { NamespaceImportService } from './namespace-import.service';
@@ -41,7 +40,6 @@ export class DataTransferWorker {
     private readonly transfers: DataTransferService,
     private readonly exporter: NamespaceExportService,
     private readonly importer: NamespaceImportService,
-    private readonly storage: ArchiveStorageService,
   ) {}
 
   /**
@@ -66,14 +64,17 @@ export class DataTransferWorker {
     this.logger.log(`Registered worker for queue ${DATA_TRANSFER_QUEUE}`);
   }
 
-  /** Stop the archive-purge timer and drop the namespace's staged archives. */
-  async stopForSchema(schema: string): Promise<void> {
+  /**
+   * Stop the archive-purge timer for a namespace being torn down. The archives
+   * themselves need no cleanup here — they live in the tenant schema and go
+   * with it.
+   */
+  stopForSchema(schema: string): void {
     const timer = this.purgeTimers.get(schema);
     if (timer) {
       clearInterval(timer);
       this.purgeTimers.delete(schema);
     }
-    await this.storage.removeSchema(schema);
   }
 
   /** Schedule the recurring archive purge for the current namespace. */

@@ -446,6 +446,7 @@
     "noArchive": "No archive",
     "deleteJob": "Delete transfer",
     "status": {
+      "STAGED": "Uploaded",
       "PENDING": "Queued",
       "RUNNING": "Running",
       "COMPLETED": "Done",

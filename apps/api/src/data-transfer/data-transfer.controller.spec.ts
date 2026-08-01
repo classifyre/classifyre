@@ -4,12 +4,10 @@ import {
 } from '@nestjs/platform-fastify';
 import { NotFoundException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
-import { ClsService } from 'nestjs-cls';
-import * as fsp from 'node:fs/promises';
-import * as os from 'node:os';
-import * as path from 'node:path';
+import { Readable } from 'node:stream';
 import { gzipSync } from 'node:zlib';
 
+import { ArchiveStoreService } from './archive-store.service';
 import { DataTransferController } from './data-transfer.controller';
 import { DataTransferService } from './data-transfer.service';
 
@@ -22,24 +20,21 @@ import { DataTransferService } from './data-transfer.service';
  */
 describe('DataTransferController download', () => {
   let app: NestFastifyApplication;
-  let dir: string;
-  let archivePath: string;
   const archiveBody = gzipSync(Buffer.from('{"kind":"archive"}\n'));
 
-  const transfers = {
-    downloadable: jest.fn(),
+  const transfers = { downloadable: jest.fn() };
+  // Chunked exactly as the real store hands the archive back.
+  const store = {
+    stream: () =>
+      Readable.from([archiveBody.subarray(0, 4), archiveBody.subarray(4)]),
   };
 
   beforeAll(async () => {
-    dir = await fsp.mkdtemp(path.join(os.tmpdir(), 'cfyre-dl-'));
-    archivePath = path.join(dir, 'archive.cfyre');
-    await fsp.writeFile(archivePath, archiveBody);
-
     const moduleRef = await Test.createTestingModule({
       controllers: [DataTransferController],
       providers: [
         { provide: DataTransferService, useValue: transfers },
-        { provide: ClsService, useValue: { get: () => 'ns_test' } },
+        { provide: ArchiveStoreService, useValue: store },
       ],
     }).compile();
 
@@ -52,14 +47,13 @@ describe('DataTransferController download', () => {
 
   afterAll(async () => {
     await app?.close();
-    await fsp.rm(dir, { recursive: true, force: true });
   });
 
   beforeEach(() => transfers.downloadable.mockReset());
 
   it('serves the archive with its own name and content type', async () => {
     transfers.downloadable.mockResolvedValue({
-      path: archivePath,
+      jobId: 'job-1',
       fileName: 'all-sources-test-2026-07-31.cfyre',
       size: archiveBody.length,
     });

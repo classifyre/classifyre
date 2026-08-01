@@ -11,6 +11,7 @@ import {
   cancelTransferJob,
   downloadArchive,
   formatBytes,
+  isRunning,
   listTransferScopes,
   startExport,
   type TransferJob,
@@ -107,9 +108,7 @@ export function ExportPanel({
   };
 
   const running =
-    current !== null &&
-    current.kind === "EXPORT" &&
-    (current.status === "PENDING" || current.status === "RUNNING");
+    current !== null && current.kind === "EXPORT" && isRunning(current.status);
 
   const finished =
     current !== null && current.kind === "EXPORT" && !running;
