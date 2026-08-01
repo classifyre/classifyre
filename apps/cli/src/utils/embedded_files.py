@@ -125,7 +125,7 @@ def has_embedded_files(mime_type: str) -> bool:
 
 
 def iter_embedded_files(
-    file_bytes: bytes,
+    source: bytes | Any,
     mime_type: str,
     *,
     start_row: int = 0,
@@ -136,19 +136,25 @@ def iter_embedded_files(
 
     ``start_row``/``max_rows`` bound a parquet walk to one row window and are
     ignored for containers with no row axis.
+
+    ``source`` may be a seekable handle rather than bytes (parquet only), which
+    is how an object too large to download still yields its embedded children:
+    only the row groups the window covers are transferred. OOXML has no row axis
+    and is read whole, so it stays on bytes.
     """
-    if not file_bytes:
+    is_bytes = isinstance(source, bytes | bytearray)
+    if is_bytes and not source:
         return
     normalized = _normalize_mime_type(mime_type)
     if normalized in _PARQUET_MIME_TYPES:
         yield from _iter_parquet_files(
-            file_bytes,
+            source,
             start_row=start_row,
             max_rows=max_rows,
             max_files=max_files,
         )
-    elif normalized in _OOXML_MIME_TYPES:
-        yield from _iter_ooxml_files(file_bytes, max_files)
+    elif normalized in _OOXML_MIME_TYPES and is_bytes:
+        yield from _iter_ooxml_files(source, max_files)
 
 
 # ---------------------------------------------------------------------------
@@ -182,7 +188,11 @@ def embedded_cell_name(cell: object, kind: str) -> str:
     return ""
 
 
-def detect_parquet_payload_columns(parquet_file: Any) -> dict[str, EmbeddedColumn]:
+def detect_parquet_payload_columns(
+    parquet_file: Any,
+    *,
+    sample_row_group: int | None = None,
+) -> dict[str, EmbeddedColumn]:
     """Map column name → ``EmbeddedColumn`` for every column whose cells hold bytes.
 
     All of them are returned, classified by what the bytes turned out to be, because
@@ -221,8 +231,18 @@ def detect_parquet_payload_columns(parquet_file: Any) -> dict[str, EmbeddedColum
     if not candidates:
         return {}
 
+    # Naming the row group matters: handed an open-ended batch iterator, pyarrow
+    # buffers every group in the file before yielding the first one — which over a
+    # range-reading handle means downloading the whole object to sniff one batch.
+    # Callers that already know which group they are about to read pass it, so the
+    # sample costs nothing beyond the window itself.
     try:
-        sample = next(iter(parquet_file.iter_batches(batch_size=_COLUMN_SAMPLE_ROWS)), None)
+        sample_kwargs: dict[str, Any] = {"batch_size": _COLUMN_SAMPLE_ROWS}
+        groups = int(parquet_file.metadata.num_row_groups)
+        if groups > 0:
+            index = 0 if sample_row_group is None else max(0, min(sample_row_group, groups - 1))
+            sample_kwargs["row_groups"] = [index]
+        sample = next(iter(parquet_file.iter_batches(**sample_kwargs)), None)
     except Exception as exc:
         logger.warning("Cannot sample parquet columns: %s", exc)
         return {}
@@ -267,36 +287,28 @@ def _sample_column_payload(batch: Any, column_name: str, kind: str) -> tuple[str
 
 
 def _iter_parquet_files(
-    file_bytes: bytes,
+    source: bytes | Any,
     *,
     start_row: int,
     max_rows: int | None,
     max_files: int,
 ) -> Iterator[EmbeddedFile]:
-    if len(file_bytes) < 8 or file_bytes[-4:] != _PARQUET_MAGIC:
+    is_bytes = isinstance(source, bytes | bytearray)
+    if is_bytes and (len(source) < 8 or bytes(source[-4:]) != _PARQUET_MAGIC):
         logger.warning(
             "Parquet bytes appear truncated (footer magic missing, %d bytes); "
             "skipping embedded-file extraction",
-            len(file_bytes),
+            len(source),
         )
         return
 
     try:
         pq = _require_file_processing("pyarrow.parquet")
-        parquet_file = pq.ParquetFile(io.BytesIO(file_bytes))  # type: ignore[attr-defined]
+        parquet_file = pq.ParquetFile(  # type: ignore[attr-defined]
+            io.BytesIO(source) if is_bytes else source
+        )
     except Exception as exc:
         logger.warning("Cannot open parquet for embedded-file extraction: %s", exc)
-        return
-
-    # Only file-bearing columns produce child assets. A text column is decoded into
-    # its own row's text by the page iterator, so walking it here would scan the
-    # same characters twice under two different asset identities.
-    columns = {
-        name: column
-        for name, column in detect_parquet_payload_columns(parquet_file).items()
-        if column.content == CONTENT_FILE
-    }
-    if not columns:
         return
 
     begin = max(0, start_row)
@@ -307,6 +319,23 @@ def _iter_parquet_files(
         total_groups = int(parquet_file.metadata.num_row_groups)
     except Exception:
         total_groups = 0
+
+    # Only file-bearing columns produce child assets. A text column is decoded into
+    # its own row's text by the page iterator, so walking it here would scan the
+    # same characters twice under two different asset identities.
+    #
+    # The classification sample is taken from the first group this walk will read
+    # anyway, so it adds no transfer of its own.
+    columns = {
+        name: column
+        for name, column in detect_parquet_payload_columns(
+            parquet_file,
+            sample_row_group=groups[0] if groups else None,
+        ).items()
+        if column.content == CONTENT_FILE
+    }
+    if not columns:
+        return
 
     # Resuming deep into a large file skips whole row groups without decoding them,
     # the same pushdown ``_iter_parquet_pages`` uses for the row text.

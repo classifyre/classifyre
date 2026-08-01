@@ -1490,13 +1490,17 @@ def _iter_parquet_pages(
             extract_embedded_bytes,
         )
 
-        payload_columns = detect_parquet_payload_columns(pf)
-
         begin = max(0, start_row)
         groups, drop_in_group = _parquet_row_group_span(pf, begin, max_rows)
         if groups is not None and not groups:
             # The window starts at or past the last row: nothing to read.
             return
+
+        # Sampled from the first group this window reads, so classifying the
+        # columns costs no transfer of its own on a range-reading handle.
+        payload_columns = detect_parquet_payload_columns(
+            pf, sample_row_group=groups[0] if groups else None
+        )
 
         try:
             total_groups = int(pf.metadata.num_row_groups)

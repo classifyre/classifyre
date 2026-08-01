@@ -7,7 +7,7 @@ import logging
 import random
 import tempfile
 from abc import ABC, abstractmethod
-from collections.abc import AsyncGenerator, Iterator
+from collections.abc import AsyncGenerator, Callable, Iterator
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
@@ -134,6 +134,11 @@ class ContentSnapshot:
 # it closes the batch early, which expands the queue and frees it.
 _MAX_PENDING_CONTAINER_BYTES = 256 * 1024 * 1024
 
+# Formats a seekable handle buys anything for: the reader can seek to an index
+# and pull only the parts it needs. Everything else is extracted whole, so a
+# handle would just be a slower way to download the object.
+_RANGE_READABLE_MIME_TYPES = frozenset({"application/parquet", "application/vnd.apache.parquet"})
+
 
 @dataclass
 class _PendingContainer:
@@ -143,12 +148,24 @@ class _PendingContainer:
     inside ``_to_asset``: the row window a parquet's children come from is only
     knowable once the API has handed back that asset's payload cursor, which
     happens after the batch carrying the parent has been registered.
+
+    A container is held either as bytes or as ``open_stream`` — a factory for a
+    seekable handle, used for an object too large to download. The stream form
+    holds no memory while it waits and is opened, read and closed inside the one
+    expansion, so a repository of half-gigabyte shards queues as cheaply as a
+    directory of spreadsheets.
     """
 
     parent: SingleAssetScanResults
     ref: ObjectRef
-    file_bytes: bytes
+    file_bytes: bytes | None
     mime_type: str
+    open_stream: Callable[[], Any] | None = None
+
+    @property
+    def resident_bytes(self) -> int:
+        """What holding this container costs until it is expanded."""
+        return len(self.file_bytes) if self.file_bytes is not None else 0
 
 
 class ObjectStorageSourceBase(BaseSource, ABC):
@@ -161,6 +178,11 @@ class ObjectStorageSourceBase(BaseSource, ABC):
     # LocalFolderSource overrides this: its "ETag" is only mtime and size.
     SUPPORTS_SCAN_CACHE = True
     SCAN_CACHE_VERIFY = "metadata"
+
+    # Whether this provider can serve byte ranges of an object. Set alongside an
+    # ``_open_object_range_reader`` override; the two are read at different points
+    # (discovery decides from the listing, phase 2 opens the handle) and must agree.
+    SUPPORTS_RANGE_READS = False
 
     def __init__(
         self,
@@ -460,9 +482,13 @@ class ObjectStorageSourceBase(BaseSource, ABC):
 
         # An object the downloader would refuse or truncate cannot be expanded
         # anyway — a partial parquet has no footer, a partial zip no directory — so
-        # reading it during discovery would spend the egress for nothing.
+        # reading it during discovery would spend the egress for nothing. Unless it
+        # can be range-read, in which case its footer is reachable and its embedded
+        # files are not lost to its size.
         max_bytes = self._max_object_bytes()
         if ref.size and ref.size > max_bytes:
+            if self._range_read_mime(ref) is not None:
+                return True
             logger.info(
                 "Not expanding container %s during discovery: %d bytes exceeds the "
                 "%d-byte object limit, so its embedded assets are skipped",
@@ -481,8 +507,12 @@ class ObjectStorageSourceBase(BaseSource, ABC):
         # all. Only containers are fetched: a bucket of ordinary documents still
         # downloads nothing here, which is the invariant that rule protects.
         metadata_only = self._discovery_only or not self._include_content_preview()
-        if metadata_only and not self._is_container_object(ref):
-            mime = normalize_mime_type(ref.content_type_hint)
+        range_mime = self._range_read_mime(ref)
+        if range_mime is not None or (metadata_only and not self._is_container_object(ref)):
+            # A range-readable object is never downloaded here — not even as a
+            # container. Its children come from a handle opened at expansion time,
+            # and its rows from one opened in phase 2.
+            mime = range_mime or normalize_mime_type(ref.content_type_hint)
             if not mime:
                 mime = infer_mime_type_from_file_name(self._object_file_name(ref))
             return ContentSnapshot(
@@ -623,6 +653,18 @@ class ObjectStorageSourceBase(BaseSource, ABC):
                     mime_type=snapshot.mime_type,
                 )
             )
+        elif self._range_read_mime(ref) is not None and has_embedded_files(snapshot.mime_type):
+            # Too large to download, but its footer is a range request away. The
+            # handle is opened at expansion time so nothing is held meanwhile.
+            self._pending_containers.append(
+                _PendingContainer(
+                    parent=asset,
+                    ref=ref,
+                    file_bytes=None,
+                    mime_type=snapshot.mime_type,
+                    open_stream=lambda captured=ref: self._open_object_range_reader(captured),
+                )
+            )
 
         # Archive containers (zip/tar/gz/7z/rar) expand into one child asset per
         # member file so each member gets its own MIME resolution, text
@@ -640,7 +682,7 @@ class ObjectStorageSourceBase(BaseSource, ABC):
 
     def _pending_container_bytes(self) -> int:
         """Bytes held by containers still waiting to be expanded."""
-        return sum(len(container.file_bytes) for container in self._pending_containers)
+        return sum(container.resident_bytes for container in self._pending_containers)
 
     def _expand_pending_containers(self) -> list[SingleAssetScanResults]:
         """Turn every queued container's embedded files into child assets.
@@ -653,10 +695,19 @@ class ObjectStorageSourceBase(BaseSource, ABC):
         pending, self._pending_containers = self._pending_containers, []
         children: list[SingleAssetScanResults] = []
         for container in pending:
-            start_row, max_rows = self._embedded_row_bounds(container)
+            handle: Any = None
             try:
+                if container.file_bytes is not None:
+                    payload: Any = container.file_bytes
+                else:
+                    handle = container.open_stream() if container.open_stream else None
+                    if handle is None:
+                        continue
+                    payload = handle
+
+                start_row, max_rows = self._embedded_row_bounds(container, payload)
                 for embedded in iter_embedded_files(
-                    container.file_bytes,
+                    payload,
                     container.mime_type,
                     start_row=start_row,
                     max_rows=max_rows,
@@ -674,9 +725,19 @@ class ObjectStorageSourceBase(BaseSource, ABC):
                     container.parent.external_url,
                     exc,
                 )
+            finally:
+                if handle is not None:
+                    try:
+                        handle.close()
+                    except Exception:  # pragma: no cover - close is best effort
+                        pass
         return children
 
-    def _embedded_row_bounds(self, container: _PendingContainer) -> tuple[int, int | None]:
+    def _embedded_row_bounds(
+        self,
+        container: _PendingContainer,
+        payload: bytes | Any,
+    ) -> tuple[int, int | None]:
         """The row slice of a container this run expands, taken from its payload window.
 
         ``(0, None)`` — the whole container — for the ALL strategy and for anything
@@ -688,9 +749,7 @@ class ObjectStorageSourceBase(BaseSource, ABC):
         window = store.window_for(container.parent.hash, container.mime_type)
         if window is None:
             return 0, None
-        return window.row_bounds(
-            row_count=count_tabular_rows(container.file_bytes, container.mime_type)
-        )
+        return window.row_bounds(row_count=count_tabular_rows(payload, container.mime_type))
 
     def _build_child_embedded_asset(
         self,
@@ -936,30 +995,42 @@ class ObjectStorageSourceBase(BaseSource, ABC):
     def _open_object_range_reader(self, ref: ObjectRef) -> Any | None:
         """A seekable handle over this object, or None when ranges are unavailable.
 
-        Overridden by providers whose backend serves HTTP ``Range`` requests. The
-        default is None, which keeps every other source on the download-and-parse
-        path it has always used.
+        Overridden by providers whose backend serves HTTP ``Range`` requests —
+        which must also set ``SUPPORTS_RANGE_READS``. The default is None, which
+        keeps every other source on the download-and-parse path it has always used.
         """
         return None
 
-    def _open_row_reader(self, asset_id: str) -> tuple[Any, str] | None:
-        """A range-reading handle for an object too large to download, if possible.
+    def _range_read_mime(self, ref: ObjectRef) -> str | None:
+        """The MIME to range-read this object as, or None to download it normally.
 
         Byte-capping a Parquet file does not produce fewer rows, it produces a
-        headless file with no rows at all — the footer that says where the row
-        groups live is the part that gets cut off. So for an oversized Parquet the
-        choice is not "read some of it" but "read it by ranges or not at all", and
-        this is where that decision is made. Everything else still goes down the
-        capped-download path, where truncation costs detail rather than the file.
+        headless file with no rows at all — the footer that indexes the row groups
+        is the part that gets cut off. So for an oversized Parquet the choice is
+        not "read some of it" but "read it by ranges or not at all", and this is
+        where that decision is made, for both its rows and its embedded children.
+        Everything else still goes down the capped-download path, where truncation
+        costs detail rather than the file.
+
+        Decided from the listing alone — no request — because discovery consults
+        it before it would otherwise fetch the object.
         """
+        if not self.SUPPORTS_RANGE_READS:
+            return None
+        if not ref.size or ref.size <= self._max_object_bytes():
+            return None
+        mime = tabular_mime_type_for_name(self._object_file_name(ref)) or ""
+        return mime if mime in _RANGE_READABLE_MIME_TYPES else None
+
+    def _open_row_reader(self, asset_id: str) -> tuple[Any, str] | None:
+        """A range-reading handle for an object too large to download, if possible."""
         ref_hash, _ = self._object_identity(asset_id)
         ref = self._object_ref_by_hash.get(ref_hash)
-        if ref is None or not ref.size or ref.size <= self._max_object_bytes():
+        if ref is None:
             return None
 
-        file_name = self._object_file_name(ref)
-        mime = tabular_mime_type_for_name(file_name) or ""
-        if mime not in ("application/parquet", "application/vnd.apache.parquet"):
+        mime = self._range_read_mime(ref)
+        if mime is None:
             return None
 
         try:
