@@ -8,7 +8,11 @@ import zipfile
 import pytest
 
 from src.utils.embedded_files import (
+    CONTENT_FILE,
+    CONTENT_OPAQUE,
+    CONTENT_TEXT,
     EmbeddedFile,
+    classify_embedded_mime,
     embedded_cell_name,
     extract_embedded_bytes,
     has_embedded_files,
@@ -98,9 +102,21 @@ def test_is_embeddable_file_mime() -> None:
     # Unrecognized blobs (embedding vectors, digests) must not each become an asset.
     assert not is_embeddable_file_mime("application/octet-stream")
     assert not is_embeddable_file_mime("")
-    # Text already reads correctly as row text.
+    # Text belongs to its row, so it is decoded there instead.
     assert not is_embeddable_file_mime("text/plain")
     assert not is_embeddable_file_mime("application/json")
+
+
+def test_classify_embedded_mime() -> None:
+    assert classify_embedded_mime("image/png") == CONTENT_FILE
+    assert classify_embedded_mime("application/pdf") == CONTENT_FILE
+    # A real document format the file parser can structure is worth its own asset.
+    assert classify_embedded_mime("message/rfc822") == CONTENT_FILE
+    assert classify_embedded_mime("text/plain") == CONTENT_TEXT
+    assert classify_embedded_mime("text/html") == CONTENT_TEXT
+    assert classify_embedded_mime("application/json") == CONTENT_TEXT
+    assert classify_embedded_mime("application/octet-stream") == CONTENT_OPAQUE
+    assert classify_embedded_mime("") == CONTENT_OPAQUE
 
 
 def test_extract_embedded_bytes_struct_and_binary() -> None:
@@ -160,6 +176,90 @@ def test_parquet_row_text_placeholder_names_non_image_columns() -> None:
     assert "<application/pdf:" in joined
     assert "%PDF" not in joined  # the blob itself never reaches text detectors
     assert "note: alpha" in joined
+    # Bytes that are neither a file nor text are summarized, never repr'd.
+    assert "<binary:" in joined
+    assert "\\x01" not in joined
+
+
+# ── Text carried as bytes ────────────────────────────────────────────────────
+#
+# A cell can hold text without being a string column: a raw-binary column of JSON
+# documents, or a HuggingFace struct<bytes, path> feature holding .txt files. Both
+# used to reach the detectors unreadable — the first as a Python bytes repr, the
+# second replaced by a placeholder and never scanned at all.
+
+_TEXT_DOC = b"Contact Grace at grace@example.com about invoice 4471."
+_JSON_DOC = b'{"name": "Ada Lovelace", "email": "ada@example.com"}'
+
+
+def _single_column_parquet(name: str, value: object, arrow_type: object = None) -> bytes:
+    pa = pytest.importorskip("pyarrow")
+
+    array = pa.array([value], type=arrow_type) if arrow_type is not None else pa.array([value])
+    return _write_parquet(pa.table({name: array}))
+
+
+def _row_text(data: bytes) -> str:
+    from src.utils.file_parser import iter_file_pages
+
+    return "\n".join(iter_file_pages(data, _PARQUET_MIME, batch_size=10))
+
+
+def test_binary_column_holding_text_is_decoded_into_the_row() -> None:
+    pa = pytest.importorskip("pyarrow")
+
+    data = _single_column_parquet("body", _TEXT_DOC, pa.binary())
+
+    assert "body: Contact Grace at grace@example.com about invoice 4471." in _row_text(data)
+    assert "b'" not in _row_text(data)  # no Python repr
+    assert list(iter_embedded_files(data, _PARQUET_MIME)) == []  # stays part of its row
+
+
+def test_binary_column_holding_json_is_decoded_unescaped() -> None:
+    pa = pytest.importorskip("pyarrow")
+
+    text = _row_text(_single_column_parquet("payload", _JSON_DOC, pa.binary()))
+
+    assert '{"name": "Ada Lovelace", "email": "ada@example.com"}' in text
+    assert '\\"' not in text  # quotes were escaped by the old repr rendering
+
+
+def test_struct_column_holding_text_is_decoded_rather_than_hidden() -> None:
+    """Regression: a struct<bytes, path> of .txt files was replaced by a placeholder,
+    so its content reached no detector at all — neither as row text nor as a child."""
+    data = _single_column_parquet("doc", {"bytes": _TEXT_DOC, "path": "notes/a.txt"})
+
+    text = _row_text(data)
+    assert "grace@example.com" in text
+    assert "<text/plain" not in text
+    assert list(iter_embedded_files(data, _PARQUET_MIME)) == []
+
+
+def test_struct_column_holding_json_is_decoded() -> None:
+    data = _single_column_parquet("doc", {"bytes": _JSON_DOC, "path": "notes/a.json"})
+
+    assert "ada@example.com" in _row_text(data)
+
+
+def test_multiline_text_bytes_keep_their_line_structure() -> None:
+    pa = pytest.importorskip("pyarrow")
+
+    multiline = b"Dear Grace,\n\nInvoice 4471 is overdue.\nContact ada@example.com\n"
+    text = _row_text(_single_column_parquet("body", multiline, pa.binary()))
+
+    assert "Dear Grace," in text
+    assert "Invoice 4471 is overdue." in text
+    assert "\\n" not in text  # newlines stayed newlines
+
+
+def test_unreadable_bytes_are_not_decoded_as_text() -> None:
+    """The MIME sniffer calls unplaceable bytes text/plain; decoding those would
+    put a row of invisible control characters where a summary belongs."""
+    pa = pytest.importorskip("pyarrow")
+
+    text = _row_text(_single_column_parquet("vector", b"\x01\x02\x03\x04\x05\x06", pa.binary()))
+
+    assert "<binary: 6 B>" in text
 
 
 # ── Row windows ──────────────────────────────────────────────────────────────

@@ -1369,12 +1369,20 @@ def _iter_parquet_pages(
         # (before reading any data) so a bad file can't lock the C++ thread pool.
         pf = pq.ParquetFile(io.BytesIO(file_bytes))  # type: ignore[attr-defined]
 
-        # File columns (HF Image/Audio structs, raw file-byte columns) carry whole
-        # files that are useless and wasteful as row text — they're surfaced
-        # separately as child assets. Render a compact placeholder instead.
-        from .embedded_files import detect_parquet_file_columns, extract_embedded_bytes
+        # Columns whose cells hold bytes never reach str(): that renders a Python
+        # repr, so a column of JSON documents would arrive at the detectors as
+        # b'{"email": ...}' with escaped quotes. Whole files (HF Image/Audio
+        # structs, file-byte columns) render as a placeholder and are scanned
+        # separately as child assets; text carried as bytes is decoded into the row
+        # it belongs to; anything else is summarized rather than spelled out.
+        from .embedded_files import (
+            CONTENT_FILE,
+            CONTENT_TEXT,
+            detect_parquet_payload_columns,
+            extract_embedded_bytes,
+        )
 
-        file_columns = detect_parquet_file_columns(pf)
+        payload_columns = detect_parquet_payload_columns(pf)
 
         begin = max(0, start_row)
         first_group, drop_in_group = _parquet_row_group_start(pf, begin)
@@ -1411,12 +1419,15 @@ def _iter_parquet_pages(
                 lines.append(f"row_{abs_row + 1}:")
                 for col_i, col in enumerate(col_names):
                     cell = batch.column(col_i)[local_idx].as_py()
-                    if col in file_columns:
-                        embedded_column = file_columns[col]
-                        cell_str = _format_embedded_placeholder(
-                            extract_embedded_bytes(cell, embedded_column.kind),
-                            embedded_column.mime_hint,
-                        )
+                    if col in payload_columns:
+                        payload_column = payload_columns[col]
+                        raw = extract_embedded_bytes(cell, payload_column.kind)
+                        if payload_column.content == CONTENT_TEXT:
+                            cell_str = _decode_bytes(raw) if raw else ""
+                        elif payload_column.content == CONTENT_FILE:
+                            cell_str = _format_embedded_placeholder(raw, payload_column.mime_hint)
+                        else:
+                            cell_str = _format_embedded_placeholder(raw, OCTET_STREAM)
                     else:
                         cell_str = "" if cell is None else str(cell)
                     first, *rest = cell_str.splitlines() or [""]
@@ -1470,7 +1481,12 @@ def _format_embedded_placeholder(raw: bytes | None, mime_hint: str = "") -> str:
     The label names what the column holds, since that is the only trace of it left
     in the row text once the child asset carries the content.
     """
-    label = "image" if mime_hint.startswith("image/") else (mime_hint or "file")
+    if mime_hint.startswith("image/"):
+        label = "image"
+    elif not mime_hint or mime_hint == OCTET_STREAM:
+        label = "binary"
+    else:
+        label = mime_hint
     if not raw:
         return f"<{label}>"
     size = len(raw)
