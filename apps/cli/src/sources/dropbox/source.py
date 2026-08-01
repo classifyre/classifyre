@@ -28,6 +28,8 @@ from ..object_storage.base import ObjectRef, ObjectStorageSourceBase
 
 logger = logging.getLogger(__name__)
 
+_DOWNLOAD_CHUNK_BYTES = 1024 * 1024
+
 # Dropbox Paper docs (and a few other cloud-native items) carry no downloadable
 # bytes. They are exported instead; markdown keeps the text intact for detectors.
 _EXPORT_MIME_TYPES = {
@@ -586,6 +588,33 @@ class DropboxSource(ObjectStorageSourceBase):
         return options[0] if options else "markdown"
 
     # ── download ─────────────────────────────────────────────────────────
+
+    def _stream_object(self, ref: ObjectRef) -> Iterator[bytes]:
+        """Stream a Dropbox file in chunks — no cap, nothing held whole.
+
+        Exported formats (Paper docs and friends) go through the same path: the
+        export is generated server-side and streamed back like any other file.
+        """
+        dropbox_ref = ref if isinstance(ref, DropboxObjectRef) else None
+        client = self._client_for(dropbox_ref.target if dropbox_ref else _ACCOUNT_TARGET)
+        path = dropbox_ref.file_id if dropbox_ref and dropbox_ref.file_id else ref.key
+
+        if dropbox_ref is not None and not dropbox_ref.is_downloadable:
+            export_format = dropbox_ref.export_format or "markdown"
+            _export_result, response = client.files_export(path, export_format)
+            self._exported_as_by_key[ref.key] = _EXPORT_MIME_TYPES.get(export_format, "text/plain")
+        else:
+            _metadata, response = client.files_download(path)
+
+        try:
+            yield from response.iter_content(chunk_size=_DOWNLOAD_CHUNK_BYTES)
+        finally:
+            close = getattr(response, "close", None)
+            if callable(close):
+                try:
+                    close()
+                except Exception:
+                    logger.debug("Failed to close Dropbox response body")
 
     def _download_object(self, ref: ObjectRef) -> tuple[bytes, str | None]:
         max_bytes = self._max_object_bytes()

@@ -20,7 +20,7 @@ import pytest
 
 from src.pipeline.payload_window import PayloadWindowStore
 from src.sources.hugging_face.source import HuggingFaceObjectRef, HuggingFaceSource
-from src.utils.http_range_reader import HttpRangeReader, open_buffered
+from src.utils.range_reader import HttpRangeReader, open_buffered
 
 pytest.importorskip("pyarrow")
 

@@ -123,7 +123,15 @@ SOURCE_FACTORIES = {
 
 
 def _instrument(source, refs, monkeypatch, *, fail_on: set[str] | None = None):
-    """Wire the source to in-memory objects and count byte reads."""
+    """Wire the source to in-memory objects and count byte reads.
+
+    Both seams are counted. ``_download_object`` is the whole-object read (binary
+    detectors, and providers that have not been migrated); ``_stream_object`` is
+    the chunked read behind ``_open_object``, which is where a migrated provider
+    now fetches its bytes. Either one hitting the network twice for the same
+    object is the regression these tests exist to catch, so both land in the same
+    list.
+    """
     downloads: list[str] = []
 
     def _download(ref):
@@ -132,8 +140,15 @@ def _instrument(source, refs, monkeypatch, *, fail_on: set[str] | None = None):
             raise RuntimeError("object unavailable")
         return CSV_BYTES, "text/csv"
 
+    def _stream(ref):
+        downloads.append(ref.key)
+        if fail_on and ref.key in fail_on:
+            raise RuntimeError("object unavailable")
+        yield CSV_BYTES
+
     monkeypatch.setattr(source, "_list_objects", lambda: iter(refs))
     monkeypatch.setattr(source, "_download_object", _download)
+    monkeypatch.setattr(source, "_stream_object", _stream)
     monkeypatch.setattr(source, "_ensure_file_processing_dependencies", lambda: None)
     return downloads
 

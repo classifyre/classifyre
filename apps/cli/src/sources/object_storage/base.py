@@ -33,6 +33,7 @@ from ...utils.file_parser import (
     tabular_mime_type_for_name,
 )
 from ...utils.hashing import hash_id, unhash_id
+from ...utils.payload import spool
 from ..base import BaseSource
 from ..dependencies import require_module
 
@@ -1049,6 +1050,70 @@ class ObjectStorageSourceBase(BaseSource, ABC):
         )
         return handle, mime
 
+    def _stream_object(self, ref: ObjectRef) -> Iterator[bytes]:
+        """Yield an object's bytes in chunks, for providers that can stream.
+
+        The default has nothing to stream from — it defers to ``_download_object``,
+        which is what an unmigrated provider still implements — so overriding this
+        is what moves a provider off "the whole object must fit in memory".
+        """
+        file_bytes, _hint = self._download_object(ref)
+        yield file_bytes
+
+    def _open_object(self, ref: ObjectRef) -> tuple[Any, str]:
+        """A seekable handle over an object, and the MIME type to read it as.
+
+        This is the path that decides how big a file the scan can survive. The
+        bytes are streamed into a ``SpooledTemporaryFile``: a small object stays
+        in memory exactly as before, and a large one rolls over to a temp file, so
+        resident memory is bounded by the spool threshold rather than by the
+        largest file in the corpus. Parsers take the handle, so nothing copies it
+        back into the heap.
+
+        Prefers a range reader when the provider has one, which transfers less
+        again — only the parts of the object the parser actually touches.
+        """
+        range_mime = self._range_read_mime(ref)
+        if range_mime is not None:
+            handle = self._open_object_range_reader(ref)
+            if handle is not None:
+                return handle, range_mime
+
+        spooled = spool(
+            self._stream_object(ref),
+            threshold_bytes=self._spool_threshold_bytes(),
+            max_bytes=self._hard_size_limit_bytes(),
+            label=f"{self.provider_label}:{ref.key}",
+        )
+        mime_type = resolve_mime_type(
+            spooled,
+            declared_mime_type=ref.content_type_hint or "",
+            file_name=self._object_file_name(ref),
+        )
+        return spooled, mime_type
+
+    def _spool_threshold_bytes(self) -> int:
+        """How much of one object may sit in memory before it spills to disk.
+
+        This is what ``max_object_bytes`` now means for providers that stream: not
+        "the largest file we can read" but "the largest we hold in RAM". The file
+        size a scan can handle is free disk.
+        """
+        return max(0, self._max_object_bytes())
+
+    def _hard_size_limit_bytes(self) -> int | None:
+        """A hard refusal ceiling, or None for no limit (the default).
+
+        Distinct from the spool threshold on purpose: refusing an object is a
+        policy choice, while spilling it to disk is an implementation detail.
+        """
+        value = self._connection_option("max_file_bytes", None)
+        try:
+            parsed = int(value)  # type: ignore[arg-type]
+        except (TypeError, ValueError):
+            return None
+        return parsed if parsed > 0 else None
+
     async def fetch_content_bytes(self, asset_id: str) -> tuple[bytes, str] | None:
         raw_bytes = self._bytes_cache.get(asset_id)
         if raw_bytes is None:
@@ -1090,25 +1155,10 @@ class ObjectStorageSourceBase(BaseSource, ABC):
         mime = self._mime_cache.get(asset_id, "")
 
         if raw_bytes is None:
-            # An object too large to download whole is read by byte range instead
-            # of being truncated into an unreadable stub. Checked before the
-            # download below so the capped bytes are never fetched for it.
-            row_reader = self._open_row_reader(asset_id)
-            if row_reader is not None:
-                handle, stream_mime = row_reader
-                try:
-                    async for page in self._pump_pages(asset_id, handle, stream_mime):
-                        yield "", page
-                finally:
-                    try:
-                        handle.close()
-                    except Exception:  # pragma: no cover - close is best effort
-                        pass
-                self._content_pages_processed.add(asset_id)
-                return
-
             # Normal phase-2 path: discovery ran with discovery_only=True, so no
-            # bytes were ever cached. Fetch them once here.
+            # bytes were ever cached. The object is opened once here, as a handle
+            # — a range reader where the provider supports one, otherwise a
+            # spooled copy that lives in memory only while it is small enough to.
             #
             # Falling through to fetch_content() instead would download the
             # object via _build_snapshot() and then discard it (the snapshot
@@ -1116,14 +1166,31 @@ class ObjectStorageSourceBase(BaseSource, ABC):
             # fetch_content_bytes() fallback to download the very same object a
             # second time — 2x egress on every object-storage scan.
             #
-            # These bytes stay a local of this generator, so they are released
-            # when it finishes whether or not the asset is evicted (the caller
-            # skips eviction on error). Caching them here instead would leak one
-            # object per failed asset, which a memory-capped scan pod cannot
-            # afford.
-            fetched = await self.fetch_content_bytes(asset_id)
-            if fetched is not None:
-                raw_bytes, mime = fetched
+            # The handle is closed when this generator finishes, whether or not
+            # the asset is evicted (the caller skips eviction on error), so a
+            # failed asset cannot leak a spool file.
+            asset_hash, _external_url = self._object_identity(asset_id)
+            ref = self._object_ref_by_hash.get(asset_hash)
+            if ref is not None:
+                handle: Any = None
+                try:
+                    handle, stream_mime = self._open_object(ref)
+                    logger.info(
+                        "fetch_content_pages(%s): streaming %s as %s",
+                        asset_id,
+                        ref.key,
+                        stream_mime or "unknown",
+                    )
+                    async for page in self._pump_pages(asset_id, handle, stream_mime):
+                        yield "", page
+                finally:
+                    if handle is not None:
+                        try:
+                            handle.close()
+                        except Exception:  # pragma: no cover - close is best effort
+                            pass
+                self._content_pages_processed.add(asset_id)
+                return
 
         logger.info(
             "fetch_content_pages(%s): raw_bytes=%s mime=%s processed=%s",

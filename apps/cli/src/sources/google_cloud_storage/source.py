@@ -7,15 +7,20 @@ from typing import Any
 
 from ...models.generated_input import GoogleCloudStorageInput
 from ..dependencies import require_module
+from ...utils.range_reader import CallableRangeReader, open_buffered
 from ..object_storage.base import ObjectRef, ObjectStorageSourceBase
 
 logger = logging.getLogger(__name__)
+
+_STREAM_CHUNK_BYTES = 1024 * 1024
 
 
 class GoogleCloudStorageSource(ObjectStorageSourceBase):
     source_type = "google_cloud_storage"
     provider_label = "GOOGLE_CLOUD_STORAGE"
     input_model = GoogleCloudStorageInput
+
+    SUPPORTS_RANGE_READS = True
 
     def _required_bucket(self) -> str:
         bucket = str(self.config.required.bucket).strip()
@@ -97,6 +102,31 @@ class GoogleCloudStorageSource(ObjectStorageSourceBase):
                 etag=str(getattr(blob, "etag", "") or "") or None,
                 content_type_hint=str(getattr(blob, "content_type", "") or "") or None,
             )
+
+    def _stream_object(self, ref: ObjectRef) -> Iterator[bytes]:
+        """Stream the whole blob in chunks — no cap, nothing held whole."""
+        blob = self._client().bucket(self._required_bucket()).blob(ref.key)
+        with blob.open("rb") as handle:
+            while True:
+                chunk = handle.read(_STREAM_CHUNK_BYTES)
+                if not chunk:
+                    return
+                yield chunk
+
+    def _open_object_range_reader(self, ref: ObjectRef) -> Any | None:
+        """GCS takes an inclusive byte range, so a columnar blob needs no download."""
+        if not ref.size:
+            return None
+        bucket_name = self._required_bucket()
+        blob = self._client().bucket(bucket_name).blob(ref.key)
+        timeout = self._request_timeout_seconds()
+
+        def _fetch(start: int, end_inclusive: int) -> bytes:
+            return bytes(blob.download_as_bytes(start=start, end=end_inclusive, timeout=timeout))
+
+        return open_buffered(
+            CallableRangeReader(_fetch, size=int(ref.size), label=f"gs://{bucket_name}/{ref.key}")
+        )
 
     def _download_object(self, ref: ObjectRef) -> tuple[bytes, str | None]:
         client = self._client()

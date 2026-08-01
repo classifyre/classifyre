@@ -12,7 +12,7 @@ import requests
 
 from ...models.generated_input import HuggingFaceInput
 from ...models.generated_single_asset_scan_results import SingleAssetScanResults
-from ...utils.http_range_reader import HttpRangeReader, open_buffered
+from ...utils.range_reader import HttpRangeReader, open_buffered
 from ..dependencies import require_module
 from ..object_storage.base import ObjectRef, ObjectStorageSourceBase
 
@@ -412,6 +412,34 @@ class HuggingFaceSource(ObjectStorageSourceBase):
                 ref.size,
             )
         return file_bytes, content_type
+
+    def _stream_object(self, ref: ObjectRef) -> Iterator[bytes]:
+        """Stream a Hub file in chunks — no cap, nothing held whole.
+
+        ``_open_object`` spools this, so the peak cost of a file the range reader
+        cannot help with (a PDF, a zip) is a temp file rather than its full size
+        in memory.
+        """
+        response = self._session().get(
+            self._resolve_url(ref.key),
+            headers={
+                "Authorization": f"Bearer {self._token()}",
+                "User-Agent": "classifyre",
+            },
+            stream=True,
+            timeout=self._request_timeout_seconds(),
+            allow_redirects=True,
+        )
+        response.raise_for_status()
+        try:
+            yield from response.iter_content(chunk_size=_DOWNLOAD_CHUNK_BYTES)
+        finally:
+            close = getattr(response, "close", None)
+            if callable(close):
+                try:
+                    close()
+                except Exception:
+                    logger.debug("Failed to close Hugging Face response body")
 
     def _open_object_range_reader(self, ref: ObjectRef) -> Any | None:
         """A seekable handle over a Hub file, served by HTTP range requests.

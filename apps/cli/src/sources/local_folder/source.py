@@ -9,6 +9,7 @@ from typing import Any
 from urllib.parse import quote
 
 from ...models.generated_input import LocalFolderInput
+from ...utils.file_parser import resolve_mime_type
 from ..object_storage.base import ObjectRef, ObjectStorageSourceBase
 
 logger = logging.getLogger(__name__)
@@ -132,6 +133,27 @@ class LocalFolderSource(ObjectStorageSourceBase):
 
     def _list_objects(self) -> Iterator[ObjectRef]:
         yield from self._walk(self._root(), depth=0)
+
+    def _open_object(self, ref: ObjectRef) -> tuple[Any, str]:
+        """Open the file where it already is.
+
+        The one source that needs neither a download nor a spool: the payload is
+        a local file, so the parser reads it in place at any size. ``max_file_bytes``
+        keeps governing how much is pulled into memory by the *bytes* path
+        (binary detectors), not how large a file can be read.
+        """
+        file_path = self._root() / ref.key
+        handle = open(file_path, "rb")  # noqa: SIM115 - closed by the caller
+        try:
+            mime_type = resolve_mime_type(
+                handle,
+                declared_mime_type=ref.content_type_hint or "",
+                file_name=self._object_file_name(ref),
+            )
+        except Exception:
+            handle.close()
+            raise
+        return handle, mime_type
 
     def _download_object(self, ref: ObjectRef) -> tuple[bytes, str | None]:
         file_path = self._root() / ref.key
