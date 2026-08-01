@@ -31,6 +31,7 @@ from typing import Any
 
 from .file_parser import (
     OCTET_STREAM,
+    _is_null_byte_unicode_text,
     _normalize_mime_type,
     _parquet_row_group_start,
     _require_file_processing,
@@ -75,29 +76,46 @@ class EmbeddedFile:
     mime_type: str  # resolved from the bytes (and the cell's own path, when it has one)
 
 
+# What a byte-carrying parquet column holds, and therefore how a row renders it.
+CONTENT_FILE = "file"  # a whole file: becomes a child asset, row text gets a placeholder
+CONTENT_TEXT = "text"  # text carried as bytes: decoded straight into the row text
+CONTENT_OPAQUE = "opaque"  # bytes that are not a file and not text: placeholder only
+
+# Markup and data serializations read fine as raw text and belong to their row.
+# Deliberately not here: message/rfc822, which is a real document format the file
+# parser splits into headers and body, so it is worth its own asset.
+_TEXTUAL_MIME_TYPES = frozenset({"application/json", "application/xml", "application/xhtml+xml"})
+
+
 @dataclass(frozen=True)
 class EmbeddedColumn:
-    """A parquet column whose cells hold whole files instead of values."""
+    """A parquet column whose cells hold byte payloads instead of plain values."""
 
     kind: str  # "struct" (a HuggingFace feature: struct<bytes, path>) or "binary"
-    mime_hint: str  # sniffed once from a sample cell; used for row-text placeholders
+    mime_hint: str  # sniffed once from a sample cell
+    content: str  # CONTENT_FILE | CONTENT_TEXT | CONTENT_OPAQUE
 
 
 def is_embeddable_file_mime(mime_type: str) -> bool:
     """Whether sniffed bytes look like a self-contained file worth its own asset.
 
-    Text-shaped payloads are excluded deliberately. A binary column holding JSON or
-    plain text already reads correctly as row text, so promoting it to a child asset
-    would split one record across two assets and scan the same characters twice.
-    Unrecognized bytes are excluded too: a column of embedding vectors or digests is
-    binary without being a file, and each cell must not become an asset.
+    Text-shaped payloads are excluded deliberately: a cell holding JSON or plain
+    text is a *field of its row*, so it is decoded into the row's own text (see
+    ``CONTENT_TEXT``) rather than split off into a second asset. Unrecognized bytes
+    are excluded too — a column of embedding vectors or digests is binary without
+    being a file, and each cell must not become an asset.
     """
+    return classify_embedded_mime(mime_type) == CONTENT_FILE
+
+
+def classify_embedded_mime(mime_type: str) -> str:
+    """Classify sniffed bytes as a file, as text, or as opaque binary."""
     normalized = _normalize_mime_type(mime_type)
     if not normalized or normalized == OCTET_STREAM:
-        return False
-    if normalized.startswith("text/"):
-        return False
-    return normalized not in ("application/json", "application/xml", "application/xhtml+xml")
+        return CONTENT_OPAQUE
+    if normalized.startswith("text/") or normalized in _TEXTUAL_MIME_TYPES:
+        return CONTENT_TEXT
+    return CONTENT_FILE
 
 
 def has_embedded_files(mime_type: str) -> bool:
@@ -164,10 +182,20 @@ def embedded_cell_name(cell: object, kind: str) -> str:
     return ""
 
 
-def detect_parquet_file_columns(parquet_file: Any) -> dict[str, EmbeddedColumn]:
-    """Map column name → ``EmbeddedColumn`` for columns whose cells hold files.
+def detect_parquet_payload_columns(parquet_file: Any) -> dict[str, EmbeddedColumn]:
+    """Map column name → ``EmbeddedColumn`` for every column whose cells hold bytes.
 
-    Returns ``{}`` when pyarrow is unavailable or no such column exists.
+    All of them are returned, classified by what the bytes turned out to be, because
+    each class needs different handling and none of them may fall through to
+    ``str(cell)`` — that renders a Python bytes repr, which is how a column of JSON
+    documents reached the detectors as ``b'{"email": ...}'`` with escaped quotes.
+
+    Classification is per column, sampled once: sniffing every cell of a
+    million-row file would cost more than the scan it feeds. A column of uniform
+    content — the normal case — is therefore classified correctly, and the
+    child-asset path re-checks each cell it emits anyway.
+
+    Returns ``{}`` when pyarrow is unavailable or no column carries bytes.
     """
     try:
         pa = _require_file_processing("pyarrow")
@@ -201,30 +229,54 @@ def detect_parquet_file_columns(parquet_file: Any) -> dict[str, EmbeddedColumn]:
 
     columns: dict[str, EmbeddedColumn] = {}
     for name, kind in candidates:
-        mime = _sample_column_mime(sample, name, kind)
+        mime, sample_bytes = _sample_column_payload(sample, name, kind)
+        content = classify_embedded_mime(mime)
+        # The MIME sniffer falls back to text/plain for bytes it cannot place, so a
+        # column of packed floats or digests arrives labelled as text. Decoding one
+        # would trade a useless repr for a row of invisible control characters.
+        if (
+            content == CONTENT_TEXT
+            and sample_bytes is not None
+            and not _is_readable_text(sample_bytes)
+        ):
+            content = CONTENT_OPAQUE
         # A struct<bytes, …> column is a *declared* file feature (HuggingFace Image,
-        # Audio, Video), so it stays a file column even when the sample is empty or
-        # unrecognized. A plain binary column has to prove itself — see
-        # ``is_embeddable_file_mime``.
-        if kind == "struct" or is_embeddable_file_mime(mime):
-            columns[name] = EmbeddedColumn(kind=kind, mime_hint=mime)
+        # Audio, Video), so an unreadable sample still means "file" rather than the
+        # opaque default — the alternative is a declared feature silently rendering
+        # as a placeholder and never being scanned.
+        if content == CONTENT_OPAQUE and kind == "struct" and not mime:
+            content = CONTENT_FILE
+        columns[name] = EmbeddedColumn(kind=kind, mime_hint=mime, content=content)
     return columns
 
 
-def _sample_column_mime(batch: Any, column_name: str, kind: str) -> str:
-    """MIME of the first non-empty cell in the sample batch, or ""."""
+def _is_readable_text(raw: bytes) -> bool:
+    """Whether bytes decode to something a text detector could actually read."""
+    sample = raw[:4096]
+    if not sample:
+        return False
+    if b"\x00" in sample:
+        # UTF-16/32 interleaves a NUL with every character and is still text.
+        return _is_null_byte_unicode_text(sample)
+    decoded = sample.decode("utf-8", errors="replace")
+    printable = sum(1 for char in decoded if char.isprintable() or char.isspace())
+    return printable / len(decoded) >= 0.9
+
+
+def _sample_column_payload(batch: Any, column_name: str, kind: str) -> tuple[str, bytes | None]:
+    """MIME and bytes of the first non-empty cell in the sample batch."""
     if batch is None:
-        return ""
+        return "", None
     try:
         column = batch.column(column_name)
     except Exception:
-        return ""
+        return "", None
     for index in range(len(column)):
         cell = column[index].as_py()
         raw = extract_embedded_bytes(cell, kind)
         if raw:
-            return resolve_mime_type(raw, file_name=embedded_cell_name(cell, kind))
-    return ""
+            return resolve_mime_type(raw, file_name=embedded_cell_name(cell, kind)), raw
+    return "", None
 
 
 def _iter_parquet_files(
@@ -249,7 +301,14 @@ def _iter_parquet_files(
         logger.warning("Cannot open parquet for embedded-file extraction: %s", exc)
         return
 
-    columns = detect_parquet_file_columns(parquet_file)
+    # Only file-bearing columns produce child assets. A text column is decoded into
+    # its own row's text by the page iterator, so walking it here would scan the
+    # same characters twice under two different asset identities.
+    columns = {
+        name: column
+        for name, column in detect_parquet_payload_columns(parquet_file).items()
+        if column.content == CONTENT_FILE
+    }
     if not columns:
         return
 
