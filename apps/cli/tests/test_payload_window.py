@@ -174,6 +174,126 @@ def test_automatic_offset_past_the_end_restarts_within_the_same_run() -> None:
     assert (cursor["offset"], cursor["exhausted"]) == (0, True)
 
 
+def test_automatic_uses_a_known_row_count_to_decide_the_sweep_is_done() -> None:
+    """A reader that knows the total is believed over the size of the last window."""
+    store = _store("AUTOMATIC", 100)
+    store.record_prior([{"hash": "h1", "cursor": {"v": 1, "offset": 200, "checksum": "c1"}}])
+    window = store.window_for("h1", PARQUET)
+    assert window is not None
+
+    list(window.iterate(_factory(300), row_count=300, on_cursor=lambda c: store.record("h1", c)))
+
+    cursor = store.cursor_payload_for(_asset())
+    assert cursor is not None
+    # The window was full (rows 200-299) but the file ends there, so the pass is
+    # complete. Waiting for a short window would mean another whole run.
+    assert (cursor["offset"], cursor["exhausted"], cursor["rows_seen"]) == (0, True, 300)
+
+
+def test_automatic_does_not_wrap_forever_on_an_exact_multiple_of_the_page_size() -> None:
+    """The bug this guards: a full last window used to read as 'more to come'.
+
+    With 300 rows and 100 per run, run 3 ends exactly on the boundary. Inferring
+    completion from an underfilled window never fires here — run 4 reads nothing,
+    restarts at the top, and the asset is re-scanned forever without ever being
+    cacheable.
+    """
+    stored: dict[str, Any] | None = None
+    for _ in range(3):
+        run = _store("AUTOMATIC", 100)
+        run.record_prior([{"hash": "h1", "cursor": stored}] if stored else [])
+        window = run.window_for("h1", PARQUET)
+        assert window is not None
+        list(window.iterate(_factory(300), row_count=300, on_cursor=partial(run.record, "h1")))
+        stored = run.cursor_payload_for(_asset())
+
+    assert stored is not None
+    assert (stored["offset"], stored["exhausted"], stored["passes"]) == (0, True, 1)
+
+
+def test_automatic_treats_an_empty_payload_with_a_known_count_as_covered() -> None:
+    store = _store("AUTOMATIC", 100)
+    window = store.window_for("h1", PARQUET)
+    assert window is not None
+
+    list(window.iterate(_factory(0), row_count=0, on_cursor=lambda c: store.record("h1", c)))
+
+    cursor = store.cursor_payload_for(_asset())
+    assert cursor is not None
+    assert (cursor["exhausted"], cursor["rows_seen"]) == (True, 0)
+
+
+def test_automatic_never_calls_a_payload_covered_when_it_read_nothing_at_all() -> None:
+    """Zero rows from row 0 with no row count is not proof of an empty file.
+
+    It is equally the signature of a payload that could not be read — and banking
+    ``exhausted`` on it retires the asset from every later scan (the scan cache
+    reads that flag to skip). Re-reading costs one pass; the alternative costs the
+    whole file.
+    """
+    store = _store("AUTOMATIC", 100)
+    window = store.window_for("h1", CSV)
+    assert window is not None
+
+    list(window.iterate(_factory(0), on_cursor=lambda c: store.record("h1", c)))
+
+    cursor = store.cursor_payload_for(_asset())
+    assert cursor is not None
+    assert (cursor["offset"], cursor["exhausted"]) == (0, False)
+
+
+def test_a_stored_cursor_claiming_a_zero_row_sweep_is_repaired() -> None:
+    """Cursors already poisoned by the old logic must heal themselves.
+
+    Runs before the fix banked ``exhausted`` after reading nothing, and the scan
+    cache honours that flag on every later run — so without this the asset stays
+    retired for ever, whatever the reader now does.
+    """
+    store = _store("AUTOMATIC", 100)
+    store.record_prior(
+        [
+            {
+                "hash": "h1",
+                "cursor": {
+                    "v": 1,
+                    "offset": 0,
+                    "rows_seen": 0,
+                    "passes": 1,
+                    "exhausted": True,
+                    "checksum": "c1",
+                },
+            }
+        ]
+    )
+
+    assert store.prior_for(_asset()) is None
+    # And so the scan cache is told there are rows still to cover.
+    assert store.advances_for(_asset()) is True
+
+
+def test_a_completed_sweep_that_actually_read_rows_is_kept() -> None:
+    store = _store("AUTOMATIC", 100)
+    store.record_prior(
+        [
+            {
+                "hash": "h1",
+                "cursor": {
+                    "v": 1,
+                    "offset": 0,
+                    "rows_seen": 280,
+                    "passes": 1,
+                    "exhausted": True,
+                    "checksum": "c1",
+                },
+            }
+        ]
+    )
+
+    cursor = store.prior_for(_asset())
+    assert cursor is not None and cursor.exhausted is True
+    assert store.advances_for(_asset()) is False
+
+
 def test_automatic_counts_rows_not_pages_for_line_paged_payloads() -> None:
     """A spreadsheet page carries a block of rows; the offset still counts rows."""
     store = _store("AUTOMATIC", 100)

@@ -12,6 +12,7 @@ import requests
 
 from ...models.generated_input import HuggingFaceInput
 from ...models.generated_single_asset_scan_results import SingleAssetScanResults
+from ...utils.http_range_reader import HttpRangeReader, open_buffered
 from ..dependencies import require_module
 from ..object_storage.base import ObjectRef, ObjectStorageSourceBase
 
@@ -408,6 +409,38 @@ class HuggingFaceSource(ObjectStorageSourceBase):
                 ref.size,
             )
         return file_bytes, content_type
+
+    def _open_object_range_reader(self, ref: ObjectRef) -> Any | None:
+        """A seekable handle over a Hub file, served by HTTP range requests.
+
+        This is what makes a repository of multi-hundred-megabyte Parquet shards
+        scannable at all. ``max_object_bytes`` bounds a whole-file download, and
+        a Parquet file cut off at that bound has lost its footer — the index of
+        where the row groups are — so it yields not fewer rows but none. Reading
+        by range inverts the cost: the sampling window picks the rows, and only
+        the footer plus the row groups holding those rows ever cross the wire.
+
+        The Hub's ``resolve`` endpoint and its CDN both honour ``Range``. If a
+        deployment ever does not, ``HttpRangeReader`` still returns correct bytes
+        (it slices a full response) and says so in the log.
+        """
+        if not ref.size:
+            return None
+
+        reader = HttpRangeReader(
+            self._session(),
+            self._resolve_url(ref.key),
+            size=int(ref.size),
+            # As in _download_object: requests drops this on the redirect to the
+            # pre-signed CDN host, which is exactly what the Hub expects.
+            headers={
+                "Authorization": f"Bearer {self._token()}",
+                "User-Agent": "classifyre",
+            },
+            timeout=self._request_timeout_seconds(),
+            label=f"hugging_face:{ref.key}",
+        )
+        return open_buffered(reader)
 
     @staticmethod
     def _read_capped(response: Any, max_bytes: int) -> bytes:

@@ -1199,7 +1199,7 @@ def parse_bytes(
 
 
 def iter_file_pages(
-    file_bytes: bytes,
+    file_bytes: bytes | Any,
     mime_type: str,
     batch_size: int = 100,
     include_column_names: bool = True,
@@ -1225,8 +1225,22 @@ def iter_file_pages(
     row groups without decoding them — and only ever restrict the output, so a
     caller that leaves them at their defaults sees exactly the previous behaviour.
     They are ignored for payloads with no row axis, which have no window to apply.
+
+    ``file_bytes`` may also be a seekable binary file object, which only the
+    Parquet reader supports — every other format is extracted whole, so there is
+    nothing for a range-reading handle to save.
     """
     normalized = _normalize_mime_type(mime_type)
+
+    if not isinstance(file_bytes, bytes | bytearray) and normalized not in (
+        "application/parquet",
+        "application/vnd.apache.parquet",
+    ):
+        raise TextExtractionCoverageError(
+            f"A streaming handle was supplied for {normalized or mime_type}, "
+            "which is only supported for Parquet payloads.",
+            code=TextExtractionCoverageCode.FAILED,
+        )
 
     if normalized in ("application/parquet", "application/vnd.apache.parquet"):
         yield from _iter_parquet_pages(
@@ -1337,73 +1351,119 @@ def _iter_text_lines(
 _PARQUET_MAGIC = b"PAR1"
 
 
-def count_tabular_rows(file_bytes: bytes, mime_type: str) -> int | None:
+def count_tabular_rows(source: bytes | Any, mime_type: str) -> int | None:
     """Total rows in a tabular payload, but only when it is free to ask.
 
     Parquet stores the count in its footer. CSV does not, and counting it would
     mean a full pass — so this returns None there and the caller uses a strategy
     that needs no total (reservoir sampling). None means "unknown", never "zero".
+
+    ``source`` may be a seekable file object instead of bytes, in which case only
+    the footer is read — the whole point of the range-reading path.
     """
     normalized = _normalize_mime_type(mime_type)
     if normalized not in ("application/parquet", "application/vnd.apache.parquet"):
         return None
-    if len(file_bytes) < 8 or file_bytes[-4:] != _PARQUET_MAGIC:
+    is_bytes = isinstance(source, bytes | bytearray)
+    if is_bytes and (len(source) < 8 or bytes(source[-4:]) != _PARQUET_MAGIC):
         return None
     try:
         import io
 
         pq = _require_file_processing("pyarrow.parquet")
-        return int(pq.ParquetFile(io.BytesIO(file_bytes)).metadata.num_rows)  # type: ignore[attr-defined]
+        handle = io.BytesIO(source) if is_bytes else source
+        count = int(pq.ParquetFile(handle).metadata.num_rows)  # type: ignore[attr-defined]
     except Exception as exc:
         logger.debug("Parquet row count unavailable: %s", exc)
         return None
+    if not is_bytes:
+        # pyarrow leaves the handle wherever the footer read ended; the page
+        # iterator opens it again from the top.
+        try:
+            source.seek(0)
+        except Exception:  # pragma: no cover - a non-seekable handle never got here
+            pass
+    return count
 
 
-def _parquet_row_group_start(pf: Any, start_row: int) -> tuple[int, int]:
-    """Map a row offset onto (first row group to read, rows to drop inside it).
+def _parquet_row_group_span(
+    pf: Any,
+    start_row: int,
+    max_rows: int | None,
+) -> tuple[list[int] | None, int]:
+    """Map a row window onto (the row groups holding it, rows to drop up front).
 
-    Parquet keeps per-row-group counts in the footer, so a sweep resuming deep
-    into a large file can skip entire row groups without decoding a single value.
-    Falls back to (0, start_row) when the metadata is unreadable, which costs a
-    decode-and-drop but never a wrong answer.
+    Parquet keeps per-row-group counts in the footer, so a window can be turned
+    into the exact set of groups that carries it. Both ends matter: naming the
+    groups is what stops pyarrow from buffering *every* group before handing back
+    the first batch, which over a range-reading handle means transferring the
+    whole object to read a hundred rows.
+
+    Returns ``(None, start_row)`` when the metadata is unreadable — a
+    decode-and-drop, but never a wrong answer — and ``([], 0)`` when the window
+    starts at or past the end of the file.
     """
     try:
         metadata = pf.metadata
         num_groups = int(metadata.num_row_groups)
     except Exception:
-        return 0, start_row
+        return None, start_row
 
+    end = None if max_rows is None else start_row + max(0, max_rows)
+    groups: list[int] = []
+    drop = 0
     consumed = 0
     for index in range(num_groups):
         try:
             rows = int(metadata.row_group(index).num_rows)
         except Exception:
-            return 0, start_row
-        if consumed + rows > start_row:
-            return index, start_row - consumed
-        consumed += rows
-    # start_row is at or past the end: read nothing.
-    return num_groups, 0
+            return None, start_row
+        group_start, consumed = consumed, consumed + rows
+        if consumed <= start_row:
+            continue
+        if end is not None and group_start >= end:
+            break
+        if not groups:
+            drop = start_row - group_start
+        groups.append(index)
+    return groups, max(0, drop)
 
 
 def _iter_parquet_pages(
-    file_bytes: bytes,
+    source: bytes | Any,
     batch_size: int,
     include_column_names: bool,
     *,
     start_row: int = 0,
     max_rows: int | None = None,
 ) -> Generator[str, None, None]:
+    """Yield one page per row of a Parquet payload.
+
+    ``source`` is either the file's bytes or a seekable binary file object. The
+    file-object form is what lets a source read a multi-gigabyte object through
+    HTTP range requests: pyarrow seeks to the footer, then to the row groups the
+    window actually needs, and nothing else is ever transferred.
+
+    A payload that cannot be read raises ``TextExtractionCoverageError`` rather
+    than yielding nothing. Yielding nothing is indistinguishable from an empty
+    file, and the AUTOMATIC sampling cursor would bank that as "this payload has
+    been read end to end" — retiring the asset from every future scan on the
+    strength of a failed download.
+    """
     # Parquet files begin AND end with the 4-byte magic "PAR1".  If the footer
     # is missing the bytes were truncated mid-download; pyarrow's C++ thread
     # pool will hang indefinitely trying to read schema metadata that isn't
     # there, locking all worker threads on a futex.  Bail out early instead.
-    if len(file_bytes) < 8 or file_bytes[-4:] != _PARQUET_MAGIC:
-        logger.warning(
-            "Parquet bytes appear truncated (footer magic missing, %d bytes); skipping",
-            len(file_bytes),
+    if isinstance(source, bytes | bytearray) and (
+        len(source) < 8 or bytes(source[-4:]) != _PARQUET_MAGIC
+    ):
+        raise TextExtractionCoverageError(
+            f"Parquet payload is truncated or not a Parquet file "
+            f"(footer magic missing, {len(source)} bytes read). A file larger than "
+            f"the configured object-size cap cannot be row-scanned: raise "
+            f"optional.connection.max_object_bytes for this source.",
+            code=TextExtractionCoverageCode.FAILED,
         )
-        return
 
     try:
         import io
@@ -1413,7 +1473,9 @@ def _iter_parquet_pages(
         # ParquetFile + iter_batches() reads one row-group at a time instead of
         # loading the whole table into memory, and surfaces schema errors early
         # (before reading any data) so a bad file can't lock the C++ thread pool.
-        pf = pq.ParquetFile(io.BytesIO(file_bytes))  # type: ignore[attr-defined]
+        pf = pq.ParquetFile(  # type: ignore[attr-defined]
+            io.BytesIO(source) if isinstance(source, bytes | bytearray) else source
+        )
 
         # Columns whose cells hold bytes never reach str(): that renders a Python
         # repr, so a column of JSON documents would arrive at the detectors as
@@ -1431,21 +1493,23 @@ def _iter_parquet_pages(
         payload_columns = detect_parquet_payload_columns(pf)
 
         begin = max(0, start_row)
-        first_group, drop_in_group = _parquet_row_group_start(pf, begin)
+        groups, drop_in_group = _parquet_row_group_span(pf, begin, max_rows)
+        if groups is not None and not groups:
+            # The window starts at or past the last row: nothing to read.
+            return
+
         try:
             total_groups = int(pf.metadata.num_row_groups)
         except Exception:
             total_groups = 0
-        if total_groups and first_group >= total_groups:
-            return
+        reads_everything = groups is None or (
+            drop_in_group == 0 and len(groups) == total_groups and max_rows is None
+        )
 
         batches = (
             pf.iter_batches(batch_size=batch_size)
-            if first_group == 0 and drop_in_group == 0
-            else pf.iter_batches(
-                batch_size=batch_size,
-                row_groups=list(range(first_group, total_groups)),
-            )
+            if reads_everything
+            else pf.iter_batches(batch_size=batch_size, row_groups=groups)
         )
 
         # Row numbering stays absolute across runs: a finding reported on
@@ -1484,8 +1548,18 @@ def _iter_parquet_pages(
                 emitted += 1
                 if lines:
                     yield "\n".join(lines)
+    except TextExtractionCoverageError:
+        raise
+    except GeneratorExit:
+        # The consumer stopped early (it had its fill of rows). Not a failure.
+        raise
     except Exception as exc:
-        logger.warning("Parquet page iteration failed: %s", exc)
+        # A decode that dies part-way through has delivered *some* of the window
+        # and none of the rest, which must not read as "the file ends here".
+        raise TextExtractionCoverageError(
+            f"Parquet page iteration failed after {emitted} row(s): {exc}",
+            code=TextExtractionCoverageCode.FAILED,
+        ) from exc
 
 
 def _iter_csv_pages(
@@ -1517,8 +1591,15 @@ def _iter_csv_pages(
                 return
             emitted += 1
             yield _format_tabular_page([dict(row)], headers, total_seen, include_column_names)
+    except GeneratorExit:
+        raise
     except Exception as exc:
-        logger.warning("CSV page iteration failed: %s", exc)
+        # Same reasoning as the Parquet reader: a half-read window that reports
+        # success is banked by the sampling cursor as a completed sweep.
+        raise TextExtractionCoverageError(
+            f"CSV page iteration failed after {emitted} row(s): {exc}",
+            code=TextExtractionCoverageCode.FAILED,
+        ) from exc
 
 
 def _format_embedded_placeholder(raw: bytes | None, mime_hint: str = "") -> str:

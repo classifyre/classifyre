@@ -378,7 +378,7 @@ class BaseSource(ABC):
 
     def iter_asset_pages(
         self,
-        file_bytes: bytes,
+        file_bytes: bytes | Any,
         mime_type: str,
         batch_size: int = 100,
         include_column_names: bool = True,
@@ -397,6 +397,11 @@ class BaseSource(ABC):
 
         Everything else — PDFs, images, audio — has no row axis and streams
         unchanged.
+
+        ``file_bytes`` may be a seekable binary handle instead of bytes (Parquet
+        only). The window then bounds what is *transferred*, not just what is
+        decoded: a source that can serve byte ranges reads the footer and the one
+        row group this run needs out of an object it never downloads whole.
         """
         from ..utils.file_parser import count_tabular_rows, iter_file_pages
 

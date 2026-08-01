@@ -114,8 +114,16 @@ class PayloadCursor:
 
         Returning None is the restart signal. It fires on an unreadable cursor,
         an unknown format version, a checksum that no longer matches the file,
-        and a strategy switch — in each case the stored offset points at rows we
-        can no longer vouch for.
+        a strategy switch, and a completed sweep that covered no rows — in each
+        case the stored offset points at rows we can no longer vouch for.
+
+        That last one is a repair. A cursor reading ``exhausted`` with an explicit
+        ``rows_seen: 0`` was written by a run that read nothing and concluded the
+        file was finished — the signature of a payload that failed to open, not
+        one that was scanned. Such a cursor retires the asset from every future
+        scan (the scan cache skips on ``exhausted``), so it is discarded on sight
+        and the sweep starts over. A genuinely empty payload is re-read instead
+        of skipped, which costs nothing.
         """
         if not isinstance(raw, dict):
             return None
@@ -137,6 +145,15 @@ class PayloadCursor:
 
         rows_seen = raw.get("rows_seen")
         offset = _coerce_int(raw.get("offset"), 0)
+        swept_nothing = (
+            isinstance(rows_seen, int) and not isinstance(rows_seen, bool) and rows_seen <= 0
+        )
+        if bool(raw.get("exhausted", False)) and swept_nothing:
+            logger.info(
+                "Discarding a payload cursor that claims a completed sweep of 0 rows; "
+                "the payload was never actually read, so this asset restarts its sweep"
+            )
+            return None
         return cls(
             offset=max(0, offset),
             rows_seen=(max(0, int(rows_seen)) if isinstance(rows_seen, int) else None),
@@ -227,6 +244,8 @@ class PayloadWindow:
         it for free (Parquet keeps it in the footer). RANDOM uses it to seek
         straight to a random window; without it, RANDOM falls back to reservoir
         sampling, which still visits every row but holds only one window.
+        AUTOMATIC uses it to decide when a sweep is genuinely complete instead of
+        inferring it from the size of the last window (see ``_advanced``).
         """
         take = max(1, self.rows_per_page)
         unit = max(1, rows_per_unit)
@@ -244,7 +263,7 @@ class PayloadWindow:
             yield from pages(0, None)
             return
 
-        yield from self._iterate_automatic(pages, take, unit, on_cursor)
+        yield from self._iterate_automatic(pages, take, unit, on_cursor, row_count)
 
     # ── AUTOMATIC ────────────────────────────────────────────────────────
 
@@ -254,6 +273,7 @@ class PayloadWindow:
         take: int,
         unit: int,
         on_cursor: Callable[[PayloadCursor], None] | None,
+        row_count: int | None = None,
     ) -> Iterator[str]:
         start = self.start_row
         emitted = 0
@@ -276,15 +296,33 @@ class PayloadWindow:
                 yield page
 
         if on_cursor is not None:
-            on_cursor(self._advanced(start, emitted, take, unit))
+            on_cursor(self._advanced(start, emitted, take, unit, row_count))
 
-    def _advanced(self, start: int, emitted: int, take: int, unit: int) -> PayloadCursor:
+    def _advanced(
+        self,
+        start: int,
+        emitted: int,
+        take: int,
+        unit: int,
+        row_count: int | None = None,
+    ) -> PayloadCursor:
         """The cursor to persist after emitting ``emitted`` pages from ``start``.
 
-        An underfilled window means the reader ran off the end, which is what
-        marks the pass complete: the offset wraps to 0 so the next run re-reads
-        from the top, and ``exhausted`` tells the scan cache the payload has been
-        covered.
+        ``exhausted`` is the flag that lets the scan cache skip this asset for
+        good, so it is only ever set on positive proof that every row has been
+        read:
+
+        * when the reader knows the payload's row count (Parquet keeps it in the
+          footer), the sweep is complete exactly when it has reached that count.
+          Nothing is inferred, which is what stops a file whose length is a
+          multiple of ``rows_per_page`` from wrapping forever;
+        * otherwise the only available signal is an underfilled window, and it is
+          trusted *except* when the window came back completely empty from row 0.
+          A reader that produced nothing at all has not proved the payload is
+          empty — it may have failed — and treating that as a finished sweep is
+          how an unreadable file gets banked as fully scanned and skipped for
+          ever after. Re-reading a genuinely empty payload costs one cheap pass;
+          the other mistake costs the whole file.
         """
         prior = self.prior
         passes = prior.passes if prior is not None else 0
@@ -292,10 +330,18 @@ class PayloadWindow:
         # rows each, so a full window is that many pages.
         expected_units = -(-take // unit)
         reached = start + emitted * unit
-        if emitted < expected_units:
+
+        if row_count is not None and row_count >= 0:
+            complete = reached >= row_count
+            rows_seen = min(reached, row_count)
+        else:
+            complete = emitted < expected_units and not (emitted == 0 and start == 0)
+            rows_seen = reached
+
+        if complete:
             return PayloadCursor(
                 offset=0,
-                rows_seen=reached,
+                rows_seen=rows_seen,
                 passes=passes + 1,
                 exhausted=True,
                 checksum=self.checksum,
@@ -303,7 +349,7 @@ class PayloadWindow:
             )
         return PayloadCursor(
             offset=reached,
-            rows_seen=prior.rows_seen if prior is not None else None,
+            rows_seen=(rows_seen if row_count is not None else prior.rows_seen if prior else None),
             passes=passes,
             exhausted=False,
             checksum=self.checksum,
