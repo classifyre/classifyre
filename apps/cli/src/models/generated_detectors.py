@@ -432,7 +432,7 @@ class SecretsDetectorConfig(DetectorConfig):
 class MaxLength(RootModel[int]):
     root: int = Field(
         None,
-        description="Override spaCy's nlp.max_length (default 1,000,000 chars). Set higher than your longest expected input to avoid the E088 error. Prefer chunk_size for very large texts.",
+        description="Override spaCy's nlp.max_length (default 1,000,000 chars). Raising it makes memory scale with input size (~1GB of scratch per 100,000 chars), so prefer chunk_size for very large texts. Oversized pages are auto-chunked rather than failing, so this rarely needs setting.",
         ge=1,
     )
 
@@ -440,7 +440,7 @@ class MaxLength(RootModel[int]):
 class ChunkSize(RootModel[int]):
     root: int = Field(
         None,
-        description='Split text into chunks of this many characters before analysis. Findings from all chunks are merged with corrected offsets. When null the full text is passed as-is (subject to max_length).',
+        description='Split text into chunks of this many characters before analysis. Findings from all chunks are merged with corrected offsets. When null the full text is passed as-is, unless it exceeds the spaCy limit, in which case it is auto-chunked at 200,000 characters on whitespace boundaries.',
         ge=1,
     )
 
@@ -483,11 +483,11 @@ class PIIDetectorConfig(DetectorConfig):
     )
     max_length: MaxLength | None = Field(
         None,
-        description="Override spaCy's nlp.max_length (default 1,000,000 chars). Set higher than your longest expected input to avoid the E088 error. Prefer chunk_size for very large texts.",
+        description="Override spaCy's nlp.max_length (default 1,000,000 chars). Raising it makes memory scale with input size (~1GB of scratch per 100,000 chars), so prefer chunk_size for very large texts. Oversized pages are auto-chunked rather than failing, so this rarely needs setting.",
     )
     chunk_size: ChunkSize | None = Field(
         None,
-        description='Split text into chunks of this many characters before analysis. Findings from all chunks are merged with corrected offsets. When null the full text is passed as-is (subject to max_length).',
+        description='Split text into chunks of this many characters before analysis. Findings from all chunks are merged with corrected offsets. When null the full text is passed as-is, unless it exceeds the spaCy limit, in which case it is auto-chunked at 200,000 characters on whitespace boundaries.',
     )
     chunk_overlap: ChunkOverlap | None = Field(
         0,

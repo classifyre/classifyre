@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterator
 from typing import Any
 
 from ....models.generated_detectors import Severity, TextClassificationPipelineSchema
@@ -13,12 +14,77 @@ from ._base import _TEXT_CONTENT_TYPES, BaseRunner, _resolve_pipeline_severity
 logger = logging.getLogger(__name__)
 
 
+# A transformer pipeline called with truncation=True silently keeps only the
+# first model_max_length tokens, so without chunking a long document is
+# classified on its opening paragraph alone -- no error, no log, and everything
+# after it is never looked at. When chunk_size is not configured we derive a
+# window from the model's own token limit instead.
+# Deliberate under-estimate: too small a window only costs compute, too large
+# a one hands the tail back to truncation.
+_CHARS_PER_TOKEN = 3
+_DEFAULT_MODEL_MAX_TOKENS = 512
+# model_max_length is a huge sentinel on tokenizers that declare no limit.
+_MODEL_MAX_TOKENS_SENTINEL = 100_000
+_AUTO_CHUNK_OVERLAP = 128
+# Bound per-asset CPU cost; hitting this is logged, never silent.
+_MAX_AUTO_CHUNKS = 200
+
+
 def _chunk_text(text: str, chunk_size: int | None, chunk_overlap: int) -> list[str]:
     """Split text into chunks. Returns [text] when chunk_size is not set."""
     if not chunk_size:
         return [text]
     step = max(1, chunk_size - chunk_overlap)
     return [text[i : i + chunk_size] for i in range(0, len(text), step)]
+
+
+def _model_chunk_chars(pipe: Any, max_length: int | None) -> int:
+    """Characters that comfortably fit one forward pass of *pipe*."""
+    tokens = max_length
+    if tokens is None:
+        tokenizer_limit = getattr(getattr(pipe, "tokenizer", None), "model_max_length", None)
+        if isinstance(tokenizer_limit, int) and 0 < tokenizer_limit < _MODEL_MAX_TOKENS_SENTINEL:
+            tokens = tokenizer_limit
+    if not isinstance(tokens, int) or tokens <= 0:
+        tokens = _DEFAULT_MODEL_MAX_TOKENS
+    return max(256, tokens * _CHARS_PER_TOKEN)
+
+
+def _iter_analysis_chunks(
+    text: str,
+    chunk_size: int | None,
+    chunk_overlap: int,
+    auto_chunk_chars: int,
+) -> Iterator[str]:
+    """Yield the windows to classify, one resident at a time.
+
+    An explicit chunk_size wins. Otherwise the text is passed through whole
+    unless it would overflow the model window, in which case it is auto-chunked
+    so the tail is classified rather than truncated away.
+    """
+    if chunk_size:
+        step = max(1, chunk_size - chunk_overlap)
+        for start in range(0, len(text), step):
+            yield text[start : start + chunk_size]
+        return
+
+    if len(text) <= auto_chunk_chars:
+        yield text
+        return
+
+    overlap = min(_AUTO_CHUNK_OVERLAP, auto_chunk_chars // 4)
+    step = max(1, auto_chunk_chars - overlap)
+    for index, start in enumerate(range(0, len(text), step)):
+        if index >= _MAX_AUTO_CHUNKS:
+            logger.warning(
+                "text_classification: text of %d chars exceeds %d auto-chunks of %d; "
+                "the remainder was not classified (set chunk_size to control this)",
+                len(text),
+                _MAX_AUTO_CHUNKS,
+                auto_chunk_chars,
+            )
+            return
+        yield text[start : start + auto_chunk_chars]
 
 
 class TextClassificationRunner(BaseRunner):
@@ -94,8 +160,9 @@ class TextClassificationRunner(BaseRunner):
         default_severity = schema.severity if schema.severity is not None else Severity.info
 
         best_scores: dict[str, float] = {}
+        auto_chunk_chars = _model_chunk_chars(pipe, max_length)
         try:
-            for chunk in _chunk_text(text, chunk_size, chunk_overlap):
+            for chunk in _iter_analysis_chunks(text, chunk_size, chunk_overlap, auto_chunk_chars):
                 call_kwargs: dict[str, Any] = {"truncation": True}
                 if max_length is not None:
                     call_kwargs["max_length"] = max_length
