@@ -1,12 +1,14 @@
 """PII detector powered by Microsoft Presidio."""
 
 import asyncio
+import bisect
 import importlib
 import logging
 import re
 import subprocess
 import sys
 import warnings
+from collections.abc import Iterator
 from dataclasses import dataclass
 from typing import Any, ClassVar
 
@@ -238,6 +240,17 @@ class PIIDetector(BaseDetector):
     # Fall back to full-text analysis when a page has more than this many cells.
     # Per-cell analysis at scale causes O(rowsxcolumns) Presidio calls per page.
     _TABULAR_CELL_LIMIT: ClassVar[int] = 200
+
+    # spaCy's own ceiling when nlp.max_length is not overridden.
+    _SPACY_DEFAULT_MAX_LENGTH: ClassVar[int] = 1_000_000
+
+    # Window used when a page exceeds the spaCy ceiling and no chunk_size is
+    # configured. The parser/NER need roughly 1GB of scratch memory per 100k
+    # characters, so 200k caps peak usage near 2GB no matter how large the page
+    # is -- whereas simply raising nlp.max_length scales memory with file size
+    # (a 1.4M-char page would need ~14GB).
+    _AUTO_CHUNK_CHARS: ClassVar[int] = 200_000
+    _AUTO_CHUNK_OVERLAP: ClassVar[int] = 512
 
     def __init__(self, config: DetectorConfig | None = None) -> None:
         super().__init__(config)
@@ -983,14 +996,64 @@ class PIIDetector(BaseDetector):
         # Offloading to a thread keeps the loop alive and allows I/O to proceed.
         return await asyncio.to_thread(self._detect_sync, content)
 
-    def _chunk_text(self, text: str) -> list[tuple[str, int]]:
-        """Return (chunk, offset) pairs. When chunk_size is null returns the full text at offset 0."""
+    def _spacy_char_limit(self) -> int:
+        """Largest text spaCy will accept in a single call, honouring max_length."""
+        return _unwrap_int(getattr(self._cfg, "max_length", None)) or self._SPACY_DEFAULT_MAX_LENGTH
+
+    def _iter_chunks(self, text: str) -> Iterator[tuple[str, int]]:
+        """Yield (chunk, offset) pairs, one chunk resident at a time.
+
+        With chunk_size configured the text is split on that fixed window. With
+        chunk_size null the text is passed through whole -- unless it exceeds
+        the spaCy ceiling, in which case it is auto-chunked instead of raising
+        E088 and losing every finding on the page.
+        """
         chunk_size = _unwrap_int(getattr(self._cfg, "chunk_size", None))
-        if not chunk_size:
-            return [(text, 0)]
-        overlap = _unwrap_int(getattr(self._cfg, "chunk_overlap", None)) or 0
-        step = max(1, chunk_size - overlap)
-        return [(text[i : i + chunk_size], i) for i in range(0, len(text), step)]
+        if chunk_size:
+            overlap = _unwrap_int(getattr(self._cfg, "chunk_overlap", None)) or 0
+            step = max(1, chunk_size - overlap)
+            for start in range(0, len(text), step):
+                yield (text[start : start + chunk_size], start)
+            return
+
+        if len(text) <= self._spacy_char_limit():
+            yield (text, 0)
+            return
+
+        yield from self._auto_chunks(text)
+
+    def _auto_chunks(self, text: str) -> Iterator[tuple[str, int]]:
+        """Split an oversized page into spaCy-sized windows on whitespace boundaries."""
+        window = min(self._AUTO_CHUNK_CHARS, self._spacy_char_limit())
+        overlap = min(self._AUTO_CHUNK_OVERLAP, window // 4)
+        total = len(text)
+        logger.info(
+            "Page of %d chars exceeds the spaCy limit (%d); auto-chunking at %d chars "
+            "(set chunk_size to control this explicitly)",
+            total,
+            self._spacy_char_limit(),
+            window,
+        )
+
+        start = 0
+        while start < total:
+            end = min(start + window, total)
+            if end < total:
+                # Prefer a line/word boundary inside the trailing overlap zone so
+                # entities are not cut in half; the overlap re-covers the seam.
+                split = text.rfind("\n", end - overlap, end)
+                if split == -1:
+                    split = text.rfind(" ", end - overlap, end)
+                if split > start:
+                    end = split + 1
+            yield (text[start:end], start)
+            if end >= total:
+                return
+            start = max(start + 1, end - overlap)
+
+    def _chunk_text(self, text: str) -> list[tuple[str, int]]:
+        """Materialized :meth:`_iter_chunks` (kept for callers that need a list)."""
+        return list(self._iter_chunks(text))
 
     def _detect_sync(self, content: str) -> list[DetectionResult]:
         tabular_results = self._detect_tabular_content(content)
@@ -1004,8 +1067,11 @@ class PIIDetector(BaseDetector):
         threshold = self._cfg.confidence_threshold or 0.7
         results: list[DetectionResult] = []
         seen: set[tuple[str, int, int]] = set()
+        # Precomputed once: content[:start].count("\n") per finding is O(n) each
+        # and copies the prefix, which is quadratic on multi-megabyte pages.
+        newline_offsets = [m.start() for m in re.finditer("\n", content)]
 
-        for chunk, offset in self._chunk_text(content):
+        for chunk, offset in self._iter_chunks(content):
             for result in self._analyze_content(chunk, entities=entities):
                 if not self._is_entity_enabled(result.entity_type):
                     continue
@@ -1017,7 +1083,7 @@ class PIIDetector(BaseDetector):
                     continue
                 seen.add(dedup_key)
 
-                line_number = content[:abs_start].count("\n") + 1
+                line_number = bisect.bisect_left(newline_offsets, abs_start) + 1
                 matched_content = content[abs_start:abs_end]
 
                 detection = self._build_detection_result(

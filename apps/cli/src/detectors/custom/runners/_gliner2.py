@@ -189,7 +189,17 @@ class GLiNER2Runner(BaseRunner):
         self, model: Any, text: str, task_name: str, labels: list[str]
     ) -> dict[str, object]:
         """Classify text, chunking long inputs and keeping the max-confidence label."""
-        chunks = _chunk_text(text, _CLS_CHUNK_SIZE, _CLS_CHUNK_OVERLAP)[:_MAX_CLS_CHUNKS]
+        all_chunks = _chunk_text(text, _CLS_CHUNK_SIZE, _CLS_CHUNK_OVERLAP)
+        chunks = all_chunks[:_MAX_CLS_CHUNKS]
+        if len(all_chunks) > _MAX_CLS_CHUNKS:
+            logger.warning(
+                "GLiNER2 classification for detector '%s': text of %d chars needs %d chunks, "
+                "capping at %d; the remainder was not classified",
+                self._detector_key,
+                len(text),
+                len(all_chunks),
+                _MAX_CLS_CHUNKS,
+            )
 
         best: dict[str, object] = {}
         for chunk in chunks:
