@@ -7,7 +7,7 @@ from typing import Any
 
 import pytest
 
-from src.outputs.base import OutputRuntimeContext
+from src.outputs.base import DEFAULT_REST_TIMEOUT_SEC, OutputRuntimeContext
 from src.outputs.console import ConsoleOutputSink
 from src.outputs.factory import resolve_output_settings
 from src.outputs.file import FileOutputSink
@@ -85,6 +85,32 @@ def test_output_resolution_rest_uses_api_url_env_fallback(
     assert settings.output_type == "rest"
     assert settings.batch_size == 20
     assert settings.rest_url == "http://api-env.example:8000"
+
+
+def test_output_resolution_uses_the_five_minute_read_timeout_by_default() -> None:
+    settings = resolve_output_settings(_args(source_id="source-1"))
+
+    assert settings.rest_timeout_sec == DEFAULT_REST_TIMEOUT_SEC == 300
+
+
+def test_output_resolution_env_overrides_the_read_timeout(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("CLASSIFYRE_OUTPUT_REST_TIMEOUT_SEC", "45")
+
+    settings = resolve_output_settings(_args(source_id="source-1"))
+
+    assert settings.rest_timeout_sec == 45
+
+
+def test_output_resolution_treats_non_positive_read_timeout_as_unlimited(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("CLASSIFYRE_OUTPUT_REST_TIMEOUT_SEC", "0")
+
+    settings = resolve_output_settings(_args(source_id="source-1"))
+
+    assert settings.rest_timeout_sec is None
 
 
 def test_output_resolution_defaults_to_console_without_source_id() -> None:
@@ -167,7 +193,7 @@ class _FakeSession:
         method: str,
         url: str,
         json: dict[str, Any] | None,
-        timeout: int,
+        timeout: tuple[float, float | None],
     ) -> _FakeResponse:
         self.calls.append(
             {
@@ -199,7 +225,9 @@ async def test_rest_output_managed_runner_flow(monkeypatch: pytest.MonkeyPatch) 
         managed_runner=True,
         batch_size=20,
     )
-    sink = RestOutputSink(context, base_url="http://localhost:8000", timeout_sec=30)
+    sink = RestOutputSink(
+        context, base_url="http://localhost:8000", timeout_sec=DEFAULT_REST_TIMEOUT_SEC
+    )
 
     await sink.start()
     await sink.emit_batch([{"hash": "h1"}])
@@ -231,7 +259,7 @@ async def test_rest_output_keeps_namespace_base_for_discovery_and_finding_batche
     sink = RestOutputSink(
         context,
         base_url="http://api.internal/prefix/namespace-id/",
-        timeout_sec=30,
+        timeout_sec=DEFAULT_REST_TIMEOUT_SEC,
     )
 
     await sink.register_discovered_assets(["hash-1", "hash-2"])
@@ -267,7 +295,7 @@ async def test_register_discovered_assets_returns_a_bare_list_without_payload_cu
     sink = RestOutputSink(
         OutputRuntimeContext(source_id="s", runner_id="r", managed_runner=True, batch_size=20),
         base_url="http://localhost:8000",
-        timeout_sec=30,
+        timeout_sec=DEFAULT_REST_TIMEOUT_SEC,
     )
 
     result = await sink.register_discovered_assets(["a", "b"], include_scan_cache=True)
@@ -297,7 +325,7 @@ async def test_register_discovered_assets_collects_payload_cursors(
     sink = RestOutputSink(
         OutputRuntimeContext(source_id="s", runner_id="r", managed_runner=True, batch_size=20),
         base_url="http://localhost:8000",
-        timeout_sec=30,
+        timeout_sec=DEFAULT_REST_TIMEOUT_SEC,
     )
 
     cache, cursors = await sink.register_discovered_assets(
@@ -320,7 +348,7 @@ async def test_asset_payload_carries_the_payload_cursor(
     sink = RestOutputSink(
         OutputRuntimeContext(source_id="s", runner_id="r", managed_runner=True, batch_size=20),
         base_url="http://localhost:8000",
-        timeout_sec=30,
+        timeout_sec=DEFAULT_REST_TIMEOUT_SEC,
     )
 
     cursor = {"v": 1, "offset": 300, "exhausted": False, "checksum": "c1"}
@@ -342,7 +370,9 @@ async def test_rest_output_finalize_includes_sampling_cursor(
         managed_runner=True,
         batch_size=20,
     )
-    sink = RestOutputSink(context, base_url="http://localhost:8000", timeout_sec=30)
+    sink = RestOutputSink(
+        context, base_url="http://localhost:8000", timeout_sec=DEFAULT_REST_TIMEOUT_SEC
+    )
 
     cursor = {"tables": {"db_#_users": {"pk": [42]}}}
     sink.set_sampling_cursor(cursor)
@@ -373,7 +403,9 @@ async def test_rest_output_omits_null_fields_in_nested_payload(
         managed_runner=True,
         batch_size=20,
     )
-    sink = RestOutputSink(context, base_url="http://localhost:8000", timeout_sec=30)
+    sink = RestOutputSink(
+        context, base_url="http://localhost:8000", timeout_sec=DEFAULT_REST_TIMEOUT_SEC
+    )
 
     await sink.start()
     await sink.emit_batch(
@@ -425,7 +457,9 @@ async def test_rest_output_auto_creates_external_runner(monkeypatch: pytest.Monk
         managed_runner=False,
         batch_size=20,
     )
-    sink = RestOutputSink(context, base_url="http://localhost:8000", timeout_sec=30)
+    sink = RestOutputSink(
+        context, base_url="http://localhost:8000", timeout_sec=DEFAULT_REST_TIMEOUT_SEC
+    )
 
     await sink.start()
     await sink.emit_batch([{"hash": "h1"}])
@@ -447,7 +481,9 @@ async def test_rest_output_fail_marks_runner_error(monkeypatch: pytest.MonkeyPat
         managed_runner=False,
         batch_size=20,
     )
-    sink = RestOutputSink(context, base_url="http://localhost:8000", timeout_sec=30)
+    sink = RestOutputSink(
+        context, base_url="http://localhost:8000", timeout_sec=DEFAULT_REST_TIMEOUT_SEC
+    )
 
     await sink.start()
     await sink.fail(RuntimeError("boom"))
@@ -470,7 +506,9 @@ async def test_rest_output_fail_marks_managed_runner_error(
         managed_runner=True,
         batch_size=20,
     )
-    sink = RestOutputSink(context, base_url="http://localhost:8000", timeout_sec=30)
+    sink = RestOutputSink(
+        context, base_url="http://localhost:8000", timeout_sec=DEFAULT_REST_TIMEOUT_SEC
+    )
 
     await sink.start()
     await sink.fail(RuntimeError("boom"))

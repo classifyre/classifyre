@@ -4,7 +4,13 @@ import argparse
 import os
 from typing import Any, cast
 
-from .base import OutputRuntimeContext, OutputSettings, OutputSink, OutputType
+from .base import (
+    DEFAULT_REST_TIMEOUT_SEC,
+    OutputRuntimeContext,
+    OutputSettings,
+    OutputSink,
+    OutputType,
+)
 from .console import ConsoleOutputSink
 from .file import FileOutputSink
 from .rest import RestOutputSink
@@ -96,9 +102,17 @@ def resolve_output_settings(
     )
     rest_url = str(rest_url_value) if rest_url_value is not None else None
 
-    rest_timeout_sec = _parse_int(_coalesce(env_rest_timeout, 30), 30)
-    if rest_timeout_sec < 1:
-        rest_timeout_sec = 30
+    # 5 minutes by default (see DEFAULT_REST_TIMEOUT_SEC): long enough that a
+    # bulk ingest of a large batch is never cut off mid-flight, short enough
+    # that a wedged API surfaces as a failure. Override with
+    # CLASSIFYRE_OUTPUT_REST_TIMEOUT_SEC; 0 or negative disables the read
+    # timeout entirely.
+    rest_timeout_sec: int | None = _parse_int(
+        _coalesce(env_rest_timeout, DEFAULT_REST_TIMEOUT_SEC),
+        DEFAULT_REST_TIMEOUT_SEC,
+    )
+    if rest_timeout_sec is not None and rest_timeout_sec < 1:
+        rest_timeout_sec = None
 
     file_path_value = _coalesce(
         getattr(args, "output_file_path", None),
