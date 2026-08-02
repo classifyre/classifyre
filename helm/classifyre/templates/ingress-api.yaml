@@ -12,6 +12,10 @@ metadata:
     # CLI bulk ingest with 413 long before the request reaches the API.
     nginx.ingress.kubernetes.io/proxy-body-size: "0"
     nginx.ingress.kubernetes.io/proxy-request-buffering: "off"
+    # A bulk ingest of a large batch outlasts nginx's 60s read/send defaults,
+    # which would turn a still-running request into a 504 for the CLI.
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
     {{- with .Values.ingress.annotations }}
     {{- toYaml . | nindent 4 }}
     {{- end }}

@@ -672,10 +672,40 @@ class PIIDetector(BaseDetector):
     # ------------------------------------------------------------------
 
     def _analyze_content(self, content: str, *, entities: list[str] | None = None) -> list[Any]:
+        """Analyze *content*, splitting it first if it would overflow spaCy.
+
+        This is the single chokepoint every caller goes through -- full-text
+        pages, individual tabular cells, and pre-chunked windows alike -- so the
+        oversize guard lives here rather than at any one call site. A page that
+        arrives already chunked passes straight through.
+        """
         if self.analyzer is None:
             if self._init_error is not None:
                 raise self._init_error
             return []
+        if len(content) > self._spacy_char_limit():
+            return self._analyze_oversized(content, entities=entities)
+        return self._analyze_once(content, entities=entities)
+
+    def _analyze_oversized(self, content: str, *, entities: list[str] | None) -> list[Any]:
+        """Analyze text past the spaCy ceiling window by window, merged into one result set.
+
+        Results are re-based onto absolute offsets in *content* and deduped
+        across the overlap, keeping the highest-scoring hit for each span.
+        """
+        merged: dict[tuple[str, int, int], Any] = {}
+        for chunk, offset in self._auto_chunks(content):
+            for result in self._analyze_once(chunk, entities=entities):
+                result.start += offset
+                result.end += offset
+                key = (result.entity_type, result.start, result.end)
+                existing = merged.get(key)
+                if existing is None or result.score > existing.score:
+                    merged[key] = result
+        return sorted(merged.values(), key=lambda r: (r.start, r.end))
+
+    def _analyze_once(self, content: str, *, entities: list[str] | None = None) -> list[Any]:
+        """One Presidio pass over text already known to fit the spaCy window."""
         try:
             return self.analyzer.analyze(text=content, language="en", entities=entities)
         except ModuleNotFoundError as exc:
