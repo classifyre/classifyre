@@ -457,13 +457,9 @@ export class SourcesController {
       normalizedConfig && typeof normalizedConfig === 'object'
         ? normalizedConfig
         : {};
-    const customDetectors =
-      await this.customDetectorsService.assertActiveDetectorIds(
-        normalizedConfigRecord.custom_detectors,
-      );
-    if (customDetectors.length > 0) {
-      normalizedConfigRecord.custom_detectors = customDetectors;
-    }
+    await this.customDetectorsService.sanitizeSourceConfigDetectors(
+      normalizedConfigRecord,
+    );
 
     // Create source in database
     const source = await this.sourceService.createFromConfig({
@@ -613,13 +609,9 @@ export class SourcesController {
         normalizedConfig && typeof normalizedConfig === 'object'
           ? (normalizedConfig as Record<string, unknown>)
           : {};
-      const customDetectors =
-        await this.customDetectorsService.assertActiveDetectorIds(
-          normalizedConfigRecord.custom_detectors,
-        );
-      if (customDetectors.length > 0) {
-        normalizedConfigRecord.custom_detectors = customDetectors;
-      }
+      await this.customDetectorsService.sanitizeSourceConfigDetectors(
+        normalizedConfigRecord,
+      );
     }
 
     // Validate cron expression up-front before any mutations

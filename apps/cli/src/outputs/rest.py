@@ -55,9 +55,12 @@ class _JitteredRetry(Retry):
 # What we retry and why:
 #   connect=8  — pod restarted / not yet ready (RemoteDisconnected, ConnectionReset,
 #                ConnectTimeout). Request never reached the application.
-#   read=8     — API is under load and slow to respond (ReadTimeout). Safe to retry
-#                because all endpoints are idempotent (bulk ingest is upsert-based,
-#                status/findings updates are set-operations).
+#   read=8     — API is under load and slow to respond (ReadTimeout), i.e. it did
+#                not answer within DEFAULT_REST_TIMEOUT_SEC. Safe to retry because
+#                all endpoints are idempotent (bulk ingest is upsert-based,
+#                status/findings updates are set-operations) — but note that a
+#                retry re-uploads the whole body, which is why that budget is
+#                generous rather than tight.
 #   status=8   — transient HTTP errors from an overloaded or restarting API:
 #                  408 Request Timeout   - API-level timeout
 #                  429 Too Many Requests - rate-limited / backpressure
@@ -76,8 +79,7 @@ class _JitteredRetry(Retry):
 #   attempt 7 → ~60 s  (capped)
 #   attempt 8 → ~60 s  (capped)
 # Total extra wait: ~182 s (~3 min) — covers extended load spikes on a
-# single-node VPS before event-loop pressure drops. Worst-case a single
-# call costs 8 * 120 s + 182 s = ~18 min, acceptable for long-running scans.
+# single-node VPS before event-loop pressure drops.
 #
 # POST and PATCH are explicitly allowed: without this urllib3 only retries
 # idempotent methods (GET/HEAD) by default.
@@ -161,6 +163,12 @@ class ExternalRunnerResponse(BaseModel):
     source_id: str = Field(validation_alias="sourceId")
 
 
+# Applied to connection establishment only, kept short so a refused or
+# unreachable API fails fast and is retried by _RETRY_POLICY. How long the API
+# may then take to answer is a separate budget (timeout_sec, 5 min by default).
+_CONNECT_TIMEOUT_SEC = 30
+
+
 class RestOutputSink:
     output_type: OutputType = "rest"
 
@@ -169,7 +177,7 @@ class RestOutputSink:
         context: OutputRuntimeContext,
         *,
         base_url: str,
-        timeout_sec: int,
+        timeout_sec: int | None,
     ):
         self.context = context
         self.batch_size = context.batch_size
@@ -443,7 +451,9 @@ class RestOutputSink:
             method=method,
             url=url,
             json=payload,
-            timeout=self.timeout_sec,
+            # (connect, read): the read budget is the API's whole processing
+            # time, not just the first byte. None waits indefinitely.
+            timeout=(_CONNECT_TIMEOUT_SEC, self.timeout_sec),
         )
 
         if response.status_code >= 400:

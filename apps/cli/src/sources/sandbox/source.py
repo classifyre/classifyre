@@ -10,6 +10,7 @@ from urllib.parse import quote
 import requests
 
 from ...models.generated_input import SandboxInput
+from ...outputs.base import DEFAULT_REST_TIMEOUT_SEC
 from ..object_storage.base import ObjectRef, ObjectStorageSourceBase
 
 logger = logging.getLogger(__name__)
@@ -48,15 +49,19 @@ class SandboxSource(ObjectStorageSourceBase):
         return default
 
     def _max_object_bytes(self) -> int:
-        # Keep the extractor aligned with the API's per-upload limit instead
-        # of the object-storage connector family's conservative 5 MiB default.
+        # Spool threshold (RAM before spilling to disk), not a refusal ceiling —
+        # uploads are no longer size-capped. Raised above the object-storage
+        # family's conservative 5 MiB default because these files are local.
         return 50 * 1024 * 1024
 
     def _request(self, method: str, path: str, *, stream: bool = False) -> requests.Response:
         response = self._session.request(
             method,
             f"{self._api_url}{path}",
-            timeout=120,
+            # (connect, read). The read budget applies per socket read, so 5
+            # minutes is generous for a streamed download of any size; the old
+            # flat 120 s applied to connect and read alike.
+            timeout=(30, DEFAULT_REST_TIMEOUT_SEC),
             stream=stream,
             headers={"Connection": "close"},
         )
