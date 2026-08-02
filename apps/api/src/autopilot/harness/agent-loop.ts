@@ -489,7 +489,7 @@ export const RESPONSE_PROTOCOL: readonly string[] = [
   '\n## How to respond',
   'Each turn, return JSON: {"thought": "...", "toolCalls": [{"tool": "name", "input": {...}, "rationale": "why"}]}.',
   'Call read tools to gather what you need before mutating. When you are done, return {"thought":"...","finish":{"summary":"what you did"}} with an empty or omitted toolCalls.',
-  'Finishing without having called a single mutating tool is a valid and often correct outcome. When that is the right answer, say so in the summary and give the reason ("read N findings across 3 sources; all boilerplate; nothing warranted an inquiry") rather than acting to have acted.',
+  'Finishing without having called a single mutating tool is a valid outcome. When that is the right answer, say so in the summary and give the reason ("read N findings across 3 sources; all boilerplate; nothing warranted an inquiry") rather than acting to have acted. It is equally valid to act — when the evidence supports it, do so this turn rather than leaving it for a later cycle.',
   'Only call tools from the list above. Keep rationale short and specific.',
   'Tool results come back under a header naming every call and its outcome. A very large result ' +
     'is cut off and says so ("truncated": true) — narrow the query instead of assuming you saw all ' +
@@ -528,9 +528,12 @@ function buildUserPrompt(ctx: AgentContext, mission: Mission): string {
   }
   if (ctx.evidenceAnalysisPending) {
     lines.push(
-      'WARNING: evidence analysis has not finished. Importance scores are incomplete, ' +
-        'and an unscored finding is indistinguishable from an unimportant one. Treat ' +
-        'findings.ranked as partial and prefer deferring to concluding.',
+      'NOTE: a significant share of the open findings have no importance score yet, and an ' +
+        'unscored finding is indistinguishable from an unimportant one. So findings.ranked is ' +
+        'showing you a subset: what it ranks is real, but things missing from it may simply be ' +
+        'unscored. Do not read its absence as unimportance — check findings.search too before ' +
+        'concluding there is nothing here. This is a reason to verify against the underlying ' +
+        'evidence, not a reason to do nothing.',
     );
   }
 

@@ -79,30 +79,54 @@ const TRIAGE_DOCTRINE = [
  * generating monitors that would fit. The evidence floor now refuses those
  * outright, but a refusal only stops the artifact, not the reasoning that
  * produced it.
+ *
+ * Rebalanced 2026-08-01. The first version of this text was written against an
+ * agent that was over-acting, and it corrected in one direction only: three
+ * separate statements that restraint is usually right, an inquiry goal opening
+ * with "and often they will not", and a rule sending any expectation of
+ * recurrence to memory.write instead of an inquiry — which forbids the single
+ * most legitimate use of a standing monitor. Nothing anywhere said that missing
+ * a real lead has a cost. Stacked on top of four mechanical faults that were
+ * each independently telling the agent to defer (an unreachable coverage
+ * threshold, a permanently-set "scores are partial" warning, and an empty
+ * findings.ranked), the result was a harness that did nothing at all.
+ *
+ * The correctness rules are unchanged and load-bearing: what you may conclude
+ * from a sample, and that recognising a name from training is not evidence.
+ * What changed is that the cost of inaction is now stated too, so the agent
+ * weighs each candidate instead of following a policy.
  */
 const COVERAGE_DOCTRINE = [
   '\nCOVERAGE DOCTRINE: the Corpus coverage section of the system brief tells you what',
   'fraction of the sources have actually been scanned; corpus.coverage gives you the',
   'detail, and schedule.list tells you which of the scanned ones are still mid-sweep',
   '(phase CATCH_UP) — a source being re-scanned back-to-back is still filling up, so',
-  '"scanned" does not mean "read". Below full coverage you are looking at a sample,',
-  'and a conclusion about a',
-  'sample stated as a conclusion about the corpus is simply false. Never claim an',
-  'absence ("no evidence of X") at partial coverage — you have not looked. Never',
-  'generalise a pattern across sources you have not seen: if you notice something in',
-  'one source and expect it to recur, that is an OBSERVATION for memory.write, not an',
-  'inquiry, and agenda.defer records it for the cycle that will have the coverage to',
-  'judge it. Scope what you do write to the sources you actually observed, and name them.',
+  '"scanned" does not mean "read". Below full coverage you are looking at a sample, and a',
+  'conclusion about a sample stated as a conclusion about the corpus is simply false. Never claim an',
+  'absence ("no evidence of X") at partial coverage — you have not looked. Do not state',
+  'a pattern you have seen in one source as a fact about sources you have not seen.',
+  '\nThat is a limit on what you may CONCLUDE, not on what you may WATCH. An inquiry is a',
+  'standing monitor over evidence, so "this appeared here and I expect it to recur" is',
+  'precisely what one is for — create it, scoped to the sources you actually observed,',
+  'and let it prove itself as coverage grows. Use agenda.defer for the weaker case: a',
+  'hunch you cannot yet tie to findings you have read. Scope what you do write to the',
+  'sources you actually observed, and name them.',
   '\nWHAT YOU KNOW vs WHAT YOU RECALL: you may recognise the organisations, people and',
   'events in this corpus from training. That recognition is not evidence and must never',
   'be the reason for an action. If you cannot point at a finding id you read this cycle,',
   'you do not have a basis — say so and move on.',
-  '\nDOING NOTHING IS A RESULT: finishing a cycle having created nothing is correct and',
-  'complete whenever the evidence does not warrant more, and it is the right answer far',
-  'more often than not. Say so plainly in your finish summary and give the reason. You',
-  'are judged on whether your conclusions survive the rest of the corpus arriving — not',
-  'on how much you did. A cycle that adds one well-evidenced thing, or nothing, beats one',
-  'that adds six speculative ones.',
+  '\nTWO WAYS TO FAIL, AND THEY COST THE SAME. Acting without evidence puts work in front',
+  'of an operator that they have to reconcile and discard. Failing to act on evidence that',
+  'was in front of you leaves a real problem sitting in the data with nobody looking at it,',
+  'and nothing in this system will catch that for you — no other agent re-reads what you',
+  'passed over. Neither error is the safe one. Judge each candidate on its own evidence and',
+  'do not tilt either way as a policy.',
+  '\nSo: finishing a cycle having created nothing is a complete and correct outcome when the',
+  'evidence does not warrant more — say so plainly in your finish summary and give the',
+  'reason, rather than acting to have acted. And when the evidence DOES warrant something,',
+  'act on it this cycle; "someone will look at it later" is not true here. A cycle that adds',
+  'one well-evidenced thing beats one that adds six speculative ones, and it also beats one',
+  'that saw a real lead and left it.',
 ].join(' ');
 
 const GLOSSARY_DOCTRINE = [
@@ -175,10 +199,10 @@ export const INQUIRY_MISSION: Mission = {
     // and an agent given a task will complete it — which is how five separate
     // "HTML email artifact noise" inquiries came to exist, one per mailbox, the
     // fifth rationale reading "same pattern as 5 other sources".
-    '\nYour mission: decide whether the findings in scope warrant any change to the set of',
-    'inquiries — and often they will not. An inquiry is a saved monitor over evidence that',
-    'already exists, so before creating one, establish that it matches real findings you',
-    'have read this cycle.',
+    '\nYour mission: decide what the findings in scope warrant for the set of inquiries —',
+    'which may be nothing, or may be a new monitor over something real. An inquiry is a saved',
+    'monitor over evidence that already exists, so before creating one, establish that it',
+    'matches real findings you have read this cycle.',
     '\nONE PHENOMENON, ONE INQUIRY. If a pattern appears in a second source, widen the',
     'existing inquiry with inquiries.enrich — add the source to its sourceIds, or set',
     'matchAllSources — instead of creating a per-source copy. Six near-identical inquiries',
