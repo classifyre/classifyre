@@ -89,6 +89,56 @@ async def test_text_classification_runner_applies_severity_map() -> None:
     assert findings[0].severity == Severity.high
 
 
+@pytest.mark.asyncio
+async def test_text_classification_short_text_is_a_single_call() -> None:
+    runner = _make_text_cls_runner([{"label": "SPAM", "score": 0.95}])
+
+    runner.detect("Win a free iPhone now!", "text/plain")
+
+    assert runner._pipe.call_count == 1
+
+
+@pytest.mark.asyncio
+async def test_text_classification_long_text_is_chunked_not_truncated() -> None:
+    # A pipeline called with truncation=True keeps only the first ~512 tokens,
+    # so an unchunked long document was classified on its opening lines alone
+    # and the rest was silently discarded.
+    runner = _make_text_cls_runner([{"label": "SPAM", "score": 0.95}])
+    text = "spam and eggs " * 5_000  # 70k chars, far past any model window
+
+    runner.detect(text, "text/plain")
+
+    assert runner._pipe.call_count > 1
+    seen = "".join(call.args[0] for call in runner._pipe.call_args_list)
+    # Overlapping windows, so the concatenation is longer than the input -- the
+    # point is that no part of it went unseen.
+    assert len(seen) >= len(text)
+    assert all(len(call.args[0]) <= 4_000 for call in runner._pipe.call_args_list)
+
+
+@pytest.mark.asyncio
+async def test_text_classification_chunk_cap_is_bounded() -> None:
+    from src.detectors.custom.runners._text_classification import _MAX_AUTO_CHUNKS
+
+    runner = _make_text_cls_runner([{"label": "SPAM", "score": 0.95}])
+
+    runner.detect("spam and eggs " * 200_000, "text/plain")
+
+    assert runner._pipe.call_count <= _MAX_AUTO_CHUNKS
+
+
+@pytest.mark.asyncio
+async def test_text_classification_scores_are_max_across_chunks() -> None:
+    runner = _make_text_cls_runner([])
+    runner._pipe = MagicMock(
+        side_effect=[[{"label": "SPAM", "score": s}] for s in (0.1, 0.99, 0.2)] * 200
+    )
+
+    findings = runner.detect("spam and eggs " * 400, "text/plain")
+
+    assert findings[0].confidence == pytest.approx(0.99)
+
+
 def test_text_classification_run_raises_not_implemented() -> None:
     runner = _make_text_cls_runner([])
     with pytest.raises(NotImplementedError):
