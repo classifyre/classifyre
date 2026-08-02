@@ -12,6 +12,9 @@ describe('CustomDetectorsService', () => {
   function createService() {
     const prisma = {
       $queryRaw: jest.fn(),
+      $executeRaw: jest.fn(),
+      finding: { updateMany: jest.fn() },
+      customDetectorExtraction: { updateMany: jest.fn() },
       customDetector: {
         findMany: jest.fn(),
         findUnique: jest.fn(),
@@ -21,6 +24,7 @@ describe('CustomDetectorsService', () => {
       },
       customDetectorFeedback: {
         findMany: jest.fn(),
+        updateMany: jest.fn(),
       },
       customDetectorTrainingRun: {
         create: jest.fn(),
@@ -471,14 +475,185 @@ describe('CustomDetectorsService', () => {
     ).resolves.toBeDefined();
   });
 
-  it('rejects unknown IDs in assertActiveDetectorIds', async () => {
+  it('strips a deleted detector out of every source config', async () => {
     const { service, prisma } = createService();
 
-    prisma.customDetector.findMany.mockResolvedValue([{ id: 'det-1' }]);
+    prisma.customDetector.findUnique.mockResolvedValue({
+      id: 'det-1',
+      key: 'nsfw_image_detection',
+    });
+    prisma.customDetector.delete.mockResolvedValue({ id: 'det-1' });
+
+    await expect(service.delete('det-1')).resolves.toEqual({ deleted: true });
+
+    // One statement per shape a source can hold the reference in:
+    // custom_detectors[] and detectors[].
+    expect(prisma.$executeRaw).toHaveBeenCalledTimes(2);
+    const statements = prisma.$executeRaw.mock.calls.map((call: unknown[]) =>
+      JSON.stringify(call[0]),
+    );
+    expect(statements[0]).toContain('custom_detectors');
+    expect(statements[1]).toContain('custom_detector_key');
+    for (const statement of statements) {
+      expect(statement).toContain('det-1');
+      expect(statement).toContain('nsfw_image_detection');
+    }
+    expect(prisma.customDetector.delete).toHaveBeenCalledWith({
+      where: { id: 'det-1' },
+    });
+  });
+
+  it('propagates a key rename into sources and denormalized key columns', async () => {
+    const { service, prisma } = createService();
+
+    const pipelineSchema = { type: 'REGEX', patterns: { x: { pattern: 'a' } } };
+    prisma.customDetector.findUnique.mockResolvedValue({
+      id: 'det-1',
+      key: 'old_key',
+      name: 'Detector',
+      description: null,
+      pipelineSchema,
+      isActive: true,
+      version: 1,
+      aiProviderConfigId: null,
+    });
+    prisma.customDetector.update.mockResolvedValue({
+      id: 'det-1',
+      key: 'new_key',
+      name: 'Detector',
+      description: null,
+      pipelineSchema,
+      isActive: true,
+      version: 1,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      trainingRuns: [],
+      _count: { findings: 0 },
+    });
+
+    await service.update('det-1', { key: 'new_key' });
+
+    expect(prisma.$executeRaw).toHaveBeenCalledTimes(2);
+    const statements = prisma.$executeRaw.mock.calls.map((call: unknown[]) =>
+      JSON.stringify(call[0]),
+    );
+    // detectors[] entries follow the key…
+    expect(statements[0]).toContain('old_key');
+    expect(statements[0]).toContain('new_key');
+    // …while key-valued custom_detectors entries are pinned to the ID, which
+    // no future rename can break.
+    expect(statements[1]).toContain('old_key');
+    expect(statements[1]).toContain('det-1');
+    for (const model of [
+      prisma.finding,
+      prisma.customDetectorExtraction,
+      prisma.customDetectorFeedback,
+    ]) {
+      expect(model.updateMany).toHaveBeenCalledWith({
+        where: { customDetectorId: 'det-1', customDetectorKey: 'old_key' },
+        data: { customDetectorKey: 'new_key' },
+      });
+    }
+  });
+
+  it('leaves sources untouched when the key does not change', async () => {
+    const { service, prisma } = createService();
+
+    const pipelineSchema = { type: 'REGEX', patterns: { x: { pattern: 'a' } } };
+    prisma.customDetector.findUnique.mockResolvedValue({
+      id: 'det-1',
+      key: 'same_key',
+      name: 'Detector',
+      description: null,
+      pipelineSchema,
+      isActive: true,
+      version: 1,
+      aiProviderConfigId: null,
+    });
+    prisma.customDetector.update.mockResolvedValue({
+      id: 'det-1',
+      key: 'same_key',
+      name: 'Renamed',
+      description: null,
+      pipelineSchema,
+      isActive: false,
+      version: 1,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      trainingRuns: [],
+      _count: { findings: 0 },
+    });
+
+    await service.update('det-1', { name: 'Renamed', isActive: false });
+
+    expect(prisma.$executeRaw).not.toHaveBeenCalled();
+  });
+
+  it('drops selections whose detector no longer exists instead of failing', async () => {
+    const { service, prisma } = createService();
+
+    prisma.customDetector.findMany.mockResolvedValue([
+      { id: 'det-1', key: 'alpha' },
+    ]);
 
     await expect(
-      service.assertActiveDetectorIds(['det-1', 'det-2']),
-    ).rejects.toBeInstanceOf(BadRequestException);
+      service.resolveDetectorSelections(['det-1', 'det-2']),
+    ).resolves.toEqual({ ids: ['det-1'], dropped: ['det-2'] });
+  });
+
+  it('keeps deactivated detectors selected so unrelated saves are not blocked', async () => {
+    const { service, prisma } = createService();
+
+    prisma.customDetector.findMany.mockResolvedValue([
+      { id: 'det-1', key: 'alpha' },
+    ]);
+
+    await expect(service.resolveDetectorSelections(['det-1'])).resolves.toEqual(
+      { ids: ['det-1'], dropped: [] },
+    );
+    // The lookup must not filter on isActive — deactivation pauses a detector,
+    // it does not unconfigure it.
+    expect(prisma.customDetector.findMany).toHaveBeenCalledWith({
+      where: { OR: [{ id: { in: ['det-1'] } }, { key: { in: ['det-1'] } }] },
+      select: { id: true, key: true },
+    });
+  });
+
+  it('rewrites key-valued selections to canonical detector IDs', async () => {
+    const { service, prisma } = createService();
+
+    prisma.customDetector.findMany.mockResolvedValue([
+      { id: 'det-1', key: 'nsfw_image_detection' },
+    ]);
+
+    const config: Record<string, unknown> = {
+      custom_detectors: ['nsfw_image_detection', 'det-1'],
+    };
+    await service.sanitizeSourceConfigDetectors(config);
+
+    expect(config.custom_detectors).toEqual(['det-1']);
+  });
+
+  it('drops detectors[] CUSTOM entries whose detector was deleted', async () => {
+    const { service, prisma } = createService();
+
+    prisma.customDetector.findMany.mockResolvedValue([
+      { id: 'det-1', key: 'alpha' },
+    ]);
+
+    const config: Record<string, unknown> = {
+      detectors: [
+        { type: 'PII', enabled: true },
+        { type: 'CUSTOM', enabled: true, custom_detector_key: 'alpha' },
+        { type: 'CUSTOM', enabled: true, custom_detector_key: 'gone' },
+      ],
+    };
+    await service.sanitizeSourceConfigDetectors(config);
+
+    expect(config.detectors).toEqual([
+      { type: 'PII', enabled: true },
+      { type: 'CUSTOM', enabled: true, custom_detector_key: 'alpha' },
+    ]);
   });
 
   it('returns conflict when detector key already exists on create', async () => {

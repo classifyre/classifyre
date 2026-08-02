@@ -188,14 +188,9 @@ export class McpToolExecutorService {
     const normalized = this.validationService.validate(type, config);
     const normalizedRecord =
       normalized && typeof normalized === 'object' ? normalized : {};
-    const customDetectors =
-      await this.customDetectorsService.assertActiveDetectorIds(
-        normalizedRecord.custom_detectors,
-      );
-
-    if (customDetectors.length > 0) {
-      normalizedRecord.custom_detectors = customDetectors;
-    }
+    await this.customDetectorsService.sanitizeSourceConfigDetectors(
+      normalizedRecord,
+    );
 
     return normalizedRecord;
   }

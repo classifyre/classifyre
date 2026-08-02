@@ -15,6 +15,7 @@ import {
   NotificationType,
 } from '../../../types/notification.types';
 import { DecisionApplierService } from '../../decision-applier.service';
+import { CustomDetectorsService } from '../../../custom-detectors.service';
 import { AutoScheduleService } from '../../../scheduler/auto-schedule.service';
 import { computeDetectionFingerprint } from '../../../utils/scope-fingerprint';
 import {
@@ -54,6 +55,7 @@ export class ConfigToolset {
     private readonly cliRunner: CliRunnerService,
     private readonly notifications: NotificationsService,
     private readonly autoSchedule: AutoScheduleService,
+    private readonly customDetectors: CustomDetectorsService,
   ) {}
 
   private sourceGate = async (
@@ -308,6 +310,12 @@ export class ConfigToolset {
             String(source.type),
             merged,
           );
+
+          // 4b. Custom-detector references are resolved to canonical IDs and
+          //     stale ones are dropped — an agent naming a detector by key, or
+          //     re-writing a selection whose detector was deleted meanwhile,
+          //     must not persist a reference that later rejects every save.
+          await this.customDetectors.sanitizeSourceConfigDetectors(validated);
 
           // 5. Defensive assertion: base connection unchanged.
           for (const key of PROTECTED_KEYS) {
