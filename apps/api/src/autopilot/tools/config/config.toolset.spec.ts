@@ -7,6 +7,7 @@ import type { CliRunnerService } from '../../../cli-runner/cli-runner.service';
 import type { NotificationsService } from '../../../notifications.service';
 import type { DecisionApplierService } from '../../decision-applier.service';
 import type { AutoScheduleService } from '../../../scheduler/auto-schedule.service';
+import type { CustomDetectorsService } from '../../../custom-detectors.service';
 import { computeDetectionFingerprint } from '../../../utils/scope-fingerprint';
 import type { Tool, ToolContext } from '../tool.types';
 
@@ -33,6 +34,9 @@ describe('ConfigToolset — config.tune_source', () => {
   const mockCliRunner = { startRun: jest.fn() };
   const mockNotifications = { create: jest.fn() };
   const mockAutoSchedule = { resetToCatchUp: jest.fn() };
+  const mockCustomDetectors = {
+    sanitizeSourceConfigDetectors: jest.fn((c: unknown) => Promise.resolve(c)),
+  };
 
   const toolset = new ConfigToolset(
     mockPrisma as unknown as PrismaService,
@@ -42,6 +46,7 @@ describe('ConfigToolset — config.tune_source', () => {
     mockCliRunner as unknown as CliRunnerService,
     mockNotifications as unknown as NotificationsService,
     mockAutoSchedule as unknown as AutoScheduleService,
+    mockCustomDetectors as unknown as CustomDetectorsService,
   );
   const tune = toolset
     .list()
@@ -201,6 +206,9 @@ describe('ConfigToolset — sources.rescan', () => {
   const mockApplier = { sourceGate: jest.fn() };
   const mockNotifications = { create: jest.fn() };
   const mockAutoSchedule = { resetToCatchUp: jest.fn() };
+  const mockCustomDetectors = {
+    sanitizeSourceConfigDetectors: jest.fn((c: unknown) => Promise.resolve(c)),
+  };
 
   const toolset = new ConfigToolset(
     mockPrisma as unknown as PrismaService,
@@ -210,6 +218,7 @@ describe('ConfigToolset — sources.rescan', () => {
     mockCliRunner as unknown as CliRunnerService,
     mockNotifications as unknown as NotificationsService,
     mockAutoSchedule as unknown as AutoScheduleService,
+    mockCustomDetectors as unknown as CustomDetectorsService,
   );
   const rescan = toolset
     .list()

@@ -74,7 +74,9 @@ describe('SourcesController', () => {
   };
 
   const mockCustomDetectorsService = {
-    assertActiveDetectorIds: jest.fn().mockResolvedValue([]),
+    sanitizeSourceConfigDetectors: jest.fn((config: unknown) =>
+      Promise.resolve(config),
+    ),
   };
 
   const mockSourceFilesService = {

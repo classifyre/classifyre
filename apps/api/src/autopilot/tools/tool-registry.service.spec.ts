@@ -51,6 +51,7 @@ describe('ToolRegistry', () => {
       {} as CliRunnerService,
       {} as NotificationsService,
       {} as AutoScheduleService,
+      {} as CustomDetectorsService,
     ),
     new DetectorToolset(
       {} as CustomDetectorsService,

@@ -100,6 +100,33 @@ function asString(value: unknown): string | null {
     : null;
 }
 
+/**
+ * The custom-detector key carried by a `detectors[]` entry, or null when the
+ * entry is a built-in detector. Current configs put the key at the top level;
+ * older ones nested it under `config`.
+ */
+function customDetectorKeyOf(entry: unknown): string | null {
+  const record = asRecord(entry);
+  if (asString(record.type)?.toUpperCase() !== 'CUSTOM') {
+    return null;
+  }
+  return (
+    asString(record.custom_detector_key) ??
+    asString(asRecord(record.config).custom_detector_key)
+  );
+}
+
+/** Point a `detectors[]` CUSTOM entry at `key`, wherever it stores the key. */
+function rewriteCustomDetectorKey(entry: unknown, key: string): JsonRecord {
+  const record = { ...asRecord(entry) };
+  if (asString(asRecord(record.config).custom_detector_key)) {
+    record.config = { ...asRecord(record.config), custom_detector_key: key };
+    return record;
+  }
+  record.custom_detector_key = key;
+  return record;
+}
+
 function normalizeHeaderCell(value: string): string {
   return value.trim().toLowerCase().replace(/\s+/g, '_');
 }
@@ -1135,19 +1162,40 @@ export class CustomDetectorsService {
       throw error;
     }
 
+    if (nextKey !== existing.key) {
+      await this.propagateDetectorKeyRename(id, existing.key, nextKey);
+    }
+
     return this.toResponse(detector);
   }
 
   async delete(id: string): Promise<{ deleted: true }> {
     const existing = await this.prisma.customDetector.findUnique({
       where: { id },
-      select: { id: true },
+      select: { id: true, key: true },
     });
     if (!existing) {
       throw new NotFoundException(`Custom detector with ID ${id} not found`);
     }
 
-    // Remove this detector from all source configs that reference it.
+    // Remove this detector from every source that references it, in both
+    // shapes a source can hold it (ID array and detectors[] key), so a deleted
+    // detector never leaves a dangling reference behind to reject later saves.
+    await this.removeDetectorFromSources(existing.id, existing.key);
+
+    await this.prisma.customDetector.delete({ where: { id } });
+    return { deleted: true };
+  }
+
+  /**
+   * Strip every reference to one custom detector out of all source configs.
+   * Matches on ID *and* key because both have been written into
+   * `custom_detectors` over time (the UI writes IDs, agents write keys).
+   */
+  private async removeDetectorFromSources(
+    id: string,
+    key: string,
+  ): Promise<void> {
     await this.prisma.$executeRaw(Prisma.sql`
       UPDATE sources
       SET config = jsonb_set(
@@ -1156,17 +1204,123 @@ export class CustomDetectorsService {
         COALESCE(
           (
             SELECT jsonb_agg(elem)
-            FROM jsonb_array_elements_text(COALESCE(config->'custom_detectors', '[]'::jsonb)) AS elem
-            WHERE elem != ${id}
+            FROM jsonb_array_elements_text(config->'custom_detectors') AS elem
+            WHERE elem NOT IN (${id}, ${key})
           ),
           '[]'::jsonb
         )
       )
-      WHERE config->'custom_detectors' @> ${JSON.stringify([id])}::jsonb
+      WHERE jsonb_typeof(config->'custom_detectors') = 'array'
+        AND (
+          config->'custom_detectors' @> ${JSON.stringify([id])}::jsonb
+          OR config->'custom_detectors' @> ${JSON.stringify([key])}::jsonb
+        )
     `);
 
-    await this.prisma.customDetector.delete({ where: { id } });
-    return { deleted: true };
+    await this.prisma.$executeRaw(Prisma.sql`
+      UPDATE sources
+      SET config = jsonb_set(
+        config,
+        '{detectors}',
+        COALESCE(
+          (
+            SELECT jsonb_agg(entry)
+            FROM jsonb_array_elements(config->'detectors') AS entry
+            WHERE NOT (
+              upper(COALESCE(entry->>'type', '')) = 'CUSTOM'
+              AND COALESCE(
+                entry->>'custom_detector_key',
+                entry->'config'->>'custom_detector_key'
+              ) IN (${id}, ${key})
+            )
+          ),
+          '[]'::jsonb
+        )
+      )
+      WHERE jsonb_typeof(config->'detectors') = 'array'
+        AND EXISTS (
+          SELECT 1
+          FROM jsonb_array_elements(config->'detectors') AS entry
+          WHERE upper(COALESCE(entry->>'type', '')) = 'CUSTOM'
+            AND COALESCE(
+              entry->>'custom_detector_key',
+              entry->'config'->>'custom_detector_key'
+            ) IN (${id}, ${key})
+        )
+    `);
+  }
+
+  /**
+   * Carry a key rename into every place that stores the key rather than the ID:
+   * source configs (`detectors[]` entries and key-valued `custom_detectors`
+   * entries) and the key columns denormalized onto findings, extractions and
+   * feedback. Without this, renaming a detector silently detaches it from its
+   * sources and its own history.
+   */
+  private async propagateDetectorKeyRename(
+    id: string,
+    previousKey: string,
+    nextKey: string,
+  ): Promise<void> {
+    await this.prisma.$executeRaw(Prisma.sql`
+      UPDATE sources
+      SET config = jsonb_set(
+        config,
+        '{detectors}',
+        (
+          SELECT jsonb_agg(
+            CASE
+              WHEN upper(COALESCE(entry->>'type', '')) = 'CUSTOM'
+                AND entry->>'custom_detector_key' = ${previousKey}
+                THEN jsonb_set(entry, '{custom_detector_key}', to_jsonb(${nextKey}::text))
+              WHEN upper(COALESCE(entry->>'type', '')) = 'CUSTOM'
+                AND entry->'config'->>'custom_detector_key' = ${previousKey}
+                THEN jsonb_set(entry, '{config,custom_detector_key}', to_jsonb(${nextKey}::text))
+              ELSE entry
+            END
+          )
+          FROM jsonb_array_elements(config->'detectors') AS entry
+        )
+      )
+      WHERE jsonb_typeof(config->'detectors') = 'array'
+        AND EXISTS (
+          SELECT 1
+          FROM jsonb_array_elements(config->'detectors') AS entry
+          WHERE upper(COALESCE(entry->>'type', '')) = 'CUSTOM'
+            AND COALESCE(
+              entry->>'custom_detector_key',
+              entry->'config'->>'custom_detector_key'
+            ) = ${previousKey}
+        )
+    `);
+
+    // Key-valued selections become the canonical ID, which no rename can break.
+    await this.prisma.$executeRaw(Prisma.sql`
+      UPDATE sources
+      SET config = jsonb_set(
+        config,
+        '{custom_detectors}',
+        (
+          SELECT jsonb_agg(DISTINCT CASE WHEN elem = ${previousKey} THEN ${id} ELSE elem END)
+          FROM jsonb_array_elements_text(config->'custom_detectors') AS elem
+        )
+      )
+      WHERE jsonb_typeof(config->'custom_detectors') = 'array'
+        AND config->'custom_detectors' @> ${JSON.stringify([previousKey])}::jsonb
+    `);
+
+    await this.prisma.finding.updateMany({
+      where: { customDetectorId: id, customDetectorKey: previousKey },
+      data: { customDetectorKey: nextKey },
+    });
+    await this.prisma.customDetectorExtraction.updateMany({
+      where: { customDetectorId: id, customDetectorKey: previousKey },
+      data: { customDetectorKey: nextKey },
+    });
+    await this.prisma.customDetectorFeedback.updateMany({
+      where: { customDetectorId: id, customDetectorKey: previousKey },
+      data: { customDetectorKey: nextKey },
+    });
   }
 
   /** Read the raw CUSTOM example templates, or [] if the schema file is absent. */
@@ -1294,36 +1448,136 @@ export class CustomDetectorsService {
     ].join('\n');
   }
 
-  async assertActiveDetectorIds(ids: unknown): Promise<string[]> {
-    if (!Array.isArray(ids)) {
-      return [];
+  /**
+   * Resolve a source's `custom_detectors` selection to canonical detector IDs.
+   *
+   * Selections are self-healing rather than fatal:
+   * - entries may be a detector ID *or* a detector key (agents and older
+   *   configs write keys); keys are rewritten to the current ID, so renaming a
+   *   key never orphans a selection;
+   * - deactivated detectors are kept — deactivation pauses a detector, it does
+   *   not unconfigure it, and it must not block saving an unrelated field;
+   * - entries pointing at a detector that no longer exists are dropped, so a
+   *   config left stale by an out-of-band delete repairs itself on next save
+   *   instead of rejecting every subsequent update.
+   */
+  async resolveDetectorSelections(
+    selections: unknown,
+  ): Promise<{ ids: string[]; dropped: string[] }> {
+    if (!Array.isArray(selections)) {
+      return { ids: [], dropped: [] };
     }
 
     const normalized = Array.from(
       new Set(
-        ids
+        selections
           .map((entry) => (typeof entry === 'string' ? entry.trim() : ''))
           .filter((entry) => entry.length > 0),
       ),
     );
 
     if (normalized.length === 0) {
-      return [];
+      return { ids: [], dropped: [] };
     }
 
     const rows = await this.prisma.customDetector.findMany({
-      where: { id: { in: normalized }, isActive: true },
-      select: { id: true },
+      where: {
+        OR: [{ id: { in: normalized } }, { key: { in: normalized } }],
+      },
+      select: { id: true, key: true },
     });
-    const existing = new Set(rows.map((row) => row.id));
-    const missing = normalized.filter((id) => !existing.has(id));
-    if (missing.length > 0) {
-      throw new BadRequestException(
-        `Unknown or inactive custom detectors: ${missing.join(', ')}`,
+    const byId = new Map(rows.map((row) => [row.id, row.id]));
+    const byKey = new Map(rows.map((row) => [row.key, row.id]));
+
+    const ids: string[] = [];
+    const seen = new Set<string>();
+    const dropped: string[] = [];
+    for (const entry of normalized) {
+      const resolved = byId.get(entry) ?? byKey.get(entry);
+      if (!resolved) {
+        dropped.push(entry);
+        continue;
+      }
+      if (seen.has(resolved)) {
+        continue;
+      }
+      seen.add(resolved);
+      ids.push(resolved);
+    }
+
+    if (dropped.length > 0) {
+      this.logger.warn(
+        `Dropping custom detector selections that no longer exist: ${dropped.join(', ')}`,
       );
     }
 
-    return normalized;
+    return { ids, dropped };
+  }
+
+  /**
+   * Normalize the custom-detector references inside a source config in place.
+   *
+   * Two shapes carry them: the `custom_detectors` ID array, and CUSTOM entries
+   * in `detectors[]` keyed by `custom_detector_key`. Both are repaired against
+   * the current catalog so a deleted or renamed detector can never wedge a
+   * source save.
+   */
+  async sanitizeSourceConfigDetectors(
+    config: Record<string, unknown>,
+  ): Promise<Record<string, unknown>> {
+    if (!config || typeof config !== 'object') {
+      return config;
+    }
+
+    if (Array.isArray(config.custom_detectors)) {
+      const { ids } = await this.resolveDetectorSelections(
+        config.custom_detectors,
+      );
+      config.custom_detectors = ids;
+    }
+
+    if (Array.isArray(config.detectors)) {
+      const keys = config.detectors
+        .map((entry) => customDetectorKeyOf(entry))
+        .filter((key): key is string => Boolean(key));
+      if (keys.length > 0) {
+        const rows = await this.prisma.customDetector.findMany({
+          where: { OR: [{ key: { in: keys } }, { id: { in: keys } }] },
+          select: { id: true, key: true },
+        });
+        const keyById = new Map(rows.map((row) => [row.id, row.key]));
+        const knownKeys = new Set(rows.map((row) => row.key));
+        const kept: unknown[] = [];
+        const droppedKeys: string[] = [];
+        for (const entry of config.detectors) {
+          const key = customDetectorKeyOf(entry);
+          if (!key) {
+            kept.push(entry);
+            continue;
+          }
+          if (knownKeys.has(key)) {
+            kept.push(entry);
+            continue;
+          }
+          // Configs that stored an ID where a key belongs are rewritten
+          // rather than dropped.
+          const canonicalKey = keyById.get(key);
+          if (canonicalKey) {
+            kept.push(rewriteCustomDetectorKey(entry, canonicalKey));
+            continue;
+          }
+          droppedKeys.push(key);
+        }
+        if (droppedKeys.length > 0) {
+          this.logger.warn(
+            `Dropping CUSTOM detector entries for detectors that no longer exist: ${droppedKeys.join(', ')}`,
+          );
+        }
+        config.detectors = kept;
+      }
+    }
+
+    return config;
   }
 
   async buildRuntimeCustomDetectors(ids: unknown): Promise<
