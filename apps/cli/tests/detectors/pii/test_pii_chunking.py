@@ -32,6 +32,51 @@ class _Cfg:
         self.max_length = max_length
 
 
+class _FakeResult:
+    """Shape of a Presidio RecognizerResult, as far as the detector uses it."""
+
+    def __init__(self, entity_type, start, end, score):
+        self.entity_type = entity_type
+        self.start = start
+        self.end = end
+        self.score = score
+        self.recognition_metadata = None
+
+
+class _FakeAnalyzer:
+    """Finds every occurrence of a needle and reports chunk-relative offsets.
+
+    Real Presidio raises E088 above nlp.max_length; this records what it was
+    handed so the tests can assert nothing was skipped and offsets came back
+    absolute.
+    """
+
+    NEEDLE = "alice@example.com"
+
+    def __init__(self, score=0.9):
+        self.calls: list[str] = []
+        self._score = score
+
+    def analyze(self, *, text, language, entities=None):
+        self.calls.append(text)
+        results = []
+        start = text.find(self.NEEDLE)
+        while start != -1:
+            results.append(
+                _FakeResult("EMAIL_ADDRESS", start, start + len(self.NEEDLE), self._score)
+            )
+            start = text.find(self.NEEDLE, start + 1)
+        return results
+
+
+def _detector_with_analyzer(analyzer, cfg=None) -> PIIDetector:
+    detector = _detector_with(cfg or _Cfg())
+    detector.analyzer = analyzer
+    detector._init_error = None
+    detector._supported_entities_cache = frozenset({"EMAIL_ADDRESS"})
+    return detector
+
+
 class TestUnwrapInt:
     def test_unwraps_root_model(self):
         assert _unwrap_int(ChunkSize(root=500)) == 500
@@ -197,3 +242,86 @@ class TestAutoChunking:
 
         assert chunks[-1][1] + len(chunks[-1][0]) == len(text)
         assert all(len(chunk) <= 1_000 for chunk, _ in chunks)
+
+
+class TestAnalyzeContentGuard:
+    """_analyze_content is the chokepoint every caller shares. Guarding only the
+    full-text loop left the tabular per-cell path calling Presidio with the raw
+    cell, so one multi-megabyte text column still raised E088 -- swallowed, so
+    the page reported zero findings."""
+
+    def _text_with_needles(self, length: int, positions: list[int]) -> str:
+        buf = list("x" * length)
+        for pos in positions:
+            buf[pos : pos + len(_FakeAnalyzer.NEEDLE)] = _FakeAnalyzer.NEEDLE
+        return "".join(buf)
+
+    def test_short_text_is_a_single_pass(self):
+        analyzer = _FakeAnalyzer()
+        detector = _detector_with_analyzer(analyzer)
+
+        detector._analyze_content("contact alice@example.com today")
+
+        assert len(analyzer.calls) == 1
+
+    def test_oversized_text_is_split_before_reaching_presidio(self):
+        analyzer = _FakeAnalyzer()
+        detector = _detector_with_analyzer(analyzer)
+        text = self._text_with_needles(2_023_954, [1_500_000])
+
+        detector._analyze_content(text)
+
+        assert len(analyzer.calls) > 1
+        limit = PIIDetector._SPACY_DEFAULT_MAX_LENGTH
+        assert all(len(call) <= limit for call in analyzer.calls)
+
+    def test_offsets_come_back_absolute(self):
+        analyzer = _FakeAnalyzer()
+        detector = _detector_with_analyzer(analyzer)
+        text = self._text_with_needles(2_023_954, [10, 640_000, 1_500_000, 2_000_000])
+
+        results = detector._analyze_content(text)
+
+        # A finding past the first window is exactly what the old code lost.
+        assert [r.start for r in results] == [10, 640_000, 1_500_000, 2_000_000]
+        assert all(text[r.start : r.end] == _FakeAnalyzer.NEEDLE for r in results)
+
+    def test_overlap_does_not_duplicate_findings(self):
+        analyzer = _FakeAnalyzer()
+        detector = _detector_with_analyzer(analyzer)
+        window = PIIDetector._AUTO_CHUNK_CHARS
+        # Sitting inside the overlap zone, this one is seen by two windows.
+        seam = window - (PIIDetector._AUTO_CHUNK_OVERLAP // 2)
+        text = self._text_with_needles(1_200_000, [seam])
+
+        results = detector._analyze_content(text)
+
+        assert len(results) == 1
+        assert results[0].start == seam
+
+    def test_oversized_tabular_cell_is_analyzed_not_dropped(self):
+        analyzer = _FakeAnalyzer()
+        detector = _detector_with_analyzer(analyzer)
+        cell_value = self._text_with_needles(2_023_954, [1_800_000])
+
+        results = detector._analyze_structured_cell(
+            cell_value, allowed_entity_types={"EMAIL_ADDRESS"}
+        )
+
+        assert [r.start for r in results] == [1_800_000]
+        assert cell_value[results[0].start : results[0].end] == _FakeAnalyzer.NEEDLE
+
+    def test_chunk_size_larger_than_the_spacy_limit_is_still_safe(self):
+        # An explicit chunk_size above the ceiling used to hand Presidio an
+        # oversized window just the same.
+        analyzer = _FakeAnalyzer()
+        detector = _detector_with_analyzer(
+            analyzer, _Cfg(chunk_size=ChunkSize(root=1_500_000), chunk_overlap=ChunkOverlap(root=0))
+        )
+        text = self._text_with_needles(2_023_954, [1_400_000])
+
+        for chunk, _offset in detector._iter_chunks(text):
+            detector._analyze_content(chunk)
+
+        limit = PIIDetector._SPACY_DEFAULT_MAX_LENGTH
+        assert all(len(call) <= limit for call in analyzer.calls)
