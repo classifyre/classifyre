@@ -10,6 +10,8 @@ produced nothing for the whole corpus.
 These tests need no Presidio: they exercise the config plumbing directly.
 """
 
+import itertools
+
 from src.detectors.pii.detector import PIIDetector, _unwrap_int
 from src.models.generated_detectors import ChunkOverlap, ChunkSize, MaxLength
 
@@ -119,3 +121,79 @@ class TestMaxLength:
 
     def test_unset_max_length_is_none(self):
         assert _unwrap_int(None) is None
+
+    def test_limit_defaults_to_spacy_default(self):
+        detector = _detector_with(_Cfg())
+
+        assert detector._spacy_char_limit() == PIIDetector._SPACY_DEFAULT_MAX_LENGTH
+
+    def test_limit_follows_configured_max_length(self):
+        detector = _detector_with(_Cfg(max_length=MaxLength(root=2_000_000)))
+
+        assert detector._spacy_char_limit() == 2_000_000
+
+
+class TestAutoChunking:
+    """A page longer than spaCy's ceiling used to raise E088 inside Presidio,
+    which the detector swallowed -- so every finding on that page was lost.
+    Oversized pages are now split into bounded windows instead."""
+
+    def _oversized(self, chars: int) -> str:
+        # Word-shaped text so boundary snapping has somewhere to cut.
+        return ("lorem ipsum dolor sit amet " * ((chars // 27) + 1))[:chars]
+
+    def test_text_under_the_limit_is_not_chunked(self):
+        detector = _detector_with(_Cfg())
+
+        assert detector._chunk_text("some text") == [("some text", 0)]
+
+    def test_oversized_text_is_split_without_config(self):
+        detector = _detector_with(_Cfg())
+        text = self._oversized(PIIDetector._SPACY_DEFAULT_MAX_LENGTH + 500_000)
+
+        chunks = detector._chunk_text(text)
+
+        assert len(chunks) > 1
+        assert all(len(chunk) <= PIIDetector._AUTO_CHUNK_CHARS for chunk, _ in chunks)
+
+    def test_chunks_cover_the_whole_text_at_correct_offsets(self):
+        detector = _detector_with(_Cfg())
+        text = self._oversized(PIIDetector._SPACY_DEFAULT_MAX_LENGTH + 12_345)
+
+        chunks = detector._chunk_text(text)
+
+        # Every chunk must sit at the offset it claims, or finding positions
+        # reported back to the API point at the wrong bytes.
+        assert all(text[offset : offset + len(chunk)] == chunk for chunk, offset in chunks)
+        assert chunks[0][1] == 0
+        last_chunk, last_offset = chunks[-1]
+        assert last_offset + len(last_chunk) == len(text)
+        # No gaps between consecutive windows.
+        for (chunk, offset), (_, next_offset) in itertools.pairwise(chunks):
+            assert next_offset <= offset + len(chunk)
+
+    def test_a_lower_max_length_tightens_the_window(self):
+        detector = _detector_with(_Cfg(max_length=MaxLength(root=50_000)))
+        text = self._oversized(120_000)
+
+        chunks = detector._chunk_text(text)
+
+        assert all(len(chunk) <= 50_000 for chunk, _ in chunks)
+
+    def test_explicit_chunk_size_still_wins_over_auto(self):
+        detector = _detector_with(_Cfg(chunk_size=ChunkSize(root=10), chunk_overlap=None))
+        text = self._oversized(PIIDetector._SPACY_DEFAULT_MAX_LENGTH + 1)
+
+        first, offset = next(iter(detector._iter_chunks(text)))
+
+        assert offset == 0
+        assert len(first) == 10
+
+    def test_text_without_whitespace_still_terminates(self):
+        detector = _detector_with(_Cfg(max_length=MaxLength(root=1_000)))
+        text = "a" * 5_000
+
+        chunks = detector._chunk_text(text)
+
+        assert chunks[-1][1] + len(chunks[-1][0]) == len(text)
+        assert all(len(chunk) <= 1_000 for chunk, _ in chunks)
