@@ -3,7 +3,6 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
-  PayloadTooLargeException,
 } from '@nestjs/common';
 import {
   AssetStatus,
@@ -17,7 +16,9 @@ import * as path from 'path';
 import { PrismaService } from './prisma.service';
 import { HistoryEventType } from './types/finding-history.types';
 
-export const MAX_SOURCE_FILE_BYTES = 50 * 1024 * 1024;
+// Uploads are not size-capped by the API; the transport (Fastify bodyLimit /
+// @fastify/multipart) is unbounded too, so a large sandbox file is stored
+// rather than rejected with 413.
 
 const fileMetadataSelect = {
   id: true,
@@ -54,9 +55,6 @@ export class SourceFilesService {
     this.assertSourceIdle(source);
     if (params.data.length === 0) {
       throw new BadRequestException('No file uploaded');
-    }
-    if (params.data.length > MAX_SOURCE_FILE_BYTES) {
-      throw new PayloadTooLargeException('Files may not exceed 50 MiB');
     }
 
     const contentHash = createHash('sha256').update(params.data).digest('hex');

@@ -215,7 +215,9 @@ class RestOutputSink:
         self._runner_id = response.id
         logger.info("Created external runner %s for source %s", response.id, response.source_id)
 
-    # Keep each bulk request well under Fastify's 50 MB bodyLimit
+    # Batching heuristic only — the API no longer caps request bodies, so this
+    # bounds per-request memory/latency rather than avoiding a 413. A single
+    # asset larger than this is still sent whole, in its own request.
     _MAX_BATCH_BYTES = 20 * 1024 * 1024  # 20 MB
 
     async def emit_batch(

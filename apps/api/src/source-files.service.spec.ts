@@ -1,13 +1,6 @@
-import {
-  BadRequestException,
-  ConflictException,
-  PayloadTooLargeException,
-} from '@nestjs/common';
+import { BadRequestException, ConflictException } from '@nestjs/common';
 import { AssetType, RunnerStatus } from '@prisma/client';
-import {
-  MAX_SOURCE_FILE_BYTES,
-  SourceFilesService,
-} from './source-files.service';
+import { SourceFilesService } from './source-files.service';
 
 function sandboxSource(runnerStatus: RunnerStatus = RunnerStatus.COMPLETED) {
   return { id: 'source-1', type: AssetType.SANDBOX, runnerStatus };
@@ -74,19 +67,19 @@ describe(SourceFilesService.name, () => {
     ).rejects.toBeInstanceOf(ConflictException);
   });
 
-  it('enforces the per-file byte limit before persistence', async () => {
+  it('stores oversized files instead of rejecting them', async () => {
     const prisma = createPrisma();
     const service = new SourceFilesService(prisma as never);
 
-    await expect(
-      service.create({
-        sourceId: 'source-1',
-        fileName: 'large.bin',
-        declaredMimeType: 'application/octet-stream',
-        data: Buffer.alloc(MAX_SOURCE_FILE_BYTES + 1),
-      }),
-    ).rejects.toBeInstanceOf(PayloadTooLargeException);
-    expect(prisma.uploadedSourceFile.create).not.toHaveBeenCalled();
+    const created = await service.create({
+      sourceId: 'source-1',
+      fileName: 'large.bin',
+      declaredMimeType: 'application/octet-stream',
+      data: Buffer.alloc(60 * 1024 * 1024),
+    });
+
+    expect(created).toMatchObject({ id: 'file-1' });
+    expect(prisma.uploadedSourceFile.create).toHaveBeenCalled();
   });
 
   it('rejects non-Sandbox sources and active runners', async () => {

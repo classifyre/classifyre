@@ -30,6 +30,21 @@ import {
 } from './namespace/namespace.constants';
 import { PrismaClientManager } from './prisma/prisma-client-manager';
 
+// No API-side ceiling on request bodies. The CLI posts whole assets in a single
+// bulk request and a single asset (large parquet/archive payloads, extracted
+// text, findings) can exceed any fixed cap we would pick, so a 413 is always an
+// ingestion bug rather than a useful guard. Set API_BODY_LIMIT_BYTES to a
+// positive integer only if a deployment deliberately wants a ceiling back.
+const BODY_LIMIT_BYTES = (() => {
+  const configured = Number.parseInt(
+    process.env.API_BODY_LIMIT_BYTES ?? '',
+    10,
+  );
+  return Number.isFinite(configured) && configured > 0
+    ? configured
+    : Number.MAX_SAFE_INTEGER;
+})();
+
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
   const port = process.env.PORT ?? 8000;
@@ -38,14 +53,11 @@ async function bootstrap() {
 
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule,
-    // Leave room for multipart framing while @fastify/multipart enforces the
-    // exact 50 MiB per-file limit below.
-    //
     // `rewriteUrl` runs pre-routing and strips a leading `/<namespace-slug>` so
     // the existing (namespace-blind) routes keep matching; the slug is resolved
     // to a tenant schema by the onRequest hook registered below.
     new FastifyAdapter({
-      bodyLimit: 51 * 1024 * 1024,
+      bodyLimit: BODY_LIMIT_BYTES,
       rewriteUrl: namespaceRewriteUrl,
     }),
   );
@@ -59,8 +71,14 @@ async function bootstrap() {
     methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   });
 
+  // Uploads follow the same rule as JSON bodies: no size ceiling. `files: 1`
+  // stays because these routes accept exactly one file per request.
   await app.register(multipart, {
-    limits: { fileSize: 50 * 1024 * 1024, files: 1 },
+    limits: {
+      fileSize: BODY_LIMIT_BYTES,
+      fieldSize: BODY_LIMIT_BYTES,
+      files: 1,
+    },
   });
 
   // Backpressure guard — returns 503 when the process is genuinely overloaded.
