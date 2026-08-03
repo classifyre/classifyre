@@ -55,6 +55,15 @@ import {
 } from "@/components/uploaded-files";
 import { deleteSourceFile, uploadSourceFile } from "@/lib/source-files-api";
 
+/**
+ * A brand-new source starts on the adaptive schedule: it is the right choice
+ * for almost every source, and it puts the Automatic/Fixed selector — not a
+ * bare cron grid — in front of the user from the first render.
+ */
+const newSourceSchedule = (
+  schedule?: Parameters<typeof defaultScheduleValue>[0],
+) => defaultScheduleValue(schedule ?? { mode: "AUTO" });
+
 const normalizeDetectors = (detectors: DetectorConfigInput[]) =>
   detectors
     .filter((detector) => detector.type.toUpperCase() !== "CUSTOM")
@@ -94,9 +103,7 @@ export default function NewSourcePage() {
   );
   const [isSavingConfig, setIsSavingConfig] = useState(false);
   const [isTestingConfig, setIsTestingConfig] = useState(false);
-  const [schedule, setSchedule] = useState<ScheduleValue>(
-    defaultScheduleValue(),
-  );
+  const [schedule, setSchedule] = useState<ScheduleValue>(newSourceSchedule());
   const [testConnectionDialog, setTestConnectionDialog] = useState<{
     open: boolean;
     status: TestConnectionStatus;
@@ -134,7 +141,7 @@ export default function NewSourcePage() {
       setDetectors([]);
       setDetectorDefaults([]);
     }
-    setSchedule(defaultScheduleValue(example.schedule));
+    setSchedule(newSourceSchedule(example.schedule));
     setSourceId(null);
     setUploadedFiles([]);
     setPendingFiles([]);
@@ -148,7 +155,7 @@ export default function NewSourcePage() {
     setDetectors([]);
     setSelectedCustomDetectorIds([]);
     setDetectorDefaults([]);
-    setSchedule(defaultScheduleValue());
+    setSchedule(newSourceSchedule());
     setSourceId(null);
     setUploadedFiles([]);
     setPendingFiles([]);
@@ -161,7 +168,7 @@ export default function NewSourcePage() {
     setDetectors([]);
     setSelectedCustomDetectorIds([]);
     setDetectorDefaults([]);
-    setSchedule(defaultScheduleValue());
+    setSchedule(newSourceSchedule());
     setSourceId(null);
     setUploadedFiles([]);
     setPendingFiles([]);
@@ -538,9 +545,6 @@ export default function NewSourcePage() {
               })
             : t("sources.new.title")}
         </h1>
-        <p className="text-muted-foreground mt-2">
-          {t("sources.new.description")}
-        </p>
       </div>
 
       {!selectedSourceType ? (

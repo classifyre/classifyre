@@ -714,13 +714,13 @@ export function RunnersTable({
           </span>
           <Select value={pageSize} onValueChange={setPageSize}>
             <SelectTrigger className="h-8 w-[130px] border-2 border-border rounded-[4px]">
-              <SelectValue placeholder={t("common.rows")} />
+              <SelectValue placeholder={t("common.rows", { pageSize })} />
             </SelectTrigger>
             <SelectContent>
               {PAGE_SIZE_OPTIONS.map((size) => (
-                <SelectItem key={size} value={String(size)}>
-                  {size} {t("common.rows")}
-                </SelectItem>
+                  <SelectItem key={size} value={String(size)}>
+                    {t("common.rows", { size })}
+                  </SelectItem>
               ))}
             </SelectContent>
           </Select>

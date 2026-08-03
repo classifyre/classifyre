@@ -1,11 +1,11 @@
 "use client";
 
-import { useNsPath } from "@/lib/ns-path";
 import * as React from "react";
 import {
   ArrowDownWideNarrow,
   ChevronDown,
   ChevronRight,
+  ExternalLink,
   Link2,
   RotateCw,
   Search,
@@ -23,6 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@workspace/ui/components/select";
+import { useDetailLink } from "@/hooks/use-detail-link";
 import { useTranslation } from "@/hooks/use-translation";
 
 /** Rows rendered per "show more" batch. */
@@ -87,7 +88,7 @@ export function FingerprintsConnections({
    *  or null when both dropdowns are back on "All". */
   onFilterFocus?: (assetIds: string[] | null) => void;
 }) {
-  const nsPath = useNsPath();
+  const detailLink = useDetailLink();
   const { t } = useTranslation();
   const [expanded, setExpanded] = React.useState<Set<string>>(new Set());
   const [search, setSearch] = React.useState("");
@@ -392,6 +393,7 @@ export function FingerprintsConnections({
                   focusedPair &&
                   ((focusedPair[0] === row.assetA.id && focusedPair[1] === row.assetB.id) ||
                     (focusedPair[0] === row.assetB.id && focusedPair[1] === row.assetA.id));
+                const isExpanded = expanded.has(row.key);
                 return (
                   <li
                     key={row.key}
@@ -399,88 +401,92 @@ export function FingerprintsConnections({
                       isFocused ? "border-foreground" : "border-border"
                     }`}
                   >
-                    <button
-                      type="button"
-                      onClick={() => focusRow(row)}
-                      className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-muted/50"
-                    >
-                      {expanded.has(row.key) ? (
-                        <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                      ) : (
-                        <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                      )}
-                      {/* The two assets as a vertical list — no overlap at any width. */}
-                      <span className="flex min-w-0 flex-1 flex-col gap-0.5 text-sm">
-                        <span className="truncate font-medium" title={row.assetA.label}>
-                          {row.assetA.label}
-                        </span>
-                        <span className="truncate font-medium" title={row.assetB.label}>
-                          {row.assetB.label}
-                        </span>
-                      </span>
-                      <Badge
-                        variant={row.matchPercent != null ? "default" : "outline"}
-                        className="shrink-0 text-[10px]"
-                      >
-                        {row.matchPercent != null
-                          ? t("correlation.connections.matchPercent", {
-                              count: String(row.matchPercent),
-                            })
-                          : t("correlation.connections.noScore")}
-                      </Badge>
-                    </button>
-
-                    {expanded.has(row.key) && (
-                      <div className="space-y-2 border-t border-border/60 px-3 py-2">
-                        <Badge variant="secondary" className="text-[10px]">
-                          {t("correlation.connections.sharedCount", {
-                            count: String(row.sharedValues.length),
-                          })}
-                        </Badge>
-                        <ul className="max-h-[30vh] space-y-1 overflow-y-auto">
-                          {row.sharedValues.map((v) => (
-                            <li
-                              key={v.id}
-                              className="flex items-center gap-2 rounded-[3px] px-1.5 py-1 text-xs"
+                    {/* The whole header focuses the pair on the graph, but the
+                        two asset names stay real links to their documents. A
+                        full-bleed button underneath the content (rather than
+                        wrapping it) keeps the row clickable without nesting
+                        anchors inside a button. */}
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => focusRow(row)}
+                        aria-expanded={isExpanded}
+                        aria-label={t("correlation.connections.matchPercent", {
+                          count: String(row.matchPercent ?? 0),
+                        })}
+                        className="absolute inset-0 rounded-[2px] hover:bg-muted/50 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-foreground"
+                      />
+                      <div className="pointer-events-none relative flex items-center gap-2 px-3 py-2">
+                        {isExpanded ? (
+                          <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                        ) : (
+                          <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                        )}
+                        {/* The two assets as a vertical list — no overlap at any width. */}
+                        <span className="flex min-w-0 flex-1 flex-col gap-0.5 text-sm">
+                          {[row.assetA, row.assetB].map((asset) => (
+                            <a
+                              key={asset.id}
+                              {...detailLink(`/assets/${asset.id}`)}
+                              className="pointer-events-auto truncate font-medium underline-offset-2 hover:underline"
+                              title={`${asset.label} — ${t("correlation.connections.openAsset")}`}
                             >
-                              <span className="shrink-0 font-mono text-[9px] uppercase text-muted-foreground">
-                                {v.label}
-                              </span>
-                              <span
-                                className="min-w-0 flex-1 truncate font-mono"
-                                title={v.value}
+                              {asset.label}
+                            </a>
+                          ))}
+                        </span>
+                        <Badge
+                          variant={row.matchPercent != null ? "default" : "outline"}
+                          className="shrink-0 text-[10px]"
+                        >
+                          {row.matchPercent != null
+                            ? t("correlation.connections.matchPercent", {
+                                count: String(row.matchPercent),
+                              })
+                            : t("correlation.connections.noScore")}
+                        </Badge>
+                      </div>
+                    </div>
+
+                    {isExpanded && (
+                      <div className="space-y-2 border-t border-border/60 px-3 py-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Badge variant="secondary" className="text-[10px]">
+                            {t("correlation.connections.sharedCount", {
+                              count: String(row.sharedValues.length),
+                            })}
+                          </Badge>
+                          <span className="text-[10px] text-muted-foreground">
+                            {t("correlation.connections.sharedValuesHint")}
+                          </span>
+                        </div>
+                        {/* Each shared value IS a finding — link straight to it. */}
+                        <ul className="max-h-[30vh] space-y-0.5 overflow-y-auto">
+                          {row.sharedValues.map((v) => (
+                            <li key={v.id}>
+                              <a
+                                {...detailLink(`/findings/${v.id}`)}
+                                className="group flex items-center gap-2 rounded-[3px] px-1.5 py-1 text-xs transition-colors hover:bg-muted"
+                                title={`${v.value} — ${t("correlation.connections.openFinding")}`}
                               >
-                                {v.value}
-                              </span>
-                              {v.fanOut > 2 && (
-                                <span className="shrink-0 text-[10px] text-muted-foreground">
-                                  {t("correlation.connections.fanOut", {
-                                    count: String(v.fanOut),
-                                  })}
+                                <span className="shrink-0 font-mono text-[9px] uppercase text-muted-foreground">
+                                  {v.label}
                                 </span>
-                              )}
+                                <span className="min-w-0 flex-1 truncate font-mono underline-offset-2 group-hover:underline">
+                                  {v.value}
+                                </span>
+                                {v.fanOut > 2 && (
+                                  <span className="shrink-0 text-[10px] text-muted-foreground">
+                                    {t("correlation.connections.fanOut", {
+                                      count: String(v.fanOut),
+                                    })}
+                                  </span>
+                                )}
+                                <ExternalLink className="h-3 w-3 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+                              </a>
                             </li>
                           ))}
                         </ul>
-                        <div className="flex items-center gap-2 pt-1">
-                          <a
-                            href={nsPath(`/assets/${row.assetA.id}`)}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="text-[11px] text-muted-foreground underline-offset-2 hover:underline"
-                          >
-                            {row.assetA.label}
-                          </a>
-                          <span className="text-[11px] text-muted-foreground">·</span>
-                          <a
-                            href={nsPath(`/assets/${row.assetB.id}`)}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="text-[11px] text-muted-foreground underline-offset-2 hover:underline"
-                          >
-                            {row.assetB.label}
-                          </a>
-                        </div>
                       </div>
                     )}
                   </li>

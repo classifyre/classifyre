@@ -794,6 +794,14 @@ postgres:
       # -- reclaim policy otherwise deletes the underlying volume's data along
       # -- with the PVC on `helm uninstall`.
       keepOnUninstall: false
+    # -- Size of the tmpfs mounted at /dev/shm. Parallel query workers allocate
+    # -- their exchange buffers there, and the container runtime default (64Mi)
+    # -- is far too small: a parallel aggregate over a large table fails with
+    # -- `could not resize shared memory segment ... No space left on device`
+    # -- (SQLSTATE 53100). Counts against the pod's memory limit, so keep it
+    # -- comfortably below postgres.embedded.resources.limits.memory. Set to ""
+    # -- to fall back to the runtime default.
+    shmSize: 1Gi
     # -- postgresql.conf parameters passed to the server as `-c key=value` container
     # -- args. Tune these for the workload rather than raising Postgres resource
     # -- limits (see postgres.embedded.resources) — shared_buffers/work_mem control
@@ -926,9 +934,9 @@ telemetry:
 dataTransfer:
   # -- Minutes an archive is kept after its export finishes, then it is deleted.
   ttlMinutes: 60
-  # -- Largest archive accepted on import, in MB. Bounded by the API's
-  # -- multipart upload limit, so raising this alone has no effect.
-  maxSizeMb: 50
+  # -- Largest archive accepted on import, in MB. `0` (the default) means no
+  # -- limit; set a positive value only if you want to cap uploads.
+  maxSizeMb: 0
 
 objectStorage:
   # -- Set to true to enable S3-compatible object storage.

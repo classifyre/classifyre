@@ -15123,6 +15123,14 @@
           "sourceType": {
             "type": "string"
           },
+          "sourceId": {
+            "type": "string",
+            "description": "For asset nodes: parent source id"
+          },
+          "sourceName": {
+            "type": "string",
+            "description": "For asset nodes: the operator-facing name of the parent source (not its connector type)"
+          },
           "severity": {
             "type": "string"
           },

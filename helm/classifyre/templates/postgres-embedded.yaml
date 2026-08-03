@@ -138,7 +138,20 @@ spec:
           volumeMounts:
             - name: postgres-data
               mountPath: /var/lib/postgresql
+            {{- if .Values.postgres.embedded.shmSize }}
+            - name: dshm
+              mountPath: /dev/shm
+            {{- end }}
       volumes:
+        {{- if .Values.postgres.embedded.shmSize }}
+        # Parallel query workers allocate their exchange buffers in /dev/shm.
+        # The container runtime's 64Mi default makes large parallel aggregates
+        # fail with SQLSTATE 53100 ("could not resize shared memory segment").
+        - name: dshm
+          emptyDir:
+            medium: Memory
+            sizeLimit: {{ .Values.postgres.embedded.shmSize }}
+        {{- end }}
         - name: postgres-data
           {{- if .Values.postgres.embedded.persistence.enabled }}
           persistentVolumeClaim:

@@ -507,7 +507,12 @@ export default function FindingDetailPage() {
       </Card>
 
       {/* ── Similar findings (semantic neighbours) ── */}
-      <SimilarFindingsCard findingId={finding.id} />
+      <SimilarFindingsCard
+        findingId={finding.id}
+        matchedContent={finding.matchedContent}
+        assetId={finding.asset?.id || finding.assetId}
+        assetName={assetLabel}
+      />
 
       {/* ── Matched content ── */}
       <MatchedContentBlock
