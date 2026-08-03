@@ -25,7 +25,7 @@ export function MissionRing() {
       viewBox="0 0 420 400"
       role="img"
       aria-label="Five Harness AI missions — inquiry, case, config, detector author, and dream — cycling around a shared memory and system brief, with the Classifyre investigator at the center"
-      className="h-auto w-full max-w-105"
+      className="h-auto w-full max-w-135"
     >
       {/* rotating dashed orbit */}
       <g className="cl-rotate-slow" style={{ transformOrigin: "210px 200px" }}>

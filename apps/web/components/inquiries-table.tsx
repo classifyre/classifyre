@@ -4,7 +4,13 @@ import { nsPath } from "@/lib/ns-path";
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { formatDate, formatRelative, formatShortUTC } from "@/lib/date";
-import { FolderOpen, FolderPlus, Loader2, Pencil, Sparkles } from "lucide-react";
+import {
+  FolderOpen,
+  FolderPlus,
+  Loader2,
+  Pencil,
+  Sparkles,
+} from "lucide-react";
 import { AiActorBadge, isAiActor } from "@/components/ai-actor-badge";
 import {
   api,
@@ -45,6 +51,8 @@ import {
   TooltipTrigger,
 } from "@workspace/ui/components";
 import { Filter, Search } from "lucide-react";
+import { useTranslation } from "@/hooks/use-translation";
+import type { TranslationKey } from "@/i18n";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -63,24 +71,30 @@ function getPageItems(current: number, total: number) {
   return Array.from(pages).sort((a, b) => a - b);
 }
 
-function inquiryScope(q: InquiryResponseDto): string {
+function inquiryScope(
+  q: InquiryResponseDto,
+  t: (key: TranslationKey, params?: Record<string, string | number>) => string,
+): string {
   const sources = q.matchAllSources
-    ? "all sources"
-    : `${q.sourceIds.length} source${q.sourceIds.length === 1 ? "" : "s"}`;
+    ? t("investigations.inquiries.scopeAllSources")
+    : t("investigations.inquiries.scopeSources", { count: q.sourceIds.length });
   const matcherCount =
     q.detectorTypes.length +
     q.customDetectorKeys.length +
     q.findingTypes.length +
     q.findingTypeRegex.length;
-  return matcherCount === 0
-    ? `${sources} · any finding`
-    : `${sources} · ${matcherCount} matcher${matcherCount === 1 ? "" : "s"}`;
+  const matchers =
+    matcherCount === 0
+      ? t("investigations.inquiries.scopeAnyFinding")
+      : t("investigations.inquiries.scopeMatchers", { count: matcherCount });
+  return `${sources} · ${matchers}`;
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export function InquiriesTable() {
   const router = useRouter();
+  const { t } = useTranslation();
 
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
@@ -147,7 +161,7 @@ export function InquiriesTable() {
         setError(
           loadError instanceof Error
             ? loadError.message
-            : "Failed to load inquiries",
+            : t("investigations.inquiries.loadFailed"),
         );
         setData([]);
         setTotal(0);
@@ -167,7 +181,10 @@ export function InquiriesTable() {
 
   // ── Derived ───────────────────────────────────────────────────────────────
 
-  const totalPages = Math.max(1, Math.ceil(total / Math.max(1, resolvedPageSize)));
+  const totalPages = Math.max(
+    1,
+    Math.ceil(total / Math.max(1, resolvedPageSize)),
+  );
   const clampedPage = Math.min(page, totalPages);
   const canPrev = clampedPage > 1;
   const canNext = clampedPage < totalPages;
@@ -187,19 +204,21 @@ export function InquiriesTable() {
           <Input
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
-            placeholder="Search inquiries…"
+            placeholder={t("investigations.inquiries.searchPlaceholder")}
             className="h-9 pl-9 border-2 border-border rounded-[4px]"
           />
         </div>
 
         <MultiSelect values={statuses} onValuesChange={setStatuses}>
           <MultiSelectTrigger className="h-9 w-[180px] border-2 border-border rounded-[4px]">
-            <MultiSelectValue placeholder="Status" />
+            <MultiSelectValue
+              placeholder={t("investigations.inquiries.statusPlaceholder")}
+            />
           </MultiSelectTrigger>
           <MultiSelectContent
             search={{
-              placeholder: "Search statuses…",
-              emptyMessage: "No statuses found",
+              placeholder: t("investigations.inquiries.searchStatuses"),
+              emptyMessage: t("investigations.inquiries.noStatusesFound"),
             }}
           >
             <MultiSelectGroup>
@@ -215,7 +234,7 @@ export function InquiriesTable() {
         {isFilterLoading && (
           <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            Updating…
+            {t("investigations.inquiries.updating")}
           </span>
         )}
       </div>
@@ -231,16 +250,18 @@ export function InquiriesTable() {
         {showInitialLoading ? (
           <div className="flex items-center justify-center py-12 text-muted-foreground">
             <Loader2 className="h-5 w-5 animate-spin" />
-            <span className="ml-2 text-sm">Loading inquiries…</span>
+            <span className="ml-2 text-sm">
+              {t("investigations.inquiries.loading")}
+            </span>
           </div>
         ) : !hasRows ? (
           <EmptyState
             icon={search || statuses.length > 0 ? Filter : Sparkles}
-            title="No inquiries found"
+            title={t("investigations.inquiries.emptyTitle")}
             description={
               search
-                ? "No inquiries match the current filters."
-                : "Create an inquiry to start monitoring findings across your sources."
+                ? t("investigations.inquiries.emptyFiltered")
+                : t("investigations.inquiries.emptyDescription")
             }
           />
         ) : (
@@ -252,45 +273,51 @@ export function InquiriesTable() {
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <span className="cursor-default text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-                          Inquiry
+                          {t("investigations.inquiries.colInquiry")}
                         </span>
                       </TooltipTrigger>
-                      <TooltipContent>The saved question and its scope</TooltipContent>
+                      <TooltipContent>
+                        {t("investigations.inquiries.colInquiryHint")}
+                      </TooltipContent>
                     </Tooltip>
                   </TableHead>
                   <TableHead className="bg-white/95 dark:bg-card/95 text-right">
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <span className="cursor-default text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-                          Matches
+                          {t("investigations.inquiries.colMatches")}
                         </span>
                       </TooltipTrigger>
-                      <TooltipContent>Findings currently matching this inquiry</TooltipContent>
+                      <TooltipContent>
+                        {t("investigations.inquiries.colMatchesHint")}
+                      </TooltipContent>
                     </Tooltip>
                   </TableHead>
                   <TableHead className="bg-white/95 dark:bg-card/95">
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <span className="cursor-default text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-                          Cases
+                          {t("investigations.inquiries.colCases")}
                         </span>
                       </TooltipTrigger>
-                      <TooltipContent>Cases driven by this inquiry</TooltipContent>
+                      <TooltipContent>
+                        {t("investigations.inquiries.colCasesHint")}
+                      </TooltipContent>
                     </Tooltip>
                   </TableHead>
                   <TableHead className="bg-white/95 dark:bg-card/95">
                     <span className="cursor-default text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-                      Status
+                      {t("common.status")}
                     </span>
                   </TableHead>
                   <TableHead className="bg-white/95 dark:bg-card/95">
                     <span className="cursor-default text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-                      Updated
+                      {t("common.updated")}
                     </span>
                   </TableHead>
                   <TableHead className="bg-white/95 dark:bg-card/95 text-right">
                     <span className="cursor-default text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-                      Actions
+                      {t("common.actions")}
                     </span>
                   </TableHead>
                 </TableRow>
@@ -302,16 +329,22 @@ export function InquiriesTable() {
                     <Fragment key={q.id}>
                       <TableRow
                         className={`cursor-pointer hover:bg-muted/40 ${archived ? "opacity-60" : ""}`}
-                        onClick={() => router.push(nsPath(`/investigations/inquiries/${q.id}`))}
+                        onClick={() =>
+                          router.push(
+                            nsPath(`/investigations/inquiries/${q.id}`),
+                          )
+                        }
                       >
                         <TableCell className="max-w-[420px]">
                           <div className="flex items-center gap-2">
                             <Sparkles className="h-3.5 w-3.5 shrink-0 text-[color:var(--color-amber-600,#d97706)]" />
-                            <span className="truncate font-medium">{q.title}</span>
+                            <span className="truncate font-medium">
+                              {q.title}
+                            </span>
                             {isAiActor(q.createdBy) && <AiActorBadge />}
                           </div>
                           <p className="text-muted-foreground mt-0.5 pl-[22px] text-[11px]">
-                            {inquiryScope(q)}
+                            {inquiryScope(q, t)}
                           </p>
                         </TableCell>
                         <TableCell className="text-right">
@@ -321,7 +354,9 @@ export function InquiriesTable() {
                                 variant="outline"
                                 className="border-[color:var(--color-amber-600,#d97706)]/50 text-[10px] text-[color:var(--color-amber-600,#d97706)]"
                               >
-                                {q.newMatchCount} new
+                                {t("investigations.inquiries.newCount", {
+                                  count: q.newMatchCount,
+                                })}
                               </Badge>
                             )}
                             <span className="font-mono text-sm tabular-nums">
@@ -331,7 +366,9 @@ export function InquiriesTable() {
                         </TableCell>
                         <TableCell>
                           {q.cases.length === 0 ? (
-                            <span className="text-xs text-muted-foreground">—</span>
+                            <span className="text-xs text-muted-foreground">
+                              —
+                            </span>
                           ) : (
                             <Button
                               size="sm"
@@ -350,8 +387,10 @@ export function InquiriesTable() {
                             >
                               <FolderOpen className="h-3.5 w-3.5" />
                               {q.cases.length === 1
-                                ? "Case"
-                                : `${q.cases.length} cases`}
+                                ? t("investigations.inquiries.case")
+                                : t("investigations.inquiries.casesCount", {
+                                    count: q.cases.length,
+                                  })}
                             </Button>
                           )}
                         </TableCell>
@@ -360,7 +399,9 @@ export function InquiriesTable() {
                             variant="outline"
                             className="text-[10px] uppercase tracking-wide"
                           >
-                            {archived ? "archived" : "active"}
+                            {archived
+                              ? t("investigations.inquiries.statusArchived")
+                              : t("investigations.inquiries.statusActive")}
                           </Badge>
                         </TableCell>
                         <TableCell>
@@ -389,7 +430,9 @@ export function InquiriesTable() {
                                     size="icon"
                                     variant="ghost"
                                     className="h-8 w-8"
-                                    aria-label="Open case from inquiry"
+                                    aria-label={t(
+                                      "investigations.inquiries.openCaseFromInquiry",
+                                    )}
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       router.push(
@@ -402,7 +445,9 @@ export function InquiriesTable() {
                                     <FolderPlus className="h-3.5 w-3.5" />
                                   </Button>
                                 </TooltipTrigger>
-                                <TooltipContent>Open case</TooltipContent>
+                                <TooltipContent>
+                                  {t("investigations.inquiries.openCase")}
+                                </TooltipContent>
                               </Tooltip>
                               <Tooltip>
                                 <TooltipTrigger asChild>
@@ -410,7 +455,9 @@ export function InquiriesTable() {
                                     size="icon"
                                     variant="ghost"
                                     className="h-8 w-8"
-                                    aria-label="Edit inquiry"
+                                    aria-label={t(
+                                      "investigations.inquiries.editInquiry",
+                                    )}
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       router.push(
@@ -423,7 +470,9 @@ export function InquiriesTable() {
                                     <Pencil className="h-3.5 w-3.5" />
                                   </Button>
                                 </TooltipTrigger>
-                                <TooltipContent>Edit query</TooltipContent>
+                                <TooltipContent>
+                                  {t("investigations.inquiries.editQuery")}
+                                </TooltipContent>
                               </Tooltip>
                             </span>
                           )}
@@ -441,7 +490,7 @@ export function InquiriesTable() {
           <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-[4px] bg-background/45 backdrop-blur-[1px]">
             <div className="inline-flex items-center gap-2 text-xs text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />
-              Updating…
+              {t("investigations.inquiries.updating")}
             </div>
           </div>
         )}
@@ -450,23 +499,25 @@ export function InquiriesTable() {
       {/* ── Footer: page size + pagination ── */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-t pt-3">
         <div className="flex items-center gap-2">
-          <span className="text-xs text-muted-foreground">Rows per page</span>
+          <span className="text-xs text-muted-foreground">
+            {t("common.rowsPerPage")}
+          </span>
           <Select value={pageSize} onValueChange={setPageSize}>
             <SelectTrigger className="h-8 w-[130px] border-2 border-border rounded-[4px]">
-              <SelectValue placeholder="Rows per page" />
+              <SelectValue placeholder={t("common.rowsPerPage")} />
             </SelectTrigger>
             <SelectContent>
               {PAGE_SIZE_OPTIONS.map((size) => (
                 <SelectItem key={size} value={String(size)}>
-                  {size} rows
+                  {t("common.rows", { size })}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
           <span className="text-xs text-muted-foreground">
             {total > 0
-              ? `${((clampedPage - 1) * resolvedPageSize + 1).toLocaleString()}–${Math.min(clampedPage * resolvedPageSize, total).toLocaleString()} of ${total.toLocaleString()}`
-              : "0 inquiries"}
+              ? `${((clampedPage - 1) * resolvedPageSize + 1).toLocaleString()}–${Math.min(clampedPage * resolvedPageSize, total).toLocaleString()} ${t("common.of")} ${total.toLocaleString()}`
+              : t("investigations.inquiries.noInquiries")}
           </span>
         </div>
 
@@ -475,13 +526,15 @@ export function InquiriesTable() {
             <PaginationContent>
               <PaginationItem>
                 <PaginationPrevious
-                  label="Previous"
+                  label={t("common.pagination.previous")}
                   href="#"
                   onClick={(e) => {
                     e.preventDefault();
                     if (canPrev) setPage(clampedPage - 1);
                   }}
-                  className={!canPrev ? "pointer-events-none opacity-50" : undefined}
+                  className={
+                    !canPrev ? "pointer-events-none opacity-50" : undefined
+                  }
                 />
               </PaginationItem>
               {pageItems.map((pageNumber, index) => {
@@ -491,7 +544,9 @@ export function InquiriesTable() {
                   <Fragment key={`page-group-${pageNumber}`}>
                     {showEllipsis && (
                       <PaginationItem>
-                        <PaginationEllipsis label="More pages" />
+                        <PaginationEllipsis
+                          label={t("common.pagination.morePages")}
+                        />
                       </PaginationItem>
                     )}
                     <PaginationItem>
@@ -511,13 +566,15 @@ export function InquiriesTable() {
               })}
               <PaginationItem>
                 <PaginationNext
-                  label="Next"
+                  label={t("common.pagination.next")}
                   href="#"
                   onClick={(e) => {
                     e.preventDefault();
                     if (canNext) setPage(clampedPage + 1);
                   }}
-                  className={!canNext ? "pointer-events-none opacity-50" : undefined}
+                  className={
+                    !canNext ? "pointer-events-none opacity-50" : undefined
+                  }
                 />
               </PaginationItem>
             </PaginationContent>

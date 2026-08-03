@@ -1,8 +1,7 @@
 "use client";
 
-import { useNsPath } from "@/lib/ns-path";
 import * as React from "react";
-import { ExternalLink, Layers } from "lucide-react";
+import { Database, ExternalLink, Layers } from "lucide-react";
 import type { GraphNodeDto } from "@workspace/api-client";
 import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
@@ -20,6 +19,8 @@ import {
   type GraphSelection,
 } from "./graph-explorer/graph-types";
 import type { BundleDetail } from "./fingerprints-graph";
+import { useDetailLink } from "@/hooks/use-detail-link";
+import { useSourceTypeLabel } from "@/hooks/use-source-type-label";
 import { useTranslation } from "@/hooks/use-translation";
 
 /**
@@ -49,7 +50,8 @@ export function FingerprintsGraphSelectionRail({
   focusCluster: (meta: ClusterMeta) => void;
   assetLabel: (id: string) => string;
 }) {
-  const nsPath = useNsPath();
+  const detailLink = useDetailLink();
+  const sourceTypeLabel = useSourceTypeLabel();
   const { t } = useTranslation();
   if (!selection) return null;
 
@@ -76,27 +78,44 @@ export function FingerprintsGraphSelectionRail({
           </p>
           <div className="flex flex-wrap gap-1">
             {selectedDetail.assetIds.map((id) => (
-              <a key={id} href={nsPath(`/assets/${id}`)} target="_blank" rel="noreferrer">
-                <Badge variant="secondary" className="max-w-[220px] truncate">
+              <a
+                key={id}
+                {...detailLink(`/assets/${id}`)}
+                title={t("graphExplorer.openDocument")}
+              >
+                <Badge
+                  variant="secondary"
+                  className="max-w-[220px] truncate transition-colors hover:bg-foreground hover:text-background"
+                >
                   {assetLabel(id)}
                 </Badge>
               </a>
             ))}
           </div>
-          <div className="max-h-[40vh] space-y-1 overflow-y-auto border-t border-border/60 pt-2">
-            {selectedDetail.values.map((v, i) => (
-              <div
-                key={`${v.value}-${i}`}
-                className="flex items-center gap-2 rounded-[3px] px-1.5 py-1 text-xs"
-              >
-                <span className="shrink-0 font-mono text-[9px] uppercase text-muted-foreground">
-                  {v.label}
-                </span>
-                <span className="truncate font-mono" title={v.value}>
-                  {v.value}
-                </span>
-              </div>
-            ))}
+          <div className="space-y-1 border-t border-border/60 pt-2">
+            <p className="font-mono text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+              {t("graphExplorer.sharedValues")}
+            </p>
+            {/* Every shared value is a finding; the row links to its page. */}
+            <ul className="max-h-[40vh] space-y-0.5 overflow-y-auto">
+              {selectedDetail.values.map((v, i) => (
+                <li key={`${v.id}-${i}`}>
+                  <a
+                    {...detailLink(`/findings/${v.id}`)}
+                    className="group flex items-center gap-2 rounded-[3px] px-1.5 py-1 text-xs transition-colors hover:bg-muted"
+                    title={`${v.value} — ${t("graphExplorer.openFinding")}`}
+                  >
+                    <span className="shrink-0 font-mono text-[9px] uppercase text-muted-foreground">
+                      {v.label}
+                    </span>
+                    <span className="min-w-0 flex-1 truncate font-mono underline-offset-2 group-hover:underline">
+                      {v.value}
+                    </span>
+                    <ExternalLink className="h-3 w-3 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+                  </a>
+                </li>
+              ))}
+            </ul>
           </div>
         </div>
       ) : selectedNode && isClusterNode(selectedNode) ? (
@@ -117,12 +136,28 @@ export function FingerprintsGraphSelectionRail({
           <p className="break-words font-mono text-sm font-semibold">
             {selectedNode.label}
           </p>
+          {/* Which source this document came from, by its real name. */}
+          {selectedNode.sourceName && (
+            <p className="font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
+              {[selectedNode.sourceName, sourceTypeLabel(selectedNode.sourceType)]
+                .filter(Boolean)
+                .join(" · ")}
+            </p>
+          )}
           <Button size="sm" variant="outline" asChild className="w-full">
-            <a href={nsPath(`/assets/${selectedNode.id}`)} target="_blank" rel="noreferrer">
+            <a {...detailLink(`/assets/${selectedNode.id}`)}>
               <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
               {t("correlation.fingerprints.openAsset")}
             </a>
           </Button>
+          {selectedNode.sourceId && (
+            <Button size="sm" variant="outline" asChild className="w-full">
+              <a {...detailLink(`/sources/${selectedNode.sourceId}`)}>
+                <Database className="mr-1.5 h-3.5 w-3.5" />
+                {t("graphExplorer.openSource")}
+              </a>
+            </Button>
+          )}
         </div>
       ) : selectedNode ? (
         <div className="space-y-3">
@@ -135,6 +170,15 @@ export function FingerprintsGraphSelectionRail({
           <p className="text-xs text-muted-foreground">
             {t("correlation.fingerprints.sharedValueHint")}
           </p>
+          {/* Bundle stand-ins carry no finding row of their own. */}
+          {selectedNode.detectorType !== "BUNDLE" && (
+            <Button size="sm" variant="outline" asChild className="w-full">
+              <a {...detailLink(`/findings/${selectedNode.id}`)}>
+                <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
+                {t("graphExplorer.openFinding")}
+              </a>
+            </Button>
+          )}
         </div>
       ) : null}
     </div>

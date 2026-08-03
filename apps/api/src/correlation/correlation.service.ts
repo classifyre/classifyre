@@ -81,6 +81,9 @@ const ASSET_NODE_SELECT = {
   assetType: true,
   sourceType: true,
   sourceId: true,
+  // The operator-facing source name, so the UI can label clusters with the
+  // real source ("Enron Email Archive") instead of its connector enum.
+  source: { select: { name: true } },
 } satisfies Prisma.AssetSelect;
 
 /**
@@ -1783,6 +1786,7 @@ function assetNode(
     assetType: string;
     sourceType: string;
     sourceId: string;
+    source?: { name: string } | null;
   },
   scopeSourceId?: string,
 ): GraphNodeDto {
@@ -1793,6 +1797,8 @@ function assetNode(
     depth: 0,
     assetType: a.assetType,
     sourceType: a.sourceType,
+    sourceId: a.sourceId,
+    sourceName: a.source?.name || undefined,
     // Flag assets outside the scoping source so the UI can mark/expand them.
     status:
       scopeSourceId && a.sourceId !== scopeSourceId ? 'external' : undefined,

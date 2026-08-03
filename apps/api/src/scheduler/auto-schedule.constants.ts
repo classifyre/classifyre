@@ -71,10 +71,18 @@ export const CIRCUIT_BREAK_FAILURES = 8;
 
 // ── Global bounds ────────────────────────────────────────────────────────────
 /**
- * How many auto-scheduled scans may be in flight per namespace. The
- * NamespaceJobConcurrencyService caps worker slots globally, but nothing
- * stopped one namespace from filling every one of them with its own catch-up
- * runs — this is the per-tenant fair share.
+ * How many scans may be in flight before the adaptive scheduler stops starting
+ * more.
+ *
+ * A ceiling on TOTAL concurrent scans, not on the scheduler's own share: a cron
+ * schedule an operator set, a manual run and an agent's verification re-scan
+ * all consume the same capacity, so all of them count. Adaptive scanning is the
+ * opportunistic one and yields to the rest — a source sweeping itself faster is
+ * never worth delaying a schedule someone chose.
+ *
+ * Distinct from `MAX_CONCURRENT_RUNNERS`, which is the hard instance-wide cap
+ * enforced in CliRunnerService (unset by default) and queues rather than
+ * refuses. This one decides whether to ask at all.
  */
 export const DEFAULT_MAX_CONCURRENT_AUTO_SCANS = 2;
 

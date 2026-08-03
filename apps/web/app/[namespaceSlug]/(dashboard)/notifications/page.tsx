@@ -363,9 +363,6 @@ export default function NotificationsPage() {
             {t("notifications.title")}
           </h1>
         </div>
-        <p className="text-muted-foreground">
-          {t("notifications.description")}
-        </p>
       </div>
 
       <div className="relative grid gap-3 sm:grid-cols-2 xl:grid-cols-4">

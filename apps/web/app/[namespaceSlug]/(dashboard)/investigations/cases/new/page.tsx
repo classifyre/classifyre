@@ -226,9 +226,6 @@ function NewCasePageInner() {
           <ArrowLeft className="h-4 w-4" /> Back
         </Button>
         <h1 className="font-serif text-2xl font-black uppercase tracking-[0.03em]">{t("investigations.newCase.title")}</h1>
-        <p className="text-muted-foreground mt-1 max-w-2xl text-sm">
-          {t("investigations.newCase.description")}
-        </p>
       </div>
 
       <div className="grid max-w-6xl gap-6 lg:grid-cols-[360px_1fr]">

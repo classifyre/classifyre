@@ -20,11 +20,17 @@ import { getAllDetectorDocs } from "@workspace/schemas/detector-docs";
 import { getAllSourceDocs } from "@workspace/schemas/source-docs";
 
 import { normalizeSiteUrl, safeJsonLdStringify } from "@/lib/seo";
-import { AssistantDemo } from "@/components/assistant-demo";
+import {
+  AppleLogo,
+  HelmLogo,
+  KubernetesLogo,
+  LinuxLogo,
+  WindowsLogo,
+} from "@/components/brand-logos";
 import { CaseGraph } from "@/components/case-graph";
-import { HarnessSimulation } from "@/components/harness-simulation";
+import { EvidenceBoard } from "@/components/evidence-board";
+import { Illustration, type IllustrationName } from "@/components/illustration";
 import { MissionRing } from "@/components/mission-ring";
-import { PipelineStory } from "@/components/pipeline-story";
 import { Reveal } from "@/components/reveal";
 
 import "./landing.css";
@@ -32,21 +38,21 @@ import "./landing.css";
 export const metadata: Metadata = {
   title: "The Open-Source Investigation Platform for Your Data",
   description:
-    "Classifyre turns raw findings into real investigations. Run the full product as a desktop app or deploy it with Helm at any scale, keep every client, region, or business unit in its own sealed workspace, connect the systems you already run, and let semantic ranking float the evidence that matters while Harness AI opens inquiries, builds cases, tunes sources, and authors detectors with every decision explained.",
+    "Classifyre scans the systems you already run, detects secrets, PII, and the signals you define, and works them like a detective — standing inquiries, ranked evidence, cases, and an AI autopilot. Free desktop app for macOS, Windows, and Linux, or a Helm chart on Kubernetes.",
   alternates: {
     canonical: "/",
   },
   openGraph: {
     title: "Classifyre | Every leak leaves a trail",
     description:
-      "An open-source investigation platform: detectors surface evidence, semantic ranking sorts signal from boilerplate, isolated workspaces keep every investigation sealed in its own database schema, and Harness AI opens inquiries, builds cases, drafts hypotheses, and authors detectors with a full audit trail. Available for desktop and Kubernetes with Helm.",
+      "An open-source investigation platform. Detectors surface evidence, cases turn it into an investigation, and an AI autopilot works between scans. Runs on your laptop or your Kubernetes cluster.",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
     title: "Classifyre | Every leak leaves a trail",
     description:
-      "Open-source core, importance-ranked evidence with written reasons, isolated workspaces on one instance, Harness AI, custom detectors from regex to any model, and one product that runs on desktop or Kubernetes.",
+      "Open-source data investigation: detectors, ranked evidence, cases, and an AI autopilot. Desktop app or Helm chart.",
   },
 };
 
@@ -56,75 +62,138 @@ const sourceEntries = Object.keys(SOURCE_TYPE_CATALOG_META).map((type) => ({
 }));
 
 const marqueeEntries = [...sourceEntries, ...sourceEntries];
+
 const desktopDownloadUrl =
   "https://github.com/classifyre/classifyre/releases/latest";
+const demoUrl = "https://demo.classifyre.com/";
+const enterpriseContactEmail = "contact@classifyre.com";
+
 const helmInstallCommand = [
   "helm install classifyre \\",
   "  oci://registry-1.docker.io/classifyre/classifyre-core \\",
   `  --version ${softwareVersion}`,
 ];
-const helmDocsUrl = "https://docs.classifyre.com/deployment/kubernetes/";
-const enterpriseContactEmail = "contact@classifyre.com";
 
-const desktopDownloads = [
-  { os: "macOS", detail: "Apple Silicon" },
-  { os: "Windows", detail: "x64 installer" },
-  { os: "Linux", detail: "deb · rpm — x64 & arm64" },
+/* Deep content lives in the docs site — the landing page only points at it. */
+const docs = {
+  root: "https://docs.classifyre.com/",
+  howItWorks: "https://docs.classifyre.com/how-it-works/",
+  ranking: "https://docs.classifyre.com/how-it-works/ranking-and-semantics/",
+  workspaces: "https://docs.classifyre.com/how-it-works/workspaces/",
+  autopilot: "https://docs.classifyre.com/how-it-works/autopilot/",
+  customDetectors: "https://docs.classifyre.com/detectors/custom-detectors/",
+  kubernetes: "https://docs.classifyre.com/deployment/kubernetes/",
+} as const;
+
+const desktopPlatforms = [
+  { os: "macOS", detail: "Apple Silicon", Logo: AppleLogo },
+  { os: "Windows", detail: "x64 installer", Logo: WindowsLogo },
+  { os: "Linux", detail: "deb · rpm", Logo: LinuxLogo },
 ] as const;
 
-const enterprisePillars = [
+/** The four things a finding turns into once it lands. */
+const investigationPillars: readonly {
+  illustration: IllustrationName;
+  title: string;
+  description: string;
+  /** Optional deep-dive on the docs site, for the parts that earn one. */
+  href?: string;
+  hrefLabel?: string;
+}[] = [
   {
-    marker: "GOVERNED WORKSPACES",
-    title: "Who may open which file",
+    illustration: "check-list",
+    title: "Inquiries",
     description:
-      "Workspaces are isolated in the open-source core. Enterprise decides who gets a key: SSO, roles, and per-workspace authorization — the layer the core deliberately leaves out.",
+      "Standing questions that keep matching new evidence, scan after scan.",
   },
   {
-    marker: "CUSTOM MODELS",
-    title: "Detection that speaks your language",
+    illustration: "finger-print",
+    title: "Fingerprints",
     description:
-      "Models tuned on your terminology and document shapes, so “account number” means what it means at your company — not on the internet.",
+      "The same value surfacing in two systems, connected by identity.",
   },
   {
-    marker: "CUSTOM DETECTORS",
-    title: "Built for your domain",
+    illustration: "dna",
+    title: "Ranked evidence",
     description:
-      "Detectors, sources, and multilanguage support engineered around the data your industry actually produces — with our engineers doing the building.",
+      "Importance from 0 to 1, with written reasons you can argue with.",
+    href: docs.ranking,
+    hrefLabel: "How ranking works",
   },
   {
-    marker: "GUIDED ROLLOUT",
-    title: "We stay in the room",
+    illustration: "binders",
+    title: "Cases",
     description:
-      "From first pilot to global deployment: architecture reviews, upgrade assistance across Kubernetes and OpenShift, and SLA-backed support.",
+      "Evidence, competing hypotheses, an owner, and a full audit trail.",
+  },
+];
+
+/** Custom detection, cheapest rung first. */
+const detectorLadder = [
+  {
+    tier: "01",
+    power: 1,
+    title: "Regex & rules",
+    description: "Deterministic, instant, explainable.",
+  },
+  {
+    tier: "02",
+    power: 2,
+    title: "Entities & classification",
+    description: "Zero-shot, using labels in your words.",
+  },
+  {
+    tier: "03",
+    power: 3,
+    title: "Any Hugging Face model",
+    description: "Open models for text and images.",
+  },
+  {
+    tier: "04",
+    power: 4,
+    title: "Bring any LLM",
+    description: "A prompt becomes a detector.",
   },
 ] as const;
 
-const workspacePillars = [
+/** One autopilot cycle, in the order the agents wake. */
+const harnessMissions: readonly {
+  step: string;
+  illustration: IllustrationName;
+  title: string;
+  description: string;
+}[] = [
   {
-    marker: "SEALED BY DEFAULT",
-    title: "A schema, not a filter",
-    description:
-      "Each workspace gets its own PostgreSQL schema — assets, findings, cases, detectors, embeddings. Not a tenant column somebody can forget to filter on. A wall.",
+    step: "01",
+    illustration: "check-list",
+    title: "Inquiry",
+    description: "Matches fresh findings to your standing questions.",
   },
   {
-    marker: "SEPARATE MEMORY",
-    title: "The autopilot forgets on purpose",
-    description:
-      "Harness AI keeps its own memory, system brief, and glossary per workspace. What it learns working the finance estate never bleeds into the support one.",
+    step: "02",
+    illustration: "binders",
+    title: "Case",
+    description: "Opens cases, drafts hypotheses, attaches evidence.",
   },
   {
-    marker: "ITS OWN ADDRESS",
-    title: "/acme-corp, all the way down",
-    description:
-      "The workspace lives in the URL — app, REST API, MCP endpoint, scan callbacks. Point an MCP client at one workspace and that is the only estate it can ever see.",
+    step: "03",
+    illustration: "settings",
+    title: "Config",
+    description: "Wakes up sources that ingest data but find nothing.",
   },
   {
-    marker: "SWITCH, NEVER MIX",
-    title: "One instance, many investigations",
-    description:
-      "A workspace per client, per region, per business unit — on a single deployment. Open one in seconds; retire it without touching another file.",
+    step: "04",
+    illustration: "probe",
+    title: "Detector author",
+    description: "Writes and dry-runs the detector you were missing.",
   },
-] as const;
+  {
+    step: "05",
+    illustration: "brush",
+    title: "Dream",
+    description: "Consolidates memory so the next cycle starts grounded.",
+  },
+];
 
 /** Illustrative cabinet: separate case files on one instance. */
 const workspaceFiles = [
@@ -160,244 +229,34 @@ const workspaceIsolation = [
   "MCP endpoint",
 ] as const;
 
-const investigationPillars = [
+const enterprisePillars = [
   {
-    marker: "INQUIRIES",
-    title: "Standing questions that keep watching",
+    marker: "Governed workspaces",
     description:
-      "Phrase what you actually want to know — “Are credentials leaking through CI logs?” — and the inquiry keeps matching new topics and findings against it, scan after scan.",
+      "SSO, roles, and per-workspace authorization — the layer the open-source core deliberately leaves out.",
   },
   {
-    marker: "CASES",
-    title: "Evidence with an owner and a lifecycle",
+    marker: "Custom models",
     description:
-      "Findings get attached to cases instead of dying in a CSV export. Each case carries its evidence, status, and history — and proposes its own next leads, ranked by importance.",
+      "Detection tuned on your terminology, so a term means what it means at your company.",
   },
   {
-    marker: "HYPOTHESES",
-    title: "Competing explanations, pinned to evidence",
+    marker: "Custom detectors",
     description:
-      "Work a case like an analyst: propose explanations, link each one to the findings that support or contradict it, and watch the graph confirm or kill it.",
+      "Detectors, sources, and multilanguage support built around your industry's data — by our engineers.",
   },
   {
-    marker: "COLLABORATION",
-    title: "Humans and AI in one audit trail",
+    marker: "Guided rollout",
     description:
-      "Teammates and the autopilot operate on the same cases, with every action — human or AI — attributed and explained in a shared record.",
+      "Architecture reviews, upgrade assistance across Kubernetes and OpenShift, SLA-backed support.",
   },
 ] as const;
 
-const semanticsPillars = [
-  {
-    marker: "IMPORTANCE 0–1",
-    title: "Ranked, not piled",
-    description:
-      "Every finding gets an importance score, and the docket sorts by it out of the box. Severity is one input weighted at ten percent — not the verdict.",
-  },
-  {
-    marker: "WRITTEN REASONS",
-    title: "A score you can argue with",
-    description:
-      "Each rank carries readable reasons — “recurs across systems”, “known test value”, “near-duplicate of 38”. No black-box number decides your morning.",
-  },
-  {
-    marker: "RECURRENCE IS A LEAD",
-    title: "Twice is a trail. Fifty times is wallpaper.",
-    description:
-      "The same value surfacing in a handful of systems, in different contexts, gets promoted as a lead. The same value in fifty assets is boilerplate — it sinks.",
-  },
-  {
-    marker: "SELF-CALIBRATING",
-    title: "It re-ranks itself",
-    description:
-      "Early findings score against an almost-empty space, so once the embedding queue drains, Classifyre recalibrates the whole corpus. Ranks stay honest as evidence grows.",
-  },
-] as const;
+/* ── Small building blocks ─────────────────────────────────────────────── */
 
-const semanticsFacts = [
-  {
-    marker: "ONE SEMANTIC SPACE",
-    title: "Meaning, indexed",
-    description:
-      "Every finding is embedded into a pgvector semantic space — a local model out of the box, or any OpenAI-compatible provider you configure. Similar findings and boilerplate clusters come for free.",
-  },
-  {
-    marker: "HYBRID SEARCH",
-    title: "Ask in your own words",
-    description:
-      "Search fuses semantic and keyword results into one ranked list. Ask for “bank details” and the IBANs surface — even when no keyword matches.",
-  },
-  {
-    marker: "RANKED LEADS",
-    title: "Cases find their own next evidence",
-    description:
-      "Each case proposes leads: semantic neighbours of the evidence already attached, plus high-importance matches from its linked inquiries — ranked, capped, reviewable.",
-  },
-] as const;
-
-/** Illustrative docket rows for the ranked-evidence section. */
-const rankedDocket = [
-  {
-    id: "F-2041",
-    label: "AWS access key · CI deploy log",
-    score: 0.94,
-    reasons: [
-      { dir: "up", text: "recurs in 2 systems" },
-      { dir: "up", text: "novel" },
-      { dir: "up", text: "semantic outlier" },
-    ],
-  },
-  {
-    id: "F-1987",
-    label: "IBAN · quarterly finance export",
-    score: 0.81,
-    reasons: [
-      { dir: "up", text: "high quality" },
-      { dir: "up", text: "distinct context" },
-    ],
-  },
-  {
-    id: "F-2033",
-    label: "Email address · support inbox dump",
-    score: 0.42,
-    reasons: [{ dir: "down", text: "38 near-duplicates" }],
-  },
-  {
-    id: "F-2012",
-    label: "Card number · 4111 1111 1111 1111",
-    score: 0.18,
-    reasons: [{ dir: "down", text: "known test value" }],
-  },
-  {
-    id: "F-2029",
-    label: "Phone number · page-footer boilerplate",
-    score: 0.07,
-    reasons: [
-      { dir: "down", text: "found in 48 assets" },
-      { dir: "down", text: "low extraction quality" },
-    ],
-  },
-] as const;
-
-const harnessMissions = [
-  {
-    step: "01",
-    marker: "Inquiry",
-    title: "Keeps standing questions answered",
-    description:
-      "Matches fresh findings to your inquiries and dedupes the rest — similar signals collapse into one monitor instead of a flood.",
-    tools: ["findings.search", "inquiries.enrich"],
-  },
-  {
-    step: "02",
-    marker: "Case",
-    title: "Builds the investigation",
-    description:
-      "Opens and enriches cases: drafts competing hypotheses, attaches evidence, and links findings into the case graph.",
-    tools: ["cases.create", "cases.add_hypothesis"],
-  },
-  {
-    step: "03",
-    marker: "Config",
-    title: "Wakes up silent sources",
-    description:
-      "Profiles sources that ingest data but produce nothing, then enables the detectors that fit the data shape — no manual setup.",
-    tools: ["assets.profile", "config.tune_source"],
-  },
-  {
-    step: "04",
-    marker: "Detector Author",
-    title: "Writes the detector you were missing",
-    description:
-      "When findings slip through, it hypothesizes a detector, dry-runs it, ships it, and verifies the results on the next cycle.",
-    tools: ["detector.test", "detector.create"],
-  },
-  {
-    step: "05",
-    marker: "Dream",
-    title: "Consolidates what it learned",
-    description:
-      "Curates long-lived memory and refreshes the system brief so every agent starts the next cycle grounded in today's reality.",
-    tools: ["memory.rewrite", "system_brief.update"],
-  },
-] as const;
-
-const harnessFacts = [
-  {
-    marker: "IT REMEMBERS",
-    title: "A memory you can read",
-    description:
-      "Harness keeps a long-lived memory of your instance — business glossary, decision precedents, topic-to-inquiry maps. Every cycle, the server composes it into a system brief: live counts and learned facts in fixed sections, with only the short overview written by the model. Inspect and edit any of it.",
-  },
-  {
-    marker: "IT STARTS FROM ZERO",
-    title: "No findings? It makes some",
-    description:
-      "Connect a source with no detectors and there is nothing to react to — so Harness profiles the ingested assets instead: column names, mime types, field shapes. From that metadata alone it hypothesizes a detector, dry-runs it against samples, ships it, and checks the results on the next cycle.",
-  },
-  {
-    marker: "IT ANSWERS FOR ITSELF",
-    title: "Observe-only when you want it",
-    description:
-      "Every action — and every deliberate non-action — lands in one audit trail with a written rationale, attributed to the agent that made it. Flip the whole instance, or a single case, into observe-only and Harness proposes without touching a thing.",
-  },
-] as const;
-
-const detectorLadder = [
-  {
-    tier: "01",
-    power: 1,
-    marker: "RULESET",
-    title: "Regex & rules",
-    description:
-      "Deterministic pattern matching for IDs, secrets formats, policy phrases, and internal codes. Instant, explainable, zero ML overhead.",
-    tags: ["deterministic", "fast", "no GPU"],
-  },
-  {
-    tier: "02",
-    power: 2,
-    marker: "TEXT INTELLIGENCE",
-    title: "Entities & classification",
-    description:
-      "Extract entities and classify text in a single model pass, using labels written in your own words. Contextual understanding without training a model.",
-    tags: ["zero-shot", "your labels", "one pass"],
-  },
-  {
-    tier: "03",
-    power: 3,
-    marker: "TRANSFORMERS",
-    title: "Any Hugging Face model",
-    description:
-      "Plug in open models for text classification, image classification, object detection, and embeddings. Yes — Classifyre sees images, not just text.",
-    tags: ["text + vision", "open models", "embeddings"],
-  },
-  {
-    tier: "04",
-    power: 4,
-    marker: "AI DETECTOR",
-    title: "Bring any LLM",
-    description:
-      "Write a prompt, define labels and extraction fields, and any configured LLM provider becomes a detector — for signals too fuzzy to define any other way.",
-    tags: ["any provider", "prompt-defined", "extraction"],
-  },
-] as const;
-
-function Marker({
-  label,
-  inverted = false,
-}: {
-  label: string;
-  inverted?: boolean;
-}) {
+function Marker({ label }: { label: string }) {
   return (
-    <span
-      className={cn(
-        "inline-flex items-center border-2 px-2.5 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.18em]",
-        inverted
-          ? "border-accent bg-accent text-black"
-          : "border-border bg-background text-foreground",
-      )}
-    >
+    <span className="inline-flex items-center border-2 border-accent bg-accent px-2.5 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-black">
       {label}
     </span>
   );
@@ -418,8 +277,9 @@ function LandingSectionShell({
     <div
       className={cn(
         "relative",
-        // overflow-hidden creates a scroll container and would break
-        // position:sticky descendants, so plain sections skip it.
+        // overflow-hidden creates a scroll container and would break any
+        // position:sticky descendant, so only the tinted sections (which
+        // need it to clip the grid overlay) get it.
         tone === "signal" && "overflow-hidden",
         fullWidth
           ? "left-1/2 w-screen max-w-none -translate-x-1/2 rounded-none border-0"
@@ -435,7 +295,7 @@ function LandingSectionShell({
       ) : null}
       <div
         className={cn(
-          "relative py-8 sm:py-10 lg:py-12",
+          "relative py-10 sm:py-12 lg:py-16",
           fullWidth ? "px-4 sm:px-6 lg:px-10" : "px-6 sm:px-8 lg:px-10",
         )}
       >
@@ -445,34 +305,87 @@ function LandingSectionShell({
   );
 }
 
-function CommandBlock({
-  label,
-  lines,
-  inverted = false,
+/** Section headline block: marker, title, at most two lines of copy. */
+function SectionHead({
+  id,
+  marker,
+  title,
+  lede,
+  tone = "plain",
+  action,
+  illustration,
 }: {
-  label: string;
-  lines: readonly string[];
-  inverted?: boolean;
+  id: string;
+  marker: string;
+  title: ReactNode;
+  lede?: string;
+  tone?: "signal" | "plain";
+  action?: ReactNode;
+  illustration?: IllustrationName;
 }) {
   return (
-    <div
-      className={`border-2 border-border p-4 ${
-        inverted
-          ? "bg-foreground text-primary-foreground"
-          : "bg-background text-foreground"
-      }`}
-    >
-      <div
-        className={`mb-3 text-[11px] font-mono uppercase tracking-[0.14em] ${
-          inverted ? "text-primary-foreground/55" : "text-muted-foreground"
-        }`}
-      >
-        {label}
+    <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+      <div className="flex items-start gap-6 lg:gap-8">
+        {illustration ? (
+          // Hung level with the headline and sized as a drawing, not a bullet.
+          <Illustration
+            name={illustration}
+            surface={tone === "signal" ? "inverted" : "page"}
+            tilt="left"
+            className="-mt-2 hidden h-28 w-28 shrink-0 sm:block lg:h-36 lg:w-36"
+          />
+        ) : null}
+        <div className="space-y-3">
+          <Marker label={marker} />
+          <h2
+            id={id}
+            className="font-serif text-[clamp(2rem,5vw,3rem)] font-black uppercase leading-[0.92] tracking-[0.04em]"
+          >
+            {title}
+          </h2>
+          {lede ? (
+            <p
+              className={cn(
+                "max-w-2xl text-base leading-7",
+                tone === "signal"
+                  ? "text-primary-foreground/72"
+                  : "text-muted-foreground",
+              )}
+            >
+              {lede}
+            </p>
+          ) : null}
+        </div>
       </div>
-      <pre className="overflow-hidden whitespace-pre-wrap wrap-break-word font-mono text-xs leading-6 sm:text-sm">
-        <code>{lines.join("\n")}</code>
-      </pre>
+      {action ? <div className="shrink-0">{action}</div> : null}
     </div>
+  );
+}
+
+function DocsLink({
+  href,
+  children,
+  tone = "plain",
+}: {
+  href: string;
+  children: ReactNode;
+  tone?: "signal" | "plain";
+}) {
+  return (
+    <Button
+      asChild
+      variant="secondary"
+      className={cn(
+        "border-2",
+        tone === "signal"
+          ? "border-primary-foreground/25 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/16"
+          : "border-border",
+      )}
+    >
+      <a href={href} target="_blank" rel="noreferrer">
+        {children}
+      </a>
+    </Button>
   );
 }
 
@@ -490,44 +403,6 @@ function PowerMeter({ level }: { level: number }) {
         />
       ))}
     </div>
-  );
-}
-
-/** Evidence tag: a tilted manila-tag stat with a punched hole. */
-function EvidenceTag({
-  label,
-  value,
-  detail,
-  tilt,
-  delayMs,
-}: {
-  label: string;
-  value: string;
-  detail: string;
-  tilt: "l" | "r";
-  delayMs: number;
-}) {
-  return (
-    <Reveal delayMs={delayMs}>
-      <div
-        className={cn(
-          "relative border-2 border-white/25 bg-white/8 p-4 pt-5",
-          tilt === "l" ? "cl-tag-tilt-l" : "cl-tag-tilt-r",
-        )}
-      >
-        <span
-          aria-hidden="true"
-          className="absolute -top-1.5 left-5 h-3 w-3 rounded-full border-2 border-white/45 bg-black"
-        />
-        <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-white/54">
-          {label}
-        </p>
-        <p className="font-hero mt-1 text-5xl uppercase leading-none text-accent">
-          {value}
-        </p>
-        <p className="mt-2 text-sm leading-6 text-white/68">{detail}</p>
-      </div>
-    </Reveal>
   );
 }
 
@@ -554,6 +429,8 @@ function PawPrint({
     </svg>
   );
 }
+
+/* ── Page ──────────────────────────────────────────────────────────────── */
 
 export default function HomePage() {
   const sourceDocs = getAllSourceDocs();
@@ -595,7 +472,7 @@ export default function HomePage() {
     operatingSystem: "macOS, Windows, Linux, Kubernetes",
     url: siteUrl,
     description:
-      "Classifyre is an open-source investigation platform: detectors surface evidence across modern source systems, isolated workspaces keep every client, region, or business unit in its own PostgreSQL schema on a single deployment, and Harness AI — a five-agent autopilot (inquiry, case, config, detector-author, and memory) — opens inquiries, builds cases, tunes sources, and authors detectors with a full audit trail. Available as a desktop app for macOS, Windows, and Linux, and as a Helm chart for Kubernetes.",
+      "Classifyre is an open-source investigation platform: detectors surface evidence across modern source systems, findings become inquiries, fingerprints, and cases, and Harness AI works the investigation between scans. Available as a free desktop app for macOS, Windows, and Linux, and as a Helm chart for Kubernetes.",
     offers: [
       {
         "@type": "Offer",
@@ -632,583 +509,311 @@ export default function HomePage() {
       {/* ── Hero ─────────────────────────────────────────────────────────── */}
       <section aria-labelledby="hero-title">
         <LandingSectionShell tone="signal" fullWidth className="bg-black">
-          <div className="space-y-10 text-white">
-            <div className="flex flex-col gap-10 lg:flex-row lg:items-center lg:gap-14">
-              <div className="space-y-6 lg:flex-[1.35]">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="inline-flex items-center border-2 border-accent bg-accent px-2.5 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-black">
-                    Open source
+          <div className="flex flex-col gap-10 text-white lg:flex-row lg:items-center lg:gap-14">
+            <div className="space-y-7 lg:flex-[1.35]">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="inline-flex items-center border-2 border-accent bg-accent px-2.5 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-black">
+                  Open source
+                </span>
+                <span className="inline-flex items-center border-2 border-white/25 px-2.5 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-white/70">
+                  v{softwareVersion}
+                </span>
+              </div>
+
+              <h1
+                id="hero-title"
+                className="font-hero text-[clamp(4.2rem,11vw,9rem)] font-normal uppercase leading-[0.86] tracking-[0.01em] text-white"
+              >
+                <span className="block">Every leak</span>
+                <span className="block">
+                  leaves a{" "}
+                  <span className="inline-block bg-accent px-[0.12em] text-black">
+                    trail.
                   </span>
-                  <span className="inline-flex items-center border-2 border-white/25 px-2.5 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-white/70">
-                    Case file Nº 001
+                </span>
+              </h1>
+
+              <p className="max-w-2xl text-lg leading-8 text-white/78">
+                Classifyre scans the systems you already run and detects
+                secrets, PII, and the signals you define — then works them like
+                a detective, with an AI autopilot doing the legwork between
+                scans.
+              </p>
+
+              <div className="flex flex-wrap items-center gap-3">
+                <Button
+                  asChild
+                  size="lg"
+                  className="border-2 border-accent bg-accent text-black hover:bg-accent/90"
+                >
+                  <a href="#run-it">Download the app</a>
+                </Button>
+                <Button
+                  asChild
+                  size="lg"
+                  variant="secondary"
+                  className="border-2 border-white/20 bg-white/10 text-white hover:bg-white/16"
+                >
+                  <a href={demoUrl} target="_blank" rel="noreferrer">
+                    Try the live demo
+                  </a>
+                </Button>
+              </div>
+            </div>
+
+            {/* The investigator */}
+            <div className="lg:flex-1">
+              <div className="relative mx-auto w-52 sm:w-60 lg:w-72">
+                <svg
+                  viewBox="0 0 300 300"
+                  aria-hidden="true"
+                  className="absolute -inset-6 h-auto w-[calc(100%+3rem)] text-white/40"
+                >
+                  <g
+                    className="cl-rotate-slow"
+                    style={{ transformOrigin: "150px 150px" }}
+                  >
+                    <circle
+                      cx="150"
+                      cy="150"
+                      r="144"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeDasharray="16 11"
+                    />
+                  </g>
+                  <g
+                    className="cl-rotate-slower"
+                    style={{ transformOrigin: "150px 150px" }}
+                  >
+                    <circle
+                      cx="150"
+                      cy="150"
+                      r="128"
+                      fill="none"
+                      stroke="var(--accent)"
+                      strokeWidth="1.5"
+                      strokeDasharray="3 14"
+                      opacity="0.8"
+                    />
+                  </g>
+                </svg>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src="/clasifyre_icon.png"
+                  alt="The Classifyre investigator — a detective cat on a green badge"
+                  width={288}
+                  height={288}
+                  className="relative w-full drop-shadow-[0_0_70px_rgba(183,255,0,0.3)]"
+                />
+                <div
+                  className="cl-stamp absolute -right-8 top-0 border-[3px] border-accent px-2.5 py-1 font-mono text-[11px] font-black uppercase tracking-[0.2em] text-accent"
+                  style={{ "--cl-delay": "700ms" } as CSSProperties}
+                >
+                  Case open
+                </div>
+              </div>
+            </div>
+          </div>
+        </LandingSectionShell>
+      </section>
+
+      {/* ── Get it running ───────────────────────────────────────────────── */}
+      <section aria-labelledby="run-it-title" id="run-it">
+        <LandingSectionShell tone="plain">
+          <div className="space-y-8">
+            <SectionHead
+              id="run-it-title"
+              marker="Get it running"
+              title={
+                <>
+                  Your laptop.
+                  <br />
+                  Or your cluster.
+                </>
+              }
+              lede="The same open-source product either way — nothing here is a trial, a lite edition, or a hosted upsell."
+            />
+
+            <div className="grid gap-4 lg:grid-cols-2">
+              {/* Desktop — the primary path */}
+              <div className="flex h-full flex-col gap-6 border-2 border-border bg-background p-6 shadow-[6px_6px_0_var(--color-border)] sm:p-8">
+                <div className="space-y-2">
+                  <span className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
+                    Download · free · no signup
                   </span>
-                  <span className="inline-flex items-center border-2 border-white/25 px-2.5 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-white/70">
-                    v{softwareVersion}
-                  </span>
+                  <h3 className="font-serif text-2xl font-black uppercase leading-tight tracking-[0.04em] sm:text-3xl">
+                    Install it on your machine
+                  </h3>
+                  <p className="text-sm leading-6 text-muted-foreground">
+                    One installer with PostgreSQL and the scan workers already
+                    inside. Everything — sources, findings, cases — stays on
+                    your machine.
+                  </p>
                 </div>
 
-                <h1
-                  id="hero-title"
-                  className="font-hero text-[clamp(4.2rem,11vw,9rem)] font-normal uppercase leading-[0.86] tracking-[0.01em] text-white"
-                >
-                  <span className="block">Every leak</span>
-                  <span className="block">
-                    leaves a{" "}
-                    <span className="inline-block bg-accent px-[0.12em] text-black">
-                      trail.
-                    </span>
-                  </span>
-                </h1>
+                {/* The three platforms, large and unmissable. */}
+                <ul className="grid grid-cols-3 gap-3">
+                  {desktopPlatforms.map(({ os, detail, Logo }) => (
+                    <li key={os}>
+                      <a
+                        href={desktopDownloadUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="group flex h-full flex-col items-center justify-start gap-3 border-2 border-border bg-background px-2 py-6 text-center transition-all hover:-translate-y-1 hover:border-accent hover:bg-accent/10"
+                      >
+                        <Logo className="h-12 w-12 text-foreground transition-transform group-hover:scale-110 sm:h-16 sm:w-16" />
+                        <span className="font-mono text-xs font-bold uppercase tracking-[0.1em] sm:text-sm">
+                          {os}
+                        </span>
+                        <span className="font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground">
+                          {detail}
+                        </span>
+                      </a>
+                    </li>
+                  ))}
+                </ul>
 
-                <p className="max-w-2xl text-base leading-7 text-white/78 sm:text-lg">
-                  Classifyre is an open-source investigation platform for your
-                  data estate. It scans the systems you already run, detects
-                  secrets, PII, and the signals you define — then works them
-                  like a detective: standing inquiries, fingerprints,
-                  importance-ranked evidence, cases, competing hypotheses, and
-                  an AI autopilot that does the legwork between scans.
-                </p>
-
-                <div className="flex flex-wrap items-center gap-3">
+                <div className="mt-auto space-y-3">
                   <Button
                     asChild
-                    className="border-2 border-accent bg-accent text-black hover:bg-accent/90"
+                    size="lg"
+                    className="w-full border-2 border-accent bg-accent text-black hover:bg-accent/90"
                   >
                     <a
                       href={desktopDownloadUrl}
                       target="_blank"
                       rel="noreferrer"
                     >
-                      Download the app
+                      Download Classifyre {softwareVersion}
                     </a>
                   </Button>
-                  <Button
-                    asChild
-                    variant="secondary"
-                    className="border-2 border-white/20 bg-white/10 text-white hover:bg-white/16"
-                  >
-                    <a
-                      href="https://demo.classifyre.com/"
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      Try the live demo
-                    </a>
-                  </Button>
+                  <p className="text-center font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+                    macOS · Windows · Linux — the full product, not a demo
+                  </p>
                 </div>
               </div>
 
-              {/* The investigator */}
-              <div className="lg:flex-1">
-                <div className="relative mx-auto w-52 sm:w-60 lg:w-72">
-                  <svg
-                    viewBox="0 0 300 300"
-                    aria-hidden="true"
-                    className="absolute -inset-6 h-auto w-[calc(100%+3rem)] text-white/40"
-                  >
-                    <g
-                      className="cl-rotate-slow"
-                      style={{ transformOrigin: "150px 150px" }}
-                    >
-                      <circle
-                        cx="150"
-                        cy="150"
-                        r="144"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeDasharray="16 11"
-                      />
-                    </g>
-                    <g
-                      className="cl-rotate-slower"
-                      style={{ transformOrigin: "150px 150px" }}
-                    >
-                      <circle
-                        cx="150"
-                        cy="150"
-                        r="128"
-                        fill="none"
-                        stroke="var(--accent)"
-                        strokeWidth="1.5"
-                        strokeDasharray="3 14"
-                        opacity="0.8"
-                      />
-                    </g>
-                  </svg>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src="/clasifyre_icon.png"
-                    alt="The Classifyre investigator — a detective cat on a green badge"
-                    width={288}
-                    height={288}
-                    className="relative w-full drop-shadow-[0_0_70px_rgba(183,255,0,0.3)]"
-                  />
-                  <div
-                    className="cl-stamp absolute -right-8 top-0 border-[3px] border-accent px-2.5 py-1 font-mono text-[11px] font-black uppercase tracking-[0.2em] text-accent"
-                    style={{ "--cl-delay": "700ms" } as CSSProperties}
-                  >
-                    Case open
-                  </div>
-                  <div className="absolute -bottom-8 left-1/2 w-48 -translate-x-1/2">
-                    <div className="cl-tag-tilt-r relative border-2 border-white/30 bg-black px-3 py-2 text-center">
-                      <span
-                        aria-hidden="true"
-                        className="absolute -top-1.5 left-1/2 h-3 w-3 -translate-x-1/2 rounded-full border-2 border-white/45 bg-black"
-                      />
-                      <p className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-accent">
-                        Lead investigator
-                      </p>
-                      <p className="mt-0.5 font-mono text-[10px] uppercase tracking-[0.08em] text-white/55">
-                        On duty since your last scan
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Runtime rail: desktop or Kubernetes */}
-            <div className="border-2 border-white/25 bg-white/4">
-              <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b-2 border-white/25 px-4 py-3 sm:px-5">
-                <span className="font-mono text-[11px] font-bold uppercase tracking-[0.2em] text-accent">
-                  Two ways to run it
-                </span>
-                <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-white/50">
-                  Every one is the full product — only the jurisdiction changes
-                </span>
-              </div>
-              <div className="grid divide-y-2 divide-white/25 lg:grid-cols-2 lg:divide-x-2 lg:divide-y-0">
-                {/* Desktop */}
-                <div className="flex flex-col gap-3 p-4 sm:p-5">
-                  <div className="flex items-baseline justify-between gap-2">
-                    <span className="font-mono text-xs font-bold uppercase tracking-[0.16em] text-white">
-                      Desktop
-                    </span>
-                    <span className="border border-white/30 px-1.5 py-0.5 font-mono text-[9px] font-bold uppercase tracking-[0.16em] text-white/60">
-                      Local · one install
-                    </span>
-                  </div>
-                  <div className="grid gap-1.5">
-                    {desktopDownloads.map((download) => (
-                      <a
-                        key={download.os}
-                        href={desktopDownloadUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="group flex items-baseline justify-between gap-2 border border-white/20 bg-white/6 px-2.5 py-1.5 transition-colors hover:border-accent hover:bg-accent/10"
-                      >
-                        <span className="font-mono text-xs font-bold uppercase tracking-[0.1em] text-white">
-                          {download.os}
-                          <span className="text-accent"> ↓</span>
-                        </span>
-                        <span className="font-mono text-[10px] uppercase tracking-[0.06em] text-white/50 group-hover:text-white/75">
-                          {download.detail}
-                        </span>
-                      </a>
-                    ))}
-                  </div>
-                  <p className="mt-auto font-mono text-[10px] uppercase tracking-[0.1em] text-white/45">
-                    Everything stays on your machine
+              {/* Kubernetes — the same product, scaled out */}
+              <div className="flex h-full flex-col gap-6 border-2 border-foreground bg-foreground p-6 text-primary-foreground shadow-[6px_6px_0_var(--color-accent)] sm:p-8">
+                <div className="space-y-2">
+                  <span className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-accent dark:text-accent-foreground">
+                    Helm chart · scales to any size
+                  </span>
+                  <h3 className="font-serif text-2xl font-black uppercase leading-tight tracking-[0.04em] sm:text-3xl">
+                    Or run it on Kubernetes
+                  </h3>
+                  <p className="text-sm leading-6 text-primary-foreground/72">
+                    The same core as a Helm chart, with ephemeral scan workers
+                    that scale to zero between runs and fan out as far as your
+                    estate goes. Your cluster, your data.
                   </p>
                 </div>
 
-                {/* Helm */}
-                <div className="flex flex-col gap-3 p-4 sm:p-5">
-                  <div className="flex items-baseline justify-between gap-2">
-                    <span className="font-mono text-xs font-bold uppercase tracking-[0.16em] text-white">
-                      Helm on Kubernetes
-                    </span>
-                    <span className="border border-accent px-1.5 py-0.5 font-mono text-[9px] font-bold uppercase tracking-[0.16em] text-accent">
-                      Remote · any size
-                    </span>
-                  </div>
-                  <pre className="overflow-hidden whitespace-pre-wrap wrap-break-word border border-white/20 bg-black/40 px-2.5 py-2 font-mono text-[11px] leading-5 text-white/85">
-                    <code>{helmInstallCommand.join("\n")}</code>
-                  </pre>
-                  <a
-                    href={helmDocsUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="mt-auto font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-accent hover:underline"
-                  >
-                    Helm chart docs →
-                  </a>
+                <div className="flex items-center justify-center gap-8 border-2 border-primary-foreground/20 bg-primary-foreground/5 py-6">
+                  <KubernetesLogo className="h-14 w-14 text-accent sm:h-16 sm:w-16 dark:text-accent-foreground" />
+                  <span
+                    aria-hidden="true"
+                    className="h-12 w-px bg-primary-foreground/20"
+                  />
+                  <HelmLogo className="h-14 w-14 text-accent sm:h-16 sm:w-16 dark:text-accent-foreground" />
+                </div>
+
+                {/* Tinted with primary-foreground, not black: this card is
+                    painted with bg-foreground, which flips with the theme. */}
+                <pre className="overflow-x-auto border-2 border-primary-foreground/20 bg-primary-foreground/8 px-3 py-3 font-mono text-[11px] leading-6 text-primary-foreground/85 sm:text-xs">
+                  <code>{helmInstallCommand.join("\n")}</code>
+                </pre>
+
+                <div className="mt-auto">
+                  <DocsLink href={docs.kubernetes} tone="signal">
+                    Helm chart docs
+                  </DocsLink>
                 </div>
               </div>
             </div>
-
-            <div className="grid gap-4 pt-4 sm:grid-cols-3">
-              <EvidenceTag
-                label="Source types"
-                value={`${sourceEntries.length}+`}
-                detail="Databases, lakehouses, collaboration tools, BI, and web content — one evidence stream."
-                tilt="l"
-                delayMs={0}
-              />
-              <EvidenceTag
-                label="Built-in detectors"
-                value={`${activeDetectorItems.length}`}
-                detail="Switch-on packs for PII, secrets, and security — plus four custom engines, regex to any LLM."
-                tilt="r"
-                delayMs={120}
-              />
-              <EvidenceTag
-                label="Autopilot agents"
-                value="5"
-                detail="Inquiry, case, config, detector author, dream — every move logged with a written rationale."
-                tilt="l"
-                delayMs={240}
-              />
-            </div>
           </div>
         </LandingSectionShell>
       </section>
 
-      {/* ── How it all connects: scroll narrative ────────────────────────── */}
-      <section aria-labelledby="pipeline-title">
-        <LandingSectionShell tone="plain">
-          <div className="space-y-8">
-            <div className="space-y-3">
-              <Marker label="How it all connects" inverted />
-              <h2
-                id="pipeline-title"
-                className="font-serif text-4xl font-black uppercase leading-[0.9] tracking-[0.06em] sm:text-5xl"
-              >
-                Follow the evidence
-              </h2>
-              <p className="max-w-3xl text-muted-foreground">
-                One pipeline runs from the systems you connect to a resolved
-                investigation: sources become assets, detectors raise findings,
-                findings feed inquiries and fingerprints, and everything
-                converges into cases. Here is one real night in the life of it —
-                a credential leaking through CI logs, traced end to end.
-              </p>
-            </div>
-
-            <PipelineStory />
-          </div>
-        </LandingSectionShell>
-      </section>
-
-      {/* ── Investigation layer ──────────────────────────────────────────── */}
+      {/* ── How it works: findings become cases ──────────────────────────── */}
       <section aria-labelledby="investigation-title">
         <LandingSectionShell tone="plain">
           <div className="space-y-8">
-            <div className="space-y-3">
-              <Marker label="The investigation layer" inverted />
-              <h2
-                id="investigation-title"
-                className="font-serif text-4xl font-black uppercase leading-[0.9] tracking-[0.06em] sm:text-5xl"
-              >
-                Findings are evidence.
-                <br />
-                Cases are the product.
-              </h2>
-              <p className="max-w-3xl text-muted-foreground">
-                Most scanners stop at a findings table and wish you luck.
-                Classifyre treats every finding as evidence in an ongoing
-                investigation — connected to the questions you are asking, the
-                cases you are working, and the explanations you are testing.
-              </p>
-            </div>
+            <SectionHead
+              id="investigation-title"
+              marker="How it works"
+              title={
+                <>
+                  Findings are evidence.
+                  <br />
+                  Cases are the product.
+                </>
+              }
+              lede="Most scanners stop at a findings table and wish you luck. Classifyre keeps going — every finding is evidence in an investigation somebody can actually work."
+              action={<DocsLink href={docs.howItWorks}>How it works</DocsLink>}
+            />
 
-            <div className="grid gap-8 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] lg:items-center">
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
-                {investigationPillars.map((pillar, index) => (
-                  <Reveal key={pillar.marker} delayMs={index * 90}>
-                    <div className="flex h-full flex-col gap-2 border-2 border-border bg-background p-4 shadow-[4px_4px_0_var(--color-border)]">
-                      <span className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-accent-foreground/60 dark:text-accent">
-                        {pillar.marker}
-                      </span>
-                      <p className="font-serif text-base font-black uppercase leading-tight tracking-[0.04em]">
-                        {pillar.title}
-                      </p>
-                      <p className="text-sm leading-6 text-muted-foreground">
-                        {pillar.description}
-                      </p>
-                    </div>
-                  </Reveal>
-                ))}
-              </div>
-
-              <figure className="border-2 border-border bg-background p-4 shadow-[6px_6px_0_var(--color-border)]">
-                <CaseGraph />
-                <figcaption className="mt-2 border-t-2 border-border pt-3 font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
-                  Case #42 from the story above, assembling itself: hypotheses
-                  linked to severity-rated evidence, an analyst link, a
-                  fingerprint match, and autopilot contributions.
-                </figcaption>
-              </figure>
-            </div>
-          </div>
-        </LandingSectionShell>
-      </section>
-
-      {/* ── Semantics: ranked evidence ───────────────────────────────────── */}
-      <section aria-labelledby="semantics-title">
-        <LandingSectionShell tone="plain">
-          <div className="space-y-8">
-            <div className="space-y-3">
-              <Marker label="The semantic layer" inverted />
-              <h2
-                id="semantics-title"
-                className="font-serif text-4xl font-black uppercase leading-[0.9] tracking-[0.06em] sm:text-5xl"
-              >
-                Signal rises.
-                <br />
-                Noise sinks.
-              </h2>
-              <p className="max-w-3xl text-muted-foreground">
-                Severity tells you what a finding is. Importance tells you
-                whether it deserves your morning. Classifyre embeds every
-                finding into a semantic space and ranks it from 0 to 1 —
-                weighing quality, novelty, context, and how the same value
-                recurs across your estate — so the docket opens on the leak, not
-                on page forty of boilerplate.
-              </p>
-            </div>
-
-            <div className="grid gap-8 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] lg:items-center">
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
-                {semanticsPillars.map((pillar, index) => (
-                  <Reveal key={pillar.marker} delayMs={index * 90}>
-                    <div className="flex h-full flex-col gap-2 border-2 border-border bg-background p-4 shadow-[4px_4px_0_var(--color-border)]">
-                      <span className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-accent-foreground/60 dark:text-accent">
-                        {pillar.marker}
-                      </span>
-                      <p className="font-serif text-base font-black uppercase leading-tight tracking-[0.04em]">
-                        {pillar.title}
-                      </p>
-                      <p className="text-sm leading-6 text-muted-foreground">
-                        {pillar.description}
-                      </p>
-                    </div>
-                  </Reveal>
-                ))}
-              </div>
-
-              {/* The morning docket */}
-              <figure className="border-2 border-border bg-background p-4 shadow-[6px_6px_0_var(--color-border)]">
-                <div className="mb-3 flex items-center justify-between border-b-2 border-border pb-3">
-                  <span className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
-                    The morning docket
-                  </span>
-                  <span className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-accent-foreground/60 dark:text-accent">
-                    Sorted by importance
-                  </span>
-                </div>
-                <ol className="flex flex-col gap-2.5">
-                  {rankedDocket.map((row, index) => (
-                    <Reveal key={row.id} as="li" delayMs={index * 130}>
-                      <div className="border border-border/60 bg-background p-2.5">
-                        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                          <span className="font-mono text-[10px] font-bold tracking-[0.1em] text-muted-foreground">
-                            {row.id}
-                          </span>
-                          <span className="min-w-0 flex-1 truncate text-sm font-medium">
-                            {row.label}
-                          </span>
-                          <span className="font-mono text-xs font-black tabular-nums">
-                            {row.score.toFixed(2)}
-                          </span>
-                        </div>
-                        <div className="mt-2 h-2 border border-border bg-foreground/5">
-                          <div
-                            className={cn(
-                              "cl-docket-fill h-full",
-                              row.score >= 0.6
-                                ? "bg-accent"
-                                : "bg-foreground/25",
-                            )}
-                            style={{ width: `${Math.round(row.score * 100)}%` }}
-                          />
-                        </div>
-                        <div className="mt-2 flex flex-wrap gap-1">
-                          {row.reasons.map((reason) => (
-                            <span
-                              key={reason.text}
-                              className={cn(
-                                "border px-1.5 py-0.5 font-mono text-[10px]",
-                                reason.dir === "up"
-                                  ? "border-accent-foreground/30 text-accent-foreground/80 dark:border-accent/50 dark:text-accent"
-                                  : "border-border/60 text-muted-foreground",
-                              )}
-                            >
-                              {reason.dir === "up" ? "↑" : "↓"} {reason.text}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    </Reveal>
-                  ))}
-                </ol>
-                <figcaption className="mt-3 border-t-2 border-border pt-3 font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
-                  Every rank ships with its reasons — inspect them, argue with
-                  them, or re-sort by severity or recency any time.
-                </figcaption>
-              </figure>
-            </div>
-
-            <div className="grid gap-3 md:grid-cols-3">
-              {semanticsFacts.map((fact, index) => (
-                <Reveal key={fact.marker} delayMs={index * 110}>
-                  <div className="h-full border-2 border-border bg-background p-5 shadow-[4px_4px_0_var(--color-border)]">
-                    <span className="inline-flex bg-accent px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-black">
-                      {fact.marker}
-                    </span>
-                    <p className="mt-3 font-serif text-lg font-black uppercase leading-tight tracking-[0.04em]">
-                      {fact.title}
-                    </p>
-                    <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                      {fact.description}
-                    </p>
-                  </div>
-                </Reveal>
-              ))}
-            </div>
-          </div>
-        </LandingSectionShell>
-      </section>
-
-      {/* ── Harness AI ───────────────────────────────────────────────────── */}
-      <section aria-labelledby="harness-title">
-        <LandingSectionShell tone="signal">
-          <div className="space-y-10">
-            <div className="space-y-3">
-              <Marker label="Harness AI" inverted />
-              <h2
-                id="harness-title"
-                className="font-serif text-4xl font-black uppercase leading-[0.9] tracking-[0.06em] sm:text-5xl"
-              >
-                Autopilot,{" "}
-                <span className="inline-block bg-accent px-[0.14em] text-black">
-                  not copilot
+            <div className="grid gap-6 lg:grid-cols-[minmax(0,0.72fr)_minmax(0,1.28fr)] lg:items-stretch">
+              <Reveal className="border-2 border-border bg-background p-5">
+                <span className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
+                  The pipeline
                 </span>
-              </h2>
-              <p className="max-w-3xl text-primary-foreground/72">
-                A copilot waits for you to type a prompt. Harness AI
-                doesn&apos;t wait. After every scan, five specialized agents
-                wake in sequence, read a system brief composed from live facts
-                and long-lived memory, and move the investigation forward on
-                their own — deduping findings, building cases, tuning silent
-                sources, even authoring the detectors you were missing. The
-                fifth agent literally dreams: it consolidates what the others
-                learned while nothing else is running.
-              </p>
+                <div className="mt-4">
+                  <EvidenceBoard />
+                </div>
+              </Reveal>
+
+              <figure className="flex flex-col border-2 border-border bg-background p-5">
+                <span className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
+                  A case, assembling itself
+                </span>
+                <div className="my-auto py-4">
+                  <CaseGraph />
+                </div>
+                <figcaption className="border-t-2 border-border pt-3 font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
+                  Hypotheses pinned to severity-rated evidence, a fingerprint
+                  match, and autopilot contributions — all attributed.
+                </figcaption>
+              </figure>
             </div>
 
-            {/* The night shift: ring + missions */}
-            <div className="grid gap-8 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:items-center">
-              <div className="flex justify-center">
-                <MissionRing />
-              </div>
-              <ol className="flex flex-col divide-y divide-primary-foreground/15 border-2 border-primary-foreground/25 bg-primary-foreground/5">
-                {harnessMissions.map((mission) => (
-                  <li
-                    key={mission.step}
-                    className="flex flex-col gap-1.5 p-4 sm:flex-row sm:items-baseline sm:gap-4"
-                  >
-                    <span className="font-hero shrink-0 text-3xl uppercase leading-none text-accent sm:w-10">
-                      {mission.step}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                        <span className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-accent">
-                          {mission.marker}
-                        </span>
-                        <span className="text-sm font-bold uppercase tracking-[0.04em]">
-                          {mission.title}
-                        </span>
-                      </div>
-                      <p className="mt-1 text-xs leading-5 text-primary-foreground/65">
-                        {mission.description}
+            {/* Drawing-led cards: the illustration is the card's subject, so
+                it gets its own band above the rule and alternates tilt. */}
+            <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              {investigationPillars.map((pillar, index) => (
+                <Reveal key={pillar.title} as="li" delayMs={index * 80}>
+                  <div className="flex h-full flex-col border-2 border-border bg-background shadow-[4px_4px_0_var(--color-border)]">
+                    <div className="flex min-h-38 items-center justify-center px-5 py-6">
+                      <Illustration
+                        name={pillar.illustration}
+                        tilt={index % 2 === 0 ? "left" : "right"}
+                        className="h-28 w-28"
+                      />
+                    </div>
+                    <div className="flex flex-1 flex-col gap-2 border-t-2 border-border p-5">
+                      <p className="font-serif text-base font-black uppercase leading-tight tracking-[0.04em]">
+                        {pillar.title}
                       </p>
-                    </div>
-                    <div className="flex shrink-0 flex-wrap gap-1 sm:flex-col sm:items-end">
-                      {mission.tools.map((tool) => (
-                        <span
-                          key={tool}
-                          className="border border-primary-foreground/20 bg-primary-foreground/5 px-1.5 py-0.5 font-mono text-[10px] text-primary-foreground/70"
+                      <p className="text-sm leading-6 text-muted-foreground">
+                        {pillar.description}
+                      </p>
+                      {pillar.href ? (
+                        <a
+                          href={pillar.href}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="mt-auto pt-2 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-accent-foreground/70 underline-offset-4 hover:underline dark:text-accent"
                         >
-                          {tool}
-                        </span>
-                      ))}
+                          {pillar.hrefLabel} →
+                        </a>
+                      ) : null}
                     </div>
-                  </li>
-                ))}
-              </ol>
-            </div>
-
-            {/* How it works + flight recorder */}
-            <div className="grid gap-6 lg:grid-cols-2 lg:items-stretch">
-              <div className="flex flex-col gap-4">
-                <h3 className="font-serif text-2xl font-black uppercase leading-tight tracking-[0.04em] sm:text-3xl">
-                  A flight recorder, not a black box
-                </h3>
-                <p className="text-base leading-7 text-primary-foreground/72">
-                  Each agent runs a resumable reason → act loop: it reads the
-                  live system brief, calls real tools, and writes back what it
-                  did and why. Watch one cycle play out — it&apos;s the same
-                  credential-leak night from the story above, every decision
-                  audited, every deliberate non-action recorded too.
-                </p>
-                <ul className="space-y-2 text-sm leading-6 text-primary-foreground/72">
-                  <li className="border-l-2 border-accent pl-3">
-                    <span className="font-bold text-primary-foreground">
-                      Grounded in facts.
-                    </span>{" "}
-                    The system brief is composed by the server every cycle —
-                    coverage, glossary, topics, gaps — from live counts plus
-                    learned memory. Only the short overview is model-written.
-                  </li>
-                  <li className="border-l-2 border-accent pl-3">
-                    <span className="font-bold text-primary-foreground">
-                      Idempotent &amp; resumable.
-                    </span>{" "}
-                    Runs persist mid-loop and resume without replaying work, so
-                    side effects never double-fire.
-                  </li>
-                  <li className="border-l-2 border-accent pl-3">
-                    <span className="font-bold text-primary-foreground">
-                      You stay in command.
-                    </span>{" "}
-                    Steer it with a one-line instruction, or flip observe-only
-                    and it proposes without touching a thing.
-                  </li>
-                </ul>
-              </div>
-
-              <HarnessSimulation />
-            </div>
-
-            {/* Facts */}
-            <div className="grid gap-3 md:grid-cols-3">
-              {harnessFacts.map((fact, index) => (
-                <Reveal key={fact.marker} delayMs={index * 110}>
-                  <div className="h-full border-2 border-primary-foreground/30 bg-primary-foreground/8 p-5">
-                    <span className="inline-flex bg-accent px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-black">
-                      {fact.marker}
-                    </span>
-                    <p className="mt-3 font-serif text-lg font-black uppercase leading-tight tracking-[0.04em]">
-                      {fact.title}
-                    </p>
-                    <p className="mt-2 text-sm leading-6 text-primary-foreground/72">
-                      {fact.description}
-                    </p>
                   </div>
                 </Reveal>
               ))}
-            </div>
-          </div>
-        </LandingSectionShell>
-      </section>
-
-      {/* ── Assistant (setup) ────────────────────────────────────────────── */}
-      <section aria-labelledby="assistant-demo-title">
-        <LandingSectionShell tone="plain">
-          <div className="space-y-6">
-            <AssistantDemo />
+            </ul>
           </div>
         </LandingSectionShell>
       </section>
@@ -1217,37 +822,14 @@ export default function HomePage() {
       <section aria-labelledby="sources-title">
         <LandingSectionShell tone="plain">
           <div className="space-y-6">
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-              <div className="space-y-3">
-                <div>
-                  <h2
-                    id="sources-title"
-                    className="font-serif text-4xl font-black uppercase leading-[0.9] tracking-[0.06em] sm:text-5xl"
-                  >
-                    Scan the systems you already own
-                  </h2>
-                  <p className="mt-3 max-w-3xl text-muted-foreground">
-                    Classifyre is built for mixed estates: operational
-                    databases, lakehouse and warehouse platforms, collaboration
-                    systems, analytics assets, and public-facing content — all
-                    feeding evidence into the same investigation layer.
-                  </p>
-                </div>
-              </div>
-              <Button
-                asChild
-                variant="secondary"
-                className="border-2 border-border"
-              >
-                <a
-                  href="https://docs.classifyre.com/"
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  Connector docs
-                </a>
-              </Button>
-            </div>
+            <SectionHead
+              id="sources-title"
+              marker="Sources"
+              illustration="docs"
+              title="Scan the systems you already own"
+              lede="Operational databases, lakehouses, collaboration tools, analytics assets, and public content — all feeding one evidence stream."
+              action={<DocsLink href={docs.root}>Connector docs</DocsLink>}
+            />
 
             <div className="edge-fade-x overflow-hidden py-3">
               <div className="marquee-track-slow flex w-max items-stretch gap-14 py-6">
@@ -1274,184 +856,169 @@ export default function HomePage() {
         </LandingSectionShell>
       </section>
 
-      {/* ── Built-in detectors ───────────────────────────────────────────── */}
+      {/* ── Detectors: built-in packs + the custom ladder ────────────────── */}
       <section aria-labelledby="detectors-title">
         <LandingSectionShell tone="signal">
-          <div className="space-y-6">
-            <div className="space-y-3">
-              <div>
-                <h2
-                  id="detectors-title"
-                  className="font-serif text-4xl font-black uppercase leading-[0.9] tracking-[0.06em] sm:text-5xl"
-                >
-                  Evidence on day one
-                </h2>
-                <p className="mt-3 max-w-3xl text-primary-foreground/72">
-                  Switch on curated built-in packs — PII, secrets, security,
-                  moderation, quality — and findings start flowing into your
-                  investigations immediately. No model wrangling required.
-                </p>
-              </div>
-            </div>
+          <div className="space-y-8">
+            <SectionHead
+              id="detectors-title"
+              marker="Detectors"
+              tone="signal"
+              illustration="probe"
+              title="Switch one on. Evidence follows."
+              lede="Curated packs for PII, secrets, security, moderation, and quality work on the first scan — no model wrangling."
+            />
 
             <DetectorCatalog
               items={activeDetectorItems}
               groups={detectorCatalogGroups}
               external
             />
+
+            {/* Custom detection: a ladder, not a leap. */}
+            <div className="border-2 border-primary-foreground/25 bg-primary-foreground/5">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b-2 border-primary-foreground/25 px-4 py-3 sm:px-5">
+                <span className="font-mono text-[11px] font-bold uppercase tracking-[0.2em] text-accent dark:text-accent-foreground">
+                  Need your own? From a regex to any model
+                </span>
+                <a
+                  href={docs.customDetectors}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-primary-foreground/70 underline-offset-4 hover:text-accent hover:underline dark:hover:text-accent-foreground"
+                >
+                  Custom detector docs →
+                </a>
+              </div>
+              <ol className="grid divide-y-2 divide-primary-foreground/20 sm:grid-cols-2 sm:divide-y-0 xl:grid-cols-4 xl:divide-x-2">
+                {detectorLadder.map((rung) => (
+                  <li
+                    key={rung.tier}
+                    className="flex flex-col gap-2 p-4 sm:p-5"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-mono text-2xl font-black text-primary-foreground/20">
+                        {rung.tier}
+                      </span>
+                      <PowerMeter level={rung.power} />
+                    </div>
+                    <p className="font-serif text-sm font-black uppercase leading-tight tracking-[0.04em]">
+                      {rung.title}
+                    </p>
+                    <p className="text-xs leading-5 text-primary-foreground/65">
+                      {rung.description}
+                    </p>
+                  </li>
+                ))}
+              </ol>
+            </div>
           </div>
         </LandingSectionShell>
       </section>
 
-      {/* ── Custom detector ladder ───────────────────────────────────────── */}
-      <section aria-labelledby="detector-ladder-title">
-        <LandingSectionShell tone="plain">
-          <div className="space-y-6">
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-              <div className="space-y-3">
-                <Marker label="Custom detectors" inverted />
-                <h2
-                  id="detector-ladder-title"
-                  className="font-serif text-4xl font-black uppercase leading-[0.9] tracking-[0.06em] sm:text-5xl"
-                >
-                  From a regex to any model
-                </h2>
-                <p className="max-w-3xl text-muted-foreground">
-                  Custom detection is a ladder, not a leap. Start with a
-                  deterministic rule, climb to zero-shot text understanding,
-                  plug in open transformer models for text and images, and top
-                  out with an LLM detector for the signals nothing else can
-                  catch. Every rung feeds the same findings stream.
-                </p>
-              </div>
-              <Button
-                asChild
-                variant="secondary"
-                className="border-2 border-border"
-              >
-                <a
-                  href="https://docs.classifyre.com/custom-detectors/"
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  Custom detector docs
-                </a>
-              </Button>
+      {/* ── Autopilot ────────────────────────────────────────────────────── */}
+      <section aria-labelledby="harness-title">
+        <LandingSectionShell tone="signal">
+          <div className="space-y-8">
+            <SectionHead
+              id="harness-title"
+              marker="Harness AI"
+              tone="signal"
+              title={
+                <>
+                  Autopilot,{" "}
+                  <span className="inline-block bg-accent px-[0.14em] text-black">
+                    not copilot
+                  </span>
+                </>
+              }
+              lede="Nobody has to type a prompt. After every scan five agents wake in sequence and move the investigation forward — each one logging what it did and why."
+              action={
+                <DocsLink href={docs.autopilot} tone="signal">
+                  Autopilot docs
+                </DocsLink>
+              }
+            />
+
+            {/* The ring is the poster; the five drawings below are the cast.
+                Giving each agent its own full-size illustration beats cramming
+                them into a two-column list of thumbnails. */}
+            <div className="flex flex-col items-center gap-4">
+              <MissionRing />
+              <p className="max-w-md text-center font-mono text-[10px] uppercase leading-5 tracking-[0.14em] text-primary-foreground/55">
+                Flip observe-only and it proposes without touching a thing
+              </p>
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-              {detectorLadder.map((rung, index) => (
-                <div
-                  key={rung.tier}
-                  className={cn(
-                    "group flex flex-col border-2 border-border bg-background p-5 shadow-[4px_4px_0_var(--color-border)] transition-all hover:-translate-y-0.5 hover:shadow-[6px_6px_0_var(--color-border)]",
-                    index === detectorLadder.length - 1 &&
-                      "border-accent shadow-[4px_4px_0_var(--color-accent)] hover:shadow-[6px_6px_0_var(--color-accent)]",
-                  )}
-                >
-                  <div className="flex items-start justify-between">
-                    <span className="font-mono text-3xl font-black text-foreground/15">
-                      {rung.tier}
-                    </span>
-                    <PowerMeter level={rung.power} />
-                  </div>
-                  <span className="mt-3 font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
-                    {rung.marker}
-                  </span>
-                  <p className="mt-1 font-serif text-lg font-black uppercase leading-tight tracking-[0.04em]">
-                    {rung.title}
-                  </p>
-                  <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                    {rung.description}
-                  </p>
-                  <div className="mt-auto flex flex-wrap gap-1 pt-4">
-                    {rung.tags.map((tag) => (
-                      <span
-                        key={tag}
-                        className="border border-border/40 bg-foreground/5 px-1.5 py-0.5 font-mono text-[10px]"
-                      >
-                        {tag}
+            <ol className="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-5">
+              {harnessMissions.map((mission, index) => (
+                <Reveal key={mission.step} as="li" delayMs={index * 80}>
+                  <div className="flex h-full flex-col items-center gap-4 border-2 border-primary-foreground/25 bg-primary-foreground/8 p-5 text-center">
+                    <Illustration
+                      name={mission.illustration}
+                      surface="inverted"
+                      tilt={index % 2 === 0 ? "left" : "right"}
+                      className="h-24 w-24"
+                    />
+                    <div className="flex items-baseline gap-2">
+                      <span className="font-mono text-[10px] font-bold text-accent dark:text-accent-foreground">
+                        {mission.step}
                       </span>
-                    ))}
+                      <span className="font-mono text-xs font-bold uppercase tracking-[0.14em]">
+                        {mission.title}
+                      </span>
+                    </div>
+                    <p className="text-xs leading-5 text-primary-foreground/68">
+                      {mission.description}
+                    </p>
                   </div>
-                </div>
+                </Reveal>
               ))}
-            </div>
+            </ol>
           </div>
         </LandingSectionShell>
       </section>
 
       {/* ── Workspaces ───────────────────────────────────────────────────── */}
       <section aria-labelledby="workspaces-title">
-        <LandingSectionShell tone="signal">
-          <div className="space-y-10">
-            <div className="space-y-3">
-              <Marker label="Isolated workspaces" inverted />
-              <h2
-                id="workspaces-title"
-                className="font-serif text-4xl font-black uppercase leading-[0.9] tracking-[0.06em] sm:text-5xl"
-              >
-                One instance.
-                <br />
-                <span className="inline-block bg-accent px-[0.14em] text-black">
+        <LandingSectionShell tone="plain">
+          <div className="space-y-8">
+            <SectionHead
+              id="workspaces-title"
+              marker="Isolated workspaces"
+              title={
+                <>
+                  One instance.
+                  <br />
                   Sealed case files.
-                </span>
-              </h2>
-              <p className="max-w-3xl text-primary-foreground/72">
-                A client, a region, a business unit, a single sensitive matter —
-                each gets its own workspace, and a workspace is a wall, not a
-                filter. Separate schema, separate evidence, separate AI memory,
-                separate endpoint. Switch between them from the same install;
-                nothing crosses.
-              </p>
-            </div>
+                </>
+              }
+              lede="A client, a region, a business unit — each gets its own PostgreSQL schema, evidence, AI memory, and endpoint. A wall, not a tenant column somebody can forget to filter on."
+              action={
+                <DocsLink href={docs.workspaces}>Workspace docs</DocsLink>
+              }
+            />
 
-            <div className="grid gap-8 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)] lg:items-center">
-              <div className="grid gap-3 sm:grid-cols-2">
-                {workspacePillars.map((pillar, index) => (
-                  <Reveal key={pillar.marker} delayMs={index * 90}>
-                    <div className="flex h-full flex-col gap-2 border-2 border-primary-foreground/30 bg-primary-foreground/8 p-4">
-                      <span className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-accent dark:text-accent-foreground">
-                        {pillar.marker}
-                      </span>
-                      <p className="font-serif text-base font-black uppercase leading-tight tracking-[0.04em]">
-                        {pillar.title}
-                      </p>
-                      <p className="text-sm leading-6 text-primary-foreground/72">
-                        {pillar.description}
-                      </p>
-                    </div>
-                  </Reveal>
-                ))}
-              </div>
-
+            <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-center">
               {/* The cabinet: tabbed case files, stacked and sealed. */}
               <figure className="relative">
-                <div
-                  className="cl-stamp absolute -right-2 -top-4 z-10 border-[3px] border-accent px-2.5 py-1 font-mono text-[11px] font-black uppercase tracking-[0.2em] text-accent dark:border-accent-foreground dark:text-accent-foreground"
-                  style={{ "--cl-delay": "500ms" } as CSSProperties}
-                >
-                  Airtight
-                </div>
-
                 <ol className="flex flex-col">
                   {workspaceFiles.map((file, index) => (
-                    <Reveal key={file.slug} as="li" delayMs={index * 140}>
+                    <Reveal key={file.slug} as="li" delayMs={index * 120}>
                       {index > 0 ? (
                         <div
                           className="flex items-center gap-3 py-3"
                           aria-hidden="true"
                         >
-                          <span className="h-px flex-1 border-t-2 border-dashed border-primary-foreground/20" />
-                          <span className="font-mono text-[9px] font-bold uppercase tracking-[0.22em] text-primary-foreground/35">
+                          <span className="h-px flex-1 border-t-2 border-dashed border-border/50" />
+                          <span className="font-mono text-[9px] font-bold uppercase tracking-[0.22em] text-muted-foreground">
                             No crossover
                           </span>
-                          <span className="h-px flex-1 border-t-2 border-dashed border-primary-foreground/20" />
+                          <span className="h-px flex-1 border-t-2 border-dashed border-border/50" />
                         </div>
                       ) : null}
 
                       <div className="cl-file">
-                        {/* Index tab, staggered across the stack. */}
                         <div
                           className="cl-file-tab flex"
                           style={
@@ -1465,7 +1032,7 @@ export default function HomePage() {
                               "border-2 border-b-0 px-2.5 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.14em]",
                               file.active
                                 ? "border-accent bg-accent text-black"
-                                : "border-primary-foreground/30 bg-primary-foreground/8 text-primary-foreground/60",
+                                : "border-border bg-foreground/5 text-muted-foreground",
                             )}
                           >
                             {file.slug}
@@ -1476,26 +1043,19 @@ export default function HomePage() {
                           className={cn(
                             "flex items-center justify-between gap-3 border-2 p-4",
                             file.active
-                              ? "border-accent bg-primary-foreground/10"
-                              : "border-primary-foreground/30 bg-primary-foreground/5",
+                              ? "border-accent bg-accent/10"
+                              : "border-border bg-background",
                           )}
                         >
                           <div className="min-w-0">
                             <p className="truncate font-serif text-lg font-black uppercase leading-tight tracking-[0.04em]">
                               {file.name}
                             </p>
-                            <p className="mt-0.5 font-mono text-[11px] uppercase tracking-[0.08em] text-primary-foreground/55">
+                            <p className="mt-0.5 font-mono text-[11px] uppercase tracking-[0.08em] text-muted-foreground">
                               {file.detail}
                             </p>
                           </div>
-                          <span
-                            className={cn(
-                              "shrink-0 border px-1.5 py-0.5 font-mono text-[9px] font-bold uppercase tracking-[0.16em]",
-                              file.active
-                                ? "border-accent text-accent dark:border-accent-foreground/40 dark:text-accent-foreground"
-                                : "border-primary-foreground/25 text-primary-foreground/45",
-                            )}
-                          >
+                          <span className="shrink-0 border border-border px-1.5 py-0.5 font-mono text-[9px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
                             Sealed
                           </span>
                         </div>
@@ -1503,223 +1063,84 @@ export default function HomePage() {
                     </Reveal>
                   ))}
                 </ol>
-
-                <figcaption className="mt-5 border-t-2 border-primary-foreground/25 pt-3 font-mono text-[10px] uppercase tracking-[0.16em] text-primary-foreground/50">
-                  Three investigations, one deployment. The open file is the
-                  only one this session can read.
-                </figcaption>
               </figure>
-            </div>
 
-            {/* What a workspace owns outright */}
-            <div className="border-2 border-primary-foreground/25 bg-primary-foreground/4">
-              <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b-2 border-primary-foreground/25 px-4 py-3 sm:px-5">
-                <span className="font-mono text-[11px] font-bold uppercase tracking-[0.2em] text-accent dark:text-accent-foreground">
-                  Not shared. Ever.
-                </span>
-                <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-primary-foreground/50">
-                  Every workspace owns its own
-                </span>
+              <div className="border-2 border-border bg-background">
+                <div className="border-b-2 border-border px-4 py-3 sm:px-5">
+                  <span className="font-mono text-[11px] font-bold uppercase tracking-[0.2em] text-accent-foreground/70 dark:text-accent">
+                    Not shared. Ever.
+                  </span>
+                </div>
+                <ul className="grid grid-cols-2 gap-px bg-border">
+                  {workspaceIsolation.map((item) => (
+                    <li
+                      key={item}
+                      className="bg-background px-4 py-3 font-mono text-[11px] uppercase tracking-[0.1em] text-muted-foreground"
+                    >
+                      <span className="mr-1.5 text-accent-foreground/70 dark:text-accent">
+                        ▪
+                      </span>
+                      {item}
+                    </li>
+                  ))}
+                </ul>
               </div>
-              <ul className="grid grid-cols-2 gap-px bg-primary-foreground/15 sm:grid-cols-4">
-                {workspaceIsolation.map((item) => (
-                  <li
-                    key={item}
-                    className="bg-foreground px-4 py-3 font-mono text-[11px] uppercase tracking-[0.1em] text-primary-foreground/75"
-                  >
-                    <span className="mr-1.5 text-accent dark:text-accent-foreground">▪</span>
-                    {item}
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            {/* Governance handoff to the enterprise section below */}
-            <div className="flex flex-col gap-3 border-l-2 border-accent pl-4 sm:pl-5">
-              <span className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-accent dark:text-accent-foreground">
-                For enterprise · governed
-              </span>
-              <p className="max-w-3xl text-base leading-7 text-primary-foreground/72">
-                Isolation is in the open-source core and always on. What
-                enterprise adds is the lock on the cabinet: SSO, roles, and
-                per-workspace authorization, so an auditor opens the audit file,
-                a regional team opens its own region, and nobody browses the
-                drawer next door.
-              </p>
             </div>
           </div>
         </LandingSectionShell>
       </section>
 
-      {/* ── Deployment path ──────────────────────────────────────────────── */}
-      <section aria-labelledby="runtime-title">
-        <LandingSectionShell tone="plain" fullWidth>
-          <div className="space-y-8">
-            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:items-end">
-              <div className="space-y-3">
-                <Marker label="Deployment path" inverted />
-                <h2
-                  id="runtime-title"
-                  className="font-serif text-4xl font-black uppercase leading-[0.9] tracking-wider sm:text-5xl"
-                >
-                  One product.
+      {/* ── Enterprise ───────────────────────────────────────────────────── */}
+      {/* The accent frame is this section's own border — it skips the shared
+          shell so the two don't nest into a card-in-a-card. */}
+      <section aria-labelledby="enterprise-title">
+        <div className="relative overflow-hidden rounded-[8px] border-2 border-accent bg-background">
+          <div className="landing-grid absolute inset-0 opacity-20" />
+          <div className="relative space-y-6 p-6 py-10 sm:p-8 sm:py-12 lg:py-16">
+            <SectionHead
+              id="enterprise-title"
+              marker="Enterprise"
+              illustration="people"
+              title={
+                <>
+                  A partnership,
                   <br />
-                  Two jurisdictions.
-                </h2>
-              </div>
-              <p className="max-w-2xl text-muted-foreground">
-                These aren&apos;t tiers, trials, or lite editions — each runtime
-                is the full, productized platform. The desktop app keeps the
-                investigation local; the Helm chart runs it remotely and scales
-                as heavily as your estate demands.
-              </p>
+                  not a license key
+                </>
+              }
+              lede="Our engineers work with your team from the first pilot — learning how your business names things and tuning Classifyre to how your company actually works."
+            />
+
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              {enterprisePillars.map((pillar, index) => (
+                <Reveal key={pillar.marker} delayMs={index * 80}>
+                  <div className="flex h-full flex-col gap-2 border-2 border-border bg-background p-4">
+                    <p className="font-serif text-sm font-black uppercase leading-tight tracking-[0.04em]">
+                      {pillar.marker}
+                    </p>
+                    <p className="text-sm leading-6 text-muted-foreground">
+                      {pillar.description}
+                    </p>
+                  </div>
+                </Reveal>
+              ))}
             </div>
 
-            <div className="grid gap-4 lg:grid-cols-2">
-              {/* Desktop */}
-              <div className="panel-card flex h-full flex-col gap-4 rounded-[16px] bg-card p-6">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="space-y-2">
-                    <span className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
-                      01 · Local · one install
-                    </span>
-                    <h3 className="font-serif text-2xl font-black uppercase leading-tight tracking-[0.04em]">
-                      Desktop
-                    </h3>
-                  </div>
-                  <span className="inline-flex shrink-0 border-2 border-accent bg-accent px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-black">
-                    Full product
-                  </span>
-                </div>
-                <p className="text-sm leading-6 text-muted-foreground">
-                  The complete platform in a single install — PostgreSQL
-                  embedded, every scan worker sandboxed under the hood. Not a
-                  demo, not a trial: it&apos;s how a single investigator runs
-                  Classifyre day to day, with everything on your machine.
-                </p>
-                <div className="grid gap-2">
-                  {desktopDownloads.map((download) => (
-                    <a
-                      key={download.os}
-                      href={desktopDownloadUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="group flex items-baseline justify-between gap-2 border-2 border-border bg-background px-3 py-2.5 transition-all hover:-translate-y-0.5 hover:border-accent hover:shadow-[4px_4px_0_var(--color-accent)]"
-                    >
-                      <span className="font-mono text-sm font-bold uppercase tracking-[0.1em]">
-                        {download.os}
-                        <span className="text-accent-foreground/60 transition-colors group-hover:text-accent-foreground dark:text-accent">
-                          {" "}
-                          ↓
-                        </span>
-                      </span>
-                      <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-muted-foreground">
-                        {download.detail}
-                      </span>
-                    </a>
-                  ))}
-                </div>
-                <p className="mt-auto pt-1 font-mono text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
-                  Free · Open source · No signup, no cluster, no sales call
-                </p>
-              </div>
-
-              {/* Kubernetes */}
-              <div className="panel-card flex h-full flex-col gap-4 rounded-[16px] bg-foreground p-6 text-primary-foreground">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="space-y-2">
-                    <span className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-primary-foreground/55">
-                      02 · Remote · any size
-                    </span>
-                    <h3 className="font-serif text-2xl font-black uppercase leading-tight tracking-[0.04em]">
-                      Helm on Kubernetes
-                    </h3>
-                  </div>
-                  <span className="inline-flex shrink-0 border-2 border-accent px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-accent">
-                    Scales to any size
-                  </span>
-                </div>
-                <p className="text-sm leading-6 text-primary-foreground/72">
-                  The same open-source core, deployed remotely — self-hosted or
-                  in your cloud — with properly separated components and
-                  ephemeral processing workers that scale to zero between scans
-                  and fan out as far as your estate goes. Your infrastructure,
-                  your data.
-                </p>
-                <CommandBlock label="Helm install" lines={helmInstallCommand} />
-                <div className="mt-auto pt-1">
-                  <Button
-                    asChild
-                    variant="secondary"
-                    className="w-full border-2 border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/16"
-                  >
-                    <a href={helmDocsUrl} target="_blank" rel="noreferrer">
-                      Helm chart docs
-                    </a>
-                  </Button>
-                </div>
-              </div>
-            </div>
-
-            {/* Enterprise partnership */}
-            <div className="relative overflow-hidden border-2 border-accent bg-background">
-              <div className="landing-grid absolute inset-0 opacity-20" />
-              <div className="relative space-y-6 p-6 sm:p-8">
-                <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-                  <div className="space-y-2">
-                    <span className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
-                      03 · When it becomes infrastructure
-                    </span>
-                    <h3 className="font-serif text-3xl font-black uppercase leading-[0.95] tracking-[0.04em] sm:text-4xl">
-                      A partnership,
-                      <br />
-                      not a license key
-                    </h3>
-                  </div>
-                  <p className="max-w-xl text-sm leading-6 text-muted-foreground sm:text-base sm:leading-7">
-                    The enterprise layer adds what a regulated, global rollout
-                    needs — and it comes with us attached. Our engineers work
-                    with your team from the first pilot: we learn how your
-                    business names things, tune detection to your language, and
-                    tailor Classifyre to the way your company actually works.
-                  </p>
-                </div>
-
-                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                  {enterprisePillars.map((pillar, index) => (
-                    <Reveal key={pillar.marker} delayMs={index * 90}>
-                      <div className="flex h-full flex-col gap-2 border-2 border-border bg-background p-4">
-                        <span className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-accent-foreground/60 dark:text-accent">
-                          {pillar.marker}
-                        </span>
-                        <p className="font-serif text-base font-black uppercase leading-tight tracking-[0.04em]">
-                          {pillar.title}
-                        </p>
-                        <p className="text-sm leading-6 text-muted-foreground">
-                          {pillar.description}
-                        </p>
-                      </div>
-                    </Reveal>
-                  ))}
-                </div>
-
-                <div className="flex flex-wrap items-center gap-4">
-                  <Button
-                    asChild
-                    className="border-2 border-accent bg-accent text-accent-foreground hover:bg-accent/90"
-                  >
-                    <a href={`mailto:${enterpriseContactEmail}`}>
-                      Start the conversation
-                    </a>
-                  </Button>
-                  <span className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
-                    {enterpriseContactEmail}
-                  </span>
-                </div>
-              </div>
+            <div className="flex flex-wrap items-center gap-4">
+              <Button
+                asChild
+                className="border-2 border-accent bg-accent text-accent-foreground hover:bg-accent/90"
+              >
+                <a href={`mailto:${enterpriseContactEmail}`}>
+                  Start the conversation
+                </a>
+              </Button>
+              <span className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
+                {enterpriseContactEmail}
+              </span>
             </div>
           </div>
-        </LandingSectionShell>
+        </div>
       </section>
 
       {/* ── Closing CTA ──────────────────────────────────────────────────── */}
@@ -1762,14 +1183,14 @@ export default function HomePage() {
                 </span>
               </h2>
               <p className="max-w-xl text-base leading-7 text-white/70">
-                Download the desktop app — or run one Docker command — point it
-                at a system you already run, and see what the investigator
-                finds. Everything stays on your machine, and everything you
-                build carries over when you go remote with Helm.
+                Download it, point it at a system you already run, and see what
+                the investigator finds. Everything you build carries over when
+                you go remote with Helm.
               </p>
               <div className="flex flex-wrap justify-center gap-3">
                 <Button
                   asChild
+                  size="lg"
                   className="border-2 border-accent bg-accent text-black hover:bg-accent/90"
                 >
                   <a href={desktopDownloadUrl} target="_blank" rel="noreferrer">
@@ -1778,14 +1199,11 @@ export default function HomePage() {
                 </Button>
                 <Button
                   asChild
+                  size="lg"
                   variant="secondary"
                   className="border-2 border-white/20 bg-white/10 text-white hover:bg-white/16"
                 >
-                  <a
-                    href="https://demo.classifyre.com/"
-                    target="_blank"
-                    rel="noreferrer"
-                  >
+                  <a href={demoUrl} target="_blank" rel="noreferrer">
                     Try the live demo
                   </a>
                 </Button>

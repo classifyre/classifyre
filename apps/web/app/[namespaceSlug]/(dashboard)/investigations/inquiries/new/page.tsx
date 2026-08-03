@@ -4,9 +4,11 @@ import { useMemo, useRef } from "react";
 import type { AssistantUiAction } from "@workspace/api-client";
 import { InquiryForm, type InquiryFormHandle } from "@/components/inquiry-form";
 import { useRegisterAssistantBridge } from "@/components/assistant-workflow-provider";
+import { useTranslation } from "@/hooks/use-translation";
 
 export default function NewInquiryPage() {
   const formRef = useRef<InquiryFormHandle | null>(null);
+  const { t } = useTranslation();
 
   const assistantBridge = useMemo(
     () => ({
@@ -21,7 +23,7 @@ export default function NewInquiryPage() {
         return {
           key: "inquiry.create" as const,
           route: "/investigations/inquiries/new",
-          title: "Inquiry Builder Assistant",
+          title: t("investigations.inquiryForm.assistantTitle"),
           entityId: null,
           values,
           schema: null,
@@ -35,7 +37,7 @@ export default function NewInquiryPage() {
         }
       },
     }),
-    [],
+    [t],
   );
 
   useRegisterAssistantBridge(assistantBridge);

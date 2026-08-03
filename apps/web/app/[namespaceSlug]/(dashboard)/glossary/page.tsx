@@ -309,7 +309,6 @@ export default function GlossaryPage() {
               {t("glossary.title")}
             </h1>
           </div>
-          <p className="text-muted-foreground">{t("glossary.description")}</p>
         </div>
         <Button onClick={openAddDialog}>
           <Plus className="mr-2 h-4 w-4" />

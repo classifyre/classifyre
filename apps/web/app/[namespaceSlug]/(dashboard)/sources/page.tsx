@@ -29,9 +29,6 @@ export default function SourcesPage() {
               {t("sources.title")}
             </h1>
           </div>
-          <p className="text-muted-foreground">
-            {t("sources.description")}
-          </p>
         </div>
         <Button onClick={() => router.push(nsPath("/sources/new"))}>
           <Plus className="mr-2 h-4 w-4" />

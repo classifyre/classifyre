@@ -384,6 +384,7 @@ helm upgrade --install classifyre ./helm/classifyre \
 | postgres.embedded.resources.limits | object | `{"cpu":"2","memory":"4Gi"}` | Embedded Postgres resource limits. |
 | postgres.embedded.resources.requests | object | `{"cpu":"100m","memory":"256Mi"}` | Embedded Postgres resource requests. |
 | postgres.embedded.service.annotations | object | `{}` | Additional annotations for embedded Postgres service. |
+| postgres.embedded.shmSize | string | `"1Gi"` | to fall back to the runtime default. |
 | postgres.embedded.terminationGracePeriodSeconds | string | `nil` | Embedded Postgres pod termination grace period (seconds). Set to null to use Kubernetes default. |
 | postgres.embedded.tolerations | list | `[]` | Embedded Postgres scheduling: tolerations. |
 | postgres.embedded.username | string | `"postgres"` | Embedded Postgres user name. |
