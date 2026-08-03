@@ -35,14 +35,16 @@ export class ArchiveStoreService {
   }
 
   /**
-   * Largest archive accepted on import.
+   * Largest archive accepted on import. Unlimited by default, matching the
+   * multipart/body limits in main.ts — a real corpus export is routinely
+   * hundreds of MB and a fixed ceiling only made import fail at the door.
    *
-   * Capped by @fastify/multipart's per-file limit in main.ts, which is the real
-   * ceiling on an upload — a larger value here would only produce a confusing
-   * failure further down.
+   * `DATA_TRANSFER_MAX_MB` re-imposes a cap for deployments that want one;
+   * anything unset or non-positive means no cap.
    */
   get maxArchiveBytes(): number {
-    return readIntEnv('DATA_TRANSFER_MAX_MB', 50) * 1024 * 1024;
+    const mb = readIntEnv('DATA_TRANSFER_MAX_MB', 0);
+    return mb > 0 ? mb * 1024 * 1024 : Number.MAX_SAFE_INTEGER;
   }
 
   expiryFromNow(): Date {

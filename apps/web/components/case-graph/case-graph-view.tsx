@@ -52,6 +52,7 @@ import {
 } from "../graph-explorer/use-clustered-graph";
 import { ClusterControls } from "../graph-explorer/cluster-controls";
 import { ClusterDetailPanel, ClusterOverviewPanel } from "../graph-explorer/cluster-panels";
+import { useClusterLabelFormatter } from "../graph-explorer/use-cluster-label";
 import { useClusterFocus } from "../graph-explorer/use-cluster-focus";
 import { severityArcsOf } from "../graph-explorer/node-render";
 import {
@@ -184,7 +185,11 @@ export function CaseGraphView({
   const seedOverridesRef = React.useRef(new Map<string, { x: number; y: number }>());
 
   // ── Community clustering / semantic zoom ──────────────────────────────────
-  const clustered = useClusteredGraph(visibleNodes, visibleEdges, { assetStats });
+  const formatClusterLabel = useClusterLabelFormatter();
+  const clustered = useClusteredGraph(visibleNodes, visibleEdges, {
+    assetStats,
+    formatLabel: formatClusterLabel,
+  });
   const { renderNodes, renderEdges } = clustered;
 
   const layout = useForceLayout(renderNodes, renderEdges, size, seedOverridesRef.current);

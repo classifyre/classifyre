@@ -34,15 +34,26 @@ function useAssistantFabOffset(ref: React.RefObject<HTMLDivElement | null>) {
 }
 
 type StickyActionToolbarProps = {
-  onSave: () => void;
-  onTest: () => void;
+  /** Secondary "save without running" action — omitted when a flow has none. */
+  onSave?: () => void;
+  /** Secondary "dry run" action — omitted when a flow has none. */
+  onTest?: () => void;
   onSaveAndRun: () => void;
-  saveLabel: string;
-  testLabel: string;
+  saveLabel?: string;
+  testLabel?: string;
   saveAndRunLabel: string;
+  /** Left-most escape hatch (back / cancel). */
+  onCancel?: () => void;
+  cancelLabel?: string;
+  /** Small muted note rendered next to the secondary actions. */
+  hint?: ReactNode;
   isBusy?: boolean;
   disabled?: boolean;
+  /** Disables only the primary action (e.g. a required field is still empty). */
+  saveAndRunDisabled?: boolean;
   className?: string;
+  saveTestId?: string;
+  testTestId?: string;
   saveAndRunTestId?: string;
   testIcon?: ReactNode;
   runIcon?: ReactNode;
@@ -55,9 +66,15 @@ export function StickyActionToolbar({
   saveLabel,
   testLabel,
   saveAndRunLabel,
+  onCancel,
+  cancelLabel,
+  hint,
   isBusy = false,
   disabled = false,
+  saveAndRunDisabled = false,
   className,
+  saveTestId = "btn-save-source",
+  testTestId = "btn-test-source",
   saveAndRunTestId,
   testIcon,
   runIcon,
@@ -71,31 +88,53 @@ export function StickyActionToolbar({
       className={cn("sticky bottom-0 z-30 p-4", className)}
     >
       <div className="flex items-center justify-between gap-3">
-        <Button
-          type="button"
-          variant="outline"
-          onClick={onSave}
-          disabled={isBusy || disabled}
-          data-testid="btn-save-source"
-        >
-          {saveLabel}
-        </Button>
+        <div className="flex min-w-0 items-center gap-2">
+          {onCancel && cancelLabel && (
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={onCancel}
+              disabled={isBusy}
+              data-testid="btn-cancel"
+            >
+              {cancelLabel}
+            </Button>
+          )}
+          {onSave && saveLabel && (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onSave}
+              disabled={isBusy || disabled}
+              data-testid={saveTestId}
+            >
+              {saveLabel}
+            </Button>
+          )}
+        </div>
 
-        <div className="flex items-center gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={onTest}
-            disabled={isBusy || disabled}
-            data-testid="btn-test-source"
-          >
-            {testIcon}
-            {testLabel}
-          </Button>
+        <div className="flex items-center gap-3">
+          {hint && (
+            <span className="text-muted-foreground hidden text-[11px] sm:block">
+              {hint}
+            </span>
+          )}
+          {onTest && testLabel && (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onTest}
+              disabled={isBusy || disabled}
+              data-testid={testTestId}
+            >
+              {testIcon}
+              {testLabel}
+            </Button>
+          )}
           <Button
             type="submit"
             onClick={onSaveAndRun}
-            disabled={isBusy || disabled}
+            disabled={isBusy || disabled || saveAndRunDisabled}
             data-testid={saveAndRunTestId}
           >
             {runIcon}

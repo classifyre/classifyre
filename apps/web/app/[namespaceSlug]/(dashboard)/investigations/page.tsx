@@ -32,9 +32,6 @@ function InvestigationsPageInner() {
           <h1 className="font-serif text-3xl font-black uppercase tracking-[0.04em]">
             {t("nav.investigations")}
           </h1>
-          <p className="text-muted-foreground mt-1 max-w-xl text-sm">
-            {t("investigations.page.description")}
-          </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <Button

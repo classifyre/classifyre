@@ -56,6 +56,18 @@ export interface GraphNodeDto {
      */
     sourceType?: string;
     /**
+     * For asset nodes: parent source id
+     * @type {string}
+     * @memberof GraphNodeDto
+     */
+    sourceId?: string;
+    /**
+     * For asset nodes: the operator-facing name of the parent source (not its connector type)
+     * @type {string}
+     * @memberof GraphNodeDto
+     */
+    sourceName?: string;
+    /**
      * 
      * @type {string}
      * @memberof GraphNodeDto
@@ -144,6 +156,8 @@ export function GraphNodeDtoFromJSONTyped(json: any, ignoreDiscriminator: boolea
         'depth': json['depth'],
         'assetType': json['assetType'] == null ? undefined : json['assetType'],
         'sourceType': json['sourceType'] == null ? undefined : json['sourceType'],
+        'sourceId': json['sourceId'] == null ? undefined : json['sourceId'],
+        'sourceName': json['sourceName'] == null ? undefined : json['sourceName'],
         'severity': json['severity'] == null ? undefined : json['severity'],
         'detectorType': json['detectorType'] == null ? undefined : json['detectorType'],
         'customDetectorName': json['customDetectorName'] == null ? undefined : json['customDetectorName'],
@@ -174,6 +188,8 @@ export function GraphNodeDtoToJSONTyped(value?: GraphNodeDto | null, ignoreDiscr
         'depth': value['depth'],
         'assetType': value['assetType'],
         'sourceType': value['sourceType'],
+        'sourceId': value['sourceId'],
+        'sourceName': value['sourceName'],
         'severity': value['severity'],
         'detectorType': value['detectorType'],
         'customDetectorName': value['customDetectorName'],

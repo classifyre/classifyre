@@ -378,14 +378,34 @@ export class AutoScheduleService {
     const limit = maxConcurrentAutoScans();
     if (limit === 0) return;
 
+    // EVERY scan in flight counts, not just the adaptive scheduler's own.
+    //
+    // The thing being rationed is the instance's capacity to scan, and a cron
+    // schedule an operator set, a run they started by hand, and an agent's
+    // verification re-scan all consume it. Counting only AUTO sources here
+    // meant `AUTO_SCHEDULE_MAX_CONCURRENT` really read "two adaptive scans ON
+    // TOP OF whatever else is running" — so ten cron sources firing at 02:00
+    // would have had two more piled on them, and with MAX_CONCURRENT_RUNNERS
+    // unset (the default) nothing downstream would have objected.
+    //
+    // The consequence is deliberate: adaptive scanning is opportunistic and
+    // yields to explicit intent. A busy instance simply gets fewer catch-up
+    // runs, which is the correct trade — a source sweeping itself faster is
+    // never worth delaying the schedule someone chose.
     const inFlight = await this.prisma.source.count({
       where: {
-        scheduleMode: SourceScheduleMode.AUTO,
         runnerStatus: { in: [RunnerStatus.PENDING, RunnerStatus.RUNNING] },
       },
     });
     let budget = limit - inFlight;
-    if (budget <= 0) return;
+    if (budget <= 0) {
+      // Logged rather than silent: "why has my catch-up sweep stalled" should
+      // be answerable from the log without reading this code.
+      this.logger.debug(
+        `Auto-schedule yielding: ${inFlight} scan(s) already in flight (cap ${limit}).`,
+      );
+      return;
+    }
 
     const due = await this.prisma.source.findMany({
       where: {

@@ -279,6 +279,10 @@ export function ScheduleCard({
     ? describeCronLocal(value.cron)
     : "";
 
+  // The cron controls belong to the fixed mode only. While the schedule is off
+  // — the default for a new source — the mode selector is what should show.
+  const showCron = value.enabled && value.mode === "CRON";
+
   // ── Render ───────────────────────────────────────────────────────────────────
 
   return (
@@ -403,9 +407,7 @@ export function ScheduleCard({
                   <span className="text-[10px] font-mono text-muted-foreground">
                     {autoStatus.nextRunAt
                       ? t("schedule.nextScan", {
-                          time: new Date(
-                            autoStatus.nextRunAt,
-                          ).toLocaleString(),
+                          time: new Date(autoStatus.nextRunAt).toLocaleString(),
                         })
                       : t("schedule.noScanQueued")}
                   </span>
@@ -432,136 +434,125 @@ export function ScheduleCard({
         )}
 
         {/* ── Preset frequency grid ─────────────────────────────────────────── */}
-        <div
-          className={cn(
-            "space-y-2",
-            value.enabled && value.mode === "AUTO" && "hidden",
-          )}
-        >
-          <p className="text-[10px] font-mono uppercase tracking-[0.14em] text-muted-foreground">
-            Frequency
-          </p>
-          <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
-            {PRESETS.map((preset) => {
-              const active = isPresetActive(preset.value);
-              return (
-                <button
-                  key={preset.value}
-                  type="button"
-                  onClick={() => handlePresetSelect(preset.value)}
-                  disabled={disabled}
-                  className={cn(
-                    "group relative flex flex-col items-start gap-0.5 rounded-[4px] border-2 px-3 py-2 text-left transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1",
-                    active
-                      ? "border-border bg-accent text-accent-foreground shadow-[2px_2px_0_var(--color-border)]"
-                      : "border-border/20 hover:border-border hover:bg-foreground/5",
-                  )}
-                >
-                  <span
-                    className={cn(
-                      "text-xs font-semibold leading-tight",
-                      active ? "text-accent-foreground" : "text-foreground",
-                    )}
-                  >
-                    {preset.label}
-                  </span>
-                  <span
-                    className={cn(
-                      "text-[10px] font-mono",
-                      active
-                        ? "text-accent-foreground/60"
-                        : "text-muted-foreground",
-                    )}
-                  >
-                    {preset.hint}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        <Separator
-          className={cn(
-            "bg-border/10",
-            value.enabled && value.mode === "AUTO" && "hidden",
-          )}
-        />
-
-        {/* ── Cron input row ────────────────────────────────────────────────── */}
-        <div
-          className={cn(
-            "space-y-1.5",
-            value.enabled && value.mode === "AUTO" && "hidden",
-          )}
-        >
-          <div className="flex gap-2 items-center">
-            <div className="relative flex-1">
-              <Input
-                placeholder={t("schedule.cronPlaceholder")}
-                value={cronInput}
-                onChange={(e) => handleCronInputChange(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    handleApply();
-                  }
-                }}
-                disabled={disabled}
-                className={cn(
-                  "font-mono text-xs border-2 rounded-[4px] h-9 pr-8",
-                  cronError
-                    ? "border-destructive focus:border-destructive"
-                    : "border-border/40 focus:border-border",
-                )}
-              />
-              {/* Re-roll button for preset modes */}
-              {value.enabled &&
-                value.mode === "CRON" &&
-                value.preset !== "none" &&
-                value.preset !== "custom" && (
-                  <button
-                    type="button"
-                    onClick={handleReroll}
-                    disabled={disabled}
-                    title={t("schedule.randomise")}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    <RefreshCw className="h-3 w-3" />
-                  </button>
-                )}
+        {showCron && (
+          <>
+            <div className="space-y-2">
+              <p className="text-[10px] font-mono uppercase tracking-[0.14em] text-muted-foreground">
+                Frequency
+              </p>
+              <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
+                {PRESETS.map((preset) => {
+                  const active = isPresetActive(preset.value);
+                  return (
+                    <button
+                      key={preset.value}
+                      type="button"
+                      onClick={() => handlePresetSelect(preset.value)}
+                      disabled={disabled}
+                      className={cn(
+                        "group relative flex flex-col items-start gap-0.5 rounded-[4px] border-2 px-3 py-2 text-left transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1",
+                        active
+                          ? "border-border bg-accent text-accent-foreground shadow-[2px_2px_0_var(--color-border)]"
+                          : "border-border/20 hover:border-border hover:bg-foreground/5",
+                      )}
+                    >
+                      <span
+                        className={cn(
+                          "text-xs font-semibold leading-tight",
+                          active ? "text-accent-foreground" : "text-foreground",
+                        )}
+                      >
+                        {preset.label}
+                      </span>
+                      <span
+                        className={cn(
+                          "text-[10px] font-mono",
+                          active
+                            ? "text-accent-foreground/60"
+                            : "text-muted-foreground",
+                        )}
+                      >
+                        {preset.hint}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
-            {/* Apply */}
-            <Button
-              type="button"
-              size="sm"
-              onClick={handleApply}
-              disabled={disabled || !cronInput || !!cronError}
-              className="h-9 px-3 text-xs border-2 border-border rounded-[4px] font-mono font-semibold bg-foreground text-primary-foreground hover:bg-accent hover:text-accent-foreground transition-colors shrink-0"
-            >
-              Apply
-            </Button>
-          </div>
+            <Separator className="bg-border/10" />
 
-          {/* Cron caption / error */}
-          {cronError ? (
-            <p className="text-[10px] text-destructive font-mono pl-0.5">
-              {cronError}
-            </p>
-          ) : cronDescription ? (
-            <p className="text-[10px] text-muted-foreground font-mono pl-0.5">
-              {cronDescription}
-            </p>
-          ) : (
-            <p className="text-[10px] text-muted-foreground font-mono pl-0.5">
-              5 fields:{" "}
-              <span className="text-foreground/70">
-                minute · hour · day · month · weekday
-              </span>
-            </p>
-          )}
-        </div>
+            {/* ── Cron input row ────────────────────────────────────────── */}
+            <div className="space-y-1.5">
+              <div className="flex gap-2 items-center">
+                <div className="relative flex-1">
+                  <Input
+                    placeholder={t("schedule.cronPlaceholder")}
+                    value={cronInput}
+                    onChange={(e) => handleCronInputChange(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        handleApply();
+                      }
+                    }}
+                    disabled={disabled}
+                    className={cn(
+                      "font-mono text-xs border-2 rounded-[4px] h-9 pr-8",
+                      cronError
+                        ? "border-destructive focus:border-destructive"
+                        : "border-border/40 focus:border-border",
+                    )}
+                  />
+                  {/* Re-roll button for preset modes */}
+                  {value.enabled &&
+                    value.mode === "CRON" &&
+                    value.preset !== "none" &&
+                    value.preset !== "custom" && (
+                      <button
+                        type="button"
+                        onClick={handleReroll}
+                        disabled={disabled}
+                        title={t("schedule.randomise")}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                      >
+                        <RefreshCw className="h-3 w-3" />
+                      </button>
+                    )}
+                </div>
+
+                {/* Apply */}
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={handleApply}
+                  disabled={disabled || !cronInput || !!cronError}
+                  className="h-9 px-3 text-xs border-2 border-border rounded-[4px] font-mono font-semibold bg-foreground text-primary-foreground hover:bg-accent hover:text-accent-foreground transition-colors shrink-0"
+                >
+                  Apply
+                </Button>
+              </div>
+
+              {/* Cron caption / error */}
+              {cronError ? (
+                <p className="text-[10px] text-destructive font-mono pl-0.5">
+                  {cronError}
+                </p>
+              ) : cronDescription ? (
+                <p className="text-[10px] text-muted-foreground font-mono pl-0.5">
+                  {cronDescription}
+                </p>
+              ) : (
+                <p className="text-[10px] text-muted-foreground font-mono pl-0.5">
+                  5 fields:{" "}
+                  <span className="text-foreground/70">
+                    minute · hour · day · month · weekday
+                  </span>
+                </p>
+              )}
+            </div>
+          </>
+        )}
 
         {/* ── Disabled hint ──────────────────────────────────────────────────── */}
         {!value.enabled && (

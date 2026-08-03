@@ -26,6 +26,7 @@ import {
 } from "./use-clustered-graph";
 import { ClusterControls } from "./cluster-controls";
 import { ClusterDetailPanel, ClusterOverviewPanel } from "./cluster-panels";
+import { useClusterLabelFormatter } from "./use-cluster-label";
 import { useClusterFocus } from "./use-cluster-focus";
 
 const SELECT_MODE: GraphMode = { kind: "select" };
@@ -100,7 +101,8 @@ export function GraphExplorer({
   const containerRef = React.useRef<HTMLDivElement>(null);
   const size = useContainerSize(containerRef);
 
-  const clustered = useClusteredGraph(nodes, edges, clustering);
+  const formatLabel = useClusterLabelFormatter();
+  const clustered = useClusteredGraph(nodes, edges, { formatLabel, ...clustering });
   const { renderNodes, renderEdges } = clustered;
 
   /** Fan seed positions for members of a just-expanded cluster. */
