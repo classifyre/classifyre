@@ -7,6 +7,17 @@ import type { GraphEdgeDto, GraphNodeDto } from "@workspace/api-client";
 import { keyOf, nodeKey } from "./graph-types";
 import type { AssetFindingStats } from "./explorer-types";
 
+/** One source contributing assets to a community, with its share of them. */
+export interface ClusterSourceShare {
+  /** Absent on payloads predating sourceId on graph nodes. */
+  id?: string;
+  /** Operator-facing source name, e.g. "Enron Email Archive". */
+  name?: string;
+  /** Connector type enum, e.g. "S3_COMPATIBLE_STORAGE". */
+  type?: string;
+  assetCount: number;
+}
+
 /** Aggregate metadata for one detected community. */
 export interface ClusterMeta {
   id: string;
@@ -18,10 +29,24 @@ export interface ClusterMeta {
   findingCount: number;
   severityCounts: Record<string, number>;
   topSeverity?: string;
+  /** Sources behind the cluster's assets, biggest contributor first. */
+  sources: ClusterSourceShare[];
   dominantSourceType?: string;
   dominantDetector?: string;
   label: string;
 }
+
+/** Everything a label formatter gets to work with. */
+export type ClusterLabelInput = Omit<ClusterMeta, "label">;
+
+/**
+ * Default label: the connector enum and the asset count. Views that can reach
+ * translations pass `formatLabel` instead and get the real source name.
+ */
+const defaultFormatLabel = (meta: ClusterLabelInput): string =>
+  [meta.dominantSourceType ?? meta.dominantDetector, `${meta.assetCount || meta.size}`]
+    .filter(Boolean)
+    .join(" · ");
 
 /** Pseudo graph node standing in for a collapsed community. */
 export interface ClusterNode extends GraphNodeDto {
@@ -53,6 +78,12 @@ export interface ClusteringOptions {
   minGraphSize?: number;
   /** Per-asset finding stats (from useVisibleGraph) to enrich severity mixes. */
   assetStats?: Map<string, AssetFindingStats>;
+  /**
+   * Renders the caption drawn under a cluster bubble. Keep it referentially
+   * stable (see {@link useClusterLabelFormatter}) — it feeds the clustering
+   * memo, so a fresh function every render would recompute Louvain.
+   */
+  formatLabel?: (meta: ClusterLabelInput) => string;
 }
 
 export interface ClusteredGraph {
@@ -109,6 +140,7 @@ export function useClusteredGraph(
   const minClusterSize = options?.minClusterSize ?? 5;
   const minGraphSize = options?.minGraphSize ?? 40;
   const assetStats = options?.assetStats;
+  const formatLabel = options?.formatLabel ?? defaultFormatLabel;
 
   const [expandedClusters, setExpandedClusters] = React.useState<Set<string>>(new Set());
 
@@ -146,6 +178,9 @@ export function useClusteredGraph(
         .filter((n): n is GraphNodeDto => Boolean(n));
 
       const severityCounts: Record<string, number> = {};
+      // Keyed by source id when the payload carries one, else by connector type
+      // so older responses still collapse per source instead of per asset.
+      const sourceShares = new Map<string, ClusterSourceShare>();
       let findingCount = 0;
       let assetCount = 0;
       for (const m of members) {
@@ -155,6 +190,16 @@ export function useClusteredGraph(
           severityCounts[sev] = (severityCounts[sev] ?? 0) + 1;
         } else if (m.type === "asset") {
           assetCount += 1;
+          const shareKey = m.sourceId ?? m.sourceType ?? "";
+          const share = sourceShares.get(shareKey);
+          if (share) share.assetCount += 1;
+          else
+            sourceShares.set(shareKey, {
+              id: m.sourceId,
+              name: m.sourceName,
+              type: m.sourceType,
+              assetCount: 1,
+            });
           const stats = assetStats?.get(m.id);
           if (stats) {
             findingCount += stats.total;
@@ -165,9 +210,10 @@ export function useClusteredGraph(
         }
       }
       const topSeverity = SEVERITY_ORDER.find((s) => severityCounts[s]);
-      const dominantSourceType = mode(
-        members.filter((m) => m.type === "asset").map((m) => m.sourceType),
+      const sources = [...sourceShares.values()].sort(
+        (a, b) => b.assetCount - a.assetCount,
       );
+      const dominantSourceType = sources[0]?.type;
       const dominantDetector = mode(
         members
           .filter((m) => m.type === "finding")
@@ -177,9 +223,6 @@ export function useClusteredGraph(
       // Stable id: the lexicographically smallest member key anchors the
       // cluster identity across recomputes of the same data.
       const id = `c-${memberKeys.slice().sort()[0]!.replace(/[^a-z0-9]/gi, "").slice(0, 32)}`;
-      const label = [dominantSourceType ?? dominantDetector, `${assetCount || memberKeys.length}`]
-        .filter(Boolean)
-        .join(" · ");
 
       const meta: ClusterMeta = {
         id,
@@ -189,15 +232,17 @@ export function useClusteredGraph(
         findingCount,
         severityCounts,
         topSeverity,
+        sources,
         dominantSourceType,
         dominantDetector,
-        label,
+        label: "",
       };
+      meta.label = formatLabel(meta);
       clusters.set(id, meta);
       for (const k of memberKeys) clusterOfNode.set(k, id);
     }
     return { clusters, clusterOfNode };
-  }, [active, nodes, edges, minClusterSize, assetStats]);
+  }, [active, nodes, edges, minClusterSize, assetStats, formatLabel]);
 
   // ── Carry expansion across recomputes by member overlap ──────────────────
   const prevClustersRef = React.useRef<Map<string, ClusterMeta>>(new Map());

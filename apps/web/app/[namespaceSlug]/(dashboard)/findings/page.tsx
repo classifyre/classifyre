@@ -227,7 +227,6 @@ function FindingsPageContent() {
             {t("findings.title")}
           </h1>
         </div>
-        <p className="text-muted-foreground">{t("findings.description")}</p>
       </div>
 
       {error && (

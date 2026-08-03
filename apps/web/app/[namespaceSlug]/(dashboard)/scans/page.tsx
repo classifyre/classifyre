@@ -331,9 +331,6 @@ export default function ScansPage() {
               {t("scans.title")}
             </h1>
           </div>
-          <p className="text-muted-foreground">
-            {t("scans.subtitle")}
-          </p>
         </div>
         <div className="flex items-center gap-2">
           <Button onClick={() => setWizardOpen(true)}>

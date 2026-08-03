@@ -12,6 +12,8 @@ Name | Type
 `depth` | number
 `assetType` | string
 `sourceType` | string
+`sourceId` | string
+`sourceName` | string
 `severity` | string
 `detectorType` | string
 `customDetectorName` | string
@@ -36,6 +38,8 @@ const example = {
   "depth": null,
   "assetType": null,
   "sourceType": null,
+  "sourceId": null,
+  "sourceName": null,
   "severity": null,
   "detectorType": null,
   "customDetectorName": null,

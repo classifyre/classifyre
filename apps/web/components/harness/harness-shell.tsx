@@ -104,9 +104,6 @@ export function HarnessShell() {
             <h1 className="font-serif text-3xl font-black uppercase tracking-[0.03em]">
               {t("harness.title")}
             </h1>
-            <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-              {t("harness.description")}
-            </p>
           </div>
         </div>
         <Button onClick={() => setRunOpen(true)} className="shrink-0">

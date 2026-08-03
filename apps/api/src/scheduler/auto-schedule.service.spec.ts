@@ -313,6 +313,47 @@ describe('AutoScheduleService', () => {
       expect(prisma.source.findMany).not.toHaveBeenCalled();
     });
 
+    // The capacity being rationed is the instance's, and a cron schedule an
+    // operator set consumes it just as much as a catch-up sweep does. Counting
+    // only AUTO sources made the cap read "two adaptive scans ON TOP OF
+    // everything else".
+    it('counts every scan in flight, not just its own', async () => {
+      prisma.source.count.mockResolvedValue(0);
+      prisma.source.findMany.mockResolvedValue([
+        { id: 's1', name: 'A', scheduleNextAt: new Date() },
+      ]);
+      cliRunner.startRun.mockResolvedValue({ id: 'run-1' });
+
+      await service.tick();
+
+      const where = prisma.source.count.mock.calls[0]![0].where;
+      expect(where.runnerStatus).toEqual({ in: ['PENDING', 'RUNNING'] });
+      // No scheduleMode filter: a cron or manual run counts too.
+      expect(where.scheduleMode).toBeUndefined();
+    });
+
+    it('yields entirely when cron and manual runs have filled the capacity', async () => {
+      // Two scans in flight, none of them adaptive.
+      prisma.source.count.mockResolvedValue(2);
+
+      await service.tick();
+
+      expect(cliRunner.startRun).not.toHaveBeenCalled();
+    });
+
+    // Fair rotation among adaptive sources: longest-overdue first, so a source
+    // whose slow steady interval came due ten minutes ago is picked ahead of a
+    // catch-up source that re-armed thirty seconds ago.
+    it('takes the longest-overdue source first', async () => {
+      prisma.source.count.mockResolvedValue(0);
+      prisma.source.findMany.mockResolvedValue([]);
+
+      await service.tick();
+
+      const args = prisma.source.findMany.mock.calls[0]![0];
+      expect(args.orderBy).toEqual({ scheduleNextAt: 'asc' });
+    });
+
     it('starts nothing when another replica won the claim', async () => {
       prisma.source.findMany.mockResolvedValue([
         { id: 's1', name: 'A', scheduleNextAt: new Date() },

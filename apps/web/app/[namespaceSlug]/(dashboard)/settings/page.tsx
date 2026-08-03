@@ -189,7 +189,6 @@ export default function SettingsPage() {
                   : t("settings.autosaveOn")}
           </div>
         </div>
-        <p className="text-muted-foreground">{t("settings.description")}</p>
       </div>
 
       {error ? (

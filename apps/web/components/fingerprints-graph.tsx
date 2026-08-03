@@ -50,6 +50,7 @@ import {
   isMetaEdge,
   useClusteredGraph,
 } from "./graph-explorer/use-clustered-graph";
+import { useClusterLabelFormatter } from "./graph-explorer/use-cluster-label";
 import { ClusterControls } from "./graph-explorer/cluster-controls";
 import {
   keyOf,
@@ -75,7 +76,8 @@ const BUNDLE_EDGE_PREFIX = "bundle-edge:";
 
 export interface BundleDetail {
   assetIds: string[];
-  values: Array<{ label: string; value: string }>;
+  /** Each entry is a real finding — `id` addresses its detail page. */
+  values: Array<{ id: string; label: string; value: string }>;
   /** Pairwise weighted match % (only for 2-asset bundles). */
   matchPercent?: number;
 }
@@ -490,7 +492,7 @@ export function FingerprintsGraph({
         values: valueIds
           .map((vId) => valueById.get(vId))
           .filter((v): v is GraphNodeDto => Boolean(v))
-          .map((v) => ({ label: v.detectorType ?? "", value: v.label })),
+          .map((v) => ({ id: v.id, label: v.detectorType ?? "", value: v.label })),
       };
       const countLabel = t("correlation.fingerprints.sharedValuesN", {
         count: String(valueIds.length),
@@ -578,7 +580,10 @@ export function FingerprintsGraph({
   // on `clustered` directly — an unstable identity there previously caused
   // an effect→setState→render loop once the rail state started being
   // pushed to the host page.
-  const clusteredUnstable = useClusteredGraph(dNodes, dEdges);
+  const formatClusterLabel = useClusterLabelFormatter();
+  const clusteredUnstable = useClusteredGraph(dNodes, dEdges, {
+    formatLabel: formatClusterLabel,
+  });
   const clustered = React.useMemo(
     () => clusteredUnstable,
     // Deliberately excluding `clusteredUnstable` itself: its wrapping object

@@ -22,7 +22,6 @@ export default function CustomDetectorsPage() {
               {t("detectors.title")}
             </h1>
           </div>
-          <p className="text-muted-foreground">{t("detectors.description")}</p>
         </div>
         <Button asChild className="rounded-[4px] border-2 border-border">
           <Link href={nsPath("/detectors/new")}>

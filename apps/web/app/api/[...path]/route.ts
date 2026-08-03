@@ -45,7 +45,7 @@ function getApiBaseUrls(): string[] {
     normalizeAbsoluteUrl(process.env.INTERNAL_API_URL),
     normalizeAbsoluteUrl(process.env.API_URL),
     normalizeAbsoluteUrl(process.env.NEXT_PUBLIC_API_URL),
-    "http://127.0.0.1:8000",
+    "http://127.0.0.1:8811",
   ];
 
   const seen = new Set<string>();

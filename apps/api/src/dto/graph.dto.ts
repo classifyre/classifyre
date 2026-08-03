@@ -70,6 +70,15 @@ export class GraphNodeDto {
   @ApiPropertyOptional()
   sourceType?: string;
 
+  @ApiPropertyOptional({ description: 'For asset nodes: parent source id' })
+  sourceId?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'For asset nodes: the operator-facing name of the parent source (not its connector type)',
+  })
+  sourceName?: string;
+
   @ApiPropertyOptional()
   severity?: string;
 
