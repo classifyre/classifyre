@@ -22,5 +22,6 @@ export { InstanceSettingsApi } from './InstanceSettingsApi';
 export { NamespacesApi } from './NamespacesApi';
 export { NotificationsApi } from './NotificationsApi';
 export { RunnersApi } from './RunnersApi';
+export { SitemapApi } from './SitemapApi';
 export { SourcesApi } from './SourcesApi';
 export { ThreadsApi } from './ThreadsApi';

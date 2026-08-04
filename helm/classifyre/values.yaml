@@ -584,6 +584,46 @@ frontend:
     # -- GA4 measurement ID (G-XXXXXXXXXX), injected as GOOGLE_ANALYTICS_MEASUREMENT_ID. Required when enabled=true.
     measurementId: ""
 
+  cookieConsent:
+    # A GDPR/ePrivacy consent bar for the web app. It slides up for visitors in
+    # the EEA, the UK and Switzerland (detected from the browser time zone),
+    # offers Accept and Decline with equal weight, and stores the answer in a
+    # first-party cookie for six months. Until it is answered, PostHog and
+    # Google Analytics do not initialise at all — with this on, gtag is loaded
+    # by the app after consent rather than bootstrapped by /classifyre-cfg/.
+    #
+    # Off by default: a Classifyre instance is normally private and reached
+    # only by people who already have a contract with its operator, where a
+    # public-website consent bar is noise. Turn it on for deliberately public
+    # deployments — the demo instance does (see values-vps.yaml). The desktop
+    # app never shows it: that build ships no analytics at all.
+    #
+    # Turning it on does not, by itself, make a deployment compliant: the
+    # operator of the instance is the data controller and is responsible for
+    # publishing a policy that matches what their deployment actually collects.
+    # -- Show the cookie consent banner in the web app (COOKIE_CONSENT_ENABLED).
+    enabled: false
+    # -- Policy the banner links to (COOKIE_CONSENT_POLICY_URL). Point this at your own privacy policy when self-hosting.
+    policyUrl: "https://www.classifyre.com/privacy/"
+
+  sitemap:
+    # Publishes /sitemap.xml (a sitemap index) plus per-namespace child
+    # sitemaps covering the list pages and every findings/sources/assets/cases/
+    # inquiries/detectors/scans detail page, each with its real last-modified
+    # timestamp read from the database. robots.txt invites crawlers only when
+    # this is on; while it is off, robots.txt serves `Disallow: /` and the
+    # sitemap routes 404.
+    #
+    # Off by default: most Classifyre instances are private, and a sitemap
+    # would enumerate every asset and finding in the workspace. Turn it on only
+    # for deliberately public instances (see values-vps.yaml).
+    # -- Publish sitemap.xml and allow crawling (SITEMAP_ENABLED).
+    enabled: false
+    # -- Canonical origin for the URLs in the sitemap (SITEMAP_BASE_URL), e.g. `https://demo.example.com`. Leave empty to derive it from each request's Host/X-Forwarded-* headers.
+    baseUrl: ""
+    # -- URLs per child sitemap (SITEMAP_CHUNK_SIZE), clamped to 100–50000. Lower it if crawlers time out on large workspaces.
+    chunkSize: 10000
+
   # -- Extra environment variables for web container.
   extraEnv: []
   # -- Extra envFrom sources for web container.

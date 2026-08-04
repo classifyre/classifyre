@@ -45,6 +45,26 @@ export const RESERVED_PREFIXES = new Set<string>([
 ]);
 
 /**
+ * Slugs the registry must also refuse, but which are NOT API routes and so must
+ * keep going through the namespace strip/resolve pipeline.
+ *
+ * `sitemap` is a web-only top level (`/sitemap/<namespace>/<file>.xml`, see
+ * `apps/web/app/sitemap/[...segments]/route.ts`). A workspace named `sitemap`
+ * would be shadowed by that static segment in the UI, while on the API side
+ * `/sitemap` is a perfectly ordinary namespace-scoped controller reached as
+ * `/<namespace>/sitemap` — putting it in {@link RESERVED_PREFIXES} would make
+ * an unscoped `/sitemap` bypass namespace resolution and hit tenant code with
+ * no schema. Extensions (`sitemap.xml`, `robots.txt`) need no entry: SLUG_RE
+ * already rejects dots.
+ */
+export const RESERVED_WEB_PREFIXES = new Set<string>(['sitemap']);
+
+/** True when `slug` collides with a reserved API or web route segment. */
+export function isReservedSlug(slug: string): boolean {
+  return RESERVED_PREFIXES.has(slug) || RESERVED_WEB_PREFIXES.has(slug);
+}
+
+/**
  * A valid slug: lowercase alphanumerics and single dashes, 1–50 chars, no
  * leading/trailing dash. Mirrors the desktop slugify rules so the same names
  * work in both deployments.

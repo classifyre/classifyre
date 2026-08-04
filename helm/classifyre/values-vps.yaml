@@ -16,7 +16,7 @@ api:
     # agents run in-process. To make changes to this instance, run a local
     # writable cluster against this same database:
     #   ./scripts/dev/start-vps-db.sh
-    DEMO_MODE: "false"
+    DEMO_MODE: "true"
     # Single-node VPS: node has ~11.4Gi allocatable memory. 3 concurrent CLI
     # extract jobs at 3Gi request/4Gi limit each (9Gi) left no headroom for
     # API/postgres/worker, causing OOMKilled restarts and Pending jobs.
@@ -61,6 +61,21 @@ frontend:
   googleAnalytics:
     enabled: true
     measurementId: "G-0RLFLNZDPP"
+
+  # Public instance reachable from the EU without any contract, and it runs
+  # both PostHog and GA — so it is the one deployment that has to ask before
+  # either of them loads.
+  cookieConsent:
+    enabled: true
+    policyUrl: "https://www.classifyre.com/privacy/"
+
+  # This instance is deliberately public (read-only demo), so it is the one
+  # deployment that publishes a sitemap and invites crawlers. URLs are built
+  # from the request's forwarded host, which is https://demo.classifyre.com
+  # behind the node's reverse proxy — set `baseUrl` here if that ever stops
+  # being what reaches the pod.
+  sitemap:
+    enabled: true
 
   service:
     type: NodePort

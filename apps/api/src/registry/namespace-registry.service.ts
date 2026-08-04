@@ -15,7 +15,7 @@ import {
   withDatabaseMigrationLock,
 } from '../database-migrations';
 import {
-  RESERVED_PREFIXES,
+  isReservedSlug,
   SLUG_RE,
   schemaForId,
   slugifyName,
@@ -223,7 +223,7 @@ export class NamespaceRegistryService implements OnModuleInit, OnModuleDestroy {
         `Invalid namespace slug '${slug}' (use lowercase letters, digits and dashes)`,
       );
     }
-    if (RESERVED_PREFIXES.has(slug)) {
+    if (isReservedSlug(slug)) {
       throw new BadRequestException(
         `Namespace slug '${slug}' is reserved by the application`,
       );
@@ -344,7 +344,7 @@ export class NamespaceRegistryService implements OnModuleInit, OnModuleDestroy {
           `Invalid namespace slug '${slug}' (use lowercase letters, digits and dashes)`,
         );
       }
-      if (RESERVED_PREFIXES.has(slug)) {
+      if (isReservedSlug(slug)) {
         throw new BadRequestException(
           `Namespace slug '${slug}' is reserved by the application`,
         );

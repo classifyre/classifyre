@@ -48,6 +48,37 @@
   box-shadow: none;
 }
 
+/* Navbar dropdowns (`type: 'menu'` in `_meta.js`) are rendered by Nextra with
+   HeadlessUI and portaled to `#headlessui-portal-root`, outside the navbar —
+   so they cannot be scoped to `.classifyre-blog-navbar` and are styled here by
+   the portal root instead. Only the surface is restyled to the case-file look;
+   Nextra keeps ownership of positioning, transitions, and the mobile drawer. */
+#headlessui-portal-root [role="menu"] {
+  border-radius: 4px;
+  border: 2px solid var(--border);
+  background: var(--background);
+  box-shadow: 6px 6px 0 0 var(--border);
+  backdrop-filter: none;
+}
+
+#headlessui-portal-root [role="menu"] a {
+  border-left: 2px solid transparent;
+  padding-block: 0.5rem;
+  color: var(--foreground);
+  font-family: var(--font-mono), monospace;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+#headlessui-portal-root [role="menu"] a:hover,
+#headlessui-portal-root [role="menu"] a[data-focus] {
+  border-left-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  color: var(--foreground);
+}
+
 .nextra-sidebar,
 .nextra-sidebar-container {
   border-right-width: 2px !important;
@@ -92,7 +123,10 @@ a {
   color: var(--foreground) !important;
   text-decoration: none !important;
   cursor: pointer !important;
-  transition: color 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
+  transition:
+    color 0.2s ease,
+    background-color 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 .nextra-sidebar a:hover {
@@ -115,7 +149,10 @@ a {
   color: var(--foreground) !important;
   cursor: pointer !important;
   text-decoration: none !important;
-  transition: color 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
+  transition:
+    color 0.2s ease,
+    background-color 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 .nextra-toc a:hover {
@@ -142,10 +179,15 @@ a {
   text-decoration-color: var(--accent);
   text-decoration-thickness: 2px;
   text-underline-offset: 3px;
-  transition: color 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
+  transition:
+    color 0.2s ease,
+    background-color 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
-.nextra-content div[class*="x:mb-8"][class*="x:border-t"][class*="x:pt-8"] > a:hover {
+.nextra-content
+  div[class*="x:mb-8"][class*="x:border-t"][class*="x:pt-8"]
+  > a:hover {
   color: var(--accent-foreground) !important;
   background: color-mix(in oklab, var(--accent) 92%, transparent) !important;
   box-shadow: 0 0 0 1px var(--border);
@@ -154,6 +196,29 @@ a {
 article img {
   border: 2px solid var(--border);
   box-shadow: 4px 4px 0 0 var(--border);
+}
+
+/* ── Site footer ──────────────────────────────────────────────────────────
+   Nextra wraps `<Footer>` in a tinted band, clamps the footer element to the
+   content width, and — on pages with no sidebar — stacks a locale/theme
+   switcher row and a divider above it. `<SiteFooter>` is a single full-width
+   black surface carrying its own chrome, so all of that is removed and the
+   band is allowed to run to the viewport edge. */
+div:has(> .classifyre-site-footer) {
+  background: transparent !important;
+}
+
+div:has(> .classifyre-site-footer) > :not(.classifyre-site-footer) {
+  display: none !important;
+}
+
+.classifyre-site-footer {
+  display: block !important;
+  width: 100%;
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  color: #fff;
 }
 
 :root ::selection {

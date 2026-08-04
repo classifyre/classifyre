@@ -94,6 +94,12 @@
 | api.image.pullPolicy | string | `"IfNotPresent"` | API image pull policy. |
 | api.image.repository | string | `"classifyre/api"` | API container image repository. |
 | api.image.tag | string | `""` | API container image tag. Defaults to the chart appVersion when empty. |
+| api.internalApiKey | object | `{"autoGenerate":true,"existingSecret":"","secretKey":"CLASSIFYRE_INTERNAL_KEY","secretName":"","value":""}` | autopilot agents keep working on a demo instance. |
+| api.internalApiKey.autoGenerate | bool | `true` | Generated key is persisted via Kubernetes Secret lookup across upgrades. |
+| api.internalApiKey.existingSecret | string | `""` | When set, chart will not create or manage this secret. |
+| api.internalApiKey.secretKey | string | `"CLASSIFYRE_INTERNAL_KEY"` | Secret key name used for CLASSIFYRE_INTERNAL_KEY. |
+| api.internalApiKey.secretName | string | `""` | Secret name created by this chart when existingSecret is empty. |
+| api.internalApiKey.value | string | `""` | Explicit key value to store in the chart-managed secret. |
 | api.lifecycle | object | `{"preStop":{"exec":{"command":["/bin/sh","-c","sleep 5"]}}}` | during rolling updates by giving kube-proxy time to drain in-flight requests. |
 | api.livenessProbe.enabled | bool | `true` | Enable API liveness probe. |
 | api.livenessProbe.failureThreshold | int | `6` | API liveness failure threshold. |
@@ -147,6 +153,8 @@
 | api.workingDir | string | `""` | Working directory used by default shell command. |
 | commonAnnotations | object | `{}` | Additional annotations added to supported chart resources. |
 | commonLabels | object | `{}` | Additional labels added to all chart resources. |
+| dataTransfer.maxSizeMb | int | `0` | limit; set a positive value only if you want to cap uploads. |
+| dataTransfer.ttlMinutes | int | `60` | Minutes an archive is kept after its export finishes, then it is deleted. |
 | frontend.affinity | object | `{}` | Web scheduling: affinity rules. When empty, default soft anti-affinity is applied. |
 | frontend.args | list | `[]` | Optional web container args override. |
 | frontend.autoscaling.enabled | bool | `true` | Enable HPA for web deployment. |
@@ -158,6 +166,9 @@
 | frontend.containerSecurityContext.allowPrivilegeEscalation | bool | `false` | Disallow privilege escalation in web container. |
 | frontend.containerSecurityContext.capabilities.drop | list | `["ALL"]` | Drop all Linux capabilities in web container. |
 | frontend.containerSecurityContext.readOnlyRootFilesystem | bool | `false` | path the app writes to at runtime. Hardening step for advanced users. |
+| frontend.cookieConsent.enabled | bool | `false` | Show the cookie consent banner in the web app (COOKIE_CONSENT_ENABLED). |
+| frontend.cookieConsent.policyUrl | string | `"https://www.classifyre.com/privacy/"` | Policy the banner links to (COOKIE_CONSENT_POLICY_URL). Point this at your own privacy policy when self-hosting. |
+| frontend.enabled | bool | `true` | Deploy the web app in-cluster. Set false to run it externally (e.g. a local `next dev` pointed at this cluster's API) instead of building and deploying an image for it. |
 | frontend.env.HOSTNAME | string | `"0.0.0.0"` | Bind address for Next.js standalone server. |
 | frontend.env.NEXT_PUBLIC_API_URL | string | `"/api"` | Browser-side API base path. |
 | frontend.env.NODE_ENV | string | `"production"` | Runtime environment passed to web container. |
@@ -207,6 +218,9 @@
 | frontend.service.nodePort | string | `nil` | Fixed nodePort when `type` is `NodePort` or `LoadBalancer`. |
 | frontend.service.port | int | `3100` | Web service port. |
 | frontend.service.type | string | `"ClusterIP"` | Web service type. |
+| frontend.sitemap.baseUrl | string | `""` | Canonical origin for the URLs in the sitemap (SITEMAP_BASE_URL), e.g. `https://demo.example.com`. Leave empty to derive it from each request's Host/X-Forwarded-* headers. |
+| frontend.sitemap.chunkSize | int | `10000` | URLs per child sitemap (SITEMAP_CHUNK_SIZE), clamped to 100–50000. Lower it if crawlers time out on large workspaces. |
+| frontend.sitemap.enabled | bool | `false` | Publish sitemap.xml and allow crawling (SITEMAP_ENABLED). |
 | frontend.startCommand | string | `"node /app/apps/web/server.js"` | Default web process command when `command/args` are not set. |
 | frontend.startupProbe.enabled | bool | `true` | Enable web startup probe. |
 | frontend.startupProbe.failureThreshold | int | `30` | Web startup failure threshold. |
@@ -264,6 +278,7 @@
 | postgres.embedded.persistence.accessModes | list | `["ReadWriteOnce"]` | Access modes for embedded Postgres PVC. |
 | postgres.embedded.persistence.enabled | bool | `true` | Enable persistent volume for embedded Postgres data. |
 | postgres.embedded.persistence.existingClaim | string | `""` | Existing PVC name for embedded Postgres data. |
+| postgres.embedded.persistence.keepOnUninstall | bool | `false` | with the PVC on `helm uninstall`. |
 | postgres.embedded.persistence.size | string | `"20Gi"` | Requested size for embedded Postgres PVC. |
 | postgres.embedded.persistence.storageClassName | string | `""` | Storage class for embedded Postgres PVC. |
 | postgres.embedded.podAnnotations | object | `{}` | Additional annotations for embedded Postgres pod. |

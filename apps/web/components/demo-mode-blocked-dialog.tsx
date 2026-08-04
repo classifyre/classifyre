@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { Lock } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -8,8 +9,13 @@ import {
   AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
+  AlertDialogMedia,
   AlertDialogTitle,
 } from "@workspace/ui/components/alert-dialog";
+import {
+  DemoUpgradeFootnote,
+  DemoUpgradeOptions,
+} from "./demo-upgrade-cta";
 import { useTranslation } from "@/hooks/use-translation";
 
 const DEMO_BLOCKED_EVENT = "classifyre:demo-blocked";
@@ -65,16 +71,22 @@ export function DemoModeBlockedDialog() {
 
   return (
     <AlertDialog open={open} onOpenChange={setOpen}>
-      <AlertDialogContent size="sm">
+      {/* Short viewports (landscape phones) scroll rather than clip the CTAs. */}
+      <AlertDialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto">
         <AlertDialogHeader>
+          <AlertDialogMedia className="bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-500">
+            <Lock />
+          </AlertDialogMedia>
           <AlertDialogTitle>{t("demo.blockedTitle")}</AlertDialogTitle>
           <AlertDialogDescription>
             {t("demo.blockedDescription")}
           </AlertDialogDescription>
         </AlertDialogHeader>
+        <DemoUpgradeOptions />
+        <DemoUpgradeFootnote />
         <AlertDialogFooter>
-          <AlertDialogAction onClick={() => setOpen(false)}>
-            {t("common.close")}
+          <AlertDialogAction variant="outline" onClick={() => setOpen(false)}>
+            {t("demo.keepExploring")}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

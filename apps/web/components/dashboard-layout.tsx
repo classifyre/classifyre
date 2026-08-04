@@ -19,7 +19,7 @@ import {
 import { NotificationCenter } from "./notification-center";
 import { DesktopNotificationsBridge } from "./desktop-notifications-bridge";
 import { Button } from "@workspace/ui/components/button";
-import { Eye, Settings } from "lucide-react";
+import { Settings } from "lucide-react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { useNamespace } from "@/components/namespace-provider";
@@ -31,6 +31,7 @@ import {
   TooltipTrigger,
 } from "@workspace/ui/components/tooltip";
 import { AssistantFab } from "./assistant-workflow-provider";
+import { DemoModeBanner, DemoModeHeaderBadge } from "./demo-mode-badge";
 import { DocumentTitleUpdater } from "./document-title-updater";
 import { AiHealthProvider, AiHealthFixButton } from "./ai-health";
 import { LanguageSwitcher } from "./language-switcher";
@@ -295,7 +296,9 @@ export function DashboardLayout({
                 <SidebarTrigger className="-ml-1 size-7" />
                 <Separator orientation="vertical" className="mr-2 h-4" />
                 <Breadcrumb className="min-w-0">
-                  <BreadcrumbList>
+                  {/* Nowrap so a squeezed header truncates the trail instead
+                      of stacking it into a second row and overflowing h-16. */}
+                  <BreadcrumbList className="flex-nowrap">
                     <BreadcrumbItem>
                       <BreadcrumbLink asChild>
                         <Link href={nsHref("/")}>{t("breadcrumb.home")}</Link>
@@ -361,25 +364,9 @@ export function DashboardLayout({
                   </BreadcrumbList>
                 </Breadcrumb>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex shrink-0 items-center gap-2">
                 <AiHealthFixButton />
-                {demoMode && (
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <div className="flex cursor-default items-center gap-1.5 rounded-[4px] border border-amber-600/40 bg-amber-50 px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-amber-700 dark:border-amber-500/30 dark:bg-amber-950/40 dark:text-amber-400">
-                        <Eye className="h-3 w-3" />
-                        {t("demo.badge")}
-                      </div>
-                    </TooltipTrigger>
-                    <TooltipContent
-                      side="bottom"
-                      sideOffset={6}
-                      className="max-w-xs"
-                    >
-                      {t("demo.tooltip")}
-                    </TooltipContent>
-                  </Tooltip>
-                )}
+                {demoMode && <DemoModeHeaderBadge />}
                 <LanguageSwitcher />
                 <ThemeToggle />
                 <NotificationCenter />
@@ -397,6 +384,7 @@ export function DashboardLayout({
                 </Button>
               </div>
             </header>
+            {demoMode && <DemoModeBanner />}
             <div className="flex min-w-0 flex-1 flex-col gap-4 p-4 pt-2">
               {children}
             </div>
