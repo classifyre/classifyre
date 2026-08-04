@@ -2,14 +2,10 @@
 
 import * as React from "react";
 
-import { Button } from "@workspace/ui/components";
-import { cn } from "@workspace/ui/lib/utils";
+import { Button } from "./button";
+import { cn } from "../lib/utils";
 
-import {
-  AppleLogo,
-  LinuxLogo,
-  WindowsLogo,
-} from "@/components/brand-logos";
+import { AppleLogo, LinuxLogo, WindowsLogo } from "./brand-logos";
 import {
   formatAssetSize,
   groupByOs,
@@ -20,8 +16,8 @@ import {
   type LatestRelease,
   type OsKey,
   type ReleaseDownload,
-} from "@/lib/releases";
-import { desktopDownloadUrl } from "@/lib/site";
+} from "../lib/releases";
+import { releasesLatestUrl } from "../lib/site-links";
 
 /**
  * Download UI that hands over the actual release file instead of the GitHub
@@ -29,7 +25,11 @@ import { desktopDownloadUrl } from "@/lib/site";
  * component) and passed in as `release`; these components refresh it in the
  * browser so a desktop release cut after the last site deploy still wins.
  *
- * Everything degrades to `desktopDownloadUrl` (the releases page) when the
+ * Shared by the marketing site (`/download`, landing page) and the docs site
+ * (home page, desktop install guide) so both hand out the same artifact for a
+ * given platform.
+ *
+ * Everything degrades to `releasesLatestUrl` (the releases page) when the
  * release can't be resolved at all — offline build plus a rate-limited
  * browser — so a download button is never a dead end.
  */
@@ -199,7 +199,7 @@ export function DownloadPrimaryButton({
   const download = pickDownload(release, os, arch);
   const version = release?.version;
 
-  const href = download?.asset.url ?? release?.htmlUrl ?? desktopDownloadUrl;
+  const href = download?.asset.url ?? release?.htmlUrl ?? releasesLatestUrl;
   const isDirect = Boolean(download);
   const text =
     label ??
@@ -301,7 +301,7 @@ export function DownloadPlatformGrid({
               )}
             >
               <a
-                href={recommended?.asset.url ?? release?.htmlUrl ?? desktopDownloadUrl}
+                href={recommended?.asset.url ?? release?.htmlUrl ?? releasesLatestUrl}
                 {...(recommended
                   ? { download: recommended.asset.name }
                   : { target: "_blank", rel: "noreferrer" })}
@@ -392,7 +392,7 @@ export function AllReleasesLink({
   const release = useLatestRelease(initialRelease);
   return (
     <a
-      href={release?.htmlUrl ?? desktopDownloadUrl}
+      href={release?.htmlUrl ?? releasesLatestUrl}
       target="_blank"
       rel="noreferrer"
       className={cn(
