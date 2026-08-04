@@ -10,7 +10,12 @@ import { Banner, Head } from "nextra/components";
 import { getPageMap } from "nextra/page-map";
 import { Footer, Layout, Navbar } from "nextra-theme-docs";
 
+import { CookieConsentBanner, SiteFooter } from "@workspace/ui/components";
 import { softwareVersionLabel } from "@workspace/ui/lib/software-version";
+import {
+  marketingSiteUrl,
+  privacyPolicyUrl,
+} from "@workspace/ui/lib/site-links";
 import { getAllSourceDocs } from "@workspace/schemas/source-docs";
 
 import {
@@ -263,9 +268,11 @@ const navbar = (
   />
 );
 
+/* The same footer as the marketing site, only with the marketing routes made
+   absolute — they live on the other origin from here. */
 const footer = (
-  <Footer className="border-t border-border bg-muted/40 px-4 py-6 text-center text-sm text-muted-foreground">
-    Classifyre Docs
+  <Footer className="classifyre-site-footer">
+    <SiteFooter origin={marketingSiteUrl} />
   </Footer>
 );
 
@@ -327,6 +334,10 @@ export default async function RootLayout({
           >
             {children}
           </Layout>
+          {/* Shown only where consent is legally required (EEA/UK/CH, by time
+              zone) and only until answered; the analytics providers above stay
+              inert until it is. */}
+          <CookieConsentBanner policyHref={privacyPolicyUrl} />
         </PostHogProvider>
       </body>
     </html>

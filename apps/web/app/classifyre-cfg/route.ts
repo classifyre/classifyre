@@ -1,5 +1,6 @@
 import {
   ANALYTICS_CONFIG_GLOBAL,
+  DEFAULT_COOKIE_POLICY_URL,
   GA_MEASUREMENT_ID_PATTERN,
   type AnalyticsRuntimeConfig,
 } from "@/lib/analytics-config";
@@ -37,6 +38,11 @@ function buildConfig(): AnalyticsRuntimeConfig {
       measurementId && GA_MEASUREMENT_ID_PATTERN.test(measurementId)
         ? { measurementId }
         : null,
+    cookieConsent: {
+      enabled: readEnv("COOKIE_CONSENT_ENABLED") === "true",
+      policyUrl:
+        readEnv("COOKIE_CONSENT_POLICY_URL") ?? DEFAULT_COOKIE_POLICY_URL,
+    },
   };
 }
 
@@ -70,7 +76,12 @@ export function GET(): Response {
     `window.${ANALYTICS_CONFIG_GLOBAL} = ${JSON.stringify(config)};`,
   ];
 
-  if (config.googleAnalytics) {
+  // With the consent banner on, gtag must not bootstrap here: this script runs
+  // before hydration, which is exactly what "before consent" means. The client
+  // component in `components/google-analytics.tsx` loads it instead, once the
+  // visitor has accepted. With the banner off (private instances), the inline
+  // bootstrap is kept — it is one fewer round trip and nothing is gated.
+  if (config.googleAnalytics && !config.cookieConsent.enabled) {
     lines.push(renderGoogleAnalytics(config.googleAnalytics.measurementId));
   }
 

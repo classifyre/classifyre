@@ -6926,6 +6926,95 @@
         ]
       }
     },
+    "/sitemap": {
+      "get": {
+        "operationId": "SitemapController_getIndex",
+        "parameters": [
+          {
+            "name": "chunkSize",
+            "required": false,
+            "in": "query",
+            "description": "URLs per child sitemap (100–50000, default 10000).",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SitemapIndexDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Sitemap index: per-entity chunk counts and last-modified dates",
+        "tags": [
+          "Sitemap"
+        ]
+      }
+    },
+    "/sitemap/entries": {
+      "get": {
+        "operationId": "SitemapController_getEntries",
+        "parameters": [
+          {
+            "name": "type",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "source",
+                "asset",
+                "finding",
+                "case",
+                "inquiry",
+                "detector",
+                "scan"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "chunk",
+            "required": false,
+            "in": "query",
+            "description": "Zero-based chunk.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "chunkSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SitemapEntriesDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "One chunk of detail-page ids + last-modified dates",
+        "tags": [
+          "Sitemap"
+        ]
+      }
+    },
     "/sources/{sourceId}/run": {
       "post": {
         "operationId": "CliRunnerController_startRunner",
@@ -17515,6 +17604,144 @@
             "type": "string"
           }
         }
+      },
+      "SitemapChunkDto": {
+        "type": "object",
+        "properties": {
+          "index": {
+            "type": "number",
+            "description": "Zero-based chunk number within its section.",
+            "example": 0
+          },
+          "count": {
+            "type": "number",
+            "description": "URLs in this chunk.",
+            "example": 10000
+          },
+          "lastModified": {
+            "type": "string",
+            "description": "Newest last-modified instant across the chunk, for the sitemap index <lastmod>. Null when unknown, in which case <lastmod> is omitted.",
+            "example": "2026-08-04T10:00:00.000Z",
+            "nullable": true
+          }
+        },
+        "required": [
+          "index",
+          "count"
+        ]
+      },
+      "SitemapSectionDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "source",
+              "asset",
+              "finding",
+              "case",
+              "inquiry",
+              "detector",
+              "scan"
+            ]
+          },
+          "total": {
+            "type": "number",
+            "description": "Total detail pages of this type."
+          },
+          "lastModified": {
+            "type": "string",
+            "description": "Newest last-modified instant across the section, null when empty.",
+            "nullable": true
+          },
+          "chunks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SitemapChunkDto"
+            }
+          }
+        },
+        "required": [
+          "type",
+          "total",
+          "chunks"
+        ]
+      },
+      "SitemapIndexDto": {
+        "type": "object",
+        "properties": {
+          "generatedAt": {
+            "type": "string",
+            "example": "2026-08-04T10:00:00.000Z"
+          },
+          "chunkSize": {
+            "type": "number",
+            "description": "URLs per chunk this index was computed with."
+          },
+          "sections": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SitemapSectionDto"
+            }
+          }
+        },
+        "required": [
+          "generatedAt",
+          "chunkSize",
+          "sections"
+        ]
+      },
+      "SitemapEntryDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "lastModified": {
+            "type": "string",
+            "example": "2026-08-04T10:00:00.000Z",
+            "nullable": true,
+            "description": "Null when unknown; the rendered <lastmod> is then omitted."
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
+      "SitemapEntriesDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "source",
+              "asset",
+              "finding",
+              "case",
+              "inquiry",
+              "detector",
+              "scan"
+            ]
+          },
+          "chunk": {
+            "type": "number"
+          },
+          "chunkSize": {
+            "type": "number"
+          },
+          "entries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SitemapEntryDto"
+            }
+          }
+        },
+        "required": [
+          "type",
+          "chunk",
+          "chunkSize",
+          "entries"
+        ]
       },
       "StartRunnerDto": {
         "type": "object",

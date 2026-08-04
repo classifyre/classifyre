@@ -270,6 +270,12 @@ docs/SimilarFindingAssetDto.md
 docs/SimilarFindingDto.md
 docs/SimilarFindingEvidenceAnalysisDto.md
 docs/SimilarFindingSourceDto.md
+docs/SitemapApi.md
+docs/SitemapChunkDto.md
+docs/SitemapEntriesDto.md
+docs/SitemapEntryDto.md
+docs/SitemapIndexDto.md
+docs/SitemapSectionDto.md
 docs/SourceAssetsControllerBulkIngest201Response.md
 docs/SourceInfoDto.md
 docs/SourceResponseDto.md
@@ -345,6 +351,7 @@ src/apis/InstanceSettingsApi.ts
 src/apis/NamespacesApi.ts
 src/apis/NotificationsApi.ts
 src/apis/RunnersApi.ts
+src/apis/SitemapApi.ts
 src/apis/SourcesApi.ts
 src/apis/ThreadsApi.ts
 src/apis/index.ts
@@ -596,6 +603,11 @@ src/models/SimilarFindingAssetDto.ts
 src/models/SimilarFindingDto.ts
 src/models/SimilarFindingEvidenceAnalysisDto.ts
 src/models/SimilarFindingSourceDto.ts
+src/models/SitemapChunkDto.ts
+src/models/SitemapEntriesDto.ts
+src/models/SitemapEntryDto.ts
+src/models/SitemapIndexDto.ts
+src/models/SitemapSectionDto.ts
 src/models/SourceAssetsControllerBulkIngest201Response.ts
 src/models/SourceInfoDto.ts
 src/models/SourceResponseDto.ts
