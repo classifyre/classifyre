@@ -1,0 +1,19 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    "build": {
+      // The marketing pages resolve the latest GitHub release at build time
+      // (apps/blog/lib/releases.ts) so the exported HTML links straight at the
+      // desktop installers. A token only lifts GitHub's anonymous rate limit;
+      // the build succeeds without one and falls back to the releases page.
+      //
+      // Declared here rather than in the root globalEnv on purpose: CI mints a
+      // fresh GITHUB_TOKEN per job, so a global entry would bust every
+      // package's cache on every run. Scoped to this task, only the site that
+      // actually embeds release URLs re-builds — which is what we want anyway
+      // when a new release lands.
+      "env": ["GITHUB_TOKEN", "GH_TOKEN"]
+    }
+  }
+}

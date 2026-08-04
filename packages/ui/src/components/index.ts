@@ -66,6 +66,8 @@ export * from "./custom-detector-types-grid";
 export * from "./empty-state";
 export * from "./stats-card";
 export * from "./ai-assisted-card";
+export * from "./cookie-consent-banner";
+export * from "./site-footer";
 export * from "./ai-prompt-popover";
 export * from "./assistant-workflow-panel";
 

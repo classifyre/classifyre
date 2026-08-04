@@ -52,6 +52,13 @@ backup_file "$WEB_DIR/app/classifyre-usr/[...path]/route.ts"
 # DESKTOP_BUILD=true, so nothing requests this path.
 backup_file "$WEB_DIR/app/classifyre-cfg/route.ts"
 
+# Sitemap + robots. These read the request host and query the API at runtime,
+# so they cannot be statically exported — and the desktop app is never crawled,
+# which is also why the chart defaults `frontend.sitemap.enabled` to false.
+backup_file "$WEB_DIR/app/sitemap.xml/route.ts"
+backup_file "$WEB_DIR/app/sitemap/[...segments]/route.ts"
+backup_file "$WEB_DIR/app/robots.txt/route.ts"
+
 # Guard: fail loudly if a dynamic [param] *page* is not covered by a
 # generateStaticParams() somewhere in its segment — the page itself or, more
 # usually, an ancestor layout (a "use client" page cannot export it). Without

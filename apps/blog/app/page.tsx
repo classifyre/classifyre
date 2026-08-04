@@ -1,37 +1,45 @@
 import type { Metadata } from "next";
-import type { CSSProperties, ReactNode } from "react";
+import type { CSSProperties } from "react";
 
 import {
   Button,
   DetectorCatalog,
   detectorCatalogGroups,
   resolveDetectorGroupId,
-  SourceCatalog,
-  SourceIcon,
 } from "@workspace/ui/components";
-import {
-  resolveSourceCatalogMeta,
-  SOURCE_TYPE_CATALOG_META,
-  type SourceCatalogEntry,
-} from "@workspace/ui/lib/source-catalog";
-import { softwareVersion } from "@workspace/ui/lib/software-version";
 import { cn } from "@workspace/ui/lib/utils";
 import { getAllDetectorDocs } from "@workspace/schemas/detector-docs";
-import { getAllSourceDocs } from "@workspace/schemas/source-docs";
 
+import { fetchLatestRelease } from "@/lib/releases";
 import { normalizeSiteUrl, safeJsonLdStringify } from "@/lib/seo";
-import {
-  AppleLogo,
-  HelmLogo,
-  KubernetesLogo,
-  LinuxLogo,
-  WindowsLogo,
-} from "@/components/brand-logos";
+import { HelmLogo, KubernetesLogo } from "@/components/brand-logos";
 import { CaseGraph } from "@/components/case-graph";
+import {
+  AllReleasesLink,
+  DownloadPlatformGrid,
+  DownloadPrimaryButton,
+} from "@/components/download-links";
 import { EvidenceBoard } from "@/components/evidence-board";
 import { Illustration, type IllustrationName } from "@/components/illustration";
 import { MissionRing } from "@/components/mission-ring";
+import {
+  DocsLink,
+  SectionHead,
+  SectionShell as LandingSectionShell,
+} from "@/components/page-kit";
 import { Reveal } from "@/components/reveal";
+import {
+  SourceCatalogSection,
+  SourceMarquee,
+} from "@/components/source-showcase";
+import {
+  demoUrl,
+  docs,
+  enterpriseContactEmail,
+  helmInstallCommand,
+  routes,
+  softwareVersion,
+} from "@/lib/site";
 
 import "./landing.css";
 
@@ -55,41 +63,6 @@ export const metadata: Metadata = {
       "Open-source data investigation: detectors, ranked evidence, cases, and an AI autopilot. Desktop app or Helm chart.",
   },
 };
-
-const sourceEntries = Object.keys(SOURCE_TYPE_CATALOG_META).map((type) => ({
-  type,
-  ...resolveSourceCatalogMeta(type),
-}));
-
-const marqueeEntries = [...sourceEntries, ...sourceEntries];
-
-const desktopDownloadUrl =
-  "https://github.com/classifyre/classifyre/releases/latest";
-const demoUrl = "https://demo.classifyre.com/";
-const enterpriseContactEmail = "contact@classifyre.com";
-
-const helmInstallCommand = [
-  "helm install classifyre \\",
-  "  oci://registry-1.docker.io/classifyre/classifyre-core \\",
-  `  --version ${softwareVersion}`,
-];
-
-/* Deep content lives in the docs site — the landing page only points at it. */
-const docs = {
-  root: "https://docs.classifyre.com/",
-  howItWorks: "https://docs.classifyre.com/how-it-works/",
-  ranking: "https://docs.classifyre.com/how-it-works/ranking-and-semantics/",
-  workspaces: "https://docs.classifyre.com/how-it-works/workspaces/",
-  autopilot: "https://docs.classifyre.com/how-it-works/autopilot/",
-  customDetectors: "https://docs.classifyre.com/detectors/custom-detectors/",
-  kubernetes: "https://docs.classifyre.com/deployment/kubernetes/",
-} as const;
-
-const desktopPlatforms = [
-  { os: "macOS", detail: "Apple Silicon", Logo: AppleLogo },
-  { os: "Windows", detail: "x64 installer", Logo: WindowsLogo },
-  { os: "Linux", detail: "deb · rpm", Logo: LinuxLogo },
-] as const;
 
 /** The four things a finding turns into once it lands. */
 const investigationPillars: readonly {
@@ -254,141 +227,6 @@ const enterprisePillars = [
 
 /* ── Small building blocks ─────────────────────────────────────────────── */
 
-function Marker({ label }: { label: string }) {
-  return (
-    <span className="inline-flex items-center border-2 border-accent bg-accent px-2.5 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-black">
-      {label}
-    </span>
-  );
-}
-
-function LandingSectionShell({
-  tone = "plain",
-  fullWidth = false,
-  children,
-  className = "",
-}: {
-  tone?: "signal" | "plain";
-  fullWidth?: boolean;
-  children: ReactNode;
-  className?: string;
-}) {
-  return (
-    <div
-      className={cn(
-        "relative",
-        // overflow-hidden creates a scroll container and would break any
-        // position:sticky descendant, so only the tinted sections (which
-        // need it to clip the grid overlay) get it.
-        tone === "signal" && "overflow-hidden",
-        fullWidth
-          ? "left-1/2 w-screen max-w-none -translate-x-1/2 rounded-none border-0"
-          : "rounded-[8px] border-2 border-border",
-        tone === "signal"
-          ? "bg-foreground text-primary-foreground"
-          : "bg-background text-foreground",
-        className,
-      )}
-    >
-      {tone === "signal" ? (
-        <div className="landing-grid absolute inset-0 opacity-30" />
-      ) : null}
-      <div
-        className={cn(
-          "relative py-10 sm:py-12 lg:py-16",
-          fullWidth ? "px-4 sm:px-6 lg:px-10" : "px-6 sm:px-8 lg:px-10",
-        )}
-      >
-        {children}
-      </div>
-    </div>
-  );
-}
-
-/** Section headline block: marker, title, at most two lines of copy. */
-function SectionHead({
-  id,
-  marker,
-  title,
-  lede,
-  tone = "plain",
-  action,
-  illustration,
-}: {
-  id: string;
-  marker: string;
-  title: ReactNode;
-  lede?: string;
-  tone?: "signal" | "plain";
-  action?: ReactNode;
-  illustration?: IllustrationName;
-}) {
-  return (
-    <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-      <div className="flex items-start gap-6 lg:gap-8">
-        {illustration ? (
-          // Hung level with the headline and sized as a drawing, not a bullet.
-          <Illustration
-            name={illustration}
-            surface={tone === "signal" ? "inverted" : "page"}
-            tilt="left"
-            className="-mt-2 hidden h-28 w-28 shrink-0 sm:block lg:h-36 lg:w-36"
-          />
-        ) : null}
-        <div className="space-y-3">
-          <Marker label={marker} />
-          <h2
-            id={id}
-            className="font-serif text-[clamp(2rem,5vw,3rem)] font-black uppercase leading-[0.92] tracking-[0.04em]"
-          >
-            {title}
-          </h2>
-          {lede ? (
-            <p
-              className={cn(
-                "max-w-2xl text-base leading-7",
-                tone === "signal"
-                  ? "text-primary-foreground/72"
-                  : "text-muted-foreground",
-              )}
-            >
-              {lede}
-            </p>
-          ) : null}
-        </div>
-      </div>
-      {action ? <div className="shrink-0">{action}</div> : null}
-    </div>
-  );
-}
-
-function DocsLink({
-  href,
-  children,
-  tone = "plain",
-}: {
-  href: string;
-  children: ReactNode;
-  tone?: "signal" | "plain";
-}) {
-  return (
-    <Button
-      asChild
-      variant="secondary"
-      className={cn(
-        "border-2",
-        tone === "signal"
-          ? "border-primary-foreground/25 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/16"
-          : "border-border",
-      )}
-    >
-      <a href={href} target="_blank" rel="noreferrer">
-        {children}
-      </a>
-    </Button>
-  );
-}
-
 function PowerMeter({ level }: { level: number }) {
   return (
     <div className="flex items-end gap-1" aria-hidden="true">
@@ -432,21 +270,14 @@ function PawPrint({
 
 /* ── Page ──────────────────────────────────────────────────────────────── */
 
-export default function HomePage() {
-  const sourceDocs = getAllSourceDocs();
+export default async function HomePage() {
+  // Resolved once at build time so the exported HTML already carries direct
+  // asset links; the download components refresh it in the browser.
+  const latestRelease = await fetchLatestRelease();
   const detectorDocs = getAllDetectorDocs();
   const siteUrl = normalizeSiteUrl(
     process.env.NEXT_PUBLIC_BLOG_SITE_URL ?? "https://blog.classifyre.local",
   );
-  const searchableSourceEntries: SourceCatalogEntry[] = sourceDocs
-    .map((source) => ({
-      type: source.sourceType,
-      href: `https://docs.classifyre.com/sources/${source.slug}/`,
-      ...resolveSourceCatalogMeta(source.sourceType, {
-        label: source.label,
-      }),
-    }))
-    .sort((left, right) => left.label.localeCompare(right.label));
   const activeDetectorItems = detectorDocs
     .filter((detector) => detector.catalogMeta.lifecycleStatus === "active")
     .map((detector) => ({
@@ -461,7 +292,7 @@ export default function HomePage() {
         detector.detectorType,
         detector.catalogMeta.categories,
       ),
-      href: `https://docs.classifyre.com/detectors/${detector.slug}/`,
+      href: `${docs.detectors}${detector.slug}/`,
     }));
 
   const softwareApplicationSchema = {
@@ -513,10 +344,12 @@ export default function HomePage() {
             <div className="space-y-7 lg:flex-[1.35]">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="inline-flex items-center border-2 border-accent bg-accent px-2.5 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-black">
-                  Open source
+                  Open source Investigation Platform
                 </span>
                 <span className="inline-flex items-center border-2 border-white/25 px-2.5 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-white/70">
-                  v{softwareVersion}
+                  {/* The published release when it could be resolved — the
+                      workspace version can be a -SNAPSHOT ahead of it. */}
+                  v{latestRelease?.version ?? softwareVersion}
                 </span>
               </div>
 
@@ -621,24 +454,12 @@ export default function HomePage() {
 
       {/* ── Get it running ───────────────────────────────────────────────── */}
       <section aria-labelledby="run-it-title" id="run-it">
-        <LandingSectionShell tone="plain">
+        <LandingSectionShell tone="plain" fullWidth>
           <div className="space-y-8">
-            <SectionHead
-              id="run-it-title"
-              marker="Get it running"
-              title={
-                <>
-                  Your laptop.
-                  <br />
-                  Or your cluster.
-                </>
-              }
-              lede="The same open-source product either way — nothing here is a trial, a lite edition, or a hosted upsell."
-            />
 
             <div className="grid gap-4 lg:grid-cols-2">
               {/* Desktop — the primary path */}
-              <div className="flex h-full flex-col gap-6 border-2 border-border bg-background p-6 shadow-[6px_6px_0_var(--color-border)] sm:p-8">
+              <div className="flex h-full min-w-0 flex-col gap-6 border-2 border-border bg-background p-6 shadow-[6px_6px_0_var(--color-border)] sm:p-8">
                 <div className="space-y-2">
                   <span className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
                     Download · free · no signup
@@ -647,56 +468,25 @@ export default function HomePage() {
                     Install it on your machine
                   </h3>
                   <p className="text-sm leading-6 text-muted-foreground">
-                    One installer with PostgreSQL and the scan workers already
-                    inside. Everything — sources, findings, cases — stays on
+                    Everything — sources, findings, cases — stays on
                     your machine.
                   </p>
                 </div>
 
-                {/* The three platforms, large and unmissable. */}
-                <ul className="grid grid-cols-3 gap-3">
-                  {desktopPlatforms.map(({ os, detail, Logo }) => (
-                    <li key={os}>
-                      <a
-                        href={desktopDownloadUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="group flex h-full flex-col items-center justify-start gap-3 border-2 border-border bg-background px-2 py-6 text-center transition-all hover:-translate-y-1 hover:border-accent hover:bg-accent/10"
-                      >
-                        <Logo className="h-12 w-12 text-foreground transition-transform group-hover:scale-110 sm:h-16 sm:w-16" />
-                        <span className="font-mono text-xs font-bold uppercase tracking-[0.1em] sm:text-sm">
-                          {os}
-                        </span>
-                        <span className="font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground">
-                          {detail}
-                        </span>
-                      </a>
-                    </li>
-                  ))}
-                </ul>
+                {/* The three platforms, large and unmissable — each tile is
+                    the real installer for that OS, not a link to GitHub. */}
+                <DownloadPlatformGrid release={latestRelease} />
 
                 <div className="mt-auto space-y-3">
-                  <Button
-                    asChild
-                    size="lg"
-                    className="w-full border-2 border-accent bg-accent text-black hover:bg-accent/90"
-                  >
-                    <a
-                      href={desktopDownloadUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      Download Classifyre {softwareVersion}
-                    </a>
-                  </Button>
-                  <p className="text-center font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
-                    macOS · Windows · Linux — the full product, not a demo
-                  </p>
+                  <DownloadPrimaryButton release={latestRelease} />
+                  <div className="text-center">
+                    <AllReleasesLink release={latestRelease} />
+                  </div>
                 </div>
               </div>
 
               {/* Kubernetes — the same product, scaled out */}
-              <div className="flex h-full flex-col gap-6 border-2 border-foreground bg-foreground p-6 text-primary-foreground shadow-[6px_6px_0_var(--color-accent)] sm:p-8">
+              <div className="flex h-full min-w-0 flex-col gap-6 border-2 border-foreground bg-foreground p-6 text-primary-foreground shadow-[6px_6px_0_var(--color-accent)] sm:p-8">
                 <div className="space-y-2">
                   <span className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-accent dark:text-accent-foreground">
                     Helm chart · scales to any size
@@ -722,7 +512,7 @@ export default function HomePage() {
 
                 {/* Tinted with primary-foreground, not black: this card is
                     painted with bg-foreground, which flips with the theme. */}
-                <pre className="overflow-x-auto border-2 border-primary-foreground/20 bg-primary-foreground/8 px-3 py-3 font-mono text-[11px] leading-6 text-primary-foreground/85 sm:text-xs">
+                <pre className="min-w-0 overflow-x-auto border-2 border-primary-foreground/20 bg-primary-foreground/8 px-3 py-3 font-mono text-[11px] leading-6 text-primary-foreground/85 sm:text-xs">
                   <code>{helmInstallCommand.join("\n")}</code>
                 </pre>
 
@@ -743,7 +533,6 @@ export default function HomePage() {
           <div className="space-y-8">
             <SectionHead
               id="investigation-title"
-              marker="How it works"
               title={
                 <>
                   Findings are evidence.
@@ -765,12 +554,24 @@ export default function HomePage() {
                 </div>
               </Reveal>
 
-              <figure className="flex flex-col border-2 border-border bg-background p-5">
-                <span className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
-                  A case, assembling itself
-                </span>
-                <div className="my-auto py-4">
-                  <CaseGraph />
+              <figure className="flex min-w-0 flex-col border-2 border-border bg-background p-5">
+                <div className="flex flex-wrap items-baseline justify-between gap-x-3">
+                  <span className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
+                    A case, assembling itself
+                  </span>
+                  <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground lg:hidden">
+                    Swipe →
+                  </span>
+                </div>
+                {/* The graph is a wide landscape drawing. Squeezed into a phone
+                    it scales to ~0.3 and its labels stop being readable, so
+                    below `lg` it keeps a legible width and scrolls sideways
+                    instead. Bleeds into the figure padding so the scroll edge
+                    reads as intentional. */}
+                <div className="-mx-5 my-auto overflow-x-auto px-5 py-4 lg:mx-0 lg:overflow-visible lg:px-0">
+                  <div className="min-w-142 lg:min-w-0">
+                    <CaseGraph />
+                  </div>
                 </div>
                 <figcaption className="border-t-2 border-border pt-3 font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
                   Hypotheses pinned to severity-rated evidence, a fingerprint
@@ -820,328 +621,313 @@ export default function HomePage() {
 
       {/* ── Sources ──────────────────────────────────────────────────────── */}
       <section aria-labelledby="sources-title">
-        <LandingSectionShell tone="plain">
+        <LandingSectionShell tone="plain" fullWidth>
           <div className="space-y-6">
             <SectionHead
               id="sources-title"
-              marker="Sources"
-              illustration="docs"
               title="Scan the systems you already own"
-              lede="Operational databases, lakehouses, collaboration tools, analytics assets, and public content — all feeding one evidence stream."
-              action={<DocsLink href={docs.root}>Connector docs</DocsLink>}
+              lede="Operational databases, lakehouses, collaboration tools, analytics assets, and public content, all feeding one evidence stream."
+              action={<DocsLink href={`${docs.root}/sources/`}>Sources Documentation</DocsLink>}
             />
 
-            <div className="edge-fade-x overflow-hidden py-3">
-              <div className="marquee-track-slow flex w-max items-stretch gap-14 py-6">
-                {marqueeEntries.map((entry, index) => (
-                  <div
-                    key={`${entry.type}-${index}`}
-                    className="flex min-w-40 flex-col items-center justify-center gap-4 px-5 text-center"
-                  >
-                    <SourceIcon
-                      source={String(entry.icon)}
-                      size="lg"
-                      className="[&_svg]:h-14 [&_svg]:w-14 [&_svg]:text-foreground"
-                    />
-                    <span className="max-w-32 text-base font-medium uppercase tracking-[0.08em]">
-                      {entry.label}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <SourceMarquee />
 
-            <SourceCatalog entries={searchableSourceEntries} />
+
           </div>
+        </LandingSectionShell>
+
+        <LandingSectionShell tone="plain" className="border-0">
+          <SourceCatalogSection />
         </LandingSectionShell>
       </section>
 
-      {/* ── Detectors: built-in packs + the custom ladder ────────────────── */}
-      <section aria-labelledby="detectors-title">
-        <LandingSectionShell tone="signal">
-          <div className="space-y-8">
-            <SectionHead
-              id="detectors-title"
-              marker="Detectors"
-              tone="signal"
-              illustration="probe"
-              title="Switch one on. Evidence follows."
-              lede="Curated packs for PII, secrets, security, moderation, and quality work on the first scan — no model wrangling."
-            />
+      {/*/!* ── Detectors: built-in packs + the custom ladder ────────────────── *!/*/}
+      {/*<section aria-labelledby="detectors-title">*/}
+      {/*  <LandingSectionShell tone="signal">*/}
+      {/*    <div className="space-y-8">*/}
+      {/*      <SectionHead*/}
+      {/*        id="detectors-title"*/}
+      {/*        marker="Detectors"*/}
+      {/*        tone="signal"*/}
+      {/*        illustration="probe"*/}
+      {/*        title="Switch one on. Evidence follows."*/}
+      {/*        lede="Curated packs for PII, secrets, security, moderation, and quality work on the first scan — no model wrangling."*/}
+      {/*      />*/}
 
-            <DetectorCatalog
-              items={activeDetectorItems}
-              groups={detectorCatalogGroups}
-              external
-            />
+      {/*      <DetectorCatalog*/}
+      {/*        items={activeDetectorItems}*/}
+      {/*        groups={detectorCatalogGroups}*/}
+      {/*        external*/}
+      {/*      />*/}
 
-            {/* Custom detection: a ladder, not a leap. */}
-            <div className="border-2 border-primary-foreground/25 bg-primary-foreground/5">
-              <div className="flex flex-wrap items-center justify-between gap-3 border-b-2 border-primary-foreground/25 px-4 py-3 sm:px-5">
-                <span className="font-mono text-[11px] font-bold uppercase tracking-[0.2em] text-accent dark:text-accent-foreground">
-                  Need your own? From a regex to any model
-                </span>
-                <a
-                  href={docs.customDetectors}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-primary-foreground/70 underline-offset-4 hover:text-accent hover:underline dark:hover:text-accent-foreground"
-                >
-                  Custom detector docs →
-                </a>
-              </div>
-              <ol className="grid divide-y-2 divide-primary-foreground/20 sm:grid-cols-2 sm:divide-y-0 xl:grid-cols-4 xl:divide-x-2">
-                {detectorLadder.map((rung) => (
-                  <li
-                    key={rung.tier}
-                    className="flex flex-col gap-2 p-4 sm:p-5"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="font-mono text-2xl font-black text-primary-foreground/20">
-                        {rung.tier}
-                      </span>
-                      <PowerMeter level={rung.power} />
-                    </div>
-                    <p className="font-serif text-sm font-black uppercase leading-tight tracking-[0.04em]">
-                      {rung.title}
-                    </p>
-                    <p className="text-xs leading-5 text-primary-foreground/65">
-                      {rung.description}
-                    </p>
-                  </li>
-                ))}
-              </ol>
-            </div>
-          </div>
-        </LandingSectionShell>
-      </section>
+      {/*      /!* Custom detection: a ladder, not a leap. *!/*/}
+      {/*      <div className="border-2 border-primary-foreground/25 bg-primary-foreground/5">*/}
+      {/*        <div className="flex flex-wrap items-center justify-between gap-3 border-b-2 border-primary-foreground/25 px-4 py-3 sm:px-5">*/}
+      {/*          <span className="font-mono text-[11px] font-bold uppercase tracking-[0.2em] text-accent dark:text-accent-foreground">*/}
+      {/*            Need your own? From a regex to any model*/}
+      {/*          </span>*/}
+      {/*          <a*/}
+      {/*            href={docs.customDetectors}*/}
+      {/*            target="_blank"*/}
+      {/*            rel="noreferrer"*/}
+      {/*            className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-primary-foreground/70 underline-offset-4 hover:text-accent hover:underline dark:hover:text-accent-foreground"*/}
+      {/*          >*/}
+      {/*            Custom detector docs →*/}
+      {/*          </a>*/}
+      {/*        </div>*/}
+      {/*        <ol className="grid divide-y-2 divide-primary-foreground/20 sm:grid-cols-2 sm:divide-y-0 xl:grid-cols-4 xl:divide-x-2">*/}
+      {/*          {detectorLadder.map((rung) => (*/}
+      {/*            <li*/}
+      {/*              key={rung.tier}*/}
+      {/*              className="flex flex-col gap-2 p-4 sm:p-5"*/}
+      {/*            >*/}
+      {/*              <div className="flex items-center justify-between">*/}
+      {/*                <span className="font-mono text-2xl font-black text-primary-foreground/20">*/}
+      {/*                  {rung.tier}*/}
+      {/*                </span>*/}
+      {/*                <PowerMeter level={rung.power} />*/}
+      {/*              </div>*/}
+      {/*              <p className="font-serif text-sm font-black uppercase leading-tight tracking-[0.04em]">*/}
+      {/*                {rung.title}*/}
+      {/*              </p>*/}
+      {/*              <p className="text-xs leading-5 text-primary-foreground/65">*/}
+      {/*                {rung.description}*/}
+      {/*              </p>*/}
+      {/*            </li>*/}
+      {/*          ))}*/}
+      {/*        </ol>*/}
+      {/*      </div>*/}
+      {/*    </div>*/}
+      {/*  </LandingSectionShell>*/}
+      {/*</section>*/}
 
       {/* ── Autopilot ────────────────────────────────────────────────────── */}
-      <section aria-labelledby="harness-title">
-        <LandingSectionShell tone="signal">
-          <div className="space-y-8">
-            <SectionHead
-              id="harness-title"
-              marker="Harness AI"
-              tone="signal"
-              title={
-                <>
-                  Autopilot,{" "}
-                  <span className="inline-block bg-accent px-[0.14em] text-black">
-                    not copilot
-                  </span>
-                </>
-              }
-              lede="Nobody has to type a prompt. After every scan five agents wake in sequence and move the investigation forward — each one logging what it did and why."
-              action={
-                <DocsLink href={docs.autopilot} tone="signal">
-                  Autopilot docs
-                </DocsLink>
-              }
-            />
+      {/*<section aria-labelledby="harness-title">*/}
+      {/*  <LandingSectionShell tone="signal">*/}
+      {/*    <div className="space-y-8">*/}
+      {/*      <SectionHead*/}
+      {/*        id="harness-title"*/}
+      {/*        marker="Harness AI"*/}
+      {/*        tone="signal"*/}
+      {/*        title={*/}
+      {/*          <>*/}
+      {/*            Autopilot,{" "}*/}
+      {/*            <span className="inline-block bg-accent px-[0.14em] text-black">*/}
+      {/*              not copilot*/}
+      {/*            </span>*/}
+      {/*          </>*/}
+      {/*        }*/}
+      {/*        lede="Nobody has to type a prompt. After every scan five agents wake in sequence and move the investigation forward — each one logging what it did and why."*/}
+      {/*        action={*/}
+      {/*          <DocsLink href={docs.autopilot} tone="signal">*/}
+      {/*            Autopilot docs*/}
+      {/*          </DocsLink>*/}
+      {/*        }*/}
+      {/*      />*/}
 
-            {/* The ring is the poster; the five drawings below are the cast.
-                Giving each agent its own full-size illustration beats cramming
-                them into a two-column list of thumbnails. */}
-            <div className="flex flex-col items-center gap-4">
-              <MissionRing />
-              <p className="max-w-md text-center font-mono text-[10px] uppercase leading-5 tracking-[0.14em] text-primary-foreground/55">
-                Flip observe-only and it proposes without touching a thing
-              </p>
-            </div>
+      {/*      /!* The ring is the poster; the five drawings below are the cast.*/}
+      {/*          Giving each agent its own full-size illustration beats cramming*/}
+      {/*          them into a two-column list of thumbnails. *!/*/}
+      {/*      <div className="flex flex-col items-center gap-4">*/}
+      {/*        <MissionRing />*/}
+      {/*        <p className="max-w-md text-center font-mono text-[10px] uppercase leading-5 tracking-[0.14em] text-primary-foreground/55">*/}
+      {/*          Flip observe-only and it proposes without touching a thing*/}
+      {/*        </p>*/}
+      {/*      </div>*/}
 
-            <ol className="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-5">
-              {harnessMissions.map((mission, index) => (
-                <Reveal key={mission.step} as="li" delayMs={index * 80}>
-                  <div className="flex h-full flex-col items-center gap-4 border-2 border-primary-foreground/25 bg-primary-foreground/8 p-5 text-center">
-                    <Illustration
-                      name={mission.illustration}
-                      surface="inverted"
-                      tilt={index % 2 === 0 ? "left" : "right"}
-                      className="h-24 w-24"
-                    />
-                    <div className="flex items-baseline gap-2">
-                      <span className="font-mono text-[10px] font-bold text-accent dark:text-accent-foreground">
-                        {mission.step}
-                      </span>
-                      <span className="font-mono text-xs font-bold uppercase tracking-[0.14em]">
-                        {mission.title}
-                      </span>
-                    </div>
-                    <p className="text-xs leading-5 text-primary-foreground/68">
-                      {mission.description}
-                    </p>
-                  </div>
-                </Reveal>
-              ))}
-            </ol>
-          </div>
-        </LandingSectionShell>
-      </section>
+      {/*      <ol className="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-5">*/}
+      {/*        {harnessMissions.map((mission, index) => (*/}
+      {/*          <Reveal key={mission.step} as="li" delayMs={index * 80}>*/}
+      {/*            <div className="flex h-full flex-col items-center gap-4 border-2 border-primary-foreground/25 bg-primary-foreground/8 p-5 text-center">*/}
+      {/*              <Illustration*/}
+      {/*                name={mission.illustration}*/}
+      {/*                surface="inverted"*/}
+      {/*                tilt={index % 2 === 0 ? "left" : "right"}*/}
+      {/*                className="h-24 w-24"*/}
+      {/*              />*/}
+      {/*              <div className="flex items-baseline gap-2">*/}
+      {/*                <span className="font-mono text-[10px] font-bold text-accent dark:text-accent-foreground">*/}
+      {/*                  {mission.step}*/}
+      {/*                </span>*/}
+      {/*                <span className="font-mono text-xs font-bold uppercase tracking-[0.14em]">*/}
+      {/*                  {mission.title}*/}
+      {/*                </span>*/}
+      {/*              </div>*/}
+      {/*              <p className="text-xs leading-5 text-primary-foreground/68">*/}
+      {/*                {mission.description}*/}
+      {/*              </p>*/}
+      {/*            </div>*/}
+      {/*          </Reveal>*/}
+      {/*        ))}*/}
+      {/*      </ol>*/}
+      {/*    </div>*/}
+      {/*  </LandingSectionShell>*/}
+      {/*</section>*/}
 
       {/* ── Workspaces ───────────────────────────────────────────────────── */}
-      <section aria-labelledby="workspaces-title">
-        <LandingSectionShell tone="plain">
-          <div className="space-y-8">
-            <SectionHead
-              id="workspaces-title"
-              marker="Isolated workspaces"
-              title={
-                <>
-                  One instance.
-                  <br />
-                  Sealed case files.
-                </>
-              }
-              lede="A client, a region, a business unit — each gets its own PostgreSQL schema, evidence, AI memory, and endpoint. A wall, not a tenant column somebody can forget to filter on."
-              action={
-                <DocsLink href={docs.workspaces}>Workspace docs</DocsLink>
-              }
-            />
+      {/*<section aria-labelledby="workspaces-title">*/}
+      {/*  <LandingSectionShell tone="plain">*/}
+      {/*    <div className="space-y-8">*/}
+      {/*      <SectionHead*/}
+      {/*        id="workspaces-title"*/}
+      {/*        marker="Isolated workspaces"*/}
+      {/*        title={*/}
+      {/*          <>*/}
+      {/*            One instance.*/}
+      {/*            <br />*/}
+      {/*            Sealed case files.*/}
+      {/*          </>*/}
+      {/*        }*/}
+      {/*        lede="A client, a region, a business unit — each gets its own PostgreSQL schema, evidence, AI memory, and endpoint. A wall, not a tenant column somebody can forget to filter on."*/}
+      {/*        action={*/}
+      {/*          <DocsLink href={docs.workspaces}>Workspace docs</DocsLink>*/}
+      {/*        }*/}
+      {/*      />*/}
 
-            <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-center">
-              {/* The cabinet: tabbed case files, stacked and sealed. */}
-              <figure className="relative">
-                <ol className="flex flex-col">
-                  {workspaceFiles.map((file, index) => (
-                    <Reveal key={file.slug} as="li" delayMs={index * 120}>
-                      {index > 0 ? (
-                        <div
-                          className="flex items-center gap-3 py-3"
-                          aria-hidden="true"
-                        >
-                          <span className="h-px flex-1 border-t-2 border-dashed border-border/50" />
-                          <span className="font-mono text-[9px] font-bold uppercase tracking-[0.22em] text-muted-foreground">
-                            No crossover
-                          </span>
-                          <span className="h-px flex-1 border-t-2 border-dashed border-border/50" />
-                        </div>
-                      ) : null}
+      {/*      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-center">*/}
+      {/*        /!* The cabinet: tabbed case files, stacked and sealed. *!/*/}
+      {/*        <figure className="relative">*/}
+      {/*          <ol className="flex flex-col">*/}
+      {/*            {workspaceFiles.map((file, index) => (*/}
+      {/*              <Reveal key={file.slug} as="li" delayMs={index * 120}>*/}
+      {/*                {index > 0 ? (*/}
+      {/*                  <div*/}
+      {/*                    className="flex items-center gap-3 py-3"*/}
+      {/*                    aria-hidden="true"*/}
+      {/*                  >*/}
+      {/*                    <span className="h-px flex-1 border-t-2 border-dashed border-border/50" />*/}
+      {/*                    <span className="font-mono text-[9px] font-bold uppercase tracking-[0.22em] text-muted-foreground">*/}
+      {/*                      No crossover*/}
+      {/*                    </span>*/}
+      {/*                    <span className="h-px flex-1 border-t-2 border-dashed border-border/50" />*/}
+      {/*                  </div>*/}
+      {/*                ) : null}*/}
 
-                      <div className="cl-file">
-                        <div
-                          className="cl-file-tab flex"
-                          style={
-                            {
-                              "--cl-tab-offset": `${index * 28}%`,
-                            } as CSSProperties
-                          }
-                        >
-                          <span
-                            className={cn(
-                              "border-2 border-b-0 px-2.5 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.14em]",
-                              file.active
-                                ? "border-accent bg-accent text-black"
-                                : "border-border bg-foreground/5 text-muted-foreground",
-                            )}
-                          >
-                            {file.slug}
-                          </span>
-                        </div>
+      {/*                <div className="cl-file">*/}
+      {/*                  <div*/}
+      {/*                    className="cl-file-tab flex"*/}
+      {/*                    style={*/}
+      {/*                      {*/}
+      {/*                        "--cl-tab-offset": `${index * 28}%`,*/}
+      {/*                      } as CSSProperties*/}
+      {/*                    }*/}
+      {/*                  >*/}
+      {/*                    <span*/}
+      {/*                      className={cn(*/}
+      {/*                        "border-2 border-b-0 px-2.5 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.14em]",*/}
+      {/*                        file.active*/}
+      {/*                          ? "border-accent bg-accent text-black"*/}
+      {/*                          : "border-border bg-foreground/5 text-muted-foreground",*/}
+      {/*                      )}*/}
+      {/*                    >*/}
+      {/*                      {file.slug}*/}
+      {/*                    </span>*/}
+      {/*                  </div>*/}
 
-                        <div
-                          className={cn(
-                            "flex items-center justify-between gap-3 border-2 p-4",
-                            file.active
-                              ? "border-accent bg-accent/10"
-                              : "border-border bg-background",
-                          )}
-                        >
-                          <div className="min-w-0">
-                            <p className="truncate font-serif text-lg font-black uppercase leading-tight tracking-[0.04em]">
-                              {file.name}
-                            </p>
-                            <p className="mt-0.5 font-mono text-[11px] uppercase tracking-[0.08em] text-muted-foreground">
-                              {file.detail}
-                            </p>
-                          </div>
-                          <span className="shrink-0 border border-border px-1.5 py-0.5 font-mono text-[9px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
-                            Sealed
-                          </span>
-                        </div>
-                      </div>
-                    </Reveal>
-                  ))}
-                </ol>
-              </figure>
+      {/*                  <div*/}
+      {/*                    className={cn(*/}
+      {/*                      "flex items-center justify-between gap-3 border-2 p-4",*/}
+      {/*                      file.active*/}
+      {/*                        ? "border-accent bg-accent/10"*/}
+      {/*                        : "border-border bg-background",*/}
+      {/*                    )}*/}
+      {/*                  >*/}
+      {/*                    <div className="min-w-0">*/}
+      {/*                      <p className="truncate font-serif text-lg font-black uppercase leading-tight tracking-[0.04em]">*/}
+      {/*                        {file.name}*/}
+      {/*                      </p>*/}
+      {/*                      <p className="mt-0.5 font-mono text-[11px] uppercase tracking-[0.08em] text-muted-foreground">*/}
+      {/*                        {file.detail}*/}
+      {/*                      </p>*/}
+      {/*                    </div>*/}
+      {/*                    <span className="shrink-0 border border-border px-1.5 py-0.5 font-mono text-[9px] font-bold uppercase tracking-[0.16em] text-muted-foreground">*/}
+      {/*                      Sealed*/}
+      {/*                    </span>*/}
+      {/*                  </div>*/}
+      {/*                </div>*/}
+      {/*              </Reveal>*/}
+      {/*            ))}*/}
+      {/*          </ol>*/}
+      {/*        </figure>*/}
 
-              <div className="border-2 border-border bg-background">
-                <div className="border-b-2 border-border px-4 py-3 sm:px-5">
-                  <span className="font-mono text-[11px] font-bold uppercase tracking-[0.2em] text-accent-foreground/70 dark:text-accent">
-                    Not shared. Ever.
-                  </span>
-                </div>
-                <ul className="grid grid-cols-2 gap-px bg-border">
-                  {workspaceIsolation.map((item) => (
-                    <li
-                      key={item}
-                      className="bg-background px-4 py-3 font-mono text-[11px] uppercase tracking-[0.1em] text-muted-foreground"
-                    >
-                      <span className="mr-1.5 text-accent-foreground/70 dark:text-accent">
-                        ▪
-                      </span>
-                      {item}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          </div>
-        </LandingSectionShell>
-      </section>
+      {/*        <div className="border-2 border-border bg-background">*/}
+      {/*          <div className="border-b-2 border-border px-4 py-3 sm:px-5">*/}
+      {/*            <span className="font-mono text-[11px] font-bold uppercase tracking-[0.2em] text-accent-foreground/70 dark:text-accent">*/}
+      {/*              Not shared. Ever.*/}
+      {/*            </span>*/}
+      {/*          </div>*/}
+      {/*          <ul className="grid grid-cols-2 gap-px bg-border">*/}
+      {/*            {workspaceIsolation.map((item) => (*/}
+      {/*              <li*/}
+      {/*                key={item}*/}
+      {/*                className="bg-background px-4 py-3 font-mono text-[11px] uppercase tracking-[0.1em] text-muted-foreground"*/}
+      {/*              >*/}
+      {/*                <span className="mr-1.5 text-accent-foreground/70 dark:text-accent">*/}
+      {/*                  ▪*/}
+      {/*                </span>*/}
+      {/*                {item}*/}
+      {/*              </li>*/}
+      {/*            ))}*/}
+      {/*          </ul>*/}
+      {/*        </div>*/}
+      {/*      </div>*/}
+      {/*    </div>*/}
+      {/*  </LandingSectionShell>*/}
+      {/*</section>*/}
 
       {/* ── Enterprise ───────────────────────────────────────────────────── */}
       {/* The accent frame is this section's own border — it skips the shared
           shell so the two don't nest into a card-in-a-card. */}
-      <section aria-labelledby="enterprise-title">
-        <div className="relative overflow-hidden rounded-[8px] border-2 border-accent bg-background">
-          <div className="landing-grid absolute inset-0 opacity-20" />
-          <div className="relative space-y-6 p-6 py-10 sm:p-8 sm:py-12 lg:py-16">
-            <SectionHead
-              id="enterprise-title"
-              marker="Enterprise"
-              illustration="people"
-              title={
-                <>
-                  A partnership,
-                  <br />
-                  not a license key
-                </>
-              }
-              lede="Our engineers work with your team from the first pilot — learning how your business names things and tuning Classifyre to how your company actually works."
-            />
+      {/*<section aria-labelledby="enterprise-title">*/}
+      {/*  <div className="relative overflow-hidden rounded-[8px] border-2 border-accent bg-background">*/}
+      {/*    <div className="landing-grid absolute inset-0 opacity-20" />*/}
+      {/*    <div className="relative space-y-6 p-6 py-10 sm:p-8 sm:py-12 lg:py-16">*/}
+      {/*      <SectionHead*/}
+      {/*        id="enterprise-title"*/}
+      {/*        marker="Enterprise"*/}
+      {/*        illustration="people"*/}
+      {/*        title={*/}
+      {/*          <>*/}
+      {/*            A partnership,*/}
+      {/*            <br />*/}
+      {/*            not a license key*/}
+      {/*          </>*/}
+      {/*        }*/}
+      {/*        lede="Our engineers work with your team from the first pilot — learning how your business names things and tuning Classifyre to how your company actually works."*/}
+      {/*      />*/}
 
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              {enterprisePillars.map((pillar, index) => (
-                <Reveal key={pillar.marker} delayMs={index * 80}>
-                  <div className="flex h-full flex-col gap-2 border-2 border-border bg-background p-4">
-                    <p className="font-serif text-sm font-black uppercase leading-tight tracking-[0.04em]">
-                      {pillar.marker}
-                    </p>
-                    <p className="text-sm leading-6 text-muted-foreground">
-                      {pillar.description}
-                    </p>
-                  </div>
-                </Reveal>
-              ))}
-            </div>
+      {/*      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">*/}
+      {/*        {enterprisePillars.map((pillar, index) => (*/}
+      {/*          <Reveal key={pillar.marker} delayMs={index * 80}>*/}
+      {/*            <div className="flex h-full flex-col gap-2 border-2 border-border bg-background p-4">*/}
+      {/*              <p className="font-serif text-sm font-black uppercase leading-tight tracking-[0.04em]">*/}
+      {/*                {pillar.marker}*/}
+      {/*              </p>*/}
+      {/*              <p className="text-sm leading-6 text-muted-foreground">*/}
+      {/*                {pillar.description}*/}
+      {/*              </p>*/}
+      {/*            </div>*/}
+      {/*          </Reveal>*/}
+      {/*        ))}*/}
+      {/*      </div>*/}
 
-            <div className="flex flex-wrap items-center gap-4">
-              <Button
-                asChild
-                className="border-2 border-accent bg-accent text-accent-foreground hover:bg-accent/90"
-              >
-                <a href={`mailto:${enterpriseContactEmail}`}>
-                  Start the conversation
-                </a>
-              </Button>
-              <span className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
-                {enterpriseContactEmail}
-              </span>
-            </div>
-          </div>
-        </div>
-      </section>
+      {/*      <div className="flex flex-wrap items-center gap-4">*/}
+      {/*        <Button*/}
+      {/*          asChild*/}
+      {/*          className="border-2 border-accent bg-accent text-accent-foreground hover:bg-accent/90"*/}
+      {/*        >*/}
+      {/*          <a href={`mailto:${enterpriseContactEmail}`}>*/}
+      {/*            Start the conversation*/}
+      {/*          </a>*/}
+      {/*        </Button>*/}
+      {/*        <span className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted-foreground">*/}
+      {/*          {enterpriseContactEmail}*/}
+      {/*        </span>*/}
+      {/*      </div>*/}
+      {/*    </div>*/}
+      {/*  </div>*/}
+      {/*</section>*/}
+
 
       {/* ── Closing CTA ──────────────────────────────────────────────────── */}
       <section aria-labelledby="closing-title">
@@ -1187,16 +973,14 @@ export default function HomePage() {
                 the investigator finds. Everything you build carries over when
                 you go remote with Helm.
               </p>
-              <div className="flex flex-wrap justify-center gap-3">
-                <Button
-                  asChild
-                  size="lg"
-                  className="border-2 border-accent bg-accent text-black hover:bg-accent/90"
-                >
-                  <a href={desktopDownloadUrl} target="_blank" rel="noreferrer">
-                    Download for macOS · Windows · Linux
-                  </a>
-                </Button>
+              <div className="flex w-full flex-wrap items-start justify-center gap-3">
+                <div className="w-full max-w-xs">
+                  {/* Dark section: the caption under the button inherits
+                      muted-foreground, which reads on white — force it light. */}
+                  <div className="[&_p]:text-white/55">
+                    <DownloadPrimaryButton release={latestRelease} />
+                  </div>
+                </div>
                 <Button
                   asChild
                   size="lg"

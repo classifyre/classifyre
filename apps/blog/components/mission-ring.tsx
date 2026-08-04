@@ -40,7 +40,10 @@ export function MissionRing() {
           opacity="0.4"
         />
       </g>
-      <g className="cl-rotate-slower" style={{ transformOrigin: "210px 200px" }}>
+      <g
+        className="cl-rotate-slower"
+        style={{ transformOrigin: "210px 200px" }}
+      >
         <circle
           cx="210"
           cy="200"

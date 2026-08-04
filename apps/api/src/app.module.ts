@@ -56,6 +56,8 @@ import { CaseEventsController } from './controllers/case-events.controller';
 import { CaseLeadsService } from './case-leads.service';
 import { CaseEventsService } from './case-events.service';
 import { NamespacesController } from './registry/namespaces.controller';
+import { SitemapController } from './sitemap/sitemap.controller';
+import { SitemapService } from './sitemap/sitemap.service';
 import { NamespaceWorkerManager } from './namespace/namespace-worker-manager';
 
 // Import organized controllers
@@ -130,6 +132,7 @@ import {
     CaseLeadsController,
     CaseEventsController,
     NamespacesController,
+    SitemapController,
   ],
   providers: [
     { provide: APP_GUARD, useClass: InternalApiKeyGuard },
@@ -176,6 +179,7 @@ import {
     CaseLeadsService,
     CaseEventsService,
     NamespaceWorkerManager,
+    SitemapService,
   ],
 })
 export class AppModule {}

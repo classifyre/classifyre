@@ -247,6 +247,8 @@ All URIs are relative to *http://localhost*
 *RunnersApi* | [**searchRunnersControllerSearchRunnerAssets**](docs/RunnersApi.md#searchrunnerscontrollersearchrunnerassets) | **POST** /search/runner-assets | Search runner assets
 *RunnersApi* | [**searchRunnersControllerSearchRunners**](docs/RunnersApi.md#searchrunnerscontrollersearchrunners) | **POST** /search/runners | Search runners
 *RunnersApi* | [**searchRunnersControllerSearchRunnersCharts**](docs/RunnersApi.md#searchrunnerscontrollersearchrunnerscharts) | **POST** /search/runners/charts | Runners charts overview
+*SitemapApi* | [**sitemapControllerGetEntries**](docs/SitemapApi.md#sitemapcontrollergetentries) | **GET** /sitemap/entries | One chunk of detail-page ids + last-modified dates
+*SitemapApi* | [**sitemapControllerGetIndex**](docs/SitemapApi.md#sitemapcontrollergetindex) | **GET** /sitemap | Sitemap index: per-entity chunk counts and last-modified dates
 *SourcesApi* | [**searchSourcesControllerSearchSources**](docs/SourcesApi.md#searchsourcescontrollersearchsources) | **POST** /search/sources | Search data sources
 *SourcesApi* | [**sourceAssetsControllerBulkIngest**](docs/SourcesApi.md#sourceassetscontrollerbulkingest) | **POST** /sources/{sourceId}/assets/bulk | Bulk ingest assets
 *SourcesApi* | [**sourceAssetsControllerFinalizeIngest**](docs/SourcesApi.md#sourceassetscontrollerfinalizeingest) | **POST** /sources/{sourceId}/assets/finalize | Finalize ingest run
@@ -525,6 +527,11 @@ All URIs are relative to *http://localhost*
 - [SimilarFindingDto](docs/SimilarFindingDto.md)
 - [SimilarFindingEvidenceAnalysisDto](docs/SimilarFindingEvidenceAnalysisDto.md)
 - [SimilarFindingSourceDto](docs/SimilarFindingSourceDto.md)
+- [SitemapChunkDto](docs/SitemapChunkDto.md)
+- [SitemapEntriesDto](docs/SitemapEntriesDto.md)
+- [SitemapEntryDto](docs/SitemapEntryDto.md)
+- [SitemapIndexDto](docs/SitemapIndexDto.md)
+- [SitemapSectionDto](docs/SitemapSectionDto.md)
 - [SourceAssetsControllerBulkIngest201Response](docs/SourceAssetsControllerBulkIngest201Response.md)
 - [SourceInfoDto](docs/SourceInfoDto.md)
 - [SourceResponseDto](docs/SourceResponseDto.md)
