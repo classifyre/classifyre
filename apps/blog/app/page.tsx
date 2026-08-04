@@ -2,23 +2,22 @@ import type { Metadata } from "next";
 import type { CSSProperties } from "react";
 
 import {
+  AllReleasesLink,
   Button,
   DetectorCatalog,
   detectorCatalogGroups,
+  DownloadPlatformGrid,
+  DownloadPrimaryButton,
+  HelmLogo,
+  KubernetesLogo,
   resolveDetectorGroupId,
 } from "@workspace/ui/components";
 import { cn } from "@workspace/ui/lib/utils";
+import { fetchLatestRelease } from "@workspace/ui/lib/releases";
 import { getAllDetectorDocs } from "@workspace/schemas/detector-docs";
 
-import { fetchLatestRelease } from "@/lib/releases";
 import { normalizeSiteUrl, safeJsonLdStringify } from "@/lib/seo";
-import { HelmLogo, KubernetesLogo } from "@/components/brand-logos";
 import { CaseGraph } from "@/components/case-graph";
-import {
-  AllReleasesLink,
-  DownloadPlatformGrid,
-  DownloadPrimaryButton,
-} from "@/components/download-links";
 import { EvidenceBoard } from "@/components/evidence-board";
 import { Illustration, type IllustrationName } from "@/components/illustration";
 import { MissionRing } from "@/components/mission-ring";

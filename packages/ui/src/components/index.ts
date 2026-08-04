@@ -68,6 +68,8 @@ export * from "./stats-card";
 export * from "./ai-assisted-card";
 export * from "./cookie-consent-banner";
 export * from "./site-footer";
+export * from "./brand-logos";
+export * from "./download-links";
 export * from "./ai-prompt-popover";
 export * from "./assistant-workflow-panel";
 

@@ -25,6 +25,17 @@ export const repositoryUrl = "https://github.com/classifyre/classifyre";
 export const contactEmail = "contact@classifyre.com";
 
 /**
+ * The GitHub release the desktop builds are published to. Used as the last
+ * fallback by the download UI (see `components/download-links`) when a release
+ * can't be resolved, so a download link is never a dead end.
+ */
+export const releasesLatestUrl = `${repositoryUrl}/releases/latest`;
+
+/** The OCI reference of the Helm chart, quoted verbatim in install commands. */
+export const helmChartRef =
+  "oci://registry-1.docker.io/classifyre/classifyre-core";
+
+/**
  * Marketing-site routes as *paths*, not URLs.
  *
  * The shared footer renders the same set of links on the marketing site (where

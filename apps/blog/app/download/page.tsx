@@ -1,14 +1,16 @@
 import type { Metadata } from "next";
 
-import { Button } from "@workspace/ui/components";
-import { cn } from "@workspace/ui/lib/utils";
-
-import { HelmLogo, KubernetesLogo } from "@/components/brand-logos";
 import {
   AllReleasesLink,
+  Button,
   DownloadPlatformGrid,
   DownloadPrimaryButton,
-} from "@/components/download-links";
+  HelmLogo,
+  KubernetesLogo,
+} from "@workspace/ui/components";
+import { cn } from "@workspace/ui/lib/utils";
+import { fetchLatestRelease, type OsKey } from "@workspace/ui/lib/releases";
+
 import { Illustration } from "@/components/illustration";
 import {
   DocsLink,
@@ -17,7 +19,6 @@ import {
   SectionShell,
 } from "@/components/page-kit";
 import { Reveal } from "@/components/reveal";
-import { fetchLatestRelease, type OsKey } from "@/lib/releases";
 import {
   demoUrl,
   docs,

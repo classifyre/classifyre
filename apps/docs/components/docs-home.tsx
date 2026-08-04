@@ -1,5 +1,7 @@
 import Link from "next/link";
 
+import { InstallOptions } from "./install-options";
+
 const PIPELINE: Array<{
   step: string;
   name: string;
@@ -65,6 +67,7 @@ const START_HERE: Array<{
     blurb:
       "Stand the platform up, connect your first system, and watch the first scan land — on a laptop or in production.",
     links: [
+      { text: "Install the desktop app", href: "/deployment/desktop/" },
       { text: "Deploy with Kubernetes", href: "/deployment/kubernetes/" },
       { text: "Connect a source", href: "/sources/" },
       { text: "Your first scan", href: "/flow/" },
@@ -89,6 +92,12 @@ const DIRECTORY: Array<{ name: string; blurb: string; href: string }> = [
     blurb:
       "The plain-English map of the whole platform, from isolated workspaces down to each screen.",
     href: "/how-it-works/",
+  },
+  {
+    name: "Install & Deploy",
+    blurb:
+      "The two distributions: the desktop app, and the Helm chart for local and production clusters.",
+    href: "/deployment/",
   },
   {
     name: "Sources",
@@ -125,11 +134,6 @@ const DIRECTORY: Array<{ name: string; blurb: string; href: string }> = [
     blurb: "Locale, AI providers, and the MCP server for your own tools.",
     href: "/settings/",
   },
-  {
-    name: "Deployment",
-    blurb: "Helm deployment for local and production Kubernetes clusters.",
-    href: "/deployment/",
-  },
 ];
 
 export function DocsHome() {
@@ -159,20 +163,35 @@ export function DocsHome() {
           docs explain how the application works, section by section.
         </p>
         <div className="mt-8 flex flex-wrap gap-3">
-          <Link
-            href="/how-it-works/"
+          <a
+            href="#install"
             className="border-2 border-border bg-accent px-5 py-2.5 font-mono text-sm font-bold uppercase tracking-[0.12em] text-accent-foreground transition-transform hover:-translate-y-0.5"
           >
-            Start: how it works →
-          </Link>
+            Get Classifyre ↓
+          </a>
           <Link
-            href="/deployment/kubernetes/"
+            href="/how-it-works/"
             className="border-2 border-border bg-background px-5 py-2.5 font-mono text-sm font-bold uppercase tracking-[0.12em] text-foreground transition-colors hover:bg-foreground hover:text-background"
           >
-            Install with Helm
+            How it works
           </Link>
         </div>
       </header>
+
+      {/* ── Install ──────────────────────────────────────────────── */}
+      <section id="install" aria-labelledby="install-heading" className="py-10">
+        <h2
+          id="install-heading"
+          className="mb-2 font-mono text-[11px] font-bold uppercase tracking-[0.22em] text-muted-foreground"
+        >
+          Step zero — get it running
+        </h2>
+        <p className="mb-5 max-w-2xl text-sm leading-6 text-muted-foreground">
+          Classifyre ships in two distributions, with the same features in
+          both. Install one, then work through the pipeline below.
+        </p>
+        <InstallOptions />
+      </section>
 
       {/* ── Pipeline strip ───────────────────────────────────────── */}
       <section aria-labelledby="pipeline-heading" className="py-10">
@@ -180,7 +199,7 @@ export function DocsHome() {
           id="pipeline-heading"
           className="mb-5 font-mono text-[11px] font-bold uppercase tracking-[0.22em] text-muted-foreground"
         >
-          One pipeline, five steps
+          Then: one pipeline, five steps
         </h2>
         <ol className="grid grid-cols-1 border-2 border-border sm:grid-cols-2 lg:grid-cols-5">
           {PIPELINE.map((stage, i) => (
