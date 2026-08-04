@@ -38,9 +38,30 @@ const FINDINGS: readonly FindingNode[] = [
     delay: 1500,
     pulse: true,
   },
-  { cx: 210, cy: 350, fill: SEVERITY.high, label: "PII", labelFill: "#0a0a0a", delay: 1620 },
-  { cx: 470, cy: 350, fill: SEVERITY.medium, label: "IBN", labelFill: "#0a0a0a", delay: 1740 },
-  { cx: 590, cy: 340, fill: SEVERITY.low, label: "SEC", labelFill: "#0a0a0a", delay: 1860 },
+  {
+    cx: 210,
+    cy: 350,
+    fill: SEVERITY.high,
+    label: "PII",
+    labelFill: "#0a0a0a",
+    delay: 1620,
+  },
+  {
+    cx: 470,
+    cy: 350,
+    fill: SEVERITY.medium,
+    label: "IBN",
+    labelFill: "#0a0a0a",
+    delay: 1740,
+  },
+  {
+    cx: 590,
+    cy: 340,
+    fill: SEVERITY.low,
+    label: "SEC",
+    labelFill: "#0a0a0a",
+    delay: 1860,
+  },
 ] as const;
 
 function delayStyle(delayMs: number, length?: number) {
@@ -84,8 +105,19 @@ export function CaseGraph() {
       data-inview={inView ? "true" : "false"}
     >
       <defs>
-        <pattern id="cg-dots" width="26" height="26" patternUnits="userSpaceOnUse">
-          <circle cx="1.5" cy="1.5" r="1.5" fill="currentColor" opacity="0.12" />
+        <pattern
+          id="cg-dots"
+          width="26"
+          height="26"
+          patternUnits="userSpaceOnUse"
+        >
+          <circle
+            cx="1.5"
+            cy="1.5"
+            r="1.5"
+            fill="currentColor"
+            opacity="0.12"
+          />
         </pattern>
       </defs>
       <rect x="0" y="0" width="720" height="460" fill="url(#cg-dots)" />

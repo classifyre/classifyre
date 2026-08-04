@@ -90,10 +90,22 @@
   },
   "demo": {
     "badge": "Demo",
-    "tooltip": "Demo-Modus ist aktiv. Ansicht, Suche und Dashboards funktionieren normal. Erstellen, Bearbeiten, Löschen, Scans ausführen, Detektoren trainieren und der Browser-Assistent sind deaktiviert.",
-    "mcpNotice": "Demo-Modus ist aktiv. MCP-Lesezugriff funktioniert mit einem vorhandenen Token, aber das Erstellen, Bearbeiten oder Löschen von Tokens ist deaktiviert.",
-    "blockedTitle": "Im Demo-Modus nicht verfügbar",
-    "blockedDescription": "Diese Operation ist im Demo-Modus nicht verfügbar. Erstellen, Bearbeiten und Löschen sind deaktiviert."
+    "headerCta": "Eigene Instanz",
+    "bannerCta": "Demo im Nur-Lese-Modus — eigene Instanz holen",
+    "tooltip": "Sie erkunden eine gemeinsam genutzte Demo im Nur-Lese-Modus. Ansicht, Suche und Dashboards funktionieren normal — Erstellen, Bearbeiten, Löschen, Scans ausführen, Detektoren trainieren und der Browser-Assistent sind deaktiviert.",
+    "mcpNotice": "Demo-Modus ist aktiv. MCP-Lesezugriff funktioniert mit einem vorhandenen Token, aber das Erstellen, Bearbeiten oder Löschen von Tokens ist deaktiviert. Mit einer eigenen Instanz können Sie Tokens ausstellen.",
+    "upgradeTitle": "Classifyre mit Ihren eigenen Daten betreiben",
+    "upgradeDescription": "Diese Demo wird geteilt und ist schreibgeschützt. Ihre eigene Instanz ist in Minuten eingerichtet, kostenlos und sendet Ihre Dokumente nirgendwohin.",
+    "blockedTitle": "Dafür brauchen Sie eine eigene Instanz",
+    "blockedDescription": "Die Demo ist schreibgeschützt, daher sind Erstellen, Bearbeiten, Löschen und das Ausführen von Scans hier deaktiviert. Mit einer eigenen Classifyre-Instanz steht alles zur Verfügung.",
+    "desktopTitle": "Desktop-App",
+    "desktopDescription": "macOS, Windows und Linux. Alles läuft auf Ihrem Rechner — ohne Server, ohne Konto.",
+    "desktopCta": "Herunterladen",
+    "helmTitle": "Kubernetes (Helm)",
+    "helmDescription": "Für Ihr Team selbst hosten — mit dem Produktions-Helm-Chart und Ihrer eigenen Datenbank.",
+    "helmCta": "Installationsanleitung",
+    "upgradeFootnote": "Beide Optionen sind kostenlos und Open Source. Ihre Dokumente bleiben auf Ihrem Rechner oder in Ihrem eigenen Cluster.",
+    "keepExploring": "Demo weiter erkunden"
   },
   "nav": {
     "overview": "Übersicht",
@@ -3326,6 +3338,15 @@
     "openDocument": "Dokument öffnen",
     "openFinding": "Finding öffnen",
     "sharedValues": "Geteilte Werte"
+  },
+  "cookieConsent": {
+    "label": "Cookies",
+    "message": "Diese Instanz verwendet Analyse-Cookies, um Seitenaufrufe zu zählen. Keine Werbung, kein Profiling, kein Datenverkauf. Bei Ablehnung funktioniert alles genauso.",
+    "policyLabel": "Datenschutz- & Cookie-Richtlinie",
+    "accept": "Akzeptieren",
+    "decline": "Ablehnen",
+    "ariaLabel": "Cookie-Einwilligung",
+    "settings": "Cookie-Einstellungen"
   },
   "sourceTypes": {
     "AZURE_BLOB_STORAGE": "Azure Blob Storage",

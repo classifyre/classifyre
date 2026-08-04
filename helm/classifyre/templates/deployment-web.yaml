@@ -92,9 +92,25 @@ spec:
             - name: POSTHOG_INGEST_HOST
               value: {{ .Values.frontend.posthog.ingestHost | quote }}
             {{- end }}
+            - name: SITEMAP_ENABLED
+              value: {{ .Values.frontend.sitemap.enabled | quote }}
+            {{- if .Values.frontend.sitemap.enabled }}
+            {{- with .Values.frontend.sitemap.baseUrl }}
+            - name: SITEMAP_BASE_URL
+              value: {{ . | quote }}
+            {{- end }}
+            - name: SITEMAP_CHUNK_SIZE
+              value: {{ .Values.frontend.sitemap.chunkSize | quote }}
+            {{- end }}
             {{- if .Values.frontend.googleAnalytics.enabled }}
             - name: GOOGLE_ANALYTICS_MEASUREMENT_ID
               value: {{ required "frontend.googleAnalytics.measurementId is required when frontend.googleAnalytics.enabled is true" .Values.frontend.googleAnalytics.measurementId | quote }}
+            {{- end }}
+            - name: COOKIE_CONSENT_ENABLED
+              value: {{ .Values.frontend.cookieConsent.enabled | quote }}
+            {{- if .Values.frontend.cookieConsent.enabled }}
+            - name: COOKIE_CONSENT_POLICY_URL
+              value: {{ .Values.frontend.cookieConsent.policyUrl | quote }}
             {{- end }}
             {{- include "classifyre.telemetryEnv" . | nindent 12 }}
             {{- with .Values.frontend.extraEnv }}

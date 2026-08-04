@@ -4,7 +4,7 @@ import {Head} from "nextra/components";
 import {getPageMap} from "nextra/page-map";
 import {Footer, Layout, Navbar} from "nextra-theme-docs";
 
-import {Badge, Button, SourceIcon, ThemeToggle,} from "@workspace/ui/components";
+import {CookieConsentBanner, SiteFooter} from "@workspace/ui/components";
 
 import {
     generateBlogSchema,
@@ -13,6 +13,8 @@ import {
     normalizeSiteUrl,
     safeJsonLdStringify,
 } from "@/lib/seo";
+import {SiteNav} from "@/components/site-nav";
+import {routes} from "@/lib/site";
 import {GoogleAnalytics} from "./google-analytics";
 import {PostHogProvider} from "./providers";
 
@@ -119,148 +121,13 @@ const navbar = (
         }
         className="classifyre-blog-navbar border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80"
     >
-        <div className="hidden items-center gap-2 lg:flex">
-            <Button asChild variant="link">
-                <a href="/blog">Blog</a>
-            </Button>
-            <Button asChild variant="link">
-                <a href="https://docs.classifyre.com/" target="_blank" rel="noreferrer">
-                    Documentation
-                </a>
-            </Button>
-            <Button
-                asChild
-                variant="ghost"
-                size="sm"
-                className="border-2 border-accent bg-accent text-black hover:bg-accent/90 hover:text-black"
-            >
-                <a href="https://demo.classifyre.com/" target="_blank" rel="noreferrer">
-                    Demo
-                </a>
-            </Button>
-            <Button
-                variant="ghost"
-                size="icon"
-                asChild
-                className="rounded-[4px] border-2 border-transparent hover:border-border"
-            >
-                <a
-                    href="https://github.com/classifyre/classifyre"
-                    target="_blank"
-                    rel="noreferrer"
-                    aria-label="Classifyre on GitHub"
-                >
-                    <SourceIcon
-                        source="github"
-                        size="sm"
-                        className="[&_svg]:text-current"
-                    />
-                </a>
-            </Button>
-            <ThemeToggle/>
-        </div>
+        <SiteNav/>
     </Navbar>
 );
 
 const footer = (
-    <Footer
-        className="relative left-1/2 w-screen max-w-none -translate-x-1/2 border-t-2 border-white/20 bg-black px-0 py-0 text-sm text-white">
-        <div className="grid w-full lg:grid-cols-3">
-            <div className="border-b-2 border-white/20 px-6 py-8 text-left lg:border-b-0 lg:border-r-2 lg:px-8">
-                <div className="space-y-4">
-                    <div className="flex items-center gap-3">
-                        <Badge
-                            variant="secondary"
-                            className="rounded-[4px] border-2 border-white/20 bg-accent px-2 py-1 font-mono text-[10px] uppercase tracking-[0.16em] text-black"
-                        >
-                            Classifyre
-                        </Badge>
-                        <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-white/60">
-              Detect. Classify. Label.
-            </span>
-                    </div>
-                    <p className="max-w-md text-base leading-7 text-white/78">
-                        Open-source detection, classification, and labeling for the systems
-                        you already run, with a clean path from local evaluation to governed
-                        enterprise rollout.
-                    </p>
-                </div>
-            </div>
-
-            <div className="border-b-2 border-white/20 px-6 py-8 text-left lg:border-b-0 lg:border-r-2 lg:px-8">
-                <div className="space-y-4">
-                    <div className="font-mono text-[11px] uppercase tracking-[0.14em] text-white/60">
-                        Links
-                    </div>
-                    <div className="grid gap-2 sm:grid-cols-2">
-                        <a
-                            href="https://docs.classifyre.com/"
-                            target="_blank"
-                            rel="noreferrer"
-                            className="inline-flex items-center justify-between rounded-sm border border-white/20 bg-transparent px-3 py-2 font-mono text-[11px] uppercase tracking-[0.12em] text-white shadow-xs transition-all hover:bg-accent/10 hover:text-white"
-                        >
-                            Docs
-                            <span>01</span>
-                        </a>
-                        <a
-                            href="https://demo.classifyre.com/"
-                            target="_blank"
-                            rel="noreferrer"
-                            className="inline-flex items-center justify-between rounded-sm border border-white/20 bg-transparent px-3 py-2 font-mono text-[11px] uppercase tracking-[0.12em] text-white shadow-xs transition-all hover:bg-accent/10 hover:text-white"
-                        >
-                            Demo
-                            <span>02</span>
-                        </a>
-                        <a
-                            href="https://github.com/classifyre/classifyre"
-                            target="_blank"
-                            rel="noreferrer"
-                            className="inline-flex items-center justify-between rounded-sm border border-white/20 bg-transparent px-3 py-2 font-mono text-[11px] uppercase tracking-[0.12em] text-white shadow-xs transition-all hover:bg-accent/10 hover:text-white"
-                        >
-                            GitHub
-                            <span>03</span>
-                        </a>
-                        <a
-                            href="https://docs.classifyre.com/sources/"
-                            target="_blank"
-                            rel="noreferrer"
-                            className="inline-flex items-center justify-between rounded-sm border border-white/20 bg-transparent px-3 py-2 font-mono text-[11px] uppercase tracking-[0.12em] text-white shadow-xs transition-all hover:bg-accent/10 hover:text-white"
-                        >
-                            Sources
-                            <span>04</span>
-                        </a>
-                    </div>
-                </div>
-            </div>
-
-            <div className="px-6 py-8 text-left lg:px-8">
-                <div className="space-y-4">
-                    <div className="font-mono text-[11px] uppercase tracking-[0.14em] text-white/60">
-                        Delivery Path
-                    </div>
-                    <div className="space-y-3">
-                        <div className="border border-white/20 px-4 py-3">
-                            <div className="font-mono text-[11px] uppercase tracking-[0.14em] text-accent">
-                                Evaluate
-                            </div>
-                            <p className="mt-2 text-white/78">
-                                One download. The full desktop app for macOS, Windows, and
-                                Linux — everything on your machine.
-                            </p>
-                        </div>
-                        <div className="border border-white/20 px-4 py-3">
-                            <div className="font-mono text-[11px] uppercase tracking-[0.14em] text-accent">
-                                Operate
-                            </div>
-                            <p className="mt-2 text-white/78">
-                                Demo the release, run real scans, and move into enterprise
-                                Kubernetes when governance and SLA matter.
-                            </p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+    <Footer className="classifyre-site-footer">
+        <SiteFooter/>
     </Footer>
 );
 
@@ -328,6 +195,10 @@ export default async function RootLayout({
             >
                 {children}
             </Layout>
+            {/* Shown only where consent is legally required (EEA/UK/CH, by time
+                zone) and only until answered; the analytics providers above
+                stay inert until it is. */}
+            <CookieConsentBanner policyHref={`${routes.privacy}/`}/>
         </PostHogProvider>
         </body>
         </html>

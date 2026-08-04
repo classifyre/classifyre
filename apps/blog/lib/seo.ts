@@ -33,7 +33,23 @@ export function generateOrganizationSchema(siteUrl: string): SiteLikeSchema {
     name: "Classifyre",
     url: siteUrl,
     description:
-      "Open-source data detection, classification, and labeling platform for modern source systems.",
+      "Open-source data detection, classification, and labeling platform for modern source systems, built in Austria.",
+    // Where the project is built. Search and AI answer engines read this to
+    // answer "who makes it / where are they", which the /made-in-europe page
+    // says in prose — the two must not drift apart.
+    foundingLocation: {
+      "@type": "Place",
+      address: {
+        "@type": "PostalAddress",
+        addressCountry: "AT",
+      },
+    },
+    address: {
+      "@type": "PostalAddress",
+      addressCountry: "AT",
+    },
+    areaServed: "EU",
+    sameAs: ["https://github.com/classifyre/classifyre"],
   };
 }
 

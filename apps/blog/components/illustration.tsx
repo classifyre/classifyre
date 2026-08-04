@@ -37,6 +37,7 @@ export type IllustrationName =
   | "finger-print"
   | "people"
   | "probe"
+    | "feet"
   | "settings";
 
 type IllustrationProps = {

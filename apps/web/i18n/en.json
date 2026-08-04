@@ -90,10 +90,22 @@
   },
   "demo": {
     "badge": "Demo",
-    "tooltip": "Demo mode is active. Viewing, search, and dashboards work normally. Creating, editing, deleting, running scans, training detectors, and the browser assistant are disabled.",
-    "mcpNotice": "Demo mode is active. MCP read-only access works with an existing token, but creating, editing, or deleting tokens is disabled.",
-    "blockedTitle": "Not available in demo mode",
-    "blockedDescription": "This operation is not available in demo mode. Create, update, and delete operations are disabled."
+    "headerCta": "Get your own",
+    "bannerCta": "Read-only demo — get your own Classifyre",
+    "tooltip": "You are exploring a shared, read-only demo. Viewing, search, and dashboards work normally — creating, editing, deleting, running scans, training detectors, and the browser assistant are disabled.",
+    "mcpNotice": "Demo mode is active. MCP read-only access works with an existing token, but creating, editing, or deleting tokens is disabled. Run your own instance to issue tokens.",
+    "upgradeTitle": "Run Classifyre on your own data",
+    "upgradeDescription": "This demo is shared and read-only. Your own instance takes minutes, costs nothing, and never sends your documents anywhere.",
+    "blockedTitle": "This action needs your own instance",
+    "blockedDescription": "The demo is read-only, so creating, editing, deleting, and running scans are turned off here. Everything unlocks the moment you run Classifyre yourself.",
+    "desktopTitle": "Desktop app",
+    "desktopDescription": "macOS, Windows and Linux. Everything runs on your machine — no server, no account.",
+    "desktopCta": "Download",
+    "helmTitle": "Kubernetes (Helm)",
+    "helmDescription": "Self-host for your team with the production Helm chart and your own database.",
+    "helmCta": "Installation guide",
+    "upgradeFootnote": "Both options are free and open source. Your documents stay on your machine or in your own cluster.",
+    "keepExploring": "Keep exploring the demo"
   },
   "nav": {
     "overview": "Overview",
@@ -3326,6 +3338,15 @@
     "openDocument": "Open document",
     "openFinding": "Open finding",
     "sharedValues": "Shared values"
+  },
+  "cookieConsent": {
+    "label": "Cookies",
+    "message": "This instance uses analytics cookies to count page views. No ads, no profiling, no data sold. Decline and everything works the same.",
+    "policyLabel": "Privacy & cookie policy",
+    "accept": "Accept",
+    "decline": "Decline",
+    "ariaLabel": "Cookie consent",
+    "settings": "Cookie settings"
   },
   "sourceTypes": {
     "AZURE_BLOB_STORAGE": "Azure Blob Storage",

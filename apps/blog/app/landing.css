@@ -6,6 +6,35 @@
   font-family: var(--font-hero), var(--font-serif), sans-serif;
 }
 
+/* ── Full-bleed sections ────────────────────────────────────────── */
+
+/* Break a section out of `main`'s centred max-width so it touches both
+   screen edges.
+
+   `100vw` is the only way to reach the viewport from inside a constrained
+   parent, but it *includes* the classic scrollbar gutter — so on any
+   platform with non-overlay scrollbars the page ends up ~15px wider than
+   the visible area and scrolls sideways. Clipping the overflow on the
+   scroll container is the fix: `clip` rather than `hidden` because `hidden`
+   would turn the element into a scroll container and break `position: sticky`
+   anywhere on the page.
+
+   It has to sit on `html`, not only `body`: overflow set on `body` propagates
+   up to the viewport and leaves body's own box `visible`, so the sideways
+   scroll survives. Setting the root ends it. */
+html,
+body {
+  overflow-x: clip;
+}
+
+.cl-bleed {
+  position: relative;
+  left: 50%;
+  width: 100vw;
+  max-width: 100vw;
+  transform: translateX(-50%);
+}
+
 /* ── In-view reveal ─────────────────────────────────────────────── */
 
 .cl-reveal {
