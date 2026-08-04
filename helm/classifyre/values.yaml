@@ -777,7 +777,7 @@ postgres:
       # -- Embedded Postgres image repository.
       repository: pgvector/pgvector
       # -- Embedded Postgres image tag.
-      tag: "0.8.5-pg18-bookworm"
+      tag: "0.8.6"
       # -- Embedded Postgres image pull policy.
       pullPolicy: IfNotPresent
     # -- Embedded Postgres service and container port.
