@@ -11,7 +11,11 @@ import {
   FindingStatus,
   Severity,
 } from '@prisma/client';
-import { NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  NotFoundException,
+  BadRequestException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { generateDetectionIdentity } from './utils/detection-identity';
 import { computeScopeFingerprint } from './utils/scope-fingerprint';
 import { HistoryEventType } from './types/finding-history.types';
@@ -865,6 +869,214 @@ describe('AssetService', () => {
       await expect(service.bulkIngest(sourceId, runnerId, [])).rejects.toThrow(
         BadRequestException,
       );
+    });
+
+    // The API repeatedly died with "Ineffective mark-compacts near heap limit"
+    // because this path loaded every finding an asset had ever accumulated —
+    // full rows, contexts and history included — just to look up the handful
+    // being re-reported. Memory must stay proportional to the incoming batch.
+    describe('existing-finding lookup (heap regression guards)', () => {
+      const buildTx = (findingFindMany: jest.Mock) => ({
+        asset: {
+          createMany: jest.fn().mockResolvedValue({}),
+          update: jest.fn().mockResolvedValue({}),
+          updateMany: jest.fn().mockResolvedValue({}),
+          findMany: jest
+            .fn()
+            .mockResolvedValue([{ id: 'db-asset-1', hash: 'asset-1' }]),
+        },
+        finding: {
+          findMany: findingFindMany,
+          createMany: jest.fn().mockResolvedValue({}),
+          update: jest.fn().mockResolvedValue({}),
+        },
+        customDetector: { findMany: jest.fn().mockResolvedValue([]) },
+        runner: { update: jest.fn().mockResolvedValue({}) },
+        runnerAsset: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+      });
+
+      const assetWithFindings = (count: number) => [
+        {
+          hash: 'asset-1',
+          checksum: 'checksum-1',
+          name: 'dense.parquet',
+          external_url: 'https://example.com/dense.parquet',
+          links: [],
+          asset_type: 'TABLE',
+          findings: Array.from({ length: count }, (_, i) => ({
+            detector_type: DetectorType.SECRETS,
+            finding_type: 'Base64 High Entropy String',
+            matched_content: `secret-${i}`,
+            category: 'secrets',
+            severity: 'high',
+            confidence: 0.9,
+            detected_at: new Date().toISOString(),
+          })),
+        },
+      ];
+
+      it('scopes the lookup by detectionIdentity, never by assetId', async () => {
+        const findingFindMany = jest.fn().mockResolvedValue([]);
+        mockPrismaService.asset.findMany.mockResolvedValue([]);
+        mockPrismaService.$transaction.mockImplementation((cb: any) =>
+          cb(buildTx(findingFindMany)),
+        );
+
+        await service.bulkIngest(sourceId, runnerId, assetWithFindings(3));
+
+        expect(findingFindMany).toHaveBeenCalled();
+        for (const [args] of findingFindMany.mock.calls) {
+          expect(args.where).not.toHaveProperty('assetId');
+          expect(args.where.detectionIdentity.in).toBeInstanceOf(Array);
+          // A narrow select keeps the heavy columns (contexts, metadata,
+          // redacted content) out of the process entirely.
+          expect(args.select).toBeDefined();
+          expect(args.select).not.toHaveProperty('contextBefore');
+          expect(args.select).not.toHaveProperty('metadata');
+        }
+      });
+
+      it('chunks the lookup so one dense page cannot build a giant IN list', async () => {
+        const findingFindMany = jest.fn().mockResolvedValue([]);
+        mockPrismaService.asset.findMany.mockResolvedValue([]);
+        mockPrismaService.$transaction.mockImplementation((cb: any) =>
+          cb(buildTx(findingFindMany)),
+        );
+
+        await service.bulkIngest(sourceId, runnerId, assetWithFindings(2500));
+
+        const lookups = findingFindMany.mock.calls.filter(
+          ([args]) => args.where?.detectionIdentity,
+        );
+        expect(lookups.length).toBeGreaterThan(1);
+        for (const [args] of lookups) {
+          expect(args.where.detectionIdentity.in.length).toBeLessThanOrEqual(
+            1000,
+          );
+        }
+      });
+
+      it('still re-detects an existing finding and preserves its history', async () => {
+        const identity = generateDetectionIdentity({
+          assetId: 'db-asset-1',
+          detectorType: DetectorType.SECRETS,
+          findingType: 'Base64 High Entropy String',
+          matchedContent: 'secret-0',
+          customDetectorKey: undefined,
+        });
+        const priorHistory = [
+          {
+            timestamp: new Date().toISOString(),
+            runnerId: 'old-runner',
+            eventType: HistoryEventType.DETECTED,
+            status: FindingStatus.OPEN,
+          },
+        ];
+        const findingFindMany = jest.fn().mockResolvedValue([
+          {
+            id: 'existing-finding-1',
+            detectionIdentity: identity,
+            status: FindingStatus.RESOLVED,
+            severity: 'LOW',
+            confidence: 0.1,
+            matchedContent: 'stale',
+            resolvedAt: new Date(),
+            resolutionReason: 'was fixed',
+            history: priorHistory,
+          },
+        ]);
+        const tx = buildTx(findingFindMany);
+        mockPrismaService.asset.findMany.mockResolvedValue([]);
+        mockPrismaService.$transaction.mockImplementation((cb: any) => cb(tx));
+
+        await service.bulkIngest(sourceId, runnerId, assetWithFindings(1));
+
+        // Re-opened (auto-resolved, no manual override) with history appended
+        // rather than replaced, and not inserted as a duplicate.
+        expect(tx.finding.update).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: { id: 'existing-finding-1' },
+            data: expect.objectContaining({
+              status: FindingStatus.OPEN,
+              resolvedAt: null,
+              resolutionReason: null,
+            }),
+          }),
+        );
+        const history = tx.finding.update.mock.calls[0][0].data.history;
+        expect(history[0]).toEqual(priorHistory[0]);
+        expect(history.length).toBeGreaterThan(priorHistory.length);
+      });
+    });
+
+    // Same failure shape as the findings lookup above: `where: { sourceId }`
+    // alone loads every asset a source has ever seen — all columns, source
+    // metadata JSONB included — to answer questions about the few in this
+    // payload, and grows without bound as the corpus grows.
+    it('looks up prior assets by incoming hash, not by source', async () => {
+      const incomingAssets = Array.from({ length: 1500 }, (_, i) => ({
+        hash: `asset-${i}`,
+        checksum: `checksum-${i}`,
+        name: `Asset ${i}`,
+        external_url: `https://example.com/${i}`,
+        links: [],
+        asset_type: 'TXT',
+        findings: [],
+      }));
+
+      mockPrismaService.asset.findMany.mockResolvedValue([]);
+      mockPrismaService.$transaction.mockImplementation((cb: any) =>
+        cb({
+          asset: {
+            createMany: jest.fn().mockResolvedValue({}),
+            update: jest.fn().mockResolvedValue({}),
+            updateMany: jest.fn().mockResolvedValue({}),
+            findMany: jest.fn().mockResolvedValue([]),
+          },
+          finding: {
+            findMany: jest.fn().mockResolvedValue([]),
+            createMany: jest.fn().mockResolvedValue({}),
+            update: jest.fn().mockResolvedValue({}),
+          },
+          customDetector: { findMany: jest.fn().mockResolvedValue([]) },
+          runner: { update: jest.fn().mockResolvedValue({}) },
+          runnerAsset: {
+            updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+          },
+        }),
+      );
+
+      await service.bulkIngest(sourceId, runnerId, incomingAssets);
+
+      const lookups = mockPrismaService.asset.findMany.mock.calls;
+      expect(lookups.length).toBeGreaterThan(1); // chunked
+      for (const [args] of lookups) {
+        expect(args.where.sourceId).toBe(sourceId);
+        expect(args.where.hash.in).toBeInstanceOf(Array);
+        expect(args.where.hash.in.length).toBeLessThanOrEqual(1000);
+      }
+      // Every incoming hash is still covered exactly once.
+      const looked = lookups.flatMap(([args]: any) => args.where.hash.in);
+      expect(new Set(looked).size).toBe(1500);
+    });
+
+    it('sheds the batch with 503 when the heap is already near its ceiling', async () => {
+      const previous = process.env.UNDER_PRESSURE_MAX_HEAP_USED_BYTES;
+      // Any real heap usage exceeds a 1-byte threshold.
+      process.env.UNDER_PRESSURE_MAX_HEAP_USED_BYTES = '1';
+      try {
+        await expect(
+          service.bulkIngest(sourceId, runnerId, []),
+        ).rejects.toThrow(ServiceUnavailableException);
+        // Rejected before touching the database at all.
+        expect(mockPrismaService.asset.findMany).not.toHaveBeenCalled();
+      } finally {
+        if (previous === undefined) {
+          delete process.env.UNDER_PRESSURE_MAX_HEAP_USED_BYTES;
+        } else {
+          process.env.UNDER_PRESSURE_MAX_HEAP_USED_BYTES = previous;
+        }
+      }
     });
 
     it('should create NEW assets when they do not exist', async () => {
