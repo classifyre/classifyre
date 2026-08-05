@@ -1,20 +1,21 @@
-"""Extract whole files embedded inside parquet rows and OOXML media folders.
+"""Extract whole files embedded inside table rows and OOXML media folders.
 
 Some files carry other *files* inside them rather than beside them: a HuggingFace
 dataset stores an ``image`` or ``audio`` column as ``struct<bytes, path>``, a
-parquet export can hold a column of PDF or archive blobs, and Office documents
-embed media under their ``media/`` folders. This module surfaces those as raw
-bytes so the scan pipeline can turn each one into its own child asset — parsed by
-``utils.file_parser`` and scanned like any standalone file — instead of dumping
-undecodable bytes into text detectors.
+parquet or Arrow export can hold a column of PDF or archive blobs, and Office
+documents embed media under their ``media/`` folders. This module surfaces those
+as raw bytes so the scan pipeline can turn each one into its own child asset —
+parsed by ``utils.file_parser`` and scanned like any standalone file — instead of
+dumping undecodable bytes into text detectors.
 
-Parquet extraction is row-addressable. ``start_row``/``max_rows`` bound it to the
-same window the sampling strategy applies to that payload's rows (see
-``pipeline.payload_window``), so a run materializes the children of the rows it
-actually scanned rather than the first N rows of the file on every run. Row
-numbers stay absolute, which is what keeps a child's identity stable: the image in
-row 4,000,001 is ``row=4000001;col=image`` whichever window found it. OOXML media
-has no row axis, so the bounds are ignored there.
+Row-shaped containers (parquet, Arrow IPC / Feather) are extracted by row.
+``start_row``/``max_rows`` bound the walk to the same window the sampling strategy
+applies to that payload's rows (see ``pipeline.payload_window``), so a run
+materializes the children of the rows it actually scanned rather than the first N
+rows of the file on every run. Row numbers stay absolute, which is what keeps a
+child's identity stable: the image in row 4,000,001 is ``row=4000001;col=image``
+whichever window found it, and whichever format it was stored in. OOXML media has
+no row axis, so the bounds are ignored there.
 
 On any missing optional dependency or parse failure the iterators log a warning and
 yield nothing, so callers degrade gracefully.
@@ -30,11 +31,14 @@ from dataclasses import dataclass
 from typing import Any
 
 from .file_parser import (
+    ARROW_MIME_TYPES,
     OCTET_STREAM,
+    _arrow_truncation_error,
     _normalize_mime_type,
     _parquet_row_group_span,
     _require_file_processing,
     is_readable_text,
+    open_arrow_batches,
     resolve_mime_type,
 )
 
@@ -121,7 +125,11 @@ def classify_embedded_mime(mime_type: str) -> str:
 def has_embedded_files(mime_type: str) -> bool:
     """Return True if this MIME type is a container we can pull whole files out of."""
     normalized = _normalize_mime_type(mime_type)
-    return normalized in _PARQUET_MIME_TYPES or normalized in _OOXML_MIME_TYPES
+    return (
+        normalized in _PARQUET_MIME_TYPES
+        or normalized in ARROW_MIME_TYPES
+        or normalized in _OOXML_MIME_TYPES
+    )
 
 
 def iter_embedded_files(
@@ -132,14 +140,14 @@ def iter_embedded_files(
     max_rows: int | None = None,
     max_files: int = DEFAULT_MAX_EMBEDDED_FILES,
 ) -> Iterator[EmbeddedFile]:
-    """Yield the files embedded in a parquet or OOXML container.
+    """Yield the files embedded in a parquet, Arrow IPC, or OOXML container.
 
-    ``start_row``/``max_rows`` bound a parquet walk to one row window and are
+    ``start_row``/``max_rows`` bound a row-shaped walk to one row window and are
     ignored for containers with no row axis.
 
-    ``source`` may be a seekable handle rather than bytes (parquet only), which
-    is how an object too large to download still yields its embedded children:
-    only the row groups the window covers are transferred. OOXML has no row axis
+    ``source`` may be a seekable handle rather than bytes (parquet and Arrow),
+    which is how an object too large to download still yields its embedded
+    children: only the batches the window covers are read. OOXML has no row axis
     and is read whole, so it stays on bytes.
     """
     is_bytes = isinstance(source, bytes | bytearray)
@@ -148,6 +156,13 @@ def iter_embedded_files(
     normalized = _normalize_mime_type(mime_type)
     if normalized in _PARQUET_MIME_TYPES:
         yield from _iter_parquet_files(
+            source,
+            start_row=start_row,
+            max_rows=max_rows,
+            max_files=max_files,
+        )
+    elif normalized in ARROW_MIME_TYPES:
+        yield from _iter_arrow_files(
             source,
             start_row=start_row,
             max_rows=max_rows,
@@ -188,33 +203,10 @@ def embedded_cell_name(cell: object, kind: str) -> str:
     return ""
 
 
-def detect_parquet_payload_columns(
-    parquet_file: Any,
-    *,
-    sample_row_group: int | None = None,
-) -> dict[str, EmbeddedColumn]:
-    """Map column name → ``EmbeddedColumn`` for every column whose cells hold bytes.
-
-    All of them are returned, classified by what the bytes turned out to be, because
-    each class needs different handling and none of them may fall through to
-    ``str(cell)`` — that renders a Python bytes repr, which is how a column of JSON
-    documents reached the detectors as ``b'{"email": ...}'`` with escaped quotes.
-
-    Classification is per column, sampled once: sniffing every cell of a
-    million-row file would cost more than the scan it feeds. A column of uniform
-    content — the normal case — is therefore classified correctly, and the
-    child-asset path re-checks each cell it emits anyway.
-
-    Returns ``{}`` when pyarrow is unavailable or no column carries bytes.
-    """
-    try:
-        pa = _require_file_processing("pyarrow")
-    except Exception as exc:  # pragma: no cover - dependency missing
-        logger.warning("Cannot inspect parquet file columns: %s", exc)
-        return {}
-
+def _byte_carrying_columns(pa: Any, schema: Any) -> list[tuple[str, str]]:
+    """``(column name, kind)`` for every field of an Arrow schema holding bytes."""
     candidates: list[tuple[str, str]] = []
-    for field in parquet_file.schema_arrow:
+    for field in schema:
         field_type = field.type
         if pa.types.is_struct(field_type):  # type: ignore[attr-defined]
             child_names = {
@@ -227,15 +219,31 @@ def detect_parquet_payload_columns(
             field_type
         ):
             candidates.append((field.name, "binary"))
+    return candidates
 
-    if not candidates:
+
+def detect_parquet_payload_columns(
+    parquet_file: Any,
+    *,
+    sample_row_group: int | None = None,
+) -> dict[str, EmbeddedColumn]:
+    """``detect_payload_columns`` for a Parquet file, sampled from one row group.
+
+    Naming the row group matters: handed an open-ended batch iterator, pyarrow
+    buffers every group in the file before yielding the first one — which over a
+    range-reading handle means downloading the whole object to sniff one batch.
+    Callers that already know which group they are about to read pass it, so the
+    sample costs nothing beyond the window itself.
+    """
+    try:
+        pa = _require_file_processing("pyarrow")
+    except Exception as exc:  # pragma: no cover - dependency missing
+        logger.warning("Cannot inspect parquet file columns: %s", exc)
         return {}
 
-    # Naming the row group matters: handed an open-ended batch iterator, pyarrow
-    # buffers every group in the file before yielding the first one — which over a
-    # range-reading handle means downloading the whole object to sniff one batch.
-    # Callers that already know which group they are about to read pass it, so the
-    # sample costs nothing beyond the window itself.
+    if not _byte_carrying_columns(pa, parquet_file.schema_arrow):
+        return {}
+
     try:
         sample_kwargs: dict[str, Any] = {"batch_size": _COLUMN_SAMPLE_ROWS}
         groups = int(parquet_file.metadata.num_row_groups)
@@ -245,6 +253,34 @@ def detect_parquet_payload_columns(
         sample = next(iter(parquet_file.iter_batches(**sample_kwargs)), None)
     except Exception as exc:
         logger.warning("Cannot sample parquet columns: %s", exc)
+        return {}
+
+    return detect_payload_columns(parquet_file.schema_arrow, sample)
+
+
+def detect_payload_columns(schema: Any, sample: Any) -> dict[str, EmbeddedColumn]:
+    """Map column name → ``EmbeddedColumn`` for every column whose cells hold bytes.
+
+    All of them are returned, classified by what the bytes turned out to be, because
+    each class needs different handling and none of them may fall through to
+    ``str(cell)`` — that renders a Python bytes repr, which is how a column of JSON
+    documents reached the detectors as ``b'{"email": ...}'`` with escaped quotes.
+
+    Classification is per column, sampled once from ``sample`` (one record batch):
+    sniffing every cell of a million-row file would cost more than the scan it
+    feeds. A column of uniform content — the normal case — is therefore classified
+    correctly, and the child-asset path re-checks each cell it emits anyway.
+
+    Returns ``{}`` when pyarrow is unavailable or no column carries bytes.
+    """
+    try:
+        pa = _require_file_processing("pyarrow")
+    except Exception as exc:  # pragma: no cover - dependency missing
+        logger.warning("Cannot inspect columns for embedded files: %s", exc)
+        return {}
+
+    candidates = _byte_carrying_columns(pa, schema)
+    if not candidates:
         return {}
 
     columns: dict[str, EmbeddedColumn] = {}
@@ -383,6 +419,93 @@ def _iter_parquet_files(
                 rows_read += 1
     except Exception as exc:
         logger.warning("Parquet embedded-file iteration failed: %s", exc)
+
+
+# ---------------------------------------------------------------------------
+# Arrow IPC / Feather
+# ---------------------------------------------------------------------------
+
+
+def _iter_arrow_files(
+    source: bytes | Any,
+    *,
+    start_row: int,
+    max_rows: int | None,
+    max_files: int,
+) -> Iterator[EmbeddedFile]:
+    """The parquet walk over an Arrow payload: same rows, same child identities.
+
+    A HuggingFace dataset is published as both formats, so an ``image`` column is
+    a ``struct<bytes, path>`` either way and has to become the same child asset
+    either way — ``row=N;col=image``, numbered absolutely, so a second run updates
+    the child rather than duplicating it.
+    """
+    truncation = _arrow_truncation_error(source)
+    if truncation is not None:
+        logger.warning("%s Skipping embedded-file extraction.", truncation)
+        return
+
+    try:
+        schema, batches = open_arrow_batches(source, batch_rows=_ROW_BATCH_SIZE)
+    except Exception as exc:
+        logger.warning("Cannot open Arrow payload for embedded-file extraction: %s", exc)
+        return
+
+    begin = max(0, start_row)
+    files = 0
+    rows_read = 0
+    abs_row = 0
+    # Only file-bearing columns produce child assets. A text column is decoded into
+    # its own row's text by the page iterator, so walking it here would scan the
+    # same characters twice under two different asset identities.
+    columns: dict[str, EmbeddedColumn] | None = None
+    try:
+        for batch in batches:
+            rows = batch.num_rows
+            if abs_row + rows <= begin:
+                abs_row += rows
+                continue
+            if columns is None:
+                # Sampled from the first batch of the window, which is being read
+                # anyway — the same bargain the parquet walk strikes.
+                columns = {
+                    name: column
+                    for name, column in detect_payload_columns(schema, batch).items()
+                    if column.content == CONTENT_FILE
+                }
+                if not columns:
+                    return
+            for local_index in range(rows):
+                if abs_row < begin:
+                    abs_row += 1
+                    continue
+                if max_rows is not None and rows_read >= max_rows:
+                    return
+                for column_name, column in columns.items():
+                    cell = batch.column(column_name)[local_index].as_py()
+                    raw = extract_embedded_bytes(cell, column.kind)
+                    if not raw:
+                        continue
+                    mime = resolve_mime_type(raw, file_name=embedded_cell_name(cell, column.kind))
+                    if not is_embeddable_file_mime(mime):
+                        continue
+                    yield EmbeddedFile(
+                        location=f"row={abs_row + 1};col={column_name}",
+                        file_bytes=raw,
+                        mime_type=mime,
+                    )
+                    files += 1
+                    if files >= max_files:
+                        logger.info(
+                            "Reached max embedded files (%d); stopping extraction", max_files
+                        )
+                        return
+                abs_row += 1
+                rows_read += 1
+            if max_rows is not None and rows_read >= max_rows:
+                return
+    except Exception as exc:
+        logger.warning("Arrow embedded-file iteration failed: %s", exc)
 
 
 # ---------------------------------------------------------------------------
