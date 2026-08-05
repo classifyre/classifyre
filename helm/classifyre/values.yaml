@@ -102,6 +102,33 @@ api:
   # -- limit. Rule of thumb: heap ≈ 0.75 × the memory limit (in MB).
   maxOldSpaceSizeMb: 1536
 
+  # Postgres connection pooling. One pool is created per workspace (namespace)
+  # that the pod actually touches, and `pg` opens connections lazily and closes
+  # them again after `idleTimeoutMs`, so these are ceilings rather than
+  # reservations. Worst case per pod is `poolMax × maxResidentNamespaces`; keep
+  # that (summed over API + worker replicas) under the server's
+  # `max_connections`.
+  database:
+    # -- Max Postgres connections per workspace pool. Too low and concurrent
+    # -- overview queries (list + count + charts) queue until transactions fail
+    # -- with `P2028`; too high and the server runs out of connections.
+    poolMax: 10
+    # -- Max workspace pools kept in memory; least-recently-used pools beyond
+    # -- this are disconnected.
+    maxResidentNamespaces: 20
+    # -- Give up acquiring a connection after this long (ms).
+    connectionTimeoutMs: 10000
+    # -- Close a pooled connection after this much idle time (ms).
+    idleTimeoutMs: 10000
+    # -- How long a transaction may wait for a free connection (ms). Prisma's
+    # -- own default is 2000, which a busy pool exceeds routinely.
+    transactionMaxWaitMs: 10000
+    # -- Max duration of a single interactive transaction (ms).
+    transactionTimeoutMs: 30000
+    # -- Attempts (including the first) for read-only requests that fail with a
+    # -- transient database error. Set to 1 to disable retrying.
+    retryAttempts: 3
+
   # -- Additional pod labels for API deployment.
   podLabels: {}
   # -- Additional pod annotations for API deployment.

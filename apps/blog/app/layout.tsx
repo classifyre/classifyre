@@ -181,6 +181,10 @@ export default async function RootLayout({
                 footer={footer}
                 pageMap={pageMap}
                 docsRepositoryBase="https://github.com/classifyre/classifyre/tree/main/apps/blog"
+                // Marketing pages, not docs: no "edit this page" and no
+                // feedback issue link under every post.
+                editLink={null}
+                feedback={{content: null}}
                 sidebar={{
                     defaultMenuCollapseLevel: 2,
                     defaultOpen: true,

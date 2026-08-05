@@ -12,6 +12,7 @@ import {
   type NamespaceContext,
 } from './namespace.constants';
 import { PrismaClientManager } from '../prisma/prisma-client-manager';
+import { transientDbErrorCode } from '../db/transient-db-error';
 
 /**
  * Fastify raw request augmented by the namespace pipeline.
@@ -93,6 +94,23 @@ export function registerNamespaceHook(
     try {
       ns = await registry.resolve(slug);
     } catch (error) {
+      // This hook runs before Nest, so `PrismaExceptionFilter` never sees the
+      // failure — classify it here or a database blip in the registry turns
+      // every request on the page into an unretryable 500.
+      const transientCode = transientDbErrorCode(error);
+      if (transientCode) {
+        logger.warn(
+          `Registry temporarily unavailable resolving '${slug}' [${transientCode}]: ${String(error)}`,
+        );
+        await reply.code(503).header('Retry-After', '5').send({
+          statusCode: 503,
+          error: 'Service Unavailable',
+          message:
+            'Database is temporarily unavailable — please retry in a moment.',
+          code: transientCode,
+        });
+        return;
+      }
       logger.error(`Failed to resolve namespace '${slug}': ${String(error)}`);
       await reply.code(500).send({
         error: 'Internal Server Error',

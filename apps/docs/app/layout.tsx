@@ -6,7 +6,7 @@ import {
   League_Gothic,
 } from "next/font/google";
 import type { PageMapItem } from "nextra";
-import { Banner, Head } from "nextra/components";
+import { Head } from "nextra/components";
 import { getPageMap } from "nextra/page-map";
 import { Footer, Layout, Navbar } from "nextra-theme-docs";
 
@@ -236,13 +236,6 @@ export const metadata: Metadata = {
   },
 };
 
-const banner = (
-  <Banner storageKey="classifyre-docs-banner">
-    Unified docs shell with shared Classifyre tokens and acid-green highlight
-    accents.
-  </Banner>
-);
-
 const navbar = (
   <Navbar
     logo={
@@ -315,13 +308,27 @@ export default async function RootLayout({
         <GoogleAnalytics />
         <PostHogProvider>
           <Layout
-            // banner={banner}
             navbar={navbar}
             footer={footer}
             pageMap={pageMap}
-            docsRepositoryBase="https://github.com/classifyre/classifyre/tree/develop/apps/docs"
+            // Points at the published branch, so "Edit this page" and the
+            // feedback link resolve for a reader who is not on develop.
+            docsRepositoryBase="https://github.com/classifyre/classifyre/tree/main/apps/docs"
+            editLink="Edit this page on GitHub"
+            feedback={{
+              content: "Question about this page? Tell us",
+              labels: "documentation",
+            }}
+            toc={{
+              backToTop: "Scroll to top",
+              float: true,
+              title: "On this page",
+            }}
             sidebar={{
+              // Section folders open; their sub-folders (source and detector
+              // catalogs, autopilot, cases) stay collapsed until visited.
               defaultMenuCollapseLevel: 2,
+              autoCollapse: true,
               defaultOpen: true,
               toggleButton: true,
             }}

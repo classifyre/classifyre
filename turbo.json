@@ -16,7 +16,9 @@
     "SITEMAP_CHUNK_SIZE",
     "PUBLIC_BASE_URL",
     "DESKTOP_BUILD",
-    "NODE_ENV"
+    "NODE_ENV",
+    "GITHUB_TOKEN",
+    "GH_TOKEN"
   ],
   "tasks": {
     "prisma:generate": {

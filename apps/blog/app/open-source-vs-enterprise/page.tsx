@@ -13,7 +13,6 @@ import {
 } from "@/components/page-kit";
 import {
   demoUrl,
-  desktopDownloadUrl,
   docs,
   enterpriseContactEmail,
   repoUrl,

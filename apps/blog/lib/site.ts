@@ -1,7 +1,9 @@
 import { softwareVersion } from "@workspace/ui/lib/software-version";
 import {
+  helmChartRef,
   marketingSiteUrl,
   privacyPolicyUrl,
+  releasesLatestUrl,
 } from "@workspace/ui/lib/site-links";
 
 /**
@@ -10,8 +12,8 @@ import {
  * version-pinned command is only ever written once.
  */
 
-export const desktopDownloadUrl =
-  "https://github.com/classifyre/classifyre/releases/latest";
+/** The GitHub release page, shared with the docs site's install pages. */
+export { releasesLatestUrl };
 export const repoUrl = "https://github.com/classifyre/classifyre";
 export const demoUrl = "https://demo.classifyre.com/";
 export const enterpriseContactEmail = "contact@classifyre.com";
@@ -60,8 +62,7 @@ export const routes = {
   privacy: "/privacy",
 } as const;
 
-export const helmChartRef =
-  "oci://registry-1.docker.io/classifyre/classifyre-core";
+export { helmChartRef };
 
 export const helmInstallCommand = [
   "helm install classifyre \\",

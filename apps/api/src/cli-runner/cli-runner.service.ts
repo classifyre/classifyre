@@ -3511,7 +3511,10 @@ export class CliRunnerService {
       sortOrder: page.sortOrder,
     });
 
-    const [items, total] = await this.prisma.$transaction([
+    // Promise.all, not $transaction: a paginated list + its count need no
+    // snapshot isolation, and the transaction wrapper made the pair fail as one
+    // unit with P2028 whenever the pool was momentarily busy.
+    const [items, total] = await Promise.all([
       this.prisma.runner.findMany({
         where,
         include: {
@@ -3942,7 +3945,7 @@ export class CliRunnerService {
                 ? { findingsTotal: orderDir }
                 : { createdAt: orderDir };
 
-      const [rows, count] = await this.prisma.$transaction([
+      const [rows, count] = await Promise.all([
         this.prisma.runnerAsset.findMany({ where, orderBy, skip, take: limit }),
         this.prisma.runnerAsset.count({ where }),
       ]);

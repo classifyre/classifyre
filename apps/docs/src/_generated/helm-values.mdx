@@ -55,6 +55,13 @@
 | api.containerSecurityContext.allowPrivilegeEscalation | bool | `false` | Disallow privilege escalation in API container. |
 | api.containerSecurityContext.capabilities.drop | list | `["ALL"]` | Drop all Linux capabilities in API container. |
 | api.containerSecurityContext.readOnlyRootFilesystem | bool | `false` | path the app writes to at runtime (e.g. /tmp, log dirs). Hardening step for advanced users. |
+| api.database.connectionTimeoutMs | int | `10000` | Give up acquiring a connection after this long (ms). |
+| api.database.idleTimeoutMs | int | `10000` | Close a pooled connection after this much idle time (ms). |
+| api.database.maxResidentNamespaces | int | `20` | this are disconnected. |
+| api.database.poolMax | int | `10` | with `P2028`; too high and the server runs out of connections. |
+| api.database.retryAttempts | int | `3` | transient database error. Set to 1 to disable retrying. |
+| api.database.transactionMaxWaitMs | int | `10000` | own default is 2000, which a busy pool exceeds routinely. |
+| api.database.transactionTimeoutMs | int | `30000` | Max duration of a single interactive transaction (ms). |
 | api.embedding.allowRemoteModels | bool | `true` |  |
 | api.embedding.autoBackfill | bool | `true` | embedding space on API startup. Existing vectors are hash-skipped. |
 | api.embedding.batchSize | int | `16` | backfill burst cannot spike the worker heap into an OOM. |
