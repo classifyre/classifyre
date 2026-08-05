@@ -58,6 +58,7 @@ class AssetType(StrEnum):
     DROPBOX = 'DROPBOX'
     HUGGING_FACE = 'HUGGING_FACE'
     SANDBOX = 'SANDBOX'
+    GIT = 'GIT'
 
 
 class DetectorType(StrEnum):
@@ -389,6 +390,7 @@ class Type(StrEnum):
     DROPBOX = 'DROPBOX'
     HUGGING_FACE = 'HUGGING_FACE'
     SANDBOX = 'SANDBOX'
+    GIT = 'GIT'
 
 
 class YouTubeRequired(BaseModel):
@@ -3470,6 +3472,7 @@ class Type22(StrEnum):
     DROPBOX = 'DROPBOX'
     HUGGING_FACE = 'HUGGING_FACE'
     SANDBOX = 'SANDBOX'
+    GIT = 'GIT'
 
 
 class ConfluenceInput(CoreInput):
@@ -5051,6 +5054,230 @@ class SlackOptionalAttachments(BaseModel):
     )
 
 
+class GitAuthMethod(StrEnum):
+    """
+    How the scan authenticates to the Git server. none scans a public repository over http(s). token uses a personal access / deploy token (GitHub, GitLab, Bitbucket, Azure DevOps). basic uses a username and password. ssh_key uses an SSH private key with an ssh:// or git@host:org/repo.git URL. client_certificate uses mutual TLS against an enterprise Git server. Credentials are never written to the runner's git configuration: they are materialised into a private, per-run directory that is deleted when the scan ends.
+    """
+
+    none = 'none'
+    token = 'token'
+    basic = 'basic'
+    ssh_key = 'ssh_key'
+    client_certificate = 'client_certificate'
+
+
+class GitCloneStrategy(StrEnum):
+    """
+    How much of the repository is transferred up front. blob_limit (recommended) fetches the file tree plus the contents of every file at or below the memory threshold in one pack, and leaves larger files to be fetched individually only if the scan reaches them. blobless fetches the file tree only, so every file is catalogued from Git metadata and downloaded one at a time as it is scanned — the cheapest option for a very large repository where only a slice is sampled, at the cost of one request per file and unknown file sizes until a file is read. full transfers every file in the commit up front.
+    """
+
+    blob_limit = 'blob_limit'
+    blobless = 'blobless'
+    full = 'full'
+
+
+class GitRequired(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    repository_url: str = Field(
+        ...,
+        description='Repository to scan. Works with GitHub, GitLab, Bitbucket, Azure DevOps, Gitea and any other Git server. Accepts https://host/org/repo.git, ssh://git@host/org/repo.git, or the scp-style git@host:org/repo.git.',
+    )
+
+
+class GitMasked(BaseModel):
+    """
+    Secrets for the selected authentication method. Leave the whole block empty for a public repository. Every value is encrypted at rest and only ever materialised into a private, per-run directory that is deleted when the scan ends.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    username: str | None = Field(
+        None,
+        description='Username for basic authentication, or the token user for token authentication. Optional for tokens: the correct user for the detected host is used when this is empty (x-access-token for GitHub, oauth2 for GitLab, x-token-auth for Bitbucket).',
+    )
+    password: str | None = Field(None, description='Password for basic authentication.')
+    token: str | None = Field(
+        None,
+        description='Personal access token, deploy token or app installation token with read access to the repository.',
+    )
+    ssh_private_key: str | None = Field(
+        None,
+        description='OpenSSH private key in PEM form, including the BEGIN and END lines. Used with an ssh:// or git@host:org/repo.git URL.',
+    )
+    ssh_private_key_passphrase: str | None = Field(
+        None, description='Passphrase protecting the SSH private key, when it has one.'
+    )
+    client_certificate_pem: str | None = Field(
+        None, description='PEM client certificate for mutual-TLS authentication.'
+    )
+    client_key_pem: str | None = Field(
+        None, description='PEM private key matching the client certificate.'
+    )
+    ca_certificate_pem: str | None = Field(
+        None,
+        description='PEM certificate authority bundle used to verify the server, for an internal Git server with a private CA. Applies to any http(s) authentication method.',
+    )
+
+
+class GitOptionalAuth(BaseModel):
+    """
+    Which credentials to use and how the server is verified.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    auth_method: GitAuthMethod | None = 'none'
+    ssh_known_hosts: str | None = Field(
+        None,
+        description='known_hosts entries for the Git server, one per line (the output of ssh-keyscan host). Required for SSH unless host key checking is turned off.',
+    )
+    ssh_strict_host_key_checking: bool | None = Field(
+        True,
+        description='Refuse to connect over SSH to a host that is not in ssh_known_hosts. Leave on unless you are connecting to a server whose host key you cannot pin.',
+    )
+    verify_ssl: bool | None = Field(
+        True,
+        description="Verify the server's TLS certificate on http(s) remotes. Turn off only for an internal server with a self-signed certificate; prefer ca_certificate_pem.",
+    )
+
+
+class GitOptionalScope(BaseModel):
+    """
+    Which branch is read and which files inside it become assets. One branch is scanned per source; add a second source to scan a second branch.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    branch: str | None = Field(
+        None,
+        description="Branch or tag to scan, for example main or release/2026-01. Defaults to the repository's default branch.",
+    )
+    include_paths: list[str] | None = Field(
+        None,
+        description='Folders or glob patterns to scan, for example docs, src/config or **/*.sql. A file is kept when it matches at least one entry. Leave empty to scan the whole repository.',
+    )
+    exclude_paths: list[str] | None = Field(
+        None,
+        description='Folders or glob patterns to skip, for example node_modules, vendor or **/fixtures/*. Applied after include_paths, so an excluded folder inside an included one is still skipped.',
+    )
+    include_extensions: list[str] | None = Field(
+        None,
+        description='Optional extension allowlist (for example, .py, .sql, .env, .md)',
+    )
+    exclude_extensions: list[str] | None = Field(
+        None,
+        description='Optional extension denylist (for example, .png, .lock, .min.js)',
+    )
+    include_last_commit: bool | None = Field(
+        False,
+        description="Record each file's own last-commit date, which is what LATEST and AUTOMATIC sampling order by. Needs the branch's commit history, so it makes the initial transfer larger. When off, every file inherits the date of the scanned commit.",
+    )
+    include_empty_objects: bool | None = Field(
+        False, description='Include zero-byte files in extraction results'
+    )
+    include_object_metadata: bool | None = Field(
+        True,
+        description='Attach Git metadata (blob object id, size, commit) to asset checksums. The blob id is a content hash, so leaving this on lets an unchanged file be skipped on the next run without re-reading it.',
+    )
+    include_content_preview: bool | None = Field(
+        True,
+        description='Read file contents to infer type and extract detector-ready text. Turn off for a metadata-only inventory of the repository.',
+    )
+
+
+class GitOptionalConnection(BaseModel):
+    """
+    How the repository is transferred and how much of one file may be held at once. Every run clones into its own empty directory and deletes it afterwards — nothing is shared or cached between runs or between sources.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    clone_strategy: GitCloneStrategy | None = 'blob_limit'
+    depth: int | None = Field(
+        1,
+        description='How many commits of history to fetch. 1 (default) fetches only the commit being scanned. 0 fetches the full history, which is what per-file commit dates need.',
+        ge=0,
+        le=1000,
+    )
+    clone_timeout_seconds: float | None = Field(
+        1800, description='Time limit for the initial clone.', ge=30.0, le=86400.0
+    )
+    command_timeout_seconds: float | None = Field(
+        300,
+        description='Time limit for each subsequent Git command, including fetching one file.',
+        ge=5.0,
+        le=3600.0,
+    )
+    max_object_bytes: int | None = Field(
+        26214400,
+        description='Maximum bytes of one file held in memory. Larger files are streamed to a temporary file, so this bounds memory rather than the size of file that can be scanned. Also the threshold used by the blob_limit clone strategy. See max_file_bytes to refuse large files outright.',
+        ge=1024,
+    )
+    max_file_bytes: int | None = Field(
+        None,
+        description='Refuse any file larger than this many bytes. 0 or unset means no limit: a file above max_object_bytes is spooled to disk rather than held in memory, so file size is bounded by free disk, not by RAM.',
+        ge=0,
+    )
+    max_archive_members: int | None = Field(
+        200,
+        description='Maximum member files expanded from one archive into child assets. Bounds fan-out, and is the guard against a zip bomb.',
+        ge=1,
+        le=10000,
+    )
+    max_archive_member_bytes: int | None = Field(
+        10485760,
+        description='Maximum uncompressed bytes read from a single archive member',
+        ge=1024,
+    )
+    max_archive_total_bytes: int | None = Field(
+        104857600,
+        description='Maximum uncompressed bytes read across all members of one archive. The decompression-ratio ceiling: a zip bomb hits this before it hits memory.',
+        ge=1024,
+    )
+    max_embedded_files: int | None = Field(
+        200,
+        description='Maximum embedded files (parquet image/audio columns, office media) expanded from one container into child assets per run',
+        ge=1,
+        le=10000,
+    )
+
+
+class GitOptional(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    auth: GitOptionalAuth | None = None
+    scope: GitOptionalScope | None = None
+    connection: GitOptionalConnection | None = None
+
+
+class GitInput(CoreInput):
+    type: Literal['GIT'] = Field(..., description='Type of the asset or source')
+    required: GitRequired
+    masked: GitMasked | None = None
+    optional: GitOptional | None = None
+    detectors: list[Detector] | None = Field(
+        None, description='Detectors to run on ingested content'
+    )
+    custom_detectors: list[CustomDetectorSelection] | None = Field(
+        None,
+        description='Reusable custom detector IDs selected from the custom detector catalog.',
+    )
+    sampling: SamplingConfig
+    scan_cache: ScanCacheConfig | None = None
+    resources: ResourceOverrides | None = None
+    cleanup_removed_detector_findings: bool | None = Field(
+        True,
+        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
+    )
+
+
 class YouTubeInput(CoreInput):
     type: Literal['YOUTUBE'] = Field(..., description='Type of the asset or source')
     required: YouTubeRequired
@@ -5224,6 +5451,7 @@ class SourceInput(
         | GoogleWorkspaceInput
         | DropboxInput
         | HuggingFaceInput
+        | GitInput
     ]
 ):
     root: (
@@ -5263,6 +5491,7 @@ class SourceInput(
         | GoogleWorkspaceInput
         | DropboxInput
         | HuggingFaceInput
+        | GitInput
     ) = Field(
         ...,
         description='Merged configuration schema with all source types and common definitions',

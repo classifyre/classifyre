@@ -129,6 +129,33 @@ const COVERAGE_DOCTRINE = [
   'that saw a real lead and left it.',
 ].join(' ');
 
+/**
+ * The counterweight to the coverage doctrine, for the case it does not cover.
+ *
+ * COVERAGE_DOCTRINE constrains what may be concluded from a partial corpus, and
+ * an operator running a single freshly-ingested source read all of that as a
+ * reason to sit still: nothing detected yet, so nothing to triage, so nothing
+ * to do — and the harness looked inert on exactly the run where its work is
+ * most visible. An empty system is not evidence of absence, it is an absence of
+ * evidence, and the two call for opposite behaviour.
+ */
+const COLD_START_DOCTRINE = [
+  '\nCOLD START: when a source has assets but few or no findings, that is not a quiet',
+  'system — it is an unexamined one, and examining it is your job this cycle. Nothing has',
+  'looked at this data yet, so there is no prior work to duplicate and no operator',
+  'judgement to second-guess. Read it: assets.profile for what was ingested and what',
+  'metadata it carries, assets.sample for what the content actually looks like.',
+  '\nFrom that you can act with real evidence in hand, without waiting for a detector to',
+  'fire: glossary.propose the recurring real-world names the data plainly contains;',
+  'memory.write a SOURCE_PROFILE describing the shape you found and what you expect to',
+  'matter in it; create an inquiry when the findings that DO exist support one. If what',
+  'the source needs is a detector or a config change rather than an inquiry, say so in',
+  'your finish summary and record it — the config and detector agents read that.',
+  '\nThe restraint this prompt asks of you is about unevidenced CLAIMS, never about',
+  'curiosity. Finishing a first look at a new source having recorded nothing at all is a',
+  'worse outcome than a rough note that a later cycle sharpens.',
+].join(' ');
+
 const GLOSSARY_DOCTRINE = [
   '\nGLOSSARY: the glossary is the operator-facing shared vocabulary — canonical real-world names',
   '(people, organizations, locations, project codenames, document references, recurring jargon)',
@@ -211,6 +238,7 @@ export const INQUIRY_MISSION: Mission = {
     'Do not recreate intentionally archived inquiries. Use memory.search to recall precedents.',
     TRIAGE_DOCTRINE,
     COVERAGE_DOCTRINE,
+    COLD_START_DOCTRINE,
     GLOSSARY_DOCTRINE,
     '\nAim inquiries at what findings.ranked says matters: high-importance recurring evidence,',
     'not high-severity noise. An inquiry that would match a boilerplate cluster is a bad inquiry.',
@@ -222,6 +250,11 @@ export const INQUIRY_MISSION: Mission = {
   ].join('\n'),
   allowedTools: [
     ...OBSERVE_TOOLS,
+    // Cold start needs the raw data. With no findings yet, every observe tool
+    // this mission had returned empty, so on a freshly ingested source it could
+    // only conclude that there was nothing to do — correctly, and uselessly.
+    // Asset shape is what a glossary term or a first inquiry is built from.
+    ...ASSET_OBSERVE_TOOLS,
     ...SEMANTIC_TOOLS,
     ...INVESTIGATION_INQUIRY_TOOLS,
     ...KNOWLEDGE_TOOLS,

@@ -709,6 +709,15 @@ export function formatSummary(s: ApplySummary): string {
   // cycle looks like. Restraint is an outcome; name it as one.
   if (s.applied === 0 && s.failed === 0 && (s.readOk ?? 0) > 0) {
     const why = s.finishSummary?.trim();
+    // Only a run that CHOSE to stop can be called restraint. One that hit its
+    // iteration budget was cut off mid-investigation and decided nothing —
+    // labelling it "nothing warranted a change" reported a truncated run as a
+    // considered judgement, and buried the runs most worth looking at. Observed
+    // live as: "observed only, nothing warranted a change — Reached the
+    // 14-iteration budget without finishing."
+    if (s.finishedDeliberately === false) {
+      return `ran out of iterations before finishing${why ? ` — ${why}` : ''} (${s.readOk} read, nothing applied)`;
+    }
     return `observed only, nothing warranted a change${why ? ` — ${why}` : ''} (${s.readOk} read)`;
   }
   // "applied" counts mutations only. Reads are reported separately rather than

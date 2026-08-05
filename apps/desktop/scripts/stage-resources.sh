@@ -16,6 +16,8 @@ set -euo pipefail
 #   resources/python/  — standalone CPython (python-build-standalone via uv)
 #   resources/venv/    — pre-baked BASE venv (optional groups install on demand)
 #   resources/prisma/  — Prisma schema + migrations
+#   resources/git/     — portable git for Git-repository scans (Windows always;
+#                        elsewhere only when GIT_PORTABLE_DIR is set)
 #
 # LibreOffice is deliberately NOT bundled: it is ~550 MB even stripped, and
 # modifying the upstream bundle to slim it breaks its code signature (Apple
@@ -28,6 +30,9 @@ set -euo pipefail
 #   SKIP_APP_BUILD=1  — skip rebuilding API/web (reuse existing dist/out)
 #   SKIP_PYTHON=1     — skip Python/venv baking (dev iteration)
 #   PYTHON_VERSION    — standalone CPython version (default 3.12)
+#   GIT_PORTABLE_DIR  — stage this relocatable git tree instead of resolving
+#                       one per platform (expects bin/git or cmd/git.exe)
+#   MINGIT_VERSION    — MinGit version bundled on Windows (default 2.51.0)
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 DESKTOP_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -320,6 +325,58 @@ if [ "${SKIP_PYTHON:-0}" != "1" ]; then
     echo "Staged venv is only ${VENV_SIZE_KB}KB — uv sync did not populate it" >&2
     exit 1
   fi
+fi
+
+# --- Git binary for Git-repository scans ---------------------------------------
+# Git scans shell out to the git binary (apps/cli/src/sources/git/source.py).
+# Whether one has to be bundled is entirely platform-dependent:
+#
+#   Windows — nothing is installed by default, so MinGit is downloaded and
+#             staged. MinGit is the portable build Git for Windows publishes for
+#             exactly this: ~50 MB, relocatable, no installer, `cmd/git.exe`.
+#   macOS   — /usr/bin/git is a stub that pops up an Xcode Command Line Tools
+#             prompt, and packaged mode does not inherit the login shell, so a
+#             Homebrew git is invisible. Bundling a relocatable macOS git is
+#             possible but every dylib path has to be rewritten and re-signed,
+#             so it is opt-in via GIT_PORTABLE_DIR rather than automatic.
+#   Linux   — distributions ship git and it is on the rebuilt PATH.
+#
+# Where nothing is staged the CLI resolves git from the PATH and reports a
+# clear "git is not installed" error when there is none, so a missing git fails
+# visibly instead of turning into a source that finds nothing.
+MINGIT_VERSION="${MINGIT_VERSION:-2.51.0}"
+MINGIT_TAG="${MINGIT_TAG:-v${MINGIT_VERSION}.windows.1}"
+
+if [ -n "${GIT_PORTABLE_DIR:-}" ]; then
+  echo "=== Stage git from GIT_PORTABLE_DIR ==="
+  [ -d "$GIT_PORTABLE_DIR" ] || { echo "GIT_PORTABLE_DIR is not a directory: $GIT_PORTABLE_DIR" >&2; exit 1; }
+  rm -rf "$RESOURCES/git"
+  mkdir -p "$RESOURCES/git"
+  cp -R "$GIT_PORTABLE_DIR/." "$RESOURCES/git/"
+elif [ "$IS_WINDOWS" = "1" ]; then
+  echo "=== Bundle MinGit $MINGIT_VERSION ==="
+  MINGIT_ZIP="$DESKTOP_DIR/.mingit.zip"
+  curl -fsSL -o "$MINGIT_ZIP" \
+    "https://github.com/git-for-windows/git/releases/download/${MINGIT_TAG}/MinGit-${MINGIT_VERSION}-64-bit.zip"
+  rm -rf "$RESOURCES/git"
+  mkdir -p "$RESOURCES/git"
+  unzip -q "$MINGIT_ZIP" -d "$RESOURCES/git"
+  rm -f "$MINGIT_ZIP"
+else
+  echo "=== Skipping git bundle (using the system git on this platform) ==="
+  rm -rf "$RESOURCES/git"
+fi
+
+# A staged git that cannot run is worse than none: git-env.ts would pin the CLI
+# to it and every Git scan would fail. Prove it works before shipping it.
+if [ -d "$RESOURCES/git" ]; then
+  if [ "$IS_WINDOWS" = "1" ]; then
+    GIT_BIN="$RESOURCES/git/cmd/git.exe"
+  else
+    GIT_BIN="$RESOURCES/git/bin/git"
+  fi
+  [ -x "$GIT_BIN" ] || { echo "Staged git is missing or not executable: $GIT_BIN" >&2; exit 1; }
+  "$GIT_BIN" --version
 fi
 
 # --- macOS: sign the API's Mach-O binaries, then collapse into one archive ----

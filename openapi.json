@@ -1422,6 +1422,7 @@
                   "GOOGLE_WORKSPACE",
                   "DROPBOX",
                   "HUGGING_FACE",
+                  "GIT",
                   "SANDBOX",
                   "CUSTOM"
                 ]
@@ -1778,6 +1779,7 @@
                   "GOOGLE_WORKSPACE",
                   "DROPBOX",
                   "HUGGING_FACE",
+                  "GIT",
                   "SANDBOX",
                   "CUSTOM"
                 ]
@@ -2156,6 +2158,7 @@
                   "GOOGLE_WORKSPACE",
                   "DROPBOX",
                   "HUGGING_FACE",
+                  "GIT",
                   "SANDBOX",
                   "CUSTOM"
                 ]
@@ -9739,7 +9742,8 @@
               "GOOGLE_WORKSPACE",
               "DROPBOX",
               "HUGGING_FACE",
-              "SANDBOX"
+              "SANDBOX",
+              "GIT"
             ],
             "description": "The type of the source",
             "example": "WORDPRESS"
@@ -9982,7 +9986,8 @@
               "GOOGLE_WORKSPACE",
               "DROPBOX",
               "HUGGING_FACE",
-              "SANDBOX"
+              "SANDBOX",
+              "GIT"
             ],
             "description": "The type of the source",
             "example": "WORDPRESS"
@@ -10176,6 +10181,7 @@
                 "GOOGLE_WORKSPACE",
                 "DROPBOX",
                 "HUGGING_FACE",
+                "GIT",
                 "SANDBOX",
                 "CUSTOM"
               ]
@@ -10522,6 +10528,7 @@
               "GOOGLE_WORKSPACE",
               "DROPBOX",
               "HUGGING_FACE",
+              "GIT",
               "SANDBOX",
               "CUSTOM"
             ]
@@ -10672,6 +10679,7 @@
                 "GOOGLE_WORKSPACE",
                 "DROPBOX",
                 "HUGGING_FACE",
+                "GIT",
                 "SANDBOX",
                 "CUSTOM"
               ]
@@ -11636,6 +11644,7 @@
               "GOOGLE_WORKSPACE",
               "DROPBOX",
               "HUGGING_FACE",
+              "GIT",
               "SANDBOX",
               "CUSTOM"
             ]
@@ -18515,6 +18524,7 @@
                 "GOOGLE_WORKSPACE",
                 "DROPBOX",
                 "HUGGING_FACE",
+                "GIT",
                 "SANDBOX",
                 "CUSTOM"
               ]

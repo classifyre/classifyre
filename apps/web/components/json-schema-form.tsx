@@ -2508,6 +2508,7 @@ export const JsonSchemaForm = React.forwardRef<
     GOOGLE_WORKSPACE: false,
     DROPBOX: false,
     HUGGING_FACE: false,
+    GIT: false,
   };
   const isTabular =
     assistantSourceType && isIngestionSourceType(assistantSourceType)

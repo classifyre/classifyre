@@ -287,6 +287,9 @@ SCAN_CACHE_ELIGIBLE_SOURCE_TYPES: frozenset[str] = frozenset(
         # Hub file entries carry a content-derived digest: the Git LFS SHA-256 for
         # LFS-backed files (every large data file) and the Git blob OID otherwise.
         "hugging_face",
+        # Every tree entry carries the Git blob OID, which is a hash of the
+        # file's contents — an unchanged OID is proof the bytes are unchanged.
+        "git",
         "sandbox",
         "google_workspace",
         "microsoft_365",

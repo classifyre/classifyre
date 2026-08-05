@@ -44,6 +44,33 @@ describe('formatSummary (G-032)', () => {
     expect(text).toContain('boilerplate');
   });
 
+  // A run cut off by its iteration budget decided nothing. Reporting it as
+  // "nothing warranted a change" turned a truncated investigation into a
+  // considered judgement and hid the runs most worth looking at. Seen live as:
+  // "observed only, nothing warranted a change — Reached the 14-iteration
+  // budget without finishing."
+  it('does not dress budget exhaustion up as restraint', () => {
+    const text = formatSummary(
+      summary({
+        applied: 0,
+        readOk: 46,
+        finishedDeliberately: false,
+        finishSummary: 'Reached the 14-iteration budget without finishing.',
+      }),
+    );
+
+    expect(text).toContain('ran out of iterations');
+    expect(text).not.toContain('nothing warranted a change');
+  });
+
+  it('still calls a deliberate stop restraint', () => {
+    const text = formatSummary(
+      summary({ applied: 0, readOk: 6, finishedDeliberately: true }),
+    );
+
+    expect(text).toContain('observed only');
+  });
+
   // A run that failed has not "observed only" — it has a problem to report.
   it('does not dress a failed run up as restraint', () => {
     const text = formatSummary(summary({ applied: 0, readOk: 3, failed: 2 }));

@@ -22,6 +22,7 @@ import pytest
 
 from src.pipeline.parsed_content_provider import ParsedContentProvider
 from src.sources.dropbox.source import DropboxObjectRef, DropboxSource
+from src.sources.git.source import GitObjectRef, GitSource
 from src.sources.hugging_face.source import HuggingFaceObjectRef, HuggingFaceSource
 from src.sources.object_storage.base import ObjectRef
 from src.sources.s3_compatible_storage.source import S3CompatibleStorageSource
@@ -116,10 +117,36 @@ def _s3(file_count: int):
     return source, refs
 
 
+def _git(file_count: int):
+    source = GitSource(
+        {
+            "type": "GIT",
+            "required": {"repository_url": "https://git.example.com/acme/corpus.git"},
+            "masked": {},
+            "optional": {},
+            "sampling": {"strategy": "ALL"},
+        }
+    )
+    source._resolved_branch = "main"
+    source._commit_sha = "c" * 40
+    refs = [
+        GitObjectRef(
+            key=f"data/f{index:03d}.csv",
+            size=len(CSV_BYTES),
+            last_modified=MODIFIED,
+            etag=f"blob-{index}",
+            blob_id=f"blob-{index}",
+        )
+        for index in range(file_count)
+    ]
+    return source, refs
+
+
 SOURCE_FACTORIES = {
     "hugging_face": _hugging_face,
     "dropbox": _dropbox,
     "s3_compatible_storage": _s3,
+    "git": _git,
 }
 
 
