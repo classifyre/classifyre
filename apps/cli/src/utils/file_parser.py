@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 import tempfile
 import threading
-from collections.abc import Generator
+from collections.abc import Generator, Iterator
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
@@ -89,14 +89,39 @@ _GENERIC_BINARY_MIME_TYPES = frozenset(
 )
 
 
+# Arrow IPC, in the spellings it arrives under. ``.arrow`` and ``.ipc`` hold the
+# random-access *file* layout; ``.feather`` holds either that same layout
+# (Feather V2) or the legacy V1 one, which pyarrow still reads. The streaming
+# layout is a type of its own because it carries no footer, so it can only be
+# read front to back.
+ARROW_FILE_MIME_TYPE = "application/vnd.apache.arrow.file"
+ARROW_STREAM_MIME_TYPE = "application/vnd.apache.arrow.stream"
+ARROW_MIME_TYPES = frozenset({ARROW_FILE_MIME_TYPE, ARROW_STREAM_MIME_TYPE})
+
+# Content types that name a format this module already knows under another
+# spelling. Collapsed here for the same reason the generic-binary aliases are:
+# one name then reaches every downstream comparison. Arrow has no IANA-registered
+# type, so object stores and dataset tools each picked their own.
+_MIME_TYPE_ALIASES = {
+    "application/x-arrow": ARROW_FILE_MIME_TYPE,
+    "application/arrow": ARROW_FILE_MIME_TYPE,
+    "application/vnd.apache.arrow": ARROW_FILE_MIME_TYPE,
+    "application/x-feather": ARROW_FILE_MIME_TYPE,
+    "application/vnd.apache.feather": ARROW_FILE_MIME_TYPE,
+}
+
+
 def _canonical_mime_type(mime_type: str) -> str:
     """Collapse every "unknown bytes" spelling onto the registered one.
 
     Downstream code compares against ``application/octet-stream`` in a dozen
     places (is_binary, archive handling, detector content-type matching); mapping
-    aliases here means none of those have to know the alias list.
+    aliases here means none of those have to know the alias list. The same goes
+    for formats with several spellings in the wild (see ``_MIME_TYPE_ALIASES``).
     """
-    return OCTET_STREAM if mime_type in _GENERIC_BINARY_MIME_TYPES else mime_type
+    if mime_type in _GENERIC_BINARY_MIME_TYPES:
+        return OCTET_STREAM
+    return _MIME_TYPE_ALIASES.get(mime_type, mime_type)
 
 
 _TEXT_RAW_MIME_TYPES = {
@@ -113,12 +138,17 @@ _TABULAR_MIME_TYPES = {
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     "application/parquet",
     "application/vnd.apache.parquet",
+    *ARROW_MIME_TYPES,
 }
 
 _MIME_HINTS_BY_EXTENSION = {
     ".csv": "text/csv",
     ".tsv": "text/tab-separated-values",
     ".parquet": "application/parquet",
+    ".arrow": ARROW_FILE_MIME_TYPE,
+    ".feather": ARROW_FILE_MIME_TYPE,
+    ".ipc": ARROW_FILE_MIME_TYPE,
+    ".arrows": ARROW_STREAM_MIME_TYPE,
     ".json": "application/json",
     ".xml": "application/xml",
     ".html": "text/html",
@@ -464,6 +494,12 @@ def _detect_magic_mime_type(
         (b"7z\xbc\xaf\x27\x1c", "application/x-7z-compressed"),
         (b"Rar!\x1a\x07", "application/vnd.rar"),
         (b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1", "application/x-ole-storage"),
+        # Arrow IPC file layout, and the legacy Feather V1 layout it replaced.
+        # Both answer to the same MIME type; the reader dispatches on the magic
+        # again because only one of them is random-access. The streaming layout
+        # has no magic at all, so it is recognised by name alone.
+        (b"ARROW1\x00\x00", ARROW_FILE_MIME_TYPE),
+        (b"FEA1", ARROW_FILE_MIME_TYPE),
     )
 
     for signature, mime_type in signatures:
@@ -996,6 +1032,15 @@ def extract_text(
         except Exception as e:
             return "", f"Parquet extraction failed: {e}"
 
+    # Arrow IPC / Feather — same treatment as Parquet: rows are streamed one
+    # batch at a time and file-bearing columns render as placeholders.
+    if mime_type in ARROW_MIME_TYPES:
+        try:
+            pages = _iter_arrow_pages(source, batch_size=1000, include_column_names=True)
+            return "\n".join(pages), None
+        except Exception as e:
+            return "", f"Arrow extraction failed: {e}"
+
     # Unknown / binary
     return "", ocr_error
 
@@ -1253,7 +1298,8 @@ def iter_file_pages(
     """
     Iterate over file content in pages of up to batch_size rows or lines.
 
-    Parquet / CSV / TSV  → yields batch_size *rows* per page with labelled columns.
+    Parquet / Arrow IPC / CSV / TSV → yields batch_size *rows* per page with
+    labelled columns.
     All other extractable types (PDF, DOCX, TXT, JSON, XML, XLSX, …) → extracts the
     full text once via extract_text(), then yields batch_size *lines* per page.
     Audio/video → transcript lines; video also yields distinct-frame OCR.
@@ -1277,6 +1323,14 @@ def iter_file_pages(
 
     if normalized in ("application/parquet", "application/vnd.apache.parquet"):
         yield from _iter_parquet_pages(
+            file_bytes,
+            batch_size,
+            include_column_names,
+            start_row=start_row,
+            max_rows=max_rows,
+        )
+    elif normalized in ARROW_MIME_TYPES:
+        yield from _iter_arrow_pages(
             file_bytes,
             batch_size,
             include_column_names,
@@ -1393,6 +1447,11 @@ def count_tabular_rows(source: bytes | Any, mime_type: str) -> int | None:
     Parquet stores the count in its footer. CSV does not, and counting it would
     mean a full pass — so this returns None there and the caller uses a strategy
     that needs no total (reservoir sampling). None means "unknown", never "zero".
+
+    Arrow IPC is in the CSV camp despite having a footer: that footer records
+    where each record batch *starts*, not how many rows it holds, so the only way
+    to total them is to read every batch. Paying a full pass to plan a bounded
+    one is exactly the trade this function exists to avoid.
 
     ``source`` may be a seekable file object instead of bytes, in which case only
     the footer is read — the whole point of the range-reading path.
@@ -1513,18 +1572,9 @@ def _iter_parquet_pages(
             io.BytesIO(source) if isinstance(source, bytes | bytearray) else source
         )
 
-        # Columns whose cells hold bytes never reach str(): that renders a Python
-        # repr, so a column of JSON documents would arrive at the detectors as
-        # b'{"email": ...}' with escaped quotes. Whole files (HF Image/Audio
-        # structs, file-byte columns) render as a placeholder and are scanned
-        # separately as child assets; text carried as bytes is decoded into the row
-        # it belongs to; anything else is summarized rather than spelled out.
-        from .embedded_files import (
-            CONTENT_FILE,
-            CONTENT_TEXT,
-            detect_parquet_payload_columns,
-            extract_embedded_bytes,
-        )
+        # Columns whose cells hold bytes are classified once here and rendered by
+        # _format_record_row, which never lets them reach str().
+        from .embedded_files import detect_parquet_payload_columns
 
         begin = max(0, start_row)
         groups, drop_in_group = _parquet_row_group_span(pf, begin, max_rows)
@@ -1558,36 +1608,22 @@ def _iter_parquet_pages(
         skipped = 0
         emitted = 0
         for batch in batches:
-            col_names = batch.schema.names
             for local_idx in range(batch.num_rows):
                 if skipped < drop_in_group:
                     skipped += 1
                     continue
                 if max_rows is not None and emitted >= max_rows:
                     return
-                lines: list[str] = []
-                lines.append(f"row_{abs_row + 1}:")
-                for col_i, col in enumerate(col_names):
-                    cell = batch.column(col_i)[local_idx].as_py()
-                    if col in payload_columns:
-                        payload_column = payload_columns[col]
-                        raw = extract_embedded_bytes(cell, payload_column.kind)
-                        if payload_column.content == CONTENT_TEXT:
-                            cell_str = _decode_bytes(raw) if raw else ""
-                        elif payload_column.content == CONTENT_FILE:
-                            cell_str = _format_embedded_placeholder(raw, payload_column.mime_hint)
-                        else:
-                            cell_str = _format_embedded_placeholder(raw, OCTET_STREAM)
-                    else:
-                        cell_str = "" if cell is None else str(cell)
-                    first, *rest = cell_str.splitlines() or [""]
-                    lines.append(f"  {col}: {first}" if include_column_names else f"  {first}")
-                    lines.extend(f"    {c}" for c in rest)
-                lines.append("")
+                page = _format_record_row(
+                    batch,
+                    local_idx,
+                    abs_row,
+                    payload_columns,
+                    include_column_names,
+                )
                 abs_row += 1
                 emitted += 1
-                if lines:
-                    yield "\n".join(lines)
+                yield page
     except TextExtractionCoverageError:
         raise
     except GeneratorExit:
@@ -1598,6 +1634,225 @@ def _iter_parquet_pages(
         # and none of the rest, which must not read as "the file ends here".
         raise TextExtractionCoverageError(
             f"Parquet page iteration failed after {emitted} row(s): {exc}",
+            code=TextExtractionCoverageCode.FAILED,
+        ) from exc
+
+
+def _format_record_row(
+    batch: Any,
+    local_index: int,
+    abs_row: int,
+    payload_columns: dict[str, Any],
+    include_column_names: bool,
+) -> str:
+    """Render one row of an Arrow record batch as a detector-visible page.
+
+    Shared by the Parquet and Arrow IPC readers because both hand back Arrow
+    record batches, and a row must read identically whichever container it came
+    out of — the row text is what a finding quotes, so a difference here would
+    make the same data look like two different findings.
+
+    Columns whose cells hold bytes never reach ``str()``: that renders a Python
+    repr, so a column of JSON documents would arrive at the detectors as
+    ``b'{"email": ...}'`` with escaped quotes. Whole files (HuggingFace
+    Image/Audio structs, file-byte columns) render as a placeholder and are
+    scanned separately as child assets; text carried as bytes is decoded into the
+    row it belongs to; anything else is summarized rather than spelled out.
+    """
+    from .embedded_files import CONTENT_FILE, CONTENT_TEXT, extract_embedded_bytes
+
+    lines: list[str] = [f"row_{abs_row + 1}:"]
+    for col_i, col in enumerate(batch.schema.names):
+        cell = batch.column(col_i)[local_index].as_py()
+        if col in payload_columns:
+            payload_column = payload_columns[col]
+            raw = extract_embedded_bytes(cell, payload_column.kind)
+            if payload_column.content == CONTENT_TEXT:
+                cell_str = _decode_bytes(raw) if raw else ""
+            elif payload_column.content == CONTENT_FILE:
+                cell_str = _format_embedded_placeholder(raw, payload_column.mime_hint)
+            else:
+                cell_str = _format_embedded_placeholder(raw, OCTET_STREAM)
+        else:
+            cell_str = "" if cell is None else str(cell)
+        first, *rest = cell_str.splitlines() or [""]
+        lines.append(f"  {col}: {first}" if include_column_names else f"  {first}")
+        lines.extend(f"    {c}" for c in rest)
+    lines.append("")
+    return "\n".join(lines)
+
+
+_ARROW_FILE_MAGIC = b"ARROW1"
+_FEATHER_V1_MAGIC = b"FEA1"
+
+# Rows per batch when a payload's own batching cannot be reused (Feather V1,
+# which is read as one table). The IPC layouts keep the batches their writer
+# chose, so nothing rebatches them.
+_ARROW_DEFAULT_BATCH_ROWS = 1000
+
+
+def open_arrow_batches(
+    source: BinarySource,
+    *,
+    batch_rows: int = _ARROW_DEFAULT_BATCH_ROWS,
+) -> tuple[Any, Iterator[Any]]:
+    """Open an Arrow payload as ``(schema, record-batch iterator)``.
+
+    Three layouts share the ``.arrow`` / ``.feather`` / ``.ipc`` extensions and
+    are told apart by their magic, not their name:
+
+    * **IPC file** (``ARROW1``) — the common one, and the only random-access
+      layout: its footer indexes the record batches, so opening it costs a few
+      hundred bytes and each batch is fetched on demand. Over a range-reading
+      handle that means a multi-gigabyte object is never downloaded whole.
+    * **Feather V1** (``FEA1``) — the legacy layout pyarrow still reads, but only
+      as a whole table, so this one is resident while it is walked.
+    * **IPC stream** (no magic) — batches back to back with no index; read front
+      to back, one batch at a time.
+
+    The iterator is lazy in every case except Feather V1, so a caller that stops
+    early stops the reading too.
+    """
+    prefix = header(source, len(_ARROW_FILE_MAGIC))
+    handle = as_binary_io(source)
+
+    if prefix.startswith(_ARROW_FILE_MAGIC):
+        ipc = _require_file_processing("pyarrow.ipc")
+        reader = ipc.open_file(handle)  # type: ignore[attr-defined]
+
+        def _file_batches() -> Iterator[Any]:
+            for index in range(reader.num_record_batches):
+                yield reader.get_batch(index)
+
+        return reader.schema, _file_batches()
+
+    if prefix.startswith(_FEATHER_V1_MAGIC):
+        import warnings
+
+        feather = _require_file_processing("pyarrow.feather")
+        # ``read_table`` is the only reader that still understands V1, and pyarrow
+        # has it under a deprecation notice pointing at the IPC readers — which
+        # cannot read V1 at all. Warning once per legacy file would be noise in a
+        # scan log; when pyarrow does drop it, this raises and the caller reports
+        # the payload as unreadable rather than as empty.
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", FutureWarning)
+            table = feather.read_table(handle)  # type: ignore[attr-defined]
+        return table.schema, iter(table.to_batches(max_chunksize=max(1, batch_rows)))
+
+    ipc = _require_file_processing("pyarrow.ipc")
+    stream = ipc.open_stream(handle)  # type: ignore[attr-defined]
+    return stream.schema, iter(stream)
+
+
+def _arrow_truncation_error(source: BinarySource) -> TextExtractionCoverageError | None:
+    """The error for an Arrow payload whose closing magic is missing, else None.
+
+    Same reasoning as the Parquet guard: a payload cut short by an object-size
+    cap has lost the index at its end, and reading it as "no rows" is
+    indistinguishable from an empty file — which the AUTOMATIC cursor banks as a
+    completed sweep, retiring the asset from every future scan. Only checkable on
+    resident bytes; a handle is a range reader that was never truncated. The
+    streaming layout closes with no magic, so a truncated stream is caught later,
+    when a batch fails to decode.
+    """
+    if not isinstance(source, bytes | bytearray):
+        return None
+    head = bytes(source[: len(_ARROW_FILE_MAGIC)])
+    tail = bytes(source[-len(_ARROW_FILE_MAGIC) :])
+    if head.startswith(_ARROW_FILE_MAGIC):
+        # 8-byte header (magic + padding), footer length, and the closing magic.
+        complete = len(source) >= 18 and tail == _ARROW_FILE_MAGIC
+    elif head.startswith(_FEATHER_V1_MAGIC):
+        complete = len(source) >= 8 and tail.endswith(_FEATHER_V1_MAGIC)
+    else:
+        return None
+    if complete:
+        return None
+    return TextExtractionCoverageError(
+        f"Arrow payload is truncated (closing magic missing, {len(source)} bytes read). "
+        f"A file larger than the configured object-size cap cannot be row-scanned: "
+        f"raise optional.connection.max_object_bytes for this source.",
+        code=TextExtractionCoverageCode.FAILED,
+    )
+
+
+def _iter_arrow_pages(
+    source: BinarySource,
+    batch_size: int,
+    include_column_names: bool,
+    *,
+    start_row: int = 0,
+    max_rows: int | None = None,
+) -> Generator[str, None, None]:
+    """Yield one page per row of an Arrow IPC / Feather payload.
+
+    The Parquet reader's twin, row for row: absolute row numbering, the same
+    placeholder rendering for columns that hold whole files, and the same refusal
+    to report a failed read as an empty payload.
+
+    One difference is worth knowing about. Parquet's footer carries per-row-group
+    row counts, so a window starting deep in a file names the groups it needs and
+    transfers nothing else. Arrow's footer indexes batches by offset only, so
+    reaching row 4,000,000 means walking the batches before it. They are read but
+    never formatted, which is where the cost of a row actually is; over a
+    range-reading handle, though, those batches are transferred.
+    """
+    truncation = _arrow_truncation_error(source)
+    if truncation is not None:
+        raise truncation
+
+    begin = max(0, start_row)
+    emitted = 0
+    try:
+        from .embedded_files import EmbeddedColumn, detect_payload_columns
+
+        schema, batches = open_arrow_batches(source, batch_rows=max(1, batch_size))
+
+        # Classified from the first batch this window actually reads, so the
+        # sample costs no reading of its own — the same bargain the Parquet
+        # reader strikes by sampling the first row group of its span.
+        payload_columns: dict[str, EmbeddedColumn] | None = None
+
+        abs_row = 0
+        for batch in batches:
+            rows = batch.num_rows
+            if abs_row + rows <= begin:
+                # Wholly before the window: skipped without formatting a row.
+                abs_row += rows
+                continue
+            if payload_columns is None:
+                payload_columns = detect_payload_columns(schema, batch)
+            for local_index in range(rows):
+                if abs_row < begin:
+                    abs_row += 1
+                    continue
+                if max_rows is not None and emitted >= max_rows:
+                    return
+                page = _format_record_row(
+                    batch,
+                    local_index,
+                    abs_row,
+                    payload_columns,
+                    include_column_names,
+                )
+                abs_row += 1
+                emitted += 1
+                yield page
+            if max_rows is not None and emitted >= max_rows:
+                # The window closed exactly on a batch boundary; stop before
+                # pulling the next batch off the wire to discover the same thing.
+                return
+    except TextExtractionCoverageError:
+        raise
+    except GeneratorExit:
+        # The consumer stopped early (it had its fill of rows). Not a failure.
+        raise
+    except Exception as exc:
+        # A decode that dies part-way through has delivered *some* of the window
+        # and none of the rest, which must not read as "the file ends here".
+        raise TextExtractionCoverageError(
+            f"Arrow page iteration failed after {emitted} row(s): {exc}",
             code=TextExtractionCoverageCode.FAILED,
         ) from exc
 

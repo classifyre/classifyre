@@ -28,7 +28,11 @@ from ...models.generated_single_asset_scan_results import (
     SingleAssetScanResults,
 )
 from ...utils.file_metadata import extract_file_metadata
-from ...utils.file_parser import normalize_mime_type, resolve_mime_type
+from ...utils.file_parser import (
+    ARROW_MIME_TYPES,
+    normalize_mime_type,
+    resolve_mime_type,
+)
 from ...utils.hashing import hash_id
 from ..base import BaseSource
 from ..dependencies import require_module
@@ -85,6 +89,7 @@ _TABULAR_MIME_TYPES = {
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     "application/parquet",
     "application/vnd.apache.parquet",
+    *ARROW_MIME_TYPES,
 }
 
 _FILE_EXTENSION_HINTS: dict[str, OutputAssetType] = {
@@ -109,6 +114,10 @@ _FILE_EXTENSION_HINTS: dict[str, OutputAssetType] = {
     ".xlsx": OutputAssetType.TABLE,
     ".pptx": OutputAssetType.BINARY,
     ".parquet": OutputAssetType.TABLE,
+    ".arrow": OutputAssetType.TABLE,
+    ".arrows": OutputAssetType.TABLE,
+    ".feather": OutputAssetType.TABLE,
+    ".ipc": OutputAssetType.TABLE,
     ".json": OutputAssetType.TXT,
     ".xml": OutputAssetType.TXT,
     ".txt": OutputAssetType.TXT,
