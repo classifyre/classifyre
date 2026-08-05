@@ -9,12 +9,19 @@ export interface AppSettings {
   runInBackground: boolean;
   /** Show native OS notifications for in-app notifications (scan failures etc.). */
   desktopNotifications: boolean;
+  /**
+   * Override for the API process's V8 old-space cap, in MB. 0 (the default)
+   * means 'size it from installed RAM' — see computeApiHeapMb. Raise this only
+   * when scans of a very large corpus still hit heap-OOM crashes.
+   */
+  memoryLimitMb: number;
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
   postgresPort: 54320,
   runInBackground: true,
   desktopNotifications: true,
+  memoryLimitMb: 0,
 };
 
 export class SettingsManager {
@@ -53,6 +60,14 @@ export class SettingsManager {
     }
     if (patch.desktopNotifications !== undefined) {
       this.settings.desktopNotifications = patch.desktopNotifications === true;
+    }
+    if (patch.memoryLimitMb !== undefined) {
+      const limit = patch.memoryLimitMb;
+      // 0 disables the override. Anything below 1 GB cannot boot the API.
+      if (!Number.isInteger(limit) || limit < 0 || (limit > 0 && limit < 1024)) {
+        throw new Error('Memory limit must be 0 (automatic) or at least 1024 MB');
+      }
+      this.settings.memoryLimitMb = limit;
     }
     fs.writeFileSync(this.filePath, JSON.stringify(this.settings, null, 2));
     return this.get();

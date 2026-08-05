@@ -3,6 +3,7 @@ import {
   NotFoundException,
   BadRequestException,
   Optional,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { PrismaService } from './prisma.service';
 import {
@@ -17,6 +18,7 @@ import {
   TextExtractionStatus,
 } from '@prisma/client';
 import { generateDetectionIdentity } from './utils/detection-identity';
+import { heapOverThreshold } from './utils/heap-guard';
 import { computeScopeFingerprint } from './utils/scope-fingerprint';
 import {
   HistoryEventType,
@@ -50,6 +52,19 @@ const CHANGE_TYPE_TO_ASSET_STATUS: Record<RunnerAssetChangeType, AssetStatus> =
     [RunnerAssetChangeType.UNCHANGED]: AssetStatus.UNCHANGED,
     [RunnerAssetChangeType.DELETED]: AssetStatus.DELETED,
   };
+
+/**
+ * Batch size for the existing-finding lookup during ingestion. A single parquet
+ * page can carry ~9k detections, and one `IN` list that long produces a query
+ * Postgres plans poorly and Prisma serialises expensively — chunk it.
+ */
+const EXISTING_FINDING_LOOKUP_CHUNK = 1000;
+
+/** Rows per `createMany` when inserting new findings (see call site). */
+const FINDING_CREATE_CHUNK = 500;
+
+/** Assets per prior-row lookup during ingestion (see call site). */
+const EXISTING_ASSET_LOOKUP_CHUNK = 1000;
 
 const findingForAssetSelect = {
   id: true,
@@ -1583,6 +1598,22 @@ export class AssetService {
       skipFindings?: boolean;
     },
   ) {
+    // Shed the batch before it allocates anything if the heap is already near
+    // the V8 ceiling. The CLI retries 503s with backoff, so the work is not
+    // lost — whereas a heap OOM here takes the whole API down mid-scan.
+    const pressure = heapOverThreshold();
+    if (pressure) {
+      throw new ServiceUnavailableException({
+        statusCode: 503,
+        error: 'Service Unavailable',
+        message: `Server is low on memory (heap ${Math.round(
+          pressure.usedBytes / 1024 / 1024,
+        )} MB of ${Math.round(
+          pressure.thresholdBytes / 1024 / 1024,
+        )} MB) — please retry in a moment.`,
+      });
+    }
+
     const finalizeRun = options?.finalizeRun ?? true;
     const skipFindings = options?.skipFindings ?? false;
     const { source, runner } = await this.assertSourceAndRunner(
@@ -1606,14 +1637,35 @@ export class AssetService {
       batches.push(assets.slice(i, i + BATCH_SIZE));
     }
 
-    // Get all existing assets once (outside transactions)
-    const existingAssets = await this.prisma.asset.findMany({
-      where: { sourceId },
-    });
-
-    const existingAssetsMap = new Map(
-      existingAssets.map((asset) => [asset.hash, asset]),
+    // Prior rows for the assets in *this* payload, fetched once outside the
+    // per-batch transactions. Never `where: { sourceId }` on its own: that
+    // loads every asset the source has ever seen (all columns, source metadata
+    // JSONB included) to answer questions about the handful being reported, and
+    // grows without bound as a corpus grows — the same shape as the findings
+    // query that was crashing the desktop API. `@@unique([sourceId, hash])`
+    // makes the scoped lookup an index hit.
+    const incomingHashes = Array.from(
+      new Set(assets.map((asset) => String(asset.hash))),
     );
+    const existingAssetsMap = new Map<string, Asset>();
+    for (
+      let offset = 0;
+      offset < incomingHashes.length;
+      offset += EXISTING_ASSET_LOOKUP_CHUNK
+    ) {
+      const rows = await this.prisma.asset.findMany({
+        where: {
+          sourceId,
+          hash: {
+            in: incomingHashes.slice(
+              offset,
+              offset + EXISTING_ASSET_LOOKUP_CHUNK,
+            ),
+          },
+        },
+      });
+      for (const asset of rows) existingAssetsMap.set(asset.hash, asset);
+    }
 
     // Track overall statistics
     let totalCreated = 0;
@@ -2434,14 +2486,6 @@ export class AssetService {
           };
         }
 
-        // Collect ALL scanned asset IDs — needed to resolve findings on assets
-        // that were scanned clean (zero findings) in this batch.
-        const allScannedAssetIds = new Set<string>();
-        for (const asset of batch) {
-          const mappedAsset = existingAssetsMap.get(String(asset.hash));
-          if (mappedAsset) allScannedAssetIds.add(mappedAsset.id);
-        }
-
         // Collect individual detections with identity
         const incomingDetections: Map<string, any> = new Map();
 
@@ -2550,16 +2594,62 @@ export class AssetService {
           }
         }
 
-        // Fetch existing findings for ALL scanned assets (not just those with
-        // findings in this batch) so we can resolve findings on assets that
-        // came back clean.
-        const existingFindings = await tx.finding.findMany({
-          where: { assetId: { in: Array.from(allScannedAssetIds) } },
-        });
-
-        const existingMap = new Map(
-          existingFindings.map((f) => [f.detectionIdentity, f]),
-        );
+        // Look up the prior row for each *incoming* detection so re-detections
+        // keep their history/manual overrides. Scoped by detectionIdentity (a
+        // unique index), never by assetId: an asset can accumulate hundreds of
+        // thousands of findings across pages, and loading them all — with
+        // matched_content, contexts, metadata and history — is what drove the
+        // API into repeated JS-heap OOM crashes on desktop. Memory here is now
+        // O(incoming batch) instead of O(asset history).
+        //
+        // Findings that disappeared are *not* resolved here; that is the
+        // runner-scoped stale-findings pass in finalizeIngestRun.
+        const incomingIdentities = Array.from(incomingDetections.keys());
+        const existingMap = new Map<
+          string,
+          {
+            id: string;
+            detectionIdentity: string;
+            status: FindingStatus;
+            severity: Severity;
+            confidence: Prisma.Decimal | null;
+            matchedContent: string | null;
+            resolvedAt: Date | null;
+            resolutionReason: string | null;
+            history: Prisma.JsonValue;
+          }
+        >();
+        for (
+          let offset = 0;
+          offset < incomingIdentities.length;
+          offset += EXISTING_FINDING_LOOKUP_CHUNK
+        ) {
+          const rows = await tx.finding.findMany({
+            where: {
+              detectionIdentity: {
+                in: incomingIdentities.slice(
+                  offset,
+                  offset + EXISTING_FINDING_LOOKUP_CHUNK,
+                ),
+              },
+            },
+            // Only the columns the reconciliation below actually reads. The
+            // omitted ones (contexts, redacted content, metadata, location)
+            // are always overwritten from the incoming detection anyway.
+            select: {
+              id: true,
+              detectionIdentity: true,
+              status: true,
+              severity: true,
+              confidence: true,
+              matchedContent: true,
+              resolvedAt: true,
+              resolutionReason: true,
+              history: true,
+            },
+          });
+          for (const row of rows) existingMap.set(row.detectionIdentity, row);
+        }
 
         const toCreate: any[] = [];
         const toUpdate: any[] = [];
@@ -2721,9 +2811,19 @@ export class AssetService {
           }
         }
 
-        // Bulk create new findings
-        if (toCreate.length > 0) {
-          await tx.finding.createMany({ data: toCreate });
+        // Bulk create new findings. Chunked: a finding-dense page can produce
+        // ~9k rows, and handing Prisma one array that large means the whole
+        // parameter set (matched content, contexts, metadata, history) is
+        // serialised at once — a multi-hundred-MB spike on exactly the path
+        // that was OOMing.
+        for (
+          let offset = 0;
+          offset < toCreate.length;
+          offset += FINDING_CREATE_CHUNK
+        ) {
+          await tx.finding.createMany({
+            data: toCreate.slice(offset, offset + FINDING_CREATE_CHUNK),
+          });
         }
 
         // Update existing findings

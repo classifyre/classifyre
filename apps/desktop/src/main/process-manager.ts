@@ -187,9 +187,14 @@ interface ManagedProcess {
 // and the user's other apps, so the scan pipeline must never size itself to
 // the whole machine (the CLI pool auto-sizes to cores-1 when unconstrained,
 // which froze the host during scans).
+function detectorWorkerCount(): number {
+  const cores = os.cpus().length;
+  return Math.max(1, Math.min(4, Math.floor(cores / 2) - 1));
+}
+
 function resourceDefaultEnv(): Record<string, string> {
   const cores = os.cpus().length;
-  const detectorWorkers = Math.max(1, Math.min(4, Math.floor(cores / 2) - 1));
+  const detectorWorkers = detectorWorkerCount();
   return {
     // Detector process pool: at most half the machine, and 2 BLAS/torch
     // threads per worker so workers*threads stays well under core count.
@@ -202,6 +207,40 @@ function resourceDefaultEnv(): Record<string, string> {
     // One scan at a time by default on desktop.
     MAX_CONCURRENT_RUNNERS: "1",
   };
+}
+
+/**
+ * Sizes the API's V8 old-space cap for this machine.
+ *
+ * The previous formula was `clamp(1024, RAM * 0.25, 2048)`, which meant every
+ * machine with 8 GB or more got exactly 2 GB — the `* 0.25` term was dead above
+ * 8 GB. That ceiling is what a finding-dense scan hit on a 34 GB laptop,
+ * crashing the API with "Ineffective mark-compacts near heap limit".
+ *
+ * Budget from what else has to fit rather than from a flat fraction: the
+ * renderer and Electron main, embedded Postgres, and one resident Python
+ * detector worker per pool slot (spaCy + torch are ~1 GB apiece). Whatever is
+ * left goes to the API, floored so small machines still boot and capped so a
+ * runaway allocation is still bounded rather than swapping the host to death.
+ *
+ * Note this reserves nothing: V8 grows the heap lazily, so a higher ceiling
+ * costs no memory until it is actually used.
+ */
+export function computeApiHeapMb(
+  totalMb: number,
+  detectorWorkers: number,
+  overrideMb?: number,
+): number {
+  if (overrideMb && overrideMb > 0) return Math.floor(overrideMb);
+  const reservedMb = 2000 + detectorWorkers * 1200;
+  return Math.max(
+    1024,
+    Math.min(
+      6144, // absolute ceiling: past this a runaway allocation just swaps
+      totalMb - reservedMb, // what is actually left over
+      Math.floor(totalMb * 0.35), // never more than a third of the machine
+    ),
+  );
 }
 
 // Unexpected API death (native crash, external kill) is respawned so the
@@ -233,7 +272,16 @@ export class ProcessManager {
 
   // First-launch preparation (venv relocation, API unpacking) runs for minutes
   // with nothing else to show for it, so the caller can surface it to the user.
-  constructor(private readonly onProgress: ApiStartupProgress = () => {}) {}
+  // onUnavailable fires when the restart budget is spent and the API is staying
+  // down, so the UI can say so instead of looping on connection-refused.
+  constructor(
+    private readonly onProgress: ApiStartupProgress = () => {},
+    private readonly memoryLimitMb: number = 0,
+    private readonly onUnavailable: (
+      processId: string,
+      reason: string,
+    ) => void = () => {},
+  ) {}
 
   private progress(detail: string, phase: ApiStartupPhase): void {
     if (this.reportProgress) this.onProgress(detail, phase);
@@ -381,6 +429,9 @@ export class ProcessManager {
     processId: string,
     port: number,
     databaseUrl: string,
+    // Set by scheduleRestart. A failed *first* start is fatal and surfaces to
+    // the startup window; a failed restart is retried against the budget.
+    isRestart = false,
   ): Promise<void> {
     if (this.processes.has(processId)) {
       return;
@@ -407,13 +458,16 @@ export class ProcessManager {
       ? `${venvBin}${path.delimiter}${baseEnv["PATH"] ?? ""}`
       : (baseEnv["PATH"] ?? "");
 
-    // JS heap cap. Node's ~512 MB default (or ~4 GB on large machines) ignores
-    // what else the laptop is running, so size it to a fraction of installed
-    // RAM: enough headroom to avoid heap-OOM crashes during scans, but never so
-    // much that the API can squeeze the UI, embedded Postgres, and the user's
-    // other apps.
+    // JS heap cap. Electron's default old-space limit is both small and
+    // unreliable under ELECTRON_RUN_AS_NODE, so pin it explicitly — see
+    // computeApiHeapMb for how the value is budgeted. `memoryLimitMb` in
+    // settings.json overrides it for corpora that need more.
     const totalMb = Math.floor(os.totalmem() / (1024 * 1024));
-    const heapMb = Math.max(1024, Math.min(2048, Math.floor(totalMb * 0.25)));
+    const heapMb = computeApiHeapMb(
+      totalMb,
+      detectorWorkerCount(),
+      this.memoryLimitMb,
+    );
     const nodeArgs: string[] = [`--max-old-space-size=${heapMb}`];
     // Fastify under-pressure heap guard, just below the cap (85%): the API
     // sheds ingestion (CLI 503 → retry, no lost batches) before V8 hard-crashes
@@ -473,11 +527,19 @@ export class ProcessManager {
       stdio: ["ignore", "pipe", "pipe"],
     });
 
+    // Last sign of life from the child. A cold boot that is slowly working
+    // through `prisma migrate deploy` on a loaded database keeps printing; a
+    // genuinely wedged process goes quiet. waitForReady uses this to tell the
+    // two apart instead of killing whatever is running when the clock expires.
+    let lastOutputAt = Date.now();
+
     child.stdout?.on("data", (data: Buffer) => {
+      lastOutputAt = Date.now();
       process.stderr.write(`[API:${processId}] ${data.toString().trim()}\n`);
     });
 
     child.stderr?.on("data", (data: Buffer) => {
+      lastOutputAt = Date.now();
       process.stderr.write(`[API:${processId}] ${data.toString().trim()}\n`);
     });
 
@@ -511,15 +573,42 @@ export class ProcessManager {
 
     this.progress("Waiting for the service to accept connections…", "service");
     try {
-      await Promise.race([this.waitForReady(port), spawnFailed]);
+      await Promise.race([
+        this.waitForReady(port, () => lastOutputAt),
+        spawnFailed,
+      ]);
     } catch (err) {
-      await this.stopApi(processId);
+      // If our child died on its own, its exit handler already scheduled the
+      // retry — and may already have a replacement running. Killing "the"
+      // process here would take that replacement down with it.
+      if (this.processes.get(processId)?.child === child) {
+        // stopApi drops the map entry before killing, so the exit handler
+        // deliberately stays silent — which used to end the story: a restart
+        // that failed its readiness probe left nothing scheduled and nothing
+        // watching, and the app sat on connection-refused until someone
+        // noticed. Re-arm explicitly and let the retry budget decide when to
+        // stop.
+        await this.stopApi(processId);
+        if (isRestart) {
+          this.scheduleRestart(processId, port, databaseUrl);
+          return;
+        }
+      } else if (isRestart) {
+        return;
+      }
+      // A failed *first* start is fatal: the caller shows it and quits.
       throw err;
     }
   }
 
   private waitForReady(
     port: number,
+    // Timestamp of the child's last stdout/stderr write. While the child is
+    // still talking it is making progress (migrations against a busy database
+    // can take minutes), so the deadline is extended rather than enforced —
+    // otherwise the probe SIGTERMs a healthy boot mid-migration, which is
+    // exactly how a recoverable crash turned into a multi-hour outage.
+    lastOutputAt: () => number = () => Date.now(),
     // The first API boot does heavy one-time work before binding its port —
     // pg-boss creates its schema, Nest wires every module, and
     // on macOS the embedded Postgres runs under Rosetta. 60s was too tight for
@@ -528,6 +617,11 @@ export class ProcessManager {
     // resolves the instant the API is up.
     timeoutMs = 180_000,
     intervalMs = 500,
+    // Hard ceiling regardless of chatter, so a process stuck in a log loop
+    // cannot keep the probe alive forever.
+    maxTimeoutMs = 900_000,
+    // How long the child must be silent before the expired deadline is final.
+    quietMs = 45_000,
   ): Promise<void> {
     const start = Date.now();
     return new Promise((resolve, reject) => {
@@ -551,11 +645,17 @@ export class ProcessManager {
       };
 
       const check = () => {
-        if (Date.now() - start > timeoutMs) {
+        const elapsed = Date.now() - start;
+        const quietFor = Date.now() - lastOutputAt();
+        if (
+          elapsed > timeoutMs &&
+          (quietFor >= quietMs || elapsed > maxTimeoutMs)
+        ) {
           const logFile = getLogFilePath();
           fail(
             new Error(
-              `API on port ${port} not ready after ${timeoutMs}ms` +
+              `API on port ${port} not ready after ${elapsed}ms ` +
+                `(silent for ${Math.round(quietFor / 1000)}s)` +
                 (logFile ? ` — see log for details: ${logFile}` : ""),
             ),
           );
@@ -595,9 +695,13 @@ export class ProcessManager {
       (at) => now - at < RESTART_WINDOW_MS,
     );
     if (recent.length >= MAX_RESTARTS_PER_WINDOW) {
+      const reason = `The Classifyre service stopped ${recent.length} times in ${RESTART_WINDOW_MS / 60000} minutes and is no longer being restarted automatically.`;
       process.stderr.write(
         `[API:${processId}] crashed ${recent.length} times in ${RESTART_WINDOW_MS / 60000} minutes; not restarting again\n`,
       );
+      // Giving up silently is what made this look like a frozen app: the
+      // renderer just retried forever against a port nobody was listening on.
+      this.onUnavailable(processId, reason);
       return;
     }
     recent.push(now);
@@ -607,12 +711,23 @@ export class ProcessManager {
     );
     setTimeout(() => {
       if (this.processes.has(processId)) return;
-      this.startApi(processId, port, databaseUrl).catch((err) => {
+      this.startApi(processId, port, databaseUrl, true).catch((err) => {
         process.stderr.write(
           `[API:${processId}] restart failed: ${err instanceof Error ? err.message : String(err)}\n`,
         );
       });
     }, RESTART_DELAY_MS);
+  }
+
+  /** Lets the UI offer a manual retry after the automatic budget is spent. */
+  async restartApiNow(
+    processId: string,
+    port: number,
+    databaseUrl: string,
+  ): Promise<void> {
+    this.restartTimestamps.delete(processId);
+    await this.stopApi(processId);
+    await this.startApi(processId, port, databaseUrl);
   }
 
   async stopApi(processId: string): Promise<void> {
