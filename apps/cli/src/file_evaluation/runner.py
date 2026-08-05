@@ -148,7 +148,7 @@ class FileEvaluationRunner:
                     file_mime,
                 )
 
-        # Files that embed whole other files (parquet file columns, office media)
+        # Files that embed whole other files (parquet/Arrow file columns, office media)
         # get each embedded file run through the binary detectors directly, with
         # findings tagged by the embedded location so the UI can group them.
         embedded_files = has_embedded_files(mime_type)

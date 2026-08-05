@@ -137,6 +137,54 @@ async function failStartup(summary: string, error: unknown): Promise<void> {
   app.quit();
 }
 
+// The automatic restart budget is spent and the API is staying down. Without
+// this the window just retries forever against a closed port and the app looks
+// frozen — say what happened and offer the one action that helps.
+let apiUnavailableDialogOpen = false;
+async function reportApiUnavailable(reason: string): Promise<void> {
+  if (apiUnavailableDialogOpen) return;
+  // A crash-on-boot exhausts the same budget, but there failStartup owns the
+  // error surface and is already quitting; and during shutdown the API is
+  // *supposed* to be going away. Only speak up when a running app lost it.
+  if (startupState !== 'ready' || isQuitting || shutdownStarted) return;
+  apiUnavailableDialogOpen = true;
+  try {
+    const logFile = getLogFilePath();
+    const buttons = logFile
+      ? ['Try Again', 'Open Log', 'Quit']
+      : ['Try Again', 'Quit'];
+    const { response } = await dialog.showMessageBox({
+      type: 'error',
+      title: 'Classifyre service stopped',
+      message: reason,
+      detail:
+        'Scans in progress have been interrupted. Trying again restarts the ' +
+        'service; the scan can be re-run afterwards.',
+      buttons,
+      defaultId: 0,
+      cancelId: buttons.length - 1,
+    });
+    const choice = buttons[response];
+    if (choice === 'Open Log' && logFile) {
+      await shell.openPath(logFile);
+    } else if (choice === 'Quit') {
+      app.quit();
+    } else if (choice === 'Try Again') {
+      try {
+        await processManager.restartApiNow(
+          SHARED_API_ID,
+          Number(new URL(sharedApiBaseUrl).port),
+          pg.getConnectionString(),
+        );
+      } catch (error) {
+        console.error('Manual API restart failed:', error);
+      }
+    }
+  } finally {
+    apiUnavailableDialogOpen = false;
+  }
+}
+
 function showHome(): void {
   showMainWindow();
   if (mainWindow && !mainWindow.isDestroyed()) {
@@ -333,7 +381,11 @@ app.on('ready', async () => {
 
   settingsManager = new SettingsManager();
   pg = new PostgresManager(settingsManager.get().postgresPort, reportProgress);
-  processManager = new ProcessManager(reportProgress);
+  processManager = new ProcessManager(
+    reportProgress,
+    settingsManager.get().memoryLimitMb,
+    (_processId, reason) => void reportApiUnavailable(reason),
+  );
   updateChecker = new UpdateChecker();
   updateChecker.startPeriodicChecks();
 

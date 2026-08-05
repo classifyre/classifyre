@@ -82,6 +82,8 @@ def extract_file_metadata(
             metadata.update(_docx_metadata(file_bytes))
         elif _is_parquet(normalized, extension):
             metadata.update(_parquet_metadata(file_bytes))
+        elif _is_arrow(normalized, extension):
+            metadata.update(_arrow_metadata(file_bytes))
         elif _is_xlsx(normalized, extension):
             metadata.update(_xlsx_metadata(file_bytes))
         elif _is_delimited(normalized, extension):
@@ -114,8 +116,15 @@ _IMAGE_EXTENSIONS = {
 _TEXT_EXTENSIONS = {".txt", ".md", ".xml", ".log", ".yaml", ".yml"}
 
 
+_ARROW_EXTENSIONS = {".arrow", ".arrows", ".feather", ".ipc"}
+
+
 def _is_parquet(mime: str, extension: str) -> bool:
     return "parquet" in mime or extension == ".parquet"
+
+
+def _is_arrow(mime: str, extension: str) -> bool:
+    return "arrow" in mime or "feather" in mime or extension in _ARROW_EXTENSIONS
 
 
 def _is_xlsx(mime: str, extension: str) -> bool:
@@ -186,6 +195,22 @@ def _parquet_metadata(file_bytes: bytes) -> dict[str, Any]:
     return {
         "row_count": parquet_file.metadata.num_rows,
         "columns": build_columns(column_names, column_types),
+    }
+
+
+def _arrow_metadata(file_bytes: bytes) -> dict[str, Any]:
+    # Arrow's footer indexes record batches by offset and does not total their
+    # rows, so unlike Parquet the count has to be walked for. One batch is held at
+    # a time and the payload is already resident here, so the walk costs decoding
+    # rather than transfer.
+    from .file_parser import open_arrow_batches
+
+    schema, batches = open_arrow_batches(io.BytesIO(file_bytes))
+    row_count = sum(batch.num_rows for batch in batches)
+    column_types = {field.name: str(field.type) for field in schema}
+    return {
+        "row_count": row_count,
+        "columns": build_columns(list(schema.names), column_types),
     }
 
 

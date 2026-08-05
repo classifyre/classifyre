@@ -1,7 +1,7 @@
 {
   "name": "classifyre-desktop",
   "productName": "Classifyre",
-  "version": "0.4.90",
+  "version": "0.4.91",
   "private": true,
   "description": "Classifyre Desktop — Electron app with embedded PostgreSQL",
   "main": ".vite/build/index.js",
@@ -10,7 +10,7 @@
     "dev": "electron-forge start",
     "build": "electron-forge package",
     "make": "electron-forge make",
-    "test": "npx tsx test/protocol-handler.test.ts && npx tsx test/namespace-lifecycle.test.ts && npx tsx test/soffice-env.test.ts",
+    "test": "npx tsx test/protocol-handler.test.ts && npx tsx test/namespace-lifecycle.test.ts && npx tsx test/soffice-env.test.ts && npx tsx test/api-heap-size.test.ts",
     "test:e2e": "npx playwright test --config test/playwright.config.ts",
     "lint": "eslint src/",
     "check-types": "tsc --noEmit"
