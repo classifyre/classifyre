@@ -1,5 +1,64 @@
 {
   "sources": {
+    "GIT": {
+      "sections": {
+        "name": {
+          "title": "Source name",
+          "summary": "Name the source after the repository and branch it scans, since one source covers exactly one branch.",
+          "suggestions": [
+            "Include the repository (example: Platform monorepo — main).",
+            "Add the branch when you scan more than one branch of the same repository."
+          ]
+        },
+        "required": {
+          "title": "Required",
+          "summary": "Set required.repository_url to the repository's clone URL. Works with GitHub, GitLab, Bitbucket, Azure DevOps, Gitea and self-hosted servers.",
+          "suggestions": [
+            "Use the same URL you would pass to git clone (example: https://github.com/acme/platform.git).",
+            "SSH remotes work in either form: ssh://git@host/org/repo.git or git@host:org/repo.git."
+          ],
+          "questions": [
+            "Which repository should be scanned, and over https or SSH?"
+          ]
+        },
+        "masked": {
+          "title": "Authentication",
+          "summary": "Pick optional.auth.auth_method, then fill in the matching secrets. Leave everything empty for a public repository.",
+          "suggestions": [
+            "none — a public repository over http(s); no secrets needed.",
+            "token — masked.token holds a personal access, deploy or app token. The username is derived from the host, so it can usually stay empty.",
+            "basic — masked.username and masked.password for a server using ordinary credentials.",
+            "ssh_key — masked.ssh_private_key holds the private key; set optional.auth.ssh_known_hosts from ssh-keyscan so the host key can be verified.",
+            "client_certificate — masked.client_certificate_pem and masked.client_key_pem for a server using mutual TLS.",
+            "For a private certificate authority set masked.ca_certificate_pem rather than turning verification off."
+          ],
+          "questions": [
+            "Is the repository public, or which credential should the scan use?"
+          ]
+        },
+        "optional": {
+          "title": "Optional",
+          "summary": "Use optional.scope to choose the branch and narrow which folders are read, and optional.connection to control how much is transferred.",
+          "suggestions": [
+            "Set optional.scope.branch to scan a branch other than the default one.",
+            "Use optional.scope.include_paths to scan only certain folders (example: services, config) and exclude_paths to skip the rest (example: node_modules, vendor).",
+            "Both accept plain folders and globs, so **/testdata/* works alongside docs.",
+            "Use include_extensions/exclude_extensions to limit formats (example: .py, .tf, .env).",
+            "Leave optional.connection.clone_strategy on blob_limit unless the repository is very large; blobless then catalogues the tree first and pulls each file only when it is scanned.",
+            "Enable optional.scope.include_last_commit if you want LATEST or AUTOMATIC sampling to order by each file's own last change — it fetches the branch history to do so."
+          ]
+        },
+        "sampling": {
+          "title": "Sampling",
+          "summary": "Controls how many files are read each run.",
+          "suggestions": [
+            "Use ALL for a complete sweep of a normal-sized repository.",
+            "Use AUTOMATIC on a large repository to cover it in bounded slices across scheduled runs.",
+            "Use LATEST with include_last_commit to prioritise recently changed files."
+          ]
+        }
+      }
+    },
     "YOUTUBE": {
       "sections": {
         "name": {
