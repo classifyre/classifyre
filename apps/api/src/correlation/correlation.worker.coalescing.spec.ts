@@ -169,6 +169,41 @@ describe('CorrelationWorker autopilot hand-off', () => {
   });
 
   describe('the express lane skips the window', () => {
+    // The express lane is an EXTRA pass, never a replacement. It used to
+    // `return` after enqueuing, so a scan that tripped any express trigger got
+    // only the narrow express cycle — and an operational trigger narrows that
+    // to [CONFIG], which is disabled by default. A completed ingest then ran no
+    // agent at all and left the source dirty with no corpus job queued. That
+    // was "I ingested a source and nothing happened".
+    it('still enrols the source in the corpus batch', async () => {
+      build({
+        runner: {
+          status: RunnerStatus.ERROR,
+          assetsWithoutText: 0,
+          assetsCreated: 0,
+        },
+      });
+
+      await handOff();
+
+      expect(sent).toHaveLength(2);
+      expect(sent[0].data.expressReason).toBeDefined();
+      const corpus = sent.find((s) => s.data.corpus === true);
+      expect(corpus).toBeDefined();
+      expect(corpus!.opts.singletonKey).toBe(AUTOPILOT_CORPUS_SINGLETON_KEY);
+    });
+
+    it('enrols in the batch even when the express agent set is narrow', async () => {
+      build({ source: { consecutiveFailures: 5 } });
+
+      await handOff();
+
+      // Express runs CONFIG only; the batch still runs the full pipeline, so a
+      // disabled config agent cannot swallow the whole ingest.
+      expect(sent[0].data.agentKinds).toEqual([AgentKind.CONFIG]);
+      expect(sent.some((s) => s.data.corpus === true)).toBe(true);
+    });
+
     it('escalates a failed scan to the config agent, not the investigators', async () => {
       build({
         runner: {

@@ -255,6 +255,11 @@ export async function runAgentLoop(
       // Carried so a cycle that deliberately changed nothing can say why,
       // rather than reporting as "0 applied" and reading like a failure.
       finishSummary: progress.summary,
+      // Whether the model chose to stop, or simply ran out of iterations. A run
+      // that hit its budget has NOT decided that nothing was warranted — it was
+      // cut off mid-investigation, and reporting it as restraint hides exactly
+      // the runs worth looking at.
+      finishedDeliberately: progress.done,
     },
     narrative: progress.summary,
     iterations: progress.iteration,

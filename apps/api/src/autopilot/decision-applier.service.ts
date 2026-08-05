@@ -33,6 +33,8 @@ export interface ApplySummary {
   createdCases: Array<{ id: string; title: string }>;
   /** The model's own closing statement, used to explain a deliberate no-op. */
   finishSummary?: string;
+  /** False when the loop hit its iteration budget instead of finishing. */
+  finishedDeliberately?: boolean;
 }
 
 /**
