@@ -1,4 +1,5 @@
 import { Readable } from 'node:stream';
+import { gzipSync } from 'node:zlib';
 
 import {
   ARCHIVE_MAGIC,
@@ -130,18 +131,50 @@ describe('archive round trip', () => {
     await expect(reader().readManifest()).resolves.toEqual(manifest);
   });
 
-  it('refuses an archive that ends without its footer', async () => {
+  it('reports an archive that ends without its footer, without throwing', async () => {
     const w = writer();
     await w.writeManifest(manifest);
     await w.writeRecord('source', { id: 's1' });
     await w.close();
 
     const r = reader();
-    await expect(
-      (async () => {
-        for await (const _ of r.read()) void _;
-      })(),
-    ).rejects.toThrow(/truncated|footer/i);
+    const rows: Array<{ table: string }> = [];
+    for await (const record of r.read()) rows.push(record);
+
+    // The rows that were there are still yielded — `complete` is what tells the
+    // caller the file stopped early.
+    expect(rows).toHaveLength(1);
+    expect(r.complete).toBe(false);
+    expect(r.footer).toBeUndefined();
+  });
+
+  it('skips records it cannot parse instead of abandoning the archive', async () => {
+    // Written by hand: a corrupted line is exactly what ArchiveWriter cannot
+    // produce, and it is the case that used to lose the whole import.
+    const ndjson = [
+      JSON.stringify(manifest),
+      JSON.stringify({ t: 'source', d: { id: 's1' } }),
+      '{"t":"source","d":{"id": <-- damaged',
+      JSON.stringify({ t: 'source', d: { id: 's2' } }),
+      JSON.stringify({
+        t: '__end__',
+        d: { counts: { source: 2 }, stripped: {} },
+      }),
+      '',
+    ].join('\n');
+
+    const bad: string[] = [];
+    const r = new ArchiveReader(
+      () => Readable.from([gzipSync(Buffer.from(ndjson))]),
+      (description) => bad.push(description),
+    );
+    const rows: Array<{ table: string; row: Record<string, unknown> }> = [];
+    for await (const record of r.read()) rows.push(record);
+
+    expect(rows.map((record) => record.row['id'])).toEqual(['s1', 's2']);
+    expect(r.skippedRecords).toBe(1);
+    expect(bad).toHaveLength(1);
+    expect(r.complete).toBe(true);
   });
 
   it('refuses a file that is not an archive', async () => {

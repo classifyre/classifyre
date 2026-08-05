@@ -31,6 +31,7 @@ import {
 import { CliRunnerService } from './cli-runner.service';
 import { RunnerStatus } from '@prisma/client';
 import { AllowInDemoMode } from '../demo-mode.decorator';
+import { ReadOnlyEndpoint } from '../db/read-only-endpoint.decorator';
 import { InternalOnly } from '../internal-only.decorator';
 import { CliBackpressureGuard } from '../guards/cli-backpressure.guard';
 import {
@@ -250,6 +251,7 @@ export class CliRunnerController {
 }
 
 @AllowInDemoMode()
+@ReadOnlyEndpoint()
 @ApiTags('Runners')
 @Controller('search')
 export class SearchRunnersController {

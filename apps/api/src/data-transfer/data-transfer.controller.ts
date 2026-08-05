@@ -116,20 +116,26 @@ export class DataTransferController {
   })
   @ApiOkResponse({ type: ArchivePreviewDto })
   async upload(@Req() request: FastifyRequest): Promise<ArchivePreviewDto> {
-    let fileName = 'archive.cfyre';
-    let bytes: Buffer | undefined;
-    for await (const part of request.parts()) {
-      if (part.type !== 'file') continue;
-      if (bytes) {
-        throw new BadRequestException('Upload exactly one archive per request');
+    const part = await request.file();
+    if (!part) throw new BadRequestException('No archive was uploaded');
+
+    // Handed to the service as a stream, never a Buffer: a real corpus export
+    // runs to hundreds of megabytes, and materialising that in the API process
+    // was both the slowest and the most fragile step of an import.
+    const bytes = part.file;
+    async function* received(): AsyncGenerator<Buffer> {
+      for await (const chunk of bytes) yield chunk as Buffer;
+      if (bytes.truncated) {
+        throw new BadRequestException(
+          'The archive exceeded the upload size limit and was cut off',
+        );
       }
-      fileName = part.filename || fileName;
-      bytes = await part.toBuffer();
     }
 
-    if (!bytes) throw new BadRequestException('No archive was uploaded');
-
-    return this.transfers.previewUpload(fileName, bytes);
+    return this.transfers.receiveUpload(
+      part.filename || 'archive.cfyre',
+      received(),
+    );
   }
 
   @Post('imports')

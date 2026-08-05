@@ -959,7 +959,9 @@ export class AssetService {
       where.sourceType = { in: sourceTypes };
     }
 
-    const [items, total] = await this.prisma.$transaction([
+    // Read-only pair: no transaction, so a busy pool degrades into a slightly
+    // slower page instead of a P2028 failure.
+    const [items, total] = await Promise.all([
       this.prisma.asset.findMany({
         where,
         skip: safeSkip,
@@ -1174,7 +1176,7 @@ export class AssetService {
         explained: true,
       };
     } else {
-      [assets, total] = await this.prisma.$transaction([
+      [assets, total] = await Promise.all([
         this.prisma.asset.findMany({
           where,
           skip: safeSkip,

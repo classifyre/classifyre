@@ -8,41 +8,52 @@ import {
 import {
   PrismaClientInitializationError,
   PrismaClientKnownRequestError,
+  PrismaClientUnknownRequestError,
 } from '@prisma/client/runtime/client';
 import { FastifyReply } from 'fastify';
+import { transientDbErrorCode } from '../db/transient-db-error';
 
-// Prisma error codes that signal transient conditions the caller should retry.
-// The CLI uses urllib3 Retry with status_forcelist={503}, so returning 503
-// lets it back off and retry automatically instead of failing the whole run.
-//
-// P1001 — Can't reach database server (transient network blip, I/O stall
-//          during Postgres checkpoint, or brief pod restart). Safe to retry.
-// P2024 — Timed out fetching a new connection from the connection pool
-// P2028 — Transaction API error (query/transaction timeout, or maxWait exceeded)
-// P2034 — Transaction failed due to a write conflict or deadlock
-const RETRYABLE_CODES = new Set(['P1001', 'P2024', 'P2028', 'P2034']);
-
-@Catch(PrismaClientKnownRequestError, PrismaClientInitializationError)
+/**
+ * Turns Prisma failures into HTTP responses.
+ *
+ * Transient conditions (pool starvation, transaction start timeout, deadlock,
+ * dropped connection) become a 503 with `Retry-After`, which the CLI's
+ * urllib3 `Retry(status_forcelist={503})` and the web api-client both back off
+ * on. `DbRetryInterceptor` has already retried read-only handlers by the time a
+ * response reaches here, so a 503 means the database stayed unavailable across
+ * every attempt.
+ *
+ * `PrismaClientUnknownRequestError` is caught as well: with Prisma 7 driver
+ * adapters, `pg` socket failures (connection terminated, ECONNRESET) arrive
+ * without a Prisma code and used to be reported as a 500.
+ */
+@Catch(
+  PrismaClientKnownRequestError,
+  PrismaClientInitializationError,
+  PrismaClientUnknownRequestError,
+)
 export class PrismaExceptionFilter implements ExceptionFilter<
-  PrismaClientKnownRequestError | PrismaClientInitializationError
+  | PrismaClientKnownRequestError
+  | PrismaClientInitializationError
+  | PrismaClientUnknownRequestError
 > {
   private readonly logger = new Logger(PrismaExceptionFilter.name);
 
   catch(
-    exception: PrismaClientKnownRequestError | PrismaClientInitializationError,
+    exception:
+      | PrismaClientKnownRequestError
+      | PrismaClientInitializationError
+      | PrismaClientUnknownRequestError,
     host: ArgumentsHost,
   ): void {
     const ctx = host.switchToHttp();
     const reply = ctx.getResponse<FastifyReply>();
 
-    const code =
-      exception instanceof PrismaClientKnownRequestError
-        ? exception.code
-        : (exception.errorCode ?? 'P1000');
+    const transientCode = transientDbErrorCode(exception);
 
-    if (RETRYABLE_CODES.has(code)) {
+    if (transientCode) {
       this.logger.warn(
-        `Database transient error [${code}]: ${exception.message}`,
+        `Database transient error [${transientCode}]: ${exception.message}`,
       );
       void reply
         .status(HttpStatus.SERVICE_UNAVAILABLE)
@@ -52,10 +63,17 @@ export class PrismaExceptionFilter implements ExceptionFilter<
           error: 'Service Unavailable',
           message:
             'Database is temporarily unavailable — please retry in a moment.',
-          code,
+          code: transientCode,
         });
       return;
     }
+
+    const code =
+      exception instanceof PrismaClientKnownRequestError
+        ? exception.code
+        : exception instanceof PrismaClientInitializationError
+          ? (exception.errorCode ?? 'P1000')
+          : 'P1000';
 
     this.logger.error(`Unhandled Prisma error [${code}]: ${exception.message}`);
     void reply.status(HttpStatus.INTERNAL_SERVER_ERROR).send({

@@ -25,6 +25,7 @@ import {
   isTerminal,
   startImport,
   uploadArchive,
+  type UploadProgress,
 } from "@/lib/data-transfer-api";
 
 function slugify(name: string): string {
@@ -52,6 +53,8 @@ export function CreateNamespaceDialog({
   const [thumbnail, setThumbnail] = React.useState<string | null>(null);
   const [submitting, setSubmitting] = React.useState(false);
   const [seedFile, setSeedFile] = React.useState<File | null>(null);
+  // Non-null only while the archive is going up, before there is a job to poll.
+  const [upload, setUpload] = React.useState<UploadProgress | null>(null);
   // Set once the workspace exists and its seed import has been queued.
   const [seed, setSeed] = React.useState<{
     jobId: string;
@@ -70,6 +73,7 @@ export function CreateNamespaceDialog({
     setThumbnail(null);
     setSubmitting(false);
     setSeedFile(null);
+    setUpload(null);
     setSeed(null);
   };
 
@@ -83,12 +87,19 @@ export function CreateNamespaceDialog({
    */
   const seedFromArchive = async (namespace: Namespace, file: File) => {
     const base = apiBaseForNamespace(namespace.id);
-    const preview = await uploadArchive(file, base);
-    const job = await startImport(
-      { uploadId: preview.uploadId, scopes: preview.scopes },
-      base,
-    );
-    setSeed({ jobId: job.id, apiBase: base, namespace });
+    setUpload({ loaded: 0, total: file.size, percent: 0, finalising: false });
+    try {
+      const preview = await uploadArchive(file, base, setUpload);
+      const job = await startImport(
+        { uploadId: preview.uploadId, scopes: preview.scopes },
+        base,
+      );
+      setSeed({ jobId: job.id, apiBase: base, namespace });
+    } finally {
+      // From here the import runs on the worker and reports itself through the
+      // job; the upload meter has nothing left to say.
+      setUpload(null);
+    }
   };
 
   const finish = (namespace: Namespace) => {
@@ -209,6 +220,7 @@ export function CreateNamespaceDialog({
                 file={seedFile}
                 onFileChange={setSeedFile}
                 job={seedJob}
+                upload={upload}
                 disabled={submitting || seed !== null}
               />
             </div>
