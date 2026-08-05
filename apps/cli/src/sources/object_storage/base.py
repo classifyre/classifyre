@@ -38,6 +38,8 @@ from ...utils.embedded_files import (
 )
 from ...utils.file_metadata import extract_file_metadata
 from ...utils.file_parser import (
+    ARROW_FILE_MIME_TYPE,
+    ARROW_MIME_TYPES,
     count_tabular_rows,
     infer_mime_type_from_file_name,
     normalize_mime_type,
@@ -66,6 +68,7 @@ _TABULAR_MIME_TYPES = {
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     "application/parquet",
     "application/vnd.apache.parquet",
+    *ARROW_MIME_TYPES,
 }
 
 
@@ -109,6 +112,10 @@ _FILE_EXTENSION_HINTS: dict[str, OutputAssetType] = {
     ".gz": OutputAssetType.BINARY,
     ".tgz": OutputAssetType.BINARY,
     ".parquet": OutputAssetType.TABLE,
+    ".arrow": OutputAssetType.TABLE,
+    ".arrows": OutputAssetType.TABLE,
+    ".feather": OutputAssetType.TABLE,
+    ".ipc": OutputAssetType.TABLE,
     ".json": OutputAssetType.TXT,
     ".xml": OutputAssetType.TXT,
     ".txt": OutputAssetType.TXT,
@@ -149,8 +156,12 @@ _MAX_PENDING_CONTAINER_BYTES = 256 * 1024 * 1024
 
 # Formats a seekable handle buys anything for: the reader can seek to an index
 # and pull only the parts it needs. Everything else is extracted whole, so a
-# handle would just be a slower way to download the object.
-_RANGE_READABLE_MIME_TYPES = frozenset({"application/parquet", "application/vnd.apache.parquet"})
+# handle would just be a slower way to download the object. The Arrow *streaming*
+# layout is deliberately absent: it has no index, so reading it through ranges
+# transfers the same bytes in more requests.
+_RANGE_READABLE_MIME_TYPES = frozenset(
+    {"application/parquet", "application/vnd.apache.parquet", ARROW_FILE_MIME_TYPE}
+)
 
 
 @dataclass

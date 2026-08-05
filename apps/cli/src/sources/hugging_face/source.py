@@ -450,6 +450,9 @@ class HuggingFaceSource(ObjectStorageSourceBase):
         where the row groups are — so it yields not fewer rows but none. Reading
         by range inverts the cost: the sampling window picks the rows, and only
         the footer plus the row groups holding those rows ever cross the wire.
+        Arrow IPC shards are read the same way — their footer indexes batches by
+        offset rather than by row, so a window costs the batches up to its end
+        instead of the whole shard.
 
         The Hub's ``resolve`` endpoint and its CDN both honour ``Range``. If a
         deployment ever does not, ``HttpRangeReader`` still returns correct bytes

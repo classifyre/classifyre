@@ -11,7 +11,7 @@ from urllib.parse import urljoin, urlsplit, urlunsplit
 
 import requests
 
-from ..utils.file_parser import normalize_mime_type
+from ..utils.file_parser import ARROW_MIME_TYPES, normalize_mime_type
 from ..utils.hashing import normalize_http_url
 
 logger = logging.getLogger(__name__)
@@ -25,6 +25,7 @@ TABULAR_MIME_TYPES = {
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     "application/parquet",
     "application/vnd.apache.parquet",
+    *ARROW_MIME_TYPES,
 }
 
 TABULAR_FILE_EXTENSIONS = {
@@ -33,6 +34,10 @@ TABULAR_FILE_EXTENSIONS = {
     ".xls",
     ".xlsx",
     ".parquet",
+    ".arrow",
+    ".arrows",
+    ".feather",
+    ".ipc",
 }
 
 

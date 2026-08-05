@@ -399,7 +399,7 @@ class BaseSource(ABC):
         unchanged.
 
         ``file_bytes`` may be a seekable binary handle instead of bytes (Parquet
-        only). The window then bounds what is *transferred*, not just what is
+        and Arrow). The window then bounds what is *transferred*, not just what is
         decoded: a source that can serve byte ranges reads the footer and the one
         row group this run needs out of an object it never downloads whole.
         """
@@ -432,11 +432,11 @@ class BaseSource(ABC):
     def _payload_rows_per_page_unit(mime_type: str, batch_size: int) -> int:
         """How many payload rows one page from ``iter_file_pages`` carries.
 
-        Record-shaped readers (Parquet, CSV/TSV) emit a page per row. Spreadsheets
-        reach the detectors as extracted text, which is paged in blocks of
-        ``batch_size`` lines — one line per sheet row.
+        Record-shaped readers (Parquet, Arrow IPC, CSV/TSV) emit a page per row.
+        Spreadsheets reach the detectors as extracted text, which is paged in
+        blocks of ``batch_size`` lines — one line per sheet row.
         """
-        from ..utils.file_parser import normalize_mime_type
+        from ..utils.file_parser import ARROW_MIME_TYPES, normalize_mime_type
 
         normalized = normalize_mime_type(mime_type)
         record_shaped = {
@@ -444,6 +444,7 @@ class BaseSource(ABC):
             "application/vnd.apache.parquet",
             "text/csv",
             "text/tab-separated-values",
+            *ARROW_MIME_TYPES,
         }
         return 1 if normalized in record_shaped else max(1, batch_size)
 

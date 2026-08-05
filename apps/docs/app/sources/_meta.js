@@ -4,6 +4,7 @@ export default {
   configuration: "Configuration & Fields",
   sampling: "Sampling Strategies",
   "content-extraction": "OCR & Transcription",
+  "file-formats": "File Formats",
   testing: "Testing & Scheduling",
   "assets-and-metadata": "Assets & Metadata",
 };
