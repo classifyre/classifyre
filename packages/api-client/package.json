@@ -17,13 +17,16 @@
     "codegen": "bun run generate",
     "lint": "echo 'No linting configured'",
     "check-types": "tsc --noEmit",
-    "test": "echo 'No tests configured for api-client'",
+    "test": "jest",
     "test:e2e": "echo 'No e2e tests configured for api-client'"
   },
   "dependencies": {},
   "devDependencies": {
     "@openapitools/openapi-generator-cli": "2.39.1",
+    "@types/jest": "^30.0.0",
     "@types/node": "^26.1.1",
+    "jest": "^30.3.0",
+    "ts-jest": "^29.4.9",
     "typescript": "^5.9.3"
   }
 }

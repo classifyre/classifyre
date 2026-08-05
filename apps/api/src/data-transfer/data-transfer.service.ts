@@ -13,7 +13,10 @@ import {
 
 import { PrismaService } from '../prisma.service';
 import { PgBossService } from '../scheduler/pg-boss.service';
-import { ArchiveStoreService } from './archive-store.service';
+import {
+  ArchiveStoreService,
+  ArchiveTooLargeError,
+} from './archive-store.service';
 import { NamespaceImportService } from './namespace-import.service';
 import { DATA_TRANSFER_QUEUE } from './data-transfer.constants';
 import {
@@ -25,13 +28,20 @@ import {
 } from './transfer-scopes';
 import { ArchiveFormatError, type ArchiveManifest } from './archive';
 
+/**
+ * How many received bytes go by between progress writes on a staged upload.
+ * Large enough that a fast upload does not turn into a stream of UPDATEs,
+ * small enough that the number visibly moves.
+ */
+const UPLOAD_PROGRESS_BYTES = 16 * 1024 * 1024;
+
 export interface StartExportInput {
   scopes: string[];
   createdBy?: string;
 }
 
 export interface StartImportInput {
-  /** Id of the STAGED job created by {@link DataTransferService.previewUpload}. */
+  /** Id of the STAGED job created by {@link DataTransferService.receiveUpload}. */
   uploadId: string;
   scopes: string[];
   conflictMode?: DataTransferConflict;
@@ -127,35 +137,16 @@ export class DataTransferService {
    * Stage an uploaded archive and read its manifest. Nothing is written to the
    * database yet — the operator reviews the contents, picks the scopes to take,
    * and only then starts the import with {@link startImport}.
+   *
+   * The bytes are streamed straight into chunk rows as they arrive rather than
+   * buffered and validated first. That ordering means a rejected file leaves a
+   * job row behind for the moment it takes to delete it, which is the price of
+   * never holding a multi-hundred-megabyte archive in the API process's heap.
    */
-  async previewUpload(
+  async receiveUpload(
     fileName: string,
-    bytes: Buffer,
+    source: AsyncIterable<Buffer | Uint8Array>,
   ): Promise<ArchivePreview> {
-    if (bytes.length === 0) {
-      throw new BadRequestException('The uploaded archive is empty');
-    }
-    if (bytes.length > this.store.maxArchiveBytes) {
-      throw new BadRequestException(
-        `Archive is larger than the ${Math.round(
-          this.store.maxArchiveBytes / 1024 / 1024,
-        )} MB limit`,
-      );
-    }
-
-    // Validate before storing anything: a file that is not one of our archives
-    // should not leave rows behind.
-    let manifest: ArchiveManifest;
-    try {
-      manifest = await this.importer.inspect(bytes);
-    } catch (error) {
-      throw new BadRequestException(
-        error instanceof ArchiveFormatError
-          ? error.message
-          : `Could not read the archive: ${String(error)}`,
-      );
-    }
-
     // The job row *is* the upload handle: the archive's chunks hang off it, so
     // discarding the upload is a single delete and nothing can be orphaned.
     // STAGED means uploaded but not queued — the operator still has to choose
@@ -165,12 +156,66 @@ export class DataTransferService {
         kind: DataTransferKind.IMPORT,
         status: DataTransferStatus.STAGED,
         fileName,
-        fileSize: BigInt(bytes.length),
+        fileSize: BigInt(0),
         archived: true,
         expiresAt: this.store.expiryFromNow(),
       },
     });
-    await this.store.writeAll(job.id, bytes);
+
+    let manifest: ArchiveManifest;
+    let fileSize = 0;
+    try {
+      // `fileSize` doubles as the received-bytes counter while STAGED, so a
+      // client that loses its upload progress (or never had any) can still poll
+      // the job and watch the number climb instead of staring at a spinner.
+      let lastPersisted = 0;
+      // Chained rather than fired off independently: these are unordered
+      // updates to one column, and a stale one landing after the authoritative
+      // write below would leave the archive permanently recorded as smaller
+      // than it is. Chaining also keeps at most one of them in flight.
+      let persisted: Promise<unknown> = Promise.resolve();
+
+      const { bytes } = await this.store.writeStream(job.id, source, {
+        maxBytes: this.store.maxArchiveBytes,
+        onProgress: (received) => {
+          if (received - lastPersisted < UPLOAD_PROGRESS_BYTES) return;
+          lastPersisted = received;
+          persisted = persisted.then(() =>
+            this.prisma.dataTransferJob
+              .update({
+                where: { id: job.id },
+                data: { fileSize: BigInt(received) },
+              })
+              .catch(() => undefined),
+          );
+        },
+      });
+      fileSize = bytes;
+
+      if (fileSize === 0) {
+        throw new BadRequestException('The uploaded archive is empty');
+      }
+
+      await persisted;
+      await this.prisma.dataTransferJob.update({
+        where: { id: job.id },
+        data: { fileSize: BigInt(fileSize) },
+      });
+
+      // Reading the manifest back out of the store costs one gzip block — the
+      // reader stops at the first line — so this stays cheap however big the
+      // archive is.
+      manifest = await this.importer.inspectStored(job.id);
+    } catch (error) {
+      await this.discardStaged(job.id);
+      if (error instanceof BadRequestException) throw error;
+      throw new BadRequestException(
+        error instanceof ArchiveFormatError ||
+          error instanceof ArchiveTooLargeError
+          ? error.message
+          : `Could not read the archive: ${describe(error)}`,
+      );
+    }
 
     const rowsByScope: Record<string, number> = {};
     let totalRows = 0;
@@ -184,7 +229,7 @@ export class DataTransferService {
     return {
       uploadId: job.id,
       fileName,
-      fileSize: bytes.length,
+      fileSize,
       createdAt: manifest.createdAt,
       appVersion: manifest.appVersion,
       sourceNamespace: manifest.namespace?.name ?? 'unknown',
@@ -192,6 +237,17 @@ export class DataTransferService {
       rowsByScope,
       totalRows,
     };
+  }
+
+  /** Drop a staged upload that turned out to be unusable, chunks and all. */
+  private async discardStaged(jobId: string): Promise<void> {
+    await this.prisma.dataTransferJob
+      .delete({ where: { id: jobId } })
+      .catch((error) =>
+        this.logger.warn(
+          `Could not discard staged upload ${jobId}: ${describe(error)}`,
+        ),
+      );
   }
 
   async startImport(input: StartImportInput): Promise<DataTransferJob> {
@@ -395,6 +451,10 @@ export class DataTransferService {
         `'${scope}' references ${missing.join(', ')}, which are not included. Rows that point at missing data will be skipped.`,
     );
   }
+}
+
+function describe(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
 
 function isTerminal(status: DataTransferStatus): boolean {

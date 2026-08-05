@@ -23,6 +23,25 @@ import { PrismaService } from '../prisma.service';
  *  enough that one row is a comfortable buffer and query payload. */
 export const CHUNK_BYTES = 4 * 1024 * 1024;
 
+/**
+ * Chunk inserts allowed to be in flight at once while receiving an upload.
+ *
+ * With a single write the socket stalls for every round trip, so a 250 MB
+ * archive costs upload time *plus* database time. A shallow pipeline lets the
+ * next chunk arrive over the wire while the previous one commits, which is
+ * what turns that sum back into roughly the larger of the two. Kept small: each
+ * in-flight write pins a pooled connection and holds a 4 MB payload.
+ */
+const CHUNK_WRITE_CONCURRENCY = 3;
+
+/** Raised when an upload exceeds the configured archive ceiling. */
+export class ArchiveTooLargeError extends Error {}
+
+export interface ArchiveWriteResult {
+  bytes: number;
+  chunks: number;
+}
+
 @Injectable()
 export class ArchiveStoreService {
   private readonly logger = new Logger(ArchiveStoreService.name);
@@ -81,18 +100,90 @@ export class ArchiveStoreService {
     });
   }
 
-  /** Store a complete archive that is already in memory (an upload). */
-  async writeAll(jobId: string, bytes: Buffer): Promise<number> {
+  /**
+   * Store an archive as it arrives, without ever holding it whole.
+   *
+   * This is the import's counterpart to {@link ArchiveWriter}'s sink: at most
+   * one partial chunk plus {@link CHUNK_WRITE_CONCURRENCY} in-flight ones are
+   * resident, so a 250 MB upload costs the same memory as a 25 MB one. The
+   * previous buffer-it-all approach put the entire archive in the API process's
+   * heap before a single row was written, which on a memory-capped pod is an
+   * OOM rather than an import.
+   */
+  async writeStream(
+    jobId: string,
+    source: AsyncIterable<Buffer | Uint8Array>,
+    options: {
+      maxBytes?: number;
+      /** Called as whole chunks land, with the running byte total. */
+      onProgress?: (bytes: number) => void;
+    } = {},
+  ): Promise<ArchiveWriteResult> {
+    const maxBytes = options.maxBytes ?? Number.MAX_SAFE_INTEGER;
+    const inFlight: Promise<void>[] = [];
+    let pending: Buffer[] = [];
+    let pendingBytes = 0;
     let ordinal = 0;
-    for (let offset = 0; offset < bytes.length; offset += CHUNK_BYTES) {
-      await this.writeChunk(
-        jobId,
-        ordinal,
-        bytes.subarray(offset, offset + CHUNK_BYTES),
-      );
+    let bytes = 0;
+
+    // Writes are independent — each carries its own ordinal — so they only need
+    // to be bounded, not ordered. Awaiting the oldest keeps the queue shallow
+    // while leaving the socket free to keep reading.
+    const submit = async (data: Buffer): Promise<void> => {
+      const write = this.writeChunk(jobId, ordinal, data);
       ordinal += 1;
+      inFlight.push(write);
+      if (inFlight.length >= CHUNK_WRITE_CONCURRENCY) {
+        await inFlight.shift();
+      }
+    };
+
+    const drainWhole = async (): Promise<void> => {
+      let joined = Buffer.concat(pending, pendingBytes);
+      pending = [];
+      pendingBytes = 0;
+      while (joined.length >= CHUNK_BYTES) {
+        await submit(joined.subarray(0, CHUNK_BYTES));
+        joined = joined.subarray(CHUNK_BYTES);
+      }
+      if (joined.length > 0) {
+        pending = [joined];
+        pendingBytes = joined.length;
+      }
+    };
+
+    try {
+      for await (const piece of source) {
+        const chunk = Buffer.isBuffer(piece) ? piece : Buffer.from(piece);
+        bytes += chunk.length;
+        if (bytes > maxBytes) {
+          throw new ArchiveTooLargeError(
+            `Archive is larger than the ${Math.round(maxBytes / 1024 / 1024)} MB limit`,
+          );
+        }
+        pending.push(chunk);
+        pendingBytes += chunk.length;
+        if (pendingBytes >= CHUNK_BYTES) {
+          await drainWhole();
+          options.onProgress?.(bytes);
+        }
+      }
+
+      if (pendingBytes > 0) {
+        await submit(Buffer.concat(pending, pendingBytes));
+        pending = [];
+        pendingBytes = 0;
+      }
+      await Promise.all(inFlight);
+      options.onProgress?.(bytes);
+    } catch (error) {
+      // Let the outstanding writes settle before unwinding, or their rejections
+      // surface later as unhandled ones — the caller drops the job either way.
+      await Promise.allSettled(inFlight);
+      throw error;
     }
-    return ordinal;
+
+    return { bytes, chunks: ordinal };
   }
 
   /**

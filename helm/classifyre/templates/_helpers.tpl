@@ -327,6 +327,24 @@ which each deployment sets on its own after including this block.
 {{- end }}
 - name: CLASSIFYRE_AUTO_MIGRATE
   value: {{ ternary "false" "true" .Values.api.migration.enabled | quote }}
+{{- /* ── Postgres pooling + transient-failure retries ──────────
+     Sizing lives in `.Values.api.database`; both the API and the worker read
+     the same values so a namespace pool behaves identically wherever it is
+     opened. */}}
+- name: PRISMA_POOL_MAX
+  value: {{ .Values.api.database.poolMax | quote }}
+- name: PRISMA_MAX_RESIDENT
+  value: {{ .Values.api.database.maxResidentNamespaces | quote }}
+- name: PRISMA_CONNECTION_TIMEOUT_MS
+  value: {{ .Values.api.database.connectionTimeoutMs | quote }}
+- name: PRISMA_IDLE_TIMEOUT_MS
+  value: {{ .Values.api.database.idleTimeoutMs | quote }}
+- name: PRISMA_TX_MAX_WAIT_MS
+  value: {{ .Values.api.database.transactionMaxWaitMs | quote }}
+- name: PRISMA_TX_TIMEOUT_MS
+  value: {{ .Values.api.database.transactionTimeoutMs | quote }}
+- name: DB_RETRY_ATTEMPTS
+  value: {{ .Values.api.database.retryAttempts | quote }}
 - name: MAX_CONCURRENT_NAMESPACE_JOBS
   value: {{ .Values.worker.maxConcurrentNamespaceJobs | quote }}
 {{- if not (hasKey .Values.api.env "CLASSIFYRE_INTERNAL_API_URL") }}

@@ -6,8 +6,13 @@ import { FileArchive, Loader2, Upload, X } from "lucide-react";
 import { cn } from "@workspace/ui/lib/utils";
 
 import { useTranslation } from "@/hooks/use-translation";
-import { formatBytes, type TransferJob } from "@/lib/data-transfer-api";
+import {
+  formatBytes,
+  type TransferJob,
+  type UploadProgress,
+} from "@/lib/data-transfer-api";
 import { TransferProgressPanel } from "@/components/data-transfer/transfer-progress";
+import { UploadMeter } from "@/components/data-transfer/upload-meter";
 
 /**
  * Optional archive attachment on the create-workspace form.
@@ -21,17 +26,28 @@ export function NamespaceSeedPicker({
   file,
   onFileChange,
   job,
+  upload,
   disabled,
 }: {
   file: File | null;
   onFileChange: (file: File | null) => void;
   /** Set once the workspace exists and its seed import is running. */
   job: TransferJob | null;
+  /** Set while the archive is still going up, before the job exists. */
+  upload?: UploadProgress | null;
   disabled?: boolean;
 }) {
   const { t } = useTranslation();
   const [dragging, setDragging] = React.useState(false);
   const inputRef = React.useRef<HTMLInputElement>(null);
+
+  if (upload) {
+    return (
+      <div className="rounded-[4px] border-2 border-border bg-muted/20 px-3 py-2.5">
+        <UploadMeter progress={upload} />
+      </div>
+    );
+  }
 
   if (job) {
     return (

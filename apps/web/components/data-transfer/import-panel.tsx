@@ -27,7 +27,9 @@ import {
   type ConflictMode,
   type TransferJob,
   type TransferScopeId,
+  type UploadProgress,
 } from "@/lib/data-transfer-api";
+import { UploadMeter } from "./upload-meter";
 import { ScopePicker, type ScopeRow } from "./scope-picker";
 import { NewIdentitiesNotice, SecretsNotice } from "./secrets-notice";
 import { TransferProgressPanel } from "./transfer-progress";
@@ -47,7 +49,7 @@ export function ImportPanel({
   const [scopeRows, setScopeRows] = React.useState<ScopeRow[]>([]);
   const [selected, setSelected] = React.useState<Set<TransferScopeId>>(new Set());
   const [conflictMode, setConflictMode] = React.useState<ConflictMode>("SKIP");
-  const [uploading, setUploading] = React.useState(false);
+  const [upload, setUpload] = React.useState<UploadProgress | null>(null);
   const [dragging, setDragging] = React.useState(false);
   const [starting, setStarting] = React.useState(false);
   const [cancelling, setCancelling] = React.useState(false);
@@ -62,9 +64,14 @@ export function ImportPanel({
   }, [activeJob, jobId]);
 
   const handleFile = async (file: File) => {
-    setUploading(true);
+    setUpload({
+      loaded: 0,
+      total: file.size,
+      percent: 0,
+      finalising: false,
+    });
     try {
-      const uploaded = await uploadArchive(file, apiBase);
+      const uploaded = await uploadArchive(file, apiBase, setUpload);
 
       // The archive's own scope list is the source of truth for what can be
       // taken from it; the catalogue only supplies the labels and descriptions.
@@ -84,7 +91,7 @@ export function ImportPanel({
         error instanceof Error ? error.message : t("dataTransfer.uploadFailed"),
       );
     } finally {
-      setUploading(false);
+      setUpload(null);
       if (inputRef.current) inputRef.current.value = "";
     }
   };
@@ -177,13 +184,10 @@ export function ImportPanel({
               : "border-border hover:border-muted-foreground/50",
           )}
         >
-          {uploading ? (
-            <>
-              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-              <p className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
-                {t("dataTransfer.reading")}
-              </p>
-            </>
+          {upload ? (
+            <div className="w-full max-w-sm">
+              <UploadMeter progress={upload} />
+            </div>
           ) : (
             <>
               <Upload className="h-5 w-5 text-muted-foreground" />

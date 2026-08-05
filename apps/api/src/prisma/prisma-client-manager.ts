@@ -23,8 +23,39 @@ export class PrismaClientManager implements OnModuleDestroy {
   /** Active worker/request references per schema; referenced clients cannot LRU-evict. */
   private readonly pins = new Map<string, number>();
   private readonly idleWaiters = new Map<string, Set<() => void>>();
-  private readonly poolMax = Number(process.env.PRISMA_POOL_MAX ?? 3);
+  /**
+   * Connections per schema. This is a ceiling, not a reservation: `pg` opens
+   * connections lazily and reaps them after `idleTimeoutMillis`, so an idle
+   * namespace costs nothing.
+   *
+   * It used to be 3, which a single overview page could exhaust on its own —
+   * the scans/findings/assets views fan out a list, a count and a chart query
+   * at the same time, and every one of those needed a connection while
+   * background pollers held theirs. The result was `P2028 Unable to start a
+   * transaction in the given time` and an empty table.
+   */
+  private readonly poolMax = Number(process.env.PRISMA_POOL_MAX ?? 10);
   private readonly maxResident = Number(process.env.PRISMA_MAX_RESIDENT ?? 20);
+  /** Fail an acquire that hangs rather than blocking a request forever. */
+  private readonly connectionTimeoutMs = Number(
+    process.env.PRISMA_CONNECTION_TIMEOUT_MS ?? 10_000,
+  );
+  /** Return connections to Postgres when a namespace goes quiet. */
+  private readonly idleTimeoutMs = Number(
+    process.env.PRISMA_IDLE_TIMEOUT_MS ?? 10_000,
+  );
+  /**
+   * How long a transaction may wait for a free connection before Prisma gives
+   * up with P2028. Prisma's default is 2 s — too tight for a page that opens
+   * several queries at once against a warm-but-busy pool.
+   */
+  private readonly txMaxWaitMs = Number(
+    process.env.PRISMA_TX_MAX_WAIT_MS ?? 10_000,
+  );
+  /** Ceiling on a single interactive transaction (Prisma default: 5 s). */
+  private readonly txTimeoutMs = Number(
+    process.env.PRISMA_TX_TIMEOUT_MS ?? 30_000,
+  );
 
   /** Get (or lazily create) the client for a schema, marking it most-recent. */
   get(schema: string): PrismaClient {
@@ -43,11 +74,22 @@ export class PrismaClientManager implements OnModuleDestroy {
       {
         connectionString: rawUrl.toString(),
         max: this.poolMax,
+        connectionTimeoutMillis: this.connectionTimeoutMs,
+        idleTimeoutMillis: this.idleTimeoutMs,
+        // Detect half-open sockets (k8s node reboot, laptop sleep) instead of
+        // handing a dead connection to the next query.
+        keepAlive: true,
         options: `-c search_path=${schema},public`,
       },
       { schema },
     );
-    const client = new PrismaClient({ adapter });
+    const client = new PrismaClient({
+      adapter,
+      transactionOptions: {
+        maxWait: this.txMaxWaitMs,
+        timeout: this.txTimeoutMs,
+      },
+    });
     this.clients.set(schema, client);
     this.evictIfNeeded();
     return client;

@@ -123,7 +123,7 @@ export class NotificationsService {
         ? parseInt(query.take, 10)
         : (query.take ?? 50);
 
-    const [notifications, total, unreadCount] = await this.prisma.$transaction([
+    const [notifications, total, unreadCount] = await Promise.all([
       this.prisma.notification.findMany({
         where,
         include: {

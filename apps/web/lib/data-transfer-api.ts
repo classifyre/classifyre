@@ -153,19 +153,94 @@ export function startExport(
   return postJson<TransferJob>(`${base}/data-transfer/exports`, { scopes });
 }
 
-export async function uploadArchive(
+/** Where an upload has got to, as reported by {@link uploadArchive}. */
+export interface UploadProgress {
+  /** Bytes accepted by the server so far. */
+  loaded: number;
+  total: number;
+  /** 0–100, or null while the total is still unknown. */
+  percent: number | null;
+  /**
+   * True once every byte has been sent and the server is reading the archive's
+   * manifest. Short, but on a 250 MB file it is the difference between "stuck
+   * at 100%" and a state the UI can name.
+   */
+  finalising: boolean;
+}
+
+/**
+ * Send an archive and report progress while it goes.
+ *
+ * XMLHttpRequest rather than `fetch` purely for `upload.onprogress`: fetch
+ * still cannot report request-body progress in any shipping browser, and a
+ * quarter-gigabyte upload behind an indeterminate spinner is indistinguishable
+ * from one that has hung — which is exactly how this read before.
+ */
+export function uploadArchive(
   file: File,
   base = apiBase(),
+  onProgress?: (progress: UploadProgress) => void,
 ): Promise<ArchivePreview> {
-  const form = new FormData();
-  form.append("file", file);
-  const response = await requireOk(
-    await fetch(`${base}/data-transfer/imports/upload`, {
-      method: "POST",
-      body: form,
-    }),
-  );
-  return response.json() as Promise<ArchivePreview>;
+  return new Promise((resolve, reject) => {
+    const form = new FormData();
+    form.append("file", file);
+
+    const request = new XMLHttpRequest();
+    request.open("POST", `${base}/data-transfer/imports/upload`);
+    request.responseType = "text";
+
+    request.upload.onprogress = (event) => {
+      const total = event.lengthComputable ? event.total : file.size;
+      onProgress?.({
+        loaded: event.loaded,
+        total,
+        percent: total > 0 ? Math.min(100, Math.round((event.loaded / total) * 100)) : null,
+        finalising: false,
+      });
+    };
+    request.upload.onload = () => {
+      onProgress?.({
+        loaded: file.size,
+        total: file.size,
+        percent: 100,
+        finalising: true,
+      });
+    };
+
+    request.onload = () => {
+      const body = request.responseText;
+      if (request.status >= 200 && request.status < 300) {
+        try {
+          resolve(JSON.parse(body) as ArchivePreview);
+        } catch {
+          reject(new Error("The server returned an unreadable response"));
+        }
+        return;
+      }
+      reject(new Error(errorMessageFrom(body, request.status)));
+    };
+    request.onerror = () =>
+      reject(new Error("The connection dropped while uploading the archive"));
+    request.ontimeout = () =>
+      reject(new Error("The upload timed out"));
+    request.onabort = () => reject(new Error("The upload was cancelled"));
+
+    request.send(form);
+  });
+}
+
+/** Nest error bodies are `{"message": …}`; fall back to the raw text. */
+function errorMessageFrom(body: string, status: number): string {
+  try {
+    const parsed = JSON.parse(body) as { message?: string | string[] };
+    const message = Array.isArray(parsed.message)
+      ? parsed.message.join(", ")
+      : parsed.message;
+    if (message) return message;
+  } catch {
+    // Not JSON — use whatever came back.
+  }
+  return body || `Upload failed with HTTP ${status}`;
 }
 
 export function startImport(
