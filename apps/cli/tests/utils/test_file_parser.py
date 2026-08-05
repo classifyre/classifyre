@@ -989,3 +989,84 @@ class TestArchiveMimeHandling:
         parsed = parse_bytes(data, file_name="a.zip")
         assert parsed.mime_type == "application/zip"
         assert parsed.is_binary is True
+
+
+class TestSourceCodeFiles:
+    """Code and configuration files must be read as the text they are.
+
+    A repository scan is mostly source, and every one of these formats reaches
+    the detectors only if it resolves to a ``text/*`` type — anything else routes
+    it into a record reader or drops it as opaque binary.
+    """
+
+    @pytest.mark.parametrize(
+        ("file_name", "content", "expected_mime"),
+        [
+            # First line has two commas, which is the CSV sniffing heuristic
+            # exactly. The extension has to win, or the file becomes a table.
+            ("src/app.py", b"from typing import Any, Dict, List\nKEY = 'x'\n", "text/x-python"),
+            ("src/index.ts", b"const {a, b, c} = require('x');\n", "text/typescript"),
+            ("src/App.tsx", b"export default function App() { return null }\n", "text/tsx"),
+            ("main.go", b"package main\n\nfunc main() {}\n", "text/x-go"),
+            ("lib.rs", b"fn main() {}\n", "text/x-rust"),
+            ("Main.java", b"class Main {}\n", "text/x-java"),
+            ("query.sql", b"SELECT a, b, c FROM t;\n", "text/x-sql"),
+            ("values.yaml", b"a: 1\nb: 2\n", "text/x-yaml"),
+            ("pyproject.toml", b"[tool.x]\nname = 'y'\n", "text/x-toml"),
+            (".env", b"AWS_SECRET_ACCESS_KEY=abc\n", "text/x-env"),
+            ("main.tf", b'resource "aws_s3_bucket" "b" {}\n', "text/x-terraform"),
+            ("deploy.sh", b"#!/bin/sh\nset -eu\n", "text/x-shellscript"),
+            ("styles.css", b"body { color: red, blue, green }\n", "text/css"),
+            # No extension at all — a repository is full of these.
+            ("Dockerfile", b"FROM python:3.12\nRUN pip install x\n", "text/x-dockerfile"),
+            ("Makefile", b"all:\n\techo hi\n", "text/x-makefile"),
+            ("Jenkinsfile", b"pipeline { agent any }\n", "text/x-groovy"),
+        ],
+    )
+    def test_code_files_resolve_to_text(self, file_name, content, expected_mime) -> None:
+        from src.utils.file_parser import resolve_mime_type
+
+        assert resolve_mime_type(content, file_name=file_name) == expected_mime
+
+    @pytest.mark.parametrize(
+        ("file_name", "content"),
+        [
+            ("src/app.py", b"from typing import Any, Dict, List\nKEY = 'AKIAIOSFODNN7EXAMPLE'\n"),
+            ("values.yaml", b"database:\n  password: hunter2\n"),
+            (".env", b"AWS_SECRET_ACCESS_KEY=AKIAIOSFODNN7EXAMPLE\n"),
+            ("Dockerfile", b"FROM python:3.12\nENV TOKEN=AKIAIOSFODNN7EXAMPLE\n"),
+        ],
+    )
+    def test_code_file_contents_reach_the_detectors_verbatim(self, file_name, content) -> None:
+        from src.utils.file_parser import resolve_mime_type
+
+        mime = resolve_mime_type(content, file_name=file_name)
+        text, error = extract_text(content, mime, file_name=file_name)
+        assert error is None
+        assert text == content.decode()
+
+    def test_code_files_are_paged_as_lines(self) -> None:
+        from src.utils.file_parser import resolve_mime_type
+
+        content = b"".join(f"line_{index} = {index}\n".encode() for index in range(10))
+        mime = resolve_mime_type(content, file_name="a.py")
+        pages = list(iter_file_pages(content, mime, batch_size=4, file_name="a.py"))
+        assert len(pages) == 3
+        assert pages[0].startswith("line_0")
+
+    def test_a_real_csv_is_still_read_as_a_table(self) -> None:
+        from src.utils.file_parser import resolve_mime_type
+
+        content = b"name,email,role\nAda,ada@example.com,admin\n"
+        assert resolve_mime_type(content, file_name="people.csv") == "text/csv"
+
+    def test_a_binary_named_like_code_is_still_binary(self) -> None:
+        """The extension informs the reading, it does not override the bytes."""
+        from src.utils.file_parser import resolve_mime_type
+
+        assert resolve_mime_type(b"\x89PNG\r\n\x1a\n\x00\x00", file_name="a.py") == "image/png"
+
+    def test_an_unknown_extension_falls_back_to_content(self) -> None:
+        from src.utils.file_parser import resolve_mime_type
+
+        assert resolve_mime_type(b"just words here\n", file_name="notes.qqq") == "text/plain"

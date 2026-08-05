@@ -921,6 +921,7 @@ export const SearchAssetsControllerExportAssetsAssetSourceTypeEnum = {
     GoogleWorkspace: 'GOOGLE_WORKSPACE',
     Dropbox: 'DROPBOX',
     HuggingFace: 'HUGGING_FACE',
+    Git: 'GIT',
     Sandbox: 'SANDBOX',
     Custom: 'CUSTOM'
 } as const;
@@ -1047,6 +1048,7 @@ export const SearchAssetsControllerQueryAssetsAssetSourceTypeEnum = {
     GoogleWorkspace: 'GOOGLE_WORKSPACE',
     Dropbox: 'DROPBOX',
     HuggingFace: 'HUGGING_FACE',
+    Git: 'GIT',
     Sandbox: 'SANDBOX',
     Custom: 'CUSTOM'
 } as const;
@@ -1173,6 +1175,7 @@ export const SourceAssetsControllerListSourceAssetsSourceTypesEnum = {
     GoogleWorkspace: 'GOOGLE_WORKSPACE',
     Dropbox: 'DROPBOX',
     HuggingFace: 'HUGGING_FACE',
+    Git: 'GIT',
     Sandbox: 'SANDBOX',
     Custom: 'CUSTOM'
 } as const;

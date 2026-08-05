@@ -1,7 +1,7 @@
 ---
 title: Supported File Formats
 sidebarTitle: File Formats
-description: Every file type Classifyre can read — PDFs and Office documents, spreadsheets, CSV, Parquet and Arrow tables, images, audio, video, email, and archives — and which connected sources those files come from.
+description: Every file type Classifyre can read — PDFs and Office documents, spreadsheets, CSV, Parquet and Arrow tables, source code and configuration, images, audio, video, email, and archives — and which connected sources those files come from.
 ---
 
 # Supported File Formats
@@ -38,6 +38,7 @@ storage tends to label almost everything as generic binary data.
 | **Spreadsheets**      | XLSX, ODS                                                  | Every sheet, row by row                                               |
 | **Tables & datasets** | CSV, TSV, Parquet, Arrow, Feather, IPC                     | Every row, with columns labelled so a finding points at a real record |
 | **Text & data**       | TXT, Markdown, JSON, XML, HTML, log files                  | The content as written, with encoding detected automatically          |
+| **Code & config**     | Python, JavaScript / TypeScript, Java, Go, Rust, C / C++, C#, Ruby, PHP, Swift, Kotlin, shell, SQL, Terraform, YAML, TOML, INI, `.env`, Dockerfile, Makefile | Every line, exactly as written — including the comments |
 | **Email**             | EML, MSG                                                   | Sender, recipients, subject, body, and attachment names               |
 | **Images**            | PNG, JPG, TIFF, BMP, WEBP, GIF, HEIC / HEIF                | Text inside the image, via [OCR](/sources/content-extraction/)        |
 | **Audio**             | MP3, WAV, M4A, AAC, OGG, OPUS, FLAC                        | A transcript of what was said                                         |
@@ -47,6 +48,29 @@ storage tends to label almost everything as generic binary data.
 Images, audio, and video need [OCR and transcription](/sources/content-extraction/)
 switched on for the source — they're off by default because they cost more time
 per item than reading text.
+
+---
+
+## Source code and configuration
+
+Code files are read as the text they are, so a key committed to
+`config/settings.py`, a password in `values.yaml`, or a live token in `.env` is
+found the same way one in a spreadsheet is. Roughly eighty extensions are
+recognised, plus the files that carry no extension at all — `Dockerfile`,
+`Makefile`, `Jenkinsfile`, `Gemfile`, `.env.production`.
+
+This matters more than it sounds. A Python module whose first line is
+`from typing import Any, Dict, List` has two commas on line one, which is
+exactly what a spreadsheet's header row looks like — and a minified JavaScript
+bundle starts with `{`, which is exactly what a JSON file looks like. Read by
+content alone, both get sent to a table reader that produces columns of
+nonsense and finds nothing. Classifyre uses the file name to settle it, so the
+file is read line by line as source.
+
+The most common places a real credential turns up are the ones you would
+expect: `.env` and its per-environment variants, Terraform variable files, CI
+pipeline definitions, Kubernetes manifests, and connection strings in
+application config. All of them are read.
 
 ---
 
@@ -116,6 +140,7 @@ media, and archives enter Classifyre.
 | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------- |
 | [S3-compatible storage](/sources/s3-compatible-storage/), [Azure Blob](/sources/azure-blob-storage/), [Google Cloud Storage](/sources/google-cloud-storage/) | Every object in a bucket or container                         |
 | [Local folder](/sources/local-folder/)                                                                                                                       | A directory tree on the machine running the scan              |
+| [Git repository](/sources/git/)                                                                                                                              | Every file on one branch — code, config, docs, and committed data |
 | [Sandbox](/sources/sandbox/)                                                                                                                                 | Files uploaded straight into Classifyre                       |
 | [Dropbox](/sources/dropbox/)                                                                                                                                 | Files and shared folders                                      |
 | [Hugging Face](/sources/hugging-face/)                                                                                                                       | Dataset and model repository files, including large shards    |
@@ -181,6 +206,11 @@ recursively.
 Yes, row by row, including columns that hold whole files such as images or
 documents. Large shards in cloud storage are read in place rather than
 downloaded.
+
+**Does it read source code?**
+Yes — around eighty languages and configuration formats, plus extension-less
+files such as `Dockerfile` and `Makefile`. Each is read line by line as text, so
+a secret in a config file is found the same way one in a document is.
 
 **What about audio and video?**
 Both are transcribed, and video also has the text on screen read via OCR. Enable

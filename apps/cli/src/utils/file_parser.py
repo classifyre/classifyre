@@ -205,6 +205,166 @@ _MIME_HINTS_BY_EXTENSION = {
     ".flv": "video/x-flv",
 }
 
+# Source code and configuration. Every one of these is read as text — the
+# extraction path for `text/*` is `_decode_bytes`, so a .py file reaches the
+# detectors as exactly the characters it contains, which is what a secret
+# scanner needs.
+#
+# They are here rather than left to content sniffing because sniffing cannot
+# tell code apart from data: `from a import b, c, d` is a first line with two
+# commas, which is precisely the CSV heuristic, and a minified bundle starting
+# with `{` looks like JSON. Either misread turns a source file into a table of
+# nonsense columns. The extension is the reliable signal, so it is used.
+_CODE_MIME_HINTS_BY_EXTENSION = {
+    # Scripting and application languages
+    ".py": "text/x-python",
+    ".pyi": "text/x-python",
+    ".rb": "text/x-ruby",
+    ".php": "text/x-php",
+    ".pl": "text/x-perl",
+    ".lua": "text/x-lua",
+    ".r": "text/x-r",
+    ".jl": "text/x-julia",
+    # JavaScript / TypeScript family
+    ".js": "text/javascript",
+    ".mjs": "text/javascript",
+    ".cjs": "text/javascript",
+    ".jsx": "text/jsx",
+    ".ts": "text/typescript",
+    ".tsx": "text/tsx",
+    ".vue": "text/x-vue",
+    ".svelte": "text/x-svelte",
+    # JVM and .NET
+    ".java": "text/x-java",
+    ".kt": "text/x-kotlin",
+    ".kts": "text/x-kotlin",
+    ".scala": "text/x-scala",
+    ".groovy": "text/x-groovy",
+    ".cs": "text/x-csharp",
+    ".fs": "text/x-fsharp",
+    ".vb": "text/x-vb",
+    # Systems languages
+    ".c": "text/x-c",
+    ".h": "text/x-c",
+    ".cc": "text/x-c++",
+    ".cpp": "text/x-c++",
+    ".cxx": "text/x-c++",
+    ".hpp": "text/x-c++",
+    ".hh": "text/x-c++",
+    ".go": "text/x-go",
+    ".rs": "text/x-rust",
+    ".swift": "text/x-swift",
+    ".m": "text/x-objectivec",
+    ".mm": "text/x-objectivec",
+    ".zig": "text/x-zig",
+    ".dart": "text/x-dart",
+    ".ex": "text/x-elixir",
+    ".exs": "text/x-elixir",
+    ".erl": "text/x-erlang",
+    ".hs": "text/x-haskell",
+    ".clj": "text/x-clojure",
+    # Shell and automation
+    ".sh": "text/x-shellscript",
+    ".bash": "text/x-shellscript",
+    ".zsh": "text/x-shellscript",
+    ".fish": "text/x-shellscript",
+    ".ps1": "text/x-powershell",
+    ".psm1": "text/x-powershell",
+    ".bat": "text/x-msdos-batch",
+    ".cmd": "text/x-msdos-batch",
+    # Query, schema and interface definitions
+    ".sql": "text/x-sql",
+    ".graphql": "text/x-graphql",
+    ".gql": "text/x-graphql",
+    ".proto": "text/x-protobuf",
+    ".thrift": "text/x-thrift",
+    ".avsc": "application/json",
+    # Configuration — where credentials most often end up
+    ".yaml": "text/x-yaml",
+    ".yml": "text/x-yaml",
+    ".toml": "text/x-toml",
+    ".ini": "text/x-ini",
+    ".cfg": "text/x-ini",
+    ".conf": "text/x-ini",
+    ".properties": "text/x-properties",
+    ".env": "text/x-env",
+    ".tf": "text/x-terraform",
+    ".tfvars": "text/x-terraform",
+    ".hcl": "text/x-hcl",
+    ".dockerfile": "text/x-dockerfile",
+    ".gradle": "text/x-groovy",
+    ".cmake": "text/x-cmake",
+    ".mk": "text/x-makefile",
+    # Web templates and styles
+    ".css": "text/css",
+    ".scss": "text/x-scss",
+    ".sass": "text/x-sass",
+    ".less": "text/x-less",
+    ".jinja": "text/x-jinja",
+    ".j2": "text/x-jinja",
+    ".hbs": "text/x-handlebars",
+    ".ejs": "text/x-ejs",
+    ".erb": "text/x-erb",
+    ".twig": "text/x-twig",
+    # Notebooks, patches and docs-as-code
+    ".ipynb": "application/json",
+    ".patch": "text/x-diff",
+    ".diff": "text/x-diff",
+    ".rst": "text/x-rst",
+    ".adoc": "text/x-asciidoc",
+    ".tex": "text/x-tex",
+}
+
+# Extension-less files that are code by convention. Matched on the whole file
+# name, since they have no suffix to look at.
+_CODE_MIME_HINTS_BY_FILE_NAME = {
+    "dockerfile": "text/x-dockerfile",
+    "containerfile": "text/x-dockerfile",
+    "makefile": "text/x-makefile",
+    "gnumakefile": "text/x-makefile",
+    "jenkinsfile": "text/x-groovy",
+    "vagrantfile": "text/x-ruby",
+    "gemfile": "text/x-ruby",
+    "rakefile": "text/x-ruby",
+    "brewfile": "text/x-ruby",
+    "procfile": "text/x-yaml",
+    "cmakelists.txt": "text/x-cmake",
+    # A dotfile's leading dot is its stem, not a suffix, so `.env` and its
+    # per-environment variants have to be matched by name. Worth the special
+    # case: this is the single most common place a live credential is committed.
+    ".env": "text/x-env",
+    ".npmrc": "text/x-ini",
+    ".netrc": "text/x-ini",
+    ".gitconfig": "text/x-ini",
+    ".editorconfig": "text/x-ini",
+    ".gitattributes": "text/plain",
+    ".gitignore": "text/plain",
+    ".dockerignore": "text/plain",
+}
+
+_MIME_HINTS_BY_EXTENSION.update(_CODE_MIME_HINTS_BY_EXTENSION)
+
+# The types the extension may override a content guess with (see
+# `normalize_detected_mime_type`).
+_CODE_TEXT_MIME_TYPES = frozenset(_CODE_MIME_HINTS_BY_EXTENSION.values()) | frozenset(
+    _CODE_MIME_HINTS_BY_FILE_NAME.values()
+)
+
+# Content guesses that a code extension is allowed to correct. All of them are
+# things the sniffer infers from the first few characters of a text file, which
+# is exactly the evidence that cannot distinguish code from data.
+_SNIFFED_TEXT_MIME_TYPES = frozenset(
+    {
+        "text/plain",
+        "text/csv",
+        "text/tab-separated-values",
+        "text/html",
+        "application/json",
+        "application/xml",
+        "text/xml",
+    }
+)
+
 _DOCLING_IMAGE_MIME_TYPES = {
     "image/png",
     "image/jpeg",
@@ -420,10 +580,33 @@ def _file_extension(file_name: str) -> str:
     return Path(value).suffix.lower()
 
 
+def _base_file_name(file_name: str) -> str:
+    if not file_name:
+        return ""
+    path = urlsplit(file_name).path or file_name
+    return Path(path).name.lower()
+
+
 def infer_mime_type_from_file_name(file_name: str) -> str:
-    """Infer MIME type from file name or URL path extension."""
+    """Infer MIME type from file name or URL path extension.
+
+    Falls back to the whole file name for the code files that carry no
+    extension at all — a Dockerfile or a Makefile is still source, and a
+    repository is full of them.
+    """
     extension = _file_extension(file_name)
-    return _MIME_HINTS_BY_EXTENSION.get(extension, "application/octet-stream")
+    if extension:
+        hint = _MIME_HINTS_BY_EXTENSION.get(extension)
+        if hint:
+            return hint
+    base_name = _base_file_name(file_name)
+    by_name = _CODE_MIME_HINTS_BY_FILE_NAME.get(base_name)
+    if by_name:
+        return by_name
+    # .env.local, .env.production, … all hold the same kind of thing.
+    if base_name.startswith(".env"):
+        return "text/x-env"
+    return "application/octet-stream"
 
 
 # Public view of the tabular set. A payload in it has a row axis, which is what
@@ -462,6 +645,14 @@ def normalize_detected_mime_type(detected_mime_type: str, file_name: str) -> str
         return inferred_mime
 
     if mime == "text/plain" and inferred_mime in _TABULAR_MIME_TYPES:
+        return inferred_mime
+
+    # Source code, where the name is better evidence than the contents. Content
+    # sniffing reads the first few characters, and by that measure a Python
+    # module whose first line is `from a import b, c, d` is a CSV and a minified
+    # bundle beginning with `{` is JSON. Both misreadings send the file down a
+    # record-oriented reader that produces garbage columns instead of the code.
+    if mime in _SNIFFED_TEXT_MIME_TYPES and inferred_mime in _CODE_TEXT_MIME_TYPES:
         return inferred_mime
 
     # OLE Compound Files (.doc/.xls/.ppt/.msg) share one magic signature; the

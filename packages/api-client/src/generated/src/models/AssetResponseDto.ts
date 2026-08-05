@@ -110,6 +110,7 @@ export const AssetResponseDtoSourceTypeEnum = {
     GoogleWorkspace: 'GOOGLE_WORKSPACE',
     Dropbox: 'DROPBOX',
     HuggingFace: 'HUGGING_FACE',
+    Git: 'GIT',
     Sandbox: 'SANDBOX',
     Custom: 'CUSTOM'
 } as const;

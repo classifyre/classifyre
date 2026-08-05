@@ -133,6 +133,14 @@ export class CorrelationWorker {
         data: { autopilotDirtyAt: new Date() },
       });
 
+      // The express lane is an EXTRA fast pass, never a replacement for the
+      // batch. It used to `return` here, which quietly made it the opposite: a
+      // scan that tripped any express trigger got only the narrow express
+      // cycle, and an operational trigger narrows that to `agentKinds:
+      // [CONFIG]`. With the config agent disabled — it is off by default —
+      // that meant a completed ingest ran no agent at all and left the source
+      // marked dirty with no corpus job queued, silent until some later scan
+      // happened to land. "I ingested a source and nothing happened" was this.
       const express = await this.expressReason(sourceId, runnerId);
       if (express) {
         this.logger.log(
@@ -157,7 +165,6 @@ export class CorrelationWorker {
             startAfter: AUTOPILOT_START_AFTER_SECONDS,
           },
         );
-        return;
       }
 
       // One corpus job per window, whatever the scan rate.

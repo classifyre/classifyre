@@ -110,6 +110,9 @@
     },
     {
       "$ref": "#/definitions/HuggingFaceInput"
+    },
+    {
+      "$ref": "#/definitions/GitInput"
     }
   ],
   "x-asset-metadata": {
@@ -3288,6 +3291,310 @@
             "repo_type"
           ]
         }
+      },
+      "GIT": {
+        "file": {
+          "use": [
+            "file",
+            "image",
+            "document",
+            "spreadsheet",
+            "text",
+            "json"
+          ],
+          "properties": {
+            "provider": {
+              "type": "string",
+              "description": "Storage provider label"
+            },
+            "object_key": {
+              "type": "string",
+              "description": "File path relative to the repository root"
+            },
+            "repository_url": {
+              "type": "string",
+              "description": "Repository the file was read from, with any credentials removed"
+            },
+            "branch": {
+              "type": "string",
+              "description": "Branch or tag that was scanned"
+            },
+            "commit_sha": {
+              "type": "string",
+              "description": "Commit the file was read at"
+            },
+            "blob_id": {
+              "type": "string",
+              "description": "Git object id (OID) of the file blob \u2014 a hash of its contents"
+            },
+            "etag": {
+              "type": "string",
+              "description": "Content digest of the file: the Git blob OID"
+            },
+            "size_known": {
+              "type": "boolean",
+              "description": "False when the file's bytes were not part of the initial transfer, so its size was not known at discovery time"
+            },
+            "lfs_pointer": {
+              "type": "boolean",
+              "description": "True when the tracked file is a Git LFS pointer rather than the payload"
+            },
+            "web_url": {
+              "type": "string",
+              "description": "Browser-accessible URL for the file, when the host is recognised"
+            },
+            "source_hash": {
+              "type": "string",
+              "description": "Hash of the parent asset (embedded files and archive members only)"
+            },
+            "location": {
+              "type": "string",
+              "description": "Location within the parent (embedded file location or archive member path)"
+            }
+          },
+          "required": [
+            "provider",
+            "object_key",
+            "repository_url"
+          ]
+        },
+        "image": {
+          "use": [
+            "file",
+            "image"
+          ],
+          "properties": {
+            "provider": {
+              "type": "string",
+              "description": "Storage provider label"
+            },
+            "object_key": {
+              "type": "string",
+              "description": "File path relative to the repository root"
+            },
+            "repository_url": {
+              "type": "string",
+              "description": "Repository the file was read from, with any credentials removed"
+            },
+            "branch": {
+              "type": "string",
+              "description": "Branch or tag that was scanned"
+            },
+            "commit_sha": {
+              "type": "string",
+              "description": "Commit the file was read at"
+            },
+            "blob_id": {
+              "type": "string",
+              "description": "Git object id (OID) of the file blob \u2014 a hash of its contents"
+            },
+            "etag": {
+              "type": "string",
+              "description": "Content digest of the file: the Git blob OID"
+            },
+            "size_known": {
+              "type": "boolean",
+              "description": "False when the file's bytes were not part of the initial transfer, so its size was not known at discovery time"
+            },
+            "lfs_pointer": {
+              "type": "boolean",
+              "description": "True when the tracked file is a Git LFS pointer rather than the payload"
+            },
+            "web_url": {
+              "type": "string",
+              "description": "Browser-accessible URL for the file, when the host is recognised"
+            },
+            "source_hash": {
+              "type": "string",
+              "description": "Hash of the parent asset (embedded files and archive members only)"
+            },
+            "location": {
+              "type": "string",
+              "description": "Location within the parent (embedded file location or archive member path)"
+            }
+          },
+          "required": []
+        },
+        "audio": {
+          "use": [
+            "file"
+          ],
+          "properties": {
+            "provider": {
+              "type": "string",
+              "description": "Storage provider label"
+            },
+            "object_key": {
+              "type": "string",
+              "description": "File path relative to the repository root"
+            },
+            "repository_url": {
+              "type": "string",
+              "description": "Repository the file was read from, with any credentials removed"
+            },
+            "branch": {
+              "type": "string",
+              "description": "Branch or tag that was scanned"
+            },
+            "commit_sha": {
+              "type": "string",
+              "description": "Commit the file was read at"
+            },
+            "blob_id": {
+              "type": "string",
+              "description": "Git object id (OID) of the file blob \u2014 a hash of its contents"
+            },
+            "etag": {
+              "type": "string",
+              "description": "Content digest of the file: the Git blob OID"
+            },
+            "size_known": {
+              "type": "boolean",
+              "description": "False when the file's bytes were not part of the initial transfer, so its size was not known at discovery time"
+            },
+            "lfs_pointer": {
+              "type": "boolean",
+              "description": "True when the tracked file is a Git LFS pointer rather than the payload"
+            },
+            "web_url": {
+              "type": "string",
+              "description": "Browser-accessible URL for the file, when the host is recognised"
+            },
+            "source_hash": {
+              "type": "string",
+              "description": "Hash of the parent asset (embedded files and archive members only)"
+            },
+            "location": {
+              "type": "string",
+              "description": "Location within the parent (embedded file location or archive member path)"
+            }
+          },
+          "required": [
+            "provider",
+            "object_key",
+            "repository_url"
+          ]
+        },
+        "video": {
+          "use": [
+            "file"
+          ],
+          "properties": {
+            "provider": {
+              "type": "string",
+              "description": "Storage provider label"
+            },
+            "object_key": {
+              "type": "string",
+              "description": "File path relative to the repository root"
+            },
+            "repository_url": {
+              "type": "string",
+              "description": "Repository the file was read from, with any credentials removed"
+            },
+            "branch": {
+              "type": "string",
+              "description": "Branch or tag that was scanned"
+            },
+            "commit_sha": {
+              "type": "string",
+              "description": "Commit the file was read at"
+            },
+            "blob_id": {
+              "type": "string",
+              "description": "Git object id (OID) of the file blob \u2014 a hash of its contents"
+            },
+            "etag": {
+              "type": "string",
+              "description": "Content digest of the file: the Git blob OID"
+            },
+            "size_known": {
+              "type": "boolean",
+              "description": "False when the file's bytes were not part of the initial transfer, so its size was not known at discovery time"
+            },
+            "lfs_pointer": {
+              "type": "boolean",
+              "description": "True when the tracked file is a Git LFS pointer rather than the payload"
+            },
+            "web_url": {
+              "type": "string",
+              "description": "Browser-accessible URL for the file, when the host is recognised"
+            },
+            "source_hash": {
+              "type": "string",
+              "description": "Hash of the parent asset (embedded files and archive members only)"
+            },
+            "location": {
+              "type": "string",
+              "description": "Location within the parent (embedded file location or archive member path)"
+            }
+          },
+          "required": [
+            "provider",
+            "object_key",
+            "repository_url"
+          ]
+        },
+        "archive": {
+          "use": [
+            "file"
+          ],
+          "properties": {
+            "provider": {
+              "type": "string",
+              "description": "Storage provider label"
+            },
+            "object_key": {
+              "type": "string",
+              "description": "File path relative to the repository root"
+            },
+            "repository_url": {
+              "type": "string",
+              "description": "Repository the file was read from, with any credentials removed"
+            },
+            "branch": {
+              "type": "string",
+              "description": "Branch or tag that was scanned"
+            },
+            "commit_sha": {
+              "type": "string",
+              "description": "Commit the file was read at"
+            },
+            "blob_id": {
+              "type": "string",
+              "description": "Git object id (OID) of the file blob \u2014 a hash of its contents"
+            },
+            "etag": {
+              "type": "string",
+              "description": "Content digest of the file: the Git blob OID"
+            },
+            "size_known": {
+              "type": "boolean",
+              "description": "False when the file's bytes were not part of the initial transfer, so its size was not known at discovery time"
+            },
+            "lfs_pointer": {
+              "type": "boolean",
+              "description": "True when the tracked file is a Git LFS pointer rather than the payload"
+            },
+            "web_url": {
+              "type": "string",
+              "description": "Browser-accessible URL for the file, when the host is recognised"
+            },
+            "source_hash": {
+              "type": "string",
+              "description": "Hash of the parent asset (embedded files and archive members only)"
+            },
+            "location": {
+              "type": "string",
+              "description": "Location within the parent (embedded file location or archive member path)"
+            }
+          },
+          "required": [
+            "provider",
+            "object_key",
+            "repository_url"
+          ]
+        }
       }
     }
   },
@@ -3330,7 +3637,8 @@
         "GOOGLE_WORKSPACE",
         "DROPBOX",
         "HUGGING_FACE",
-        "SANDBOX"
+        "SANDBOX",
+        "GIT"
       ],
       "description": "Type of the asset or source"
     },
@@ -11609,6 +11917,309 @@
         }
       },
       "additionalProperties": false
+    },
+    "GitAuthMethod": {
+      "type": "string",
+      "enum": [
+        "none",
+        "token",
+        "basic",
+        "ssh_key",
+        "client_certificate"
+      ],
+      "default": "none",
+      "description": "How the scan authenticates to the Git server. none scans a public repository over http(s). token uses a personal access / deploy token (GitHub, GitLab, Bitbucket, Azure DevOps). basic uses a username and password. ssh_key uses an SSH private key with an ssh:// or git@host:org/repo.git URL. client_certificate uses mutual TLS against an enterprise Git server. Credentials are never written to the runner's git configuration: they are materialised into a private, per-run directory that is deleted when the scan ends."
+    },
+    "GitCloneStrategy": {
+      "type": "string",
+      "enum": [
+        "blob_limit",
+        "blobless",
+        "full"
+      ],
+      "default": "blob_limit",
+      "description": "How much of the repository is transferred up front. blob_limit (recommended) fetches the file tree plus the contents of every file at or below the memory threshold in one pack, and leaves larger files to be fetched individually only if the scan reaches them. blobless fetches the file tree only, so every file is catalogued from Git metadata and downloaded one at a time as it is scanned \u2014 the cheapest option for a very large repository where only a slice is sampled, at the cost of one request per file and unknown file sizes until a file is read. full transfers every file in the commit up front."
+    },
+    "GitRequired": {
+      "title": "GitRequired",
+      "label": "Repository",
+      "type": "object",
+      "properties": {
+        "repository_url": {
+          "type": "string",
+          "description": "Repository to scan. Works with GitHub, GitLab, Bitbucket, Azure DevOps, Gitea and any other Git server. Accepts https://host/org/repo.git, ssh://git@host/org/repo.git, or the scp-style git@host:org/repo.git."
+        }
+      },
+      "required": [
+        "repository_url"
+      ],
+      "additionalProperties": false
+    },
+    "GitMasked": {
+      "title": "GitMasked",
+      "label": "Repository Credentials",
+      "type": "object",
+      "description": "Secrets for the selected authentication method. Leave the whole block empty for a public repository. Every value is encrypted at rest and only ever materialised into a private, per-run directory that is deleted when the scan ends.",
+      "properties": {
+        "username": {
+          "type": "string",
+          "description": "Username for basic authentication, or the token user for token authentication. Optional for tokens: the correct user for the detected host is used when this is empty (x-access-token for GitHub, oauth2 for GitLab, x-token-auth for Bitbucket)."
+        },
+        "password": {
+          "type": "string",
+          "description": "Password for basic authentication."
+        },
+        "token": {
+          "type": "string",
+          "description": "Personal access token, deploy token or app installation token with read access to the repository."
+        },
+        "ssh_private_key": {
+          "type": "string",
+          "description": "OpenSSH private key in PEM form, including the BEGIN and END lines. Used with an ssh:// or git@host:org/repo.git URL."
+        },
+        "ssh_private_key_passphrase": {
+          "type": "string",
+          "description": "Passphrase protecting the SSH private key, when it has one."
+        },
+        "client_certificate_pem": {
+          "type": "string",
+          "description": "PEM client certificate for mutual-TLS authentication."
+        },
+        "client_key_pem": {
+          "type": "string",
+          "description": "PEM private key matching the client certificate."
+        },
+        "ca_certificate_pem": {
+          "type": "string",
+          "description": "PEM certificate authority bundle used to verify the server, for an internal Git server with a private CA. Applies to any http(s) authentication method."
+        }
+      },
+      "additionalProperties": false
+    },
+    "GitOptionalAuth": {
+      "title": "GitOptionalAuth",
+      "label": "Authentication",
+      "type": "object",
+      "description": "Which credentials to use and how the server is verified.",
+      "properties": {
+        "auth_method": {
+          "$ref": "#/definitions/GitAuthMethod"
+        },
+        "ssh_known_hosts": {
+          "type": "string",
+          "description": "known_hosts entries for the Git server, one per line (the output of ssh-keyscan host). Required for SSH unless host key checking is turned off."
+        },
+        "ssh_strict_host_key_checking": {
+          "type": "boolean",
+          "default": true,
+          "description": "Refuse to connect over SSH to a host that is not in ssh_known_hosts. Leave on unless you are connecting to a server whose host key you cannot pin."
+        },
+        "verify_ssl": {
+          "type": "boolean",
+          "default": true,
+          "description": "Verify the server's TLS certificate on http(s) remotes. Turn off only for an internal server with a self-signed certificate; prefer ca_certificate_pem."
+        }
+      },
+      "additionalProperties": false
+    },
+    "GitOptionalScope": {
+      "title": "GitOptionalScope",
+      "label": "Repository Scope",
+      "type": "object",
+      "description": "Which branch is read and which files inside it become assets. One branch is scanned per source; add a second source to scan a second branch.",
+      "properties": {
+        "branch": {
+          "type": "string",
+          "description": "Branch or tag to scan, for example main or release/2026-01. Defaults to the repository's default branch."
+        },
+        "include_paths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Folders or glob patterns to scan, for example docs, src/config or **/*.sql. A file is kept when it matches at least one entry. Leave empty to scan the whole repository."
+        },
+        "exclude_paths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Folders or glob patterns to skip, for example node_modules, vendor or **/fixtures/*. Applied after include_paths, so an excluded folder inside an included one is still skipped."
+        },
+        "include_extensions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Optional extension allowlist (for example, .py, .sql, .env, .md)"
+        },
+        "exclude_extensions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Optional extension denylist (for example, .png, .lock, .min.js)"
+        },
+        "include_last_commit": {
+          "type": "boolean",
+          "default": false,
+          "description": "Record each file's own last-commit date, which is what LATEST and AUTOMATIC sampling order by. Needs the branch's commit history, so it makes the initial transfer larger. When off, every file inherits the date of the scanned commit."
+        },
+        "include_empty_objects": {
+          "type": "boolean",
+          "default": false,
+          "description": "Include zero-byte files in extraction results"
+        },
+        "include_object_metadata": {
+          "type": "boolean",
+          "default": true,
+          "description": "Attach Git metadata (blob object id, size, commit) to asset checksums. The blob id is a content hash, so leaving this on lets an unchanged file be skipped on the next run without re-reading it."
+        },
+        "include_content_preview": {
+          "type": "boolean",
+          "default": true,
+          "description": "Read file contents to infer type and extract detector-ready text. Turn off for a metadata-only inventory of the repository."
+        }
+      },
+      "additionalProperties": false
+    },
+    "GitOptionalConnection": {
+      "title": "GitOptionalConnection",
+      "label": "Clone & Limits",
+      "type": "object",
+      "description": "How the repository is transferred and how much of one file may be held at once. Every run clones into its own empty directory and deletes it afterwards \u2014 nothing is shared or cached between runs or between sources.",
+      "properties": {
+        "clone_strategy": {
+          "$ref": "#/definitions/GitCloneStrategy"
+        },
+        "depth": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000,
+          "default": 1,
+          "description": "How many commits of history to fetch. 1 (default) fetches only the commit being scanned. 0 fetches the full history, which is what per-file commit dates need."
+        },
+        "clone_timeout_seconds": {
+          "type": "number",
+          "minimum": 30,
+          "maximum": 86400,
+          "default": 1800,
+          "description": "Time limit for the initial clone."
+        },
+        "command_timeout_seconds": {
+          "type": "number",
+          "minimum": 5,
+          "maximum": 3600,
+          "default": 300,
+          "description": "Time limit for each subsequent Git command, including fetching one file."
+        },
+        "max_object_bytes": {
+          "type": "integer",
+          "minimum": 1024,
+          "default": 26214400,
+          "description": "Maximum bytes of one file held in memory. Larger files are streamed to a temporary file, so this bounds memory rather than the size of file that can be scanned. Also the threshold used by the blob_limit clone strategy. See max_file_bytes to refuse large files outright."
+        },
+        "max_file_bytes": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Refuse any file larger than this many bytes. 0 or unset means no limit: a file above max_object_bytes is spooled to disk rather than held in memory, so file size is bounded by free disk, not by RAM."
+        },
+        "max_archive_members": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10000,
+          "default": 200,
+          "description": "Maximum member files expanded from one archive into child assets. Bounds fan-out, and is the guard against a zip bomb."
+        },
+        "max_archive_member_bytes": {
+          "type": "integer",
+          "minimum": 1024,
+          "default": 10485760,
+          "description": "Maximum uncompressed bytes read from a single archive member"
+        },
+        "max_archive_total_bytes": {
+          "type": "integer",
+          "minimum": 1024,
+          "default": 104857600,
+          "description": "Maximum uncompressed bytes read across all members of one archive. The decompression-ratio ceiling: a zip bomb hits this before it hits memory."
+        },
+        "max_embedded_files": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10000,
+          "default": 200,
+          "description": "Maximum embedded files (parquet image/audio columns, office media) expanded from one container into child assets per run"
+        }
+      },
+      "additionalProperties": false
+    },
+    "GitOptional": {
+      "title": "GitOptional",
+      "label": "Repository Options",
+      "type": "object",
+      "properties": {
+        "auth": {
+          "$ref": "#/definitions/GitOptionalAuth"
+        },
+        "scope": {
+          "$ref": "#/definitions/GitOptionalScope"
+        },
+        "connection": {
+          "$ref": "#/definitions/GitOptionalConnection"
+        }
+      },
+      "additionalProperties": false
+    },
+    "GitInput": {
+      "title": "GitInput",
+      "label": "Git Repository",
+      "allOf": [
+        {
+          "$ref": "#/definitions/CoreInput"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "GIT"
+            },
+            "required": {
+              "$ref": "#/definitions/GitRequired"
+            },
+            "masked": {
+              "$ref": "#/definitions/GitMasked"
+            },
+            "optional": {
+              "$ref": "#/definitions/GitOptional"
+            },
+            "detectors": {
+              "$ref": "#/definitions/Detectors"
+            },
+            "custom_detectors": {
+              "$ref": "#/definitions/CustomDetectorSelections"
+            },
+            "sampling": {
+              "$ref": "#/definitions/SamplingConfig"
+            },
+            "scan_cache": {
+              "$ref": "#/definitions/ScanCacheConfig"
+            },
+            "resources": {
+              "$ref": "#/definitions/ResourceOverrides"
+            },
+            "cleanup_removed_detector_findings": {
+              "type": "boolean",
+              "default": true,
+              "description": "When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set."
+            }
+          },
+          "required": [
+            "required",
+            "sampling"
+          ],
+          "additionalProperties": false
+        }
+      ]
     }
   }
 }

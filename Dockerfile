@@ -202,12 +202,19 @@ ENV UV_LINK_MODE=copy \
 #     desktop suite. -core carries the conversion engine; writer/calc/impress
 #     carry the .doc / .xls / .ppt import filters respectively — dropping any
 #     one of them turns that format back into a silent "no content" asset.
+#   git + openssh-client — the Git source, which talks the wire protocol through
+#     the git binary rather than any provider REST API. openssh-client is what
+#     makes an ssh:// remote and a deploy key work; without it only http(s)
+#     remotes can be scanned. Each scan clones into its own temporary directory
+#     under the container's writable layer and deletes it when the run ends, so
+#     nothing is shared between jobs and the pod carries no clone cache.
 #     Deliberately unpinned: no dependency bot tracks apt packages, so these
 #     refresh to the current Debian security build on every image rebuild.
 RUN set -eux; \
     apt-get update; \
     apt-get install -y --no-install-recommends \
         libgl1 libglib2.0-0 ca-certificates \
+        git openssh-client \
         libreoffice-core-nogui libreoffice-writer-nogui \
         libreoffice-calc-nogui libreoffice-impress-nogui \
         fonts-dejavu-core; \
@@ -215,7 +222,9 @@ RUN set -eux; \
     # Throwaway HOME for the gate so this root-run check cannot leave
     # root-owned cache directories behind in the real one.
     HOME=/tmp/soffice-build-check soffice --version; \
-    rm -rf /tmp/soffice-build-check
+    rm -rf /tmp/soffice-build-check; \
+    git --version; \
+    ssh -V
 RUN chown -R 10001:10001 /app /home/classifyre
 WORKDIR /app/apps/cli
 USER 10001
