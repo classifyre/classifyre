@@ -400,6 +400,67 @@ describe('export → import round trip', () => {
     expect(warningsOf(job).join(' ')).toMatch(/re-entered after import/i);
   });
 
+  it('isolates a rejected row without retrying the batch one row at a time', async () => {
+    const { archiveId } = await runExport(
+      ['sources', 'assets', 'scanData'],
+      sourceTables(),
+    );
+
+    // One asset out of 1200 has a reference Postgres will not accept. The rest
+    // of its 500-row batch is perfectly good and has to land — the question
+    // this guards is how many statements that costs, because the row-by-row
+    // fallback it replaced turned every such batch into 500 round trips.
+    // Matched on `name`, not `id`: ids are regenerated on import, names are not.
+    const target = {
+      source: { keys: ['id'], rows: [] },
+      runner: { keys: ['id'], rows: [] },
+      runnerAsset: { keys: ['runnerId', 'assetHash'], rows: [] },
+      asset: {
+        keys: ['id'],
+        rows: [],
+        fkCheck: (row: Record<string, unknown>) => row['name'] !== 'Doc 700',
+      },
+    } as unknown as Record<string, FakeTable>;
+
+    const scopes = ['sources', 'assets', 'scanData'];
+    const state = makePrisma(
+      target,
+      { ...baseJob, kind: 'IMPORT', archived: true, scopes },
+      chunkStore,
+    );
+
+    const assetDelegate = (
+      state.prisma as unknown as Record<
+        string,
+        { createMany: (...args: unknown[]) => unknown }
+      >
+    )['asset'];
+    const original = assetDelegate.createMany.bind(assetDelegate);
+    let statements = 0;
+    assetDelegate.createMany = (...args: unknown[]) => {
+      statements += 1;
+      return original(...args);
+    };
+
+    await importer(state.prisma).run(
+      stageImport(archiveId, {
+        ...baseJob,
+        kind: 'IMPORT',
+        archived: true,
+        scopes,
+      }),
+    );
+
+    expect(target['asset'].rows).toHaveLength(1199);
+    expect(state.job.skippedRows).toBe(1);
+    // 1200 assets is three batches; only the one holding the bad row bisects,
+    // which is ~2·log2(500) extra statements. Row-by-row would be 500+.
+    expect(statements).toBeLessThan(40);
+    expect(warningsOf(state.job).join(' ')).toMatch(
+      /1 'asset' rows could not be imported/i,
+    );
+  });
+
   it('imports an archive into an empty namespace and disarms the sources', async () => {
     const { archiveId } = await runExport(
       ['sources', 'assets', 'scanData'],
@@ -614,17 +675,57 @@ describe('export → import round trip', () => {
       true,
     );
     expect(target['source'].rows).toHaveLength(0);
+    // One counted line rather than 1200 copies of the same sentence — and the
+    // count is the part the operator can act on.
+    const warnings = warningsOf(state.job);
+    expect(warnings.join(' ')).toMatch(/1,200 assets.*scan history/i);
+    expect(
+      warnings.filter((warning) => /scan history/i.test(warning)),
+    ).toHaveLength(1);
+  });
+
+  it('imports what it can from a truncated archive and says so', async () => {
+    const { archiveId } = await runExport(
+      ['sources', 'assets', 'scanData'],
+      sourceTables(),
+    );
+    // Drop the tail — the gzip trailer and the footer line with it, which is
+    // what a half-finished upload looks like. Enough is kept that the manifest
+    // and a good number of rows still decompress.
+    const raw = archiveBytes(archiveId);
+    chunkStore.set(archiveId, [raw.subarray(0, Math.floor(raw.length * 0.7))]);
+
+    const scopes = ['sources', 'assets', 'scanData'];
+    const job = stageImport(archiveId, {
+      ...baseJob,
+      kind: 'IMPORT' as const,
+      archived: true,
+      scopes,
+    });
+    const state = makePrisma(
+      {
+        source: { keys: ['id'], rows: [] },
+        runner: { keys: ['id'], rows: [] },
+        asset: { keys: ['id'], rows: [] },
+      },
+      { ...baseJob, kind: 'IMPORT', archived: true, scopes },
+      chunkStore,
+    );
+
+    // Half a namespace beats none: the rows that survived the truncation are
+    // written, and the gap is stated rather than thrown.
+    await expect(importer(state.prisma).run(job)).resolves.toBeUndefined();
+
+    expect(state.job.status).toBe('COMPLETED');
+    expect(state.job.processedRows).toBeGreaterThan(0);
     expect(warningsOf(state.job).join(' ')).toMatch(
-      /asset\.runnerId.*cleared.*scanData/i,
+      /incomplete|truncated|could not be read to the end/i,
     );
   });
 
-  it('refuses to import a truncated archive', async () => {
-    const { archiveId } = await runExport(['sources'], sourceTables());
-    // Drop the tail chunks — the gzip trailer and the footer line with them,
-    // which is what a half-finished upload looks like.
-    const raw = archiveBytes(archiveId);
-    chunkStore.set(archiveId, [raw.subarray(0, Math.floor(raw.length / 2))]);
+  it('fails when the file is not an archive at all', async () => {
+    const archiveId = 'not-an-archive';
+    chunkStore.set(archiveId, [Buffer.from('this is not gzip')]);
 
     const job = stageImport(archiveId, {
       ...baseJob,

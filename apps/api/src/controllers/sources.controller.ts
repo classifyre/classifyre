@@ -42,6 +42,7 @@ import { TestConnectionResponseDto } from '../dto/test-connection-response.dto';
 import { SearchSourcesRequestDto } from '../dto/search-sources-request.dto';
 import { SearchSourcesResponseDto } from '../dto/search-sources-response.dto';
 import { AllowInDemoMode } from '../demo-mode.decorator';
+import { ReadOnlyEndpoint } from '../db/read-only-endpoint.decorator';
 import { SourceFilesService } from '../source-files.service';
 
 @Controller('sources')
@@ -1026,6 +1027,7 @@ export class SourcesController {
 }
 
 @AllowInDemoMode()
+@ReadOnlyEndpoint()
 @Controller('search/sources')
 @ApiTags('Sources')
 export class SearchSourcesController {

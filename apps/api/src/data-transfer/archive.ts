@@ -24,9 +24,10 @@ import type { TransferScopeId } from './transfer-scopes';
  * as it reads instead of buffering the whole file to sort it. Gzip because
  * these rows are highly repetitive JSON and compress roughly 10:1.
  *
- * The footer is what distinguishes a complete archive from a truncated one — an
- * import that reaches EOF without it refuses to run rather than silently
- * loading half a namespace.
+ * The footer is what distinguishes a complete archive from a truncated one. An
+ * import that reaches EOF without it still keeps every row it managed to read,
+ * but says plainly that the archive was incomplete — silence is the one thing
+ * that must not happen.
  */
 
 /** Bump on any breaking change to the line shape or a model rename. */
@@ -310,13 +311,26 @@ export class ArchiveFormatError extends Error {}
  * Reads an archive line by line. Yields `{table, row}` for data records; the
  * manifest is returned up front and the footer through {@link footer} once the
  * iteration completes.
+ *
+ * Only the manifest is a hard gate — a file whose first line is not one of ours
+ * is rejected outright. Past that point the reader is deliberately forgiving: a
+ * record that will not parse is counted and skipped rather than thrown, and
+ * reaching EOF without a footer leaves {@link complete} false instead of
+ * raising. A damaged archive should cost you the rows it damaged, not the
+ * hundreds of thousands of rows that read cleanly before them; the caller
+ * decides what to do about the gap.
  */
 export class ArchiveReader {
   private manifestValue?: ArchiveManifest;
   private footerValue?: ArchiveFooter;
+  private skippedLines = 0;
 
   /** `source` is re-invoked per read, so one reader can be read twice. */
-  constructor(private readonly source: () => Readable) {}
+  constructor(
+    private readonly source: () => Readable,
+    /** Notified once per unreadable line, with the line already skipped. */
+    private readonly onBadRecord?: (description: string) => void,
+  ) {}
 
   /** Read an archive held entirely in memory (a fresh upload). */
   static fromBuffer(bytes: Buffer): ArchiveReader {
@@ -329,6 +343,16 @@ export class ArchiveReader {
 
   get manifest(): ArchiveManifest | undefined {
     return this.manifestValue;
+  }
+
+  /** True once the footer has been read — i.e. the archive was whole. */
+  get complete(): boolean {
+    return this.footerValue !== undefined;
+  }
+
+  /** Records dropped because they could not be parsed. */
+  get skippedRecords(): number {
+    return this.skippedLines;
   }
 
   /**
@@ -355,14 +379,15 @@ export class ArchiveReader {
         continue;
       }
 
-      let record: ArchiveRecord;
+      let record: ArchiveRecord | undefined;
       try {
         record = JSON.parse(line) as ArchiveRecord;
       } catch {
-        throw new ArchiveFormatError('Archive contains a malformed record');
+        record = undefined;
       }
       if (!record || typeof record.t !== 'string') {
-        throw new ArchiveFormatError('Archive contains a record with no table');
+        this.dropRecord('a record that could not be parsed');
+        continue;
       }
 
       if (record.t === FOOTER_TAG) {
@@ -370,15 +395,26 @@ export class ArchiveReader {
         return;
       }
 
-      yield {
-        table: record.t,
-        row: decodeValue(record.d) as Record<string, unknown>,
-      };
+      let row: Record<string, unknown>;
+      try {
+        row = decodeValue(record.d) as Record<string, unknown>;
+      } catch {
+        this.dropRecord(
+          `a '${record.t}' record whose values could not be read`,
+        );
+        continue;
+      }
+
+      yield { table: record.t, row };
     }
 
-    throw new ArchiveFormatError(
-      'Archive ends without its footer — the file is truncated or still uploading',
-    );
+    // EOF without a footer. Not thrown: `complete` already says so, and the
+    // caller is better placed to decide whether a partial load is acceptable.
+  }
+
+  private dropRecord(description: string): void {
+    this.skippedLines += 1;
+    this.onBadRecord?.(description);
   }
 
   private async *lines(): AsyncGenerator<string> {

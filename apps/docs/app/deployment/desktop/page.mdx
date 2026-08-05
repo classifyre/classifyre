@@ -1,0 +1,217 @@
+---
+title: Desktop App
+sidebarTitle: Desktop App
+description: Download and install the Classifyre desktop app for macOS, Windows, and Linux — what is bundled, where data lives, updates, and background mode.
+---
+
+import { Callout, Steps, Tabs } from "nextra/components";
+import { DesktopDownloads } from "../../../components/install-options";
+
+# Desktop App
+
+The desktop app is the fastest way to get Classifyre running: a single
+installer that carries the whole stack — the API, the web UI, the Python scan
+workers, and an embedded PostgreSQL. Nothing else has to be installed, and
+nothing leaves the machine.
+
+<DesktopDownloads />
+
+<Callout type="info">
+  The tiles above are resolved from the latest GitHub release, so the artifact,
+  architecture, and size are always the ones actually published.
+</Callout>
+
+---
+
+## What is inside the package
+
+| Component | Notes |
+|---|---|
+| **API** | The same NestJS API the cluster runs, started as a child process. |
+| **Web UI** | The Next.js app, served over an internal `app://` protocol. |
+| **PostgreSQL** | Embedded instance, started and stopped with the app. |
+| **Python + CLI** | A standalone CPython and a pre-baked virtualenv, so scans run without touching a system Python. |
+
+Because the API is the same one the Helm chart deploys, everything documented
+elsewhere in these docs — [sources](/sources/), [detectors](/detectors/),
+[investigations](/investigations/), the
+[MCP server](/settings/mcp-server/) — behaves identically here.
+
+---
+
+## Install
+
+<Tabs items={["macOS", "Windows", "Linux"]}>
+<Tabs.Tab>
+
+Open the `.dmg` and drag **Classifyre** to Applications. Release builds are
+signed and notarised, and update themselves in place.
+
+If you are running a build that was not signed (a local build, or a fork's CI
+artifact), Gatekeeper blocks the first launch. Use right-click → **Open**, or
+clear the quarantine flag:
+
+```bash
+xattr -cr /Applications/Classifyre.app
+```
+
+</Tabs.Tab>
+<Tabs.Tab>
+
+Windows ships as a portable archive rather than an installer: unzip it
+anywhere and run `Classifyre.exe`. Keep the folder intact — the bundled
+runtimes live next to the executable.
+
+</Tabs.Tab>
+<Tabs.Tab>
+
+Install the package for your distribution family:
+
+```bash
+# Debian / Ubuntu
+sudo dpkg -i classifyre_*.deb
+
+# Fedora / RHEL
+sudo rpm -i classifyre-*.rpm
+```
+
+Both `amd64` and `arm64` builds are published.
+
+</Tabs.Tab>
+</Tabs>
+
+---
+
+## First run
+
+<Steps>
+
+### Let the database initialise
+
+The first launch creates the embedded PostgreSQL data directory and runs the
+migrations. It takes a few seconds longer than later launches — the startup
+window reports what it is doing.
+
+### Create or open a workspace
+
+Local workspaces are listed in the app and in the tray menu. Each one gets its
+own schema, its own evidence, and its own AI memory — see
+[Workspaces](/how-it-works/workspaces/).
+
+### Connect a source
+
+Point it at something you already run, or at a folder on this machine. See
+[configuring sources](/sources/configuration/).
+
+### Enable detectors and scan
+
+The [pre-built packs](/detectors/pre-built/) work on the first scan with no
+model setup. Findings land ranked by importance.
+
+</Steps>
+
+---
+
+## Local folders as a source
+
+The desktop build exposes a **Local Folder** source type that server
+deployments deliberately do not: it scans a directory on the machine the app
+runs on, with a native folder picker. It is the shortest path from "I have a
+pile of documents" to a first finding.
+
+---
+
+## Where the data lives
+
+Everything is stored under the Electron `userData` directory, or under
+`CLASSIFYRE_DATA_DIR` when that environment variable is set:
+
+| Platform | Path |
+|---|---|
+| macOS | `~/Library/Application Support/Classifyre` |
+| Windows | `%APPDATA%\Classifyre` |
+| Linux | `~/.config/Classifyre` |
+
+Inside it:
+
+- `pgdata/` — the PostgreSQL data directory (workspaces, findings, cases)
+- `runner-logs/` — per-run scan logs as NDJSON, size-capped
+- `logs/` — application logs
+- `settings.json` — app-wide settings, such as the preferred database port
+- `uv-cache/` — the contained Python package cache, wiped when it exceeds its cap
+
+<Callout type="warning">
+  Deleting this directory deletes every local workspace and its investigation
+  history. Use [namespace export](/data-export/) first if you want to keep or
+  move the work — an export moves cleanly between the desktop app and a
+  cluster.
+</Callout>
+
+Source credentials are encrypted at rest in the embedded database, the same
+way they are in a cluster deployment.
+
+---
+
+## Updates
+
+The app checks GitHub Releases on launch and every six hours. When an update is
+available it is offered in the application menu and the tray menu.
+
+- **macOS (signed builds):** the update downloads in the background; the badge
+  becomes *Restart to update*, which installs it in place and relaunches.
+- **Windows and Linux:** the matching archive or package is downloaded to your
+  Downloads folder, then revealed (`.zip`) or handed to the system package
+  installer (`.deb`, `.rpm`).
+
+Because the database migrations run at startup, upgrading is just installing
+the newer build — see [Upgrade & versioning](/deployment/upgrade-and-versioning/).
+
+---
+
+## Background mode and the tray
+
+A tray item (menu-bar item on macOS) lists the local workspaces and can open
+them, run an update, or quit the app.
+
+**Keep Running in Background** is on by default: closing the window hides it
+while the API, the database, and any running scan keep going. The tray, the
+dock, or relaunching the app brings the window back. Quit from the tray to stop
+the services.
+
+---
+
+## Logs and troubleshooting
+
+The application menu has a **Logs** submenu — open the log file, reveal it in
+Finder or Explorer, open the logs folder, or copy its path. Scan logs are also
+readable per run inside the app.
+
+Common cases:
+
+- **Stuck on startup.** The embedded PostgreSQL could not claim its port.
+  The app picks another and records the preferred one in `settings.json`;
+  the log file names the port it tried.
+- **A scan fails immediately.** Open the run's log in the app — extraction runs
+  as a separate process and reports the source error verbatim.
+
+---
+
+## Remote workspaces
+
+The desktop app can list a workspace that lives on another Classifyre instance.
+It appears in the directory alongside the local ones and opens that instance in
+your browser; no data is copied to your machine. See
+[Workspaces](/how-it-works/workspaces/).
+
+---
+
+## Desktop or Kubernetes?
+
+Both distributions carry the same features, and a namespace export moves work
+between them, so this is not a decision you are locked into.
+
+| Choose desktop when | Choose [Kubernetes](/deployment/kubernetes/) when |
+|---|---|
+| You are evaluating, or investigating alone | A team shares the instance, split into workspaces |
+| The corpus is on this machine or reachable from it | Scans must run on a schedule, unattended |
+| Nothing may leave the laptop | The estate needs workers fanning out under load |

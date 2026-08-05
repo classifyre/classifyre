@@ -22,6 +22,10 @@ export class TransferProgress {
   private currentTable: string | null = null;
   private readonly counts: Record<string, number> = {};
   private readonly warnings: string[] = [];
+  private readonly tallies = new Map<
+    string,
+    { count: number; render: (count: number) => string }
+  >();
   private suppressedWarnings = 0;
   private lastFlush = 0;
   private cancelledFlag = false;
@@ -48,12 +52,16 @@ export class TransferProgress {
   }
 
   get collectedWarnings(): string[] {
+    const tallied = [...this.tallies.values()].map(({ count, render }) =>
+      render(count),
+    );
+    const all = [...this.warnings, ...tallied];
     return this.suppressedWarnings > 0
       ? [
-          ...this.warnings,
+          ...all,
           `…and ${this.suppressedWarnings} more warnings (see the API log).`,
         ]
-      : [...this.warnings];
+      : all;
   }
 
   setTotal(total: number): void {
@@ -71,6 +79,23 @@ export class TransferProgress {
 
   skip(rows: number): void {
     this.skipped += rows;
+  }
+
+  /**
+   * Record one occurrence of a recurring condition under `key`, rendered once
+   * at the end with its final count.
+   *
+   * The alternative — a `warn()` per row — either floods the warning list with
+   * the same sentence or, deduplicated, reduces "half a million rows lost a
+   * link" to a single unquantified line. Neither tells the operator how much of
+   * their import was affected. Keys are schema-shaped (`table.column`), so the
+   * map stays small no matter how many rows go through.
+   */
+  tally(key: string, count: number, render: (count: number) => string): void {
+    if (count <= 0) return;
+    const existing = this.tallies.get(key);
+    if (existing) existing.count += count;
+    else this.tallies.set(key, { count, render });
   }
 
   warn(message: string): void {

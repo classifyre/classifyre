@@ -1,16 +1,32 @@
 ---
 title: Deployment
 sidebarTitle: Overview
-description: Kubernetes and desktop deployment options for Classifyre.
+description: The two Classifyre distributions — the desktop app and the Helm chart — and how to choose between them.
 ---
+
+import { InstallOptions } from "../../components/install-options";
 
 # Deployment
 
-Classifyre supports two deployment paths:
+Classifyre ships in two distributions, with the same features in both:
 
-- **Kubernetes with Helm** for local clusters, production, high availability,
-  and horizontal scaling.
-- **Desktop** for an investigator running the packaged application locally.
+- **Desktop** — one installer for macOS, Windows, or Linux, with the database
+  and scan workers inside the package.
+- **Kubernetes with Helm** — for shared instances, production, high
+  availability, and horizontal scaling.
+
+A [namespace export](/data-export/) moves work from one to the other, so this
+is not a decision you are locked into.
+
+<InstallOptions />
+
+## Desktop
+
+The desktop package carries the API, the web UI, the Python scan workers, and
+an embedded PostgreSQL, so nothing else has to be installed. It is also the
+only build that can scan a local folder.
+
+[Read the desktop install guide](/deployment/desktop/).
 
 ## Kubernetes
 
@@ -30,13 +46,7 @@ graph TD
     Jobs --> API
 ```
 
-[Read the Kubernetes deployment guide](/deployment/kubernetes).
-
-## Desktop
-
-The desktop package includes the application resources required to run
-Classifyre on macOS, Windows, or Linux. Download it from the project’s GitHub
-releases.
+[Read the Kubernetes deployment guide](/deployment/kubernetes/).
 
 ## Platform components
 

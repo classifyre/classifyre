@@ -24,6 +24,8 @@ import {
   publicConnectionString,
   PUBLIC_SEARCH_PATH_OPTION,
 } from './namespace-registry.sql';
+import { withDbRetry } from '../db/db-retry';
+import { isTransientDbError } from '../db/transient-db-error';
 import type {
   CreateNamespaceInput,
   Namespace,
@@ -122,16 +124,43 @@ export class NamespaceRegistryService implements OnModuleInit, OnModuleDestroy {
   async resolve(segment: string): Promise<NamespaceLifecycleEvent | null> {
     const hit = this.resolveCache.get(segment);
     if (hit && hit.expiresAt > Date.now()) return hit.context;
-    if (hit) this.resolveCache.delete(segment);
+
     const byId = UUID_RE.test(segment);
-    const { rows } = await this.pool.query<NamespaceRow>(
-      `SELECT id, slug, schema_name FROM namespaces
-         WHERE ${byId ? 'id = $1' : 'slug = $1'}
-           AND type = 'local' AND status = 'active'`,
-      [segment],
-    );
+    let rows: NamespaceRow[];
+    try {
+      // Every request on a page passes through here, so a momentary registry
+      // hiccup would otherwise fail the whole view at once.
+      ({ rows } = await withDbRetry(
+        () =>
+          this.pool.query<NamespaceRow>(
+            `SELECT id, slug, schema_name FROM namespaces
+               WHERE ${byId ? 'id = $1' : 'slug = $1'}
+                 AND type = 'local' AND status = 'active'`,
+            [segment],
+          ),
+        { label: `namespace resolve '${segment}'` },
+      ));
+    } catch (error) {
+      // A stale entry is deliberately kept until a query replaces it: the
+      // slug → schema mapping barely ever changes, so serving it beats failing
+      // the request while the database is briefly unreachable. Invalidation on
+      // rename/delete is explicit (`resolveCache.delete`), not TTL-driven.
+      if (hit && isTransientDbError(error)) {
+        this.logger.warn(
+          `Registry unavailable while resolving '${segment}'; serving cached namespace: ${String(error)}`,
+        );
+        return hit.context;
+      }
+      this.resolveCache.delete(segment);
+      throw error;
+    }
+
     const row = rows[0];
-    if (!row) return null;
+    if (!row) {
+      // Renamed or deleted: drop the entry the stale-serving path above keeps.
+      this.resolveCache.delete(segment);
+      return null;
+    }
     const ctx: NamespaceLifecycleEvent = {
       namespaceId: row.id,
       slug: row.slug,

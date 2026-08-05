@@ -1,4 +1,5 @@
 import { Configuration } from "./generated/src/runtime";
+import { resilientFetch } from "./http";
 import {
   SearchFindingsFiltersInputDtoSeverityEnum,
   SearchFindingsFiltersInputDtoStatusEnum,
@@ -1087,6 +1088,8 @@ function createConfiguration(baseUrl?: string): Configuration {
 
   return new Configuration({
     basePath,
+    // Every generated endpoint inherits the transient-failure retry policy.
+    fetchApi: resilientFetch,
     middleware: [
       {
         pre: async (context) => {
@@ -1170,21 +1173,21 @@ class NamespacesApi {
   }
 
   async list(): Promise<Namespace[]> {
-    const res = await fetch(this.url(), { cache: "no-store" });
+    const res = await resilientFetch(this.url(), { cache: "no-store" });
     if (!res.ok) throw new Error(`Failed to list namespaces (${res.status})`);
     const namespaces = (await res.json()) as Namespace[];
     return namespaces.map((ns) => this.absolutizeThumbnail(ns));
   }
 
   async stats(): Promise<NamespaceStats[]> {
-    const res = await fetch(this.url("/stats"), { cache: "no-store" });
+    const res = await resilientFetch(this.url("/stats"), { cache: "no-store" });
     if (!res.ok)
       throw new Error(`Failed to load namespace stats (${res.status})`);
     return (await res.json()) as NamespaceStats[];
   }
 
   async get(id: string): Promise<Namespace> {
-    const res = await fetch(this.url(`/${encodeURIComponent(id)}`), {
+    const res = await resilientFetch(this.url(`/${encodeURIComponent(id)}`), {
       cache: "no-store",
     });
     if (!res.ok) throw new Error(`Failed to load namespace (${res.status})`);
@@ -1192,7 +1195,7 @@ class NamespacesApi {
   }
 
   async create(input: CreateNamespaceInput): Promise<Namespace> {
-    const res = await fetch(this.url(), {
+    const res = await resilientFetch(this.url(), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(input),
@@ -1211,7 +1214,7 @@ class NamespacesApi {
   }
 
   async update(id: string, input: UpdateNamespaceInput): Promise<Namespace> {
-    const res = await fetch(this.url(`/${encodeURIComponent(id)}`), {
+    const res = await resilientFetch(this.url(`/${encodeURIComponent(id)}`), {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(input),
@@ -1230,7 +1233,7 @@ class NamespacesApi {
   }
 
   async remove(id: string): Promise<void> {
-    const res = await fetch(this.url(`/${id}`), { method: "DELETE" });
+    const res = await resilientFetch(this.url(`/${id}`), { method: "DELETE" });
     if (!res.ok && res.status !== 204) {
       throw new Error(`Failed to delete namespace (${res.status})`);
     }
@@ -1298,7 +1301,7 @@ class ApiClient {
     request: SearchAssetsRequestInputDto,
   ): Promise<GeneratedSearchAssetsResponseDto> {
     const basePath = this.searchBase();
-    const response = await fetch(`${basePath}/search/assets`, {
+    const response = await resilientFetch(`${basePath}/search/assets`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -1320,7 +1323,7 @@ class ApiClient {
     request: SearchAssetsChartsRequestInputDto = {},
   ): Promise<GeneratedSearchAssetsChartsResponseDto> {
     const basePath = this.searchBase();
-    const response = await fetch(`${basePath}/search/assets/charts`, {
+    const response = await resilientFetch(`${basePath}/search/assets/charts`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -1342,7 +1345,7 @@ class ApiClient {
     request: GeneratedSearchFindingsChartsRequestDto = {},
   ): Promise<GeneratedSearchFindingsChartsResponseDto> {
     const basePath = this.searchBase();
-    const response = await fetch(`${basePath}/search/findings/charts`, {
+    const response = await resilientFetch(`${basePath}/search/findings/charts`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(request),
@@ -1362,7 +1365,7 @@ class ApiClient {
     request: GeneratedSearchSourcesRequestDto = {},
   ): Promise<GeneratedSearchSourcesResponseDto> {
     const basePath = this.searchBase();
-    const response = await fetch(`${basePath}/search/sources`, {
+    const response = await resilientFetch(`${basePath}/search/sources`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(request),
@@ -1382,7 +1385,7 @@ class ApiClient {
     request: SearchRunnersRequestInputDto = {},
   ): Promise<SearchRunnersResponseDto> {
     const basePath = this.searchBase();
-    const response = await fetch(`${basePath}/search/runners`, {
+    const response = await resilientFetch(`${basePath}/search/runners`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(request),
@@ -1402,7 +1405,7 @@ class ApiClient {
     request: SearchRunnersChartsRequestInputDto = {},
   ): Promise<SearchRunnersChartsResponseDto> {
     const basePath = this.searchBase();
-    const response = await fetch(`${basePath}/search/runners/charts`, {
+    const response = await resilientFetch(`${basePath}/search/runners/charts`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(request),
@@ -1422,7 +1425,7 @@ class ApiClient {
     request: SearchRunnerAssetsRequestInputDto,
   ): Promise<SearchRunnerAssetsResponseDto> {
     const basePath = this.searchBase();
-    const response = await fetch(`${basePath}/search/runner-assets`, {
+    const response = await resilientFetch(`${basePath}/search/runner-assets`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(request),
@@ -1450,7 +1453,7 @@ class ApiClient {
     const url = query.size
       ? `${basePath}/custom-detectors?${query.toString()}`
       : `${basePath}/custom-detectors`;
-    const response = await fetch(url);
+    const response = await resilientFetch(url);
 
     if (!response.ok) {
       const message = await response.text();
@@ -1464,7 +1467,7 @@ class ApiClient {
 
   async listCustomDetectorExamples(): Promise<CustomDetectorExampleDto[]> {
     const basePath = this.searchBase();
-    const response = await fetch(`${basePath}/custom-detectors/examples`);
+    const response = await resilientFetch(`${basePath}/custom-detectors/examples`);
 
     if (!response.ok) {
       const message = await response.text();
@@ -1478,7 +1481,7 @@ class ApiClient {
 
   async getCustomDetector(id: string): Promise<CustomDetectorResponseDto> {
     const basePath = this.searchBase();
-    const response = await fetch(`${basePath}/custom-detectors/${id}`);
+    const response = await resilientFetch(`${basePath}/custom-detectors/${id}`);
 
     if (!response.ok) {
       const message = await response.text();
@@ -1494,7 +1497,7 @@ class ApiClient {
     payload: CreateCustomDetectorDto,
   ): Promise<CustomDetectorResponseDto> {
     const basePath = this.searchBase();
-    const response = await fetch(`${basePath}/custom-detectors`, {
+    const response = await resilientFetch(`${basePath}/custom-detectors`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -1515,7 +1518,7 @@ class ApiClient {
     payload: UpdateCustomDetectorDto,
   ): Promise<CustomDetectorResponseDto> {
     const basePath = this.searchBase();
-    const response = await fetch(`${basePath}/custom-detectors/${id}`, {
+    const response = await resilientFetch(`${basePath}/custom-detectors/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -1536,7 +1539,7 @@ class ApiClient {
     payload: TrainCustomDetectorDto = {},
   ): Promise<CustomDetectorTrainingRunDto> {
     const basePath = this.searchBase();
-    const response = await fetch(`${basePath}/custom-detectors/${id}/train`, {
+    const response = await resilientFetch(`${basePath}/custom-detectors/${id}/train`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -1568,7 +1571,7 @@ class ApiClient {
     if (opts.labelColumn) formData.set("labelColumn", opts.labelColumn);
     if (opts.textColumn) formData.set("textColumn", opts.textColumn);
 
-    const response = await fetch(
+    const response = await resilientFetch(
       `${basePath}/custom-detectors/training-examples/parse`,
       {
         method: "POST",
@@ -1591,7 +1594,7 @@ class ApiClient {
     take = 20,
   ): Promise<CustomDetectorTrainingRunDto[]> {
     const basePath = this.searchBase();
-    const response = await fetch(
+    const response = await resilientFetch(
       `${basePath}/custom-detectors/${id}/training-history?take=${take}`,
     );
 
@@ -1609,7 +1612,7 @@ class ApiClient {
     findingId: string,
   ): Promise<CustomDetectorExtractionDto | null> {
     const basePath = this.searchBase();
-    const response = await fetch(
+    const response = await resilientFetch(
       `${basePath}/findings/${findingId}/extraction`,
     );
     if (response.status === 404) return null;
@@ -1637,7 +1640,7 @@ class ApiClient {
     const url = query.size
       ? `${basePath}/custom-detectors/${detectorId}/extractions?${query.toString()}`
       : `${basePath}/custom-detectors/${detectorId}/extractions`;
-    const response = await fetch(url);
+    const response = await resilientFetch(url);
     if (!response.ok) {
       const message = await response.text();
       throw new Error(
@@ -1651,7 +1654,7 @@ class ApiClient {
     detectorId: string,
   ): Promise<ExtractionCoverageDto> {
     const basePath = this.searchBase();
-    const response = await fetch(
+    const response = await resilientFetch(
       `${basePath}/custom-detectors/${detectorId}/extractions/coverage`,
     );
     if (!response.ok) {
@@ -1665,7 +1668,7 @@ class ApiClient {
 
   async getSchedule(sourceId: string): Promise<SourceScheduleDto> {
     const basePath = this.searchBase();
-    const response = await fetch(`${basePath}/sources/${sourceId}/schedule`);
+    const response = await resilientFetch(`${basePath}/sources/${sourceId}/schedule`);
 
     if (!response.ok) {
       const message = await response.text();
@@ -1679,7 +1682,7 @@ class ApiClient {
 
   async aiComplete(messages: AiMessageDto[]): Promise<AiCompleteResponseDto> {
     const basePath = this.searchBase();
-    const response = await fetch(`${basePath}/ai/complete`, {
+    const response = await resilientFetch(`${basePath}/ai/complete`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ messages } satisfies AiCompleteRequestDto),
@@ -1699,7 +1702,7 @@ class ApiClient {
     payload: AssistantChatRequest,
   ): Promise<AssistantChatResponse> {
     const basePath = this.searchBase();
-    const response = await fetch(`${basePath}/assistant/respond`, {
+    const response = await resilientFetch(`${basePath}/assistant/respond`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -1728,7 +1731,7 @@ class ApiClient {
         : "upload.txt");
     formData.set("file", file, fallbackName);
 
-    const response = await fetch(`${basePath}/assistant/parse-upload`, {
+    const response = await resilientFetch(`${basePath}/assistant/parse-upload`, {
       method: "POST",
       body: formData,
     });
@@ -1745,7 +1748,7 @@ class ApiClient {
 
   async listTestScenarios(detectorId: string): Promise<TestScenarioDto[]> {
     const basePath = this.searchBase();
-    const response = await fetch(
+    const response = await resilientFetch(
       `${basePath}/custom-detectors/${detectorId}/test-scenarios`,
     );
     if (!response.ok) {
@@ -1762,7 +1765,7 @@ class ApiClient {
     payload: CreateTestScenarioDto,
   ): Promise<TestScenarioDto> {
     const basePath = this.searchBase();
-    const response = await fetch(
+    const response = await resilientFetch(
       `${basePath}/custom-detectors/${detectorId}/test-scenarios`,
       {
         method: "POST",
@@ -1784,7 +1787,7 @@ class ApiClient {
     scenarioId: string,
   ): Promise<void> {
     const basePath = this.searchBase();
-    const response = await fetch(
+    const response = await resilientFetch(
       `${basePath}/custom-detectors/${detectorId}/test-scenarios/${scenarioId}`,
       { method: "DELETE" },
     );
@@ -1801,7 +1804,7 @@ class ApiClient {
     triggeredBy: TestTrigger = "MANUAL",
   ): Promise<RunTestsResponseDto> {
     const basePath = this.searchBase();
-    const response = await fetch(
+    const response = await resilientFetch(
       `${basePath}/custom-detectors/${detectorId}/test-scenarios/run?triggeredBy=${triggeredBy}`,
       { method: "POST" },
     );
@@ -1816,7 +1819,7 @@ class ApiClient {
 
   async deleteCustomDetector(id: string): Promise<{ deleted: true }> {
     const basePath = this.searchBase();
-    const response = await fetch(`${basePath}/custom-detectors/${id}`, {
+    const response = await resilientFetch(`${basePath}/custom-detectors/${id}`, {
       method: "DELETE",
     });
 
@@ -1834,7 +1837,7 @@ class ApiClient {
     detectorId: string,
   ): Promise<TrainingExampleDto[]> {
     const basePath = this.searchBase();
-    const response = await fetch(
+    const response = await resilientFetch(
       `${basePath}/custom-detectors/${detectorId}/training-examples`,
     );
     if (!response.ok) {
@@ -1852,7 +1855,7 @@ class ApiClient {
     clearExisting = false,
   ): Promise<{ saved: number }> {
     const basePath = this.searchBase();
-    const response = await fetch(
+    const response = await resilientFetch(
       `${basePath}/custom-detectors/${detectorId}/training-examples`,
       {
         method: "POST",
@@ -1874,7 +1877,7 @@ class ApiClient {
     exampleId: string,
   ): Promise<{ deleted: true }> {
     const basePath = this.searchBase();
-    const response = await fetch(
+    const response = await resilientFetch(
       `${basePath}/custom-detectors/${detectorId}/training-examples/${exampleId}`,
       { method: "DELETE" },
     );
@@ -1891,7 +1894,7 @@ class ApiClient {
     detectorId: string,
   ): Promise<{ deleted: number }> {
     const basePath = this.searchBase();
-    const response = await fetch(
+    const response = await resilientFetch(
       `${basePath}/custom-detectors/${detectorId}/training-examples`,
       { method: "DELETE" },
     );
@@ -1913,7 +1916,7 @@ class ApiClient {
     },
   ): Promise<SourceScheduleDto> {
     const basePath = this.searchBase();
-    const response = await fetch(`${basePath}/sources/${sourceId}/schedule`, {
+    const response = await resilientFetch(`${basePath}/sources/${sourceId}/schedule`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(schedule),

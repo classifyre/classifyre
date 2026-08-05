@@ -1,6 +1,6 @@
 import './tracing';
 import 'dotenv/config';
-import { NestFactory } from '@nestjs/core';
+import { NestFactory, Reflector } from '@nestjs/core';
 import {
   FastifyAdapter,
   NestFastifyApplication,
@@ -15,6 +15,7 @@ import { McpServerFactoryService } from './mcp-server.factory';
 import { McpTokenService } from './mcp-token.service';
 import { InstanceSettingsService } from './instance-settings.service';
 import { PrismaExceptionFilter } from './filters/prisma-exception.filter';
+import { DbRetryInterceptor } from './interceptors/db-retry.interceptor';
 import { applyAllPendingMigrations } from './database-migrations';
 import { ClsService } from 'nestjs-cls';
 import { NamespaceRegistryService } from './registry/namespace-registry.service';
@@ -118,6 +119,11 @@ async function bootstrap() {
     pressureHandler: () => undefined,
     exposeStatusRoute: '/api/health/pressure',
   });
+
+  // Retry read-only handlers that hit a transient database error (pool
+  // starvation, transaction start timeout, dropped connection) before the
+  // client ever sees a failure. Mutations are left alone — see the interceptor.
+  app.useGlobalInterceptors(new DbRetryInterceptor(app.get(Reflector)));
 
   // Map transient Prisma overload errors (P2028, P2034, P2024) to 503 so the
   // CLI retry policy handles them the same way as under-pressure rejections.

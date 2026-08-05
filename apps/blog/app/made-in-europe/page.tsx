@@ -15,7 +15,7 @@ import {
 import { Reveal } from "@/components/reveal";
 import {
   demoUrl,
-  desktopDownloadUrl,
+  releasesLatestUrl,
   docs,
   enterpriseContactEmail,
   repoUrl,
@@ -457,7 +457,7 @@ export default function MadeInEuropePage() {
                 size="lg"
                 className="border-2 border-accent bg-accent text-black hover:bg-accent/90"
               >
-                <a href={desktopDownloadUrl} target="_blank" rel="noreferrer">
+                <a href={releasesLatestUrl} target="_blank" rel="noreferrer">
                   Download Classifyre
                 </a>
               </Button>

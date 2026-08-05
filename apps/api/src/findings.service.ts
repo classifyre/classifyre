@@ -557,7 +557,10 @@ export class FindingsService {
       };
     }
 
-    const [findings, total] = await this.prisma.$transaction([
+    // Plain Promise.all — a list page and its total need no shared snapshot,
+    // and wrapping them in a transaction only added a pool acquire that timed
+    // out (P2028) under concurrent overview traffic.
+    const [findings, total] = await Promise.all([
       this.prisma.finding.findMany({
         where,
         select: this.searchFindingSelect,
