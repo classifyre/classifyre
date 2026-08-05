@@ -7,6 +7,7 @@ import {
   siDatabricks,
   siDropbox,
   siElasticsearch,
+  siGit,
   siGithub,
   siGoogledocs,
   siGoogledrive,
@@ -163,6 +164,7 @@ const SOURCE_SIMPLE_ICON_BY_INGESTION_TYPE: Record<
   [CreateSourceDtoTypeEnum.GoogleWorkspace]: siGoogledrive,
   [CreateSourceDtoTypeEnum.Dropbox]: siDropbox,
   [CreateSourceDtoTypeEnum.HuggingFace]: siHuggingface,
+  [CreateSourceDtoTypeEnum.Git]: siGit,
 };
 
 const SOURCE_CUSTOM_ICON_BY_INGESTION_TYPE: Partial<
@@ -223,6 +225,7 @@ const SOURCE_ICON_BY_INGESTION_TYPE: Record<ApiSourceType, IconComponent> = {
   [CreateSourceDtoTypeEnum.Dropbox]: createSimpleIconComponent(siDropbox),
   [CreateSourceDtoTypeEnum.HuggingFace]:
     createSimpleIconComponent(siHuggingface),
+  [CreateSourceDtoTypeEnum.Git]: createSimpleIconComponent(siGit),
 };
 
 const SOURCE_ICON_BY_INGESTION_TYPE_LOWERCASE: Record<string, IconComponent> =

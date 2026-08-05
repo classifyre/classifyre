@@ -8,6 +8,7 @@ import crypto from "crypto";
 import treeKill from "tree-kill";
 import { ensurePythonRuntime } from "./python-env.js";
 import { getLogFilePath } from "./logger.js";
+import { gitEnv } from "./git-env.js";
 import { sofficeEnv } from "./soffice-env.js";
 
 // In dev mode we inherit the developer's login-shell PATH so locally installed
@@ -506,6 +507,10 @@ export class ProcessManager {
         // Legacy Office (.doc/.xls/.ppt) extraction shells out to a system
         // LibreOffice, which the desktop bundle does not ship (see soffice-env.ts).
         ...sofficeEnv(),
+        // Git-repository scans shell out to the git binary. Pinned explicitly
+        // so a scan never picks up the user's own git — and with it their
+        // ~/.gitconfig, credential helpers and SSH agent (see git-env.ts).
+        ...gitEnv(),
         // Persist scan logs on the local filesystem (desktop has no S3).
         // The storage service enforces per-run and total-size caps itself.
         RUNNER_LOG_DIR: getRunnerLogDir(),

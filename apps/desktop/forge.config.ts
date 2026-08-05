@@ -14,7 +14,10 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // 'api' is a directory on Linux/Windows but a single api.tar.gz on macOS
 // (65k loose node_modules files made Apple's notary scan take hours); the
 // existsSync filter below picks whichever the staging script produced.
-const allResources = ['api', 'api.tar.gz', 'web', 'pg', 'venv', 'python', 'pyapp', 'models'];
+// 'git' is present only where the staging script bundles one — Windows always,
+// and elsewhere when GIT_PORTABLE_DIR pointed at a relocatable build. Absent, the
+// CLI falls back to the system git (see src/main/git-env.ts).
+const allResources = ['api', 'api.tar.gz', 'web', 'pg', 'venv', 'python', 'pyapp', 'models', 'git'];
 const extraResource = allResources
   .map((name) => path.resolve(__dirname, 'resources', name))
   .filter((abs) => fs.existsSync(abs));

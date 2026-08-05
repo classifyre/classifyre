@@ -109,7 +109,8 @@ export const UpdateSourceDtoTypeEnum = {
     GoogleWorkspace: 'GOOGLE_WORKSPACE',
     Dropbox: 'DROPBOX',
     HuggingFace: 'HUGGING_FACE',
-    Sandbox: 'SANDBOX'
+    Sandbox: 'SANDBOX',
+    Git: 'GIT'
 } as const;
 export type UpdateSourceDtoTypeEnum = typeof UpdateSourceDtoTypeEnum[keyof typeof UpdateSourceDtoTypeEnum];
 

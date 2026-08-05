@@ -6,6 +6,7 @@ export type SourceCatalogCategory =
   | "DATABASES"
   | "GRAPH_DATABASES"
   | "WAREHOUSE_LAKEHOUSE"
+  | "CODE_REPOSITORIES"
   | "STREAMING"
   | "WEB_AND_UGC"
   | "SOCIAL_MEDIA"
@@ -48,6 +49,10 @@ export const SOURCE_CATEGORY_META: Record<
     label: "Warehouse & Lakehouse",
     description: "Analytical compute platforms and catalog-first ingestion.",
   },
+  CODE_REPOSITORIES: {
+    label: "Code Repositories",
+    description: "Version-controlled source, configuration, and documentation.",
+  },
   STREAMING: {
     label: "Streaming",
     description: "Event streams and message brokers sampled for content.",
@@ -80,6 +85,7 @@ export const SOURCE_CATEGORY_ORDER: SourceCatalogCategory[] = [
   "DATABASES",
   "GRAPH_DATABASES",
   "WAREHOUSE_LAKEHOUSE",
+  "CODE_REPOSITORIES",
   "STREAMING",
   "WEB_AND_UGC",
   "SOCIAL_MEDIA",
@@ -386,6 +392,26 @@ export const SOURCE_TYPE_CATALOG_META: Record<string, SourceCatalogMetaBase> = {
       "parquet",
       "hub",
       "ml",
+    ],
+  },
+  GIT: {
+    description:
+      "Scan the source, configuration, and documents on one branch of any Git repository — GitHub, GitLab, Bitbucket, Azure DevOps, or self-hosted.",
+    icon: CreateSourceDtoTypeEnum.Git,
+    category: "CODE_REPOSITORIES",
+    keywords: [
+      "git",
+      "github",
+      "gitlab",
+      "bitbucket",
+      "azure devops",
+      "gitea",
+      "repository",
+      "repo",
+      "source code",
+      "branch",
+      "clone",
+      "ssh",
     ],
   },
 };

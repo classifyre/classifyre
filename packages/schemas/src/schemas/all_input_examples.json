@@ -3371,5 +3371,165 @@
         ]
       }
     }
+  ],
+  "GIT": [
+    {
+      "name": "Public repository secret sweep",
+      "description": "Scan a public GitHub repository for hard-coded credentials — no authentication, and the clone is thrown away when the run ends",
+      "schedule": {
+        "enabled": true,
+        "preset": "nightly",
+        "cron": "17 2 * * *",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "GIT",
+        "required": {
+          "repository_url": "https://github.com/your-org/your-repo.git"
+        },
+        "masked": {},
+        "optional": {
+          "auth": {
+            "auth_method": "none"
+          },
+          "scope": {
+            "branch": "main",
+            "exclude_paths": [
+              "node_modules",
+              "vendor",
+              "**/dist/*"
+            ],
+            "exclude_extensions": [
+              ".png",
+              ".jpg",
+              ".lock"
+            ]
+          }
+        },
+        "sampling": {
+          "strategy": "ALL",
+          "rows_per_page": 100
+        },
+        "detectors": [
+          {
+            "type": "SECRETS",
+            "enabled": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "Private GitLab repository over token auth",
+      "description": "Scan configuration and infrastructure folders of a private GitLab repository using a read-only deploy token",
+      "schedule": {
+        "enabled": true,
+        "preset": "weekly",
+        "cron": "35 3 * * 1",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "GIT",
+        "required": {
+          "repository_url": "https://gitlab.com/your-group/your-repo.git"
+        },
+        "masked": {
+          "token": "glpat-your-read-token"
+        },
+        "optional": {
+          "auth": {
+            "auth_method": "token"
+          },
+          "scope": {
+            "branch": "main",
+            "include_paths": [
+              "config",
+              "deploy",
+              "docs"
+            ],
+            "exclude_paths": [
+              "docs/archive"
+            ],
+            "include_last_commit": true
+          },
+          "connection": {
+            "clone_strategy": "blob_limit",
+            "depth": 0,
+            "max_object_bytes": 26214400
+          }
+        },
+        "sampling": {
+          "strategy": "AUTOMATIC",
+          "rows_per_page": 100
+        },
+        "detectors": [
+          {
+            "type": "SECRETS",
+            "enabled": true
+          },
+          {
+            "type": "PII",
+            "enabled": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "Self-hosted repository over SSH",
+      "description": "Scan a very large internal repository over SSH, cataloguing the file tree first and pulling each sampled file on its own",
+      "schedule": {
+        "enabled": false,
+        "preset": "weekly",
+        "cron": "12 4 * * 6",
+        "timezone": "UTC"
+      },
+      "config": {
+        "type": "GIT",
+        "required": {
+          "repository_url": "git@git.internal.example.com:platform/monorepo.git"
+        },
+        "masked": {
+          "ssh_private_key": "-----BEGIN OPENSSH PRIVATE KEY-----\nyour-key-material\n-----END OPENSSH PRIVATE KEY-----\n"
+        },
+        "optional": {
+          "auth": {
+            "auth_method": "ssh_key",
+            "ssh_known_hosts": "git.internal.example.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA...",
+            "ssh_strict_host_key_checking": true
+          },
+          "scope": {
+            "branch": "develop",
+            "include_paths": [
+              "services",
+              "platform"
+            ],
+            "exclude_paths": [
+              "**/testdata/*"
+            ],
+            "include_extensions": [
+              ".py",
+              ".ts",
+              ".sql",
+              ".yaml",
+              ".env"
+            ]
+          },
+          "connection": {
+            "clone_strategy": "blobless",
+            "clone_timeout_seconds": 3600,
+            "max_file_bytes": 52428800
+          }
+        },
+        "sampling": {
+          "strategy": "AUTOMATIC",
+          "rows_per_page": 200
+        },
+        "detectors": [
+          {
+            "type": "SECRETS",
+            "enabled": true
+          }
+        ]
+      }
+    }
   ]
 }
