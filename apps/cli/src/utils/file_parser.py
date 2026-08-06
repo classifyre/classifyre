@@ -732,6 +732,28 @@ def _refine_zip_mime(source: BinarySource) -> str:
     return "application/zip"
 
 
+def _null_bytes_look_interleaved(sample: bytes, unit: int) -> bool:
+    """
+    Whether the null bytes sit where a fixed-width encoding would put them.
+
+    This is the structural signal that separates real UTF-16/32 from binary
+    that merely happens to contain a null. Text in a fixed-width encoding pads
+    every character to `unit` bytes, so for any script whose code points fit in
+    the low byte the padding lands at the SAME offset within every unit, and it
+    is common: roughly half the bytes for UTF-16 Latin text, three quarters for
+    UTF-32. Binary with an incidental null shows neither property.
+    """
+    if len(sample) < unit * 2:
+        return False
+    nulls = sample.count(0)
+    # Well under what padding produces, so the nulls are incidental.
+    if nulls * unit < len(sample) * 0.5:
+        return False
+    offsets = {i % unit for i, byte in enumerate(sample) if byte == 0}
+    # Padding occupies fixed positions; scattered nulls are not padding.
+    return len(offsets) < unit
+
+
 def _is_null_byte_unicode_text(file_bytes: bytes) -> bool:
     """UTF-16/32 text interleaves null bytes with every character — still text."""
     # \xff\xfe prefixes both UTF-16 LE and UTF-32 LE BOMs.
@@ -751,6 +773,14 @@ def _is_null_byte_unicode_text(file_bytes: bytes) -> bool:
         sample = sample[: len(sample) - len(sample) % unit]
         decoded = sample.decode(encoding)
         if not decoded:
+            return False
+        # Printability alone is not enough either, and this is where short
+        # binary payloads got through: chardet calls b"\x00\x01\x02\x03binary"
+        # utf-16-le with 0.95 confidence, it decodes to CJK code points, and
+        # every one of those is `isprintable()`. So the payload was reported as
+        # text/plain and the parser tried to read it as text. Require the nulls
+        # to sit where an encoding's padding would actually put them.
+        if not _null_bytes_look_interleaved(sample, unit):
             return False
         printable = sum(1 for ch in decoded if ch.isprintable() or ch.isspace())
         return printable / len(decoded) >= 0.9

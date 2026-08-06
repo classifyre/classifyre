@@ -80,6 +80,26 @@ class TestDetectMimeType:
         result = detect_mime_type(b"")
         assert result == "application/octet-stream"
 
+    def test_utf16_text_with_bom_is_text(self) -> None:
+        payload = "hello world this is plain utf16 text".encode("utf-16")
+        assert detect_mime_type(payload) == "text/plain"
+
+    def test_utf16_text_without_bom_is_text(self) -> None:
+        # No BOM, so this reaches the heuristic rather than the prefix check.
+        payload = "hello world this is plain utf16 text".encode("utf-16-le")
+        assert detect_mime_type(payload) == "text/plain"
+
+    def test_binary_is_not_mistaken_for_utf16(self) -> None:
+        # chardet calls this utf-16-le with 0.95 confidence and it decodes to
+        # CJK code points, every one of which is `isprintable()` — so a
+        # printability check alone accepted it as text. Real UTF-16 pads every
+        # character to a fixed width, putting its nulls at a consistent offset
+        # and in quantity; incidental nulls in binary do neither.
+        assert detect_mime_type(b"\x00\x01\x02\x03binary") == "application/octet-stream"
+        assert detect_mime_type(b"\x00\x01\x02\x03\x04\x05\x06\x07more binary") == (
+            "application/octet-stream"
+        )
+
 
 # ---------------------------------------------------------------------------
 # extract_text
