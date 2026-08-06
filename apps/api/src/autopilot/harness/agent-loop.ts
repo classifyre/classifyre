@@ -8,6 +8,7 @@ import {
 import { AgentAuditService } from '../audit/agent-audit.service';
 import { AgentLoggerService } from '../audit/agent-logger.service';
 import { AgentRunCancelledError } from '../agent-runtime';
+import { AGENT_RUN_BUDGET_MS } from '../autopilot.constants';
 import type { ApplySummary } from '../decision-applier.service';
 import { ToolDispatcherService } from '../tools/tool-dispatcher.service';
 import { ToolRegistry } from '../tools/tool-registry.service';
@@ -159,9 +160,22 @@ export async function runAgentLoop(
     opts.missionPrimer,
   );
 
+  // Wall-clock budget, not just an iteration budget. Iterations bound how many
+  // times the model may think; they do not bound how long one of those turns
+  // takes, and a provider that accepts a connection and then never answers
+  // makes a single turn unbounded. The handler running this loop holds one of
+  // the instance's job slots (default: one, shared by every namespace and
+  // queue), so an unbounded run does not fail alone — it freezes everything.
+  const deadline = Date.now() + AGENT_RUN_BUDGET_MS;
+  let outOfTime = false;
+
   while (!progress.done && progress.iteration < mission.maxIterations) {
     if (await deps.audit.isCancelled(runId)) {
       throw new AgentRunCancelledError(runId);
+    }
+    if (Date.now() > deadline) {
+      outOfTime = true;
+      break;
     }
     progress.iteration++;
 
@@ -235,7 +249,9 @@ export async function runAgentLoop(
   }
 
   if (!progress.done) {
-    progress.summary = `Reached the ${mission.maxIterations}-iteration budget without finishing.`;
+    progress.summary = outOfTime
+      ? `Stopped after ${Math.round(AGENT_RUN_BUDGET_MS / 60_000)} minutes without finishing — the model or a tool was not responding. Whatever was applied before this point stands; a later cycle picks the work up.`
+      : `Reached the ${mission.maxIterations}-iteration budget without finishing.`;
     await deps.log.business(runId, progress.summary, undefined, 'WARN');
     await persist(ctx, deps.audit, progress);
   }

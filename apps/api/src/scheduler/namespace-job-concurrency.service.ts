@@ -125,8 +125,27 @@ export class NamespaceJobConcurrencyService {
   }
 }
 
+/**
+ * Default concurrent background jobs for the whole instance.
+ *
+ * This is a GLOBAL semaphore: every pg-boss handler in every namespace and
+ * every queue waits on it. At 1 the instance processed exactly one background
+ * job at a time, so a single slow handler stalled everything else — and a
+ * single wedged one stopped the app dead. Seen on desktop: one agent run hung
+ * on an unresponsive local model held the only slot for hours, so scheduler
+ * ticks piled up and timed out at 900s, scan hand-offs never reached the
+ * autopilot, and four namespaces did nothing at all.
+ *
+ * Four keeps the rationing that made the limit worth having — the point is to
+ * stop N namespaces stampeding one machine — while leaving room for the
+ * control-plane work (a one-minute scheduler tick, a scan hand-off) to get
+ * through alongside one long job. Operators who need the old behaviour can
+ * still set MAX_CONCURRENT_NAMESPACE_JOBS=1.
+ */
+const DEFAULT_LIMIT = 4;
+
 function parseLimit(raw: string | undefined): number {
-  if (raw === undefined || raw.trim() === '') return 1;
+  if (raw === undefined || raw.trim() === '') return DEFAULT_LIMIT;
   const value = Number.parseInt(raw, 10);
   if (!Number.isFinite(value) || value < 0) {
     throw new Error(

@@ -13,6 +13,7 @@ import { HarnessService } from './harness/harness.service';
 import { AgentRunCancelledError } from './agent-runtime';
 import type { ApplySummary } from './decision-applier.service';
 import {
+  AGENT_RUN_STALE_AFTER_MS,
   AUTOPILOT_CORPUS_SINGLETON_KEY,
   AUTOPILOT_DREAM_CRON,
   AUTOPILOT_MAX_READINESS_REQUEUES,
@@ -85,6 +86,7 @@ export class AutopilotWorker {
    * NamespaceWorkerManager inside the namespace's CLS context).
    */
   async registerForNamespace(): Promise<void> {
+    await this.reapStaleRuns();
     const boss = await this.pgBoss.getBossAsync();
     await boss.createQueue(AUTOPILOT_QUEUE);
     await this.pgBoss.work(AUTOPILOT_QUEUE, { localConcurrency: 1 }, (jobs) =>
@@ -104,6 +106,47 @@ export class AutopilotWorker {
       );
     }
     this.logger.log(`Registered worker for queue ${AUTOPILOT_QUEUE}`);
+  }
+
+  /**
+   * Fail agent runs left RUNNING far past any plausible duration.
+   *
+   * A run wedged on an unresponsive provider keeps its status forever: nothing
+   * finalises it, so the UI shows a permanently "active" run and
+   * `openRun` will not reuse the cycle key. The DUPLICATES worker has recovered
+   * its own stale runs on startup for a while; the LLM-driven kinds need it
+   * more, because they are the ones that can hang for hours on a network call.
+   *
+   * Time-based rather than "everything RUNNING at boot": a worker registering
+   * for a second namespace must not fail a run that is legitimately in flight
+   * for the first one.
+   */
+  private async reapStaleRuns(): Promise<void> {
+    try {
+      const cutoff = new Date(Date.now() - AGENT_RUN_STALE_AFTER_MS);
+      const result = await this.prisma.agentRun.updateMany({
+        where: {
+          status: AgentRunStatus.RUNNING,
+          startedAt: { lt: cutoff },
+        },
+        data: {
+          status: AgentRunStatus.FAILED,
+          error:
+            'Run exceeded its maximum lifetime without finishing (provider or tool never responded).',
+          finishedAt: new Date(),
+        },
+      });
+      if (result.count > 0) {
+        this.logger.warn(
+          `Reaped ${result.count} stale agent run(s) that were still RUNNING past the maximum lifetime.`,
+        );
+      }
+    } catch (error) {
+      // Never block worker registration on cleanup.
+      this.logger.warn(
+        `Failed to reap stale agent runs: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
   }
 
   private async handle(jobs: Job[]): Promise<void> {
