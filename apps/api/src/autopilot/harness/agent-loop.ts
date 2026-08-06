@@ -548,13 +548,21 @@ function buildUserPrompt(ctx: AgentContext, mission: Mission): string {
     );
   }
   if (ctx.evidenceAnalysisPending) {
+    const open = ctx.evidenceCoverage?.open ?? 0;
+    const scored = ctx.evidenceCoverage?.analyzed ?? 0;
+    // State the real ratio. "Scores are partial" reads very differently at
+    // 700/749 than at 1/749, and the missions were given the mild version while
+    // findings.ranked was returning essentially nothing — so every cycle they
+    // stood down citing "ranking unavailable" and wrote a memory note about it.
+    const scale =
+      open > 0 && scored / open < 0.1
+        ? `Only ${scored} of ${open} open findings have been scored so far, so findings.ranked is close to EMPTY — not because the findings are unimportant, but because scoring has not reached them yet.`
+        : `${scored} of ${open} open findings have been scored, so findings.ranked is showing a subset.`;
     lines.push(
-      'NOTE: a significant share of the open findings have no importance score yet, and an ' +
-        'unscored finding is indistinguishable from an unimportant one. So findings.ranked is ' +
-        'showing you a subset: what it ranks is real, but things missing from it may simply be ' +
-        'unscored. Do not read its absence as unimportance — check findings.search too before ' +
-        'concluding there is nothing here. This is a reason to verify against the underlying ' +
-        'evidence, not a reason to do nothing.',
+      `${scale} Do not read absence from findings.ranked as unimportance, and do NOT stand down ` +
+        'for it: read the findings directly with findings.search and findings.explain and judge ' +
+        'them on their content. An unscored corpus is a reason to look harder, not a reason to ' +
+        'wait — nothing else will look at these findings before the next cycle.',
     );
   }
 

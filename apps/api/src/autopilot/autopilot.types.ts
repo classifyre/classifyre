@@ -309,6 +309,8 @@ export interface AgentContext {
    * Importance scores in this run are partial and the missions are told so.
    */
   evidenceAnalysisPending?: boolean;
+  /** Open vs scored finding counts, so the prompt can state the real ratio. */
+  evidenceCoverage?: { open: number; analyzed: number };
   /** Validated output of each completed step, keyed by step name. */
   state: Record<string, unknown>;
 }

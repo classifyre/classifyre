@@ -100,7 +100,7 @@ export class KnowledgeToolset {
       {
         name: 'memory.write',
         description:
-          'Record a long-lived memory the agent should recall in future cycles (decision precedent, entity map, source profile, detector insight, or sacred operator directive). NOT for vocabulary: real-world names, organizations, codenames and jargon belong in glossary.propose, never here. Memories you write are UNVERIFIED hypotheses by default; set verified=true ONLY when you checked the claim against real system state this cycle (e.g. inspected the actual findings). Never mark a summary of state you did not directly observe as verified.',
+          'Record a long-lived memory the agent should recall in future cycles (decision precedent, entity map, source profile, detector insight, or sacred operator directive). Memory is for durable facts that change a FUTURE decision — not a diary. Do NOT record that a cycle reviewed things and found nothing new, or that ranking was unavailable: the run summary already says so, one such note per cycle buries the memories that matter, and every one of them is re-read and re-billed on every later run. NOT for vocabulary: real-world names, organizations, codenames and jargon belong in glossary.propose, never here. Memories you write are UNVERIFIED hypotheses by default; set verified=true ONLY when you checked the claim against real system state this cycle (e.g. inspected the actual findings). Never mark a summary of state you did not directly observe as verified.',
         inputSchema: {
           type: 'object',
           properties: {

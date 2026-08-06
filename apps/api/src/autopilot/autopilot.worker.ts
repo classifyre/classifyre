@@ -49,6 +49,7 @@ interface CycleInput {
 interface CycleScope {
   batchSources?: Array<{ id: string; name: string }>;
   evidenceAnalysisPending?: boolean;
+  evidenceCoverage?: { open: number; analyzed: number };
 }
 
 interface DirtySource {
@@ -316,7 +317,15 @@ export class AutopilotWorker {
     // when every finding in scope was in fact scored. What the missions need to
     // know is whether the findings they are about to triage have importance
     // scores, and that is a question about the data.
-    const evidenceAnalysisPending = await this.evidenceScoresIncomplete();
+    // Carry the actual numbers, not just a flag. "Scores are partial" reads
+    // very differently at 700/749 than at 1/749, and the missions were told the
+    // mild version while `findings.ranked` was returning essentially nothing —
+    // so they stood down every cycle citing "ranking unavailable".
+    const evidenceCoverage = await this.evidenceCoverageSafe();
+    const evidenceAnalysisPending =
+      evidenceCoverage.open > 0 &&
+      evidenceCoverage.analyzed / evidenceCoverage.open <
+        EVIDENCE_ANALYSIS_MIN_COVERAGE;
     if (blocked) {
       this.logger.warn(
         `Proceeding with autopilot cycle after ${attempts} readiness requeue(s); ${blocked} is still pending.`,
@@ -349,6 +358,7 @@ export class AutopilotWorker {
     const scope: CycleScope = {
       batchSources: cycle.corpus ? batchSources : undefined,
       evidenceAnalysisPending,
+      evidenceCoverage,
     };
 
     // An explicit agent set ("only") is operator intent: run exactly those
@@ -516,6 +526,7 @@ export class AutopilotWorker {
       batchSources: scope.batchSources,
       expressReason: cycle.expressReason ?? null,
       evidenceAnalysisPending: scope.evidenceAnalysisPending,
+      evidenceCoverage: scope.evidenceCoverage,
       state: {},
     };
     try {
@@ -648,14 +659,15 @@ export class AutopilotWorker {
    * not make findings.ranked untrustworthy, and warning about it anyway trained
    * the agents to discount the one tool their triage doctrine is built on.
    */
-  private async evidenceScoresIncomplete(): Promise<boolean> {
+  /** Open/scored finding counts; never fails a cycle because a count failed. */
+  private async evidenceCoverageSafe(): Promise<{
+    open: number;
+    analyzed: number;
+  }> {
     try {
-      const { open, analyzed } = await this.search.evidenceCoverage();
-      if (open === 0) return false;
-      return analyzed / open < EVIDENCE_ANALYSIS_MIN_COVERAGE;
+      return await this.search.evidenceCoverage();
     } catch {
-      // Never block or mislabel a cycle because a count failed.
-      return false;
+      return { open: 0, analyzed: 0 };
     }
   }
 
