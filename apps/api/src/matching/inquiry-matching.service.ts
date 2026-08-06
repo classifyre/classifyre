@@ -55,6 +55,11 @@ const PREVIEW_CAP = 50;
  */
 const PROBE_SCAN_LIMIT = 2000;
 
+/** Sample finding ids/values per unmonitored group. */
+const UNMONITORED_SAMPLES = 5;
+/** Distinct unmonitored groups reported. */
+const UNMONITORED_GROUPS = 15;
+
 /**
  * Background engine: an Inquiry is a saved query. After a source finishes
  * ingesting, the run's new findings are matched against every ACTIVE inquiry for
@@ -354,6 +359,106 @@ export class InquiryMatchingService {
     if (!q) return [];
     const rows = await this.candidateFindings(q, false);
     return rows.map((r) => r.id);
+  }
+
+  /**
+   * High-importance open findings that NO active inquiry is watching.
+   *
+   * The coverage the harness already reported was about SOURCES scanned. There
+   * was nothing anywhere about findings *monitored*, and the difference showed:
+   * on a live instance 250 findings scored above the high-importance bar while
+   * a single inquiry matched anything at all, and the inquiry agent spent every
+   * cycle re-reading its own two artifacts because the mission text pushes
+   * hard toward "avoid duplicates, prefer enriching" and nothing pushed the
+   * other way. This is the signal that was missing: evidence with no monitor.
+   *
+   * Every active inquiry's matcher is compiled once and applied in memory, so
+   * this costs two queries rather than a preview per inquiry.
+   */
+  async unmonitoredFindings(
+    minImportance: number,
+    limit: number,
+  ): Promise<{
+    total: number;
+    groups: Array<{
+      detectorType: string;
+      customDetectorKey: string | null;
+      findingType: string;
+      count: number;
+      topImportance: number;
+      sampleFindingIds: string[];
+      sampleValues: string[];
+    }>;
+  }> {
+    const [candidates, inquiries] = await Promise.all([
+      this.prisma.finding.findMany({
+        where: { status: 'OPEN', importanceScore: { gte: minImportance } },
+        orderBy: { importanceScore: 'desc' },
+        take: limit,
+        select: {
+          id: true,
+          sourceId: true,
+          detectorType: true,
+          findingType: true,
+          customDetectorKey: true,
+          matchedContent: true,
+          importanceScore: true,
+        },
+      }),
+      this.prisma.inquiry.findMany({
+        where: { status: 'ACTIVE' },
+        select: this.matcherSelect,
+      }),
+    ]);
+
+    const matchers = inquiries.map((q) => new CompiledMatcher(q));
+    const unmatched = candidates.filter(
+      (f) => !matchers.some((m) => m.matches(f)),
+    );
+
+    const byGroup = new Map<
+      string,
+      {
+        detectorType: string;
+        customDetectorKey: string | null;
+        findingType: string;
+        count: number;
+        topImportance: number;
+        sampleFindingIds: string[];
+        sampleValues: string[];
+      }
+    >();
+    for (const f of unmatched) {
+      const key = `${f.detectorType}|${f.customDetectorKey ?? ''}|${f.findingType}`;
+      let group = byGroup.get(key);
+      if (!group) {
+        group = {
+          detectorType: String(f.detectorType),
+          customDetectorKey: f.customDetectorKey,
+          findingType: f.findingType,
+          count: 0,
+          topImportance: 0,
+          sampleFindingIds: [],
+          sampleValues: [],
+        };
+        byGroup.set(key, group);
+      }
+      group.count++;
+      group.topImportance = Math.max(group.topImportance, f.importanceScore);
+      if (group.sampleFindingIds.length < UNMONITORED_SAMPLES) {
+        group.sampleFindingIds.push(f.id);
+        if (f.matchedContent) {
+          group.sampleValues.push(f.matchedContent.slice(0, 120));
+        }
+      }
+    }
+
+    return {
+      total: unmatched.length,
+      groups: [...byGroup.values()]
+        .sort((a, b) => b.topImportance - a.topImportance)
+        .slice(0, UNMONITORED_GROUPS),
+    };
   }
 
   /**
