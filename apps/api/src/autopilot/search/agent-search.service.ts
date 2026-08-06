@@ -19,6 +19,8 @@ import {
   MAX_CASE_SUMMARIES,
   COVERAGE_UNAVAILABLE_FAILURE_STREAK,
   MAX_COVERAGE_SOURCE_ROWS,
+  UNMONITORED_MIN_IMPORTANCE,
+  UNMONITORED_SCAN_LIMIT,
   MAX_DUPLICATE_CLUSTERS,
   MAX_DUPLICATE_PAIRS,
   MAX_FINDING_GROUPS,
@@ -39,6 +41,7 @@ import type {
   FindingGroupSummary,
   FocusedCaseDetail,
   InquirySummary,
+  UnmonitoredFindings,
 } from '../autopilot.types';
 
 /**
@@ -492,6 +495,20 @@ export class AgentSearchService {
         .join(' '),
       sources: rows,
     };
+  }
+
+  /**
+   * High-importance findings no active inquiry is watching.
+   *
+   * Delegates to the matching service, which owns the canonical matcher — the
+   * answer has to agree with what an inquiry would actually select, not with a
+   * second implementation of the same rules.
+   */
+  async unmonitoredFindings(): Promise<UnmonitoredFindings> {
+    return this.matching.unmonitoredFindings(
+      UNMONITORED_MIN_IMPORTANCE,
+      UNMONITORED_SCAN_LIMIT,
+    );
   }
 
   /** All ACTIVE inquiries (capped) as compact summaries for dedupe/enrichment. */

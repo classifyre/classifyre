@@ -22,6 +22,13 @@ const OBSERVE_TOOLS = [
   // still mid-sweep. A source scanned once is not a source read fully, and
   // without this the two are indistinguishable.
   'schedule.list',
+  // The counterweight to corpus.coverage. That one measures how much data has
+  // been READ; this measures how much of what was found is being TRACKED.
+  // Without it every signal pointed one way — "avoid duplicates", "prefer
+  // enriching", "wind down noise" — and the rational move each cycle was to
+  // re-read the inquiries that already existed while high-importance findings
+  // sat unwatched.
+  'findings.unmonitored',
   'findings.search',
   'inquiries.list',
   'inquiries.archived',
@@ -230,6 +237,12 @@ export const INQUIRY_MISSION: Mission = {
     'which may be nothing, or may be a new monitor over something real. An inquiry is a saved',
     'monitor over evidence that already exists, so before creating one, establish that it',
     'matches real findings you have read this cycle.',
+    '\nCOVER WHAT IS UNWATCHED. findings.unmonitored lists high-importance findings that no',
+    'active inquiry matches. That list is the first place to look when deciding whether a new',
+    'inquiry is warranted: those findings are already scored and already real, so an inquiry',
+    'over them clears the evidence floor by construction. Maintaining the inquiries you have',
+    'is worth doing, but it is not the job on its own — an inquiry set that watches none of',
+    "the corpus's strongest evidence is not healthy just because it contains no duplicates.",
     '\nONE PHENOMENON, ONE INQUIRY. If a pattern appears in a second source, widen the',
     'existing inquiry with inquiries.enrich — add the source to its sourceIds, or set',
     'matchAllSources — instead of creating a per-source copy. Six near-identical inquiries',
