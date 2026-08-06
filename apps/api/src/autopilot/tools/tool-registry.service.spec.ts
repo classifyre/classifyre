@@ -58,6 +58,7 @@ describe('ToolRegistry', () => {
       {} as CustomDetectorTestsService,
       {} as DecisionApplierService,
       {} as AgentSearchService,
+      {} as never,
     ),
     new FingerprintsToolset(
       {} as PrismaService,

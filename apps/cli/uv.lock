@@ -830,7 +830,7 @@ wheels = [
 
 [[package]]
 name = "classifyre-cli"
-version = "0.4.93"
+version = "0.4.94"
 source = { editable = "." }
 dependencies = [
     { name = "beautifulsoup4" },
@@ -1369,7 +1369,7 @@ youtube = [
 
 [[package]]
 name = "classifyre-schemas"
-version = "0.4.93"
+version = "0.4.94"
 source = { editable = "../../packages/schemas" }
 dependencies = [
     { name = "fastjsonschema" },
@@ -2520,7 +2520,7 @@ http2 = [
 
 [[package]]
 name = "huggingface-hub"
-version = "1.26.0"
+version = "1.26.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "click" },
@@ -2533,9 +2533,9 @@ dependencies = [
     { name = "tqdm" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/82/db/3582597f8be0d34bd6881365a26d390854f12893eabdd62dd36de9df5a47/huggingface_hub-1.26.0.tar.gz", hash = "sha256:c8cd4e2df1ba9402f77fce9b509ec1d52debb502551789473f34016acc14e361", size = 936665, upload-time = "2026-07-30T14:12:04.156Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/89/64/bfe23dab749cb2342e1e13b61c9e684ce46b4d189c7d433cd26f76f52baf/huggingface_hub-1.26.1.tar.gz", hash = "sha256:7c28860777594ac679233f571552d0e46df34ed4e4239e844190fad3ca05e4cd", size = 936700, upload-time = "2026-08-06T09:42:24.859Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/97/bb/63a644c75b545f3ff394b822e9bd1c4a9586489c618b77a4d8a44a33a23b/huggingface_hub-1.26.0-py3-none-any.whl", hash = "sha256:e8cca670caa5d8dfa7e45bf45e86b466698198cd8150c021bcdb4a86b9252364", size = 780357, upload-time = "2026-07-30T14:12:01.998Z" },
+    { url = "https://files.pythonhosted.org/packages/b4/a7/b519cd01e57b685c5f3e9db02cb1bd7aaade35fb6554e0d36bee6d6aae28/huggingface_hub-1.26.1-py3-none-any.whl", hash = "sha256:d8676e4ec96c1e481a22a93232bd86d73bbac643fb767399aefaeaa503890fb0", size = 780754, upload-time = "2026-08-06T09:42:22.497Z" },
 ]
 
 [[package]]
@@ -2558,11 +2558,11 @@ wheels = [
 
 [[package]]
 name = "imap-tools"
-version = "1.14.0"
+version = "1.15.0"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/41/66/d52b6c7740aa81678404a9039668ab2b4887f46055290f232229a2d5b612/imap_tools-1.14.0.tar.gz", hash = "sha256:d730a35763c09ca02be45b93c8d5d638d9f098876c95841c7ce4d337ede403da", size = 48268, upload-time = "2026-07-24T06:23:43.804Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/59/4e/acf9a7d59932548bc749fe0f5ae852e6da00b640303ed72786f697944b69/imap_tools-1.15.0.tar.gz", hash = "sha256:a90f948549ab000d96caf17c90e63b114f8788ba4a0d3f9274a96c0e108c3805", size = 48497, upload-time = "2026-08-06T10:25:26.567Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/02/eb/8567f7542aaee43575002915a959e8891d2d9f3642d1bc5d32410d871bb5/imap_tools-1.14.0-py3-none-any.whl", hash = "sha256:eab3506e701eba44269bc04760b8b29a96c93b173553057180fe40a084d65426", size = 36410, upload-time = "2026-07-24T06:23:41.945Z" },
+    { url = "https://files.pythonhosted.org/packages/50/eb/a4ad6ec962af2806c3484adb1869c24a04d8ef8c2034f2dd2b0f48459b0a/imap_tools-1.15.0-py3-none-any.whl", hash = "sha256:7bb0003c8bf124b80968c7bef786e4577d8365e9afb6551dc15b13161b688bdc", size = 36512, upload-time = "2026-08-06T10:25:24.377Z" },
 ]
 
 [[package]]

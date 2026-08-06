@@ -4,6 +4,13 @@ import { CustomDetectorsService } from '../../../custom-detectors.service';
 import { CustomDetectorTestsService } from '../../../custom-detector-tests.service';
 import { DecisionApplierService } from '../../decision-applier.service';
 import { AgentSearchService } from '../../search/agent-search.service';
+import { PrismaService } from '../../../prisma.service';
+import {
+  coveredByBuiltIn,
+  detectorSimilarity,
+  DETECTOR_DUPLICATE_OVERLAP,
+  MAX_UNPROVEN_DETECTORS,
+} from '../../detector-overlap';
 import type { Tool, ToolContext, ToolGate } from '../tool.types';
 
 /** One-line per-type required-field rules, surfaced to the model so it stops
@@ -39,7 +46,103 @@ export class DetectorToolset {
     private readonly tests: CustomDetectorTestsService,
     private readonly applier: DecisionApplierService,
     private readonly search: AgentSearchService,
+    private readonly prisma: PrismaService,
   ) {}
+
+  /**
+   * Refuse a detector the system already has.
+   *
+   * Without this the authoring agent produced ten detectors in under three
+   * hours, seven of them one idea rewritten — it re-approached the theme every
+   * cycle instead of sharpening what it wrote last time — plus a phone-number
+   * detector on a source where the built-in PII PHONE_NUMBER pattern was
+   * already enabled. Neither the operator nor the corpus benefits from being
+   * scanned twice for the same thing.
+   */
+  private async assertDetectorIsNew(input: {
+    key?: string;
+    name: string;
+    pipelineSchema: unknown;
+  }): Promise<void> {
+    const proposal = {
+      key: input.key ?? input.name,
+      name: input.name,
+      pipelineSchema: input.pipelineSchema,
+    };
+
+    const existing = await this.prisma.customDetector.findMany({
+      where: { isActive: true },
+      select: {
+        id: true,
+        key: true,
+        name: true,
+        pipelineSchema: true,
+        _count: { select: { findings: true } },
+      },
+    });
+    for (const candidate of existing) {
+      const overlap = detectorSimilarity(proposal, candidate);
+      if (overlap >= DETECTOR_DUPLICATE_OVERLAP) {
+        throw new Error(
+          `Refused: detector "${candidate.key}" already covers this ` +
+            `(${Math.round(overlap * 100)}% overlap). Sharpen it with ` +
+            `detector.update (id ${candidate.id}) instead of adding a second ` +
+            `detector for the same idea — a operator triaging findings cannot ` +
+            `tell two near-identical detectors apart, and both scan the corpus.`,
+        );
+      }
+    }
+
+    // Built-in patterns currently switched on across the instance's sources.
+    const sources = await this.prisma.source.findMany({
+      select: { config: true },
+    });
+    const enabled = new Set<string>();
+    for (const source of sources) {
+      const detectors = (source.config as { detectors?: unknown })?.detectors;
+      if (!Array.isArray(detectors)) continue;
+      for (const d of detectors) {
+        const entry = d as {
+          type?: string;
+          enabled?: boolean;
+          config?: { enabled_patterns?: unknown };
+        };
+        if (entry?.enabled === false) continue;
+        const patterns = entry?.config?.enabled_patterns;
+        if (Array.isArray(patterns)) {
+          for (const p of patterns) {
+            if (typeof p === 'string') enabled.add(p);
+          }
+        }
+      }
+    }
+    // Instruments you have not read yet. A detector that has been active
+    // through at least one re-scan and produced nothing is either wrong or
+    // unnecessary, and authoring the next one before resolving it is how ten
+    // detectors appeared in three hours with one of them ever firing.
+    const unproven = existing.filter((c) => c._count.findings === 0);
+    if (unproven.length >= MAX_UNPROVEN_DETECTORS) {
+      throw new Error(
+        `Refused: ${unproven.length} detectors you already authored have produced ` +
+          `no findings at all (${unproven.map((u) => u.key).join(', ')}). Resolve ` +
+          `those before adding another — detector.test them, fix them with ` +
+          `detector.update, or detector.deactivate the ones that were a bad idea. ` +
+          `Authoring a new detector every cycle without reading what the last one ` +
+          `caught is not exploration, it is accumulation.`,
+      );
+    }
+
+    const builtIn = coveredByBuiltIn(proposal, [...enabled]);
+    if (builtIn) {
+      throw new Error(
+        `Refused: the built-in ${builtIn} pattern is already enabled on this ` +
+          `instance and detects exactly this. Authoring a custom detector for ` +
+          `it duplicates the scan and splits its findings across two detectors. ` +
+          `If the built-in one is missing cases, say so in memory.write and ` +
+          `tune the source's detector config instead.`,
+      );
+    }
+  }
 
   private detectorGate = async (
     input: Record<string, unknown>,
@@ -215,6 +318,11 @@ export class DetectorToolset {
             entityType: 'detector',
           }),
         handler: async (input) => {
+          await this.assertDetectorIsNew({
+            key: input.key as string | undefined,
+            name: String(input.name),
+            pipelineSchema: input.pipelineSchema,
+          });
           const created = await this.detectors.create({
             name: String(input.name),
             key: input.key as string | undefined,
