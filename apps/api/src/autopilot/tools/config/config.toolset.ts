@@ -92,6 +92,7 @@ export class ConfigToolset {
     sourceId: string,
     sourceName: string,
     changedKeys: string[],
+    reason?: string,
   ): Promise<void> {
     try {
       await this.notifications.create({
@@ -99,7 +100,13 @@ export class ConfigToolset {
         event: NotificationEvent.SOURCE_CONFIG_CHANGED,
         severity: Severity.INFO,
         title: 'Autopilot changed a source configuration',
-        message: `Autopilot updated ${changedKeys.join(', ')} on "${sourceName}".`,
+        // The reason, not just the mechanics. "Autopilot updated detectors,
+        // custom_detectors" tells an operator nothing about WHY a detector
+        // they were watching stopped producing findings, and the reasoning
+        // otherwise only exists on an agent decision row nobody opens.
+        message:
+          `Autopilot updated ${changedKeys.join(', ')} on "${sourceName}".` +
+          (reason ? ` Reason: ${reason}` : ''),
         sourceId,
         triggeredBy: AI_ACTOR,
         metadata: { changedKeys },
@@ -254,7 +261,7 @@ export class ConfigToolset {
         domain: 'source',
         decisionAction: AgentDecisionAction.TUNE_SOURCE,
         resolveGate: this.sourceGate,
-        handler: async (input) => {
+        handler: async (input, tc) => {
           const sourceId = String(input.sourceId);
           const patch = (input.patch ?? {}) as Record<string, unknown>;
           const expectedVersion =
@@ -347,7 +354,12 @@ export class ConfigToolset {
           // 7. Surface the change to the operator — an autopilot config mutation
           //    must never be silent (BUG F / R-12). Best-effort: a notification
           //    failure must not fail the mutation that already succeeded.
-          await this.notifyConfigChanged(sourceId, source.name, changedKeys);
+          await this.notifyConfigChanged(
+            sourceId,
+            source.name,
+            changedKeys,
+            tc.rationale,
+          );
           // 8. A detection/sampling change invalidates "there is nothing new to
           //    read": the existing assets must be looked at again. Restart the
           //    adaptive sweep so a converged source does not wait out its slow
