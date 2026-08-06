@@ -32,6 +32,17 @@ export interface ToolContext {
   ctx: AgentContext;
   audit: AgentAuditService;
   log: AgentLoggerService;
+  /**
+   * The model's stated reason for THIS call, as recorded on the decision row.
+   *
+   * Available to handlers so an operator-facing side effect can say why it
+   * happened. Without it a notification could only report the mechanics —
+   * "Autopilot updated detectors, custom_detectors" — while the actual reason
+   * ("the custom detector matched the bare words 'classified'/'confidential'
+   * in prose and none of its 50 findings scored as important") stayed buried in
+   * an agent decision row that an operator has no reason to go and read.
+   */
+  rationale?: string;
 }
 
 /**

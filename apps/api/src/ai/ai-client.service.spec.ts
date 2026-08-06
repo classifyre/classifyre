@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { AiClientService } from './ai-client.service';
+import { validateAgainstSchema } from './schema-validate';
 import {
   AiAuthError,
   AiConfigError,
@@ -346,5 +347,45 @@ describe('AiClientService', () => {
 
       expect(mockProviderComplete).toHaveBeenCalledTimes(1);
     });
+  });
+});
+
+/**
+ * An error a caller cannot act on reads to it as an error that cannot be fixed.
+ *
+ * The detector-authoring agent hit `(root) must NOT have additional properties`
+ * five times in a row against the live instance. Ajv knows exactly which key it
+ * rejected — it is sitting in `error.params.additionalProperty` — but the
+ * message dropped it, so the agent could only guess ("remove case_sensitive",
+ * "try just the pipeline_schema", "try absolute minimal REGEX schema"), burned
+ * its whole iteration budget, and authored nothing.
+ */
+describe('schema error messages name what was wrong', () => {
+  const objectSchema = {
+    type: 'object',
+    properties: { name: { type: 'string' }, mode: { enum: ['A', 'B'] } },
+    required: ['name'],
+    additionalProperties: false,
+  } as const;
+
+  it('names the rejected property instead of "additional properties"', () => {
+    expect(() =>
+      validateAgainstSchema(
+        { name: 'x', case_sensitive: true },
+        objectSchema as never,
+      ),
+    ).toThrow(/case_sensitive/);
+  });
+
+  it('names the missing property', () => {
+    expect(() => validateAgainstSchema({}, objectSchema as never)).toThrow(
+      /"name"/,
+    );
+  });
+
+  it('lists the allowed values for a bad enum', () => {
+    expect(() =>
+      validateAgainstSchema({ name: 'x', mode: 'Z' }, objectSchema as never),
+    ).toThrow(/allowed: A, B/);
   });
 });

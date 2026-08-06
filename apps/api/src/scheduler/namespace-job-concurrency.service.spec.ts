@@ -54,8 +54,21 @@ describe('NamespaceJobConcurrencyService', () => {
     process.env = originalEnv;
   });
 
-  it('defaults to one global slot and serializes different replicas/namespaces', async () => {
+  // The semaphore is global: every handler in every namespace and queue waits
+  // on it. At a limit of one that made a single wedged handler stop the whole
+  // instance — one agent run hung on an unresponsive model held the only slot
+  // for hours, so scheduler ticks piled up and timed out and scan hand-offs
+  // never reached the autopilot. The serialization mechanism is still correct
+  // and still tested below; what changed is that the DEFAULT leaves room for
+  // control-plane work to pass a long job.
+  it('leaves room by default rather than serializing the whole instance', () => {
     delete process.env.MAX_CONCURRENT_NAMESPACE_JOBS;
+
+    expect(new NamespaceJobConcurrencyService().getLimit()).toBeGreaterThan(1);
+  });
+
+  it('serializes different replicas/namespaces when the limit is one', async () => {
+    process.env.MAX_CONCURRENT_NAMESPACE_JOBS = '1';
     const held = new Set<string>();
     const replicaA = new NamespaceJobConcurrencyService();
     const replicaB = new NamespaceJobConcurrencyService();
