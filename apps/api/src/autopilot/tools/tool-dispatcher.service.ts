@@ -38,6 +38,8 @@ export class ToolDispatcherService {
   ): Promise<ToolCallResult> {
     const runId = tc.ctx.run.id;
     const mutate = tool.sideEffect === 'mutate';
+    // Handlers may surface the model's reason to the operator; see ToolContext.
+    tc = { ...tc, rationale };
 
     await this.log.technical(
       runId,
