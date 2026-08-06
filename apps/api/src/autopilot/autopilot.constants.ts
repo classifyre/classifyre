@@ -23,6 +23,31 @@ export const AUTOPILOT_RETRY_AFTER_SECONDS = 60;
 /** Give up resuming a run after this many worker attempts. */
 export const AUTOPILOT_MAX_ATTEMPTS = 3;
 
+/**
+ * Wall-clock budget for one agent run, checked between loop iterations.
+ *
+ * A run holds a pg-boss handler, and that handler holds one of the instance's
+ * `MAX_CONCURRENT_NAMESPACE_JOBS` slots — which defaults to 1. So a run that
+ * never returns does not merely fail itself: it freezes every queue in every
+ * namespace behind it. Observed on a desktop instance as a CONFIG run stuck in
+ * `reason-act` for nine and a half hours against an unresponsive local model,
+ * holding the only slot; auto-schedule ticks piled up and timed out, scan
+ * hand-offs never reached the autopilot, and the whole app looked idle. The
+ * per-request timeout alone cannot bound this — a run makes many requests.
+ *
+ * Generous on purpose: this is a safety valve against a wedged provider, not a
+ * performance target. A healthy run finishes in a minute or two.
+ */
+export const AGENT_RUN_BUDGET_MS = 20 * 60 * 1000;
+
+/**
+ * A RUNNING agent run older than this is presumed dead and reaped, so a run
+ * wedged before a restart (or by a provider that never answered) does not need
+ * an operator to notice it. Comfortably above the run budget: anything past it
+ * is not slow, it is gone.
+ */
+export const AGENT_RUN_STALE_AFTER_MS = 60 * 60 * 1000;
+
 // ── Cadence: coalescing many scan completions into one corpus cycle ──────────
 /**
  * Scan completions used to fire one cycle each, debounced only per source
