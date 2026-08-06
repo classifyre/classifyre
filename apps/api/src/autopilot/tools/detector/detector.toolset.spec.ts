@@ -24,6 +24,10 @@ describe('DetectorToolset', () => {
     mockTests as unknown as CustomDetectorTestsService,
     mockApplier as unknown as DecisionApplierService,
     mockSearch as unknown as AgentSearchService,
+    {
+      customDetector: { findMany: jest.fn().mockResolvedValue([]) },  // eslint-disable-line
+      source: { findMany: jest.fn().mockResolvedValue([]) },
+    } as never,
   );
   const tools = toolset.list();
   const byName = (name: string) => tools.find((t) => t.name === name) as Tool;
