@@ -571,6 +571,14 @@ model Runner {
   // Aggregate of runner_assets.text_extraction_status. Kept as JSON so new
   // coverage states can be added without widening the runner table again.
   textCoverage      Json?                @map("text_coverage") @db.JsonB
+  // The source's AUTOMATIC sampling cursor as it stood when this run finished.
+  //
+  // Snapshotted so the adaptive scheduler can tell "the sweep moved through new
+  // ground" from "the sweep is going over ground it already covered" — the only
+  // signal that distinguishes them, and the one whose absence stopped a sweep
+  // at 900 of 9600 objects. Opaque and source-defined; compared for equality
+  // only, never interpreted.
+  samplingCursor    Json?                @map("sampling_cursor") @db.JsonB
   errorMessage      String?              @map("error_message")
   errorDetails      Json?                @map("error_details")
   jobName           String?              @map("job_name")

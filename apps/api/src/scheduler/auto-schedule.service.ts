@@ -67,6 +67,11 @@ interface ResolvedRun {
   assetsCreated: number;
   assetsUpdated: number;
   assetsDeleted: number;
+  /** New findings, so detection progress counts even when ingestion is idle. */
+  findingsCreated: number;
+  /** Opaque AUTOMATIC sampling position this run finished at, if any. */
+  samplingCursor: unknown;
+  completedAt: Date | null;
 }
 
 /**
@@ -210,7 +215,11 @@ export class AutoScheduleService {
     // each run in exactly once or a single scan would advance the phase twice.
     if (!run || (run.id && run.id === source.autoLastRunnerId)) return;
 
-    const outcome = this.classifyRun(sourceId, run);
+    const outcome = this.classifyRun(
+      sourceId,
+      run,
+      await this.previousCursor(sourceId, run.completedAt),
+    );
     const now = new Date();
     const seen = { autoLastRunnerId: run.id };
 
@@ -311,14 +320,6 @@ export class AutoScheduleService {
     });
   }
 
-  /**
-   * What the run did, in the only terms the scheduler cares about.
-   *
-   * "Progress" is assets created, updated or deleted. Updates count because a
-   * paginating sweep inside one large object (a Parquet file read a slice at a
-   * time) advances by rewriting the same asset, so a created-only test would
-   * declare that sweep finished after its first page.
-   */
   /** The run this kick is about: the named one, or the source's latest. */
   private async resolveRun(
     sourceId: string,
@@ -331,6 +332,9 @@ export class AutoScheduleService {
       assetsCreated: true,
       assetsUpdated: true,
       assetsDeleted: true,
+      findingsCreated: true,
+      samplingCursor: true,
+      completedAt: true,
     };
     return runnerId
       ? this.prisma.runner.findUnique({ where: { id: runnerId }, select })
@@ -342,20 +346,76 @@ export class AutoScheduleService {
   }
 
   /**
+   * The sampling cursor the run BEFORE this one finished at.
+   *
+   * Null when there is no earlier run, or when neither run recorded a cursor
+   * (a non-AUTOMATIC strategy, or a run predating the snapshot). Callers must
+   * read that as "unknown", never as "did not move".
+   */
+  private async previousCursor(
+    sourceId: string,
+    before: Date | null,
+  ): Promise<unknown> {
+    if (!before) return null;
+    const previous = await this.prisma.runner.findFirst({
+      where: { sourceId, completedAt: { lt: before, not: null } },
+      orderBy: { completedAt: 'desc' },
+      select: { samplingCursor: true },
+    });
+    return previous?.samplingCursor ?? null;
+  }
+
+  /**
    * What the run did, in the only terms the scheduler cares about.
    *
-   * "Progress" is assets created, updated or deleted. Updates count because a
+   * Three signals, because each one alone is blind to a real kind of progress.
+   *
+   * ASSETS created/updated/deleted — ingestion. Updates count because a
    * paginating sweep inside one large object (a Parquet file read a slice at a
    * time) advances by rewriting the same asset, so a created-only test would
    * declare that sweep finished after its first page.
+   *
+   * FINDINGS created — detection. Asset counts say nothing about it, and a
+   * re-scan over known assets still advances the investigation whenever the
+   * detectors changed, which is constantly: the config and detector agents tune
+   * detectors and then trigger exactly such a re-scan.
+   *
+   * The SAMPLING CURSOR moving — the sweep itself. This is the one that
+   * actually answers the question, and its absence is what stopped a live
+   * source dead. That source had all 9600 of its assets ingested up front and
+   * an AUTOMATIC strategy walking 100 objects per run, so no run ever created
+   * an asset. Nine passes were filed as no progress, the source converged to a
+   * once-a-day cadence, and its cursor sat at 900 of 9600 — 9% swept, called
+   * finished. Findings would have rescued that particular case only because
+   * every pass happened to detect something; a pass over 100 quiet assets is
+   * just as much progress and would still have looked idle.
+   *
+   * A moved cursor means new ground regardless of what was on it. When the
+   * cursor is unknown on either side the check abstains rather than inventing
+   * movement, and the other two signals decide.
    */
-  private classifyRun(sourceId: string, runner: ResolvedRun): RunOutcome {
+  private classifyRun(
+    sourceId: string,
+    runner: ResolvedRun,
+    previousCursor: unknown,
+  ): RunOutcome {
     // A kick naming a runner that belongs to another source is a bug
     // elsewhere; treat it as no signal rather than acting on it.
     if (runner.sourceId !== sourceId) return 'NO_PROGRESS';
     if (runner.status === RunnerStatus.ERROR) return 'FAILED';
+
+    if (cursorAdvanced(previousCursor, runner.samplingCursor)) {
+      return 'PROGRESS';
+    }
+
+    // Summed with explicit defaults: one missing count would make the whole
+    // sum NaN, and `NaN > 0` is false — silently converging a source that is
+    // still producing, which is the exact failure this method exists to avoid.
     const touched =
-      runner.assetsCreated + runner.assetsUpdated + runner.assetsDeleted;
+      (runner.assetsCreated ?? 0) +
+      (runner.assetsUpdated ?? 0) +
+      (runner.assetsDeleted ?? 0) +
+      (runner.findingsCreated ?? 0);
     return touched > 0 ? 'PROGRESS' : 'NO_PROGRESS';
   }
 
@@ -672,4 +732,27 @@ export function humanize(seconds: number): string {
   if (hours < 24) return `${hours} hour${hours === 1 ? '' : 's'}`;
   const days = Math.round(seconds / 86400);
   return `${days} day${days === 1 ? '' : 's'}`;
+}
+
+/**
+ * Whether the sweep moved between two runs.
+ *
+ * The cursor is opaque and source-defined — a row offset for one connector, an
+ * object key or a page token for another — so it is compared for equality and
+ * never interpreted. Serialising is enough: these are small JSON values written
+ * by the same producer, so key order is stable in practice, and a false
+ * "unchanged" is the safe direction anyway (the asset and finding counts still
+ * get their say).
+ *
+ * Abstains when either side is missing. A first run has nothing to compare
+ * against, and a non-AUTOMATIC strategy never writes a cursor at all; reading
+ * either as movement would keep such a source in catch-up permanently.
+ */
+export function cursorAdvanced(before: unknown, after: unknown): boolean {
+  if (before == null || after == null) return false;
+  try {
+    return JSON.stringify(before) !== JSON.stringify(after);
+  } catch {
+    return false;
+  }
 }
