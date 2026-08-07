@@ -102,6 +102,23 @@ export const AUTOPILOT_MAX_READINESS_REQUEUES = 5;
  */
 export const EVIDENCE_ANALYSIS_MIN_COVERAGE = 0.8;
 
+// ── Monitored coverage: evidence with no inquiry watching it ─────────────────
+/**
+ * Importance at or above which an open finding ought to be watched by SOME
+ * inquiry, and the ceiling on how many are examined per check.
+ *
+ * The harness reported coverage of SOURCES scanned and nothing at all about
+ * findings monitored. On a live instance that gap showed plainly: 250 findings
+ * scored above this bar while one inquiry matched anything, and the inquiry
+ * agent spent every cycle re-reading its own two artifacts. The mission text
+ * pushes hard toward "avoid duplicates, prefer enriching, wind down noise" and
+ * nothing pushed the other way, so maintenance was the rational move. This is
+ * the missing counterweight: evidence nobody is watching.
+ */
+export const UNMONITORED_MIN_IMPORTANCE = 0.75;
+/** Highest-importance findings examined per unmonitored-coverage check. */
+export const UNMONITORED_SCAN_LIMIT = 500;
+
 // ── Evidence floor (enforced in code, not prose) ─────────────────────────────
 /**
  * An inquiry is a saved monitor over findings. One whose matchers select
