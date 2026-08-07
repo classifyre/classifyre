@@ -14,6 +14,7 @@ describe('SourceAssetsController', () => {
     bulkIngest: jest.fn(),
     finalizeIngestRun: jest.fn(),
     recordScanCacheSavings: jest.fn(),
+    recordRunSamplingCursor: jest.fn().mockResolvedValue(undefined),
   };
   const sourceService = {
     source: jest.fn(),
@@ -120,6 +121,14 @@ describe('SourceAssetsController', () => {
 
     expect(sourceService.updateSamplingCursor).toHaveBeenCalledWith(
       'source-1',
+      cursor,
+    );
+    // Snapshotted on the run too. The source row is overwritten in place, so
+    // without a per-run copy the scheduler cannot tell a sweep that advanced
+    // from one going over ground it already covered — and reading that wrong
+    // stopped a live sweep at 9% of its corpus.
+    expect(assetService.recordRunSamplingCursor).toHaveBeenCalledWith(
+      'runner-1',
       cursor,
     );
     // AUTOMATIC ingests one slice per run → absence never implies deletion.
