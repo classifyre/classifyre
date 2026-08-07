@@ -505,6 +505,15 @@ export class SourceAssetsController {
     // one stopped. Sent only by AUTOMATIC runs; left untouched otherwise.
     if (samplingCursor !== undefined) {
       await this.sourceService.updateSamplingCursor(sourceId, samplingCursor);
+      // Snapshot it on the run too. The source row holds only the latest value
+      // and is overwritten in place, so without a per-run copy there is no way
+      // to tell whether a sweep advanced — which is what the adaptive
+      // scheduler needs to distinguish "covered new ground" from "went over
+      // ground it had already covered". Best-effort: a run must never fail
+      // because a scheduling hint could not be recorded.
+      await this.assetService
+        .recordRunSamplingCursor(runnerId, samplingCursor)
+        .catch(() => undefined);
     }
 
     // Recorded here rather than inside finalizeIngestRun, which returns early
