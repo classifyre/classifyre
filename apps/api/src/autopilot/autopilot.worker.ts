@@ -50,6 +50,7 @@ interface CycleScope {
   batchSources?: Array<{ id: string; name: string }>;
   evidenceAnalysisPending?: boolean;
   evidenceCoverage?: { open: number; analyzed: number };
+  unmonitoredFindings?: number;
 }
 
 interface DirtySource {
@@ -359,6 +360,7 @@ export class AutopilotWorker {
       batchSources: cycle.corpus ? batchSources : undefined,
       evidenceAnalysisPending,
       evidenceCoverage,
+      unmonitoredFindings: await this.unmonitoredCount(),
     };
 
     // An explicit agent set ("only") is operator intent: run exactly those
@@ -527,6 +529,7 @@ export class AutopilotWorker {
       expressReason: cycle.expressReason ?? null,
       evidenceAnalysisPending: scope.evidenceAnalysisPending,
       evidenceCoverage: scope.evidenceCoverage,
+      unmonitoredFindings: scope.unmonitoredFindings,
       state: {},
     };
     try {
@@ -659,6 +662,24 @@ export class AutopilotWorker {
    * not make findings.ranked untrustworthy, and warning about it anyway trained
    * the agents to discount the one tool their triage doctrine is built on.
    */
+  /**
+   * How many high-importance findings no inquiry is watching.
+   *
+   * Surfaced on every cycle rather than left to the agent to go and ask,
+   * because it never did: with only "avoid duplicates / prefer enriching /
+   * wind down noise" in front of it, re-reading the inquiries that already
+   * existed was the rational move, and 250 high-importance findings sat
+   * unwatched behind a single matching inquiry.
+   */
+  private async unmonitoredCount(): Promise<number | undefined> {
+    try {
+      return (await this.search.unmonitoredFindings()).total;
+    } catch {
+      // Advisory only — never fail a cycle over it.
+      return undefined;
+    }
+  }
+
   /** Open/scored finding counts; never fails a cycle because a count failed. */
   private async evidenceCoverageSafe(): Promise<{
     open: number;

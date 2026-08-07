@@ -135,6 +135,23 @@ export interface CorpusCoverage {
   }>;
 }
 
+/**
+ * Open findings above the importance bar that no ACTIVE inquiry matches — the
+ * inverse of corpus coverage: evidence present but unwatched.
+ */
+export interface UnmonitoredFindings {
+  total: number;
+  groups: Array<{
+    detectorType: string;
+    customDetectorKey: string | null;
+    findingType: string;
+    count: number;
+    topImportance: number;
+    sampleFindingIds: string[];
+    sampleValues: string[];
+  }>;
+}
+
 /** Compact inquiry summary fed to the model. */
 export interface InquirySummary {
   id: string;
@@ -311,6 +328,8 @@ export interface AgentContext {
   evidenceAnalysisPending?: boolean;
   /** Open vs scored finding counts, so the prompt can state the real ratio. */
   evidenceCoverage?: { open: number; analyzed: number };
+  /** High-importance findings no active inquiry matches, surfaced each cycle. */
+  unmonitoredFindings?: number;
   /** Validated output of each completed step, keyed by step name. */
   state: Record<string, unknown>;
 }

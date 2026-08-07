@@ -184,6 +184,14 @@ export class ObserveToolset {
         handler: async () => this.search.corpusCoverage(),
       },
       {
+        name: 'findings.unmonitored',
+        description:
+          'High-importance open findings that NO active inquiry matches — evidence nobody is watching. The inverse of corpus.coverage: that tells you how much of the data has been READ, this tells you how much of what was found is being TRACKED. Grouped by detector and finding type, with sample finding ids you can build a matcher from. Start here when deciding whether a new inquiry is warranted.',
+        inputSchema: EMPTY_INPUT,
+        sideEffect: 'read',
+        handler: async () => this.search.unmonitoredFindings(),
+      },
+      {
         name: 'memory.search',
         description:
           'Recall long-lived agent memory (decision precedents, topic→entity maps) by free-text query. For shared vocabulary (names, orgs, codenames) use glossary.lookup instead.',

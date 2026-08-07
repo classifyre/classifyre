@@ -547,6 +547,22 @@ function buildUserPrompt(ctx: AgentContext, mission: Mission): string {
       `This cycle was expedited rather than batched because: ${ctx.expressReason}.`,
     );
   }
+  const unwatched = ctx.unmonitoredFindings ?? 0;
+  if (unwatched > 0) {
+    // Stated every cycle rather than left for the agent to go and ask. The
+    // mission text pushes hard toward not duplicating and toward winding noise
+    // down; nothing pushed toward covering evidence that has no monitor at
+    // all, so re-reading the existing inquiries was the rational move while
+    // hundreds of high-importance findings sat unwatched.
+    lines.push(
+      `UNWATCHED EVIDENCE: ${unwatched} high-importance open finding(s) match NO active ` +
+        'inquiry. Call findings.unmonitored for the breakdown and sample finding ids. ' +
+        'These are already-scored, already-real findings that nothing is tracking — if ' +
+        'one of those groups is worth watching, widen an existing inquiry to cover it or ' +
+        'create one for it. Reviewing the inquiries you already have is not a substitute ' +
+        'for covering evidence that has none.',
+    );
+  }
   if (ctx.evidenceAnalysisPending) {
     const open = ctx.evidenceCoverage?.open ?? 0;
     const scored = ctx.evidenceCoverage?.analyzed ?? 0;
