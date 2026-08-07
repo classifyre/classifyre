@@ -390,6 +390,29 @@ export class AssetService {
   }
 
   /**
+   * Record the AUTOMATIC sampling cursor this run finished at.
+   *
+   * The source row carries only the newest value and is overwritten in place,
+   * so comparing consecutive runs — the one thing that says whether a sweep
+   * advanced — needs a per-run copy. Opaque and source-defined; stored for
+   * equality comparison, never interpreted.
+   */
+  async recordRunSamplingCursor(
+    runnerId: string,
+    samplingCursor: Record<string, unknown> | null,
+  ): Promise<void> {
+    await this.prisma.runner.update({
+      where: { id: runnerId },
+      data: {
+        samplingCursor:
+          samplingCursor === null
+            ? Prisma.DbNull
+            : (samplingCursor as Prisma.InputJsonValue),
+      },
+    });
+  }
+
+  /**
    * Build the set of (detector, asset) pairs this run may resolve findings for.
    *
    * Keys are `assetHash|DETECTOR_TYPE|customKey`. Membership means the detector

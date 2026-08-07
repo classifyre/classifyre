@@ -1,0 +1,24 @@
+-- Snapshot the sampling cursor on each run, so the adaptive scheduler can see
+-- whether a sweep advanced.
+--
+-- Progress was measured as assets created/updated/deleted, later also findings
+-- created. Neither answers the actual question for a source whose assets are
+-- all ingested up front and re-examined a slice at a time: an AUTOMATIC sweep
+-- walks 100 objects per run, creating no assets at all, so every pass looked
+-- idle. Nine such passes converged one live source to a once-a-day cadence
+-- with its cursor at 900 of 9600 objects — 9% swept, declared finished, and
+-- with no scans running nothing marked a source dirty, so the whole autopilot
+-- went quiet with it.
+--
+-- The cursor is the exact signal: if it moved, the sweep covered new ground,
+-- whatever that ground happened to contain. Comparing consecutive runs needs
+-- the previous value, which lived only on the source row and was overwritten
+-- in place — hence this snapshot.
+--
+-- prisma migrate runs each migration inside a transaction, so no transaction
+-- control here. The statement is idempotent so a partial apply can be re-run.
+
+-- AlterTable. Nullable: runs that predate this column, and every non-AUTOMATIC
+-- strategy, simply have no cursor — and a null on either side of a comparison
+-- means "unknown", which the scheduler must not read as movement.
+ALTER TABLE "runners" ADD COLUMN IF NOT EXISTS "sampling_cursor" JSONB;

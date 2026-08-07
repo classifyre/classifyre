@@ -63,6 +63,8 @@ describe('AutoScheduleService', () => {
     assetsUpdated: 0,
     assetsDeleted: 0,
     findingsCreated: 0,
+    samplingCursor: null,
+    completedAt: new Date('2026-08-07T08:33:42Z'),
     ...over,
   });
 
@@ -76,6 +78,69 @@ describe('AutoScheduleService', () => {
   });
 
   describe('recordRunOutcome', () => {
+    /**
+     * The sweep advancing IS progress, whatever it happened to find.
+     *
+     * The live failure: a source with all 9600 assets ingested up front and an
+     * AUTOMATIC strategy walking 100 objects per run. No run ever created an
+     * asset, so nine passes were filed as no progress and the source converged
+     * to a once-a-day cadence with its cursor at 900 of 9600 — 9% swept, called
+     * finished. Scanning stopped, so nothing was marked dirty, so no autopilot
+     * cycle ran at all.
+     */
+    it('treats a moved sampling cursor as progress, with no assets or findings', async () => {
+      const now = Date.now();
+      prisma.source.findUnique.mockResolvedValue(autoSource());
+      prisma.runner.findUnique.mockResolvedValue(
+        runner({
+          assetsCreated: 0,
+          assetsUpdated: 0,
+          assetsDeleted: 0,
+          findingsCreated: 0,
+          samplingCursor: { objects: 1000 },
+        }),
+      );
+      // The run before it stopped 100 objects earlier.
+      prisma.runner.findFirst.mockResolvedValue({
+        samplingCursor: { objects: 900 },
+      });
+
+      await service.recordRunOutcome('s1', 'r1');
+
+      const data = written();
+      expect(data.autoPhase).toBe('CATCH_UP');
+      expect(data.autoNoProgressStreak).toBe(0);
+      expect(delayOf(data, now)).toBe(CATCH_UP_COOLDOWN_SECONDS);
+    });
+
+    it('converges once the cursor stops moving', async () => {
+      prisma.source.findUnique.mockResolvedValue(autoSource());
+      prisma.runner.findUnique.mockResolvedValue(
+        runner({ samplingCursor: { objects: 9600 } }),
+      );
+      prisma.runner.findFirst.mockResolvedValue({
+        samplingCursor: { objects: 9600 },
+      });
+
+      await service.recordRunOutcome('s1', 'r1');
+
+      expect(written().autoNoProgressStreak).toBe(1);
+    });
+
+    // A first run, or any non-AUTOMATIC strategy, records no cursor. Reading
+    // that as movement would keep such a source in catch-up forever.
+    it('abstains when there is no cursor to compare', async () => {
+      prisma.source.findUnique.mockResolvedValue(autoSource());
+      prisma.runner.findUnique.mockResolvedValue(
+        runner({ samplingCursor: null }),
+      );
+      prisma.runner.findFirst.mockResolvedValue({ samplingCursor: null });
+
+      await service.recordRunOutcome('s1', 'r1');
+
+      expect(written().autoNoProgressStreak).toBe(1);
+    });
+
     /**
      * Detection progress counts, not just ingestion.
      *
