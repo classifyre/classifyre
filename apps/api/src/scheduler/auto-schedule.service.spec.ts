@@ -62,6 +62,7 @@ describe('AutoScheduleService', () => {
     assetsCreated: 0,
     assetsUpdated: 0,
     assetsDeleted: 0,
+    findingsCreated: 0,
     ...over,
   });
 
@@ -75,6 +76,50 @@ describe('AutoScheduleService', () => {
   });
 
   describe('recordRunOutcome', () => {
+    /**
+     * Detection progress counts, not just ingestion.
+     *
+     * Measured on a live instance: nine consecutive scans reported
+     * `assetsCreated 0, assetsUpdated 0, assetsUnchanged 100` while creating
+     * 26, 17, 6, 31, 25 and 22 findings. Progress was assets-only, so all nine
+     * were filed NO_PROGRESS and the source converged to a once-a-day cadence
+     * while still yielding findings on every pass. Scanning stopped, nothing
+     * was marked dirty, no autopilot cycle ran, and the harness looked idle on
+     * a corpus it had not finished reading. This is the common case rather than
+     * an edge one: the config and detector agents tune detectors and then
+     * trigger a re-scan over assets that are all already known.
+     */
+    it('counts new findings as progress even when no asset changed', async () => {
+      const now = Date.now();
+      prisma.source.findUnique.mockResolvedValue(autoSource());
+      prisma.runner.findUnique.mockResolvedValue(
+        runner({
+          assetsCreated: 0,
+          assetsUpdated: 0,
+          assetsDeleted: 0,
+          findingsCreated: 26,
+        }),
+      );
+
+      await service.recordRunOutcome('s1', 'r1');
+
+      const data = written();
+      expect(data.autoPhase).toBe('CATCH_UP');
+      expect(data.autoNoProgressStreak).toBe(0);
+      expect(delayOf(data, now)).toBe(CATCH_UP_COOLDOWN_SECONDS);
+    });
+
+    it('still converges when a run produces neither assets nor findings', async () => {
+      prisma.source.findUnique.mockResolvedValue(autoSource());
+      prisma.runner.findUnique.mockResolvedValue(
+        runner({ assetsCreated: 0, findingsCreated: 0 }),
+      );
+
+      await service.recordRunOutcome('s1', 'r1');
+
+      expect(written().autoNoProgressStreak).toBe(1);
+    });
+
     it('keeps sweeping while a run is still ingesting', async () => {
       const now = Date.now();
       prisma.source.findUnique.mockResolvedValue(autoSource());

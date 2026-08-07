@@ -67,6 +67,8 @@ interface ResolvedRun {
   assetsCreated: number;
   assetsUpdated: number;
   assetsDeleted: number;
+  /** New findings, so detection progress counts even when ingestion is idle. */
+  findingsCreated: number;
 }
 
 /**
@@ -331,6 +333,7 @@ export class AutoScheduleService {
       assetsCreated: true,
       assetsUpdated: true,
       assetsDeleted: true,
+      findingsCreated: true,
     };
     return runnerId
       ? this.prisma.runner.findUnique({ where: { id: runnerId }, select })
@@ -344,18 +347,40 @@ export class AutoScheduleService {
   /**
    * What the run did, in the only terms the scheduler cares about.
    *
-   * "Progress" is assets created, updated or deleted. Updates count because a
-   * paginating sweep inside one large object (a Parquet file read a slice at a
-   * time) advances by rewriting the same asset, so a created-only test would
-   * declare that sweep finished after its first page.
+   * "Progress" is assets created, updated or deleted, OR findings created.
+   * Updates count because a paginating sweep inside one large object (a Parquet
+   * file read a slice at a time) advances by rewriting the same asset, so a
+   * created-only test would declare that sweep finished after its first page.
+   *
+   * Findings count for the same reason one level up. Asset counts measure
+   * INGESTION; they say nothing about detection, and detection is what the rest
+   * of the system consumes. A scan over assets it has already seen still
+   * advances the investigation whenever the detectors changed — which is
+   * constantly, because the config and detector-authoring agents tune them and
+   * then trigger exactly such a re-scan.
+   *
+   * Measured on a live instance: nine consecutive scans reported
+   * `assetsCreated 0, assetsUpdated 0, assetsUnchanged 100` and
+   * `findingsCreated` of 26, 17, 6, 31, 25 and 22. Every one was filed as
+   * NO_PROGRESS, the streak reached nine, and the source converged to a
+   * once-a-day cadence while it was still yielding new findings on every pass.
+   * Scanning stopped, so nothing was marked dirty, so no autopilot cycle ran,
+   * and the whole harness looked idle on a corpus it had not finished reading.
    */
   private classifyRun(sourceId: string, runner: ResolvedRun): RunOutcome {
     // A kick naming a runner that belongs to another source is a bug
     // elsewhere; treat it as no signal rather than acting on it.
     if (runner.sourceId !== sourceId) return 'NO_PROGRESS';
     if (runner.status === RunnerStatus.ERROR) return 'FAILED';
+    // Summed with explicit defaults: one missing count would make the whole
+    // sum NaN, and `NaN > 0` is false — silently converging a source that is
+    // still producing, which is the exact failure this method just grew a fix
+    // for.
     const touched =
-      runner.assetsCreated + runner.assetsUpdated + runner.assetsDeleted;
+      (runner.assetsCreated ?? 0) +
+      (runner.assetsUpdated ?? 0) +
+      (runner.assetsDeleted ?? 0) +
+      (runner.findingsCreated ?? 0);
     return touched > 0 ? 'PROGRESS' : 'NO_PROGRESS';
   }
 
