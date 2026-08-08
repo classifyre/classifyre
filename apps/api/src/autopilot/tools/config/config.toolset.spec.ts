@@ -9,7 +9,40 @@ import type { DecisionApplierService } from '../../decision-applier.service';
 import type { AutoScheduleService } from '../../../scheduler/auto-schedule.service';
 import type { CustomDetectorsService } from '../../../custom-detectors.service';
 import { computeDetectionFingerprint } from '../../../utils/scope-fingerprint';
+import type {
+  DetectionImpact,
+  DetectionImpactService,
+} from '../../detection-impact.service';
+import type {
+  DetectionPostureReport,
+  DetectionPostureService,
+} from '../../detection-posture.service';
 import type { Tool, ToolContext } from '../tool.types';
+
+/** A priced change that costs nothing — the default for tests not about pricing. */
+export const NO_IMPACT: DetectionImpact = {
+  removedDetectors: [],
+  addedDetectors: [],
+  resolves: { total: 0, byDetector: [], highImportance: 0 },
+  protectedEvidence: { total: 0, citedByCases: [], watchedByInquiries: [] },
+  citationScanComplete: true,
+};
+
+/** A source with brakes off — EXPLORING never triggers the churn budget. */
+export const EXPLORING_POSTURE: DetectionPostureReport = {
+  sourceId: 's1',
+  posture: 'EXPLORING',
+  reason: 'no completed scan yet',
+  openFindings: 0,
+  citedByCases: 0,
+  watchingInquiries: 0,
+  inquiryMatches: 0,
+  completedScans: 0,
+  scansSinceDetectionChanged: 0,
+  tunesLast24h: 0,
+  tuneBudgetRemaining: 4,
+  lastChangeUnevaluated: false,
+};
 
 describe('ConfigToolset — config.tune_source', () => {
   const baseConfig = {
@@ -37,6 +70,8 @@ describe('ConfigToolset — config.tune_source', () => {
   const mockCustomDetectors = {
     sanitizeSourceConfigDetectors: jest.fn((c: unknown) => Promise.resolve(c)),
   };
+  const mockImpact = { preview: jest.fn() };
+  const mockPosture = { forSource: jest.fn() };
 
   const toolset = new ConfigToolset(
     mockPrisma as unknown as PrismaService,
@@ -47,6 +82,8 @@ describe('ConfigToolset — config.tune_source', () => {
     mockNotifications as unknown as NotificationsService,
     mockAutoSchedule as unknown as AutoScheduleService,
     mockCustomDetectors as unknown as CustomDetectorsService,
+    mockImpact as unknown as DetectionImpactService,
+    mockPosture as unknown as DetectionPostureService,
   );
   const tune = toolset
     .list()
@@ -65,6 +102,8 @@ describe('ConfigToolset — config.tune_source', () => {
     mockValidation.validate.mockImplementation((_t, c) => c);
     mockMasked.decryptMaskedConfig.mockImplementation((c) => c);
     mockMasked.encryptMaskedConfig.mockImplementation((c) => c);
+    mockImpact.preview.mockResolvedValue(NO_IMPACT);
+    mockPosture.forSource.mockResolvedValue(EXPLORING_POSTURE);
   });
 
   it('rejects a patch that targets the base connection (masked/required)', async () => {
@@ -154,7 +193,10 @@ describe('ConfigToolset — config.tune_source', () => {
       tune.handler(
         {
           sourceId: 's1',
-          patch: { detectors: [] },
+          // Keeps one detector live so the write reaches the update and this
+          // stays a test of the concurrency race; an empty detector list is
+          // refused earlier now, by the detection floor.
+          patch: { detectors: [{ type: 'PII', enabled: true }] },
           expectedVersion: VERSION,
         },
         tc,
@@ -194,6 +236,90 @@ describe('ConfigToolset — config.tune_source', () => {
       ),
     ).rejects.toThrow(/Unknown sourceId/);
   });
+
+  /**
+   * The tool used to return `{ok: true, changedKeys}` whether a patch touched
+   * nothing or resolved 44,174 findings, so every reduction looked free. The
+   * agent now gets the bill with the change, and so does the operator.
+   */
+  describe('the receipt', () => {
+    const costly: DetectionImpact = {
+      removedDetectors: ['built-in PII'],
+      addedDetectors: [],
+      resolves: { total: 44174, byDetector: [], highImportance: 120 },
+      protectedEvidence: { total: 6, citedByCases: [], watchedByInquiries: [] },
+      citationScanComplete: true,
+    };
+
+    it('returns what the change cost', async () => {
+      mockImpact.preview.mockResolvedValue(costly);
+
+      const result = (await tune.handler(
+        {
+          sourceId: 's1',
+          patch: { detectors: [{ type: 'SECRETS', enabled: true }] },
+          expectedVersion: VERSION,
+        },
+        tc,
+      )) as { impact: DetectionImpact; detectionPosture: string };
+
+      expect(result.impact.resolves.total).toBe(44174);
+      expect(result.detectionPosture).toBe('EXPLORING');
+    });
+
+    it('prices the change before writing it, not after', async () => {
+      mockImpact.preview.mockResolvedValue(costly);
+
+      await tune.handler(
+        {
+          sourceId: 's1',
+          patch: { detectors: [{ type: 'SECRETS', enabled: true }] },
+          expectedVersion: VERSION,
+        },
+        tc,
+      );
+
+      expect(mockImpact.preview.mock.invocationCallOrder[0]).toBeLessThan(
+        mockPrisma.source.updateMany.mock.invocationCallOrder[0],
+      );
+    });
+
+    it('tells the operator what was resolved, and raises the severity', async () => {
+      mockImpact.preview.mockResolvedValue(costly);
+
+      await tune.handler(
+        {
+          sourceId: 's1',
+          patch: { detectors: [{ type: 'SECRETS', enabled: true }] },
+          expectedVersion: VERSION,
+        },
+        tc,
+      );
+
+      expect(mockNotifications.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          severity: 'MEDIUM',
+          message: expect.stringContaining('44174 open finding(s)'),
+          metadata: expect.objectContaining({ resolvedFindings: 44174 }),
+        }),
+      );
+    });
+
+    it('stays at INFO for a change that resolves nothing', async () => {
+      await tune.handler(
+        {
+          sourceId: 's1',
+          patch: { sampling: { strategy: 'LATEST' } },
+          expectedVersion: VERSION,
+        },
+        tc,
+      );
+
+      expect(mockNotifications.create).toHaveBeenCalledWith(
+        expect.objectContaining({ severity: 'INFO' }),
+      );
+    });
+  });
 });
 
 describe('ConfigToolset — sources.rescan', () => {
@@ -219,6 +345,9 @@ describe('ConfigToolset — sources.rescan', () => {
     mockNotifications as unknown as NotificationsService,
     mockAutoSchedule as unknown as AutoScheduleService,
     mockCustomDetectors as unknown as CustomDetectorsService,
+    // sources.rescan never prices or postures — it changes no config.
+    {} as unknown as DetectionImpactService,
+    {} as unknown as DetectionPostureService,
   );
   const rescan = toolset
     .list()

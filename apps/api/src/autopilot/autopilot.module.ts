@@ -18,6 +18,8 @@ import { AgentAuditService } from './audit/agent-audit.service';
 import { AgentLoggerService } from './audit/agent-logger.service';
 import { DecisionApplierService } from './decision-applier.service';
 import { EvidenceFloorService } from './evidence-floor.service';
+import { DetectionImpactService } from './detection-impact.service';
+import { DetectionPostureService } from './detection-posture.service';
 import { ValidationService } from '../validation.service';
 import { CustomDetectorsService } from '../custom-detectors.service';
 import { CustomDetectorTestsService } from '../custom-detector-tests.service';
@@ -86,6 +88,8 @@ import { AssistantCapabilityService } from './capability/assistant-capability.se
     AgentLoggerService,
     DecisionApplierService,
     EvidenceFloorService,
+    DetectionImpactService,
+    DetectionPostureService,
     ValidationService,
     CustomDetectorsService,
     CustomDetectorTestsService,

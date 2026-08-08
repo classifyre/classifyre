@@ -24,6 +24,8 @@ import {
   SearchAssetsSortOrder,
 } from './dto/search-assets-request.dto';
 import { SemanticSearchMode } from './dto/search-findings-request.dto';
+import { InquiryMatchingService } from './matching/inquiry-matching.service';
+import { PgBossService } from './scheduler/pg-boss.service';
 
 describe('AssetService', () => {
   let service: AssetService;
@@ -56,8 +58,19 @@ describe('AssetService', () => {
       findUnique: jest.fn(),
       updateMany: jest.fn(),
     },
+    caseFinding: {
+      findMany: jest.fn(),
+    },
     $transaction: jest.fn(),
     $queryRaw: jest.fn(),
+  };
+
+  const mockInquiryMatching = {
+    watchersForFindings: jest.fn(),
+  };
+
+  const mockPgBoss = {
+    getBossAsync: jest.fn(),
   };
 
   const mockCustomDetectorExtractionsService = {
@@ -87,6 +100,8 @@ describe('AssetService', () => {
         },
         { provide: EmbeddingService, useValue: mockEmbeddingService },
         { provide: QueryEmbeddingService, useValue: mockQueryEmbeddingService },
+        { provide: InquiryMatchingService, useValue: mockInquiryMatching },
+        { provide: PgBossService, useValue: mockPgBoss },
       ],
     }).compile();
 
@@ -96,6 +111,11 @@ describe('AssetService', () => {
     // Default: no per-detector outcomes recorded, so nothing is resolvable for
     // absence. Tests that exercise resolution opt in explicitly.
     mockPrismaService.runnerAsset.findMany.mockResolvedValue([]);
+    // Default: nothing cites or watches anything, so the removed-detector
+    // cleanup behaves exactly as it did before the protection existed.
+    mockPrismaService.caseFinding.findMany.mockResolvedValue([]);
+    mockInquiryMatching.watchersForFindings.mockResolvedValue(new Map());
+    mockPgBoss.getBossAsync.mockResolvedValue({ send: jest.fn() });
   });
 
   it('should be defined', () => {
@@ -2082,6 +2102,7 @@ describe('AssetService', () => {
           outOfScope: 0,
           resolvedForAbsence: 0,
           resolvedForRemovedDetectors: 0,
+          retainedForCitation: 0,
         });
         // The bug: with no seenHashes the `notIn` filter was dropped, so the
         // query matched every asset in the source. Nothing may even be queried.
@@ -2671,6 +2692,129 @@ describe('AssetService', () => {
 
         expect(result.resolvedForRemovedDetectors).toBe(0);
         expect(findingUpdate).not.toHaveBeenCalled();
+      });
+
+      /**
+       * Detection is a setting; cited evidence is a record. A setting change
+       * must not silently rewrite a record — on the live instance that produced
+       * this rule, the config agent's tuning resolved 6 of the 17 findings
+       * attached to cases as a side effect nobody connected to it.
+       */
+      describe('evidence an investigation relies on', () => {
+        const detectorGone = { detectors: [{ type: 'PII', enabled: true }] };
+
+        it('does not resolve a finding a case cites', async () => {
+          mockPrismaService.caseFinding.findMany.mockResolvedValue([
+            { findingId: 'finding-llm' },
+          ]);
+
+          const result = await runCleanup(detectorGone, [openFinding()]);
+
+          expect(result.resolvedForRemovedDetectors).toBe(0);
+          expect(result.retainedForCitation).toBe(1);
+          expect(findingUpdate).not.toHaveBeenCalledWith(
+            expect.objectContaining({
+              data: expect.objectContaining({
+                status: FindingStatus.RESOLVED,
+              }),
+            }),
+          );
+        });
+
+        it('does not resolve a finding an active inquiry watches', async () => {
+          mockInquiryMatching.watchersForFindings.mockResolvedValue(
+            new Map([['finding-llm', ['inquiry-1']]]),
+          );
+
+          const result = await runCleanup(detectorGone, [openFinding()]);
+
+          expect(result.resolvedForRemovedDetectors).toBe(0);
+          expect(result.retainedForCitation).toBe(1);
+        });
+
+        it('records on a retained finding why it outlives its detector', async () => {
+          mockPrismaService.caseFinding.findMany.mockResolvedValue([
+            { findingId: 'finding-llm' },
+          ]);
+
+          await runCleanup(detectorGone, [openFinding()]);
+
+          expect(findingUpdate).toHaveBeenCalledWith(
+            expect.objectContaining({
+              where: { id: 'finding-llm' },
+              data: {
+                history: [
+                  expect.objectContaining({
+                    status: FindingStatus.OPEN,
+                    changeReason: expect.stringMatching(/is kept because/),
+                  }),
+                ],
+              },
+            }),
+          );
+        });
+
+        // The check runs at the end of every scan, so a finding cited by a
+        // long-running case would otherwise accrue one entry per scan forever.
+        it('does not re-append the note it already wrote', async () => {
+          mockPrismaService.caseFinding.findMany.mockResolvedValue([
+            { findingId: 'finding-llm' },
+          ]);
+
+          await runCleanup(detectorGone, [
+            openFinding({
+              history: [
+                {
+                  eventType: HistoryEventType.RE_DETECTED,
+                  status: FindingStatus.OPEN,
+                  changeReason:
+                    'Detector removed from source configuration, but this ' +
+                    'finding is kept because a case cites it or an active ' +
+                    'inquiry watches it',
+                },
+              ],
+            }),
+          ]);
+
+          expect(findingUpdate).not.toHaveBeenCalled();
+        });
+
+        it('still resolves an orphaned finding nobody is relying on', async () => {
+          mockPrismaService.caseFinding.findMany.mockResolvedValue([
+            { findingId: 'some-other-finding' },
+          ]);
+
+          const result = await runCleanup(detectorGone, [openFinding()]);
+
+          expect(result.resolvedForRemovedDetectors).toBe(1);
+          expect(result.retainedForCitation).toBe(0);
+        });
+
+        // Correlation values are derived from findings and only rebuilt for
+        // assets a run touched, so a mass-resolve leaves ghost fingerprints
+        // behind until something recomputes the whole index.
+        it('schedules a correlation recompute after resolving', async () => {
+          const send = jest.fn();
+          mockPgBoss.getBossAsync.mockResolvedValue({ send });
+
+          await runCleanup(detectorGone, [openFinding()]);
+
+          expect(send).toHaveBeenCalledWith(
+            expect.any(String),
+            { recomputeAll: true },
+            expect.objectContaining({
+              singletonKey: 'correlation:recompute-all',
+            }),
+          );
+        });
+
+        it('does not fail the run when the recompute cannot be scheduled', async () => {
+          mockPgBoss.getBossAsync.mockRejectedValue(new Error('boss is down'));
+
+          const result = await runCleanup(detectorGone, [openFinding()]);
+
+          expect(result.resolvedForRemovedDetectors).toBe(1);
+        });
       });
     });
 

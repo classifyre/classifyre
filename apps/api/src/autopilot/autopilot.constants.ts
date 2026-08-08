@@ -116,6 +116,15 @@ export const EVIDENCE_ANALYSIS_MIN_COVERAGE = 0.8;
  * the missing counterweight: evidence nobody is watching.
  */
 export const UNMONITORED_MIN_IMPORTANCE = 0.75;
+
+/**
+ * Completed scans examined when asking "is this source still detecting
+ * anything?". A source whose recent scans all processed assets and produced no
+ * findings is blind, not quiet — and nothing said so, which is how one ran a
+ * full sweep of its corpus every three hours for a night, finding nothing,
+ * while the agents had no material to build anything from.
+ */
+export const DETECTION_YIELD_SCANS = 5;
 /** Highest-importance findings examined per unmonitored-coverage check. */
 export const UNMONITORED_SCAN_LIMIT = 500;
 
@@ -225,6 +234,53 @@ export const MAX_DEFERRED_ENTRIES = 10;
  * time.
  */
 export const AUTOPILOT_RESCANS_PER_DAY = 4;
+
+/**
+ * Detection-change budget: how many times the autopilot may change ONE source's
+ * detection in 24 hours.
+ *
+ * `AUTOPILOT_RESCANS_PER_DAY` above bounds how often a source is re-read; this
+ * bounds how often what it detects is redefined, which is the more expensive of
+ * the two. Removing a detector resolves every open finding it produced, so a
+ * source whose detector set keeps moving never accumulates an evidence base for
+ * anything to be investigated from. On the live instance that produced this
+ * constant, one source took 22 TUNE_SOURCE writes across three days and ended
+ * with every built-in detector disabled and 96% of its findings resolved.
+ */
+export const AUTOPILOT_TUNES_PER_DAY = 4;
+
+/**
+ * Completed scans a source's detection fingerprint must survive unchanged
+ * before its detection counts as settled. Two would be satisfied by a pair of
+ * back-to-back catch-up runs minutes apart; three means the set has actually
+ * been exercised.
+ */
+export const DETECTION_STABLE_RUNS = 3;
+
+/**
+ * Open findings a source needs before its detection can be judged at all.
+ * Below this it is EXPLORING: there is nothing yet to be right or wrong about,
+ * and the agent should be free to experiment without any of the brakes.
+ */
+export const DETECTION_POSTURE_MIN_FINDINGS = 50;
+
+/**
+ * Rows a detection-impact preview will pull before reporting itself capped.
+ *
+ * The count of what a change resolves comes from an aggregate and is always
+ * exact; this bounds only the per-row pass that decides which of them a case
+ * cites or an inquiry watches. Sized well above any plausible number of cited
+ * findings and far below the 44k a single detector can hold.
+ */
+export const DETECTION_IMPACT_SCAN_LIMIT = 5000;
+
+/**
+ * Findings `detectors.value` inspects row-by-row to decide what is watched,
+ * cited or high-importance. The volume column is an aggregate and always exact;
+ * this bounds only the value columns, and the scan is ordered by importance so
+ * a capped answer still describes the part of the output that matters.
+ */
+export const DETECTOR_VALUE_SCAN_LIMIT = 5000;
 
 /**
  * "Dreaming" cadence: every other day at 03:10 the agent consolidates its

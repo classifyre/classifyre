@@ -73,6 +73,42 @@ export interface DetectorPrecisionSummary {
 }
 
 /**
+ * What a detector's output is actually WORTH, as opposed to how much of it
+ * there is.
+ *
+ * The config agent had only volume to go on, plus its own reading of a sample.
+ * Volume is a metric you improve by reducing it, so it reduced: 44,174 PII
+ * findings were disabled as "5000+ noise findings" on a source where an active
+ * inquiry was matching over a thousand of them. This is the counterweight —
+ * a detector that feeds inquiries and cases is the corpus, not noise, however
+ * loud it is; one nothing has ever looked at is the candidate for retuning
+ * however quiet it is.
+ */
+export interface DetectorValueSummary {
+  /** `PII`, or `CUSTOM::my_detector` — the same identity the source config uses. */
+  detector: string;
+  /** Human-readable form of the same. */
+  label: string;
+  isCustom: boolean;
+  /** Currently enabled on at least one source in scope. */
+  openFindings: number;
+  /** Of those, how many an ACTIVE inquiry matches. */
+  watchedByInquiries: number;
+  /** Of those, how many are attached to a case. */
+  citedByCases: number;
+  /** Of those, how many clear the high-importance bar. */
+  highImportance: number;
+  /** Operator dismissals (custom detectors only — built-ins carry no feedback rows). */
+  dismissedByOperator: number;
+  /**
+   * False when the per-finding pass hit its scan cap, so the watched/cited/
+   * high-importance columns describe a sample of this detector's output.
+   * `openFindings` is always exact.
+   */
+  scanComplete: boolean;
+}
+
+/**
  * Compact summary of what the DUPLICATES FINDER AGENT found for this scan,
  * fed to the inquiry/case agents so they can take same-entity / cross-source
  * duplicate signals into account.
@@ -330,6 +366,8 @@ export interface AgentContext {
   evidenceCoverage?: { open: number; analyzed: number };
   /** High-importance findings no active inquiry matches, surfaced each cycle. */
   unmonitoredFindings?: number;
+  /** Set when recent scans processed assets and detected nothing at all. */
+  detectionBlind?: boolean;
   /** Validated output of each completed step, keyed by step name. */
   state: Record<string, unknown>;
 }
