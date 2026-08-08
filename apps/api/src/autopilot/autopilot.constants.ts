@@ -90,6 +90,28 @@ export const EXPRESS_CONSECUTIVE_FAILURES = 3;
  * deadlocking the autopilot entirely.
  */
 export const AUTOPILOT_MAX_READINESS_REQUEUES = 5;
+
+/**
+ * Wall-clock ceiling for one whole cycle, across every agent it runs.
+ *
+ * `AGENT_RUN_BUDGET_MS` bounds a single agent; nothing bounded the cycle, and
+ * five agents in series could legitimately occupy 100 minutes. Measured on a
+ * live instance mid-ingestion: cycle 1 took 29 minutes, cycle 2 took 69 — of
+ * which a DETECTOR_AUTHOR run spent 18 minutes before failing on malformed
+ * JSON, with ESCALATION queued behind it the whole time. Scans were completing
+ * every two minutes throughout, so the harness saw roughly one cycle per thirty
+ * scans.
+ *
+ * Past the deadline the remaining agents are skipped and the next cycle picks
+ * the work up with fresher data, which is strictly better than finishing a
+ * cycle whose premises are an hour stale.
+ *
+ * Checked before each agent starts, so a chain can overshoot by at most one
+ * `AGENT_RUN_BUDGET_MS` — an effective ceiling of 50 minutes rather than a hard
+ * 30. Interrupting an agent mid-run would cost its work and leave its decisions
+ * half-applied; letting the last one finish does not.
+ */
+export const AUTOPILOT_CYCLE_BUDGET_MS = 30 * 60 * 1000;
 /**
  * Below this fraction of OPEN findings carrying an importance score, the
  * missions are told their triage order is partial.
@@ -325,13 +347,14 @@ export const NOISY_FALSE_POSITIVE_RATE = 0.5;
 export const CLEAN_FALSE_POSITIVE_RATE = 0.2;
 
 /**
- * The scan-cycle agents, in the order a cycle runs them. Each reacts to what
- * the previous ones observed, so the order is meaningful, not cosmetic.
+ * The scan-cycle agents, in canonical order.
  *
  * Shared by the trigger endpoint and the worker so "which agents make up a
  * cycle" has exactly one definition — the worker's own list used to be
  * implicit in a chain of per-agent flag checks, which is how the cycle gate
  * came to test only two of the five.
+ *
+ * The worker no longer runs them as one series; see the two chains below.
  */
 export const PIPELINE_KINDS = [
   AgentKind.INQUIRY,
@@ -339,4 +362,30 @@ export const PIPELINE_KINDS = [
   AgentKind.CONFIG,
   AgentKind.DETECTOR_AUTHOR,
   AgentKind.ESCALATION,
+] as const;
+
+/**
+ * The investigation chain. Ordering here is a real data dependency: CASE
+ * consumes the inquiries INQUIRY just created or widened, and ESCALATION
+ * alerts on the final state of the cases CASE mutated.
+ */
+export const INVESTIGATION_CHAIN = [
+  AgentKind.INQUIRY,
+  AgentKind.CASE,
+  AgentKind.ESCALATION,
+] as const;
+
+/**
+ * The detection chain. DETECTOR_AUTHOR reacts to what CONFIG left unaddressed,
+ * and both write the same source config — serialising them keeps them off each
+ * other's optimistic-concurrency token.
+ *
+ * Independent of the investigation chain: it reads the finding landscape from
+ * the database, not from what those agents produced, so the two run
+ * concurrently. Keeping all five in one series cost a live instance roughly an
+ * order of magnitude in cycle throughput.
+ */
+export const DETECTION_CHAIN = [
+  AgentKind.CONFIG,
+  AgentKind.DETECTOR_AUTHOR,
 ] as const;
