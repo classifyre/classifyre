@@ -66,6 +66,7 @@ import {
   FingerprintsGraphOverviewFooter,
   FingerprintsGraphSelectionRail,
 } from "./fingerprints-graph-rail";
+import type { FingerprintOccurrencesCache } from "./fingerprint-value-occurrences";
 import { useTranslation } from "@/hooks/use-translation";
 
 const SELECT_MODE = { kind: "select" } as const;
@@ -76,7 +77,7 @@ const BUNDLE_EDGE_PREFIX = "bundle-edge:";
 
 export interface BundleDetail {
   assetIds: string[];
-  /** Each entry is a real finding — `id` addresses its detail page. */
+  /** Each entry is a shared-value hash, resolved lazily to per-asset findings. */
   values: Array<{ id: string; label: string; value: string }>;
   /** Pairwise weighted match % (only for 2-asset bundles). */
   matchPercent?: number;
@@ -135,6 +136,7 @@ export function FingerprintsGraph({
   onRailStateChange,
   focus,
   onExitFocus,
+  occurrencesCache,
 }: {
   assetId?: string;
   /** Scope to a source's clusters; external assets get a show/hide toggle. */
@@ -156,8 +158,13 @@ export function FingerprintsGraph({
   focus?: FingerprintsFocus;
   /** Clear `focus` — invoked from the floating pill's Reset and from a background click. */
   onExitFocus?: () => void;
+  /** Optional page-scoped cache shared with sibling fingerprint panels. */
+  occurrencesCache?: FingerprintOccurrencesCache;
 }) {
   const { t } = useTranslation();
+  const localOccurrencesCache = React.useRef<FingerprintOccurrencesCache>(new Map());
+  const effectiveOccurrencesCache =
+    occurrencesCache ?? localOccurrencesCache.current;
   const externallyManaged = graphData !== undefined;
   const [fetchedNodes, setFetchedNodes] = React.useState<GraphNodeDto[]>([]);
   const [fetchedEdges, setFetchedEdges] = React.useState<GraphEdgeDto[]>([]);
@@ -851,6 +858,7 @@ export function FingerprintsGraph({
         onHoverKey={setHoverKey}
         focusCluster={focusCluster}
         assetLabel={assetLabel}
+        occurrencesCache={effectiveOccurrencesCache}
       />
     ),
     [
@@ -862,6 +870,7 @@ export function FingerprintsGraph({
       hoverKey,
       focusCluster,
       assetLabel,
+      effectiveOccurrencesCache,
     ],
   );
   const overviewFooter = React.useMemo(

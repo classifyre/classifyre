@@ -30,6 +30,12 @@ export interface ValueOccurrenceAssetDto {
      * @type {string}
      * @memberof ValueOccurrenceAssetDto
      */
+    findingId?: string | null;
+    /**
+     *
+     * @type {string}
+     * @memberof ValueOccurrenceAssetDto
+     */
     name: string;
     /**
      * 
@@ -94,6 +100,7 @@ export function ValueOccurrenceAssetDtoFromJSONTyped(json: any, ignoreDiscrimina
     return {
         
         'assetId': json['assetId'],
+        'findingId': json['findingId'] == null ? undefined : json['findingId'],
         'name': json['name'],
         'externalUrl': json['externalUrl'],
         'assetType': json['assetType'],
@@ -116,6 +123,7 @@ export function ValueOccurrenceAssetDtoToJSONTyped(value?: ValueOccurrenceAssetD
     return {
         
         'assetId': value['assetId'],
+        'findingId': value['findingId'],
         'name': value['name'],
         'externalUrl': value['externalUrl'],
         'assetType': value['assetType'],
@@ -125,4 +133,3 @@ export function ValueOccurrenceAssetDtoToJSONTyped(value?: ValueOccurrenceAssetD
         'clusterId': value['clusterId'],
     };
 }
-

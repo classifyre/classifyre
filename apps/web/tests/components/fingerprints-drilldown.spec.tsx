@@ -90,10 +90,9 @@ test.describe("cluster detail panel", () => {
       <ClusterDetailHarness meta={CLUSTER} members={MEMBERS} />,
     );
 
-    await expect(panel.getByRole("link", { name: /open source/i })).toHaveAttribute(
-      "href",
-      "/sources/source-1",
-    );
+    await expect(
+      panel.getByRole("link", { name: /open source/i }),
+    ).toHaveAttribute("href", "/sources/source-1");
   });
 
   test("splits members into documents and severity-banded findings, all clickable", async ({
@@ -132,7 +131,9 @@ test.describe("cluster detail panel", () => {
     );
 
     await expect(panel.getByText("12 shared values")).toBeVisible();
-    await expect(panel.getByRole("link", { name: /shared values/ })).toHaveCount(0);
+    await expect(
+      panel.getByRole("link", { name: /shared values/ }),
+    ).toHaveCount(0);
   });
 });
 
@@ -157,7 +158,35 @@ test.describe("connections panel", () => {
     ).toHaveAttribute("href", "/assets/asset-b");
   });
 
-  test("shared values open the finding they came from", async ({ mount }) => {
+  test("loads a shared value lazily and links each source to its real finding", async ({
+    mount,
+    page,
+  }) => {
+    let occurrenceRequests = 0;
+    await page.route("**/findings/occurrences**", async (route) => {
+      occurrenceRequests += 1;
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          label: "email",
+          value: "k.lay@enron.com",
+          valueHash: SHARED_VALUE.id,
+          assets: [
+            {
+              assetId: ASSET_A.id,
+              findingId: "8a9dda05-f035-46cd-8fa0-1ad864a39d14",
+              name: ASSET_A.label,
+              externalUrl: "",
+              assetType: "EMAIL",
+              sourceType: ASSET_A.sourceType,
+              sourceId: ASSET_A.sourceId,
+              sourceName: ASSET_A.sourceName,
+              clusterId: null,
+            },
+          ],
+        }),
+      });
+    });
     const panel = await mount(
       <FingerprintsConnections
         nodes={[ASSET_A, ASSET_B, SHARED_VALUE]}
@@ -170,9 +199,27 @@ test.describe("connections panel", () => {
     );
 
     await panel.getByRole("button", { expanded: false }).click();
+    expect(occurrenceRequests).toBe(0);
+
+    const sharedValue = panel.getByRole("button", {
+      name: /show matching findings by source/i,
+    });
+    await sharedValue.click();
 
     await expect(
-      panel.getByRole("link", { name: /k\.lay@enron\.com/ }),
-    ).toHaveAttribute("href", "/findings/finding-1");
+      panel.getByRole("link", {
+        name: /open finding from enron email archive/i,
+      }),
+    ).toHaveAttribute("href", "/findings/8a9dda05-f035-46cd-8fa0-1ad864a39d14");
+    expect(occurrenceRequests).toBe(1);
+
+    await sharedValue.click();
+    await sharedValue.click();
+    await expect(
+      panel.getByRole("link", {
+        name: /open finding from enron email archive/i,
+      }),
+    ).toBeVisible();
+    expect(occurrenceRequests).toBe(1);
   });
 });
