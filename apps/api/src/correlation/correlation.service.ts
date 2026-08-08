@@ -1,6 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import { Injectable, Logger } from '@nestjs/common';
-import { DetectorType, EdgeOrigin, Prisma } from '@prisma/client';
+import {
+  DetectorType,
+  EdgeOrigin,
+  FindingStatus,
+  Prisma,
+} from '@prisma/client';
 import { PrismaService } from '../prisma.service';
 import type { GraphEdgeDto, GraphNodeDto } from '../dto/graph.dto';
 import { UnionFind } from '../utils/union-find';
@@ -520,7 +525,16 @@ export class CorrelationService {
         detectorType: DetectorType;
         customDetectorKey: string | null;
       }> = await this.prisma.finding.findMany({
-        where: { assetId, ...(idCursor ? { id: { gt: idCursor } } : {}) },
+        // OPEN only. A fingerprint asserts that this asset CURRENTLY carries
+        // this value; a resolved finding is not that. Without the filter, a
+        // detector leaving a source config left its values correlating assets
+        // forever — 74% of the correlation index on a live instance belonged
+        // to assets with no open finding at all.
+        where: {
+          assetId,
+          status: FindingStatus.OPEN,
+          ...(idCursor ? { id: { gt: idCursor } } : {}),
+        },
         select: {
           id: true,
           findingType: true,

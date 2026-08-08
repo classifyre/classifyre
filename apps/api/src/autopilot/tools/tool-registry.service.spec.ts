@@ -35,6 +35,8 @@ import type { GlossaryService } from '../../glossary/glossary.service';
 import type { CaseLeadsService } from '../../case-leads.service';
 import type { CaseEventsService } from '../../case-events.service';
 import type { AutoScheduleService } from '../../scheduler/auto-schedule.service';
+import type { DetectionImpactService } from '../detection-impact.service';
+import type { DetectionPostureService } from '../detection-posture.service';
 import { ScheduleToolset } from './schedule/schedule.toolset';
 
 describe('ToolRegistry', () => {
@@ -52,6 +54,8 @@ describe('ToolRegistry', () => {
       {} as NotificationsService,
       {} as AutoScheduleService,
       {} as CustomDetectorsService,
+      {} as DetectionImpactService,
+      {} as DetectionPostureService,
     ),
     new DetectorToolset(
       {} as CustomDetectorsService,

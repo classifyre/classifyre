@@ -547,6 +547,18 @@ function buildUserPrompt(ctx: AgentContext, mission: Mission): string {
       `This cycle was expedited rather than batched because: ${ctx.expressReason}.`,
     );
   }
+  if (ctx.detectionBlind) {
+    lines.push(
+      'DETECTION IS BLIND: the recent scans read assets and produced NO findings at ' +
+        'all. This is a configuration failure, not a quiet corpus — a source that ' +
+        'detects nothing gives every other agent nothing to work with, and the scans ' +
+        'keep running and returning empty. Treat restoring detection as the priority ' +
+        'over any other work this cycle: read sources.get_config, see which detectors ' +
+        'are enabled, and put one back that suits this material — narrowed or with a ' +
+        'higher confidence threshold if it was disabled for noise, rather than left ' +
+        'off. Findings that are somewhat noisy are recoverable; no findings is not.',
+    );
+  }
   const unwatched = ctx.unmonitoredFindings ?? 0;
   if (unwatched > 0) {
     // Stated every cycle rather than left for the agent to go and ask. The
