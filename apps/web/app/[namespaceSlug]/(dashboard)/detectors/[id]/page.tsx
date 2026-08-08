@@ -1,14 +1,16 @@
 "use client";
 
 import { useNsPath } from "@/lib/ns-path";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useRouteId } from "@/lib/use-route-id";
 import { ArrowLeft, Play, Trash2 } from "lucide-react";
 import {
   api,
+  SearchFindingsFiltersInputDtoDetectorTypeEnum,
   type CustomDetectorResponseDto,
   type CustomDetectorTrainingRunDto,
+  type SearchFindingsRequestDto,
   type UpdateCustomDetectorDto,
 } from "@workspace/api-client";
 import { useRegisterAssistantBridge } from "@/components/assistant-workflow-provider";
@@ -46,6 +48,13 @@ import { VisualScanBadge } from "@/components/detector-type-badge";
 import { isVisualDetector } from "@/lib/custom-detector-badge";
 import { formatDate } from "@/lib/date";
 import { useTranslation } from "@/hooks/use-translation";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@workspace/ui/components/tabs";
+import { FindingsTable } from "@/components/findings-table";
 
 // The generated DTO is out-of-sync with the server — pipeline detectors carry
 // pipelineSchema rather than config/method. Extend locally until codegen is refreshed.
@@ -65,6 +74,9 @@ export default function CustomDetectorDetailsPage() {
   const [isTraining, setIsTraining] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [activeTab, setActiveTab] = useState<"overview" | "results">(
+    "overview",
+  );
   const [detector, setDetector] = useState<DetectorWithPipeline | null>(null);
   const [history, setHistory] = useState<CustomDetectorTrainingRunDto[]>([]);
 
@@ -209,6 +221,16 @@ export default function CustomDetectorDetailsPage() {
 
   useRegisterAssistantBridge(assistantBridge);
 
+  const detectorKey = detector?.key;
+  const findingsFilters = useMemo<SearchFindingsRequestDto["filters"]>(
+    () => ({
+      detectorType: [SearchFindingsFiltersInputDtoDetectorTypeEnum.Custom],
+      customDetectorKey: detectorKey ? [detectorKey] : [],
+      includeResolved: true,
+    }),
+    [detectorKey],
+  );
+
   if (isLoading || !detector) {
     return (
       <div className="text-sm text-muted-foreground">
@@ -278,6 +300,23 @@ export default function CustomDetectorDetailsPage() {
         </div>
       </div>
 
+      <Tabs
+        value={activeTab}
+        onValueChange={(value) =>
+          setActiveTab(value as "overview" | "results")
+        }
+        className="space-y-4"
+      >
+        <TabsList className="h-auto rounded-[4px] border-2 border-border bg-background p-1">
+          <TabsTrigger value="overview" className="rounded-[3px]">
+            {t("detectors.overviewTab")}
+          </TabsTrigger>
+          <TabsTrigger value="results" className="rounded-[3px]">
+            {t("detectors.resultsTab")}
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="overview" className="space-y-6">
       <Card className="border-2 border-border rounded-[6px] shadow-[6px_6px_0_var(--color-border)]">
         <CardHeader>
           <div className="flex items-center justify-between gap-3">
@@ -526,6 +565,17 @@ export default function CustomDetectorDetailsPage() {
             <CustomDetectorTrainingHistoryTable history={history} />
           </section>
         )}
+
+        </TabsContent>
+
+        <TabsContent value="results" className="space-y-4">
+          {activeTab === "results" ? (
+            <Suspense>
+              <FindingsTable lockedFilters={findingsFilters} disableUrlSync />
+            </Suspense>
+          ) : null}
+        </TabsContent>
+      </Tabs>
 
       <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <DialogContent>
