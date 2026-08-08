@@ -3,7 +3,11 @@ import type { Job } from 'pg-boss';
 import { DetectorType, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
 import { PgBossService } from '../scheduler/pg-boss.service';
-import { CompiledMatcher, InquiryMatchers } from './inquiry-matcher';
+import {
+  CompiledMatcher,
+  FindingCandidate,
+  InquiryMatchers,
+} from './inquiry-matcher';
 import { INQUIRY_MATCH_QUEUE } from './matching.constants';
 import {
   PreviewResponseDto,
@@ -459,6 +463,60 @@ export class InquiryMatchingService {
         .sort((a, b) => b.topImportance - a.topImportance)
         .slice(0, UNMONITORED_GROUPS),
     };
+  }
+
+  /**
+   * Which of these findings an ACTIVE inquiry is watching, and which inquiries.
+   *
+   * The inverse of `unmonitoredFindings`, and the primitive behind two rules
+   * that both turn on the same question — "is anyone relying on this finding?":
+   * the ingest path must not auto-resolve watched evidence when its detector
+   * leaves the config, and the autopilot must be told what a config change
+   * would cost before it makes one.
+   *
+   * Findings absent from the returned map are watched by nobody. Ids that no
+   * longer exist are simply absent — this never throws on a stale id.
+   */
+  async watchedBy(findingIds: string[]): Promise<Map<string, string[]>> {
+    if (findingIds.length === 0) return new Map();
+    const findings = await this.prisma.finding.findMany({
+      where: { id: { in: findingIds } },
+      select: FINDING_SELECT,
+    });
+    return this.watchersForFindings(findings);
+  }
+
+  /**
+   * `watchedBy` for callers that already hold the finding rows.
+   *
+   * The ingest path has tens of thousands of them in memory when a detector
+   * leaves a config, and turning those back into an `IN (…)` list of 44k ids
+   * just to re-read what it already has would be the expensive way to ask a
+   * cheap question. One query for the active inquiries, then match in memory —
+   * the same shape `unmonitoredFindings` uses.
+   */
+  async watchersForFindings(
+    findings: Array<FindingCandidate & { id: string }>,
+  ): Promise<Map<string, string[]>> {
+    const watched = new Map<string, string[]>();
+    if (findings.length === 0) return watched;
+
+    const inquiries = await this.prisma.inquiry.findMany({
+      where: { status: 'ACTIVE' },
+      select: this.matcherSelect,
+    });
+    if (inquiries.length === 0) return watched;
+
+    const matchers = inquiries.map(
+      (q) => [q.id, new CompiledMatcher(q)] as const,
+    );
+    for (const finding of findings) {
+      const hits = matchers
+        .filter(([, m]) => m.matches(finding))
+        .map(([id]) => id);
+      if (hits.length > 0) watched.set(finding.id, hits);
+    }
+    return watched;
   }
 
   /**

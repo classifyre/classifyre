@@ -196,6 +196,7 @@ describe('Post-first-use store remediation (e2e)', () => {
       outOfScope: 1,
       resolvedForAbsence: 0,
       resolvedForRemovedDetectors: 0,
+      retainedForCitation: 0,
     });
     expect(
       await prisma.asset.findUnique({
@@ -230,6 +231,7 @@ describe('Post-first-use store remediation (e2e)', () => {
       outOfScope: 0,
       resolvedForAbsence: 0,
       resolvedForRemovedDetectors: 0,
+      retainedForCitation: 0,
     });
     expect(
       await prisma.asset.findUnique({
