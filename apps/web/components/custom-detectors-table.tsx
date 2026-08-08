@@ -1,11 +1,24 @@
 "use client";
 
 import { nsPath } from "@/lib/ns-path";
-import {Fragment, useEffect, useMemo, useState} from "react";
+import {Fragment, Suspense, useEffect, useMemo, useState} from "react";
 import {useRouter} from "next/navigation";
 import {useTranslation} from "@/hooks/use-translation";
-import {ArrowDown, ArrowUp, ChevronsUpDown, Loader2, Search,} from "lucide-react";
-import {api, type CustomDetectorResponseDto,} from "@workspace/api-client";
+import {
+    ArrowDown,
+    ArrowUp,
+    ChevronDown,
+    ChevronRight,
+    ChevronsUpDown,
+    Loader2,
+    Search,
+} from "lucide-react";
+import {
+    api,
+    SearchFindingsFiltersInputDtoDetectorTypeEnum,
+    type CustomDetectorResponseDto,
+    type SearchFindingsRequestDto,
+} from "@workspace/api-client";
 import {
     Badge,
     Button,
@@ -35,6 +48,7 @@ import {detectorCatalogStatusLabel, detectorCatalogStatusToRunnerStatus, isVisua
 import {getRunnerStatusBadgeTone} from "@/lib/runner-status-badge";
 import {CustomDetectorTypeBadge, VisualScanBadge} from "@/components/detector-type-badge";
 import {useDetectorVision} from "@/hooks/use-detector-vision";
+import {FindingsTable} from "@/components/findings-table";
 
 const PAGE_SIZE_OPTIONS = [20, 50, 100] as const;
 
@@ -101,6 +115,23 @@ function sortRows(
     return ordered;
 }
 
+function DetectorFindings({detectorKey}: { detectorKey: string }) {
+    const lockedFilters = useMemo<SearchFindingsRequestDto["filters"]>(
+        () => ({
+            detectorType: [SearchFindingsFiltersInputDtoDetectorTypeEnum.Custom],
+            customDetectorKey: [detectorKey],
+            includeResolved: true,
+        }),
+        [detectorKey],
+    );
+
+    return (
+        <Suspense>
+            <FindingsTable lockedFilters={lockedFilters} disableUrlSync />
+        </Suspense>
+    );
+}
+
 export function CustomDetectorsTable() {
     const router = useRouter();
     const {t} = useTranslation();
@@ -124,6 +155,9 @@ export function CustomDetectorsTable() {
         String(PAGE_SIZE_OPTIONS[0]),
     );
     const [page, setPage] = useState(1);
+    const [expandedDetectorId, setExpandedDetectorId] = useState<string | null>(
+        null,
+    );
 
     useEffect(() => {
         const timer = setTimeout(() => {
@@ -221,6 +255,15 @@ export function CustomDetectorsTable() {
         const start = (clampedPage - 1) * safePageSize;
         return filtered.slice(start, start + safePageSize);
     }, [filtered, clampedPage, safePageSize]);
+
+    useEffect(() => {
+        if (
+            expandedDetectorId &&
+            !pagedRows.some((row) => row.id === expandedDetectorId)
+        ) {
+            setExpandedDetectorId(null);
+        }
+    }, [expandedDetectorId, pagedRows]);
 
     const pageItems = useMemo(
         () => getPageItems(clampedPage, totalPages),
@@ -334,6 +377,7 @@ export function CustomDetectorsTable() {
                     <Table>
                         <TableHeader>
                             <TableRow>
+                                <TableHead className="w-10" />
                                 <TableHead>{renderSortHead("Detector", "name")}</TableHead>
                                 <TableHead>{t("common.type")}</TableHead>
                                 <TableHead>
@@ -356,7 +400,7 @@ export function CustomDetectorsTable() {
                         <TableBody>
                             {pagedRows.length === 0 ? (
                                 <TableRow>
-                                    <TableCell colSpan={6}>
+                                    <TableCell colSpan={8}>
                                         <EmptyState
                                             title={t("detectors.noDetectors")}
                                             description={t("detectors.noDetectorsHint")}
@@ -364,15 +408,47 @@ export function CustomDetectorsTable() {
                                     </TableCell>
                                 </TableRow>
                             ) : (
-                                pagedRows.map((row) => (
-                                    <TableRow
-                                        key={row.id}
-                                        className="cursor-pointer"
-                                        onClick={() => router.push(nsPath(`/detectors/${row.id}`))}
-                                    >
+                                pagedRows.map((row) => {
+                                    const isExpanded = expandedDetectorId === row.id;
+
+                                    return (
+                                    <Fragment key={row.id}>
+                                    <TableRow data-testid="detector-row">
+                                        <TableCell className="py-2">
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="sm"
+                                                className="h-7 w-7 p-0"
+                                                aria-expanded={isExpanded}
+                                                aria-label={t(
+                                                    isExpanded
+                                                        ? "detectors.collapseResults"
+                                                        : "detectors.expandResults",
+                                                    {name: row.name},
+                                                )}
+                                                onClick={() =>
+                                                    setExpandedDetectorId((current) =>
+                                                        current === row.id ? null : row.id,
+                                                    )
+                                                }
+                                            >
+                                                {isExpanded ? (
+                                                    <ChevronDown className="h-3.5 w-3.5" />
+                                                ) : (
+                                                    <ChevronRight className="h-3.5 w-3.5" />
+                                                )}
+                                            </Button>
+                                        </TableCell>
                                         <TableCell>
                                             <div className="space-y-1">
-                                                <p className="font-medium leading-tight">{row.name}</p>
+                                                <button
+                                                    type="button"
+                                                    className="font-medium leading-tight underline-offset-2 hover:underline"
+                                                    onClick={() => router.push(nsPath(`/detectors/${row.id}`))}
+                                                >
+                                                    {row.name}
+                                                </button>
                                                 <p className="font-mono text-[11px] text-muted-foreground">
                                                     {row.key}
                                                 </p>
@@ -472,7 +548,19 @@ export function CustomDetectorsTable() {
                                             </div>
                                         </TableCell>
                                     </TableRow>
-                                ))
+                                    {isExpanded ? (
+                                        <TableRow data-testid="detector-findings-row">
+                                            <TableCell
+                                                colSpan={8}
+                                                className="bg-muted/15 p-4 whitespace-normal"
+                                            >
+                                                <DetectorFindings detectorKey={row.key} />
+                                            </TableCell>
+                                        </TableRow>
+                                    ) : null}
+                                    </Fragment>
+                                    );
+                                })
                             )}
                         </TableBody>
                     </Table>
