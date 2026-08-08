@@ -45,6 +45,17 @@ const MIN_NEIGHBORHOOD = 5;
 const OUTLIER_BONUS_THRESHOLD = 0.55;
 const RECALIBRATE_BATCH_SIZE = 500;
 
+/**
+ * Batches of already-scored findings one pass will refresh, after it has
+ * finished scoring everything unscored.
+ *
+ * The refresh keeps scores corpus-relative as the space grows, but it must
+ * never crowd out the phase that makes unscored evidence visible at all —
+ * bounded here so a pass always terminates and the next one continues from the
+ * next-stalest rows.
+ */
+const RECALIBRATE_REFRESH_BATCHES = 20;
+
 @Injectable()
 export class EmbeddingService {
   private readonly logger = new Logger(EmbeddingService.name);
@@ -323,11 +334,24 @@ export class EmbeddingService {
   }
 
   /**
-   * Re-run evidence analysis and neighbourhood calibration for every finding
-   * that has an embedding hash. Insert-time calibration is order-dependent —
-   * the first vectors stored see a nearly empty space — so this pass must run
-   * once the space is stable (after a backfill or scan drains the queue) to
-   * make importance scores corpus-relative instead of insert-order-relative.
+   * Re-run evidence analysis and neighbourhood calibration. Insert-time
+   * calibration is order-dependent — the first vectors stored see a nearly
+   * empty space — so this pass exists to make importance scores corpus-relative
+   * instead of insert-order-relative.
+   *
+   * Two phases, and the order between them is the point.
+   *
+   * It used to be one walk over every embedded finding in `id asc` order. Under
+   * continuous ingestion that never got far enough to reach the findings nobody
+   * had scored yet: `id` is a random UUID, so each pass re-scored an arbitrary
+   * prefix and the corpus tail stayed at zero. A live instance sat at 27%
+   * coverage — 35,667 analyses against 131,905 open findings — while every
+   * investigation agent stood down citing unscored evidence.
+   *
+   * So: score what has never been scored FIRST, so coverage climbs
+   * monotonically and a pass cut short still leaves the system better off. Then
+   * refresh existing scores, oldest first, bounded — that keeps them
+   * corpus-relative without letting the refresh crowd out the new work.
    */
   async recalibrateSpace(spaceId?: string): Promise<{ analyzed: number }> {
     const space = spaceId
@@ -337,40 +361,88 @@ export class EmbeddingService {
       : await this.activeSpace();
     const resolvedSpaceId = space.id;
     const recurrence = await this.analysis.valueRecurrenceSnapshot();
-    let cursor: string | undefined;
+
+    // Neither phase pages with a cursor, and deliberately so: processing a row
+    // takes it out of the set its query selects from — phase 1 gives it an
+    // analysis, phase 2 stamps a fresh `analyzedAt` — so re-running the same
+    // query always returns the next tranche. A cursor would instead skip rows
+    // that entered the set behind it, which is exactly the corpus tail.
+    const scored = await this.analyzeBatches(
+      { id: resolvedSpaceId, dim: space.dim },
+      recurrence,
+      {
+        embedContentHash: { not: null },
+        evidenceAnalysis: { is: null },
+      },
+      { id: 'asc' },
+      // Unbounded: this is the work that makes the ranking usable at all, and
+      // the set shrinks as it runs.
+      Number.POSITIVE_INFINITY,
+    );
+
+    const refreshed = await this.analyzeBatches(
+      { id: resolvedSpaceId, dim: space.dim },
+      recurrence,
+      { embedContentHash: { not: null }, evidenceAnalysis: { isNot: null } },
+      // Stalest scores first, so successive passes rotate through the corpus
+      // instead of re-refreshing the same prefix forever.
+      { evidenceAnalysis: { analyzedAt: 'asc' } },
+      RECALIBRATE_REFRESH_BATCHES,
+    );
+
+    await this.prisma.embeddingSpace.update({
+      where: { id: resolvedSpaceId },
+      data: { lastRecalibratedAt: new Date() },
+      select: { id: true },
+    });
+    const analyzed = scored + refreshed;
+    this.logger.log(
+      `Recalibrated evidence analyses in space ${resolvedSpaceId}: ` +
+        `${scored} newly scored, ${refreshed} refreshed`,
+    );
+    return { analyzed };
+  }
+
+  /**
+   * Drive one analysis phase: pull a batch, score it, yield, repeat.
+   *
+   * `maxBatches` bounds the phase so a pass always terminates — an unbounded
+   * refresh over a corpus that grows every two minutes never returns.
+   */
+  private async analyzeBatches(
+    space: { id: string; dim: number },
+    recurrence: Awaited<
+      ReturnType<EmbeddingAnalysisService['valueRecurrenceSnapshot']>
+    >,
+    where: Prisma.FindingWhereInput,
+    orderBy: Prisma.FindingOrderByWithRelationInput,
+    maxBatches: number,
+  ): Promise<number> {
     let analyzed = 0;
-    do {
+    for (let batch = 0; batch < maxBatches; batch++) {
       const findings = await this.prisma.finding.findMany({
-        where: { embedContentHash: { not: null } },
-        ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
-        orderBy: { id: 'asc' },
+        where,
+        orderBy,
         take: RECALIBRATE_BATCH_SIZE,
         select: { id: true, embedContentHash: true },
       });
       if (!findings.length) break;
       const hashes = [
         ...new Set(
-          findings.map((finding) => finding.embedContentHash as string),
+          findings
+            .map((finding) => finding.embedContentHash)
+            .filter((hash): hash is string => typeof hash === 'string'),
         ),
       ];
-      await this.analysis.analyzeHashes(resolvedSpaceId, hashes, recurrence);
-      await this.calibrateNeighborhood(
-        { id: resolvedSpaceId, dim: space.dim },
-        hashes,
-      );
+      if (hashes.length > 0) {
+        await this.analysis.analyzeHashes(space.id, hashes, recurrence);
+        await this.calibrateNeighborhood(space, hashes);
+      }
       analyzed += findings.length;
-      cursor = findings.at(-1)?.id;
+      if (findings.length < RECALIBRATE_BATCH_SIZE) break;
       await new Promise((resolve) => setImmediate(resolve));
-    } while (cursor);
-    await this.prisma.embeddingSpace.update({
-      where: { id: resolvedSpaceId },
-      data: { lastRecalibratedAt: new Date() },
-      select: { id: true },
-    });
-    this.logger.log(
-      `Recalibrated evidence analyses for ${analyzed} findings in space ${resolvedSpaceId}`,
-    );
-    return { analyzed };
+    }
+    return analyzed;
   }
 
   private async calibrateNeighborhood(
