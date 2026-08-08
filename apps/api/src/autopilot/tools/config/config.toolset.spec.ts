@@ -9,6 +9,7 @@ import type { DecisionApplierService } from '../../decision-applier.service';
 import type { AutoScheduleService } from '../../../scheduler/auto-schedule.service';
 import type { CustomDetectorsService } from '../../../custom-detectors.service';
 import { computeDetectionFingerprint } from '../../../utils/scope-fingerprint';
+import { configVersion } from '../../../utils/config-version';
 import type {
   DetectionImpact,
   DetectionImpactService,
@@ -52,11 +53,16 @@ describe('ConfigToolset — config.tune_source', () => {
     sampling: { strategy: 'RANDOM' },
   };
   const UPDATED_AT = new Date('2026-07-20T12:00:00.000Z');
-  const VERSION = UPDATED_AT.toISOString();
+  // The concurrency token is a hash of the CONFIG, not the row's updatedAt —
+  // the scheduler writes to this row on every scan and must not invalidate it.
+  const VERSION = configVersion(baseConfig);
 
   const mockPrisma = {
     source: { findUnique: jest.fn(), update: jest.fn(), updateMany: jest.fn() },
     runner: { findUnique: jest.fn() },
+    // The write re-reads the config under FOR UPDATE inside a transaction.
+    $queryRaw: jest.fn(),
+    $transaction: jest.fn(),
   };
   const mockValidation = { validate: jest.fn((_t: string, c: unknown) => c) };
   const mockMasked = {
@@ -99,6 +105,11 @@ describe('ConfigToolset — config.tune_source', () => {
       updatedAt: UPDATED_AT,
     });
     mockPrisma.source.updateMany.mockResolvedValue({ count: 1 });
+    mockPrisma.source.update.mockResolvedValue({ id: 's1' });
+    mockPrisma.$queryRaw.mockResolvedValue([{ config: baseConfig }]);
+    mockPrisma.$transaction.mockImplementation((fn: any) =>
+      fn({ $queryRaw: mockPrisma.$queryRaw, source: mockPrisma.source }),
+    );
     mockValidation.validate.mockImplementation((_t, c) => c);
     mockMasked.decryptMaskedConfig.mockImplementation((c) => c);
     mockMasked.encryptMaskedConfig.mockImplementation((c) => c);
@@ -117,7 +128,7 @@ describe('ConfigToolset — config.tune_source', () => {
         tc,
       ),
     ).rejects.toThrow(/base connection/i);
-    expect(mockPrisma.source.updateMany).not.toHaveBeenCalled();
+    expect(mockPrisma.source.update).not.toHaveBeenCalled();
   });
 
   it('rejects a patch with a non-editable key', async () => {
@@ -127,7 +138,7 @@ describe('ConfigToolset — config.tune_source', () => {
         tc,
       ),
     ).rejects.toThrow(/not editable/i);
-    expect(mockPrisma.source.updateMany).not.toHaveBeenCalled();
+    expect(mockPrisma.source.update).not.toHaveBeenCalled();
   });
 
   it('applies an editable change while leaving base connection byte-identical', async () => {
@@ -140,8 +151,8 @@ describe('ConfigToolset — config.tune_source', () => {
       tc,
     );
     expect(mockValidation.validate).toHaveBeenCalled();
-    const call = mockPrisma.source.updateMany.mock.calls[0]![0];
-    expect(call.where).toEqual({ id: 's1', updatedAt: UPDATED_AT });
+    const call = mockPrisma.source.update.mock.calls[0]![0];
+    expect(call.where).toEqual({ id: 's1' });
     const written = call.data.config;
     expect(written.required).toEqual(baseConfig.required);
     expect(written.masked).toEqual(baseConfig.masked);
@@ -171,12 +182,12 @@ describe('ConfigToolset — config.tune_source', () => {
         {
           sourceId: 's1',
           patch: { detectors: [] },
-          expectedVersion: '2026-07-20T11:59:00.000Z',
+          expectedVersion: 'a-version-from-an-older-config',
         },
         tc,
       ),
     ).rejects.toThrow(/changed since you read it/i);
-    expect(mockPrisma.source.updateMany).not.toHaveBeenCalled();
+    expect(mockPrisma.source.update).not.toHaveBeenCalled();
     expect(mockNotifications.create).not.toHaveBeenCalled();
   });
 
@@ -184,11 +195,14 @@ describe('ConfigToolset — config.tune_source', () => {
     await expect(
       tune.handler({ sourceId: 's1', patch: { detectors: [] } }, tc),
     ).rejects.toThrow(/expectedVersion is required/i);
-    expect(mockPrisma.source.updateMany).not.toHaveBeenCalled();
+    expect(mockPrisma.source.update).not.toHaveBeenCalled();
   });
 
-  it('refuses when a concurrent write wins the update race (count 0)', async () => {
-    mockPrisma.source.updateMany.mockResolvedValue({ count: 0 });
+  it('refuses when a concurrent write changes the config mid-write', async () => {
+    // The locked re-read sees a different config than the one checked above.
+    mockPrisma.$queryRaw.mockResolvedValue([
+      { config: { ...baseConfig, detectors: [{ type: 'YARA' }] } },
+    ]);
     await expect(
       tune.handler(
         {
@@ -201,7 +215,7 @@ describe('ConfigToolset — config.tune_source', () => {
         },
         tc,
       ),
-    ).rejects.toThrow(/modified concurrently/i);
+    ).rejects.toThrow(/modified while you were preparing/i);
     expect(mockNotifications.create).not.toHaveBeenCalled();
   });
 
@@ -220,7 +234,7 @@ describe('ConfigToolset — config.tune_source', () => {
         tc,
       ),
     ).rejects.toThrow(/base connection/i);
-    expect(mockPrisma.source.updateMany).not.toHaveBeenCalled();
+    expect(mockPrisma.source.update).not.toHaveBeenCalled();
   });
 
   it('throws on unknown sourceId', async () => {
@@ -280,7 +294,7 @@ describe('ConfigToolset — config.tune_source', () => {
       );
 
       expect(mockImpact.preview.mock.invocationCallOrder[0]).toBeLessThan(
-        mockPrisma.source.updateMany.mock.invocationCallOrder[0],
+        mockPrisma.source.update.mock.invocationCallOrder[0],
       );
     });
 

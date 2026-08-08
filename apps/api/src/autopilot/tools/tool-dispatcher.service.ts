@@ -7,7 +7,21 @@ import {
 } from '../../ai/schema-validate';
 import { AgentAuditService } from '../audit/agent-audit.service';
 import { AgentLoggerService } from '../audit/agent-logger.service';
+import { stableJsonHash } from '../../utils/stable-json';
 import type { Tool, ToolCallResult, ToolContext } from './tool.types';
+
+/**
+ * Identical failing calls tolerated per run before the dispatcher refuses.
+ *
+ * Two is one retry — enough for a genuinely transient failure, few enough that
+ * a bounded iteration budget is not spent re-sending the same bad id.
+ */
+const MAX_IDENTICAL_FAILURES = 2;
+
+/** Identity of one tool call: the tool plus its normalized input. */
+function fingerprintCall(tool: string, input: unknown): string {
+  return stableJsonHash({ tool, input });
+}
 
 /**
  * Single chokepoint between the agent loop and any tool. Generalizes the
@@ -114,7 +128,37 @@ export class ToolDispatcherService {
         };
       }
 
-      // 4a. Run the mutating handler under audit.
+      // 4a. Refuse a call this run has already made, identically, and that has
+      //     already failed the same way. An agent that reads "not found" tends
+      //     to try another plausible id rather than stop — one live run
+      //     repeated the same malformed threadId four times, each attempt
+      //     costing an iteration of a bounded budget.
+      const callFingerprint = fingerprintCall(tool.name, input);
+      const priorFailures = await this.audit.countFailedCalls(
+        runId,
+        callFingerprint,
+      );
+      if (priorFailures >= MAX_IDENTICAL_FAILURES) {
+        const message =
+          `Refused: this exact ${tool.name} call has already failed ` +
+          `${priorFailures} times in this run. Repeating it will not succeed. ` +
+          `Change the input — most often an id that was composed rather than ` +
+          `taken from a previous tool result — or move on and record what you ` +
+          `could not do in your finish summary.`;
+        await this.log.technical(
+          runId,
+          `Tool ${tool.name} refused after ${priorFailures} identical failures.`,
+          { input },
+          'WARN',
+        );
+        return {
+          tool: tool.name,
+          outcome: 'FAILED',
+          result: { error: message },
+        };
+      }
+
+      // 4b. Run the mutating handler under audit.
       try {
         const result = await tool.handler(input, tc);
         await this.record(tc, tool, AgentDecisionOutcome.APPLIED, rationale, {
@@ -130,7 +174,7 @@ export class ToolDispatcherService {
           dedupeKey,
           entityType: gate.entityType ?? tool.domain ?? undefined,
           entityId: gate.entityId,
-          payload: { error: message, input },
+          payload: { error: message, input, _callFingerprint: callFingerprint },
         });
         this.logger.warn(`Tool ${tool.name} failed: ${message}`);
         return {

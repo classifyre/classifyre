@@ -3,6 +3,7 @@ import { AgentDecisionAction, AiManagementMode } from '@prisma/client';
 import { DecisionApplierService } from '../../decision-applier.service';
 import type { CaseOperation } from '../../autopilot.types';
 import type { Tool, ToolContext, ToolGate } from '../tool.types';
+import { assertUuid } from '../../../utils/agent-ids';
 
 const SEVERITY = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'INFO'] as const;
 const CASE_STATUS = ['OPEN', 'IN_PROGRESS', 'CLOSED', 'ARCHIVED'] as const;
@@ -109,8 +110,15 @@ export class InvestigationToolset {
       decisionAction,
       resolveGate: this.caseGate,
       handler: async (input) => {
+        // Validated here rather than left to "not found": a composed id reads
+        // to the model as a missing row, so it tries another plausible one.
+        // Every case tool routes through this factory.
         await this.applier.applyCaseOperationCore(
-          String(input.caseId),
+          assertUuid(
+            input.caseId,
+            'caseId',
+            'Take it from cases.list or cases.detail.',
+          ),
           buildOp(input),
         );
         return { ok: true };
@@ -474,9 +482,17 @@ export class InvestigationToolset {
         (input) => ({
           op: 'LINK_SUPPORT',
           rationale: '',
-          threadId: input.threadId as string,
+          threadId: assertUuid(
+            input.threadId,
+            'threadId',
+            'Hypothesis thread ids come from cases.detail — they are not the case id.',
+          ),
           targetType: input.targetType as never,
-          targetId: input.targetId as string,
+          targetId: assertUuid(
+            input.targetId,
+            'targetId',
+            'Use a finding id from findings.search/ranked, or an evidence id from cases.detail.',
+          ),
           stance: input.stance as never,
           note: input.note as string | undefined,
         }),

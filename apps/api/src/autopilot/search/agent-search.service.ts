@@ -12,6 +12,7 @@ import {
   CUSTOM_KEY_PREFIX,
   describeDetectorKey,
 } from '../../utils/detector-config-keys';
+import { citedFindingIds } from '../../utils/cited-findings';
 import {
   ASSET_PROFILE_SCAN_LIMIT,
   MAX_ASSET_METADATA_KEY_BUCKETS,
@@ -265,7 +266,7 @@ export class AgentSearchService {
           importanceScore: true,
         },
       }),
-      this.prisma.caseFinding.findMany({ select: { findingId: true } }),
+      citedFindingIds(this.prisma, sourceId),
       this.prisma.customDetectorFeedback.groupBy({
         by: ['customDetectorKey', 'status'],
         _count: true,
@@ -273,7 +274,7 @@ export class AgentSearchService {
     ]);
 
     const watched = await this.matching.watchersForFindings(sample);
-    const attached = new Set(caseFindings.map((row) => row.findingId));
+    const attached = caseFindings;
 
     const keyOf = (row: {
       detectorType: unknown;
