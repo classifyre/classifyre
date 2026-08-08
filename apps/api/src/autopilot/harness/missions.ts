@@ -163,6 +163,65 @@ const COLD_START_DOCTRINE = [
   'worse outcome than a rough note that a later cycle sharpens.',
 ].join(' ');
 
+/**
+ * The correction for treating a source's detector list as a free knob.
+ *
+ * It is not a setting, it is the schema of the evidence base. Removing a
+ * detector resolves every open finding it produced, and inquiries, cases,
+ * fingerprints and glossary terms are all built on those findings. The config
+ * agent could not see any of that: its tool returned `{ok: true}` whether a
+ * change touched nothing or resolved 44,174 findings, and the only quantity it
+ * could measure was volume — a metric you improve by reducing it.
+ *
+ * So it reduced, 22 times in three days on one source, each step defensible on
+ * its own: DATE_TIME and NRP as "pure noise", then CRYPTO and CREDIT_CARD, then
+ * PII's confidence raised, then EMAIL_ADDRESS/PERSON/LOCATION/URL, then SECRETS,
+ * then the noisiest custom detector. It ended with every built-in disabled, 96%
+ * of the source's findings resolved, 74% of the correlation index pointing at
+ * assets with no open finding, and six case-cited findings quietly gone. The
+ * source then swept its entire corpus every three hours detecting nothing.
+ *
+ * The mechanical guards (detection floor, churn budget, cited-evidence
+ * protection) stop the worst of it. This is the part they cannot supply: what
+ * the agent should be trying to MAXIMISE instead.
+ */
+const DETECTION_STEWARDSHIP = [
+  '\nDETECTION STEWARDSHIP: a source’s detector list is not a setting, it is the schema of',
+  'its evidence base. Removing or disabling a detector RESOLVES every open finding it',
+  'produced, and inquiries, cases, fingerprints and glossary terms are all built on those',
+  'findings. config.preview_impact tells you exactly what a patch would cost before you make',
+  'it — how many findings it orphans, how many of those are high-importance, and which',
+  'inquiries and cases are relying on them. Call it before any patch that disables a detector',
+  'or drops a custom_detector. Findings a case cites or an active inquiry watches are never',
+  'auto-resolved, but your change still stops them being re-detected.',
+  '\nWHAT YOU ARE OPTIMISING: evidence that gets USED, not low finding volume. Read',
+  'detectors.value — it covers built-ins as well as custom detectors. A detector producing',
+  'thousands of findings that active inquiries match and cases cite is the corpus, not noise,',
+  'however loud it is. A detector whose output nothing has ever watched, cited or ranked is',
+  'the candidate for retuning, however quiet it is. "This produces too many findings" is not',
+  'a finding about quality; check what those findings feed before you call them noise.',
+  '\nPREFER NARROWING TO DISABLING. Tightening a pattern set, raising a confidence threshold',
+  'or excluding one noisy finding type keeps the detector alive and keeps its good findings.',
+  'Switching it off is the largest available change and is almost never the smallest correct',
+  'one. Disabling a detector that an inquiry is matching needs a stated reason and should',
+  'usually mean archiving that inquiry first.',
+  '\nPOSTURE — sources.get_config returns it, sources.detection_posture explains it:',
+  '  EXPLORING  nothing is known yet. Experiment freely; no brakes apply. Getting a',
+  '             detector-less source to produce its first findings is the whole job here.',
+  '  CONVERGING it is producing findings but little of it is watched or cited. Change ONE',
+  '             thing, re-scan, and judge the result next cycle before changing another.',
+  '  STABLE     the set has survived several scans and its findings feed real investigation.',
+  '             This is the goal state, not a stalled one. A change here needs a reason',
+  '             beyond "this looks noisy": say what evidence you expect it to produce that',
+  '             the current set does not.',
+  'A reduction is refused while your previous change is still unevaluated, and after four',
+  'reductions in a day. Adding detection is never refused — if a source is detecting too',
+  'little, fix that now.',
+  '\nStability is the destination. A source whose detection you keep flipping produces no',
+  'investigation, because nothing accumulates. Converging on a detector set that yields',
+  'evidence people act on, and then leaving it alone, is success — not idleness.',
+].join(' ');
+
 const GLOSSARY_DOCTRINE = [
   '\nGLOSSARY: the glossary is the operator-facing shared vocabulary — canonical real-world names',
   '(people, organizations, locations, project codenames, document references, recurring jargon)',
@@ -317,12 +376,17 @@ export const CONFIG_MISSION: Mission = {
   kind: AgentKind.CONFIG,
   goal: [
     DOMAIN_PRIMER,
-    '\nYour mission: improve detection by tuning source configuration. Inspect the finding',
-    'landscape and each source’s editable config, then adjust detectors (enable/disable/retune),',
-    'custom_detectors, sampling, optional and resources to catch what is being missed or to cut',
-    'noise. You may ONLY change those editable keys — never the base connection. Every change is',
-    'schema-validated for you; if a change is rejected, read the error and try a valid one.',
-    'Make the smallest correct change and explain why.',
+    // Was "catch what is being missed or cut noise". Half of that goal was
+    // measurable (volume) and half was not, so the agent optimised the half it
+    // could see and cut until there was nothing left to cut.
+    '\nYour mission: steward what each source detects, so that it converges on a detector set',
+    'producing evidence an investigation can actually be built from — and then holds it.',
+    'Inspect the finding landscape and each source’s editable config, then adjust detectors',
+    '(enable/disable/retune), custom_detectors, sampling, optional and resources. You may ONLY',
+    'change those editable keys — never the base connection. Every change is schema-validated',
+    'for you; if a change is rejected, read the error and try a valid one. Make the smallest',
+    'correct change and explain why.',
+    DETECTION_STEWARDSHIP,
     '\nCOLD START: if a source has ingested assets but produced NO findings, it likely has no',
     'detectors enabled. Call assets.profile (and assets.sample for detail) to see the asset kinds',
     'and metadata shape, then enable the baseline detectors that fit that data (e.g. SECRETS/PII for',
@@ -365,6 +429,11 @@ export const CONFIG_MISSION: Mission = {
     'memory.search',
     'system_brief.get',
     'config.tune_source',
+    // The two that make the mission's objective legible: what a change would
+    // cost, and what a detector's output is worth.
+    'config.preview_impact',
+    'sources.detection_posture',
+    'detectors.value',
     'sources.rescan',
     // Scan cadence. Read is unconditional (a source mid-sweep must not be
     // judged as if it were complete); the write is narrow — see ScheduleToolset.
@@ -448,6 +517,12 @@ export const DETECTOR_AUTHOR_MISSION: Mission = {
     ...ASSET_OBSERVE_TOOLS,
     'detectors.list',
     'detectors.precision',
+    // Retiring a detector is this mission's job too, and it needs the same
+    // "what is this worth, what would removing it cost" pair the config
+    // mission has — its MAX_UNPROVEN_DETECTORS sweep otherwise judges purely
+    // on whether a detector has fired.
+    'detectors.value',
+    'config.preview_impact',
     'detector.examples',
     'sources.list',
     'sources.get_config',

@@ -19,8 +19,17 @@ import { CustomDetectorsService } from '../../../custom-detectors.service';
 import { AutoScheduleService } from '../../../scheduler/auto-schedule.service';
 import { computeDetectionFingerprint } from '../../../utils/scope-fingerprint';
 import {
+  DetectionImpactService,
+  type DetectionImpact,
+} from '../../detection-impact.service';
+import {
+  DetectionPostureService,
+  type DetectionPostureReport,
+} from '../../detection-posture.service';
+import {
   AI_ACTOR,
   AUTOPILOT_RESCANS_PER_DAY,
+  AUTOPILOT_TUNES_PER_DAY,
   MAX_COVERAGE_SOURCE_ROWS,
 } from '../../autopilot.constants';
 import type { Tool, ToolContext, ToolGate } from '../tool.types';
@@ -56,6 +65,8 @@ export class ConfigToolset {
     private readonly notifications: NotificationsService,
     private readonly autoSchedule: AutoScheduleService,
     private readonly customDetectors: CustomDetectorsService,
+    private readonly impact: DetectionImpactService,
+    private readonly posture: DetectionPostureService,
   ) {}
 
   private sourceGate = async (
@@ -92,24 +103,36 @@ export class ConfigToolset {
     sourceId: string,
     sourceName: string,
     changedKeys: string[],
+    impact: DetectionImpact,
     reason?: string,
   ): Promise<void> {
     try {
       await this.notifications.create({
         type: NotificationType.SOURCE,
         event: NotificationEvent.SOURCE_CONFIG_CHANGED,
-        severity: Severity.INFO,
+        severity:
+          // A change that resolves findings is not routine information — it
+          // rewrites what the operator can see. Nothing about the day the
+          // autopilot resolved 44,174 findings was visible at INFO.
+          impact.resolves.total > 0 ? Severity.MEDIUM : Severity.INFO,
         title: 'Autopilot changed a source configuration',
-        // The reason, not just the mechanics. "Autopilot updated detectors,
-        // custom_detectors" tells an operator nothing about WHY a detector
-        // they were watching stopped producing findings, and the reasoning
-        // otherwise only exists on an agent decision row nobody opens.
+        // The reason and the cost, not just the mechanics. "Autopilot updated
+        // detectors, custom_detectors" tells an operator nothing about WHY a
+        // detector they were watching stopped producing findings, nor that
+        // every finding it had produced was just resolved.
         message:
           `Autopilot updated ${changedKeys.join(', ')} on "${sourceName}".` +
-          (reason ? ` Reason: ${reason}` : ''),
+          (reason ? ` Reason: ${reason}` : '') +
+          (impact.resolves.total > 0
+            ? ` ${DetectionImpactService.describe(impact)}`
+            : ''),
         sourceId,
         triggeredBy: AI_ACTOR,
-        metadata: { changedKeys },
+        metadata: {
+          changedKeys,
+          resolvedFindings: impact.resolves.total,
+          removedDetectors: impact.removedDetectors,
+        },
       });
     } catch (error) {
       this.logger.warn(
@@ -188,7 +211,7 @@ export class ConfigToolset {
       {
         name: 'sources.get_config',
         description:
-          'Read a source’s EDITABLE config (detectors, custom_detectors, sampling, optional, resources). Base connection (required/masked) is never returned. The returned `version` is a concurrency token — pass it back as `expectedVersion` to config.tune_source so your write is rejected if an operator changed the config in the meantime.',
+          'Read a source’s EDITABLE config (detectors, custom_detectors, sampling, optional, resources). Base connection (required/masked) is never returned. The returned `version` is a concurrency token — pass it back as `expectedVersion` to config.tune_source so your write is rejected if an operator changed the config in the meantime. Also returns `detectionPosture` — where this source sits in its detection lifecycle and how much of its daily detection-change budget is left — because that decides how freely you should be changing what it detects.',
         inputSchema: {
           type: 'object',
           properties: { sourceId: { type: 'string' } },
@@ -216,6 +239,10 @@ export class ConfigToolset {
           for (const key of EDITABLE_KEYS) {
             if (key in decrypted) editable[key] = decrypted[key];
           }
+          // Bundled rather than left to a separate tool call: this is the tool
+          // the agent must call before every tune, so posture arrives whether
+          // or not it thought to ask.
+          const posture = await this.posture.forSource(source.id);
           return {
             id: source.id,
             name: source.name,
@@ -223,6 +250,7 @@ export class ConfigToolset {
             aiMode: String(source.aiMode),
             editableConfig: editable,
             version: source.updatedAt.toISOString(),
+            detectionPosture: posture,
           };
         },
       },
@@ -338,6 +366,22 @@ export class ConfigToolset {
           //     source, it is a blind one.
           assertDetectionSurvives(validated);
 
+          // 4d. Price the change. This is the number the agent never had: the
+          //      tool returned {ok: true} whether a patch touched nothing or
+          //      resolved 44,174 findings, so every reduction looked free.
+          const impact = await this.impact.preview(
+            sourceId,
+            current,
+            validated,
+          );
+
+          // 4e. Detection-churn budget. Both guards are about the same thing —
+          //      a source whose detector set keeps moving never accumulates an
+          //      evidence base — and both scale with how settled the source is,
+          //      so a new source is free to experiment.
+          const posture = await this.posture.forSource(sourceId);
+          assertChurnBudget(posture, impact);
+
           // 5. Defensive assertion: base connection unchanged.
           for (const key of PROTECTED_KEYS) {
             if (
@@ -372,6 +416,7 @@ export class ConfigToolset {
             sourceId,
             source.name,
             changedKeys,
+            impact,
             tc.rationale,
           );
           // 8. A detection/sampling change invalidates "there is nothing new to
@@ -382,8 +427,78 @@ export class ConfigToolset {
             sourceId,
             `Autopilot changed ${changedKeys.join(', ')} — re-sweeping so the change takes effect.`,
           );
-          return { ok: true, changedKeys };
+          return {
+            ok: true,
+            changedKeys,
+            // The receipt. It lands in the decision payload, so the next
+            // cycle's own history says what the last change cost.
+            impact,
+            detectionPosture: posture.posture,
+            tuneBudgetRemaining: Math.max(0, posture.tuneBudgetRemaining - 1),
+          };
         },
+      },
+      {
+        name: 'config.preview_impact',
+        description:
+          'What a config change WOULD cost, without making it. Returns the detectors the patch adds and removes, how many open findings removing them orphans (grouped by detector, with how many are high-importance), and which of those an active inquiry watches or a case cites. Removing a detector from a source resolves the findings it produced — inquiries, cases, fingerprints and glossary terms are all built on those findings — so call this before any patch that disables a detector or drops a custom_detector. Findings a case cites or an inquiry watches are never auto-resolved, but the change still stops them being re-detected.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            sourceId: { type: 'string' },
+            patch: {
+              type: 'object',
+              properties: {
+                detectors: { type: 'array' },
+                custom_detectors: { type: 'array', items: { type: 'string' } },
+                sampling: { type: 'object' },
+                optional: { type: 'object' },
+                resources: { type: 'object' },
+              },
+              additionalProperties: false,
+            },
+          },
+          required: ['sourceId', 'patch'],
+          additionalProperties: false,
+        },
+        lenientInput: false,
+        sideEffect: 'read',
+        handler: async (input) => {
+          const sourceId = String(input.sourceId);
+          const patch = (input.patch ?? {}) as Record<string, unknown>;
+          const source = await this.prisma.source.findUnique({
+            where: { id: sourceId },
+            select: { config: true },
+          });
+          if (!source) throw new Error('Unknown sourceId');
+
+          const current = this.masked.decryptMaskedConfig(
+            (source.config ?? {}) as Record<string, unknown>,
+          );
+          // Same allow-list merge tune_source performs, so the preview prices
+          // exactly the config that would be written — no schema validation,
+          // because an invalid patch should be priced then rejected there, not
+          // silently reported as costless here.
+          const candidate: Record<string, unknown> = { ...current };
+          for (const key of EDITABLE_KEYS) {
+            if (key in patch) candidate[key] = patch[key];
+          }
+          return this.impact.preview(sourceId, current, candidate);
+        },
+      },
+      {
+        name: 'sources.detection_posture',
+        description:
+          'Where a source is in its detection lifecycle: EXPLORING (too new or too empty to judge — experiment freely), CONVERGING (producing findings, but little of it watched or cited — change one thing and evaluate it), or STABLE (the detector set has survived several scans unchanged and its findings feed real investigation — changes need a reason beyond "this looks noisy"). Also returns the numbers behind the verdict and how much of this source\'s daily detection-change budget is left.',
+        inputSchema: {
+          type: 'object',
+          properties: { sourceId: { type: 'string' } },
+          required: ['sourceId'],
+          additionalProperties: false,
+        },
+        sideEffect: 'read',
+        handler: async (input) =>
+          this.posture.forSource(String(input.sourceId)),
       },
       {
         name: 'sources.rescan',
@@ -527,6 +642,54 @@ export class ConfigToolset {
  * detection to zero is the failure it has to be stopped from reaching one
  * locally-reasonable step at a time.
  */
+/**
+ * Refuse a detection change the source has not earned yet.
+ *
+ * Two guards, one idea: a source whose detector set keeps moving never
+ * accumulates an evidence base, because every removal resolves the findings the
+ * removed detector produced. Neither guard applies while a source is EXPLORING
+ * — there, churn is called experimentation and it is the correct behaviour.
+ *
+ * Both are deliberately one-sided. A patch that only ADDS detection is never
+ * refused: the failure mode being corrected is a ratchet that only ever
+ * subtracted, and an agent must always be able to restore detection, including
+ * on a source it has already spent its budget on.
+ */
+export function assertChurnBudget(
+  posture: DetectionPostureReport,
+  impact: DetectionImpact,
+): void {
+  const reduces = impact.removedDetectors.length > 0;
+  if (posture.posture === 'EXPLORING' || !reduces) return;
+
+  if (posture.tuneBudgetRemaining <= 0) {
+    throw new Error(
+      `Refused: the autopilot has already changed this source's detection ` +
+        `${posture.tunesLast24h} time(s) in the last 24 hours (limit ` +
+        `${AUTOPILOT_TUNES_PER_DAY}), and this patch removes ` +
+        `${impact.removedDetectors.join(', ')}. Detection that keeps moving ` +
+        `never produces a stable evidence base for an investigation to be built ` +
+        `on. Evaluate what you already changed — read the findings the last ` +
+        `re-scan produced — or record what you would change next with ` +
+        `memory.write and let a later cycle apply it. Adding detection is still ` +
+        `allowed.`,
+    );
+  }
+
+  if (posture.lastChangeUnevaluated) {
+    throw new Error(
+      `Refused: your previous change to this source has not been evaluated yet ` +
+        `— no scan has completed since it was applied, so nothing is known ` +
+        `about whether it helped. This patch removes ` +
+        `${impact.removedDetectors.join(', ')}, which would resolve ` +
+        `${impact.resolves.total} open finding(s) on top of a change whose ` +
+        `effect you have not seen. Wait for the re-scan and judge the new ` +
+        `finding landscape first. Source posture: ${posture.posture} — ` +
+        `${posture.reason}. Adding detection is still allowed.`,
+    );
+  }
+}
+
 export function assertDetectionSurvives(config: Record<string, unknown>): void {
   const detectors = Array.isArray(config.detectors) ? config.detectors : [];
   const anyBuiltIn = detectors.some((entry) => {

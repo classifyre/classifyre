@@ -21,6 +21,11 @@ import { generateDetectionIdentity } from './utils/detection-identity';
 import { heapOverThreshold } from './utils/heap-guard';
 import { computeScopeFingerprint } from './utils/scope-fingerprint';
 import {
+  CUSTOM_KEY_PREFIX,
+  configuredDetectorKeysFromConfig,
+  findingDetectorConfigKey,
+} from './utils/detector-config-keys';
+import {
   HistoryEventType,
   type FindingHistoryEntry,
 } from './types/finding-history.types';
@@ -39,6 +44,9 @@ import { EmbeddingService } from './embedding/embedding.service';
 import { QueryEmbeddingService } from './embedding/query-embedding.service';
 import { EmbeddingQueueService } from './embedding/embedding-queue.service';
 import { SemanticSearchMode } from './dto/search-findings-request.dto';
+import { InquiryMatchingService } from './matching/inquiry-matching.service';
+import { PgBossService } from './scheduler/pg-boss.service';
+import { CORRELATION_QUEUE } from './correlation/correlation.constants';
 
 /**
  * Maps a run's per-asset change_type onto the asset-level status enum so a
@@ -178,6 +186,11 @@ export class AssetService {
     private readonly embeddings: EmbeddingService,
     private readonly queryEmbeddings: QueryEmbeddingService,
     @Optional() private readonly embeddingQueue?: EmbeddingQueueService,
+    // Both optional: they exist only to protect and repair around a detector
+    // leaving a config. Without them the service falls back to its previous
+    // behaviour rather than failing to construct.
+    @Optional() private readonly inquiryMatching?: InquiryMatchingService,
+    @Optional() private readonly pgBoss?: PgBossService,
   ) {}
 
   private async assertSourceAndRunner(sourceId: string, runnerId: string) {
@@ -1786,6 +1799,8 @@ export class AssetService {
     outOfScope: number;
     resolvedForAbsence: number;
     resolvedForRemovedDetectors: number;
+    /** Orphaned findings kept because a case cites them or an inquiry watches them. */
+    retainedForCitation: number;
   }> {
     const { source, runner } = await this.assertSourceAndRunner(
       sourceId,
@@ -1796,11 +1811,12 @@ export class AssetService {
     // disabled) resolve on the next run unless the source opts out via
     // cleanup_removed_detector_findings: false. Leaving them OPEN makes every
     // detector-set change accumulate stale noise. Config-based, not
-    // observation-based, so it applies to sampled runs too.
-    const resolvedForRemovedDetectors =
+    // observation-based, so it applies to sampled runs too. Findings an
+    // investigation cites are exempt — see resolveRemovedDetectorFindings.
+    const { resolved: resolvedForRemovedDetectors, retained } =
       (source.config as Record<string, unknown> | null)
         ?.cleanup_removed_detector_findings === false
-        ? 0
+        ? { resolved: 0, retained: 0 }
         : await this.resolveRemovedDetectorFindings(source, runnerId);
 
     if (!isFullScan) {
@@ -1810,6 +1826,7 @@ export class AssetService {
         outOfScope: 0,
         resolvedForAbsence: 0,
         resolvedForRemovedDetectors,
+        retainedForCitation: retained,
       };
     }
 
@@ -1838,6 +1855,7 @@ export class AssetService {
         outOfScope: 0,
         resolvedForAbsence: 0,
         resolvedForRemovedDetectors,
+        retainedForCitation: retained,
       };
     }
 
@@ -2039,27 +2057,37 @@ export class AssetService {
       outOfScope: outOfScopeAssets.length,
       resolvedForAbsence,
       resolvedForRemovedDetectors,
+      retainedForCitation: retained,
     };
   }
 
   /**
    * Resolve OPEN findings whose detector is no longer in the source's
-   * configured detector set. Skips entirely (returns 0) when the config
-   * carries no readable detector list — an unknown detector set must never
-   * be treated as an empty one.
+   * configured detector set. Skips entirely when the config carries no readable
+   * detector list — an unknown detector set must never be treated as an empty
+   * one.
+   *
+   * Findings an investigation is relying on are exempt. On a live instance the
+   * config agent's tuning resolved 47,870 of 49,671 findings across two days,
+   * and 6 of the 17 findings attached to cases went with them: the operator's
+   * evidence disappeared as a side effect of a detector change nobody
+   * connected it to. Detection is a setting; cited evidence is a record, and a
+   * setting change must not silently rewrite a record. Those findings stay
+   * OPEN with a history note explaining why they outlive their detector.
    */
   private async resolveRemovedDetectorFindings(
     source: { id: string; config: unknown },
     runnerId: string,
-  ): Promise<number> {
+  ): Promise<{ resolved: number; retained: number }> {
+    const none = { resolved: 0, retained: 0 };
     const configured = await this.configuredDetectorKeys(source.config);
-    if (configured === null) return 0;
+    if (configured === null) return none;
 
     const openFindings = await this.prisma.finding.findMany({
       where: { sourceId: source.id, status: FindingStatus.OPEN },
     });
 
-    const removed = openFindings.filter((finding) => {
+    const orphaned = openFindings.filter((finding) => {
       if (this.findingHasManualStatusOverride(finding)) return false;
       const key = this.findingDetectorConfigKey(finding);
       // Unknown identity (e.g. CUSTOM finding without a key): keep it —
@@ -2067,31 +2095,157 @@ export class AssetService {
       if (key === null) return false;
       return !configured.has(key);
     });
-    if (removed.length === 0) return 0;
+    if (orphaned.length === 0) return none;
+
+    const cited = await this.citedFindingIds(orphaned);
+    const removed = orphaned.filter((f) => !cited.has(f.id));
+    const retained = orphaned.filter((f) => cited.has(f.id));
 
     const reason = 'Detector removed from source configuration';
     const now = new Date();
+    if (removed.length > 0) {
+      await this.prisma.$transaction(
+        async (tx) => {
+          for (const finding of removed) {
+            const currentHistory = Array.isArray(finding.history)
+              ? finding.history
+              : [];
+            await tx.finding.update({
+              where: { id: finding.id },
+              data: {
+                status: FindingStatus.RESOLVED,
+                runnerId,
+                resolvedAt: now,
+                resolutionReason: reason,
+                history: [
+                  ...currentHistory,
+                  {
+                    timestamp: now,
+                    runnerId,
+                    eventType: HistoryEventType.RESOLVED,
+                    status: FindingStatus.RESOLVED,
+                    changeReason: reason,
+                  },
+                ],
+              },
+            });
+          }
+        },
+        { timeout: 60000 },
+      );
+    }
+
+    await this.noteRetainedForCitation(retained, runnerId, now);
+
+    console.warn(
+      `[finalizeIngestRun] Source ${source.id}: resolved ${removed.length} ` +
+        `finding(s) from detectors no longer configured on the source ` +
+        `(cleanup_removed_detector_findings is enabled)` +
+        (retained.length > 0
+          ? `; retained ${retained.length} that a case cites or an active ` +
+            `inquiry watches`
+          : '') +
+        `.`,
+    );
+
+    // Correlation fingerprints are derived from findings, and only assets this
+    // run touched get rebuilt — so without a full recompute a resolved
+    // finding's value keeps correlating assets forever. On the live instance
+    // that left 36,641 of 49,497 correlation values (74%) on assets with no
+    // open finding at all, and 681k edges resting on them.
+    if (removed.length > 0) {
+      await this.scheduleCorrelationRecompute(source.id, removed.length);
+    }
+
+    return { resolved: removed.length, retained: retained.length };
+  }
+
+  /**
+   * Of these orphaned findings, the ones an investigation is relying on:
+   * attached to a case, or matched by an ACTIVE inquiry.
+   *
+   * `CaseFinding` is read whole rather than filtered by a (potentially
+   * 44k-long) `IN` list — it is a small, human-curated table, and intersecting
+   * in memory is both cheaper and simpler than the query that avoids it.
+   */
+  private async citedFindingIds(
+    orphaned: Array<{
+      id: string;
+      sourceId: string;
+      detectorType: DetectorType;
+      findingType: string;
+      customDetectorKey: string | null;
+      matchedContent: string | null;
+    }>,
+  ): Promise<Set<string>> {
+    const cited = new Set<string>();
+
+    const caseFindings = await this.prisma.caseFinding.findMany({
+      select: { findingId: true },
+    });
+    const attached = new Set(caseFindings.map((row) => row.findingId));
+    for (const finding of orphaned) {
+      if (attached.has(finding.id)) cited.add(finding.id);
+    }
+
+    // Optional so unit tests and any context without the matching module keep
+    // working; the effect of its absence is the old behaviour, not a crash.
+    if (this.inquiryMatching) {
+      try {
+        const watched =
+          await this.inquiryMatching.watchersForFindings(orphaned);
+        for (const id of watched.keys()) cited.add(id);
+      } catch (error) {
+        // Never fail an ingest run over this. Erring toward resolving is the
+        // pre-existing behaviour, so a failure here is a regression to it.
+        console.warn(
+          `[finalizeIngestRun] Could not determine inquiry coverage for ` +
+            `orphaned findings: ${String(error)}`,
+        );
+      }
+    }
+
+    return cited;
+  }
+
+  /**
+   * Record on each retained finding why it outlives its detector — once. The
+   * check runs at the end of every scan, so without the idempotence guard a
+   * finding cited by a long-running case would accrue one history entry per
+   * scan forever.
+   */
+  private async noteRetainedForCitation(
+    retained: Array<{ id: string; history: unknown }>,
+    runnerId: string,
+    now: Date,
+  ): Promise<void> {
+    const note =
+      'Detector removed from source configuration, but this finding is kept ' +
+      'because a case cites it or an active inquiry watches it';
+    const needsNote = retained.filter((finding) => {
+      const history = Array.isArray(finding.history) ? finding.history : [];
+      const last = history.at(-1) as { changeReason?: string } | undefined;
+      return last?.changeReason !== note;
+    });
+    if (needsNote.length === 0) return;
+
     await this.prisma.$transaction(
       async (tx) => {
-        for (const finding of removed) {
+        for (const finding of needsNote) {
           const currentHistory = Array.isArray(finding.history)
             ? finding.history
             : [];
           await tx.finding.update({
             where: { id: finding.id },
             data: {
-              status: FindingStatus.RESOLVED,
-              runnerId,
-              resolvedAt: now,
-              resolutionReason: reason,
               history: [
                 ...currentHistory,
                 {
                   timestamp: now,
                   runnerId,
-                  eventType: HistoryEventType.RESOLVED,
-                  status: FindingStatus.RESOLVED,
-                  changeReason: reason,
+                  eventType: HistoryEventType.RE_DETECTED,
+                  status: FindingStatus.OPEN,
+                  changeReason: note,
                 },
               ],
             },
@@ -2100,13 +2254,35 @@ export class AssetService {
       },
       { timeout: 60000 },
     );
+  }
 
-    console.warn(
-      `[finalizeIngestRun] Source ${source.id}: resolved ${removed.length} ` +
-        `finding(s) from detectors no longer configured on the source ` +
-        `(cleanup_removed_detector_findings is enabled).`,
-    );
-    return removed.length;
+  /**
+   * Best-effort full correlation recompute. Mirrors the purge path in
+   * SourceService: a scheduling failure must never fail the run that already
+   * succeeded — fingerprints refresh on a later recompute.
+   */
+  private async scheduleCorrelationRecompute(
+    sourceId: string,
+    resolvedCount: number,
+  ): Promise<void> {
+    if (!this.pgBoss) return;
+    try {
+      const boss = await this.pgBoss.getBossAsync();
+      await boss.send(
+        CORRELATION_QUEUE,
+        { recomputeAll: true },
+        {
+          singletonKey: 'correlation:recompute-all',
+          expireInSeconds: 6 * 3600,
+        },
+      );
+    } catch (error) {
+      console.warn(
+        `[finalizeIngestRun] Source ${sourceId}: resolved ${resolvedCount} ` +
+          `finding(s) but could not schedule the correlation recompute: ` +
+          `${String(error)}`,
+      );
+    }
   }
 
   /**
@@ -2117,46 +2293,18 @@ export class AssetService {
   private async configuredDetectorKeys(
     config: unknown,
   ): Promise<Set<string> | null> {
-    const recipe = (config ?? {}) as Record<string, any>;
-    const detectors = recipe.detectors;
-    if (!Array.isArray(detectors)) return null;
+    const parsed = configuredDetectorKeysFromConfig(config);
+    if (parsed === null) return null;
+    const { keys, legacyCustomIds } = parsed;
 
-    const keys = new Set<string>();
-    for (const entry of detectors) {
-      if (!entry || typeof entry !== 'object' || entry.enabled === false) {
-        continue;
-      }
-      const type = String(entry.type ?? '')
-        .trim()
-        .toUpperCase();
-      if (!type) continue;
-      if (type === 'CUSTOM') {
-        // Key lives at the top level in current configs; older shapes nested
-        // it under config.
-        const key =
-          typeof entry.custom_detector_key === 'string'
-            ? entry.custom_detector_key.trim()
-            : typeof entry.config?.custom_detector_key === 'string'
-              ? entry.config.custom_detector_key.trim()
-              : '';
-        if (key) keys.add(`CUSTOM::${key}`);
-      } else {
-        keys.add(type);
-      }
-    }
-
-    // Legacy path: recipe.custom_detectors is an array of custom-detector IDs.
-    const legacyIds = Array.isArray(recipe.custom_detectors)
-      ? recipe.custom_detectors.filter(
-          (id: unknown): id is string => typeof id === 'string',
-        )
-      : [];
-    if (legacyIds.length > 0) {
+    // Legacy path: recipe.custom_detectors is an array of custom-detector IDs,
+    // which only the database can resolve to keys.
+    if (legacyCustomIds.length > 0) {
       const rows = await this.prisma.customDetector.findMany({
-        where: { id: { in: legacyIds } },
+        where: { id: { in: legacyCustomIds } },
         select: { key: true },
       });
-      for (const row of rows) keys.add(`CUSTOM::${row.key}`);
+      for (const row of rows) keys.add(`${CUSTOM_KEY_PREFIX}${row.key}`);
     }
 
     return keys;
@@ -2166,12 +2314,7 @@ export class AssetService {
     detectorType: string;
     customDetectorKey: string | null;
   }): string | null {
-    if (finding.detectorType === 'CUSTOM') {
-      return finding.customDetectorKey
-        ? `CUSTOM::${finding.customDetectorKey}`
-        : null;
-    }
-    return finding.detectorType;
+    return findingDetectorConfigKey(finding);
   }
 
   private findingHasManualStatusOverride(finding: {

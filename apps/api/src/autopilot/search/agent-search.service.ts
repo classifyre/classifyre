@@ -9,6 +9,10 @@ import {
 import { PrismaService } from '../../prisma.service';
 import { InquiryMatchingService } from '../../matching/inquiry-matching.service';
 import {
+  CUSTOM_KEY_PREFIX,
+  describeDetectorKey,
+} from '../../utils/detector-config-keys';
+import {
   ASSET_PROFILE_SCAN_LIMIT,
   MAX_ASSET_METADATA_KEY_BUCKETS,
   MAX_ASSET_METADATA_PREVIEW_KEYS,
@@ -20,6 +24,7 @@ import {
   COVERAGE_UNAVAILABLE_FAILURE_STREAK,
   MAX_COVERAGE_SOURCE_ROWS,
   DETECTION_YIELD_SCANS,
+  DETECTOR_VALUE_SCAN_LIMIT,
   UNMONITORED_MIN_IMPORTANCE,
   UNMONITORED_SCAN_LIMIT,
   MAX_DUPLICATE_CLUSTERS,
@@ -38,6 +43,7 @@ import type {
   CaseSummary,
   CorpusCoverage,
   DetectorPrecisionSummary,
+  DetectorValueSummary,
   DuplicateSummary,
   FindingGroupSummary,
   FocusedCaseDetail,
@@ -217,6 +223,112 @@ export class AgentSearchService {
         const rb = b.falsePositiveRate ?? -1;
         return rb !== ra ? rb - ra : b.reviewed - a.reviewed;
       });
+  }
+
+  /**
+   * Per-detector value: not how much a detector produces, but how much of what
+   * it produces anyone is using.
+   *
+   * Covers built-ins as well as custom detectors. `detectors.precision` only
+   * ever scored custom ones, so the built-in that held 44,174 of a source's
+   * 49,671 findings had no value signal at all — and a detector with no value
+   * signal and a large volume reads, to anything optimising a number, as noise.
+   */
+  async detectorValue(
+    sourceId: string | null,
+  ): Promise<DetectorValueSummary[]> {
+    const where: Prisma.FindingWhereInput = {
+      status: 'OPEN',
+      ...(sourceId ? { sourceId } : {}),
+    };
+
+    const [counts, sample, caseFindings, feedback] = await Promise.all([
+      this.prisma.finding.groupBy({
+        by: ['detectorType', 'customDetectorKey'],
+        where,
+        _count: true,
+      }),
+      // The per-finding columns need rows, not aggregates. Bounded, ordered by
+      // importance so a capped scan describes the part of the output that
+      // matters rather than an arbitrary slice.
+      this.prisma.finding.findMany({
+        where,
+        orderBy: { importanceScore: 'desc' },
+        take: DETECTOR_VALUE_SCAN_LIMIT,
+        select: {
+          id: true,
+          sourceId: true,
+          detectorType: true,
+          findingType: true,
+          customDetectorKey: true,
+          matchedContent: true,
+          importanceScore: true,
+        },
+      }),
+      this.prisma.caseFinding.findMany({ select: { findingId: true } }),
+      this.prisma.customDetectorFeedback.groupBy({
+        by: ['customDetectorKey', 'status'],
+        _count: true,
+      }),
+    ]);
+
+    const watched = await this.matching.watchersForFindings(sample);
+    const attached = new Set(caseFindings.map((row) => row.findingId));
+
+    const keyOf = (row: {
+      detectorType: unknown;
+      customDetectorKey: string | null;
+    }): string =>
+      String(row.detectorType) === 'CUSTOM' && row.customDetectorKey
+        ? `${CUSTOM_KEY_PREFIX}${row.customDetectorKey}`
+        : String(row.detectorType);
+
+    const rows = new Map<string, DetectorValueSummary>();
+    for (const row of counts) {
+      const detector = keyOf(row);
+      const existing = rows.get(detector);
+      if (existing) {
+        existing.openFindings += row._count;
+        continue;
+      }
+      rows.set(detector, {
+        detector,
+        label: describeDetectorKey(detector),
+        isCustom: detector.startsWith(CUSTOM_KEY_PREFIX),
+        openFindings: row._count,
+        watchedByInquiries: 0,
+        citedByCases: 0,
+        highImportance: 0,
+        dismissedByOperator: 0,
+        scanComplete: sample.length < DETECTOR_VALUE_SCAN_LIMIT,
+      });
+    }
+
+    for (const finding of sample) {
+      const entry = rows.get(keyOf(finding));
+      if (!entry) continue;
+      if (watched.has(finding.id)) entry.watchedByInquiries++;
+      if (attached.has(finding.id)) entry.citedByCases++;
+      if (finding.importanceScore >= UNMONITORED_MIN_IMPORTANCE) {
+        entry.highImportance++;
+      }
+    }
+
+    for (const row of feedback) {
+      if (row.status !== 'FALSE_POSITIVE' && row.status !== 'IGNORED') continue;
+      const entry = rows.get(`${CUSTOM_KEY_PREFIX}${row.customDetectorKey}`);
+      if (entry) entry.dismissedByOperator += row._count;
+    }
+
+    // Most-used first: a detector nothing watches or cites belongs at the
+    // bottom of this list whatever its volume, which is the whole point.
+    return [...rows.values()].sort((a, b) => {
+      const used =
+        b.watchedByInquiries +
+        b.citedByCases -
+        (a.watchedByInquiries + a.citedByCases);
+      return used !== 0 ? used : b.openFindings - a.openFindings;
+    });
   }
 
   /**

@@ -203,6 +203,27 @@ export class DetectorToolset {
           ),
       },
       {
+        name: 'detectors.value',
+        description:
+          'What each detector\'s output is WORTH, not how much of it there is — for built-in detectors as well as custom ones. Per detector: openFindings, watchedByInquiries, citedByCases, highImportance and dismissedByOperator. Read this before judging a detector "noisy": volume is not noise. A detector producing thousands of findings that active inquiries match and cases cite IS the corpus; a detector nothing has ever watched, cited or ranked is the candidate for retuning, however quiet it is. Pass sourceId to scope to one source.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            sourceId: {
+              type: 'string',
+              description:
+                'Optional: score detectors against one source; omit for the whole instance.',
+            },
+          },
+          additionalProperties: false,
+        },
+        sideEffect: 'read',
+        handler: (input) =>
+          this.search.detectorValue(
+            (input.sourceId as string | undefined) ?? null,
+          ),
+      },
+      {
         name: 'detector.examples',
         description:
           'List worked example custom detectors (name, description, pipelineSchema) to copy when authoring a valid pipelineSchema. Pass `type` to return only examples for one engine (incl. candidate HuggingFace model ids); omit it for all types. ' +
