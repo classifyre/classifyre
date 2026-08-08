@@ -19,6 +19,7 @@ import {
   MAX_CASE_SUMMARIES,
   COVERAGE_UNAVAILABLE_FAILURE_STREAK,
   MAX_COVERAGE_SOURCE_ROWS,
+  DETECTION_YIELD_SCANS,
   UNMONITORED_MIN_IMPORTANCE,
   UNMONITORED_SCAN_LIMIT,
   MAX_DUPLICATE_CLUSTERS,
@@ -509,6 +510,51 @@ export class AgentSearchService {
       UNMONITORED_MIN_IMPORTANCE,
       UNMONITORED_SCAN_LIMIT,
     );
+  }
+
+  /**
+   * Whether recent scans are still detecting anything.
+   *
+   * `blind` means every recent completed scan processed assets and produced no
+   * finding at all — the source is being read and yielding nothing, which is a
+   * detection-configuration failure rather than a quiet corpus. Scans that
+   * processed no assets are ignored: they say nothing either way.
+   */
+  async detectionYield(): Promise<{
+    scans: number;
+    scansWithFindings: number;
+    findingsCreated: number;
+    blind: boolean;
+  }> {
+    const rows = await this.prisma.runner.findMany({
+      where: { completedAt: { not: null } },
+      orderBy: { completedAt: 'desc' },
+      take: DETECTION_YIELD_SCANS,
+      select: {
+        assetsCreated: true,
+        assetsUpdated: true,
+        assetsUnchanged: true,
+        findingsCreated: true,
+      },
+    });
+    const processed = rows.filter(
+      (r) =>
+        (r.assetsCreated ?? 0) +
+          (r.assetsUpdated ?? 0) +
+          (r.assetsUnchanged ?? 0) >
+        0,
+    );
+    const findingsCreated = processed.reduce(
+      (sum, r) => sum + (r.findingsCreated ?? 0),
+      0,
+    );
+    return {
+      scans: processed.length,
+      scansWithFindings: processed.filter((r) => (r.findingsCreated ?? 0) > 0)
+        .length,
+      findingsCreated,
+      blind: processed.length > 0 && findingsCreated === 0,
+    };
   }
 
   /** All ACTIVE inquiries (capped) as compact summaries for dedupe/enrichment. */

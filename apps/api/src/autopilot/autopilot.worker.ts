@@ -51,6 +51,7 @@ interface CycleScope {
   evidenceAnalysisPending?: boolean;
   evidenceCoverage?: { open: number; analyzed: number };
   unmonitoredFindings?: number;
+  detectionBlind?: boolean;
 }
 
 interface DirtySource {
@@ -361,6 +362,7 @@ export class AutopilotWorker {
       evidenceAnalysisPending,
       evidenceCoverage,
       unmonitoredFindings: await this.unmonitoredCount(),
+      detectionBlind: await this.detectionBlind(),
     };
 
     // An explicit agent set ("only") is operator intent: run exactly those
@@ -530,6 +532,7 @@ export class AutopilotWorker {
       evidenceAnalysisPending: scope.evidenceAnalysisPending,
       evidenceCoverage: scope.evidenceCoverage,
       unmonitoredFindings: scope.unmonitoredFindings,
+      detectionBlind: scope.detectionBlind,
       state: {},
     };
     try {
@@ -674,6 +677,24 @@ export class AutopilotWorker {
   private async unmonitoredCount(): Promise<number | undefined> {
     try {
       return (await this.search.unmonitoredFindings()).total;
+    } catch {
+      // Advisory only — never fail a cycle over it.
+      return undefined;
+    }
+  }
+
+  /**
+   * Whether recent scans read assets and detected nothing at all.
+   *
+   * Every config decision is a reduction, and each one alone is defensible, so
+   * on a live instance the ratchet ran to its end: all five built-in detectors
+   * disabled over two days, then a full sweep of the corpus every three hours
+   * producing zero findings and nothing for any other agent to work with. This
+   * is the counter-pressure that was missing.
+   */
+  private async detectionBlind(): Promise<boolean | undefined> {
+    try {
+      return (await this.search.detectionYield()).blind;
     } catch {
       // Advisory only — never fail a cycle over it.
       return undefined;
