@@ -23,7 +23,8 @@ describe('DetectionPostureService', () => {
     finding: { count: jest.fn() },
     runner: { count: jest.fn(), findMany: jest.fn() },
     agentDecision: { count: jest.fn(), findFirst: jest.fn() },
-    caseFinding: { findMany: jest.fn() },
+    // The cited-evidence count is a source-scoped SQL join, not a table read.
+    $queryRaw: jest.fn(),
     inquiry: { findMany: jest.fn() },
   };
   const masked = { decryptMaskedConfig: jest.fn((c: unknown) => c) };
@@ -52,7 +53,7 @@ describe('DetectionPostureService', () => {
     prisma.runner.findMany.mockResolvedValue(settledRuns(4));
     prisma.agentDecision.count.mockResolvedValue(0);
     prisma.agentDecision.findFirst.mockResolvedValue(null);
-    prisma.caseFinding.findMany.mockResolvedValue([]);
+    prisma.$queryRaw.mockResolvedValue([{ cited: 0n }]);
     prisma.inquiry.findMany.mockResolvedValue([]);
   });
 
@@ -128,16 +129,11 @@ describe('DetectionPostureService', () => {
     expect(report.tuneBudgetRemaining).toBe(1);
   });
 
+  // The join is scoped by source_id, so a case citing another source's finding
+  // does not make this source's detection look used — and the count never
+  // reads the whole case_findings table.
   it('counts findings cited by cases only when they belong to this source', async () => {
-    prisma.caseFinding.findMany.mockResolvedValue([
-      { findingId: 'f1' },
-      { findingId: 'f2' },
-    ]);
-    // The count query is scoped by sourceId, so a case citing another source's
-    // finding does not make this source's detection look used.
-    prisma.finding.count
-      .mockResolvedValueOnce(5000) // openFindings
-      .mockResolvedValueOnce(1); // citedByCases
+    prisma.$queryRaw.mockResolvedValue([{ cited: 1n }]);
 
     const report = await service.forSource('s1');
 

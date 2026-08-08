@@ -378,4 +378,24 @@ export class AgentAuditService {
     });
     return found !== null;
   }
+
+  /**
+   * How many times this exact tool call has already failed in this run.
+   *
+   * Backs the dispatcher's repeated-failure guard: an agent that gets "not
+   * found" tends to try another plausible id rather than stop, and each attempt
+   * costs an iteration of a bounded budget.
+   */
+  async countFailedCalls(
+    runId: string,
+    callFingerprint: string,
+  ): Promise<number> {
+    return this.prisma.agentDecision.count({
+      where: {
+        runId,
+        outcome: AgentDecisionOutcome.FAILED,
+        payload: { path: ['_callFingerprint'], equals: callFingerprint },
+      },
+    });
+  }
 }
