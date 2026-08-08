@@ -15,16 +15,31 @@ import type { ApplySummary } from './decision-applier.service';
 import {
   AGENT_RUN_STALE_AFTER_MS,
   AUTOPILOT_CORPUS_SINGLETON_KEY,
+  AUTOPILOT_CYCLE_BUDGET_MS,
   AUTOPILOT_DREAM_CRON,
   AUTOPILOT_MAX_READINESS_REQUEUES,
   AUTOPILOT_QUEUE,
   AUTOPILOT_RETRY_AFTER_SECONDS,
+  DETECTION_CHAIN,
   EVIDENCE_ANALYSIS_MIN_COVERAGE,
+  INVESTIGATION_CHAIN,
   PIPELINE_KINDS,
 } from './autopilot.constants';
 import type { AgentContext, AutopilotJob } from './autopilot.types';
 
 const INSTANCE_SETTINGS_ID = 1;
+
+/**
+ * Agents that record a SKIPPED run when their switch is off.
+ *
+ * Only the two investigation agents do. The other three are opt-in and off by
+ * default, so a SKIPPED row per scan for each would bury the audit trail.
+ */
+const DISABLED_SKIP_REASONS: Partial<Record<AgentKind, string>> = {
+  [AgentKind.INQUIRY]:
+    'Inquiry autopilot disabled in settings; observing only.',
+  [AgentKind.CASE]: 'Case autopilot disabled in settings; observing only.',
+};
 
 interface CycleInput {
   sourceId: string | null;
@@ -365,71 +380,86 @@ export class AutopilotWorker {
       detectionBlind: await this.detectionBlind(),
     };
 
-    // An explicit agent set ("only") is operator intent: run exactly those
-    // pipeline agents (in canonical order) and skip the rest without a SKIPPED
-    // record.
-    if (await this.agentEnabled(AgentKind.INQUIRY, cycle)) {
-      await this.runAgent(
-        AgentKind.INQUIRY,
+    // Two chains, run concurrently, each ordered internally by a real
+    // dependency. Running all five in series cost the harness an order of
+    // magnitude in throughput for ordering that mostly was not load-bearing:
+    // CONFIG's "reacts to the finding landscape the investigation agents
+    // observed" is a read of the database, not of their output, and the
+    // landscape it reads is whatever the last scan produced either way.
+    //
+    // What IS load-bearing is kept: CASE consumes the inquiries INQUIRY just
+    // created or widened, ESCALATION alerts on the final state of the cases
+    // CASE mutated, and DETECTOR_AUTHOR reacts to what CONFIG left unaddressed
+    // (they also write the same source config, so serialising them keeps them
+    // off each other's optimistic-concurrency token).
+    const deadline = Date.now() + AUTOPILOT_CYCLE_BUDGET_MS;
+    await Promise.all([
+      this.runChain(
+        INVESTIGATION_CHAIN,
         settings,
         cycle,
         sourceName,
         scope,
-      );
-    } else if (!cycle.only) {
-      await this.audit.recordSkippedRun(
-        AgentKind.INQUIRY,
-        cycle.sourceId ?? 'all',
-        cycle.runnerId,
-        'Inquiry autopilot disabled in settings; observing only.',
-      );
-    }
-
-    if (await this.agentEnabled(AgentKind.CASE, cycle)) {
-      await this.runAgent(AgentKind.CASE, settings, cycle, sourceName, scope);
-    } else if (!cycle.only) {
-      await this.audit.recordSkippedRun(
-        AgentKind.CASE,
-        cycle.sourceId ?? 'all',
-        cycle.runnerId,
-        'Case autopilot disabled in settings; observing only.',
-      );
-    }
-
-    // Config-tuning agent — opt-in, off by default. Runs after the
-    // investigation agents (it reacts to the finding landscape they observed).
-    // Skipped silently when disabled (no SKIPPED-run noise on every scan).
-    if (await this.agentEnabled(AgentKind.CONFIG, cycle)) {
-      await this.runAgent(AgentKind.CONFIG, settings, cycle, sourceName, scope);
-    }
-
-    // Detector-authoring agent — opt-in, off by default. Runs last so it can
-    // react to what the config agent left unaddressed.
-    if (await this.agentEnabled(AgentKind.DETECTOR_AUTHOR, cycle)) {
-      await this.runAgent(
-        AgentKind.DETECTOR_AUTHOR,
+        deadline,
+      ),
+      this.runChain(
+        DETECTION_CHAIN,
         settings,
         cycle,
         sourceName,
         scope,
-      );
-    }
-
-    // Escalation agent — opt-in, off by default. Runs last, once every case
-    // mutation for this cycle has settled, so it alerts operators on the final
-    // state of the open high-severity cases.
-    if (await this.agentEnabled(AgentKind.ESCALATION, cycle)) {
-      await this.runAgent(
-        AgentKind.ESCALATION,
-        settings,
-        cycle,
-        sourceName,
-        scope,
-      );
-    }
+        deadline,
+      ),
+    ]);
 
     if (cycle.corpus) {
       await this.acknowledgeDirtySources(dirtySources);
+    }
+  }
+
+  /**
+   * Run one dependency chain in order, stopping at the cycle deadline.
+   *
+   * An explicit agent set ("only") is operator intent: run exactly those
+   * pipeline agents and skip the rest without a SKIPPED record.
+   */
+  private async runChain(
+    chain: readonly AgentKind[],
+    settings: InstanceSettings,
+    cycle: CycleInput,
+    sourceName: string,
+    scope: CycleScope,
+    deadline: number,
+  ): Promise<void> {
+    for (const kind of chain) {
+      if (Date.now() >= deadline) {
+        // Deliberately not a SKIPPED audit row: the agent was not disabled,
+        // the cycle simply ran out of wall clock. The next cycle runs it with
+        // fresher data.
+        this.logger.warn(
+          `Autopilot cycle budget exhausted — skipping ${kind} and the rest of ` +
+            `its chain for ${cycle.corpus ? 'corpus' : `source ${cycle.sourceId}`}.`,
+        );
+        return;
+      }
+
+      if (await this.agentEnabled(kind, cycle)) {
+        await this.runAgent(kind, settings, cycle, sourceName, scope);
+        continue;
+      }
+
+      // Only the two investigation agents record a SKIPPED run; the opt-in
+      // agents are off by default, and a SKIPPED row per scan for each of them
+      // is pure noise.
+      const skipReason = DISABLED_SKIP_REASONS[kind];
+      if (!cycle.only && skipReason) {
+        await this.audit.recordSkippedRun(
+          kind,
+          cycle.sourceId ?? 'all',
+          cycle.runnerId,
+          skipReason,
+        );
+      }
     }
   }
 

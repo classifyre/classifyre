@@ -24,6 +24,14 @@ const INSERT_BATCH_SIZE = 500;
 // batches bursts of scans into one pass; singletonKey collapses repeat requests.
 const RECALIBRATE_DELAY_SECONDS = 120;
 
+/**
+ * How many times a recalibration pass may stand aside for in-flight inference
+ * before it runs anyway. At the 120s delay above that is ten minutes of grace,
+ * which covers any normal drain; past it, ingestion is producing embeddings
+ * faster than they can be consumed and waiting longer only means never.
+ */
+const MAX_RECALIBRATION_DEFERRALS = 5;
+
 type QueuedContent = { hash: string; text: string };
 type EmbeddingJob = QueuedContent & { spaceId: string };
 
@@ -49,6 +57,8 @@ interface EmbeddingRuntime {
   backfillCompletedAt?: string;
   backfillError?: string;
   recalibrationRunning: boolean;
+  /** Consecutive passes deferred because inference was still draining. */
+  recalibrationDeferrals: number;
   lastRecalibratedAt?: string;
   lastRecalibrationError?: string;
   embedJobFailureCount: number;
@@ -88,6 +98,7 @@ export class EmbeddingQueueService {
         pendingWrites: 0,
         workerRegistered: false,
         recalibrationRunning: false,
+        recalibrationDeferrals: 0,
         embedJobFailureCount: 0,
       };
       this.runtimes.set(schema, rt);
@@ -303,12 +314,32 @@ export class EmbeddingQueueService {
     const boss = await this.pgBoss.getBossAsync();
     const stats = await boss.getQueueStats(rt.queueName);
     const pending = stats.queuedCount + stats.activeCount + stats.deferredCount;
-    if (pending > 0) {
-      // Inference is still draining; push the pass back until the space is
-      // stable so scores are computed against the full neighbourhood.
+
+    // Waiting for a stable space is right in principle and starves in practice.
+    // A source in CATCH_UP completes a scan every couple of minutes and each one
+    // enqueues thousands of embedding jobs, so `pending > 0` is permanently true
+    // and the pass deferred itself forever: on a live instance mid-ingestion,
+    // 131,905 open findings had 35,667 analyses between them — 27% coverage,
+    // falling — and every investigation agent stood down citing unscored
+    // evidence. Partial-neighbourhood scores that exist beat perfect scores that
+    // never arrive, so the deferral is now bounded.
+    if (
+      pending > 0 &&
+      rt.recalibrationDeferrals < MAX_RECALIBRATION_DEFERRALS
+    ) {
+      rt.recalibrationDeferrals += 1;
       await this.persistRecalibration(false);
       return;
     }
+    if (pending > 0) {
+      this.logger.warn(
+        `Recalibrating space ${rt.spaceId} with ${pending} embedding job(s) still ` +
+          `queued after ${rt.recalibrationDeferrals} deferral(s): ingestion is ` +
+          'outpacing inference, so scores would otherwise never be written.',
+      );
+    }
+
+    rt.recalibrationDeferrals = 0;
     rt.recalibrationRunning = true;
     rt.lastRecalibrationError = undefined;
     try {

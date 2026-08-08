@@ -1308,24 +1308,33 @@ export function FindingsTable({
                           </Tooltip>
                         </TableCell>
 
-                        <TableCell className="max-w-[240px]">
-                          <Button
-                            variant="link"
-                            size="sm"
-                            className="h-auto max-w-[220px] justify-start p-0 text-left"
-                            onClick={() =>
-                              router.push(nsPath(`/sources/${finding.sourceId}`))
-                            }
-                          >
-                            <div className="flex items-center gap-1.5">
-                              <SourceTypeIcon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                              <div className="min-w-0">
-                                <div className="truncate text-sm">
+                        <TableCell className="w-[240px] max-w-[240px] overflow-hidden">
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="link"
+                                size="sm"
+                                className="h-auto w-full min-w-0 max-w-[220px] justify-start overflow-hidden p-0 text-left"
+                                onClick={() =>
+                                  router.push(
+                                    nsPath(`/sources/${finding.sourceId}`),
+                                  )
+                                }
+                              >
+                                <SourceTypeIcon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                                <span className="min-w-0 flex-1 truncate text-sm">
                                   {sourceLabel}
-                                </div>
-                              </div>
-                            </div>
-                          </Button>
+                                </span>
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent
+                              side="top"
+                              sideOffset={6}
+                              className="max-w-[320px] break-all"
+                            >
+                              {sourceLabel}
+                            </TooltipContent>
+                          </Tooltip>
                         </TableCell>
 
                         <TableCell className="max-w-[220px]">

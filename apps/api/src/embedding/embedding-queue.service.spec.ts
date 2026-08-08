@@ -244,6 +244,63 @@ describe('EmbeddingQueueService', () => {
     expect(boss.send.mock.calls.at(-1)?.[2]).not.toHaveProperty('singletonKey');
   });
 
+  /**
+   * Waiting for a stable space is right in principle and starved in practice.
+   * A source in CATCH_UP finishes a scan every couple of minutes and each one
+   * enqueues thousands of embedding jobs, so `pending > 0` was permanently true
+   * and the pass deferred itself forever: a live instance sat at 27% evidence
+   * coverage (35,667 analyses against 131,905 open findings) with every
+   * investigation agent standing down for want of scores.
+   */
+  // The deferral counter lives on per-namespace runtime state that outlives a
+  // single test, so these build their own service rather than inheriting a
+  // count from whatever ran before them.
+  const backlogged = async () => {
+    const own = new EmbeddingQueueService(
+      prisma as never,
+      config as never,
+      provider as never,
+      embeddings as never,
+      pgBoss as never,
+      capability as never,
+      cls as never,
+    );
+    await own.registerForNamespace();
+    boss.getQueueStats.mockResolvedValue({
+      queuedCount: 5000,
+      activeCount: 1,
+      deferredCount: 0,
+      totalCount: 5001,
+    });
+    return boss.work.mock.calls.at(-1)?.[2] as () => Promise<void>;
+  };
+
+  it('stops deferring once ingestion is outpacing inference', async () => {
+    const recalibrate = await backlogged();
+
+    // Five deferrals of grace at the 120s debounce — ten minutes.
+    for (let attempt = 0; attempt < 5; attempt++) {
+      await recalibrate();
+      expect(embeddings.recalibrateSpace).not.toHaveBeenCalled();
+    }
+
+    await recalibrate();
+
+    expect(embeddings.recalibrateSpace).toHaveBeenCalledTimes(1);
+  });
+
+  it('restores the full grace period after a pass runs', async () => {
+    const recalibrate = await backlogged();
+    for (let attempt = 0; attempt < 6; attempt++) await recalibrate();
+    expect(embeddings.recalibrateSpace).toHaveBeenCalledTimes(1);
+
+    // The counter resets, so the next pass defers again rather than running
+    // back-to-back against a queue that is still draining.
+    await recalibrate();
+
+    expect(embeddings.recalibrateSpace).toHaveBeenCalledTimes(1);
+  });
+
   it('reports whether recalibration was actually scheduled', async () => {
     await service.registerForNamespace();
     expect(await service.scheduleRecalibration()).toBe(true);
