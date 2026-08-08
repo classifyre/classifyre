@@ -324,6 +324,20 @@ export class ConfigToolset {
           //     must not persist a reference that later rejects every save.
           await this.customDetectors.sanitizeSourceConfigDetectors(validated);
 
+          // 4c. Detection floor. Every tuning decision this agent makes is a
+          //     reduction — "this pattern is noise", "this detector is a
+          //     prose-noise generator" — and each one in isolation is
+          //     defensible. Nothing pushed back, so on a live instance the
+          //     ratchet ran to its end over two days: DATE_TIME and NRP, then
+          //     CRYPTO and CREDIT_CARD, then EMAIL_ADDRESS/PERSON/LOCATION/URL,
+          //     then SECRETS, then the noisiest custom detector. All five
+          //     built-in detectors ended up disabled, the source swept its
+          //     whole 9600-object corpus every three hours finding nothing, and
+          //     with no findings there was nothing for any other agent to
+          //     investigate. A source that detects nothing is not a quiet
+          //     source, it is a blind one.
+          assertDetectionSurvives(validated);
+
           // 5. Defensive assertion: base connection unchanged.
           for (const key of PROTECTED_KEYS) {
             if (
@@ -501,4 +515,38 @@ export class ConfigToolset {
       },
     ];
   }
+}
+
+/**
+ * Refuse a config that would leave a source detecting nothing at all.
+ *
+ * "Nothing" means no built-in detector enabled AND no custom detector wired.
+ * Deliberately the weakest possible floor: the agent stays free to disable any
+ * individual detector, narrow any pattern set, and raise any threshold — it
+ * only cannot take the last one away. Tuning noise down is the job; tuning
+ * detection to zero is the failure it has to be stopped from reaching one
+ * locally-reasonable step at a time.
+ */
+export function assertDetectionSurvives(config: Record<string, unknown>): void {
+  const detectors = Array.isArray(config.detectors) ? config.detectors : [];
+  const anyBuiltIn = detectors.some((entry) => {
+    const d = entry as { enabled?: unknown };
+    return d?.enabled !== false;
+  });
+  const custom = Array.isArray(config.custom_detectors)
+    ? config.custom_detectors
+    : [];
+
+  if (anyBuiltIn || custom.length > 0) return;
+
+  throw new Error(
+    'Refused: this would leave the source with no detection at all — every ' +
+      'built-in detector disabled and no custom detector wired. A source that ' +
+      'detects nothing produces no findings, and with no findings there is ' +
+      'nothing for any inquiry, case or glossary term to be built from; the ' +
+      'scans keep running and return empty. Reducing noise is right, but keep ' +
+      'at least one detector live: narrow its patterns or raise its confidence ' +
+      'threshold instead of switching the last one off, or author a targeted ' +
+      'custom detector first and wire that in the same change.',
+  );
 }

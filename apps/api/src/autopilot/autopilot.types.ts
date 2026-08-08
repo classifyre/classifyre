@@ -330,6 +330,8 @@ export interface AgentContext {
   evidenceCoverage?: { open: number; analyzed: number };
   /** High-importance findings no active inquiry matches, surfaced each cycle. */
   unmonitoredFindings?: number;
+  /** Set when recent scans processed assets and detected nothing at all. */
+  detectionBlind?: boolean;
   /** Validated output of each completed step, keyed by step name. */
   state: Record<string, unknown>;
 }

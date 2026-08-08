@@ -154,7 +154,10 @@ describe('ConfigToolset — config.tune_source', () => {
       tune.handler(
         {
           sourceId: 's1',
-          patch: { detectors: [] },
+          // Keeps one detector live so the write reaches the update and this
+          // stays a test of the concurrency race; an empty detector list is
+          // refused earlier now, by the detection floor.
+          patch: { detectors: [{ type: 'PII', enabled: true }] },
           expectedVersion: VERSION,
         },
         tc,

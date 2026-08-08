@@ -116,6 +116,15 @@ export const EVIDENCE_ANALYSIS_MIN_COVERAGE = 0.8;
  * the missing counterweight: evidence nobody is watching.
  */
 export const UNMONITORED_MIN_IMPORTANCE = 0.75;
+
+/**
+ * Completed scans examined when asking "is this source still detecting
+ * anything?". A source whose recent scans all processed assets and produced no
+ * findings is blind, not quiet — and nothing said so, which is how one ran a
+ * full sweep of its corpus every three hours for a night, finding nothing,
+ * while the agents had no material to build anything from.
+ */
+export const DETECTION_YIELD_SCANS = 5;
 /** Highest-importance findings examined per unmonitored-coverage check. */
 export const UNMONITORED_SCAN_LIMIT = 500;
 
