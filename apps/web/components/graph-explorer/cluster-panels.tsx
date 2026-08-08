@@ -151,15 +151,24 @@ function MemberRow({
   memberKey,
   hoverKey,
   onHoverKey,
+  memberHref,
 }: {
   node: GraphNodeDto;
   memberKey: string;
+  memberHref?: (node: GraphNodeDto) => string | null;
 } & Pick<ClusterPanelCallbacks, "hoverKey" | "onHoverKey">) {
   const { t } = useTranslation();
   const detailLink = useDetailLink();
   const isAsset = node.type === "asset";
   const severity = node.severity?.toUpperCase();
   const hovered = hoverKey === memberKey;
+  const href = memberHref
+    ? memberHref(node)
+    : isLinkableMember(node)
+      ? isAsset
+        ? `/assets/${node.id}`
+        : `/findings/${node.id}`
+      : null;
 
   const body = (
     <>
@@ -183,7 +192,7 @@ function MemberRow({
     hovered ? "border-foreground bg-muted" : "border-border"
   }`;
 
-  if (!isLinkableMember(node)) {
+  if (!href) {
     return (
       <li
         className={shared}
@@ -198,7 +207,7 @@ function MemberRow({
   return (
     <li>
       <a
-        {...detailLink(isAsset ? `/assets/${node.id}` : `/findings/${node.id}`)}
+        {...detailLink(href)}
         className={`${shared} group transition-colors hover:border-foreground hover:bg-muted`}
         title={t(isAsset ? "graphExplorer.openDocument" : "graphExplorer.openFinding")}
         onMouseEnter={() => onHoverKey?.(memberKey)}
@@ -218,11 +227,13 @@ function MemberGroup({
   members,
   hoverKey,
   onHoverKey,
+  memberHref,
 }: {
   label: string;
   /** Colour chip for severity bands; omitted for the Documents group. */
   swatch?: string;
   members: Array<{ key: string; node: GraphNodeDto }>;
+  memberHref?: (node: GraphNodeDto) => string | null;
 } & Pick<ClusterPanelCallbacks, "hoverKey" | "onHoverKey">) {
   if (members.length === 0) return null;
   return (
@@ -249,6 +260,7 @@ function MemberGroup({
             memberKey={key}
             hoverKey={hoverKey}
             onHoverKey={onHoverKey}
+            memberHref={memberHref}
           />
         ))}
       </ul>
@@ -268,11 +280,15 @@ export function ClusterDetailPanel({
   onFocusCluster,
   onHoverKey,
   hoverKey,
+  memberHref,
 }: {
   meta: ClusterMeta;
   clusters: Map<string, ClusterMeta>;
   renderEdges: GraphEdgeDto[];
   nodeByKey: (key: string) => GraphNodeDto | undefined;
+  /** Override member navigation for graphs whose synthetic node ids do not
+   * address real finding rows. Return null to render a non-link member. */
+  memberHref?: (node: GraphNodeDto) => string | null;
 } & ClusterPanelCallbacks) {
   const { t } = useTranslation();
   const detailLink = useDetailLink();
@@ -418,6 +434,7 @@ export function ClusterDetailPanel({
               members={documents}
               hoverKey={hoverKey}
               onHoverKey={onHoverKey}
+              memberHref={memberHref}
             />
             {findingBands.length > 0 && (
               <div>
@@ -438,6 +455,7 @@ export function ClusterDetailPanel({
                       members={members}
                       hoverKey={hoverKey}
                       onHoverKey={onHoverKey}
+                      memberHref={memberHref}
                     />
                   ))}
                 </div>

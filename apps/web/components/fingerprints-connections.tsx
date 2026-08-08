@@ -5,7 +5,6 @@ import {
   ArrowDownWideNarrow,
   ChevronDown,
   ChevronRight,
-  ExternalLink,
   Link2,
   RotateCw,
   Search,
@@ -25,6 +24,10 @@ import {
 } from "@workspace/ui/components/select";
 import { useDetailLink } from "@/hooks/use-detail-link";
 import { useTranslation } from "@/hooks/use-translation";
+import {
+  FingerprintValueOccurrences,
+  type FingerprintOccurrencesCache,
+} from "./fingerprint-value-occurrences";
 
 /** Rows rendered per "show more" batch. */
 const BATCH_SIZE = 50;
@@ -73,6 +76,7 @@ export function FingerprintsConnections({
   onFocusPair,
   focusedPair,
   onFilterFocus,
+  occurrencesCache,
 }: {
   nodes: GraphNodeDto[];
   edges: GraphEdgeDto[];
@@ -87,6 +91,8 @@ export function FingerprintsConnections({
   /** Sidebar dropdown filters → graph dim: the assets of every matching pair,
    *  or null when both dropdowns are back on "All". */
   onFilterFocus?: (assetIds: string[] | null) => void;
+  /** Page-scoped lazy occurrence cache shared with the graph rail. */
+  occurrencesCache?: FingerprintOccurrencesCache;
 }) {
   const detailLink = useDetailLink();
   const { t } = useTranslation();
@@ -96,6 +102,10 @@ export function FingerprintsConnections({
   const [typeSel, setTypeSel] = React.useState<string>(ALL);
   const [sort, setSort] = React.useState<SortKey>("strongest");
   const [visibleCount, setVisibleCount] = React.useState(BATCH_SIZE);
+  const [openOccurrence, setOpenOccurrence] = React.useState<string | null>(null);
+  const localOccurrencesCache = React.useRef<FingerprintOccurrencesCache>(new Map());
+  const effectiveOccurrencesCache =
+    occurrencesCache ?? localOccurrencesCache.current;
 
   const { rows } = React.useMemo(() => {
     const assetById = new Map(
@@ -460,32 +470,55 @@ export function FingerprintsConnections({
                             {t("correlation.connections.sharedValuesHint")}
                           </span>
                         </div>
-                        {/* Each shared value IS a finding — link straight to it. */}
-                        <ul className="max-h-[30vh] space-y-0.5 overflow-y-auto">
-                          {row.sharedValues.map((v) => (
-                            <li key={v.id}>
-                              <a
-                                {...detailLink(`/findings/${v.id}`)}
-                                className="group flex items-center gap-2 rounded-[3px] px-1.5 py-1 text-xs transition-colors hover:bg-muted"
-                                title={`${v.value} — ${t("correlation.connections.openFinding")}`}
-                              >
-                                <span className="shrink-0 font-mono text-[9px] uppercase text-muted-foreground">
-                                  {v.label}
-                                </span>
-                                <span className="min-w-0 flex-1 truncate font-mono underline-offset-2 group-hover:underline">
-                                  {v.value}
-                                </span>
-                                {v.fanOut > 2 && (
-                                  <span className="shrink-0 text-[10px] text-muted-foreground">
-                                    {t("correlation.connections.fanOut", {
-                                      count: String(v.fanOut),
-                                    })}
+                        <ul className="max-h-[45vh] space-y-1 overflow-y-auto">
+                          {row.sharedValues.map((v) => {
+                            const occurrenceKey = `${row.key}:${v.id}`;
+                            const isOccurrenceOpen =
+                              openOccurrence === occurrenceKey;
+                            return (
+                              <li key={v.id} className="space-y-2">
+                                <button
+                                  type="button"
+                                  className={`flex w-full items-center gap-2 rounded-[3px] px-1.5 py-1 text-left text-xs transition-colors hover:bg-muted ${
+                                    isOccurrenceOpen ? "bg-muted" : ""
+                                  }`}
+                                  title={`${v.value} — ${t("correlation.occurrences.showSources")}`}
+                                  aria-label={`${v.value} — ${t("correlation.occurrences.showSources")}`}
+                                  aria-expanded={isOccurrenceOpen}
+                                  onClick={() =>
+                                    setOpenOccurrence(
+                                      isOccurrenceOpen ? null : occurrenceKey,
+                                    )
+                                  }
+                                >
+                                  {isOccurrenceOpen ? (
+                                    <ChevronDown className="h-3 w-3 shrink-0 text-muted-foreground" />
+                                  ) : (
+                                    <ChevronRight className="h-3 w-3 shrink-0 text-muted-foreground" />
+                                  )}
+                                  <span className="shrink-0 font-mono text-[9px] uppercase text-muted-foreground">
+                                    {v.label}
                                   </span>
+                                  <span className="min-w-0 flex-1 truncate font-mono">
+                                    {v.value}
+                                  </span>
+                                  {v.fanOut > 2 && (
+                                    <span className="shrink-0 text-[10px] text-muted-foreground">
+                                      {t("correlation.connections.fanOut", {
+                                        count: String(v.fanOut),
+                                      })}
+                                    </span>
+                                  )}
+                                </button>
+                                {isOccurrenceOpen && (
+                                  <FingerprintValueOccurrences
+                                    valueHash={v.id}
+                                    cache={effectiveOccurrencesCache}
+                                  />
                                 )}
-                                <ExternalLink className="h-3 w-3 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
-                              </a>
-                            </li>
-                          ))}
+                              </li>
+                            );
+                          })}
                         </ul>
                       </div>
                     )}

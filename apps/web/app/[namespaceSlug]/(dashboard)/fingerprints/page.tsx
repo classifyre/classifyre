@@ -20,6 +20,7 @@ import {
   type FingerprintsRailState,
 } from "@/components/fingerprints-graph";
 import { FingerprintsConnections } from "@/components/fingerprints-connections";
+import type { FingerprintOccurrencesCache } from "@/components/fingerprint-value-occurrences";
 import { BoilerplateClusters } from "@/components/boilerplate-clusters";
 import { SemanticIndexControls } from "@/components/semantic-index-controls";
 import {
@@ -55,6 +56,7 @@ export default function FingerprintsPage() {
   // over the sidebar in place of the Connections/Near-duplicates panels.
   const [rail, setRail] = React.useState<FingerprintsRailState | null>(null);
   const tuningPanelRef = React.useRef<CorrelationTuningPanelHandle | null>(null);
+  const occurrencesCache = React.useRef<FingerprintOccurrencesCache>(new Map());
 
   // ── Shared graph data, fetched once and handed to both the canvas and the
   //    Connections panel so they never disagree. ───────────────────────────
@@ -198,6 +200,7 @@ export default function FingerprintsPage() {
             onExitFocus={clearFocus}
             onTune={goToTune}
             pendingRecomputeAt={pendingRecomputeAt}
+            occurrencesCache={occurrencesCache.current}
           />
         </div>
 
@@ -311,6 +314,7 @@ export default function FingerprintsPage() {
                       : undefined
                   }
                   onFilterFocus={handleFilterFocus}
+                  occurrencesCache={occurrencesCache.current}
                 />
               </TabsContent>
               <TabsContent value="nearDuplicates" className="mt-0">

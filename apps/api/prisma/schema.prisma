@@ -258,6 +258,7 @@ model Finding {
   notifications          Notification[]
   extraction             CustomDetectorExtraction?
   evidenceAnalysis       FindingEvidenceAnalysis?
+  correlationValues      AssetCorrelationValue[]
 
   @@index([assetId])
   @@index([sourceId])
@@ -1060,6 +1061,10 @@ model AssetCorrelationValue {
   id                String       @id @default(uuid())
   assetId           String       @map("asset_id")
   sourceId          String       @map("source_id")
+  // Representative OPEN finding that produced this asset/value occurrence.
+  // Nullable so correlation rows created before this field was introduced can
+  // be resolved lazily by the occurrences endpoint and self-healed in place.
+  findingId         String?      @map("finding_id")
   label             String
   detectorType      DetectorType @map("detector_type")
   customDetectorKey String?      @map("custom_detector_key")
@@ -1073,11 +1078,13 @@ model AssetCorrelationValue {
   phoneticHash      String?      @map("phonetic_hash") @db.VarChar(64)
   createdAt         DateTime     @default(now()) @map("created_at")
 
-  asset Asset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  asset   Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  finding Finding? @relation(fields: [findingId], references: [id], onDelete: SetNull)
 
   @@unique([assetId, valueHash])
   @@index([valueHash])
   @@index([assetId])
+  @@index([findingId])
   @@index([sourceId])
   @@index([label, phoneticHash])
   @@map("asset_correlation_values")

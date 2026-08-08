@@ -20906,6 +20906,10 @@
           "assetId": {
             "type": "string"
           },
+          "findingId": {
+            "type": "string",
+            "nullable": true
+          },
           "name": {
             "type": "string"
           },

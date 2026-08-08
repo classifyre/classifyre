@@ -1,7 +1,13 @@
 "use client";
 
 import * as React from "react";
-import { Database, ExternalLink, Layers } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronRight,
+  Database,
+  ExternalLink,
+  Layers,
+} from "lucide-react";
 import type { GraphNodeDto } from "@workspace/api-client";
 import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
@@ -19,6 +25,10 @@ import {
   type GraphSelection,
 } from "./graph-explorer/graph-types";
 import type { BundleDetail } from "./fingerprints-graph";
+import {
+  FingerprintValueOccurrences,
+  type FingerprintOccurrencesCache,
+} from "./fingerprint-value-occurrences";
 import { useDetailLink } from "@/hooks/use-detail-link";
 import { useSourceTypeLabel } from "@/hooks/use-source-type-label";
 import { useTranslation } from "@/hooks/use-translation";
@@ -39,6 +49,7 @@ export function FingerprintsGraphSelectionRail({
   onHoverKey,
   focusCluster,
   assetLabel,
+  occurrencesCache,
 }: {
   selection: GraphSelection;
   selectedNode: GraphNodeDto | null;
@@ -49,6 +60,7 @@ export function FingerprintsGraphSelectionRail({
   onHoverKey: (key: string | null) => void;
   focusCluster: (meta: ClusterMeta) => void;
   assetLabel: (id: string) => string;
+  occurrencesCache: FingerprintOccurrencesCache;
 }) {
   const detailLink = useDetailLink();
   const sourceTypeLabel = useSourceTypeLabel();
@@ -96,26 +108,11 @@ export function FingerprintsGraphSelectionRail({
             <p className="font-mono text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
               {t("graphExplorer.sharedValues")}
             </p>
-            {/* Every shared value is a finding; the row links to its page. */}
-            <ul className="max-h-[40vh] space-y-0.5 overflow-y-auto">
-              {selectedDetail.values.map((v, i) => (
-                <li key={`${v.id}-${i}`}>
-                  <a
-                    {...detailLink(`/findings/${v.id}`)}
-                    className="group flex items-center gap-2 rounded-[3px] px-1.5 py-1 text-xs transition-colors hover:bg-muted"
-                    title={`${v.value} — ${t("graphExplorer.openFinding")}`}
-                  >
-                    <span className="shrink-0 font-mono text-[9px] uppercase text-muted-foreground">
-                      {v.label}
-                    </span>
-                    <span className="min-w-0 flex-1 truncate font-mono underline-offset-2 group-hover:underline">
-                      {v.value}
-                    </span>
-                    <ExternalLink className="h-3 w-3 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
-                  </a>
-                </li>
-              ))}
-            </ul>
+            <BundleValueOccurrences
+              key={selectedDetail.values.map((value) => value.id).join(":")}
+              values={selectedDetail.values}
+              cache={occurrencesCache}
+            />
           </div>
         </div>
       ) : selectedNode && isClusterNode(selectedNode) ? (
@@ -127,6 +124,9 @@ export function FingerprintsGraphSelectionRail({
           onFocusCluster={focusCluster}
           hoverKey={hoverKey}
           onHoverKey={onHoverKey}
+          memberHref={(node) =>
+            node.type === "asset" ? `/assets/${node.id}` : null
+          }
         />
       ) : selectedNode && selectedNode.type === "asset" ? (
         <div className="space-y-3">
@@ -170,18 +170,70 @@ export function FingerprintsGraphSelectionRail({
           <p className="text-xs text-muted-foreground">
             {t("correlation.fingerprints.sharedValueHint")}
           </p>
-          {/* Bundle stand-ins carry no finding row of their own. */}
+          <Badge variant="secondary" className="text-[10px] uppercase">
+            {selectedNode.detectorType}
+          </Badge>
+          {/* A graph value is a hash shared by multiple finding rows. Resolve
+              the concrete row only once the operator opens this detail. */}
           {selectedNode.detectorType !== "BUNDLE" && (
-            <Button size="sm" variant="outline" asChild className="w-full">
-              <a {...detailLink(`/findings/${selectedNode.id}`)}>
-                <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
-                {t("graphExplorer.openFinding")}
-              </a>
-            </Button>
+            <FingerprintValueOccurrences
+              valueHash={selectedNode.id}
+              cache={occurrencesCache}
+            />
           )}
         </div>
       ) : null}
     </div>
+  );
+}
+
+function BundleValueOccurrences({
+  values,
+  cache,
+}: {
+  values: BundleDetail["values"];
+  cache: FingerprintOccurrencesCache;
+}) {
+  const { t } = useTranslation();
+  const [activeHash, setActiveHash] = React.useState<string | null>(null);
+
+  return (
+    <ul className="max-h-[55vh] space-y-1 overflow-y-auto">
+      {values.map((value, index) => {
+        const active = activeHash === value.id;
+        return (
+          <li key={`${value.id}-${index}`} className="space-y-2">
+            <button
+              type="button"
+              className={`flex w-full items-center gap-2 rounded-[3px] px-1.5 py-1 text-left text-xs transition-colors hover:bg-muted ${
+                active ? "bg-muted" : ""
+              }`}
+              onClick={() => setActiveHash(active ? null : value.id)}
+              aria-expanded={active}
+              aria-label={`${value.value} — ${t("correlation.occurrences.showSources")}`}
+            >
+              {active ? (
+                <ChevronDown className="h-3 w-3 shrink-0 text-muted-foreground" />
+              ) : (
+                <ChevronRight className="h-3 w-3 shrink-0 text-muted-foreground" />
+              )}
+              <span className="shrink-0 font-mono text-[9px] uppercase text-muted-foreground">
+                {value.label}
+              </span>
+              <span
+                className="min-w-0 flex-1 truncate font-mono"
+                title={value.value}
+              >
+                {value.value}
+              </span>
+            </button>
+            {active && (
+              <FingerprintValueOccurrences valueHash={value.id} cache={cache} />
+            )}
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 
