@@ -1298,6 +1298,10 @@
     "deleting": "Deleting...",
     "loadingLabel": "Loading...",
     "findingsCount": "Findings: {{count}}",
+    "overviewTab": "Overview",
+    "resultsTab": "Results",
+    "expandResults": "Show results for {{name}}",
+    "collapseResults": "Hide results for {{name}}",
     "stepper": {
       "identity": "Identity",
       "identityDesc": "Name, key and status",
