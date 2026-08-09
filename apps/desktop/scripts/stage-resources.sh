@@ -109,6 +109,22 @@ node -e "
     if (!v) throw new Error('KEEP dep missing from apps/api/package.json: ' + name);
     dependencies[name] = v;
   }
+  // bundle-api.mjs externalises '@fastify/*' by glob, so ANY @fastify plugin
+  // the API depends on must also be staged here or it is missing at runtime.
+  // The loop above catches a KEEP entry with no dependency; this catches the
+  // opposite, which is the direction that actually broke a release —
+  // @fastify/compress was added upstream, the bundler dutifully left it
+  // external, nothing installed it, and the packaged app died on
+  // 'Cannot find module @fastify/compress' in the smoke test.
+  const missing = Object.keys(allDeps)
+    .filter((name) => name.startsWith('@fastify/'))
+    .filter((name) => !KEEP.includes(name));
+  if (missing.length) {
+    throw new Error(
+      'These @fastify plugins are externalised by bundle-api.mjs but not staged — ' +
+      'add them to KEEP: ' + missing.join(', ')
+    );
+  }
   const out = { name: pkg.name, version: pkg.version, private: true, dependencies };
   fs.writeFileSync('$RESOURCES_NODE/api/package.json', JSON.stringify(out, null, 2));
 "
