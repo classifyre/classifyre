@@ -13595,6 +13595,11 @@
             "description": "Master switch for adaptive (\"automatic\") source scheduling. When false, no AUTO source is started; each source keeps its phase, so turning this back on resumes exactly where it left off.",
             "example": true
           },
+          "maxConcurrentRunners": {
+            "type": "number",
+            "description": "How many scans this workspace may run at once. 0 means unlimited.",
+            "example": 2
+          },
           "demoMode": {
             "type": "boolean",
             "description": "Read-only. When true, the instance runs in demo mode and all mutating operations are rejected.",
@@ -13640,6 +13645,7 @@
           "autopilotEscalationGuidance",
           "autopilotMcpEnabled",
           "autoScheduleEnabled",
+          "maxConcurrentRunners",
           "demoMode",
           "hfTokenSet",
           "hfTokenInstanceSet",
@@ -13752,6 +13758,13 @@
             "type": "boolean",
             "description": "Master switch for adaptive (\"automatic\") source scheduling. Setting it false stops AUTO sources from being started without losing their state.",
             "example": true
+          },
+          "maxConcurrentRunners": {
+            "type": "number",
+            "description": "How many scans this workspace may run at once. Scans are CPU-heavy, so this trades sweep speed against machine responsiveness: a workspace with many sources finishes a full pass roughly twice as fast at 2 as at 1. 0 means unlimited.",
+            "example": 2,
+            "minimum": 0,
+            "maximum": 16
           },
           "hfToken": {
             "type": "string",

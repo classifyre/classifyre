@@ -101,6 +101,19 @@ const TERMINAL_RUNNER_STATUSES = new Set<RunnerStatus>([
   RunnerStatus.ERROR,
 ]);
 
+/** The single per-namespace settings row. */
+const INSTANCE_SETTINGS_ID = 1;
+
+/**
+ * Scans this workspace may run at once when settings cannot be read.
+ *
+ * Matches the column default. Two rather than one: scans are CPU-heavy but
+ * spend real time waiting on I/O and the model pool, so a second keeps the
+ * machine busy without saturating it — and it halves the time a multi-source
+ * workspace needs for a full sweep.
+ */
+const DEFAULT_MAX_CONCURRENT_RUNNERS = 2;
+
 @Injectable()
 export class CliRunnerService {
   private readonly logger = new Logger(CliRunnerService.name);
@@ -3753,15 +3766,41 @@ export class CliRunnerService {
     return { runners, total, skip, take };
   }
 
-  private resolveMaxConcurrentRunners(): number {
+  /**
+   * How many scans this workspace may run at once. 0 means unlimited.
+   *
+   * Per-workspace, from instance_settings — that table lives in the namespace
+   * schema, so one machine hosting a small workspace and a 151-source one can
+   * give them different budgets. `MAX_CONCURRENT_RUNNERS` remains as a
+   * deployment-wide override for operators who need to cap a shared box
+   * regardless of what any workspace asks for; when it is set it wins, because
+   * the machine's limits are not a tenant's to raise.
+   */
+  private async resolveMaxConcurrentRunners(): Promise<number> {
     const raw = process.env.MAX_CONCURRENT_RUNNERS;
-    if (!raw) return 0;
-    const parsed = Number.parseInt(raw, 10);
-    return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
+    if (raw && raw.trim() !== '') {
+      const parsed = Number.parseInt(raw, 10);
+      if (Number.isFinite(parsed) && parsed >= 0) return parsed;
+    }
+    try {
+      const settings = await this.prisma.instanceSettings.findUnique({
+        where: { id: INSTANCE_SETTINGS_ID },
+        select: { maxConcurrentRunners: true },
+      });
+      const configured = settings?.maxConcurrentRunners;
+      if (typeof configured === 'number' && configured >= 0) return configured;
+    } catch (error) {
+      // Never let a settings read stop a scan from starting: falling back to
+      // the default is strictly better than refusing to run.
+      this.logger.warn(
+        `Failed to read scan concurrency setting, using default ${DEFAULT_MAX_CONCURRENT_RUNNERS}: ${String(error)}`,
+      );
+    }
+    return DEFAULT_MAX_CONCURRENT_RUNNERS;
   }
 
   private async canStartNewRunner(): Promise<boolean> {
-    const limit = this.resolveMaxConcurrentRunners();
+    const limit = await this.resolveMaxConcurrentRunners();
     if (limit === 0) return true;
     const running = await this.prisma.runner.count({
       where: { status: RunnerStatus.RUNNING },

@@ -181,10 +181,22 @@ function clusterGraph(request: ClusterWorkerRequest): Extract<
   };
 }
 
+// This file runs as a worker, but the project's `lib` includes DOM, so bare
+// `self` resolves to `Window` — whose postMessage overload takes a
+// `targetOrigin: string` where the worker's takes a transfer list. Naming the
+// real scope keeps the transfer below (a zero-copy hand-off of the cluster
+// buffers, which is the whole reason this runs off the main thread) instead of
+// silently degrading it to a structured clone.
+// Structural rather than `DedicatedWorkerGlobalScope`: that name needs the
+// `webworker` lib, which this program does not include.
+const workerScope = self as unknown as {
+  postMessage: (message: unknown, transfer: ArrayBufferLike[]) => void;
+};
+
 self.onmessage = (event: MessageEvent<ClusterWorkerRequest>) => {
   try {
     const response = clusterGraph(event.data);
-    self.postMessage(response, [
+    workerScope.postMessage(response, [
       response.clusterOffsets.buffer,
       response.clusterMembers.buffer,
       response.clusterOfNode.buffer,

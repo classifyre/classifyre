@@ -15,6 +15,17 @@ export const INSTANCE_TIME_FORMAT_VALUES = [
 export type InstanceTimeFormatValue =
   (typeof INSTANCE_TIME_FORMAT_VALUES)[number];
 
+/**
+ * Upper bound for the per-workspace scan concurrency setting.
+ *
+ * Not a capability limit — the runner would happily start more — but a guard
+ * against a value that only makes the machine slower. Scans spawn the Python
+ * CLI with its own detector process pool sized to half the cores, so past a
+ * handful of concurrent scans they contend for the same CPUs and the whole
+ * workspace gets less done, not more.
+ */
+export const MAX_CONCURRENT_RUNNERS_LIMIT = 16;
+
 export class InstanceSettingsResponseDto {
   @ApiProperty({ example: 1 })
   id: number;
@@ -143,6 +154,13 @@ export class InstanceSettingsResponseDto {
     example: true,
   })
   autoScheduleEnabled: boolean;
+
+  @ApiProperty({
+    description:
+      'How many scans this workspace may run at once. 0 means unlimited.',
+    example: 2,
+  })
+  maxConcurrentRunners: number;
 
   @ApiProperty({
     description:

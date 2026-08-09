@@ -124,6 +124,26 @@ export const AUTOPILOT_CYCLE_BUDGET_MS = 30 * 60 * 1000;
  */
 export const EVIDENCE_ANALYSIS_MIN_COVERAGE = 0.8;
 
+/**
+ * Coverage below which a cycle is held back rather than run on unscored data.
+ *
+ * Distinct from `EVIDENCE_ANALYSIS_MIN_COVERAGE` above, and much lower. That
+ * one decides whether the missions are WARNED that scores are partial; this one
+ * decides whether the cycle runs at all.
+ *
+ * The gate used to be "is the embedding queue non-empty", which under
+ * continuous ingestion is permanently true — a live 151-source namespace sat at
+ * 38% coverage while scans kept arriving and the harness managed one
+ * investigation cycle in two hours. A corpus that will not reach 80% for
+ * another day must not mean a harness that does nothing for a day.
+ *
+ * A quarter is where `findings.ranked` stops being mostly zeros: below it the
+ * triage doctrine reads unscored findings as unimportant ones, which is worse
+ * than waiting; above it, partial ranking plus the warning the missions already
+ * know how to handle beats standing still.
+ */
+export const EVIDENCE_ANALYSIS_USABLE_COVERAGE = 0.25;
+
 // ── Monitored coverage: evidence with no inquiry watching it ─────────────────
 /**
  * Importance at or above which an open finding ought to be watched by SOME

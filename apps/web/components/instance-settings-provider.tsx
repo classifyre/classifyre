@@ -77,6 +77,7 @@ const DEFAULT_SETTINGS: InstanceSettingsResponse = {
   autopilotEscalationGuidance: null,
   autopilotMcpEnabled: false,
   autoScheduleEnabled: true,
+  maxConcurrentRunners: 2,
   hfTokenSet: false,
   hfTokenInstanceSet: false,
   createdAt: new Date(0),

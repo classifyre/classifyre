@@ -73,15 +73,19 @@ async function bootstrap() {
     methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   });
 
-  // Graph snapshots can be tens or hundreds of megabytes as JSON. Prefer the
-  // fastest gzip level and always use the streaming path: this cuts network
-  // transfer substantially without blocking Node's event loop on compression.
+  // Graph snapshots can be tens or hundreds of megabytes as JSON. The fastest
+  // gzip level still cuts network transfer substantially while keeping the
+  // per-response CPU cost low.
+  //
+  // There is no stream-vs-sync knob to set here: @fastify/compress 8 makes that
+  // choice internally, and `syncThreshold` — which this used to pass — is not
+  // one of its options in any version. It was silently doing nothing and
+  // failing the build.
   await app.register(compress, {
     global: true,
     globalDecompression: false,
     encodings: ['gzip'],
     threshold: 1024,
-    syncThreshold: 0,
     zlibOptions: { level: 1 },
   });
 

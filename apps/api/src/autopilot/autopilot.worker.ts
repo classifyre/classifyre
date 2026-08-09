@@ -14,6 +14,7 @@ import { AgentRunCancelledError } from './agent-runtime';
 import type { ApplySummary } from './decision-applier.service';
 import {
   AGENT_RUN_STALE_AFTER_MS,
+  AUTOPILOT_COALESCE_WINDOW_SECONDS,
   AUTOPILOT_CORPUS_SINGLETON_KEY,
   AUTOPILOT_CYCLE_BUDGET_MS,
   AUTOPILOT_DREAM_CRON,
@@ -22,6 +23,7 @@ import {
   AUTOPILOT_RETRY_AFTER_SECONDS,
   DETECTION_CHAIN,
   EVIDENCE_ANALYSIS_MIN_COVERAGE,
+  EVIDENCE_ANALYSIS_USABLE_COVERAGE,
   INVESTIGATION_CHAIN,
   PIPELINE_KINDS,
 } from './autopilot.constants';
@@ -322,6 +324,20 @@ export class AutopilotWorker {
           singletonKey: cycle.corpus
             ? AUTOPILOT_CORPUS_SINGLETON_KEY
             : `autopilot:${cycle.sourceId}`,
+          // `singletonKey` alone dedupes NOTHING on this queue: in pg-boss 12
+          // every single-job-per-key index is predicated on the queue policy,
+          // and this queue is `standard`. Without a slot width each requeue
+          // therefore inserted a brand-new job, and with a fresh corpus cycle
+          // arriving every window each one started its own chain counting to
+          // five. Measured on a live 151-source namespace: 29 completed cycle
+          // jobs spread across attempts 1..5, and exactly one of them ever
+          // reached the agents — the rest found the dirty set already claimed
+          // and exited. Same slot width as the coalescing window, so a retry
+          // and a fresh cycle landing together become one job rather than two.
+          singletonSeconds: AUTOPILOT_COALESCE_WINDOW_SECONDS,
+          // Defer a collision to the next slot instead of dropping it: a
+          // dropped retry strands the dirty sources that provoked it.
+          singletonNextSlot: true,
           expireInSeconds: 3 * 3600,
         },
       );
@@ -680,10 +696,38 @@ export class AutopilotWorker {
    * unanalyzed finding scores 0, exactly like a genuinely unimportant one, so
    * running early does not merely lose signal, it inverts it.
    */
+  /**
+   * Whether the work the agents reason FROM is too raw to reason from yet.
+   *
+   * Both checks used to be "is this queue non-empty" — which under continuous
+   * ingestion is permanently true, so the gate deferred forever. On a live
+   * 151-source namespace evidence analysis sat at 38% while scans kept
+   * arriving, and the harness ran one investigation cycle in two hours.
+   *
+   * The queue being busy is not the question. The question is whether the
+   * findings the agents are about to triage have importance scores, and that
+   * is answered by coverage: below `EVIDENCE_ANALYSIS_USABLE_COVERAGE` a
+   * ranking read is mostly zeros and TRIAGE DOCTRINE misfires on it; above it,
+   * partial ranking plus the honest "scores are partial" warning the missions
+   * already handle beats not running at all. A corpus that will not reach the
+   * full bar for another day must not mean a harness that does nothing for a
+   * day.
+   */
   private async readinessBlocked(): Promise<string | null> {
     if (await this.queueBusy(INQUIRY_MATCH_QUEUE)) return 'Inquiry matching';
-    if (await this.evidenceAnalysisBusy()) return 'Evidence analysis';
-    return null;
+    if (!(await this.evidenceAnalysisBusy())) return null;
+
+    const coverage = await this.evidenceCoverageSafe();
+    // Nothing scored and nothing to score: an instance with no semantic stack
+    // still needs its agents.
+    if (coverage.open === 0) return null;
+    const ratio = coverage.analyzed / coverage.open;
+    if (ratio >= EVIDENCE_ANALYSIS_USABLE_COVERAGE) return null;
+    return (
+      `Evidence analysis (${coverage.analyzed}/${coverage.open} scored, ` +
+      `below the ${Math.round(EVIDENCE_ANALYSIS_USABLE_COVERAGE * 100)}% ` +
+      'usable floor)'
+    );
   }
 
   /**
