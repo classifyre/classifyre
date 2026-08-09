@@ -103,7 +103,7 @@ export class DetectionPostureService {
       runs,
       tunesLast24h,
       lastTune,
-      caseFindings,
+      citedRows,
       inquiries,
     ] = await Promise.all([
       this.prisma.finding.count({ where: { sourceId, status: 'OPEN' } }),
@@ -124,9 +124,16 @@ export class DetectionPostureService {
         orderBy: { createdAt: 'desc' },
         select: { createdAt: true },
       }),
-      // Small, human-curated table: read it whole and intersect, rather than
-      // joining through findings.
-      this.prisma.caseFinding.findMany({ select: { findingId: true } }),
+      // Counted in SQL, scoped to this source. This runs on every
+      // sources.get_config, so on an instance with hundreds of sources an
+      // unscoped read of case_findings would be a table scan per source per
+      // cycle. Ids are text columns — no casts.
+      this.prisma.$queryRaw<Array<{ cited: bigint }>>`
+        SELECT count(*)::bigint AS cited
+        FROM case_findings cf
+        JOIN findings f ON f.id = cf.finding_id
+        WHERE f.source_id = ${sourceId}
+      `,
       this.prisma.inquiry.findMany({
         where: {
           status: 'ACTIVE',
@@ -136,15 +143,7 @@ export class DetectionPostureService {
       }),
     ]);
 
-    const citedByCases =
-      caseFindings.length > 0
-        ? await this.prisma.finding.count({
-            where: {
-              sourceId,
-              id: { in: caseFindings.map((row) => row.findingId) },
-            },
-          })
-        : 0;
+    const citedByCases = Number(citedRows[0]?.cited ?? 0);
     const inquiryMatches = inquiries.reduce((sum, q) => sum + q.matchCount, 0);
 
     // Walk newest-first while the recorded fingerprint still matches what the

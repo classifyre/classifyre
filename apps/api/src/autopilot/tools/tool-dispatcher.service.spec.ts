@@ -8,7 +8,11 @@ import type { Tool, ToolContext } from './tool.types';
 describe('ToolDispatcherService', () => {
   let dispatcher: ToolDispatcherService;
 
-  const mockAudit = { hasDecision: jest.fn(), recordDecision: jest.fn() };
+  const mockAudit = {
+    hasDecision: jest.fn(),
+    countFailedCalls: jest.fn().mockResolvedValue(0),
+    recordDecision: jest.fn(),
+  };
   const mockLog = { technical: jest.fn(), business: jest.fn() };
 
   const tc = {
@@ -34,6 +38,7 @@ describe('ToolDispatcherService', () => {
     dispatcher = module.get(ToolDispatcherService);
     jest.clearAllMocks();
     mockAudit.hasDecision.mockResolvedValue(false);
+    mockAudit.countFailedCalls.mockResolvedValue(0);
     mockAudit.recordDecision.mockResolvedValue(true);
   });
 
@@ -125,6 +130,89 @@ describe('ToolDispatcherService', () => {
     );
     expect(res.outcome).toBe('DEDUPED');
     expect(handler).not.toHaveBeenCalled();
+  });
+
+  /**
+   * An agent that reads "not found" tends to try another plausible id rather
+   * than stop. One live run sent the same malformed threadId four times, each
+   * attempt spending an iteration of a bounded budget.
+   */
+  describe('repeated identical failures', () => {
+    it('refuses a call that has already failed identically twice', async () => {
+      mockAudit.countFailedCalls.mockResolvedValue(2);
+      const handler = jest.fn();
+
+      const res = await dispatcher.dispatch(
+        tc,
+        mutateTool({}, handler),
+        { threadId: 'bad' },
+        'k-repeat',
+        'r',
+      );
+
+      expect(res.outcome).toBe('FAILED');
+      expect(handler).not.toHaveBeenCalled();
+      const { error } = res.result as { error: string };
+      expect(error).toMatch(/already failed 2 times/);
+      expect(error).toMatch(/composed rather than/);
+    });
+
+    it('still runs a call that has failed once', async () => {
+      mockAudit.countFailedCalls.mockResolvedValue(1);
+      const handler = jest.fn().mockResolvedValue({ ok: true });
+
+      const res = await dispatcher.dispatch(
+        tc,
+        mutateTool({}, handler),
+        {},
+        'k-retry',
+        'r',
+      );
+
+      expect(res.outcome).toBe('APPLIED');
+      expect(handler).toHaveBeenCalled();
+    });
+
+    // The count is per (tool, input): a different input is a different call,
+    // however many times its sibling has failed. Computed on the NORMALIZED
+    // input, so two calls differing only in a field the schema strips are
+    // correctly the same call.
+    it('fingerprints the tool and its input together', async () => {
+      mockAudit.countFailedCalls.mockResolvedValue(0);
+      const send = (x: string, key: string) =>
+        dispatcher.dispatch(
+          tc,
+          mutateTool({}, jest.fn().mockResolvedValue({})),
+          { x },
+          key,
+          'r',
+        );
+      await send('one', 'k-a');
+      await send('two', 'k-b');
+      await send('one', 'k-c');
+
+      const prints = mockAudit.countFailedCalls.mock.calls.map(
+        (call) => call[1],
+      );
+      expect(prints[0]).not.toBe(prints[1]);
+      expect(prints[2]).toBe(prints[0]);
+    });
+
+    it('records the fingerprint on failure so the next attempt can count it', async () => {
+      const handler = jest.fn().mockRejectedValue(new Error('boom'));
+
+      await dispatcher.dispatch(tc, mutateTool({}, handler), {}, 'k-fp', 'r');
+
+      expect(mockAudit.recordDecision).toHaveBeenCalledWith(
+        'run-1',
+        expect.objectContaining({
+          outcome: 'FAILED',
+          payload: expect.objectContaining({
+            _callFingerprint: expect.any(String),
+          }),
+        }),
+      );
+    });
   });
 
   it('records FAILED when handler throws', async () => {

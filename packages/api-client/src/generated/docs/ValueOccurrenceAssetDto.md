@@ -7,6 +7,7 @@
 Name | Type
 ------------ | -------------
 `assetId` | string
+`findingId` | string
 `name` | string
 `externalUrl` | string
 `assetType` | string
@@ -23,6 +24,7 @@ import type { ValueOccurrenceAssetDto } from '@workspace/api-client'
 // TODO: Update the object below with actual values
 const example = {
   "assetId": null,
+  "findingId": null,
   "name": null,
   "externalUrl": null,
   "assetType": null,

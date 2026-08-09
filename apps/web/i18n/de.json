@@ -2887,10 +2887,18 @@
     "occurrences": {
       "title": "Wo sonst gefunden",
       "desc": "Weitere Assets, in denen dieser exakte Wert vorkommt.",
+      "loading": "Übereinstimmende Funde werden geladen",
       "none": "Nirgendwo sonst gefunden",
       "noneDesc": "Dieser Wert kommt in keinem anderen Asset vor.",
+      "noneIndexed": "Für diesen gemeinsamen Wert ist kein indiziertes Fundvorkommen verfügbar.",
       "loadFailed": "Vorkommen konnten nicht geladen werden",
-      "foundIn": "In {{count}} Asset(s) gefunden"
+      "foundIn": "In {{count}} Asset(s) gefunden",
+      "sourceCount": "Über {{count}} Quelle(n) geteilt",
+      "assetCount": "{{count}} Asset(s)",
+      "sharedExplanation": "Dieser normalisierte Wert verbindet die folgenden Quellen. Öffnen Sie den Fund aus der Quelle und dem Asset, das Sie untersuchen möchten.",
+      "openFindingInSource": "Fund aus {{source}} öffnen",
+      "findingUnavailable": "Das Asset ist verknüpft, aber der ursprüngliche Fund ist nicht mehr offen.",
+      "showSources": "Übereinstimmende Funde nach Quelle anzeigen"
     },
     "connections": {
       "title": "Stärkste Verbindungen",
@@ -2916,7 +2924,7 @@
       "noMatches": "Keine Verbindungen entsprechen Ihrer Suche",
       "openAsset": "Dokument öffnen",
       "openFinding": "Finding öffnen",
-      "sharedValuesHint": "Jeder geteilte Wert ist ein Finding — zum vollständigen Nachweis öffnen."
+      "sharedValuesHint": "Einen gemeinsamen Wert aufklappen, um seinen Fund in jeder Quelle zu sehen."
     },
     "nearDuplicates": {
       "title": "Fast-Duplikate Funde",

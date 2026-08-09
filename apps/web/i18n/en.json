@@ -2887,10 +2887,18 @@
     "occurrences": {
       "title": "Where else found",
       "desc": "Other assets where this exact value appears.",
+      "loading": "Loading matching findings",
       "none": "Not found elsewhere",
       "noneDesc": "This value doesn't appear on any other asset.",
+      "noneIndexed": "No indexed finding occurrence is available for this shared value.",
       "loadFailed": "Failed to load occurrences",
-      "foundIn": "Found in {{count}} asset(s)"
+      "foundIn": "Found in {{count}} asset(s)",
+      "sourceCount": "Shared across {{count}} source(s)",
+      "assetCount": "{{count}} asset(s)",
+      "sharedExplanation": "This normalized value connects the sources below. Open the finding from the source and asset you want to inspect.",
+      "openFindingInSource": "Open finding from {{source}}",
+      "findingUnavailable": "The asset is linked, but its original finding is no longer open.",
+      "showSources": "Show matching findings by source"
     },
     "connections": {
       "title": "Top connections",
@@ -2916,7 +2924,7 @@
       "noMatches": "No connections match your search",
       "openAsset": "Open document",
       "openFinding": "Open finding",
-      "sharedValuesHint": "Each shared value is a finding — open it for full evidence."
+      "sharedValuesHint": "Expand a shared value to see its finding in each source."
     },
     "nearDuplicates": {
       "title": "Near-duplicate findings",

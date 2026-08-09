@@ -18,6 +18,7 @@ import { DecisionApplierService } from '../../decision-applier.service';
 import { CustomDetectorsService } from '../../../custom-detectors.service';
 import { AutoScheduleService } from '../../../scheduler/auto-schedule.service';
 import { computeDetectionFingerprint } from '../../../utils/scope-fingerprint';
+import { configVersion } from '../../../utils/config-version';
 import {
   DetectionImpactService,
   type DetectionImpact,
@@ -211,7 +212,7 @@ export class ConfigToolset {
       {
         name: 'sources.get_config',
         description:
-          'Read a source’s EDITABLE config (detectors, custom_detectors, sampling, optional, resources). Base connection (required/masked) is never returned. The returned `version` is a concurrency token — pass it back as `expectedVersion` to config.tune_source so your write is rejected if an operator changed the config in the meantime. Also returns `detectionPosture` — where this source sits in its detection lifecycle and how much of its daily detection-change budget is left — because that decides how freely you should be changing what it detects.',
+          'Read a source’s EDITABLE config (detectors, custom_detectors, sampling, optional, resources). Base connection (required/masked) is never returned. The returned `version` is a concurrency token derived from the configuration itself — pass it back as `expectedVersion` to config.tune_source so your write is rejected if an operator changed the config in the meantime. It only changes when the configuration does, so taking time to think does not invalidate it. Also returns `detectionPosture` — where this source sits in its detection lifecycle and how much of its daily detection-change budget is left — because that decides how freely you should be changing what it detects.',
         inputSchema: {
           type: 'object',
           properties: { sourceId: { type: 'string' } },
@@ -249,7 +250,11 @@ export class ConfigToolset {
             type: String(source.type),
             aiMode: String(source.aiMode),
             editableConfig: editable,
-            version: source.updatedAt.toISOString(),
+            // A hash of the config, NOT the row's updatedAt. See
+            // configVersion: the row is written by the scheduler on every scan
+            // claim, and using updatedAt made those writes look like config
+            // changes to an agent that had merely spent 30 seconds thinking.
+            version: configVersion(decrypted),
             detectionPosture: posture,
           };
         },
@@ -257,7 +262,7 @@ export class ConfigToolset {
       {
         name: 'config.tune_source',
         description:
-          'Change a source’s editable config. `patch` may only contain detectors, custom_detectors, sampling, optional, resources. The merged config is validated against the source schema; base connection is left untouched. You MUST first call sources.get_config and pass its `version` back as `expectedVersion`: the write is rejected if an operator (or another agent) changed the config since you read it, so you never silently clobber a newer change. On rejection, re-read and reapply your patch on the current config. An operator notification is raised for every change.',
+          'Change a source’s editable config. `patch` may only contain detectors, custom_detectors, sampling, optional, resources. The merged config is validated against the source schema; base connection is left untouched. You MUST first call sources.get_config and pass its `version` back as `expectedVersion`: the write is rejected if an operator (or another agent) changed the CONFIGURATION since you read it, so you never silently clobber a newer change. Scans, schedule updates and other activity on the source do NOT invalidate your version — only a real configuration change does. On rejection, re-read and reapply your patch on the current config. An operator notification is raised for every change.',
         inputSchema: {
           type: 'object',
           properties: {
@@ -309,20 +314,30 @@ export class ConfigToolset {
 
           const source = await this.prisma.source.findUnique({
             where: { id: sourceId },
-            select: { name: true, type: true, config: true, updatedAt: true },
+            select: { name: true, type: true, config: true },
           });
           if (!source) throw new Error('Unknown sourceId');
 
           // 2. Optimistic concurrency: the agent must supply the version it read
-          //    from sources.get_config. If the source has changed since (e.g. an
+          //    from sources.get_config. If the CONFIG has changed since (e.g. an
           //    operator saved a new detector selection seconds ago), refuse —
           //    never silently overwrite a newer write with a stale base.
+          //
+          //    Compared on a hash of the configuration, not on the row's
+          //    updatedAt: the scheduler writes scheduleNextAt and autoPhase to
+          //    this row on every scan, so the timestamp version expired for
+          //    reasons that had nothing to do with configuration and refused
+          //    perfectly valid patches. See configVersion.
           if (!expectedVersion) {
             throw new Error(
               'expectedVersion is required — call sources.get_config first and pass back its `version`.',
             );
           }
-          const currentVersion = source.updatedAt.toISOString();
+          // 3. Decrypt → allow-list merge.
+          const current = this.masked.decryptMaskedConfig(
+            (source.config ?? {}) as Record<string, unknown>,
+          );
+          const currentVersion = configVersion(current);
           if (expectedVersion !== currentVersion) {
             throw new Error(
               `Source config changed since you read it (you have version ${expectedVersion}, ` +
@@ -331,10 +346,6 @@ export class ConfigToolset {
             );
           }
 
-          // 3. Decrypt → allow-list merge.
-          const current = this.masked.decryptMaskedConfig(
-            (source.config ?? {}) as Record<string, unknown>,
-          );
           const merged: Record<string, unknown> = { ...current };
           for (const key of EDITABLE_KEYS) {
             if (key in patch) merged[key] = patch[key];
@@ -393,20 +404,38 @@ export class ConfigToolset {
             }
           }
 
-          // 6. Persist with the version as a precondition, so a write that
-          //    raced in between our read and this update (updatedAt advanced)
-          //    matches zero rows and is refused rather than clobbering it.
+          // 6. Persist. The checks above ran against a config read some seconds
+          //    ago, so re-read it under the row lock and re-compare before
+          //    writing: only a genuine config change between the two reads
+          //    aborts, and a scheduler write in that window no longer can.
+          //    `FOR UPDATE` serialises this against a concurrent tune of the
+          //    same source rather than letting both pass their checks and the
+          //    later one win.
           const encrypted = this.masked.encryptMaskedConfig(validated);
-          const written = await this.prisma.source.updateMany({
-            where: { id: sourceId, updatedAt: source.updatedAt },
-            data: { config: encrypted as Prisma.InputJsonValue },
-          });
-          if (written.count === 0) {
-            throw new Error(
-              'Source config was modified concurrently while writing — refusing to ' +
-                'overwrite. Re-read sources.get_config and retry.',
+          await this.prisma.$transaction(async (tx) => {
+            // `sources.id` is text, not uuid — no cast.
+            const [locked] = await tx.$queryRaw<Array<{ config: unknown }>>`
+              SELECT config FROM sources WHERE id = ${sourceId} FOR UPDATE
+            `;
+            if (!locked) throw new Error('Unknown sourceId');
+            const lockedVersion = configVersion(
+              this.masked.decryptMaskedConfig(
+                (locked.config ?? {}) as Record<string, unknown>,
+              ),
             );
-          }
+            if (lockedVersion !== expectedVersion) {
+              throw new Error(
+                'Source config was modified while you were preparing this change — ' +
+                  'refusing to overwrite. Re-read sources.get_config and reapply ' +
+                  'your patch on the current config.',
+              );
+            }
+            await tx.source.update({
+              where: { id: sourceId },
+              data: { config: encrypted as Prisma.InputJsonValue },
+              select: { id: true },
+            });
+          });
 
           const changedKeys = Object.keys(patch);
           // 7. Surface the change to the operator — an autopilot config mutation
