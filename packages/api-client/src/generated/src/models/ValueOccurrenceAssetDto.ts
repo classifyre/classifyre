@@ -32,7 +32,7 @@ export interface ValueOccurrenceAssetDto {
      */
     findingId?: string | null;
     /**
-     *
+     * 
      * @type {string}
      * @memberof ValueOccurrenceAssetDto
      */
@@ -133,3 +133,4 @@ export function ValueOccurrenceAssetDtoToJSONTyped(value?: ValueOccurrenceAssetD
         'clusterId': value['clusterId'],
     };
 }
+
