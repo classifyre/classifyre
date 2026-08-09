@@ -1,0 +1,36 @@
+-- Index case_findings by finding_id.
+--
+-- Four paths ask "is this finding cited by a case?" — the removed-detector
+-- cleanup at the end of every scan, the detection-posture read behind every
+-- sources.get_config, the config-change impact preview, and detectors.value.
+-- Each answers it by joining case_findings to findings.
+--
+-- `CaseFinding.findingId` carries no foreign key, and the only index covering
+-- it is the unique (case_id, finding_id), whose leading column is case_id.
+-- That index is not useless for a finding_id predicate — Postgres will scan it
+-- in full and filter — but a full index scan is not a seek, and its cost grows
+-- with the whole table:
+--
+--   without:  Index Scan using case_findings_case_id_finding_id_key
+--             Index Cond: (finding_id = $1)          -- full scan, filtered
+--   with:     Index Scan using case_findings_finding_id_idx
+--             Index Cond: (finding_id = $1)          -- seek
+--
+-- So the practical effect is on join order. While case evidence is small (56
+-- rows on the instance this was measured on) the planner correctly drives from
+-- case_findings and probes findings by primary key, and this index changes
+-- nothing. Once it is not small, driving from findings (indexed by source_id)
+-- and probing case_findings becomes the better plan — and that plan needs a
+-- seek on finding_id to be worth choosing.
+--
+-- Added now rather than later because these queries run per source per cycle:
+-- on an instance with hundreds of sources, many times a minute. It changes no
+-- result, only the plans available to the planner.
+--
+-- prisma migrate runs each migration inside a transaction, so no CONCURRENTLY
+-- and no transaction control here. The statement is idempotent so a partial
+-- apply can be re-run, and the table is small enough in every existing
+-- namespace that the brief write lock is not a concern.
+
+-- CreateIndex
+CREATE INDEX IF NOT EXISTS "case_findings_finding_id_idx" ON "case_findings"("finding_id");

@@ -1409,6 +1409,13 @@ model CaseFinding {
   @@unique([caseId, findingId])
   @@index([caseId])
   @@index([caseEvidenceId])
+  // "Is this finding cited by a case?" — asked per scan, per config read and
+  // per detector-value query, and answered by joining case_findings to
+  // findings. The unique index above leads with case_id, so a finding_id
+  // predicate can only scan it in full and filter; this one seeks. That is
+  // what makes the alternative join order (drive from findings by source_id,
+  // probe case_findings) worth choosing once case evidence stops being small.
+  @@index([findingId])
   @@map("case_findings")
 }
 
