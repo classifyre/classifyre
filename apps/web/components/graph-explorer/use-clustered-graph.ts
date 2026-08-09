@@ -5,6 +5,7 @@ import type { GraphEdgeDto, GraphNodeDto } from "@workspace/api-client";
 import { keyOf, nodeKey } from "./graph-types";
 import type { AssetFindingStats } from "./explorer-types";
 import type {
+  ClusterWorkerMeta,
   ClusterWorkerRequest,
   ClusterWorkerResponse,
 } from "./clustering-worker";
@@ -105,6 +106,131 @@ export interface ClusteredGraph {
   expandAllClusters: () => void;
 }
 
+const STANDARD_SEVERITIES = ["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"];
+
+/**
+ * Convert DTO-heavy graph data into a columnar worker message. Large labels and
+ * unused DTO fields never cross the process boundary, and numeric columns are
+ * transferred instead of copied by Chromium's structured-clone serializer.
+ */
+function buildWorkerRequest(
+  nodes: GraphNodeDto[],
+  edges: GraphEdgeDto[],
+  minClusterSize: number,
+  assetStats?: Map<string, AssetFindingStats>,
+): ClusterWorkerRequest {
+  const nodeCount = nodes.length;
+  const nodeKeys = new Array<string>(nodeCount);
+  const nodeKinds = new Uint8Array(nodeCount);
+  const nodeSeverities = new Int32Array(nodeCount);
+  const nodeSources = new Int32Array(nodeCount);
+  const nodeDetectors = new Int32Array(nodeCount);
+  const assetFindingTotals = new Uint32Array(nodeCount);
+  nodeSeverities.fill(-1);
+  nodeSources.fill(-1);
+  nodeDetectors.fill(-1);
+
+  const severities = [...STANDARD_SEVERITIES];
+  const severityIndexes = new Map(severities.map((severity, index) => [severity, index]));
+  const severityIndexOf = (severity: string): number => {
+    const existing = severityIndexes.get(severity);
+    if (existing !== undefined) return existing;
+    const index = severities.length;
+    severities.push(severity);
+    severityIndexes.set(severity, index);
+    return index;
+  };
+  for (const node of nodes) {
+    if (node.type === "finding") severityIndexOf((node.severity ?? "INFO").toUpperCase());
+  }
+  assetStats?.forEach((stats) => {
+    for (const severity of Object.keys(stats.severityCounts)) severityIndexOf(severity);
+  });
+
+  const sources: Array<{ id?: string; name?: string; type?: string }> = [];
+  const sourceIndexes = new Map<string, number>();
+  const detectors: string[] = [];
+  const detectorIndexes = new Map<string, number>();
+  const indexByNodeKey = new Map<string, number>();
+  const assetSeverityCounts = new Uint32Array(nodeCount * severities.length);
+
+  for (let nodeIndex = 0; nodeIndex < nodeCount; nodeIndex += 1) {
+    const node = nodes[nodeIndex]!;
+    const key = keyOf(node);
+    nodeKeys[nodeIndex] = key;
+    indexByNodeKey.set(key, nodeIndex);
+
+    if (node.type === "asset") {
+      nodeKinds[nodeIndex] = 1;
+      const sourceKey = node.sourceId ?? node.sourceType ?? "";
+      let sourceIndex = sourceIndexes.get(sourceKey);
+      if (sourceIndex === undefined) {
+        sourceIndex = sources.length;
+        sourceIndexes.set(sourceKey, sourceIndex);
+        sources.push({ id: node.sourceId, name: node.sourceName, type: node.sourceType });
+      }
+      nodeSources[nodeIndex] = sourceIndex;
+
+      const stats = assetStats?.get(node.id);
+      if (stats) {
+        assetFindingTotals[nodeIndex] = stats.total;
+        for (const [severity, count] of Object.entries(stats.severityCounts)) {
+          const severityIndex = severityIndexes.get(severity);
+          if (severityIndex !== undefined) {
+            assetSeverityCounts[nodeIndex * severities.length + severityIndex] = count;
+          }
+        }
+      }
+    } else if (node.type === "finding") {
+      nodeKinds[nodeIndex] = 2;
+      nodeSeverities[nodeIndex] = severityIndexes.get(
+        (node.severity ?? "INFO").toUpperCase(),
+      )!;
+      const detector = node.customDetectorName ?? node.detectorType;
+      if (detector) {
+        let detectorIndex = detectorIndexes.get(detector);
+        if (detectorIndex === undefined) {
+          detectorIndex = detectors.length;
+          detectorIndexes.set(detector, detectorIndex);
+          detectors.push(detector);
+        }
+        nodeDetectors[nodeIndex] = detectorIndex;
+      }
+    }
+  }
+
+  const edgeEndpoints = new Int32Array(edges.length * 2);
+  const edgeWeights = new Float32Array(edges.length);
+  edgeEndpoints.fill(-1);
+  for (let edgeIndex = 0; edgeIndex < edges.length; edgeIndex += 1) {
+    const edge = edges[edgeIndex]!;
+    const from = indexByNodeKey.get(nodeKey(edge.fromType, edge.fromId));
+    const to = indexByNodeKey.get(nodeKey(edge.toType, edge.toId));
+    if (from !== undefined && to !== undefined) {
+      edgeEndpoints[edgeIndex * 2] = from;
+      edgeEndpoints[edgeIndex * 2 + 1] = to;
+    }
+    edgeWeights[edgeIndex] = Math.max(0.01, Number(edge.confidence ?? 1));
+  }
+
+  return {
+    type: "cluster",
+    minClusterSize,
+    nodeKeys,
+    nodeKinds,
+    nodeSeverities,
+    nodeSources,
+    nodeDetectors,
+    assetFindingTotals,
+    assetSeverityCounts,
+    severities,
+    sources,
+    detectors,
+    edgeEndpoints,
+    edgeWeights,
+  };
+}
+
 /**
  * Community detection over the visible graph (Louvain, weighted by edge
  * confidence), collapsing each sizable community into a single meta-node.
@@ -138,8 +264,10 @@ export function useClusteredGraph(
   );
   const [workerResult, setWorkerResult] = React.useState<{
     request: typeof request;
-    clusters: ClusterMeta[];
-    clusterOfNode: Array<[string, string]>;
+    clusters: ClusterWorkerMeta[];
+    clusterOffsets: Uint32Array;
+    clusterMembers: Uint32Array;
+    clusterOfNode: Int32Array;
   } | null>(null);
 
   React.useEffect(() => {
@@ -156,27 +284,45 @@ export function useClusteredGraph(
         setWorkerResult({
           request,
           clusters: response.clusters,
+          clusterOffsets: response.clusterOffsets,
+          clusterMembers: response.clusterMembers,
           clusterOfNode: response.clusterOfNode,
         });
       } else {
         console.error("Graph clustering worker failed:", response.message);
-        setWorkerResult({ request, clusters: [], clusterOfNode: [] });
+        setWorkerResult({
+          request,
+          clusters: [],
+          clusterOffsets: new Uint32Array([0]),
+          clusterMembers: new Uint32Array(),
+          clusterOfNode: new Int32Array(),
+        });
       }
       worker.terminate();
     };
     worker.onerror = (event) => {
       if (disposed) return;
       console.error("Graph clustering worker failed:", event.message);
-      setWorkerResult({ request, clusters: [], clusterOfNode: [] });
+      setWorkerResult({
+        request,
+        clusters: [],
+        clusterOffsets: new Uint32Array([0]),
+        clusterMembers: new Uint32Array(),
+        clusterOfNode: new Int32Array(),
+      });
       worker.terminate();
     };
-    worker.postMessage({
-      type: "cluster",
-      nodes,
-      edges,
-      minClusterSize,
-      assetStats: assetStats ? [...assetStats] : [],
-    } satisfies ClusterWorkerRequest);
+    const message = buildWorkerRequest(nodes, edges, minClusterSize, assetStats);
+    worker.postMessage(message, [
+      message.nodeKinds.buffer,
+      message.nodeSeverities.buffer,
+      message.nodeSources.buffer,
+      message.nodeDetectors.buffer,
+      message.assetFindingTotals.buffer,
+      message.assetSeverityCounts.buffer,
+      message.edgeEndpoints.buffer,
+      message.edgeWeights.buffer,
+    ]);
 
     return () => {
       disposed = true;
@@ -192,16 +338,30 @@ export function useClusteredGraph(
       return { clusters, clusterOfNode };
     }
 
-    for (const rawMeta of workerResult.clusters) {
-      const meta = { ...rawMeta, label: "" };
+    const nodeKeys = nodes.map(keyOf);
+    for (let clusterIndex = 0; clusterIndex < workerResult.clusters.length; clusterIndex += 1) {
+      const rawMeta = workerResult.clusters[clusterIndex]!;
+      const start = workerResult.clusterOffsets[clusterIndex]!;
+      const end = workerResult.clusterOffsets[clusterIndex + 1]!;
+      const memberKeys: string[] = [];
+      for (let offset = start; offset < end; offset += 1) {
+        const nodeIndex = workerResult.clusterMembers[offset]!;
+        const key = nodeKeys[nodeIndex];
+        if (key) memberKeys.push(key);
+      }
+      const meta: ClusterMeta = { ...rawMeta, memberKeys, label: "" };
       meta.label = formatLabel(meta);
       clusters.set(meta.id, meta);
     }
-    for (const [key, clusterId] of workerResult.clusterOfNode) {
-      clusterOfNode.set(key, clusterId);
+    for (let nodeIndex = 0; nodeIndex < workerResult.clusterOfNode.length; nodeIndex += 1) {
+      const clusterIndex = workerResult.clusterOfNode[nodeIndex]!;
+      if (clusterIndex < 0) continue;
+      const key = nodeKeys[nodeIndex];
+      const clusterId = workerResult.clusters[clusterIndex]?.id;
+      if (key && clusterId) clusterOfNode.set(key, clusterId);
     }
     return { clusters, clusterOfNode };
-  }, [active, request, workerResult, formatLabel]);
+  }, [active, request, workerResult, formatLabel, nodes]);
 
   // ── Carry expansion across recomputes by member overlap ──────────────────
   const prevClustersRef = React.useRef<Map<string, ClusterMeta>>(new Map());

@@ -9,6 +9,7 @@ import { AppModule } from './app.module';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { Logger } from '@nestjs/common';
 import multipart from '@fastify/multipart';
+import compress from '@fastify/compress';
 import underPressure from '@fastify/under-pressure';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { McpServerFactoryService } from './mcp-server.factory';
@@ -70,6 +71,18 @@ async function bootstrap() {
     // desktop web talks to the API cross-origin (app://classifyre → 127.0.0.1),
     // so without listing PUT/PATCH/DELETE every mutating request fails preflight.
     methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  });
+
+  // Graph snapshots can be tens or hundreds of megabytes as JSON. Prefer the
+  // fastest gzip level and always use the streaming path: this cuts network
+  // transfer substantially without blocking Node's event loop on compression.
+  await app.register(compress, {
+    global: true,
+    globalDecompression: false,
+    encodings: ['gzip'],
+    threshold: 1024,
+    syncThreshold: 0,
+    zlibOptions: { level: 1 },
   });
 
   // Uploads follow the same rule as JSON bodies: no size ceiling. `files: 1`
