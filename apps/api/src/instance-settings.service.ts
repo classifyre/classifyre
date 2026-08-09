@@ -42,6 +42,7 @@ export class InstanceSettingsService {
       autopilotEscalationGuidance: settings.autopilotEscalationGuidance,
       autopilotMcpEnabled: settings.autopilotMcpEnabled,
       autoScheduleEnabled: settings.autoScheduleEnabled,
+      maxConcurrentRunners: settings.maxConcurrentRunners,
       hfTokenSet: !!settings.hfTokenEnc,
       hfTokenInstanceSet: isInstanceTokenSet,
       demoMode: this.demoMode.isDemoMode,
@@ -180,6 +181,9 @@ export class InstanceSettingsService {
         : {}),
       ...(updateDto.autoScheduleEnabled !== undefined
         ? { autoScheduleEnabled: updateDto.autoScheduleEnabled }
+        : {}),
+      ...(updateDto.maxConcurrentRunners !== undefined
+        ? { maxConcurrentRunners: updateDto.maxConcurrentRunners }
         : {}),
       ...(aiProviderConfigUpdate ?? {}),
       ...(updateDto.hfToken !== undefined

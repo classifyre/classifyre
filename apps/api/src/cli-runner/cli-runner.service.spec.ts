@@ -46,6 +46,11 @@ describe('CliRunnerService', () => {
       customDetectorFeedback: {
         findMany: jest.fn().mockResolvedValue([]),
       },
+      // Scan concurrency is a per-workspace setting; these tests are about
+      // what a run carries, not about rationing, so leave it unlimited.
+      instanceSettings: {
+        findUnique: jest.fn().mockResolvedValue({ maxConcurrentRunners: 0 }),
+      },
       runner: {
         findUnique: jest.fn(),
         findFirst: jest.fn().mockResolvedValue(null),
@@ -819,6 +824,11 @@ describe('CliRunnerService', () => {
       },
       customDetectorFeedback: {
         findMany: jest.fn().mockResolvedValue([]),
+      },
+      // Scan concurrency is a per-workspace setting; these tests are about
+      // what a run carries, not about rationing, so leave it unlimited.
+      instanceSettings: {
+        findUnique: jest.fn().mockResolvedValue({ maxConcurrentRunners: 0 }),
       },
       runner: {
         findUnique: jest.fn(),

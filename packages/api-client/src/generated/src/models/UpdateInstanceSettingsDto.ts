@@ -134,6 +134,12 @@ export interface UpdateInstanceSettingsDto {
      */
     autoScheduleEnabled?: boolean;
     /**
+     * How many scans this workspace may run at once. Scans are CPU-heavy, so this trades sweep speed against machine responsiveness: a workspace with many sources finishes a full pass roughly twice as fast at 2 as at 1. 0 means unlimited.
+     * @type {number}
+     * @memberof UpdateInstanceSettingsDto
+     */
+    maxConcurrentRunners?: number;
+    /**
      * Hugging Face token to set. Pass a token value to store (encrypted at rest). Pass null or an empty string to clear the stored token. Ignored when an instance-level HF_TOKEN is configured.
      * @type {string}
      * @memberof UpdateInstanceSettingsDto
@@ -199,6 +205,7 @@ export function UpdateInstanceSettingsDtoFromJSONTyped(json: any, ignoreDiscrimi
         'autopilotEscalationGuidance': json['autopilotEscalationGuidance'] == null ? undefined : json['autopilotEscalationGuidance'],
         'autopilotMcpEnabled': json['autopilotMcpEnabled'] == null ? undefined : json['autopilotMcpEnabled'],
         'autoScheduleEnabled': json['autoScheduleEnabled'] == null ? undefined : json['autoScheduleEnabled'],
+        'maxConcurrentRunners': json['maxConcurrentRunners'] == null ? undefined : json['maxConcurrentRunners'],
         'hfToken': json['hfToken'] == null ? undefined : json['hfToken'],
     };
 }
@@ -233,6 +240,7 @@ export function UpdateInstanceSettingsDtoToJSONTyped(value?: UpdateInstanceSetti
         'autopilotEscalationGuidance': value['autopilotEscalationGuidance'],
         'autopilotMcpEnabled': value['autopilotMcpEnabled'],
         'autoScheduleEnabled': value['autoScheduleEnabled'],
+        'maxConcurrentRunners': value['maxConcurrentRunners'],
         'hfToken': value['hfToken'],
     };
 }

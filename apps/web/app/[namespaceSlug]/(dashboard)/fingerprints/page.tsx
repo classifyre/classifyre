@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useParams } from "next/navigation";
 import {
   ArrowLeft,
   Copy,
@@ -9,7 +10,13 @@ import {
   PanelRightClose,
   PanelRightOpen,
 } from "lucide-react";
-import { api, type AssetSimilarityDto, type GraphEdgeDto, type GraphNodeDto } from "@workspace/api-client";
+import {
+  api,
+  type AssetSimilarityDto,
+  type CorrelationGraphResponseDto,
+  type GraphEdgeDto,
+  type GraphNodeDto,
+} from "@workspace/api-client";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@workspace/ui/components/tabs";
 import { Button } from "@workspace/ui/components/button";
 import type { AssistantUiAction } from "@workspace/api-client";
@@ -41,6 +48,7 @@ const EMPTY_GRAPH_DATA: FingerprintsGraphData = {
 
 export default function FingerprintsPage() {
   const { t } = useTranslation();
+  const { namespaceSlug } = useParams<{ namespaceSlug: string }>();
   const [sidebarMode, setSidebarMode] = React.useState<SidebarMode>("connections");
   const [sidebarCollapsed, setSidebarCollapsed] = React.useState(false);
   // "tune" swaps the canvas area for the settings view; the graph component
@@ -64,12 +72,11 @@ export default function FingerprintsPage() {
   const [graphLoading, setGraphLoading] = React.useState(true);
   const [graphError, setGraphError] = React.useState<string | null>(null);
 
-  const loadGraph = React.useCallback(() => {
+  const loadGraph = React.useCallback((existingRequest?: Promise<CorrelationGraphResponseDto>) => {
     let active = true;
     setGraphLoading(true);
     setGraphError(null);
-    api.correlation
-      .correlationControllerGraph({})
+    (existingRequest ?? api.correlation.correlationControllerGraph({}))
       .then((g) => {
         if (!active) return;
         setGraphData({
@@ -93,7 +100,22 @@ export default function FingerprintsPage() {
     };
   }, [t]);
 
-  React.useEffect(() => loadGraph(), [loadGraph]);
+  // React Strict Mode mounts effects twice in development. Keep the request
+  // itself outside the effect subscription so the second mount reuses the
+  // in-flight download instead of starting another enormous graph transfer.
+  const initialGraphRequest = React.useRef<{
+    namespaceSlug: string;
+    promise: Promise<CorrelationGraphResponseDto>;
+  } | null>(null);
+  React.useEffect(() => {
+    if (initialGraphRequest.current?.namespaceSlug !== namespaceSlug) {
+      initialGraphRequest.current = {
+        namespaceSlug,
+        promise: api.correlation.correlationControllerGraph({}),
+      };
+    }
+    return loadGraph(initialGraphRequest.current.promise);
+  }, [loadGraph, namespaceSlug]);
 
   const goToTune = React.useCallback(() => setView("tune"), []);
 
