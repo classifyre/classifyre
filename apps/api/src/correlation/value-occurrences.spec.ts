@@ -13,7 +13,12 @@ describe('correlation value occurrences', () => {
     finding: { findMany: jest.fn() },
     $transaction: jest.fn(),
   };
-  const service = new CorrelationService(prisma as unknown as PrismaService);
+  const service = new CorrelationService(
+    prisma as unknown as PrismaService,
+    {} as never,
+    {} as never,
+    {} as never,
+  );
 
   beforeEach(() => {
     jest.clearAllMocks();

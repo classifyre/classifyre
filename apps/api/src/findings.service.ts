@@ -28,6 +28,7 @@ import {
 import { EmbeddingService } from './embedding/embedding.service';
 import { QueryEmbeddingService } from './embedding/query-embedding.service';
 import { EmbeddingQueueService } from './embedding/embedding-queue.service';
+import { CorrelationJobScheduler } from './correlation/correlation-job-scheduler.service';
 
 @Injectable()
 export class FindingsService {
@@ -36,6 +37,7 @@ export class FindingsService {
     private readonly embeddings: EmbeddingService,
     private readonly queryEmbeddings: QueryEmbeddingService,
     @Optional() private readonly embeddingQueue?: EmbeddingQueueService,
+    @Optional() private readonly correlationJobs?: CorrelationJobScheduler,
   ) {}
 
   private readonly searchFindingSelect = {
@@ -448,6 +450,10 @@ export class FindingsService {
       },
     });
     this.embeddingQueue?.enqueue([{ hash: contentHash, text }]);
+    await this.correlationJobs?.scheduleAssets(
+      [finding.assetId],
+      'finding created',
+    );
     return finding;
   }
 
@@ -994,6 +1000,13 @@ export class FindingsService {
       );
     }
 
+    if (updateDto.status && updateDto.status !== finding.status) {
+      await this.correlationJobs?.scheduleAssets(
+        [finding.assetId],
+        'finding status changed',
+      );
+    }
+
     return updatedFinding;
   }
 
@@ -1045,6 +1058,9 @@ export class FindingsService {
       const result = await this.prisma.finding.updateMany({ where, data });
       if (status && feedbackCandidates.length > 0) {
         await this.recordCustomDetectorFeedback(feedbackCandidates, status);
+      }
+      if (status && result.count > 0) {
+        await this.correlationJobs?.scheduleFull('bulk finding status changed');
       }
       return { updatedCount: result.count, ids: [] };
     }
@@ -1138,6 +1154,9 @@ export class FindingsService {
           matchedContent: finding.matchedContent,
         }));
       await this.recordCustomDetectorFeedback(feedbackFindings, status);
+    }
+    if (status && findings.some((finding) => finding.status !== status)) {
+      await this.correlationJobs?.scheduleFull('bulk finding status changed');
     }
     return { updatedCount: updated.length, ids: updated.map((f) => f.id) };
   }

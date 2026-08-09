@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { AgentKind, AgentRunStatus, Prisma } from '@prisma/client';
@@ -13,7 +14,7 @@ import { ToolRegistry } from './tools/tool-registry.service';
 import { AgentConfigService } from './harness/agent-config.service';
 import { McpClientService } from './mcp-client/mcp-client.service';
 import { AUTOPILOT_QUEUE, PIPELINE_KINDS } from './autopilot.constants';
-import { CORRELATION_QUEUE } from '../correlation/correlation.constants';
+import { CorrelationJobScheduler } from '../correlation/correlation-job-scheduler.service';
 import type { AutopilotJob } from './autopilot.types';
 
 /** Agents that run in canonical order as one chained cycle on the autopilot queue. */
@@ -64,6 +65,7 @@ export class AutopilotService {
     private readonly tools: ToolRegistry,
     private readonly agentConfig: AgentConfigService,
     private readonly mcp: McpClientService,
+    @Optional() private readonly correlationJobs?: CorrelationJobScheduler,
   ) {}
 
   /** The capability map: every registered tool + the missions that wield them. */
@@ -205,14 +207,21 @@ export class AutopilotService {
     // DUPLICATES (fingerprint consolidation) — deterministic global recompute on
     // the correlation queue; the instruction does not apply.
     if (wantsDuplicates) {
-      await boss.send(
-        CORRELATION_QUEUE,
-        { recomputeAll: true, manual: true },
-        {
-          singletonKey: 'correlation:recompute-all',
-          expireInSeconds: 6 * 3600,
-        },
-      );
+      if (this.correlationJobs) {
+        await this.correlationJobs.scheduleFull(
+          'manual autopilot duplicates trigger',
+          true,
+        );
+      } else {
+        await boss.send(
+          'correlation.scan',
+          { recomputeAll: true, manual: true },
+          {
+            singletonKey: 'correlation:recompute-all',
+            expireInSeconds: 6 * 3600,
+          },
+        );
+      }
     }
 
     return { cycleKey, enqueued: true };

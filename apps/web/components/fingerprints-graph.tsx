@@ -604,6 +604,7 @@ export function FingerprintsGraph({
       clusteredUnstable.clusterOfNode,
       clusteredUnstable.expandedClusters,
       clusteredUnstable.hasCollapsedClusters,
+      clusteredUnstable.isClustering,
       clusteredUnstable.expandCluster,
       clusteredUnstable.collapseCluster,
       clusteredUnstable.collapseAll,
@@ -1087,11 +1088,11 @@ export function FingerprintsGraph({
               </Button>
             </div>
           )}
-          {(loading || recomputing || error || showEmpty) && (
+          {(loading || recomputing || clustered.isClustering || error || showEmpty) && (
             <div className="absolute inset-0 flex items-center justify-center bg-card/80 backdrop-blur-sm">
               {recomputing ? (
                 <Spinner size="lg" label={t("correlation.fingerprints.recomputing")} />
-              ) : loading ? (
+              ) : loading || clustered.isClustering ? (
                 <Spinner size="lg" label={t("correlation.fingerprints.title")} />
               ) : error ? (
                 <EmptyState
