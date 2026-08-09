@@ -1,11 +1,13 @@
 "use client";
 
 import * as React from "react";
-import Graph from "graphology";
-import louvain from "graphology-communities-louvain";
 import type { GraphEdgeDto, GraphNodeDto } from "@workspace/api-client";
 import { keyOf, nodeKey } from "./graph-types";
 import type { AssetFindingStats } from "./explorer-types";
+import type {
+  ClusterWorkerRequest,
+  ClusterWorkerResponse,
+} from "./clustering-worker";
 
 /** One source contributing assets to a community, with its share of them. */
 export interface ClusterSourceShare {
@@ -68,8 +70,6 @@ export function isMetaEdge(e: GraphEdgeDto): e is MetaEdge {
 
 export const clusterNodeKey = (clusterId: string) => nodeKey("cluster", clusterId);
 
-const SEVERITY_ORDER = ["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"];
-
 export interface ClusteringOptions {
   enabled?: boolean;
   /** Communities smaller than this render as plain nodes. */
@@ -79,9 +79,8 @@ export interface ClusteringOptions {
   /** Per-asset finding stats (from useVisibleGraph) to enrich severity mixes. */
   assetStats?: Map<string, AssetFindingStats>;
   /**
-   * Renders the caption drawn under a cluster bubble. Keep it referentially
-   * stable (see {@link useClusterLabelFormatter}) — it feeds the clustering
-   * memo, so a fresh function every render would recompute Louvain.
+   * Renders the caption drawn under a cluster bubble. A formatter change only
+   * relabels completed clusters; it does not rerun community detection.
    */
   formatLabel?: (meta: ClusterLabelInput) => string;
 }
@@ -98,34 +97,19 @@ export interface ClusteredGraph {
   expandedClusters: Set<string>;
   /** True when at least one community is currently collapsed. */
   hasCollapsedClusters: boolean;
+  /** True while community detection is running outside the renderer thread. */
+  isClustering: boolean;
   expandCluster: (id: string) => void;
   collapseCluster: (id: string) => void;
   collapseAll: () => void;
   expandAllClusters: () => void;
 }
 
-const mode = (values: Array<string | undefined>): string | undefined => {
-  const counts = new Map<string, number>();
-  for (const v of values) {
-    if (!v) continue;
-    counts.set(v, (counts.get(v) ?? 0) + 1);
-  }
-  let best: string | undefined;
-  let bestCount = 0;
-  counts.forEach((count, value) => {
-    if (count > bestCount) {
-      best = value;
-      bestCount = count;
-    }
-  });
-  return best;
-};
-
 /**
  * Community detection over the visible graph (Louvain, weighted by edge
  * confidence), collapsing each sizable community into a single meta-node.
- * Runs synchronously in a memo: server responses cap at a few hundred nodes,
- * where Louvain finishes in single-digit milliseconds.
+ * Graph construction, Louvain, and cluster metadata aggregation run in a Web
+ * Worker so large responses cannot block the renderer's event loop.
  *
  * Expansion state survives data reloads by member overlap: a recomputed
  * community that shares >50% of its members with a previously expanded one
@@ -146,103 +130,78 @@ export function useClusteredGraph(
 
   const active = enabled && nodes.length >= minGraphSize;
 
-  // ── Community assignment (memoized per topology) ─────────────────────────
+  // A request object gives each input snapshot an identity. Results from an
+  // older worker can never be applied to newer props, even if they arrive late.
+  const request = React.useMemo(
+    () => ({ nodes, edges, minClusterSize, assetStats }),
+    [nodes, edges, minClusterSize, assetStats],
+  );
+  const [workerResult, setWorkerResult] = React.useState<{
+    request: typeof request;
+    clusters: ClusterMeta[];
+    clusterOfNode: Array<[string, string]>;
+  } | null>(null);
+
+  React.useEffect(() => {
+    if (!active || nodes.length === 0) return;
+
+    const worker = new Worker(new URL("./clustering-worker.ts", import.meta.url), {
+      type: "module",
+    });
+    let disposed = false;
+    worker.onmessage = (event: MessageEvent<ClusterWorkerResponse>) => {
+      if (disposed) return;
+      const response = event.data;
+      if (response.type === "result") {
+        setWorkerResult({
+          request,
+          clusters: response.clusters,
+          clusterOfNode: response.clusterOfNode,
+        });
+      } else {
+        console.error("Graph clustering worker failed:", response.message);
+        setWorkerResult({ request, clusters: [], clusterOfNode: [] });
+      }
+      worker.terminate();
+    };
+    worker.onerror = (event) => {
+      if (disposed) return;
+      console.error("Graph clustering worker failed:", event.message);
+      setWorkerResult({ request, clusters: [], clusterOfNode: [] });
+      worker.terminate();
+    };
+    worker.postMessage({
+      type: "cluster",
+      nodes,
+      edges,
+      minClusterSize,
+      assetStats: assetStats ? [...assetStats] : [],
+    } satisfies ClusterWorkerRequest);
+
+    return () => {
+      disposed = true;
+      worker.terminate();
+    };
+  }, [active, request, nodes, edges, minClusterSize, assetStats]);
+
+  const isClustering = active && workerResult?.request !== request;
   const { clusters, clusterOfNode } = React.useMemo(() => {
     const clusters = new Map<string, ClusterMeta>();
     const clusterOfNode = new Map<string, string>();
-    if (!active || nodes.length === 0) return { clusters, clusterOfNode };
-
-    const g = new Graph({ type: "undirected", multi: true });
-    for (const n of nodes) g.addNode(keyOf(n));
-    for (const e of edges) {
-      const a = nodeKey(e.fromType, e.fromId);
-      const b = nodeKey(e.toType, e.toId);
-      if (!g.hasNode(a) || !g.hasNode(b) || a === b) continue;
-      g.addEdge(a, b, { weight: Math.max(0.01, Number(e.confidence ?? 1)) });
+    if (!active || workerResult?.request !== request) {
+      return { clusters, clusterOfNode };
     }
 
-    const assignments = louvain(g, { getEdgeWeight: "weight" });
-
-    const byCommunity = new Map<string | number, string[]>();
-    for (const [key, community] of Object.entries(assignments)) {
-      const arr = byCommunity.get(community) ?? [];
-      arr.push(key);
-      byCommunity.set(community, arr);
-    }
-
-    const nodeByKey = new Map(nodes.map((n) => [keyOf(n), n]));
-    for (const memberKeys of byCommunity.values()) {
-      if (memberKeys.length < minClusterSize) continue;
-      const members = memberKeys
-        .map((k) => nodeByKey.get(k))
-        .filter((n): n is GraphNodeDto => Boolean(n));
-
-      const severityCounts: Record<string, number> = {};
-      // Keyed by source id when the payload carries one, else by connector type
-      // so older responses still collapse per source instead of per asset.
-      const sourceShares = new Map<string, ClusterSourceShare>();
-      let findingCount = 0;
-      let assetCount = 0;
-      for (const m of members) {
-        if (m.type === "finding") {
-          findingCount += 1;
-          const sev = (m.severity ?? "INFO").toUpperCase();
-          severityCounts[sev] = (severityCounts[sev] ?? 0) + 1;
-        } else if (m.type === "asset") {
-          assetCount += 1;
-          const shareKey = m.sourceId ?? m.sourceType ?? "";
-          const share = sourceShares.get(shareKey);
-          if (share) share.assetCount += 1;
-          else
-            sourceShares.set(shareKey, {
-              id: m.sourceId,
-              name: m.sourceName,
-              type: m.sourceType,
-              assetCount: 1,
-            });
-          const stats = assetStats?.get(m.id);
-          if (stats) {
-            findingCount += stats.total;
-            for (const [sev, count] of Object.entries(stats.severityCounts)) {
-              severityCounts[sev] = (severityCounts[sev] ?? 0) + count;
-            }
-          }
-        }
-      }
-      const topSeverity = SEVERITY_ORDER.find((s) => severityCounts[s]);
-      const sources = [...sourceShares.values()].sort(
-        (a, b) => b.assetCount - a.assetCount,
-      );
-      const dominantSourceType = sources[0]?.type;
-      const dominantDetector = mode(
-        members
-          .filter((m) => m.type === "finding")
-          .map((m) => m.customDetectorName ?? m.detectorType),
-      );
-
-      // Stable id: the lexicographically smallest member key anchors the
-      // cluster identity across recomputes of the same data.
-      const id = `c-${memberKeys.slice().sort()[0]!.replace(/[^a-z0-9]/gi, "").slice(0, 32)}`;
-
-      const meta: ClusterMeta = {
-        id,
-        memberKeys,
-        size: memberKeys.length,
-        assetCount,
-        findingCount,
-        severityCounts,
-        topSeverity,
-        sources,
-        dominantSourceType,
-        dominantDetector,
-        label: "",
-      };
+    for (const rawMeta of workerResult.clusters) {
+      const meta = { ...rawMeta, label: "" };
       meta.label = formatLabel(meta);
-      clusters.set(id, meta);
-      for (const k of memberKeys) clusterOfNode.set(k, id);
+      clusters.set(meta.id, meta);
+    }
+    for (const [key, clusterId] of workerResult.clusterOfNode) {
+      clusterOfNode.set(key, clusterId);
     }
     return { clusters, clusterOfNode };
-  }, [active, nodes, edges, minClusterSize, assetStats, formatLabel]);
+  }, [active, request, workerResult, formatLabel]);
 
   // ── Carry expansion across recomputes by member overlap ──────────────────
   const prevClustersRef = React.useRef<Map<string, ClusterMeta>>(new Map());
@@ -306,6 +265,11 @@ export function useClusteredGraph(
 
   // ── Render graph (collapse communities into meta nodes/edges) ────────────
   const { renderNodes, renderEdges, hasCollapsedClusters } = React.useMemo(() => {
+    // Do not briefly feed a large unclustered graph into layout while its
+    // worker is running; that would move the bottleneck rather than remove it.
+    if (isClustering) {
+      return { renderNodes: [], renderEdges: [], hasCollapsedClusters: false };
+    }
     if (clusters.size === 0) {
       return { renderNodes: nodes, renderEdges: edges, hasCollapsedClusters: false };
     }
@@ -383,7 +347,7 @@ export function useClusteredGraph(
     metaEdges.forEach((me) => renderEdges.push(me));
 
     return { renderNodes, renderEdges, hasCollapsedClusters: collapsed };
-  }, [nodes, edges, clusters, clusterOfNode, expandedClusters]);
+  }, [nodes, edges, clusters, clusterOfNode, expandedClusters, isClustering]);
 
   return {
     renderNodes,
@@ -392,6 +356,7 @@ export function useClusteredGraph(
     clusterOfNode,
     expandedClusters,
     hasCollapsedClusters,
+    isClustering,
     expandCluster,
     collapseCluster,
     collapseAll,

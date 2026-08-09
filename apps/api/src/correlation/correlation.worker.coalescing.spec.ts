@@ -59,7 +59,14 @@ describe('CorrelationWorker autopilot hand-off', () => {
         },
       }),
     };
-    worker = new CorrelationWorker(pgBoss as any, prisma, {} as any, matching);
+    worker = new CorrelationWorker(
+      pgBoss as any,
+      prisma,
+      {} as any,
+      matching,
+      {} as any,
+      {} as any,
+    );
   };
 
   const handOff = (sourceId = 's1') =>

@@ -11,10 +11,8 @@ import {
   Query,
 } from '@nestjs/common';
 import { ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { PgBossService } from '../scheduler/pg-boss.service';
 import { CorrelationService } from './correlation.service';
 import { DuplicatesFinderAgentService } from './duplicates-finder-agent.service';
-import { CORRELATION_QUEUE } from './correlation.constants';
 import {
   AddExclusionDto,
   CaseActionRequestDto,
@@ -32,7 +30,6 @@ export class CorrelationController {
   constructor(
     private readonly correlation: CorrelationService,
     private readonly duplicatesFinder: DuplicatesFinderAgentService,
-    private readonly pgBoss: PgBossService,
   ) {}
 
   @Get('correlation/graph')
@@ -91,7 +88,6 @@ export class CorrelationController {
     @Body() dto: UpdateCorrelationConfigDto,
   ): Promise<CorrelationConfigResponseDto> {
     const config = await this.correlation.saveConfig(dto);
-    await this.scheduleRecompute();
     return config;
   }
 
@@ -109,7 +105,6 @@ export class CorrelationController {
       label: dto.label ?? null,
       value: dto.value ?? null,
     });
-    await this.scheduleRecompute();
     return config;
   }
 
@@ -120,25 +115,7 @@ export class CorrelationController {
     @Param('id') id: string,
   ): Promise<CorrelationConfigResponseDto> {
     const config = await this.correlation.removeExclusion(id);
-    await this.scheduleRecompute();
     return config;
-  }
-
-  /** Recompute everything in the background; surfaces as a DUPLICATES run. */
-  private async scheduleRecompute(): Promise<void> {
-    try {
-      const boss = await this.pgBoss.getBossAsync();
-      await boss.send(
-        CORRELATION_QUEUE,
-        { recomputeAll: true },
-        {
-          singletonKey: 'correlation:recompute-all',
-          expireInSeconds: 6 * 3600,
-        },
-      );
-    } catch {
-      // Non-fatal: config is saved; it will apply on the next scan recompute.
-    }
   }
 
   @Post('correlation/case-action')
