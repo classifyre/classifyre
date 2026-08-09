@@ -58,9 +58,6 @@ describe('AssetService', () => {
       findUnique: jest.fn(),
       updateMany: jest.fn(),
     },
-    caseFinding: {
-      findMany: jest.fn(),
-    },
     $transaction: jest.fn(),
     $queryRaw: jest.fn(),
   };
@@ -112,8 +109,9 @@ describe('AssetService', () => {
     // absence. Tests that exercise resolution opt in explicitly.
     mockPrismaService.runnerAsset.findMany.mockResolvedValue([]);
     // Default: nothing cites or watches anything, so the removed-detector
-    // cleanup behaves exactly as it did before the protection existed.
-    mockPrismaService.caseFinding.findMany.mockResolvedValue([]);
+    // cleanup behaves exactly as it did before the protection existed. The
+    // case-citation lookup is a source-scoped SQL join.
+    mockPrismaService.$queryRaw.mockResolvedValue([]);
     mockInquiryMatching.watchersForFindings.mockResolvedValue(new Map());
     mockPgBoss.getBossAsync.mockResolvedValue({ send: jest.fn() });
   });
@@ -2704,7 +2702,7 @@ describe('AssetService', () => {
         const detectorGone = { detectors: [{ type: 'PII', enabled: true }] };
 
         it('does not resolve a finding a case cites', async () => {
-          mockPrismaService.caseFinding.findMany.mockResolvedValue([
+          mockPrismaService.$queryRaw.mockResolvedValue([
             { findingId: 'finding-llm' },
           ]);
 
@@ -2733,7 +2731,7 @@ describe('AssetService', () => {
         });
 
         it('records on a retained finding why it outlives its detector', async () => {
-          mockPrismaService.caseFinding.findMany.mockResolvedValue([
+          mockPrismaService.$queryRaw.mockResolvedValue([
             { findingId: 'finding-llm' },
           ]);
 
@@ -2757,7 +2755,7 @@ describe('AssetService', () => {
         // The check runs at the end of every scan, so a finding cited by a
         // long-running case would otherwise accrue one entry per scan forever.
         it('does not re-append the note it already wrote', async () => {
-          mockPrismaService.caseFinding.findMany.mockResolvedValue([
+          mockPrismaService.$queryRaw.mockResolvedValue([
             { findingId: 'finding-llm' },
           ]);
 
@@ -2780,7 +2778,7 @@ describe('AssetService', () => {
         });
 
         it('still resolves an orphaned finding nobody is relying on', async () => {
-          mockPrismaService.caseFinding.findMany.mockResolvedValue([
+          mockPrismaService.$queryRaw.mockResolvedValue([
             { findingId: 'some-other-finding' },
           ]);
 

@@ -239,12 +239,17 @@ export class DetectionImpactService {
     }
     const ids = new Set(sample.map((f) => f.id));
 
-    // case_findings is a small, human-curated table — read it whole rather
-    // than sending a several-thousand-long IN list.
+    // Scoped to this source in SQL rather than reading the whole table: an
+    // instance with hundreds of sources tunes configs constantly, and each
+    // preview would otherwise scan every case finding in the namespace.
+    const sourceId = sample[0]?.sourceId ?? null;
     const [caseFindings, watched] = await Promise.all([
-      this.prisma.caseFinding.findMany({
-        select: { findingId: true, caseId: true },
-      }),
+      this.prisma.$queryRaw<Array<{ findingId: string; caseId: string }>>`
+        SELECT cf.finding_id AS "findingId", cf.case_id AS "caseId"
+        FROM case_findings cf
+        JOIN findings f ON f.id = cf.finding_id
+        WHERE f.source_id = ${sourceId}
+      `,
       this.inquiryMatching.watchersForFindings(sample),
     ]);
 

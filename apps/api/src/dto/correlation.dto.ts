@@ -189,6 +189,7 @@ export class CaseActionResponseDto {
 
 export class ValueOccurrenceAssetDto {
   @ApiProperty() assetId!: string;
+  @ApiPropertyOptional({ nullable: true }) findingId!: string | null;
   @ApiProperty() name!: string;
   @ApiProperty() externalUrl!: string;
   @ApiProperty() assetType!: string;

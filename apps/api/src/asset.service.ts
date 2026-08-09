@@ -47,6 +47,7 @@ import { SemanticSearchMode } from './dto/search-findings-request.dto';
 import { InquiryMatchingService } from './matching/inquiry-matching.service';
 import { PgBossService } from './scheduler/pg-boss.service';
 import { CORRELATION_QUEUE } from './correlation/correlation.constants';
+import { citedFindingIds as citedFindingIdsForSource } from './utils/cited-findings';
 
 /**
  * Maps a run's per-asset change_type onto the asset-level status enum so a
@@ -2097,7 +2098,7 @@ export class AssetService {
     });
     if (orphaned.length === 0) return none;
 
-    const cited = await this.citedFindingIds(orphaned);
+    const cited = await this.citedFindingIds(source.id, orphaned);
     const removed = orphaned.filter((f) => !cited.has(f.id));
     const retained = orphaned.filter((f) => cited.has(f.id));
 
@@ -2164,11 +2165,13 @@ export class AssetService {
    * Of these orphaned findings, the ones an investigation is relying on:
    * attached to a case, or matched by an ACTIVE inquiry.
    *
-   * `CaseFinding` is read whole rather than filtered by a (potentially
-   * 44k-long) `IN` list — it is a small, human-curated table, and intersecting
-   * in memory is both cheaper and simpler than the query that avoids it.
+   * The case-citation lookup is scoped to this source in SQL rather than
+   * reading every `case_findings` row: this runs at the end of every scan, and
+   * an instance with hundreds of sources scanning continuously would otherwise
+   * scan the whole table many times a minute.
    */
   private async citedFindingIds(
+    sourceId: string,
     orphaned: Array<{
       id: string;
       sourceId: string;
@@ -2180,10 +2183,7 @@ export class AssetService {
   ): Promise<Set<string>> {
     const cited = new Set<string>();
 
-    const caseFindings = await this.prisma.caseFinding.findMany({
-      select: { findingId: true },
-    });
-    const attached = new Set(caseFindings.map((row) => row.findingId));
+    const attached = await citedFindingIdsForSource(this.prisma, sourceId);
     for (const finding of orphaned) {
       if (attached.has(finding.id)) cited.add(finding.id);
     }

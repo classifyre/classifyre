@@ -160,6 +160,7 @@ export interface ValueOccurrenceDto {
   valueHash: string;
   assets: Array<{
     assetId: string;
+    findingId: string | null;
     name: string;
     externalUrl: string;
     assetType: string;
@@ -509,6 +510,7 @@ export class CorrelationService {
     const rows = new Map<
       string,
       {
+        findingId: string;
         label: string;
         detectorType: DetectorType;
         customDetectorKey: string | null;
@@ -554,6 +556,7 @@ export class CorrelationService {
         const hash = valueHash(f.findingType, normalized);
         if (rows.has(hash)) continue;
         rows.set(hash, {
+          findingId: f.id,
           label,
           detectorType: f.detectorType,
           customDetectorKey: f.customDetectorKey ?? null,
@@ -589,6 +592,7 @@ export class CorrelationService {
             .map(([hash, r]) => ({
               assetId,
               sourceId: asset.sourceId,
+              findingId: r.findingId,
               label: r.label,
               detectorType: r.detectorType,
               customDetectorKey: r.customDetectorKey,
@@ -1654,7 +1658,10 @@ export class CorrelationService {
       where: { valueHash: hash },
       select: {
         assetId: true,
+        findingId: true,
         label: true,
+        detectorType: true,
+        customDetectorKey: true,
         normalizedValue: true,
         asset: { select: ASSET_SELECT },
       },
@@ -1663,6 +1670,91 @@ export class CorrelationService {
       label = label || rows[0].label;
       normalized = normalized || rows[0].normalizedValue;
     }
+    const findingByAsset = new Map(
+      rows.filter((r) => r.findingId).map((r) => [r.assetId, r.findingId!]),
+    );
+
+    // Existing correlation rows predate findingId. Resolve only after this
+    // value is opened in the UI, then persist the result so later opens are an
+    // indexed lookup. Restrict the fallback to OPEN findings from the indexed
+    // detectors before re-running normalization, avoiding an all-findings scan.
+    const missingRows = rows.filter((r) => !r.findingId);
+    const missingAssetIds = missingRows.map((r) => r.assetId);
+    const missingAssetIdSet = new Set(missingAssetIds);
+    if (missingAssetIds.length > 0 && label) {
+      const detectorTypes = [
+        ...new Set(
+          missingRows
+            .map((row) => row.detectorType)
+            .filter((type) => type !== DetectorType.CUSTOM),
+        ),
+      ];
+      const customKeys = [
+        ...new Set(
+          missingRows
+            .map((row) => row.customDetectorKey)
+            .filter((key): key is string => Boolean(key)),
+        ),
+      ];
+      const detectorWhere: Prisma.FindingWhereInput[] = [];
+      if (detectorTypes.length > 0) {
+        detectorWhere.push({ detectorType: { in: detectorTypes } });
+      }
+      if (customKeys.length > 0) {
+        detectorWhere.push({
+          detectorType: DetectorType.CUSTOM,
+          customDetectorKey: { in: customKeys },
+        });
+      }
+      if (
+        missingRows.some(
+          (row) =>
+            row.detectorType === DetectorType.CUSTOM && !row.customDetectorKey,
+        )
+      ) {
+        detectorWhere.push({ detectorType: DetectorType.CUSTOM });
+      }
+      const candidates = await this.prisma.finding.findMany({
+        where: {
+          assetId: { in: missingAssetIds },
+          status: FindingStatus.OPEN,
+          OR: detectorWhere,
+        },
+        select: {
+          id: true,
+          assetId: true,
+          findingType: true,
+          matchedContent: true,
+        },
+        orderBy: { id: 'asc' },
+      });
+      for (const candidate of candidates) {
+        if (findingByAsset.has(candidate.assetId)) continue;
+        const candidateValue = normalizeValue(
+          candidate.findingType,
+          candidate.matchedContent,
+        );
+        if (
+          candidateValue &&
+          valueHash(candidate.findingType, candidateValue) === hash
+        ) {
+          findingByAsset.set(candidate.assetId, candidate.id);
+        }
+      }
+      const resolved = [...findingByAsset.entries()].filter(([assetId]) =>
+        missingAssetIdSet.has(assetId),
+      );
+      if (resolved.length > 0) {
+        await this.prisma.$transaction(
+          resolved.map(([assetId, findingId]) =>
+            this.prisma.assetCorrelationValue.updateMany({
+              where: { assetId, valueHash: hash, findingId: null },
+              data: { findingId },
+            }),
+          ),
+        );
+      }
+    }
     const clusterByAsset = await this.clusterIdsFor(rows.map((r) => r.assetId));
     return {
       label,
@@ -1670,6 +1762,7 @@ export class CorrelationService {
       valueHash: hash,
       assets: rows.map((r) => ({
         assetId: r.asset.id,
+        findingId: findingByAsset.get(r.assetId) ?? null,
         name: r.asset.name,
         externalUrl: r.asset.externalUrl,
         assetType: r.asset.assetType,

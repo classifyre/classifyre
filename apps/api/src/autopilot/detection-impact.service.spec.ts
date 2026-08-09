@@ -13,7 +13,8 @@ describe('DetectionImpactService', () => {
   const prisma = {
     finding: { groupBy: jest.fn(), count: jest.fn(), findMany: jest.fn() },
     customDetector: { findMany: jest.fn() },
-    caseFinding: { findMany: jest.fn() },
+    // Case citations come from a source-scoped SQL join, not a table read.
+    $queryRaw: jest.fn(),
     case: { findMany: jest.fn() },
     inquiry: { findMany: jest.fn() },
   };
@@ -32,7 +33,7 @@ describe('DetectionImpactService', () => {
     prisma.finding.groupBy.mockResolvedValue([]);
     prisma.finding.count.mockResolvedValue(0);
     prisma.finding.findMany.mockResolvedValue([]);
-    prisma.caseFinding.findMany.mockResolvedValue([]);
+    prisma.$queryRaw.mockResolvedValue([]);
     prisma.case.findMany.mockResolvedValue([]);
     prisma.inquiry.findMany.mockResolvedValue([]);
     matching.watchersForFindings.mockResolvedValue(new Map());
@@ -94,9 +95,10 @@ describe('DetectionImpactService', () => {
         matchedContent: 'g@h.i',
       },
     ]);
-    prisma.caseFinding.findMany.mockResolvedValue([
+    // The join is source-scoped, so rows for other sources never arrive; a
+    // stale id that is not in the sample is still ignored.
+    prisma.$queryRaw.mockResolvedValue([
       { findingId: 'f1', caseId: 'c1' },
-      // Belongs to another source's finding — must not be counted here.
       { findingId: 'other', caseId: 'c1' },
     ]);
     prisma.case.findMany.mockResolvedValue([{ id: 'c1', title: 'Cayman' }]);

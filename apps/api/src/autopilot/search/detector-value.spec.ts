@@ -14,7 +14,8 @@ import type { InquiryMatchingService } from '../../matching/inquiry-matching.ser
 describe('AgentSearchService.detectorValue', () => {
   const prisma = {
     finding: { groupBy: jest.fn(), findMany: jest.fn() },
-    caseFinding: { findMany: jest.fn() },
+    // Cited findings come from a source-scoped SQL join.
+    $queryRaw: jest.fn(),
     customDetectorFeedback: { groupBy: jest.fn() },
   };
   const matching = { watchersForFindings: jest.fn() };
@@ -38,7 +39,7 @@ describe('AgentSearchService.detectorValue', () => {
     jest.clearAllMocks();
     prisma.finding.groupBy.mockResolvedValue([]);
     prisma.finding.findMany.mockResolvedValue([]);
-    prisma.caseFinding.findMany.mockResolvedValue([]);
+    prisma.$queryRaw.mockResolvedValue([]);
     prisma.customDetectorFeedback.groupBy.mockResolvedValue([]);
     matching.watchersForFindings.mockResolvedValue(new Map());
   });
@@ -74,7 +75,7 @@ describe('AgentSearchService.detectorValue', () => {
       finding('f3'),
     ]);
     matching.watchersForFindings.mockResolvedValue(new Map([['f1', ['q1']]]));
-    prisma.caseFinding.findMany.mockResolvedValue([{ findingId: 'f2' }]);
+    prisma.$queryRaw.mockResolvedValue([{ findingId: 'f2' }]);
 
     const [pii] = await service.detectorValue('s1');
 
