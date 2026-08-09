@@ -1577,7 +1577,6 @@ export class CorrelationService {
         label: info.value,
         depth: 1,
         detectorType: info.label.toUpperCase(),
-        matchedContent: info.value,
       });
       for (const aId of info.assetIds) {
         edges.push({
