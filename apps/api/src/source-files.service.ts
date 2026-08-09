@@ -3,6 +3,7 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import {
   AssetStatus,
@@ -15,6 +16,7 @@ import { createHash } from 'crypto';
 import * as path from 'path';
 import { PrismaService } from './prisma.service';
 import { HistoryEventType } from './types/finding-history.types';
+import { CorrelationJobScheduler } from './correlation/correlation-job-scheduler.service';
 
 // Uploads are not size-capped by the API; the transport (Fastify bodyLimit /
 // @fastify/multipart) is unbounded too, so a large sandbox file is stored
@@ -34,7 +36,10 @@ const fileMetadataSelect = {
 
 @Injectable()
 export class SourceFilesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() private readonly correlationJobs?: CorrelationJobScheduler,
+  ) {}
 
   async list(sourceId: string) {
     await this.assertSandboxSource(sourceId);
@@ -118,6 +123,7 @@ export class SourceFilesService {
     const source = await this.assertSandboxSource(sourceId);
     this.assertSourceIdle(source);
 
+    let graphAffected = false;
     await this.prisma.$transaction(async (tx) => {
       const [file, count] = await Promise.all([
         tx.uploadedSourceFile.findFirst({
@@ -149,6 +155,7 @@ export class SourceFilesService {
       });
       const assetIds = assets.map((asset) => asset.id);
       if (assetIds.length > 0) {
+        graphAffected = true;
         await tx.asset.updateMany({
           where: { id: { in: assetIds } },
           data: { status: AssetStatus.DELETED },
@@ -185,6 +192,9 @@ export class SourceFilesService {
 
       await tx.uploadedSourceFile.delete({ where: { id: fileId } });
     });
+    if (graphAffected) {
+      await this.correlationJobs?.scheduleFull('uploaded source file deleted');
+    }
   }
 
   async assertHasFiles(sourceId: string): Promise<void> {

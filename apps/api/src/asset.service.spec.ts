@@ -25,7 +25,7 @@ import {
 } from './dto/search-assets-request.dto';
 import { SemanticSearchMode } from './dto/search-findings-request.dto';
 import { InquiryMatchingService } from './matching/inquiry-matching.service';
-import { PgBossService } from './scheduler/pg-boss.service';
+import { CorrelationJobScheduler } from './correlation/correlation-job-scheduler.service';
 
 describe('AssetService', () => {
   let service: AssetService;
@@ -66,8 +66,8 @@ describe('AssetService', () => {
     watchersForFindings: jest.fn(),
   };
 
-  const mockPgBoss = {
-    getBossAsync: jest.fn(),
+  const mockCorrelationJobs = {
+    scheduleFull: jest.fn(),
   };
 
   const mockCustomDetectorExtractionsService = {
@@ -98,7 +98,10 @@ describe('AssetService', () => {
         { provide: EmbeddingService, useValue: mockEmbeddingService },
         { provide: QueryEmbeddingService, useValue: mockQueryEmbeddingService },
         { provide: InquiryMatchingService, useValue: mockInquiryMatching },
-        { provide: PgBossService, useValue: mockPgBoss },
+        {
+          provide: CorrelationJobScheduler,
+          useValue: mockCorrelationJobs,
+        },
       ],
     }).compile();
 
@@ -113,7 +116,7 @@ describe('AssetService', () => {
     // case-citation lookup is a source-scoped SQL join.
     mockPrismaService.$queryRaw.mockResolvedValue([]);
     mockInquiryMatching.watchersForFindings.mockResolvedValue(new Map());
-    mockPgBoss.getBossAsync.mockResolvedValue({ send: jest.fn() });
+    mockCorrelationJobs.scheduleFull.mockResolvedValue(undefined);
   });
 
   it('should be defined', () => {
@@ -2792,22 +2795,16 @@ describe('AssetService', () => {
         // assets a run touched, so a mass-resolve leaves ghost fingerprints
         // behind until something recomputes the whole index.
         it('schedules a correlation recompute after resolving', async () => {
-          const send = jest.fn();
-          mockPgBoss.getBossAsync.mockResolvedValue({ send });
-
           await runCleanup(detectorGone, [openFinding()]);
 
-          expect(send).toHaveBeenCalledWith(
-            expect.any(String),
-            { recomputeAll: true },
-            expect.objectContaining({
-              singletonKey: 'correlation:recompute-all',
-            }),
+          expect(mockCorrelationJobs.scheduleFull).toHaveBeenCalledWith(
+            expect.stringContaining('resolved 1 finding'),
           );
         });
 
         it('does not fail the run when the recompute cannot be scheduled', async () => {
-          mockPgBoss.getBossAsync.mockRejectedValue(new Error('boss is down'));
+          // The production scheduler absorbs pg-boss failures after logging.
+          mockCorrelationJobs.scheduleFull.mockResolvedValue(undefined);
 
           const result = await runCleanup(detectorGone, [openFinding()]);
 

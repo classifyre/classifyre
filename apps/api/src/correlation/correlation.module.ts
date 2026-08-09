@@ -11,6 +11,9 @@ import { CorrelationService } from './correlation.service';
 import { DuplicatesFinderAgentService } from './duplicates-finder-agent.service';
 import { CorrelationWorker } from './correlation.worker';
 import { CorrelationController } from './correlation.controller';
+import { CorrelationGraphCacheService } from './correlation-graph-cache.service';
+import { CorrelationJobScheduler } from './correlation-job-scheduler.service';
+import { CorrelationLockService } from './correlation-lock.service';
 
 /**
  * Deterministic asset correlation / duplicate detection. Derives evidence
@@ -30,12 +33,17 @@ import { CorrelationController } from './correlation.controller';
     CasesService,
     AgentAuditService,
     AgentLoggerService,
+    CorrelationLockService,
+    CorrelationJobScheduler,
+    CorrelationGraphCacheService,
     CorrelationService,
     DuplicatesFinderAgentService,
     CorrelationWorker,
   ],
   exports: [
     CorrelationService,
+    CorrelationGraphCacheService,
+    CorrelationJobScheduler,
     DuplicatesFinderAgentService,
     CorrelationWorker,
   ],

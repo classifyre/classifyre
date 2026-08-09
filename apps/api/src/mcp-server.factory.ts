@@ -33,8 +33,6 @@ import { CasesService } from './cases.service';
 import { CaseThreadsService } from './case-threads.service';
 import { CaseActivityService } from './case-activity.service';
 import { CorrelationService } from './correlation/correlation.service';
-import { PgBossService } from './scheduler/pg-boss.service';
-import { CORRELATION_QUEUE } from './correlation/correlation.constants';
 import { AgentKind, CaseThreadKind } from '@prisma/client';
 import { EmbeddingService } from './embedding/embedding.service';
 import { GlossaryService } from './glossary/glossary.service';
@@ -234,7 +232,6 @@ export class McpServerFactoryService {
     private readonly caseThreadsService: CaseThreadsService,
     private readonly caseActivityService: CaseActivityService,
     private readonly correlationService: CorrelationService,
-    private readonly pgBossService: PgBossService,
     private readonly embeddingService: EmbeddingService,
     private readonly glossaryService: GlossaryService,
     private readonly caseLeadsService: CaseLeadsService,
@@ -2845,23 +2842,6 @@ export class McpServerFactoryService {
   }
 
   private registerCorrelationTools(server: McpServerCompat) {
-    /** Recompute everything in the background; mirrors CorrelationController's private helper. */
-    const scheduleRecompute = async (): Promise<void> => {
-      try {
-        const boss = await this.pgBossService.getBossAsync();
-        await boss.send(
-          CORRELATION_QUEUE,
-          { recomputeAll: true },
-          {
-            singletonKey: 'correlation:recompute-all',
-            expireInSeconds: 6 * 3600,
-          },
-        );
-      } catch {
-        // Non-fatal: config is saved; it will apply on the next scan recompute.
-      }
-    };
-
     server.registerTool(
       'get_correlation_config',
       {
@@ -2911,7 +2891,6 @@ export class McpServerFactoryService {
       async (dto) => {
         this.mcpToolExecutor.assertNotDemoMode();
         const config = await this.correlationService.saveConfig(dto);
-        await scheduleRecompute();
         return jsonResult({
           config,
           status: 'Config saved; a background recompute has been scheduled.',
@@ -2942,7 +2921,6 @@ export class McpServerFactoryService {
           label: label ?? null,
           value: value ?? null,
         });
-        await scheduleRecompute();
         return jsonResult({
           config,
           status: 'Exclusion added; a background recompute has been scheduled.',
@@ -2967,7 +2945,6 @@ export class McpServerFactoryService {
       async ({ id }) => {
         this.mcpToolExecutor.assertNotDemoMode();
         const config = await this.correlationService.removeExclusion(id);
-        await scheduleRecompute();
         return jsonResult({
           config,
           status:
@@ -3001,7 +2978,10 @@ export class McpServerFactoryService {
             await this.correlationService.recomputeForAsset(assetId);
           return jsonResult({ scheduled: false, summary });
         }
-        await scheduleRecompute();
+        await this.correlationService.scheduleFullRecompute(
+          'MCP recompute request',
+          true,
+        );
         return jsonResult({
           scheduled: true,
           status: 'Full correlation recompute scheduled in the background.',

@@ -23,6 +23,9 @@ import {
   type CorrelationBatchSizes,
   computeCorrelationBatchSizes,
 } from './batch-sizing';
+import { CorrelationGraphCacheService } from './correlation-graph-cache.service';
+import { CorrelationJobScheduler } from './correlation-job-scheduler.service';
+import { CorrelationLockService } from './correlation-lock.service';
 import {
   hashSet,
   jaroWinkler,
@@ -194,7 +197,12 @@ export class CorrelationService {
   private readonly logger = new Logger(CorrelationService.name);
   private readonly batches: CorrelationBatchSizes;
 
-  constructor(private readonly prisma: PrismaService) {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly graphCache: CorrelationGraphCacheService,
+    private readonly correlationLock: CorrelationLockService,
+    private readonly jobs: CorrelationJobScheduler,
+  ) {
     this.batches = computeCorrelationBatchSizes();
     this.logger.log(
       `Batch sizing: memory=${this.batches.memoryMb} MB (${this.batches.memorySource}), ` +
@@ -220,16 +228,27 @@ export class CorrelationService {
       await onProgress(`Found ${touched.length} asset(s) to fingerprint.`, {
         total: touched.length,
       });
-    return this.recompute(
-      touched.map((a) => a.id),
-      false,
-      onProgress,
+    return this.runRecomputeAndPublish(`runner:${runnerId}`, () =>
+      this.recompute(
+        touched.map((a) => a.id),
+        false,
+        onProgress,
+      ),
     );
   }
 
   /** On-demand correlation for a single asset (and its neighbourhood). */
   async recomputeForAsset(assetId: string): Promise<CorrelationRunSummary> {
-    return this.recompute([assetId]);
+    return this.runRecomputeAndPublish(`asset:${assetId}`, () =>
+      this.recompute([assetId]),
+    );
+  }
+
+  async recomputeForAssets(assetIds: string[]): Promise<CorrelationRunSummary> {
+    const unique = [...new Set(assetIds)].filter(Boolean);
+    return this.runRecomputeAndPublish(`assets:${unique.length}`, () =>
+      this.recompute(unique),
+    );
   }
 
   /**
@@ -238,6 +257,14 @@ export class CorrelationService {
    * once. Fingerprint rebuild is also paged with GC yields between pages.
    */
   async recomputeAll(onProgress?: ProgressFn): Promise<CorrelationRunSummary> {
+    return this.runRecomputeAndPublish('full recompute', () =>
+      this.recomputeAllUnlocked(onProgress),
+    );
+  }
+
+  private async recomputeAllUnlocked(
+    onProgress?: ProgressFn,
+  ): Promise<CorrelationRunSummary> {
     const cfg = await this.loadConfig();
     const total = await this.prisma.asset.count();
     if (onProgress)
@@ -422,7 +449,23 @@ export class CorrelationService {
         exclusions: exclusions,
       },
     });
-    return this.getConfig();
+    const config = await this.getConfig();
+    await this.jobs.scheduleFull('correlation config changed');
+    return config;
+  }
+
+  private async runRecomputeAndPublish<T>(
+    reason: string,
+    operation: () => Promise<T>,
+  ): Promise<T> {
+    return this.correlationLock.runExclusive(async () => {
+      const result = await operation();
+      await this.graphCache.publishAfterRecomputeLocked(
+        () => this.buildGraphFromDatabase(),
+        reason,
+      );
+      return result;
+    });
   }
 
   private async recompute(
@@ -1414,6 +1457,28 @@ export class CorrelationService {
   async buildGraph(opts?: {
     assetId?: string;
     /** Scope to clusters that touch this source; flags external members. */
+    sourceId?: string;
+  }): Promise<CorrelationGraphResult> {
+    if (!opts?.assetId && !opts?.sourceId) {
+      return this.graphCache.getOrBuild(() => this.buildGraphFromDatabase());
+    }
+    return this.buildGraphFromDatabase(opts);
+  }
+
+  async refreshGraphSnapshot(): Promise<void> {
+    await this.graphCache.refreshIfStale(() => this.buildGraphFromDatabase());
+  }
+
+  async invalidateGraphSnapshot(reason: string): Promise<void> {
+    await this.graphCache.invalidate(reason);
+  }
+
+  async scheduleFullRecompute(reason: string, manual = false): Promise<void> {
+    await this.jobs.scheduleFull(reason, manual);
+  }
+
+  private async buildGraphFromDatabase(opts?: {
+    assetId?: string;
     sourceId?: string;
   }): Promise<CorrelationGraphResult> {
     const scopeSourceId = opts?.sourceId;

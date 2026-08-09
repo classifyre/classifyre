@@ -12,8 +12,8 @@ import { MaskedConfigCryptoService } from './masked-config-crypto.service';
 import { stableStringify } from './utils/masked-config.utils';
 import { normalizeSourceConfig } from './utils/source-config-normalizer';
 import { RunnerLogStorageService } from './cli-runner/runner-log-storage.service';
-import { PgBossService } from './scheduler/pg-boss.service';
-import { CORRELATION_QUEUE } from './correlation/correlation.constants';
+import { CorrelationJobScheduler } from './correlation/correlation-job-scheduler.service';
+import { CorrelationGraphCacheService } from './correlation/correlation-graph-cache.service';
 import {
   SearchSourcesRequestDto,
   SearchSourcesSortBy,
@@ -64,7 +64,8 @@ export class SourceService {
     private prisma: PrismaService,
     private maskedConfigCryptoService: MaskedConfigCryptoService,
     private runnerLogStorage: RunnerLogStorageService,
-    private pgBoss: PgBossService,
+    private correlationJobs: CorrelationJobScheduler,
+    private graphCache: CorrelationGraphCacheService,
   ) {}
 
   generateId(data: any): string {
@@ -159,7 +160,7 @@ export class SourceService {
     });
   }
 
-  updateFromConfig(
+  async updateFromConfig(
     sourceId: string,
     updateSourceDto: {
       name?: string;
@@ -190,21 +191,29 @@ export class SourceService {
       updateData.config = assertSerializableConfig(encryptedConfig);
     }
 
-    return this.prisma.source.update({
+    const source = await this.prisma.source.update({
       where: { id: sourceId },
       data: updateData,
     });
+    if (updateSourceDto.name !== undefined) {
+      await this.graphCache.invalidate('source display name changed');
+    }
+    return source;
   }
 
-  updateSource(params: {
+  async updateSource(params: {
     where: Prisma.SourceWhereUniqueInput;
     data: Prisma.SourceUpdateInput;
   }): Promise<Source> {
     const { where, data } = params;
-    return this.prisma.source.update({
+    const source = await this.prisma.source.update({
       data,
       where,
     });
+    if (data.name !== undefined) {
+      await this.graphCache.invalidate('source display name changed');
+    }
+    return source;
   }
 
   /**
@@ -253,7 +262,9 @@ export class SourceService {
       }
     }
 
-    return this.prisma.source.delete({ where });
+    const deleted = await this.prisma.source.delete({ where });
+    await this.correlationJobs.scheduleFull('source deleted');
+    return deleted;
   }
 
   /**
@@ -280,22 +291,7 @@ export class SourceService {
       `Purged ${result.count} finding(s) from source ${sourceId}; scheduling correlation recompute.`,
     );
 
-    try {
-      const boss = await this.pgBoss.getBossAsync();
-      await boss.send(
-        CORRELATION_QUEUE,
-        { recomputeAll: true },
-        {
-          singletonKey: 'correlation:recompute-all',
-          expireInSeconds: 6 * 3600,
-        },
-      );
-    } catch (error) {
-      // Non-fatal: fingerprints refresh on the next scan recompute.
-      this.logger.warn(
-        `Failed to schedule correlation recompute after purge: ${String(error)}`,
-      );
-    }
+    await this.correlationJobs.scheduleFull('source findings purged');
 
     return { purgedFindings: result.count };
   }
