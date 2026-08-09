@@ -45,8 +45,8 @@ import { QueryEmbeddingService } from './embedding/query-embedding.service';
 import { EmbeddingQueueService } from './embedding/embedding-queue.service';
 import { SemanticSearchMode } from './dto/search-findings-request.dto';
 import { InquiryMatchingService } from './matching/inquiry-matching.service';
-import { PgBossService } from './scheduler/pg-boss.service';
-import { CORRELATION_QUEUE } from './correlation/correlation.constants';
+import { CorrelationJobScheduler } from './correlation/correlation-job-scheduler.service';
+import { CorrelationGraphCacheService } from './correlation/correlation-graph-cache.service';
 import { citedFindingIds as citedFindingIdsForSource } from './utils/cited-findings';
 
 /**
@@ -191,7 +191,8 @@ export class AssetService {
     // leaving a config. Without them the service falls back to its previous
     // behaviour rather than failing to construct.
     @Optional() private readonly inquiryMatching?: InquiryMatchingService,
-    @Optional() private readonly pgBoss?: PgBossService,
+    @Optional() private readonly correlationJobs?: CorrelationJobScheduler,
+    @Optional() private readonly graphCache?: CorrelationGraphCacheService,
   ) {}
 
   private async assertSourceAndRunner(sourceId: string, runnerId: string) {
@@ -1608,21 +1609,33 @@ export class AssetService {
     });
   }
 
-  updateAsset(params: {
+  async updateAsset(params: {
     where: Prisma.AssetWhereUniqueInput;
     data: Prisma.AssetUpdateInput;
   }): Promise<Asset> {
     const { where, data } = params;
-    return this.prisma.asset.update({
+    const asset = await this.prisma.asset.update({
       data,
       where,
     });
+    if (
+      data.name !== undefined ||
+      data.externalUrl !== undefined ||
+      data.assetType !== undefined ||
+      data.sourceType !== undefined ||
+      data.source !== undefined
+    ) {
+      await this.graphCache?.invalidate('asset display metadata changed');
+    }
+    return asset;
   }
 
-  deleteAsset(where: Prisma.AssetWhereUniqueInput): Promise<Asset> {
-    return this.prisma.asset.delete({
+  async deleteAsset(where: Prisma.AssetWhereUniqueInput): Promise<Asset> {
+    const asset = await this.prisma.asset.delete({
       where,
     });
+    await this.correlationJobs?.scheduleFull('asset deleted');
+    return asset;
   }
 
   async bulkIngest(
@@ -2265,24 +2278,9 @@ export class AssetService {
     sourceId: string,
     resolvedCount: number,
   ): Promise<void> {
-    if (!this.pgBoss) return;
-    try {
-      const boss = await this.pgBoss.getBossAsync();
-      await boss.send(
-        CORRELATION_QUEUE,
-        { recomputeAll: true },
-        {
-          singletonKey: 'correlation:recompute-all',
-          expireInSeconds: 6 * 3600,
-        },
-      );
-    } catch (error) {
-      console.warn(
-        `[finalizeIngestRun] Source ${sourceId}: resolved ${resolvedCount} ` +
-          `finding(s) but could not schedule the correlation recompute: ` +
-          `${String(error)}`,
-      );
-    }
+    await this.correlationJobs?.scheduleFull(
+      `source ${sourceId} resolved ${resolvedCount} finding(s)`,
+    );
   }
 
   /**

@@ -5,9 +5,14 @@ import { FindingStatus, Severity } from '@prisma/client';
 import { HistoryEventType } from './types/finding-history.types';
 import { EmbeddingService } from './embedding/embedding.service';
 import { QueryEmbeddingService } from './embedding/query-embedding.service';
+import { CorrelationJobScheduler } from './correlation/correlation-job-scheduler.service';
 
 describe('FindingsService', () => {
   let service: FindingsService;
+  const correlationJobs = {
+    scheduleAssets: jest.fn(),
+    scheduleFull: jest.fn(),
+  };
 
   const mockPrismaService = {
     finding: {
@@ -40,6 +45,7 @@ describe('FindingsService', () => {
           provide: QueryEmbeddingService,
           useValue: { embed: jest.fn(), embedIfAvailable: jest.fn() },
         },
+        { provide: CorrelationJobScheduler, useValue: correlationJobs },
       ],
     }).compile();
 
@@ -51,6 +57,7 @@ describe('FindingsService', () => {
   it('tracks status changes and sets status overrides', async () => {
     const finding = {
       id: 'finding-1',
+      assetId: 'asset-1',
       status: FindingStatus.OPEN,
       severity: Severity.LOW,
       history: [],
@@ -78,11 +85,16 @@ describe('FindingsService', () => {
     expect(updateCall.data.resolvedAt).toBeInstanceOf(Date);
     expect(history).toHaveLength(1);
     expect(history[0].eventType).toBe(HistoryEventType.STATUS_CHANGED);
+    expect(correlationJobs.scheduleAssets).toHaveBeenCalledWith(
+      ['asset-1'],
+      'finding status changed',
+    );
   });
 
   it('tracks severity changes and sets severity overrides', async () => {
     const finding = {
       id: 'finding-2',
+      assetId: 'asset-2',
       status: FindingStatus.OPEN,
       severity: Severity.MEDIUM,
       history: [],
@@ -103,6 +115,7 @@ describe('FindingsService', () => {
     expect(updateCall.data.severity).toBe(Severity.HIGH);
     expect(history).toHaveLength(1);
     expect(history[0].eventType).toBe(HistoryEventType.SEVERITY_CHANGED);
+    expect(correlationJobs.scheduleAssets).not.toHaveBeenCalled();
   });
 
   it('ranks discovery top assets by severity before total findings', async () => {

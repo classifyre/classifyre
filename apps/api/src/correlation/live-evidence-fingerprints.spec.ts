@@ -24,7 +24,12 @@ describe('correlation fingerprints follow live evidence', () => {
     $executeRaw: jest.fn(),
     $queryRaw: jest.fn(),
   };
-  const service = new CorrelationService(prisma as unknown as PrismaService);
+  const service = new CorrelationService(
+    prisma as unknown as PrismaService,
+    {} as never,
+    { runExclusive: (fn: () => Promise<unknown>) => fn() } as never,
+    {} as never,
+  );
 
   beforeEach(() => {
     jest.clearAllMocks();

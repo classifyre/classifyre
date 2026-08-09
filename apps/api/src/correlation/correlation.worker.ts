@@ -15,13 +15,11 @@ import {
 } from '../autopilot/autopilot.constants';
 import { CORRELATION_QUEUE } from './correlation.constants';
 import { DuplicatesFinderAgentService } from './duplicates-finder-agent.service';
-
-interface CorrelationJob {
-  sourceId?: string;
-  runnerId?: string;
-  /** Full recompute of every asset after a tuning change (logged run). */
-  recomputeAll?: boolean;
-}
+import {
+  CorrelationJobScheduler,
+  type CorrelationJobPayload,
+} from './correlation-job-scheduler.service';
+import { CorrelationService } from './correlation.service';
 
 /**
  * Consumes CORRELATION_QUEUE jobs (enqueued by the cli-runner when a scan
@@ -38,6 +36,8 @@ export class CorrelationWorker {
     private readonly prisma: PrismaService,
     private readonly duplicatesFinder: DuplicatesFinderAgentService,
     private readonly matching: InquiryMatchingService,
+    private readonly correlationService: CorrelationService,
+    private readonly jobs: CorrelationJobScheduler,
   ) {}
 
   /**
@@ -52,6 +52,7 @@ export class CorrelationWorker {
     await this.pgBoss.work(CORRELATION_QUEUE, { localConcurrency: 1 }, (jobs) =>
       this.handle(jobs as Job[]),
     );
+    await this.jobs.scheduleGraphRefresh('namespace worker warm-up');
     this.logger.log(`Registered worker for queue ${CORRELATION_QUEUE}`);
   }
 
@@ -81,9 +82,17 @@ export class CorrelationWorker {
 
   private async handle(jobs: Job[]): Promise<void> {
     for (const job of jobs) {
-      const data = job.data as CorrelationJob;
+      const data = job.data as CorrelationJobPayload;
+      if (data?.refreshGraph) {
+        await this.correlationService.refreshGraphSnapshot();
+        continue;
+      }
       if (data?.recomputeAll) {
         await this.duplicatesFinder.runForConfigChange();
+        continue;
+      }
+      if (data?.assetIds?.length) {
+        await this.correlationService.recomputeForAssets(data.assetIds);
         continue;
       }
       if (!data?.sourceId || !data?.runnerId) continue;

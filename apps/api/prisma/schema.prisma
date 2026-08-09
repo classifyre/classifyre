@@ -1162,6 +1162,25 @@ model CorrelationConfig {
   @@map("correlation_config")
 }
 
+// Last complete payload returned by the unscoped correlation graph endpoint.
+// A single row per namespace keeps the expensive graph assembly off the HTTP
+// read path while requested/built versions make invalidation lossless across
+// API and worker replicas. The previous payload remains readable while a new
+// version is being assembled.
+model CorrelationGraphSnapshot {
+  id               Int       @id @default(1)
+  requestedVersion BigInt    @default(1) @map("requested_version")
+  builtVersion     BigInt    @default(0) @map("built_version")
+  payload          Json?     @db.JsonB
+  builtAt          DateTime? @map("built_at")
+  buildDurationMs  Int?      @map("build_duration_ms")
+  lastError        String?   @map("last_error") @db.Text
+  lastInvalidation String?   @map("last_invalidation") @db.Text
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  @@map("correlation_graph_snapshot")
+}
+
 // Scratch space for a recompute pass: the pairwise overlap aggregation
 // (GROUP BY over the asset_correlation_values self-join) runs as a single
 // INSERT ... SELECT so the heavy intermediate state lives in Postgres
