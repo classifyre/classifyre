@@ -1,6 +1,7 @@
 import { AgentKind } from '@prisma/client';
 import { AutopilotWorker } from './autopilot.worker';
 import {
+  AUTOPILOT_COALESCE_WINDOW_SECONDS,
   AUTOPILOT_CORPUS_SINGLETON_KEY,
   AUTOPILOT_MAX_READINESS_REQUEUES,
 } from './autopilot.constants';
@@ -88,9 +89,37 @@ describe('AutopilotWorker readiness and batch consumption', () => {
       await expect(blocked()).resolves.toBe('Inquiry matching');
     });
 
-    it('waits for evidence analysis', async () => {
-      build({ pendingEmbedJobs: 120 });
-      await expect(blocked()).resolves.toBe('Evidence analysis');
+    /**
+     * The gate is about the DATA, not the queue.
+     *
+     * It used to be "is the embedding queue non-empty", which under continuous
+     * ingestion is permanently true. A live 151-source namespace sat at 38%
+     * coverage while scans kept arriving, and the harness ran one investigation
+     * cycle in two hours — every other one deferred, requeued, and found the
+     * dirty set already claimed.
+     */
+    it('waits while too little of the corpus is scored to rank it', async () => {
+      build({
+        pendingEmbedJobs: 120,
+        openFindings: 1000,
+        analyzedFindings: 50,
+      });
+      await expect(blocked()).resolves.toMatch(/50\/1000 scored/);
+    });
+
+    it('proceeds once coverage is usable, even with inference still running', async () => {
+      // 38% — the live figure that used to defer indefinitely.
+      build({
+        pendingEmbedJobs: 5000,
+        openFindings: 135772,
+        analyzedFindings: 51455,
+      });
+      await expect(blocked()).resolves.toBeNull();
+    });
+
+    it('proceeds when there is nothing to score', async () => {
+      build({ pendingEmbedJobs: 120, openFindings: 0, analyzedFindings: 0 });
+      await expect(blocked()).resolves.toBeNull();
     });
 
     // It used to. And that closed the gate permanently on any busy instance:
@@ -146,7 +175,7 @@ describe('AutopilotWorker readiness and batch consumption', () => {
     };
 
     it('re-queues under the corpus key, incrementing the attempt count', async () => {
-      build({ pendingEmbedJobs: 50 });
+      build({ pendingEmbedJobs: 50, openFindings: 1000, analyzedFindings: 10 });
       withSettings();
       // One agent enabled so the cycle is not short-circuited by the gate.
       prisma.instanceSettings.findUnique.mockResolvedValue({
@@ -166,6 +195,37 @@ describe('AutopilotWorker readiness and batch consumption', () => {
       expect(sent[0].data.corpus).toBe(true);
       // It must NOT have consumed the batch while deferring.
       expect(prisma.source.updateMany).not.toHaveBeenCalled();
+    });
+
+    /**
+     * `singletonKey` alone dedupes nothing on a pg-boss 12 `standard` queue —
+     * every single-job-per-key index is predicated on the queue policy. So each
+     * requeue inserted a NEW job, and with a fresh corpus cycle arriving every
+     * window each started its own chain counting to five. A live 151-source
+     * namespace accumulated 29 completed cycle jobs across attempts 1..5, of
+     * which exactly one reached the agents; the rest found the dirty set
+     * already claimed and exited.
+     */
+    it('gives the requeue a slot width so chains collapse instead of multiplying', async () => {
+      build({ pendingEmbedJobs: 50, openFindings: 1000, analyzedFindings: 10 });
+      withSettings();
+      prisma.instanceSettings.findUnique.mockResolvedValue({
+        aiEnabled: true,
+        autopilotInquiryEnabled: true,
+        autopilotCaseEnabled: false,
+        autopilotConfigEnabled: false,
+        autopilotDetectorEnabled: false,
+        autopilotEscalationEnabled: false,
+      });
+
+      await runCycle(0);
+
+      expect(sent[0].opts.singletonSeconds).toBe(
+        AUTOPILOT_COALESCE_WINDOW_SECONDS,
+      );
+      // A dropped retry strands the dirty sources that provoked it, so a
+      // collision must defer rather than vanish.
+      expect(sent[0].opts.singletonNextSlot).toBe(true);
     });
 
     it('preserves targeted agent scope and focus when re-queueing', async () => {

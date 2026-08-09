@@ -25,6 +25,7 @@ Name | Type
 `autopilotEscalationGuidance` | string
 `autopilotMcpEnabled` | boolean
 `autoScheduleEnabled` | boolean
+`maxConcurrentRunners` | number
 `hfToken` | string
 
 ## Example
@@ -53,6 +54,7 @@ const example = {
   "autopilotEscalationGuidance": null,
   "autopilotMcpEnabled": false,
   "autoScheduleEnabled": true,
+  "maxConcurrentRunners": 2,
   "hfToken": null,
 } satisfies UpdateInstanceSettingsDto
 

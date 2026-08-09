@@ -205,8 +205,10 @@ function resourceDefaultEnv(): Record<string, string> {
     // less than the machine staying responsive.
     EMBEDDING_BATCH_SIZE: "8",
     EMBEDDING_INTRA_OP_THREADS: cores >= 8 ? "2" : "1",
-    // One scan at a time by default on desktop.
-    MAX_CONCURRENT_RUNNERS: "1",
+    // Scan concurrency is deliberately NOT set here. It is a per-workspace
+    // setting (Workspace settings → Scanning), so a small workspace and a
+    // 151-source one on the same machine can differ; pinning the environment
+    // variable would override every workspace and make the control inert.
   };
 }
 

@@ -26,6 +26,7 @@ Name | Type
 `autopilotEscalationGuidance` | string
 `autopilotMcpEnabled` | boolean
 `autoScheduleEnabled` | boolean
+`maxConcurrentRunners` | number
 `demoMode` | boolean
 `hfTokenSet` | boolean
 `hfTokenInstanceSet` | boolean
@@ -59,6 +60,7 @@ const example = {
   "autopilotEscalationGuidance": null,
   "autopilotMcpEnabled": false,
   "autoScheduleEnabled": true,
+  "maxConcurrentRunners": 2,
   "demoMode": false,
   "hfTokenSet": false,
   "hfTokenInstanceSet": false,
