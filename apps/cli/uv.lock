@@ -853,7 +853,7 @@ wheels = [
 
 [[package]]
 name = "classifyre-cli"
-version = "0.4.101.dev0"
+version = "0.4.101"
 source = { editable = "." }
 dependencies = [
     { name = "beautifulsoup4" },
@@ -1392,7 +1392,7 @@ youtube = [
 
 [[package]]
 name = "classifyre-schemas"
-version = "0.4.101.dev0"
+version = "0.4.101"
 source = { editable = "../../packages/schemas" }
 dependencies = [
     { name = "fastjsonschema" },
@@ -3110,11 +3110,11 @@ wheels = [
 
 [[package]]
 name = "mail-parser"
-version = "4.5.0"
+version = "4.6.0"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/4e/4d/5fe2ab8505a0f1fe2160e4fdd42500dac32a7ea41a55709aeb2025ba4dbd/mail_parser-4.5.0.tar.gz", hash = "sha256:9ce06b44332115d43b82ee6d21a77a4e2a25cc42e219efe43730534b70c77a7e", size = 2857302, upload-time = "2026-07-29T21:59:34.568Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/4e/62/54e04e45102517d564142e1cc3e0fa4a9a9db32f1c5dd2aff82b02f47220/mail_parser-4.6.0.tar.gz", hash = "sha256:d4251ff1eef58bf2ed2d39007e83762e8edd6be2df01334ff24aad9c1a75605d", size = 2859373, upload-time = "2026-08-09T08:44:29.811Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/02/fa/acbe2bb6e328703094306ef7e75cb5952233a487f17381cb030e6e640006/mail_parser-4.5.0-py3-none-any.whl", hash = "sha256:27ce06c80d2bf3680bc0a8d4aadef05a4f5ff6ebf13f6a668b8182bdcccdd72e", size = 35857, upload-time = "2026-07-29T21:59:33.587Z" },
+    { url = "https://files.pythonhosted.org/packages/b1/7c/d30573d54c9ae44945feca9085125c307748f9a7727e053bac9ffab708fc/mail_parser-4.6.0-py3-none-any.whl", hash = "sha256:18f02d80d2e561c992514d1cc602b98a6a2c3fa5911c415bb291492cc43826e7", size = 36979, upload-time = "2026-08-09T08:44:28.463Z" },
 ]
 
 [[package]]
