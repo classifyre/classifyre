@@ -731,6 +731,12 @@ model InstanceSettings {
   // exactly where each source was. The kill switch for "stop scanning now".
   autoScheduleEnabled Boolean @default(true) @map("auto_schedule_enabled")
 
+  // How many scans this workspace may run at once. Scans are CPU-heavy
+  // (extraction, OCR, ML detectors), so this is the throughput/responsiveness
+  // dial an operator actually needs: a workspace with 151 slow sources sweeps
+  // its corpus in half the time at 2 that it does at 1. 0 means unlimited.
+  maxConcurrentRunners Int @default(2) @map("max_concurrent_runners")
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
