@@ -1447,6 +1447,7 @@ model CaseThread {
   // Hypothesis-only denormalized current state (for graph/quick queries)
   status     HypothesisStatus? @default(PROPOSED)
   confidence Decimal?          @db.Decimal(3, 2)
+  testablePredicate String?    @map("testable_predicate") @db.Text
   color      String?
   createdBy  String?           @map("created_by")
   createdAt  DateTime          @default(now()) @map("created_at")

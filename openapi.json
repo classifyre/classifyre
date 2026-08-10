@@ -16134,6 +16134,10 @@
             "type": "number",
             "nullable": true
           },
+          "testablePredicate": {
+            "type": "string",
+            "nullable": true
+          },
           "color": {
             "type": "string",
             "nullable": true
@@ -16217,6 +16221,11 @@
             "minimum": 0,
             "maximum": 1
           },
+          "testablePredicate": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 2000
+          },
           "createdBy": {
             "type": "string"
           }
@@ -16248,6 +16257,11 @@
             "maximum": 1,
             "nullable": true
           },
+          "testablePredicate": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 2000
+          },
           "color": {
             "type": "string",
             "nullable": true
@@ -16271,6 +16285,11 @@
           },
           "body": {
             "type": "string"
+          },
+          "metadata": {
+            "type": "object",
+            "nullable": true,
+            "additionalProperties": true
           },
           "author": {
             "type": "string"

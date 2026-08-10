@@ -38,6 +38,7 @@ import type { AutoScheduleService } from '../../scheduler/auto-schedule.service'
 import type { DetectionImpactService } from '../detection-impact.service';
 import type { DetectionPostureService } from '../detection-posture.service';
 import { ScheduleToolset } from './schedule/schedule.toolset';
+import { HypothesesToolset } from './hypotheses/hypotheses.toolset';
 
 describe('ToolRegistry', () => {
   // list() does not touch deps; safe to pass empty stubs.
@@ -84,6 +85,10 @@ describe('ToolRegistry', () => {
       {} as DecisionApplierService,
       {} as NotificationsService,
     ),
+    new HypothesesToolset(
+      {} as AgentSearchService,
+      {} as DecisionApplierService,
+    ),
   );
 
   it('registers observe, investigation, knowledge and config tools', () => {
@@ -102,6 +107,18 @@ describe('ToolRegistry', () => {
     expect(registry.get('fingerprints.tune_config')).toBeDefined();
     expect(registry.get('operator.notify')).toBeDefined();
     expect(registry.get('alerts.recent')).toBeDefined();
+    expect(registry.get('hypotheses.open')).toBeDefined();
+    expect(registry.get('hypotheses.link_probe')).toBeDefined();
+  });
+
+  it('registers well-named mutating tools with fail-closed gates and domains', () => {
+    for (const tool of registry.list()) {
+      expect(tool.name).toMatch(/^[a-z_]+\.[a-z_]+$/);
+      if (tool.sideEffect === 'mutate') {
+        expect(tool.resolveGate).toBeDefined();
+        expect(tool.domain).toBeDefined();
+      }
+    }
   });
 
   it('every tool referenced by a mission exists in the registry', () => {

@@ -36,6 +36,7 @@ import { GlossaryToolset } from './tools/glossary/glossary.toolset';
 import { GlossaryService } from '../glossary/glossary.service';
 import { CaseLeadsToolset } from './tools/leads/case-leads.toolset';
 import { ScheduleToolset } from './tools/schedule/schedule.toolset';
+import { HypothesesToolset } from './tools/hypotheses/hypotheses.toolset';
 import { SchedulerModule } from '../scheduler/scheduler.module';
 import { CaseLeadsService } from '../case-leads.service';
 import { CaseEventsService } from '../case-events.service';
@@ -107,6 +108,7 @@ import { AssistantCapabilityService } from './capability/assistant-capability.se
     CaseEventsService,
     CaseLeadsToolset,
     ScheduleToolset,
+    HypothesesToolset,
     NotificationsService,
     ToolRegistry,
     ToolDispatcherService,

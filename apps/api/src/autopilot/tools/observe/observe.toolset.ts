@@ -106,7 +106,7 @@ export class ObserveToolset {
       {
         name: 'inquiries.list',
         description:
-          'List all ACTIVE inquiries as compact summaries (matchers, counts, linked cases) for dedupe/enrichment.',
+          'List ACTIVE inquiries as priority-ranked compact summaries for dedupe/enrichment. Operator-created and inquiries with new matches lead. If omitted is above zero the dedupe check is incomplete — search memory before creating.',
         inputSchema: EMPTY_INPUT,
         sideEffect: 'read',
         handler: async () => this.search.listActiveInquiries(),
@@ -136,7 +136,7 @@ export class ObserveToolset {
       {
         name: 'cases.list',
         description:
-          'List OPEN/IN_PROGRESS cases as compact summaries (status, severity, hypotheses, counts).',
+          'List OPEN/IN_PROGRESS cases in priority order, not date order: operator-created first, then severity, unevaluated hypotheses, and oldest attention. Each item carries rank and a priority explanation. Work from the top and justify any skip.',
         inputSchema: EMPTY_INPUT,
         sideEffect: 'read',
         handler: async () => this.search.listOpenCases(),

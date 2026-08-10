@@ -35,7 +35,7 @@ import {
  */
 export interface ThreadResponseDto {
     /**
-     * 
+     *
      * @type {string}
      * @memberof ThreadResponseDto
      */
@@ -72,6 +72,12 @@ export interface ThreadResponseDto {
     confidence?: number | null;
     /**
      * 
+     * @type {string}
+     * @memberof ThreadResponseDto
+     */
+    testablePredicate?: string | null;
+    /**
+     *
      * @type {string}
      * @memberof ThreadResponseDto
      */
@@ -175,6 +181,7 @@ export function ThreadResponseDtoFromJSONTyped(json: any, ignoreDiscriminator: b
         'title': json['title'],
         'status': json['status'] == null ? undefined : json['status'],
         'confidence': json['confidence'] == null ? undefined : json['confidence'],
+        'testablePredicate': json['testablePredicate'] == null ? undefined : json['testablePredicate'],
         'color': json['color'] == null ? undefined : json['color'],
         'createdBy': json['createdBy'] == null ? undefined : json['createdBy'],
         'supportingCount': json['supportingCount'],
@@ -203,6 +210,7 @@ export function ThreadResponseDtoToJSONTyped(value?: ThreadResponseDto | null, i
         'title': value['title'],
         'status': value['status'],
         'confidence': value['confidence'],
+        'testablePredicate': value['testablePredicate'],
         'color': value['color'],
         'createdBy': value['createdBy'],
         'supportingCount': value['supportingCount'],
@@ -213,4 +221,3 @@ export function ThreadResponseDtoToJSONTyped(value?: ThreadResponseDto | null, i
         'updatedAt': value['updatedAt'].toISOString(),
     };
 }
-

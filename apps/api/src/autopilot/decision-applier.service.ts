@@ -94,6 +94,20 @@ export class DecisionApplierService {
     return this.effectiveMode(existing.aiMode, instanceEnabled);
   }
 
+  /** Effective mode resolved through a thread's owning case. */
+  async caseThreadGate(
+    threadId: string,
+    instanceEnabled: boolean,
+  ): Promise<AiManagementMode> {
+    const existing = await this.prisma.caseThread.findUnique({
+      where: { id: threadId },
+      select: { investigation: { select: { aiMode: true } } },
+    });
+    // Unknown ids stay MANAGED so the handler runs and reports the missing row.
+    if (!existing) return AiManagementMode.MANAGED;
+    return this.effectiveMode(existing.investigation.aiMode, instanceEnabled);
+  }
+
   /** Effective mode for a source (unknown id → MANAGED so the handler fails). */
   async sourceGate(
     sourceId: string,
@@ -321,6 +335,7 @@ export class DecisionApplierService {
             ? HypothesisStatus[op.hypothesisStatus]
             : undefined,
           confidence: op.confidence,
+          testablePredicate: op.testablePredicate,
           createdBy: AI_ACTOR,
         });
         return;
@@ -335,6 +350,7 @@ export class DecisionApplierService {
             ? HypothesisStatus[op.hypothesisStatus]
             : undefined,
           confidence: op.confidence,
+          testablePredicate: op.testablePredicate,
           actor: AI_ACTOR,
         });
         return;
@@ -470,6 +486,40 @@ export class DecisionApplierService {
         return;
       }
     }
+  }
+
+  /** Gate-free primitive used by hypotheses.link_probe after dispatcher gating. */
+  async linkProbeCore(input: {
+    threadId: string;
+    customDetectorKey: string;
+    detectorId?: string;
+    note?: string;
+  }): Promise<void> {
+    const detector = await this.prisma.customDetector.findUnique({
+      where: { key: input.customDetectorKey },
+      select: { id: true },
+    });
+    if (!detector) {
+      throw new Error(
+        `Unknown customDetectorKey "${input.customDetectorKey}". Link only a key returned by detector.create or detectors.list.`,
+      );
+    }
+    if (input.detectorId && input.detectorId !== detector.id) {
+      throw new Error(
+        `detectorId ${input.detectorId} does not belong to customDetectorKey "${input.customDetectorKey}".`,
+      );
+    }
+    const detectorId = input.detectorId ?? detector.id;
+    await this.threads.addEntry(input.threadId, {
+      entryType: CaseThreadEntryType.NOTE,
+      body:
+        input.note ??
+        `Linked detector probe ${input.customDetectorKey} (${detectorId}) to this hypothesis.`,
+      author: AI_ACTOR,
+      metadata: {
+        probe: { customDetectorKey: input.customDetectorKey, detectorId },
+      },
+    });
   }
 
   // ── Helpers ─────────────────────────────────────────────────────────────────

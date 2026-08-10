@@ -9,6 +9,7 @@ import {
   InquiryMatchers,
 } from './inquiry-matcher';
 import { INQUIRY_MATCH_QUEUE } from './matching.constants';
+import { OPERATOR_CREATED } from '../autopilot/autopilot.constants';
 import {
   PreviewResponseDto,
   InquiryMatchDto,
@@ -198,9 +199,16 @@ export class InquiryMatchingService {
     const inquiries = await this.prisma.inquiry.findMany({
       where: {
         status: 'ACTIVE',
-        createdBy: { not: args.createdByNot },
         matchesSeenAt: { not: null },
-        OR: [{ matchAllSources: true }, { sourceIds: { has: args.sourceId } }],
+        AND: [
+          { OR: [...OPERATOR_CREATED.OR] },
+          {
+            OR: [
+              { matchAllSources: true },
+              { sourceIds: { has: args.sourceId } },
+            ],
+          },
+        ],
       },
       select: {
         ...this.matcherSelect,

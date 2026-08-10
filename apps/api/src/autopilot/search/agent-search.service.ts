@@ -22,6 +22,9 @@ import {
   MAX_ASSET_TYPE_BUCKETS,
   MAX_CANDIDATE_INQUIRIES,
   MAX_CASE_SUMMARIES,
+  MAX_CASE_SUMMARY_DESCRIPTION,
+  MAX_HYPOTHESIS_TITLES_PER_CASE,
+  MAX_OPEN_HYPOTHESES,
   COVERAGE_UNAVAILABLE_FAILURE_STREAK,
   MAX_COVERAGE_SOURCE_ROWS,
   DETECTION_YIELD_SCANS,
@@ -37,6 +40,8 @@ import {
   MIN_FEEDBACK_FOR_PRECISION,
   NOISY_FALSE_POSITIVE_RATE,
   CLEAN_FALSE_POSITIVE_RATE,
+  OPERATOR_CREATED,
+  originOf,
 } from '../autopilot.constants';
 import type {
   AssetMetadataProfile,
@@ -49,8 +54,41 @@ import type {
   FindingGroupSummary,
   FocusedCaseDetail,
   InquirySummary,
+  OpenHypothesesResult,
+  ProbeSummary,
+  RankedList,
   UnmonitoredFindings,
 } from '../autopilot.types';
+
+const OPEN_CASE_INCLUDE = {
+  inquiryLinks: { select: { inquiryId: true } },
+  threads: {
+    where: { kind: 'HYPOTHESIS' as const },
+    select: {
+      id: true,
+      title: true,
+      status: true,
+      confidence: true,
+      testablePredicate: true,
+      _count: { select: { support: true } },
+    },
+  },
+  _count: { select: { evidence: true, findings: true } },
+} satisfies Prisma.CaseInclude;
+
+const SEVERITY_RANK: Record<string, number> = {
+  CRITICAL: 0,
+  HIGH: 1,
+  MEDIUM: 2,
+  LOW: 3,
+  INFO: 4,
+};
+
+const CASE_ORDER =
+  'operator origin → severity → unevaluated hypotheses → oldest update → id';
+const INQUIRY_ORDER = 'operator origin → new matches → oldest update → id';
+const HYPOTHESIS_ORDER =
+  'case origin → hypothesis origin → severity → testable predicate → oldest';
 
 /**
  * Read-only search facade for the autopilot agents. Produces compact,
@@ -670,30 +708,73 @@ export class AgentSearchService {
     };
   }
 
-  /** All ACTIVE inquiries (capped) as compact summaries for dedupe/enrichment. */
-  async listActiveInquiries(): Promise<InquirySummary[]> {
-    const rows = await this.prisma.inquiry.findMany({
-      where: { status: 'ACTIVE' },
-      include: { caseLinks: { select: { caseId: true } } },
-      orderBy: { updatedAt: 'desc' },
-      take: MAX_CANDIDATE_INQUIRIES,
+  /** ACTIVE inquiries, with operator work sampled separately from recent work. */
+  async listActiveInquiries(): Promise<RankedList<InquirySummary>> {
+    const include = {
+      caseLinks: { select: { caseId: true } },
+    } satisfies Prisma.InquiryInclude;
+    const [operatorRows, recentRows, total] = await Promise.all([
+      this.prisma.inquiry.findMany({
+        where: { status: 'ACTIVE', OR: [...OPERATOR_CREATED.OR] },
+        include,
+        orderBy: { updatedAt: 'asc' },
+        take: MAX_CANDIDATE_INQUIRIES,
+      }),
+      this.prisma.inquiry.findMany({
+        where: { status: 'ACTIVE' },
+        include,
+        orderBy: { updatedAt: 'desc' },
+        take: MAX_CANDIDATE_INQUIRIES,
+      }),
+      this.prisma.inquiry.count({ where: { status: 'ACTIVE' } }),
+    ]);
+    const rows = [
+      ...new Map(
+        [...operatorRows, ...recentRows].map((row) => [row.id, row]),
+      ).values(),
+    ].sort((a, b) => {
+      const origin =
+        Number(originOf(a.createdBy) === 'ai') -
+        Number(originOf(b.createdBy) === 'ai');
+      if (origin !== 0) return origin;
+      const matches = Number(b.newMatchCount > 0) - Number(a.newMatchCount > 0);
+      if (matches !== 0) return matches;
+      const age = a.updatedAt.getTime() - b.updatedAt.getTime();
+      return age !== 0 ? age : a.id.localeCompare(b.id);
     });
-    return rows.map((r) => ({
-      id: r.id,
-      title: r.title,
-      description: r.description,
-      aiMode: String(r.aiMode),
-      matchAllSources: r.matchAllSources,
-      sourceIds: r.sourceIds,
-      detectorTypes: r.detectorTypes.map(String),
-      customDetectorKeys: r.customDetectorKeys,
-      findingTypes: r.findingTypes,
-      findingTypeRegex: r.findingTypeRegex,
-      findingValueRegex: r.findingValueRegex,
-      matchCount: r.matchCount,
-      newMatchCount: r.newMatchCount,
-      linkedCaseIds: r.caseLinks.map((l) => l.caseId),
-    }));
+    const selected = rows.slice(0, MAX_CANDIDATE_INQUIRIES);
+    const items = selected.map((r, index): InquirySummary => {
+      const origin = originOf(r.createdBy);
+      const idleDays = daysSince(r.updatedAt);
+      return {
+        id: r.id,
+        title: r.title,
+        description: r.description,
+        aiMode: String(r.aiMode),
+        matchAllSources: r.matchAllSources,
+        sourceIds: r.sourceIds,
+        detectorTypes: r.detectorTypes.map(String),
+        customDetectorKeys: r.customDetectorKeys,
+        findingTypes: r.findingTypes,
+        findingTypeRegex: r.findingTypeRegex,
+        findingValueRegex: r.findingValueRegex,
+        matchCount: r.matchCount,
+        newMatchCount: r.newMatchCount,
+        linkedCaseIds: r.caseLinks.map((l) => l.caseId),
+        createdBy: r.createdBy,
+        origin,
+        rank: index + 1,
+        idleDays,
+        priority: `${origin} · ${r.newMatchCount} new matches · idle ${idleDays}d`,
+      };
+    });
+    return {
+      orderedBy: INQUIRY_ORDER,
+      total,
+      shown: items.length,
+      omitted: Math.max(0, total - items.length),
+      items,
+    };
   }
 
   /**
@@ -745,30 +826,233 @@ export class AgentSearchService {
     }));
   }
 
-  /** Open/in-progress cases (capped) as compact summaries. */
-  async listOpenCases(): Promise<CaseSummary[]> {
-    const rows = await this.prisma.case.findMany({
-      where: { status: { in: ['OPEN', 'IN_PROGRESS'] } },
-      include: {
-        inquiryLinks: { select: { inquiryId: true } },
-        threads: { where: { kind: 'HYPOTHESIS' }, select: { title: true } },
-        _count: { select: { evidence: true, findings: true } },
+  /** Open/in-progress cases, sampled by four strata before global priority. */
+  async listOpenCases(): Promise<RankedList<CaseSummary>> {
+    const open: Prisma.CaseWhereInput = {
+      status: { in: ['OPEN', 'IN_PROGRESS'] },
+    };
+    const unevidenced: Prisma.CaseWhereInput = {
+      threads: {
+        some: {
+          kind: 'HYPOTHESIS' as const,
+          status: 'PROPOSED' as const,
+          support: { none: {} },
+        },
       },
-      orderBy: { updatedAt: 'desc' },
-      take: MAX_CASE_SUMMARIES,
+    };
+    const [operatorRows, severeRows, recentRows, unevidencedRows, total] =
+      await Promise.all([
+        this.prisma.case.findMany({
+          where: { ...open, OR: [...OPERATOR_CREATED.OR] },
+          include: OPEN_CASE_INCLUDE,
+          orderBy: [{ severity: 'asc' }, { updatedAt: 'asc' }],
+          take: MAX_CASE_SUMMARIES,
+        }),
+        this.prisma.case.findMany({
+          where: { ...open, severity: { in: ['CRITICAL', 'HIGH'] } },
+          include: OPEN_CASE_INCLUDE,
+          orderBy: [{ severity: 'asc' }, { updatedAt: 'asc' }],
+          take: MAX_CASE_SUMMARIES,
+        }),
+        this.prisma.case.findMany({
+          where: open,
+          include: OPEN_CASE_INCLUDE,
+          orderBy: { updatedAt: 'desc' },
+          take: MAX_CASE_SUMMARIES,
+        }),
+        this.prisma.case.findMany({
+          where: { ...open, ...unevidenced },
+          include: OPEN_CASE_INCLUDE,
+          orderBy: { updatedAt: 'asc' },
+          take: MAX_CASE_SUMMARIES,
+        }),
+        this.prisma.case.count({ where: open }),
+      ]);
+
+    const rows = [
+      ...new Map(
+        [...operatorRows, ...severeRows, ...recentRows, ...unevidencedRows].map(
+          (row) => [row.id, row],
+        ),
+      ).values(),
+    ].sort((a, b) => {
+      const origin =
+        Number(originOf(a.createdBy) === 'ai') -
+        Number(originOf(b.createdBy) === 'ai');
+      if (origin !== 0) return origin;
+      const severity =
+        (SEVERITY_RANK[String(a.severity)] ?? 99) -
+        (SEVERITY_RANK[String(b.severity)] ?? 99);
+      if (severity !== 0) return severity;
+      const aUnevaluated = unevaluatedCount(a.threads);
+      const bUnevaluated = unevaluatedCount(b.threads);
+      const hypotheses = Number(bUnevaluated > 0) - Number(aUnevaluated > 0);
+      if (hypotheses !== 0) return hypotheses;
+      // updatedAt cannot distinguish an operator edit from an agent edit. The
+      // operator signal is preserved by tier 1; age here prevents agent writes
+      // from making their own attention self-reinforcing.
+      const age = a.updatedAt.getTime() - b.updatedAt.getTime();
+      return age !== 0 ? age : a.id.localeCompare(b.id);
     });
-    return rows.map((r) => ({
-      id: r.id,
-      title: r.title,
-      description: r.description,
-      status: String(r.status),
-      severity: String(r.severity),
-      aiMode: String(r.aiMode),
-      linkedInquiryIds: r.inquiryLinks.map((l) => l.inquiryId),
-      hypothesisTitles: r.threads.map((t) => t.title),
-      evidenceCount: r._count.evidence,
-      findingCount: r._count.findings,
-    }));
+    const selected = rows.slice(0, MAX_CASE_SUMMARIES);
+    const items = selected.map((r, index): CaseSummary => {
+      const origin = originOf(r.createdBy);
+      const idleDays = daysSince(r.updatedAt);
+      const unevaluatedHypothesisCount = unevaluatedCount(r.threads);
+      return {
+        id: r.id,
+        title: r.title,
+        description: r.description
+          ? truncate(r.description, MAX_CASE_SUMMARY_DESCRIPTION)
+          : null,
+        status: String(r.status),
+        severity: String(r.severity),
+        aiMode: String(r.aiMode),
+        linkedInquiryIds: r.inquiryLinks.map((l) => l.inquiryId),
+        hypothesisTitles: r.threads
+          .slice(0, MAX_HYPOTHESIS_TITLES_PER_CASE)
+          .map((t) => t.title),
+        hypothesisCount: r.threads.length,
+        unevaluatedHypothesisCount,
+        evidenceCount: r._count.evidence,
+        findingCount: r._count.findings,
+        createdBy: r.createdBy,
+        origin,
+        rank: index + 1,
+        idleDays,
+        priority: `${origin} · ${String(r.severity)} · ${unevaluatedHypothesisCount} unevaluated · idle ${idleDays}d`,
+      };
+    });
+    return {
+      orderedBy: CASE_ORDER,
+      total,
+      shown: items.length,
+      omitted: Math.max(0, total - items.length),
+      items,
+    };
+  }
+
+  /** Unevidenced proposed hypotheses that can pull detector-authoring work. */
+  async openHypotheses(includeProbed = false): Promise<OpenHypothesesResult> {
+    const threadWhere = {
+      kind: 'HYPOTHESIS' as const,
+      status: 'PROPOSED' as const,
+      support: { none: {} },
+    };
+    // Lead from the small, status-indexed case table. The existing
+    // case_threads(case_id, kind) index then serves the nested hypothesis read.
+    const cases = await this.prisma.case.findMany({
+      where: {
+        status: { in: ['OPEN', 'IN_PROGRESS'] },
+        threads: { some: threadWhere },
+      },
+      select: {
+        id: true,
+        title: true,
+        severity: true,
+        createdBy: true,
+        threads: {
+          where: threadWhere,
+          select: {
+            id: true,
+            title: true,
+            testablePredicate: true,
+            createdBy: true,
+            createdAt: true,
+            entries: {
+              where: { entryType: 'STATEMENT' },
+              select: { body: true },
+              orderBy: { createdAt: 'desc' },
+              take: 1,
+            },
+          },
+        },
+      },
+    });
+    const threadIds = cases.flatMap((c) => c.threads.map((t) => t.id));
+    const probesByThread = await this.probesForThreads(threadIds);
+    const all = cases.flatMap((investigation) =>
+      investigation.threads.map((thread) => ({ investigation, thread })),
+    );
+    const probedExcluded = includeProbed
+      ? 0
+      : all.filter(
+          ({ thread }) => (probesByThread.get(thread.id)?.length ?? 0) > 0,
+        ).length;
+    const eligible = all
+      .filter(
+        ({ thread }) =>
+          includeProbed || (probesByThread.get(thread.id)?.length ?? 0) === 0,
+      )
+      .sort((a, b) => {
+        const caseOrigin =
+          Number(originOf(a.investigation.createdBy) === 'ai') -
+          Number(originOf(b.investigation.createdBy) === 'ai');
+        if (caseOrigin !== 0) return caseOrigin;
+        const threadOrigin =
+          Number(originOf(a.thread.createdBy) === 'ai') -
+          Number(originOf(b.thread.createdBy) === 'ai');
+        if (threadOrigin !== 0) return threadOrigin;
+        const severity =
+          (SEVERITY_RANK[String(a.investigation.severity)] ?? 99) -
+          (SEVERITY_RANK[String(b.investigation.severity)] ?? 99);
+        if (severity !== 0) return severity;
+        const predicate =
+          Number(Boolean(b.thread.testablePredicate?.trim())) -
+          Number(Boolean(a.thread.testablePredicate?.trim()));
+        if (predicate !== 0) return predicate;
+        const age = a.thread.createdAt.getTime() - b.thread.createdAt.getTime();
+        return age !== 0 ? age : a.thread.id.localeCompare(b.thread.id);
+      });
+    const items = eligible
+      .slice(0, MAX_OPEN_HYPOTHESES)
+      .map(({ investigation, thread }) => ({
+        threadId: thread.id,
+        caseId: investigation.id,
+        caseTitle: investigation.title,
+        caseSeverity: String(investigation.severity),
+        caseCreatedBy: investigation.createdBy,
+        caseOrigin: originOf(investigation.createdBy),
+        title: thread.title,
+        statement: thread.entries[0]?.body
+          ? truncate(thread.entries[0].body, 300)
+          : null,
+        testablePredicate: thread.testablePredicate
+          ? truncate(thread.testablePredicate, 300)
+          : null,
+        createdBy: thread.createdBy,
+        origin: originOf(thread.createdBy),
+        createdAt: thread.createdAt,
+        probes: probesByThread.get(thread.id) ?? [],
+      }));
+    return {
+      orderedBy: HYPOTHESIS_ORDER,
+      total: eligible.length,
+      shown: items.length,
+      omitted: Math.max(0, eligible.length - items.length),
+      probedExcluded,
+      items,
+    };
+  }
+
+  private async probesForThreads(
+    threadIds: string[],
+  ): Promise<Map<string, ProbeSummary[]>> {
+    if (threadIds.length === 0) return new Map();
+    const entries = await this.prisma.caseThreadEntry.findMany({
+      where: { threadId: { in: threadIds }, entryType: 'NOTE' },
+      select: { threadId: true, metadata: true, createdAt: true },
+      orderBy: { createdAt: 'asc' },
+    });
+    const result = new Map<string, ProbeSummary[]>();
+    for (const entry of entries) {
+      const probe = parseProbe(entry.metadata);
+      if (!probe) continue;
+      const existing = result.get(entry.threadId) ?? [];
+      existing.push({ ...probe, createdAt: entry.createdAt });
+      result.set(entry.threadId, existing);
+    }
+    return result;
   }
 
   /**
@@ -804,7 +1088,7 @@ export class AgentSearchService {
       .map((e) => e.entityId);
     const findingIds = row.findings.map((f) => f.findingId);
     const endpointIds = [...new Set([...assetIds, ...findingIds])];
-    const [edges, glossary] = await Promise.all([
+    const [edges, glossary, probesByThread] = await Promise.all([
       endpointIds.length > 0
         ? this.prisma.edge.findMany({
             where: {
@@ -823,6 +1107,7 @@ export class AgentSearchService {
         orderBy: { term: { term: 'asc' } },
         take: 100,
       }),
+      this.probesForThreads(row.threads.map((thread) => thread.id)),
     ]);
 
     return {
@@ -831,12 +1116,18 @@ export class AgentSearchService {
       description: row.description,
       status: String(row.status),
       severity: String(row.severity),
+      createdBy: row.createdBy,
+      origin: originOf(row.createdBy),
       hypotheses: row.threads.map((t) => ({
         threadId: t.id,
         title: t.title,
         status: t.status ? String(t.status) : null,
         confidence: t.confidence !== null ? Number(t.confidence) : null,
         supportCount: t._count.support,
+        testablePredicate: t.testablePredicate,
+        createdBy: t.createdBy,
+        origin: originOf(t.createdBy),
+        probes: probesByThread.get(t.id) ?? [],
       })),
       evidence: row.evidence.map((e) => ({
         evidenceId: e.id,
@@ -1023,7 +1314,39 @@ export class AgentSearchService {
 }
 
 function truncate(value: string, max: number): string {
-  return value.length > max ? `${value.slice(0, max)}…` : value;
+  return value.length > max
+    ? `${value.slice(0, Math.max(0, max - 1))}…`
+    : value;
+}
+
+function daysSince(value: Date): number {
+  return Math.max(0, Math.floor((Date.now() - value.getTime()) / 86_400_000));
+}
+
+function unevaluatedCount(
+  threads: Array<{
+    status: unknown;
+    _count: { support: number };
+  }>,
+): number {
+  return threads.filter(
+    (thread) =>
+      String(thread.status) === 'PROPOSED' && thread._count.support === 0,
+  ).length;
+}
+
+function parseProbe(value: Prisma.JsonValue): {
+  customDetectorKey: string;
+  detectorId: string | null;
+} | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const probe = value.probe;
+  if (!probe || typeof probe !== 'object' || Array.isArray(probe)) return null;
+  if (typeof probe.customDetectorKey !== 'string') return null;
+  return {
+    customDetectorKey: probe.customDetectorKey,
+    detectorId: typeof probe.detectorId === 'string' ? probe.detectorId : null,
+  };
 }
 
 /**

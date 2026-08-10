@@ -142,6 +142,42 @@ const COVERAGE_DOCTRINE = [
 ].join(' ');
 
 /**
+ * The correction for treating operator work as disposable agent output. A
+ * hand-opened case was previously indistinguishable in the prompt from one the
+ * harness invented, so the ordinary wind-down pass could erase the operator's
+ * investigation merely because the current sample was quiet.
+ */
+const PROVENANCE_DOCTRINE = [
+  '\nPROVENANCE DOCTRINE: every case and inquiry carries origin. An empty createdBy is an',
+  'operator, because the UI does not stamp one. Operator-created work outranks anything you',
+  'invented: work its hypotheses and evidence first. Never close, archive or downgrade an',
+  'operator-created case or inquiry without evidence that directly contradicts it; "it is quiet"',
+  'and "I would not have opened this" are not reasons. When you disagree, say so in a note and',
+  'leave it open.',
+].join(' ');
+
+/**
+ * The correction for hypotheses that accumulated as prose but never pulled a
+ * check. The detector author had no consumer for its work, while the case agent
+ * had no observable criterion by which to settle its own claim.
+ */
+const HYPOTHESIS_DOCTRINE = [
+  '\nHYPOTHESES — TESTABLE OR IT IS A HUNCH: when adding a hypothesis, state a',
+  'testablePredicate: observable evidence in this data that would confirm or refute it. It must',
+  'not merely restate the claim or require an outside source. Good: "messages from this account',
+  'contain AWS access-key-shaped tokens after the stated rotation date." Bad: "the CFO knew."',
+  '\nCLOSING THE LOOP: cases.detail shows each hypothesis with its predicate and probes. For each',
+  'probed hypothesis, findings.search the customDetectorKey, findings.explain the strongest result,',
+  'cases.attach_findings the verified findings, cases.link_support them as SUPPORTS or CONTRADICTS,',
+  'then cases.update_hypothesis with an evidence-based status and confidence. A probe that ran and',
+  'was never judged is worse than no probe: it cost a detector and a scan and moved nothing.',
+  '\nZERO MATCHES IS NOT REFUTED: this is a COVERAGE DOCTRINE corollary. An empty search at partial',
+  'coverage means only "not seen in the fraction that has been read." Leave the hypothesis PROPOSED',
+  'and add a thread entry recording the probe key, its coverage and what would be needed, or mark it',
+  'INCONCLUSIVE if the probe was wrong for the question. REFUTED requires evidence that CONTRADICTS.',
+].join(' ');
+
+/**
  * The counterweight to the coverage doctrine, for the case it does not cover.
  *
  * COVERAGE_DOCTRINE constrains what may be concluded from a partial corpus, and
@@ -317,6 +353,7 @@ export const INQUIRY_MISSION: Mission = {
     'Do not recreate intentionally archived inquiries. Use memory.search to recall precedents.',
     TRIAGE_DOCTRINE,
     COVERAGE_DOCTRINE,
+    PROVENANCE_DOCTRINE,
     COLD_START_DOCTRINE,
     GLOSSARY_DOCTRINE,
     '\nAim inquiries at what findings.ranked says matters: high-importance recurring evidence,',
@@ -354,6 +391,8 @@ export const CASE_MISSION: Mission = {
     'that happened, not somewhere to look.',
     TRIAGE_DOCTRINE,
     COVERAGE_DOCTRINE,
+    PROVENANCE_DOCTRINE,
+    HYPOTHESIS_DOCTRINE,
     GLOSSARY_DOCTRINE,
     '\nLEADS vs EVIDENCE: cases.attach_findings is ONLY for findings you verified against source',
     'evidence this cycle. For everything else that MIGHT belong — semantic neighbours, unreviewed',
@@ -366,7 +405,8 @@ export const CASE_MISSION: Mission = {
     '\nWIND DOWN: review each open case against its thread/findings. If it no longer holds up —',
     'false-positive findings, refuted hypotheses, or the issue is resolved — cases.close it with a',
     'clear conclusion explaining why (this also archives its linked inquiries). Close only when the',
-    'evidence genuinely does not support the case, not merely because it is quiet.',
+    'evidence genuinely does not support the case, not merely because it is quiet, and never an',
+    'operator-created case on that basis.',
     '\nRECURRENCE: scan cases.closed; if a closed case’s issue reappears, cases.reopen it (this',
     'reactivates the inquiries archived with it) and add a note explaining what recurred.',
   ].join('\n'),
@@ -374,6 +414,9 @@ export const CASE_MISSION: Mission = {
     ...OBSERVE_TOOLS,
     ...SEMANTIC_TOOLS,
     ...INVESTIGATION_CASE_TOOLS,
+    // A focused work queue for claims with no evidence; deliberately not in
+    // OBSERVE_TOOLS because it is noise for the inquiry mission.
+    'hypotheses.open',
     ...KNOWLEDGE_TOOLS,
   ],
   maxIterations: 14,
@@ -487,7 +530,15 @@ export const DETECTOR_AUTHOR_MISSION: Mission = {
     'detectors.list AND detectors.precision. Never re-attempt a concept a prior run abandoned, never',
     'duplicate a detector that already exists, and never re-author a concept operators keep dismissing',
     '(a "noisy" detector in detectors.precision) — retune or retire the existing one instead.',
-    '2. HYPOTHESISE: from findings.search (or, on cold start, from assets.profile/assets.sample),',
+    '2. ANSWER AN OPEN QUESTION FIRST: call hypotheses.open. It returns PROPOSED hypotheses on',
+    'open cases that nobody has produced a single piece of evidence for — operator-created first,',
+    'each with its case, severity and the testablePredicate its author wrote. A predicate naming',
+    'something a detector could match is the strongest reason to author one that exists here: the',
+    'question is already asked and the finished detector has a known consumer. Rank these above any',
+    'gap you spot yourself. If a predicate names nothing detectable ("the CFO knew"), skip it — do',
+    'not invent a proxy and claim it tests the hypothesis; memory.write a DETECTOR_INSIGHT recording',
+    'the dead end. An empty result is normal — proceed to the next step.',
+    '3. HYPOTHESISE: from findings.search (or, on cold start, from assets.profile/assets.sample),',
     'pick one missed finding class, then choose the SIMPLEST engine that fits from the "Detector type',
     'registry" in your system prompt — do not default to REGEX/GLINER2 when a better fit exists:',
     '   • REGEX — fixed / structured tokens (IDs, keys, account or product codes).',
@@ -498,29 +549,33 @@ export const DETECTOR_AUTHOR_MISSION: Mission = {
     '     objects like weapons/people/logos).',
     '   • LLM — only for nuanced judgement no smaller model captures (needs an aiProviderConfigId;',
     '     never include provider_runtime).',
-    '3. SHAPE: call detector.examples (pass `type` to get just that engine, with candidate model ids)',
+    '4. SHAPE: call detector.examples (pass `type` to get just that engine, with candidate model ids)',
     'and copy a worked schema, following the required fields for that type exactly.',
-    '4. DRY-RUN (MANDATORY — an untested detector is not shippable): call detector.test with a DRAFT',
+    '5. DRY-RUN (MANDATORY — an untested detector is not shippable): call detector.test with a DRAFT',
     'pipelineSchema plus a representative POSITIVE sampleText AND a COUNTER-EXAMPLE. Proceed to create',
     'only once it matches what it should and not what it should not; otherwise re-shape and re-test.',
-    '5. CREATE: detector.create, then wire it into the relevant source via',
+    '6. CREATE: detector.create, then wire it into the relevant source via',
     'config.tune_source.custom_detectors. TRAIN IF APPLICABLE: if the detector carries labelled',
     'examples (a classifier/entity schema with training_examples), call detector.train. GLINER2 and the',
     'HuggingFace pipelines are zero-shot — there is nothing to train, but never skip the dry-run.',
-    '6. DRY-RUN VERIFY: detector.test the saved detector (by detectorId) for a final sanity check.',
-    '7. APPLY: call sources.rescan(sourceId) so the detector runs on REAL assets. Scans are async —',
+    '7. DRY-RUN VERIFY: detector.test the saved detector (by detectorId) for a final sanity check.',
+    '8. APPLY: call sources.rescan(sourceId) so the detector runs on REAL assets. Scans are async —',
     'the real findings will NOT exist yet this cycle; a later cycle verifies them (see VERIFY PENDING).',
     'If this run is itself a verification re-scan, sources.rescan is a no-op — that is fine.',
-    '8. ADJUST-OR-ABANDON (bounded): if the dry-run still fails, make AT MOST ONE corrective',
+    'LINK THE PROBE: if this detector was authored to test an open hypothesis, call',
+    'hypotheses.link_probe after sources.rescan, or it fires into a case nobody connects it to.',
+    '9. ADJUST-OR-ABANDON (bounded): if the dry-run still fails, make AT MOST ONE corrective',
     'detector.update and re-test. If it still fails, detector.delete it (if you created it this run and',
     'never relied on it) or detector.deactivate it — then stop pursuing this concept.',
-    '9. DOCUMENT (always, even on failure): memory.write kind DETECTOR_INSIGHT, key',
+    '10. DOCUMENT (always, even on failure): memory.write kind DETECTOR_INSIGHT, key',
     '"detector-author:<concept-slug>", content = hypothesis + pipeline type + dry-run outcome +',
     'conclusion. When you shipped a detector and triggered a re-scan, tag it "pending-verification" so',
     'the next cycle evaluates its real findings; otherwise record "abandoned-because-X". Then finish.',
   ].join('\n'),
   allowedTools: [
     'findings.search',
+    'hypotheses.open',
+    'hypotheses.link_probe',
     ...ASSET_OBSERVE_TOOLS,
     'detectors.list',
     'detectors.precision',

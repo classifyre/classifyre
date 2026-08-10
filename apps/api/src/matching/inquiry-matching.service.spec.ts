@@ -226,8 +226,17 @@ describe('InquiryMatchingService', () => {
       expect(mockPrisma.inquiry.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({
-            createdBy: { not: 'ai-autopilot' },
-            OR: [{ matchAllSources: true }, { sourceIds: { has: 's1' } }],
+            AND: [
+              {
+                OR: [
+                  { createdBy: null },
+                  { createdBy: { not: 'ai-autopilot' } },
+                ],
+              },
+              {
+                OR: [{ matchAllSources: true }, { sourceIds: { has: 's1' } }],
+              },
+            ],
           }),
         }),
       );
