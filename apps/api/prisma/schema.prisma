@@ -707,24 +707,24 @@ model InstanceSettings {
 
   // Investigation autopilot — instance-wide defaults. Per-entity aiMode on
   // Inquiry/Case overrides these when not INHERIT.
-  autopilotInquiryEnabled     Boolean @default(false) @map("autopilot_inquiry_enabled")
+  autopilotInquiryEnabled     Boolean @default(true) @map("autopilot_inquiry_enabled")
   autopilotInquiryDesired     String? @map("autopilot_inquiry_desired") @db.Text
   autopilotInquirySearchable  String? @map("autopilot_inquiry_searchable") @db.Text
-  autopilotCaseEnabled        Boolean @default(false) @map("autopilot_case_enabled")
+  autopilotCaseEnabled        Boolean @default(true) @map("autopilot_case_enabled")
   autopilotCaseGuidance       String? @map("autopilot_case_guidance") @db.Text
   // Config-tuning agent: may change editable source config (detectors,
-  // sampling, optional, resources) — never base connection. Opt-in.
-  autopilotConfigEnabled      Boolean @default(false) @map("autopilot_config_enabled")
+  // sampling, optional, resources) — never base connection.
+  autopilotConfigEnabled      Boolean @default(true) @map("autopilot_config_enabled")
   autopilotConfigGuidance     String? @map("autopilot_config_guidance") @db.Text
-  // Detector-authoring agent: may create/train custom detectors. Opt-in.
-  autopilotDetectorEnabled    Boolean @default(false) @map("autopilot_detector_enabled")
+  // Detector-authoring agent: may create/train custom detectors.
+  autopilotDetectorEnabled    Boolean @default(true) @map("autopilot_detector_enabled")
   autopilotDetectorGuidance   String? @map("autopilot_detector_guidance") @db.Text
   // Escalation agent: reviews open cases and raises operator notifications for
-  // high-severity ones so the harness can run unattended. Opt-in.
-  autopilotEscalationEnabled  Boolean @default(false) @map("autopilot_escalation_enabled")
+  // high-severity ones so the harness can run unattended.
+  autopilotEscalationEnabled  Boolean @default(true) @map("autopilot_escalation_enabled")
   autopilotEscalationGuidance String? @map("autopilot_escalation_guidance") @db.Text
-  // Allow the harness to call tools from connected external MCP servers. Opt-in.
-  autopilotMcpEnabled         Boolean @default(false) @map("autopilot_mcp_enabled")
+  // Allow the harness to call tools from connected external MCP servers.
+  autopilotMcpEnabled         Boolean @default(true) @map("autopilot_mcp_enabled")
 
   // Master switch for the adaptive scheduler. Sources stay in AUTO mode when
   // this is off; the tick simply starts nothing, so flipping it back on resumes

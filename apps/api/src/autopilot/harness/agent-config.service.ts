@@ -93,7 +93,9 @@ export class AgentConfigService {
       const flag = ENABLE_FLAG[def.kind];
       return {
         kind: def.kind,
-        enabled: flag ? Boolean(settings?.[flag]) : true,
+        // A missing singleton is the same fresh-workspace state that
+        // InstanceSettingsService creates with every agent enabled.
+        enabled: flag ? (settings ? Boolean(settings[flag]) : true) : true,
         enableable: flag !== undefined,
         goal,
         defaultGoal: def.goal,
