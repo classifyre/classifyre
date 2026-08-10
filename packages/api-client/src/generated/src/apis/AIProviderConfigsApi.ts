@@ -38,6 +38,10 @@ export interface AiProviderConfigControllerCapabilityTestRequest {
     id: string;
 }
 
+export interface AiProviderConfigControllerCapabilityTestStreamRequest {
+    id: string;
+}
+
 export interface AiProviderConfigControllerCreateRequest {
     createAiProviderConfigDto: CreateAiProviderConfigDto;
 }
@@ -100,6 +104,47 @@ export class AIProviderConfigsApi extends runtime.BaseAPI {
      */
     async aiProviderConfigControllerCapabilityTest(requestParameters: AiProviderConfigControllerCapabilityTestRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<AssistantCapabilityReportDto> {
         const response = await this.aiProviderConfigControllerCapabilityTestRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Stream Harness capability-test progress as newline-delimited JSON
+     */
+    async aiProviderConfigControllerCapabilityTestStreamRaw(requestParameters: AiProviderConfigControllerCapabilityTestStreamRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<string>> {
+        if (requestParameters['id'] == null) {
+            throw new runtime.RequiredError(
+                'id',
+                'Required parameter "id" was null or undefined when calling aiProviderConfigControllerCapabilityTestStream().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/ai-provider-configs/{id}/capability-test-stream`;
+        urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        if (this.isJsonMime(response.headers.get('content-type'))) {
+            return new runtime.JSONApiResponse<string>(response);
+        } else {
+            return new runtime.TextApiResponse(response) as any;
+        }
+    }
+
+    /**
+     * Stream Harness capability-test progress as newline-delimited JSON
+     */
+    async aiProviderConfigControllerCapabilityTestStream(requestParameters: AiProviderConfigControllerCapabilityTestStreamRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<string> {
+        const response = await this.aiProviderConfigControllerCapabilityTestStreamRaw(requestParameters, initOverrides);
         return await response.value();
     }
 
@@ -249,7 +294,7 @@ export class AIProviderConfigsApi extends runtime.BaseAPI {
     }
 
     /**
-     * Runs a small structured-JSON round-trip against the given credential to verify the provider, model, and API key work.
+     * Runs a small structured-JSON round-trip against the given credential to verify the provider, model, and API key work. Expected configuration and provider failures are returned as structured diagnostics.
      * Test an AI provider configuration
      */
     async aiProviderConfigControllerTestRaw(requestParameters: AiProviderConfigControllerTestRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<AiProviderConfigTestResultDto>> {
@@ -279,7 +324,7 @@ export class AIProviderConfigsApi extends runtime.BaseAPI {
     }
 
     /**
-     * Runs a small structured-JSON round-trip against the given credential to verify the provider, model, and API key work.
+     * Runs a small structured-JSON round-trip against the given credential to verify the provider, model, and API key work. Expected configuration and provider failures are returned as structured diagnostics.
      * Test an AI provider configuration
      */
     async aiProviderConfigControllerTest(requestParameters: AiProviderConfigControllerTestRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<AiProviderConfigTestResultDto> {

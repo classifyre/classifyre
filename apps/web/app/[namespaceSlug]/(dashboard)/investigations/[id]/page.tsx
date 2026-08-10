@@ -3,7 +3,7 @@
 import { nsPath } from "@/lib/ns-path";
 import * as React from "react";
 import dynamic from "next/dynamic";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useRouteId } from "@/lib/use-route-id";
 import {
   ArrowRight,
@@ -81,8 +81,7 @@ const CaseGraphView = dynamic(
 );
 
 // The graph is the case's front door — every other view is a drill-down.
-const TABS = ["graph", "evidence", "explore", "threads", "timeline", "overview"] as const;
-type TabValue = (typeof TABS)[number];
+type TabValue = "graph" | "evidence" | "explore" | "threads" | "timeline" | "overview";
 const DEFAULT_TAB: TabValue = "graph";
 
 const STATUSES = ["OPEN", "IN_PROGRESS", "CLOSED", "ARCHIVED"] as const;
@@ -102,24 +101,12 @@ export default function CaseWorkspacePage() {
 
 function CaseWorkspaceInner() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const { t } = useTranslation();
   const caseId = useRouteId();
 
-  const urlTab = searchParams.get("tab");
-  const [tab, setTab] = React.useState<TabValue>(
-    TABS.includes(urlTab as TabValue) ? (urlTab as TabValue) : DEFAULT_TAB,
-  );
+  const [tab, setTab] = React.useState<TabValue>(DEFAULT_TAB);
   const changeTab = (value: string) => {
-    const next = value as TabValue;
-    setTab(next);
-    const sp = new URLSearchParams(searchParams.toString());
-    if (next === DEFAULT_TAB) sp.delete("tab");
-    else sp.set("tab", next);
-    router.replace(
-      nsPath(`/investigations/${caseId}${sp.size > 0 ? `?${sp}` : ""}`),
-      { scroll: false },
-    );
+    setTab(value as TabValue);
   };
 
   const [caseData, setCaseData] = React.useState<CaseResponseDto | null>(null);
@@ -593,7 +580,7 @@ function CaseWorkspaceInner() {
         </Card>
       )}
 
-      <Tabs value={tab} onValueChange={changeTab}>
+      <Tabs value={tab} onValueChange={changeTab} urlParam="tab">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <TabsList>
             <TabsTrigger value="graph">

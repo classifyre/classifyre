@@ -24,6 +24,18 @@ export interface AiProviderConfigTestResultDto {
      * @type {string}
      * @memberof AiProviderConfigTestResultDto
      */
+    status: AiProviderConfigTestResultDtoStatusEnum;
+    /**
+     * 
+     * @type {string}
+     * @memberof AiProviderConfigTestResultDto
+     */
+    category: AiProviderConfigTestResultDtoCategoryEnum;
+    /**
+     * 
+     * @type {string}
+     * @memberof AiProviderConfigTestResultDto
+     */
     provider: AiProviderConfigTestResultDtoProviderEnum;
     /**
      * 
@@ -31,8 +43,66 @@ export interface AiProviderConfigTestResultDto {
      * @memberof AiProviderConfigTestResultDto
      */
     model: string;
+    /**
+     * Plain-language explanation of why the test passed or failed.
+     * @type {string}
+     * @memberof AiProviderConfigTestResultDto
+     */
+    message: string;
+    /**
+     * 
+     * @type {Array<string>}
+     * @memberof AiProviderConfigTestResultDto
+     */
+    details: Array<string>;
+    /**
+     * 
+     * @type {number}
+     * @memberof AiProviderConfigTestResultDto
+     */
+    durationMs: number;
+    /**
+     * 
+     * @type {number}
+     * @memberof AiProviderConfigTestResultDto
+     */
+    inputTokens: number | null;
+    /**
+     * 
+     * @type {number}
+     * @memberof AiProviderConfigTestResultDto
+     */
+    outputTokens: number | null;
+    /**
+     * Short preview proving that the configured model responded.
+     * @type {string}
+     * @memberof AiProviderConfigTestResultDto
+     */
+    responsePreview: string | null;
 }
 
+
+/**
+ * @export
+ */
+export const AiProviderConfigTestResultDtoStatusEnum = {
+    Pass: 'PASS',
+    Fail: 'FAIL'
+} as const;
+export type AiProviderConfigTestResultDtoStatusEnum = typeof AiProviderConfigTestResultDtoStatusEnum[keyof typeof AiProviderConfigTestResultDtoStatusEnum];
+
+/**
+ * @export
+ */
+export const AiProviderConfigTestResultDtoCategoryEnum = {
+    Connection: 'CONNECTION',
+    Configuration: 'CONFIGURATION',
+    Authentication: 'AUTHENTICATION',
+    Model: 'MODEL',
+    RateLimit: 'RATE_LIMIT',
+    Provider: 'PROVIDER'
+} as const;
+export type AiProviderConfigTestResultDtoCategoryEnum = typeof AiProviderConfigTestResultDtoCategoryEnum[keyof typeof AiProviderConfigTestResultDtoCategoryEnum];
 
 /**
  * @export
@@ -49,8 +119,16 @@ export type AiProviderConfigTestResultDtoProviderEnum = typeof AiProviderConfigT
  * Check if a given object implements the AiProviderConfigTestResultDto interface.
  */
 export function instanceOfAiProviderConfigTestResultDto(value: object): value is AiProviderConfigTestResultDto {
+    if (!('status' in value) || value['status'] === undefined) return false;
+    if (!('category' in value) || value['category'] === undefined) return false;
     if (!('provider' in value) || value['provider'] === undefined) return false;
     if (!('model' in value) || value['model'] === undefined) return false;
+    if (!('message' in value) || value['message'] === undefined) return false;
+    if (!('details' in value) || value['details'] === undefined) return false;
+    if (!('durationMs' in value) || value['durationMs'] === undefined) return false;
+    if (!('inputTokens' in value) || value['inputTokens'] === undefined) return false;
+    if (!('outputTokens' in value) || value['outputTokens'] === undefined) return false;
+    if (!('responsePreview' in value) || value['responsePreview'] === undefined) return false;
     return true;
 }
 
@@ -64,8 +142,16 @@ export function AiProviderConfigTestResultDtoFromJSONTyped(json: any, ignoreDisc
     }
     return {
         
+        'status': json['status'],
+        'category': json['category'],
         'provider': json['provider'],
         'model': json['model'],
+        'message': json['message'],
+        'details': json['details'],
+        'durationMs': json['durationMs'],
+        'inputTokens': json['inputTokens'],
+        'outputTokens': json['outputTokens'],
+        'responsePreview': json['responsePreview'],
     };
 }
 
@@ -80,8 +166,16 @@ export function AiProviderConfigTestResultDtoToJSONTyped(value?: AiProviderConfi
 
     return {
         
+        'status': value['status'],
+        'category': value['category'],
         'provider': value['provider'],
         'model': value['model'],
+        'message': value['message'],
+        'details': value['details'],
+        'durationMs': value['durationMs'],
+        'inputTokens': value['inputTokens'],
+        'outputTokens': value['outputTokens'],
+        'responsePreview': value['responsePreview'],
     };
 }
 

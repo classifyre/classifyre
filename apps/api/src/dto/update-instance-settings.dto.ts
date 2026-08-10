@@ -29,6 +29,15 @@ export class UpdateInstanceSettingsDto {
   aiEnabled?: boolean;
 
   @ApiPropertyOptional({
+    description:
+      'When false, the autonomous AI harness and all of its agents are disabled instance-wide.',
+    example: true,
+  })
+  @IsOptional()
+  @IsBoolean()
+  harnessEnabled?: boolean;
+
+  @ApiPropertyOptional({
     description: 'When false, the MCP endpoint is disabled instance-wide.',
     example: true,
   })
@@ -60,7 +69,7 @@ export class UpdateInstanceSettingsDto {
 
   @ApiPropertyOptional({
     description:
-      'Id of the AI provider credential to use as the instance-wide default. ' +
+      'Id of the AI provider credential to use for the interactive AI assistant. ' +
       'Pass null or an empty string to clear the selection.',
     nullable: true,
   })
@@ -68,6 +77,17 @@ export class UpdateInstanceSettingsDto {
   @IsString()
   @MaxLength(64)
   aiProviderConfigId?: string | null;
+
+  @ApiPropertyOptional({
+    description:
+      'Id of the AI provider credential to use for the autonomous AI harness. ' +
+      'Pass null or an empty string to clear the selection.',
+    nullable: true,
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  harnessAiProviderConfigId?: string | null;
 
   @ApiPropertyOptional({
     description:

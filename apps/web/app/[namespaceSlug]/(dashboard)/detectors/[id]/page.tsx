@@ -305,6 +305,7 @@ export default function CustomDetectorDetailsPage() {
         onValueChange={(value) =>
           setActiveTab(value as "overview" | "results")
         }
+        urlParam="tab"
         className="space-y-4"
       >
         <TabsList className="h-auto rounded-[4px] border-2 border-border bg-background p-1">

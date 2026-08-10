@@ -609,7 +609,7 @@ export const TRANSFER_TABLES: readonly TransferTableSpec[] = [
   },
   {
     model: 'instanceSettings',
-    idRefs: ['aiProviderConfigId'],
+    idRefs: ['aiProviderConfigId', 'harnessAiProviderConfigId'],
     scope: 'instanceConfig',
     order: 910,
     keys: ['id'],

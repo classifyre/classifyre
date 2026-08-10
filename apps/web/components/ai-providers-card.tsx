@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { api, type AiProviderConfigResponseDto } from "@workspace/api-client";
 import {
   Alert,
@@ -20,11 +21,7 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
+  Switch,
 } from "@workspace/ui/components";
 import {
   BrainCircuit,
@@ -37,14 +34,15 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useInstanceSettings } from "@/components/instance-settings-provider";
-import { AiProviderForm } from "@/components/ai-provider-form";
 import { useAiProviderConfigs } from "@/hooks/use-ai-provider-configs";
 import { useTranslation } from "@/hooks/use-translation";
 import type { TranslationKey } from "@/i18n";
+import { useNsPath } from "@/lib/ns-path";
 
 export function AiProvidersCard() {
   const { t } = useTranslation();
-  const { settings } = useInstanceSettings();
+  const nsPath = useNsPath();
+  const { settings, saving, updateSettings } = useInstanceSettings();
   const { providers, loading, error, refresh } = useAiProviderConfigs();
 
   // Map of providerId -> detector names that reference it (usage highlight).
@@ -52,14 +50,13 @@ export function AiProvidersCard() {
     Record<string, string[]>
   >({});
 
-  const [formOpen, setFormOpen] = React.useState(false);
-  const [editing, setEditing] =
-    React.useState<AiProviderConfigResponseDto | null>(null);
   const [deleteTarget, setDeleteTarget] =
     React.useState<AiProviderConfigResponseDto | null>(null);
   const [deleting, setDeleting] = React.useState(false);
+  const [roleSaving, setRoleSaving] = React.useState<string | null>(null);
 
   const assistantId = settings.aiProviderConfigId ?? null;
+  const harnessId = settings.harnessAiProviderConfigId ?? null;
 
   const loadDetectorUsage = React.useCallback(async () => {
     try {
@@ -83,31 +80,46 @@ export function AiProvidersCard() {
     void loadDetectorUsage();
   }, [loadDetectorUsage]);
 
-  const openCreate = React.useCallback(() => {
-    setEditing(null);
-    setFormOpen(true);
-  }, []);
-
-  const openEdit = React.useCallback((config: AiProviderConfigResponseDto) => {
-    setEditing(config);
-    setFormOpen(true);
-  }, []);
-
-  const handleSaved = React.useCallback(
-    async (saved: AiProviderConfigResponseDto, close: boolean) => {
-      const isNew = !providers.some((p) => p.id === saved.id);
-      if (close) {
-        toast.success(
-          isNew ? t("aiProvider.created") : t("aiProvider.updated"),
+  const updateFeature = React.useCallback(
+    async (
+      payload: Parameters<typeof updateSettings>[0],
+      key: string,
+      message: string,
+    ) => {
+      try {
+        setRoleSaving(key);
+        await updateSettings(payload);
+        toast.success(message);
+      } catch (updateError) {
+        toast.error(
+          updateError instanceof Error
+            ? updateError.message
+            : t("settings.failedToSave"),
         );
-      }
-      await refresh();
-      if (close) {
-        setFormOpen(false);
-        setEditing(null);
+      } finally {
+        setRoleSaving(null);
       }
     },
-    [providers, refresh, t],
+    [t, updateSettings],
+  );
+
+  const updateAssignment = React.useCallback(
+    async (
+      role: "assistant" | "harness",
+      providerId: string,
+      checked: boolean,
+    ) => {
+      const payload =
+        role === "assistant"
+          ? { aiProviderConfigId: checked ? providerId : null }
+          : { harnessAiProviderConfigId: checked ? providerId : null };
+      await updateFeature(
+        payload,
+        `${role}:${providerId}`,
+        t("aiProvider.assignmentSaved"),
+      );
+    },
+    [t, updateFeature],
   );
 
   const handleDelete = React.useCallback(async () => {
@@ -151,14 +163,63 @@ export function AiProvidersCard() {
             <CardTitle>{t("aiProvider.manageTitle")}</CardTitle>
             <CardDescription>{t("aiProvider.manageDesc")}</CardDescription>
           </div>
-          <Button size="sm" onClick={openCreate}>
-            <Plus className="mr-2 h-3.5 w-3.5" />
-            {t("aiProvider.addProvider")}
+          <Button size="sm" asChild>
+            <Link href={nsPath("/harness/providers/new")}>
+              <Plus className="mr-2 h-3.5 w-3.5" />
+              {t("aiProvider.addProvider")}
+            </Link>
           </Button>
         </div>
       </CardHeader>
 
       <CardContent className="space-y-4">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="flex items-start justify-between gap-4 rounded-[4px] border-2 border-border bg-muted/20 px-4 py-3">
+            <div className="space-y-1">
+              <p className="text-sm font-semibold">
+                {t("aiProvider.assistantEnabled")}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {t("aiProvider.assistantEnabledDesc")}
+              </p>
+            </div>
+            <Switch
+              checked={settings.aiEnabled}
+              disabled={saving || roleSaving !== null}
+              onCheckedChange={(checked) =>
+                void updateFeature(
+                  { aiEnabled: checked },
+                  "assistant-enabled",
+                  t("aiProvider.featureSaved"),
+                )
+              }
+              aria-label={t("aiProvider.assistantEnabled")}
+            />
+          </div>
+          <div className="flex items-start justify-between gap-4 rounded-[4px] border-2 border-border bg-muted/20 px-4 py-3">
+            <div className="space-y-1">
+              <p className="text-sm font-semibold">
+                {t("aiProvider.harnessEnabled")}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {t("aiProvider.harnessEnabledDesc")}
+              </p>
+            </div>
+            <Switch
+              checked={settings.harnessEnabled}
+              disabled={saving || roleSaving !== null}
+              onCheckedChange={(checked) =>
+                void updateFeature(
+                  { harnessEnabled: checked },
+                  "harness-enabled",
+                  t("aiProvider.featureSaved"),
+                )
+              }
+              aria-label={t("aiProvider.harnessEnabled")}
+            />
+          </div>
+        </div>
+
         {loading ? (
           <div className="flex min-h-24 items-center justify-center text-sm text-muted-foreground">
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -181,20 +242,22 @@ export function AiProvidersCard() {
             <ul className="grid gap-3">
               {providers.map((p) => {
                 const isAssistant = p.id === assistantId;
+                const isHarness = p.id === harnessId;
                 const detectors = detectorUsage[p.id] ?? [];
                 const inUse = detectors.length > 0;
-                const lockDelete = isAssistant || inUse;
-                const deleteHint = isAssistant
-                  ? t("aiProvider.deleteAssistantHint")
-                  : inUse
-                    ? t("aiProvider.deleteInUseHint")
-                    : t("aiProvider.delete");
+                const lockDelete = isAssistant || isHarness || inUse;
+                const deleteHint =
+                  isAssistant || isHarness
+                    ? t("aiProvider.deleteRoleHint")
+                    : inUse
+                      ? t("aiProvider.deleteInUseHint")
+                      : t("aiProvider.delete");
 
                 return (
                   <li
                     key={p.id}
                     className={`flex items-center justify-between gap-3 rounded-[4px] border-2 bg-muted/20 px-4 py-3 transition-colors ${
-                      isAssistant
+                      isAssistant || isHarness
                         ? "border-[#d97706]/50 bg-[#d97706]/[0.06]"
                         : "border-border"
                     }`}
@@ -208,6 +271,12 @@ export function AiProvidersCard() {
                           <Badge className="gap-1 border-[#d97706]/40 bg-[#d97706]/10 text-[#b45309] dark:text-[#fbbf24]">
                             <Sparkles className="h-3 w-3" />
                             {t("aiProvider.assistantBadge")}
+                          </Badge>
+                        ) : null}
+                        {isHarness ? (
+                          <Badge className="gap-1 border-sky-600/40 bg-sky-600/10 text-sky-700 dark:text-sky-300">
+                            <BrainCircuit className="h-3 w-3" />
+                            {t("aiProvider.harnessBadge")}
                           </Badge>
                         ) : null}
                         {inUse ? (
@@ -231,14 +300,36 @@ export function AiProvidersCard() {
                           : ""}
                       </p>
                     </div>
-                    <div className="flex shrink-0 items-center gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => openEdit(p)}
-                        title={t("aiProvider.edit")}
-                      >
-                        <Pencil className="h-3.5 w-3.5" />
+                    <div className="flex shrink-0 flex-wrap items-center justify-end gap-3">
+                      <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                        {t("aiProvider.assistantRole")}
+                        <Switch
+                          checked={isAssistant}
+                          disabled={saving || roleSaving !== null}
+                          onCheckedChange={(checked) =>
+                            void updateAssignment("assistant", p.id, checked)
+                          }
+                          aria-label={`${t("aiProvider.useForAssistant")} — ${p.name}`}
+                        />
+                      </label>
+                      <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                        {t("aiProvider.harnessRole")}
+                        <Switch
+                          checked={isHarness}
+                          disabled={saving || roleSaving !== null}
+                          onCheckedChange={(checked) =>
+                            void updateAssignment("harness", p.id, checked)
+                          }
+                          aria-label={`${t("aiProvider.useForHarness")} — ${p.name}`}
+                        />
+                      </label>
+                      <Button variant="ghost" size="icon" asChild>
+                        <Link
+                          href={nsPath(`/harness/providers/${p.id}/edit`)}
+                          title={t("aiProvider.edit")}
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Link>
                       </Button>
                       <Button
                         variant="ghost"
@@ -259,24 +350,6 @@ export function AiProvidersCard() {
           )
         ) : null}
       </CardContent>
-
-      <Dialog open={formOpen} onOpenChange={setFormOpen}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto rounded-[6px] border-2 border-border sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>
-              {editing
-                ? t("aiProvider.editProvider")
-                : t("aiProvider.newProvider")}
-            </DialogTitle>
-            <DialogDescription>{t("aiProvider.manageDesc")}</DialogDescription>
-          </DialogHeader>
-          <AiProviderForm
-            config={editing}
-            onSaved={(saved, close) => void handleSaved(saved, close)}
-            onCancel={() => setFormOpen(false)}
-          />
-        </DialogContent>
-      </Dialog>
 
       <AlertDialog
         open={deleteTarget !== null}

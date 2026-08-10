@@ -98,7 +98,7 @@ export class ChatAgentService {
       where: { id: 1 },
     });
     if (!settings?.aiEnabled || !settings.aiProviderConfigId) {
-      return 'AI is not configured on this Classifyre instance. Enable AI and select a default provider in Settings first.';
+      return 'AI Assistant is not configured on this Classifyre instance. Enable it and assign an Assistant provider in Harness AI → Configuration first.';
     }
 
     const session = await this.sessions.getOrCreateSession(

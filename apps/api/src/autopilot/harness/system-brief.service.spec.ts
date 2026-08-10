@@ -149,7 +149,8 @@ describe('SystemBriefService', () => {
         updatedBy: 'ai-autopilot',
       });
       mockPrisma.instanceSettings.findUnique.mockResolvedValue({
-        aiEnabled: true,
+        harnessEnabled: true,
+        harnessAiProviderConfigId: 'p1',
         autopilotDetectorEnabled: false,
       });
       mockPrisma.aiProviderConfig.count.mockResolvedValue(1);

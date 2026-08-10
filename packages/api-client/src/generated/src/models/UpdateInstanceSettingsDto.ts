@@ -26,6 +26,12 @@ export interface UpdateInstanceSettingsDto {
      */
     aiEnabled?: boolean;
     /**
+     * When false, the autonomous AI harness and all of its agents are disabled instance-wide.
+     * @type {boolean}
+     * @memberof UpdateInstanceSettingsDto
+     */
+    harnessEnabled?: boolean;
+    /**
      * When false, the MCP endpoint is disabled instance-wide.
      * @type {boolean}
      * @memberof UpdateInstanceSettingsDto
@@ -50,11 +56,17 @@ export interface UpdateInstanceSettingsDto {
      */
     timeFormat?: UpdateInstanceSettingsDtoTimeFormatEnum;
     /**
-     * Id of the AI provider credential to use as the instance-wide default. Pass null or an empty string to clear the selection.
+     * Id of the AI provider credential to use for the interactive AI assistant. Pass null or an empty string to clear the selection.
      * @type {string}
      * @memberof UpdateInstanceSettingsDto
      */
     aiProviderConfigId?: string | null;
+    /**
+     * Id of the AI provider credential to use for the autonomous AI harness. Pass null or an empty string to clear the selection.
+     * @type {string}
+     * @memberof UpdateInstanceSettingsDto
+     */
+    harnessAiProviderConfigId?: string | null;
     /**
      * When true, the autopilot inquiry agent manages inquiries automatically after scans.
      * @type {boolean}
@@ -187,11 +199,13 @@ export function UpdateInstanceSettingsDtoFromJSONTyped(json: any, ignoreDiscrimi
     return {
         
         'aiEnabled': json['aiEnabled'] == null ? undefined : json['aiEnabled'],
+        'harnessEnabled': json['harnessEnabled'] == null ? undefined : json['harnessEnabled'],
         'mcpEnabled': json['mcpEnabled'] == null ? undefined : json['mcpEnabled'],
         'language': json['language'] == null ? undefined : json['language'],
         'timezone': json['timezone'] == null ? undefined : json['timezone'],
         'timeFormat': json['timeFormat'] == null ? undefined : json['timeFormat'],
         'aiProviderConfigId': json['aiProviderConfigId'] == null ? undefined : json['aiProviderConfigId'],
+        'harnessAiProviderConfigId': json['harnessAiProviderConfigId'] == null ? undefined : json['harnessAiProviderConfigId'],
         'autopilotInquiryEnabled': json['autopilotInquiryEnabled'] == null ? undefined : json['autopilotInquiryEnabled'],
         'autopilotInquiryDesired': json['autopilotInquiryDesired'] == null ? undefined : json['autopilotInquiryDesired'],
         'autopilotInquirySearchable': json['autopilotInquirySearchable'] == null ? undefined : json['autopilotInquirySearchable'],
@@ -222,11 +236,13 @@ export function UpdateInstanceSettingsDtoToJSONTyped(value?: UpdateInstanceSetti
     return {
         
         'aiEnabled': value['aiEnabled'],
+        'harnessEnabled': value['harnessEnabled'],
         'mcpEnabled': value['mcpEnabled'],
         'language': value['language'],
         'timezone': value['timezone'],
         'timeFormat': value['timeFormat'],
         'aiProviderConfigId': value['aiProviderConfigId'],
+        'harnessAiProviderConfigId': value['harnessAiProviderConfigId'],
         'autopilotInquiryEnabled': value['autopilotInquiryEnabled'],
         'autopilotInquiryDesired': value['autopilotInquiryDesired'],
         'autopilotInquirySearchable': value['autopilotInquirySearchable'],

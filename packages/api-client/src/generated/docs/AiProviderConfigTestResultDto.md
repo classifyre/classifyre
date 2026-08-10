@@ -6,8 +6,16 @@
 
 Name | Type
 ------------ | -------------
+`status` | string
+`category` | string
 `provider` | string
 `model` | string
+`message` | string
+`details` | Array&lt;string&gt;
+`durationMs` | number
+`inputTokens` | number
+`outputTokens` | number
+`responsePreview` | string
 
 ## Example
 
@@ -16,8 +24,16 @@ import type { AiProviderConfigTestResultDto } from '@workspace/api-client'
 
 // TODO: Update the object below with actual values
 const example = {
+  "status": PASS,
+  "category": CONNECTION,
   "provider": CLAUDE,
   "model": claude-sonnet-4-5,
+  "message": null,
+  "details": null,
+  "durationMs": 842,
+  "inputTokens": 42,
+  "outputTokens": 18,
+  "responsePreview": null,
 } satisfies AiProviderConfigTestResultDto
 
 console.log(example)

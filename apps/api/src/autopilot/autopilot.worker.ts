@@ -242,8 +242,10 @@ export class AutopilotWorker {
     const settings = await this.prisma.instanceSettings.findUnique({
       where: { id: INSTANCE_SETTINGS_ID },
     });
-    if (!settings?.aiEnabled) {
-      this.logger.debug('AI disabled — skipping dream cycle');
+    if (!settings?.harnessEnabled || !settings.harnessAiProviderConfigId) {
+      this.logger.debug(
+        'AI harness disabled or unconfigured — skipping dream cycle',
+      );
       return;
     }
     await this.runAgent(
@@ -265,8 +267,10 @@ export class AutopilotWorker {
     const settings = await this.prisma.instanceSettings.findUnique({
       where: { id: INSTANCE_SETTINGS_ID },
     });
-    if (!settings?.aiEnabled) {
-      this.logger.debug('AI disabled — skipping autopilot cycle');
+    if (!settings?.harnessEnabled || !settings.harnessAiProviderConfigId) {
+      this.logger.debug(
+        'AI harness disabled or unconfigured — skipping autopilot cycle',
+      );
       return;
     }
     // Scan cycles respect the instance flags as master switches. Only a manual
@@ -511,7 +515,8 @@ export class AutopilotWorker {
     const settings = await this.prisma.instanceSettings.findUnique({
       where: { id: INSTANCE_SETTINGS_ID },
     });
-    if (!settings?.aiEnabled) return false;
+    if (!settings?.harnessEnabled || !settings.harnessAiProviderConfigId)
+      return false;
 
     // Explicit operator intent overrides the master switches; the decision
     // applier still enforces per-entity OBSERVE_ONLY.

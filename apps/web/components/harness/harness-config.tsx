@@ -8,6 +8,7 @@ import { cn } from "@workspace/ui/lib/utils";
 import { useInstanceSettings } from "@/components/instance-settings-provider";
 import { useTranslation } from "@/hooks/use-translation";
 import { HarnessMcp } from "./harness-mcp";
+import { AiProvidersCard } from "@/components/ai-providers-card";
 
 /**
  * Harness configuration — global switches that aren't per-agent. Per-agent
@@ -19,7 +20,8 @@ export function HarnessConfig() {
   const { settings, saving, updateSettings } = useInstanceSettings();
   const [busy, setBusy] = React.useState(false);
 
-  const aiReady = settings.aiEnabled && !!settings.aiProviderConfigId;
+  const aiReady =
+    settings.harnessEnabled && !!settings.harnessAiProviderConfigId;
   const disabled = busy || saving;
 
   const save = React.useCallback(
@@ -38,7 +40,18 @@ export function HarnessConfig() {
   );
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
+      <div className="space-y-1">
+        <h2 className="font-serif text-xl font-black uppercase tracking-[0.04em]">
+          {t("harness.config.title")}
+        </h2>
+        <p className="text-sm text-muted-foreground">
+          {t("harness.config.desc")}
+        </p>
+      </div>
+
+      <AiProvidersCard />
+
       {!aiReady && (
         <p className="rounded-[4px] border border-dashed border-border bg-muted/20 px-4 py-3 text-xs text-muted-foreground">
           {t("harness.config.requiresAi")}

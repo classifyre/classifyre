@@ -14,6 +14,9 @@ describe('InstanceSettingsService', () => {
       upsert: jest.fn(),
       update: jest.fn(),
     },
+    aiProviderConfig: {
+      findUnique: jest.fn(),
+    },
   };
 
   beforeEach(async () => {
@@ -118,6 +121,65 @@ describe('InstanceSettingsService', () => {
     expect(result.timezone).toBe('America/New_York');
     expect(result.timeFormat).toBe(InstanceTimeFormat.TWENTY_FOUR_HOUR);
     expect(result.aiEnabled).toBe(false);
+  });
+
+  it('updates Assistant and Harness controls independently', async () => {
+    const now = new Date('2026-03-05T12:00:00.000Z');
+    mockPrismaService.instanceSettings.upsert.mockResolvedValue({
+      id: 1,
+      aiEnabled: true,
+      harnessEnabled: true,
+      mcpEnabled: true,
+      language: InstanceLanguage.ENGLISH,
+      timezone: 'UTC',
+      timeFormat: InstanceTimeFormat.TWELVE_HOUR,
+      aiProviderConfigId: null,
+      harnessAiProviderConfigId: null,
+      createdAt: now,
+      updatedAt: now,
+    });
+    mockPrismaService.aiProviderConfig.findUnique.mockResolvedValue({
+      id: 'shared-provider',
+    });
+    mockPrismaService.instanceSettings.update.mockResolvedValue({
+      id: 1,
+      aiEnabled: false,
+      harnessEnabled: true,
+      mcpEnabled: true,
+      language: InstanceLanguage.ENGLISH,
+      timezone: 'UTC',
+      timeFormat: InstanceTimeFormat.TWELVE_HOUR,
+      aiProviderConfigId: 'shared-provider',
+      harnessAiProviderConfigId: 'shared-provider',
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    const result = await service.updateSettings({
+      aiEnabled: false,
+      harnessEnabled: true,
+      aiProviderConfigId: 'shared-provider',
+      harnessAiProviderConfigId: 'shared-provider',
+    });
+
+    expect(mockPrismaService.aiProviderConfig.findUnique).toHaveBeenCalledTimes(
+      2,
+    );
+    expect(mockPrismaService.instanceSettings.update).toHaveBeenCalledWith({
+      where: { id: 1 },
+      data: expect.objectContaining({
+        aiEnabled: false,
+        harnessEnabled: true,
+        aiProviderConfig: { connect: { id: 'shared-provider' } },
+        harnessAiProviderConfig: { connect: { id: 'shared-provider' } },
+      }),
+    });
+    expect(result).toMatchObject({
+      aiEnabled: false,
+      harnessEnabled: true,
+      aiProviderConfigId: 'shared-provider',
+      harnessAiProviderConfigId: 'shared-provider',
+    });
   });
 
   it('persists AUTOMATIC language setting', async () => {

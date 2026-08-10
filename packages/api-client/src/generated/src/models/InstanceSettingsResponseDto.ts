@@ -32,6 +32,12 @@ export interface InstanceSettingsResponseDto {
      */
     aiEnabled: boolean;
     /**
+     * When false, the autonomous AI harness and all of its agents are disabled instance-wide.
+     * @type {boolean}
+     * @memberof InstanceSettingsResponseDto
+     */
+    harnessEnabled: boolean;
+    /**
      * When false, the MCP endpoint is disabled instance-wide.
      * @type {boolean}
      * @memberof InstanceSettingsResponseDto
@@ -56,11 +62,17 @@ export interface InstanceSettingsResponseDto {
      */
     timeFormat: InstanceSettingsResponseDtoTimeFormatEnum;
     /**
-     * Id of the AI provider credential used as the instance-wide default. Null when unset.
+     * Id of the AI provider credential used by the interactive AI assistant. Null when unset.
      * @type {string}
      * @memberof InstanceSettingsResponseDto
      */
     aiProviderConfigId: string | null;
+    /**
+     * Id of the AI provider credential used by the autonomous AI harness. Null when unset.
+     * @type {string}
+     * @memberof InstanceSettingsResponseDto
+     */
+    harnessAiProviderConfigId: string | null;
     /**
      * When true, the autopilot inquiry agent manages inquiries automatically after scans.
      * @type {boolean}
@@ -205,11 +217,13 @@ export type InstanceSettingsResponseDtoTimeFormatEnum = typeof InstanceSettingsR
 export function instanceOfInstanceSettingsResponseDto(value: object): value is InstanceSettingsResponseDto {
     if (!('id' in value) || value['id'] === undefined) return false;
     if (!('aiEnabled' in value) || value['aiEnabled'] === undefined) return false;
+    if (!('harnessEnabled' in value) || value['harnessEnabled'] === undefined) return false;
     if (!('mcpEnabled' in value) || value['mcpEnabled'] === undefined) return false;
     if (!('language' in value) || value['language'] === undefined) return false;
     if (!('timezone' in value) || value['timezone'] === undefined) return false;
     if (!('timeFormat' in value) || value['timeFormat'] === undefined) return false;
     if (!('aiProviderConfigId' in value) || value['aiProviderConfigId'] === undefined) return false;
+    if (!('harnessAiProviderConfigId' in value) || value['harnessAiProviderConfigId'] === undefined) return false;
     if (!('autopilotInquiryEnabled' in value) || value['autopilotInquiryEnabled'] === undefined) return false;
     if (!('autopilotInquiryDesired' in value) || value['autopilotInquiryDesired'] === undefined) return false;
     if (!('autopilotInquirySearchable' in value) || value['autopilotInquirySearchable'] === undefined) return false;
@@ -244,11 +258,13 @@ export function InstanceSettingsResponseDtoFromJSONTyped(json: any, ignoreDiscri
         
         'id': json['id'],
         'aiEnabled': json['aiEnabled'],
+        'harnessEnabled': json['harnessEnabled'],
         'mcpEnabled': json['mcpEnabled'],
         'language': json['language'],
         'timezone': json['timezone'],
         'timeFormat': json['timeFormat'],
         'aiProviderConfigId': json['aiProviderConfigId'],
+        'harnessAiProviderConfigId': json['harnessAiProviderConfigId'],
         'autopilotInquiryEnabled': json['autopilotInquiryEnabled'],
         'autopilotInquiryDesired': json['autopilotInquiryDesired'],
         'autopilotInquirySearchable': json['autopilotInquirySearchable'],
@@ -284,11 +300,13 @@ export function InstanceSettingsResponseDtoToJSONTyped(value?: InstanceSettingsR
         
         'id': value['id'],
         'aiEnabled': value['aiEnabled'],
+        'harnessEnabled': value['harnessEnabled'],
         'mcpEnabled': value['mcpEnabled'],
         'language': value['language'],
         'timezone': value['timezone'],
         'timeFormat': value['timeFormat'],
         'aiProviderConfigId': value['aiProviderConfigId'],
+        'harnessAiProviderConfigId': value['harnessAiProviderConfigId'],
         'autopilotInquiryEnabled': value['autopilotInquiryEnabled'],
         'autopilotInquiryDesired': value['autopilotInquiryDesired'],
         'autopilotInquirySearchable': value['autopilotInquirySearchable'],

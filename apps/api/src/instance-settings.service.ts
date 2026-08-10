@@ -24,11 +24,13 @@ export class InstanceSettingsService {
     return {
       id: settings.id,
       aiEnabled: settings.aiEnabled,
+      harnessEnabled: settings.harnessEnabled,
       mcpEnabled: settings.mcpEnabled,
       language: settings.language,
       timezone: settings.timezone,
       timeFormat: settings.timeFormat,
       aiProviderConfigId: settings.aiProviderConfigId,
+      harnessAiProviderConfigId: settings.harnessAiProviderConfigId,
       autopilotInquiryEnabled: settings.autopilotInquiryEnabled,
       autopilotInquiryDesired: settings.autopilotInquiryDesired,
       autopilotInquirySearchable: settings.autopilotInquirySearchable,
@@ -57,6 +59,7 @@ export class InstanceSettingsService {
       create: {
         id: INSTANCE_SETTINGS_ID,
         aiEnabled: true,
+        harnessEnabled: true,
         mcpEnabled: true,
         autopilotInquiryEnabled: true,
         autopilotCaseEnabled: true,
@@ -113,9 +116,36 @@ export class InstanceSettingsService {
       }
     }
 
+    let harnessAiProviderConfigUpdate: Prisma.InstanceSettingsUpdateInput | null =
+      null;
+    if (updateDto.harnessAiProviderConfigId !== undefined) {
+      const targetId = updateDto.harnessAiProviderConfigId?.trim() || null;
+      if (targetId) {
+        const exists = await this.prisma.aiProviderConfig.findUnique({
+          where: { id: targetId },
+          select: { id: true },
+        });
+        if (!exists) {
+          throw new BadRequestException(
+            `AI provider config "${targetId}" does not exist`,
+          );
+        }
+        harnessAiProviderConfigUpdate = {
+          harnessAiProviderConfig: { connect: { id: targetId } },
+        };
+      } else {
+        harnessAiProviderConfigUpdate = {
+          harnessAiProviderConfig: { disconnect: true },
+        };
+      }
+    }
+
     const data: Prisma.InstanceSettingsUpdateInput = {
       ...(updateDto.aiEnabled !== undefined
         ? { aiEnabled: updateDto.aiEnabled }
+        : {}),
+      ...(updateDto.harnessEnabled !== undefined
+        ? { harnessEnabled: updateDto.harnessEnabled }
         : {}),
       ...(updateDto.mcpEnabled !== undefined
         ? { mcpEnabled: updateDto.mcpEnabled }
@@ -192,6 +222,7 @@ export class InstanceSettingsService {
         ? { maxConcurrentRunners: updateDto.maxConcurrentRunners }
         : {}),
       ...(aiProviderConfigUpdate ?? {}),
+      ...(harnessAiProviderConfigUpdate ?? {}),
       ...(updateDto.hfToken !== undefined
         ? {
             hfTokenEnc:
