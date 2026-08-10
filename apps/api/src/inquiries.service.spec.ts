@@ -27,7 +27,10 @@ describe('InquiriesService', () => {
     getLiveMatches: jest.fn(),
     preview: jest.fn(),
   };
-  const mockAgentMemory = { recordEntityDeletion: jest.fn() };
+  const mockAgentMemory = {
+    recordEntityDeletion: jest.fn(),
+    syncEntityMap: jest.fn(),
+  };
 
   const row = (over: Record<string, unknown> = {}) => ({
     id: 'q1',
@@ -76,6 +79,7 @@ describe('InquiriesService', () => {
     });
 
     expect(mockMatching.rematchInquiry).toHaveBeenCalledWith('q1');
+    expect(mockAgentMemory.syncEntityMap).toHaveBeenCalledWith('inquiry', 'q1');
     expect(result.matchCount).toBe(3);
   });
 
@@ -94,6 +98,7 @@ describe('InquiriesService', () => {
     await service.update('q1', { findingTypes: ['email'] });
 
     expect(mockMatching.rematchInquiry).toHaveBeenCalledWith('q1');
+    expect(mockAgentMemory.syncEntityMap).toHaveBeenCalledWith('inquiry', 'q1');
   });
 
   it('does NOT recompute when only metadata changes', async () => {

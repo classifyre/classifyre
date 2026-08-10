@@ -69,7 +69,9 @@ export class AgentConfigService {
       kind,
       goal: row.goal ?? fallback.goal,
       maxIterations: row.maxIterations ?? fallback.maxIterations,
-      allowedTools: row.toolsOverride ? row.toolNames : fallback.allowedTools,
+      allowedTools: withGlossaryLookup(
+        row.toolsOverride ? row.toolNames : fallback.allowedTools,
+      ),
     };
   }
 
@@ -85,7 +87,9 @@ export class AgentConfigService {
       const row = byKind.get(def.kind);
       const goal = row?.goal ?? def.goal;
       const maxIterations = row?.maxIterations ?? def.maxIterations;
-      const toolNames = row?.toolsOverride ? row.toolNames : def.allowedTools;
+      const toolNames = withGlossaryLookup(
+        row?.toolsOverride ? row.toolNames : def.allowedTools,
+      );
       const flag = ENABLE_FLAG[def.kind];
       return {
         kind: def.kind,
@@ -201,4 +205,21 @@ function sameTools(a: string[], b: string[]): boolean {
   if (a.length !== b.length) return false;
   const set = new Set(a);
   return b.every((name) => set.has(name));
+}
+
+/** A proposer without canonical lookup can only create duplicates. Preserve
+ * this invariant even for tool overrides saved before glossary.lookup existed. */
+function withGlossaryLookup(toolNames: string[]): string[] {
+  if (
+    !toolNames.includes('glossary.propose') ||
+    toolNames.includes('glossary.lookup')
+  ) {
+    return toolNames;
+  }
+  const proposeAt = toolNames.indexOf('glossary.propose');
+  return [
+    ...toolNames.slice(0, proposeAt),
+    'glossary.lookup',
+    ...toolNames.slice(proposeAt),
+  ];
 }

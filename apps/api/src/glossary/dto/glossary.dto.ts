@@ -127,12 +127,6 @@ export class GlossaryTermDto {
   @ApiPropertyOptional({ nullable: true })
   notes?: string | null;
 
-  @ApiPropertyOptional({ nullable: true })
-  refType?: string | null;
-
-  @ApiPropertyOptional({ nullable: true })
-  refId?: string | null;
-
   @ApiProperty({ description: 'AGENT proposals are unverified hypotheses' })
   origin!: string;
 

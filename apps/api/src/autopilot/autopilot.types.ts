@@ -262,6 +262,14 @@ export interface FocusedCaseDetail {
     relationType: string;
     origin: string;
   }>;
+  glossary: Array<{
+    id: string;
+    term: string;
+    aliases: string[];
+    entityType: string;
+    notes: string | null;
+    verified: boolean;
+  }>;
   linkedInquiryIds: string[];
 }
 
@@ -394,7 +402,6 @@ export interface InquiryMatcherProposal {
 
 export interface MemoryWrite {
   kind:
-    | 'GLOSSARY'
     | 'DECISION_PRECEDENT'
     | 'ENTITY_MAP'
     | 'SOURCE_PROFILE'
@@ -403,6 +410,8 @@ export interface MemoryWrite {
   key: string;
   content: string;
   tags?: string[];
+  /** Replace tags instead of merging them (used by deterministic live maps). */
+  replaceTags?: boolean;
   /**
    * Set true only when the content was checked against real system state this
    * cycle (e.g. a detector's actual findings). Refreshed-but-unchecked content

@@ -804,9 +804,9 @@ export class AgentSearchService {
       .map((e) => e.entityId);
     const findingIds = row.findings.map((f) => f.findingId);
     const endpointIds = [...new Set([...assetIds, ...findingIds])];
-    const edges =
+    const [edges, glossary] = await Promise.all([
       endpointIds.length > 0
-        ? await this.prisma.edge.findMany({
+        ? this.prisma.edge.findMany({
             where: {
               OR: [
                 { fromId: { in: endpointIds } },
@@ -816,7 +816,14 @@ export class AgentSearchService {
             orderBy: { createdAt: 'asc' },
             take: 150,
           })
-        : [];
+        : Promise.resolve([]),
+      this.prisma.glossaryReference.findMany({
+        where: { entityType: 'case', entityId: caseId },
+        include: { term: true },
+        orderBy: { term: { term: 'asc' } },
+        take: 100,
+      }),
+    ]);
 
     return {
       id: row.id,
@@ -856,6 +863,14 @@ export class AgentSearchService {
         toId: e.toId,
         relationType: e.relationType,
         origin: String(e.origin),
+      })),
+      glossary: glossary.map(({ term }) => ({
+        id: term.id,
+        term: term.term,
+        aliases: term.aliases,
+        entityType: String(term.entityType),
+        notes: term.notes,
+        verified: term.verifiedAt !== null,
       })),
       linkedInquiryIds: row.inquiryLinks.map((l) => l.inquiryId),
     };

@@ -38,12 +38,17 @@ const OBSERVE_TOOLS = [
   'cases.detail',
   'duplicates.summary',
   'memory.search',
-  'glossary.lookup',
   'system_brief.get',
 ];
 
-/** Learning tools available to every mission. */
-const KNOWLEDGE_TOOLS = ['memory.write', 'glossary.propose', 'agenda.defer'];
+/** Learning tools available to every mission. Lookup and propose stay paired:
+ * an agent must check canonical vocabulary before it can add to it. */
+const KNOWLEDGE_TOOLS = [
+  'memory.write',
+  'glossary.lookup',
+  'glossary.propose',
+  'agenda.defer',
+];
 
 /**
  * Semantic evidence tools: corpus-relative importance ranking with reasons,
@@ -227,6 +232,8 @@ const GLOSSARY_DOCTRINE = [
   '(people, organizations, locations, project codenames, document references, recurring jargon)',
   'written the way a human says them, with aliases for variant spellings. glossary.propose ONLY such',
   'terms; observations, per-source summaries and investigation state go to memory.write instead.',
+  'When a specific case, inquiry, source or finding established the term, pass its refType/refId so',
+  'the investigation retains provenance and cases.detail can surface the vocabulary it relies on.',
   'Bad: "aws_supabase_pii_consolidated". Good: term "Aurora Holdings Ltd" aliases ["Aurora Holdings",',
   '"AHL"]. Use glossary.lookup before treating two spellings as different entities.',
 ].join(' ');

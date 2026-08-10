@@ -12,8 +12,6 @@ Name | Type
 `proposedAliases` | Array&lt;string&gt;
 `entityType` | string
 `notes` | string
-`refType` | string
-`refId` | string
 `origin` | string
 `verified` | boolean
 `verifiedBy` | string
@@ -35,8 +33,6 @@ const example = {
   "proposedAliases": null,
   "entityType": null,
   "notes": null,
-  "refType": null,
-  "refId": null,
   "origin": null,
   "verified": null,
   "verifiedBy": null,

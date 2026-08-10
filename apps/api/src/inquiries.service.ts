@@ -82,6 +82,7 @@ export class InquiriesService {
     });
     // Seed matchCount with existing findings; resets newMatchCount to 0.
     await this.matching.rematchInquiry(created.id);
+    await this.agentMemory.syncEntityMap('inquiry', created.id);
     return this.findOneOrThrow(created.id);
   }
 
@@ -143,6 +144,7 @@ export class InquiriesService {
     if (touchesMatchers(dto)) {
       await this.matching.rematchInquiry(id);
     }
+    await this.agentMemory.syncEntityMap('inquiry', id);
     return this.findOneOrThrow(id);
   }
 

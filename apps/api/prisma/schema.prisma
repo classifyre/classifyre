@@ -1619,7 +1619,6 @@ enum AgentDecisionOutcome {
 }
 
 enum AgentMemoryKind {
-  GLOSSARY
   DECISION_PRECEDENT
   // Topic → any entity (inquiry/case/source/detector) mapping for dedupe.
   ENTITY_MAP
@@ -1796,9 +1795,9 @@ model AgentDecision {
   @@map("agent_decisions")
 }
 
-// Long-lived agent knowledge: domain glossary, generalized decision precedents
-// and topic→inquiry mappings. Recalled via pg_trgm similarity on key/content
-// (raw SQL indexes in the migration). weight is a reinforcement counter.
+// Long-lived agent knowledge: generalized decision precedents, entity maps,
+// source profiles, detector lessons and operator directives. Shared vocabulary
+// lives exclusively in GlossaryTerm. weight is a reinforcement counter.
 model AgentMemory {
   id        String          @id @default(uuid())
   kind      AgentMemoryKind
@@ -1850,8 +1849,6 @@ model GlossaryTerm {
   proposedAliases String[]      @default([]) @map("proposed_aliases")
   entityType GlossaryEntityType @default(TERM) @map("entity_type")
   notes      String?            @db.Text
-  refType    String?            @map("ref_type")
-  refId      String?            @map("ref_id")
   origin     AgentMemoryOrigin  @default(OPERATOR)
   verifiedAt DateTime?          @map("verified_at")
   verifiedBy String?            @map("verified_by")
@@ -1860,9 +1857,28 @@ model GlossaryTerm {
   embedContentHash String? @map("embed_content_hash")
   createdAt        DateTime @default(now()) @map("created_at")
   updatedAt        DateTime @updatedAt @map("updated_at")
+  references       GlossaryReference[]
 
   @@index([entityType])
   @@map("glossary_terms")
+}
+
+// A canonical term may be established or used by many investigation entities.
+// Polymorphic ids deliberately mirror CaseEvidence: namespace-local services
+// validate the target before insertion and the compound key is idempotent.
+model GlossaryReference {
+  id             String   @id @default(uuid())
+  glossaryTermId String   @map("glossary_term_id")
+  entityType     String   @map("entity_type")
+  entityId       String   @map("entity_id")
+  createdBy      String?  @map("created_by")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  term GlossaryTerm @relation(fields: [glossaryTermId], references: [id], onDelete: Cascade)
+
+  @@unique([glossaryTermId, entityType, entityId])
+  @@index([entityType, entityId])
+  @@map("glossary_references")
 }
 
 // ── Chat gateway (Telegram / Slack bots) ─────────────────────────────────────

@@ -152,7 +152,7 @@ export class ObserveToolset {
       {
         name: 'cases.detail',
         description:
-          'Full detail of one case: hypotheses (threadIds), evidence (assetIds), findings, graph edges, linked inquiries.',
+          'Full detail of one case: hypotheses (threadIds), evidence (assetIds), findings, graph edges, linked inquiries and case-linked glossary vocabulary.',
         inputSchema: {
           type: 'object',
           properties: { caseId: { type: 'string' } },
