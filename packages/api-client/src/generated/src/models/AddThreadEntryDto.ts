@@ -20,7 +20,7 @@ import { mapValues } from '../runtime';
  */
 export interface AddThreadEntryDto {
     /**
-     *
+     * 
      * @type {string}
      * @memberof AddThreadEntryDto
      */
@@ -38,7 +38,7 @@ export interface AddThreadEntryDto {
      */
     metadata?: { [key: string]: any; } | null;
     /**
-     *
+     * 
      * @type {string}
      * @memberof AddThreadEntryDto
      */
@@ -100,3 +100,4 @@ export function AddThreadEntryDtoToJSONTyped(value?: AddThreadEntryDto | null, i
         'author': value['author'],
     };
 }
+

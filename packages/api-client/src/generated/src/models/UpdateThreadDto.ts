@@ -20,7 +20,7 @@ import { mapValues } from '../runtime';
  */
 export interface UpdateThreadDto {
     /**
-     *
+     * 
      * @type {string}
      * @memberof UpdateThreadDto
      */
@@ -44,7 +44,7 @@ export interface UpdateThreadDto {
      */
     testablePredicate?: string | null;
     /**
-     *
+     * 
      * @type {string}
      * @memberof UpdateThreadDto
      */
@@ -115,3 +115,4 @@ export function UpdateThreadDtoToJSONTyped(value?: UpdateThreadDto | null, ignor
         'actor': value['actor'],
     };
 }
+

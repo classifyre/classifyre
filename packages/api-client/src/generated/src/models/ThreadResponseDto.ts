@@ -35,7 +35,7 @@ import {
  */
 export interface ThreadResponseDto {
     /**
-     *
+     * 
      * @type {string}
      * @memberof ThreadResponseDto
      */
@@ -77,7 +77,7 @@ export interface ThreadResponseDto {
      */
     testablePredicate?: string | null;
     /**
-     *
+     * 
      * @type {string}
      * @memberof ThreadResponseDto
      */
@@ -221,3 +221,4 @@ export function ThreadResponseDtoToJSONTyped(value?: ThreadResponseDto | null, i
         'updatedAt': value['updatedAt'].toISOString(),
     };
 }
+
