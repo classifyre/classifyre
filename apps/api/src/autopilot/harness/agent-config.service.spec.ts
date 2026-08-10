@@ -70,6 +70,24 @@ describe('AgentConfigService', () => {
     );
   });
 
+  it('restores glossary lookup before propose in legacy tool overrides', async () => {
+    agentConfig.findUnique.mockResolvedValue({
+      kind: AgentKind.CONFIG,
+      goal: null,
+      maxIterations: null,
+      toolNames: ['memory.write', 'glossary.propose'],
+      toolsOverride: true,
+    });
+
+    const resolved = await service.resolveMission(AgentKind.CONFIG);
+
+    expect(resolved?.allowedTools).toEqual([
+      'memory.write',
+      'glossary.lookup',
+      'glossary.propose',
+    ]);
+  });
+
   it('lists all factory agents with the enable flag from settings', async () => {
     agentConfig.findMany.mockResolvedValue([]);
     const list = await service.list();

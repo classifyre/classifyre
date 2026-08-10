@@ -48,9 +48,6 @@ describe('SystemBriefService', () => {
     ]);
     mockMemory.topByWeight.mockImplementation((kind: AgentMemoryKind) => {
       const byKind: Partial<Record<AgentMemoryKind, unknown[]>> = {
-        [AgentMemoryKind.GLOSSARY]: [
-          { kind: 'GLOSSARY', key: 'pii', content: 'personal data', weight: 3 },
-        ],
         [AgentMemoryKind.ENTITY_MAP]: [
           {
             kind: 'ENTITY_MAP',

@@ -56,18 +56,6 @@ export interface UpsertGlossaryTermResponseDto {
      */
     notes?: string | null;
     /**
-     * 
-     * @type {string}
-     * @memberof UpsertGlossaryTermResponseDto
-     */
-    refType?: string | null;
-    /**
-     * 
-     * @type {string}
-     * @memberof UpsertGlossaryTermResponseDto
-     */
-    refId?: string | null;
-    /**
      * AGENT proposals are unverified hypotheses
      * @type {string}
      * @memberof UpsertGlossaryTermResponseDto
@@ -152,8 +140,6 @@ export function UpsertGlossaryTermResponseDtoFromJSONTyped(json: any, ignoreDisc
         'proposedAliases': json['proposedAliases'],
         'entityType': json['entityType'],
         'notes': json['notes'] == null ? undefined : json['notes'],
-        'refType': json['refType'] == null ? undefined : json['refType'],
-        'refId': json['refId'] == null ? undefined : json['refId'],
         'origin': json['origin'],
         'verified': json['verified'],
         'verifiedBy': json['verifiedBy'] == null ? undefined : json['verifiedBy'],
@@ -180,8 +166,6 @@ export function UpsertGlossaryTermResponseDtoToJSONTyped(value?: UpsertGlossaryT
         'proposedAliases': value['proposedAliases'],
         'entityType': value['entityType'],
         'notes': value['notes'],
-        'refType': value['refType'],
-        'refId': value['refId'],
         'origin': value['origin'],
         'verified': value['verified'],
         'verifiedBy': value['verifiedBy'],

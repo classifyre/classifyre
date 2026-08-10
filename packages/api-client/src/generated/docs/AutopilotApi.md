@@ -15,7 +15,7 @@ All URIs are relative to *http://localhost*
 | [**autopilotControllerGetUsage**](AutopilotApi.md#autopilotcontrollergetusage) | **GET** /autopilot/usage | LLM token/cost usage per day and agent (for the harness usage charts) — filter by agent kind and time range |
 | [**autopilotControllerListActivity**](AutopilotApi.md#autopilotcontrollerlistactivity) | **GET** /autopilot/activity | Cross-run activity feed (the business timeline) — server-side filter by kind, action, outcome, entity, text and time |
 | [**autopilotControllerListLogs**](AutopilotApi.md#autopilotcontrollerlistlogs) | **GET** /autopilot/runs/{id}/logs | Execution log of a run — filter by channel (BUSINESS narrative vs TECHNICAL mechanics/raw model output) |
-| [**autopilotControllerListMemory**](AutopilotApi.md#autopilotcontrollerlistmemory) | **GET** /autopilot/memory | List the agent memory (glossary, precedents, topic map) |
+| [**autopilotControllerListMemory**](AutopilotApi.md#autopilotcontrollerlistmemory) | **GET** /autopilot/memory | List long-lived agent memory (precedents, entity maps, source profiles, detector insights and directives) |
 | [**autopilotControllerListRuns**](AutopilotApi.md#autopilotcontrollerlistruns) | **GET** /autopilot/runs | List autopilot agent runs (newest first) |
 | [**autopilotControllerRerunRun**](AutopilotApi.md#autopilotcontrollerrerunrun) | **POST** /autopilot/runs/{id}/rerun | Re-execute one specific agent run from scratch under its original cycle identity |
 | [**autopilotControllerTrigger**](AutopilotApi.md#autopilotcontrollertrigger) | **POST** /autopilot/trigger | Manually trigger an autopilot cycle over existing data, with an optional steering instruction |
@@ -758,7 +758,7 @@ No authorization required
 
 > AgentMemoryListResponseDto autopilotControllerListMemory(kind, search, skip, limit)
 
-List the agent memory (glossary, precedents, topic map)
+List long-lived agent memory (precedents, entity maps, source profiles, detector insights and directives)
 
 ### Example
 
@@ -774,7 +774,7 @@ async function example() {
   const api = new AutopilotApi();
 
   const body = {
-    // 'GLOSSARY' | 'DECISION_PRECEDENT' | 'ENTITY_MAP' | 'SOURCE_PROFILE' | 'DETECTOR_INSIGHT' | 'OPERATOR_DIRECTIVE' (optional)
+    // 'DECISION_PRECEDENT' | 'ENTITY_MAP' | 'SOURCE_PROFILE' | 'DETECTOR_INSIGHT' | 'OPERATOR_DIRECTIVE' (optional)
     kind: kind_example,
     // string | Substring search over key and content (optional)
     search: search_example,
@@ -801,7 +801,7 @@ example().catch(console.error);
 
 | Name | Type | Description  | Notes |
 |------------- | ------------- | ------------- | -------------|
-| **kind** | `GLOSSARY`, `DECISION_PRECEDENT`, `ENTITY_MAP`, `SOURCE_PROFILE`, `DETECTOR_INSIGHT`, `OPERATOR_DIRECTIVE` |  | [Optional] [Defaults to `undefined`] [Enum: GLOSSARY, DECISION_PRECEDENT, ENTITY_MAP, SOURCE_PROFILE, DETECTOR_INSIGHT, OPERATOR_DIRECTIVE] |
+| **kind** | `DECISION_PRECEDENT`, `ENTITY_MAP`, `SOURCE_PROFILE`, `DETECTOR_INSIGHT`, `OPERATOR_DIRECTIVE` |  | [Optional] [Defaults to `undefined`] [Enum: DECISION_PRECEDENT, ENTITY_MAP, SOURCE_PROFILE, DETECTOR_INSIGHT, OPERATOR_DIRECTIVE] |
 | **search** | `string` | Substring search over key and content | [Optional] [Defaults to `undefined`] |
 | **skip** | `number` |  | [Optional] [Defaults to `0`] |
 | **limit** | `number` |  | [Optional] [Defaults to `50`] |

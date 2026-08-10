@@ -22,6 +22,7 @@ export interface RecordDecisionInput {
     | 'cluster'
     | 'source'
     | 'detector'
+    | 'glossary'
     | 'memory'
     | 'system';
   entityId?: string;

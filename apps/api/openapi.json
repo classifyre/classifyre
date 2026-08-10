@@ -8484,7 +8484,6 @@
             "schema": {
               "type": "string",
               "enum": [
-                "GLOSSARY",
                 "DECISION_PRECEDENT",
                 "ENTITY_MAP",
                 "SOURCE_PROFILE",
@@ -8533,7 +8532,7 @@
             }
           }
         },
-        "summary": "List the agent memory (glossary, precedents, topic map)",
+        "summary": "List long-lived agent memory (precedents, entity maps, source profiles, detector insights and directives)",
         "tags": [
           "autopilot"
         ]
@@ -17010,14 +17009,6 @@
             "type": "string",
             "nullable": true
           },
-          "refType": {
-            "type": "string",
-            "nullable": true
-          },
-          "refId": {
-            "type": "string",
-            "nullable": true
-          },
           "origin": {
             "type": "string",
             "description": "AGENT proposals are unverified hypotheses"
@@ -17102,14 +17093,6 @@
             ]
           },
           "notes": {
-            "type": "string",
-            "nullable": true
-          },
-          "refType": {
-            "type": "string",
-            "nullable": true
-          },
-          "refId": {
             "type": "string",
             "nullable": true
           },
@@ -17238,14 +17221,6 @@
             ]
           },
           "notes": {
-            "type": "string",
-            "nullable": true
-          },
-          "refType": {
-            "type": "string",
-            "nullable": true
-          },
-          "refId": {
             "type": "string",
             "nullable": true
           },
@@ -20236,7 +20211,6 @@
           "kind": {
             "type": "string",
             "enum": [
-              "GLOSSARY",
               "DECISION_PRECEDENT",
               "ENTITY_MAP",
               "SOURCE_PROFILE",
@@ -20320,7 +20294,6 @@
           "kind": {
             "type": "string",
             "enum": [
-              "GLOSSARY",
               "DECISION_PRECEDENT",
               "ENTITY_MAP",
               "SOURCE_PROFILE",
@@ -20330,7 +20303,7 @@
           },
           "key": {
             "type": "string",
-            "description": "Normalized lookup key (topic slug, term)"
+            "description": "Normalized lookup key (topic or entity slug)"
           },
           "content": {
             "type": "string"

@@ -128,6 +128,7 @@
   },
   "glossary": {
     "title": "Glossar",
+    "description": "Kanonisches Vokabular für Bediener, Fälle und jeden KI-Harness-Lauf.",
     "addTerm": "Begriff hinzufügen",
     "editTerm": "Begriff bearbeiten",
     "searchPlaceholder": "Begriffe, Aliasse oder Notizen durchsuchen…",
@@ -2363,10 +2364,12 @@
         "teach": "Beibringen",
         "loading": "Erinnerung wird geladen…",
         "emptyTitle": "Noch nichts gelernt",
-        "emptyDesc": "Der Agent erstellt während der Arbeit Glossareinträge, Entscheidungspräzedenzfälle und Entitätskarten — oder bringen Sie ihm jetzt etwas bei.",
+        "emptyDesc": "Der Agent erstellt während der Arbeit Entscheidungspräzedenzfälle, Entitätskarten, Quellprofile und Detektor-Erkenntnisse — oder bringen Sie ihm jetzt etwas bei.",
         "entryCount": "{{count}} Eintr{{suffix}}",
         "editTitle": "Bearbeiten",
         "forgetTitle": "Vergessen",
+        "openCase": "Fall öffnen",
+        "openInquiry": "Anfrage öffnen",
         "labelTags": "Tags",
         "labelWeight": "Gewichtung",
         "placeholders": {
