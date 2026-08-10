@@ -8,6 +8,7 @@ Name | Type
 ------------ | -------------
 `entryType` | string
 `body` | string
+`metadata` | { [key: string]: any; }
 `author` | string
 
 ## Example
@@ -19,6 +20,7 @@ import type { AddThreadEntryDto } from '@workspace/api-client'
 const example = {
   "entryType": null,
   "body": null,
+  "metadata": null,
   "author": null,
 } satisfies AddThreadEntryDto
 

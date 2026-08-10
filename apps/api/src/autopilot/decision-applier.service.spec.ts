@@ -16,7 +16,8 @@ describe('DecisionApplierService', () => {
   const mockPrisma = {
     inquiry: { findUnique: jest.fn() },
     case: { findUnique: jest.fn() },
-    caseThread: { findFirst: jest.fn() },
+    caseThread: { findFirst: jest.fn(), findUnique: jest.fn() },
+    customDetector: { findUnique: jest.fn() },
   };
   const mockInquiries = {
     create: jest.fn(),
@@ -99,6 +100,22 @@ describe('DecisionApplierService', () => {
     it('caseGate returns MANAGED for an unknown id (handler will fail)', async () => {
       mockPrisma.case.findUnique.mockResolvedValue(null);
       expect(await service.caseGate('ghost', false)).toBe(
+        AiManagementMode.MANAGED,
+      );
+    });
+
+    it('caseThreadGate resolves through the owning observe-only case', async () => {
+      mockPrisma.caseThread.findUnique.mockResolvedValue({
+        investigation: { aiMode: AiManagementMode.OBSERVE_ONLY },
+      });
+      expect(await service.caseThreadGate('thread-1', true)).toBe(
+        AiManagementMode.OBSERVE_ONLY,
+      );
+    });
+
+    it('caseThreadGate returns MANAGED for an unknown thread', async () => {
+      mockPrisma.caseThread.findUnique.mockResolvedValue(null);
+      expect(await service.caseThreadGate('ghost', false)).toBe(
         AiManagementMode.MANAGED,
       );
     });
@@ -185,6 +202,65 @@ describe('DecisionApplierService', () => {
         }),
       ).rejects.toThrow(/Unknown assetId/);
       expect(mockCases.addEvidence).not.toHaveBeenCalled();
+    });
+
+    it('forwards a testable predicate when adding and updating hypotheses', async () => {
+      await service.applyCaseOperationCore('c1', {
+        op: 'ADD_HYPOTHESIS',
+        rationale: '',
+        title: 'Key reuse',
+        testablePredicate: 'The same key appears after rotation.',
+      });
+      expect(mockThreads.create).toHaveBeenCalledWith(
+        'c1',
+        expect.objectContaining({
+          testablePredicate: 'The same key appears after rotation.',
+        }),
+      );
+
+      mockSearch.existingIds.mockResolvedValue(new Set(['thread-1']));
+      await service.applyCaseOperationCore('c1', {
+        op: 'UPDATE_HYPOTHESIS',
+        rationale: '',
+        threadId: 'thread-1',
+        testablePredicate: 'A rotated key is observed in later messages.',
+      });
+      expect(mockThreads.update).toHaveBeenCalledWith(
+        'thread-1',
+        expect.objectContaining({
+          testablePredicate: 'A rotated key is observed in later messages.',
+        }),
+      );
+    });
+
+    it('links a known detector as probe metadata on the hypothesis thread', async () => {
+      mockPrisma.customDetector.findUnique.mockResolvedValue({ id: 'det-1' });
+      await service.linkProbeCore({
+        threadId: 'thread-1',
+        customDetectorKey: 'cust_key_reuse',
+      });
+      expect(mockThreads.addEntry).toHaveBeenCalledWith(
+        'thread-1',
+        expect.objectContaining({
+          metadata: {
+            probe: {
+              customDetectorKey: 'cust_key_reuse',
+              detectorId: 'det-1',
+            },
+          },
+        }),
+      );
+    });
+
+    it('rejects an unknown detector key instead of creating a dead probe', async () => {
+      mockPrisma.customDetector.findUnique.mockResolvedValue(null);
+      await expect(
+        service.linkProbeCore({
+          threadId: 'thread-1',
+          customDetectorKey: 'invented_key',
+        }),
+      ).rejects.toThrow(/invented_key/);
+      expect(mockThreads.addEntry).not.toHaveBeenCalled();
     });
 
     it('applyCaseOperationCore attaches valid findings', async () => {

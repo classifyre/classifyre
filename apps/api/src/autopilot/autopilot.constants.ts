@@ -10,6 +10,18 @@ export const AUTOPILOT_QUEUE = 'autopilot.cycle';
  */
 export const AI_ACTOR = 'ai-autopilot';
 
+export type EntityOrigin = 'operator' | 'ai';
+
+/** NULL createdBy means an operator: the web never stamps one. */
+export function originOf(createdBy: string | null | undefined): EntityOrigin {
+  return createdBy === AI_ACTOR ? 'ai' : 'operator';
+}
+
+/** Prisma `where` fragment for operator-created rows. `{ not: AI_ACTOR }` alone drops NULLs. */
+export const OPERATOR_CREATED = {
+  OR: [{ createdBy: null }, { createdBy: { not: AI_ACTOR } }],
+} as const;
+
 /**
  * Delay (seconds) before an autopilot cycle starts. Keeps the agent "slow":
  * inquiry matching for the same source runs immediately on its own queue and
@@ -353,6 +365,9 @@ export const MAX_SAMPLE_VALUES_PER_GROUP = 15;
 export const MAX_SAMPLE_VALUE_LENGTH = 120;
 export const MAX_CANDIDATE_INQUIRIES = 60;
 export const MAX_CASE_SUMMARIES = 40;
+export const MAX_CASE_SUMMARY_DESCRIPTION = 240;
+export const MAX_HYPOTHESIS_TITLES_PER_CASE = 6;
+export const MAX_OPEN_HYPOTHESES = 20;
 export const MAX_FINDINGS_PER_INQUIRY = 25;
 export const MAX_CASE_CLUSTERS_PER_CYCLE = 5;
 export const MAX_GLOSSARY_ENTRIES = 20;

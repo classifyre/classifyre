@@ -20,7 +20,7 @@ import { mapValues } from '../runtime';
  */
 export interface UpdateThreadDto {
     /**
-     * 
+     *
      * @type {string}
      * @memberof UpdateThreadDto
      */
@@ -39,6 +39,12 @@ export interface UpdateThreadDto {
     confidence?: number | null;
     /**
      * 
+     * @type {string}
+     * @memberof UpdateThreadDto
+     */
+    testablePredicate?: string | null;
+    /**
+     *
      * @type {string}
      * @memberof UpdateThreadDto
      */
@@ -84,6 +90,7 @@ export function UpdateThreadDtoFromJSONTyped(json: any, ignoreDiscriminator: boo
         'title': json['title'] == null ? undefined : json['title'],
         'status': json['status'] == null ? undefined : json['status'],
         'confidence': json['confidence'] == null ? undefined : json['confidence'],
+        'testablePredicate': json['testablePredicate'] == null ? undefined : json['testablePredicate'],
         'color': json['color'] == null ? undefined : json['color'],
         'actor': json['actor'] == null ? undefined : json['actor'],
     };
@@ -103,8 +110,8 @@ export function UpdateThreadDtoToJSONTyped(value?: UpdateThreadDto | null, ignor
         'title': value['title'],
         'status': value['status'],
         'confidence': value['confidence'],
+        'testablePredicate': value['testablePredicate'],
         'color': value['color'],
         'actor': value['actor'],
     };
 }
-
