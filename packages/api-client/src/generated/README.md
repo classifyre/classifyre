@@ -52,6 +52,7 @@ All URIs are relative to *http://localhost*
 | ----- | ------ | ------------ | -------------
 *AIApi* | [**aiControllerComplete**](docs/AIApi.md#aicontrollercomplete) | **POST** /ai/complete | Generate a text completion
 *AIProviderConfigsApi* | [**aiProviderConfigControllerCapabilityTest**](docs/AIProviderConfigsApi.md#aiproviderconfigcontrollercapabilitytest) | **POST** /ai-provider-configs/{id}/capability-test | Grade a credential against what the agent harness requires
+*AIProviderConfigsApi* | [**aiProviderConfigControllerCapabilityTestStream**](docs/AIProviderConfigsApi.md#aiproviderconfigcontrollercapabilityteststream) | **POST** /ai-provider-configs/{id}/capability-test-stream | Stream Harness capability-test progress as newline-delimited JSON
 *AIProviderConfigsApi* | [**aiProviderConfigControllerCreate**](docs/AIProviderConfigsApi.md#aiproviderconfigcontrollercreate) | **POST** /ai-provider-configs | Create an AI provider configuration
 *AIProviderConfigsApi* | [**aiProviderConfigControllerGet**](docs/AIProviderConfigsApi.md#aiproviderconfigcontrollerget) | **GET** /ai-provider-configs/{id} | Get a single AI provider configuration
 *AIProviderConfigsApi* | [**aiProviderConfigControllerList**](docs/AIProviderConfigsApi.md#aiproviderconfigcontrollerlist) | **GET** /ai-provider-configs | List AI provider configurations

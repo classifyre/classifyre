@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { usePathname } from "next/navigation";
+import { usePathname } from "next/navigation.js";
 import {
   api,
   namespaceSlugFromPath,
@@ -58,12 +58,14 @@ type InstanceSettingsContextValue = {
 const DEFAULT_SETTINGS: InstanceSettingsResponse = {
   id: 1,
   aiEnabled: true,
+  harnessEnabled: true,
   mcpEnabled: true,
   demoMode: false,
   language: InstanceSettingsResponseDtoLanguageEnum.Automatic,
   timezone: "AUTOMATIC",
   timeFormat: InstanceSettingsResponseDtoTimeFormatEnum.Automatic,
   aiProviderConfigId: null,
+  harnessAiProviderConfigId: null,
   autopilotInquiryEnabled: true,
   autopilotInquiryDesired: null,
   autopilotInquirySearchable: null,

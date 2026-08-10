@@ -184,7 +184,11 @@ export async function runAgentLoop(
       turnResult = await deps.ai.completeJson<LoopTurn>(
         progress.messages,
         loopTurnSchema,
-        { temperature: 0.2, repair: repairTurn },
+        {
+          configId: ctx.settings.harnessAiProviderConfigId ?? undefined,
+          temperature: 0.2,
+          repair: repairTurn,
+        },
       );
     } catch (error) {
       // Failed attempts were billed too — record their tokens before the

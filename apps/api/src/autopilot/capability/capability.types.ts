@@ -129,3 +129,31 @@ export interface CapabilityReport {
    */
   assumptions: string[];
 }
+
+export type CapabilityProgressEvent =
+  | {
+      type: 'started';
+      configId: string;
+      configName: string;
+      provider: string;
+      model: string;
+      totalProbes: number;
+    }
+  | {
+      type: 'probe_started';
+      index: number;
+      totalProbes: number;
+      probe: Pick<ProbeResult, 'id' | 'tier' | 'title' | 'whatItProves'>;
+    }
+  | {
+      type: 'probe_completed';
+      index: number;
+      totalProbes: number;
+      probe: ProbeResult;
+    }
+  | { type: 'capacity_started' }
+  | { type: 'capacity_completed'; agents: AgentCapacityReport[] };
+
+export type CapabilityProgressCallback = (
+  event: CapabilityProgressEvent,
+) => void | Promise<void>;

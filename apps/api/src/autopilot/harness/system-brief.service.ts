@@ -411,15 +411,22 @@ export class SystemBriefService {
             status: 'todo',
             label: 'Add an AI provider',
             detail:
-              'The harness and assistants need a Claude/OpenAI/Gemini credential in Settings → AI Providers.',
+              'The harness and assistant need a Claude/OpenAI/Gemini credential in Harness AI → Configuration.',
           },
     );
 
-    if (settings && !settings.aiEnabled) {
+    if (settings && !settings.harnessEnabled) {
       items.push({
         status: 'todo',
-        label: 'Enable AI',
-        detail: 'AI is switched off instance-wide; the harness will not run.',
+        label: 'Enable the AI harness',
+        detail: 'The AI harness is switched off; its agents will not run.',
+      });
+    } else if (settings && !settings.harnessAiProviderConfigId) {
+      items.push({
+        status: 'todo',
+        label: 'Assign a Harness provider',
+        detail:
+          'Choose which AI provider the harness should use in Harness AI → Configuration.',
       });
     }
 

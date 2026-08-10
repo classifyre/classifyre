@@ -1,6 +1,7 @@
 import { AgentKind } from '@prisma/client';
 import { AiSchemaError } from '../../ai';
 import { AssistantCapabilityService } from './assistant-capability.service';
+import type { CapabilityProgressEvent } from './capability.types';
 import type { LoopTurn } from '../harness/agent-loop';
 import type { Tool } from '../tools/tool.types';
 
@@ -158,6 +159,32 @@ function buildService(deps: Deps = {}) {
 }
 
 describe('AssistantCapabilityService', () => {
+  it('emits real progress for every probe and the capacity analysis', async () => {
+    const { service } = buildService();
+    const events: CapabilityProgressEvent[] = [];
+
+    const report = await service.run('cfg-1', (event) => {
+      events.push(event);
+    });
+
+    expect(events[0]).toMatchObject({
+      type: 'started',
+      configId: 'cfg-1',
+      totalProbes: report.probes.length,
+    });
+    expect(
+      events.filter((event) => event.type === 'probe_started'),
+    ).toHaveLength(report.probes.length);
+    expect(
+      events.filter((event) => event.type === 'probe_completed'),
+    ).toHaveLength(report.probes.length);
+    expect(events.at(-2)).toEqual({ type: 'capacity_started' });
+    expect(events.at(-1)).toMatchObject({
+      type: 'capacity_completed',
+      agents: report.agents,
+    });
+  });
+
   it('reports READY and skips the recovery probe when the model is compliant', async () => {
     const { service } = buildService();
     const report = await service.run('cfg-1');

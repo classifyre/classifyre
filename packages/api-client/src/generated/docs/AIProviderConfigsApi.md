@@ -5,6 +5,7 @@ All URIs are relative to *http://localhost*
 | Method | HTTP request | Description |
 |------------- | ------------- | -------------|
 | [**aiProviderConfigControllerCapabilityTest**](AIProviderConfigsApi.md#aiproviderconfigcontrollercapabilitytest) | **POST** /ai-provider-configs/{id}/capability-test | Grade a credential against what the agent harness requires |
+| [**aiProviderConfigControllerCapabilityTestStream**](AIProviderConfigsApi.md#aiproviderconfigcontrollercapabilityteststream) | **POST** /ai-provider-configs/{id}/capability-test-stream | Stream Harness capability-test progress as newline-delimited JSON |
 | [**aiProviderConfigControllerCreate**](AIProviderConfigsApi.md#aiproviderconfigcontrollercreate) | **POST** /ai-provider-configs | Create an AI provider configuration |
 | [**aiProviderConfigControllerGet**](AIProviderConfigsApi.md#aiproviderconfigcontrollerget) | **GET** /ai-provider-configs/{id} | Get a single AI provider configuration |
 | [**aiProviderConfigControllerList**](AIProviderConfigsApi.md#aiproviderconfigcontrollerlist) | **GET** /ai-provider-configs | List AI provider configurations |
@@ -79,6 +80,71 @@ No authorization required
 | **200** |  |  -  |
 | **502** | AI provider returned an error |  -  |
 | **503** | AI provider not configured or rate limit hit |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## aiProviderConfigControllerCapabilityTestStream
+
+> string aiProviderConfigControllerCapabilityTestStream(id)
+
+Stream Harness capability-test progress as newline-delimited JSON
+
+### Example
+
+```ts
+import {
+  Configuration,
+  AIProviderConfigsApi,
+} from '@workspace/api-client';
+import type { AiProviderConfigControllerCapabilityTestStreamRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new AIProviderConfigsApi();
+
+  const body = {
+    // string
+    id: id_example,
+  } satisfies AiProviderConfigControllerCapabilityTestStreamRequest;
+
+  try {
+    const data = await api.aiProviderConfigControllerCapabilityTestStream(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **id** | `string` |  | [Defaults to `undefined`] |
+
+### Return type
+
+**string**
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: `application/x-ndjson`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** | Progress events followed by a complete event containing the capability report. |  -  |
 
 [[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
 
@@ -345,7 +411,7 @@ No authorization required
 
 Test an AI provider configuration
 
-Runs a small structured-JSON round-trip against the given credential to verify the provider, model, and API key work.
+Runs a small structured-JSON round-trip against the given credential to verify the provider, model, and API key work. Expected configuration and provider failures are returned as structured diagnostics.
 
 ### Example
 
@@ -402,8 +468,6 @@ No authorization required
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
 | **200** |  |  -  |
-| **502** | AI provider returned an error |  -  |
-| **503** | AI provider not configured or rate limit hit |  -  |
 
 [[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
 

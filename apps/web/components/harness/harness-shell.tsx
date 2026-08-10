@@ -15,10 +15,17 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { api, type AutopilotStatsDto } from "@workspace/api-client";
-import { Button } from "@workspace/ui/components";
+import {
+  Button,
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@workspace/ui/components";
 import { cn } from "@workspace/ui/lib/utils";
 import { useTranslation } from "@/hooks/use-translation";
 import { formatRelative } from "@/lib/date";
+import { useInstanceSettings } from "@/components/instance-settings-provider";
 import { AutopilotActivity } from "@/components/autopilot/autopilot-activity";
 import { AutopilotMemory } from "@/components/autopilot/autopilot-memory";
 import { RunAutopilotDialog } from "@/components/autopilot/run-autopilot-dialog";
@@ -50,11 +57,14 @@ const POLL_MS = 8000;
  */
 export function HarnessShell() {
   const { t } = useTranslation();
+  const { settings } = useInstanceSettings();
   const [view, setView] = React.useState<View>("activity");
   const [runOpen, setRunOpen] = React.useState(false);
   const [stats, setStats] = React.useState<AutopilotStatsDto | null>(null);
   const [focusRunId, setFocusRunId] = React.useState<string | undefined>();
   const [epoch, setEpoch] = React.useState(0);
+  const harnessReady =
+    settings.harnessEnabled && !!settings.harnessAiProviderConfigId;
 
   const loadStats = React.useCallback(async () => {
     try {
@@ -106,7 +116,12 @@ export function HarnessShell() {
             </h1>
           </div>
         </div>
-        <Button onClick={() => setRunOpen(true)} className="shrink-0">
+        <Button
+          onClick={() => setRunOpen(true)}
+          className="shrink-0"
+          disabled={!harnessReady}
+          title={!harnessReady ? t("harness.config.requiresAi") : undefined}
+        >
           <Play className="h-3.5 w-3.5" />
           {t("harness.steer")}
         </Button>
@@ -115,41 +130,58 @@ export function HarnessShell() {
       {/* ── Live counters ── */}
       <StatStrip stats={stats} />
 
-      {/* ── Sub-nav ── */}
-      <div className="flex flex-wrap items-center gap-1 border-b-2 border-border pb-px">
-        {tabs.map((tab) => {
-          const active = view === tab.value;
-          return (
-            <button
+      <Tabs
+        value={view}
+        onValueChange={(next) => setView(next as View)}
+        urlParam="tab"
+        className="gap-5"
+      >
+        {/* ── Sub-nav ── */}
+        <TabsList
+          variant="line"
+          className="h-auto w-full flex-wrap justify-start gap-1 border-b-2 border-border p-0"
+        >
+          {tabs.map((tab) => (
+            <TabsTrigger
               key={tab.value}
-              onClick={() => setView(tab.value)}
+              value={tab.value}
               className={cn(
-                "-mb-[2px] inline-flex items-center gap-1.5 border-b-2 px-3 py-2 font-mono text-[11px] uppercase tracking-wider transition-colors",
-                active
-                  ? "border-[#d97706] text-foreground"
-                  : "border-transparent text-muted-foreground hover:text-foreground",
+                "flex-none rounded-none border-b-2 border-transparent px-3 py-2 font-mono text-[11px] uppercase tracking-wider",
+                "data-[state=active]:border-[#d97706] data-[state=active]:after:opacity-0",
               )}
             >
               <tab.icon className="h-3.5 w-3.5" />
               {tab.label}
-            </button>
-          );
-        })}
-      </div>
+            </TabsTrigger>
+          ))}
+        </TabsList>
 
-      {/* ── Views ── */}
-      <div>
-        {view === "activity" && <HarnessActivity onOpenRun={openRun} />}
-        {view === "runs" && (
+        {/* ── Views ── */}
+        <TabsContent value="activity">
+          <HarnessActivity onOpenRun={openRun} />
+        </TabsContent>
+        <TabsContent value="runs">
           <AutopilotActivity key={`runs-${epoch}`} focusRunId={focusRunId} />
-        )}
-        {view === "usage" && <HarnessUsage />}
-        {view === "agents" && <HarnessAgents />}
-        {view === "tools" && <HarnessTools />}
-        {view === "memory" && <AutopilotMemory />}
-        {view === "brief" && <HarnessBrief key={`brief-${epoch}`} />}
-        {view === "config" && <HarnessConfig />}
-      </div>
+        </TabsContent>
+        <TabsContent value="usage">
+          <HarnessUsage />
+        </TabsContent>
+        <TabsContent value="agents">
+          <HarnessAgents />
+        </TabsContent>
+        <TabsContent value="tools">
+          <HarnessTools />
+        </TabsContent>
+        <TabsContent value="memory">
+          <AutopilotMemory />
+        </TabsContent>
+        <TabsContent value="brief">
+          <HarnessBrief key={`brief-${epoch}`} />
+        </TabsContent>
+        <TabsContent value="config">
+          <HarnessConfig />
+        </TabsContent>
+      </Tabs>
 
       <RunAutopilotDialog
         open={runOpen}

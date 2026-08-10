@@ -697,11 +697,13 @@ model Notification {
 model InstanceSettings {
   id                 Int                @id @default(1)
   aiEnabled          Boolean            @default(true) @map("ai_enabled")
+  harnessEnabled     Boolean            @default(true) @map("harness_enabled")
   mcpEnabled         Boolean            @default(true) @map("mcp_enabled")
   language           InstanceLanguage   @default(AUTOMATIC)
   timezone           String             @default("AUTOMATIC")
   timeFormat         InstanceTimeFormat @default(AUTOMATIC) @map("time_format")
   aiProviderConfigId String?            @map("ai_provider_config_id")
+  harnessAiProviderConfigId String?     @map("harness_ai_provider_config_id")
 
   hfTokenEnc String? @map("hf_token_enc")
 
@@ -740,7 +742,8 @@ model InstanceSettings {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  aiProviderConfig AiProviderConfig? @relation(fields: [aiProviderConfigId], references: [id], onDelete: SetNull)
+  aiProviderConfig        AiProviderConfig? @relation("AssistantAiProvider", fields: [aiProviderConfigId], references: [id], onDelete: SetNull)
+  harnessAiProviderConfig AiProviderConfig? @relation("HarnessAiProvider", fields: [harnessAiProviderConfigId], references: [id], onDelete: SetNull)
 
   @@map("instance_settings")
 }
@@ -761,7 +764,8 @@ model AiProviderConfig {
   createdAt         DateTime       @default(now()) @map("created_at")
   updatedAt         DateTime       @updatedAt @map("updated_at")
 
-  instanceSettings InstanceSettings[]
+  assistantInstanceSettings InstanceSettings[] @relation("AssistantAiProvider")
+  harnessInstanceSettings   InstanceSettings[] @relation("HarnessAiProvider")
   customDetectors  CustomDetector[]
 
   @@map("ai_provider_config")

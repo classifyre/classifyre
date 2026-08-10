@@ -122,11 +122,11 @@ export class AutopilotService {
   ): Promise<TriggerAutopilotResponseDto> {
     const settings = await this.prisma.instanceSettings.findUnique({
       where: { id: 1 },
-      select: { aiEnabled: true, aiProviderConfigId: true },
+      select: { harnessEnabled: true, harnessAiProviderConfigId: true },
     });
-    if (!settings?.aiEnabled || !settings.aiProviderConfigId) {
+    if (!settings?.harnessEnabled || !settings.harnessAiProviderConfigId) {
       throw new BadRequestException(
-        'Enable AI and select a default provider in Settings before triggering the autopilot.',
+        'Enable the AI harness and select its provider before triggering the autopilot.',
       );
     }
     if (dto.sourceId) {
@@ -234,11 +234,11 @@ export class AutopilotService {
   async triggerDream(): Promise<TriggerAutopilotResponseDto> {
     const settings = await this.prisma.instanceSettings.findUnique({
       where: { id: 1 },
-      select: { aiEnabled: true, aiProviderConfigId: true },
+      select: { harnessEnabled: true, harnessAiProviderConfigId: true },
     });
-    if (!settings?.aiEnabled || !settings.aiProviderConfigId) {
+    if (!settings?.harnessEnabled || !settings.harnessAiProviderConfigId) {
       throw new BadRequestException(
-        'Enable AI and select a default provider in Settings before triggering a dream cycle.',
+        'Enable the AI harness and select its provider before triggering a dream cycle.',
       );
     }
     const cycleKey = `dream:manual:${randomUUID()}`;
@@ -702,7 +702,7 @@ export class AutopilotService {
       this.prisma.instanceSettings.findUnique({
         where: { id: 1 },
         select: {
-          aiProviderConfig: {
+          harnessAiProviderConfig: {
             select: { inputCostPerMTok: true, outputCostPerMTok: true },
           },
         },
@@ -730,7 +730,7 @@ export class AutopilotService {
       avgDurationMs,
     };
 
-    const pricing = settings?.aiProviderConfig;
+    const pricing = settings?.harnessAiProviderConfig;
     return {
       buckets,
       totals,

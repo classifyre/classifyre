@@ -17,6 +17,7 @@ const ID_PARENTS = new Set([
   "findings",
   "investigations",
   "inquiries",
+  "providers",
 ]);
 
 function idFromLocationPath(pathname: string): string {

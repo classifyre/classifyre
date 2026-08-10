@@ -7,11 +7,13 @@
 Name | Type
 ------------ | -------------
 `aiEnabled` | boolean
+`harnessEnabled` | boolean
 `mcpEnabled` | boolean
 `language` | string
 `timezone` | string
 `timeFormat` | string
 `aiProviderConfigId` | string
+`harnessAiProviderConfigId` | string
 `autopilotInquiryEnabled` | boolean
 `autopilotInquiryDesired` | string
 `autopilotInquirySearchable` | string
@@ -36,11 +38,13 @@ import type { UpdateInstanceSettingsDto } from '@workspace/api-client'
 // TODO: Update the object below with actual values
 const example = {
   "aiEnabled": true,
+  "harnessEnabled": true,
   "mcpEnabled": true,
   "language": ENGLISH,
   "timezone": America/New_York,
   "timeFormat": TWELVE_HOUR,
   "aiProviderConfigId": null,
+  "harnessAiProviderConfigId": null,
   "autopilotInquiryEnabled": true,
   "autopilotInquiryDesired": null,
   "autopilotInquirySearchable": null,
