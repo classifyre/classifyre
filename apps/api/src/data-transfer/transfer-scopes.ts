@@ -582,7 +582,14 @@ export const TRANSFER_TABLES: readonly TransferTableSpec[] = [
     scope: 'glossary',
     order: 800,
     keys: ['id'],
-    idRefs: ['id', 'refId'],
+    idRefs: ['id'],
+  },
+  {
+    model: 'glossaryReference',
+    scope: 'glossary',
+    order: 810,
+    keys: ['id'],
+    idRefs: ['id', 'glossaryTermId', 'entityId'],
   },
 
   // ── Instance configuration that references the above ──────────────────────

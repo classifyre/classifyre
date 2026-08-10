@@ -114,8 +114,10 @@ export class CasesService {
           dto.createdBy,
         );
       }
+      await this.syncEntityMaps(created.id, inquiryIds);
       return (await this.findOne(created.id))!;
     }
+    await this.syncEntityMaps(created.id);
     return this.mapCase(created);
   }
 
@@ -153,6 +155,7 @@ export class CasesService {
         actor,
       );
     }
+    await this.syncEntityMaps(caseId, inquiryIds);
     return (await this.findOne(caseId))!;
   }
 
@@ -175,6 +178,7 @@ export class CasesService {
       inquiryId,
       inquiryTitle: link.inquiry.title,
     });
+    await this.syncEntityMaps(caseId, [inquiryId]);
     return (await this.findOne(caseId))!;
   }
 
@@ -216,11 +220,19 @@ export class CasesService {
             data: { status: 'ARCHIVED' },
           })
         : { count: 0 };
+    const linkedInquiryIds = await this.prisma.caseInquiry.findMany({
+      where: { caseId: id },
+      select: { inquiryId: true },
+    });
     await this.activity.record(
       id,
       CaseActivityType.CONCLUSION_UPDATED,
       { closed: true, archivedInquiries: archived.count },
       dto.closedBy,
+    );
+    await this.syncEntityMaps(
+      id,
+      linkedInquiryIds.map((link) => link.inquiryId),
     );
     return {
       case: (await this.findOne(id))!,
@@ -246,6 +258,10 @@ export class CasesService {
       where: { status: 'ARCHIVED', caseLinks: { some: { caseId: id } } },
       data: { status: 'ACTIVE' },
     });
+    const linkedInquiryIds = await this.prisma.caseInquiry.findMany({
+      where: { caseId: id },
+      select: { inquiryId: true },
+    });
     await this.activity.record(
       id,
       CaseActivityType.CASE_UPDATED,
@@ -255,6 +271,10 @@ export class CasesService {
         note: dto.note,
       },
       dto.reopenedBy,
+    );
+    await this.syncEntityMaps(
+      id,
+      linkedInquiryIds.map((link) => link.inquiryId),
     );
     return {
       case: (await this.findOne(id))!,
@@ -348,6 +368,7 @@ export class CasesService {
       { title: dto.title, status: dto.status, severity: dto.severity },
       actor,
     );
+    await this.syncEntityMaps(id);
     return this.mapCase(updated);
   }
 
@@ -361,6 +382,19 @@ export class CasesService {
     // Keep the autopilot's memory consistent: drop memories referencing the
     // dead case and remember that the operator deleted it on purpose.
     await this.agentMemory.recordEntityDeletion('case', id, existing.title);
+  }
+
+  /** Keep case and linked-inquiry maps coherent after a relationship change. */
+  private async syncEntityMaps(
+    caseId: string,
+    inquiryIds: string[] = [],
+  ): Promise<void> {
+    await this.agentMemory.syncEntityMap('case', caseId);
+    await Promise.all(
+      [...new Set(inquiryIds)].map((inquiryId) =>
+        this.agentMemory.syncEntityMap('inquiry', inquiryId),
+      ),
+    );
   }
 
   async addEvidence(

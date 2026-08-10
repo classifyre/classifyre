@@ -6,7 +6,7 @@ import type { MemoryWrite, RecalledMemory } from '../autopilot.types';
 
 /**
  * Long-lived agent knowledge store. Memories are small keyed facts
- * (domain glossary, generalized decision precedents, topic→inquiry mappings)
+ * (generalized decision precedents, entity maps and operational lessons)
  * recalled via PostgreSQL full-text search over key+content (FTS indexes in
  * the autopilot migration; pg_trgm is intentionally avoided — not available
  * in all PostgreSQL distributions).
@@ -136,9 +136,12 @@ export class AgentMemoryService {
         )
         ON CONFLICT (kind, key) DO UPDATE SET
           content = EXCLUDED.content,
-          tags = ARRAY(
-            SELECT DISTINCT unnest(agent_memories.tags || EXCLUDED.tags)
-          ),
+          tags = CASE
+            WHEN ${w.replaceTags === true} THEN EXCLUDED.tags
+            ELSE ARRAY(
+              SELECT DISTINCT unnest(agent_memories.tags || EXCLUDED.tags)
+            )
+          END,
           weight = agent_memories.weight + 1,
           ref_type = COALESCE(EXCLUDED.ref_type, agent_memories.ref_type),
           ref_id = COALESCE(EXCLUDED.ref_id, agent_memories.ref_id),
@@ -158,6 +161,120 @@ export class AgentMemoryService {
       if (changed > 0) written++;
     }
     return written;
+  }
+
+  /**
+   * Keep the durable topic/entity map synchronized with live investigation
+   * state. This is deterministic system memory, not an LLM-authored summary:
+   * cases and inquiries call it after every lifecycle mutation, and failures
+   * are best-effort so a committed domain mutation is never reported failed.
+   */
+  async syncEntityMap(
+    entityType: 'inquiry' | 'case',
+    entityId: string,
+  ): Promise<void> {
+    try {
+      if (entityType === 'case') {
+        const row = await this.prisma.case.findUnique({
+          where: { id: entityId },
+          select: {
+            id: true,
+            title: true,
+            description: true,
+            status: true,
+            severity: true,
+            inquiryLinks: {
+              orderBy: { createdAt: 'asc' },
+              select: {
+                inquiry: { select: { id: true, title: true, status: true } },
+              },
+            },
+          },
+        });
+        if (!row) return;
+        const linked = row.inquiryLinks
+          .map(
+            ({ inquiry }) =>
+              `"${inquiry.title}" (${inquiry.status}, inquiry:${inquiry.id})`,
+          )
+          .join('; ');
+        await this.writeMany(
+          [
+            {
+              kind: 'ENTITY_MAP',
+              key: `case:${row.id}`,
+              content: [
+                `Case "${row.title}" [${row.status}, ${row.severity}].`,
+                row.description?.trim(),
+                linked ? `Linked inquiries: ${linked}.` : null,
+              ]
+                .filter(Boolean)
+                .join(' '),
+              tags: ['entity-map', 'case', String(row.status).toLowerCase()],
+              replaceTags: true,
+              verified: true,
+            },
+          ],
+          { refType: 'case', refId: row.id },
+          'AGENT',
+          'system',
+        );
+        return;
+      }
+
+      const row = await this.prisma.inquiry.findUnique({
+        where: { id: entityId },
+        select: {
+          id: true,
+          title: true,
+          description: true,
+          status: true,
+          matchCount: true,
+          caseLinks: {
+            orderBy: { createdAt: 'asc' },
+            select: {
+              case: {
+                select: { id: true, title: true, status: true, severity: true },
+              },
+            },
+          },
+        },
+      });
+      if (!row) return;
+      const linked = row.caseLinks
+        .map(
+          ({ case: investigation }) =>
+            `"${investigation.title}" (${investigation.status}/${investigation.severity}, case:${investigation.id})`,
+        )
+        .join('; ');
+      await this.writeMany(
+        [
+          {
+            kind: 'ENTITY_MAP',
+            key: `inquiry:${row.id}`,
+            content: [
+              `Inquiry "${row.title}" [${row.status}] with ${row.matchCount} current match(es).`,
+              row.description?.trim(),
+              linked ? `Linked cases: ${linked}.` : null,
+            ]
+              .filter(Boolean)
+              .join(' '),
+            tags: ['entity-map', 'inquiry', String(row.status).toLowerCase()],
+            replaceTags: true,
+            verified: true,
+          },
+        ],
+        { refType: 'inquiry', refId: row.id },
+        'AGENT',
+        'system',
+      );
+    } catch (error) {
+      this.logger.warn(
+        `Failed to synchronize ${entityType} ${entityId} into the entity map: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
   }
 
   // ── Dream-mode consolidation primitives ────────────────────────────────────

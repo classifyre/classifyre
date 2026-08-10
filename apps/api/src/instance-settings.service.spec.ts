@@ -49,6 +49,20 @@ describe('InstanceSettingsService', () => {
     const result = await service.getSettings();
 
     expect(mockPrismaService.instanceSettings.upsert).toHaveBeenCalledTimes(1);
+    expect(mockPrismaService.instanceSettings.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({
+          aiEnabled: true,
+          mcpEnabled: true,
+          autopilotInquiryEnabled: true,
+          autopilotCaseEnabled: true,
+          autopilotConfigEnabled: true,
+          autopilotDetectorEnabled: true,
+          autopilotEscalationEnabled: true,
+          autopilotMcpEnabled: true,
+        }),
+      }),
+    );
     expect(result).toMatchObject({
       id: 1,
       aiEnabled: true,

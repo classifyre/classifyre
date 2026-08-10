@@ -139,8 +139,8 @@ export class SystemBriefService {
     const [brief, glossary, entityMaps, detectorInsights, precedents] =
       await Promise.all([
         this.get(),
-        // Real operator-facing vocabulary, not legacy GLOSSARY memory slugs —
-        // what the brief shows is what agents imitate when proposing terms.
+        // Canonical operator-facing vocabulary. GlossaryTerm is the only
+        // glossary store, so what operators edit is exactly what agents see.
         this.glossaryEntries(),
         this.memory.topByWeight(AgentMemoryKind.ENTITY_MAP, MAX_TOPIC_ENTRIES),
         this.memory.topByWeight(

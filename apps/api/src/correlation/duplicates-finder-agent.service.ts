@@ -4,6 +4,16 @@ import { AgentAuditService } from '../autopilot/audit/agent-audit.service';
 import { AgentLoggerService } from '../autopilot/audit/agent-logger.service';
 import { CasesService } from '../cases.service';
 import { CorrelationService } from './correlation.service';
+import { isTransientDbError } from '../db/transient-db-error';
+
+/**
+ * Retries for a correlation pass that lost the race for a database connection.
+ * Two is enough for a pool blip; more would just hold the queue against a
+ * genuinely overloaded instance.
+ */
+const TRANSIENT_RETRY_ATTEMPTS = 2;
+/** Backoff before a retry, multiplied by the attempt number. */
+const TRANSIENT_RETRY_DELAY_MS = 2000;
 
 export interface CaseActionInput {
   assetIds: string[];
@@ -65,10 +75,12 @@ export class DuplicatesFinderAgentService {
         `Duplicates finder started after a scan of ${input.sourceName}.`,
       );
 
-      const summary = await this.correlation.recomputeForRunner(
-        input.sourceId,
-        input.runnerId,
-        (msg, data) => this.log.technical(run.id, msg, data),
+      const summary = await this.retryTransient(run.id, () =>
+        this.correlation.recomputeForRunner(
+          input.sourceId,
+          input.runnerId,
+          (msg, data) => this.log.technical(run.id, msg, data),
+        ),
       );
 
       await this.log.technical(run.id, 'Correlation recompute finished.', {
@@ -107,6 +119,45 @@ export class DuplicatesFinderAgentService {
       });
       await this.audit.fail(run.id, error);
       throw error;
+    }
+  }
+
+  /**
+   * Retry a correlation pass through a transient database condition.
+   *
+   * The recompute is long and connection-hungry, so on a busy namespace it can
+   * lose the race for the per-namespace pool and die on
+   * `timeout exceeded when trying to connect` — four runs did exactly that on a
+   * live instance while 1.9M findings were being ingested alongside it.
+   *
+   * pg-boss would redeliver the job, but that does not help: the catch above
+   * has already marked the AgentRun FAILED, and the resume guard at the top of
+   * this method returns early for a run that is no longer RUNNING. So the retry
+   * has to happen here, before the run is written off. Transient means nothing
+   * was committed (see `transient-db-error`), which is what makes repeating the
+   * whole pass safe.
+   */
+  private async retryTransient<T>(
+    runId: string,
+    work: () => Promise<T>,
+  ): Promise<T> {
+    for (let attempt = 1; ; attempt++) {
+      try {
+        return await work();
+      } catch (error) {
+        if (attempt > TRANSIENT_RETRY_ATTEMPTS || !isTransientDbError(error)) {
+          throw error;
+        }
+        await this.log.technical(
+          runId,
+          `Correlation pass hit a transient database condition; retrying ` +
+            `(attempt ${attempt} of ${TRANSIENT_RETRY_ATTEMPTS}).`,
+          { error: error instanceof Error ? error.message : String(error) },
+        );
+        await new Promise((resolve) =>
+          setTimeout(resolve, TRANSIENT_RETRY_DELAY_MS * attempt),
+        );
+      }
     }
   }
 

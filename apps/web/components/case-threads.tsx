@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import {
   GitCommit,
   Lightbulb,
@@ -13,6 +14,7 @@ import {
   ThumbsUp,
   Trash2,
   X,
+  Target,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -49,6 +51,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@workspace/ui/components/select";
+import { useNamespace } from "@/components/namespace-provider";
 
 const STATUSES = ["PROPOSED", "SUPPORTED", "REFUTED", "INCONCLUSIVE"] as const;
 const STANCES = ["SUPPORTS", "CONTRADICTS", "NEUTRAL"] as const;
@@ -61,8 +64,16 @@ const STATUS_COLOR: Record<string, string> = {
 };
 
 const SWATCHES = [
-  "#e11d48", "#ea580c", "#d97706", "#65a30d", "#059669",
-  "#0891b2", "#2563eb", "#7c3aed", "#db2777", "#6b7280",
+  "#e11d48",
+  "#ea580c",
+  "#d97706",
+  "#65a30d",
+  "#059669",
+  "#0891b2",
+  "#2563eb",
+  "#7c3aed",
+  "#db2777",
+  "#6b7280",
 ] as const;
 
 function relativeTime(date: Date): string {
@@ -88,12 +99,38 @@ function buildLinkTargets(evidence: CaseEvidenceDto[]): LinkTarget[] {
   const targets: LinkTarget[] = [];
   for (const e of evidence) {
     const assetLabel = e.entity?.label ?? e.entityId;
-    targets.push({ targetType: "evidence", targetId: e.id, label: assetLabel, group: assetLabel });
+    targets.push({
+      targetType: "evidence",
+      targetId: e.id,
+      label: assetLabel,
+      group: assetLabel,
+    });
     for (const f of e.findings ?? []) {
-      targets.push({ targetType: "finding", targetId: f.id, label: f.findingLabel, group: assetLabel });
+      targets.push({
+        targetType: "finding",
+        targetId: f.id,
+        label: f.findingLabel,
+        group: assetLabel,
+      });
     }
   }
   return targets;
+}
+
+function probeFromMetadata(
+  metadata: unknown,
+): { customDetectorKey: string; detectorId?: string } | null {
+  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata))
+    return null;
+  const probe = (metadata as Record<string, unknown>).probe;
+  if (!probe || typeof probe !== "object" || Array.isArray(probe)) return null;
+  const value = probe as Record<string, unknown>;
+  if (typeof value.customDetectorKey !== "string") return null;
+  return {
+    customDetectorKey: value.customDetectorKey,
+    detectorId:
+      typeof value.detectorId === "string" ? value.detectorId : undefined,
+  };
 }
 
 // ─── Thread list item ────────────────────────────────────────────────────────
@@ -108,6 +145,9 @@ function ThreadListItem({
   onSelect: () => void;
 }) {
   const isHypothesis = thread.kind === ThreadResponseDtoKindEnum.Hypothesis;
+  const probeCount = thread.entries.filter((entry) =>
+    probeFromMetadata(entry.metadata),
+  ).length;
   return (
     <button
       onClick={onSelect}
@@ -127,7 +167,9 @@ function ThreadListItem({
         ) : (
           <MessageSquare className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
         )}
-        <span className="min-w-0 flex-1 truncate text-sm font-medium">{thread.title}</span>
+        <span className="min-w-0 flex-1 truncate text-sm font-medium">
+          {thread.title}
+        </span>
       </span>
       <span className="mt-1.5 flex flex-wrap items-center gap-1.5">
         {isHypothesis && (
@@ -143,11 +185,25 @@ function ThreadListItem({
                 {Math.round(Number(thread.confidence) * 100)}%
               </span>
             )}
+            {thread.testablePredicate && (
+              <Badge
+                variant="secondary"
+                className="h-4 px-1.5 py-0 text-[10px]"
+              >
+                <Target className="mr-1 h-2.5 w-2.5" /> predicate
+              </Badge>
+            )}
+            {probeCount > 0 && (
+              <span className="text-muted-foreground font-mono text-[10px]">
+                {probeCount} probe{probeCount === 1 ? "" : "s"}
+              </span>
+            )}
           </>
         )}
         <span className="text-muted-foreground text-[11px]">
           {thread.supportingCount} for · {thread.contradictingCount} against ·{" "}
-          {thread.entries.length} entr{thread.entries.length === 1 ? "y" : "ies"}
+          {thread.entries.length} entr
+          {thread.entries.length === 1 ? "y" : "ies"}
         </span>
       </span>
     </button>
@@ -168,21 +224,27 @@ function ThreadDetail({
   onDeleted: () => void;
 }) {
   const isHypothesis = thread.kind === ThreadResponseDtoKindEnum.Hypothesis;
+  const { nsHref } = useNamespace();
 
   const [noteText, setNoteText] = React.useState("");
   const [sending, setSending] = React.useState(false);
   const [confidence, setConfidence] = React.useState(
     Math.round(Number(thread.confidence ?? 0) * 100),
   );
+  const [testablePredicate, setTestablePredicate] = React.useState(
+    thread.testablePredicate ?? "",
+  );
   const [linkTarget, setLinkTarget] = React.useState("");
-  const [linkStance, setLinkStance] = React.useState<(typeof STANCES)[number]>("SUPPORTS");
+  const [linkStance, setLinkStance] =
+    React.useState<(typeof STANCES)[number]>("SUPPORTS");
   const [linking, setLinking] = React.useState(false);
 
   React.useEffect(() => {
     setNoteText("");
     setConfidence(Math.round(Number(thread.confidence ?? 0) * 100));
+    setTestablePredicate(thread.testablePredicate ?? "");
     setLinkTarget("");
-  }, [thread.id, thread.confidence]);
+  }, [thread.id, thread.confidence, thread.testablePredicate]);
 
   const targets = React.useMemo(() => buildLinkTargets(evidence), [evidence]);
   const linkedIds = React.useMemo(
@@ -193,9 +255,16 @@ function ThreadDetail({
     (t) => !linkedIds.has(`${t.targetType}::${t.targetId}`),
   );
 
-  const patch = async (data: Parameters<typeof api.threads.caseThreadsControllerUpdate>[0]["updateThreadDto"]) => {
+  const patch = async (
+    data: Parameters<
+      typeof api.threads.caseThreadsControllerUpdate
+    >[0]["updateThreadDto"],
+  ) => {
     try {
-      await api.threads.caseThreadsControllerUpdate({ id: thread.id, updateThreadDto: data });
+      await api.threads.caseThreadsControllerUpdate({
+        id: thread.id,
+        updateThreadDto: data,
+      });
       onChanged();
     } catch (err) {
       console.error(err);
@@ -209,7 +278,10 @@ function ThreadDetail({
     try {
       await api.threads.caseThreadsControllerAddEntry({
         id: thread.id,
-        addThreadEntryDto: { entryType: AddThreadEntryDtoEntryTypeEnum.Note, body: noteText.trim() },
+        addThreadEntryDto: {
+          entryType: AddThreadEntryDtoEntryTypeEnum.Note,
+          body: noteText.trim(),
+        },
       });
       setNoteText("");
       onChanged();
@@ -246,7 +318,10 @@ function ThreadDetail({
 
   const unlink = async (linkId: string) => {
     try {
-      await api.threads.caseThreadsControllerUnlinkSupport({ id: thread.id, linkId });
+      await api.threads.caseThreadsControllerUnlinkSupport({
+        id: thread.id,
+        linkId,
+      });
       onChanged();
     } catch (err) {
       console.error(err);
@@ -277,11 +352,17 @@ function ThreadDetail({
           <p className="text-muted-foreground font-mono text-[10px] uppercase tracking-[0.14em]">
             {isHypothesis ? "Hypothesis" : "Discussion"}
           </p>
-          <h3 className="mt-0.5 break-words text-base font-semibold">{thread.title}</h3>
+          <h3 className="mt-0.5 break-words text-base font-semibold">
+            {thread.title}
+          </h3>
         </div>
         <AlertDialog>
           <AlertDialogTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0 text-destructive">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 shrink-0 text-destructive"
+            >
               <Trash2 className="h-3.5 w-3.5" />
             </Button>
           </AlertDialogTrigger>
@@ -289,8 +370,8 @@ function ThreadDetail({
             <AlertDialogHeader>
               <AlertDialogTitle>Delete this thread?</AlertDialogTitle>
               <AlertDialogDescription>
-                Its notes, history and evidence links are removed. Evidence itself stays in
-                the case.
+                Its notes, history and evidence links are removed. Evidence
+                itself stays in the case.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
@@ -303,50 +384,83 @@ function ThreadDetail({
 
       {/* ── Hypothesis state controls ── */}
       {isHypothesis && (
-        <div className="flex flex-wrap items-end gap-4 rounded-[4px] border border-border bg-background/60 p-3">
-          <div className="space-y-1">
-            <p className="text-muted-foreground text-[10px] font-mono uppercase tracking-wide">Verdict</p>
-            <Select value={thread.status ?? "PROPOSED"} onValueChange={(v) => void patch({ status: v as never })}>
-              <SelectTrigger className="h-8 w-40 text-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {STATUSES.map((s) => (
-                  <SelectItem key={s} value={s}>
-                    {s.charAt(0) + s.slice(1).toLowerCase()}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="min-w-[180px] flex-1 space-y-1">
-            <p className="text-muted-foreground text-[10px] font-mono uppercase tracking-wide">
-              Confidence: <span className="text-foreground">{confidence}%</span>
-            </p>
-            <Slider
-              value={[confidence]}
-              min={0}
-              max={100}
-              step={5}
-              onValueChange={([v]) => setConfidence(v ?? 0)}
-              onValueCommit={([v]) => void patch({ confidence: (v ?? 0) / 100 })}
-            />
-          </div>
-          <div className="space-y-1">
-            <p className="text-muted-foreground text-[10px] font-mono uppercase tracking-wide">Color</p>
-            <div className="flex gap-1">
-              {SWATCHES.map((s) => (
-                <button
-                  key={s}
-                  aria-label={`Set color ${s}`}
-                  className={`h-5 w-5 rounded-[2px] border-2 transition-transform hover:scale-110 ${
-                    (thread.color ?? "") === s ? "border-foreground" : "border-transparent"
-                  }`}
-                  style={{ backgroundColor: s }}
-                  onClick={() => void patch({ color: s })}
-                />
-              ))}
+        <div className="space-y-3 rounded-[4px] border border-border bg-background/60 p-3">
+          <div className="flex flex-wrap items-end gap-4">
+            <div className="space-y-1">
+              <p className="text-muted-foreground text-[10px] font-mono uppercase tracking-wide">
+                Verdict
+              </p>
+              <Select
+                value={thread.status ?? "PROPOSED"}
+                onValueChange={(v) => void patch({ status: v as never })}
+              >
+                <SelectTrigger className="h-8 w-40 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {STATUSES.map((s) => (
+                    <SelectItem key={s} value={s}>
+                      {s.charAt(0) + s.slice(1).toLowerCase()}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
+            <div className="min-w-[180px] flex-1 space-y-1">
+              <p className="text-muted-foreground text-[10px] font-mono uppercase tracking-wide">
+                Confidence:{" "}
+                <span className="text-foreground">{confidence}%</span>
+              </p>
+              <Slider
+                value={[confidence]}
+                min={0}
+                max={100}
+                step={5}
+                onValueChange={([v]) => setConfidence(v ?? 0)}
+                onValueCommit={([v]) =>
+                  void patch({ confidence: (v ?? 0) / 100 })
+                }
+              />
+            </div>
+            <div className="space-y-1">
+              <p className="text-muted-foreground text-[10px] font-mono uppercase tracking-wide">
+                Color
+              </p>
+              <div className="flex gap-1">
+                {SWATCHES.map((s) => (
+                  <button
+                    key={s}
+                    aria-label={`Set color ${s}`}
+                    className={`h-5 w-5 rounded-[2px] border-2 transition-transform hover:scale-110 ${
+                      (thread.color ?? "") === s
+                        ? "border-foreground"
+                        : "border-transparent"
+                    }`}
+                    style={{ backgroundColor: s }}
+                    onClick={() => void patch({ color: s })}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <p className="text-muted-foreground font-mono text-[10px] uppercase tracking-wide">
+              Testable predicate
+            </p>
+            <Textarea
+              value={testablePredicate}
+              onChange={(event) => setTestablePredicate(event.target.value)}
+              onBlur={() => {
+                const next = testablePredicate.trim();
+                if (next !== (thread.testablePredicate ?? "")) {
+                  void patch({ testablePredicate: next || null });
+                }
+              }}
+              rows={2}
+              maxLength={2000}
+              placeholder="No testable predicate — what evidence in the data would confirm or refute this?"
+              className="text-sm"
+            />
           </div>
         </div>
       )}
@@ -392,25 +506,30 @@ function ThreadDetail({
                 <SelectValue placeholder="Link evidence or a finding…" />
               </SelectTrigger>
               <SelectContent>
-                {[...new Set(availableTargets.map((t) => t.group))].map((group) => (
-                  <SelectGroup key={group}>
-                    <SelectLabel>{group}</SelectLabel>
-                    {availableTargets
-                      .filter((t) => t.group === group)
-                      .map((t) => (
-                        <SelectItem
-                          key={`${t.targetType}::${t.targetId}`}
-                          value={`${t.targetType}::${t.targetId}`}
-                        >
-                          {t.targetType === "evidence" ? "📄 " : "· "}
-                          {t.label}
-                        </SelectItem>
-                      ))}
-                  </SelectGroup>
-                ))}
+                {[...new Set(availableTargets.map((t) => t.group))].map(
+                  (group) => (
+                    <SelectGroup key={group}>
+                      <SelectLabel>{group}</SelectLabel>
+                      {availableTargets
+                        .filter((t) => t.group === group)
+                        .map((t) => (
+                          <SelectItem
+                            key={`${t.targetType}::${t.targetId}`}
+                            value={`${t.targetType}::${t.targetId}`}
+                          >
+                            {t.targetType === "evidence" ? "📄 " : "· "}
+                            {t.label}
+                          </SelectItem>
+                        ))}
+                    </SelectGroup>
+                  ),
+                )}
               </SelectContent>
             </Select>
-            <Select value={linkStance} onValueChange={(v) => setLinkStance(v as typeof linkStance)}>
+            <Select
+              value={linkStance}
+              onValueChange={(v) => setLinkStance(v as typeof linkStance)}
+            >
               <SelectTrigger className="h-8 w-32 text-xs">
                 <SelectValue />
               </SelectTrigger>
@@ -422,7 +541,12 @@ function ThreadDetail({
                 ))}
               </SelectContent>
             </Select>
-            <Button size="sm" variant="outline" onClick={link} disabled={!linkTarget || linking}>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={link}
+              disabled={!linkTarget || linking}
+            >
               <Link2 className="h-3.5 w-3.5" /> Link
             </Button>
           </div>
@@ -441,11 +565,14 @@ function ThreadDetail({
           History
         </p>
         {entries.length === 0 ? (
-          <p className="text-muted-foreground text-xs">No notes yet — start the record below.</p>
+          <p className="text-muted-foreground text-xs">
+            No notes yet — start the record below.
+          </p>
         ) : (
           <ol className="max-h-[360px] space-y-0 overflow-y-auto border-l-2 border-border">
             {entries.map((e) => {
               const md = (e.metadata ?? {}) as Record<string, unknown>;
+              const probe = probeFromMetadata(md);
               return (
                 <li key={e.id} className="relative py-2 pl-5">
                   <span className="absolute -left-[7px] top-3 flex h-3 w-3 items-center justify-center rounded-full border-2 border-border bg-card">
@@ -464,10 +591,25 @@ function ThreadDetail({
                       {relativeTime(new Date(e.createdAt))}
                     </span>
                   </div>
-                  {e.body && <p className="mt-0.5 break-words text-sm">{e.body}</p>}
+                  {e.body && (
+                    <p className="mt-0.5 break-words text-sm">{e.body}</p>
+                  )}
                   {e.entryType === "STATUS_CHANGE" && (
                     <p className="text-muted-foreground mt-0.5 text-xs">
-                      {String(md.previousStatus ?? "?")} → {String(md.status ?? "?")}
+                      {String(md.previousStatus ?? "?")} →{" "}
+                      {String(md.status ?? "?")}
+                    </p>
+                  )}
+                  {probe && (
+                    <p className="text-muted-foreground mt-1 text-xs">
+                      Detector probe:{" "}
+                      <Link
+                        className="font-mono text-foreground underline underline-offset-2"
+                        href={`${nsHref("/findings")}?customDetector=${encodeURIComponent(probe.customDetectorKey)}`}
+                      >
+                        {probe.customDetectorKey}
+                      </Link>
+                      {probe.detectorId ? ` · ${probe.detectorId}` : ""}
                     </p>
                   )}
                 </li>
@@ -492,8 +634,16 @@ function ThreadDetail({
             }
             className="flex-1 text-sm"
           />
-          <Button size="sm" onClick={addNote} disabled={sending || !noteText.trim()}>
-            {sending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+          <Button
+            size="sm"
+            onClick={addNote}
+            disabled={sending || !noteText.trim()}
+          >
+            {sending ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Send className="h-3.5 w-3.5" />
+            )}
           </Button>
         </div>
       </div>
@@ -514,7 +664,10 @@ export function CaseThreads({
   const [loaded, setLoaded] = React.useState(false);
   const [selectedId, setSelectedId] = React.useState<string | null>(null);
   const [newTitle, setNewTitle] = React.useState("");
-  const [newKind, setNewKind] = React.useState<"HYPOTHESIS" | "DISCUSSION">("HYPOTHESIS");
+  const [newKind, setNewKind] = React.useState<"HYPOTHESIS" | "DISCUSSION">(
+    "HYPOTHESIS",
+  );
+  const [newPredicate, setNewPredicate] = React.useState("");
   const [creating, setCreating] = React.useState(false);
 
   const load = React.useCallback(async () => {
@@ -543,9 +696,14 @@ export function CaseThreads({
               : CreateThreadDtoKindEnum.Discussion,
           title: newTitle.trim(),
           statement: newKind === "HYPOTHESIS" ? newTitle.trim() : undefined,
+          testablePredicate:
+            newKind === "HYPOTHESIS"
+              ? newPredicate.trim() || undefined
+              : undefined,
         },
       });
       setNewTitle("");
+      setNewPredicate("");
       await load();
       setSelectedId(created.id);
     } catch (err) {
@@ -556,15 +714,22 @@ export function CaseThreads({
     }
   };
 
-  const hypotheses = threads.filter((t) => t.kind === ThreadResponseDtoKindEnum.Hypothesis);
-  const discussions = threads.filter((t) => t.kind === ThreadResponseDtoKindEnum.Discussion);
+  const hypotheses = threads.filter(
+    (t) => t.kind === ThreadResponseDtoKindEnum.Hypothesis,
+  );
+  const discussions = threads.filter(
+    (t) => t.kind === ThreadResponseDtoKindEnum.Discussion,
+  );
   const selected = threads.find((t) => t.id === selectedId) ?? null;
 
   return (
     <div className="space-y-4">
       {/* ── Create form ── */}
       <div className="flex flex-wrap gap-2">
-        <Select value={newKind} onValueChange={(v) => setNewKind(v as typeof newKind)}>
+        <Select
+          value={newKind}
+          onValueChange={(v) => setNewKind(v as typeof newKind)}
+        >
           <SelectTrigger className="h-9 w-40 text-xs">
             <SelectValue />
           </SelectTrigger>
@@ -595,9 +760,23 @@ export function CaseThreads({
           }}
         />
         <Button onClick={create} disabled={creating || !newTitle.trim()}>
-          {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+          {creating ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Plus className="h-4 w-4" />
+          )}
           Add
         </Button>
+        {newKind === "HYPOTHESIS" && (
+          <Textarea
+            className="w-full text-sm"
+            value={newPredicate}
+            onChange={(event) => setNewPredicate(event.target.value)}
+            rows={2}
+            maxLength={2000}
+            placeholder="What observable evidence in this data would confirm or refute it?"
+          />
+        )}
       </div>
 
       {loaded && threads.length === 0 ? (

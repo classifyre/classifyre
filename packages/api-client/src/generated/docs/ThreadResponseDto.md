@@ -12,6 +12,7 @@ Name | Type
 `title` | string
 `status` | string
 `confidence` | number
+`testablePredicate` | string
 `color` | string
 `createdBy` | string
 `supportingCount` | number
@@ -34,6 +35,7 @@ const example = {
   "title": null,
   "status": null,
   "confidence": null,
+  "testablePredicate": null,
   "color": null,
   "createdBy": null,
   "supportingCount": null,

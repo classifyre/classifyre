@@ -16,6 +16,7 @@ export type ToolDomain =
   | 'case'
   | 'source'
   | 'detector'
+  | 'glossary'
   | 'memory'
   | 'system';
 

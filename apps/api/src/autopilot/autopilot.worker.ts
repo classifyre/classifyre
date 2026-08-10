@@ -24,6 +24,7 @@ import {
   DETECTION_CHAIN,
   EVIDENCE_ANALYSIS_MIN_COVERAGE,
   EVIDENCE_ANALYSIS_USABLE_COVERAGE,
+  EVIDENCE_ANALYSIS_USABLE_FINDINGS,
   INVESTIGATION_CHAIN,
   PIPELINE_KINDS,
 } from './autopilot.constants';
@@ -335,9 +336,18 @@ export class AutopilotWorker {
           // and exited. Same slot width as the coalescing window, so a retry
           // and a fresh cycle landing together become one job rather than two.
           singletonSeconds: AUTOPILOT_COALESCE_WINDOW_SECONDS,
-          // Defer a collision to the next slot instead of dropping it: a
-          // dropped retry strands the dirty sources that provoked it.
-          singletonNextSlot: true,
+          // Deliberately NOT `singletonNextSlot` here, unlike the enqueue path
+          // in CorrelationWorker. There, a collision means the slot's job has
+          // already RUN, so dropping the insert would strand the sources that
+          // scan marked dirty — it has to move to the next slot. Here, a
+          // collision means a corpus cycle is already QUEUED, and it reads the
+          // same shared dirty set when it runs, so nothing is stranded by
+          // letting this retry go.
+          //
+          // Deferring instead cost throughput: each collision pushed a retry
+          // into the following slot rather than merging it, and a live
+          // 151-source namespace accumulated 55 queued cycles across attempts
+          // 2..5 while investigation had not run for three hours.
           expireInSeconds: 3 * 3600,
         },
       );
@@ -705,13 +715,17 @@ export class AutopilotWorker {
    * arriving, and the harness ran one investigation cycle in two hours.
    *
    * The queue being busy is not the question. The question is whether the
-   * findings the agents are about to triage have importance scores, and that
-   * is answered by coverage: below `EVIDENCE_ANALYSIS_USABLE_COVERAGE` a
-   * ranking read is mostly zeros and TRIAGE DOCTRINE misfires on it; above it,
-   * partial ranking plus the honest "scores are partial" warning the missions
-   * already handle beats not running at all. A corpus that will not reach the
-   * full bar for another day must not mean a harness that does nothing for a
-   * day.
+   * agents have enough scored evidence to reason from — and that is answered
+   * primarily by how much there IS, not by what fraction of the corpus it
+   * happens to be.
+   *
+   * A ratio alone was the second version of this bug. Its denominator grows, so
+   * where ingestion outpaces analysis the ratio falls and the gate re-engages
+   * exactly when the corpus is largest: 442,613 scored findings against
+   * 1,914,477 open read as "23%, not ready" while being far more material than
+   * a cycle could ever consume. The absolute floor is the real test; the ratio
+   * survives only for corpora too small for it to apply, where a few hundred
+   * scored findings genuinely may be too thin to rank.
    */
   private async readinessBlocked(): Promise<string | null> {
     if (await this.queueBusy(INQUIRY_MATCH_QUEUE)) return 'Inquiry matching';
@@ -721,12 +735,13 @@ export class AutopilotWorker {
     // Nothing scored and nothing to score: an instance with no semantic stack
     // still needs its agents.
     if (coverage.open === 0) return null;
+    if (coverage.analyzed >= EVIDENCE_ANALYSIS_USABLE_FINDINGS) return null;
     const ratio = coverage.analyzed / coverage.open;
     if (ratio >= EVIDENCE_ANALYSIS_USABLE_COVERAGE) return null;
     return (
-      `Evidence analysis (${coverage.analyzed}/${coverage.open} scored, ` +
-      `below the ${Math.round(EVIDENCE_ANALYSIS_USABLE_COVERAGE * 100)}% ` +
-      'usable floor)'
+      `Evidence analysis (only ${coverage.analyzed} of ${coverage.open} findings ` +
+      `scored — under both the ${EVIDENCE_ANALYSIS_USABLE_FINDINGS}-finding floor ` +
+      `and the ${Math.round(EVIDENCE_ANALYSIS_USABLE_COVERAGE * 100)}% fallback)`
     );
   }
 

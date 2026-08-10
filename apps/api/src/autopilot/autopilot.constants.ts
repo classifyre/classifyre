@@ -10,6 +10,18 @@ export const AUTOPILOT_QUEUE = 'autopilot.cycle';
  */
 export const AI_ACTOR = 'ai-autopilot';
 
+export type EntityOrigin = 'operator' | 'ai';
+
+/** NULL createdBy means an operator: the web never stamps one. */
+export function originOf(createdBy: string | null | undefined): EntityOrigin {
+  return createdBy === AI_ACTOR ? 'ai' : 'operator';
+}
+
+/** Prisma `where` fragment for operator-created rows. `{ not: AI_ACTOR }` alone drops NULLs. */
+export const OPERATOR_CREATED = {
+  OR: [{ createdBy: null }, { createdBy: { not: AI_ACTOR } }],
+} as const;
+
 /**
  * Delay (seconds) before an autopilot cycle starts. Keeps the agent "slow":
  * inquiry matching for the same source runs immediately on its own queue and
@@ -125,24 +137,40 @@ export const AUTOPILOT_CYCLE_BUDGET_MS = 30 * 60 * 1000;
 export const EVIDENCE_ANALYSIS_MIN_COVERAGE = 0.8;
 
 /**
- * Coverage below which a cycle is held back rather than run on unscored data.
+ * Coverage below which a SMALL corpus is held back rather than run on unscored
+ * data. Paired with `EVIDENCE_ANALYSIS_USABLE_FINDINGS` below — either one
+ * being satisfied lets the cycle run.
  *
  * Distinct from `EVIDENCE_ANALYSIS_MIN_COVERAGE` above, and much lower. That
  * one decides whether the missions are WARNED that scores are partial; this one
  * decides whether the cycle runs at all.
  *
- * The gate used to be "is the embedding queue non-empty", which under
- * continuous ingestion is permanently true — a live 151-source namespace sat at
- * 38% coverage while scans kept arriving and the harness managed one
- * investigation cycle in two hours. A corpus that will not reach 80% for
- * another day must not mean a harness that does nothing for a day.
- *
- * A quarter is where `findings.ranked` stops being mostly zeros: below it the
- * triage doctrine reads unscored findings as unimportant ones, which is worse
- * than waiting; above it, partial ranking plus the warning the missions already
- * know how to handle beats standing still.
+ * A quarter is where `findings.ranked` stops being mostly zeros on a corpus
+ * small enough for the ratio to mean anything: below it the triage doctrine
+ * reads unscored findings as unimportant ones, which is worse than waiting.
  */
 export const EVIDENCE_ANALYSIS_USABLE_COVERAGE = 0.25;
+
+/**
+ * Scored findings that make a cycle worth running whatever the ratio says.
+ *
+ * A ratio has a growing denominator, so on a corpus where ingestion outpaces
+ * analysis it falls over time — and the gate re-engages exactly when the corpus
+ * is largest. Measured on a live 151-source namespace: 442,613 findings scored
+ * against 1,914,477 open, which is 23% and blocked, while detection ran ~30k/h
+ * and analysis ~20k/h so the ratio could only keep dropping. The harness stopped
+ * investigating at 04:57 and had not run since.
+ *
+ * 442,613 scored findings is not "too little evidence to reason from" by any
+ * reading — it is far more than a cycle can consume, given every retrieval the
+ * agents have is bounded in the hundreds. So the absolute number is the honest
+ * question and the ratio is the fallback for corpora too small for it to apply.
+ *
+ * Set well above what one cycle reads (`UNMONITORED_SCAN_LIMIT`,
+ * `MAX_FINDING_GROUPS` and the ranked lists are all in the hundreds) and low
+ * enough that a modest source clears it early.
+ */
+export const EVIDENCE_ANALYSIS_USABLE_FINDINGS = 2000;
 
 // ── Monitored coverage: evidence with no inquiry watching it ─────────────────
 /**
@@ -337,6 +365,14 @@ export const MAX_SAMPLE_VALUES_PER_GROUP = 15;
 export const MAX_SAMPLE_VALUE_LENGTH = 120;
 export const MAX_CANDIDATE_INQUIRIES = 60;
 export const MAX_CASE_SUMMARIES = 40;
+/** Whole ranked items per tool call; sized to stay below the 8k observation cap. */
+export const RANKED_LIST_PAGE_SIZE = 5;
+export const MAX_CASE_SUMMARY_DESCRIPTION = 240;
+export const MAX_INQUIRY_SUMMARY_DESCRIPTION = 240;
+export const MAX_SUMMARY_TITLE = 160;
+export const MAX_HYPOTHESIS_SUMMARY_TITLE = 100;
+export const MAX_HYPOTHESIS_TITLES_PER_CASE = 6;
+export const MAX_OPEN_HYPOTHESES = 20;
 export const MAX_FINDINGS_PER_INQUIRY = 25;
 export const MAX_CASE_CLUSTERS_PER_CYCLE = 5;
 export const MAX_GLOSSARY_ENTRIES = 20;

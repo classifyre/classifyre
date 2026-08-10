@@ -104,7 +104,7 @@ describe('AutopilotWorker readiness and batch consumption', () => {
         openFindings: 1000,
         analyzedFindings: 50,
       });
-      await expect(blocked()).resolves.toMatch(/50\/1000 scored/);
+      await expect(blocked()).resolves.toMatch(/only 50 of 1000/);
     });
 
     it('proceeds once coverage is usable, even with inference still running', async () => {
@@ -114,6 +114,36 @@ describe('AutopilotWorker readiness and batch consumption', () => {
         openFindings: 135772,
         analyzedFindings: 51455,
       });
+      await expect(blocked()).resolves.toBeNull();
+    });
+
+    /**
+     * A ratio has a growing denominator, so where ingestion outpaces analysis
+     * it falls over time and the gate re-engages exactly when the corpus is
+     * largest. The live 151-source namespace reached 442,613 scored against
+     * 1,914,477 open — 23%, blocked — and stopped investigating for three
+     * hours, with 55 cycles queued behind the gate. Half a million scored
+     * findings is not "too little to reason from"; it is more than a cycle can
+     * read many times over.
+     */
+    it('proceeds on a huge corpus whose ratio is low but whose volume is not', async () => {
+      build({
+        pendingEmbedJobs: 20000,
+        openFindings: 1914477,
+        analyzedFindings: 442613,
+      });
+      await expect(blocked()).resolves.toBeNull();
+    });
+
+    // The ratio still governs corpora too small for the absolute floor to
+    // apply, where a handful of scores genuinely cannot support ranking.
+    it('still waits on a small corpus with almost nothing scored', async () => {
+      build({ pendingEmbedJobs: 50, openFindings: 400, analyzedFindings: 12 });
+      await expect(blocked()).resolves.toMatch(/only 12 of 400/);
+    });
+
+    it('proceeds on a small corpus once a quarter of it is scored', async () => {
+      build({ pendingEmbedJobs: 50, openFindings: 400, analyzedFindings: 120 });
       await expect(blocked()).resolves.toBeNull();
     });
 
@@ -223,9 +253,11 @@ describe('AutopilotWorker readiness and batch consumption', () => {
       expect(sent[0].opts.singletonSeconds).toBe(
         AUTOPILOT_COALESCE_WINDOW_SECONDS,
       );
-      // A dropped retry strands the dirty sources that provoked it, so a
-      // collision must defer rather than vanish.
-      expect(sent[0].opts.singletonNextSlot).toBe(true);
+      // NOT singletonNextSlot: unlike the enqueue path, a collision here means
+      // a cycle is already QUEUED and will read the same shared dirty set, so
+      // nothing is stranded by dropping this retry. Deferring instead stacked
+      // retries into successive slots — 55 queued cycles on a live instance.
+      expect(sent[0].opts.singletonNextSlot).toBeUndefined();
     });
 
     it('preserves targeted agent scope and focus when re-queueing', async () => {

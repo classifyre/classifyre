@@ -2,11 +2,26 @@ import { Injectable } from '@nestjs/common';
 import { AgentMemoryKind } from '@prisma/client';
 import { AgentSearchService } from '../../search/agent-search.service';
 import { AgentMemoryService } from '../../memory/agent-memory.service';
+import { RANKED_LIST_PAGE_SIZE } from '../../autopilot.constants';
 import type { Tool } from '../tool.types';
 
 const EMPTY_INPUT = {
   type: 'object',
   properties: {},
+  additionalProperties: false,
+} as const;
+
+const RANKED_PAGE_INPUT = {
+  type: 'object',
+  properties: {
+    offset: { type: 'integer', minimum: 0, default: 0 },
+    limit: {
+      type: 'integer',
+      minimum: 1,
+      maximum: RANKED_LIST_PAGE_SIZE,
+      default: RANKED_LIST_PAGE_SIZE,
+    },
+  },
   additionalProperties: false,
 } as const;
 
@@ -106,10 +121,14 @@ export class ObserveToolset {
       {
         name: 'inquiries.list',
         description:
-          'List all ACTIVE inquiries as compact summaries (matchers, counts, linked cases) for dedupe/enrichment.',
-        inputSchema: EMPTY_INPUT,
+          'List ACTIVE inquiries as complete, priority-ranked pages for dedupe/enrichment. Operator-created and inquiries with new matches lead. Continue with nextOffset when present. If omitted is above zero the dedupe check is incomplete — page again and search memory before creating.',
+        inputSchema: RANKED_PAGE_INPUT,
         sideEffect: 'read',
-        handler: async () => this.search.listActiveInquiries(),
+        handler: async (input) =>
+          this.search.listActiveInquiries({
+            offset: input.offset as number | undefined,
+            limit: input.limit as number | undefined,
+          }),
       },
       {
         name: 'inquiries.archived',
@@ -136,10 +155,14 @@ export class ObserveToolset {
       {
         name: 'cases.list',
         description:
-          'List OPEN/IN_PROGRESS cases as compact summaries (status, severity, hypotheses, counts).',
-        inputSchema: EMPTY_INPUT,
+          'List OPEN/IN_PROGRESS cases as complete pages in priority order, not date order: operator-created first, then severity, unevaluated hypotheses, and oldest attention. Each item carries rank, priority, and aiMode. INHERIT is managed during an enabled or manual CASE run, MANAGED is an explicit override, and OBSERVE_ONLY can be read but never mutated. Work from the top, justify any skip, and continue with nextOffset when present.',
+        inputSchema: RANKED_PAGE_INPUT,
         sideEffect: 'read',
-        handler: async () => this.search.listOpenCases(),
+        handler: async (input) =>
+          this.search.listOpenCases({
+            offset: input.offset as number | undefined,
+            limit: input.limit as number | undefined,
+          }),
       },
       {
         name: 'cases.closed',
@@ -152,7 +175,7 @@ export class ObserveToolset {
       {
         name: 'cases.detail',
         description:
-          'Full detail of one case: hypotheses (threadIds), evidence (assetIds), findings, graph edges, linked inquiries.',
+          'Full detail of one case: hypotheses (threadIds), evidence (assetIds), findings, graph edges, linked inquiries and case-linked glossary vocabulary.',
         inputSchema: {
           type: 'object',
           properties: { caseId: { type: 'string' } },

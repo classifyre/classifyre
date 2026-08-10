@@ -129,6 +129,7 @@ export class GlossaryService {
   async upsert(input: GlossaryUpsertInput) {
     const term = input.term.trim();
     if (!term) throw new NotFoundException('Glossary term cannot be empty');
+    await this.assertValidReference(input.refType, input.refId);
     if (input.origin === 'AGENT' && this.looksLikeMachineSlug(term)) {
       throw new BadRequestException(
         `"${term}" looks like a machine identifier, not vocabulary. Glossary terms are real-world names as a human writes them ("Jane Doe", "Project Aurora", "NHS number"). Observations and summaries belong in memory.write, not the glossary.`,
@@ -190,6 +191,7 @@ export class GlossaryService {
               where: { id: existing.id },
               data: { proposedAliases },
             });
+      await this.linkReference(updated.id, input);
       return { ...this.toDto(updated), merged: true };
     }
 
@@ -201,8 +203,6 @@ export class GlossaryService {
       aliases,
       entityType: input.entityType ?? existing?.entityType ?? 'TERM',
       notes: input.notes ?? existing?.notes ?? null,
-      refType: input.refType ?? existing?.refType ?? null,
-      refId: input.refId ?? existing?.refId ?? null,
       origin: input.origin,
       verifiedAt: verified ? new Date() : null,
       verifiedBy,
@@ -232,7 +232,69 @@ export class GlossaryService {
       });
     }
     await this.enqueueEmbedding(saved);
+    await this.linkReference(saved.id, input);
     return { ...this.toDto(saved), merged: false };
+  }
+
+  private async linkReference(
+    glossaryTermId: string,
+    input: Pick<GlossaryUpsertInput, 'refType' | 'refId' | 'author'>,
+  ): Promise<void> {
+    if (!input.refType || !input.refId) return;
+    await this.prisma.glossaryReference.createMany({
+      data: [
+        {
+          glossaryTermId,
+          entityType: input.refType,
+          entityId: input.refId,
+          createdBy: input.author,
+        },
+      ],
+      skipDuplicates: true,
+    });
+  }
+
+  private async assertValidReference(
+    refType?: string,
+    refId?: string,
+  ): Promise<void> {
+    if (!refType && !refId) return;
+    if (!refType || !refId) {
+      throw new BadRequestException(
+        'refType and refId must be supplied together',
+      );
+    }
+    const supported = ['case', 'inquiry', 'source', 'finding'] as const;
+    if (!supported.includes(refType as (typeof supported)[number])) {
+      throw new BadRequestException(
+        `Unsupported glossary refType "${refType}"`,
+      );
+    }
+    const exists =
+      refType === 'case'
+        ? await this.prisma.case.findUnique({
+            where: { id: refId },
+            select: { id: true },
+          })
+        : refType === 'inquiry'
+          ? await this.prisma.inquiry.findUnique({
+              where: { id: refId },
+              select: { id: true },
+            })
+          : refType === 'source'
+            ? await this.prisma.source.findUnique({
+                where: { id: refId },
+                select: { id: true },
+              })
+            : await this.prisma.finding.findUnique({
+                where: { id: refId },
+                select: { id: true },
+              });
+    if (!exists) {
+      throw new BadRequestException(
+        `Glossary reference ${refType}:${refId} does not exist`,
+      );
+    }
   }
 
   private async enqueueEmbedding(term: GlossaryTerm): Promise<GlossaryTerm> {
@@ -412,8 +474,6 @@ export class GlossaryService {
       proposedAliases: term.proposedAliases,
       entityType: term.entityType,
       notes: term.notes,
-      refType: term.refType,
-      refId: term.refId,
       origin: String(term.origin),
       verified: term.verifiedAt !== null,
       verifiedBy: term.verifiedBy,

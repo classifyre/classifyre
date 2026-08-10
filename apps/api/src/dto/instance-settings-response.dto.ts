@@ -69,7 +69,7 @@ export class InstanceSettingsResponseDto {
   @ApiProperty({
     description:
       'When true, the autopilot inquiry agent manages inquiries automatically after scans.',
-    example: false,
+    example: true,
   })
   autopilotInquiryEnabled: boolean;
 
@@ -90,7 +90,7 @@ export class InstanceSettingsResponseDto {
   @ApiProperty({
     description:
       'When true, the autopilot case agent manages investigation cases automatically after scans.',
-    example: false,
+    example: true,
   })
   autopilotCaseEnabled: boolean;
 
@@ -103,7 +103,7 @@ export class InstanceSettingsResponseDto {
   @ApiProperty({
     description:
       'When true, the config-tuning agent may change editable source config.',
-    example: false,
+    example: true,
   })
   autopilotConfigEnabled: boolean;
 
@@ -116,7 +116,7 @@ export class InstanceSettingsResponseDto {
   @ApiProperty({
     description:
       'When true, the detector-authoring agent may create/train detectors.',
-    example: false,
+    example: true,
   })
   autopilotDetectorEnabled: boolean;
 
@@ -129,7 +129,7 @@ export class InstanceSettingsResponseDto {
   @ApiProperty({
     description:
       'When true, the escalation agent may raise operator notifications for high-severity cases.',
-    example: false,
+    example: true,
   })
   autopilotEscalationEnabled: boolean;
 
@@ -142,7 +142,7 @@ export class InstanceSettingsResponseDto {
   @ApiProperty({
     description:
       'When true, the harness may call tools from connected external MCP servers.',
-    example: false,
+    example: true,
   })
   autopilotMcpEnabled: boolean;
 

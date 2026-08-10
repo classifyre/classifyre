@@ -11,6 +11,11 @@ describe('GlossaryService', () => {
       update: jest.fn(),
       delete: jest.fn(),
     },
+    glossaryReference: { createMany: jest.fn() },
+    case: { findUnique: jest.fn() },
+    inquiry: { findUnique: jest.fn() },
+    source: { findUnique: jest.fn() },
+    finding: { findUnique: jest.fn() },
     agentMemory: {
       findUnique: jest.fn(),
       upsert: jest.fn(),
@@ -102,6 +107,36 @@ describe('GlossaryService', () => {
         data: expect.objectContaining({ origin: 'AGENT', verifiedAt: null }),
       }),
     );
+  });
+
+  it('validates and records repeatable case provenance separately from the term', async () => {
+    prisma.glossaryTerm.findFirst.mockResolvedValue(null);
+    prisma.case.findUnique.mockResolvedValue({ id: 'case-1' });
+    prisma.glossaryReference.createMany.mockResolvedValue({ count: 1 });
+
+    await service.upsert({
+      term: 'Project Aurora',
+      origin: 'AGENT',
+      author: 'CASE',
+      refType: 'case',
+      refId: 'case-1',
+    });
+
+    expect(prisma.case.findUnique).toHaveBeenCalledWith({
+      where: { id: 'case-1' },
+      select: { id: true },
+    });
+    expect(prisma.glossaryReference.createMany).toHaveBeenCalledWith({
+      data: [
+        {
+          glossaryTermId: 'new-id',
+          entityType: 'case',
+          entityId: 'case-1',
+          createdBy: 'CASE',
+        },
+      ],
+      skipDuplicates: true,
+    });
   });
 
   it('keeps agent aliases for an operator term unverified and out of lookup', async () => {

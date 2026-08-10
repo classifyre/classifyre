@@ -614,7 +614,7 @@ export class AutopilotApi extends runtime.BaseAPI {
     }
 
     /**
-     * List the agent memory (glossary, precedents, topic map)
+     * List long-lived agent memory (precedents, entity maps, source profiles, detector insights and directives)
      */
     async autopilotControllerListMemoryRaw(requestParameters: AutopilotControllerListMemoryRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<AgentMemoryListResponseDto>> {
         const queryParameters: any = {};
@@ -651,7 +651,7 @@ export class AutopilotApi extends runtime.BaseAPI {
     }
 
     /**
-     * List the agent memory (glossary, precedents, topic map)
+     * List long-lived agent memory (precedents, entity maps, source profiles, detector insights and directives)
      */
     async autopilotControllerListMemory(requestParameters: AutopilotControllerListMemoryRequest = {}, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<AgentMemoryListResponseDto> {
         const response = await this.autopilotControllerListMemoryRaw(requestParameters, initOverrides);
@@ -1281,7 +1281,6 @@ export type AutopilotControllerListLogsLevelEnum = typeof AutopilotControllerLis
  * @export
  */
 export const AutopilotControllerListMemoryKindEnum = {
-    Glossary: 'GLOSSARY',
     DecisionPrecedent: 'DECISION_PRECEDENT',
     EntityMap: 'ENTITY_MAP',
     SourceProfile: 'SOURCE_PROFILE',
