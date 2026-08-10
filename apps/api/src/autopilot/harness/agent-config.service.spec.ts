@@ -108,6 +108,26 @@ describe('AgentConfigService', () => {
     expect(dream.enabled).toBe(true);
   });
 
+  it('treats a not-yet-created settings singleton as enabled defaults', async () => {
+    instanceSettings.findUnique.mockResolvedValue(null);
+    agentConfig.findMany.mockResolvedValue([]);
+
+    const list = await service.list();
+
+    expect(list.filter((agent) => agent.enableable)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ kind: AgentKind.INQUIRY, enabled: true }),
+        expect.objectContaining({ kind: AgentKind.CASE, enabled: true }),
+        expect.objectContaining({ kind: AgentKind.CONFIG, enabled: true }),
+        expect.objectContaining({
+          kind: AgentKind.DETECTOR_AUTHOR,
+          enabled: true,
+        }),
+        expect.objectContaining({ kind: AgentKind.ESCALATION, enabled: true }),
+      ]),
+    );
+  });
+
   it('writes the enable flag to the matching settings column', async () => {
     agentConfig.findMany.mockResolvedValue([]);
     await service.update(AgentKind.CASE, { enabled: true });
