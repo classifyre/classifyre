@@ -1,5 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { AiManagementMode } from '@prisma/client';
+import {
+  AiManagementMode,
+  CaseStatus,
+  CaseThreadKind,
+  HypothesisStatus,
+} from '@prisma/client';
 import { DecisionApplierService } from './decision-applier.service';
 import { PrismaService } from '../prisma.service';
 import { InquiriesService } from '../inquiries.service';
@@ -63,6 +68,16 @@ describe('DecisionApplierService', () => {
     }).compile();
     service = module.get(DecisionApplierService);
     jest.clearAllMocks();
+    mockPrisma.caseThread.findUnique.mockResolvedValue({
+      caseId: 'case-1',
+      kind: CaseThreadKind.HYPOTHESIS,
+      status: HypothesisStatus.PROPOSED,
+      investigation: {
+        aiMode: AiManagementMode.INHERIT,
+        status: CaseStatus.OPEN,
+      },
+      _count: { support: 0 },
+    });
     mockEvidence.assertInquiryIsWarranted.mockResolvedValue(undefined);
     mockEvidence.assertCaseIsWarranted.mockResolvedValue(undefined);
   });
@@ -106,18 +121,21 @@ describe('DecisionApplierService', () => {
 
     it('caseThreadGate resolves through the owning observe-only case', async () => {
       mockPrisma.caseThread.findUnique.mockResolvedValue({
+        caseId: 'case-1',
         investigation: { aiMode: AiManagementMode.OBSERVE_ONLY },
       });
-      expect(await service.caseThreadGate('thread-1', true)).toBe(
-        AiManagementMode.OBSERVE_ONLY,
-      );
+      expect(await service.caseThreadGate('thread-1', true)).toEqual({
+        mode: AiManagementMode.OBSERVE_ONLY,
+        caseId: 'case-1',
+      });
     });
 
     it('caseThreadGate returns MANAGED for an unknown thread', async () => {
       mockPrisma.caseThread.findUnique.mockResolvedValue(null);
-      expect(await service.caseThreadGate('ghost', false)).toBe(
-        AiManagementMode.MANAGED,
-      );
+      expect(await service.caseThreadGate('ghost', false)).toEqual({
+        mode: AiManagementMode.MANAGED,
+        caseId: null,
+      });
     });
   });
 
@@ -234,7 +252,10 @@ describe('DecisionApplierService', () => {
     });
 
     it('links a known detector as probe metadata on the hypothesis thread', async () => {
-      mockPrisma.customDetector.findUnique.mockResolvedValue({ id: 'det-1' });
+      mockPrisma.customDetector.findUnique.mockResolvedValue({
+        id: 'det-1',
+        isActive: true,
+      });
       await service.linkProbeCore({
         threadId: 'thread-1',
         customDetectorKey: 'cust_key_reuse',
@@ -260,6 +281,46 @@ describe('DecisionApplierService', () => {
           customDetectorKey: 'invented_key',
         }),
       ).rejects.toThrow(/invented_key/);
+      expect(mockThreads.addEntry).not.toHaveBeenCalled();
+    });
+
+    it('rejects a probe target that is no longer open and unevidenced', async () => {
+      mockPrisma.customDetector.findUnique.mockResolvedValue({
+        id: 'det-1',
+        isActive: true,
+      });
+      mockPrisma.caseThread.findUnique.mockResolvedValue({
+        caseId: 'case-1',
+        kind: CaseThreadKind.HYPOTHESIS,
+        status: HypothesisStatus.SUPPORTED,
+        investigation: {
+          aiMode: AiManagementMode.INHERIT,
+          status: CaseStatus.OPEN,
+        },
+        _count: { support: 1 },
+      });
+
+      await expect(
+        service.linkProbeCore({
+          threadId: 'thread-1',
+          customDetectorKey: 'cust_key_reuse',
+        }),
+      ).rejects.toThrow(/open, PROPOSED hypothesis with zero linked evidence/);
+      expect(mockThreads.addEntry).not.toHaveBeenCalled();
+    });
+
+    it('rejects an inactive detector as a probe', async () => {
+      mockPrisma.customDetector.findUnique.mockResolvedValue({
+        id: 'det-1',
+        isActive: false,
+      });
+
+      await expect(
+        service.linkProbeCore({
+          threadId: 'thread-1',
+          customDetectorKey: 'cust_key_reuse',
+        }),
+      ).rejects.toThrow(/inactive/);
       expect(mockThreads.addEntry).not.toHaveBeenCalled();
     });
 

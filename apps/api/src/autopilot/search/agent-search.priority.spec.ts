@@ -112,6 +112,7 @@ describe('AgentSearchService — priority worklists', () => {
     expect(result.items[0].priority).toMatch(
       /operator · MEDIUM · 1 unevaluated/,
     );
+    expect(result.nextOffset).toBeNull();
   });
 
   it('keeps a stale operator case above the database-capped recent stratum', async () => {
@@ -134,8 +135,9 @@ describe('AgentSearchService — priority worklists', () => {
     const result = await service.listOpenCases();
 
     expect(result.items[0].id).toBe('stale-operator');
-    expect(result.shown).toBe(40);
-    expect(result.omitted).toBe(1);
+    expect(result.shown).toBe(5);
+    expect(result.omitted).toBe(36);
+    expect(result.nextOffset).toBe(5);
   });
 
   it('bounds descriptions and hypothesis title payloads', async () => {
@@ -155,6 +157,46 @@ describe('AgentSearchService — priority worklists', () => {
     expect(result.items[0].description).toHaveLength(240);
     expect(result.items[0].hypothesisTitles).toHaveLength(6);
     expect(result.items[0].hypothesisCount).toBe(8);
+  });
+
+  it('keeps globally higher-priority AI cases in the bounded fallback stratum', async () => {
+    const medium = investigation({ id: 'stale-medium', severity: 'MEDIUM' });
+    const info = Array.from({ length: 39 }, (_, index) =>
+      investigation({ id: `fresh-info-${index}`, severity: 'INFO' }),
+    );
+    prisma.case.findMany
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([medium, ...info]);
+    prisma.case.count.mockResolvedValue(41);
+
+    const result = await service.listOpenCases();
+
+    expect(result.items[0].id).toBe('stale-medium');
+    expect(prisma.case.findMany.mock.calls[3][0].orderBy).toEqual([
+      { severity: 'asc' },
+      { updatedAt: 'asc' },
+      { id: 'asc' },
+    ]);
+  });
+
+  it('returns whole bounded pages with stable absolute ranks', async () => {
+    const rows = Array.from({ length: 8 }, (_, index) =>
+      investigation({
+        id: `case-${index}`,
+        severity: 'HIGH',
+        updatedAt: new Date(2026, 6, index + 1),
+      }),
+    );
+    prisma.case.findMany.mockResolvedValue(rows);
+    prisma.case.count.mockResolvedValue(rows.length);
+
+    const result = await service.listOpenCases({ offset: 5 });
+
+    expect(result.items.map((item) => item.rank)).toEqual([6, 7, 8]);
+    expect(result.offset).toBe(5);
+    expect(result.nextOffset).toBeNull();
   });
 
   it('orders inquiries operator → new matches → oldest and reports omission', async () => {
@@ -185,5 +227,24 @@ describe('AgentSearchService — priority worklists', () => {
     ]);
     expect(result.items[0].origin).toBe('operator');
     expect(result.omitted).toBe(61);
+  });
+
+  it('keeps a maximum-shaped default case page below the observation cap', async () => {
+    const rows = Array.from({ length: 5 }, (_, index) =>
+      investigation({
+        id: `bounded-${index}`,
+        title: 't'.repeat(500),
+        description: 'd'.repeat(1_000),
+        threads: Array.from({ length: 6 }, (_, threadIndex) =>
+          thread(false, `h-${threadIndex}-${'x'.repeat(200)}`),
+        ),
+      }),
+    );
+    prisma.case.findMany.mockResolvedValue(rows);
+    prisma.case.count.mockResolvedValue(rows.length);
+
+    const result = await service.listOpenCases();
+
+    expect(JSON.stringify(result).length).toBeLessThan(8_000);
   });
 });

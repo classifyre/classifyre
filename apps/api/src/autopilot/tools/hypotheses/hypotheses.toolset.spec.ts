@@ -7,7 +7,9 @@ describe('HypothesesToolset', () => {
   const threadId = '11111111-1111-4111-8111-111111111111';
   const search = { openHypotheses: jest.fn() };
   const applier = {
-    caseThreadGate: jest.fn().mockResolvedValue('MANAGED'),
+    caseThreadGate: jest
+      .fn()
+      .mockResolvedValue({ mode: 'MANAGED', caseId: 'case-1' }),
     caseGate: jest.fn(),
     linkProbeCore: jest.fn(),
   };
@@ -23,12 +25,17 @@ describe('HypothesesToolset', () => {
   beforeEach(() => jest.clearAllMocks());
 
   it('resolves link_probe through the thread case and case instance flag', async () => {
-    await byName('hypotheses.link_probe').resolveGate!(
+    const gate = await byName('hypotheses.link_probe').resolveGate!(
       { threadId, customDetectorKey: 'cust_probe' },
       tc,
     );
     expect(applier.caseThreadGate).toHaveBeenCalledWith(threadId, false);
     expect(applier.caseGate).not.toHaveBeenCalled();
+    expect(gate).toEqual({
+      mode: 'MANAGED',
+      entityType: 'case',
+      entityId: 'case-1',
+    });
   });
 
   it('teaches that thread ids come from hypotheses.open', async () => {

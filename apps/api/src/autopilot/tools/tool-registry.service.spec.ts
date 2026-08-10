@@ -115,7 +115,7 @@ describe('ToolRegistry', () => {
     for (const tool of registry.list()) {
       expect(tool.name).toMatch(/^[a-z_]+\.[a-z_]+$/);
       if (tool.sideEffect === 'mutate') {
-        expect(tool.resolveGate).toBeDefined();
+        expect(typeof tool.resolveGate).toBe('function');
         expect(tool.domain).toBeDefined();
       }
     }
