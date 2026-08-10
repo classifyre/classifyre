@@ -19,7 +19,6 @@ import {
   InstanceSettingsResponseDtoTimeFormatEnum,
 } from "@workspace/api-client";
 import {
-  BrainCircuit,
   Clock3,
   DatabaseBackup,
   Globe,
@@ -35,9 +34,6 @@ import { toast } from "sonner";
 import { useInstanceSettings } from "@/components/instance-settings-provider";
 import { McpSettingsCard } from "@/components/mcp-settings-card";
 import { ChatBotsCard } from "@/components/chat-bots-card";
-import { AiProvidersCard } from "@/components/ai-providers-card";
-import { AiAssistantSettingsCard } from "@/components/ai-assistant-settings-card";
-import { HarnessPointerCard } from "@/components/harness/harness-pointer-card";
 import { HuggingFaceSettingsCard } from "@/components/huggingface-settings-card";
 import { VersionSettingsSection } from "@/components/version-update-notifier";
 import { DataTransferCard } from "@/components/data-transfer/data-transfer-card";
@@ -208,10 +204,10 @@ export default function SettingsPage() {
         </div>
       ) : null}
 
-      <Tabs defaultValue="general" className="gap-5">
+      <Tabs defaultValue="general" urlParam="tab" className="gap-5">
         {/*
           Wraps rather than scrolls: the row already overflowed a ~850px pane at
-          five tabs, and an off-screen tab with no scroll affordance is simply
+          several tabs, and an off-screen tab with no scroll affordance is simply
           an unreachable settings page.
         */}
         <TabsList
@@ -221,10 +217,6 @@ export default function SettingsPage() {
           <TabsTrigger value="general" className={TAB_TRIGGER_CLASS}>
             <SlidersHorizontal className="h-3.5 w-3.5" />
             {t("settings.tabs.global")}
-          </TabsTrigger>
-          <TabsTrigger value="ai-providers" className={TAB_TRIGGER_CLASS}>
-            <BrainCircuit className="h-3.5 w-3.5" />
-            {t("settings.tabs.aiProviders")}
           </TabsTrigger>
           <TabsTrigger value="mcp" className={TAB_TRIGGER_CLASS}>
             <Server className="h-3.5 w-3.5" />
@@ -433,18 +425,7 @@ export default function SettingsPage() {
             </CardContent>
           </Card>
 
-          <AiAssistantSettingsCard />
-
-          <HarnessPointerCard />
-
           <HuggingFaceSettingsCard />
-        </TabsContent>
-
-        <TabsContent
-          value="ai-providers"
-          className="duration-300 animate-in fade-in-50 slide-in-from-bottom-1"
-        >
-          <AiProvidersCard />
         </TabsContent>
 
         <TabsContent

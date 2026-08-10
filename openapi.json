@@ -4117,7 +4117,7 @@
     },
     "/ai-provider-configs/{id}/test": {
       "post": {
-        "description": "Runs a small structured-JSON round-trip against the given credential to verify the provider, model, and API key work.",
+        "description": "Runs a small structured-JSON round-trip against the given credential to verify the provider, model, and API key work. Expected configuration and provider failures are returned as structured diagnostics.",
         "operationId": "AiProviderConfigController_test",
         "parameters": [
           {
@@ -4139,15 +4139,40 @@
                 }
               }
             }
-          },
-          "502": {
-            "description": "AI provider returned an error"
-          },
-          "503": {
-            "description": "AI provider not configured or rate limit hit"
           }
         },
         "summary": "Test an AI provider configuration",
+        "tags": [
+          "AI Provider Configs"
+        ]
+      }
+    },
+    "/ai-provider-configs/{id}/capability-test-stream": {
+      "post": {
+        "operationId": "AiProviderConfigController_capabilityTestStream",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Progress events followed by a complete event containing the capability report.",
+            "content": {
+              "application/x-ndjson": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Stream Harness capability-test progress as newline-delimited JSON",
         "tags": [
           "AI Provider Configs"
         ]
@@ -13496,6 +13521,11 @@
             "description": "When false, AI assistant features are disabled instance-wide.",
             "example": true
           },
+          "harnessEnabled": {
+            "type": "boolean",
+            "description": "When false, the autonomous AI harness and all of its agents are disabled instance-wide.",
+            "example": true
+          },
           "mcpEnabled": {
             "type": "boolean",
             "description": "When false, the MCP endpoint is disabled instance-wide.",
@@ -13526,7 +13556,12 @@
           },
           "aiProviderConfigId": {
             "type": "string",
-            "description": "Id of the AI provider credential used as the instance-wide default. Null when unset.",
+            "description": "Id of the AI provider credential used by the interactive AI assistant. Null when unset.",
+            "nullable": true
+          },
+          "harnessAiProviderConfigId": {
+            "type": "string",
+            "description": "Id of the AI provider credential used by the autonomous AI harness. Null when unset.",
             "nullable": true
           },
           "autopilotInquiryEnabled": {
@@ -13626,11 +13661,13 @@
         "required": [
           "id",
           "aiEnabled",
+          "harnessEnabled",
           "mcpEnabled",
           "language",
           "timezone",
           "timeFormat",
           "aiProviderConfigId",
+          "harnessAiProviderConfigId",
           "autopilotInquiryEnabled",
           "autopilotInquiryDesired",
           "autopilotInquirySearchable",
@@ -13658,6 +13695,11 @@
           "aiEnabled": {
             "type": "boolean",
             "description": "When false, AI assistant features are disabled instance-wide.",
+            "example": true
+          },
+          "harnessEnabled": {
+            "type": "boolean",
+            "description": "When false, the autonomous AI harness and all of its agents are disabled instance-wide.",
             "example": true
           },
           "mcpEnabled": {
@@ -13690,7 +13732,12 @@
           },
           "aiProviderConfigId": {
             "type": "string",
-            "description": "Id of the AI provider credential to use as the instance-wide default. Pass null or an empty string to clear the selection.",
+            "description": "Id of the AI provider credential to use for the interactive AI assistant. Pass null or an empty string to clear the selection.",
+            "nullable": true
+          },
+          "harnessAiProviderConfigId": {
+            "type": "string",
+            "description": "Id of the AI provider credential to use for the autonomous AI harness. Pass null or an empty string to clear the selection.",
             "nullable": true
           },
           "autopilotInquiryEnabled": {
@@ -14363,6 +14410,26 @@
       "AiProviderConfigTestResultDto": {
         "type": "object",
         "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "PASS",
+              "FAIL"
+            ],
+            "example": "PASS"
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "CONNECTION",
+              "CONFIGURATION",
+              "AUTHENTICATION",
+              "MODEL",
+              "RATE_LIMIT",
+              "PROVIDER"
+            ],
+            "example": "CONNECTION"
+          },
           "provider": {
             "type": "string",
             "enum": [
@@ -14375,11 +14442,48 @@
           "model": {
             "type": "string",
             "example": "claude-sonnet-4-5"
+          },
+          "message": {
+            "type": "string",
+            "description": "Plain-language explanation of why the test passed or failed."
+          },
+          "details": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "durationMs": {
+            "type": "number",
+            "example": 842
+          },
+          "inputTokens": {
+            "type": "number",
+            "nullable": true,
+            "example": 42
+          },
+          "outputTokens": {
+            "type": "number",
+            "nullable": true,
+            "example": 18
+          },
+          "responsePreview": {
+            "type": "string",
+            "nullable": true,
+            "description": "Short preview proving that the configured model responded."
           }
         },
         "required": [
+          "status",
+          "category",
           "provider",
-          "model"
+          "model",
+          "message",
+          "details",
+          "durationMs",
+          "inputTokens",
+          "outputTokens",
+          "responsePreview"
         ]
       },
       "CapabilityProbeResultDto": {
@@ -19356,7 +19460,7 @@
           },
           "pricingConfigured": {
             "type": "boolean",
-            "description": "True when the default AI provider has per-MTok prices configured (cost charts are meaningful)"
+            "description": "True when the Harness AI provider has per-MTok prices configured (cost charts are meaningful)"
           }
         },
         "required": [

@@ -6,13 +6,107 @@ import { cva, type VariantProps } from "class-variance-authority";
 
 import { cn } from "@workspace/ui/lib/utils";
 
+type TabsProps = React.ComponentProps<typeof TabsPrimitive.Root> & {
+  /**
+   * Keep the selected tab in this query parameter. The URL is read on mount
+   * and updated without navigating or discarding any other query parameters.
+   * Leave unset for local tabs, such as tabs inside a dialog.
+   */
+  urlParam?: string;
+  urlHistory?: "replace" | "push";
+};
+
 function Tabs({
   className,
   orientation = "horizontal",
+  urlParam,
+  urlHistory = "replace",
+  value,
+  defaultValue,
+  onValueChange,
+  ref,
   ...props
-}: React.ComponentProps<typeof TabsPrimitive.Root>) {
+}: TabsProps) {
+  const rootRef = React.useRef<HTMLDivElement | null>(null);
+  const isControlled = value !== undefined;
+  const [localValue, setLocalValue] = React.useState(defaultValue);
+  const selectedValue = isControlled ? value : localValue;
+  const latest = React.useRef({ isControlled, onValueChange, selectedValue });
+  latest.current = { isControlled, onValueChange, selectedValue };
+
+  const writeUrl = React.useCallback(
+    (nextValue: string) => {
+      if (!urlParam || typeof window === "undefined") return;
+
+      const url = new URL(window.location.href);
+      if (url.searchParams.get(urlParam) === nextValue) return;
+
+      url.searchParams.set(urlParam, nextValue);
+      window.history[`${urlHistory}State`](null, "", url);
+    },
+    [urlHistory, urlParam],
+  );
+
+  React.useEffect(() => {
+    if (!urlParam) return;
+
+    const readUrl = () => {
+      const nextValue = new URL(window.location.href).searchParams.get(
+        urlParam,
+      );
+      if (!nextValue || !rootRef.current) return;
+
+      const valid = Array.from(
+        rootRef.current.querySelectorAll<HTMLElement>(
+          '[data-slot="tabs-trigger"]',
+        ),
+      ).some(
+        (trigger) =>
+          trigger.closest('[data-slot="tabs"]') === rootRef.current &&
+          trigger.dataset.urlTabValue === nextValue,
+      );
+      if (!valid || latest.current.selectedValue === nextValue) return;
+
+      if (!latest.current.isControlled) setLocalValue(nextValue);
+      latest.current.onValueChange?.(nextValue);
+    };
+
+    readUrl();
+    window.addEventListener("popstate", readUrl);
+    return () => window.removeEventListener("popstate", readUrl);
+  }, [urlParam]);
+
+  const mounted = React.useRef(false);
+  React.useEffect(() => {
+    if (!urlParam || !isControlled || value === undefined) return;
+    if (!mounted.current) {
+      mounted.current = true;
+      return;
+    }
+    writeUrl(value);
+  }, [isControlled, urlParam, value, writeUrl]);
+
+  const handleValueChange = React.useCallback(
+    (nextValue: string) => {
+      if (!isControlled) setLocalValue(nextValue);
+      writeUrl(nextValue);
+      onValueChange?.(nextValue);
+    },
+    [isControlled, onValueChange, writeUrl],
+  );
+
+  const setRootRef = React.useCallback(
+    (node: HTMLDivElement | null) => {
+      rootRef.current = node;
+      if (typeof ref === "function") ref(node);
+      else if (ref) ref.current = node;
+    },
+    [ref],
+  );
+
   return (
     <TabsPrimitive.Root
+      ref={setRootRef}
       data-slot="tabs"
       data-orientation={orientation}
       orientation={orientation}
@@ -20,6 +114,8 @@ function Tabs({
         "group/tabs flex gap-2 data-[orientation=horizontal]:flex-col",
         className,
       )}
+      value={selectedValue}
+      onValueChange={handleValueChange}
       {...props}
     />
   );
@@ -58,11 +154,14 @@ function TabsList({
 
 function TabsTrigger({
   className,
+  value,
   ...props
 }: React.ComponentProps<typeof TabsPrimitive.Trigger>) {
   return (
     <TabsPrimitive.Trigger
       data-slot="tabs-trigger"
+      data-url-tab-value={value}
+      value={value}
       className={cn(
         "focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:outline-ring text-foreground/60 hover:text-foreground dark:text-muted-foreground dark:hover:text-foreground relative inline-flex h-[calc(100%-1px)] flex-1 items-center justify-center gap-1.5 rounded-sm border border-transparent px-2 py-1 text-sm font-medium whitespace-nowrap transition-all group-data-[orientation=vertical]/tabs:w-full group-data-[orientation=vertical]/tabs:justify-start focus-visible:ring-[3px] focus-visible:outline-1 disabled:pointer-events-none disabled:opacity-50 group-data-[variant=default]/tabs-list:data-[state=active]:shadow-sm group-data-[variant=line]/tabs-list:data-[state=active]:shadow-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
         "group-data-[variant=line]/tabs-list:bg-transparent group-data-[variant=line]/tabs-list:data-[state=active]:bg-transparent dark:group-data-[variant=line]/tabs-list:data-[state=active]:border-transparent dark:group-data-[variant=line]/tabs-list:data-[state=active]:bg-transparent",

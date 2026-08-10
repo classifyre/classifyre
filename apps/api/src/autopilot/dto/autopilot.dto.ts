@@ -898,7 +898,7 @@ export class AgentUsageResponseDto {
 
   @ApiProperty({
     description:
-      'True when the default AI provider has per-MTok prices configured (cost charts are meaningful)',
+      'True when the Harness AI provider has per-MTok prices configured (cost charts are meaningful)',
   })
   pricingConfigured!: boolean;
 }

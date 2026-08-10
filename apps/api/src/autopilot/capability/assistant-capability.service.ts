@@ -18,6 +18,7 @@ import type {
   AgentCapacityReport,
   AgentReadiness,
   CapabilityCostProjection,
+  CapabilityProgressCallback,
   CapabilityReport,
   CapabilityVerdict,
   ProbeBuildContext,
@@ -67,9 +68,20 @@ export class AssistantCapabilityService {
     private readonly detectors: CustomDetectorsService,
   ) {}
 
-  async run(configId: string): Promise<CapabilityReport> {
+  async run(
+    configId: string,
+    onProgress?: CapabilityProgressCallback,
+  ): Promise<CapabilityReport> {
     const startedAt = Date.now();
     const config = await this.configs.get(configId);
+    await onProgress?.({
+      type: 'started',
+      configId,
+      configName: config.name,
+      provider: config.provider,
+      model: config.model,
+      totalProbes: LLM_PROBES.length,
+    });
 
     const ctx: ProbeBuildContext = {
       registry: this.registry,
@@ -80,16 +92,33 @@ export class AssistantCapabilityService {
     const probes: ProbeResult[] = [];
     let abortedEarly = false;
 
-    for (const probe of LLM_PROBES) {
+    for (const [probeIndex, probe] of LLM_PROBES.entries()) {
+      const index = probeIndex + 1;
+      await onProgress?.({
+        type: 'probe_started',
+        index,
+        totalProbes: LLM_PROBES.length,
+        probe: {
+          id: probe.id,
+          tier: probe.tier,
+          title: probe.title,
+          whatItProves: probe.whatItProves,
+        },
+      });
       // Tier gate: without the turn contract, nothing downstream is meaningful,
       // so a protocol failure stops the suite instead of spending more tokens.
       if (abortedEarly) {
-        probes.push(
-          skipped(
-            probe,
-            'Skipped: the model failed the turn-contract probes, so higher-level behaviour cannot be measured.',
-          ),
+        const result = skipped(
+          probe,
+          'Skipped: the model failed the turn-contract probes, so higher-level behaviour cannot be measured.',
         );
+        probes.push(result);
+        await onProgress?.({
+          type: 'probe_completed',
+          index,
+          totalProbes: LLM_PROBES.length,
+          probe: result,
+        });
         continue;
       }
 
@@ -97,18 +126,29 @@ export class AssistantCapabilityService {
       if (probe.id === 'json.recovery') {
         const strict = probes.find((p) => p.id === 'json.strict');
         if (strict?.status === 'PASS') {
-          probes.push(
-            skipped(
-              probe,
-              'Not exercised: the model produced valid JSON on the first attempt, so the correction path never runs.',
-            ),
+          const result = skipped(
+            probe,
+            'Not exercised: the model produced valid JSON on the first attempt, so the correction path never runs.',
           );
+          probes.push(result);
+          await onProgress?.({
+            type: 'probe_completed',
+            index,
+            totalProbes: LLM_PROBES.length,
+            probe: result,
+          });
           continue;
         }
       }
 
       const result = await this.runProbe(probe, ctx, configId);
       probes.push(result);
+      await onProgress?.({
+        type: 'probe_completed',
+        index,
+        totalProbes: LLM_PROBES.length,
+        probe: result,
+      });
 
       if (
         probe.tier === 'PROTOCOL' &&
@@ -119,7 +159,9 @@ export class AssistantCapabilityService {
       }
     }
 
+    await onProgress?.({ type: 'capacity_started' });
     const agents = await this.analyzeCapacity(config.contextSize ?? null);
+    await onProgress?.({ type: 'capacity_completed', agents });
     const cost = this.projectCost(probes, agents, config);
     const verdict = this.verdict(probes, agents);
 

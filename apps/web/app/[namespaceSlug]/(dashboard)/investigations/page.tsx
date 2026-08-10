@@ -2,7 +2,7 @@
 
 import { nsPath } from "@/lib/ns-path";
 import * as React from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { Plus, Sparkles } from "lucide-react";
 import { Button } from "@workspace/ui/components/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@workspace/ui/components/tabs";
@@ -20,10 +20,7 @@ export default function InvestigationsPage() {
 
 function InvestigationsPageInner() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const { t } = useTranslation();
-  const tabParam = searchParams.get("tab");
-  const defaultTab = tabParam === "inquiries" ? tabParam : "cases";
 
   return (
     <div className="space-y-6">
@@ -46,7 +43,7 @@ function InvestigationsPageInner() {
         </div>
       </div>
 
-      <Tabs defaultValue={defaultTab}>
+      <Tabs defaultValue="cases" urlParam="tab">
         <TabsList>
           <TabsTrigger value="cases">{t("investigations.page.tabCases")}</TabsTrigger>
           <TabsTrigger value="inquiries">{t("investigations.page.tabInquiries")}</TabsTrigger>

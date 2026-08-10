@@ -8,9 +8,17 @@ import {
   Param,
   Post,
   Put,
+  Res,
   ServiceUnavailableException,
 } from '@nestjs/common';
-import { ApiBody, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBody,
+  ApiOperation,
+  ApiProduces,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
+import type { FastifyReply } from 'fastify';
 import { AiProviderConfigService } from '../ai-provider-config.service';
 import {
   AiAuthError,
@@ -112,33 +120,97 @@ export class AiProviderConfigController {
     summary: 'Test an AI provider configuration',
     description:
       'Runs a small structured-JSON round-trip against the given credential to ' +
-      'verify the provider, model, and API key work.',
+      'verify the provider, model, and API key work. Expected configuration and ' +
+      'provider failures are returned as structured diagnostics.',
   })
   @ApiResponse({ status: 200, type: AiProviderConfigTestResultDto })
-  @ApiResponse({
-    status: 503,
-    description: 'AI provider not configured or rate limit hit',
-  })
-  @ApiResponse({ status: 502, description: 'AI provider returned an error' })
   @HttpCode(200)
   async test(@Param('id') id: string): Promise<AiProviderConfigTestResultDto> {
+    const startedAt = Date.now();
+    const config = await this.service.get(id);
     try {
       const result = await this.aiClient.completeText(TEST_MESSAGES, {
         configId: id,
       });
-      return { provider: result.provider, model: result.model };
+      return {
+        status: 'PASS',
+        category: 'CONNECTION',
+        provider: result.provider,
+        model: result.model,
+        message: `${config.name} connected successfully and ${result.model} returned a response.`,
+        details: [
+          'The stored credential was decrypted successfully.',
+          'The provider accepted a real completion request.',
+          'The configured model returned content before the timeout.',
+        ],
+        durationMs: Date.now() - startedAt,
+        inputTokens: result.usage?.inputTokens ?? null,
+        outputTokens: result.usage?.outputTokens ?? null,
+        responsePreview: preview(result.content),
+      };
     } catch (err) {
-      if (err instanceof AiConfigError || err instanceof AiRateLimitError) {
-        throw new ServiceUnavailableException(err.message);
-      }
-      if (
-        err instanceof AiAuthError ||
-        err instanceof AiModelNotFoundError ||
-        err instanceof AiProviderError
-      ) {
-        throw new BadGatewayException(err.message);
+      const diagnostic = connectionFailure(err);
+      if (diagnostic) {
+        return {
+          status: 'FAIL',
+          category: diagnostic.category,
+          provider: config.provider,
+          model: config.model,
+          message: diagnostic.message,
+          details: diagnostic.details,
+          durationMs: Date.now() - startedAt,
+          inputTokens: null,
+          outputTokens: null,
+          responsePreview: null,
+        };
       }
       throw err;
+    }
+  }
+
+  @Post(':id/capability-test-stream')
+  @ApiOperation({
+    summary:
+      'Stream Harness capability-test progress as newline-delimited JSON',
+  })
+  @ApiProduces('application/x-ndjson')
+  @ApiResponse({
+    status: 200,
+    description:
+      'Progress events followed by a complete event containing the capability report.',
+    schema: { type: 'string' },
+  })
+  @HttpCode(200)
+  async capabilityTestStream(
+    @Param('id') id: string,
+    @Res() reply: FastifyReply,
+  ): Promise<void> {
+    reply.raw.setHeader('Content-Type', 'application/x-ndjson; charset=utf-8');
+    reply.raw.setHeader('Cache-Control', 'no-cache, no-transform');
+    reply.raw.setHeader('X-Accel-Buffering', 'no');
+    reply.hijack();
+
+    const send = (event: unknown) => {
+      if (!reply.raw.destroyed && !reply.raw.writableEnded) {
+        reply.raw.write(`${JSON.stringify(event)}\n`);
+      }
+    };
+
+    try {
+      const report = await this.capability.run(id, send);
+      send({ type: 'complete', report });
+    } catch (err) {
+      send({
+        type: 'error',
+        message:
+          err instanceof Error
+            ? err.message
+            : 'The Harness capability test could not complete.',
+      });
+    } finally {
+      if (!reply.raw.destroyed && !reply.raw.writableEnded) {
+        reply.raw.end();
+      }
     }
   }
 
@@ -183,4 +255,67 @@ export class AiProviderConfigController {
       throw err;
     }
   }
+}
+
+function preview(content: string): string | null {
+  const normalized = content.replace(/\s+/g, ' ').trim();
+  return normalized ? normalized.slice(0, 280) : null;
+}
+
+function connectionFailure(error: unknown): {
+  category: Exclude<AiProviderConfigTestResultDto['category'], 'CONNECTION'>;
+  message: string;
+  details: string[];
+} | null {
+  if (error instanceof AiConfigError) {
+    return {
+      category: 'CONFIGURATION',
+      message: error.message,
+      details: [
+        'The request was not sent because the saved provider configuration is incomplete.',
+        'Check the API key, model identifier, and base URL.',
+      ],
+    };
+  }
+  if (error instanceof AiAuthError) {
+    return {
+      category: 'AUTHENTICATION',
+      message: error.message,
+      details: [
+        'The provider rejected the saved credential.',
+        'Replace the API key and verify that it has permission to use this model.',
+      ],
+    };
+  }
+  if (error instanceof AiModelNotFoundError) {
+    return {
+      category: 'MODEL',
+      message: error.message,
+      details: [
+        'The provider was reached, but the configured model was not available.',
+        'Check the exact model identifier and whether this account can access it.',
+      ],
+    };
+  }
+  if (error instanceof AiRateLimitError) {
+    return {
+      category: 'RATE_LIMIT',
+      message: error.message,
+      details: [
+        'The provider was reached but refused the request because of a usage limit.',
+        'Check provider quota and billing, then retry later.',
+      ],
+    };
+  }
+  if (error instanceof AiProviderError) {
+    return {
+      category: 'PROVIDER',
+      message: error.message,
+      details: [
+        'The provider request failed before a usable response was returned.',
+        'Check the base URL and provider availability, then retry.',
+      ],
+    };
+  }
+  return null;
 }

@@ -20,7 +20,7 @@ export interface AiCompletionOptions {
   maxRetries?: number;
   /**
    * Target a specific AI provider credential by id. When omitted, the
-   * instance-wide default selected in Settings is used.
+   * provider selected for the interactive Assistant is used.
    */
   configId?: string;
   /**

@@ -282,7 +282,6 @@
     },
     "tabs": {
       "global": "General",
-      "aiProviders": "AI Providers",
       "mcp": "MCP Servers",
       "chat": "Chat Bots",
       "data": "Export & Import"
@@ -1455,7 +1454,7 @@
       "activeLabel": "Active — available for source configuration",
       "providerTitle": "AI provider",
       "providerLabel": "Provider credential",
-      "providerHint": "Manage credentials in Settings → AI Provider.",
+      "providerHint": "Manage credentials in Harness AI → Configuration.",
       "providerPlaceholder": "Select a provider credential",
       "providerLoading": "Loading providers…",
       "providerEmpty": "No AI providers configured",
@@ -2083,7 +2082,7 @@
     "needApiKey": "Enter or keep an API key to test the provider",
     "testDescription": "Send a test code task to the configured AI provider",
     "sectionTitle": "AI Providers",
-    "sectionDesc": "Manage reusable AI provider credentials. Pick one as the default used by the assistant and other AI features. Keys are stored encrypted and never returned in plaintext.",
+    "sectionDesc": "Manage reusable AI provider credentials and assign a provider to the Assistant, AI Harness, or both. Keys are stored encrypted and never returned in plaintext.",
     "name": "Name",
     "namePlaceholder": "e.g. Production Claude",
     "nameRequired": "Name is required",
@@ -2105,20 +2104,56 @@
     "deleted": "AI provider deleted",
     "failedToDelete": "Failed to delete AI provider",
     "deleteTitle": "Delete AI provider?",
-    "deleteConfirm": "This permanently removes \"{{name}}\". Any feature using it as the default will fall back to none.",
+    "deleteConfirm": "This permanently removes \"{{name}}\". Any remaining feature assignment will be cleared.",
     "cancel": "Cancel",
     "create": "Create",
     "delete": "Delete",
     "edit": "Edit",
     "test": "Test",
     "manageTitle": "Manage providers",
-    "manageDesc": "Reusable credentials. Keys are encrypted at rest and never returned.",
+    "manageDesc": "Enable each AI feature and assign the provider it should use. Credentials are encrypted at rest and never returned.",
+    "assistantEnabled": "AI Assistant",
+    "assistantEnabledDesc": "Show the Assistant dialog and floating action button.",
+    "harnessEnabled": "AI Harness",
+    "harnessEnabledDesc": "Allow autonomous Harness agents and scheduled runs.",
+    "featureSaved": "AI feature setting saved",
+    "assignmentSaved": "AI provider assignment saved",
+    "useForAssistant": "Use for AI Assistant",
+    "useForAssistantDesc": "Assign this provider to interactive Assistant requests.",
+    "useForHarness": "Use for AI Harness",
+    "useForHarnessDesc": "Assign this provider to autonomous Harness agents.",
+    "assistantRole": "Assistant",
+    "harnessRole": "Harness",
     "assistantBadge": "Assistant",
+    "harnessBadge": "Harness",
     "detectorBadgeOne": "1 detector",
     "detectorsBadge": "{{count}} detectors",
     "usedByDetectors": "Used by detectors",
     "deleteInUseHint": "Reassign the detectors using this provider before deleting it.",
     "deleteAssistantHint": "This is the assistant model — pick another first.",
+    "deleteRoleHint": "Remove this provider's Assistant and Harness assignments before deleting it.",
+    "testType": "Test type",
+    "testConnectionOption": "Connection",
+    "testHarnessOption": "Harness capability",
+    "testHarness": "Test Harness",
+    "backToProviders": "Back to Harness configuration",
+    "editorDesc": "Configure the credential, model limits, feature assignments, and verify the provider before using it.",
+    "providerAndModel": "Provider and model",
+    "providerAndModelDesc": "Choose the endpoint and model identifier used for requests.",
+    "runtimeAndPricing": "Runtime and pricing",
+    "runtimeAndPricingDesc": "Describe the model limits and optional pricing used by Harness estimates.",
+    "featureAssignments": "Feature assignments",
+    "featureAssignmentsDesc": "One provider may serve the Assistant, Harness, both, or neither.",
+    "credential": "Credential",
+    "credentialDesc": "The API key is encrypted at rest and is never returned in plaintext.",
+    "verification": "Provider verification",
+    "verificationDesc": "Check basic connectivity or run the complete Harness capability suite.",
+    "testProgress": "Harness test progress",
+    "probesComplete": "{{complete}} of {{total}} probes complete",
+    "capacityAnalysis": "Analyzing agent context capacity",
+    "duration": "Duration",
+    "tokenUsage": "Token usage",
+    "responsePreview": "Response preview",
     "providers": {
       "OPENAI_COMPATIBLE": "OpenAI-Compatible",
       "CLAUDE": "Claude (Anthropic)",
@@ -2205,7 +2240,10 @@
     "assets": "Assets",
     "notifications": "Notifications",
     "settings": "Settings",
-    "detectors": "Custom Detectors"
+    "detectors": "Custom Detectors",
+    "aiProviders": "AI Providers",
+    "newProvider": "New Provider",
+    "edit": "Edit"
   },
   "investigations": {
     "page": {
@@ -3071,7 +3109,7 @@
     "agents": {
       "title": "Agents",
       "desc": "Each autonomous agent, what it can do, and how it works. Enable an agent, edit its goal, and assign any built-in tool — including tools from other agents.",
-      "requiresAi": "Enable AI and select a default provider in Settings → AI before agents can act.",
+      "requiresAi": "Enable AI Harness and assign a Harness provider in Harness AI → Configuration before agents can act.",
       "enabled": "Enabled",
       "alwaysOn": "Always on",
       "goal": "Goal / system prompt",
@@ -3128,8 +3166,8 @@
     },
     "config": {
       "title": "Harness configuration",
-      "desc": "Enable each autonomous capability and steer it with free-text guidance. All actions stay audited; per-entity observe-only still applies.",
-      "requiresAi": "Enable AI and select a default provider in Settings → AI before the harness can act.",
+      "desc": "Configure AI feature access, provider assignments, and external tools used by the Harness.",
+      "requiresAi": "Enable AI Harness and assign a Harness provider above before agents can act.",
       "enable": "Enabled",
       "guidance": "Guidance",
       "save": "Save guidance",
@@ -3173,11 +3211,6 @@
       "APPLIED": "Applied",
       "SKIPPED_OBSERVE_ONLY": "Observe-only",
       "FAILED": "Failed"
-    },
-    "pointer": {
-      "title": "Investigation Autopilot moved",
-      "desc": "Autopilot is now the Harness AI control plane — configure and observe it from its own workspace.",
-      "cta": "Open Harness AI"
     },
     "mcp": {
       "title": "External MCP servers",
@@ -3239,23 +3272,23 @@
       "seriesInput": "Input",
       "seriesOutput": "Output",
       "empty": "No agent runs in this period yet.",
-      "noPricing": "Add token prices to your AI provider (Settings → AI providers) to see cost estimates."
+      "noPricing": "Add token prices to your AI provider in Harness AI → Configuration to see cost estimates."
     }
   },
   "aiHealth": {
     "fix": "Fix",
-    "fixInSettings": "Fix in settings",
+    "fixInSettings": "Open configuration",
     "disabled": {
-      "title": "AI is turned off",
-      "desc": "Enable AI in Settings to use the assistant and autopilot."
+      "title": "AI Harness is turned off",
+      "desc": "Enable AI Harness in Harness AI → Configuration."
     },
     "not_configured": {
-      "title": "AI not configured",
-      "desc": "Add an AI provider and set it as the default to enable the assistant and autopilot."
+      "title": "AI Harness not configured",
+      "desc": "Assign a provider to AI Harness in Harness AI → Configuration."
     },
     "error": {
-      "title": "AI provider problem",
-      "desc": "The default AI provider failed a connection / structured-output check. Open Settings to re-test or fix it."
+      "title": "Harness provider problem",
+      "desc": "The AI Harness provider failed its connection check. Open Harness configuration to re-test or fix it."
     }
   },
   "chatBots": {

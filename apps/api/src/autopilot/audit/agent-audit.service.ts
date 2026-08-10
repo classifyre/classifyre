@@ -123,7 +123,7 @@ export class AgentAuditService {
    * Persist the run's cumulative LLM token consumption (absolute totals, not
    * increments — the loop tracks them in its resumable progress, so a resumed
    * attempt never double-counts). Cost is estimated incrementally: only the
-   * tokens ADDED since the last save are priced, at the default provider's
+   * tokens ADDED since the last save are priced, at the Harness provider's
    * current per-MTok prices, so a mid-run price change never re-prices tokens
    * that were already recorded.
    */
@@ -136,7 +136,7 @@ export class AgentAuditService {
       this.prisma.instanceSettings.findUnique({
         where: { id: 1 },
         select: {
-          aiProviderConfig: {
+          harnessAiProviderConfig: {
             select: { inputCostPerMTok: true, outputCostPerMTok: true },
           },
         },
@@ -148,7 +148,7 @@ export class AgentAuditService {
     ]);
     if (!run) return; // run row gone (retention cleanup) — nothing to record
 
-    const pricing = settings?.aiProviderConfig;
+    const pricing = settings?.harnessAiProviderConfig;
     const priced =
       pricing != null &&
       (pricing.inputCostPerMTok != null || pricing.outputCostPerMTok != null);

@@ -221,7 +221,7 @@ export class AiClientService {
 
     if (!id) {
       throw new AiConfigError(
-        'No default AI provider selected. Choose one in Settings → AI Providers.',
+        'No Assistant AI provider selected. Assign one in Harness AI → Configuration.',
       );
     }
 

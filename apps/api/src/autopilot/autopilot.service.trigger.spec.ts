@@ -15,9 +15,10 @@ describe('AutopilotService.trigger — agent selection & chaining', () => {
   const mockBoss = { getBossAsync: jest.fn().mockResolvedValue({ send }) };
   const mockPrisma = {
     instanceSettings: {
-      findUnique: jest
-        .fn()
-        .mockResolvedValue({ aiEnabled: true, aiProviderConfigId: 'p1' }),
+      findUnique: jest.fn().mockResolvedValue({
+        harnessEnabled: true,
+        harnessAiProviderConfigId: 'p1',
+      }),
     },
     source: { findUnique: jest.fn().mockResolvedValue({ id: 's1' }) },
     case: { findUnique: jest.fn().mockResolvedValue({ id: 'c1' }) },

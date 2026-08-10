@@ -268,6 +268,7 @@ export default function FingerprintsPage() {
           <Tabs
             value={sidebarMode}
             onValueChange={(v) => setSidebarMode(v as SidebarMode)}
+            urlParam="tab"
             className="flex min-h-0 w-[420px] shrink-0 flex-col border-2 border-border bg-background"
           >
             <div className="flex items-center gap-2 border-b-2 border-border p-2">

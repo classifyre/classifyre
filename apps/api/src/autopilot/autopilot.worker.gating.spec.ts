@@ -15,7 +15,8 @@ import { AutopilotWorker } from './autopilot.worker';
  */
 describe('AutopilotWorker agent gating (G-027/G-029)', () => {
   const ALL_ON = {
-    aiEnabled: true,
+    harnessEnabled: true,
+    harnessAiProviderConfigId: 'p1',
     autopilotInquiryEnabled: true,
     autopilotCaseEnabled: true,
     autopilotConfigEnabled: true,
@@ -23,7 +24,8 @@ describe('AutopilotWorker agent gating (G-027/G-029)', () => {
     autopilotEscalationEnabled: true,
   };
   const ALL_OFF = {
-    aiEnabled: true,
+    harnessEnabled: true,
+    harnessAiProviderConfigId: 'p1',
     autopilotInquiryEnabled: false,
     autopilotCaseEnabled: false,
     autopilotConfigEnabled: false,
@@ -114,8 +116,8 @@ describe('AutopilotWorker agent gating (G-027/G-029)', () => {
       },
     );
 
-    it('runs nothing when AI itself is off', async () => {
-      build({ ...ALL_ON, aiEnabled: false });
+    it('runs nothing when the AI Harness is off', async () => {
+      build({ ...ALL_ON, harnessEnabled: false });
 
       for (const kind of PIPELINE) {
         await expect(enabled(kind, scanCycle())).resolves.toBe(false);
@@ -180,7 +182,7 @@ describe('AutopilotWorker agent gating (G-027/G-029)', () => {
     });
 
     it('does not override the AI master switch', async () => {
-      build({ ...ALL_OFF, aiEnabled: false });
+      build({ ...ALL_OFF, harnessEnabled: false });
 
       await expect(
         enabled(AgentKind.INQUIRY, scanCycle({ manual: true })),
