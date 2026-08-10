@@ -20,7 +20,7 @@ import { mapValues } from '../runtime';
  */
 export interface CreateThreadDto {
     /**
-     *
+     * 
      * @type {string}
      * @memberof CreateThreadDto
      */
@@ -56,7 +56,7 @@ export interface CreateThreadDto {
      */
     testablePredicate?: string | null;
     /**
-     *
+     * 
      * @type {string}
      * @memberof CreateThreadDto
      */
@@ -134,3 +134,4 @@ export function CreateThreadDtoToJSONTyped(value?: CreateThreadDto | null, ignor
         'createdBy': value['createdBy'],
     };
 }
+
