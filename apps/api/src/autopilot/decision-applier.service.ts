@@ -98,14 +98,20 @@ export class DecisionApplierService {
   async caseThreadGate(
     threadId: string,
     instanceEnabled: boolean,
-  ): Promise<AiManagementMode> {
+  ): Promise<{ mode: AiManagementMode; caseId: string | null }> {
     const existing = await this.prisma.caseThread.findUnique({
       where: { id: threadId },
-      select: { investigation: { select: { aiMode: true } } },
+      select: {
+        caseId: true,
+        investigation: { select: { aiMode: true } },
+      },
     });
     // Unknown ids stay MANAGED so the handler runs and reports the missing row.
-    if (!existing) return AiManagementMode.MANAGED;
-    return this.effectiveMode(existing.investigation.aiMode, instanceEnabled);
+    if (!existing) return { mode: AiManagementMode.MANAGED, caseId: null };
+    return {
+      mode: this.effectiveMode(existing.investigation.aiMode, instanceEnabled),
+      caseId: existing.caseId,
+    };
   }
 
   /** Effective mode for a source (unknown id → MANAGED so the handler fails). */
@@ -497,7 +503,7 @@ export class DecisionApplierService {
   }): Promise<void> {
     const detector = await this.prisma.customDetector.findUnique({
       where: { key: input.customDetectorKey },
-      select: { id: true },
+      select: { id: true, isActive: true },
     });
     if (!detector) {
       throw new Error(
@@ -507,6 +513,33 @@ export class DecisionApplierService {
     if (input.detectorId && input.detectorId !== detector.id) {
       throw new Error(
         `detectorId ${input.detectorId} does not belong to customDetectorKey "${input.customDetectorKey}".`,
+      );
+    }
+    if (!detector.isActive) {
+      throw new Error(
+        `Custom detector "${input.customDetectorKey}" is inactive and cannot serve as a hypothesis probe.`,
+      );
+    }
+    const thread = await this.prisma.caseThread.findUnique({
+      where: { id: input.threadId },
+      select: {
+        kind: true,
+        status: true,
+        investigation: { select: { status: true } },
+        _count: { select: { support: true } },
+      },
+    });
+    if (!thread)
+      throw new Error(`Unknown hypothesis threadId ${input.threadId}.`);
+    if (
+      thread.kind !== CaseThreadKind.HYPOTHESIS ||
+      thread.status !== HypothesisStatus.PROPOSED ||
+      thread._count.support > 0 ||
+      (thread.investigation.status !== CaseStatus.OPEN &&
+        thread.investigation.status !== CaseStatus.IN_PROGRESS)
+    ) {
+      throw new Error(
+        `Thread ${input.threadId} is not an open, PROPOSED hypothesis with zero linked evidence. Refresh hypotheses.open before linking a probe.`,
       );
     }
     const detectorId = input.detectorId ?? detector.id;

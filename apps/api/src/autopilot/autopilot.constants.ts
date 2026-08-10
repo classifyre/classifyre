@@ -365,7 +365,12 @@ export const MAX_SAMPLE_VALUES_PER_GROUP = 15;
 export const MAX_SAMPLE_VALUE_LENGTH = 120;
 export const MAX_CANDIDATE_INQUIRIES = 60;
 export const MAX_CASE_SUMMARIES = 40;
+/** Whole ranked items per tool call; sized to stay below the 8k observation cap. */
+export const RANKED_LIST_PAGE_SIZE = 5;
 export const MAX_CASE_SUMMARY_DESCRIPTION = 240;
+export const MAX_INQUIRY_SUMMARY_DESCRIPTION = 240;
+export const MAX_SUMMARY_TITLE = 160;
+export const MAX_HYPOTHESIS_SUMMARY_TITLE = 100;
 export const MAX_HYPOTHESIS_TITLES_PER_CASE = 6;
 export const MAX_OPEN_HYPOTHESES = 20;
 export const MAX_FINDINGS_PER_INQUIRY = 25;

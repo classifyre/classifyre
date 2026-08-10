@@ -193,8 +193,10 @@ export interface UnmonitoredFindings {
 export interface RankedList<T> {
   orderedBy: string;
   total: number;
+  offset: number;
   shown: number;
   omitted: number;
+  nextOffset: number | null;
   items: T[];
 }
 

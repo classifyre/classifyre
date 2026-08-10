@@ -29,7 +29,9 @@ describe('CaseThreadsService', () => {
     caseThread: { findUnique: jest.fn(), findMany: jest.fn() },
     caseEvidence: { findMany: jest.fn() },
     caseFinding: { findMany: jest.fn() },
-    $transaction: jest.fn(async (fn: (client: typeof tx) => unknown) => fn(tx)),
+    $transaction: jest.fn((fn: (client: typeof tx) => unknown) =>
+      Promise.resolve(fn(tx)),
+    ),
   };
   const activity = { record: jest.fn() };
   const service = new CaseThreadsService(prisma as never, activity as never);

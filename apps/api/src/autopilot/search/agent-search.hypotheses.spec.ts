@@ -118,7 +118,7 @@ describe('AgentSearchService — open hypotheses', () => {
     ]);
   });
 
-  it('caps the work queue at twenty items', async () => {
+  it('caps the ranked queue at twenty and returns it in complete pages', async () => {
     prisma.case.findMany.mockResolvedValue([
       investigation({
         threads: Array.from({ length: 25 }, (_, index) =>
@@ -132,7 +132,32 @@ describe('AgentSearchService — open hypotheses', () => {
 
     const result = await service.openHypotheses();
 
-    expect(result.shown).toBe(20);
-    expect(result.omitted).toBe(5);
+    expect(result.shown).toBe(5);
+    expect(result.omitted).toBe(20);
+    expect(result.nextOffset).toBe(5);
+
+    const secondPage = await service.openHypotheses(false, { offset: 5 });
+    expect(secondPage.items[0].threadId).toBe('thread-05');
+    expect(secondPage.offset).toBe(5);
+  });
+
+  it('keeps a maximum-shaped default page below the observation cap', async () => {
+    prisma.case.findMany.mockResolvedValue([
+      investigation({
+        title: 'c'.repeat(500),
+        threads: Array.from({ length: 5 }, (_, index) =>
+          hypothesis({
+            id: `thread-${index}`,
+            title: 'h'.repeat(500),
+            testablePredicate: 'p'.repeat(2_000),
+            entries: [{ body: 's'.repeat(2_000) }],
+          }),
+        ),
+      }),
+    ]);
+
+    const result = await service.openHypotheses();
+
+    expect(JSON.stringify(result).length).toBeLessThan(8_000);
   });
 });

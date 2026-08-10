@@ -23,8 +23,12 @@ import {
   MAX_CANDIDATE_INQUIRIES,
   MAX_CASE_SUMMARIES,
   MAX_CASE_SUMMARY_DESCRIPTION,
+  MAX_HYPOTHESIS_SUMMARY_TITLE,
   MAX_HYPOTHESIS_TITLES_PER_CASE,
+  MAX_INQUIRY_SUMMARY_DESCRIPTION,
   MAX_OPEN_HYPOTHESES,
+  MAX_SUMMARY_TITLE,
+  RANKED_LIST_PAGE_SIZE,
   COVERAGE_UNAVAILABLE_FAILURE_STREAK,
   MAX_COVERAGE_SOURCE_ROWS,
   DETECTION_YIELD_SCANS,
@@ -40,6 +44,7 @@ import {
   MIN_FEEDBACK_FOR_PRECISION,
   NOISY_FALSE_POSITIVE_RATE,
   CLEAN_FALSE_POSITIVE_RATE,
+  AI_ACTOR,
   OPERATOR_CREATED,
   originOf,
 } from '../autopilot.constants';
@@ -89,6 +94,11 @@ const CASE_ORDER =
 const INQUIRY_ORDER = 'operator origin → new matches → oldest update → id';
 const HYPOTHESIS_ORDER =
   'case origin → hypothesis origin → severity → testable predicate → oldest';
+
+interface RankedPageOptions {
+  offset?: number;
+  limit?: number;
+}
 
 /**
  * Read-only search facade for the autopilot agents. Produces compact,
@@ -709,7 +719,9 @@ export class AgentSearchService {
   }
 
   /** ACTIVE inquiries, with operator work sampled separately from recent work. */
-  async listActiveInquiries(): Promise<RankedList<InquirySummary>> {
+  async listActiveInquiries(
+    options: RankedPageOptions = {},
+  ): Promise<RankedList<InquirySummary>> {
     const include = {
       caseLinks: { select: { caseId: true } },
     } satisfies Prisma.InquiryInclude;
@@ -742,14 +754,17 @@ export class AgentSearchService {
       const age = a.updatedAt.getTime() - b.updatedAt.getTime();
       return age !== 0 ? age : a.id.localeCompare(b.id);
     });
-    const selected = rows.slice(0, MAX_CANDIDATE_INQUIRIES);
-    const items = selected.map((r, index): InquirySummary => {
+    const ranked = rows.slice(0, MAX_CANDIDATE_INQUIRIES);
+    const page = rankedPage(ranked, options);
+    const items = page.items.map((r, index): InquirySummary => {
       const origin = originOf(r.createdBy);
       const idleDays = daysSince(r.updatedAt);
       return {
         id: r.id,
-        title: r.title,
-        description: r.description,
+        title: truncate(r.title, MAX_SUMMARY_TITLE),
+        description: r.description
+          ? truncate(r.description, MAX_INQUIRY_SUMMARY_DESCRIPTION)
+          : null,
         aiMode: String(r.aiMode),
         matchAllSources: r.matchAllSources,
         sourceIds: r.sourceIds,
@@ -763,7 +778,7 @@ export class AgentSearchService {
         linkedCaseIds: r.caseLinks.map((l) => l.caseId),
         createdBy: r.createdBy,
         origin,
-        rank: index + 1,
+        rank: page.offset + index + 1,
         idleDays,
         priority: `${origin} · ${r.newMatchCount} new matches · idle ${idleDays}d`,
       };
@@ -771,8 +786,10 @@ export class AgentSearchService {
     return {
       orderedBy: INQUIRY_ORDER,
       total,
+      offset: page.offset,
       shown: items.length,
-      omitted: Math.max(0, total - items.length),
+      omitted: Math.max(0, total - page.offset - items.length),
+      nextOffset: page.nextOffset,
       items,
     };
   }
@@ -827,7 +844,9 @@ export class AgentSearchService {
   }
 
   /** Open/in-progress cases, sampled by four strata before global priority. */
-  async listOpenCases(): Promise<RankedList<CaseSummary>> {
+  async listOpenCases(
+    options: RankedPageOptions = {},
+  ): Promise<RankedList<CaseSummary>> {
     const open: Prisma.CaseWhereInput = {
       status: { in: ['OPEN', 'IN_PROGRESS'] },
     };
@@ -840,30 +859,39 @@ export class AgentSearchService {
         },
       },
     };
-    const [operatorRows, severeRows, recentRows, unevidencedRows, total] =
+    const priorityOrder = [
+      { severity: 'asc' as const },
+      { updatedAt: 'asc' as const },
+      { id: 'asc' as const },
+    ];
+    const [operatorUnevidenced, aiUnevidenced, operatorRows, aiRows, total] =
       await Promise.all([
+        this.prisma.case.findMany({
+          where: {
+            ...open,
+            ...unevidenced,
+            OR: [...OPERATOR_CREATED.OR],
+          },
+          include: OPEN_CASE_INCLUDE,
+          orderBy: priorityOrder,
+          take: MAX_CASE_SUMMARIES,
+        }),
+        this.prisma.case.findMany({
+          where: { ...open, ...unevidenced, createdBy: AI_ACTOR },
+          include: OPEN_CASE_INCLUDE,
+          orderBy: priorityOrder,
+          take: MAX_CASE_SUMMARIES,
+        }),
         this.prisma.case.findMany({
           where: { ...open, OR: [...OPERATOR_CREATED.OR] },
           include: OPEN_CASE_INCLUDE,
-          orderBy: [{ severity: 'asc' }, { updatedAt: 'asc' }],
+          orderBy: priorityOrder,
           take: MAX_CASE_SUMMARIES,
         }),
         this.prisma.case.findMany({
-          where: { ...open, severity: { in: ['CRITICAL', 'HIGH'] } },
+          where: { ...open, createdBy: AI_ACTOR },
           include: OPEN_CASE_INCLUDE,
-          orderBy: [{ severity: 'asc' }, { updatedAt: 'asc' }],
-          take: MAX_CASE_SUMMARIES,
-        }),
-        this.prisma.case.findMany({
-          where: open,
-          include: OPEN_CASE_INCLUDE,
-          orderBy: { updatedAt: 'desc' },
-          take: MAX_CASE_SUMMARIES,
-        }),
-        this.prisma.case.findMany({
-          where: { ...open, ...unevidenced },
-          include: OPEN_CASE_INCLUDE,
-          orderBy: { updatedAt: 'asc' },
+          orderBy: priorityOrder,
           take: MAX_CASE_SUMMARIES,
         }),
         this.prisma.case.count({ where: open }),
@@ -871,9 +899,12 @@ export class AgentSearchService {
 
     const rows = [
       ...new Map(
-        [...operatorRows, ...severeRows, ...recentRows, ...unevidencedRows].map(
-          (row) => [row.id, row],
-        ),
+        [
+          ...operatorUnevidenced,
+          ...aiUnevidenced,
+          ...operatorRows,
+          ...aiRows,
+        ].map((row) => [row.id, row]),
       ).values(),
     ].sort((a, b) => {
       const origin =
@@ -894,14 +925,15 @@ export class AgentSearchService {
       const age = a.updatedAt.getTime() - b.updatedAt.getTime();
       return age !== 0 ? age : a.id.localeCompare(b.id);
     });
-    const selected = rows.slice(0, MAX_CASE_SUMMARIES);
-    const items = selected.map((r, index): CaseSummary => {
+    const ranked = rows.slice(0, MAX_CASE_SUMMARIES);
+    const page = rankedPage(ranked, options);
+    const items = page.items.map((r, index): CaseSummary => {
       const origin = originOf(r.createdBy);
       const idleDays = daysSince(r.updatedAt);
       const unevaluatedHypothesisCount = unevaluatedCount(r.threads);
       return {
         id: r.id,
-        title: r.title,
+        title: truncate(r.title, MAX_SUMMARY_TITLE),
         description: r.description
           ? truncate(r.description, MAX_CASE_SUMMARY_DESCRIPTION)
           : null,
@@ -911,14 +943,14 @@ export class AgentSearchService {
         linkedInquiryIds: r.inquiryLinks.map((l) => l.inquiryId),
         hypothesisTitles: r.threads
           .slice(0, MAX_HYPOTHESIS_TITLES_PER_CASE)
-          .map((t) => t.title),
+          .map((t) => truncate(t.title, MAX_HYPOTHESIS_SUMMARY_TITLE)),
         hypothesisCount: r.threads.length,
         unevaluatedHypothesisCount,
         evidenceCount: r._count.evidence,
         findingCount: r._count.findings,
         createdBy: r.createdBy,
         origin,
-        rank: index + 1,
+        rank: page.offset + index + 1,
         idleDays,
         priority: `${origin} · ${String(r.severity)} · ${unevaluatedHypothesisCount} unevaluated · idle ${idleDays}d`,
       };
@@ -926,14 +958,19 @@ export class AgentSearchService {
     return {
       orderedBy: CASE_ORDER,
       total,
+      offset: page.offset,
       shown: items.length,
-      omitted: Math.max(0, total - items.length),
+      omitted: Math.max(0, total - page.offset - items.length),
+      nextOffset: page.nextOffset,
       items,
     };
   }
 
   /** Unevidenced proposed hypotheses that can pull detector-authoring work. */
-  async openHypotheses(includeProbed = false): Promise<OpenHypothesesResult> {
+  async openHypotheses(
+    includeProbed = false,
+    options: RankedPageOptions = {},
+  ): Promise<OpenHypothesesResult> {
     const threadWhere = {
       kind: 'HYPOTHESIS' as const,
       status: 'PROPOSED' as const,
@@ -1004,32 +1041,34 @@ export class AgentSearchService {
         const age = a.thread.createdAt.getTime() - b.thread.createdAt.getTime();
         return age !== 0 ? age : a.thread.id.localeCompare(b.thread.id);
       });
-    const items = eligible
-      .slice(0, MAX_OPEN_HYPOTHESES)
-      .map(({ investigation, thread }) => ({
-        threadId: thread.id,
-        caseId: investigation.id,
-        caseTitle: investigation.title,
-        caseSeverity: String(investigation.severity),
-        caseCreatedBy: investigation.createdBy,
-        caseOrigin: originOf(investigation.createdBy),
-        title: thread.title,
-        statement: thread.entries[0]?.body
-          ? truncate(thread.entries[0].body, 300)
-          : null,
-        testablePredicate: thread.testablePredicate
-          ? truncate(thread.testablePredicate, 300)
-          : null,
-        createdBy: thread.createdBy,
-        origin: originOf(thread.createdBy),
-        createdAt: thread.createdAt,
-        probes: probesByThread.get(thread.id) ?? [],
-      }));
+    const ranked = eligible.slice(0, MAX_OPEN_HYPOTHESES);
+    const page = rankedPage(ranked, options);
+    const items = page.items.map(({ investigation, thread }) => ({
+      threadId: thread.id,
+      caseId: investigation.id,
+      caseTitle: truncate(investigation.title, MAX_SUMMARY_TITLE),
+      caseSeverity: String(investigation.severity),
+      caseCreatedBy: investigation.createdBy,
+      caseOrigin: originOf(investigation.createdBy),
+      title: truncate(thread.title, MAX_HYPOTHESIS_SUMMARY_TITLE),
+      statement: thread.entries[0]?.body
+        ? truncate(thread.entries[0].body, 300)
+        : null,
+      testablePredicate: thread.testablePredicate
+        ? truncate(thread.testablePredicate, 300)
+        : null,
+      createdBy: thread.createdBy,
+      origin: originOf(thread.createdBy),
+      createdAt: thread.createdAt,
+      probes: probesByThread.get(thread.id) ?? [],
+    }));
     return {
       orderedBy: HYPOTHESIS_ORDER,
       total: eligible.length,
+      offset: page.offset,
       shown: items.length,
-      omitted: Math.max(0, eligible.length - items.length),
+      omitted: Math.max(0, eligible.length - page.offset - items.length),
+      nextOffset: page.nextOffset,
       probedExcluded,
       items,
     };
@@ -1317,6 +1356,26 @@ function truncate(value: string, max: number): string {
   return value.length > max
     ? `${value.slice(0, Math.max(0, max - 1))}…`
     : value;
+}
+
+function rankedPage<T>(
+  ranked: T[],
+  options: RankedPageOptions,
+): { items: T[]; offset: number; nextOffset: number | null } {
+  const offset = Number.isFinite(options.offset)
+    ? Math.max(0, Math.floor(options.offset ?? 0))
+    : 0;
+  const requestedLimit = Number.isFinite(options.limit)
+    ? Math.max(1, Math.floor(options.limit ?? RANKED_LIST_PAGE_SIZE))
+    : RANKED_LIST_PAGE_SIZE;
+  const limit = Math.min(requestedLimit, RANKED_LIST_PAGE_SIZE);
+  const items = ranked.slice(offset, offset + limit);
+  const end = offset + items.length;
+  return {
+    items,
+    offset,
+    nextOffset: end < ranked.length ? end : null,
+  };
 }
 
 function daysSince(value: Date): number {
