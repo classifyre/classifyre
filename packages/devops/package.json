@@ -1,6 +1,6 @@
 {
   "name": "@workspace/devops",
-  "version": "0.4.106-SNAPSHOT",
+  "version": "0.4.106",
   "private": true,
   "scripts": {
     "build": "bun run helm:test",
