@@ -86,7 +86,6 @@ export interface AgentMemoryDto {
  * @export
  */
 export const AgentMemoryDtoKindEnum = {
-    Glossary: 'GLOSSARY',
     DecisionPrecedent: 'DECISION_PRECEDENT',
     EntityMap: 'ENTITY_MAP',
     SourceProfile: 'SOURCE_PROFILE',

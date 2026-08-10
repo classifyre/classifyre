@@ -58,26 +58,49 @@ export class GlossaryToolset {
               type: 'string',
               description: 'Why this term matters; keep to 1-2 sentences.',
             },
+            refType: {
+              type: 'string',
+              enum: ['case', 'inquiry', 'source', 'finding'],
+              description:
+                'Optional investigation entity that established this term. Supply together with refId.',
+            },
+            refId: {
+              type: 'string',
+              description:
+                'Existing entity id that established this term. Supply together with refType.',
+            },
           },
           required: ['term'],
           additionalProperties: false,
         },
         sideEffect: 'mutate',
-        domain: 'memory',
+        domain: 'glossary',
         resolveGate: () =>
           Promise.resolve({
             mode: AiManagementMode.MANAGED,
-            entityType: 'memory',
+            entityType: 'glossary',
           }),
-        handler: async (input, tc) =>
-          this.glossary.upsert({
+        handler: async (input, tc) => {
+          const explicitRefType = input.refType as string | undefined;
+          const explicitRefId = input.refId as string | undefined;
+          if (
+            (explicitRefType && !explicitRefId) ||
+            (!explicitRefType && explicitRefId)
+          ) {
+            throw new Error('refType and refId must be supplied together');
+          }
+          const focusedCaseId = tc.ctx.run.caseId ?? undefined;
+          return this.glossary.upsert({
             term: typeof input.term === 'string' ? input.term : '',
             aliases: (input.aliases as string[] | undefined) ?? [],
             entityType: input.entityType as never,
             notes: input.notes as string | undefined,
+            refType: explicitRefType ?? (focusedCaseId ? 'case' : undefined),
+            refId: explicitRefId ?? focusedCaseId,
             origin: 'AGENT',
             author: String(tc.ctx.run.agentKind),
-          }),
+          });
+        },
       },
     ];
   }

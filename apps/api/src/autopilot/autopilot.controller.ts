@@ -208,7 +208,8 @@ export class AutopilotController {
 
   @Get('memory')
   @ApiOperation({
-    summary: 'List the agent memory (glossary, precedents, topic map)',
+    summary:
+      'List long-lived agent memory (precedents, entity maps, source profiles, detector insights and directives)',
   })
   @ApiResponse({ status: 200, type: AgentMemoryListResponseDto })
   listMemory(

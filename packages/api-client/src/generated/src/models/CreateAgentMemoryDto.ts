@@ -26,7 +26,7 @@ export interface CreateAgentMemoryDto {
      */
     kind: CreateAgentMemoryDtoKindEnum;
     /**
-     * Normalized lookup key (topic slug, term)
+     * Normalized lookup key (topic or entity slug)
      * @type {string}
      * @memberof CreateAgentMemoryDto
      */
@@ -50,7 +50,6 @@ export interface CreateAgentMemoryDto {
  * @export
  */
 export const CreateAgentMemoryDtoKindEnum = {
-    Glossary: 'GLOSSARY',
     DecisionPrecedent: 'DECISION_PRECEDENT',
     EntityMap: 'ENTITY_MAP',
     SourceProfile: 'SOURCE_PROFILE',

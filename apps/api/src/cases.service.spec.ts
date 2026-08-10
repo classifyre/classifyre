@@ -44,7 +44,10 @@ describe('CasesService', () => {
   const mockGraph = { inferEdgesForAsset: jest.fn(), caseGraph: jest.fn() };
   const mockMatching = { getMatchingFindingIds: jest.fn() };
   const mockActivity = { record: jest.fn() };
-  const mockAgentMemory = { recordEntityDeletion: jest.fn() };
+  const mockAgentMemory = {
+    recordEntityDeletion: jest.fn(),
+    syncEntityMap: jest.fn(),
+  };
 
   const caseRow = (over: Record<string, unknown> = {}) => ({
     id: 'c1',
@@ -83,6 +86,7 @@ describe('CasesService', () => {
       severity: 'HIGH',
     });
     expect(result.id).toBe('c1');
+    expect(mockAgentMemory.syncEntityMap).toHaveBeenCalledWith('case', 'c1');
     expect(mockPrisma.inquiry.updateMany).not.toHaveBeenCalled();
   });
 
@@ -105,6 +109,9 @@ describe('CasesService', () => {
       ],
       skipDuplicates: true,
     });
+    expect(mockAgentMemory.syncEntityMap).toHaveBeenCalledWith('case', 'c1');
+    expect(mockAgentMemory.syncEntityMap).toHaveBeenCalledWith('inquiry', 'q1');
+    expect(mockAgentMemory.syncEntityMap).toHaveBeenCalledWith('inquiry', 'q2');
   });
 
   it('links additional inquiries to an existing case', async () => {
@@ -276,6 +283,10 @@ describe('CasesService', () => {
       },
     ]);
     mockPrisma.inquiry.updateMany.mockResolvedValue({ count: 1 });
+    mockPrisma.caseInquiry.findMany.mockResolvedValue([
+      { inquiryId: 'q1' },
+      { inquiryId: 'q2' },
+    ]);
 
     const result = await service.close('c1', {
       conclusion: 'It was the wiki.',
@@ -285,6 +296,9 @@ describe('CasesService', () => {
       where: { id: { in: ['q1'] } },
       data: { status: 'ARCHIVED' },
     });
+    expect(mockAgentMemory.syncEntityMap).toHaveBeenCalledWith('case', 'c1');
+    expect(mockAgentMemory.syncEntityMap).toHaveBeenCalledWith('inquiry', 'q1');
+    expect(mockAgentMemory.syncEntityMap).toHaveBeenCalledWith('inquiry', 'q2');
   });
 
   it('refuses to close a case without a conclusion', async () => {
@@ -307,6 +321,10 @@ describe('CasesService', () => {
       });
     mockPrisma.case.update.mockResolvedValue(caseRow({ status: 'OPEN' }));
     mockPrisma.inquiry.updateMany.mockResolvedValue({ count: 2 });
+    mockPrisma.caseInquiry.findMany.mockResolvedValue([
+      { inquiryId: 'q1' },
+      { inquiryId: 'q2' },
+    ]);
 
     const result = await service.reopen('c1', { note: 'It recurred.' });
 
@@ -320,6 +338,9 @@ describe('CasesService', () => {
       data: { status: 'ACTIVE' },
     });
     expect(mockActivity.record).toHaveBeenCalled();
+    expect(mockAgentMemory.syncEntityMap).toHaveBeenCalledWith('case', 'c1');
+    expect(mockAgentMemory.syncEntityMap).toHaveBeenCalledWith('inquiry', 'q1');
+    expect(mockAgentMemory.syncEntityMap).toHaveBeenCalledWith('inquiry', 'q2');
   });
 
   it('throws NotFound for a missing case on update', async () => {

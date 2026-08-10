@@ -8484,7 +8484,6 @@
             "schema": {
               "type": "string",
               "enum": [
-                "GLOSSARY",
                 "DECISION_PRECEDENT",
                 "ENTITY_MAP",
                 "SOURCE_PROFILE",
@@ -8533,7 +8532,7 @@
             }
           }
         },
-        "summary": "List the agent memory (glossary, precedents, topic map)",
+        "summary": "List long-lived agent memory (precedents, entity maps, source profiles, detector insights and directives)",
         "tags": [
           "autopilot"
         ]
@@ -13533,7 +13532,7 @@
           "autopilotInquiryEnabled": {
             "type": "boolean",
             "description": "When true, the autopilot inquiry agent manages inquiries automatically after scans.",
-            "example": false
+            "example": true
           },
           "autopilotInquiryDesired": {
             "type": "string",
@@ -13548,7 +13547,7 @@
           "autopilotCaseEnabled": {
             "type": "boolean",
             "description": "When true, the autopilot case agent manages investigation cases automatically after scans.",
-            "example": false
+            "example": true
           },
           "autopilotCaseGuidance": {
             "type": "string",
@@ -13558,7 +13557,7 @@
           "autopilotConfigEnabled": {
             "type": "boolean",
             "description": "When true, the config-tuning agent may change editable source config.",
-            "example": false
+            "example": true
           },
           "autopilotConfigGuidance": {
             "type": "string",
@@ -13568,7 +13567,7 @@
           "autopilotDetectorEnabled": {
             "type": "boolean",
             "description": "When true, the detector-authoring agent may create/train detectors.",
-            "example": false
+            "example": true
           },
           "autopilotDetectorGuidance": {
             "type": "string",
@@ -13578,7 +13577,7 @@
           "autopilotEscalationEnabled": {
             "type": "boolean",
             "description": "When true, the escalation agent may raise operator notifications for high-severity cases.",
-            "example": false
+            "example": true
           },
           "autopilotEscalationGuidance": {
             "type": "string",
@@ -13588,7 +13587,7 @@
           "autopilotMcpEnabled": {
             "type": "boolean",
             "description": "When true, the harness may call tools from connected external MCP servers.",
-            "example": false
+            "example": true
           },
           "autoScheduleEnabled": {
             "type": "boolean",
@@ -13659,12 +13658,12 @@
           "aiEnabled": {
             "type": "boolean",
             "description": "When false, AI assistant features are disabled instance-wide.",
-            "example": false
+            "example": true
           },
           "mcpEnabled": {
             "type": "boolean",
             "description": "When false, the MCP endpoint is disabled instance-wide.",
-            "example": false
+            "example": true
           },
           "language": {
             "type": "string",
@@ -13697,7 +13696,7 @@
           "autopilotInquiryEnabled": {
             "type": "boolean",
             "description": "When true, the autopilot inquiry agent manages inquiries automatically after scans.",
-            "example": false
+            "example": true
           },
           "autopilotInquiryDesired": {
             "type": "string",
@@ -13712,7 +13711,7 @@
           "autopilotCaseEnabled": {
             "type": "boolean",
             "description": "When true, the autopilot case agent manages investigation cases automatically after scans.",
-            "example": false
+            "example": true
           },
           "autopilotCaseGuidance": {
             "type": "string",
@@ -13722,7 +13721,7 @@
           "autopilotConfigEnabled": {
             "type": "boolean",
             "description": "When true, the config-tuning agent may change editable source config (detectors, sampling, optional, resources) — never the base connection.",
-            "example": false
+            "example": true
           },
           "autopilotConfigGuidance": {
             "type": "string",
@@ -13732,7 +13731,7 @@
           "autopilotDetectorEnabled": {
             "type": "boolean",
             "description": "When true, the detector-authoring agent may create and train custom detectors.",
-            "example": false
+            "example": true
           },
           "autopilotDetectorGuidance": {
             "type": "string",
@@ -13742,7 +13741,7 @@
           "autopilotEscalationEnabled": {
             "type": "boolean",
             "description": "When true, the escalation agent may raise operator notifications for high-severity cases.",
-            "example": false
+            "example": true
           },
           "autopilotEscalationGuidance": {
             "type": "string",
@@ -13752,7 +13751,7 @@
           "autopilotMcpEnabled": {
             "type": "boolean",
             "description": "When true, the harness may call tools from connected external MCP servers.",
-            "example": false
+            "example": true
           },
           "autoScheduleEnabled": {
             "type": "boolean",
@@ -16135,6 +16134,10 @@
             "type": "number",
             "nullable": true
           },
+          "testablePredicate": {
+            "type": "string",
+            "nullable": true
+          },
           "color": {
             "type": "string",
             "nullable": true
@@ -16218,6 +16221,11 @@
             "minimum": 0,
             "maximum": 1
           },
+          "testablePredicate": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 2000
+          },
           "createdBy": {
             "type": "string"
           }
@@ -16249,6 +16257,11 @@
             "maximum": 1,
             "nullable": true
           },
+          "testablePredicate": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 2000
+          },
           "color": {
             "type": "string",
             "nullable": true
@@ -16272,6 +16285,11 @@
           },
           "body": {
             "type": "string"
+          },
+          "metadata": {
+            "type": "object",
+            "nullable": true,
+            "additionalProperties": true
           },
           "author": {
             "type": "string"
@@ -17010,14 +17028,6 @@
             "type": "string",
             "nullable": true
           },
-          "refType": {
-            "type": "string",
-            "nullable": true
-          },
-          "refId": {
-            "type": "string",
-            "nullable": true
-          },
           "origin": {
             "type": "string",
             "description": "AGENT proposals are unverified hypotheses"
@@ -17102,14 +17112,6 @@
             ]
           },
           "notes": {
-            "type": "string",
-            "nullable": true
-          },
-          "refType": {
-            "type": "string",
-            "nullable": true
-          },
-          "refId": {
             "type": "string",
             "nullable": true
           },
@@ -17238,14 +17240,6 @@
             ]
           },
           "notes": {
-            "type": "string",
-            "nullable": true
-          },
-          "refType": {
-            "type": "string",
-            "nullable": true
-          },
-          "refId": {
             "type": "string",
             "nullable": true
           },
@@ -20236,7 +20230,6 @@
           "kind": {
             "type": "string",
             "enum": [
-              "GLOSSARY",
               "DECISION_PRECEDENT",
               "ENTITY_MAP",
               "SOURCE_PROFILE",
@@ -20320,7 +20313,6 @@
           "kind": {
             "type": "string",
             "enum": [
-              "GLOSSARY",
               "DECISION_PRECEDENT",
               "ENTITY_MAP",
               "SOURCE_PROFILE",
@@ -20330,7 +20322,7 @@
           },
           "key": {
             "type": "string",
-            "description": "Normalized lookup key (topic slug, term)"
+            "description": "Normalized lookup key (topic or entity slug)"
           },
           "content": {
             "type": "string"

@@ -3,8 +3,10 @@ import {
   IsEnum,
   IsIn,
   IsNumber,
+  IsObject,
   IsOptional,
   IsString,
+  MaxLength,
   Max,
   Min,
 } from 'class-validator';
@@ -47,6 +49,12 @@ export class CreateThreadDto {
   @Max(1)
   confidence?: number;
 
+  @ApiPropertyOptional({ nullable: true, maxLength: 2000 })
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  testablePredicate?: string | null;
+
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
@@ -71,6 +79,12 @@ export class UpdateThreadDto {
   @Max(1)
   confidence?: number | null;
 
+  @ApiPropertyOptional({ nullable: true, maxLength: 2000 })
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  testablePredicate?: string | null;
+
   @ApiPropertyOptional({ nullable: true })
   @IsOptional()
   @IsString()
@@ -91,6 +105,15 @@ export class AddThreadEntryDto {
   @IsOptional()
   @IsString()
   body?: string;
+
+  @ApiPropertyOptional({
+    type: 'object',
+    nullable: true,
+    additionalProperties: true,
+  })
+  @IsOptional()
+  @IsObject()
+  metadata?: Record<string, unknown> | null;
 
   @ApiPropertyOptional()
   @IsOptional()
@@ -194,6 +217,9 @@ export class ThreadResponseDto {
 
   @ApiPropertyOptional({ nullable: true })
   confidence?: number | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  testablePredicate?: string | null;
 
   @ApiPropertyOptional({ nullable: true })
   color?: string | null;

@@ -11,6 +11,7 @@ Name | Type
 `statement` | string
 `status` | string
 `confidence` | number
+`testablePredicate` | string
 `createdBy` | string
 
 ## Example
@@ -25,6 +26,7 @@ const example = {
   "statement": null,
   "status": null,
   "confidence": null,
+  "testablePredicate": null,
   "createdBy": null,
 } satisfies CreateThreadDto
 

@@ -67,6 +67,7 @@ export class CaseThreadsService {
               ? null
               : (dto.status ?? HypothesisStatus.PROPOSED),
           confidence: dto.confidence,
+          testablePredicate: dto.testablePredicate,
           createdBy: dto.createdBy,
         },
         include: this.include,
@@ -100,7 +101,13 @@ export class CaseThreadsService {
   async update(id: string, dto: UpdateThreadDto): Promise<ThreadResponseDto> {
     const existing = await this.prisma.caseThread.findUnique({
       where: { id },
-      select: { id: true, caseId: true, status: true, confidence: true },
+      select: {
+        id: true,
+        caseId: true,
+        status: true,
+        confidence: true,
+        testablePredicate: true,
+      },
     });
     if (!existing) throw new NotFoundException(`Thread ${id} not found`);
 
@@ -111,6 +118,7 @@ export class CaseThreadsService {
     const activityPayload: Record<string, unknown> = { threadId: id };
     const entriesToCreate: Array<{
       entryType: CaseThreadEntryType;
+      body?: string;
       metadata: Record<string, unknown>;
     }> = [];
 
@@ -138,6 +146,21 @@ export class CaseThreadsService {
       });
       activityPayload.confidence = dto.confidence;
     }
+    if (
+      dto.testablePredicate !== undefined &&
+      dto.testablePredicate !== existing.testablePredicate
+    ) {
+      data.testablePredicate = dto.testablePredicate;
+      entriesToCreate.push({
+        entryType: CaseThreadEntryType.NOTE,
+        body: 'Testable predicate updated.',
+        metadata: {
+          previousTestablePredicate: existing.testablePredicate,
+          testablePredicate: dto.testablePredicate,
+        },
+      });
+      activityPayload.testablePredicate = dto.testablePredicate;
+    }
 
     const primaryActivityType = entriesToCreate.some(
       (e) => e.entryType === CaseThreadEntryType.STATUS_CHANGE,
@@ -156,6 +179,7 @@ export class CaseThreadsService {
           data: {
             threadId: id,
             entryType: entry.entryType,
+            body: entry.body,
             metadata: entry.metadata as JsonInput,
           },
         });
@@ -193,12 +217,24 @@ export class CaseThreadsService {
     });
     if (!thread) throw new NotFoundException(`Thread ${threadId} not found`);
 
+    if (
+      dto.metadata !== undefined &&
+      dto.metadata !== null &&
+      JSON.stringify(dto.metadata).length > 8_000
+    ) {
+      throw new BadRequestException(
+        'Thread entry metadata exceeds 8,000 characters',
+      );
+    }
+
     await this.prisma.$transaction(async (tx) => {
       const entry = await tx.caseThreadEntry.create({
         data: {
           threadId,
           entryType: dto.entryType,
           body: dto.body,
+          metadata:
+            dto.metadata == null ? undefined : (dto.metadata as JsonInput),
           author: dto.author,
         },
       });
@@ -509,6 +545,7 @@ export class CaseThreadsService {
         title: r.title,
         status: r.status,
         confidence: r.confidence === null ? null : Number(r.confidence),
+        testablePredicate: r.testablePredicate,
         color: r.color ?? null,
         createdBy: r.createdBy,
         supportingCount,

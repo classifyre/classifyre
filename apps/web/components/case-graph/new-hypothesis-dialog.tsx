@@ -41,12 +41,14 @@ export function NewHypothesisDialog({
   const { t } = useTranslation();
   const [title, setTitle] = React.useState("");
   const [statement, setStatement] = React.useState("");
+  const [testablePredicate, setTestablePredicate] = React.useState("");
   const [saving, setSaving] = React.useState(false);
 
   React.useEffect(() => {
     if (open) {
       setTitle("");
       setStatement("");
+      setTestablePredicate("");
     }
   }, [open]);
 
@@ -60,6 +62,7 @@ export function NewHypothesisDialog({
           kind: CreateThreadDtoKindEnum.Hypothesis,
           title: title.trim(),
           statement: statement.trim() || undefined,
+          testablePredicate: testablePredicate.trim() || undefined,
         },
       });
       toast.success(t("caseGraph.newHypothesisDialog.hypothesisCreated"));
@@ -80,7 +83,9 @@ export function NewHypothesisDialog({
           <DialogTitle>{t("caseGraph.newHypothesisDialog.title")}</DialogTitle>
           <DialogDescription>
             {linkNodeLabel
-              ? t("caseGraph.newHypothesisDialog.linkedNode", { label: linkNodeLabel })
+              ? t("caseGraph.newHypothesisDialog.linkedNode", {
+                  label: linkNodeLabel,
+                })
               : t("caseGraph.newHypothesisDialog.description")}
           </DialogDescription>
         </DialogHeader>
@@ -95,11 +100,23 @@ export function NewHypothesisDialog({
             />
           </div>
           <div className="space-y-1.5">
+            <Label>Testable predicate</Label>
+            <Textarea
+              value={testablePredicate}
+              onChange={(event) => setTestablePredicate(event.target.value)}
+              placeholder="What observable evidence in this data would confirm or refute it?"
+              rows={3}
+              maxLength={2000}
+            />
+          </div>
+          <div className="space-y-1.5">
             <Label>{t("caseGraph.newHypothesisDialog.statementLabel")}</Label>
             <Textarea
               value={statement}
               onChange={(e) => setStatement(e.target.value)}
-              placeholder={t("caseGraph.newHypothesisDialog.statementPlaceholder")}
+              placeholder={t(
+                "caseGraph.newHypothesisDialog.statementPlaceholder",
+              )}
               rows={3}
             />
           </div>

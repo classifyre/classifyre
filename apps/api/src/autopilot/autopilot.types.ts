@@ -1,4 +1,5 @@
 import type { AgentRun, DetectorType, InstanceSettings } from '@prisma/client';
+import type { EntityOrigin } from './autopilot.constants';
 
 /** Payload of an AUTOPILOT_QUEUE job. */
 export interface AutopilotJob {
@@ -188,6 +189,23 @@ export interface UnmonitoredFindings {
   }>;
 }
 
+/** Bounded, explicitly-ranked list returned to an agent. */
+export interface RankedList<T> {
+  orderedBy: string;
+  total: number;
+  offset: number;
+  shown: number;
+  omitted: number;
+  nextOffset: number | null;
+  items: T[];
+}
+
+export interface ProbeSummary {
+  customDetectorKey: string;
+  detectorId: string | null;
+  createdAt: Date;
+}
+
 /** Compact inquiry summary fed to the model. */
 export interface InquirySummary {
   id: string;
@@ -204,6 +222,11 @@ export interface InquirySummary {
   matchCount: number;
   newMatchCount: number;
   linkedCaseIds: string[];
+  createdBy: string | null;
+  origin: EntityOrigin;
+  rank: number;
+  idleDays: number;
+  priority: string;
 }
 
 /** Compact case summary fed to the model. */
@@ -218,6 +241,33 @@ export interface CaseSummary {
   hypothesisTitles: string[];
   evidenceCount: number;
   findingCount: number;
+  createdBy: string | null;
+  origin: EntityOrigin;
+  rank: number;
+  hypothesisCount: number;
+  unevaluatedHypothesisCount: number;
+  idleDays: number;
+  priority: string;
+}
+
+export interface OpenHypothesisSummary {
+  threadId: string;
+  caseId: string;
+  caseTitle: string;
+  caseSeverity: string;
+  caseCreatedBy: string | null;
+  caseOrigin: EntityOrigin;
+  title: string;
+  statement: string | null;
+  testablePredicate: string | null;
+  createdBy: string | null;
+  origin: EntityOrigin;
+  createdAt: Date;
+  probes: ProbeSummary[];
+}
+
+export interface OpenHypothesesResult extends RankedList<OpenHypothesisSummary> {
+  probedExcluded: number;
 }
 
 /**
@@ -231,12 +281,18 @@ export interface FocusedCaseDetail {
   description: string | null;
   status: string;
   severity: string;
+  createdBy: string | null;
+  origin: EntityOrigin;
   hypotheses: Array<{
     threadId: string;
     title: string;
     status: string | null;
     confidence: number | null;
     supportCount: number;
+    testablePredicate: string | null;
+    createdBy: string | null;
+    origin: EntityOrigin;
+    probes: ProbeSummary[];
   }>;
   evidence: Array<{
     evidenceId: string;
@@ -261,6 +317,14 @@ export interface FocusedCaseDetail {
     toId: string;
     relationType: string;
     origin: string;
+  }>;
+  glossary: Array<{
+    id: string;
+    term: string;
+    aliases: string[];
+    entityType: string;
+    notes: string | null;
+    verified: boolean;
   }>;
   linkedInquiryIds: string[];
 }
@@ -394,7 +458,6 @@ export interface InquiryMatcherProposal {
 
 export interface MemoryWrite {
   kind:
-    | 'GLOSSARY'
     | 'DECISION_PRECEDENT'
     | 'ENTITY_MAP'
     | 'SOURCE_PROFILE'
@@ -403,6 +466,8 @@ export interface MemoryWrite {
   key: string;
   content: string;
   tags?: string[];
+  /** Replace tags instead of merging them (used by deterministic live maps). */
+  replaceTags?: boolean;
   /**
    * Set true only when the content was checked against real system state this
    * cycle (e.g. a detector's actual findings). Refreshed-but-unchecked content
@@ -431,6 +496,7 @@ export type CaseOperation = {
   statement?: string;
   hypothesisStatus?: 'PROPOSED' | 'SUPPORTED' | 'REFUTED' | 'INCONCLUSIVE';
   confidence?: number;
+  testablePredicate?: string;
   /** ADD_EVIDENCE */
   assetId?: string;
   note?: string;

@@ -128,6 +128,7 @@
   },
   "glossary": {
     "title": "Glossary",
+    "description": "Canonical vocabulary shared by operators, cases, and every AI Harness run.",
     "addTerm": "Add term",
     "editTerm": "Edit term",
     "searchPlaceholder": "Search terms, aliases, or notes…",
@@ -2363,10 +2364,12 @@
         "teach": "Teach",
         "loading": "Loading memory…",
         "emptyTitle": "Nothing learned yet",
-        "emptyDesc": "The agent writes glossary entries, decision precedents and entity maps as it works — or teach it something now.",
+        "emptyDesc": "The agent writes decision precedents, entity maps, source profiles, and detector insights as it works — or teach it something now.",
         "entryCount": "{{count}} entr{{suffix}}",
         "editTitle": "Edit",
         "forgetTitle": "Forget",
+        "openCase": "Open case",
+        "openInquiry": "Open inquiry",
         "labelTags": "Tags",
         "labelWeight": "Weight",
         "placeholders": {

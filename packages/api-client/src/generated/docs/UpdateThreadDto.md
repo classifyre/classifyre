@@ -9,6 +9,7 @@ Name | Type
 `title` | string
 `status` | string
 `confidence` | number
+`testablePredicate` | string
 `color` | string
 `actor` | string
 
@@ -22,6 +23,7 @@ const example = {
   "title": null,
   "status": null,
   "confidence": null,
+  "testablePredicate": null,
   "color": null,
   "actor": null,
 } satisfies UpdateThreadDto

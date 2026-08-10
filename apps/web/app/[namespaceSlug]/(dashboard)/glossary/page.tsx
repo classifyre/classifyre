@@ -102,7 +102,11 @@ function getPageItems(current: number, total: number) {
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-export default function GlossaryPage() {
+export function GlossaryWorkspace({
+  embedded = false,
+}: {
+  embedded?: boolean;
+}) {
   const { t } = useTranslation();
 
   const [searchInput, setSearchInput] = useState("");
@@ -302,14 +306,20 @@ export default function GlossaryPage() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div>
-          <div className="flex items-center gap-3">
-            <BookOpen className="size-7" />
-            <h1 className="font-serif text-3xl font-black uppercase tracking-[0.08em]">
-              {t("glossary.title")}
-            </h1>
+        {!embedded ? (
+          <div>
+            <div className="flex items-center gap-3">
+              <BookOpen className="size-7" />
+              <h1 className="font-serif text-3xl font-black uppercase tracking-[0.08em]">
+                {t("glossary.title")}
+              </h1>
+            </div>
           </div>
-        </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            {t("glossary.description")}
+          </p>
+        )}
         <Button onClick={openAddDialog}>
           <Plus className="mr-2 h-4 w-4" />
           {t("glossary.addTerm")}
@@ -781,4 +791,8 @@ export default function GlossaryPage() {
       </Dialog>
     </div>
   );
+}
+
+export default function GlossaryPage() {
+  return <GlossaryWorkspace />;
 }

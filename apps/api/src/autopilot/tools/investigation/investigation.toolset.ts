@@ -343,13 +343,18 @@ export class InvestigationToolset {
       },
       this.caseOpTool(
         'cases.add_hypothesis',
-        'Add a hypothesis thread to a case.',
+        'Add a hypothesis: a claim the case can prove or disprove with evidence. When possible include a testablePredicate naming observable evidence in this data that would confirm or refute it; leave it absent rather than inventing an untestable proxy.',
         AgentDecisionAction.ADD_HYPOTHESIS,
         {
           title: { type: 'string' },
           statement: { type: 'string' },
           hypothesisStatus: { type: 'string', enum: [...HYP_STATUS] },
           confidence: { type: 'number' },
+          testablePredicate: {
+            type: 'string',
+            description:
+              'Observable evidence in this data that would confirm or refute the claim.',
+          },
         },
         ['title'],
         (input) => ({
@@ -359,17 +364,23 @@ export class InvestigationToolset {
           statement: input.statement as string | undefined,
           hypothesisStatus: input.hypothesisStatus as never,
           confidence: input.confidence as number | undefined,
+          testablePredicate: input.testablePredicate as string | undefined,
         }),
       ),
       this.caseOpTool(
         'cases.update_hypothesis',
-        'Update an existing hypothesis thread (title/status/confidence).',
+        'Update an existing hypothesis thread (title/status/confidence/testable predicate).',
         AgentDecisionAction.UPDATE_HYPOTHESIS,
         {
           threadId: { type: 'string' },
           title: { type: 'string' },
           hypothesisStatus: { type: 'string', enum: [...HYP_STATUS] },
           confidence: { type: 'number' },
+          testablePredicate: {
+            type: 'string',
+            description:
+              'Observable evidence in this data that would confirm or refute the claim.',
+          },
         },
         ['threadId'],
         (input) => ({
@@ -379,6 +390,7 @@ export class InvestigationToolset {
           title: input.title as string | undefined,
           hypothesisStatus: input.hypothesisStatus as never,
           confidence: input.confidence as number | undefined,
+          testablePredicate: input.testablePredicate as string | undefined,
         }),
       ),
       this.caseOpTool(

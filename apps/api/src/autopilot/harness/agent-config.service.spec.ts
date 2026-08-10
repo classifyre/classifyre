@@ -70,6 +70,24 @@ describe('AgentConfigService', () => {
     );
   });
 
+  it('restores glossary lookup before propose in legacy tool overrides', async () => {
+    agentConfig.findUnique.mockResolvedValue({
+      kind: AgentKind.CONFIG,
+      goal: null,
+      maxIterations: null,
+      toolNames: ['memory.write', 'glossary.propose'],
+      toolsOverride: true,
+    });
+
+    const resolved = await service.resolveMission(AgentKind.CONFIG);
+
+    expect(resolved?.allowedTools).toEqual([
+      'memory.write',
+      'glossary.lookup',
+      'glossary.propose',
+    ]);
+  });
+
   it('lists all factory agents with the enable flag from settings', async () => {
     agentConfig.findMany.mockResolvedValue([]);
     const list = await service.list();
@@ -88,6 +106,26 @@ describe('AgentConfigService', () => {
     const dream = list.find((a) => a.kind === AgentKind.DREAM)!;
     expect(dream.enableable).toBe(false);
     expect(dream.enabled).toBe(true);
+  });
+
+  it('treats a not-yet-created settings singleton as enabled defaults', async () => {
+    instanceSettings.findUnique.mockResolvedValue(null);
+    agentConfig.findMany.mockResolvedValue([]);
+
+    const list = await service.list();
+
+    expect(list.filter((agent) => agent.enableable)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ kind: AgentKind.INQUIRY, enabled: true }),
+        expect.objectContaining({ kind: AgentKind.CASE, enabled: true }),
+        expect.objectContaining({ kind: AgentKind.CONFIG, enabled: true }),
+        expect.objectContaining({
+          kind: AgentKind.DETECTOR_AUTHOR,
+          enabled: true,
+        }),
+        expect.objectContaining({ kind: AgentKind.ESCALATION, enabled: true }),
+      ]),
+    );
   });
 
   it('writes the enable flag to the matching settings column', async () => {

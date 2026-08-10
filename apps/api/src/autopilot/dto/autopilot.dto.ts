@@ -501,7 +501,7 @@ export class CreateAgentMemoryDto {
   @IsEnum(AgentMemoryKind)
   kind!: AgentMemoryKind;
 
-  @ApiProperty({ description: 'Normalized lookup key (topic slug, term)' })
+  @ApiProperty({ description: 'Normalized lookup key (topic or entity slug)' })
   @IsString()
   @MaxLength(200)
   key!: string;
