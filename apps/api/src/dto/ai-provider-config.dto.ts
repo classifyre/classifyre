@@ -270,9 +270,54 @@ export class UpdateAiProviderConfigDto {
 }
 
 export class AiProviderConfigTestResultDto {
+  @ApiProperty({ enum: ['PASS', 'FAIL'], example: 'PASS' })
+  status: 'PASS' | 'FAIL';
+
+  @ApiProperty({
+    enum: [
+      'CONNECTION',
+      'CONFIGURATION',
+      'AUTHENTICATION',
+      'MODEL',
+      'RATE_LIMIT',
+      'PROVIDER',
+    ],
+    example: 'CONNECTION',
+  })
+  category:
+    | 'CONNECTION'
+    | 'CONFIGURATION'
+    | 'AUTHENTICATION'
+    | 'MODEL'
+    | 'RATE_LIMIT'
+    | 'PROVIDER';
+
   @ApiProperty({ enum: AI_PROVIDER_TYPE_VALUES, example: 'CLAUDE' })
   provider: AiProviderTypeValue;
 
   @ApiProperty({ example: 'claude-sonnet-4-5' })
   model: string;
+
+  @ApiProperty({
+    description: 'Plain-language explanation of why the test passed or failed.',
+  })
+  message: string;
+
+  @ApiProperty({ type: [String] })
+  details: string[];
+
+  @ApiProperty({ example: 842 })
+  durationMs: number;
+
+  @ApiProperty({ nullable: true, example: 42 })
+  inputTokens: number | null;
+
+  @ApiProperty({ nullable: true, example: 18 })
+  outputTokens: number | null;
+
+  @ApiProperty({
+    nullable: true,
+    description: 'Short preview proving that the configured model responded.',
+  })
+  responsePreview: string | null;
 }

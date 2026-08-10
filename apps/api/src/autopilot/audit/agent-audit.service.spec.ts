@@ -42,7 +42,7 @@ describe('AgentAuditService.saveUsage', () => {
     outputCostPerMTok: number | null,
   ) {
     prisma.instanceSettings.findUnique.mockResolvedValue({
-      aiProviderConfig: { inputCostPerMTok, outputCostPerMTok },
+      harnessAiProviderConfig: { inputCostPerMTok, outputCostPerMTok },
     });
   }
 

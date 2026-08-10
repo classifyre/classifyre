@@ -282,7 +282,6 @@
     },
     "tabs": {
       "global": "Allgemein",
-      "aiProviders": "KI-Anbieter",
       "mcp": "MCP-Server",
       "chat": "Chat-Bots",
       "data": "Export & Import"
@@ -1455,7 +1454,7 @@
       "activeLabel": "Aktiv — für die Quellenkonfiguration verfügbar",
       "providerTitle": "KI-Anbieter",
       "providerLabel": "Anbieter-Zugangsdaten",
-      "providerHint": "Zugangsdaten unter Einstellungen → KI-Anbieter verwalten.",
+      "providerHint": "Zugangsdaten unter Harness AI → Konfiguration verwalten.",
       "providerPlaceholder": "Anbieter-Zugangsdaten auswählen",
       "providerLoading": "Anbieter werden geladen…",
       "providerEmpty": "Keine KI-Anbieter konfiguriert",
@@ -2083,7 +2082,7 @@
     "needApiKey": "Geben Sie einen API-Schlüssel ein oder behalten Sie ihn, um den Anbieter zu testen",
     "testDescription": "Senden Sie eine Test-Code-Aufgabe an den konfigurierten KI-Anbieter",
     "sectionTitle": "KI-Anbieter",
-    "sectionDesc": "Verwalten Sie wiederverwendbare KI-Anbieter-Zugangsdaten. Wählen Sie einen als Standard für den Assistenten und andere KI-Funktionen. Schlüssel werden verschlüsselt gespeichert und niemals im Klartext zurückgegeben.",
+    "sectionDesc": "Verwalten Sie wiederverwendbare KI-Anbieter-Zugangsdaten und weisen Sie einen Anbieter dem Assistenten, der KI-Harness oder beiden zu. Schlüssel werden verschlüsselt gespeichert und niemals im Klartext zurückgegeben.",
     "name": "Name",
     "namePlaceholder": "z.B. Produktion Claude",
     "nameRequired": "Name ist erforderlich",
@@ -2105,20 +2104,56 @@
     "deleted": "KI-Anbieter gelöscht",
     "failedToDelete": "KI-Anbieter konnte nicht gelöscht werden",
     "deleteTitle": "KI-Anbieter löschen?",
-    "deleteConfirm": "Dadurch wird \"{{name}}\" dauerhaft entfernt. Funktionen, die ihn als Standard verwenden, greifen auf keinen zurück.",
+    "deleteConfirm": "Dadurch wird \"{{name}}\" dauerhaft entfernt. Verbleibende Funktionszuweisungen werden aufgehoben.",
     "cancel": "Abbrechen",
     "create": "Erstellen",
     "delete": "Löschen",
     "edit": "Bearbeiten",
     "test": "Testen",
     "manageTitle": "Anbieter verwalten",
-    "manageDesc": "Wiederverwendbare Zugangsdaten. Schlüssel werden verschlüsselt gespeichert und nie zurückgegeben.",
+    "manageDesc": "Aktivieren Sie jede KI-Funktion und weisen Sie den gewünschten Anbieter zu. Zugangsdaten werden verschlüsselt gespeichert und nie zurückgegeben.",
+    "assistantEnabled": "KI-Assistent",
+    "assistantEnabledDesc": "Zeigt den Assistenten-Dialog und den schwebenden Aktionsbutton an.",
+    "harnessEnabled": "KI-Harness",
+    "harnessEnabledDesc": "Erlaubt autonome Harness-Agenten und geplante Läufe.",
+    "featureSaved": "KI-Funktionseinstellung gespeichert",
+    "assignmentSaved": "KI-Anbieterzuweisung gespeichert",
+    "useForAssistant": "Für KI-Assistent verwenden",
+    "useForAssistantDesc": "Diesen Anbieter interaktiven Assistentenanfragen zuweisen.",
+    "useForHarness": "Für KI-Harness verwenden",
+    "useForHarnessDesc": "Diesen Anbieter autonomen Harness-Agenten zuweisen.",
+    "assistantRole": "Assistent",
+    "harnessRole": "Harness",
     "assistantBadge": "Assistent",
+    "harnessBadge": "Harness",
     "detectorBadgeOne": "1 Detektor",
     "detectorsBadge": "{{count}} Detektoren",
     "usedByDetectors": "Von Detektoren verwendet",
     "deleteInUseHint": "Weisen Sie die Detektoren, die diesen Anbieter verwenden, neu zu, bevor Sie ihn löschen.",
     "deleteAssistantHint": "Dies ist das Assistenzmodell – wählen Sie zuerst ein anderes.",
+    "deleteRoleHint": "Entfernen Sie die Assistenten- und Harness-Zuweisungen dieses Anbieters, bevor Sie ihn löschen.",
+    "testType": "Testtyp",
+    "testConnectionOption": "Verbindung",
+    "testHarnessOption": "Harness-Fähigkeit",
+    "testHarness": "Harness testen",
+    "backToProviders": "Zurück zur Harness-Konfiguration",
+    "editorDesc": "Konfigurieren Sie Zugangsdaten, Modellgrenzen und Funktionszuweisungen und prüfen Sie den Anbieter vor der Verwendung.",
+    "providerAndModel": "Anbieter und Modell",
+    "providerAndModelDesc": "Wählen Sie Endpunkt und Modellkennung für Anfragen.",
+    "runtimeAndPricing": "Laufzeit und Preise",
+    "runtimeAndPricingDesc": "Beschreiben Sie Modellgrenzen und optionale Preise für Harness-Schätzungen.",
+    "featureAssignments": "Funktionszuweisungen",
+    "featureAssignmentsDesc": "Ein Anbieter kann dem Assistenten, der Harness, beiden oder keinem dienen.",
+    "credential": "Zugangsdaten",
+    "credentialDesc": "Der API-Schlüssel wird verschlüsselt gespeichert und niemals im Klartext zurückgegeben.",
+    "verification": "Anbieterprüfung",
+    "verificationDesc": "Prüfen Sie die Verbindung oder führen Sie den vollständigen Harness-Fähigkeitstest aus.",
+    "testProgress": "Fortschritt des Harness-Tests",
+    "probesComplete": "{{complete}} von {{total}} Prüfungen abgeschlossen",
+    "capacityAnalysis": "Agenten-Kontextkapazität wird analysiert",
+    "duration": "Dauer",
+    "tokenUsage": "Token-Verbrauch",
+    "responsePreview": "Antwortvorschau",
     "providers": {
       "OPENAI_COMPATIBLE": "OpenAI-kompatibel",
       "CLAUDE": "Claude (Anthropic)",
@@ -2205,7 +2240,10 @@
     "assets": "Assets",
     "notifications": "Benachrichtigungen",
     "settings": "Einstellungen",
-    "detectors": "Custom-Detektoren"
+    "detectors": "Custom-Detektoren",
+    "aiProviders": "KI-Anbieter",
+    "newProvider": "Neuer Anbieter",
+    "edit": "Bearbeiten"
   },
   "investigations": {
     "page": {
@@ -3071,7 +3109,7 @@
     "agents": {
       "title": "Agenten",
       "desc": "Jeder autonome Agent, was er kann und wie er arbeitet. Aktivieren Sie einen Agenten, bearbeiten Sie sein Ziel und weisen Sie beliebige integrierte Werkzeuge zu — auch Werkzeuge anderer Agenten.",
-      "requiresAi": "Aktivieren Sie KI und wählen Sie einen Standardanbieter in Einstellungen → KI, bevor Agenten handeln können.",
+      "requiresAi": "Aktivieren Sie die KI-Harness und weisen Sie unter Harness AI → Konfiguration einen Harness-Anbieter zu, bevor Agenten handeln können.",
       "enabled": "Aktiviert",
       "alwaysOn": "Immer aktiv",
       "goal": "Ziel / System-Prompt",
@@ -3128,8 +3166,8 @@
     },
     "config": {
       "title": "Harness-Konfiguration",
-      "desc": "Enable each autonomous capability and steer it with free-text guidance. All actions stay audited; per-entity observe-only still applies.",
-      "requiresAi": "Enable AI and select a default provider in Settings → AI before the harness can act.",
+      "desc": "Konfigurieren Sie den KI-Zugriff, Anbieterzuweisungen und externe Werkzeuge der Harness.",
+      "requiresAi": "Aktivieren Sie die KI-Harness und weisen Sie oben einen Harness-Anbieter zu, bevor Agenten handeln können.",
       "enable": "Enabled",
       "guidance": "Guidance",
       "save": "Save guidance",
@@ -3173,11 +3211,6 @@
       "APPLIED": "Applied",
       "SKIPPED_OBSERVE_ONLY": "Observe-only",
       "FAILED": "Failed"
-    },
-    "pointer": {
-      "title": "Untersuchungs-Autopilot verschoben",
-      "desc": "Der Autopilot ist jetzt die Harness-KI-Steuerungsebene — konfigurieren und beobachten Sie ihn in seinem eigenen Bereich.",
-      "cta": "Harness-KI öffnen"
     },
     "mcp": {
       "title": "Externe MCP-Server",
@@ -3239,23 +3272,23 @@
       "seriesInput": "Input",
       "seriesOutput": "Output",
       "empty": "Noch keine Agentenläufe in diesem Zeitraum.",
-      "noPricing": "Hinterlege Token-Preise beim KI-Anbieter (Einstellungen → KI-Anbieter), um Kostenschätzungen zu sehen."
+      "noPricing": "Hinterlegen Sie Token-Preise beim KI-Anbieter unter Harness AI → Konfiguration, um Kostenschätzungen zu sehen."
     }
   },
   "aiHealth": {
     "fix": "Beheben",
-    "fixInSettings": "In Einstellungen beheben",
+    "fixInSettings": "Konfiguration öffnen",
     "disabled": {
-      "title": "KI ist deaktiviert",
-      "desc": "Aktivieren Sie KI in den Einstellungen, um Assistent und Autopilot zu nutzen."
+      "title": "KI-Harness ist deaktiviert",
+      "desc": "Aktivieren Sie die KI-Harness unter Harness AI → Konfiguration."
     },
     "not_configured": {
-      "title": "KI nicht konfiguriert",
-      "desc": "Fügen Sie einen KI-Anbieter hinzu und legen Sie ihn als Standard fest, um Assistent und Autopilot zu aktivieren."
+      "title": "KI-Harness nicht konfiguriert",
+      "desc": "Weisen Sie der KI-Harness unter Harness AI → Konfiguration einen Anbieter zu."
     },
     "error": {
-      "title": "KI-Anbieter-Problem",
-      "desc": "Der Standard-KI-Anbieter hat eine Verbindungs-/Structured-Output-Prüfung nicht bestanden. Öffnen Sie die Einstellungen, um ihn erneut zu testen oder zu beheben."
+      "title": "Harness-Anbieter-Problem",
+      "desc": "Der KI-Harness-Anbieter hat die Verbindungsprüfung nicht bestanden. Öffnen Sie die Harness-Konfiguration, um ihn erneut zu testen oder zu beheben."
     }
   },
   "chatBots": {

@@ -11,6 +11,9 @@ import type {
   AiMessageDto,
   AiCompleteRequestDto,
   AiCompleteResponseDto,
+  AgentCapacityReportDto,
+  AssistantCapabilityReportDto,
+  CapabilityProbeResultDto,
   FindingResponseDto as GeneratedFindingResponseDto,
   SearchAssetsChartsRequestDto as GeneratedSearchAssetsChartsRequestDto,
   SearchAssetsChartsResponseDto as GeneratedSearchAssetsChartsResponseDto,
@@ -23,6 +26,35 @@ import type {
   SearchSourcesResponseDto as GeneratedSearchSourcesResponseDto,
   RunnersChartsTimelineBucketDto,
 } from "./generated/src/models";
+
+export type AiCapabilityProgressEvent =
+  | {
+      type: "started";
+      configId: string;
+      configName: string;
+      provider: string;
+      model: string;
+      totalProbes: number;
+    }
+  | {
+      type: "probe_started";
+      index: number;
+      totalProbes: number;
+      probe: Pick<
+        CapabilityProbeResultDto,
+        "id" | "tier" | "title" | "whatItProves"
+      >;
+    }
+  | {
+      type: "probe_completed";
+      index: number;
+      totalProbes: number;
+      probe: CapabilityProbeResultDto;
+    }
+  | { type: "capacity_started" }
+  | { type: "capacity_completed"; agents: AgentCapacityReportDto[] }
+  | { type: "complete"; report: AssistantCapabilityReportDto }
+  | { type: "error"; message: string };
 
 // Import APIs individually to avoid naming conflicts
 export { SourcesApi } from "./generated/src/apis/SourcesApi";
@@ -1696,6 +1728,54 @@ class ApiClient {
     }
 
     return (await response.json()) as AiCompleteResponseDto;
+  }
+
+  async streamAiProviderCapabilityTest(
+    id: string,
+    onEvent: (event: AiCapabilityProgressEvent) => void,
+    signal?: AbortSignal,
+  ): Promise<AssistantCapabilityReportDto> {
+    const basePath = this.searchBase();
+    const response = await resilientFetch(
+      `${basePath}/ai-provider-configs/${encodeURIComponent(id)}/capability-test-stream`,
+      { method: "POST", signal },
+      { attempts: 1 },
+    );
+
+    if (!response.ok || !response.body) {
+      const message = await response.text();
+      throw new Error(
+        `Harness capability test failed (${response.status}): ${message || "No response body"}`,
+      );
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let report: AssistantCapabilityReportDto | null = null;
+
+    const consumeLine = (line: string) => {
+      if (!line.trim()) return;
+      const event = JSON.parse(line) as AiCapabilityProgressEvent;
+      onEvent(event);
+      if (event.type === "complete") report = event.report;
+      if (event.type === "error") throw new Error(event.message);
+    };
+
+    while (true) {
+      const { done, value } = await reader.read();
+      buffer += decoder.decode(value, { stream: !done });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() ?? "";
+      for (const line of lines) consumeLine(line);
+      if (done) break;
+    }
+    consumeLine(buffer);
+
+    if (!report) {
+      throw new Error("Harness capability test ended without a final report.");
+    }
+    return report;
   }
 
   async assistantRespond(

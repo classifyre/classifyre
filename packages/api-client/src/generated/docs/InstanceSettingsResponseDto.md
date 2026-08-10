@@ -8,11 +8,13 @@ Name | Type
 ------------ | -------------
 `id` | number
 `aiEnabled` | boolean
+`harnessEnabled` | boolean
 `mcpEnabled` | boolean
 `language` | string
 `timezone` | string
 `timeFormat` | string
 `aiProviderConfigId` | string
+`harnessAiProviderConfigId` | string
 `autopilotInquiryEnabled` | boolean
 `autopilotInquiryDesired` | string
 `autopilotInquirySearchable` | string
@@ -42,11 +44,13 @@ import type { InstanceSettingsResponseDto } from '@workspace/api-client'
 const example = {
   "id": 1,
   "aiEnabled": true,
+  "harnessEnabled": true,
   "mcpEnabled": true,
   "language": ENGLISH,
   "timezone": AUTOMATIC,
   "timeFormat": TWELVE_HOUR,
   "aiProviderConfigId": null,
+  "harnessAiProviderConfigId": null,
   "autopilotInquiryEnabled": true,
   "autopilotInquiryDesired": null,
   "autopilotInquirySearchable": null,

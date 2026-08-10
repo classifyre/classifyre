@@ -174,7 +174,7 @@ export class AiProviderConfigService {
     await this.prisma.aiProviderConfig.delete({ where: { id } });
   }
 
-  /** The provider selected as the instance-wide default, or null when unset. */
+  /** The provider selected for the interactive Assistant, or null when unset. */
   async getDefaultConfigId(): Promise<string | null> {
     const settings = await this.prisma.instanceSettings.findUnique({
       where: { id: INSTANCE_SETTINGS_ID },

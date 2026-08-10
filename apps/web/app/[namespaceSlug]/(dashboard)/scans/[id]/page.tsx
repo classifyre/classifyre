@@ -479,7 +479,7 @@ export default function RunnerDetailPage() {
         </div>
       </div>
 
-      <Tabs defaultValue="overview" className="space-y-4">
+      <Tabs defaultValue="overview" urlParam="tab" className="space-y-4">
         <TabsList className="h-auto rounded-[4px] border-2 border-black bg-background p-1">
           <TabsTrigger
             value="overview"

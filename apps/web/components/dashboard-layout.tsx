@@ -119,6 +119,9 @@ export function DashboardLayout({
       settings: t("breadcrumb.settings"),
       detectors: t("breadcrumb.detectors"),
       harness: t("nav.harness"),
+      providers: t("breadcrumb.aiProviders"),
+      new: t("breadcrumb.newProvider"),
+      edit: t("breadcrumb.edit"),
     }),
     [t],
   );
@@ -177,6 +180,18 @@ export function DashboardLayout({
               const response = await api.sources.sourcesControllerGetSource({
                 id: segment,
               });
+              const label = response.name?.trim();
+              if (label) {
+                labelUpdates[cacheKey] = label;
+              }
+              return;
+            }
+
+            if (previousSegment === "providers") {
+              const response =
+                await api.aiProviderConfigs.aiProviderConfigControllerGet({
+                  id: segment,
+                });
               const label = response.name?.trim();
               if (label) {
                 labelUpdates[cacheKey] = label;

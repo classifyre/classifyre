@@ -47,7 +47,7 @@ export interface AgentUsageResponseDto {
      */
     totals: AgentUsageTotalsDto;
     /**
-     * True when the default AI provider has per-MTok prices configured (cost charts are meaningful)
+     * True when the Harness AI provider has per-MTok prices configured (cost charts are meaningful)
      * @type {boolean}
      * @memberof AgentUsageResponseDto
      */

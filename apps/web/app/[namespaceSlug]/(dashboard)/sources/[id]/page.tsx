@@ -471,10 +471,10 @@ export default function SourceViewPage() {
         open={autopilotOpen}
         onOpenChange={setAutopilotOpen}
         defaultSourceId={sourceId}
-        onTriggered={() => router.push(nsPath("/investigations?tab=autopilot"))}
+        onTriggered={() => router.push(nsPath("/harness?tab=runs"))}
       />
 
-      <Tabs defaultValue="overview" className="space-y-4">
+      <Tabs defaultValue="overview" urlParam="tab" className="space-y-4">
         <TabsList className="h-auto rounded-[4px] border-2 border-border bg-background p-1">
           <TabsTrigger value="overview" className="rounded-[3px]">
             {t("sources.detail.tabOverview")}

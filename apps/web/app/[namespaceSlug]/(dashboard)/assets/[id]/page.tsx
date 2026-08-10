@@ -280,7 +280,7 @@ export default function AssetDetailPage() {
         )}
 
       {lockedFilters && (
-        <Tabs defaultValue="findings" className="space-y-4">
+        <Tabs defaultValue="findings" urlParam="tab" className="space-y-4">
           <TabsList>
             <TabsTrigger value="findings">
               {t("correlation.findingsTab")}

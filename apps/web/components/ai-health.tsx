@@ -20,13 +20,12 @@ import { useTranslation } from "@/hooks/use-translation";
 import type { TranslationKey } from "@/i18n";
 
 /**
- * Health of the AI/autopilot stack as a whole:
- * - `ok`             — a default provider is configured and passes a live
- *                      structured-JSON round-trip.
+ * Health of the Harness configuration shown in the global navigation:
+ * - `ok`             — Harness has a provider that passes a live round-trip.
  * - `loading`        — still resolving (never warned on).
- * - `disabled`       — AI is switched off instance-wide.
- * - `not_configured` — AI is on but no provider is set as the default.
- * - `error`          — the default provider failed the live test (no connection,
+ * - `disabled`       — Harness is switched off.
+ * - `not_configured` — Harness has no provider assigned.
+ * - `error`          — an assigned provider failed the live test (no connection,
  *                      no structured output, bad key, …). `detail` holds why.
  * - `unavailable`    — demo mode: never probed, never warned on. The probe is a
  *                      mutating call the demo guard rejects anyway, and the
@@ -54,8 +53,8 @@ export function AiHealthProvider({ children }: { children: React.ReactNode }) {
   const [status, setStatus] = React.useState<AiHealthStatus>("loading");
   const [detail, setDetail] = React.useState<string | null>(null);
 
-  const aiEnabled = settings.aiEnabled;
-  const defaultProviderId = settings.aiProviderConfigId;
+  const harnessEnabled = settings.harnessEnabled;
+  const harnessProviderId = settings.harnessAiProviderConfigId;
   // Two sources on purpose. `serverConfig` is the web pod's own DEMO_MODE env,
   // known synchronously, so the probe is suppressed even before instance
   // settings arrive. `settings.demoMode` is what the API actually enforces and
@@ -76,8 +75,13 @@ export function AiHealthProvider({ children }: { children: React.ReactNode }) {
       setDetail(null);
       return;
     }
-    if (!aiEnabled) {
+    if (!harnessEnabled) {
       setStatus("disabled");
+      setDetail(null);
+      return;
+    }
+    if (!harnessProviderId) {
+      setStatus("not_configured");
       setDetail(null);
       return;
     }
@@ -85,26 +89,28 @@ export function AiHealthProvider({ children }: { children: React.ReactNode }) {
     try {
       const providers =
         await api.aiProviderConfigs.aiProviderConfigControllerList();
-      const target = defaultProviderId
-        ? providers.find((p) => p.id === defaultProviderId)
-        : null;
-      if (!target) {
-        // No provider, or none chosen as the default the assistant/autopilot use.
+      if (!providers.some((provider) => provider.id === harnessProviderId)) {
         setStatus("not_configured");
         setDetail(null);
         return;
       }
-      // Live round-trip: verifies connection AND structured-JSON support.
-      await api.aiProviderConfigs.aiProviderConfigControllerTest({
-        id: target.id,
-      });
+      const result = await api.aiProviderConfigs.aiProviderConfigControllerTest(
+        {
+          id: harnessProviderId,
+        },
+      );
+      if (result.status === "FAIL") {
+        setStatus("error");
+        setDetail(result.message);
+        return;
+      }
       setStatus("ok");
       setDetail(null);
     } catch (e) {
       setStatus("error");
       setDetail(e instanceof Error ? e.message : null);
     }
-  }, [aiEnabled, defaultProviderId, demoMode, settingsLoading]);
+  }, [demoMode, harnessEnabled, harnessProviderId, settingsLoading]);
 
   React.useEffect(() => {
     void check();
@@ -135,9 +141,7 @@ export function useAiHealth(): AiHealthValue {
  * on it, so neither the sidebar warning nor the top-bar pill renders. */
 function isUnhealthy(status: AiHealthStatus): boolean {
   return (
-    status === "disabled" ||
-    status === "not_configured" ||
-    status === "error"
+    status === "disabled" || status === "not_configured" || status === "error"
   );
 }
 
@@ -147,14 +151,14 @@ function useHealthCopy(status: AiHealthStatus, detail: string | null) {
   const key = (suffix: string): TranslationKey =>
     `aiHealth.${status}.${suffix}` as TranslationKey;
   if (!isUnhealthy(status)) return null;
-  const description =
-    status === "error" && detail ? detail : t(key("desc"));
+  const description = status === "error" && detail ? detail : t(key("desc"));
   return { title: t(key("title")), description, severity: status };
 }
 
 /**
  * Prominent sidebar warning. Renders as a sidebar menu item (collapses to an
- * amber icon with a tooltip) linking to Settings. Nothing when AI is healthy.
+ * amber icon with a tooltip) linking to Harness configuration. Nothing when AI
+ * is healthy.
  */
 export function AiHealthSidebarWarning() {
   const nsPath = useNsPath();
@@ -175,7 +179,7 @@ export function AiHealthSidebarWarning() {
         tooltip={`${copy.title} — ${copy.description}`}
         className={`h-auto items-start gap-2 border-2 ${colorClasses}`}
       >
-        <Link href={nsPath("/settings")}>
+        <Link href={nsPath("/harness?tab=config")}>
           <AlertTriangle className="size-5 shrink-0" />
           <span className="flex min-w-0 flex-col">
             <span className="truncate text-xs font-semibold">{copy.title}</span>
@@ -190,8 +194,8 @@ export function AiHealthSidebarWarning() {
 }
 
 /**
- * Top-bar "fix" notification. A compact pill linking to Settings, shown only
- * when the AI stack needs attention.
+ * Top-bar "fix" notification. A compact pill linking directly to Harness
+ * configuration, shown only when the AI stack needs attention.
  */
 export function AiHealthFixButton() {
   const nsPath = useNsPath();
@@ -209,7 +213,7 @@ export function AiHealthFixButton() {
     <Tooltip>
       <TooltipTrigger asChild>
         <Link
-          href={nsPath("/settings")}
+          href={nsPath("/harness?tab=config")}
           className={`flex items-center gap-1.5 rounded-[4px] border px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.06em] transition-colors ${colorClasses}`}
         >
           <AlertTriangle className="h-3.5 w-3.5" />
