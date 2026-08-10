@@ -2,25 +2,7 @@ import * as React from "react";
 import { expect, test } from "@playwright/experimental-ct-react";
 import { AiHealthProvider, AiHealthFixButton } from "@/components/ai-health";
 import { ServerConfigContext } from "@/components/server-config-provider";
-import { useInstanceSettings } from "@/components/instance-settings-provider";
-
-function ConfigureHarnessOnly() {
-  const { updateSettings } = useInstanceSettings();
-  return (
-    <button
-      onClick={() =>
-        void updateSettings({
-          aiEnabled: false,
-          aiProviderConfigId: null,
-          harnessEnabled: true,
-          harnessAiProviderConfigId: "harness-provider",
-        })
-      }
-    >
-      Configure Harness only
-    </button>
-  );
-}
+import { AiHealthHarness } from "@/tests/components/fixtures/ai-health-harness";
 
 type CtPage = Parameters<Parameters<typeof test>[2]>[0]["page"];
 
@@ -147,16 +129,7 @@ test("global warning ignores Assistant state once Harness is healthy", async ({
     });
   });
 
-  const component = await mount(
-    <ServerConfigContext.Provider
-      value={{ s3Configured: false, demoMode: false }}
-    >
-      <AiHealthProvider>
-        <ConfigureHarnessOnly />
-        <AiHealthFixButton />
-      </AiHealthProvider>
-    </ServerConfigContext.Provider>,
-  );
+  const component = await mount(<AiHealthHarness />);
 
   await component
     .getByRole("button", { name: "Configure Harness only" })
