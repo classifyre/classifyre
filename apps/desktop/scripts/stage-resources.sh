@@ -103,11 +103,37 @@ node -e "
     'class-transformer', 'class-validator', 'fastify', 'pg',
     'reflect-metadata', 'rxjs', 'socket.io', 'prisma',
   ];
+  // Pin each staged dep to the EXACT version bun already installed for the
+  // monorepo instead of re-resolving apps/api's semver range. npm resolves
+  // ranges strictly against peerDependencies, so a range like
+  // '@nestjs/platform-fastify': '^11.1.18' can float to a release whose peers
+  // no longer match the rest of the tree (11.1.29 wants @fastify/static ^10,
+  // the workspace is on ^9) and the install dies with ERESOLVE — on a version
+  // combination CI never tested. The installed tree is the tested one.
+  const searchRoots = [
+    '$MONOREPO_ROOT_NODE/apps/api/node_modules',
+    '$MONOREPO_ROOT_NODE/node_modules',
+  ];
+  const installedVersion = (name) => {
+    for (const root of searchRoots) {
+      const manifest = root + '/' + name + '/package.json';
+      if (fs.existsSync(manifest)) {
+        return JSON.parse(fs.readFileSync(manifest, 'utf8')).version;
+      }
+    }
+    return null;
+  };
   const dependencies = {};
   for (const name of KEEP) {
-    const v = allDeps[name];
-    if (!v) throw new Error('KEEP dep missing from apps/api/package.json: ' + name);
-    dependencies[name] = v;
+    const range = allDeps[name];
+    if (!range) throw new Error('KEEP dep missing from apps/api/package.json: ' + name);
+    const resolved = installedVersion(name);
+    if (!resolved) {
+      throw new Error(
+        'KEEP dep ' + name + ' is not installed in the monorepo — run bun install first'
+      );
+    }
+    dependencies[name] = resolved;
   }
   // bundle-api.mjs externalises '@fastify/*' by glob, so ANY @fastify plugin
   // the API depends on must also be staged here or it is missing at runtime.
