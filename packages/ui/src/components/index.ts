@@ -51,6 +51,7 @@ export * from "./tooltip";
 
 // Custom domain components
 export * from "./notification-center";
+export * from "./namespace-tabs";
 export * from "./severity-badge";
 export * from "./status-badge";
 export * from "./source-icon";
