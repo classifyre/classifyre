@@ -13,6 +13,8 @@
     "title": "Workspaces",
     "subtitle": "Choose an isolated workspace to continue an investigation, or open a fresh case file.",
     "all": "All workspaces",
+    "activeTabsLabel": "Active workspaces",
+    "closeTabAria": "Deactivate {{name}}",
     "new": "New workspace",
     "loading": "Loading workspaces",
     "loadFailed": "Failed to load workspaces",

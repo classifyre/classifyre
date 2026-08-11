@@ -4,6 +4,7 @@ import fs from "fs";
 import os from "os";
 import { pathToFileURL } from "url";
 import { getAvailablePort } from "./port-manager.js";
+import { detectorWorkerCount } from "./process-manager.js";
 
 // In a packaged app, `embedded-postgres` lives in a self-contained npm tree
 // staged at resources/pg/node_modules (the Forge Vite plugin ships nothing
@@ -13,6 +14,48 @@ function stagedPgNodeModules(): string | null {
   if (!app.isPackaged) return null;
   const dir = path.join(process.resourcesPath, "pg", "node_modules");
   return fs.existsSync(dir) ? dir : null;
+}
+
+/**
+ * Postgres memory/planner settings, sized to the machine.
+ *
+ * The previous fixed `shared_buffers=256MB` was a 2005-era default that left a
+ * 57 GB corpus with a 0.45% cache hit ratio on its hottest index: a single
+ * dashboard count re-read 266 MB from disk on *every* execution because the
+ * buffer pool could not hold one index, and read-only SELECTs were forced to
+ * flush other backends' dirty pages just to find a free buffer. Worse, the
+ * system catalog itself was being evicted — cold planning of a trivial count
+ * measured 13.3 s against 0.068 ms warm, because a namespaced install carries
+ * ~1,100 tables and ~5,000 indexes whose relcache has to be re-read from disk.
+ *
+ * Budget mirrors `computeApiHeapMb`: PG shares the laptop with the UI, the
+ * Electron main process, the API's JS heap and the detector workers, so this
+ * claims a modest slice rather than the server-class 25% rule of thumb.
+ */
+export function computePostgresTuning(
+  totalMb: number,
+  detectorWorkers: number,
+): { sharedBuffersMb: number; effectiveCacheSizeMb: number } {
+  // What the rest of the app has already spoken for, mirroring
+  // computeApiHeapMb's reservation so the two budgets cannot double-count.
+  const reservedMb = 2000 + detectorWorkers * 1200;
+  const availableMb = Math.max(0, totalMb - reservedMb);
+  const sharedBuffersMb = Math.max(
+    256, // never regress below the previous fixed value
+    Math.min(
+      4096, // ceiling: past this the OS page cache serves us better than PG's
+      Math.floor(availableMb * 0.25),
+      Math.floor(totalMb * 0.12), // never more than an eighth of the machine
+    ),
+  );
+  // Not an allocation — it only tells the planner how much of the table is
+  // likely already cached by PG + the OS, which is what stops it from
+  // discarding index plans on large tables.
+  const effectiveCacheSizeMb = Math.max(
+    1024,
+    Math.floor((sharedBuffersMb + availableMb * 0.5) as number),
+  );
+  return { sharedBuffersMb, effectiveCacheSizeMb };
 }
 
 async function loadEmbeddedPostgres(): Promise<new (config: object) => object> {
@@ -167,6 +210,10 @@ export class PostgresManager {
     this.port = await getAvailablePort(this.preferredPort);
 
     const EmbeddedPostgres = await loadEmbeddedPostgres();
+    const tuning = computePostgresTuning(
+      Math.floor(os.totalmem() / (1024 * 1024)),
+      detectorWorkerCount(),
+    );
     this.pg = new EmbeddedPostgres({
       databaseDir: this.dataDir,
       user: "classifyre",
@@ -181,8 +228,29 @@ export class PostgresManager {
         "-c", "max_parallel_workers_per_gather=1",
         "-c", "max_parallel_maintenance_workers=1",
         "-c", "max_parallel_workers=2",
-        "-c", "shared_buffers=256MB",
+        "-c", `shared_buffers=${tuning.sharedBuffersMb}MB`,
         "-c", "work_mem=16MB",
+        // Tells the planner how much is cached overall (PG + OS page cache).
+        // Left at the 4 GB default, the planner assumed almost nothing was
+        // cached and discarded index plans on the large findings tables.
+        "-c", `effective_cache_size=${tuning.effectiveCacheSizeMb}MB`,
+        // The 4.0 default models a 2005 spinning disk and biases the planner
+        // *away* from index scans. Every desktop install is on SSD/NVMe.
+        "-c", "random_page_cost=1.1",
+        // Vacuum is what maintains the visibility map, and the visibility map
+        // is what makes index-only scans skip the heap. At the 64 MB default,
+        // a vacuum of a multi-GB table needs several index passes; at 256 MB
+        // the hot tables finish in one (measured: `index scans: 1`).
+        "-c", "maintenance_work_mem=256MB",
+        // Stock autovacuum is throttled to ~2005 disk throughput and falls
+        // behind ingest, which is how visibility-map coverage decayed to 36%
+        // on finding_evidence_analyses and put 610k heap fetches back into
+        // what should have been an index-only scan.
+        "-c", "autovacuum_vacuum_cost_limit=2000",
+        "-c", "autovacuum_naptime=15s",
+        // A single forgotten open transaction pins the vacuum horizon and
+        // makes autovacuum run continuously while reclaiming nothing.
+        "-c", "idle_in_transaction_session_timeout=300000",
       ],
     }) as unknown as EmbeddedPostgresInstance;
 

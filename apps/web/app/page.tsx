@@ -40,6 +40,7 @@ import { CreateNamespaceDialog } from "@/components/namespace/create-namespace-d
 import { useTranslation } from "@/hooks/use-translation";
 import { WorkspaceHeader } from "@/components/namespace/workspace-header";
 import { AddRemoteWorkspaceDialog } from "@/components/namespace/add-remote-workspace-dialog";
+import { useActiveNamespaces } from "@/components/active-namespaces-provider";
 
 function WorkspaceSkeleton() {
   return (
@@ -70,6 +71,7 @@ function remoteHost(remoteUrl: string): string {
 export default function LandingPage() {
   const router = useRouter();
   const { t } = useTranslation();
+  const { activate, removeBySlug } = useActiveNamespaces();
   const [namespaces, setNamespaces] = React.useState<Namespace[] | null>(null);
   const [stats, setStats] = React.useState<Record<string, NamespaceStats>>({});
   // Remote workspace id → its own namespace count (null once unreachable).
@@ -159,6 +161,7 @@ export default function LandingPage() {
       window.location.href = ns.remoteUrl;
       return;
     }
+    activate({ id: ns.id, slug: ns.slug, name: ns.name, href: `/${ns.slug}` });
     router.push(`/${ns.slug}`);
   };
 
@@ -167,6 +170,7 @@ export default function LandingPage() {
     setDeleting(true);
     try {
       await api.namespaces.remove(pendingDelete.id);
+      removeBySlug(pendingDelete.slug);
       window.electronAPI?.notifyNamespacesChanged();
       toast.success(t("workspaces.deleteSuccess", { name: pendingDelete.name }));
       setPendingDelete(null);
