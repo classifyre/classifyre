@@ -4,6 +4,7 @@ import type { CustomDetectorsService } from '../../../custom-detectors.service';
 import type { CustomDetectorTestsService } from '../../../custom-detector-tests.service';
 import type { DecisionApplierService } from '../../decision-applier.service';
 import type { AgentSearchService } from '../../search/agent-search.service';
+import type { AiProviderConfigService } from '../../../ai-provider-config.service';
 import type { Tool, ToolContext } from '../tool.types';
 
 describe('DetectorToolset', () => {
@@ -15,9 +16,10 @@ describe('DetectorToolset', () => {
     delete: jest.fn(),
     listExamples: jest.fn(),
   };
-  const mockTests = { evaluateSample: jest.fn() };
+  const mockTests = { evaluateSample: jest.fn(), evaluateSamples: jest.fn() };
   const mockApplier = { detectorGate: jest.fn(), effectiveMode: jest.fn() };
   const mockSearch = { customDetectorPrecision: jest.fn() };
+  const mockAiProviders = { list: jest.fn() };
 
   const toolset = new DetectorToolset(
     mockDetectors as unknown as CustomDetectorsService,
@@ -25,9 +27,10 @@ describe('DetectorToolset', () => {
     mockApplier as unknown as DecisionApplierService,
     mockSearch as unknown as AgentSearchService,
     {
-      customDetector: { findMany: jest.fn().mockResolvedValue([]) },  // eslint-disable-line
+      customDetector: { findMany: jest.fn().mockResolvedValue([]) }, // eslint-disable-line
       source: { findMany: jest.fn().mockResolvedValue([]) },
     } as never,
+    mockAiProviders as unknown as AiProviderConfigService,
   );
   const tools = toolset.list();
   const byName = (name: string) => tools.find((t) => t.name === name) as Tool;
@@ -84,6 +87,45 @@ describe('DetectorToolset', () => {
         },
         'hi',
       );
+    });
+
+    it('tests a positive and counterexample in one batch', async () => {
+      mockTests.evaluateSamples.mockResolvedValue([
+        {
+          label: 'positive',
+          expectedMatch: true,
+          matched: true,
+          expectationMet: true,
+          findings: [{}],
+        },
+        {
+          label: 'counter',
+          expectedMatch: false,
+          matched: false,
+          expectationMet: true,
+          findings: [],
+        },
+      ]);
+      const samples = [
+        {
+          label: 'positive',
+          expectedMatch: true,
+          sampleText: 'bypass approval',
+        },
+        { label: 'counter', expectedMatch: false, sampleAssetId: 'asset-2' },
+      ];
+      const out = (await test().handler(
+        { pipelineSchema: { type: 'LLM', system_prompt: 'judge' }, samples },
+        tc,
+      )) as { allExpectationsMet: boolean };
+
+      expect(mockTests.evaluateSamples).toHaveBeenCalledWith(
+        expect.objectContaining({
+          pipelineSchema: { type: 'LLM', system_prompt: 'judge' },
+        }),
+        samples,
+      );
+      expect(out.allExpectationsMet).toBe(true);
     });
 
     it('throws when neither detectorId nor pipelineSchema is given', async () => {
@@ -187,6 +229,9 @@ describe('DetectorToolset', () => {
         tc,
       )) as unknown[];
       expect(out).toHaveLength(1);
+      expect(out[0]).toEqual(
+        expect.objectContaining({ pipelineSchema: { type: 'REGEX' } }),
+      );
       expect(mockDetectors.listExamples).toHaveBeenCalledWith(undefined);
     });
 
@@ -199,6 +244,57 @@ describe('DetectorToolset', () => {
       expect(mockDetectors.listExamples).toHaveBeenCalledWith(
         'TEXT_CLASSIFICATION',
       );
+    });
+
+    it('unwraps persisted example config to the schema accepted by create/test', async () => {
+      mockDetectors.listExamples.mockReturnValue([
+        {
+          name: 'Nested',
+          description: 'd',
+          pipelineSchema: {
+            custom_detector_key: 'x',
+            pipeline_schema: {
+              type: 'TEXT_CLASSIFICATION',
+              model: 'org/model',
+            },
+          },
+        },
+      ]);
+      const out = (await byName('detector.examples').handler({}, tc)) as Array<{
+        pipelineSchema: unknown;
+      }>;
+      expect(out[0].pipelineSchema).toEqual({
+        type: 'TEXT_CLASSIFICATION',
+        model: 'org/model',
+      });
+    });
+  });
+
+  describe('ai.providers', () => {
+    it('returns provider ids and vision capability without secret metadata', async () => {
+      mockAiProviders.list.mockResolvedValue([
+        {
+          id: 'p1',
+          name: 'Vision',
+          provider: 'OPENAI_COMPATIBLE',
+          model: 'vision-model',
+          hasApiKey: true,
+          apiKeyPreview: 'sk-...secret',
+          contextSize: 128000,
+          supportsVision: true,
+        },
+      ]);
+      const out = (await byName('ai.providers').handler({}, tc)) as Array<
+        Record<string, unknown>
+      >;
+      expect(out[0]).toEqual(
+        expect.objectContaining({
+          id: 'p1',
+          supportsVision: true,
+          usable: true,
+        }),
+      );
+      expect(out[0]).not.toHaveProperty('apiKeyPreview');
     });
   });
 });

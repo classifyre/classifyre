@@ -242,10 +242,8 @@ export class AutopilotWorker {
     const settings = await this.prisma.instanceSettings.findUnique({
       where: { id: INSTANCE_SETTINGS_ID },
     });
-    if (!settings?.harnessEnabled || !settings.harnessAiProviderConfigId) {
-      this.logger.debug(
-        'AI harness disabled or unconfigured — skipping dream cycle',
-      );
+    if (!settings?.harnessAiProviderConfigId) {
+      this.logger.debug('AI harness unconfigured — skipping dream cycle');
       return;
     }
     await this.runAgent(
@@ -267,14 +265,12 @@ export class AutopilotWorker {
     const settings = await this.prisma.instanceSettings.findUnique({
       where: { id: INSTANCE_SETTINGS_ID },
     });
-    if (!settings?.harnessEnabled || !settings.harnessAiProviderConfigId) {
-      this.logger.debug(
-        'AI harness disabled or unconfigured — skipping autopilot cycle',
-      );
+    if (!settings?.harnessAiProviderConfigId) {
+      this.logger.debug('AI harness unconfigured — skipping autopilot cycle');
       return;
     }
-    // Scan cycles respect the instance flags as master switches. Only a manual
-    // run is explicit operator intent and may override them (per-entity
+    // Scan cycles respect the per-agent enable flags. Only a manual run is
+    // explicit operator intent and may override them (per-entity
     // OBSERVE_ONLY is still enforced by the decision applier).
     //
     // `cycle.only` used to bypass this too, on the reading that a targeted run
@@ -515,10 +511,9 @@ export class AutopilotWorker {
     const settings = await this.prisma.instanceSettings.findUnique({
       where: { id: INSTANCE_SETTINGS_ID },
     });
-    if (!settings?.harnessEnabled || !settings.harnessAiProviderConfigId)
-      return false;
+    if (!settings?.harnessAiProviderConfigId) return false;
 
-    // Explicit operator intent overrides the master switches; the decision
+    // Explicit operator intent overrides the per-agent switches; the decision
     // applier still enforces per-entity OBSERVE_ONLY.
     if (cycle.manual) return true;
 
@@ -565,9 +560,9 @@ export class AutopilotWorker {
       cycle.instruction ? { instruction: cycle.instruction } : undefined,
     );
 
-    // Only manual runs override the instance flags (explicit operator intent);
+    // Only manual runs override the per-agent flags (explicit operator intent);
     // the applier still enforces per-entity OBSERVE_ONLY. A targeted rerun is
-    // not on its own operator intent — see the master-switch check above.
+    // not on its own operator intent — see the per-agent check above.
     const effectiveSettings: InstanceSettings = cycle.manual
       ? {
           ...settings,

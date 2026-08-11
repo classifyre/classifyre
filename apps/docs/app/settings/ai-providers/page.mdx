@@ -1,103 +1,145 @@
 ---
 sidebarTitle: AI Providers
 title: AI Providers
-description: Configure LLM providers for the AI assistant and AI-powered custom detectors.
+description: Configure providers for the AI Assistant, AI Harness, and AI-powered custom detectors from Harness Configuration.
 ---
 
 # AI Providers
 
-AI Providers store the API credentials and model configuration used by the
-AI assistant and AI-powered custom detectors. Each provider entry specifies
-a model, an API key, and optional settings depending on the provider type.
+Open **Harness AI → Configuration** to manage AI providers. Provider creation
+and editing use dedicated pages, while the Configuration tab gives you a
+compact list for assignments and day-to-day management.
+
+Harness tabs are encoded in the URL. Bookmarks, shared links, and the **Open
+configuration** action on an AI warning therefore open the Configuration tab
+directly.
+
+Each provider stores one model configuration and its encrypted credential. A
+provider can serve the interactive **AI Assistant**, the autonomous **AI
+Harness**, both features, or neither. A provider without either assignment can
+still be used by AI-powered custom detectors.
+
+---
+
+## Assistant and Harness are independent
+
+The **Assistant** and **Harness** switches beside each provider are assignment
+and enablement controls:
+
+| Assignment    | What it powers                                                     |
+| ------------- | ------------------------------------------------------------------ |
+| **Assistant** | Interactive Assistant and chat-gateway requests                    |
+| **Harness**   | Autonomous agents, manual Harness runs, and scheduled Harness work |
+
+Each role can have at most one provider. Assigning a different provider moves
+that role to the new provider; one provider may hold both roles. Clearing an
+assignment disables only that feature, so the Assistant and Harness can be
+operated independently.
+
+The **AI Harness not configured** badges in the sidebar and top bar check only
+the Harness assignment. An Assistant-only provider does not clear them.
+Selecting a Harness provider removes the warnings and enables Harness actions.
 
 ---
 
 ## Supported providers
 
-| Provider | Default model | Base URL |
-|---|---|---|
-| **OpenAI-Compatible** | `gpt-4o` | Configurable — use for OpenAI, Azure OpenAI, Together AI, OpenRouter, Groq, etc. |
-| **Claude (Anthropic)** | `claude-sonnet-4-5` | Fixed (Anthropic API) |
-| **Gemini (Google)** | `gemini-2.0-flash` | Fixed (Google AI API) |
+| Provider               | Default model       | Base URL                                                                                                      |
+| ---------------------- | ------------------- | ------------------------------------------------------------------------------------------------------------- |
+| **OpenAI-Compatible**  | `gpt-4o`            | Configurable—for OpenAI, Azure OpenAI, Together AI, OpenRouter, Groq, self-hosted endpoints, and similar APIs |
+| **Claude (Anthropic)** | `claude-sonnet-4-5` | Managed by Classifyre                                                                                         |
+| **Gemini (Google)**    | `gemini-2.0-flash`  | Managed by Classifyre                                                                                         |
 
 ---
 
-## Configuration fields
+## Add or edit a provider
 
-| Field | Description |
-|---|---|
-| **Name** | A human-readable label (e.g. "Production Claude", "Dev OpenAI"). Max 120 characters. |
-| **Provider** | One of `OpenAI-Compatible`, `Claude (Anthropic)`, or `Gemini (Google)`. Determines which API endpoint is used. |
-| **Model** | The model identifier (e.g. `gpt-4o`, `claude-sonnet-4-5`, `gemini-2.0-flash`). Max 200 characters. |
-| **API key** | The API key for the provider. Stored encrypted at rest. Only a masked preview is shown after saving (first 4 + last 4 characters). |
-| **Base URL** | Only for **OpenAI-Compatible** providers. The full URL of the API endpoint. Ignored for Claude and Gemini. |
-| **Context size** | Optional. The context window size in tokens (e.g. 200000). |
-| **Vision support** | Optional. Whether the model accepts image and PDF input. |
+From **Harness AI → Configuration**:
 
-### Base URL behaviour
+1. Select **Add provider**, or use the edit button on an existing provider.
+2. Configure the provider and model on the dedicated page.
+3. Choose whether to use it for the Assistant, Harness, both, or neither.
+4. Run a connection or Harness capability test if required.
+5. Save. You return to the Harness Configuration tab.
 
-- For **OpenAI-Compatible** providers, the base URL is a required configuration
-  field (e.g. `https://api.openai.com/v1` for OpenAI, or a custom endpoint for
-  self-hosted or third-party providers).
-- For **Claude** and **Gemini**, the base URL is fixed to the provider's API
-  and cannot be overridden.
+The editor is arranged into provider/model, runtime/pricing, assignments,
+credential, and verification sections. On smaller screens those sections stack
+into one column and the save controls remain available at the bottom.
 
----
+### Configuration fields
 
-## Managing providers
+| Field                       | Description                                                                                  |
+| --------------------------- | -------------------------------------------------------------------------------------------- |
+| **Name**                    | A recognizable label, such as “Production Claude”. Maximum 120 characters.                   |
+| **Provider**                | `OpenAI-Compatible`, `Claude (Anthropic)`, or `Gemini (Google)`.                             |
+| **Model**                   | The provider's exact model identifier. Maximum 200 characters.                               |
+| **API key**                 | Stored encrypted at rest and never returned in plaintext after saving.                       |
+| **Base URL**                | Available for OpenAI-compatible providers; leave blank for the default OpenAI endpoint or enter a compatible endpoint. |
+| **Context size**            | Optional model context window in tokens. Used by Harness capacity analysis.                  |
+| **Vision support**          | Whether the model accepts image and PDF input.                                               |
+| **Input/output token cost** | Optional USD price per one million tokens, used for Harness cost estimates and usage charts. |
 
-### Create
-
-1. Click **New Provider** on the AI Providers tab.
-2. Enter a name, select the provider type, and fill in the configuration fields.
-3. Optionally click **Test connection** to validate the credentials.
-4. Save — the API key is encrypted before storage.
-
-### Update
-
-Edit any field. To clear the API key, submit an empty value. Changes take
-effect immediately.
-
-### Delete
-
-A provider can be deleted unless it is:
-- Selected as the instance-wide AI assistant model
-- Referenced by one or more custom detectors
-
-In either case, reassign or delete the dependent resources first.
+Testing a new provider saves its credential first. A later save updates that
+same provider instead of creating a duplicate.
 
 ---
 
-## Testing a connection
+## Test a provider
 
-The **Test connection** button sends a small structured JSON round-trip to
-the provider:
+The verification section offers two test types. **Connection** is selected by
+default.
 
-```
-system: "Reply with valid JSON only."
-user:   "Return JSON with fields: status, square of 7, language used."
-```
+### Connection test
 
-A successful test returns the provider name and model. A failure shows the
-error message returned by the provider.
+The connection test sends one small structured-response request. It verifies
+that the saved configuration can be decrypted, the provider accepts the API
+key and model, and the model responds before the timeout.
 
-The configuration is saved before the test runs, so a passing test confirms
-that the stored credentials are valid.
+The result explains why the test passed or failed and includes the provider,
+model, duration, diagnostic details, token usage when available, and a short
+response preview. Failures distinguish configuration, authentication, model,
+rate-limit, and provider errors so the next action is clear.
+
+### Harness capability test
+
+The Harness test checks whether the model can drive the real agent-loop
+contract, not merely answer a request. Progress appears while the test runs,
+including the active stage and every completed probe with its result and
+reason.
+
+It exercises:
+
+- strict structured turns and recovery from invalid output;
+- choosing tools and producing schema-valid arguments;
+- carrying a tool observation into a dependent next call;
+- judgment against representative Harness missions;
+- context capacity for each configured agent.
+
+The final report gives an overall **Ready**, **Degraded**, or **Unusable**
+verdict, per-agent readiness and context headroom, detailed probe evidence,
+token totals, duration, assumptions, and an estimated cost per run when token
+pricing is configured.
+
+The test makes real model calls and may consume provider quota, but it never
+runs a tool against workspace data. Tool observations are safe fixtures, so
+the capability test does not change the workspace. Its verdict is advisory and
+does not prevent assigning the provider.
 
 ---
 
-## API keys
+## Delete a provider
 
-- API keys are encrypted at rest using the application's encryption service.
-- Only the first 4 and last 4 characters are ever displayed (e.g. `sk-p...xyz4`).
-- Keys shorter than 8 characters are fully masked.
+A provider cannot be deleted while it is assigned to the Assistant or Harness,
+or while a custom detector references it. Clear or move those dependencies
+first, then delete the provider.
+
+---
+
+## Credential security
+
+- API keys are encrypted at rest.
 - The raw key is never returned by the API after creation.
-
----
-
-## AI assistant default
-
-One provider is selected as the **default AI assistant model** on the General
-settings tab. This provider is used for all AI assistant interactions across
-the instance. When a new provider is created from the General tab, it is
-automatically set as the default.
+- Existing keys are shown only as a masked value; entering a new key replaces
+  the stored credential.
+- Workspace archives strip provider keys. Imported providers must be given new
+  credentials before they can be used.

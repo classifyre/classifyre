@@ -97,7 +97,7 @@ export class ObserveToolset {
       {
         name: 'assets.sample',
         description:
-          'Bounded, redacted sample of raw assets in scope — name, kind and a preview of each asset’s metadata fields. The concrete material to hypothesise a detector from when there are no findings to learn from.',
+          'Bounded, redacted sample of assets in scope — id, name, kind, metadata fields and an extracted contentPreview when available. Use the id as detector.test sampleAssetId for real image/PDF tests. The concrete material to hypothesise a detector from when there are no findings to learn from.',
         inputSchema: {
           type: 'object',
           properties: {

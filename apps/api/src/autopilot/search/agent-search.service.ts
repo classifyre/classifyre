@@ -19,6 +19,8 @@ import {
   MAX_ASSET_METADATA_PREVIEW_KEYS,
   MAX_ASSET_METADATA_PREVIEW_LENGTH,
   MAX_ASSET_SAMPLES,
+  MAX_ASSET_CONTENT_SAMPLES,
+  MAX_ASSET_CONTENT_PREVIEW_LENGTH,
   MAX_ASSET_TYPE_BUCKETS,
   MAX_CANDIDATE_INQUIRIES,
   MAX_CASE_SUMMARIES,
@@ -88,6 +90,23 @@ const SEVERITY_RANK: Record<string, number> = {
   LOW: 3,
   INFO: 4,
 };
+
+/** Keep semantic context while preventing common credentials and PII from
+ * being copied into an LLM prompt. This is intentionally conservative: asset
+ * samples are for detector selection, not forensic review. */
+function redactContentPreview(value: string): string {
+  return value
+    .replace(/\bBearer\s+[A-Za-z0-9._~+/=-]+/gi, 'Bearer [REDACTED]')
+    .replace(
+      /\b(api[_-]?key|access[_-]?token|password|secret)\s*[:=]\s*[^\s,;]+/gi,
+      '$1=[REDACTED]',
+    )
+    .replace(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi, '[EMAIL]')
+    .replace(/\b(?:[a-f0-9]{40,}|[A-Za-z0-9+/]{48,}={0,2})\b/g, '[SECRET]')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, MAX_ASSET_CONTENT_PREVIEW_LENGTH);
+}
 
 const CASE_ORDER =
   'operator origin → severity → unevaluated hypotheses → oldest update → id';
@@ -381,8 +400,9 @@ export class AgentSearchService {
   }
 
   /**
-   * Bounded, redacted sample of the raw assets in scope — name, kind and a
-   * preview of their metadata. The cold-start signal: when a source has been
+   * Bounded, redacted sample of assets in scope — name, kind, metadata and a
+   * preview of already-extracted content when available. The cold-start signal:
+   * when a source has been
    * ingested but no detectors fired, this is the only material the harness has
    * to hypothesise what to detect. Scope narrows runner → source → instance.
    */
@@ -404,11 +424,16 @@ export class AgentSearchService {
         name: true,
         externalUrl: true,
         metadata: true,
+        chunks: {
+          orderBy: { ordinal: 'asc' },
+          take: 1,
+          select: { text: true },
+        },
       },
       orderBy: { createdAt: 'desc' },
       take: MAX_ASSET_SAMPLES,
     });
-    return rows.map((a) => {
+    return rows.map((a, index) => {
       const meta =
         a.metadata &&
         typeof a.metadata === 'object' &&
@@ -430,6 +455,10 @@ export class AgentSearchService {
           : null,
         metadataKeys: keys,
         metadataPreview: preview,
+        contentPreview:
+          index < MAX_ASSET_CONTENT_SAMPLES && a.chunks?.[0]?.text
+            ? redactContentPreview(a.chunks[0].text)
+            : null,
       };
     });
   }

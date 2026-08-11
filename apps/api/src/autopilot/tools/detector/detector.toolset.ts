@@ -5,6 +5,7 @@ import { CustomDetectorTestsService } from '../../../custom-detector-tests.servi
 import { DecisionApplierService } from '../../decision-applier.service';
 import { AgentSearchService } from '../../search/agent-search.service';
 import { PrismaService } from '../../../prisma.service';
+import { AiProviderConfigService } from '../../../ai-provider-config.service';
 import {
   coveredByBuiltIn,
   detectorSimilarity,
@@ -32,6 +33,15 @@ const PIPELINE_TYPES = [
   'OBJECT_DETECTION',
 ];
 
+function examplePipelineSchema(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  const record = value as Record<string, unknown>;
+  const nested = record.pipeline_schema;
+  return nested && typeof nested === 'object' && !Array.isArray(nested)
+    ? (nested as Record<string, unknown>)
+    : record;
+}
+
 /**
  * Detector-authoring tools. The autopilot can list, create, test, update,
  * deactivate, delete and train custom detectors (REGEX, GLINER2, HuggingFace
@@ -47,6 +57,7 @@ export class DetectorToolset {
     private readonly applier: DecisionApplierService,
     private readonly search: AgentSearchService,
     private readonly prisma: PrismaService,
+    private readonly aiProviders: AiProviderConfigService,
   ) {}
 
   /**
@@ -224,6 +235,29 @@ export class DetectorToolset {
           ),
       },
       {
+        name: 'ai.providers',
+        description:
+          'List AI provider configurations that an LLM detector may use. Select a usable id and pass it as aiProviderConfigId. For image or PDF reasoning, supportsVision must be true. Secrets are never returned.',
+        inputSchema: {
+          type: 'object',
+          properties: {},
+          additionalProperties: false,
+        },
+        sideEffect: 'read',
+        handler: async () => {
+          const providers = await this.aiProviders.list();
+          return providers.map((provider) => ({
+            id: provider.id,
+            name: provider.name,
+            provider: provider.provider,
+            model: provider.model,
+            contextSize: provider.contextSize,
+            supportsVision: provider.supportsVision,
+            usable: provider.hasApiKey && provider.model.trim().length > 0,
+          }));
+        },
+      },
+      {
         name: 'detector.examples',
         description:
           'List worked example custom detectors (name, description, pipelineSchema) to copy when authoring a valid pipelineSchema. Pass `type` to return only examples for one engine (incl. candidate HuggingFace model ids); omit it for all types. ' +
@@ -236,17 +270,26 @@ export class DetectorToolset {
           additionalProperties: false,
         },
         sideEffect: 'read',
-        handler: (input) =>
-          Promise.resolve(
-            this.detectors.listExamples(
-              typeof input.type === 'string' ? input.type : undefined,
-            ),
-          ),
+        handler: (input) => {
+          const examples = this.detectors.listExamples(
+            typeof input.type === 'string' ? input.type : undefined,
+          );
+          // The public examples endpoint intentionally returns the complete
+          // persisted config. Agent tools need the inner schema accepted by
+          // detector.test/create, otherwise models copy `pipeline_schema` one
+          // level too deep and burn retries on validation failures.
+          return Promise.resolve(
+            examples.map((example) => ({
+              ...example,
+              pipelineSchema: examplePipelineSchema(example.pipelineSchema),
+            })),
+          );
+        },
       },
       {
         name: 'detector.test',
         description:
-          'Run a detector against ad-hoc sample text and return what it matched — use it to verify a detector works BEFORE and AFTER creating it. Pass `pipelineSchema` to dry-run a draft (for LLM drafts also pass `aiProviderConfigId`), or `detectorId` to test a saved detector. First call may take 90–120s (model cold start).',
+          'Run a detector against ad-hoc samples and return what it matched — use it BEFORE and AFTER creating. Prefer one `samples` batch containing a positive and a counterexample; each sample has label, expectedMatch, and exactly one of sampleText or sampleAssetId. sampleAssetId delivers the real file bytes to image/object/vision detectors (never paste an image URL as text). Pass pipelineSchema for a draft (LLM drafts also need aiProviderConfigId), or detectorId for a saved detector. Legacy sampleText remains supported. First call may take 90–120s (model cold start).',
         inputSchema: {
           type: 'object',
           properties: {
@@ -256,15 +299,33 @@ export class DetectorToolset {
             name: { type: 'string' },
             aiProviderConfigId: { type: 'string' },
             sampleText: { type: 'string', minLength: 1 },
+            samples: {
+              type: 'array',
+              minItems: 1,
+              maxItems: 4,
+              items: {
+                type: 'object',
+                properties: {
+                  label: { type: 'string', minLength: 1 },
+                  expectedMatch: { type: 'boolean' },
+                  sampleText: {
+                    type: 'string',
+                    minLength: 1,
+                    maxLength: 12000,
+                  },
+                  sampleAssetId: { type: 'string', minLength: 1 },
+                },
+                required: ['label', 'expectedMatch'],
+                additionalProperties: false,
+              },
+            },
           },
-          required: ['sampleText'],
           additionalProperties: false,
         },
         // Preserve the free-form draft pipeline schema verbatim.
         lenientInput: false,
         sideEffect: 'read',
         handler: async (input) => {
-          const sampleText = String(input.sampleText);
           let detector: {
             key: string;
             name: string;
@@ -293,7 +354,38 @@ export class DetectorToolset {
           } else {
             throw new Error('Provide either detectorId or pipelineSchema.');
           }
-          const result = await this.tests.evaluateSample(detector, sampleText);
+          if (Array.isArray(input.samples)) {
+            const results = await this.tests.evaluateSamples(
+              detector,
+              input.samples as Array<{
+                label: string;
+                expectedMatch: boolean;
+                sampleText?: string;
+                sampleAssetId?: string;
+              }>,
+            );
+            return {
+              allExpectationsMet: results.every(
+                (result) => result.expectationMet === true,
+              ),
+              samples: results.map((result) => ({
+                ...result,
+                findings: Array.isArray(result.findings)
+                  ? result.findings.slice(0, 5)
+                  : [],
+              })),
+            };
+          }
+          if (
+            typeof input.sampleText !== 'string' ||
+            !input.sampleText.trim()
+          ) {
+            throw new Error('Provide sampleText or a samples batch.');
+          }
+          const result = await this.tests.evaluateSample(
+            detector,
+            input.sampleText,
+          );
           const findings = Array.isArray(result.findings)
             ? result.findings
             : [];

@@ -39,6 +39,11 @@ describe('AgentSearchService — asset observation (cold start)', () => {
             row_count: 1000,
             nested: { deep: true },
           },
+          chunks: [
+            {
+              text: 'Contact jane@example.com; api_key=super-secret about unusual invoice splitting.',
+            },
+          ],
         },
       ]);
 
@@ -51,6 +56,16 @@ describe('AgentSearchService — asset observation (cold start)', () => {
       // Arrays summarised, objects collapsed — not dumped verbatim.
       expect(out[0].metadataPreview.column_names).toContain('email');
       expect(out[0].metadataPreview.nested).toBe('{…}');
+      expect(out[0].contentPreview).toContain('unusual invoice splitting');
+      expect(out[0].contentPreview).not.toContain('jane@example.com');
+      expect(out[0].contentPreview).not.toContain('super-secret');
+      expect(mockPrisma.asset.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          select: expect.objectContaining({
+            chunks: expect.objectContaining({ take: 1 }),
+          }),
+        }),
+      );
     });
 
     it('scopes by runner when given (scan delta)', async () => {

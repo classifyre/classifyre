@@ -40,7 +40,6 @@ describe('InstanceSettingsService', () => {
     const now = new Date('2026-03-05T12:00:00.000Z');
     mockPrismaService.instanceSettings.upsert.mockResolvedValue({
       id: 1,
-      aiEnabled: true,
       mcpEnabled: true,
       language: InstanceLanguage.ENGLISH,
       timezone: 'UTC',
@@ -55,7 +54,6 @@ describe('InstanceSettingsService', () => {
     expect(mockPrismaService.instanceSettings.upsert).toHaveBeenCalledWith(
       expect.objectContaining({
         create: expect.objectContaining({
-          aiEnabled: true,
           mcpEnabled: true,
           autopilotInquiryEnabled: true,
           autopilotCaseEnabled: true,
@@ -68,7 +66,6 @@ describe('InstanceSettingsService', () => {
     );
     expect(result).toMatchObject({
       id: 1,
-      aiEnabled: true,
       mcpEnabled: true,
       demoMode: false,
       language: InstanceLanguage.ENGLISH,
@@ -81,7 +78,6 @@ describe('InstanceSettingsService', () => {
     const now = new Date('2026-03-05T12:00:00.000Z');
     mockPrismaService.instanceSettings.upsert.mockResolvedValue({
       id: 1,
-      aiEnabled: true,
       mcpEnabled: true,
       language: InstanceLanguage.ENGLISH,
       timezone: 'UTC',
@@ -92,7 +88,6 @@ describe('InstanceSettingsService', () => {
 
     mockPrismaService.instanceSettings.update.mockResolvedValue({
       id: 1,
-      aiEnabled: false,
       mcpEnabled: true,
       language: InstanceLanguage.ENGLISH,
       timezone: 'America/New_York',
@@ -102,7 +97,6 @@ describe('InstanceSettingsService', () => {
     });
 
     const result = await service.updateSettings({
-      aiEnabled: false,
       timezone: '  America/New_York  ',
       timeFormat: InstanceTimeFormat.TWENTY_FOUR_HOUR,
     });
@@ -111,7 +105,6 @@ describe('InstanceSettingsService', () => {
       expect.objectContaining({
         where: { id: 1 },
         data: expect.objectContaining({
-          aiEnabled: false,
           timezone: 'America/New_York',
           timeFormat: InstanceTimeFormat.TWENTY_FOUR_HOUR,
         }),
@@ -120,15 +113,12 @@ describe('InstanceSettingsService', () => {
 
     expect(result.timezone).toBe('America/New_York');
     expect(result.timeFormat).toBe(InstanceTimeFormat.TWENTY_FOUR_HOUR);
-    expect(result.aiEnabled).toBe(false);
   });
 
-  it('updates Assistant and Harness controls independently', async () => {
+  it('updates Assistant and Harness provider assignments independently', async () => {
     const now = new Date('2026-03-05T12:00:00.000Z');
     mockPrismaService.instanceSettings.upsert.mockResolvedValue({
       id: 1,
-      aiEnabled: true,
-      harnessEnabled: true,
       mcpEnabled: true,
       language: InstanceLanguage.ENGLISH,
       timezone: 'UTC',
@@ -143,8 +133,6 @@ describe('InstanceSettingsService', () => {
     });
     mockPrismaService.instanceSettings.update.mockResolvedValue({
       id: 1,
-      aiEnabled: false,
-      harnessEnabled: true,
       mcpEnabled: true,
       language: InstanceLanguage.ENGLISH,
       timezone: 'UTC',
@@ -156,8 +144,6 @@ describe('InstanceSettingsService', () => {
     });
 
     const result = await service.updateSettings({
-      aiEnabled: false,
-      harnessEnabled: true,
       aiProviderConfigId: 'shared-provider',
       harnessAiProviderConfigId: 'shared-provider',
     });
@@ -168,15 +154,11 @@ describe('InstanceSettingsService', () => {
     expect(mockPrismaService.instanceSettings.update).toHaveBeenCalledWith({
       where: { id: 1 },
       data: expect.objectContaining({
-        aiEnabled: false,
-        harnessEnabled: true,
         aiProviderConfig: { connect: { id: 'shared-provider' } },
         harnessAiProviderConfig: { connect: { id: 'shared-provider' } },
       }),
     });
     expect(result).toMatchObject({
-      aiEnabled: false,
-      harnessEnabled: true,
       aiProviderConfigId: 'shared-provider',
       harnessAiProviderConfigId: 'shared-provider',
     });
@@ -186,7 +168,6 @@ describe('InstanceSettingsService', () => {
     const now = new Date('2026-03-05T12:00:00.000Z');
     mockPrismaService.instanceSettings.upsert.mockResolvedValue({
       id: 1,
-      aiEnabled: true,
       mcpEnabled: true,
       language: InstanceLanguage.ENGLISH,
       timezone: 'UTC',
@@ -197,7 +178,6 @@ describe('InstanceSettingsService', () => {
 
     mockPrismaService.instanceSettings.update.mockResolvedValue({
       id: 1,
-      aiEnabled: true,
       mcpEnabled: true,
       language: 'AUTOMATIC' as InstanceLanguage,
       timezone: 'UTC',
@@ -223,7 +203,6 @@ describe('InstanceSettingsService', () => {
   it('rejects empty timezone values', async () => {
     mockPrismaService.instanceSettings.upsert.mockResolvedValue({
       id: 1,
-      aiEnabled: true,
       mcpEnabled: true,
       language: InstanceLanguage.ENGLISH,
       timezone: 'UTC',

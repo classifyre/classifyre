@@ -63,8 +63,7 @@ export function HarnessShell() {
   const [stats, setStats] = React.useState<AutopilotStatsDto | null>(null);
   const [focusRunId, setFocusRunId] = React.useState<string | undefined>();
   const [epoch, setEpoch] = React.useState(0);
-  const harnessReady =
-    settings.harnessEnabled && !!settings.harnessAiProviderConfigId;
+  const harnessReady = !!settings.harnessAiProviderConfigId;
 
   const loadStats = React.useCallback(async () => {
     try {

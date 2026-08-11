@@ -23,8 +23,6 @@ export class InstanceSettingsService {
   private toResponse(settings: InstanceSettings): InstanceSettingsResponseDto {
     return {
       id: settings.id,
-      aiEnabled: settings.aiEnabled,
-      harnessEnabled: settings.harnessEnabled,
       mcpEnabled: settings.mcpEnabled,
       language: settings.language,
       timezone: settings.timezone,
@@ -58,8 +56,6 @@ export class InstanceSettingsService {
       where: { id: INSTANCE_SETTINGS_ID },
       create: {
         id: INSTANCE_SETTINGS_ID,
-        aiEnabled: true,
-        harnessEnabled: true,
         mcpEnabled: true,
         autopilotInquiryEnabled: true,
         autopilotCaseEnabled: true,
@@ -141,12 +137,6 @@ export class InstanceSettingsService {
     }
 
     const data: Prisma.InstanceSettingsUpdateInput = {
-      ...(updateDto.aiEnabled !== undefined
-        ? { aiEnabled: updateDto.aiEnabled }
-        : {}),
-      ...(updateDto.harnessEnabled !== undefined
-        ? { harnessEnabled: updateDto.harnessEnabled }
-        : {}),
       ...(updateDto.mcpEnabled !== undefined
         ? { mcpEnabled: updateDto.mcpEnabled }
         : {}),

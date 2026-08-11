@@ -23,7 +23,6 @@ import type { TranslationKey } from "@/i18n";
  * Health of the Harness configuration shown in the global navigation:
  * - `ok`             — Harness has a provider that passes a live round-trip.
  * - `loading`        — still resolving (never warned on).
- * - `disabled`       — Harness is switched off.
  * - `not_configured` — Harness has no provider assigned.
  * - `error`          — an assigned provider failed the live test (no connection,
  *                      no structured output, bad key, …). `detail` holds why.
@@ -34,7 +33,6 @@ import type { TranslationKey } from "@/i18n";
 export type AiHealthStatus =
   | "ok"
   | "loading"
-  | "disabled"
   | "not_configured"
   | "error"
   | "unavailable";
@@ -53,7 +51,6 @@ export function AiHealthProvider({ children }: { children: React.ReactNode }) {
   const [status, setStatus] = React.useState<AiHealthStatus>("loading");
   const [detail, setDetail] = React.useState<string | null>(null);
 
-  const harnessEnabled = settings.harnessEnabled;
   const harnessProviderId = settings.harnessAiProviderConfigId;
   // Two sources on purpose. `serverConfig` is the web pod's own DEMO_MODE env,
   // known synchronously, so the probe is suppressed even before instance
@@ -72,11 +69,6 @@ export function AiHealthProvider({ children }: { children: React.ReactNode }) {
     // change. Skip the request entirely.
     if (demoMode) {
       setStatus("unavailable");
-      setDetail(null);
-      return;
-    }
-    if (!harnessEnabled) {
-      setStatus("disabled");
       setDetail(null);
       return;
     }
@@ -110,7 +102,7 @@ export function AiHealthProvider({ children }: { children: React.ReactNode }) {
       setStatus("error");
       setDetail(e instanceof Error ? e.message : null);
     }
-  }, [demoMode, harnessEnabled, harnessProviderId, settingsLoading]);
+  }, [demoMode, harnessProviderId, settingsLoading]);
 
   React.useEffect(() => {
     void check();
@@ -140,9 +132,7 @@ export function useAiHealth(): AiHealthValue {
  * deliberately excluded: nothing is broken and nobody viewing a demo can act
  * on it, so neither the sidebar warning nor the top-bar pill renders. */
 function isUnhealthy(status: AiHealthStatus): boolean {
-  return (
-    status === "disabled" || status === "not_configured" || status === "error"
-  );
+  return status === "not_configured" || status === "error";
 }
 
 /** Resolve the i18n title/description for a problem status. */

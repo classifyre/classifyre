@@ -1,91 +1,97 @@
 ---
 title: Settings
-description: Manage instance-wide configuration — locale, AI integration, and MCP connectivity.
+description: Manage workspace-wide preferences, scan capacity, integrations, and data transfer.
 ---
 
 # Settings
 
-The Settings page controls instance-wide preferences and integrations. It is
-organised into three tabs:
+The Settings page controls workspace-wide preferences and integrations. Its
+tabs stay in the URL, so a link to a specific tab opens that tab directly.
 
-| Tab | What it controls |
-|---|---|---|
-| **General** | Instance locale (language, timezone, time format), AI assistant toggle and default model, Hugging Face token |
-| **AI Providers** | API credentials for LLM providers used by the AI assistant and AI-powered custom detectors |
-| **MCP Server** | MCP endpoint configuration, bearer tokens, and client setup guides |
+| Tab                 | What it controls                                                                                        |
+| ------------------- | ------------------------------------------------------------------------------------------------------- |
+| **General**         | Software version, concurrent scan capacity, language, timezone, time format, and the Hugging Face token |
+| **MCP Servers**     | The Classifyre MCP endpoint, bearer tokens, and client connection guides                                |
+| **Chat Bots**       | Telegram and Slack bots, permissions, and connection diagnostics                                        |
+| **Export & Import** | Portable workspace archives and transfer history                                                        |
 
 ---
 
-## General settings
+## General
 
-The General tab manages how the UI displays content and whether AI assistant
-features are enabled.
+General settings cover the workspace itself rather than AI behavior.
 
-### Language, timezone and time format
+### Software and scanning
 
-These three settings each support two modes: **automatic** (detected from the
-user's browser) or **a fixed value** set at the instance level.
+The version card shows the installed Classifyre release and whether an update
+is available. **Concurrent scans** controls how many scan jobs this workspace
+may run at once. Higher values can sweep a large corpus faster, but consume
+more CPU and memory; lower values leave more capacity for the rest of the
+instance.
 
-| Setting | Options | Auto-detection |
-|---|---|---|
-| Language | `Automatic`, `English`, `German` | Browser language |
-| Timezone | `Automatic` or any IANA timezone | Browser timezone |
-| Time format | `Automatic`, `12-hour`, `24-hour` | Browser hour cycle preference |
+### Language, timezone, and time format
 
-When **Automatic** is selected, the system uses the browser's built-in
-capabilities to detect the user's preference — no IP geolocation or server-side
-detection is involved. A user can also override the language for their session
-via a cookie without affecting the instance default.
+These settings support **Automatic** browser detection or a fixed
+workspace-wide value.
 
-See [Instance Settings](/settings/instance-settings) for full details.
+| Setting     | Options                           | Automatic behavior                     |
+| ----------- | --------------------------------- | -------------------------------------- |
+| Language    | `Automatic`, `English`, `German`  | Uses the browser language              |
+| Timezone    | `Automatic` or an IANA timezone   | Uses the browser timezone              |
+| Time format | `Automatic`, `12-hour`, `24-hour` | Uses the browser hour-cycle preference |
 
-### AI assistant
-
-The AI assistant toggle enables or disables AI-powered features across the
-entire instance. When enabled, you must select a **default AI provider** and
-model that the assistant uses for all AI interactions. This default provider
-is configured separately on the AI Providers tab.
+A user can override the displayed language from the header without changing
+the workspace default. See [Instance Settings](/settings/instance-settings/)
+for the full resolution rules.
 
 ### Hugging Face token
 
-A Hugging Face token authenticates model downloads from the Hugging Face Hub.
-It is required for **audio transcription** and **Hugging Face custom detectors**
-— without it, downloads fall back to unauthenticated requests with lower rate
-limits and slower speeds.
+A Hugging Face token authenticates model downloads for audio transcription and
+Hugging Face custom detectors. It may come from the deployment or be saved on
+the General tab. Deployment-level credentials take precedence and cannot be
+replaced from the UI.
 
-The token can be provided in two ways: **instance-level** (via the Helm chart
-on Kubernetes deployments) or **user-configured** (via the Settings UI). When
-an instance-level token is set, the UI field is disabled and user tokens are
-ignored.
-
-See [Instance Settings](/settings/instance-settings) for full details.
+See [Instance Settings](/settings/instance-settings/) for configuration and
+security details.
 
 ---
 
-## AI Providers
+## MCP Servers
 
-AI Providers store the API credentials and model configuration for the LLM
-providers that power the AI assistant and custom AI detectors. Classifyre
-supports three provider types:
+The Classifyre Model Context Protocol (MCP) server exposes workspace data and
+operations to clients such as Claude, Cursor, and Codex CLI over a standard
+HTTP API. The tab controls the endpoint and its individual bearer tokens.
 
-- **OpenAI-Compatible** — any API that follows the OpenAI chat completions
-  format (OpenAI, Azure OpenAI, Together AI, OpenRouter, Groq, etc.)
-- **Claude (Anthropic)**
-- **Gemini (Google)**
-
-Each provider configuration includes the model identifier, API key, optional
-base URL (for OpenAI-compatible endpoints), context size, and vision support
-flag. A built-in test connection button validates credentials before saving.
-
-See [AI Providers](/settings/ai-providers) for configuration reference.
+See [MCP Server](/settings/mcp-server/) for client setup and troubleshooting.
 
 ---
 
-## MCP Server
+## Chat Bots
 
-The Model Context Protocol (MCP) server exposes Classifyre's data and
-operations to AI clients like Claude, Cursor, and Codex CLI over a
-standardised HTTP API. Each client authenticates with a unique bearer token.
+Chat Bots connect Telegram or Slack to Classifyre. Each bot can be enabled
+independently and restricted to selected capability groups and Autopilot
+agents. Mutation access can also be disabled to make a bot read-only. Built-in
+tests and diagnostics show whether credentials and the live connection work.
 
-See [MCP Server](/settings/mcp-server) for connection setup, client
-configuration guides, capability reference, and troubleshooting.
+---
+
+## Export & Import
+
+Export & Import moves selected workspace data through a compressed `.cfyre`
+archive. Choose the data areas to include, monitor the job, and download the
+completed archive; an import lets you preview the archive and select which
+parts to load.
+
+Credentials and secrets are never exported. Imported records receive new IDs,
+and links between those records are rewritten to remain consistent.
+
+---
+
+## AI configuration
+
+AI providers are configured in **Harness AI → Configuration**, not on the
+Settings page. That is where you assign providers independently to the
+interactive Assistant and the autonomous Harness, create or edit provider
+credentials, and run provider tests.
+
+See [AI Providers](/settings/ai-providers/) for the complete setup guide.

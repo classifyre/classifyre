@@ -191,10 +191,9 @@ describe('AutopilotWorker readiness and batch consumption', () => {
         readinessAttempts,
       }) as Promise<void>;
 
-    const withSettings = (harnessEnabled = true) => {
+    const withSettings = () => {
       prisma.instanceSettings = {
         findUnique: jest.fn().mockResolvedValue({
-          harnessEnabled,
           harnessAiProviderConfigId: 'p1',
           autopilotInquiryEnabled: false,
           autopilotCaseEnabled: false,
@@ -210,7 +209,6 @@ describe('AutopilotWorker readiness and batch consumption', () => {
       withSettings();
       // One agent enabled so the cycle is not short-circuited by the gate.
       prisma.instanceSettings.findUnique.mockResolvedValue({
-        harnessEnabled: true,
         harnessAiProviderConfigId: 'p1',
         autopilotInquiryEnabled: true,
         autopilotCaseEnabled: false,
@@ -242,7 +240,6 @@ describe('AutopilotWorker readiness and batch consumption', () => {
       build({ pendingEmbedJobs: 50, openFindings: 1000, analyzedFindings: 10 });
       withSettings();
       prisma.instanceSettings.findUnique.mockResolvedValue({
-        harnessEnabled: true,
         harnessAiProviderConfigId: 'p1',
         autopilotInquiryEnabled: true,
         autopilotCaseEnabled: false,
@@ -267,7 +264,6 @@ describe('AutopilotWorker readiness and batch consumption', () => {
       build({ matchQueue: 1 });
       prisma.instanceSettings = {
         findUnique: jest.fn().mockResolvedValue({
-          harnessEnabled: true,
           harnessAiProviderConfigId: 'p1',
           autopilotInquiryEnabled: true,
           autopilotCaseEnabled: true,
@@ -316,7 +312,6 @@ describe('AutopilotWorker readiness and batch consumption', () => {
       });
       withSettings();
       prisma.instanceSettings.findUnique.mockResolvedValue({
-        harnessEnabled: true,
         harnessAiProviderConfigId: 'p1',
         autopilotInquiryEnabled: true,
         autopilotCaseEnabled: false,
@@ -346,7 +341,6 @@ describe('AutopilotWorker readiness and batch consumption', () => {
       });
       withSettings();
       prisma.instanceSettings.findUnique.mockResolvedValue({
-        harnessEnabled: true,
         harnessAiProviderConfigId: 'p1',
         autopilotInquiryEnabled: true,
         autopilotCaseEnabled: false,
@@ -431,7 +425,6 @@ describe('AutopilotWorker readiness and batch consumption', () => {
       });
       prisma.instanceSettings = {
         findUnique: jest.fn().mockResolvedValue({
-          harnessEnabled: true,
           harnessAiProviderConfigId: 'p1',
           autopilotInquiryEnabled: true,
           autopilotCaseEnabled: false,
@@ -465,7 +458,6 @@ describe('AutopilotWorker readiness and batch consumption', () => {
       });
       prisma.instanceSettings = {
         findUnique: jest.fn().mockResolvedValue({
-          harnessEnabled: true,
           harnessAiProviderConfigId: 'p1',
           autopilotInquiryEnabled: true,
           autopilotCaseEnabled: false,
@@ -500,7 +492,6 @@ describe('AutopilotWorker readiness and batch consumption', () => {
       build({ dirty: [] });
       prisma.instanceSettings = {
         findUnique: jest.fn().mockResolvedValue({
-          harnessEnabled: true,
           harnessAiProviderConfigId: 'p1',
           autopilotInquiryEnabled: true,
           autopilotCaseEnabled: true,
@@ -528,7 +519,6 @@ describe('AutopilotWorker readiness and batch consumption', () => {
       build({ dirty: [] });
       prisma.instanceSettings = {
         findUnique: jest.fn().mockResolvedValue({
-          harnessEnabled: true,
           harnessAiProviderConfigId: 'p1',
           autopilotInquiryEnabled: true,
           autopilotCaseEnabled: false,

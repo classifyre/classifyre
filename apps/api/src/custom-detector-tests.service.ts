@@ -9,6 +9,8 @@ import * as path from 'path';
 import * as os from 'os';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { lookup } from 'dns/promises';
+import { isIP } from 'net';
 import { PrismaService } from './prisma.service';
 import { CustomDetectorsService } from './custom-detectors.service';
 import { KubernetesCliJobService } from './cli-runner/kubernetes-cli-job.service';
@@ -28,6 +30,22 @@ import {
 } from './dto/custom-detector-tests.dto';
 
 const execAsync = promisify(exec);
+const MAX_AD_HOC_SAMPLES = 4;
+const MAX_REMOTE_SAMPLE_BYTES = 25 * 1024 * 1024;
+
+export interface AdHocDetectorSample {
+  label: string;
+  expectedMatch: boolean;
+  sampleText?: string;
+  sampleAssetId?: string;
+}
+
+interface ResolvedDetectorSample extends AdHocDetectorSample {
+  fileExtension: string;
+  data?: Buffer;
+  url?: string;
+  sandboxFile?: { sourceId: string; fileId: string };
+}
 
 @Injectable()
 export class CustomDetectorTestsService {
@@ -183,12 +201,36 @@ export class CustomDetectorTestsService {
     },
     sampleText: string,
   ): Promise<Record<string, unknown>> {
+    const [result] = await this.evaluateSamples(detector, [
+      { label: 'sample', expectedMatch: true, sampleText },
+    ]);
+    return result;
+  }
+
+  /** Evaluate positive/counterexamples in one CLI process so heavyweight
+   * detector models are initialized once. Asset samples are delivered as real
+   * files, preserving images/PDFs for vision-capable pipelines. */
+  async evaluateSamples(
+    detector: {
+      key: string;
+      name: string;
+      pipelineSchema: Record<string, unknown>;
+      aiProviderConfigId?: string | null;
+    },
+    samples: AdHocDetectorSample[],
+  ): Promise<Array<Record<string, unknown>>> {
+    if (samples.length === 0 || samples.length > MAX_AD_HOC_SAMPLES) {
+      throw new Error(`Provide 1-${MAX_AD_HOC_SAMPLES} detector test samples.`);
+    }
     const pipelineSchema =
       await this.customDetectorsService.injectLlmProviderRuntime(
         detector.pipelineSchema,
         detector.aiProviderConfigId ?? null,
       );
-    return this.evaluateViaCli({ ...detector, pipelineSchema }, sampleText);
+    const resolved = await Promise.all(
+      samples.map((sample) => this.resolveAdHocSample(sample)),
+    );
+    return this.evaluateBatchViaCli({ ...detector, pipelineSchema }, resolved);
   }
 
   // ── Internals ─────────────────────────────────────────────────────────────
@@ -373,6 +415,270 @@ export class CustomDetectorTestsService {
       findingsCount: parsed.findings.length,
       matched: parsed.findings.length > 0,
     };
+  }
+
+  private async resolveAdHocSample(
+    sample: AdHocDetectorSample,
+  ): Promise<ResolvedDetectorSample> {
+    const hasText = typeof sample.sampleText === 'string';
+    const hasAsset = typeof sample.sampleAssetId === 'string';
+    if (hasText === hasAsset) {
+      throw new Error(
+        `Sample "${sample.label}" must provide exactly one of sampleText or sampleAssetId.`,
+      );
+    }
+    if (hasText) {
+      const text = sample.sampleText!.trim();
+      if (!text) throw new Error(`Sample "${sample.label}" is empty.`);
+      return {
+        ...sample,
+        sampleText: text,
+        fileExtension: '.txt',
+        data: Buffer.from(text),
+      };
+    }
+
+    const asset = await this.prisma.asset.findUnique({
+      where: { id: sample.sampleAssetId! },
+      select: { name: true, externalUrl: true },
+    });
+    if (!asset) {
+      throw new NotFoundException(`Asset ${sample.sampleAssetId} not found`);
+    }
+    if (asset.externalUrl?.startsWith('sandbox://')) {
+      const sandboxUrl = new URL(asset.externalUrl);
+      const sourceId = sandboxUrl.hostname;
+      const fileId = sandboxUrl.pathname.replace(/^\//, '');
+      const file = await this.prisma.uploadedSourceFile.findFirst({
+        where: { id: fileId, sourceId },
+        select: { fileExtension: true },
+      });
+      if (!file) {
+        throw new Error(
+          `Asset ${sample.sampleAssetId} references a missing sandbox file.`,
+        );
+      }
+      const extension = file.fileExtension.toLowerCase();
+      return {
+        ...sample,
+        fileExtension: /^\.[a-z0-9]{1,10}$/.test(extension)
+          ? extension
+          : '.bin',
+        sandboxFile: { sourceId, fileId },
+      };
+    }
+    if (!asset.externalUrl || !/^https?:\/\//i.test(asset.externalUrl)) {
+      throw new Error(
+        `Asset ${sample.sampleAssetId} has no downloadable HTTP(S) URL. Choose another sampled asset.`,
+      );
+    }
+    await this.assertPublicUrl(asset.externalUrl);
+    const urlPath = new URL(asset.externalUrl).pathname;
+    const rawExt = path.extname(asset.name || urlPath).toLowerCase();
+    const fileExtension = /^\.[a-z0-9]{1,10}$/.test(rawExt) ? rawExt : '.bin';
+    return { ...sample, fileExtension, url: asset.externalUrl };
+  }
+
+  private async assertPublicUrl(rawUrl: string): Promise<void> {
+    const url = new URL(rawUrl);
+    if (!['http:', 'https:'].includes(url.protocol)) {
+      throw new Error('Detector sample URL must use HTTP(S).');
+    }
+    if (url.username || url.password) {
+      throw new Error('Detector sample URL must not contain credentials.');
+    }
+    const addresses = await lookup(url.hostname, { all: true });
+    if (
+      addresses.length === 0 ||
+      addresses.some((entry) => isPrivateAddress(entry.address))
+    ) {
+      throw new Error(
+        'Detector sample URL resolves to a private or local address.',
+      );
+    }
+  }
+
+  private async downloadPublicSample(rawUrl: string): Promise<Buffer> {
+    let current = rawUrl;
+    for (let redirect = 0; redirect <= 3; redirect++) {
+      await this.assertPublicUrl(current);
+      const response = await fetch(current, {
+        redirect: 'manual',
+        signal: AbortSignal.timeout(60_000),
+      });
+      if (response.status >= 300 && response.status < 400) {
+        const location = response.headers.get('location');
+        if (!location)
+          throw new Error('Detector sample redirect had no location.');
+        current = new URL(location, current).toString();
+        continue;
+      }
+      if (!response.ok) {
+        throw new Error(
+          `Detector sample download failed with HTTP ${response.status}.`,
+        );
+      }
+      const declared = Number(response.headers.get('content-length') || 0);
+      if (declared > MAX_REMOTE_SAMPLE_BYTES) {
+        throw new Error(
+          'Detector sample is larger than the 25 MiB test limit.',
+        );
+      }
+      const reader = response.body?.getReader();
+      if (!reader) return Buffer.alloc(0);
+      const chunks: Buffer[] = [];
+      let total = 0;
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        total += value.byteLength;
+        if (total > MAX_REMOTE_SAMPLE_BYTES) {
+          await reader.cancel();
+          throw new Error(
+            'Detector sample is larger than the 25 MiB test limit.',
+          );
+        }
+        chunks.push(Buffer.from(value));
+      }
+      return Buffer.concat(chunks);
+    }
+    throw new Error('Detector sample exceeded the redirect limit.');
+  }
+
+  private async evaluateBatchViaCli(
+    detector: {
+      key: string;
+      name: string;
+      pipelineSchema: Record<string, unknown>;
+    },
+    samples: ResolvedDetectorSample[],
+  ): Promise<Array<Record<string, unknown>>> {
+    const runId = `test-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const detectorEntry = {
+      type: 'CUSTOM',
+      enabled: true,
+      config: {
+        custom_detector_key: detector.key,
+        name: detector.name,
+        pipeline_schema: detector.pipelineSchema,
+      },
+    };
+    let stdout: string;
+
+    if (this.kubernetesCliJobService?.isEnabled()) {
+      const environment = process.env.ENVIRONMENT || 'development';
+      const baseUrl = buildNamespaceApiBaseUrl(
+        resolveInternalApiBaseUrl(environment),
+        this.cls?.get<string>(CLS_NAMESPACE_ID),
+      );
+      const inputs = samples.map((sample) => ({
+        url:
+          sample.url ??
+          (sample.sandboxFile
+            ? appendApiPath(
+                baseUrl,
+                `/sources/${encodeURIComponent(sample.sandboxFile.sourceId)}/files/${encodeURIComponent(sample.sandboxFile.fileId)}/content`,
+              )
+            : undefined) ??
+          `data:text/plain;base64,${sample.data!.toString('base64')}`,
+        fileExtension: sample.fileExtension,
+        allowPrivate: Boolean(sample.sandboxFile),
+      }));
+      const result = await this.kubernetesCliJobService.runFileEvaluationJob({
+        evaluationId: runId,
+        inputs,
+        detectors: [detectorEntry],
+      });
+      if (result.exitCode !== 0) {
+        throw new Error(
+          `CLI exited with code ${result.exitCode}: ${result.output}`,
+        );
+      }
+      stdout = result.output;
+    } else {
+      const tmpRoot = process.env.TEMP_DIR || os.tmpdir();
+      const sampleDir = path.join(tmpRoot, `detector-test-${runId}`);
+      const detectorsFile = path.join(
+        tmpRoot,
+        `detector-test-${runId}-detectors.json`,
+      );
+      try {
+        await fs.mkdir(sampleDir, { recursive: true });
+        for (let index = 0; index < samples.length; index++) {
+          const sample = samples[index];
+          let data = sample.data;
+          if (!data && sample.sandboxFile) {
+            const file = await this.prisma.uploadedSourceFile.findFirst({
+              where: sample.sandboxFile,
+              select: { data: true, fileSizeBytes: true },
+            });
+            if (!file)
+              throw new Error('Sandbox detector sample no longer exists.');
+            if (file.fileSizeBytes > MAX_REMOTE_SAMPLE_BYTES) {
+              throw new Error(
+                'Detector sample is larger than the 25 MiB test limit.',
+              );
+            }
+            data = Buffer.from(file.data);
+          }
+          data ??= await this.downloadPublicSample(sample.url!);
+          await fs.writeFile(
+            path.join(
+              sampleDir,
+              `input-${String(index).padStart(3, '0')}${sample.fileExtension}`,
+            ),
+            data,
+          );
+        }
+        await fs.writeFile(
+          detectorsFile,
+          JSON.stringify([detectorEntry], null, 2),
+        );
+        const cliPath = this.getCliPath();
+        const venvPath = process.env.VENV_PATH
+          ? path.normalize(process.env.VENV_PATH)
+          : path.join(cliPath, '.venv');
+        const venvPython =
+          process.platform === 'win32'
+            ? path.join(venvPath, 'Scripts', 'python.exe')
+            : path.join(venvPath, 'bin', 'python');
+        const command =
+          `cd ${shellEscape(cliPath)} && ` +
+          `uv run --locked --no-dev --python ${shellEscape(venvPython)} ` +
+          `python -m src.main evaluate-file ${shellEscape(sampleDir)} --detectors-file ${shellEscape(detectorsFile)}`;
+        const result = await execAsync(command, { timeout: 180_000 });
+        stdout = result.stdout;
+      } finally {
+        await fs
+          .rm(sampleDir, { recursive: true, force: true })
+          .catch(() => undefined);
+        await fs.unlink(detectorsFile).catch(() => undefined);
+      }
+    }
+
+    const parsed = parseCliBatchOutput(stdout);
+    if (parsed.detectorErrors.length > 0) {
+      throw new Error(
+        `Detector failed to initialize in CLI: ${parsed.detectorErrors.join('; ')}`,
+      );
+    }
+    if (parsed.evaluations.length !== samples.length) {
+      throw new Error(
+        `CLI returned ${parsed.evaluations.length} evaluations for ${samples.length} samples.`,
+      );
+    }
+    return parsed.evaluations.map((evaluation, index) => {
+      const findings = evaluation.findings;
+      const matched = findings.length > 0;
+      return {
+        label: samples[index].label,
+        expectedMatch: samples[index].expectedMatch,
+        matched,
+        expectationMet: matched === samples[index].expectedMatch,
+        findingsCount: findings.length,
+        findings,
+      };
+    });
   }
 
   private getCliPath(): string {
@@ -720,4 +1026,65 @@ function parseCliOutput(stdout: string): {
     }
   }
   return { findings: [], detectorErrors: [] };
+}
+
+function parseCliBatchOutput(stdout: string): {
+  evaluations: Array<{ findings: unknown[] }>;
+  detectorErrors: string[];
+} {
+  const lines = stdout.split('\n').filter((line) => line.trim().length > 0);
+  for (const line of lines) {
+    try {
+      const parsed = JSON.parse(line) as Record<string, unknown>;
+      if (!Array.isArray(parsed.evaluations)) continue;
+      return {
+        evaluations: parsed.evaluations.map((item) => {
+          const record = item as Record<string, unknown>;
+          return {
+            findings: Array.isArray(record.findings) ? record.findings : [],
+          };
+        }),
+        detectorErrors: Array.isArray(parsed.detector_errors)
+          ? parsed.detector_errors.map(String)
+          : [],
+      };
+    } catch {
+      // CLI logging can share stdout; keep looking for the result JSON line.
+    }
+  }
+  return { evaluations: [], detectorErrors: [] };
+}
+
+function isPrivateAddress(address: string): boolean {
+  const version = isIP(address);
+  if (version === 4) {
+    const [a, b, c] = address.split('.').map(Number);
+    return (
+      a === 0 ||
+      a === 10 ||
+      a === 127 ||
+      (a === 100 && b >= 64 && b <= 127) ||
+      (a === 169 && b === 254) ||
+      (a === 172 && b >= 16 && b <= 31) ||
+      (a === 192 && b === 0 && (c === 0 || c === 2)) ||
+      (a === 192 && b === 168) ||
+      (a === 198 && (b === 18 || b === 19 || (b === 51 && c === 100))) ||
+      (a === 203 && b === 0 && c === 113) ||
+      a >= 224
+    );
+  }
+  if (version === 6) {
+    const normalized = address.toLowerCase();
+    if (normalized === '::' || normalized === '::1') return true;
+    if (
+      /^f[cd]/.test(normalized) ||
+      /^fe[89a-f]/.test(normalized) ||
+      /^ff/.test(normalized) ||
+      /^2001:db8/.test(normalized)
+    )
+      return true;
+    const mapped = normalized.match(/::ffff:(\d+\.\d+\.\d+\.\d+)$/)?.[1];
+    return mapped ? isPrivateAddress(mapped) : false;
+  }
+  return true;
 }

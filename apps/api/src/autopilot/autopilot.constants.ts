@@ -385,6 +385,9 @@ export const MAX_DUPLICATE_PAIRS = 20;
 export const MAX_ASSET_SAMPLES = 25;
 export const MAX_ASSET_METADATA_PREVIEW_KEYS = 12;
 export const MAX_ASSET_METADATA_PREVIEW_LENGTH = 80;
+/** Only a few bounded extracted-text previews are included in an agent sample. */
+export const MAX_ASSET_CONTENT_SAMPLES = 8;
+export const MAX_ASSET_CONTENT_PREVIEW_LENGTH = 600;
 export const MAX_ASSET_TYPE_BUCKETS = 15;
 export const MAX_ASSET_METADATA_KEY_BUCKETS = 25;
 export const ASSET_PROFILE_SCAN_LIMIT = 5000;
