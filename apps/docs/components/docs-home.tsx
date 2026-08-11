@@ -131,7 +131,8 @@ const DIRECTORY: Array<{ name: string; blurb: string; href: string }> = [
   },
   {
     name: "Settings",
-    blurb: "Locale, AI providers, and the MCP server for your own tools.",
+    blurb:
+      "Locale, scan capacity, MCP and chat integrations, and workspace transfer.",
     href: "/settings/",
   },
 ];
