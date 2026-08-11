@@ -9,12 +9,18 @@ spec:
   instances: {{ .Values.postgres.cnpg.instances }}
   imageName: {{ .Values.postgres.cnpg.imageName | quote }}
   enableSuperuserAccess: false
-  {{- with .Values.postgres.cnpg.postgresql.parameters }}
+  {{- if or .Values.postgres.cnpg.postgresql.parameters .Values.postgres.cnpg.postgresql.sharedPreloadLibraries }}
   postgresql:
+    {{- with .Values.postgres.cnpg.postgresql.parameters }}
     parameters:
       {{- range $key, $value := . }}
       {{ $key }}: {{ $value | quote }}
       {{- end }}
+    {{- end }}
+    {{- with .Values.postgres.cnpg.postgresql.sharedPreloadLibraries }}
+    shared_preload_libraries:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
   {{- end }}
   storage:
     size: {{ .Values.postgres.cnpg.storage.size }}
@@ -29,4 +35,7 @@ spec:
         name: {{ include "classifyre.databaseSecretName" . }}
       postInitApplicationSQL:
         - CREATE EXTENSION IF NOT EXISTS vector
+        {{- if has "pg_stat_statements" .Values.postgres.cnpg.postgresql.sharedPreloadLibraries }}
+        - CREATE EXTENSION IF NOT EXISTS pg_stat_statements
+        {{- end }}
 {{- end }}

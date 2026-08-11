@@ -154,6 +154,17 @@ export class CustomDetectorExtractionsService {
       });
       return;
     }
+    // Value-equality, not hash-equality: rows created by the payload data
+    // migration carry a content_hash that is NOT stableJsonHash(pipelineResult),
+    // so probing by hash would miss them and write a duplicate payload. This
+    // lookup is what lets a migrated row be reused.
+    //
+    // It used to be a sequential scan — 105,368 of them on one namespace,
+    // comparing whole JSONB documents row by row — because no index could
+    // answer jsonb equality. The hash index added in
+    // 20260811100000_findings_index_coverage_for_charts_and_detectors makes it
+    // an index lookup (measured 18.2ms -> 0.031ms, 715 buffers -> 3) without
+    // changing which row is selected.
     const existingPayload = await client.extractionPayload.findFirst({
       where: {
         pipelineResult: {

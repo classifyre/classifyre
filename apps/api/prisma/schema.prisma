@@ -264,14 +264,21 @@ model Finding {
   @@index([sourceId])
   @@index([runnerId])
   @@index([detectorType])
-  @@index([customDetectorId])
+  // Detector usage stats group by detector and count distinct sources; the
+  // trailing sourceId keeps that an index-only scan. Supersedes the
+  // single-column [customDetectorId] index, which was a prefix of this one.
+  @@index([customDetectorId, sourceId])
   @@index([customDetectorKey])
   @@index([findingType])
   @@index([severity])
   @@index([status])
   @@index([detectionIdentity, status])
-  @@index([firstDetectedAt])
-  @@index([lastDetectedAt])
+  // Charts aggregate counts per (firstDetectedAt, severity, status) over a
+  // window. Carrying severity and status makes that aggregation index-only
+  // instead of 3M heap fetches. Supersedes the single-column [firstDetectedAt]
+  // index, which was a prefix of this one. [lastDetectedAt] is dropped: 0
+  // scans across all 17 namespace schemas and 436 MB.
+  @@index([firstDetectedAt, severity, status])
   @@index([resolvedAt])
   @@index([embedContentHash])
   @@index([assetId, lastDetectedAt(sort: Desc)])
@@ -405,6 +412,11 @@ model ExtractionPayload {
 
   extractions CustomDetectorExtraction[]
 
+  // Dedup probes this table by jsonb value-equality (migrated rows have a
+  // content_hash that is not derived from the payload, so they can only be
+  // found by value). Hash, not btree: btree entries cap at ~8191 bytes and a
+  // large payload would fail INSERT outright.
+  @@index([pipelineResult], type: Hash)
   @@map("extraction_payloads")
 }
 

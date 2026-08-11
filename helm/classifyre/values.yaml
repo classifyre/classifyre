@@ -934,8 +934,42 @@ postgres:
       # -- raising CNPG resource limits — shared_buffers/work_mem control how
       # -- Postgres itself uses the memory already granted to each instance.
       parameters:
-        shared_buffers: 512MB
+        # Sized for a namespaced install: ~1,100 tables / ~5,000 indexes means
+        # even the system catalog competes for buffers, and at 512MB a single
+        # findings index no longer fits — every dashboard count re-read it from
+        # disk. Raise alongside the CNPG memory limit, keeping roughly 25% of
+        # the instance's memory here.
+        shared_buffers: 2GB
         work_mem: 16MB
+        # Planner's view of total cache (PG + OS page cache), not an
+        # allocation. Left at the 4GB default the planner assumes almost
+        # nothing is cached and abandons index plans on large tables.
+        effective_cache_size: 6GB
+        # 4.0 models a spinning disk and biases the planner away from index
+        # scans; cluster storage is SSD-backed.
+        random_page_cost: "1.1"
+        # Vacuum maintains the visibility map, which is what lets index-only
+        # scans skip the heap. At 64MB a multi-GB table needs several index
+        # passes per vacuum.
+        maintenance_work_mem: 256MB
+        # Stock autovacuum is throttled to 2005 disk throughput and falls
+        # behind ingest; visibility-map coverage then decays and index-only
+        # scans silently degrade into heap fetches.
+        autovacuum_vacuum_cost_limit: "2000"
+        autovacuum_naptime: 15s
+        # One forgotten open transaction pins the vacuum horizon and makes
+        # autovacuum run continuously while reclaiming nothing.
+        idle_in_transaction_session_timeout: "300000"
+        # Aggregate query cost across the day. pg_stat_activity only shows the
+        # current instant, which is a different and much less useful list.
+        # Requires the preload below and is what makes the next regression
+        # diagnosable without hand-rolled sampling.
+        pg_stat_statements.max: "10000"
+        pg_stat_statements.track: top
+      # -- Libraries preloaded at postmaster start. Changing this restarts the
+      # -- cluster (CNPG performs a rolling restart).
+      sharedPreloadLibraries:
+        - pg_stat_statements
 
 networkPolicy:
   # -- Enable network policies for API and web pods.
