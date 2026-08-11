@@ -188,7 +188,7 @@ interface ManagedProcess {
 // and the user's other apps, so the scan pipeline must never size itself to
 // the whole machine (the CLI pool auto-sizes to cores-1 when unconstrained,
 // which froze the host during scans).
-function detectorWorkerCount(): number {
+export function detectorWorkerCount(): number {
   const cores = os.cpus().length;
   return Math.max(1, Math.min(4, Math.floor(cores / 2) - 1));
 }

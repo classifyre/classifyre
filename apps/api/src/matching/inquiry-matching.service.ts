@@ -54,6 +54,13 @@ const FINDING_SELECT = {
 const PREVIEW_CAP = 50;
 
 /**
+ * Rows per batch when a preview has to scan because regexes cannot be pushed
+ * into SQL. Large enough that a big match set costs few round trips, small
+ * enough that no single batch is a heap risk.
+ */
+const PREVIEW_SCAN_BATCH = 5000;
+
+/**
  * Candidate rows a bounded probe will pull before giving up. Sized so the
  * autopilot's evidence floor stays cheap enough to run inside a tool call while
  * still being decisive for any matcher narrow enough to be worth monitoring.
@@ -556,8 +563,8 @@ export class InquiryMatchingService {
 
   /** Compute (without persisting) the findings a matcher config currently selects. */
   async preview(matchers: InquiryMatchers): Promise<PreviewResponseDto> {
-    const rows = await this.candidateFindings(matchers, true);
-    const sample: InquiryMatchDto[] = rows.slice(0, PREVIEW_CAP).map((f) => ({
+    const rows = await this.previewRows(matchers);
+    const sample: InquiryMatchDto[] = rows.sample.map((f) => ({
       findingId: f.id,
       label: f.findingType,
       severity: String(f.severity),
@@ -569,7 +576,107 @@ export class InquiryMatchingService {
       matchedAt: new Date(),
       isNew: false,
     }));
-    return { total: rows.length, sample };
+    return { total: rows.total, sample };
+  }
+
+  /**
+   * Total matched count plus the first `PREVIEW_CAP` rows, without ever
+   * materialising the whole match set.
+   *
+   * The previous implementation ran an unbounded `findMany` — every OPEN
+   * finding the SQL prefilter allowed, each carrying `matchedContent` plus an
+   * `asset` and `evidenceAnalysis` join — and then threw away all but 50 rows.
+   * On a 3.1M-finding corpus that was a 22.7s query whose only real output was
+   * a number and a 50-row sample.
+   *
+   * Two paths, because only one of them actually needs to see the rows:
+   *
+   *  - No regex dimensions configured → the SQL `where` built by
+   *    `candidateWhere` is already an exact expression of the matcher (see the
+   *    dimension-by-dimension correspondence in `CompiledMatcher.matches`), so
+   *    `matcher.matches` would return true for every row the database
+   *    returned. The count is therefore a `COUNT(*)` and the sample a
+   *    `take: PREVIEW_CAP`.
+   *  - Regexes configured → they cannot be pushed into SQL, so the rows must
+   *    still be examined. But they are streamed in id-ordered batches
+   *    selecting only the columns the matcher reads, and the expensive joins
+   *    are fetched afterwards for the ≤50 rows actually rendered.
+   */
+  private async previewRows(
+    m: InquiryMatchers,
+  ): Promise<{ total: number; sample: FindingRow[] }> {
+    const where = this.candidateWhere(m);
+    const previewSelect = {
+      ...FINDING_SELECT,
+      asset: { select: { name: true, sourceType: true } },
+      evidenceAnalysis: {
+        select: {
+          importanceScore: true,
+          qualityScore: true,
+          similarCount: true,
+          duplicateGroupHash: true,
+          reasons: true,
+        },
+      },
+    } as const;
+
+    if (m.findingTypeRegex.length === 0 && m.findingValueRegex.length === 0) {
+      const [total, sample] = await Promise.all([
+        this.prisma.finding.count({ where }),
+        this.prisma.finding.findMany({
+          where,
+          take: PREVIEW_CAP,
+          select: previewSelect,
+        }),
+      ]);
+      return { total, sample };
+    }
+
+    const matcher = new CompiledMatcher(m);
+    // Only the dimensions the matcher actually reads. `matchedContent` is the
+    // large column here, so it is pulled only when a value regex needs it.
+    const scanSelect = {
+      id: true,
+      sourceId: true,
+      detectorType: true,
+      customDetectorKey: true,
+      findingType: true,
+      ...(m.findingValueRegex.length > 0 ? { matchedContent: true } : {}),
+    } as const;
+
+    let total = 0;
+    const sampleIds: string[] = [];
+    let cursor: string | null = null;
+    for (;;) {
+      const batch = await this.prisma.finding.findMany({
+        where: { ...where, ...(cursor ? { id: { gt: cursor } } : {}) },
+        select: scanSelect,
+        orderBy: { id: 'asc' },
+        take: PREVIEW_SCAN_BATCH,
+      });
+      if (batch.length === 0) break;
+      for (const row of batch) {
+        if (!matcher.matches(row as FindingCandidate)) continue;
+        total++;
+        if (sampleIds.length < PREVIEW_CAP) sampleIds.push(row.id);
+      }
+      cursor = batch[batch.length - 1]!.id;
+      if (batch.length < PREVIEW_SCAN_BATCH) break;
+    }
+
+    if (sampleIds.length === 0) return { total, sample: [] };
+    const sample = await this.prisma.finding.findMany({
+      where: { id: { in: sampleIds } },
+      select: previewSelect,
+    });
+    // Restore the id order the scan established; `IN (…)` does not preserve it.
+    const byId = new Map(sample.map((row) => [row.id, row]));
+    return {
+      total,
+      sample: sampleIds
+        .map((id) => byId.get(id))
+        .filter((row): row is (typeof sample)[number] => row != null),
+    };
   }
 
   // ─── Private ─────────────────────────────────────────────────────
@@ -585,12 +692,13 @@ export class InquiryMatchingService {
     findingValueRegex: true,
   } satisfies Prisma.InquirySelect;
 
-  /** SQL-prefilter by source/detector/exact-type, then app-filter (regex) via the matcher. */
-  private async candidateFindings(
-    m: InquiryMatchers,
-    withAsset: boolean,
-    scanLimit?: number,
-  ): Promise<FindingRow[]> {
+  /**
+   * The SQL half of a matcher: source, detector and (when safe) exact type.
+   *
+   * Shared by the scanning paths and by `previewRows`, so the fast count path
+   * can never drift from the predicate the scanning path applies.
+   */
+  private candidateWhere(m: InquiryMatchers): Prisma.FindingWhereInput {
     const hasDetectorFilter =
       m.detectorTypes.length > 0 || m.customDetectorKeys.length > 0;
     const where: Prisma.FindingWhereInput = { status: 'OPEN' };
@@ -613,6 +721,16 @@ export class InquiryMatchingService {
     ) {
       where.findingType = { in: m.findingTypes };
     }
+    return where;
+  }
+
+  /** SQL-prefilter by source/detector/exact-type, then app-filter (regex) via the matcher. */
+  private async candidateFindings(
+    m: InquiryMatchers,
+    withAsset: boolean,
+    scanLimit?: number,
+  ): Promise<FindingRow[]> {
+    const where = this.candidateWhere(m);
 
     const rows = (await this.prisma.finding.findMany({
       where,

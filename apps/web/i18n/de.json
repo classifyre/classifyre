@@ -13,6 +13,8 @@
     "title": "Arbeitsbereiche",
     "subtitle": "Wähle einen isolierten Arbeitsbereich, um eine Ermittlung fortzusetzen, oder lege einen neuen Fall an.",
     "all": "Alle Arbeitsbereiche",
+    "activeTabsLabel": "Aktive Arbeitsbereiche",
+    "closeTabAria": "{{name}} deaktivieren",
     "new": "Neuer Arbeitsbereich",
     "loading": "Arbeitsbereiche werden geladen",
     "loadFailed": "Arbeitsbereiche konnten nicht geladen werden",

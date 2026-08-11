@@ -8,6 +8,7 @@ import { CookieConsent } from "@/components/cookie-consent";
 import { DemoModeBlockedDialog } from "@/components/demo-mode-blocked-dialog";
 import { InstanceSettingsProvider } from "@/components/instance-settings-provider";
 import { PostHogProvider } from "@/components/posthog-provider";
+import { ActiveNamespacesProvider } from "@/components/active-namespaces-provider";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
@@ -19,16 +20,18 @@ export function Providers({ children }: { children: React.ReactNode }) {
         disableTransitionOnChange
         enableColorScheme
       >
-        <InstanceSettingsProvider>
-          <AssistantWorkflowProvider>
-            {children}
-            <DemoModeBlockedDialog />
-            {/* Inside InstanceSettingsProvider so the bar speaks the same
-                language as the rest of the app. */}
-            <CookieConsent />
-            <Toaster />
-          </AssistantWorkflowProvider>
-        </InstanceSettingsProvider>
+        <ActiveNamespacesProvider>
+          <InstanceSettingsProvider>
+            <AssistantWorkflowProvider>
+              {children}
+              <DemoModeBlockedDialog />
+              {/* Inside InstanceSettingsProvider so the bar speaks the same
+                  language as the rest of the app. */}
+              <CookieConsent />
+              <Toaster />
+            </AssistantWorkflowProvider>
+          </InstanceSettingsProvider>
+        </ActiveNamespacesProvider>
       </NextThemesProvider>
     </PostHogProvider>
   );

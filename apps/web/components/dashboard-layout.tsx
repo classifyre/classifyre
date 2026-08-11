@@ -43,6 +43,7 @@ import {
   ServerConfigContext,
   useServerConfig,
 } from "./server-config-provider";
+import { ActiveNamespaceTabs } from "./namespace/active-namespace-tabs";
 
 function formatSegmentLabel(
   segment: string,
@@ -306,6 +307,7 @@ export function DashboardLayout({
           <DocumentTitleUpdater />
           <AppSidebar />
           <SidebarInset className="min-w-0 overflow-x-clip">
+            <ActiveNamespaceTabs />
             <header className="flex h-16 shrink-0 items-center justify-between gap-2 border-b px-4">
               <div className="flex min-w-0 items-center gap-2">
                 <SidebarTrigger className="-ml-1 size-7" />

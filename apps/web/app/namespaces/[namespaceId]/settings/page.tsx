@@ -18,6 +18,7 @@ import { Textarea } from "@workspace/ui/components/textarea";
 import { WorkspaceHeader } from "@/components/namespace/workspace-header";
 import { ThumbnailPicker } from "@/components/namespace/thumbnail-picker";
 import { useTranslation } from "@/hooks/use-translation";
+import { useActiveNamespaces } from "@/components/active-namespaces-provider";
 import { useStaticRouteParam } from "@/lib/use-route-id";
 
 const SLUG_MAX_LENGTH = 50;
@@ -39,6 +40,7 @@ export default function NamespaceSettingsPage() {
   const namespaceId = useStaticRouteParam("namespaceId", "namespaces");
   const router = useRouter();
   const { t } = useTranslation();
+  const { update: updateActiveNamespace } = useActiveNamespaces();
   const [namespace, setNamespace] = React.useState<Namespace | null>(null);
   const [name, setName] = React.useState("");
   const [slug, setSlug] = React.useState("");
@@ -95,6 +97,7 @@ export default function NamespaceSettingsPage() {
         // `null` clears it, `undefined` leaves it untouched.
         ...(thumbnailChanged ? { thumbnail } : {}),
       });
+      updateActiveNamespace(updated, namespace.slug);
       setNamespace(updated);
       setName(updated.name);
       setSlug(updated.slug);

@@ -42,6 +42,13 @@ type JsonRecord = Record<string, unknown>;
 type DetectorUsageStats = {
   sourcesUsingCount: number;
   sourcesWithFindingsCount: number;
+  /**
+   * Findings attributed to this detector. Comes from the same grouped scan as
+   * `sourcesWithFindingsCount` rather than Prisma's `_count: { findings }`,
+   * which compiles to a correlated per-detector subquery (~18.7s on a corpus
+   * with 3.1M findings).
+   */
+  findingsCount: number;
   recentSourceNames: string[];
   sourcesUsing: Array<{ id: string; name: string }>;
 };
@@ -891,7 +898,6 @@ export class CustomDetectorsService {
   private toResponse(
     detector: CustomDetector & {
       trainingRuns?: CustomDetectorTrainingRun[];
-      _count?: { findings?: number };
     },
     usage?: DetectorUsageStats,
   ): CustomDetectorResponseDto {
@@ -911,7 +917,7 @@ export class CustomDetectorsService {
         unknown
       > | null,
       latestTrainingRun: latestRun ? this.toTrainingRunDto(latestRun) : null,
-      findingsCount: detector._count?.findings ?? 0,
+      findingsCount: usage?.findingsCount ?? 0,
       sourcesUsingCount: usage?.sourcesUsingCount ?? 0,
       sourcesWithFindingsCount: usage?.sourcesWithFindingsCount ?? 0,
       recentSourceNames: usage?.recentSourceNames ?? [],
@@ -974,17 +980,27 @@ export class CustomDetectorsService {
       map.set(row.detector_id, {
         sourcesUsingCount: Number(row.source_count ?? 0),
         sourcesWithFindingsCount: 0,
+        findingsCount: 0,
         recentSourceNames: names.slice(0, 5),
         sourcesUsing: sourcesUsing.slice(0, 5),
       });
     }
 
+    // One grouped pass over the detector's findings answers both "how many
+    // sources produced findings" and "how many findings" — the latter used to
+    // be a separate `_count: { select: { findings: true } }` on every read
+    // path, which Prisma compiles into a correlated subquery per detector.
     const findingsUsageRows = await this.prisma.$queryRaw<
-      Array<{ detector_id: string; sources_with_findings_count: number }>
+      Array<{
+        detector_id: string;
+        sources_with_findings_count: number;
+        findings_count: number;
+      }>
     >(Prisma.sql`
       SELECT
         custom_detector_id AS detector_id,
-        COUNT(DISTINCT source_id)::int AS sources_with_findings_count
+        COUNT(DISTINCT source_id)::int AS sources_with_findings_count,
+        COUNT(*)::int AS findings_count
       FROM findings
       WHERE custom_detector_id IN (${Prisma.join(detectorIdSql)})
       GROUP BY custom_detector_id
@@ -994,12 +1010,14 @@ export class CustomDetectorsService {
       const existing = map.get(row.detector_id) ?? {
         sourcesUsingCount: 0,
         sourcesWithFindingsCount: 0,
+        findingsCount: 0,
         recentSourceNames: [],
         sourcesUsing: [],
       };
       map.set(row.detector_id, {
         ...existing,
         sourcesWithFindingsCount: Number(row.sources_with_findings_count ?? 0),
+        findingsCount: Number(row.findings_count ?? 0),
       });
     }
 
@@ -1017,7 +1035,6 @@ export class CustomDetectorsService {
           orderBy: { createdAt: 'desc' },
           take: 1,
         },
-        _count: { select: { findings: true } },
       },
       orderBy: [{ updatedAt: 'desc' }, { createdAt: 'desc' }],
     });
@@ -1039,7 +1056,6 @@ export class CustomDetectorsService {
           orderBy: { createdAt: 'desc' },
           take: 1,
         },
-        _count: { select: { findings: true } },
       },
     });
 
@@ -1075,7 +1091,6 @@ export class CustomDetectorsService {
         } as any,
         include: {
           trainingRuns: { orderBy: { createdAt: 'desc' }, take: 1 },
-          _count: { select: { findings: true } },
         },
       });
     } catch (error) {
@@ -1150,7 +1165,6 @@ export class CustomDetectorsService {
         } as any,
         include: {
           trainingRuns: { orderBy: { createdAt: 'desc' }, take: 1 },
-          _count: { select: { findings: true } },
         },
       });
     } catch (error) {
@@ -1166,7 +1180,11 @@ export class CustomDetectorsService {
       await this.propagateDetectorKeyRename(id, existing.key, nextKey);
     }
 
-    return this.toResponse(detector);
+    // An existing detector can already own findings, so the response still
+    // needs a real `findingsCount` — resolved from the grouped usage query
+    // rather than the correlated `_count` this used to include.
+    const usageByDetector = await this.buildUsageStats([id]);
+    return this.toResponse(detector, usageByDetector.get(id));
   }
 
   async delete(id: string): Promise<{ deleted: true }> {

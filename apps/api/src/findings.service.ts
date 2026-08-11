@@ -1489,16 +1489,27 @@ export class FindingsService {
       firstDetectedAt: { gte: windowStart },
     };
 
-    // Parallel: (1) light projection for totals+timeline, (2) groupBy for top assets
-    const [findings, topAssetGroups] = await Promise.all([
-      this.prisma.finding.findMany({
+    // Parallel: (1) pre-aggregated counts for totals+timeline, (2) groupBy for
+    // top assets.
+    //
+    // (1) used to be a findMany with no `take`, which streamed every finding in
+    // the window into Node purely to increment counters — 3.18M rows and ~67s
+    // on a real corpus, and a heap risk on top of that. The counting now
+    // happens in Postgres.
+    //
+    // Grouping by the raw `firstDetectedAt` rather than a truncated day is
+    // deliberate: the day buckets below are computed with `startOfDay`, which
+    // uses the API process's LOCAL timezone. `date_trunc('day', …)` in
+    // Postgres would bucket by the server's TimeZone instead and silently move
+    // findings between days across a DST boundary. Grouping on the exact
+    // timestamp keeps bucketing byte-identical to the previous implementation
+    // while still collapsing ~3.18M rows to ~67k (distinct timestamps are
+    // assigned per ingest batch, not per finding).
+    const [findingGroups, topAssetGroups] = await Promise.all([
+      this.prisma.finding.groupBy({
+        by: ['firstDetectedAt', 'severity', 'status'],
         where,
-        select: {
-          severity: true,
-          status: true,
-          firstDetectedAt: true,
-          assetId: true,
-        },
+        _count: { _all: true },
       }),
       this.prisma.finding.groupBy({
         by: ['assetId'],
@@ -1554,30 +1565,35 @@ export class FindingsService {
       });
     }
 
-    for (const f of findings) {
-      if (!f.firstDetectedAt) continue;
-      const sev = (f.severity ?? 'INFO') as string;
-      const st = (f.status ?? 'OPEN') as string;
+    // Each group carries the count of findings sharing one
+    // (firstDetectedAt, severity, status) triple, so every `++` below becomes
+    // `+= n`. Ordering of the increments is unchanged, and a group whose
+    // firstDetectedAt is null is skipped exactly as the per-row loop did.
+    for (const g of findingGroups) {
+      if (!g.firstDetectedAt) continue;
+      const n = g._count._all;
+      const sev = (g.severity ?? 'INFO') as string;
+      const st = (g.status ?? 'OPEN') as string;
 
-      totals.total++;
-      if (sev === 'CRITICAL') totals.critical++;
-      else if (sev === 'HIGH') totals.high++;
-      else if (sev === 'MEDIUM') totals.medium++;
-      else if (sev === 'LOW') totals.low++;
-      else totals.info++;
+      totals.total += n;
+      if (sev === 'CRITICAL') totals.critical += n;
+      else if (sev === 'HIGH') totals.high += n;
+      else if (sev === 'MEDIUM') totals.medium += n;
+      else if (sev === 'LOW') totals.low += n;
+      else totals.info += n;
 
-      if (st === 'OPEN') totals.open++;
-      else if (st === 'RESOLVED') totals.resolved++;
+      if (st === 'OPEN') totals.open += n;
+      else if (st === 'RESOLVED') totals.resolved += n;
 
-      const key = this.formatDateKey(this.startOfDay(f.firstDetectedAt));
+      const key = this.formatDateKey(this.startOfDay(g.firstDetectedAt));
       const bucket = dayMap.get(key);
       if (bucket) {
-        bucket.total++;
-        if (sev === 'CRITICAL') bucket.critical++;
-        else if (sev === 'HIGH') bucket.high++;
-        else if (sev === 'MEDIUM') bucket.medium++;
-        else if (sev === 'LOW') bucket.low++;
-        else bucket.info++;
+        bucket.total += n;
+        if (sev === 'CRITICAL') bucket.critical += n;
+        else if (sev === 'HIGH') bucket.high += n;
+        else if (sev === 'MEDIUM') bucket.medium += n;
+        else if (sev === 'LOW') bucket.low += n;
+        else bucket.info += n;
       }
     }
 

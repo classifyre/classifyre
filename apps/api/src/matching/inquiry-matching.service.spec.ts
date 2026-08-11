@@ -8,7 +8,7 @@ describe('InquiryMatchingService', () => {
 
   const mockPrisma = {
     inquiry: { findMany: jest.fn(), findUnique: jest.fn(), update: jest.fn() },
-    finding: { findMany: jest.fn() },
+    finding: { findMany: jest.fn(), count: jest.fn() },
   };
   const mockPgBoss = {};
 
@@ -321,6 +321,10 @@ describe('InquiryMatchingService', () => {
   });
 
   it('preview returns total + a capped sample without persisting', async () => {
+    // No regex dimensions configured, so the SQL where fully expresses the
+    // matcher: the total comes from COUNT(*) rather than from materialising
+    // and filtering every matching row.
+    mockPrisma.finding.count.mockResolvedValue(1);
     mockPrisma.finding.findMany.mockResolvedValue([
       {
         id: 'f1',
@@ -350,6 +354,62 @@ describe('InquiryMatchingService', () => {
       label: 'ssn',
       assetName: 'a.csv',
     });
+    expect(mockPrisma.inquiry.update).not.toHaveBeenCalled();
+  });
+
+  it('preview counts every regex match but only hydrates the capped sample', async () => {
+    // A value regex cannot be pushed into SQL, so this path must scan. What it
+    // must NOT do is materialise the whole match set: the total is counted as
+    // rows stream past, and the expensive asset/evidence joins are fetched
+    // only for the ids that will actually be rendered.
+    const scanned = Array.from({ length: 120 }, (_, i) => ({
+      id: `f${i}`,
+      sourceId: 's1',
+      detectorType: 'PII',
+      customDetectorKey: null,
+      findingType: 'ssn',
+      // Half the rows match the value regex below.
+      matchedContent: i % 2 === 0 ? 'hit-value' : 'miss',
+    }));
+
+    mockPrisma.finding.findMany
+      // First call: the lean scan batch.
+      .mockResolvedValueOnce(scanned)
+      // Second call: hydration of the sampled ids only.
+      .mockResolvedValueOnce(
+        scanned
+          .filter((_, i) => i % 2 === 0)
+          .slice(0, 50)
+          .map((row) => ({
+            ...row,
+            assetId: 'a1',
+            severity: 'HIGH',
+            createdAt: new Date(),
+            asset: { name: 'a.csv', sourceType: 'S3_COMPATIBLE_STORAGE' },
+          })),
+      );
+
+    const result = await service.preview({
+      matchAllSources: true,
+      sourceIds: [],
+      detectorTypes: [],
+      customDetectorKeys: [],
+      findingTypes: [],
+      findingTypeRegex: [],
+      findingValueRegex: ['^hit-'],
+    });
+
+    // 60 of the 120 scanned rows match, and all 60 are counted...
+    expect(result.total).toBe(60);
+    // ...but only PREVIEW_CAP of them are hydrated and returned.
+    expect(result.sample).toHaveLength(50);
+    expect(result.sample[0]).toMatchObject({ findingId: 'f0' });
+
+    // The count never went through COUNT(*) here — the regex forced a scan.
+    expect(mockPrisma.finding.count).not.toHaveBeenCalled();
+    // Hydration asked for exactly the sampled ids, not the whole match set.
+    const hydrateArgs = mockPrisma.finding.findMany.mock.calls[1][0];
+    expect(hydrateArgs.where.id.in).toHaveLength(50);
     expect(mockPrisma.inquiry.update).not.toHaveBeenCalled();
   });
 
