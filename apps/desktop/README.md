@@ -197,13 +197,23 @@ CLASSIFYRE_APP_PATH=out/Classifyre-darwin-arm64/Classifyre.app/Contents/MacOS/cl
 
 | Platform | Runner | Artifact |
 |----------|--------|----------|
-| macOS arm64 | `macos-latest` | `.dmg` |
-| macOS x64 | `macos-15-intel` | `.dmg` |
-| Windows x64 | `windows-latest` | `.zip` (portable) |
+| macOS arm64 | `macos-15` | `.dmg` + updater `.zip` |
+| Windows x64 | `windows-latest` | Runnable app directory (`classifyre-desktop.exe` + dependencies) |
 | Linux amd64 | `ubuntu-latest` | `.deb` + `.rpm` |
 | Linux arm64 | `ubuntu-24.04-arm` | `.deb` + `.rpm` |
 
-Each job stages resources with the same `stage-resources.sh` as local builds, packages, ad-hoc signs (macOS), **smoke-tests the packaged binary** (boots the app and waits for the API-backed workspace directory), then creates and uploads installers.
+Each job stages resources with the same `stage-resources.sh` as local builds,
+packages, signs macOS, and **smoke-tests the packaged binary**. Non-Windows
+jobs then create and upload installers; Windows uploads the tested package
+directory itself.
+
+GitHub always downloads a workflow artifact as an outer ZIP. For
+`desktop-win-x64`, that outer archive now contains `classifyre-desktop.exe` and
+the adjacent DLLs and `resources/` directory directly; there is no nested
+portable ZIP to unpack a second time. Keep the whole directory together when
+running the app. Tagged GitHub Releases still expose one portable Windows ZIP,
+reconstructed from this exact smoke-tested workflow artifact so the in-app
+updater can download it as a single file.
 
 ## Updates
 
