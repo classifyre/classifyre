@@ -1,6 +1,10 @@
 import { KubernetesCliJobService } from './kubernetes-cli-job.service';
 import type { InstanceSettingsService } from '../instance-settings.service';
 import { InternalApiKeyService } from '../internal-api-key.service';
+import { execFileSync } from 'child_process';
+import { mkdtempSync, readFileSync, rmSync } from 'fs';
+import { tmpdir } from 'os';
+import { join } from 'path';
 
 jest.mock('@kubernetes/client-node', () => ({
   KubeConfig: class {
@@ -428,6 +432,93 @@ describe('KubernetesCliJobService', () => {
     expect(
       init.env?.find((e: any) => e.name === 'EVALUATION_INPUT_URL')?.value,
     ).toContain('/custom-detectors/detector-1/test-scenarios/scenario-1/input');
+  });
+
+  it('transports a positive/counterexample batch into one evaluation job', async () => {
+    const service = new KubernetesCliJobService(
+      mockInstanceSettings(),
+      new InternalApiKeyService(),
+    );
+    const inputs = [
+      { url: 'data:text/plain;base64,cG9zaXRpdmU=', fileExtension: '.txt' },
+      { url: 'https://cdn.example.test/counter.png', fileExtension: '.png' },
+    ];
+    const encoded = Buffer.from(JSON.stringify(inputs), 'utf8').toString(
+      'base64',
+    );
+    const job = await (service as any).buildJobFromTemplate(
+      {
+        apiVersion: 'batch/v1',
+        kind: 'Job',
+        spec: {
+          template: {
+            spec: {
+              containers: [{ name: 'cli', image: 'cli:latest' }],
+            },
+          },
+        },
+      },
+      {
+        sourceId: 'batch-test',
+        mode: 'evaluation',
+        evaluationInputsB64: encoded,
+        evaluationDetectorsB64: 'W10=',
+      },
+    );
+
+    const podSpec = job.spec.template.spec;
+    const mainEnv = podSpec.containers[0].env;
+    expect(
+      mainEnv.find((item: any) => item.name === 'EVALUATION_INPUTS_B64')?.value,
+    ).toBe(encoded);
+    const init = podSpec.initContainers[0];
+    expect(
+      init.env.find((item: any) => item.name === 'EVALUATION_INPUTS_B64')
+        ?.value,
+    ).toBe(encoded);
+    expect(init.args[0]).toContain('input-{index:03d}');
+    expect(init.args[0]).toContain('SafeRedirect');
+    expect(podSpec.containers[0].args[0]).toContain(
+      'EVALUATION_PATH=/evaluation-input',
+    );
+  });
+
+  it('materializes every batched data URL with its original extension', () => {
+    const service = new KubernetesCliJobService(
+      mockInstanceSettings(),
+      new InternalApiKeyService(),
+    );
+    const directory = mkdtempSync(join(tmpdir(), 'evaluation-input-'));
+    const inputs = [
+      { url: 'data:text/plain;base64,cG9zaXRpdmU=', fileExtension: '.txt' },
+      {
+        url: 'data:application/octet-stream;base64,AAEC',
+        fileExtension: '.bin',
+      },
+    ];
+    try {
+      execFileSync(
+        '/bin/sh',
+        ['-lc', (service as any).buildEvaluationFetchCommand(directory)],
+        {
+          env: {
+            ...process.env,
+            EVALUATION_INPUTS_B64: Buffer.from(
+              JSON.stringify(inputs),
+              'utf8',
+            ).toString('base64'),
+          },
+        },
+      );
+      expect(readFileSync(join(directory, 'input-000.txt'), 'utf8')).toBe(
+        'positive',
+      );
+      expect(readFileSync(join(directory, 'input-001.bin'))).toEqual(
+        Buffer.from([0, 1, 2]),
+      );
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
   });
 
   it('strips server-generated identity fields from a captured-job template', async () => {

@@ -658,7 +658,7 @@ def run_train_command(args: argparse.Namespace) -> None:
 
 
 def run_evaluate_file_command(args: argparse.Namespace) -> None:
-    """Evaluate detector configs against one ephemeral local file."""
+    """Evaluate detector configs against one file or a directory of samples."""
     from .file_evaluation import FileEvaluationRunner
 
     file_path_str: str | None = args.recipe
@@ -689,15 +689,29 @@ def run_evaluate_file_command(args: argparse.Namespace) -> None:
 
     try:
         runner = FileEvaluationRunner(detectors)
-        parsed, findings = runner.run(file_path)
-        if parsed.parse_error:
-            logger.warning("File parse warning: %s", parsed.parse_error)
-        output: dict[str, Any] = {
-            "mime_type": parsed.mime_type,
-            "findings": [f.model_dump(mode="json") for f in findings],
-        }
-        if parsed.parse_error:
-            output["parse_error"] = parsed.parse_error
+        if file_path.is_dir():
+            evaluations: list[dict[str, Any]] = []
+            for sample_path in sorted(p for p in file_path.iterdir() if p.is_file()):
+                parsed, findings = runner.run(sample_path)
+                item: dict[str, Any] = {
+                    "name": sample_path.name,
+                    "mime_type": parsed.mime_type,
+                    "findings": [f.model_dump(mode="json") for f in findings],
+                }
+                if parsed.parse_error:
+                    item["parse_error"] = parsed.parse_error
+                evaluations.append(item)
+            output = {"evaluations": evaluations}
+        else:
+            parsed, findings = runner.run(file_path)
+            if parsed.parse_error:
+                logger.warning("File parse warning: %s", parsed.parse_error)
+            output = {
+                "mime_type": parsed.mime_type,
+                "findings": [f.model_dump(mode="json") for f in findings],
+            }
+            if parsed.parse_error:
+                output["parse_error"] = parsed.parse_error
         if runner.detector_errors:
             output["detector_errors"] = runner.detector_errors
         print(json.dumps(_sanitize_for_json(output), ensure_ascii=False))

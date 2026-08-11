@@ -361,6 +361,8 @@ export interface AssetSampleSummary {
   url: string | null;
   metadataKeys: string[];
   metadataPreview: Record<string, string>;
+  /** Redacted extracted content, when an AssetChunk is available. */
+  contentPreview: string | null;
 }
 
 /**

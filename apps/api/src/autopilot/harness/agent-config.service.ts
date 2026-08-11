@@ -49,7 +49,7 @@ export interface UpdateAgentInput {
  * Resolves an agent's effective mission by merging its optional AgentConfig row
  * over the hardcoded factory default (missions.ts), and exposes the read/write
  * surface the Harness → Agents UI uses. The enable flag is bridged to the
- * existing InstanceSettings master switches the worker already honours, so this
+ * corresponding InstanceSettings agent flag the worker honours, so this
  * service is the single place agent configuration is interpreted.
  */
 @Injectable()

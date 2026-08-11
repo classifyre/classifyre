@@ -708,8 +708,6 @@ model Notification {
 
 model InstanceSettings {
   id                 Int                @id @default(1)
-  aiEnabled          Boolean            @default(true) @map("ai_enabled")
-  harnessEnabled     Boolean            @default(true) @map("harness_enabled")
   mcpEnabled         Boolean            @default(true) @map("mcp_enabled")
   language           InstanceLanguage   @default(AUTOMATIC)
   timezone           String             @default("AUTOMATIC")

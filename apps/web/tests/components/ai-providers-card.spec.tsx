@@ -24,13 +24,9 @@ type StoredProvider = {
 function baseSettings(
   aiProviderConfigId: string | null,
   harnessAiProviderConfigId: string | null,
-  aiEnabled = true,
-  harnessEnabled = true,
 ) {
   return {
     id: 1,
-    aiEnabled,
-    harnessEnabled,
     mcpEnabled: true,
     language: "ENGLISH",
     timezone: "UTC",
@@ -47,8 +43,6 @@ async function mockApi(page: CtPage, initial: StoredProvider[]) {
   const providers = [...initial];
   let assistantId: string | null = null;
   let harnessId: string | null = null;
-  let assistantEnabled = true;
-  let harnessEnabled = true;
   const createPayloads: Array<Record<string, unknown>> = [];
   let testCalls = 0;
   let capabilityTestCalls = 0;
@@ -56,8 +50,6 @@ async function mockApi(page: CtPage, initial: StoredProvider[]) {
   await page.route("**/instance-settings", async (route) => {
     if (route.request().method() === "PUT") {
       const payload = (route.request().postDataJSON() ?? {}) as {
-        aiEnabled?: boolean;
-        harnessEnabled?: boolean;
         aiProviderConfigId?: string | null;
         harnessAiProviderConfigId?: string | null;
       };
@@ -67,18 +59,12 @@ async function mockApi(page: CtPage, initial: StoredProvider[]) {
       if ("harnessAiProviderConfigId" in payload) {
         harnessId = payload.harnessAiProviderConfigId ?? null;
       }
-      if ("aiEnabled" in payload) {
-        assistantEnabled = payload.aiEnabled ?? true;
-      }
-      if ("harnessEnabled" in payload) {
-        harnessEnabled = payload.harnessEnabled ?? true;
-      }
     }
     await route.fulfill({
       status: 200,
       contentType: "application/json",
       body: JSON.stringify(
-        baseSettings(assistantId, harnessId, assistantEnabled, harnessEnabled),
+        baseSettings(assistantId, harnessId),
       ),
     });
   });
@@ -295,8 +281,6 @@ async function mockApi(page: CtPage, initial: StoredProvider[]) {
     getCreatePayloads: () => createPayloads,
     getAssistantId: () => assistantId,
     getHarnessId: () => harnessId,
-    getAssistantEnabled: () => assistantEnabled,
-    getHarnessEnabled: () => harnessEnabled,
     getTestCalls: () => testCalls,
     getCapabilityTestCalls: () => capabilityTestCalls,
   };
@@ -337,7 +321,7 @@ test("provider editing uses its dedicated page", async ({ mount, page }) => {
   );
 });
 
-test("Assistant and Harness can be enabled and assigned independently", async ({
+test("provider assignments enable and disable Assistant and Harness independently", async ({
   mount,
   page,
 }) => {
@@ -358,21 +342,74 @@ test("Assistant and Harness can be enabled and assigned independently", async ({
 
   const component = await mount(<AiProvidersCard />);
 
-  await component
-    .getByRole("switch", { name: "AI Assistant", exact: true })
-    .click();
-  await expect.poll(() => mock.getAssistantEnabled()).toBe(false);
-  expect(mock.getHarnessEnabled()).toBe(true);
+  await expect(
+    component.getByRole("switch", { name: "AI Assistant", exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    component.getByRole("switch", { name: "AI Harness", exact: true }),
+  ).toHaveCount(0);
 
-  await component
-    .getByRole("switch", { name: "Use for AI Assistant — Shared Claude" })
-    .click();
+  const assistant = component.getByRole("switch", {
+    name: "Use for AI Assistant — Shared Claude",
+  });
+  await assistant.click();
   await component
     .getByRole("switch", { name: "Use for AI Harness — Shared Claude" })
     .click();
 
   await expect.poll(() => mock.getAssistantId()).toBe("cfg-1");
   await expect.poll(() => mock.getHarnessId()).toBe("cfg-1");
+
+  await assistant.click();
+  await expect.poll(() => mock.getAssistantId()).toBeNull();
+  expect(mock.getHarnessId()).toBe("cfg-1");
+});
+
+test("assigning another provider replaces the previous role assignment", async ({
+  mount,
+  page,
+}) => {
+  const mock = await mockApi(page, [
+    {
+      id: "cfg-1",
+      name: "Primary Claude",
+      provider: "CLAUDE",
+      model: "claude-sonnet-4-5",
+      hasApiKey: true,
+      apiKeyPreview: "sk-c...1111",
+      baseUrl: null,
+      contextSize: 200000,
+      createdAt: "2026-03-10T00:00:00.000Z",
+      updatedAt: "2026-03-10T00:00:00.000Z",
+    },
+    {
+      id: "cfg-2",
+      name: "Backup Gemini",
+      provider: "GEMINI",
+      model: "gemini-2.0-flash",
+      hasApiKey: true,
+      apiKeyPreview: "AIza...2222",
+      baseUrl: null,
+      contextSize: 1000000,
+      createdAt: "2026-03-10T00:00:00.000Z",
+      updatedAt: "2026-03-10T00:00:00.000Z",
+    },
+  ]);
+
+  const component = await mount(<AiProvidersCard />);
+  const primary = component.getByRole("switch", {
+    name: "Use for AI Assistant — Primary Claude",
+  });
+  const backup = component.getByRole("switch", {
+    name: "Use for AI Assistant — Backup Gemini",
+  });
+
+  await primary.click();
+  await expect.poll(() => mock.getAssistantId()).toBe("cfg-1");
+  await backup.click();
+  await expect.poll(() => mock.getAssistantId()).toBe("cfg-2");
+  await expect(primary).not.toBeChecked();
+  await expect(backup).toBeChecked();
 });
 
 test("connection diagnostics explain a successful provider test", async ({

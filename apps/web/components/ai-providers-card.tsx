@@ -173,53 +173,6 @@ export function AiProvidersCard() {
       </CardHeader>
 
       <CardContent className="space-y-4">
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div className="flex items-start justify-between gap-4 rounded-[4px] border-2 border-border bg-muted/20 px-4 py-3">
-            <div className="space-y-1">
-              <p className="text-sm font-semibold">
-                {t("aiProvider.assistantEnabled")}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                {t("aiProvider.assistantEnabledDesc")}
-              </p>
-            </div>
-            <Switch
-              checked={settings.aiEnabled}
-              disabled={saving || roleSaving !== null}
-              onCheckedChange={(checked) =>
-                void updateFeature(
-                  { aiEnabled: checked },
-                  "assistant-enabled",
-                  t("aiProvider.featureSaved"),
-                )
-              }
-              aria-label={t("aiProvider.assistantEnabled")}
-            />
-          </div>
-          <div className="flex items-start justify-between gap-4 rounded-[4px] border-2 border-border bg-muted/20 px-4 py-3">
-            <div className="space-y-1">
-              <p className="text-sm font-semibold">
-                {t("aiProvider.harnessEnabled")}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                {t("aiProvider.harnessEnabledDesc")}
-              </p>
-            </div>
-            <Switch
-              checked={settings.harnessEnabled}
-              disabled={saving || roleSaving !== null}
-              onCheckedChange={(checked) =>
-                void updateFeature(
-                  { harnessEnabled: checked },
-                  "harness-enabled",
-                  t("aiProvider.featureSaved"),
-                )
-              }
-              aria-label={t("aiProvider.harnessEnabled")}
-            />
-          </div>
-        </div>
-
         {loading ? (
           <div className="flex min-h-24 items-center justify-center text-sm text-muted-foreground">
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />

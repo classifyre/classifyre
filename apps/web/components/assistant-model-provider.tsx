@@ -14,8 +14,6 @@ export function AssistantModelProvider({
   children,
 }: {
   children: React.ReactNode;
-  /** @deprecated no longer used — AI runs on the backend */
-  aiEnabled?: boolean;
 }) {
   const generateText = React.useCallback(
     async (messages: AiMessageDto[]): Promise<string> => {

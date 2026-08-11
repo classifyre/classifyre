@@ -57,8 +57,6 @@ type InstanceSettingsContextValue = {
 
 const DEFAULT_SETTINGS: InstanceSettingsResponse = {
   id: 1,
-  aiEnabled: true,
-  harnessEnabled: true,
   mcpEnabled: true,
   demoMode: false,
   language: InstanceSettingsResponseDtoLanguageEnum.Automatic,

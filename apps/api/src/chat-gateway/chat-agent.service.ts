@@ -97,8 +97,8 @@ export class ChatAgentService {
     const settings = await this.prisma.instanceSettings.findUnique({
       where: { id: 1 },
     });
-    if (!settings?.aiEnabled || !settings.aiProviderConfigId) {
-      return 'AI Assistant is not configured on this Classifyre instance. Enable it and assign an Assistant provider in Harness AI → Configuration first.';
+    if (!settings?.aiProviderConfigId) {
+      return 'AI Assistant is not configured on this Classifyre instance. Assign an Assistant provider in Harness AI → Configuration first.';
     }
 
     const session = await this.sessions.getOrCreateSession(

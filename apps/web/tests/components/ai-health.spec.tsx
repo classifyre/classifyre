@@ -83,8 +83,6 @@ test("global warning ignores Assistant state once Harness is healthy", async ({
       contentType: "application/json",
       body: JSON.stringify({
         id: 1,
-        aiEnabled: false,
-        harnessEnabled: true,
         mcpEnabled: true,
         language: "ENGLISH",
         timezone: "UTC",
