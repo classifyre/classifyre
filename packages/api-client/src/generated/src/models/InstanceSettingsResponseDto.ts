@@ -26,18 +26,6 @@ export interface InstanceSettingsResponseDto {
      */
     id: number;
     /**
-     * When false, AI assistant features are disabled instance-wide.
-     * @type {boolean}
-     * @memberof InstanceSettingsResponseDto
-     */
-    aiEnabled: boolean;
-    /**
-     * When false, the autonomous AI harness and all of its agents are disabled instance-wide.
-     * @type {boolean}
-     * @memberof InstanceSettingsResponseDto
-     */
-    harnessEnabled: boolean;
-    /**
      * When false, the MCP endpoint is disabled instance-wide.
      * @type {boolean}
      * @memberof InstanceSettingsResponseDto
@@ -62,13 +50,13 @@ export interface InstanceSettingsResponseDto {
      */
     timeFormat: InstanceSettingsResponseDtoTimeFormatEnum;
     /**
-     * Id of the AI provider credential used by the interactive AI assistant. Null when unset.
+     * Id of the AI provider credential used by the interactive AI assistant. Assigning a provider enables the Assistant; null disables it.
      * @type {string}
      * @memberof InstanceSettingsResponseDto
      */
     aiProviderConfigId: string | null;
     /**
-     * Id of the AI provider credential used by the autonomous AI harness. Null when unset.
+     * Id of the AI provider credential used by the autonomous AI harness. Assigning a provider enables the Harness; null disables it.
      * @type {string}
      * @memberof InstanceSettingsResponseDto
      */
@@ -216,8 +204,6 @@ export type InstanceSettingsResponseDtoTimeFormatEnum = typeof InstanceSettingsR
  */
 export function instanceOfInstanceSettingsResponseDto(value: object): value is InstanceSettingsResponseDto {
     if (!('id' in value) || value['id'] === undefined) return false;
-    if (!('aiEnabled' in value) || value['aiEnabled'] === undefined) return false;
-    if (!('harnessEnabled' in value) || value['harnessEnabled'] === undefined) return false;
     if (!('mcpEnabled' in value) || value['mcpEnabled'] === undefined) return false;
     if (!('language' in value) || value['language'] === undefined) return false;
     if (!('timezone' in value) || value['timezone'] === undefined) return false;
@@ -257,8 +243,6 @@ export function InstanceSettingsResponseDtoFromJSONTyped(json: any, ignoreDiscri
     return {
         
         'id': json['id'],
-        'aiEnabled': json['aiEnabled'],
-        'harnessEnabled': json['harnessEnabled'],
         'mcpEnabled': json['mcpEnabled'],
         'language': json['language'],
         'timezone': json['timezone'],
@@ -299,8 +283,6 @@ export function InstanceSettingsResponseDtoToJSONTyped(value?: InstanceSettingsR
     return {
         
         'id': value['id'],
-        'aiEnabled': value['aiEnabled'],
-        'harnessEnabled': value['harnessEnabled'],
         'mcpEnabled': value['mcpEnabled'],
         'language': value['language'],
         'timezone': value['timezone'],
