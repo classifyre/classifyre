@@ -476,7 +476,14 @@ jobs:
         if: runner.os == 'Linux'
         run: printf '%%__os_install_post %%{nil}\n' > "$HOME/.rpmmacros"
 
+      # A Windows Electron app is a directory: the .exe depends on the DLLs,
+      # locales, resources/, and bundled services beside it. Upload that
+      # runnable directory directly below instead of first wrapping it in a
+      # Forge ZIP and then wrapping that ZIP in the Actions artifact archive.
+      # Tagged releases recreate the portable ZIP after downloading the tested
+      # Actions artifact, because GitHub Release assets must be single files.
       - name: Create distributables
+        if: runner.os != 'Windows'
         timeout-minutes: 60
         run: bun run --cwd apps/desktop make --skip-package
         env:
@@ -492,7 +499,8 @@ jobs:
       # out/**/*.zip glob swept npm test fixtures (thread-stream's
       # test-package.zip / ts-commonjs-default-export.zip) into the release —
       # and their duplicate names across platform artifacts broke the upload.
-      - name: Find artifacts
+      - name: Find distributables
+        if: runner.os != 'Windows'
         id: artifacts
         shell: bash
         run: |
@@ -509,7 +517,39 @@ jobs:
             exit 1
           fi
 
-      - name: Upload artifacts
+      - name: Verify runnable Windows distribution
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          APP_DIR="apps/desktop/out/Classifyre-win32-x64"
+          EXE="$APP_DIR/classifyre-desktop.exe"
+          if [ ! -f "$EXE" ]; then
+            echo "::error::Packaged Windows executable not found: $EXE"
+            find apps/desktop/out -maxdepth 3 -type f -iname '*.exe' | head -30 || true
+            exit 1
+          fi
+          if [ ! -f "$APP_DIR/resources/app.asar" ]; then
+            echo "::error::Packaged Windows resources not found: $APP_DIR/resources/app.asar"
+            exit 1
+          fi
+          if find "$APP_DIR" -maxdepth 1 -type f -name '*.zip' | grep -q .; then
+            echo "::error::Windows Actions artifact must contain the runnable app, not a nested ZIP"
+            exit 1
+          fi
+          echo "Runnable Windows distribution:"
+          find "$APP_DIR" -maxdepth 2 -type f | head -30
+
+      - name: Upload runnable Windows distribution
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v7
+        with:
+          name: desktop-${{ matrix.platform }}
+          path: apps/desktop/out/Classifyre-win32-x64/
+          include-hidden-files: true
+          if-no-files-found: error
+
+      - name: Upload distributables
+        if: runner.os != 'Windows'
         uses: actions/upload-artifact@v7
         with:
           name: desktop-${{ matrix.platform }}
@@ -536,6 +576,44 @@ jobs:
 
       - name: List downloaded artifacts
         run: find artifacts -type f | head -30
+
+      # The Windows workflow artifact contains the directly runnable Electron
+      # directory. GitHub Releases cannot publish a directory, so reconstruct
+      # the portable ZIP here from that exact smoke-tested artifact. This keeps
+      # snapshot downloads free of a nested ZIP while preserving the Windows
+      # in-app updater's single-file release asset.
+      - name: Create Windows GitHub Release asset
+        shell: bash
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          WIN_ARTIFACT="artifacts/desktop-win-x64"
+          if [ ! -d "$WIN_ARTIFACT" ]; then
+            echo "No Windows artifact in this platform-scoped run"
+            exit 0
+          fi
+          EXE=$(find "$WIN_ARTIFACT" -type f -name 'classifyre-desktop.exe' -print -quit)
+          if [ -z "$EXE" ]; then
+            echo "::error::Downloaded Windows artifact has no classifyre-desktop.exe"
+            exit 1
+          fi
+          APP_DIR=$(dirname "$EXE")
+          if [ ! -f "$APP_DIR/resources/app.asar" ]; then
+            echo "::error::Downloaded Windows artifact is missing resources/app.asar"
+            exit 1
+          fi
+          VERSION="${TAG#v}"
+          RELEASE_ZIP="$GITHUB_WORKSPACE/artifacts/Classifyre-win32-x64-$VERSION.zip"
+          (cd "$APP_DIR" && zip -q -r "$RELEASE_ZIP" .)
+          unzip -t "$RELEASE_ZIP"
+          unzip -Z1 "$RELEASE_ZIP" | awk '
+            $0 == "classifyre-desktop.exe" { found = 1 }
+            END { exit !found }
+          ' || {
+            echo "::error::Windows release ZIP does not contain classifyre-desktop.exe at its root"
+            exit 1
+          }
+          echo "Created $RELEASE_ZIP from the runnable Actions artifact"
 
       - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v2

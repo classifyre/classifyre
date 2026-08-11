@@ -3,7 +3,9 @@ name: Desktop Snapshot
 # Builds the desktop app from develop / PRs without publishing anything:
 # same pipeline as a release (stage resources, package, sign + notarize when
 # certs are present, smoke test), but the installers stay workflow artifacts
-# (desktop-<platform>) that can be downloaded and tested by hand. The
+# (desktop-<platform>) that can be downloaded and tested by hand. The Windows
+# artifact contains the runnable app directory (.exe plus its dependencies),
+# rather than a ZIP nested inside GitHub's artifact ZIP. The
 # package.json -SNAPSHOT version is kept, so a tested snapshot is clearly
 # distinguishable from a release in the app's Settings.
 #
