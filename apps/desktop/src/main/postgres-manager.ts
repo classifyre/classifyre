@@ -1,10 +1,20 @@
-import { app } from "electron";
+import { app, safeStorage } from "electron";
 import path from "path";
 import fs from "fs";
 import os from "os";
 import { pathToFileURL } from "url";
 import { getAvailablePort } from "./port-manager.js";
 import { detectorWorkerCount } from "./process-manager.js";
+import {
+  createPostgresScramVerifier,
+  LEGACY_POSTGRES_PASSWORD,
+  PostgresCredentialStore,
+  type CredentialProtection,
+  upgradePgHbaToScram,
+} from "./postgres-credentials.js";
+
+const POSTGRES_USER = "classifyre";
+const POSTGRES_DATABASE = "classifyre";
 
 // In a packaged app, `embedded-postgres` lives in a self-contained npm tree
 // staged at resources/pg/node_modules (the Forge Vite plugin ships nothing
@@ -177,22 +187,63 @@ export class PostgresManager {
   private running = false;
   private dataDir: string;
   private startPromise: Promise<void> | null = null;
+  private password = "";
+  private readonly credentialStore: PostgresCredentialStore;
 
   // `initdb` on a cold data dir takes a while (longer still under Rosetta), so
   // the caller can surface what the database is doing during first launch.
   constructor(
     preferredPort?: number,
     private readonly onProgress: (detail: string) => void = () => {},
+    credentialStore?: PostgresCredentialStore,
   ) {
     const base = process.env["CLASSIFYRE_DATA_DIR"] || app.getPath("userData");
     this.dataDir = path.join(base, "pgdata");
+    let warnedAboutFallback = false;
+    const protection: CredentialProtection = {
+      isAvailable: async () => {
+        const linuxBackend =
+          process.platform === "linux"
+            ? safeStorage.getSelectedStorageBackend()
+            : null;
+        const available =
+          linuxBackend !== "basic_text" &&
+          linuxBackend !== "unknown" &&
+          (await safeStorage.isAsyncEncryptionAvailable());
+        if (!available && !warnedAboutFallback) {
+          warnedAboutFallback = true;
+          console.warn(
+            "OS credential encryption is unavailable; the embedded PostgreSQL credential is protected by account-only file permissions",
+          );
+        }
+        return available;
+      },
+      encrypt: (plaintext) => safeStorage.encryptStringAsync(plaintext),
+      decrypt: async (ciphertext) => {
+        const result = await safeStorage.decryptStringAsync(ciphertext);
+        return {
+          plaintext: result.result,
+          shouldReEncrypt: result.shouldReEncrypt,
+        };
+      },
+    };
+    this.credentialStore =
+      credentialStore ?? new PostgresCredentialStore(base, protection);
     if (preferredPort) this.preferredPort = preferredPort;
   }
 
   // Single-flight so crash recovery cannot race an in-progress startup.
   async start(): Promise<void> {
     if (!this.startPromise) {
-      this.startPromise = this.doStart().catch((err: unknown) => {
+      this.startPromise = this.doStart().catch(async (err: unknown) => {
+        await this.stopInstance().catch((stopError) =>
+          console.error(
+            "Embedded PostgreSQL cleanup after failed start failed:",
+            stopError,
+          ),
+        );
+        this.running = false;
+        this.password = "";
         this.startPromise = null; // allow retry after a failed boot
         throw err;
       });
@@ -209,60 +260,193 @@ export class PostgresManager {
     // port collision never blocks startup.
     this.port = await getAvailablePort(this.preferredPort);
 
-    const EmbeddedPostgres = await loadEmbeddedPostgres();
+    const pgVersionFile = path.join(this.dataDir, "PG_VERSION");
+    const clusterExists = fs.existsSync(pgVersionFile);
+    let credentials = await this.credentialStore.loadOrCreate(clusterExists);
+    credentials = await this.credentialStore.stageRotationIfDue(credentials);
+
+    // A previously migrated database already stores a SCRAM verifier, so its
+    // HBA can be hardened before boot. The legacy password must be rotated
+    // first; older PostgreSQL versions may have stored it as MD5.
+    if (clusterExists && credentials.current !== LEGACY_POSTGRES_PASSWORD) {
+      await this.hardenPgHba();
+    }
+
+    let selectedPassword = credentials.current;
+    try {
+      await this.bootWithPassword(selectedPassword, clusterExists);
+    } catch (currentError) {
+      if (!credentials.pending) throw currentError;
+      console.warn(
+        "Primary embedded PostgreSQL credential was rejected; recovering a pending rotation",
+      );
+      selectedPassword = credentials.pending;
+      await this.bootWithPassword(selectedPassword, clusterExists);
+    }
+
+    await this.ensureDatabase();
+
+    if (credentials.pending) {
+      if (selectedPassword === credentials.current) {
+        this.onProgress("Securing the local database credentials…");
+        await this.changePassword(credentials.pending);
+      }
+
+      // Recreate the embedded-postgres wrapper with the new credential. This
+      // happens before the API starts, so no live client sees a stale URL.
+      await this.stopInstance();
+      await this.hardenPgHba();
+      await this.bootWithPassword(credentials.pending, true);
+      await this.ensureDatabase();
+      credentials = await this.credentialStore.commitRotation(credentials);
+      console.log("Embedded PostgreSQL credential rotation completed");
+    }
+
+    this.password = credentials.current;
+    this.running = true;
+  }
+
+  private postgresFlags(): string[] {
     const tuning = computePostgresTuning(
       Math.floor(os.totalmem() / (1024 * 1024)),
       detectorWorkerCount(),
     );
-    this.pg = new EmbeddedPostgres({
-      databaseDir: this.dataDir,
-      user: "classifyre",
-      password: "classifyre",
-      port: this.port,
-      persistent: true,
+    return [
+      // The embedded database is an implementation detail of this app. Do
+      // not expose it on LAN interfaces even if host networking changes.
+      "-c",
+      "listen_addresses=127.0.0.1",
+      "-c",
+      "password_encryption=scram-sha-256",
       // The embedded server shares a laptop with the UI and the scan
       // pipeline; PG's server-class parallelism defaults (parallel query
       // workers, parallel index builds) otherwise pile onto an already
       // saturated machine during scans and HNSW (re)builds.
-      postgresFlags: [
-        "-c", "max_parallel_workers_per_gather=1",
-        "-c", "max_parallel_maintenance_workers=1",
-        "-c", "max_parallel_workers=2",
-        "-c", `shared_buffers=${tuning.sharedBuffersMb}MB`,
-        "-c", "work_mem=16MB",
-        // Tells the planner how much is cached overall (PG + OS page cache).
-        // Left at the 4 GB default, the planner assumed almost nothing was
-        // cached and discarded index plans on the large findings tables.
-        "-c", `effective_cache_size=${tuning.effectiveCacheSizeMb}MB`,
-        // The 4.0 default models a 2005 spinning disk and biases the planner
-        // *away* from index scans. Every desktop install is on SSD/NVMe.
-        "-c", "random_page_cost=1.1",
-        // Vacuum is what maintains the visibility map, and the visibility map
-        // is what makes index-only scans skip the heap. At the 64 MB default,
-        // a vacuum of a multi-GB table needs several index passes; at 256 MB
-        // the hot tables finish in one (measured: `index scans: 1`).
-        "-c", "maintenance_work_mem=256MB",
-        // Stock autovacuum is throttled to ~2005 disk throughput and falls
-        // behind ingest, which is how visibility-map coverage decayed to 36%
-        // on finding_evidence_analyses and put 610k heap fetches back into
-        // what should have been an index-only scan.
-        "-c", "autovacuum_vacuum_cost_limit=2000",
-        "-c", "autovacuum_naptime=15s",
-        // A single forgotten open transaction pins the vacuum horizon and
-        // makes autovacuum run continuously while reclaiming nothing.
-        "-c", "idle_in_transaction_session_timeout=300000",
-      ],
+      "-c",
+      "max_parallel_workers_per_gather=1",
+      "-c",
+      "max_parallel_maintenance_workers=1",
+      "-c",
+      "max_parallel_workers=2",
+      "-c",
+      `shared_buffers=${tuning.sharedBuffersMb}MB`,
+      "-c",
+      "work_mem=16MB",
+      // Tells the planner how much is cached overall (PG + OS page cache).
+      // Left at the 4 GB default, the planner assumed almost nothing was
+      // cached and discarded index plans on the large findings tables.
+      "-c",
+      `effective_cache_size=${tuning.effectiveCacheSizeMb}MB`,
+      // The 4.0 default models a 2005 spinning disk and biases the planner
+      // *away* from index scans. Every desktop install is on SSD/NVMe.
+      "-c",
+      "random_page_cost=1.1",
+      // Vacuum is what maintains the visibility map, and the visibility map
+      // is what makes index-only scans skip the heap. At the 64 MB default,
+      // a vacuum of a multi-GB table needs several index passes; at 256 MB
+      // the hot tables finish in one (measured: `index scans: 1`).
+      "-c",
+      "maintenance_work_mem=256MB",
+      // Stock autovacuum is throttled to ~2005 disk throughput and falls
+      // behind ingest, which is how visibility-map coverage decayed to 36%
+      // on finding_evidence_analyses and put 610k heap fetches back into
+      // what should have been an index-only scan.
+      "-c",
+      "autovacuum_vacuum_cost_limit=2000",
+      "-c",
+      "autovacuum_naptime=15s",
+      // A single forgotten open transaction pins the vacuum horizon and
+      // makes autovacuum run continuously while reclaiming nothing.
+      "-c",
+      "idle_in_transaction_session_timeout=300000",
+    ];
+  }
+
+  private async bootWithPassword(
+    password: string,
+    clusterExists: boolean,
+  ): Promise<void> {
+    await this.stopInstance();
+    const EmbeddedPostgres = await loadEmbeddedPostgres();
+    this.pg = new EmbeddedPostgres({
+      databaseDir: this.dataDir,
+      user: POSTGRES_USER,
+      password,
+      authMethod: "scram-sha-256",
+      port: this.port,
+      persistent: true,
+      postgresFlags: this.postgresFlags(),
     }) as unknown as EmbeddedPostgresInstance;
 
-    const pgVersionFile = path.join(this.dataDir, "PG_VERSION");
-    if (!fs.existsSync(pgVersionFile)) {
+    if (!clusterExists) {
       this.onProgress("Creating the local database for the first time…");
       await this.pg.initialise();
     }
     this.onProgress("Starting the database server…");
     await this.pg.start();
-    await this.ensureDatabase();
-    this.running = true;
+
+    // Starting postgres itself does not authenticate. Probe now so an
+    // interrupted rotation can retry the journal's pending credential.
+    const client = this.pg.getPgClient();
+    try {
+      await client.connect();
+    } finally {
+      await client.end().catch(() => undefined);
+    }
+  }
+
+  private async changePassword(nextPassword: string): Promise<void> {
+    if (!this.pg) throw new Error("PostgreSQL not started");
+    const client = this.pg.getPgClient();
+    await client.connect();
+    try {
+      const verifier = createPostgresScramVerifier(nextPassword);
+      // The verifier alphabet contains no SQL quote characters. Validate that
+      // invariant before interpolation so the clear password never enters SQL.
+      if (
+        !/^SCRAM-SHA-256\$\d+:[A-Za-z0-9+/=]+\$[A-Za-z0-9+/=]+:[A-Za-z0-9+/=]+$/.test(
+          verifier,
+        )
+      ) {
+        throw new Error("Generated an invalid PostgreSQL SCRAM verifier");
+      }
+      await client.query(
+        `ALTER ROLE "${POSTGRES_USER}" WITH PASSWORD '${verifier}'`,
+      );
+    } finally {
+      await client.end();
+    }
+  }
+
+  private async hardenPgHba(): Promise<void> {
+    const hbaPath = path.join(this.dataDir, "pg_hba.conf");
+    let before: string;
+    try {
+      before = await fs.promises.readFile(hbaPath, "utf-8");
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return;
+      throw error;
+    }
+    const after = upgradePgHbaToScram(before);
+    if (after === before) return;
+
+    const tempPath = `${hbaPath}.${process.pid}.tmp`;
+    try {
+      await fs.promises.writeFile(tempPath, after, { flag: "wx", mode: 0o600 });
+      await fs.promises.rename(tempPath, hbaPath);
+      await fs.promises.chmod(hbaPath, 0o600).catch(() => undefined);
+    } finally {
+      await fs.promises.unlink(tempPath).catch(() => undefined);
+    }
+  }
+
+  private async stopInstance(): Promise<void> {
+    if (!this.pg) return;
+    try {
+      await this.pg.stop();
+    } finally {
+      this.pg = null;
+    }
   }
 
   private async ensureDatabase(): Promise<void> {
@@ -272,10 +456,10 @@ export class PostgresManager {
     await client.connect();
     try {
       const result = await client.query(
-        "SELECT 1 FROM pg_database WHERE datname = 'classifyre'",
+        `SELECT 1 FROM pg_database WHERE datname = '${POSTGRES_DATABASE}'`,
       );
       if ((result.rows as unknown[]).length === 0) {
-        await client.query("CREATE DATABASE classifyre");
+        await client.query(`CREATE DATABASE ${POSTGRES_DATABASE}`);
       }
     } finally {
       await client.end();
@@ -284,7 +468,7 @@ export class PostgresManager {
     // The desktop bundle carries pgvector's extension files alongside the
     // embedded PostgreSQL runtime. Install it once in the shared database;
     // individual workspace schemas then use the public.vector type.
-    const appClient = this.pg.getPgClient("classifyre");
+    const appClient = this.pg.getPgClient(POSTGRES_DATABASE);
     await appClient.connect();
     try {
       await appClient.query(
@@ -307,7 +491,7 @@ export class PostgresManager {
     }
 
     // Schemas live in the app database, not the default `postgres` database.
-    const client = this.pg.getPgClient("classifyre");
+    const client = this.pg.getPgClient(POSTGRES_DATABASE);
     await client.connect();
     try {
       await client.query(`CREATE SCHEMA IF NOT EXISTS "${schemaName}"`);
@@ -322,7 +506,7 @@ export class PostgresManager {
       throw new Error(`Invalid schema name: ${schemaName}`);
     }
 
-    const client = this.pg.getPgClient("classifyre");
+    const client = this.pg.getPgClient(POSTGRES_DATABASE);
     await client.connect();
     try {
       await client.query(`DROP SCHEMA IF EXISTS "${schemaName}" CASCADE`);
@@ -332,7 +516,8 @@ export class PostgresManager {
   }
 
   getConnectionString(schemaName?: string): string {
-    const base = `postgresql://classifyre:classifyre@127.0.0.1:${this.port}/classifyre`;
+    if (!this.password) throw new Error("PostgreSQL credentials are not ready");
+    const base = `postgresql://${encodeURIComponent(POSTGRES_USER)}:${encodeURIComponent(this.password)}@127.0.0.1:${this.port}/${POSTGRES_DATABASE}`;
     if (!schemaName) return base;
     // `public` must stay on the search_path: pgvector lives there, and its
     // `<=>` operator is unresolvable from a schema-only path.
@@ -363,14 +548,14 @@ export class PostgresManager {
     }
     if (!this.pg) return;
     try {
-      await this.pg.stop();
+      await this.stopInstance();
     } catch (err) {
       // Best-effort, but an unclean stop can leave a stale postmaster.pid that
       // blocks the next launch — it must be visible in main.log.
       console.error("Embedded PostgreSQL shutdown failed:", err);
     }
     this.running = false;
-    this.pg = null;
+    this.password = "";
     this.startPromise = null;
   }
 }

@@ -30,6 +30,7 @@ The desktop app runs an **embedded PostgreSQL** instance and one shared, namespa
 |------|---------|
 | `src/main/index.ts` | App entry point, window creation, lifecycle |
 | `src/main/postgres-manager.ts` | Embedded PostgreSQL lifecycle (start/stop/schema) |
+| `src/main/postgres-credentials.ts` | OS-protected PostgreSQL credential journal and rotation policy |
 | `src/main/process-manager.ts` | Spawn, monitor, and stop the shared NestJS API |
 | `src/main/namespace-store.ts` | Read-only API namespace snapshot for native menus |
 | `src/main/settings-manager.ts` | App-wide settings (database port), persisted to `settings.json` |
@@ -45,11 +46,34 @@ The desktop app runs an **embedded PostgreSQL** instance and one shared, namespa
 All data is stored under the Electron `userData` directory (or `CLASSIFYRE_DATA_DIR` if set):
 
 - `pgdata/` — PostgreSQL data directory
+- `postgres-credentials.bin` — OS-protected embedded-database credential journal
 - `settings.json` — app-wide settings (preferred database port)
 - `python-runtime/` — relocated Python venv (only when the install dir is read-only)
 
 Namespace definitions and settings are stored in the embedded database's
 `public.namespaces` registry and exposed through the shared API.
+
+### Embedded database credentials
+
+The desktop app generates a 256-bit PostgreSQL password per installation and
+protects its credential journal with Electron `safeStorage` (macOS Keychain,
+Windows DPAPI, and the available Secret Service/KWallet provider on Linux).
+The file is also restricted to the current OS account. If OS encryption is
+unavailable (most commonly on Linux without a usable keyring), Classifyre uses
+the permission-restricted file as a weaker fallback and records a warning;
+install and unlock a Secret Service or KWallet provider on Linux for
+OS-backed encryption.
+
+The password is rotated automatically after 90 days, only during application
+startup while the API is stopped. Rotation is crash-safe: the old and pending
+credentials are journalled before PostgreSQL is changed, PostgreSQL is then
+restarted and verified with SCRAM-SHA-256, and only then is the old credential
+removed. Existing installations using the historical `classifyre` password
+are migrated through this path on their first upgraded launch.
+
+The encrypted credential is tied to the OS account/keyring. Copying only the
+`userData` directory to a different account or machine is not a supported
+backup; export workspaces from the application instead.
 
 ## Development
 
