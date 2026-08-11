@@ -521,7 +521,7 @@ jobs:
         if: runner.os == 'Windows'
         shell: bash
         run: |
-          APP_DIR="apps/desktop/out/Classifyre-win32-x64"
+          APP_DIR="apps/desktop/out/classifyre/Classifyre-win32-x64"
           EXE="$APP_DIR/classifyre-desktop.exe"
           if [ ! -f "$EXE" ]; then
             echo "::error::Packaged Windows executable not found: $EXE"
@@ -544,7 +544,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: desktop-${{ matrix.platform }}
-          path: apps/desktop/out/Classifyre-win32-x64/
+          path: apps/desktop/out/classifyre/Classifyre-win32-x64/
           include-hidden-files: true
           if-no-files-found: error
 
