@@ -200,6 +200,12 @@ while the API, the database, and any running scan keep going. The tray, the
 dock, or relaunching the app brings the window back. Quit from the tray to stop
 the services.
 
+Scans and embedding work draw on their own bounded pool of embedded-database
+connections, separate from the pool serving the interface. Pages therefore keep
+their full connection budget no matter how busy a scan is: a heavy scan makes
+its own batches wait instead of leaving the UI stuck loading. If a scan appears
+to slow down while you browse, that is the reservation working as intended.
+
 ---
 
 ## Logs and troubleshooting

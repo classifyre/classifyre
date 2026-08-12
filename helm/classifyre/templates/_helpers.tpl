@@ -333,6 +333,8 @@ which each deployment sets on its own after including this block.
      opened. */}}
 - name: PRISMA_POOL_MAX
   value: {{ .Values.api.database.poolMax | quote }}
+- name: PRISMA_INTERACTIVE_POOL_MAX
+  value: {{ .Values.api.database.interactivePoolMax | quote }}
 - name: PRISMA_MAX_RESIDENT
   value: {{ .Values.api.database.maxResidentNamespaces | quote }}
 - name: PRISMA_CONNECTION_TIMEOUT_MS

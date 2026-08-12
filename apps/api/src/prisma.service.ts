@@ -2,7 +2,11 @@ import { Injectable } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
 import { ClsService } from 'nestjs-cls';
 import { PrismaClientManager } from './prisma/prisma-client-manager';
-import { CLS_SCHEMA } from './namespace/namespace.constants';
+import {
+  CLS_DATABASE_LANE,
+  CLS_SCHEMA,
+  type DatabaseLane,
+} from './namespace/namespace.constants';
 
 /**
  * Property names accessed by frameworks/language probes, never by tenant data
@@ -68,7 +72,9 @@ export class PrismaService {
             )}). Tenant data can only be read within a resolved namespace.`,
           );
         }
-        const client = target.manager.get(schema);
+        const lane =
+          target.cls.get<DatabaseLane>(CLS_DATABASE_LANE) ?? 'interactive';
+        const client = target.manager.get(schema, lane);
         const value = Reflect.get(client, prop, client);
         return typeof value === 'function' ? value.bind(client) : value;
       },

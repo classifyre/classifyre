@@ -359,6 +359,15 @@ export class PostgresManager {
       // makes autovacuum run continuously while reclaiming nothing.
       "-c",
       "idle_in_transaction_session_timeout=300000",
+      // Stock is 100, which the API can exhaust on its own: each active
+      // workspace costs up to PRISMA_POOL_MAX (16, split interactive +
+      // background) plus pg-boss's own 5, so ~21 per workspace leaves room
+      // for barely four before `FATAL: sorry, too many clients already` —
+      // and that fails hard rather than queueing. An idle backend costs a
+      // few MB of process memory, so headroom here is far cheaper than the
+      // failure it prevents.
+      "-c",
+      "max_connections=200",
     ];
   }
 

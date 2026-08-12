@@ -26,6 +26,7 @@ import { DataTransferWorker } from '../data-transfer/data-transfer.worker';
 import { RunnerEventsGateway } from '../websocket/runner-events.gateway';
 import { NotificationEventsGateway } from '../websocket/notification-events.gateway';
 import {
+  CLS_DATABASE_LANE,
   CLS_NAMESPACE_ID,
   CLS_SCHEMA,
   CLS_SLUG,
@@ -133,6 +134,7 @@ export class NamespaceWorkerManager
       this.cls.set(CLS_SCHEMA, ctx.schemaName);
       this.cls.set(CLS_NAMESPACE_ID, ctx.namespaceId);
       this.cls.set(CLS_SLUG, ctx.slug);
+      this.cls.set(CLS_DATABASE_LANE, 'background');
       return fn();
     });
   }
@@ -144,7 +146,7 @@ export class NamespaceWorkerManager
     // Keep this namespace's Prisma client resident while its workers run.
     try {
       this.cliRunner.activateForSchema(e.schemaName);
-      this.prismaManager.pin(e.schemaName);
+      this.prismaManager.pin(e.schemaName, 'background');
       await this.pgBoss.startForNamespace(e.schemaName, e.namespaceId);
 
       const ctx = this.store(e);

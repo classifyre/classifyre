@@ -167,8 +167,9 @@ helm upgrade --install classifyre ./helm/classifyre \
 | api.containerSecurityContext.readOnlyRootFilesystem | bool | `false` | path the app writes to at runtime (e.g. /tmp, log dirs). Hardening step for advanced users. |
 | api.database.connectionTimeoutMs | int | `10000` | Give up acquiring a connection after this long (ms). |
 | api.database.idleTimeoutMs | int | `10000` | Close a pooled connection after this much idle time (ms). |
+| api.database.interactivePoolMax | int | `10` | Connections reserved for interactive requests in API-capable pods, so a scan cannot occupy every connection needed to render the UI. The remainder of `poolMax` serves authenticated CLI callbacks and in-process workers. Capped at `poolMax - 1` so the background lane always keeps one. |
 | api.database.maxResidentNamespaces | int | `20` | this are disconnected. |
-| api.database.poolMax | int | `10` | with `P2028`; too high and the server runs out of connections. |
+| api.database.poolMax | int | `16` | Total Postgres connections per workspace, split across the interactive and background pools. Background-only worker pods use the full value as a single pool. Raised from 10 to 16 when the background lane was added, so that the lane is funded on top of the interactive budget rather than carved out of it: at 10 total the UI was left with 4, near the 3 that made overview pages fail with `P2028`. |
 | api.database.retryAttempts | int | `3` | transient database error. Set to 1 to disable retrying. |
 | api.database.transactionMaxWaitMs | int | `10000` | own default is 2000, which a busy pool exceeds routinely. |
 | api.database.transactionTimeoutMs | int | `30000` | Max duration of a single interactive transaction (ms). |
@@ -375,7 +376,8 @@ helm upgrade --install classifyre ./helm/classifyre \
 | postgres.cnpg.database | string | `"classifyre"` | Database bootstrapped by CNPG. |
 | postgres.cnpg.imageName | string | `"ghcr.io/cloudnative-pg/postgresql:18-standard-trixie"` | CNPG Postgres image. |
 | postgres.cnpg.instances | int | `3` | Number of CNPG instances. |
-| postgres.cnpg.postgresql.parameters | object | `{"shared_buffers":"512MB","work_mem":"16MB"}` | Postgres itself uses the memory already granted to each instance. |
+| postgres.cnpg.postgresql.parameters | object | `{"autovacuum_naptime":"15s","autovacuum_vacuum_cost_limit":"2000","effective_cache_size":"6GB","idle_in_transaction_session_timeout":"300000","maintenance_work_mem":"256MB","pg_stat_statements.max":"10000","pg_stat_statements.track":"top","random_page_cost":"1.1","shared_buffers":"2GB","work_mem":"16MB"}` | Postgres itself uses the memory already granted to each instance. |
+| postgres.cnpg.postgresql.sharedPreloadLibraries | list | `["pg_stat_statements"]` | cluster (CNPG performs a rolling restart). |
 | postgres.cnpg.storage.size | string | `"20Gi"` | CNPG storage size per instance. |
 | postgres.cnpg.storage.storageClassName | string | `""` | CNPG storage class name. |
 | postgres.cnpg.superuserSecretName | string | `""` | Existing CNPG superuser secret name. |
