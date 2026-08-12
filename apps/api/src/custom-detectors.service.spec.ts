@@ -993,6 +993,17 @@ describe('CustomDetectorsService', () => {
         expect(inner.type).toBe('TEXT_CLASSIFICATION');
       }
     });
+
+    it('includes a meaningful contextual LLM detector example', () => {
+      const { service } = createService();
+      const examples = service.listExamples('LLM');
+      expect(examples).toHaveLength(1);
+      const config = examples[0].pipelineSchema as Record<string, unknown>;
+      const schema = config.pipeline_schema as Record<string, unknown>;
+      expect(schema.type).toBe('LLM');
+      expect(String(schema.system_prompt)).toContain('bypass');
+      expect(schema).not.toHaveProperty('provider_runtime');
+    });
   });
 
   describe('buildTypeRegistry', () => {

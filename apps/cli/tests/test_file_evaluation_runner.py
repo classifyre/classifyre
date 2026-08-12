@@ -46,6 +46,14 @@ def _runner_with(detector: _RecordingDetector) -> FileEvaluationRunner:
     return runner
 
 
+def test_detector_initialization_is_cached_across_batch_files() -> None:
+    runner = FileEvaluationRunner([{"type": "NOT_A_DETECTOR", "enabled": True, "config": {}}])
+
+    assert runner._build_detectors() == []
+    assert runner._build_detectors() == []
+    assert len(runner.detector_errors) == 1
+
+
 def _write_png(path: Path) -> None:
     pytest.importorskip("PIL")
     from PIL import Image

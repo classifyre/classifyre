@@ -425,6 +425,16 @@ export class NamespaceImportService {
       else dropped.push(column);
     }
 
+    // Before provider assignment became the enablement switch, archives could
+    // carry an assigned provider alongside a false feature flag. Preserve that
+    // effective disabled state when importing those older archives.
+    if (table.model === 'instanceSettings') {
+      if (row['aiEnabled'] === false) prepared['aiProviderConfigId'] = null;
+      if (row['harnessEnabled'] === false) {
+        prepared['harnessAiProviderConfigId'] = null;
+      }
+    }
+
     if (dropped.length > 0) {
       progress.warn(
         `Ignored unknown column(s) on '${table.model}': ${dropped.join(', ')} — ` +

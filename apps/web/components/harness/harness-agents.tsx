@@ -50,8 +50,7 @@ export function HarnessAgents() {
   const [loading, setLoading] = React.useState(true);
   const [picker, setPicker] = React.useState<AgentConfigDto | null>(null);
 
-  const aiReady =
-    settings.harnessEnabled && !!settings.harnessAiProviderConfigId;
+  const aiReady = !!settings.harnessAiProviderConfigId;
 
   const load = React.useCallback(async () => {
     try {

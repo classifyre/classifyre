@@ -20,8 +20,7 @@ export function HarnessConfig() {
   const { settings, saving, updateSettings } = useInstanceSettings();
   const [busy, setBusy] = React.useState(false);
 
-  const aiReady =
-    settings.harnessEnabled && !!settings.harnessAiProviderConfigId;
+  const aiReady = !!settings.harnessAiProviderConfigId;
   const disabled = busy || saving;
 
   const save = React.useCallback(

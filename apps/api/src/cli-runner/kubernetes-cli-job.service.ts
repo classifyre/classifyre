@@ -99,15 +99,27 @@ export class KubernetesCliJobService {
 
   async runFileEvaluationJob(params: {
     evaluationId: string;
-    inputUrl: string;
-    fileExtension: string;
+    inputUrl?: string;
+    fileExtension?: string;
+    inputs?: Array<{
+      url: string;
+      fileExtension: string;
+      /** Only for API-generated in-cluster URLs, never user-supplied URLs. */
+      allowPrivate?: boolean;
+    }>;
     detectors: unknown[];
   }): Promise<CliJobResult> {
+    if (!params.inputUrl && !params.inputs?.length) {
+      throw new Error('File evaluation requires inputUrl or inputs');
+    }
     return this.runJob({
       sourceId: params.evaluationId,
       mode: 'evaluation',
       evaluationInputUrl: params.inputUrl,
       evaluationFileExt: params.fileExtension,
+      evaluationInputsB64: params.inputs?.length
+        ? Buffer.from(JSON.stringify(params.inputs), 'utf8').toString('base64')
+        : undefined,
       evaluationDetectorsB64: Buffer.from(
         JSON.stringify(params.detectors),
         'utf8',
@@ -227,6 +239,7 @@ export class KubernetesCliJobService {
     samplingCursorB64?: string;
     evaluationInputUrl?: string;
     evaluationFileExt?: string;
+    evaluationInputsB64?: string;
     evaluationDetectorsB64?: string;
     jobTrackingKey?: string;
     onLogChunk?: CliJobLogHandler;
@@ -410,6 +423,7 @@ export class KubernetesCliJobService {
       samplingCursorB64?: string;
       evaluationInputUrl?: string;
       evaluationFileExt?: string;
+      evaluationInputsB64?: string;
       evaluationDetectorsB64?: string;
     },
   ): Promise<V1Job> {
@@ -512,6 +526,12 @@ export class KubernetesCliJobService {
       envMap.set('EVALUATION_FILE_EXT', {
         name: 'EVALUATION_FILE_EXT',
         value: params.evaluationFileExt,
+      });
+    }
+    if (params.evaluationInputsB64) {
+      envMap.set('EVALUATION_INPUTS_B64', {
+        name: 'EVALUATION_INPUTS_B64',
+        value: params.evaluationInputsB64,
       });
     }
     if (params.evaluationDetectorsB64) {
@@ -690,8 +710,11 @@ export class KubernetesCliJobService {
       prelude.push(
         'printf "%s" "$EVALUATION_DETECTORS_B64" | base64 -d > /tmp/evaluation-detectors.json',
       );
+      prelude.push(
+        'if [ -n "${EVALUATION_INPUTS_B64:-}" ]; then EVALUATION_PATH=/evaluation-input; else EVALUATION_PATH="/evaluation-input/input${EVALUATION_FILE_EXT:-}"; fi',
+      );
       command =
-        '"$PYTHON_BIN" -m src.main evaluate-file "/evaluation-input/input${EVALUATION_FILE_EXT:-}" --detectors-file /tmp/evaluation-detectors.json';
+        '"$PYTHON_BIN" -m src.main evaluate-file "$EVALUATION_PATH" --detectors-file /tmp/evaluation-detectors.json';
     }
 
     return [
@@ -734,6 +757,10 @@ export class KubernetesCliJobService {
         name: 'EVALUATION_FILE_EXT',
         value: envMap.get('EVALUATION_FILE_EXT')?.value || '',
       },
+      {
+        name: 'EVALUATION_INPUTS_B64',
+        value: envMap.get('EVALUATION_INPUTS_B64')?.value || '',
+      },
     ];
 
     const initContainer: V1Container = {
@@ -754,22 +781,44 @@ export class KubernetesCliJobService {
 
   private buildEvaluationFetchCommand(mountPath: string): string {
     const py = [
-      'import os,sys,time,urllib.request',
+      'import base64,ipaddress,json,os,socket,sys,time,urllib.parse,urllib.request',
+      "batch=os.environ.get('EVALUATION_INPUTS_B64','')",
       "url=os.environ.get('EVALUATION_INPUT_URL','')",
       "ext=os.environ.get('EVALUATION_FILE_EXT','')",
-      `dst=f"${mountPath}/input"+ext`,
+      "inputs=json.loads(base64.b64decode(batch)) if batch else [{'url':url,'fileExtension':ext,'allowPrivate':True}]",
+      'def safe(raw,allow_private=False):',
+      '    parsed=urllib.parse.urlparse(raw)',
+      "    if parsed.scheme == 'data': return",
+      "    if parsed.scheme not in ('http','https') or parsed.username or parsed.password: raise ValueError('unsafe evaluation URL')",
+      '    for info in socket.getaddrinfo(parsed.hostname, parsed.port or (443 if parsed.scheme == "https" else 80), type=socket.SOCK_STREAM):',
+      '        ip=ipaddress.ip_address(info[4][0])',
+      "        if not allow_private and not ip.is_global: raise ValueError('evaluation URL resolves to a non-public address')",
+      'class SafeRedirect(urllib.request.HTTPRedirectHandler):',
+      '    def redirect_request(self,req,fp,code,msg,headers,newurl):',
+      '        safe(newurl,self.allow_private); return super().redirect_request(req,fp,code,msg,headers,newurl)',
       'last=None',
-      'for attempt in range(30):',
-      '    try:',
-      '        with urllib.request.urlopen(url, timeout=60) as r, open(dst,"wb") as f:',
-      '            while True:',
-      '                chunk=r.read(1048576)',
-      '                if not chunk: break',
-      '                f.write(chunk)',
-      '        print(f"evaluation input downloaded to {dst}", flush=True); sys.exit(0)',
-      '    except Exception as e:',
-      '        last=e; print(f"attempt {attempt+1} failed: {e}", flush=True); time.sleep(2)',
-      'print(f"failed to download evaluation input from {url}: {last}", file=sys.stderr); sys.exit(1)',
+      'for index,item in enumerate(inputs):',
+      '    src=item["url"]',
+      '    allow_private=bool(item.get("allowPrivate",False))',
+      '    safe(src,allow_private)',
+      '    redirect=SafeRedirect(); redirect.allow_private=allow_private',
+      '    opener=urllib.request.build_opener(redirect)',
+      `    dst=(f"${mountPath}/input-{index:03d}" if batch else f"${mountPath}/input")+item.get("fileExtension","")`,
+      '    for attempt in range(30):',
+      '        try:',
+      '            with opener.open(src, timeout=60) as r, open(dst,"wb") as f:',
+      '                total=0',
+      '                while True:',
+      '                    chunk=r.read(1048576)',
+      '                    if not chunk: break',
+      '                    total+=len(chunk)',
+      "                    if total>26214400: raise ValueError('evaluation input exceeds 25 MiB')",
+      '                    f.write(chunk)',
+      '            print(f"evaluation input downloaded to {dst}", flush=True); break',
+      '        except Exception as e:',
+      '            last=e; print(f"attempt {attempt+1} failed: {e}", flush=True); time.sleep(2)',
+      '    else:',
+      '        print(f"failed to download evaluation input from {src}: {last}", file=sys.stderr); sys.exit(1)',
     ].join('\n');
     // Heredoc keeps the python source free of shell interpolation.
     return `set -eu; python3 - <<'PYEOF'\n${py}\nPYEOF`;

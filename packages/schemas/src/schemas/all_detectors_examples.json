@@ -946,6 +946,40 @@
   ],
   "CUSTOM": [
     {
+      "name": "Control-Evasion Intent Detector",
+      "description": "Use an LLM where lexical matches are misleading: distinguish ordinary urgency or process discussion from an explicit request to conceal activity, bypass approval, or evade a control, and extract the evidence supporting that judgement.",
+      "config": {
+        "custom_detector_key": "control_evasion_intent",
+        "name": "Control-Evasion Intent Detector",
+        "description": "Detect contextual requests to conceal activity or deliberately bypass controls",
+        "languages": ["en"],
+        "pipeline_schema": {
+          "type": "LLM",
+          "system_prompt": "Classify whether the content contains an explicit request, agreement, or instruction to conceal activity, bypass an approval or monitoring control, or evade a stated policy. Use only evidence present in the content. Ordinary urgency, confidentiality, disagreement with policy, or a hypothetical discussion is benign unless the text connects an actor and action to deliberate circumvention or concealment. Return an empty labels array for benign content; otherwise return the strongest applicable label and quote the shortest supporting passage.",
+          "response_example": "{\"labels\":[{\"name\":\"control_evasion\",\"confidence\":0.96,\"matched_content\":\"Keep each invoice below 10k so compliance does not review it.\"}],\"fields\":{\"actor\":\"regional manager\",\"requested_action\":\"split the invoice to avoid approval\",\"control_or_policy\":\"purchase approval threshold\",\"evidence_quote\":\"Keep each invoice below 10k so compliance does not review it.\"}}",
+          "temperature": 0,
+          "labels": [
+            { "name": "control_evasion", "description": "Deliberate bypass of an approval, monitoring, reporting, or policy control" },
+            { "name": "concealment", "description": "Deliberate hiding, deletion, disguising, or off-channel movement intended to prevent discovery" }
+          ],
+          "multi_label": false,
+          "severity": "info",
+          "severity_map": [
+            { "pattern": "control_evasion", "severity": "high" },
+            { "pattern": "concealment", "severity": "high" }
+          ],
+          "confidence_threshold": 0.75,
+          "output_fields": [
+            { "name": "actor", "description": "Person or role requesting or agreeing to the action" },
+            { "name": "requested_action", "description": "Action intended to bypass or conceal" },
+            { "name": "control_or_policy", "description": "Control, review, reporting duty, or policy being evaded" },
+            { "name": "evidence_quote", "description": "Shortest exact supporting passage" }
+          ],
+          "content_limit": 8000
+        }
+      }
+    },
+    {
       "name": "Support Ticket Extractor",
       "description": "Extract order IDs, monetary amounts, and customer intent from support tickets using GLINER2 NER + classification.",
       "config": {

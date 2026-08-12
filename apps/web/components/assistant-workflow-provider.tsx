@@ -313,12 +313,11 @@ export function AssistantWorkflowProvider({
     [],
   );
 
-  // Single source of truth: the assistant is active whenever AI is enabled and
-  // we're not in read-only demo mode. Pages with a bridge can veto via canOpen;
-  // pages without a bridge fall back to the global context.
+  // Provider assignment is the Assistant enablement switch. Pages with a
+  // bridge can veto via canOpen; pages without one use the global context.
   const active =
     (bridge ? bridge.canOpen : true) &&
-    settings.aiEnabled &&
+    !!settings.aiProviderConfigId &&
     !settings.demoMode;
   const contextValue = React.useMemo<AssistantWorkflowContextValue>(
     () => ({
@@ -428,7 +427,7 @@ export function AssistantFab() {
   const context = useAssistantWorkflow();
   const { t } = useTranslation();
 
-  // `context.active` already accounts for aiEnabled + demoMode.
+  // `context.active` already accounts for provider assignment + demo mode.
   if (!context.active || context.open) {
     return null;
   }
