@@ -12,6 +12,7 @@
     "dev": "turbo dev --filter=@classifyre/api --filter=@classifyre/web --filter=@classifyre/docs --filter=@classifyre/blog",
     "docs:dev": "turbo dev --filter=@classifyre/docs",
     "web:dev": "turbo dev --filter=@classifyre/web",
+    "blog:dev": "turbo dev --filter=@classifyre/blog",
     "lint": "turbo lint --filter=!@workspace/devops",
     "typecheck": "turbo check-types --filter=!@workspace/devops",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
