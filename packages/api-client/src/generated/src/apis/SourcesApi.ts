@@ -17,6 +17,8 @@ import * as runtime from '../runtime';
 import type {
   AssetListResponseDto,
   BulkIngestAssetsDto,
+  BulkUpdateSourcesDto,
+  BulkUpdateSourcesResponseDto,
   CreateSourceDto,
   FinalizeIngestRunDto,
   SearchSourcesRequestDto,
@@ -34,6 +36,10 @@ import {
     AssetListResponseDtoToJSON,
     BulkIngestAssetsDtoFromJSON,
     BulkIngestAssetsDtoToJSON,
+    BulkUpdateSourcesDtoFromJSON,
+    BulkUpdateSourcesDtoToJSON,
+    BulkUpdateSourcesResponseDtoFromJSON,
+    BulkUpdateSourcesResponseDtoToJSON,
     CreateSourceDtoFromJSON,
     CreateSourceDtoToJSON,
     FinalizeIngestRunDtoFromJSON,
@@ -99,6 +105,10 @@ export interface SourceFilesControllerListRequest {
 export interface SourceFilesControllerUploadRequest {
     sourceId: string;
     file: Blob;
+}
+
+export interface SourcesControllerBulkUpdateSourcesRequest {
+    bulkUpdateSourcesDto: BulkUpdateSourcesDto;
 }
 
 export interface SourcesControllerCreateSourceRequest {
@@ -536,6 +546,47 @@ export class SourcesApi extends runtime.BaseAPI {
      */
     async sourceFilesControllerUpload(requestParameters: SourceFilesControllerUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<UploadedSourceFileDto> {
         const response = await this.sourceFilesControllerUploadRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Update scheduling and/or sampling for explicit source IDs or every source matching a filter snapshot. Omitted sections and all other source fields are preserved.
+     * Bulk update data sources
+     */
+    async sourcesControllerBulkUpdateSourcesRaw(requestParameters: SourcesControllerBulkUpdateSourcesRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<BulkUpdateSourcesResponseDto>> {
+        if (requestParameters['bulkUpdateSourcesDto'] == null) {
+            throw new runtime.RequiredError(
+                'bulkUpdateSourcesDto',
+                'Required parameter "bulkUpdateSourcesDto" was null or undefined when calling sourcesControllerBulkUpdateSources().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/sources/bulk-update`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+            body: BulkUpdateSourcesDtoToJSON(requestParameters['bulkUpdateSourcesDto']),
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => BulkUpdateSourcesResponseDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Update scheduling and/or sampling for explicit source IDs or every source matching a filter snapshot. Omitted sections and all other source fields are preserved.
+     * Bulk update data sources
+     */
+    async sourcesControllerBulkUpdateSources(requestParameters: SourcesControllerBulkUpdateSourcesRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<BulkUpdateSourcesResponseDto> {
+        const response = await this.sourcesControllerBulkUpdateSourcesRaw(requestParameters, initOverrides);
         return await response.value();
     }
 

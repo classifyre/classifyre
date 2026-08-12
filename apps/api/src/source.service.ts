@@ -216,6 +216,15 @@ export class SourceService {
     return source;
   }
 
+  decryptSourceConfig(config: unknown): Record<string, unknown> {
+    if (!config || typeof config !== 'object' || Array.isArray(config)) {
+      return {};
+    }
+    return this.maskedConfigCryptoService.decryptMaskedConfig(
+      config as Record<string, unknown>,
+    );
+  }
+
   /**
    * Persist the opaque AUTOMATIC sampling cursor for a source. The value is
    * source-defined and never interpreted here; it is injected into the next

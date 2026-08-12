@@ -12,6 +12,7 @@ All URIs are relative to *http://localhost*
 | [**sourceFilesControllerDelete**](SourcesApi.md#sourcefilescontrollerdelete) | **DELETE** /sources/{sourceId}/files/{fileId} | Delete an uploaded source file |
 | [**sourceFilesControllerList**](SourcesApi.md#sourcefilescontrollerlist) | **GET** /sources/{sourceId}/files | List uploaded files for a Sandbox source |
 | [**sourceFilesControllerUpload**](SourcesApi.md#sourcefilescontrollerupload) | **POST** /sources/{sourceId}/files | Upload one file to a Sandbox source |
+| [**sourcesControllerBulkUpdateSources**](SourcesApi.md#sourcescontrollerbulkupdatesources) | **POST** /sources/bulk-update | Bulk update data sources |
 | [**sourcesControllerCreateSource**](SourcesApi.md#sourcescontrollercreatesource) | **POST** /sources | Create a new data source |
 | [**sourcesControllerDeleteSource**](SourcesApi.md#sourcescontrollerdeletesource) | **DELETE** /sources/{id} | Delete a data source |
 | [**sourcesControllerGetSchedule**](SourcesApi.md#sourcescontrollergetschedule) | **GET** /sources/{id}/schedule | Get source schedule |
@@ -586,6 +587,73 @@ No authorization required
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
 | **201** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## sourcesControllerBulkUpdateSources
+
+> BulkUpdateSourcesResponseDto sourcesControllerBulkUpdateSources(bulkUpdateSourcesDto)
+
+Bulk update data sources
+
+Update scheduling and/or sampling for explicit source IDs or every source matching a filter snapshot. Omitted sections and all other source fields are preserved.
+
+### Example
+
+```ts
+import {
+  Configuration,
+  SourcesApi,
+} from '@workspace/api-client';
+import type { SourcesControllerBulkUpdateSourcesRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new SourcesApi();
+
+  const body = {
+    // BulkUpdateSourcesDto
+    bulkUpdateSourcesDto: ...,
+  } satisfies SourcesControllerBulkUpdateSourcesRequest;
+
+  try {
+    const data = await api.sourcesControllerBulkUpdateSources(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **bulkUpdateSourcesDto** | [BulkUpdateSourcesDto](BulkUpdateSourcesDto.md) |  | |
+
+### Return type
+
+[**BulkUpdateSourcesResponseDto**](BulkUpdateSourcesResponseDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: `application/json`
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** | Sources updated successfully |  -  |
 
 [[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
 
