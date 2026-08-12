@@ -30,6 +30,7 @@ The desktop app runs an **embedded PostgreSQL** instance and one shared, namespa
 |------|---------|
 | `src/main/index.ts` | App entry point, window creation, lifecycle |
 | `src/main/postgres-manager.ts` | Embedded PostgreSQL lifecycle (start/stop/schema) |
+| `src/main/postgres-credentials.ts` | OS-protected PostgreSQL credential journal and rotation policy |
 | `src/main/process-manager.ts` | Spawn, monitor, and stop the shared NestJS API |
 | `src/main/namespace-store.ts` | Read-only API namespace snapshot for native menus |
 | `src/main/settings-manager.ts` | App-wide settings (database port), persisted to `settings.json` |
@@ -45,11 +46,34 @@ The desktop app runs an **embedded PostgreSQL** instance and one shared, namespa
 All data is stored under the Electron `userData` directory (or `CLASSIFYRE_DATA_DIR` if set):
 
 - `pgdata/` — PostgreSQL data directory
+- `postgres-credentials.bin` — OS-protected embedded-database credential journal
 - `settings.json` — app-wide settings (preferred database port)
 - `python-runtime/` — relocated Python venv (only when the install dir is read-only)
 
 Namespace definitions and settings are stored in the embedded database's
 `public.namespaces` registry and exposed through the shared API.
+
+### Embedded database credentials
+
+The desktop app generates a 256-bit PostgreSQL password per installation and
+protects its credential journal with Electron `safeStorage` (macOS Keychain,
+Windows DPAPI, and the available Secret Service/KWallet provider on Linux).
+The file is also restricted to the current OS account. If OS encryption is
+unavailable (most commonly on Linux without a usable keyring), Classifyre uses
+the permission-restricted file as a weaker fallback and records a warning;
+install and unlock a Secret Service or KWallet provider on Linux for
+OS-backed encryption.
+
+The password is rotated automatically after 90 days, only during application
+startup while the API is stopped. Rotation is crash-safe: the old and pending
+credentials are journalled before PostgreSQL is changed, PostgreSQL is then
+restarted and verified with SCRAM-SHA-256, and only then is the old credential
+removed. Existing installations using the historical `classifyre` password
+are migrated through this path on their first upgraded launch.
+
+The encrypted credential is tied to the OS account/keyring. Copying only the
+`userData` directory to a different account or machine is not a supported
+backup; export workspaces from the application instead.
 
 ## Development
 
@@ -173,13 +197,23 @@ CLASSIFYRE_APP_PATH=out/Classifyre-darwin-arm64/Classifyre.app/Contents/MacOS/cl
 
 | Platform | Runner | Artifact |
 |----------|--------|----------|
-| macOS arm64 | `macos-latest` | `.dmg` |
-| macOS x64 | `macos-15-intel` | `.dmg` |
-| Windows x64 | `windows-latest` | `.zip` (portable) |
+| macOS arm64 | `macos-15` | `.dmg` + updater `.zip` |
+| Windows x64 | `windows-latest` | Runnable app directory (`classifyre-desktop.exe` + dependencies) |
 | Linux amd64 | `ubuntu-latest` | `.deb` + `.rpm` |
 | Linux arm64 | `ubuntu-24.04-arm` | `.deb` + `.rpm` |
 
-Each job stages resources with the same `stage-resources.sh` as local builds, packages, ad-hoc signs (macOS), **smoke-tests the packaged binary** (boots the app and waits for the API-backed workspace directory), then creates and uploads installers.
+Each job stages resources with the same `stage-resources.sh` as local builds,
+packages, signs macOS, and **smoke-tests the packaged binary**. Non-Windows
+jobs then create and upload installers; Windows uploads the tested package
+directory itself.
+
+GitHub always downloads a workflow artifact as an outer ZIP. For
+`desktop-win-x64`, that outer archive now contains `classifyre-desktop.exe` and
+the adjacent DLLs and `resources/` directory directly; there is no nested
+portable ZIP to unpack a second time. Keep the whole directory together when
+running the app. Tagged GitHub Releases still expose one portable Windows ZIP,
+reconstructed from this exact smoke-tested workflow artifact so the in-app
+updater can download it as a single file.
 
 ## Updates
 

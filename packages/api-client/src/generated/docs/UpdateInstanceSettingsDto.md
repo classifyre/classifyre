@@ -6,8 +6,6 @@
 
 Name | Type
 ------------ | -------------
-`aiEnabled` | boolean
-`harnessEnabled` | boolean
 `mcpEnabled` | boolean
 `language` | string
 `timezone` | string
@@ -37,8 +35,6 @@ import type { UpdateInstanceSettingsDto } from '@workspace/api-client'
 
 // TODO: Update the object below with actual values
 const example = {
-  "aiEnabled": true,
-  "harnessEnabled": true,
   "mcpEnabled": true,
   "language": ENGLISH,
   "timezone": America/New_York,
