@@ -9,7 +9,8 @@ Autopilot is meant to fit *your* operation, not the other way round. This page
 covers every way to shape what it does — from a single on/off switch to giving
 each agent written guidance and connecting your own tools.
 
-Everything here lives in the **Harness** panel and in **Settings**.
+Everything here lives in **Harness AI**. Provider assignment and external MCP
+access are under **Configuration**; per-agent controls are under **Agents**.
 
 ```mermaid
 graph TD
@@ -149,12 +150,14 @@ See the [MCP Server settings](/settings/mcp-server/) for setup details.
 
 ## Don't forget the AI provider
 
-The agents that reason with a language model — most importantly the **Detector**
-agent — need an **AI provider** configured. If you've enabled an agent and it
-isn't doing anything, the **Setup** section of the System Brief will usually flag
-a missing provider as the reason.
+Harness agents need a provider assigned specifically to the **Harness** role.
+An Assistant assignment is independent and does not enable autonomous runs.
+If an enabled agent is not doing anything, the **Setup** section of the System
+Brief will usually flag a missing Harness provider as the reason.
 
-Configure one under [AI Providers](/settings/ai-providers/).
+Configure and test it under **Harness AI → Configuration**. See
+[AI Providers](/settings/ai-providers/) for the complete setup and capability
+testing guide.
 
 ---
 

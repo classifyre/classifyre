@@ -13516,16 +13516,6 @@
             "type": "number",
             "example": 1
           },
-          "aiEnabled": {
-            "type": "boolean",
-            "description": "When false, AI assistant features are disabled instance-wide.",
-            "example": true
-          },
-          "harnessEnabled": {
-            "type": "boolean",
-            "description": "When false, the autonomous AI harness and all of its agents are disabled instance-wide.",
-            "example": true
-          },
           "mcpEnabled": {
             "type": "boolean",
             "description": "When false, the MCP endpoint is disabled instance-wide.",
@@ -13556,12 +13546,12 @@
           },
           "aiProviderConfigId": {
             "type": "string",
-            "description": "Id of the AI provider credential used by the interactive AI assistant. Null when unset.",
+            "description": "Id of the AI provider credential used by the interactive AI assistant. Assigning a provider enables the Assistant; null disables it.",
             "nullable": true
           },
           "harnessAiProviderConfigId": {
             "type": "string",
-            "description": "Id of the AI provider credential used by the autonomous AI harness. Null when unset.",
+            "description": "Id of the AI provider credential used by the autonomous AI harness. Assigning a provider enables the Harness; null disables it.",
             "nullable": true
           },
           "autopilotInquiryEnabled": {
@@ -13660,8 +13650,6 @@
         },
         "required": [
           "id",
-          "aiEnabled",
-          "harnessEnabled",
           "mcpEnabled",
           "language",
           "timezone",
@@ -13692,16 +13680,6 @@
       "UpdateInstanceSettingsDto": {
         "type": "object",
         "properties": {
-          "aiEnabled": {
-            "type": "boolean",
-            "description": "When false, AI assistant features are disabled instance-wide.",
-            "example": true
-          },
-          "harnessEnabled": {
-            "type": "boolean",
-            "description": "When false, the autonomous AI harness and all of its agents are disabled instance-wide.",
-            "example": true
-          },
           "mcpEnabled": {
             "type": "boolean",
             "description": "When false, the MCP endpoint is disabled instance-wide.",
@@ -13732,12 +13710,12 @@
           },
           "aiProviderConfigId": {
             "type": "string",
-            "description": "Id of the AI provider credential to use for the interactive AI assistant. Pass null or an empty string to clear the selection.",
+            "description": "Id of the AI provider credential to use for and enable the interactive AI assistant. Pass null or an empty string to clear the selection and disable it.",
             "nullable": true
           },
           "harnessAiProviderConfigId": {
             "type": "string",
-            "description": "Id of the AI provider credential to use for the autonomous AI harness. Pass null or an empty string to clear the selection.",
+            "description": "Id of the AI provider credential to use for and enable the autonomous AI harness. Pass null or an empty string to clear the selection and disable it.",
             "nullable": true
           },
           "autopilotInquiryEnabled": {

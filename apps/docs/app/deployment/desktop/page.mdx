@@ -135,6 +135,7 @@ Everything is stored under the Electron `userData` directory, or under
 Inside it:
 
 - `pgdata/` — the PostgreSQL data directory (workspaces, findings, cases)
+- `postgres-credentials.bin` — the OS-protected embedded-database credential journal
 - `runner-logs/` — per-run scan logs as NDJSON, size-capped
 - `logs/` — application logs
 - `settings.json` — app-wide settings, such as the preferred database port
@@ -149,6 +150,27 @@ Inside it:
 
 Source credentials are encrypted at rest in the embedded database, the same
 way they are in a cluster deployment.
+
+The embedded database has a separate, random 256-bit password for each desktop
+installation. Classifyre protects it with the operating system's credential
+encryption (Keychain on macOS, DPAPI on Windows, and Secret Service or KWallet
+on Linux), restricts PostgreSQL to loopback, and requires SCRAM-SHA-256
+authentication. If OS encryption is unavailable (most commonly on Linux
+without a usable keyring), the credential retains account-only file permissions
+but has weaker protection at rest; installing and unlocking Secret Service or
+KWallet enables OS-backed encryption on Linux.
+
+Classifyre rotates this password every 90 days during startup, before the API
+starts. The change is journalled and PostgreSQL must restart successfully with
+the new password before the old value is discarded, so an interrupted update
+does not lock the app out. Upgrading an older desktop installation also
+replaces the historical default password on its first launch.
+
+<Callout type="warning">
+  The encrypted database credential is tied to the current OS account and its
+  keyring. Copying the application data directory by itself to another account
+  or machine is not a supported backup. Export the workspaces you need to move.
+</Callout>
 
 ---
 
