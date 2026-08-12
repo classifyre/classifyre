@@ -235,6 +235,10 @@ export type {
   CreateSourceDto,
   CreateMcpTokenDto,
   UpdateSourceDto,
+  BulkUpdateSourcesDto,
+  BulkUpdateSourcesResponseDto,
+  BulkUpdateSourcesSamplingDto,
+  BulkUpdateSourcesScheduleDto,
   UpdateMcpTokenDto,
   SourceResponseDto as CreateSourceResponse,
   SourceResponseDto as UpdateSourceResponse,
@@ -359,6 +363,8 @@ export {
 } from "./generated/src/models";
 
 export {
+  BulkUpdateSourcesSamplingDtoStrategyEnum,
+  BulkUpdateSourcesScheduleDtoModeEnum,
   BulkUpdateFindingsDtoStatusEnum,
   BulkUpdateFindingsDtoSeverityEnum,
   NotificationResponseDtoSeverityEnum,

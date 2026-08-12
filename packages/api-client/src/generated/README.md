@@ -258,6 +258,7 @@ All URIs are relative to *http://localhost*
 *SourcesApi* | [**sourceFilesControllerDelete**](docs/SourcesApi.md#sourcefilescontrollerdelete) | **DELETE** /sources/{sourceId}/files/{fileId} | Delete an uploaded source file
 *SourcesApi* | [**sourceFilesControllerList**](docs/SourcesApi.md#sourcefilescontrollerlist) | **GET** /sources/{sourceId}/files | List uploaded files for a Sandbox source
 *SourcesApi* | [**sourceFilesControllerUpload**](docs/SourcesApi.md#sourcefilescontrollerupload) | **POST** /sources/{sourceId}/files | Upload one file to a Sandbox source
+*SourcesApi* | [**sourcesControllerBulkUpdateSources**](docs/SourcesApi.md#sourcescontrollerbulkupdatesources) | **POST** /sources/bulk-update | Bulk update data sources
 *SourcesApi* | [**sourcesControllerCreateSource**](docs/SourcesApi.md#sourcescontrollercreatesource) | **POST** /sources | Create a new data source
 *SourcesApi* | [**sourcesControllerDeleteSource**](docs/SourcesApi.md#sourcescontrollerdeletesource) | **DELETE** /sources/{id} | Delete a data source
 *SourcesApi* | [**sourcesControllerGetSchedule**](docs/SourcesApi.md#sourcescontrollergetschedule) | **GET** /sources/{id}/schedule | Get source schedule
@@ -334,6 +335,10 @@ All URIs are relative to *http://localhost*
 - [BulkIngestEdgesResponseDto](docs/BulkIngestEdgesResponseDto.md)
 - [BulkUpdateFindingsDto](docs/BulkUpdateFindingsDto.md)
 - [BulkUpdateFindingsResponseDto](docs/BulkUpdateFindingsResponseDto.md)
+- [BulkUpdateSourcesDto](docs/BulkUpdateSourcesDto.md)
+- [BulkUpdateSourcesResponseDto](docs/BulkUpdateSourcesResponseDto.md)
+- [BulkUpdateSourcesSamplingDto](docs/BulkUpdateSourcesSamplingDto.md)
+- [BulkUpdateSourcesScheduleDto](docs/BulkUpdateSourcesScheduleDto.md)
 - [CapabilityCostProjectionDto](docs/CapabilityCostProjectionDto.md)
 - [CapabilityProbeResultDto](docs/CapabilityProbeResultDto.md)
 - [CaseActionRequestDto](docs/CaseActionRequestDto.md)

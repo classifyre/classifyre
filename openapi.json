@@ -66,6 +66,39 @@
         ]
       }
     },
+    "/sources/bulk-update": {
+      "post": {
+        "description": "Update scheduling and/or sampling for explicit source IDs or every source matching a filter snapshot. Omitted sections and all other source fields are preserved.",
+        "operationId": "SourcesController_bulkUpdateSources",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkUpdateSourcesDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Sources updated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BulkUpdateSourcesResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Bulk update data sources",
+        "tags": [
+          "Sources"
+        ]
+      }
+    },
     "/sources": {
       "post": {
         "description": "Register a new data source for metadata ingestion (WordPress, Slack, S3-Compatible Storage, Azure Blob Storage, Google Cloud Storage, PostgreSQL, MySQL, MSSQL, Oracle, Hive, Databricks, Snowflake, MongoDB, PowerBI, Tableau, Confluence, Jira, Service Desk, Notion, Email, YouTube).",
@@ -9725,6 +9758,194 @@
   "servers": [],
   "components": {
     "schemas": {
+      "SearchSourcesFiltersDto": {
+        "type": "object",
+        "properties": {
+          "search": {
+            "type": "string",
+            "description": "Filter by source name (case-insensitive contains)"
+          },
+          "type": {
+            "type": "array",
+            "description": "Filter by source type",
+            "items": {
+              "type": "string",
+              "enum": [
+                "JIRA",
+                "CONFLUENCE",
+                "CROWD",
+                "BITBUCKET",
+                "SERVICEDESK",
+                "XRAY",
+                "GOOGLE_DRIVE",
+                "GOOGLE_SHEETS",
+                "GOOGLE_DOCS",
+                "GOOGLE_SLIDES",
+                "WORDPRESS",
+                "SLACK",
+                "S3_COMPATIBLE_STORAGE",
+                "AZURE_BLOB_STORAGE",
+                "GOOGLE_CLOUD_STORAGE",
+                "POSTGRESQL",
+                "MYSQL",
+                "MSSQL",
+                "ORACLE",
+                "HIVE",
+                "DATABRICKS",
+                "SNOWFLAKE",
+                "MONGODB",
+                "NEO4J",
+                "SQLITE",
+                "NOTION",
+                "POWERBI",
+                "TABLEAU",
+                "EMAIL",
+                "YOUTUBE",
+                "REDDIT",
+                "DELTA_LAKE",
+                "ICEBERG",
+                "KAFKA",
+                "ELASTICSEARCH",
+                "OPENSEARCH",
+                "MEILISEARCH",
+                "LOCAL_FOLDER",
+                "MICROSOFT_365",
+                "GOOGLE_WORKSPACE",
+                "DROPBOX",
+                "HUGGING_FACE",
+                "GIT",
+                "SANDBOX",
+                "CUSTOM"
+              ]
+            }
+          },
+          "status": {
+            "type": "array",
+            "description": "Filter by runner status",
+            "items": {
+              "type": "string",
+              "enum": [
+                "PENDING",
+                "RUNNING",
+                "COMPLETED",
+                "WARNING",
+                "ERROR"
+              ]
+            }
+          }
+        }
+      },
+      "BulkUpdateSourcesScheduleDto": {
+        "type": "object",
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "OFF",
+              "CRON",
+              "AUTO"
+            ]
+          },
+          "cron": {
+            "type": "string",
+            "example": "30 1 * * *"
+          },
+          "timezone": {
+            "type": "string",
+            "example": "UTC"
+          }
+        },
+        "required": [
+          "mode"
+        ]
+      },
+      "BulkUpdateSourcesSamplingDto": {
+        "type": "object",
+        "properties": {
+          "strategy": {
+            "type": "string",
+            "enum": [
+              "AUTOMATIC",
+              "RANDOM",
+              "LATEST",
+              "ALL"
+            ]
+          },
+          "order_by_column": {
+            "type": "string"
+          },
+          "fallback_to_random": {
+            "type": "boolean"
+          },
+          "rows_per_page": {
+            "type": "number",
+            "minimum": 10,
+            "maximum": 10000
+          },
+          "include_column_names": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "strategy"
+        ]
+      },
+      "BulkUpdateSourcesDto": {
+        "type": "object",
+        "properties": {
+          "ids": {
+            "description": "Explicit source IDs to update. Use either ids or filters.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "filters": {
+            "description": "Update every source matching this filter snapshot.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SearchSourcesFiltersDto"
+              }
+            ]
+          },
+          "schedule": {
+            "description": "New schedule for all selected sources. Omit to leave schedules unchanged.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/BulkUpdateSourcesScheduleDto"
+              }
+            ]
+          },
+          "sampling": {
+            "description": "New sampling block for all selected sources. Other config sections are preserved.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/BulkUpdateSourcesSamplingDto"
+              }
+            ]
+          }
+        }
+      },
+      "BulkUpdateSourcesResponseDto": {
+        "type": "object",
+        "properties": {
+          "updatedCount": {
+            "type": "number",
+            "description": "Number of sources successfully updated"
+          },
+          "ids": {
+            "description": "IDs of updated sources",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "updatedCount",
+          "ids"
+        ]
+      },
       "CreateSourceDto": {
         "type": "object",
         "properties": {
@@ -10149,83 +10370,6 @@
           "createdAt",
           "updatedAt"
         ]
-      },
-      "SearchSourcesFiltersDto": {
-        "type": "object",
-        "properties": {
-          "search": {
-            "type": "string",
-            "description": "Filter by source name (case-insensitive contains)"
-          },
-          "type": {
-            "type": "array",
-            "description": "Filter by source type",
-            "items": {
-              "type": "string",
-              "enum": [
-                "JIRA",
-                "CONFLUENCE",
-                "CROWD",
-                "BITBUCKET",
-                "SERVICEDESK",
-                "XRAY",
-                "GOOGLE_DRIVE",
-                "GOOGLE_SHEETS",
-                "GOOGLE_DOCS",
-                "GOOGLE_SLIDES",
-                "WORDPRESS",
-                "SLACK",
-                "S3_COMPATIBLE_STORAGE",
-                "AZURE_BLOB_STORAGE",
-                "GOOGLE_CLOUD_STORAGE",
-                "POSTGRESQL",
-                "MYSQL",
-                "MSSQL",
-                "ORACLE",
-                "HIVE",
-                "DATABRICKS",
-                "SNOWFLAKE",
-                "MONGODB",
-                "NEO4J",
-                "SQLITE",
-                "NOTION",
-                "POWERBI",
-                "TABLEAU",
-                "EMAIL",
-                "YOUTUBE",
-                "REDDIT",
-                "DELTA_LAKE",
-                "ICEBERG",
-                "KAFKA",
-                "ELASTICSEARCH",
-                "OPENSEARCH",
-                "MEILISEARCH",
-                "LOCAL_FOLDER",
-                "MICROSOFT_365",
-                "GOOGLE_WORKSPACE",
-                "DROPBOX",
-                "HUGGING_FACE",
-                "GIT",
-                "SANDBOX",
-                "CUSTOM"
-              ]
-            }
-          },
-          "status": {
-            "type": "array",
-            "description": "Filter by runner status",
-            "items": {
-              "type": "string",
-              "enum": [
-                "PENDING",
-                "RUNNING",
-                "COMPLETED",
-                "WARNING",
-                "ERROR"
-              ]
-            }
-          }
-        }
       },
       "SearchSourcesPageDto": {
         "type": "object",
