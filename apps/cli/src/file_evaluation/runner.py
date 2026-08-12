@@ -24,8 +24,14 @@ class FileEvaluationRunner:
         # output so callers can distinguish "misconfigured detector" from
         # "no findings".
         self.detector_errors: list[str] = []
+        self._detectors: list[Any] | None = None
 
     def _build_detectors(self) -> list[Any]:
+        # A detector test commonly contains a positive and a counterexample.
+        # Keep heavyweight GLiNER/HuggingFace models alive across both files.
+        if self._detectors is not None:
+            return self._detectors
+
         from ..detectors import get_detector
         from ..detectors.config import parse_detector_config
 
@@ -50,6 +56,7 @@ class FileEvaluationRunner:
                 logger.error(f"Failed to initialize detector {detector_type}: {e}")
                 self.detector_errors.append(f"{detector_type}: {e}")
 
+        self._detectors = detectors
         return detectors
 
     @staticmethod

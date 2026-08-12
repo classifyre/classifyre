@@ -122,11 +122,11 @@ export class AutopilotService {
   ): Promise<TriggerAutopilotResponseDto> {
     const settings = await this.prisma.instanceSettings.findUnique({
       where: { id: 1 },
-      select: { harnessEnabled: true, harnessAiProviderConfigId: true },
+      select: { harnessAiProviderConfigId: true },
     });
-    if (!settings?.harnessEnabled || !settings.harnessAiProviderConfigId) {
+    if (!settings?.harnessAiProviderConfigId) {
       throw new BadRequestException(
-        'Enable the AI harness and select its provider before triggering the autopilot.',
+        'Assign an AI Harness provider before triggering the autopilot.',
       );
     }
     if (dto.sourceId) {
@@ -234,11 +234,11 @@ export class AutopilotService {
   async triggerDream(): Promise<TriggerAutopilotResponseDto> {
     const settings = await this.prisma.instanceSettings.findUnique({
       where: { id: 1 },
-      select: { harnessEnabled: true, harnessAiProviderConfigId: true },
+      select: { harnessAiProviderConfigId: true },
     });
-    if (!settings?.harnessEnabled || !settings.harnessAiProviderConfigId) {
+    if (!settings?.harnessAiProviderConfigId) {
       throw new BadRequestException(
-        'Enable the AI harness and select its provider before triggering a dream cycle.',
+        'Assign an AI Harness provider before triggering a dream cycle.',
       );
     }
     const cycleKey = `dream:manual:${randomUUID()}`;

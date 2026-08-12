@@ -1,0 +1,640 @@
+---
+title: How AI Investigated 9,601 Hillary Clinton Emails
+description: See how Classifyre autonomously investigated 9,601 Hillary Clinton email files, tested 20 detectors, and opened eight evidence-backed cases.
+date: 2026-08-11T00:00:00.000Z
+tags:
+  - investigations
+  - detector-design
+  - public-data
+  - ai-agents
+categories:
+  - Field Notes
+author: Banandre
+---
+
+# How AI Investigated 9,601 Hillary Clinton Emails
+
+*Field notes · 11 August 2026 · 23 minute read*
+
+At 10:22 UTC on 8 August 2026, Classifyre opened its first inquiry into the
+Clinton email corpus. It was not about classification markings, diplomatic
+cables, or legal privilege. It was about email addresses.
+
+The system had found a simple pattern in the first part of the scan: official
+`state.gov` addresses and personal `clintonemail.com` addresses recurring in
+the same body of correspondence. Eight minutes later, it opened a case to ask
+what that overlap meant. It attached evidence, proposed two testable
+hypotheses, and added the first names and aliases to a working glossary.
+
+That was the beginning of our first investigation of real public data with
+Classifyre. Over the next three days, the same AI harness wrote and tested
+detectors, retired ideas that produced nothing, separated release stamps from
+substantive markings, opened seven standing inquiries, and assembled eight
+cases for review.
+
+You can inspect the resulting
+[Clinton email investigation in the Classifyre demo](https://demo.classifyre.com/hillary-clinton-emails-2).
+The namespace exposes the detectors, inquiries, cases, hypotheses, discussion
+threads, and timelines described below.
+
+> **The short answer:** Classifyre autonomously scanned 9,601 public Hillary
+> Clinton email files, tested 20 detector ideas, kept 14, retired six, built
+> seven monitoring inquiries, and opened eight evidence-backed cases. The AI
+> did the investigative organisation itself; people still verify terminology
+> and decide what the evidence ultimately means.
+
+This is the record of how it happened. It is not a verdict on the people in the
+corpus, and a detector match is not proof of wrongdoing. The open cases are
+questions with evidence attached, not conclusions with question marks added
+afterward.
+
+> **Screenshot 1 — namespace overview.** Add the `hillary-clinton-emails-2`
+> overview with the system brief visible. Include the single source, 9,601
+> assets, seven active inquiries, and eight open cases. Capture the updated
+> brief beginning “This instance investigates…” and the public demo URL. Avoid
+> showing credentials.
+
+## One source, deliberately
+
+We connected one source:
+[from-our-page/hillary-clinton-emails-wikileaks](https://huggingface.co/datasets/from-our-page/hillary-clinton-emails-wikileaks),
+a public text dataset on Hugging Face. We did not add newspaper coverage,
+Congressional reports, biographies, or a second copy of the archive. At the
+snapshot used for this article, Classifyre had ingested 9,601 text assets from
+that source. They had produced 312,733 open finding rows, a volume dominated by
+broad entity detection and recurring release metadata rather than 312,733
+separate conclusions.
+
+The narrow scope was useful. It forced the system to distinguish what the
+documents actually contain from what is commonly said about them. It also
+created an important limit: this investigation can establish that a string,
+marking, address, or release code appears in this corpus. It cannot, from this
+source alone, settle why it appears, whether the underlying document is
+authentic in every respect, or what legal conclusion follows.
+
+The first scan used the built-in PII detector. That gave the harness names,
+places, dates, addresses, URLs, and other entities to work with. It also gave
+it a great deal of rubbish. Ordinary words such as “Thankfully,” “OBITUARY,”
+“IRELAND,” and “Breakthrough” were sometimes labelled as people or places.
+Relative phrases such as “last weekend” appeared as dates. OCR damage turned
+addresses into variants such as `clintonennail.com` and `clintonemall.co`.
+
+This mattered because many of those mistakes ranked highly. A unique bad
+extraction can look statistically unusual, and unusual is not the same as
+important. The harness learned that lesson early and stored it in memory: in
+this corpus, generic PERSON, LOCATION, DATE_TIME, and NRP findings required
+scepticism; email addresses were the cleaner starting signal.
+
+> **Screenshot 2 — the source and scan state.** Add the Hugging Face source
+> detail showing its name, type, automatic sampling, completed status, and
+> catch-up cursor. If the configuration panel is visible, crop or redact the
+> encrypted token field. A second crop can show one 100-asset catch-up run and
+> its text-coverage result.
+
+## What the harness actually did
+
+“The AI investigated it” is too vague to be useful. The work was divided among
+agents with different jobs and different mutation rights:
+
+| Agent | Its job in this investigation |
+| --- | --- |
+| Inquiry | Find coherent, watchable groups of findings and create saved monitors. |
+| Case | Turn monitored findings into cases, attach evidence, and maintain hypotheses and notes. |
+| Config | Adjust source and correlation settings when noise or missing coverage became visible. |
+| Detector author | Propose one missing class at a time, test it, create it, wire it to the source, and check the real scan result. |
+| Escalation | Notify an operator only after checking that a case had substantive, non-boilerplate evidence. |
+| Dream | Consolidate memory and rewrite the short system brief after the investigation had accumulated enough history. |
+
+A separate duplicate pass maintained fingerprints and clusters as the corpus
+grew. This was not cosmetic. At one point, the ubiquitous `UNCLASSIFIED`
+release stamp and generic date values were making unrelated documents look
+nearly identical. The configuration agent reduced their correlation weight to
+zero, allowing shared addresses, names, and specific detector values to carry
+more of the comparison.
+
+As of 15:13 UTC on 11 August, the audit trail contained 743 agent runs:
+
+| Run type | Runs |
+| --- | ---: |
+| Duplicate and fingerprint maintenance | 476 |
+| Inquiry review | 65 |
+| Source and correlation configuration | 61 |
+| Case work | 51 |
+| Escalation review | 45 |
+| Detector authoring | 44 |
+| Memory consolidation | 1 |
+
+Those runs produced 1,270 recorded business actions and 115 long-lived memory
+entries. The memory store was not a transcript dump. It held source profiles,
+detector lessons, entity maps, and decision precedents such as “do not open a
+blanket inquiry over noisy PERSON findings” and “do not alert this case again
+unless its severity rises.”
+
+The investigation work itself is attributable in the API: the seven inquiries
+and eight cases were created by `ai-autopilot`, detector creation and source
+changes appear as agent decisions, and case evidence has the same audit trail.
+Humans were not removed from responsibility. The glossary entries were
+operator-verified, and the cases remain open for human review.
+
+### What “autonomous” meant here
+
+No operator handed the harness a prepared list of eight cases. The agents
+repeated a stateful loop: inspect what the namespace knows, choose one uncovered
+question, take a permitted action, test the result, record the decision, and
+return later when the scan has changed. The work survived between runs in the
+namespace rather than disappearing at the end of a chat response.
+
+That distinction is visible in the sequence of events:
+
+| UTC time | What the AI did |
+| --- | --- |
+| 8 Aug, 10:22 | Created the first inquiry after identifying email addresses as the cleanest useful signal in noisy PII output. |
+| 8 Aug, 10:30 | Opened the personal-versus-official email case, selected evidence, and drafted two hypotheses. |
+| 8 Aug, 10:38 | Began the first custom-detector probe, recovered from two invalid tool inputs, passed positive and counter-example tests, and sent the detector to the source. |
+| 8 Aug, 13:15–18:28 | Added handling, network, cable, and legal-privilege inquiries as their detector results became reviewable. |
+| 9 Aug, 00:20 | Opened the high-severity Top Secret case, then noticed that the related inquiry did not actually include `regex:top_secret`. |
+| 9 Aug, 01:34 | Widened the existing handling inquiry instead of creating a duplicate monitor. |
+| 9 Aug, 02:44 | Revisited the Top Secret case after a re-sweep, explained two new findings, attached them, and recorded that 427 other high-ranked items were PII noise. |
+| 9–10 Aug | Opened the FOIA and Foundation cases, linked new evidence, and identified FOIA release controls as a coherent group that still lacked an inquiry. |
+| 11 Aug | Rechecked open themes at full-corpus coverage and retained unresolved hypotheses rather than forcing closure. |
+
+This is what the automation brought in practice: persistence. A detector author
+could create a new signal; the inquiry agent could notice it; the case agent
+could attach selected evidence and state a hypothesis; and a later run could
+challenge, expand, or reject the earlier work. Every step left a timeline entry
+that an investigator can inspect.
+
+> **Screenshot 3 — flight recorder.** Add the first detector-author run from
+> 8 August. Show the business log from “No existing custom detectors” through
+> the failed input attempts, the positive test, the counter-example, detector
+> creation, source tuning, and rescan. This is the clearest visual proof that
+> the result came from an audited harness rather than a prepared demo script.
+
+## The first useful question was not the dramatic one
+
+The inquiry agent’s first saved monitor watched email addresses. Its rationale
+was plain: these were readable, high-confidence values with cross-document
+recurrence, and no inquiry covered them.
+
+The case agent then opened **Personal email accounts in official State
+Department correspondence**. Today it is the only case marked `IN_PROGRESS`;
+the other seven remain `OPEN`. It contains 17 evidence assets and 19 attached
+email-address findings. The attached set includes `state.gov` correspondents,
+personal `clintonemail.com` addresses, an `att.blackberry.net` address, and OCR
+variants that the case treats as damaged forms rather than new identities.
+
+Two hypotheses are currently marked supported:
+
+- personal `clintonemail.com` accounts carried official State Department
+  correspondence — confidence 0.75;
+- State Department officials were correspondents in that traffic — confidence
+  0.70.
+
+Those confidence values describe the state of the case, not a legal judgment.
+The strongest evidence is co-occurrence in the corpus: official and personal
+addresses appearing in the same messages, plus recurrence across documents.
+
+This first case also set a pattern for the rest of the investigation. The
+harness did not open a case for every high-ranked item. It reviewed the noisy
+unmonitored groups, documented why they were weak, and kept returning to the
+address pattern because it survived that review.
+
+## How a detector probe became a real detector
+
+At 10:38 UTC, the detector-author agent took its first turn. It saw a State
+Department email corpus with built-in PII findings but no custom detectors. It
+hypothesised that classification and handling markings were a missing class:
+`SECRET`, `CONFIDENTIAL`, `SBU`, `NOFORN`, `FOUO`, `EYES ONLY`, and related
+forms.
+
+The probe was a four-stage process.
+
+1. **Test a positive sample.** The agent supplied representative text that
+   should match the proposed regular expressions.
+2. **Test a counter-example.** It supplied ordinary prose containing nearby
+   words, designed to catch over-broad patterns.
+3. **Test the saved detector.** After creation, it tested by detector ID to
+   make sure the stored configuration behaved like the draft.
+4. **Run it on the corpus.** Only then did it add the detector to the source,
+   request a rescan, and leave a pending-verification memory for the next
+   cycle.
+
+The first attempt was not smooth. The agent sent one invalid extra property,
+then wrapped the pipeline schema at the wrong level. Both calls failed. On the
+third attempt, the positive sample produced nine expected findings. The
+counter-example produced none. The saved detector then found seven expected
+items in the positive sample and zero in the counter-example.
+
+That distinction — a passing synthetic probe followed by a real-corpus check —
+became essential. Several ideas passed their positive and negative examples
+but produced zero findings in the actual email set. A correct pattern for text
+that is absent is still an unsuccessful investigative probe.
+
+## What worked, and what did not
+
+The harness created 20 detector concepts over the three-day review. Fourteen
+are active now. Thirteen currently have findings; the newest compartmented-
+access detector has none.
+
+These are the active detectors at the article snapshot. “Finding rows” is the
+API’s current count, not a count of people, offences, or unique documents.
+Release boilerplate and repeated values can make that number large.
+
+| Active detector | What it looks for | Finding rows |
+| --- | --- | ---: |
+| `classified_handling_marks` | SECRET, CONFIDENTIAL, SBU, NOFORN, FOUO, EYES ONLY, UNCLASSIFIED | 10,483 |
+| `classified_network_references` | SIPRNet, NIPRNet, JWICS, STU-III | 4 |
+| `diplomatic_cable_references` | STATE, SECSTATE, and embassy cable references | 4 |
+| `state_dissemination_controls` | LIMDIS, NODIS, SIPDIS, REL TO, E.O. references | 19 |
+| `legal_privilege_markers` | Attorney-client, work-product, and privileged/confidential markers | 28 |
+| `clinton_foundation_references` | Clinton Foundation and Clinton Global Initiative names | 24 |
+| `foia_release_control_numbers` | FOIA case, document number, and release-status stamps | 27,655 |
+| `top_secret_handling_marks` | TOP SECRET and TS compartment forms | 12 |
+| `foia_case_number` | State Department FOIA case numbers | 9,641 |
+| `classification_authority_markings` | Classification authority blocks | 8 |
+| `foia_exemption_redaction_codes` | Parenthetical exemptions and standalone B1–B7 lines | 3,731 |
+| `state_dissemination_control_markings` | EXDIS, ORCON, PROPIN, REL TO, and similar controls | 1 |
+| `classification_reason_codes` | E.O. 13526 reason codes such as 1.4(B) | 602 |
+| `compartmented_access_handling_marks` | SCI, SAR, TALENT KEYHOLE, BYEMAN, channel controls | 0 |
+
+The zeroes were as informative as the hits. Six earlier concepts were retired
+from the active set after the real corpus did not support them:
+
+| Retired probe | What happened |
+| --- | --- |
+| `intelligence_community_markers` | The sample probe worked, but the scan found no SIGINT/HUMINT/COMINT-style marker set. |
+| `cable_distribution_markings` | No real cable distribution lines were found. |
+| `foia_exemption_codes` | The first inline/parenthetical version found nothing; the useful format turned out to be standalone State release-block codes. |
+| `declassification_instructions` | The pattern correctly matched test text such as `DECLASSIFY ON`, but the corpus produced no findings. |
+| `sipdis_distribution_control_marking` | The dedicated SIPDIS pattern passed its tests and then found no SIPDIS marking in the corpus. |
+| `state_cable_tags` | A `TAGS: PREL, KDEM`-style probe passed, but there was no real output and it was retired. |
+
+The harness also refused some bad additions before they reached the active
+set. It rejected a custom email-address detector because the built-in
+EMAIL_ADDRESS pattern already covered that class. It rejected near-duplicate
+FOIA and classification-authority detectors and told the agent to sharpen the
+existing detector instead. At another point, it blocked new authoring until
+three zero-finding detectors were resolved. These refusals prevented the
+catalogue from becoming a list of slightly different names for the same idea.
+
+The newest zero-result detector,
+`compartmented_access_handling_marks`, remains active. It searches for the most
+sensitive special-access terms. At this snapshot it has found nothing. The
+honest result is not “the corpus is clear”; it is “this detector has no matches
+and still needs a completed review or retirement decision.”
+
+> **Screenshot 4 — detector catalogue.** Add the active detector list with
+> finding counts. Include `classified_network_references` (4),
+> `top_secret_handling_marks` (12), and
+> `compartmented_access_handling_marks` (0) in the same frame. If space allows,
+> add a flight-recorder crop of the guardrail refusing a duplicate email
+> detector.
+
+## The glossary became part of the method
+
+The agents proposed a glossary as they encountered names, aliases, damaged
+spellings, release codes, and institutional references. Operators verified all
+17 current entries.
+
+The glossary is small enough to inspect:
+
+| Type | Entries |
+| --- | --- |
+| People (9) | Hillary Clinton; Huma Abedin; Cheryl Mills; Jacob “Jake” Sullivan; Sidney Blumenthal; Abdullah bin Zayed Al Nahyan; Hamad bin Khalifa Al-Thani; Hamad bin Isa al-Khalifa; Rachel Kleinfeld |
+| References (7) | `clintonemail.com`; SIPRNet; FOIA cases F-2014-20439 and F-2016-07895; FOIA exemption codes; FOIA release control number; classification reason code |
+| Organisation (1) | Clinton Foundation, including William J. Clinton Foundation, WJC Foundation, Clinton Global Initiative, and CGI aliases |
+
+This was more than a list of definitions. It stopped the system from treating
+`HRC`, `HDR22`, and “Hillary Rodham Clinton” as unrelated; connected
+`SullivanJJ@state.gov` with Jacob Sullivan; and recorded that
+`clintonennail.com` and `clintonemall.co` are OCR or spelling variants found in
+the data.
+
+It also separated terms that look similar but answer different questions. A
+FOIA exemption code such as B1 or B5 explains a release redaction. A
+classification reason code such as 1.4(B) states the classification category.
+A `Doc No. C057xxxxx` value identifies a released document. Treating all three
+as one “classification code” would destroy the structure needed for the FOIA
+case.
+
+> **Screenshot 5 — glossary.** Add a split view with the term list on the left
+> and one reference entry on the right. “FOIA exemption codes” or
+> “Classification reason code” best demonstrates aliases, notes, agent origin,
+> and operator verification. A second option is `clintonemail.com`, showing the
+> OCR variants.
+
+## Seven inquiries: what the system keeps watching
+
+An inquiry is a saved monitor, not a case. It answers: “Which new findings
+belong to this question?” The seven active inquiries currently contain the
+following match rows:
+
+| Inquiry | Current matches | What it watches |
+| --- | ---: | --- |
+| State Department correspondents’ email addresses | 16,517 | Built-in EMAIL_ADDRESS findings in the source |
+| Classified handling marks | 1,540 | Handling, Top Secret, and classification-reason detectors, excluding the ubiquitous UNCLASSIFIED stamp |
+| Classified network references | 4 | The classified-network detector, currently SIPRNet matches |
+| State Department diplomatic cable references | 4 | Cable-reference formats |
+| Legal privilege markers | 28 | The legal-privilege detector |
+| Clinton Foundation references | 24 | Foundation and CGI names |
+| FOIA exemption redaction codes | 3,731 | The exemption-code detector |
+
+The monitor sizes should not be compared as if they were vote totals. One
+email can contain several addresses. A release code can recur in repeated
+material. A four-match inquiry can be more important than one with thousands.
+The inquiry is useful because it preserves a narrow rule and supplies new
+material to the linked case.
+
+The inquiry agent also changed its mind when necessary. The Top Secret case
+initially exposed a monitoring gap: its `regex:top_secret` findings were not in
+the handling inquiry’s finding-type filter. A later update widened the existing
+inquiry rather than create another monitor for the same classification theme.
+The current inquiry also includes classification reason codes.
+
+This is a useful difference between search and an inquiry. A search gives an
+answer for one moment. These inquiries preserve the source, detector keys,
+finding types, and exclusions that define each question. When the source scan
+advanced, the agent did not have to rediscover the question; it checked the new
+matches against the same rule. All seven were created by `ai-autopilot`, and
+each is linked to the case or cases that explain why the monitor exists.
+
+> **Screenshot 6 — inquiry list.** Add the seven active inquiries with match
+> counts. Then add a detail crop for “Classified handling marks” showing the
+> three custom detector keys and the exclusion of `regex:unclassified`.
+
+## Eight cases: the questions left open
+
+Cases are narrower and more demanding than inquiries. They hold selected
+evidence, attached findings, hypotheses, notes, and links back to their
+monitors. The harness opened all eight current cases.
+
+| Case | Status | Severity | Evidence assets / attached findings |
+| --- | --- | --- | ---: |
+| Personal email accounts in official State Department correspondence | In progress | High | 17 / 19 |
+| Classified handling marks | Open | Medium | 8 / 9 |
+| Classified network references | Open | Medium | 4 / 4 |
+| Legal privilege markers | Open | Medium | 5 / 6 |
+| State Department diplomatic cable references | Open | Medium | 2 / 4 |
+| Top Secret handling marks | Open | High | 5 / 5 |
+| FOIA exemption redaction codes | Open | Medium | 7 / 7 |
+| Clinton Foundation references | Open | Medium | 2 / 2 |
+
+### The case index: hypotheses, threads, and timelines
+
+The case list is not just eight titles generated from detector names. At this
+snapshot, the case files contain 16 AI-created threads, 41 thread entries, and
+158 timeline events. Hypothesis threads preserve the claim being tested and
+its current status. Discussion threads hold re-sweep notes, monitoring gaps,
+noise decisions, and follow-up work. Timelines show when evidence, inquiry
+links, notes, and supporting relationships changed.
+
+| Case | Hypotheses at this snapshot | Threads / entries | Timeline events |
+| --- | --- | ---: | ---: |
+| Personal and official email accounts | Two supported: 0.75 and 0.70 confidence | 3 / 7 | 50 |
+| Classified handling marks | Supported at 0.70; competing residual-stamp explanation proposed at 0.40 | 3 / 11 | 26 |
+| Classified network references | SIPRNet presence supported at 0.60; incidental-reference explanation proposed at 0.40 | 3 / 5 | 16 |
+| Legal privilege markers | Privilege-marker language supported at 0.60 | 1 / 1 | 9 |
+| Diplomatic cable references | Multi-asset presence supported at 0.60 | 1 / 1 | 7 |
+| Top Secret handling marks | Genuine-stamp interpretation proposed at 0.40 | 2 / 4 | 13 |
+| FOIA exemption codes | Release-redaction interpretation supported at 0.80 | 2 / 11 | 32 |
+| Clinton Foundation references | Presence in official correspondence supported at 0.70 | 1 / 1 | 5 |
+
+The confidence figures are deliberately exposed because they make the cases
+reviewable. The AI was allowed to say “supported” when selected evidence met
+the working hypothesis, but it was also allowed to keep a competing explanation
+at 0.40. In the handling and SIPRNet cases, that is exactly what it did. This is
+more useful than a one-line AI summary because a reviewer can inspect the claim,
+the evidence linked in support, the counter-position, and the chronology that
+produced them.
+
+> **Screenshot 7 — case threads and timeline.** Add the personal-email case
+> with its hypothesis and Autopilot discussion threads listed beside the case
+> timeline. Keep at least one evidence-added event, one hypothesis event, and
+> one later agent note visible. This is the clearest marketing view of the
+> investigation as maintained work rather than a generated report.
+
+### Classification markings without a premature conclusion
+
+The general handling-mark case contains attached examples of `SECRET`,
+`NOFORN`, `EYES ONLY`, and `Top Secret`. Its supported hypothesis is limited:
+the corpus contains genuine-looking classification and handling markings. A
+second hypothesis remains proposed: the markings may be residual stamps on
+forwarded or quoted material rather than classifications applied to the email
+itself.
+
+The separate **Top Secret handling marks** case is `HIGH` severity because its
+attached findings are `CRITICAL`. One `Top Secret` finding had an importance
+score of 0.97 and readable context. Several others belonged to a duplicate
+group, which may mean the same stamp was repeated across assets. The case’s
+main hypothesis remains `PROPOSED` at 0.40 confidence. That is the correct
+posture: the string is present; its document context and significance still
+need review.
+
+> **Screenshot 8 — Top Secret case.** Add the case detail with the proposed
+> 0.40-confidence hypothesis, five evidence assets, and attached
+> `regex:top_secret` findings. Keep the duplicate-group note visible. This
+> screenshot should make the uncertainty as visible as the severity.
+
+### Network and cable references
+
+The network-reference detector found four SIPRNet mentions on four assets. The
+case supports the narrow statement that the references exist. It also carries
+the competing possibility that the mentions are incidental, quoted, or
+descriptive rather than evidence that correspondents used the classified
+network.
+
+The diplomatic-cable case currently contains four attached references on two
+assets: `STATE 82581`, `STATE 86734`, `STATE 121442`, and
+`11 STATE 121442`. The question is where cable material appears and how it
+entered or circulated in this email collection. Again, a cable number is a
+lead, not proof that a particular message was itself a cable.
+
+### Privileged language
+
+The legal-privilege case began with four verified findings on three assets:
+“privileged and confidential,” “attorney-client privilege,” and “attorney work
+product.” It has since grown to five evidence assets and six attached findings.
+None of the original verified items belonged to the boilerplate cluster the
+agent checked.
+
+The supported 0.60-confidence hypothesis says the corpus contains genuine
+privilege-marker language. It does not decide whether privilege legally
+attached, whether it was waived, or whether the surrounding material should
+have been withheld. Those are different questions.
+
+### FOIA codes: a map hiding in the margins
+
+The FOIA case may be the most useful result for a future investigator. It
+contains attached B1, B5, and B6 codes. In the
+[U.S. Department of Justice’s FOIA reference guide](https://www.justice.gov/oip/department-justice-freedom-information-act-reference-guide),
+the corresponding exemptions cover:
+
+- B1 is associated with national-security withholding;
+- B5 with deliberative-process or privilege grounds;
+- B6 with personal privacy.
+
+The case asks whether B1-coded documents overlap the classification cases and
+whether B5-coded documents overlap the legal-privilege case. It does not yet
+answer that asset-level overlap question.
+
+The harness also found a larger, still underused structure: document controls
+such as `Doc No. C057xxxxx`, FOIA case numbers, and `RELEASE IN FULL` or
+`RELEASE IN PART`. The dedicated release-control detector now has 27,655
+finding rows, but none of the seven active inquiries watches that detector
+directly. The memory store flags it as the largest coherent unwatched group.
+Pairing document control numbers with B1/B5/B6 codes could turn a loose set of
+redaction markers into a document-by-document release map.
+
+That is both a surprising result and an honest gap. The system found the
+indexing material, but the current investigation has not yet converted it into
+a standing inquiry and completed overlap analysis.
+
+> **Screenshot 9 — FOIA case and release controls.** Add the FOIA exemption
+> case with B1, B5, and B6 evidence visible. Beside it, add the
+> `foia_release_control_numbers` detector count and one finding detail showing a
+> `Doc No. C057xxxxx` value. Do not show a whole email body if it makes the
+> release stamp unreadable.
+
+### Foundation references
+
+The Foundation inquiry contains 24 current matches. The case has two selected
+evidence assets and two attached findings: `WJC FOUNDATION` and
+`Clinton Global initiative`. Its supported hypothesis is deliberately modest:
+Foundation and CGI references appear across official correspondence in the
+corpus. The case does not infer impropriety from those mentions.
+
+## What surprised us
+
+The dramatic terms were not always the most useful findings.
+
+The most common classification-related value, `UNCLASSIFIED`, was largely a
+FOIA release stamp. Left untreated, it made unrelated documents look connected.
+The useful action was to down-weight it, not celebrate thousands of matches.
+
+The highest-volume finding category, PII, contained both the investigation’s
+first strong signal and its most persistent noise. EMAIL_ADDRESS linked
+personal and official correspondence. The same detector family also labelled
+ordinary words as people and locations. The harness had to remember both facts
+at once.
+
+A detector can pass every probe and still fail the investigation. SIPDIS,
+declassification instructions, intelligence-community terms, and cable TAGS
+all behaved correctly on examples but found nothing in the live corpus.
+
+And the least glamorous detector may create the best next research tool. FOIA
+document numbers and release stamps are administrative metadata, but they may
+provide the join key needed to compare redaction grounds, classification
+markers, and specific released documents.
+
+## What the autonomous AI actually added
+
+The value was not that the model could search email text. A person with regular
+expressions can do that. The useful contribution was turning thousands of files
+and hundreds of thousands of raw findings into maintained investigative state:
+
+- **It made a review queue.** Seven inquiries keep the important questions
+  current, while eight cases separate evidence that needs judgment from the
+  much larger pool of matches.
+- **It kept competing explanations alive.** “The mark exists” and “the mark may
+  belong to forwarded material” can coexist as separate hypotheses instead of
+  being collapsed into a confident-sounding answer.
+- **It tested its own instrumentation.** Positive probes, counter-examples,
+  saved-detector tests, corpus scans, and later re-sweeps exposed the difference
+  between a good regex and a useful detector.
+- **It remembered rejected work.** Duplicate detectors, empty probes, PII
+  errors, and boilerplate exclusions were recorded, so the next cycle did not
+  repeatedly make the same proposal.
+- **It found operational gaps.** The agent noticed that Top Secret findings
+  were missing from an apparently relevant inquiry and repaired the filter. It
+  later identified FOIA document controls as a large coherent group that no
+  inquiry was watching.
+- **It produced an audit trail.** Case timelines show evidence additions,
+  hypothesis links, inquiry changes, and agent notes. A reviewer can reconstruct
+  the path to a claim instead of trusting a polished final paragraph.
+
+That is the marketing claim this example can honestly support: Classifyre did
+not merely label a public dataset. Its AI agents independently organised the
+work into detectors, monitors, cases, hypotheses, evidence links, discussion
+threads, timelines, and remembered decisions. What they brought was continuity
+and structure. What they did not bring was the authority to turn an open
+hypothesis into a fact.
+
+## What this investigation does not establish
+
+The article would be misleading without this list.
+
+- A match for `SECRET`, `Top Secret`, or `SIPRNet` does not by itself establish
+  the status of the email containing it. It may be a release stamp, quoted
+  material, a forwarded document, or an incidental reference.
+- Finding counts are not unique-document counts. A document can contain
+  multiple matches, and recurring release text can dominate a detector.
+- Importance and confidence scores rank evidence inside this system. They are
+  not probabilities that an allegation is true.
+- The source is a single public dataset. There is no independent source in this
+  namespace to corroborate context or provenance.
+- None of the eight cases is closed. The current posture is active post-scan
+  review, not completed adjudication.
+- The glossary was proposed by agents but verified by an operator. Final case
+  conclusions also remain a human responsibility.
+
+## What should happen next
+
+The investigation now has a concrete queue rather than a vague promise to
+“analyse the emails.”
+
+First, create or extend an inquiry for FOIA release control numbers, then join
+document numbers to the exemption-code case. Second, perform the asset-level
+overlap checks already named in the FOIA hypotheses: B1 against classified
+marking cases, B5 against the privilege case. Third, review the repeated Top
+Secret group in source context to separate one copied stamp from independent
+documents. Fourth, resolve the zero-result compartmented-access detector.
+Finally, add an independent source only when there is a specific corroboration
+question; adding more data for its own sake would make the evidence trail
+harder to read.
+
+The useful result of this first real-data run is not that an AI “solved” a
+famous archive. It did not. The result is a reviewable investigation: failed
+probes are visible, noise has recorded reasons, aliases have provenance,
+monitors have explicit rules, and cases say what remains uncertain.
+
+That is a much better place to begin serious work than a search box and 9,601
+files.
+
+## Questions about this AI investigation
+
+### Did AI create the Clinton email inquiries and cases on its own?
+
+Yes. The namespace API attributes all seven inquiries, all eight cases, and all
+16 case threads to `ai-autopilot`. The agents chose uncovered themes, created
+or refined detectors, attached evidence, drafted hypotheses, and revisited the
+work after later scans. Operators verified glossary entries and retain
+responsibility for final conclusions.
+
+### What did Classifyre find in the Hillary Clinton email dataset?
+
+It found classification and handling marks, four SIPRNet references, four
+diplomatic cable references, legal-privilege language, Foundation references,
+FOIA exemption codes, email-address relationships, and extensive FOIA release
+metadata. These are detector results and investigative leads, not findings of
+wrongdoing.
+
+### Why use inquiries and cases instead of an AI summary?
+
+An inquiry is a durable rule that watches for new matching evidence. A case
+selects relevant evidence, states testable hypotheses, keeps discussion
+threads, and records every change on a timeline. That structure can be checked,
+updated, or challenged after the model run ends.
+
+### Where can I inspect the investigation?
+
+Open the
+[live Classifyre demo namespace](https://demo.classifyre.com/hillary-clinton-emails-2)
+to inspect the current detectors, inquiries, cases, hypotheses, threads, and
+timelines. Counts may have changed since this article’s 11 August 2026
+snapshot.
+
+---
+
+*Snapshot note: counts and statuses in this article were read from the
+`hillary-clinton-emails-2` namespace API on 11 August 2026. The namespace was
+still active, so later scans and agent runs may change them.*

@@ -13,14 +13,16 @@ from src.detectors.custom.runners import GLiNER2Runner, RegexRunner
 from src.models.generated_detectors import (
     CustomDetectorConfig,
     ImageClassificationPipelineSchema,
+    LLMPipelineSchema,
     ObjectDetectionPipelineSchema,
     TextClassificationPipelineSchema,
 )
 
-_TRANSFORMER_SCHEMA_TYPES = (
+_EXTERNAL_RUNTIME_SCHEMA_TYPES = (
     TextClassificationPipelineSchema,
     ImageClassificationPipelineSchema,
     ObjectDetectionPipelineSchema,
+    LLMPipelineSchema,
 )
 
 
@@ -135,12 +137,12 @@ async def test_regex_example_invoice_pii_detects_iban(custom_examples: list[dict
 async def test_gliner2_example_all_examples_load_and_detect(custom_examples: list[dict]):
     """All GLINER2/REGEX examples must parse and run detect() without crashing.
 
-    Transformer-based examples (TEXT_CLASSIFICATION, IMAGE_CLASSIFICATION, etc.) are
-    skipped here — they require real model downloads. Covered by test_transformer_runners.py.
+    Examples that need model downloads or injected provider credentials are skipped here.
+    Their runners have focused coverage in the custom runner test modules.
     """
     for example in custom_examples:
         config = CustomDetectorConfig.model_validate(example["config"])
-        if isinstance(config.pipeline_schema, _TRANSFORMER_SCHEMA_TYPES):
+        if isinstance(config.pipeline_schema, _EXTERNAL_RUNTIME_SCHEMA_TYPES):
             continue
 
         detector = CustomDetector(config)

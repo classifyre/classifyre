@@ -15,7 +15,6 @@ import { AutopilotWorker } from './autopilot.worker';
  */
 describe('AutopilotWorker agent gating (G-027/G-029)', () => {
   const ALL_ON = {
-    harnessEnabled: true,
     harnessAiProviderConfigId: 'p1',
     autopilotInquiryEnabled: true,
     autopilotCaseEnabled: true,
@@ -24,7 +23,6 @@ describe('AutopilotWorker agent gating (G-027/G-029)', () => {
     autopilotEscalationEnabled: true,
   };
   const ALL_OFF = {
-    harnessEnabled: true,
     harnessAiProviderConfigId: 'p1',
     autopilotInquiryEnabled: false,
     autopilotCaseEnabled: false,
@@ -70,7 +68,7 @@ describe('AutopilotWorker agent gating (G-027/G-029)', () => {
     ...over,
   });
 
-  describe('a scan cycle honours the master switches', () => {
+  describe('a scan cycle honours the per-agent switches', () => {
     it('runs every agent when all are enabled', async () => {
       build(ALL_ON);
 
@@ -116,8 +114,8 @@ describe('AutopilotWorker agent gating (G-027/G-029)', () => {
       },
     );
 
-    it('runs nothing when the AI Harness is off', async () => {
-      build({ ...ALL_ON, harnessEnabled: false });
+    it('runs nothing when the AI Harness has no provider assignment', async () => {
+      build({ ...ALL_ON, harnessAiProviderConfigId: null });
 
       for (const kind of PIPELINE) {
         await expect(enabled(kind, scanCycle())).resolves.toBe(false);
@@ -181,8 +179,8 @@ describe('AutopilotWorker agent gating (G-027/G-029)', () => {
       await expect(enabled(AgentKind.INQUIRY, cycle)).resolves.toBe(false);
     });
 
-    it('does not override the AI master switch', async () => {
-      build({ ...ALL_OFF, harnessEnabled: false });
+    it('does not override a missing Harness provider assignment', async () => {
+      build({ ...ALL_OFF, harnessAiProviderConfigId: null });
 
       await expect(
         enabled(AgentKind.INQUIRY, scanCycle({ manual: true })),

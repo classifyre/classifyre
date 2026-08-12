@@ -90,7 +90,6 @@ test.describe("graph performance", () => {
         contentType: "application/json",
         body: JSON.stringify({
           id: 1,
-          aiEnabled: false,
           mcpEnabled: false,
           demoMode: false,
           language: "ENGLISH",

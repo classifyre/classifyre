@@ -14,9 +14,7 @@ export function AiHealthHarness() {
         <button
           onClick={() =>
             void updateSettings({
-              aiEnabled: false,
               aiProviderConfigId: null,
-              harnessEnabled: true,
               harnessAiProviderConfigId: "harness-provider",
             })
           }

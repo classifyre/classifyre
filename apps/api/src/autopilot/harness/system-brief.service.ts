@@ -415,13 +415,7 @@ export class SystemBriefService {
           },
     );
 
-    if (settings && !settings.harnessEnabled) {
-      items.push({
-        status: 'todo',
-        label: 'Enable the AI harness',
-        detail: 'The AI harness is switched off; its agents will not run.',
-      });
-    } else if (settings && !settings.harnessAiProviderConfigId) {
+    if (settings && !settings.harnessAiProviderConfigId) {
       items.push({
         status: 'todo',
         label: 'Assign a Harness provider',

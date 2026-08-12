@@ -20,18 +20,6 @@ import { mapValues } from '../runtime';
  */
 export interface UpdateInstanceSettingsDto {
     /**
-     * When false, AI assistant features are disabled instance-wide.
-     * @type {boolean}
-     * @memberof UpdateInstanceSettingsDto
-     */
-    aiEnabled?: boolean;
-    /**
-     * When false, the autonomous AI harness and all of its agents are disabled instance-wide.
-     * @type {boolean}
-     * @memberof UpdateInstanceSettingsDto
-     */
-    harnessEnabled?: boolean;
-    /**
      * When false, the MCP endpoint is disabled instance-wide.
      * @type {boolean}
      * @memberof UpdateInstanceSettingsDto
@@ -56,13 +44,13 @@ export interface UpdateInstanceSettingsDto {
      */
     timeFormat?: UpdateInstanceSettingsDtoTimeFormatEnum;
     /**
-     * Id of the AI provider credential to use for the interactive AI assistant. Pass null or an empty string to clear the selection.
+     * Id of the AI provider credential to use for and enable the interactive AI assistant. Pass null or an empty string to clear the selection and disable it.
      * @type {string}
      * @memberof UpdateInstanceSettingsDto
      */
     aiProviderConfigId?: string | null;
     /**
-     * Id of the AI provider credential to use for the autonomous AI harness. Pass null or an empty string to clear the selection.
+     * Id of the AI provider credential to use for and enable the autonomous AI harness. Pass null or an empty string to clear the selection and disable it.
      * @type {string}
      * @memberof UpdateInstanceSettingsDto
      */
@@ -198,8 +186,6 @@ export function UpdateInstanceSettingsDtoFromJSONTyped(json: any, ignoreDiscrimi
     }
     return {
         
-        'aiEnabled': json['aiEnabled'] == null ? undefined : json['aiEnabled'],
-        'harnessEnabled': json['harnessEnabled'] == null ? undefined : json['harnessEnabled'],
         'mcpEnabled': json['mcpEnabled'] == null ? undefined : json['mcpEnabled'],
         'language': json['language'] == null ? undefined : json['language'],
         'timezone': json['timezone'] == null ? undefined : json['timezone'],
@@ -235,8 +221,6 @@ export function UpdateInstanceSettingsDtoToJSONTyped(value?: UpdateInstanceSetti
 
     return {
         
-        'aiEnabled': value['aiEnabled'],
-        'harnessEnabled': value['harnessEnabled'],
         'mcpEnabled': value['mcpEnabled'],
         'language': value['language'],
         'timezone': value['timezone'],

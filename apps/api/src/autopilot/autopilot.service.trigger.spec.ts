@@ -16,7 +16,6 @@ describe('AutopilotService.trigger — agent selection & chaining', () => {
   const mockPrisma = {
     instanceSettings: {
       findUnique: jest.fn().mockResolvedValue({
-        harnessEnabled: true,
         harnessAiProviderConfigId: 'p1',
       }),
     },
@@ -52,6 +51,17 @@ describe('AutopilotService.trigger — agent selection & chaining', () => {
       AgentKind.ESCALATION,
     ]);
     expect(calls[0].payload.instruction).toBe('focus on secrets');
+  });
+
+  it('rejects a manual run when no Harness provider is assigned', async () => {
+    mockPrisma.instanceSettings.findUnique.mockResolvedValueOnce({
+      harnessAiProviderConfigId: null,
+    });
+
+    await expect(service.trigger({})).rejects.toThrow(
+      'Assign an AI Harness provider',
+    );
+    expect(send).not.toHaveBeenCalled();
   });
 
   it('chains a selected subset in one autopilot job', async () => {
