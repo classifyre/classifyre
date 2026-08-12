@@ -689,6 +689,7 @@ def run_evaluate_file_command(args: argparse.Namespace) -> None:
 
     try:
         runner = FileEvaluationRunner(detectors)
+        output: dict[str, Any]
         if file_path.is_dir():
             evaluations: list[dict[str, Any]] = []
             for sample_path in sorted(p for p in file_path.iterdir() if p.is_file()):
