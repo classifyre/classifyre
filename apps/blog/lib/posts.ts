@@ -12,7 +12,10 @@ export type BlogPostSummary = {
   image?: string;
   author?: string;
   route: string;
+  section: BlogPostSection;
 };
+
+export type BlogPostSection = "articles" | "cases";
 
 type BlogFrontmatter = {
   title?: string;
@@ -56,6 +59,9 @@ function toPostSummary(
     .dirname(path.relative(APP_DIR, filePath))
     .replace(/\\/g, "/");
   const route = `/${routeDir}`;
+  const section: BlogPostSection = route.startsWith("/blog/cases/")
+    ? "cases"
+    : "articles";
 
   return {
     title: frontmatter.title ?? "Untitled",
@@ -68,6 +74,7 @@ function toPostSummary(
     image: frontmatter.image,
     author: frontmatter.author,
     route,
+    section,
   };
 }
 
@@ -97,4 +104,11 @@ export async function getAllPosts(): Promise<BlogPostSummary[]> {
   );
 
   return sortNewestFirst(parsed);
+}
+
+export async function getPostsBySection(
+  section: BlogPostSection,
+): Promise<BlogPostSummary[]> {
+  const posts = await getAllPosts();
+  return posts.filter((post) => post.section === section);
 }
