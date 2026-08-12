@@ -59,6 +59,10 @@ docs/BulkIngestEdgesDto.md
 docs/BulkIngestEdgesResponseDto.md
 docs/BulkUpdateFindingsDto.md
 docs/BulkUpdateFindingsResponseDto.md
+docs/BulkUpdateSourcesDto.md
+docs/BulkUpdateSourcesResponseDto.md
+docs/BulkUpdateSourcesSamplingDto.md
+docs/BulkUpdateSourcesScheduleDto.md
 docs/CapabilityCostProjectionDto.md
 docs/CapabilityProbeResultDto.md
 docs/CaseActionRequestDto.md
@@ -409,6 +413,10 @@ src/models/BulkIngestEdgesDto.ts
 src/models/BulkIngestEdgesResponseDto.ts
 src/models/BulkUpdateFindingsDto.ts
 src/models/BulkUpdateFindingsResponseDto.ts
+src/models/BulkUpdateSourcesDto.ts
+src/models/BulkUpdateSourcesResponseDto.ts
+src/models/BulkUpdateSourcesSamplingDto.ts
+src/models/BulkUpdateSourcesScheduleDto.ts
 src/models/CapabilityCostProjectionDto.ts
 src/models/CapabilityProbeResultDto.ts
 src/models/CaseActionRequestDto.ts

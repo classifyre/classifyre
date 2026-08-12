@@ -1,7 +1,14 @@
 "use client";
 
 import { nsPath } from "@/lib/ns-path";
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  Fragment,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useRouter } from "next/navigation";
 import { formatDate, formatRelative, formatShortUTC } from "@/lib/date";
 import {
@@ -24,6 +31,7 @@ import {
   SearchSourcesSortOrderEnum,
   type SearchSourcesRequestDto,
   type SearchSourcesResponseDto,
+  type SearchSourceItemDto,
   type SearchSourcesSortBy,
   type SearchSourcesSortOrder,
   type RunnerDto,
@@ -32,6 +40,7 @@ import {
 import {
   Badge,
   Button,
+  Checkbox,
   EmptyState,
   Input,
   MultiSelect,
@@ -72,6 +81,7 @@ import { useUrlParams } from "../lib/url-filters";
 import { useRunnerWebSocket } from "@/hooks/use-runner-websocket";
 import { useTranslation } from "@/hooks/use-translation";
 import type { TranslationKey } from "@/i18n";
+import { BulkUpdateSourcesDialog } from "./bulk-update-sources-dialog";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -89,6 +99,20 @@ type SortDraft = {
 type SourceFilters = NonNullable<SearchSourcesRequestDto["filters"]>;
 type SourceTypeFilter = NonNullable<SourceFilters["type"]>[number];
 type RunnerStatusFilter = NonNullable<SourceFilters["status"]>[number];
+
+export type SourceSelectionIds = {
+  type: "ids";
+  sources: SearchSourceItemDto[];
+  total: number;
+};
+
+export type SourceSelectionAll = {
+  type: "all";
+  filters: SearchSourcesRequestDto["filters"];
+  total: number;
+};
+
+export type SourceSelection = SourceSelectionIds | SourceSelectionAll;
 
 const PAGE_SIZE_OPTIONS = [20, 50, 100];
 
@@ -113,6 +137,9 @@ const RUNNER_STATUS_OPTIONS: RunnerStatusFilter[] = [
   "COMPLETED",
   "ERROR",
 ];
+
+const CHECKBOX_CLASS =
+  "border-2 border-foreground/25 rounded-[2px] data-[state=checked]:bg-accent data-[state=checked]:border-accent data-[state=checked]:text-accent-foreground data-[state=indeterminate]:bg-accent data-[state=indeterminate]:border-accent data-[state=indeterminate]:text-accent-foreground";
 
 // STATUS_LABELS is now computed inside the component using t()
 
@@ -240,11 +267,12 @@ export function SourcesTable({ onTotalsChange }: SourcesTableProps) {
   }));
   const [sort, setSort] = useState<SortDraft>(() => {
     const by = searchParams.get("sortBy") as SearchSourcesSortBy | null;
-    const order = searchParams.get("sortOrder") as SearchSourcesSortOrder | null;
+    const order = searchParams.get(
+      "sortOrder",
+    ) as SearchSourcesSortOrder | null;
     return {
       by:
-        by &&
-        (Object.values(SearchSourcesSortByEnum) as string[]).includes(by)
+        by && (Object.values(SearchSourcesSortByEnum) as string[]).includes(by)
           ? by
           : DEFAULT_SORT.by,
       order:
@@ -266,6 +294,11 @@ export function SourcesTable({ onTotalsChange }: SourcesTableProps) {
     sourceId: string;
     action: "scan" | "stop";
   } | null>(null);
+  const [selectionMap, setSelectionMap] = useState<
+    Map<string, SearchSourceItemDto>
+  >(() => new Map());
+  const [isAllSelected, setIsAllSelected] = useState(false);
+  const [bulkDialogOpen, setBulkDialogOpen] = useState(false);
 
   const applyRunnerWsEvent = useCallback((runner: RunnerDto) => {
     setData((prev) => {
@@ -374,7 +407,15 @@ export function SourcesTable({ onTotalsChange }: SourcesTableProps) {
     return () => {
       active = false;
     };
-  }, [draft, page, resolvedPageSize, sort.by, sort.order, refreshCount, onTotalsChange]);
+  }, [
+    draft,
+    page,
+    resolvedPageSize,
+    sort.by,
+    sort.order,
+    refreshCount,
+    onTotalsChange,
+  ]);
 
   // ── Derived ──────────────────────────────────────────────────────────────
 
@@ -393,6 +434,63 @@ export function SourcesTable({ onTotalsChange }: SourcesTableProps) {
     () => getPageItems(clampedPage, totalPages),
     [clampedPage, totalPages],
   );
+
+  const currentFilters = useMemo<SearchSourcesRequestDto["filters"]>(
+    () => ({
+      search: draft.search.trim() || undefined,
+      type: draft.types.length > 0 ? draft.types : undefined,
+      status: draft.statuses.length > 0 ? draft.statuses : undefined,
+    }),
+    [draft],
+  );
+
+  useEffect(() => {
+    setSelectionMap(new Map());
+    setIsAllSelected(false);
+  }, [draft]);
+
+  const toggleRow = useCallback((source: SearchSourceItemDto) => {
+    setIsAllSelected(false);
+    setSelectionMap((previous) => {
+      const next = new Map(previous);
+      if (next.has(source.id)) next.delete(source.id);
+      else next.set(source.id, source);
+      return next;
+    });
+  }, []);
+
+  const clearSelection = useCallback(() => {
+    setIsAllSelected(false);
+    setSelectionMap(new Map());
+  }, []);
+
+  const currentPageSelectedCount = isAllSelected
+    ? items.length
+    : items.filter((source) => selectionMap.has(source.id)).length;
+  const headerChecked =
+    isAllSelected ||
+    (items.length > 0 && currentPageSelectedCount === items.length);
+  const headerIndeterminate =
+    !isAllSelected && currentPageSelectedCount > 0 && !headerChecked;
+  const selectionCount = isAllSelected ? total : selectionMap.size;
+  const selection: SourceSelection | null =
+    selectionCount === 0
+      ? null
+      : isAllSelected
+        ? { type: "all", filters: currentFilters, total }
+        : {
+            type: "ids",
+            sources: Array.from(selectionMap.values()),
+            total: selectionMap.size,
+          };
+
+  function handleHeaderCheckbox() {
+    if (headerChecked || headerIndeterminate) clearSelection();
+    else {
+      setIsAllSelected(true);
+      setSelectionMap(new Map());
+    }
+  }
 
   // ── Actions ──────────────────────────────────────────────────────────────
 
@@ -517,6 +615,37 @@ export function SourcesTable({ onTotalsChange }: SourcesTableProps) {
         </MultiSelect>
       </div>
 
+      {selectionCount > 0 && (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-[4px] border-2 border-accent/30 bg-background px-4 py-2.5">
+          <span className="font-mono text-xs text-accent">
+            {isAllSelected
+              ? t("sources.bulkUpdate.allSelected", {
+                  count: selectionCount.toLocaleString(),
+                })
+              : selectionCount === 1
+                ? t("sources.bulkUpdate.selected", {
+                    count: selectionCount.toLocaleString(),
+                  })
+                : t("sources.bulkUpdate.selectedPlural", {
+                    count: selectionCount.toLocaleString(),
+                  })}
+          </span>
+          <Button
+            size="sm"
+            onClick={() => setBulkDialogOpen(true)}
+            className="ml-auto rounded-[4px] border-0 bg-accent font-mono text-xs font-bold uppercase tracking-[0.08em] text-accent-foreground hover:bg-accent/90"
+          >
+            {selectionCount === 1
+              ? t("sources.bulkUpdate.updateSource", {
+                  count: selectionCount.toLocaleString(),
+                })
+              : t("sources.bulkUpdate.updateSources", {
+                  count: selectionCount.toLocaleString(),
+                })}
+          </Button>
+        </div>
+      )}
+
       {error && (
         <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive">
           {error}
@@ -541,14 +670,48 @@ export function SourcesTable({ onTotalsChange }: SourcesTableProps) {
             <Table>
               <TableHeader className="sticky top-0 z-20 bg-white/95 dark:bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-white/80">
                 <TableRow>
-                  <TableHead className="bg-white/95 dark:bg-card/95">
-                    {renderSortableHead(t("sources.columns.source"), SearchSourcesSortByEnum.Name)}
+                  <TableHead className="w-10 bg-white/95 dark:bg-card/95">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="flex items-center justify-center">
+                          <Checkbox
+                            checked={
+                              headerIndeterminate
+                                ? "indeterminate"
+                                : headerChecked
+                            }
+                            onCheckedChange={handleHeaderCheckbox}
+                            aria-label={t("sources.bulkUpdate.selectAllAria")}
+                            className={CHECKBOX_CLASS}
+                          />
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        {headerChecked || headerIndeterminate
+                          ? t("sources.bulkUpdate.deselectAll")
+                          : t("sources.bulkUpdate.selectAll", {
+                              count: total.toLocaleString(),
+                            })}
+                      </TooltipContent>
+                    </Tooltip>
                   </TableHead>
                   <TableHead className="bg-white/95 dark:bg-card/95">
-                    {renderSortableHead(t("sources.columns.type"), SearchSourcesSortByEnum.Type)}
+                    {renderSortableHead(
+                      t("sources.columns.source"),
+                      SearchSourcesSortByEnum.Name,
+                    )}
                   </TableHead>
                   <TableHead className="bg-white/95 dark:bg-card/95">
-                    {renderSortableHead(t("sources.columns.runner"), SearchSourcesSortByEnum.Status)}
+                    {renderSortableHead(
+                      t("sources.columns.type"),
+                      SearchSourcesSortByEnum.Type,
+                    )}
+                  </TableHead>
+                  <TableHead className="bg-white/95 dark:bg-card/95">
+                    {renderSortableHead(
+                      t("sources.columns.runner"),
+                      SearchSourcesSortByEnum.Status,
+                    )}
                   </TableHead>
                   <TableHead className="bg-white/95 dark:bg-card/95">
                     <Tooltip>
@@ -563,10 +726,16 @@ export function SourcesTable({ onTotalsChange }: SourcesTableProps) {
                     </Tooltip>
                   </TableHead>
                   <TableHead className="bg-white/95 dark:bg-card/95">
-                    {renderSortableHead(t("sources.columns.lastRun"), SearchSourcesSortByEnum.LastRunAt)}
+                    {renderSortableHead(
+                      t("sources.columns.lastRun"),
+                      SearchSourcesSortByEnum.LastRunAt,
+                    )}
                   </TableHead>
                   <TableHead className="bg-white/95 dark:bg-card/95">
-                    {renderSortableHead(t("sources.columns.created"), SearchSourcesSortByEnum.CreatedAt)}
+                    {renderSortableHead(
+                      t("sources.columns.created"),
+                      SearchSourcesSortByEnum.CreatedAt,
+                    )}
                   </TableHead>
                   <TableHead className="bg-white/95 text-right dark:bg-card/95">
                     <span className="cursor-default text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
@@ -588,7 +757,31 @@ export function SourcesTable({ onTotalsChange }: SourcesTableProps) {
                   const SourceTypeIcon = getSourceIcon(source.type);
 
                   return (
-                    <TableRow key={source.id} className="align-top">
+                    <TableRow
+                      key={source.id}
+                      className={
+                        selectionMap.has(source.id)
+                          ? "align-top bg-accent/5"
+                          : "align-top"
+                      }
+                    >
+                      <TableCell className="py-3">
+                        <div className="flex items-center justify-center">
+                          <Checkbox
+                            checked={
+                              isAllSelected || selectionMap.has(source.id)
+                            }
+                            onCheckedChange={() => toggleRow(source)}
+                            aria-label={t(
+                              "sources.bulkUpdate.selectSourceAria",
+                              {
+                                name: source.name,
+                              },
+                            )}
+                            className={CHECKBOX_CLASS}
+                          />
+                        </div>
+                      </TableCell>
                       {/* Source name */}
                       <TableCell className="max-w-[280px] py-3">
                         <Tooltip>
@@ -662,7 +855,9 @@ export function SourcesTable({ onTotalsChange }: SourcesTableProps) {
                             variant="ghost"
                             size="sm"
                             className="h-auto justify-start p-0 hover:bg-transparent"
-                            onClick={() => router.push(nsPath(`/scans/${runner.id}`))}
+                            onClick={() =>
+                              router.push(nsPath(`/scans/${runner.id}`))
+                            }
                           >
                             <RunnerStatusBadge status={source.runnerStatus} />
                           </Button>
@@ -703,10 +898,13 @@ export function SourcesTable({ onTotalsChange }: SourcesTableProps) {
                             {runner.totalFindings > 0 && (
                               <Tooltip>
                                 <TooltipTrigger asChild>
-                                  <p
-                                    className="text-[11px]"
-                                  >
-                                    {runner.totalFindings} {t(runner.totalFindings === 1 ? "common.finding" : "common.findings")}
+                                  <p className="text-[11px]">
+                                    {runner.totalFindings}{" "}
+                                    {t(
+                                      runner.totalFindings === 1
+                                        ? "common.finding"
+                                        : "common.findings",
+                                    )}
                                   </p>
                                 </TooltipTrigger>
                                 <TooltipContent>
@@ -931,7 +1129,9 @@ export function SourcesTable({ onTotalsChange }: SourcesTableProps) {
                   <Fragment key={`page-group-${pageNumber}`}>
                     {showEllipsis && (
                       <PaginationItem>
-                        <PaginationEllipsis label={t("common.pagination.morePages")} />
+                        <PaginationEllipsis
+                          label={t("common.pagination.morePages")}
+                        />
                       </PaginationItem>
                     )}
                     <PaginationItem>
@@ -966,6 +1166,16 @@ export function SourcesTable({ onTotalsChange }: SourcesTableProps) {
           </Pagination>
         )}
       </div>
+
+      <BulkUpdateSourcesDialog
+        open={bulkDialogOpen}
+        onOpenChange={setBulkDialogOpen}
+        selection={selection}
+        onSuccess={() => {
+          clearSelection();
+          setRefreshCount((count) => count + 1);
+        }}
+      />
     </div>
   );
 }

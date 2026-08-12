@@ -36,6 +36,10 @@ import {
 } from '@prisma/client';
 import { CreateSourceDto } from '../dto/create-source.dto';
 import { UpdateSourceDto } from '../dto/update-source.dto';
+import {
+  BulkUpdateSourcesDto,
+  BulkUpdateSourcesResponseDto,
+} from '../dto/bulk-update-sources.dto';
 import { UpdateRunnerStatusDto } from '../dto/update-runner-status.dto';
 import { SourceResponseDto } from '../dto/source-response.dto';
 import { TestConnectionResponseDto } from '../dto/test-connection-response.dto';
@@ -57,6 +61,117 @@ export class SourcesController {
     private readonly autoScheduleService: AutoScheduleService,
     private readonly sourceFilesService: SourceFilesService,
   ) {}
+
+  @Post('bulk-update')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Bulk update data sources',
+    description:
+      'Update scheduling and/or sampling for explicit source IDs or every source matching a filter snapshot. Omitted sections and all other source fields are preserved.',
+  })
+  @ApiBody({ type: BulkUpdateSourcesDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Sources updated successfully',
+    type: BulkUpdateSourcesResponseDto,
+  })
+  async bulkUpdateSources(
+    @Body() dto: BulkUpdateSourcesDto,
+  ): Promise<BulkUpdateSourcesResponseDto> {
+    const hasIds = Boolean(dto.ids?.length);
+    const hasFilters = dto.filters !== undefined;
+    if (hasIds === hasFilters) {
+      throw new BadRequestException(
+        'Provide either source ids or filters, but not both.',
+      );
+    }
+    if (!dto.schedule && !dto.sampling) {
+      throw new BadRequestException(
+        'Provide a schedule and/or sampling update.',
+      );
+    }
+    if (dto.schedule?.mode === 'CRON') {
+      if (!dto.schedule.cron) {
+        throw new BadRequestException(
+          'schedule.cron is required when schedule.mode is CRON.',
+        );
+      }
+      this.assertValidCronExpression(dto.schedule.cron);
+    }
+
+    const where: Prisma.SourceWhereInput = hasIds
+      ? { id: { in: dto.ids } }
+      : {
+          ...(dto.filters?.search
+            ? {
+                name: {
+                  contains: dto.filters.search,
+                  mode: 'insensitive' as const,
+                },
+              }
+            : {}),
+          ...(dto.filters?.type?.length
+            ? { type: { in: dto.filters.type } }
+            : {}),
+          ...(dto.filters?.status?.length
+            ? { runnerStatus: { in: dto.filters.status } }
+            : {}),
+        };
+    const sources = await this.sourceService.sources({ where });
+
+    // Validate every sampling merge before the first write so an incompatible
+    // source cannot leave an otherwise valid batch half-applied.
+    const preparedConfigs = new Map<string, Record<string, unknown>>();
+    if (dto.sampling) {
+      for (const source of sources) {
+        const currentConfig = this.sourceService.decryptSourceConfig(
+          source.config,
+        );
+        const normalizedConfig = this.validationService.validate(
+          String(source.type),
+          { ...currentConfig, sampling: dto.sampling },
+        );
+        await this.customDetectorsService.sanitizeSourceConfigDetectors(
+          normalizedConfig,
+        );
+        preparedConfigs.set(source.id, normalizedConfig);
+      }
+    }
+
+    const updatedIds: string[] = [];
+    for (const source of sources) {
+      const normalizedConfig = preparedConfigs.get(source.id);
+      if (normalizedConfig) {
+        await this.sourceService.updateFromConfig(source.id, {
+          config: normalizedConfig,
+        });
+      }
+      try {
+        if (dto.schedule) {
+          await this.applyScheduleMode(
+            source.id,
+            {
+              scheduleMode: dto.schedule.mode,
+              scheduleCron: dto.schedule.cron,
+              scheduleTimezone: dto.schedule.timezone,
+            },
+            'updated',
+          );
+        }
+      } catch (error) {
+        if (normalizedConfig) {
+          await this.sourceService.updateSource({
+            where: { id: source.id },
+            data: { config: source.config as Prisma.InputJsonValue },
+          });
+        }
+        throw error;
+      }
+      updatedIds.push(source.id);
+    }
+
+    return { updatedCount: updatedIds.length, ids: updatedIds };
+  }
 
   @Post()
   @ApiOperation({
