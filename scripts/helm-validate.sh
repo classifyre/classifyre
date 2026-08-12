@@ -129,6 +129,11 @@ run_checks() {
     "MAX_CONCURRENT_NAMESPACE_JOBS" \
     "${rendered}"
 
+  assert_contains \
+    "API reserves database connections for interactive requests" \
+    "PRISMA_INTERACTIVE_POOL_MAX" \
+    "${rendered}"
+
   # ── Postgres embedded: non-root startup ───────────────────────────────────
   # postgres:18 entrypoint skips chmod when already running as uid 999.
   # Without runAsUser:999 it tries to chmod the data dir and fails with

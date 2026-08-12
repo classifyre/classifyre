@@ -17,6 +17,7 @@ import { TelegramConnector } from './connectors/telegram.connector';
 import { runsBackgroundWorkers } from '../service-role';
 import { stableJsonHash } from '../utils/stable-json';
 import {
+  CLS_DATABASE_LANE,
   CLS_SCHEMA,
   CLS_NAMESPACE_ID,
   CLS_SLUG,
@@ -105,6 +106,7 @@ export class ChatGatewayService implements OnModuleDestroy {
       if (ctx.schema) this.cls.set(CLS_SCHEMA, ctx.schema);
       if (ctx.namespaceId) this.cls.set(CLS_NAMESPACE_ID, ctx.namespaceId);
       if (ctx.slug) this.cls.set(CLS_SLUG, ctx.slug);
+      this.cls.set(CLS_DATABASE_LANE, 'background');
       return fn();
     });
   }

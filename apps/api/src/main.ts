@@ -25,11 +25,13 @@ import {
   type NamespaceRawRequest,
 } from './namespace/namespace-request.hook';
 import {
+  CLS_DATABASE_LANE,
   CLS_NAMESPACE_ID,
   CLS_SCHEMA,
   CLS_SLUG,
 } from './namespace/namespace.constants';
 import { PrismaClientManager } from './prisma/prisma-client-manager';
+import { InternalApiKeyService } from './internal-api-key.service';
 
 // No API-side ceiling on request bodies. The CLI posts whole assets in a single
 // bulk request and a single asset (large parquet/archive payloads, extracted
@@ -177,10 +179,17 @@ async function bootstrap() {
   const cls = app.get(ClsService);
   const namespaceRegistry = app.get(NamespaceRegistryService);
   const prismaClientManager = app.get(PrismaClientManager);
+  const internalApiKey = app.get(InternalApiKeyService);
 
   // Resolve the leading `/<slug>` into a tenant context (404 on unknown slug)
   // before any route runs. `/<slug>/mcp` was already rewritten to `/mcp`.
-  registerNamespaceHook(fastify, namespaceRegistry, cls, prismaClientManager);
+  registerNamespaceHook(
+    fastify,
+    namespaceRegistry,
+    cls,
+    prismaClientManager,
+    internalApiKey,
+  );
 
   const mcpHandler = async (request: any, reply: any) => {
     // MCP requires a namespace: `/<slug>/mcp` (rewritten to `/mcp` with the
@@ -200,6 +209,13 @@ async function bootstrap() {
       cls.set(CLS_SCHEMA, ns.schemaName);
       cls.set(CLS_NAMESPACE_ID, ns.namespaceId);
       cls.set(CLS_SLUG, ns.slug);
+      // A fresh CLS store loses the lane the namespace hook resolved; re-apply
+      // it so this handler uses the same pool the hook pinned and warmed.
+      cls.set(
+        CLS_DATABASE_LANE,
+        (request.raw as NamespaceRawRequest).classifyreDatabaseLane ??
+          'interactive',
+      );
 
       const settings = await instanceSettingsService.getSettings();
       if (!settings.mcpEnabled) {

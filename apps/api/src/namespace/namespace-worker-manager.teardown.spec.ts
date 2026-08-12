@@ -164,4 +164,18 @@ describe('NamespaceWorkerManager teardown isolation', () => {
       'database schema is out of date',
     );
   });
+
+  it('pins worker database access to the background lane', async () => {
+    const pin = jest.fn();
+    const set = jest.fn();
+    const { manager } = build({
+      prismaManager: { pin, unpin: noop, dropWhenIdle: asyncNoop },
+      cls: { run: (fn: () => unknown) => fn(), set },
+    });
+
+    await start(manager);
+
+    expect(pin).toHaveBeenCalledWith('ns_abc', 'background');
+    expect(set).toHaveBeenCalledWith('databaseLane', 'background');
+  });
 });

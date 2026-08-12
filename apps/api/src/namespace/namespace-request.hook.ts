@@ -4,15 +4,18 @@ import type { IncomingMessage } from 'node:http';
 import type { ClsService } from 'nestjs-cls';
 import { NamespaceRegistryService } from '../registry/namespace-registry.service';
 import {
+  CLS_DATABASE_LANE,
   RESERVED_PREFIXES,
   SLUG_RE,
   CLS_SCHEMA,
   CLS_NAMESPACE_ID,
   CLS_SLUG,
   type NamespaceContext,
+  type DatabaseLane,
 } from './namespace.constants';
 import { PrismaClientManager } from '../prisma/prisma-client-manager';
 import { transientDbErrorCode } from '../db/transient-db-error';
+import { InternalApiKeyService } from '../internal-api-key.service';
 
 /**
  * Fastify raw request augmented by the namespace pipeline.
@@ -23,6 +26,9 @@ export interface NamespaceRawRequest extends IncomingMessage {
   classifyreSlug?: string;
   classifyreNs?: NamespaceContext;
   classifyrePrismaPinned?: boolean;
+  /** Lane this request was pinned on; re-applied by handlers that open their
+   * own CLS context (the raw MCP handler) so they use the pool that is warm. */
+  classifyreDatabaseLane?: DatabaseLane;
 }
 
 /**
@@ -64,6 +70,7 @@ export function registerNamespaceHook(
   registry: NamespaceRegistryService,
   cls: ClsService,
   prismaManager: PrismaClientManager,
+  internalApiKey: InternalApiKeyService,
 ): void {
   const logger = new Logger('NamespaceHook');
 
@@ -129,13 +136,19 @@ export function registerNamespaceHook(
     cls.set(CLS_SCHEMA, ns.schemaName);
     cls.set(CLS_NAMESPACE_ID, ns.namespaceId);
     cls.set(CLS_SLUG, ns.slug);
+    const databaseLane = databaseLaneForRequest(
+      request.headers,
+      internalApiKey,
+    );
+    cls.set(CLS_DATABASE_LANE, databaseLane);
     // Also expose on the request for the raw MCP handler (not a Nest route).
     raw.classifyreNs = ns;
+    raw.classifyreDatabaseLane = databaseLane;
     (request as unknown as { classifyreNs?: NamespaceContext }).classifyreNs =
       ns;
     // Protect the tenant client from LRU eviction until this request has
     // completely finished (important on API-only pods with many tenants).
-    prismaManager.pin(ns.schemaName);
+    prismaManager.pin(ns.schemaName, databaseLane);
     raw.classifyrePrismaPinned = true;
   });
 
@@ -145,6 +158,26 @@ export function registerNamespaceHook(
   fastify.addHook('onRequestAbort', (request) => {
     releasePrismaPin(request.raw, prismaManager);
   });
+}
+
+/**
+ * CLI callbacks carry the per-install/per-deployment internal key and are
+ * background workload. Public/browser requests never carry that key and stay
+ * on the interactive pool reserved for UI latency.
+ *
+ * When no key is configured (`bun dev`, tests — never the desktop app or the
+ * Helm chart, both of which always generate one) internal traffic is
+ * indistinguishable from browser traffic and lands on the interactive lane.
+ * In-process workers still set their lane directly, so the protection that
+ * matters under load survives; only HTTP CLI callbacks lose it.
+ */
+export function databaseLaneForRequest(
+  headers: Record<string, unknown> | undefined,
+  internalApiKey: Pick<InternalApiKeyService, 'isInternalRequest'>,
+): DatabaseLane {
+  return internalApiKey.isInternalRequest(headers)
+    ? 'background'
+    : 'interactive';
 }
 
 function releasePrismaPin(
