@@ -31,6 +31,22 @@ const HOP_BY_HOP_HEADERS = new Set([
  */
 const STRIPPED_REQUEST_HEADERS = ["x-classifyre-internal-key"];
 
+/**
+ * Response headers that describe the *upstream* body, not the one this proxy
+ * sends.
+ *
+ * `fetch` transparently decodes `Content-Encoding`, so `upstream.body` is
+ * already plain bytes while `upstream.headers` still advertises the encoding
+ * and the compressed length. Forwarding those verbatim tells the browser to
+ * gunzip text that is not gzipped, and to stop reading at the compressed
+ * length — which it reports as `ERR_CONTENT_DECODING_FAILED` on a 200.
+ *
+ * This was latent until the API started compressing responses: with nothing
+ * setting `Content-Encoding` upstream, there was nothing to copy wrongly.
+ * Whatever serves this proxy's own response sets the correct values for it.
+ */
+const STRIPPED_RESPONSE_HEADERS = ["content-encoding", "content-length"];
+
 function normalizeAbsoluteUrl(value?: string | null): string | null {
   const trimmed = value?.trim();
   if (!trimmed) {
@@ -109,6 +125,9 @@ async function proxy(request: NextRequest, context: RouteContext) {
       const upstream = await fetch(targetUrl, upstreamInit);
       const responseHeaders = new Headers(upstream.headers);
       for (const header of HOP_BY_HOP_HEADERS) {
+        responseHeaders.delete(header);
+      }
+      for (const header of STRIPPED_RESPONSE_HEADERS) {
         responseHeaders.delete(header);
       }
 
