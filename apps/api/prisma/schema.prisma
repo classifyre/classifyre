@@ -201,6 +201,11 @@ model Asset {
   @@index([status])
   @@index([sourceId, scopeFingerprint])
   @@index([sourceId, contentHash])
+  // Corpus-wide duplicate grouping (`GROUP BY content_hash HAVING count(*) > 1`,
+  // see CorrelationService.linkIdenticalContent). The composite above leads with
+  // source_id and so cannot serve a query that deliberately spans sources —
+  // byte-identical content circulating BETWEEN systems is the interesting case.
+  @@index([contentHash])
   @@map("assets")
 }
 

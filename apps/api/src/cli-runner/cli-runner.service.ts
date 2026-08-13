@@ -11,8 +11,14 @@ import { spawn, ChildProcess } from 'child_process';
 import { PrismaService } from '../prisma.service';
 import { RunnerEventsGateway } from '../websocket/runner-events.gateway';
 import { PgBossService } from '../scheduler/pg-boss.service';
-import { INQUIRY_MATCH_QUEUE } from '../matching/matching.constants';
-import { CORRELATION_QUEUE } from '../correlation/correlation.constants';
+import {
+  INQUIRY_MATCH_COALESCE_SECONDS,
+  INQUIRY_MATCH_QUEUE,
+} from '../matching/matching.constants';
+import {
+  CORRELATION_QUEUE,
+  CORRELATION_SCAN_COALESCE_SECONDS,
+} from '../correlation/correlation.constants';
 import { AUTO_SCHEDULE_QUEUE } from '../scheduler/auto-schedule.constants';
 import { ClsService } from 'nestjs-cls';
 import { CLS_SCHEMA, CLS_NAMESPACE_ID } from '../namespace/namespace.constants';
@@ -239,8 +245,24 @@ export class CliRunnerService {
 
   /**
    * Tell the question-matching engine a source finished ingesting. Decoupled from
-   * ingestion: we only drop a pg-boss message (singletonKey dedupes rapid
-   * completions). Never let a matching failure break run completion.
+   * ingestion: we only drop a pg-boss message (debounced per source, see below).
+   * Never let a matching failure break run completion.
+   *
+   * Both sends here debounce with `singletonKey` + `singletonSeconds` +
+   * `singletonNextSlot`. All three are required, and only the first was here:
+   * pg-boss 12 computes `singleton_on` solely from `singletonSeconds`, and its
+   * dedupe index `job_i4 (name, singleton_on, singleton_key)` is partial on
+   * `singleton_on IS NOT NULL`, so a bare `singletonKey` is inert on a
+   * `standard`-policy queue — which both of these queues are. Every completed
+   * scan was enqueueing its own job. `singletonNextSlot` then makes a collision
+   * DEFER to the following slot instead of vanishing, so a rescan pair still
+   * gets both passes rather than silently losing the second.
+   *
+   * Dropping only becomes possible from the third completion inside two
+   * consecutive windows, and it is safe there: the surviving job's
+   * `handOffToAutopilot` runs in a `finally` and marks the source
+   * `autopilotDirtyAt`, so the source is still enrolled in the next cycle even
+   * when a redundant recompute is coalesced away.
    */
   private async enqueueQuestionMatching(
     sourceId: string,
@@ -252,17 +274,23 @@ export class CliRunnerService {
       await boss.send(
         INQUIRY_MATCH_QUEUE,
         { sourceId, runnerId },
-        { singletonKey: sourceId },
+        {
+          singletonKey: sourceId,
+          singletonSeconds: INQUIRY_MATCH_COALESCE_SECONDS,
+          singletonNextSlot: true,
+        },
       );
       // Correlation (DUPLICATES FINDER AGENT) for the same scan — runs the
       // deterministic duplicate detection and then hands off to the autopilot
       // cycle, so inquiry/case agents can consider the duplicate/cluster
-      // results. singletonKey debounces rapid rescans.
+      // results.
       await boss.send(
         CORRELATION_QUEUE,
         { sourceId, runnerId },
         {
           singletonKey: `correlation:${sourceId}`,
+          singletonSeconds: CORRELATION_SCAN_COALESCE_SECONDS,
+          singletonNextSlot: true,
           retryLimit: 2,
           retryDelay: 60,
           retryBackoff: true,
