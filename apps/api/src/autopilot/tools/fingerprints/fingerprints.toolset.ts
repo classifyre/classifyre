@@ -5,12 +5,18 @@ import {
   Severity,
 } from '@prisma/client';
 import { PrismaService } from '../../../prisma.service';
-import { CorrelationService } from '../../../correlation/correlation.service';
+import {
+  CORRELATION_RELATION_TYPES,
+  CorrelationService,
+} from '../../../correlation/correlation.service';
 import { DuplicatesFinderAgentService } from '../../../correlation/duplicates-finder-agent.service';
 import { DecisionApplierService } from '../../decision-applier.service';
 import type { Tool, ToolGate } from '../tool.types';
 
-const RELATION_TYPES = ['related', 'likely_duplicate'];
+// Sourced from the engine rather than restated, so a new correlation edge type
+// (identical_content was the first) reaches the harness instead of being
+// silently filtered out of every similar_assets answer.
+const RELATION_TYPES = CORRELATION_RELATION_TYPES;
 
 /**
  * Fingerprints (asset correlation/similarity) tools. The similarity COMPUTE

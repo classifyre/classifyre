@@ -6,6 +6,23 @@
 export const CORRELATION_QUEUE = 'correlation.scan';
 
 /**
+ * Coalescing window for the per-scan correlation job.
+ *
+ * Must be passed as `singletonSeconds` alongside the source's `singletonKey`:
+ * in pg-boss 12 `singleton_on` is only populated when `singletonSeconds` is
+ * given, and the dedupe index (`job_i4`, partial on `singleton_on IS NOT NULL`)
+ * therefore never applies to a bare `singletonKey`. Without it every completed
+ * scan enqueued its own recompute — the "debounce" this queue documented did
+ * not exist.
+ *
+ * Sized against the adaptive scheduler, which deliberately rescans a source
+ * back-to-back while it is still ingesting. One minute collapses that burst
+ * while staying well inside the autopilot's own 120s start-after, so the
+ * handoff is not meaningfully delayed.
+ */
+export const CORRELATION_SCAN_COALESCE_SECONDS = 60;
+
+/**
  * Default per-label weights for the weighted-overlap score. Concrete
  * identifiers dominate; every unknown/custom label falls back to
  * DEFAULT_LABEL_WEIGHT, keeping the engine fully label-agnostic and free of
@@ -59,6 +76,25 @@ export const FANOUT_CAP = 2000;
 
 /** Flush correlation edges to the DB in batches of this size (memory guard). */
 export const EDGE_BATCH = 2000;
+
+/**
+ * SHA-256 of zero bytes. Assets whose scanned payload was empty all share this
+ * digest, and grouping every empty file in a corpus into one "duplicate" set is
+ * noise, not evidence — excluded from exact-duplicate linking.
+ */
+export const EMPTY_CONTENT_SHA256 =
+  'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855';
+
+/**
+ * Largest byte-identical group that still gets linked. The claim stays true
+ * past this size, but a group of thousands of identical stub files says nothing
+ * about any individual member and would drag them all into one useless
+ * mega-cluster. Same reasoning as FANOUT_CAP, applied to exact matches.
+ */
+export const IDENTICAL_GROUP_CAP = 500;
+
+/** Content-hash groups pulled from Postgres per page while linking. */
+export const IDENTICAL_GROUP_PAGE = 500;
 
 /** Longest normalized value we index; longer values are skipped as noise. */
 export const MAX_VALUE_LENGTH = 512;
