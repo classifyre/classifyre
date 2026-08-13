@@ -998,7 +998,7 @@ describe('CustomDetectorsService', () => {
       const { service } = createService();
       const examples = service.listExamples('LLM');
       expect(examples).toHaveLength(1);
-      const config = examples[0].pipelineSchema as Record<string, unknown>;
+      const config = examples[0].pipelineSchema;
       const schema = config.pipeline_schema as Record<string, unknown>;
       expect(schema.type).toBe('LLM');
       expect(String(schema.system_prompt)).toContain('bypass');

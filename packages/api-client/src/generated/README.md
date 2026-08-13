@@ -185,6 +185,7 @@ All URIs are relative to *http://localhost*
 *FindingsApi* | [**findingsControllerGetDiscoveryOverview**](docs/FindingsApi.md#findingscontrollergetdiscoveryoverview) | **GET** /findings/discovery | Get discovery dashboard overview data
 *FindingsApi* | [**findingsControllerGetStats**](docs/FindingsApi.md#findingscontrollergetstats) | **GET** /findings/stats | Get finding statistics
 *FindingsApi* | [**findingsControllerListAssetSummaries**](docs/FindingsApi.md#findingscontrollerlistassetsummaries) | **GET** /findings/assets | List asset finding summaries with optional filters
+*FindingsApi* | [**findingsControllerRefreshDiscoveryStats**](docs/FindingsApi.md#findingscontrollerrefreshdiscoverystats) | **POST** /findings/discovery/refresh | Queue a full rebuild of the pre-aggregated finding statistics
 *FindingsApi* | [**findingsControllerUpdate**](docs/FindingsApi.md#findingscontrollerupdate) | **PATCH** /findings/{id} | Update a finding
 *GlossaryApi* | [**glossaryControllerList**](docs/GlossaryApi.md#glossarycontrollerlist) | **GET** /glossary | List glossary terms
 *GlossaryApi* | [**glossaryControllerLookup**](docs/GlossaryApi.md#glossarycontrollerlookup) | **GET** /glossary/lookup | Resolve a name or alias to glossary terms (exact + semantic)
@@ -409,8 +410,10 @@ All URIs are relative to *http://localhost*
 - [FindingsChartsTopAssetDto](docs/FindingsChartsTopAssetDto.md)
 - [FindingsChartsTotalsDto](docs/FindingsChartsTotalsDto.md)
 - [FindingsDiscoveryActivityDto](docs/FindingsDiscoveryActivityDto.md)
+- [FindingsDiscoveryRefreshResponseDto](docs/FindingsDiscoveryRefreshResponseDto.md)
 - [FindingsDiscoveryResponseDto](docs/FindingsDiscoveryResponseDto.md)
 - [FindingsDiscoverySeverityBreakdownDto](docs/FindingsDiscoverySeverityBreakdownDto.md)
+- [FindingsDiscoveryStatsDto](docs/FindingsDiscoveryStatsDto.md)
 - [FindingsDiscoveryStatusBreakdownDto](docs/FindingsDiscoveryStatusBreakdownDto.md)
 - [FindingsDiscoveryTopAssetDto](docs/FindingsDiscoveryTopAssetDto.md)
 - [FindingsDiscoveryTotalsDto](docs/FindingsDiscoveryTotalsDto.md)

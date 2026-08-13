@@ -46,6 +46,7 @@ import { EmbeddingQueueService } from './embedding/embedding-queue.service';
 import { SemanticSearchMode } from './dto/search-findings-request.dto';
 import { InquiryMatchingService } from './matching/inquiry-matching.service';
 import { CorrelationJobScheduler } from './correlation/correlation-job-scheduler.service';
+import { FindingStatsScheduler } from './stats/finding-stats-scheduler.service';
 import { CorrelationGraphCacheService } from './correlation/correlation-graph-cache.service';
 import { citedFindingIds as citedFindingIdsForSource } from './utils/cited-findings';
 
@@ -193,6 +194,7 @@ export class AssetService {
     @Optional() private readonly inquiryMatching?: InquiryMatchingService,
     @Optional() private readonly correlationJobs?: CorrelationJobScheduler,
     @Optional() private readonly graphCache?: CorrelationGraphCacheService,
+    @Optional() private readonly statsJobs?: FindingStatsScheduler,
   ) {}
 
   private async assertSourceAndRunner(sourceId: string, runnerId: string) {
@@ -3053,6 +3055,13 @@ export class AssetService {
       },
     );
     this.embeddingQueue?.enqueue(embeddingContents);
+    // Scheduled after the transaction commits so the refresh reads the rows it
+    // was told about. Ingest calls this once per batch and a scan runs
+    // thousands of batches; the scheduler coalesces them onto one job per
+    // window, so the cost here is one `ON CONFLICT DO NOTHING` insert.
+    if (result.findings > 0) {
+      await this.statsJobs?.scheduleForDays([new Date()], 'findings ingested');
+    }
     return result;
   }
 }

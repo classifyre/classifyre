@@ -2227,7 +2227,15 @@
     "noFindingsInWindow": "Keine Befunde im gewählten Zeitraum",
     "currentHighest": "{{count}} {{level}} Befunde aktuell am höchsten",
     "retry": "Erneut versuchen",
-    "errorPrefix": "Fehler: {{message}}"
+    "errorPrefix": "Fehler: {{message}}",
+    "stats": {
+      "building": "Index wird erstellt…",
+      "buildingHint": "Diese Zahlen wurden direkt aus allen Funden gezählt – exakt, aber langsam. Eine Neuberechnung des vorab aggregierten Index läuft im Hintergrund; danach lädt diese Seite sofort.",
+      "updated": "Aktualisiert {when}",
+      "updatedHint": "Aus einem vorab aggregierten Index gelesen, der sich automatisch aktualisiert, sobald neue Funde eintreffen – deshalb lädt diese Seite sofort, statt Millionen Zeilen zu zählen.",
+      "never": "Noch nicht erstellt",
+      "refresh": "Statistiken jetzt neu berechnen"
+    }
   },
   "breadcrumb": {
     "home": "Startseite",

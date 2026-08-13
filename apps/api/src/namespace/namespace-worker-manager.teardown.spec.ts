@@ -57,6 +57,7 @@ describe('NamespaceWorkerManager teardown isolation', () => {
       schedulePurge: noop,
       stopForSchema: asyncNoop,
     },
+    findingStats: { registerForNamespace: asyncNoop },
     runnerEvents: { stopForSchema: noop },
     notificationEvents: { stopForSchema: noop },
     ...over,
@@ -83,6 +84,7 @@ describe('NamespaceWorkerManager teardown isolation', () => {
       d.mcpClient as never,
       d.pgStream as never,
       d.dataTransfer as never,
+      d.findingStats as never,
       d.runnerEvents as never,
       d.notificationEvents as never,
     );

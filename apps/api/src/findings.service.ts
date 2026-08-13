@@ -29,6 +29,12 @@ import { EmbeddingService } from './embedding/embedding.service';
 import { QueryEmbeddingService } from './embedding/query-embedding.service';
 import { EmbeddingQueueService } from './embedding/embedding-queue.service';
 import { CorrelationJobScheduler } from './correlation/correlation-job-scheduler.service';
+import {
+  FindingStatsService,
+  type RollupFilter,
+} from './stats/finding-stats.service';
+import { FindingStatsScheduler } from './stats/finding-stats-scheduler.service';
+import { FINDING_TOTAL_CAP } from './stats/finding-stats.constants';
 
 @Injectable()
 export class FindingsService {
@@ -38,6 +44,8 @@ export class FindingsService {
     private readonly queryEmbeddings: QueryEmbeddingService,
     @Optional() private readonly embeddingQueue?: EmbeddingQueueService,
     @Optional() private readonly correlationJobs?: CorrelationJobScheduler,
+    @Optional() private readonly stats?: FindingStatsService,
+    @Optional() private readonly statsJobs?: FindingStatsScheduler,
   ) {}
 
   private readonly searchFindingSelect = {
@@ -590,18 +598,73 @@ export class FindingsService {
                   { lastDetectedAt: 'desc' },
                 ],
       }),
-      this.prisma.finding.count({ where }),
+      this.countSearchTotal(where, params?.filters as Record<string, unknown>),
     ]);
 
     return {
       findings: findings.map((finding) => this.normalizeSearchFinding(finding)),
-      total,
+      total: total.value,
+      // True when `total` is a floor rather than the exact number of matches,
+      // so the client can render "10,000+" instead of implying a last page.
+      totalIsLowerBound: total.isLowerBound,
       skip,
       limit,
       ranking: {
         mode: params?.ranking?.sort ?? FindingsRankingSort.IMPORTANCE,
         explained: true,
       },
+    };
+  }
+
+  /**
+   * Pagination total for a findings search.
+   *
+   * The exact `count(*)` was the whole cost of an unfiltered findings page —
+   * 2.0 s of the 2.7 s response on a 5.17M-row workspace, while the 25 rows
+   * themselves came back from an index in milliseconds. Three tiers:
+   *
+   *  1. The rollup answers it exactly and instantly when the filter only
+   *     touches columns in its grain (including the common unfiltered case).
+   *  2. Otherwise count, but stop at {@link FINDING_TOTAL_CAP}: nobody
+   *     paginates to row 900,000, and a bounded count short-circuits as soon as
+   *     it has enough rows instead of scanning millions.
+   *  3. Under the cap the bounded count *is* the exact answer, so precision is
+   *     only ever lost where it stopped being useful.
+   */
+  private async countSearchTotal(
+    where: Prisma.FindingWhereInput,
+    filters: Record<string, unknown> | undefined,
+  ): Promise<{ value: number; isLowerBound: boolean }> {
+    if (this.stats?.canServe(filters)) {
+      // Mirror buildBaseFindingsWhere: an explicit status list wins, otherwise
+      // everything except RESOLVED unless resolved findings were requested.
+      const statuses = this.normalizeFilterValues(filters?.status).map(
+        (value) => value.toUpperCase(),
+      );
+      const total = await this.stats.totalFor({
+        sourceId: this.normalizeFilterValues(filters?.sourceId),
+        detectorType: this.normalizeFilterValues(filters?.detectorType).map(
+          (value) => value.toUpperCase(),
+        ),
+        severity: this.normalizeFilterValues(filters?.severity).map((value) =>
+          value.toUpperCase(),
+        ),
+        status: statuses,
+        excludeStatuses:
+          statuses.length === 0 && !filters?.includeResolved
+            ? [FindingStatus.RESOLVED]
+            : [],
+      });
+      if (total !== null) return { value: total, isLowerBound: false };
+    }
+    const capped = await this.prisma.finding.findMany({
+      where,
+      select: { id: true },
+      take: FINDING_TOTAL_CAP + 1,
+    });
+    return {
+      value: Math.min(capped.length, FINDING_TOTAL_CAP),
+      isLowerBound: capped.length > FINDING_TOTAL_CAP,
     };
   }
 
@@ -1005,6 +1068,12 @@ export class FindingsService {
         [finding.assetId],
         'finding status changed',
       );
+      // The rollup buckets by detection day, so only this finding's own day
+      // moved — no need to rebuild the rest.
+      await this.statsJobs?.scheduleForDays(
+        [updatedFinding.detectedAt],
+        'finding status changed',
+      );
     }
 
     return updatedFinding;
@@ -1061,6 +1130,10 @@ export class FindingsService {
       }
       if (status && result.count > 0) {
         await this.correlationJobs?.scheduleFull('bulk finding status changed');
+        // Filter-based bulk update: the matched findings can span any detection
+        // day, and working out which ones would cost the same scan the rollup
+        // exists to avoid. Rebuild instead.
+        await this.statsJobs?.scheduleFull('bulk finding status changed');
       }
       return { updatedCount: result.count, ids: [] };
     }
@@ -1197,6 +1270,230 @@ export class FindingsService {
     };
   }
 
+  /**
+   * Queue a full rebuild of the rollup on behalf of a user pressing "refresh".
+   *
+   * Returns immediately: the rebuild is a full pass over `findings` (19.5 s on
+   * a 5.17M-finding workspace) and belongs on the background lane, not on the
+   * request. The response carries the current freshness so the UI can show
+   * "refreshing…" until `refreshedAt` moves.
+   */
+  async refreshDiscoveryStats() {
+    if (!this.stats || !this.statsJobs) {
+      return { queued: false, refreshedAt: null, isBuilt: false };
+    }
+    await this.statsJobs.scheduleFull('manual refresh');
+    const freshness = await this.stats.getFreshness();
+    return {
+      queued: true,
+      refreshedAt: freshness.refreshedAt,
+      isBuilt: freshness.isBuilt,
+    };
+  }
+
+  /** Accumulate one (severity, status) bucket into the overview totals. */
+  private applyOverviewBucket(
+    totals: {
+      total: number;
+      bySeverity: Record<string, number>;
+      byStatus: Record<string, number>;
+    },
+    severity: string,
+    status: string,
+    count: number,
+  ): void {
+    totals.total += count;
+    const severityKey =
+      { CRITICAL: 'critical', HIGH: 'high', MEDIUM: 'medium', LOW: 'low' }[
+        severity
+      ] ?? 'info';
+    totals.bySeverity[severityKey] =
+      (totals.bySeverity[severityKey] ?? 0) + count;
+    const statusKey =
+      {
+        [FindingStatus.FALSE_POSITIVE]: 'falsePositive',
+        [FindingStatus.RESOLVED]: 'resolved',
+        [FindingStatus.IGNORED]: 'ignored',
+      }[status] ?? 'open';
+    totals.byStatus[statusKey] = (totals.byStatus[statusKey] ?? 0) + count;
+  }
+
+  /**
+   * Serve the discovery overview from the pre-aggregated rollup.
+   *
+   * Returns null when the rollup has not been built yet, so the caller runs the
+   * live aggregates instead — a slow dashboard is a better failure mode than an
+   * empty one that claims a workspace has no findings.
+   */
+  private async discoveryOverviewFromRollup(input: {
+    windowStart: Date;
+    todayStart: Date;
+    weekStart: Date;
+    monthStart: Date;
+    includeResolved: boolean;
+    windowDays: number;
+    totals: {
+      total: number;
+      bySeverity: Record<string, number>;
+      byStatus: Record<string, number>;
+    };
+  }) {
+    if (!this.stats || !(await this.stats.isUsable())) return null;
+
+    // The overview counts OPEN findings only unless the caller asked for
+    // everything — matching the live path's `{ status: OPEN }`, not the
+    // findings search's looser "anything but RESOLVED".
+    const filters: RollupFilter = input.includeResolved
+      ? {}
+      : { status: ['OPEN'] };
+    const [severityTotals, activity, topAssetRows, recentRunsRaw, freshness] =
+      await Promise.all([
+        this.stats.severityStatusTotals(input.windowStart, filters),
+        this.stats.activity(
+          input.todayStart,
+          input.weekStart,
+          input.monthStart,
+          filters,
+        ),
+        this.stats.topAssets(input.windowStart, 50),
+        this.prisma.runner.findMany({
+          orderBy: { triggeredAt: 'desc' },
+          take: 10,
+          select: {
+            id: true,
+            status: true,
+            triggerType: true,
+            triggeredAt: true,
+            startedAt: true,
+            completedAt: true,
+            durationMs: true,
+            totalFindings: true,
+            assetsCreated: true,
+            assetsUpdated: true,
+            errorMessage: true,
+            source: { select: { id: true, name: true, type: true } },
+          },
+        }),
+        this.stats.getFreshness(),
+      ]);
+
+    for (const row of severityTotals) {
+      this.applyOverviewBucket(
+        input.totals,
+        row.severity,
+        row.status,
+        row.count,
+      );
+    }
+
+    const assets = topAssetRows.length
+      ? await this.prisma.asset.findMany({
+          where: { id: { in: topAssetRows.map((row) => row.assetId) } },
+          select: {
+            id: true,
+            name: true,
+            hash: true,
+            externalUrl: true,
+            links: true,
+            assetType: true,
+            sourceType: true,
+            source: { select: { id: true, name: true, type: true } },
+          },
+        })
+      : [];
+    const assetMap = new Map(assets.map((asset) => [asset.id, asset]));
+
+    const severityOrder = [
+      'CRITICAL',
+      'HIGH',
+      'MEDIUM',
+      'LOW',
+      'INFO',
+    ] as const;
+    const severityRank: Record<string, number> = {
+      CRITICAL: 5,
+      HIGH: 4,
+      MEDIUM: 3,
+      LOW: 2,
+      INFO: 1,
+    };
+
+    const topAssets = topAssetRows.map((row) => {
+      const asset = assetMap.get(row.assetId);
+      const highest =
+        severityOrder.find(
+          (severity) => (row.severityCounts[severity] ?? 0) > 0,
+        ) ?? 'INFO';
+      return {
+        assetId: row.assetId,
+        assetName: asset?.name || asset?.externalUrl || 'Unknown asset',
+        assetType: asset?.assetType || 'OTHER',
+        sourceId: asset?.source?.id ?? null,
+        sourceName: asset?.source?.name ?? null,
+        sourceType: asset?.source?.type ?? null,
+        totalFindings: row.totalFindings,
+        highestSeverity: highest as any,
+        lastDetectedAt: row.lastDetectedAt,
+        severityCounts: row.severityCounts,
+      };
+    });
+
+    // Same severity-aware ranking the live path applies: most CRITICALs first,
+    // then HIGHs, and so on, before falling back to raw count.
+    topAssets.sort((a, b) => {
+      for (const severity of severityOrder) {
+        const delta =
+          (b.severityCounts[severity] ?? 0) - (a.severityCounts[severity] ?? 0);
+        if (delta !== 0) return delta;
+      }
+      const countDelta = b.totalFindings - a.totalFindings;
+      if (countDelta !== 0) return countDelta;
+      const rankDelta =
+        (severityRank[b.highestSeverity] ?? 0) -
+        (severityRank[a.highestSeverity] ?? 0);
+      if (rankDelta !== 0) return rankDelta;
+      return (
+        (b.lastDetectedAt?.getTime() ?? 0) - (a.lastDetectedAt?.getTime() ?? 0)
+      );
+    });
+
+    return {
+      windowDays: input.windowDays,
+      includeResolved: input.includeResolved,
+      totals: input.totals,
+      activity,
+      topAssets: topAssets
+        .slice(0, 12)
+        .map(({ severityCounts: _drop, ...rest }) => rest),
+      recentRuns: recentRunsRaw.map((run) => ({
+        id: run.id,
+        status: run.status,
+        triggerType: run.triggerType,
+        triggeredAt: run.triggeredAt,
+        startedAt: run.startedAt ?? null,
+        completedAt: run.completedAt ?? null,
+        durationMs: run.durationMs ?? null,
+        totalFindings: run.totalFindings,
+        assetsCreated: run.assetsCreated,
+        assetsUpdated: run.assetsUpdated,
+        errorMessage: run.errorMessage ?? null,
+        source: run.source
+          ? {
+              id: run.source.id,
+              name: run.source.name ?? null,
+              type: run.source.type ?? null,
+            }
+          : null,
+      })),
+      stats: {
+        refreshedAt: freshness.refreshedAt,
+        durationMs: freshness.durationMs,
+        isBuilt: freshness.isBuilt,
+        source: 'rollup' as const,
+      },
+    };
+  }
+
   async getDiscoveryOverview(query: QueryFindingsDiscoveryDto) {
     const windowDays = query.windowDays ?? 30;
     const includeResolved = query.includeResolved ?? false;
@@ -1227,6 +1524,20 @@ export class FindingsService {
       bySeverity: { critical: 0, high: 0, medium: 0, low: 0, info: 0 },
       byStatus: { open: 0, falsePositive: 0, resolved: 0, ignored: 0 },
     };
+
+    // Preferred path: read the pre-aggregated rollup. Falls through to the
+    // live aggregates below only while the rollup has never been built (a
+    // fresh install, or the first boot after the migration).
+    const rollup = await this.discoveryOverviewFromRollup({
+      windowStart,
+      todayStart,
+      weekStart,
+      monthStart,
+      includeResolved,
+      windowDays,
+      totals,
+    });
+    if (rollup) return rollup;
 
     const [
       findingGroups,
@@ -1465,6 +1776,14 @@ export class FindingsService {
       },
       topAssets: rankedTopAssets,
       recentRuns,
+      // Computed live against `findings`, so it is exact as of this instant —
+      // and cost a full aggregate to produce. The UI labels it accordingly.
+      stats: {
+        refreshedAt: new Date(),
+        durationMs: null,
+        isBuilt: false,
+        source: 'live' as const,
+      },
     };
   }
 
