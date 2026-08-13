@@ -124,6 +124,7 @@
 | api.migration.containerSecurityContext | object | `{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]}}` | Override with runAsUser/runAsNonRoot: false if the migration toolchain requires root (e.g. Prisma on Bun). |
 | api.migration.enabled | bool | `true` | API applies pending migrations itself before NestJS startup. |
 | api.migration.script | string | `"node -e \"require('./dist/src/database-migrations.js').applyAllPendingMigrations().catch((error) => { console.error(error); process.exit(1); })\""` | Migration command/script. |
+| api.namespaceRetentionDays | int | `7` | Days a deleted workspace stays recoverable before it is dropped for good. Deleting a workspace only marks it and stops serving it; its schema and all its data survive until this many days later, when a background sweep drops the schema and the registry row. That deletion is irreversible and there is no backup step, so raise this if your recovery process needs longer. Set 0 to keep deleted workspaces forever (the behaviour before this existed), at the cost of their disk. |
 | api.nodeSelector | object | `{}` | API scheduling: node selector. |
 | api.pdb.enabled | bool | `true` | Enable PodDisruptionBudget for API deployment. |
 | api.pdb.minAvailable | int | `1` | API minimum pods available during disruptions. |

@@ -17,7 +17,6 @@ spec:
       app.kubernetes.io/name: classifyre
       app.kubernetes.io/instance: classifyre
       app.kubernetes.io/component: api
-
 ---
 # Source: classifyre-core/templates/pdb-web.yaml
 apiVersion: policy/v1
@@ -37,7 +36,6 @@ spec:
       app.kubernetes.io/name: classifyre
       app.kubernetes.io/instance: classifyre
       app.kubernetes.io/component: web
-
 ---
 # Source: classifyre-core/templates/serviceaccount.yaml
 apiVersion: v1
@@ -50,7 +48,6 @@ metadata:
     app.kubernetes.io/instance: classifyre
     app.kubernetes.io/managed-by: Helm
 automountServiceAccountToken: true
-
 ---
 # Source: classifyre-core/templates/api-internal-key-secret.yaml
 apiVersion: v1
@@ -65,7 +62,6 @@ metadata:
 type: Opaque
 stringData:
   CLASSIFYRE_INTERNAL_KEY: "snapshot-classifyre-internal-key-0001"
-
 ---
 # Source: classifyre-core/templates/api-secrets.yaml
 apiVersion: v1
@@ -80,7 +76,6 @@ metadata:
 type: Opaque
 stringData:
   CLASSIFYRE_MASKED_CONFIG_KEY: "snapshot-classifyre-masked-key-0001"
-
 ---
 # Source: classifyre-core/templates/database-secrets.yaml
 apiVersion: v1
@@ -95,7 +90,6 @@ metadata:
 type: Opaque
 stringData:
   password: "snapshot-password"
-
 ---
 # Source: classifyre-core/templates/api-cli-job-template-configmap.yaml
 apiVersion: v1
@@ -197,7 +191,6 @@ data:
         }
       }
     }
-
 ---
 # Source: classifyre-core/templates/api-cli-cache-pvc.yaml
 apiVersion: v1
@@ -215,7 +208,6 @@ spec:
   resources:
     requests:
       storage: 10Gi
-
 ---
 # Source: classifyre-core/templates/postgres-embedded.yaml
 apiVersion: v1
@@ -273,7 +265,6 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
   name: classifyre-api-job-manager
-
 ---
 # Source: classifyre-core/templates/postgres-embedded.yaml
 apiVersion: v1
@@ -320,7 +311,6 @@ spec:
       port: 8000
       targetPort: http
       protocol: TCP
-
 ---
 # Source: classifyre-core/templates/service-web.yaml
 apiVersion: v1
@@ -344,7 +334,6 @@ spec:
       port: 3100
       targetPort: http
       protocol: TCP
-
 ---
 # Source: classifyre-core/templates/deployment-api.yaml
 apiVersion: apps/v1
@@ -492,6 +481,8 @@ spec:
               value: "3"
             - name: MAX_CONCURRENT_NAMESPACE_JOBS
               value: "1"
+            - name: NAMESPACE_RETENTION_DAYS
+              value: "7"
             - name: CLASSIFYRE_INTERNAL_API_URL
               value: "http://classifyre-api.default.svc.cluster.local:8000"
             - name: NODE_OPTIONS
@@ -658,7 +649,6 @@ spec:
               app.kubernetes.io/name: classifyre
               app.kubernetes.io/instance: classifyre
               app.kubernetes.io/component: api
-
 ---
 # Source: classifyre-core/templates/deployment-web.yaml
 apiVersion: apps/v1
@@ -798,7 +788,6 @@ spec:
               app.kubernetes.io/name: classifyre
               app.kubernetes.io/instance: classifyre
               app.kubernetes.io/component: web
-
 ---
 # Source: classifyre-core/templates/deployment-worker.yaml
 apiVersion: apps/v1
@@ -947,6 +936,8 @@ spec:
               value: "3"
             - name: MAX_CONCURRENT_NAMESPACE_JOBS
               value: "1"
+            - name: NAMESPACE_RETENTION_DAYS
+              value: "7"
             - name: CLASSIFYRE_INTERNAL_API_URL
               value: "http://classifyre-api.default.svc.cluster.local:8000"
             - name: NODE_OPTIONS
@@ -1093,7 +1084,6 @@ spec:
         - name: cli-job-template
           configMap:
             name: classifyre-api-cli-job-template
-
 ---
 # Source: classifyre-core/templates/postgres-embedded.yaml
 apiVersion: apps/v1
@@ -1200,7 +1190,6 @@ spec:
         - name: postgres-data
           persistentVolumeClaim:
             claimName: classifyre-postgres-data
-
 ---
 # Source: classifyre-core/templates/hpa-api.yaml
 apiVersion: autoscaling/v2
@@ -1233,7 +1222,6 @@ spec:
         target:
           type: Utilization
           averageUtilization: 75
-
 ---
 # Source: classifyre-core/templates/hpa-web.yaml
 apiVersion: autoscaling/v2
@@ -1266,7 +1254,6 @@ spec:
         target:
           type: Utilization
           averageUtilization: 75
-
 ---
 # Source: classifyre-core/templates/api-cli-cache-prune-cronjob.yaml
 apiVersion: batch/v1
