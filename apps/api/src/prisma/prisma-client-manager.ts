@@ -54,6 +54,16 @@ export class PrismaClientManager implements OnModuleDestroy {
    * workers use the remainder, so an ingest burst cannot occupy every
    * connection needed to render the UI.
    *
+   * On the outage that motivated this split, background scans were not the
+   * main consumer they were first taken to be: the discovery overview held a
+   * connection for ~43 s per request because its aggregates scanned the whole
+   * findings table, so a handful of dashboard loads could exhaust the pool on
+   * their own. That query is now served from a rollup in single-digit
+   * milliseconds. The split is kept because a scan does still compete for
+   * connections and an unused ceiling costs nothing — but it bounds
+   * contention, it does not remove work, and it is not a substitute for
+   * finding the query that holds a connection too long.
+   *
    * The interactive default is the whole of the old single-pool budget (10),
    * and `poolMax` was raised to fund the background lane on top of it, rather
    * than carving it out. Splitting the old 10 into 4 + 6 would have handed the
