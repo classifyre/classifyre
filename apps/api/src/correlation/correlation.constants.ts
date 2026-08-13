@@ -6,6 +6,23 @@
 export const CORRELATION_QUEUE = 'correlation.scan';
 
 /**
+ * Coalescing window for the per-scan correlation job.
+ *
+ * Must be passed as `singletonSeconds` alongside the source's `singletonKey`:
+ * in pg-boss 12 `singleton_on` is only populated when `singletonSeconds` is
+ * given, and the dedupe index (`job_i4`, partial on `singleton_on IS NOT NULL`)
+ * therefore never applies to a bare `singletonKey`. Without it every completed
+ * scan enqueued its own recompute — the "debounce" this queue documented did
+ * not exist.
+ *
+ * Sized against the adaptive scheduler, which deliberately rescans a source
+ * back-to-back while it is still ingesting. One minute collapses that burst
+ * while staying well inside the autopilot's own 120s start-after, so the
+ * handoff is not meaningfully delayed.
+ */
+export const CORRELATION_SCAN_COALESCE_SECONDS = 60;
+
+/**
  * Default per-label weights for the weighted-overlap score. Concrete
  * identifiers dominate; every unknown/custom label falls back to
  * DEFAULT_LABEL_WEIGHT, keeping the engine fully label-agnostic and free of
