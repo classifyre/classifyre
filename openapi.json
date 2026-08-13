@@ -3353,6 +3353,28 @@
         ]
       }
     },
+    "/findings/stats/freshness": {
+      "get": {
+        "operationId": "FindingsController_getStatsFreshness",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FindingsDiscoveryStatsDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Freshness of the pre-aggregated finding statistics shared by the dashboard charts",
+        "tags": [
+          "findings"
+        ]
+      }
+    },
     "/findings/discovery/refresh": {
       "post": {
         "operationId": "FindingsController_refreshDiscoveryStats",
@@ -13206,6 +13228,35 @@
           "limit"
         ]
       },
+      "FindingsDiscoveryStatsDto": {
+        "type": "object",
+        "properties": {
+          "refreshedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          },
+          "durationMs": {
+            "type": "number",
+            "nullable": true
+          },
+          "isBuilt": {
+            "type": "boolean"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "rollup",
+              "live"
+            ],
+            "description": "rollup: served from the pre-aggregated tables. live: the rollup has not been built yet for this workspace, so the figures were counted directly and are exact but slow."
+          }
+        },
+        "required": [
+          "isBuilt",
+          "source"
+        ]
+      },
       "FindingsDiscoveryRefreshResponseDto": {
         "type": "object",
         "properties": {
@@ -13460,35 +13511,6 @@
           "totalFindings",
           "assetsCreated",
           "assetsUpdated"
-        ]
-      },
-      "FindingsDiscoveryStatsDto": {
-        "type": "object",
-        "properties": {
-          "refreshedAt": {
-            "format": "date-time",
-            "type": "string",
-            "nullable": true
-          },
-          "durationMs": {
-            "type": "number",
-            "nullable": true
-          },
-          "isBuilt": {
-            "type": "boolean"
-          },
-          "source": {
-            "type": "string",
-            "enum": [
-              "rollup",
-              "live"
-            ],
-            "description": "rollup: served from the pre-aggregated tables. live: the rollup has not been built yet for this workspace, so the figures were counted directly and are exact but slow."
-          }
-        },
-        "required": [
-          "isBuilt",
-          "source"
         ]
       },
       "FindingsDiscoveryResponseDto": {

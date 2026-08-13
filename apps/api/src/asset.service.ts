@@ -47,6 +47,7 @@ import { SemanticSearchMode } from './dto/search-findings-request.dto';
 import { InquiryMatchingService } from './matching/inquiry-matching.service';
 import { CorrelationJobScheduler } from './correlation/correlation-job-scheduler.service';
 import { FindingStatsScheduler } from './stats/finding-stats-scheduler.service';
+import { FindingStatsService } from './stats/finding-stats.service';
 import { CorrelationGraphCacheService } from './correlation/correlation-graph-cache.service';
 import { citedFindingIds as citedFindingIdsForSource } from './utils/cited-findings';
 
@@ -195,6 +196,7 @@ export class AssetService {
     @Optional() private readonly correlationJobs?: CorrelationJobScheduler,
     @Optional() private readonly graphCache?: CorrelationGraphCacheService,
     @Optional() private readonly statsJobs?: FindingStatsScheduler,
+    @Optional() private readonly stats?: FindingStatsService,
   ) {}
 
   private async assertSourceAndRunner(sourceId: string, runnerId: string) {
@@ -1335,6 +1337,21 @@ export class AssetService {
     };
   }
 
+  /**
+   * Whether the finding statistics rollup is populated for this workspace.
+   *
+   * Optional dependency: on a fresh install (or a boot before the first build)
+   * it is absent or unbuilt, and every caller falls back to counting live.
+   */
+  private async findingStatsUsable(): Promise<boolean> {
+    if (!this.stats) return false;
+    try {
+      return await this.stats.isUsable();
+    } catch {
+      return false;
+    }
+  }
+
   async searchAssetsCharts(
     params: SearchAssetsChartsRequestDto,
   ): Promise<SearchAssetsChartsResponseDto> {
@@ -1495,19 +1512,73 @@ export class AssetService {
       ? Prisma.sql`WHERE ${Prisma.join(findingConditions, ' AND ')}`
       : Prisma.empty;
 
-    const rows = await this.prisma.$queryRaw<
-      RawAssetsChartsQueryRow[]
-    >(Prisma.sql`
-      WITH filtered_assets AS (
+    // `top_assets` is the only part of this query that touches `findings`, and
+    // it is the whole cost: joining every finding to its asset to rank the top
+    // 15 took 24.5 s on a 5.17M-finding workspace, to produce a 4 KB response.
+    //
+    // finding_stats_asset_daily already holds (asset, severity, status) counts,
+    // so when the request adds no finding predicate beyond severity/status the
+    // ranking can be read from ~27k pre-aggregated rows instead. Anything
+    // narrower — a detector, a custom-detector key, a finding type, a date
+    // bound — is not in that grain and still runs live.
+    const rollupServableFindingFilters =
+      this.normalizeStringArray(findingFilters.customDetectorKey) ===
+        undefined &&
+      this.normalizeStringArray(findingFilters.findingType) === undefined &&
+      this.normalizeStringArray(findingFilters.category) === undefined &&
+      this.normalizeStringArray(findingFilters.detectionIdentity) ===
+        undefined &&
+      this.normalizeStringArray(findingFilters.runnerId) === undefined &&
+      !detectorTypes?.length &&
+      !findingFilters.firstDetectedAfter &&
+      !findingFilters.lastDetectedBefore;
+
+    const rollupConditions: Prisma.Sql[] = [];
+    if (severities?.length) {
+      rollupConditions.push(
+        Prisma.sql`r.severity IN (${Prisma.join(severities)})`,
+      );
+    }
+    if (statuses?.length) {
+      rollupConditions.push(Prisma.sql`r.status IN (${Prisma.join(statuses)})`);
+    } else if (!includeResolved) {
+      rollupConditions.push(Prisma.sql`r.status <> ${FindingStatus.RESOLVED}`);
+    }
+    const rollupWhereSql = rollupConditions.length
+      ? Prisma.sql`WHERE ${Prisma.join(rollupConditions, ' AND ')}`
+      : Prisma.empty;
+
+    const useRollup =
+      rollupServableFindingFilters && (await this.findingStatsUsable());
+
+    const topAssetsSql = useRollup
+      ? Prisma.sql`
+      top_assets AS (
         SELECT
-          a.id,
-          a.name,
-          a.external_url,
-          a.status,
-          a.source_id
-        FROM assets a
-        ${assetWhereSql}
-      ),
+          fa.id AS "assetId",
+          COALESCE(NULLIF(fa.name, ''), NULLIF(fa.external_url, ''), fa.id) AS "assetName",
+          fa.source_id AS "sourceId",
+          SUM(r.count)::int AS "findingsCount",
+          COALESCE(
+            MAX(
+              CASE r.severity
+                WHEN 'CRITICAL' THEN 5
+                WHEN 'HIGH' THEN 4
+                WHEN 'MEDIUM' THEN 3
+                WHEN 'LOW' THEN 2
+                ELSE 1
+              END
+            ),
+            1
+          )::int AS "severityScore"
+        FROM filtered_assets fa
+        INNER JOIN finding_stats_asset_daily r ON r.asset_id = fa.id
+        ${rollupWhereSql}
+        GROUP BY fa.id, fa.name, fa.external_url, fa.source_id
+        ORDER BY "severityScore" DESC, "findingsCount" DESC, "assetName" ASC
+        LIMIT ${topAssetsLimit}
+      )`
+      : Prisma.sql`
       filtered_findings AS (
         SELECT
           f.asset_id,
@@ -1515,14 +1586,6 @@ export class AssetService {
         FROM findings f
         INNER JOIN filtered_assets fa ON fa.id = f.asset_id
         ${findingWhereSql}
-      ),
-      totals AS (
-        SELECT
-          COUNT(*)::int AS "totalAssets",
-          COUNT(*) FILTER (WHERE status = 'NEW')::int AS "newAssets",
-          COUNT(*) FILTER (WHERE status = 'UPDATED')::int AS "updatedAssets",
-          COUNT(*) FILTER (WHERE status = 'UNCHANGED')::int AS "unchangedAssets"
-        FROM filtered_assets
       ),
       top_assets AS (
         SELECT
@@ -1547,7 +1610,30 @@ export class AssetService {
         GROUP BY fa.id, fa.name, fa.external_url, fa.source_id
         ORDER BY "severityScore" DESC, "findingsCount" DESC, "assetName" ASC
         LIMIT ${topAssetsLimit}
+      )`;
+
+    const rows = await this.prisma.$queryRaw<
+      RawAssetsChartsQueryRow[]
+    >(Prisma.sql`
+      WITH filtered_assets AS (
+        SELECT
+          a.id,
+          a.name,
+          a.external_url,
+          a.status,
+          a.source_id
+        FROM assets a
+        ${assetWhereSql}
       ),
+      totals AS (
+        SELECT
+          COUNT(*)::int AS "totalAssets",
+          COUNT(*) FILTER (WHERE status = 'NEW')::int AS "newAssets",
+          COUNT(*) FILTER (WHERE status = 'UPDATED')::int AS "updatedAssets",
+          COUNT(*) FILTER (WHERE status = 'UNCHANGED')::int AS "unchangedAssets"
+        FROM filtered_assets
+      ),
+      ${topAssetsSql},
       top_sources AS (
         SELECT
           fa.source_id AS "sourceId",

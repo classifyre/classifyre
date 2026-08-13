@@ -32,6 +32,8 @@ import {
 } from './namespace/namespace.constants';
 import { PrismaClientManager } from './prisma/prisma-client-manager';
 import { InternalApiKeyService } from './internal-api-key.service';
+import compress from '@fastify/compress';
+import { constants as zlibConstants } from 'node:zlib';
 
 // No API-side ceiling on request bodies. The CLI posts whole assets in a single
 // bulk request and a single asset (large parquet/archive payloads, extracted
@@ -81,6 +83,28 @@ async function bootstrap() {
       fileSize: BODY_LIMIT_BYTES,
       fieldSize: BODY_LIMIT_BYTES,
       files: 1,
+    },
+  });
+
+  // Compress responses. The correlation graph is the reason: on a real corpus
+  // it is 36,378 nodes and 135,539 edges serialised to 57 MB of JSON, which
+  // the browser then has to receive and parse before drawing anything.
+  // Measured on that exact payload: 57.3 MB raw -> 5.9 MB gzip -> 3.7 MB
+  // brotli, so this is a 10-15x reduction on the heaviest thing the API
+  // serves, for one plugin registration.
+  //
+  // `threshold` keeps small responses uncompressed, where the CPU cost would
+  // outweigh the transfer saving. Brotli is preferred when the client offers
+  // it; quality is capped well below the default 11 because the top levels
+  // cost far more CPU than they save bytes on JSON this repetitive.
+  await app.register(compress, {
+    global: true,
+    threshold: 1024,
+    encodings: ['br', 'gzip', 'deflate'],
+    brotliOptions: {
+      params: {
+        [zlibConstants.BROTLI_PARAM_QUALITY]: 4,
+      },
     },
   });
 
