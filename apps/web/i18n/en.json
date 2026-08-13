@@ -2227,7 +2227,15 @@
     "noFindingsInWindow": "No findings in selected window",
     "currentHighest": "{{count}} {{level}} findings currently highest",
     "retry": "Retry",
-    "errorPrefix": "Error: {{message}}"
+    "errorPrefix": "Error: {{message}}",
+    "stats": {
+      "building": "Building index…",
+      "buildingHint": "These figures were counted directly from every finding, which is exact but slow. A background rebuild of the pre-aggregated index is queued; once it lands this page loads instantly.",
+      "updated": "Updated {when}",
+      "updatedHint": "Read from a pre-aggregated index that refreshes automatically as findings arrive, which is why this page loads instantly instead of counting millions of rows.",
+      "never": "Not yet built",
+      "refresh": "Rebuild statistics now"
+    }
   },
   "breadcrumb": {
     "home": "Home",

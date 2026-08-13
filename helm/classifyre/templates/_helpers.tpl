@@ -333,6 +333,8 @@ which each deployment sets on its own after including this block.
      opened. */}}
 - name: PRISMA_POOL_MAX
   value: {{ .Values.api.database.poolMax | quote }}
+- name: PRISMA_INTERACTIVE_POOL_MAX
+  value: {{ .Values.api.database.interactivePoolMax | quote }}
 - name: PRISMA_MAX_RESIDENT
   value: {{ .Values.api.database.maxResidentNamespaces | quote }}
 - name: PRISMA_CONNECTION_TIMEOUT_MS
@@ -347,6 +349,8 @@ which each deployment sets on its own after including this block.
   value: {{ .Values.api.database.retryAttempts | quote }}
 - name: MAX_CONCURRENT_NAMESPACE_JOBS
   value: {{ .Values.worker.maxConcurrentNamespaceJobs | quote }}
+- name: NAMESPACE_RETENTION_DAYS
+  value: {{ .Values.api.namespaceRetentionDays | quote }}
 {{- if not (hasKey .Values.api.env "CLASSIFYRE_INTERNAL_API_URL") }}
 - name: CLASSIFYRE_INTERNAL_API_URL
   value: "http://{{ include "classifyre.api.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.api.service.port }}"

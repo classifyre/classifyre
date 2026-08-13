@@ -1,6 +1,7 @@
 import { Injectable, Logger, OnApplicationShutdown } from '@nestjs/common';
 import { ClsService } from 'nestjs-cls';
 import {
+  CLS_DATABASE_LANE,
   CLS_SCHEMA,
   CLS_NAMESPACE_ID,
   CLS_SLUG,
@@ -124,6 +125,7 @@ export class PgBossService implements OnApplicationShutdown {
             this.cls.set(CLS_SCHEMA, schema);
             this.cls.set(CLS_NAMESPACE_ID, namespaceId);
             this.cls.set(CLS_SLUG, slug);
+            this.cls.set(CLS_DATABASE_LANE, 'background');
             return handler(jobs);
           }),
       );

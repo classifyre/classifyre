@@ -3,6 +3,8 @@ title: Workspaces
 description: Isolated workspaces let one Classifyre instance hold many separate investigations — each with its own database schema, evidence, detectors, autopilot memory, and API address, with nothing shared between them.
 ---
 
+import { Callout } from "nextra/components"
+
 # Workspaces
 
 A **workspace** is a self-contained Classifyre instance-within-an-instance. One
@@ -108,6 +110,40 @@ workspace later migrates it at creation time.
 The practical consequence: upgrading Classifyre upgrades every workspace. There
 is no per-workspace upgrade step and no way for one workspace to drift onto an
 older schema version.
+
+---
+
+## Deleting a workspace
+
+Deleting a workspace is a two-stage operation, and only the first stage is
+reversible.
+
+Deleting it immediately stops it being served: it disappears from the
+directory, its URL returns 404, and its scans, schedules and background workers
+are torn down. Its data is untouched — the workspace's database schema and
+everything in it survive, and its slug stays reserved so it cannot be quietly
+reused by a new workspace.
+
+**Seven days later, a background sweep drops that schema for good.** At that
+point the workspace, its assets, its findings and its investigations are gone,
+and Classifyre has no way to bring them back. There is no automatic backup
+taken before the drop — if you need one, take it during the grace period.
+
+The window exists because a workspace deleted by mistake is worth recovering,
+and a workspace deleted on purpose should not keep its disk forever. On one
+instance, eleven deleted workspaces were still holding 11.8 GB of a 64 GB
+database.
+
+On Kubernetes, `api.namespaceRetentionDays` changes the window; setting it to
+`0` disables the sweep entirely and keeps deleted workspaces indefinitely.
+Recovering a workspace inside the window is a database operation rather than a
+button — get in touch if you need to do it.
+
+<Callout type="warning">
+Workspace schemas that have no registry entry at all — left behind by much
+older versions — are deliberately **not** swept, because there is nothing to
+confirm what they were. Those need a deliberate manual cleanup.
+</Callout>
 
 ---
 

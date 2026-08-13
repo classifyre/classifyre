@@ -11,6 +11,7 @@ Name | Type
 `skip` | number
 `limit` | number
 `ranking` | [SearchFindingsRankingMetadataDto](SearchFindingsRankingMetadataDto.md)
+`totalIsLowerBound` | boolean
 
 ## Example
 
@@ -24,6 +25,7 @@ const example = {
   "skip": null,
   "limit": null,
   "ranking": null,
+  "totalIsLowerBound": null,
 } satisfies SearchFindingsResponseDto
 
 console.log(example)

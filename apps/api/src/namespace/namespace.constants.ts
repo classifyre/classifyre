@@ -115,7 +115,17 @@ export interface NamespaceContext {
   schemaName: string;
 }
 
+/**
+ * Database workload lane used to keep user-facing requests responsive while
+ * scans and other internal callbacks are writing heavily.
+ *
+ * Both lanes target the same namespace schema, but they use separate bounded
+ * pools. The split is a capacity reservation, not a consistency boundary.
+ */
+export type DatabaseLane = 'interactive' | 'background';
+
 /** CLS store keys. */
 export const CLS_SCHEMA = 'schemaName';
 export const CLS_NAMESPACE_ID = 'namespaceId';
 export const CLS_SLUG = 'slug';
+export const CLS_DATABASE_LANE = 'databaseLane';

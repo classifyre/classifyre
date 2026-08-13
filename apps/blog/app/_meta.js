@@ -33,9 +33,28 @@ export default {
       }
     },
   },
+  journal: {
+    type: "menu",
+    title: "Blog",
+    items: {
+      overview: {
+        title: "Publication overview",
+        href: "/blog",
+      },
+      articles: {
+        title: "Business blog",
+        href: "/blog/articles",
+      },
+      cases: {
+        title: "Case files",
+        href: "/blog/cases",
+      },
+    },
+  },
   blog: {
     type: "page",
     title: "Blog",
+    display: "hidden",
   },
   documentation: {
     type: "page",

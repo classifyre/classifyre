@@ -13,6 +13,13 @@
  */
 
 import { mapValues } from '../runtime';
+import type { FindingsDiscoveryStatsDto } from './FindingsDiscoveryStatsDto';
+import {
+    FindingsDiscoveryStatsDtoFromJSON,
+    FindingsDiscoveryStatsDtoFromJSONTyped,
+    FindingsDiscoveryStatsDtoToJSON,
+    FindingsDiscoveryStatsDtoToJSONTyped,
+} from './FindingsDiscoveryStatsDto';
 import type { FindingsDiscoveryTotalsDto } from './FindingsDiscoveryTotalsDto';
 import {
     FindingsDiscoveryTotalsDtoFromJSON,
@@ -84,6 +91,12 @@ export interface FindingsDiscoveryResponseDto {
      * @memberof FindingsDiscoveryResponseDto
      */
     recentRuns: Array<DiscoveryRecentRunDto>;
+    /**
+     * 
+     * @type {FindingsDiscoveryStatsDto}
+     * @memberof FindingsDiscoveryResponseDto
+     */
+    stats: FindingsDiscoveryStatsDto;
 }
 
 
@@ -108,6 +121,7 @@ export function instanceOfFindingsDiscoveryResponseDto(value: object): value is 
     if (!('activity' in value) || value['activity'] === undefined) return false;
     if (!('topAssets' in value) || value['topAssets'] === undefined) return false;
     if (!('recentRuns' in value) || value['recentRuns'] === undefined) return false;
+    if (!('stats' in value) || value['stats'] === undefined) return false;
     return true;
 }
 
@@ -127,6 +141,7 @@ export function FindingsDiscoveryResponseDtoFromJSONTyped(json: any, ignoreDiscr
         'activity': FindingsDiscoveryActivityDtoFromJSON(json['activity']),
         'topAssets': ((json['topAssets'] as Array<any>).map(FindingsDiscoveryTopAssetDtoFromJSON)),
         'recentRuns': ((json['recentRuns'] as Array<any>).map(DiscoveryRecentRunDtoFromJSON)),
+        'stats': FindingsDiscoveryStatsDtoFromJSON(json['stats']),
     };
 }
 
@@ -147,6 +162,7 @@ export function FindingsDiscoveryResponseDtoToJSONTyped(value?: FindingsDiscover
         'activity': FindingsDiscoveryActivityDtoToJSON(value['activity']),
         'topAssets': ((value['topAssets'] as Array<any>).map(FindingsDiscoveryTopAssetDtoToJSON)),
         'recentRuns': ((value['recentRuns'] as Array<any>).map(DiscoveryRecentRunDtoToJSON)),
+        'stats': FindingsDiscoveryStatsDtoToJSON(value['stats']),
     };
 }
 

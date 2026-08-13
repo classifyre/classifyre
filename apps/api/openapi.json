@@ -3353,6 +3353,28 @@
         ]
       }
     },
+    "/findings/discovery/refresh": {
+      "post": {
+        "operationId": "FindingsController_refreshDiscoveryStats",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Refresh queued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FindingsDiscoveryRefreshResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Queue a full rebuild of the pre-aggregated finding statistics",
+        "tags": [
+          "findings"
+        ]
+      }
+    },
     "/findings/discovery": {
       "get": {
         "operationId": "FindingsController_getDiscoveryOverview",
@@ -12024,6 +12046,10 @@
           },
           "ranking": {
             "$ref": "#/components/schemas/SearchFindingsRankingMetadataDto"
+          },
+          "totalIsLowerBound": {
+            "type": "boolean",
+            "description": "When true, `total` is a lower bound (the count was capped) and the UI should present it as e.g. \"10,000+\"."
           }
         },
         "required": [
@@ -13180,6 +13206,26 @@
           "limit"
         ]
       },
+      "FindingsDiscoveryRefreshResponseDto": {
+        "type": "object",
+        "properties": {
+          "queued": {
+            "type": "boolean"
+          },
+          "refreshedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          },
+          "isBuilt": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "queued",
+          "isBuilt"
+        ]
+      },
       "FindingsDiscoverySeverityBreakdownDto": {
         "type": "object",
         "properties": {
@@ -13416,6 +13462,35 @@
           "assetsUpdated"
         ]
       },
+      "FindingsDiscoveryStatsDto": {
+        "type": "object",
+        "properties": {
+          "refreshedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          },
+          "durationMs": {
+            "type": "number",
+            "nullable": true
+          },
+          "isBuilt": {
+            "type": "boolean"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "rollup",
+              "live"
+            ],
+            "description": "rollup: served from the pre-aggregated tables. live: the rollup has not been built yet for this workspace, so the figures were counted directly and are exact but slow."
+          }
+        },
+        "required": [
+          "isBuilt",
+          "source"
+        ]
+      },
       "FindingsDiscoveryResponseDto": {
         "type": "object",
         "properties": {
@@ -13447,6 +13522,9 @@
             "items": {
               "$ref": "#/components/schemas/DiscoveryRecentRunDto"
             }
+          },
+          "stats": {
+            "$ref": "#/components/schemas/FindingsDiscoveryStatsDto"
           }
         },
         "required": [
@@ -13455,7 +13533,8 @@
           "totals",
           "activity",
           "topAssets",
-          "recentRuns"
+          "recentRuns",
+          "stats"
         ]
       },
       "UpdateFindingDto": {
