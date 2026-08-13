@@ -1,0 +1,29 @@
+-- Index assets.content_hash on its own, for corpus-wide exact-duplicate grouping.
+--
+-- assets.content_hash is the SHA-256 of the bytes actually scanned. It has been
+-- stored since the scan cache landed but nothing has ever read it for
+-- correlation: the deterministic fingerprint engine derives its tokens from
+-- findings, so an asset that trips no detector carries no tokens and is
+-- invisible to duplicate detection entirely. Two byte-identical documents that
+-- happen to contain nothing a detector matches produced no duplicate edge.
+--
+-- CorrelationService.linkIdenticalContent now closes that gap with
+--
+--   SELECT content_hash FROM assets
+--   WHERE content_hash IS NOT NULL
+--   GROUP BY content_hash HAVING count(*) > 1
+--
+-- The existing assets_source_id_content_hash_idx cannot serve this. It leads
+-- with source_id, and the query deliberately spans sources — the same file
+-- circulating between a SharePoint site and a mailbox is precisely the lead
+-- worth surfacing, and a per-source index would force a sequential scan to
+-- find it.
+--
+-- Single column, so it is also a usable prefix for the per-source lookups that
+-- start from a hash rather than a source.
+--
+-- prisma migrate wraps each migration in a transaction, so no CONCURRENTLY
+-- here. IF NOT EXISTS keeps a partial apply re-runnable.
+
+-- CreateIndex
+CREATE INDEX IF NOT EXISTS "assets_content_hash_idx" ON "assets"("content_hash");
