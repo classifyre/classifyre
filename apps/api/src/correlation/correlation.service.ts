@@ -13,7 +13,10 @@ import {
   DEFAULT_LABEL_WEIGHT,
   DUPLICATE_MIN,
   EDGE_BATCH,
+  EMPTY_CONTENT_SHA256,
   FANOUT_CAP,
+  IDENTICAL_GROUP_CAP,
+  IDENTICAL_GROUP_PAGE,
   MAX_CLUSTER_TOP_VALUES,
   PHONETIC_FANOUT_CAP,
   PHONETIC_MIN_JW,
@@ -39,7 +42,32 @@ import {
 const ASSET_REL = 'asset';
 const REL_RELATED = 'related';
 const REL_DUPLICATE = 'likely_duplicate';
-const CORRELATION_RELATION_TYPES = [REL_RELATED, REL_DUPLICATE];
+/**
+ * Byte-identical content (equal `Asset.contentHash`). Deliberately its own
+ * relation type rather than another `likely_duplicate`: "these are the same
+ * bytes" is a stronger and differently-derived claim than "these findings
+ * overlap enough to look like the same document", and keeping them apart means
+ * the two passes cannot overwrite each other's edges (the Edge unique key
+ * includes relationType).
+ */
+const REL_IDENTICAL = 'identical_content';
+
+/**
+ * Edges produced by the weighted-overlap scorer, and therefore wiped and
+ * rewritten by it. REL_IDENTICAL is absent on purpose — it is maintained by
+ * linkIdenticalContent, which has its own delete scope.
+ */
+const SCORED_RELATION_TYPES = [REL_RELATED, REL_DUPLICATE];
+
+/** Edge types that make two assets members of the same identity cluster. */
+const CLUSTERING_RELATION_TYPES = [REL_DUPLICATE, REL_IDENTICAL];
+
+/** Every asset↔asset correlation edge type, for graph/similarity reads. */
+export const CORRELATION_RELATION_TYPES = [
+  REL_RELATED,
+  REL_DUPLICATE,
+  REL_IDENTICAL,
+];
 
 /** One normalized, correlatable token belonging to an asset. */
 interface ValueRow {
@@ -62,6 +90,10 @@ export interface CorrelationRunSummary {
   valuesIndexed: number;
   relatedPairs: number;
   duplicatePairs: number;
+  /** Byte-identical groups linked from Asset.contentHash (findings-independent). */
+  identicalGroups: number;
+  /** Links written for those groups — one per member beyond the group's hub. */
+  identicalPairs: number;
   clustersTouched: number;
   topMatch: {
     fromAssetId: string;
@@ -305,15 +337,19 @@ export class CorrelationService {
     );
     if (onProgress)
       await onProgress(
-        `Pairs scored: ${relatedPairs} related, ${duplicatePairs} duplicate. Rebuilding clusters…`,
+        `Pairs scored: ${relatedPairs} related, ${duplicatePairs} duplicate. Linking exact duplicates…`,
         { relatedPairs, duplicatePairs },
       );
+    const identical = await this.linkIdenticalContent([], true, onProgress);
+    if (onProgress) await onProgress('Rebuilding clusters…');
     const clustersTouched = await this.rebuildAllClusters(cfg);
     return {
       assetsProcessed: processed,
       valuesIndexed,
       relatedPairs,
       duplicatePairs,
+      identicalGroups: identical.groups,
+      identicalPairs: identical.pairs,
       clustersTouched,
       topMatch,
     };
@@ -478,6 +514,8 @@ export class CorrelationService {
       valuesIndexed: 0,
       relatedPairs: 0,
       duplicatePairs: 0,
+      identicalGroups: 0,
+      identicalPairs: 0,
       clustersTouched: 0,
       topMatch: null,
     };
@@ -513,21 +551,36 @@ export class CorrelationService {
 
     if (onProgress)
       await onProgress(
-        `Pairs scored: ${relatedPairs} related, ${duplicatePairs} duplicate. Updating clusters…`,
+        `Pairs scored: ${relatedPairs} related, ${duplicatePairs} duplicate. Linking exact duplicates…`,
         { relatedPairs, duplicatePairs },
       );
 
-    // 3. Clusters: a full recompute rebuilds them wholesale; an incremental run
+    // 3. Exact duplicates from the content hash. Independent of findings, so it
+    //    runs whatever the scorer produced — and its affected assets join the
+    //    cluster reconciliation below, otherwise a group linked only by content
+    //    would never be pulled into a cluster.
+    const identical = await this.linkIdenticalContent(
+      touchedIds,
+      full,
+      onProgress,
+    );
+    const clusterSeed = Array.from(
+      new Set([...affectedAssetIds, ...identical.affectedAssetIds]),
+    );
+
+    // 4. Clusters: a full recompute rebuilds them wholesale; an incremental run
     //    reconciles only the affected components.
     const clustersTouched = full
       ? await this.rebuildAllClusters(cfg)
-      : await this.reconcileClusters(affectedAssetIds, cfg);
+      : await this.reconcileClusters(clusterSeed, cfg);
 
     return {
       assetsProcessed: touchedIds.length,
       valuesIndexed,
       relatedPairs,
       duplicatePairs,
+      identicalGroups: identical.groups,
+      identicalPairs: identical.pairs,
       clustersTouched,
       topMatch,
     };
@@ -665,6 +718,154 @@ export class CorrelationService {
     return rows.size;
   }
 
+  // ── Exact duplicates (content hash) ─────────────────────────────────────────
+
+  /**
+   * Link assets whose scanned bytes are identical, straight from
+   * `Asset.contentHash`.
+   *
+   * This is the one duplicate signal that owes nothing to findings. The scorer
+   * above derives every token from a finding, so an asset that trips no
+   * detector has no tokens, scores against nothing, and cannot be a duplicate
+   * of anything — two byte-identical documents full of unremarkable text were
+   * simply invisible. The hash is already computed and stored by the scan
+   * cache, so this costs one grouped query.
+   *
+   * Deliberately NOT folded into the weighted score as another token. The score
+   * treats an asset's whole token set as its denominator, and its `exact`
+   * shortcut (`sharedCount === nfCountA === nfCountB`) bypasses relatedMin
+   * entirely — so a token that findings-free assets all share would make every
+   * such pair an "exact" duplicate of every other. A separate edge type states
+   * the stronger claim without touching the scorer's arithmetic.
+   *
+   * Groups are linked as a STAR (every member to the lowest-id member), not a
+   * clique: union-find only needs a spanning tree to put the group in one
+   * cluster, and a clique is O(n²) edges for no extra information — a group of
+   * 200 identical files would be 19,900 rows instead of 199.
+   */
+  private async linkIdenticalContent(
+    touchedIds: string[],
+    full: boolean,
+    onProgress?: ProgressFn,
+  ): Promise<{ pairs: number; groups: number; affectedAssetIds: string[] }> {
+    // Incremental runs only care about the groups the touched assets belong to.
+    // Resolved to hashes first, because a touched asset's *partners* may be
+    // untouched and must still be relinked.
+    let hashScope: string[] | null = null;
+    if (!full) {
+      const touched = await this.prisma.asset.findMany({
+        where: { id: { in: touchedIds }, contentHash: { not: null } },
+        select: { contentHash: true },
+        distinct: ['contentHash'],
+      });
+      hashScope = touched
+        .map((row) => row.contentHash as string)
+        .filter((hash) => hash !== EMPTY_CONTENT_SHA256);
+      if (hashScope.length === 0)
+        return { pairs: 0, groups: 0, affectedAssetIds: [] };
+    }
+
+    const affected = new Set<string>();
+    let pairs = 0;
+    let groups = 0;
+    let skippedGroups = 0;
+    let cursor: string | null = null;
+
+    for (;;) {
+      // Page over the duplicate groups themselves (keyset on the hash), so the
+      // heap holds one page of groups rather than every duplicate in the corpus.
+      const grouped = await this.prisma.asset.groupBy({
+        by: ['contentHash'],
+        where: {
+          contentHash: {
+            not: null,
+            ...(hashScope ? { in: hashScope } : {}),
+            ...(cursor ? { gt: cursor } : {}),
+          },
+          NOT: { contentHash: EMPTY_CONTENT_SHA256 },
+        },
+        _count: { _all: true },
+        having: { contentHash: { _count: { gt: 1 } } },
+        orderBy: { contentHash: 'asc' },
+        take: IDENTICAL_GROUP_PAGE,
+      });
+      if (grouped.length === 0) break;
+
+      for (const group of grouped) {
+        const hash = group.contentHash as string;
+        const size = group._count._all;
+        if (size > IDENTICAL_GROUP_CAP) {
+          skippedGroups++;
+          continue;
+        }
+        const members = await this.prisma.asset.findMany({
+          where: { contentHash: hash },
+          select: { id: true },
+          orderBy: { id: 'asc' },
+        });
+        if (members.length < 2) continue;
+
+        const ids = members.map((m) => m.id);
+        // Replace the whole group's edges, not just those touching the changed
+        // assets: the hub is the lowest id, so an asset entering or leaving the
+        // group can move it, and edges pointing at the old hub would survive.
+        await this.prisma.edge.deleteMany({
+          where: {
+            fromType: ASSET_REL,
+            toType: ASSET_REL,
+            relationType: REL_IDENTICAL,
+            OR: [{ fromId: { in: ids } }, { toId: { in: ids } }],
+          },
+        });
+
+        const [hub, ...spokes] = ids;
+        for (let i = 0; i < spokes.length; i += EDGE_BATCH) {
+          await this.prisma.edge.createMany({
+            data: spokes.slice(i, i + EDGE_BATCH).map((toId) => ({
+              fromType: ASSET_REL,
+              fromId: hub,
+              toType: ASSET_REL,
+              toId,
+              relationType: REL_IDENTICAL,
+              confidence: 1,
+              origin: EdgeOrigin.INFERRED,
+              metadata: {
+                weighted: 1,
+                contentHash: hash,
+                groupSize: ids.length,
+                exact: true,
+                reasons: ['byte-identical content'],
+              },
+            })),
+            skipDuplicates: true,
+          });
+        }
+
+        for (const id of ids) affected.add(id);
+        pairs += spokes.length;
+        groups++;
+      }
+
+      cursor = grouped.at(-1)!.contentHash;
+      if (grouped.length < IDENTICAL_GROUP_PAGE) break;
+      await yieldToGC();
+    }
+
+    if (skippedGroups > 0) {
+      this.logger.log(
+        `Skipped ${skippedGroups} byte-identical group(s) larger than ` +
+          `${IDENTICAL_GROUP_CAP} assets (non-discriminating).`,
+      );
+    }
+    if (onProgress && (groups > 0 || skippedGroups > 0)) {
+      await onProgress(
+        `Exact duplicates: ${groups} byte-identical group(s), ${pairs} link(s).`,
+        { groups, pairs, skippedGroups },
+      );
+    }
+    return { pairs, groups, affectedAssetIds: Array.from(affected) };
+  }
+
   // ── Scoring + linking ───────────────────────────────────────────────────────
 
   private async scoreAndLink(
@@ -705,12 +906,12 @@ export class CorrelationService {
           ? {
               fromType: ASSET_REL,
               toType: ASSET_REL,
-              relationType: { in: CORRELATION_RELATION_TYPES },
+              relationType: { in: SCORED_RELATION_TYPES },
             }
           : {
               fromType: ASSET_REL,
               toType: ASSET_REL,
-              relationType: { in: CORRELATION_RELATION_TYPES },
+              relationType: { in: SCORED_RELATION_TYPES },
               OR: [
                 { fromId: { in: touchedIds } },
                 { toId: { in: touchedIds } },
@@ -1236,7 +1437,7 @@ export class CorrelationService {
         where: {
           fromType: ASSET_REL,
           toType: ASSET_REL,
-          relationType: REL_DUPLICATE,
+          relationType: { in: CLUSTERING_RELATION_TYPES },
         },
         select: { id: true, fromId: true, toId: true },
         orderBy: { id: 'asc' },
@@ -1278,13 +1479,14 @@ export class CorrelationService {
     if (affectedIds.length === 0) return 0;
 
     // Expand the working set: touched assets, anything linked to them by a
-    // likely_duplicate edge, and any co-members of clusters they belong to.
+    // clustering edge (likely_duplicate or identical_content), and any
+    // co-members of clusters they belong to.
     const working = new Set(affectedIds);
     const dupEdges = await this.prisma.edge.findMany({
       where: {
         fromType: ASSET_REL,
         toType: ASSET_REL,
-        relationType: REL_DUPLICATE,
+        relationType: { in: CLUSTERING_RELATION_TYPES },
         OR: [{ fromId: { in: affectedIds } }, { toId: { in: affectedIds } }],
       },
       select: { fromId: true, toId: true },
@@ -1306,12 +1508,12 @@ export class CorrelationService {
 
     const workingIds = Array.from(working);
 
-    // Build adjacency from ALL likely_duplicate edges within the working set.
+    // Build adjacency from ALL clustering edges within the working set.
     const allDupEdges = await this.prisma.edge.findMany({
       where: {
         fromType: ASSET_REL,
         toType: ASSET_REL,
-        relationType: REL_DUPLICATE,
+        relationType: { in: CLUSTERING_RELATION_TYPES },
         fromId: { in: workingIds },
         toId: { in: workingIds },
       },

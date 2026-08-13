@@ -306,6 +306,8 @@ function formatSummary(s: {
   valuesIndexed: number;
   relatedPairs: number;
   duplicatePairs: number;
+  identicalGroups: number;
+  identicalPairs: number;
   clustersTouched: number;
   topMatch: { weighted: number; reasons: string[] } | null;
 }): string {
@@ -313,8 +315,15 @@ function formatSummary(s: {
     `fingerprinted ${s.assetsProcessed} asset(s) (${s.valuesIndexed} values)`,
     `${s.duplicatePairs} duplicate pair(s)`,
     `${s.relatedPairs} related pair(s)`,
-    `${s.clustersTouched} cluster(s) touched`,
   ];
+  // Only worth a line when there were any — most corpora have none, and an
+  // unconditional "0 byte-identical group(s)" would just pad every run summary.
+  if (s.identicalGroups > 0) {
+    parts.push(
+      `${s.identicalGroups} byte-identical group(s) (${s.identicalPairs} link(s))`,
+    );
+  }
+  parts.push(`${s.clustersTouched} cluster(s) touched`);
   if (s.topMatch) {
     parts.push(
       `top match ${Math.round(s.topMatch.weighted * 100)}% (${s.topMatch.reasons.join(', ')})`,
