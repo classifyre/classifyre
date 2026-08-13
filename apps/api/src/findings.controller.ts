@@ -31,6 +31,7 @@ import { QueryFindingsDiscoveryDto } from './dto/query-findings-discovery.dto';
 import {
   FindingsDiscoveryRefreshResponseDto,
   FindingsDiscoveryResponseDto,
+  FindingsDiscoveryStatsDto,
 } from './dto/findings-discovery-response.dto';
 
 @ApiTags('findings')
@@ -88,6 +89,16 @@ export class FindingsController {
   })
   async listAssetSummaries(@Query() query: QueryFindingsAssetsDto) {
     return this.findingsService.listAssetSummaries(query);
+  }
+
+  @Get('stats/freshness')
+  @ApiOperation({
+    summary:
+      'Freshness of the pre-aggregated finding statistics shared by the dashboard charts',
+  })
+  @ApiResponse({ status: 200, type: FindingsDiscoveryStatsDto })
+  async getStatsFreshness() {
+    return this.findingsService.getStatsFreshness();
   }
 
   @Post('discovery/refresh')

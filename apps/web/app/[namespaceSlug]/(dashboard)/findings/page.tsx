@@ -33,6 +33,8 @@ import { FindingsTable } from "@/components/findings-table";
 import { BulkUpdateDialog } from "@/components/bulk-update-dialog";
 
 import { useTranslation } from "@/hooks/use-translation";
+import { StatsFreshness } from "@/components/stats-freshness";
+import { useStatsFreshness } from "@/hooks/use-stats-freshness";
 
 type SeverityValue =
   (typeof SearchFindingsFiltersInputDtoSeverityEnum)[keyof typeof SearchFindingsFiltersInputDtoSeverityEnum];
@@ -67,6 +69,9 @@ function FindingsPageContent() {
   const searchParams = useSearchParams();
 
   const [windowDays, setWindowDays] = useState("7");
+  // Bumped when a rollup rebuild lands so the charts re-read the new numbers.
+  const [statsToken, setStatsToken] = useState(0);
+  const stats = useStatsFreshness(() => setStatsToken((token) => token + 1));
   const [selectedSeverities, setSelectedSeverities] = useState<SeverityValue[]>(
     () => searchParams.getAll("severity") as SeverityValue[],
   );
@@ -164,7 +169,7 @@ function FindingsPageContent() {
     return () => {
       active = false;
     };
-  }, [tableFilters, windowDaysValue]);
+  }, [tableFilters, windowDaysValue, statsToken]);
 
   // ── Panels ─────────────────────────────────────────────────────────────────
 
@@ -314,7 +319,15 @@ function FindingsPageContent() {
                         {t("findings.severityTimeline")}
                       </p>
                     </div>
-                    <Select value={windowDays} onValueChange={setWindowDays}>
+                    <div className="flex items-center gap-2">
+                      <StatsFreshness
+                        refreshedAt={stats.refreshedAt}
+                        isBuilt={stats.isBuilt}
+                        source={stats.source}
+                        onRefresh={stats.refresh}
+                        isRefreshing={stats.isRefreshing}
+                      />
+                      <Select value={windowDays} onValueChange={setWindowDays}>
                       <SelectTrigger className="h-8 w-[104px] text-xs border-2 border-border rounded-[4px] font-mono">
                         <SelectValue placeholder={t("findings.window.label")} />
                       </SelectTrigger>
@@ -329,7 +342,8 @@ function FindingsPageContent() {
                           {t("findings.window.90days")}
                         </SelectItem>
                       </SelectContent>
-                    </Select>
+                      </Select>
+                    </div>
                   </CardHeader>
                   <CardContent>
                     {chartData.timeline.length > 0 ? (

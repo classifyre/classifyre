@@ -1278,6 +1278,31 @@ export class FindingsService {
    * request. The response carries the current freshness so the UI can show
    * "refreshing…" until `refreshedAt` moves.
    */
+  /**
+   * Freshness of the shared rollup, for any section that reads it.
+   *
+   * One rollup backs the overview, the findings charts and the assets charts,
+   * so they share one freshness stamp and one refresh — a per-chart cache would
+   * be three things to invalidate and three ways to disagree.
+   */
+  async getStatsFreshness() {
+    if (!this.stats) {
+      return {
+        refreshedAt: null,
+        durationMs: null,
+        isBuilt: false,
+        source: 'live' as const,
+      };
+    }
+    const freshness = await this.stats.getFreshness();
+    return {
+      refreshedAt: freshness.refreshedAt,
+      durationMs: freshness.durationMs,
+      isBuilt: freshness.isBuilt,
+      source: freshness.isBuilt ? 'rollup' : 'live',
+    };
+  }
+
   async refreshDiscoveryStats() {
     if (!this.stats || !this.statsJobs) {
       return { queued: false, refreshedAt: null, isBuilt: false };
