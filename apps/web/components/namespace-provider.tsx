@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { usePathname } from "next/navigation";
 import {
   api,
   setActiveNamespaceSlug,
@@ -41,6 +42,11 @@ export function NamespaceProvider({
   const [effectiveSlug, setEffectiveSlug] = React.useState(
     isStaticShell ? "" : slug,
   );
+  // The static export serves every namespace from the same placeholder shell,
+  // so `slug` stays "__id__" across a client navigation from one workspace to
+  // another and cannot signal the switch. The pathname is the only thing that
+  // changes, so it must drive the re-read of the real slug.
+  const pathname = usePathname();
 
   React.useEffect(() => {
     if (!isStaticShell) {
@@ -48,8 +54,9 @@ export function NamespaceProvider({
       return;
     }
     const first = window.location.pathname.split("/").filter(Boolean)[0] ?? "";
-    setEffectiveSlug(decodeURIComponent(first));
-  }, [isStaticShell, slug]);
+    const recovered = decodeURIComponent(first);
+    setEffectiveSlug(recovered === DYNAMIC_ID_SENTINEL ? "" : recovered);
+  }, [isStaticShell, pathname, slug]);
 
   // Register immediately (module-level, idempotent) so SSR/first render is
   // scoped correctly, then keep it in sync on client navigations.
@@ -104,7 +111,11 @@ export function NamespaceProvider({
 
   return (
     <NamespaceContext.Provider value={value}>
-      {children}
+      {/* Switching workspaces reuses this layout instance (the same route
+          segment, and on desktop the same placeholder shell), so key the
+          subtree to drop state and in-flight data belonging to the old
+          tenant. */}
+      <React.Fragment key={effectiveSlug}>{children}</React.Fragment>
     </NamespaceContext.Provider>
   );
 }

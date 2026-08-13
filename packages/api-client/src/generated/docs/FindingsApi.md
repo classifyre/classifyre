@@ -9,6 +9,7 @@ All URIs are relative to *http://localhost*
 | [**findingsControllerFindOne**](FindingsApi.md#findingscontrollerfindone) | **GET** /findings/{id} | Get a finding by ID |
 | [**findingsControllerGetDiscoveryOverview**](FindingsApi.md#findingscontrollergetdiscoveryoverview) | **GET** /findings/discovery | Get discovery dashboard overview data |
 | [**findingsControllerGetStats**](FindingsApi.md#findingscontrollergetstats) | **GET** /findings/stats | Get finding statistics |
+| [**findingsControllerGetStatsFreshness**](FindingsApi.md#findingscontrollergetstatsfreshness) | **GET** /findings/stats/freshness | Freshness of the pre-aggregated finding statistics shared by the dashboard charts |
 | [**findingsControllerListAssetSummaries**](FindingsApi.md#findingscontrollerlistassetsummaries) | **GET** /findings/assets | List asset finding summaries with optional filters |
 | [**findingsControllerRefreshDiscoveryStats**](FindingsApi.md#findingscontrollerrefreshdiscoverystats) | **POST** /findings/discovery/refresh | Queue a full rebuild of the pre-aggregated finding statistics |
 | [**findingsControllerUpdate**](FindingsApi.md#findingscontrollerupdate) | **PATCH** /findings/{id} | Update a finding |
@@ -342,6 +343,63 @@ No authorization required
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
 | **200** | Finding statistics |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## findingsControllerGetStatsFreshness
+
+> FindingsDiscoveryStatsDto findingsControllerGetStatsFreshness()
+
+Freshness of the pre-aggregated finding statistics shared by the dashboard charts
+
+### Example
+
+```ts
+import {
+  Configuration,
+  FindingsApi,
+} from '@workspace/api-client';
+import type { FindingsControllerGetStatsFreshnessRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new FindingsApi();
+
+  try {
+    const data = await api.findingsControllerGetStatsFreshness();
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+This endpoint does not need any parameter.
+
+### Return type
+
+[**FindingsDiscoveryStatsDto**](FindingsDiscoveryStatsDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
 
 [[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
 

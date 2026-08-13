@@ -121,7 +121,7 @@ export function SamplingCard({
           <p className="text-[10px] font-mono uppercase tracking-[0.14em] text-muted-foreground">
             {t("sources.sampling.strategy")}
           </p>
-          <div className="grid grid-cols-3 gap-1.5">
+          <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
             {STRATEGIES.map(({ value: stratVal, label, hint, Icon }) => {
               const active = value.strategy === stratVal;
               return (

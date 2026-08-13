@@ -22,6 +22,7 @@ import type {
   FindingResponseDto,
   FindingsDiscoveryRefreshResponseDto,
   FindingsDiscoveryResponseDto,
+  FindingsDiscoveryStatsDto,
   UpdateFindingDto,
 } from '../models/index';
 import {
@@ -39,6 +40,8 @@ import {
     FindingsDiscoveryRefreshResponseDtoToJSON,
     FindingsDiscoveryResponseDtoFromJSON,
     FindingsDiscoveryResponseDtoToJSON,
+    FindingsDiscoveryStatsDtoFromJSON,
+    FindingsDiscoveryStatsDtoToJSON,
     UpdateFindingDtoFromJSON,
     UpdateFindingDtoToJSON,
 } from '../models/index';
@@ -275,6 +278,35 @@ export class FindingsApi extends runtime.BaseAPI {
      */
     async findingsControllerGetStats(requestParameters: FindingsControllerGetStatsRequest = {}, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
         await this.findingsControllerGetStatsRaw(requestParameters, initOverrides);
+    }
+
+    /**
+     * Freshness of the pre-aggregated finding statistics shared by the dashboard charts
+     */
+    async findingsControllerGetStatsFreshnessRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<FindingsDiscoveryStatsDto>> {
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/findings/stats/freshness`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => FindingsDiscoveryStatsDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Freshness of the pre-aggregated finding statistics shared by the dashboard charts
+     */
+    async findingsControllerGetStatsFreshness(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<FindingsDiscoveryStatsDto> {
+        const response = await this.findingsControllerGetStatsFreshnessRaw(initOverrides);
+        return await response.value();
     }
 
     /**

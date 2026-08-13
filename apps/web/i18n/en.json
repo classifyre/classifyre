@@ -597,6 +597,7 @@
       "onlySelectedSections": "Only the sections enabled below will change; all other source settings stay untouched.",
       "applySchedule": "Change schedule",
       "applySampling": "Change sampling",
+      "affectedSources": "Sources that will change ({{count}})",
       "chooseSection": "Choose scheduling, sampling, or both to continue.",
       "ready": "The selected changes will be applied to {{count}} sources.",
       "saving": "Updating sources…",
@@ -2231,7 +2232,7 @@
     "stats": {
       "building": "Building index…",
       "buildingHint": "These figures were counted directly from every finding, which is exact but slow. A background rebuild of the pre-aggregated index is queued; once it lands this page loads instantly.",
-      "updated": "Updated {when}",
+      "updated": "Updated {{when}}",
       "updatedHint": "Read from a pre-aggregated index that refreshes automatically as findings arrive, which is why this page loads instantly instead of counting millions of rows.",
       "never": "Not yet built",
       "refresh": "Rebuild statistics now"

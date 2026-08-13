@@ -597,6 +597,7 @@
       "onlySelectedSections": "Nur die unten aktivierten Bereiche werden geändert; alle anderen Quelleinstellungen bleiben unverändert.",
       "applySchedule": "Zeitplan ändern",
       "applySampling": "Stichprobenauswahl ändern",
+      "affectedSources": "Quellen, die geändert werden ({{count}})",
       "chooseSection": "Wählen Sie Zeitplanung, Stichprobenauswahl oder beides aus.",
       "ready": "Die ausgewählten Änderungen werden auf {{count}} Quellen angewendet.",
       "saving": "Quellen werden aktualisiert…",
@@ -2231,7 +2232,7 @@
     "stats": {
       "building": "Index wird erstellt…",
       "buildingHint": "Diese Zahlen wurden direkt aus allen Funden gezählt – exakt, aber langsam. Eine Neuberechnung des vorab aggregierten Index läuft im Hintergrund; danach lädt diese Seite sofort.",
-      "updated": "Aktualisiert {when}",
+      "updated": "Aktualisiert {{when}}",
       "updatedHint": "Aus einem vorab aggregierten Index gelesen, der sich automatisch aktualisiert, sobald neue Funde eintreffen – deshalb lädt diese Seite sofort, statt Millionen Zeilen zu zählen.",
       "never": "Noch nicht erstellt",
       "refresh": "Statistiken jetzt neu berechnen"
