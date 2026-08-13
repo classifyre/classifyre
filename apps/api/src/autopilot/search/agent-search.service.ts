@@ -7,6 +7,7 @@ import {
   SourceScheduleMode,
 } from '@prisma/client';
 import { PrismaService } from '../../prisma.service';
+import { CORRELATION_RELATION_TYPES } from '../../correlation/correlation.service';
 import { InquiryMatchingService } from '../../matching/inquiry-matching.service';
 import {
   CUSTOM_KEY_PREFIX,
@@ -1331,7 +1332,7 @@ export class AgentSearchService {
       where: {
         fromType: 'asset',
         toType: 'asset',
-        relationType: { in: ['related', 'likely_duplicate'] },
+        relationType: { in: CORRELATION_RELATION_TYPES },
         OR: [{ fromId: { in: assetIds } }, { toId: { in: assetIds } }],
       },
       orderBy: { confidence: 'desc' },
