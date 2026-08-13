@@ -2783,6 +2783,8 @@ export class AssetService {
             resolvedAt: Date | null;
             resolutionReason: string | null;
             history: Prisma.JsonValue;
+            detectedAt: Date;
+            firstDetectedAt: Date | null;
           }
         >();
         for (
@@ -2812,6 +2814,13 @@ export class AssetService {
               resolvedAt: true,
               resolutionReason: true,
               history: true,
+              // Read only to invalidate the statistics rollup. Re-detecting a
+              // finding MOVES detected_at to this run's time, so its old day's
+              // pre-aggregated row still counts a finding that is no longer
+              // there. Without the previous value there is nothing to mark
+              // dirty and that day over-counts until the next full rebuild.
+              detectedAt: true,
+              firstDetectedAt: true,
             },
           });
           for (const row of rows) existingMap.set(row.detectionIdentity, row);
@@ -2819,6 +2828,10 @@ export class AssetService {
 
         const toCreate: any[] = [];
         const toUpdate: any[] = [];
+        // Days whose pre-aggregated finding counts this batch invalidates.
+        // Re-detection moves detected_at forward, so the day a finding is
+        // leaving needs recomputing just as much as the day it lands on.
+        const staleStatsDays: Date[] = [];
         let newFindings = 0;
 
         // Process each detection
@@ -2914,6 +2927,10 @@ export class AssetService {
                   ]
                 : [];
 
+              if (existing.detectedAt) staleStatsDays.push(existing.detectedAt);
+              if (existing.firstDetectedAt) {
+                staleStatsDays.push(existing.firstDetectedAt);
+              }
               toUpdate.push({
                 id: existing.id,
                 data: {
@@ -2954,6 +2971,7 @@ export class AssetService {
               });
             } else {
               // Finding unchanged - just update lastDetectedAt without history entry
+              if (existing.detectedAt) staleStatsDays.push(existing.detectedAt);
               toUpdate.push({
                 id: existing.id,
                 data: {
@@ -3044,6 +3062,7 @@ export class AssetService {
           updated: assetsToUpdate.length,
           unchanged: assetsUnchanged.length,
           findings: newFindings,
+          staleStatsDays,
         };
       },
       {
@@ -3059,9 +3078,15 @@ export class AssetService {
     // was told about. Ingest calls this once per batch and a scan runs
     // thousands of batches; the scheduler coalesces them onto one job per
     // window, so the cost here is one `ON CONFLICT DO NOTHING` insert.
-    if (result.findings > 0) {
-      await this.statsJobs?.scheduleForDays([new Date()], 'findings ingested');
+    // `new Date()` covers the rows this batch wrote; staleStatsDays covers the
+    // rows it moved off an earlier day.
+    const { staleStatsDays = [], ...ingestResult } = result;
+    if (ingestResult.findings > 0 || staleStatsDays.length > 0) {
+      await this.statsJobs?.scheduleForDays(
+        [new Date(), ...staleStatsDays],
+        'findings ingested',
+      );
     }
-    return result;
+    return ingestResult;
   }
 }

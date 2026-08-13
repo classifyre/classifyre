@@ -46,6 +46,109 @@ describe('FindingStatsService', () => {
     });
   });
 
+  describe('refresh keeps every rollup table in step', () => {
+    // `$executeRaw` is called as a tagged template, so its first argument is
+    // the TemplateStringsArray itself; `$queryRaw(Prisma.sql`…`)` instead
+    // passes a Sql object with `.strings`. Handle both.
+    const sqlOfCall = (call: unknown[]): string => {
+      const first = call[0];
+      if (Array.isArray(first)) return first.join(' ');
+      return ((first as { strings?: string[] })?.strings ?? []).join(' ');
+    };
+    const sqlOf = (calls: unknown[][]) => calls.map(sqlOfCall).join('\n');
+
+    const TABLES = [
+      'finding_stats_daily',
+      'finding_stats_asset_daily',
+      'finding_stats_first_daily',
+      'finding_stats_first_asset_daily',
+    ];
+
+    it('rebuilds all four tables on a full rebuild', async () => {
+      const executeRaw = jest.fn().mockResolvedValue(0);
+      const queryRaw = jest.fn().mockResolvedValue([{ total: 1n }]);
+      const service = new FindingStatsService({
+        $executeRaw: executeRaw,
+        $queryRaw: queryRaw,
+      } as never);
+
+      await service.rebuildAll();
+
+      const sql = sqlOf(executeRaw.mock.calls);
+      for (const table of TABLES) {
+        expect(sql).toContain(`DELETE FROM ${table}`);
+        expect(sql).toContain(`INSERT INTO ${table}`);
+      }
+    });
+
+    it('recomputes all four tables for a dirty day', async () => {
+      const executeRaw = jest.fn().mockResolvedValue(0);
+      const queryRaw = jest
+        .fn()
+        .mockResolvedValueOnce([{ day: new Date('2026-08-13T00:00:00Z') }])
+        .mockResolvedValue([{ total: 1n }]);
+      const service = new FindingStatsService({
+        $executeRaw: executeRaw,
+        $queryRaw: queryRaw,
+      } as never);
+
+      await service.refreshDirtyDays();
+
+      const sql = sqlOf(executeRaw.mock.calls);
+      for (const table of TABLES) {
+        expect(sql).toContain(`DELETE FROM ${table} WHERE day`);
+        expect(sql).toContain(`INSERT INTO ${table}`);
+      }
+    });
+
+    it('bounds every incremental scan by a range, never a cast on the column', async () => {
+      const executeRaw = jest.fn().mockResolvedValue(0);
+      const queryRaw = jest
+        .fn()
+        .mockResolvedValueOnce([{ day: new Date('2026-08-13T00:00:00Z') }])
+        .mockResolvedValue([{ total: 1n }]);
+      const service = new FindingStatsService({
+        $executeRaw: executeRaw,
+        $queryRaw: queryRaw,
+      } as never);
+
+      await service.refreshDirtyDays();
+
+      // `WHERE detected_at::date = ANY(...)` is unsargable and seq-scans the
+      // whole findings table — measured at 50 s where the range form took
+      // 793 ms. Guard the shape, not just the result.
+      const inserts = executeRaw.mock.calls
+        .map(sqlOfCall)
+        .filter((sql) => sql.includes('FROM findings'));
+      expect(inserts.length).toBeGreaterThan(0);
+      for (const sql of inserts) {
+        expect(sql).not.toMatch(/detected_at::date\s*=\s*ANY/);
+        expect(sql).toMatch(/detected_at >=/);
+      }
+    });
+
+    it('skips findings with no first detection date', async () => {
+      const executeRaw = jest.fn().mockResolvedValue(0);
+      const queryRaw = jest.fn().mockResolvedValue([{ total: 1n }]);
+      const service = new FindingStatsService({
+        $executeRaw: executeRaw,
+        $queryRaw: queryRaw,
+      } as never);
+
+      await service.rebuildAll();
+
+      // first_detected_at is nullable and the live charts query drops those
+      // rows; including them here would invent timeline entries.
+      const firstInserts = executeRaw.mock.calls
+        .map(sqlOfCall)
+        .filter((sql) => sql.includes('INSERT INTO finding_stats_first'));
+      expect(firstInserts).toHaveLength(2);
+      for (const sql of firstInserts) {
+        expect(sql).toContain('first_detected_at IS NOT NULL');
+      }
+    });
+  });
+
   describe('status filtering', () => {
     const captureSql = async (
       filters: Parameters<FindingStatsService['totalFor']>[0],
