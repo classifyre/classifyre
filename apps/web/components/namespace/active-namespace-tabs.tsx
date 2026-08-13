@@ -107,6 +107,9 @@ export function ActiveNamespaceTabs() {
     [current, pathname, replace, router, visibleItems],
   );
 
+  // A single open workspace needs no switcher; reclaim the strip's height.
+  if (visibleItems.length < 2) return null;
+
   return (
     <NamespaceTabs
       items={visibleItems.map((item) => ({ id: item.id, label: item.name }))}

@@ -184,6 +184,7 @@ All URIs are relative to *http://localhost*
 *FindingsApi* | [**findingsControllerFindOne**](docs/FindingsApi.md#findingscontrollerfindone) | **GET** /findings/{id} | Get a finding by ID
 *FindingsApi* | [**findingsControllerGetDiscoveryOverview**](docs/FindingsApi.md#findingscontrollergetdiscoveryoverview) | **GET** /findings/discovery | Get discovery dashboard overview data
 *FindingsApi* | [**findingsControllerGetStats**](docs/FindingsApi.md#findingscontrollergetstats) | **GET** /findings/stats | Get finding statistics
+*FindingsApi* | [**findingsControllerGetStatsFreshness**](docs/FindingsApi.md#findingscontrollergetstatsfreshness) | **GET** /findings/stats/freshness | Freshness of the pre-aggregated finding statistics shared by the dashboard charts
 *FindingsApi* | [**findingsControllerListAssetSummaries**](docs/FindingsApi.md#findingscontrollerlistassetsummaries) | **GET** /findings/assets | List asset finding summaries with optional filters
 *FindingsApi* | [**findingsControllerRefreshDiscoveryStats**](docs/FindingsApi.md#findingscontrollerrefreshdiscoverystats) | **POST** /findings/discovery/refresh | Queue a full rebuild of the pre-aggregated finding statistics
 *FindingsApi* | [**findingsControllerUpdate**](docs/FindingsApi.md#findingscontrollerupdate) | **PATCH** /findings/{id} | Update a finding

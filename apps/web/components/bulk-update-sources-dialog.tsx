@@ -98,15 +98,15 @@ function SourcesPreviewTable({ selection }: { selection: SourceSelection }) {
   }, [loadPage, page]);
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <div className="relative min-h-0 flex-1 overflow-auto">
+    <div className="flex flex-col rounded-[6px] border-2 border-border bg-card">
+      <div className="relative overflow-x-auto">
         {loading && (
           <div className="absolute inset-0 z-10 flex items-center justify-center bg-background/60 backdrop-blur-[1px]">
             <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
           </div>
         )}
         <Table>
-          <TableHeader className="sticky top-0 z-10 bg-background">
+          <TableHeader>
             <TableRow>
               <TableHead>{t("sources.columns.source")}</TableHead>
               <TableHead>{t("sources.columns.type")}</TableHead>
@@ -136,7 +136,7 @@ function SourcesPreviewTable({ selection }: { selection: SourceSelection }) {
       </div>
 
       {totalPages > 1 && (
-        <div className="flex shrink-0 items-center justify-between border-t px-4 py-2.5 text-xs text-muted-foreground">
+        <div className="flex shrink-0 items-center justify-between border-t-2 border-border px-4 py-2.5 text-xs text-muted-foreground">
           <span>
             {((page - 1) * DIALOG_PAGE_SIZE + 1).toLocaleString()}–
             {Math.min(page * DIALOG_PAGE_SIZE, total).toLocaleString()}{" "}
@@ -261,7 +261,7 @@ export function BulkUpdateSourcesDialog({
         if (!nextOpen) handleClose();
       }}
     >
-      <DrawerContent className="flex h-full w-full max-w-none flex-col gap-0 overflow-hidden bg-background p-0 sm:max-w-6xl">
+      <DrawerContent className="flex h-full flex-col gap-0 overflow-hidden bg-background p-0 sm:data-[vaul-drawer-direction=right]:w-[92vw] sm:data-[vaul-drawer-direction=right]:max-w-[880px]">
         <DrawerHeader className="shrink-0 border-b px-6 py-5">
           <DrawerTitle className="font-serif text-xl font-black uppercase tracking-[0.06em]">
             {t("sources.bulkUpdate.title")}
@@ -278,48 +278,49 @@ export function BulkUpdateSourcesDialog({
           </DrawerDescription>
         </DrawerHeader>
 
-        <div className="shrink-0 overflow-y-auto border-b px-6 py-5">
-          <div className="grid gap-6 lg:grid-cols-2">
-            <section className="space-y-3">
-              <label className="flex cursor-pointer items-center gap-2 font-mono text-xs font-bold uppercase tracking-[0.08em]">
-                <Checkbox
-                  checked={applySchedule}
-                  onCheckedChange={(checked) =>
-                    setApplySchedule(checked === true)
-                  }
-                  className={CHECKBOX_CLASS}
-                />
-                {t("sources.bulkUpdate.applySchedule")}
-              </label>
-              <ScheduleCard
-                value={schedule}
-                onChange={setSchedule}
-                disabled={!applySchedule || isSaving}
+        <div className="min-h-0 flex-1 space-y-8 overflow-y-auto px-6 py-6">
+          <section className="space-y-3">
+            <label className="flex w-full cursor-pointer items-center gap-2 font-mono text-xs font-bold uppercase tracking-[0.08em]">
+              <Checkbox
+                checked={applySchedule}
+                onCheckedChange={(checked) => setApplySchedule(checked === true)}
+                className={CHECKBOX_CLASS}
               />
-            </section>
+              {t("sources.bulkUpdate.applySchedule")}
+            </label>
+            <ScheduleCard
+              value={schedule}
+              onChange={setSchedule}
+              disabled={!applySchedule || isSaving}
+              className="w-full"
+            />
+          </section>
 
-            <section className="space-y-3">
-              <label className="flex cursor-pointer items-center gap-2 font-mono text-xs font-bold uppercase tracking-[0.08em]">
-                <Checkbox
-                  checked={applySampling}
-                  onCheckedChange={(checked) =>
-                    setApplySampling(checked === true)
-                  }
-                  className={CHECKBOX_CLASS}
-                />
-                {t("sources.bulkUpdate.applySampling")}
-              </label>
-              <SamplingCard
-                value={sampling}
-                onChange={setSampling}
-                disabled={!applySampling || isSaving}
+          <section className="space-y-3">
+            <label className="flex w-full cursor-pointer items-center gap-2 font-mono text-xs font-bold uppercase tracking-[0.08em]">
+              <Checkbox
+                checked={applySampling}
+                onCheckedChange={(checked) => setApplySampling(checked === true)}
+                className={CHECKBOX_CLASS}
               />
-            </section>
-          </div>
-        </div>
+              {t("sources.bulkUpdate.applySampling")}
+            </label>
+            <SamplingCard
+              value={sampling}
+              onChange={setSampling}
+              disabled={!applySampling || isSaving}
+              className="w-full"
+            />
+          </section>
 
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-          {selection && <SourcesPreviewTable selection={selection} />}
+          <section className="space-y-3">
+            <p className="font-mono text-xs font-bold uppercase tracking-[0.08em]">
+              {t("sources.bulkUpdate.affectedSources", {
+                count: total.toLocaleString(),
+              })}
+            </p>
+            {selection && <SourcesPreviewTable selection={selection} />}
+          </section>
         </div>
 
         <div className="flex shrink-0 flex-col items-center justify-between gap-4 border-t px-6 py-4 sm:flex-row">

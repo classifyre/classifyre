@@ -22,6 +22,8 @@ import { AssetsTable } from "@/components/assets-table";
 import { EChartBox } from "@/components/echart-box";
 
 import { useTranslation } from "@/hooks/use-translation";
+import { StatsFreshness } from "@/components/stats-freshness";
+import { useStatsFreshness } from "@/hooks/use-stats-freshness";
 
 type AssetStatusFilter =
   (typeof SearchAssetsFiltersDtoStatusEnum)[keyof typeof SearchAssetsFiltersDtoStatusEnum];
@@ -92,6 +94,9 @@ export default function AssetsPage() {
   const [isBaseLoading, setIsBaseLoading] = useState(true);
   const [isChartsLoading, setIsChartsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Bumped when a rollup rebuild lands so the charts re-read the new numbers.
+  const [statsToken, setStatsToken] = useState(0);
+  const stats = useStatsFreshness(() => setStatsToken((token) => token + 1));
 
   useEffect(() => {
     let active = true;
@@ -134,7 +139,7 @@ export default function AssetsPage() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [statsToken]);
 
   useEffect(() => {
     if (selectedStatuses.length === 0) {
@@ -359,6 +364,15 @@ export default function AssetsPage() {
         <h1 className="font-serif text-3xl font-black uppercase tracking-[0.08em]">
           {t("assets.title")}
         </h1>
+        <div className="ml-auto">
+          <StatsFreshness
+            refreshedAt={stats.refreshedAt}
+            isBuilt={stats.isBuilt}
+            source={stats.source}
+            onRefresh={stats.refresh}
+            isRefreshing={stats.isRefreshing}
+          />
+        </div>
       </div>
 
       {error && (
