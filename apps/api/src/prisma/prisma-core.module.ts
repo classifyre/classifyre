@@ -1,6 +1,7 @@
 import { Global, Module } from '@nestjs/common';
 import { PrismaClientManager } from './prisma-client-manager';
 import { NamespaceRegistryService } from '../registry/namespace-registry.service';
+import { NamespacePurgeService } from '../registry/namespace-purge.service';
 
 /**
  * Makes the shared {@link PrismaClientManager} available in every module.
@@ -11,7 +12,15 @@ import { NamespaceRegistryService } from '../registry/namespace-registry.service
  */
 @Global()
 @Module({
-  providers: [PrismaClientManager, NamespaceRegistryService],
-  exports: [PrismaClientManager, NamespaceRegistryService],
+  providers: [
+    PrismaClientManager,
+    NamespaceRegistryService,
+    NamespacePurgeService,
+  ],
+  exports: [
+    PrismaClientManager,
+    NamespaceRegistryService,
+    NamespacePurgeService,
+  ],
 })
 export class PrismaCoreModule {}

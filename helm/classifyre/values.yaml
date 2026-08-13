@@ -102,6 +102,15 @@ api:
   # -- limit. Rule of thumb: heap ≈ 0.75 × the memory limit (in MB).
   maxOldSpaceSizeMb: 1536
 
+  # -- Days a deleted workspace stays recoverable before it is dropped for
+  # good. Deleting a workspace only marks it and stops serving it; its schema
+  # and all its data survive until this many days later, when a background
+  # sweep drops the schema and the registry row. That deletion is irreversible
+  # and there is no backup step, so raise this if your recovery process needs
+  # longer. Set 0 to keep deleted workspaces forever (the behaviour before this
+  # existed), at the cost of their disk.
+  namespaceRetentionDays: 7
+
   # Postgres connection pooling. API-capable processes split each workspace's
   # budget into an interactive pool and a background/internal-callback pool so
   # scan ingestion cannot consume the connections needed to render the UI.

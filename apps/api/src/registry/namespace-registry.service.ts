@@ -16,6 +16,7 @@ import {
 } from '../database-migrations';
 import {
   isReservedSlug,
+  pgBossSchemaForId,
   SLUG_RE,
   schemaForId,
   slugifyName,
@@ -446,13 +447,104 @@ export class NamespaceRegistryService implements OnModuleInit, OnModuleDestroy {
     this.resolveCache.delete(namespace.slug);
     this.resolveCache.delete(namespace.id);
     await this.pool.query(
-      "UPDATE namespaces SET status = 'deleted', updated_at = now() WHERE id = $1",
+      `UPDATE namespaces
+         SET status = 'deleted', updated_at = now(), deleted_at = now()
+       WHERE id = $1`,
       [id],
     );
     await this.notify(this.deletingListeners, ctx, 'delete');
     this.logger.log(
       `Soft-deleted namespace '${namespace.slug}' (data retained)`,
     );
+  }
+
+  /**
+   * Workspaces soft-deleted longer ago than `retentionMs` and therefore due to
+   * be dropped for good.
+   *
+   * Remote namespaces are included: they own no schema, but their registry row
+   * should not outlive the retention window either.
+   */
+  async listExpiredDeleted(retentionMs: number): Promise<
+    Array<{
+      id: string;
+      slug: string;
+      schemaName: string;
+      type: string;
+      deletedAt: Date;
+    }>
+  > {
+    const cutoff = new Date(Date.now() - retentionMs);
+    const { rows } = await this.pool.query<{
+      id: string;
+      slug: string;
+      schema_name: string;
+      type: string;
+      deleted_at: Date;
+    }>(
+      `SELECT id, slug, schema_name, type, deleted_at
+         FROM namespaces
+        WHERE status = 'deleted'
+          AND deleted_at IS NOT NULL
+          AND deleted_at < $1
+        ORDER BY deleted_at ASC`,
+      [cutoff],
+    );
+    return rows.map((row) => ({
+      id: row.id,
+      slug: row.slug,
+      schemaName: row.schema_name,
+      type: row.type,
+      deletedAt: row.deleted_at,
+    }));
+  }
+
+  /**
+   * Irreversibly drop a soft-deleted workspace: its tenant schema, its pg-boss
+   * job schema, and its registry row.
+   *
+   * Re-checks the `deleted` status inside the delete so a workspace that was
+   * restored between listing and purging is never dropped — the read and the
+   * write are separated by two schema drops, which is ample time for that to
+   * happen.
+   */
+  async purgeDeleted(id: string): Promise<boolean> {
+    const { rows } = await this.pool.query<{
+      slug: string;
+      schema_name: string;
+      type: string;
+    }>(
+      `SELECT slug, schema_name, type FROM namespaces
+        WHERE id = $1 AND status = 'deleted'`,
+      [id],
+    );
+    const row = rows[0];
+    if (!row) return false;
+
+    if (row.type === 'local') {
+      // CASCADE because the schema owns its own tables and nothing outside it
+      // references them; the registry row is the only external pointer and it
+      // goes below.
+      await this.pool.query(
+        `DROP SCHEMA IF EXISTS "${row.schema_name}" CASCADE`,
+      );
+      await this.pool.query(
+        `DROP SCHEMA IF EXISTS "${pgBossSchemaForId(id)}" CASCADE`,
+      );
+    }
+
+    const deleted = await this.pool.query(
+      "DELETE FROM namespaces WHERE id = $1 AND status = 'deleted'",
+      [id],
+    );
+    if (deleted.rowCount === 0) return false;
+
+    this.resolveCache.delete(row.slug);
+    this.resolveCache.delete(id);
+    this.logger.warn(
+      `Purged soft-deleted workspace '${row.slug}' — schema "${row.schema_name}" and all its data are gone.`,
+    );
+    return true;
   }
 
   private async notify(
