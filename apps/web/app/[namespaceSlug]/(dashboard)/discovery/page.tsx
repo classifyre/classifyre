@@ -29,6 +29,7 @@ import { cn } from "@workspace/ui/lib/utils";
 import { FINDING_SEVERITY_COLOR_BY_LEVEL } from "@workspace/ui/lib/finding-severity";
 import { formatRelative } from "@/lib/date";
 import { useTranslation } from "@/hooks/use-translation";
+import { StatsFreshness } from "@/components/stats-freshness";
 import type { TranslationKey } from "@/i18n";
 
 type DiscoveryWindowDays = 7 | 30 | 90;
@@ -225,6 +226,9 @@ export default function DiscoveryPage() {
   );
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  // Bumped to re-run the fetch effect after a manual rebuild is queued.
+  const [reloadToken, setReloadToken] = useState(0);
 
   const windowDaysValue: DiscoveryWindowDays =
     windowDays === "30" ? 30 : windowDays === "90" ? 90 : 7;
@@ -253,7 +257,42 @@ export default function DiscoveryPage() {
     };
 
     fetchOverview();
-  }, [windowDaysValue]);
+  }, [windowDaysValue, reloadToken]);
+
+  // The rebuild is a full pass over every finding, so the endpoint only queues
+  // it. Poll the overview until its refreshedAt moves rather than blocking the
+  // button on work that runs on a background worker.
+  const handleRefreshStats = async () => {
+    if (isRefreshing) return;
+    const before = overview?.stats?.refreshedAt
+      ? new Date(overview.stats.refreshedAt).getTime()
+      : 0;
+    setIsRefreshing(true);
+    try {
+      await api.findings.findingsControllerRefreshDiscoveryStats();
+      const deadline = Date.now() + 120_000;
+      while (Date.now() < deadline) {
+        await new Promise((resolve) => setTimeout(resolve, 2_000));
+        const next =
+          await api.findings.findingsControllerGetDiscoveryOverview({
+            windowDays: windowDaysValue,
+          });
+        const after = next.stats?.refreshedAt
+          ? new Date(next.stats.refreshedAt).getTime()
+          : 0;
+        if (after > before) {
+          setOverview(next);
+          return;
+        }
+      }
+      // Timed out waiting: show whatever is current rather than spinning on.
+      setReloadToken((token) => token + 1);
+    } catch (err) {
+      console.error("Failed to refresh discovery statistics:", err);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   const totals = overview?.totals;
   const severityCounts = totals?.bySeverity ?? {
@@ -360,22 +399,31 @@ export default function DiscoveryPage() {
               <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground font-mono mt-0.5">
                 {t("discovery.allFindingsWithDays", { days: windowDaysValue })}
               </p>
-              <Select value={windowDays} onValueChange={setWindowDays}>
-                <SelectTrigger className="h-7 w-[100px] text-[10px] bg-background border-2 border-border text-foreground rounded-[4px] font-mono">
-                  <SelectValue placeholder={t("common.window")} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="7">
-                    {t("findings.window.7days")}
-                  </SelectItem>
-                  <SelectItem value="30">
-                    {t("findings.window.30days")}
-                  </SelectItem>
-                  <SelectItem value="90">
-                    {t("findings.window.90days")}
-                  </SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="flex items-center gap-2">
+                <StatsFreshness
+                  refreshedAt={overview?.stats?.refreshedAt}
+                  isBuilt={overview?.stats?.isBuilt}
+                  source={overview?.stats?.source}
+                  onRefresh={handleRefreshStats}
+                  isRefreshing={isRefreshing}
+                />
+                <Select value={windowDays} onValueChange={setWindowDays}>
+                  <SelectTrigger className="h-7 w-[100px] text-[10px] bg-background border-2 border-border text-foreground rounded-[4px] font-mono">
+                    <SelectValue placeholder={t("common.window")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="7">
+                      {t("findings.window.7days")}
+                    </SelectItem>
+                    <SelectItem value="30">
+                      {t("findings.window.30days")}
+                    </SelectItem>
+                    <SelectItem value="90">
+                      {t("findings.window.90days")}
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </div>
           <div>

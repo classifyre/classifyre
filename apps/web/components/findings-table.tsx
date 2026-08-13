@@ -634,6 +634,12 @@ export function FindingsTable({
     0,
   );
   const total = data?.total ?? 0;
+  // The API caps the count for filters its statistics rollup cannot answer, so
+  // the number is a floor. Every page the pager offers is still real — the cap
+  // is a lower bound, so all of them have rows — but the last one is not
+  // necessarily the last, which is what the trailing "+" says.
+  const totalIsLowerBound = data?.totalIsLowerBound ?? false;
+  const totalLabel = `${total.toLocaleString()}${totalIsLowerBound ? "+" : ""}`;
   const hasRows = findings.length > 0;
   const showInitialLoading = isLoading && data === null;
   const totalPages = Math.max(
@@ -1021,7 +1027,7 @@ export function FindingsTable({
                       <TooltipContent>
                         {headerChecked || headerIndeterminate
                           ? "Deselect all"
-                          : `Select all ${currentTotal.toLocaleString()} matching current filters`}
+                          : `Select all ${totalLabel} matching current filters`}
                       </TooltipContent>
                     </Tooltip>
                   </TableHead>
@@ -1531,7 +1537,7 @@ export function FindingsTable({
           </Select>
           <span className="text-xs text-muted-foreground">
             {total > 0
-              ? `${((clampedPage - 1) * resolvedPageSize + 1).toLocaleString()}–${Math.min(clampedPage * resolvedPageSize, total).toLocaleString()} of ${total.toLocaleString()}`
+              ? `${((clampedPage - 1) * resolvedPageSize + 1).toLocaleString()}–${Math.min(clampedPage * resolvedPageSize, total).toLocaleString()} of ${totalLabel}`
               : "0 findings"}
           </span>
         </div>

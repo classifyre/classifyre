@@ -28,7 +28,10 @@ import { QueryFindingsAssetsDto } from './dto/query-findings-assets.dto';
 import { FindingResponseDto } from './dto/finding-response.dto';
 import { AssetFindingSummaryListResponseDto } from './dto/asset-finding-summary.dto';
 import { QueryFindingsDiscoveryDto } from './dto/query-findings-discovery.dto';
-import { FindingsDiscoveryResponseDto } from './dto/findings-discovery-response.dto';
+import {
+  FindingsDiscoveryRefreshResponseDto,
+  FindingsDiscoveryResponseDto,
+} from './dto/findings-discovery-response.dto';
 
 @ApiTags('findings')
 @Controller('findings')
@@ -85,6 +88,19 @@ export class FindingsController {
   })
   async listAssetSummaries(@Query() query: QueryFindingsAssetsDto) {
     return this.findingsService.listAssetSummaries(query);
+  }
+
+  @Post('discovery/refresh')
+  @ApiOperation({
+    summary: 'Queue a full rebuild of the pre-aggregated finding statistics',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Refresh queued',
+    type: FindingsDiscoveryRefreshResponseDto,
+  })
+  async refreshDiscoveryStats() {
+    return this.findingsService.refreshDiscoveryStats();
   }
 
   @Get('discovery')

@@ -27,7 +27,7 @@ describe('DetectorToolset', () => {
     mockApplier as unknown as DecisionApplierService,
     mockSearch as unknown as AgentSearchService,
     {
-      customDetector: { findMany: jest.fn().mockResolvedValue([]) }, // eslint-disable-line
+      customDetector: { findMany: jest.fn().mockResolvedValue([]) },
       source: { findMany: jest.fn().mockResolvedValue([]) },
     } as never,
     mockAiProviders as unknown as AiProviderConfigService,

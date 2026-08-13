@@ -260,7 +260,9 @@ model Finding {
   evidenceAnalysis       FindingEvidenceAnalysis?
   correlationValues      AssetCorrelationValue[]
 
-  @@index([assetId])
+  // [assetId] alone is deliberately absent: it is the leading prefix of both
+  // [assetId, lastDetectedAt] and [assetId, status, severity, ...] below, and
+  // carrying a third 509 MB copy of the same column only competes for cache.
   @@index([sourceId])
   @@index([runnerId])
   @@index([detectorType])
@@ -271,7 +273,8 @@ model Finding {
   @@index([customDetectorKey])
   @@index([findingType])
   @@index([severity])
-  @@index([status])
+  // [status] alone is deliberately absent: one distinct value in practice, and
+  // a leading prefix of [status, detectedAt] below.
   @@index([detectionIdentity, status])
   // Charts aggregate counts per (firstDetectedAt, severity, status) over a
   // window. Carrying severity and status makes that aggregation index-only
@@ -279,7 +282,8 @@ model Finding {
   // index, which was a prefix of this one. [lastDetectedAt] is dropped: 0
   // scans across all 17 namespace schemas and 436 MB.
   @@index([firstDetectedAt, severity, status])
-  @@index([resolvedAt])
+  // [resolvedAt] dropped: zero scans across every schema, and the column is
+  // NULL for every row, so no query regressed.
   @@index([embedContentHash])
   @@index([assetId, lastDetectedAt(sort: Desc)])
   @@index([assetId, status, severity, detectorType, findingType])
@@ -2077,4 +2081,91 @@ model DataTransferChunk {
 
   @@id([jobId, ordinal])
   @@map("data_transfer_chunks")
+}
+
+/// Pre-aggregated finding counts, one row per (day × dimension).
+///
+/// The discovery overview and the findings charts are pure aggregates over
+/// `findings`, and on a real corpus every one of their predicates matches
+/// essentially the whole table: `status` has n_distinct = 1 (every finding is
+/// OPEN) and a scan writes every `detected_at` inside the same few days, so a
+/// 30-day window is the entire table. Postgres is right to stop using the
+/// indexes and sequentially scan, which is why the overview cost ~43 s of
+/// database work on a 5.17M-finding workspace.
+///
+/// Measured on that workspace, this grain collapses 5,165,490 rows / 5.5 GB
+/// into 739 rows: severity totals 13.7 s -> 8 ms, the three activity counts
+/// 11.2 s -> 20 ms as a single query.
+///
+/// The dimensions are exactly the filters the charts can push down. A request
+/// filtering on anything outside this grain (free-text search, asset, custom
+/// detector) still runs live against `findings`.
+model FindingStatDaily {
+  day          DateTime      @db.Date
+  severity     Severity
+  status       FindingStatus
+  detectorType DetectorType  @map("detector_type")
+  sourceId     String        @map("source_id")
+  count        Int
+
+  @@id([day, severity, status, detectorType, sourceId])
+  @@index([day])
+  @@map("finding_stats_daily")
+}
+
+/// Pre-aggregated per-asset finding counts, one row per (day × asset ×
+/// severity × status).
+///
+/// Kept separate from {@link FindingStatDaily} because adding `assetId` to that
+/// grain would multiply it by the asset count and throw away the compression
+/// that makes it work. This table answers only the overview's "top assets"
+/// panel, whose live query — a full aggregate over every finding ordered by
+/// count — was the single most expensive statement in the product at 18.7 s.
+/// At this grain the same workspace holds 26,993 rows / 3 MB and answers in
+/// 11 ms.
+model FindingStatAssetDaily {
+  day            DateTime      @db.Date
+  assetId        String        @map("asset_id")
+  severity       Severity
+  status         FindingStatus
+  count          Int
+  lastDetectedAt DateTime      @map("last_detected_at")
+
+  @@id([day, assetId, severity, status])
+  @@index([day])
+  @@map("finding_stats_asset_daily")
+}
+
+/// Days whose rollup rows no longer match `findings`.
+///
+/// This is the coalescing point of the refresh design. Every write that
+/// changes a finding marks the affected day here (`ON CONFLICT DO NOTHING`),
+/// so a scan writing findings for hours leaves exactly one row rather than one
+/// job per batch. The refresh worker drains the table, recomputes only those
+/// days, and deletes them — so an idle workspace does no work at all, and a
+/// busy one does work proportional to the days it touched, not to the corpus.
+model FindingStatsDirtyDay {
+  day DateTime @id @db.Date
+
+  @@map("finding_stats_dirty_days")
+}
+
+/// Single-row freshness record for the finding rollups.
+///
+/// Surfaced in the UI so the numbers on screen can say how old they are, which
+/// is the honest trade for serving them from a cache: a dashboard that is
+/// seconds-to-minutes stale and instant beats one that is exact and takes 43 s.
+model FindingStatsState {
+  id            String    @id @default("singleton")
+  refreshedAt   DateTime? @map("refreshed_at")
+  durationMs    Int?      @map("duration_ms")
+  /// Total findings represented by the rollup — serves the unfiltered
+  /// pagination total, which was itself a 2 s `count(*)`.
+  totalFindings Int       @default(0) @map("total_findings")
+  /// False until the first full build completes, so readers can tell "no
+  /// findings yet" apart from "not built yet" and fall back accordingly.
+  isBuilt       Boolean   @default(false) @map("is_built")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  @@map("finding_stats_state")
 }

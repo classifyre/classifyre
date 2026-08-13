@@ -20,6 +20,7 @@ import type {
   BulkUpdateFindingsResponseDto,
   CreateFindingDto,
   FindingResponseDto,
+  FindingsDiscoveryRefreshResponseDto,
   FindingsDiscoveryResponseDto,
   UpdateFindingDto,
 } from '../models/index';
@@ -34,6 +35,8 @@ import {
     CreateFindingDtoToJSON,
     FindingResponseDtoFromJSON,
     FindingResponseDtoToJSON,
+    FindingsDiscoveryRefreshResponseDtoFromJSON,
+    FindingsDiscoveryRefreshResponseDtoToJSON,
     FindingsDiscoveryResponseDtoFromJSON,
     FindingsDiscoveryResponseDtoToJSON,
     UpdateFindingDtoFromJSON,
@@ -356,6 +359,35 @@ export class FindingsApi extends runtime.BaseAPI {
      */
     async findingsControllerListAssetSummaries(requestParameters: FindingsControllerListAssetSummariesRequest = {}, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<AssetFindingSummaryListResponseDto> {
         const response = await this.findingsControllerListAssetSummariesRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Queue a full rebuild of the pre-aggregated finding statistics
+     */
+    async findingsControllerRefreshDiscoveryStatsRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<FindingsDiscoveryRefreshResponseDto>> {
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/findings/discovery/refresh`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => FindingsDiscoveryRefreshResponseDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Queue a full rebuild of the pre-aggregated finding statistics
+     */
+    async findingsControllerRefreshDiscoveryStats(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<FindingsDiscoveryRefreshResponseDto> {
+        const response = await this.findingsControllerRefreshDiscoveryStatsRaw(initOverrides);
         return await response.value();
     }
 

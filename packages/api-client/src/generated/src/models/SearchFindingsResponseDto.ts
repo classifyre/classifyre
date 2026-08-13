@@ -64,6 +64,12 @@ export interface SearchFindingsResponseDto {
      * @memberof SearchFindingsResponseDto
      */
     ranking?: SearchFindingsRankingMetadataDto;
+    /**
+     * When true, `total` is a lower bound (the count was capped) and the UI should present it as e.g. "10,000+".
+     * @type {boolean}
+     * @memberof SearchFindingsResponseDto
+     */
+    totalIsLowerBound?: boolean;
 }
 
 /**
@@ -92,6 +98,7 @@ export function SearchFindingsResponseDtoFromJSONTyped(json: any, ignoreDiscrimi
         'skip': json['skip'],
         'limit': json['limit'],
         'ranking': json['ranking'] == null ? undefined : SearchFindingsRankingMetadataDtoFromJSON(json['ranking']),
+        'totalIsLowerBound': json['totalIsLowerBound'] == null ? undefined : json['totalIsLowerBound'],
     };
 }
 
@@ -111,6 +118,7 @@ export function SearchFindingsResponseDtoToJSONTyped(value?: SearchFindingsRespo
         'skip': value['skip'],
         'limit': value['limit'],
         'ranking': SearchFindingsRankingMetadataDtoToJSON(value['ranking']),
+        'totalIsLowerBound': value['totalIsLowerBound'],
     };
 }
 
