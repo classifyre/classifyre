@@ -132,6 +132,43 @@ export class DiscoveryRecentRunDto {
   source?: DiscoveryRunSourceDto | null;
 }
 
+/**
+ * Freshness of the numbers on the page.
+ *
+ * The overview is served from a pre-aggregated rollup rather than counted live,
+ * which is what makes it instant instead of a ~43 s full-table aggregate. That
+ * trade is only honest if the page can say how old the figures are, so this
+ * travels with every response and the UI surfaces it next to a manual refresh.
+ */
+export class FindingsDiscoveryStatsDto {
+  @ApiProperty({ required: false, nullable: true })
+  refreshedAt?: Date | null;
+
+  @ApiProperty({ required: false, nullable: true })
+  durationMs?: number | null;
+
+  @ApiProperty()
+  isBuilt: boolean;
+
+  @ApiProperty({
+    enum: ['rollup', 'live'],
+    description:
+      'rollup: served from the pre-aggregated tables. live: the rollup has not been built yet for this workspace, so the figures were counted directly and are exact but slow.',
+  })
+  source: 'rollup' | 'live';
+}
+
+export class FindingsDiscoveryRefreshResponseDto {
+  @ApiProperty()
+  queued: boolean;
+
+  @ApiProperty({ required: false, nullable: true })
+  refreshedAt?: Date | null;
+
+  @ApiProperty()
+  isBuilt: boolean;
+}
+
 export class FindingsDiscoveryResponseDto {
   @ApiProperty({ enum: [7, 30, 90] })
   windowDays: number;
@@ -150,4 +187,7 @@ export class FindingsDiscoveryResponseDto {
 
   @ApiProperty({ type: [DiscoveryRecentRunDto] })
   recentRuns: DiscoveryRecentRunDto[];
+
+  @ApiProperty({ type: FindingsDiscoveryStatsDto })
+  stats: FindingsDiscoveryStatsDto;
 }

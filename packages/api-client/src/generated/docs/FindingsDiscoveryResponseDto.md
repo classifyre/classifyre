@@ -12,6 +12,7 @@ Name | Type
 `activity` | [FindingsDiscoveryActivityDto](FindingsDiscoveryActivityDto.md)
 `topAssets` | [Array&lt;FindingsDiscoveryTopAssetDto&gt;](FindingsDiscoveryTopAssetDto.md)
 `recentRuns` | [Array&lt;DiscoveryRecentRunDto&gt;](DiscoveryRecentRunDto.md)
+`stats` | [FindingsDiscoveryStatsDto](FindingsDiscoveryStatsDto.md)
 
 ## Example
 
@@ -26,6 +27,7 @@ const example = {
   "activity": null,
   "topAssets": null,
   "recentRuns": null,
+  "stats": null,
 } satisfies FindingsDiscoveryResponseDto
 
 console.log(example)

@@ -23,9 +23,11 @@ import { CliRunnerService } from '../cli-runner/cli-runner.service';
 import { McpClientService } from '../autopilot/mcp-client/mcp-client.service';
 import { PgStreamService } from '../export/pg-stream.service';
 import { DataTransferWorker } from '../data-transfer/data-transfer.worker';
+import { FindingStatsWorker } from '../stats/finding-stats.worker';
 import { RunnerEventsGateway } from '../websocket/runner-events.gateway';
 import { NotificationEventsGateway } from '../websocket/notification-events.gateway';
 import {
+  CLS_DATABASE_LANE,
   CLS_NAMESPACE_ID,
   CLS_SCHEMA,
   CLS_SLUG,
@@ -70,6 +72,7 @@ export class NamespaceWorkerManager
     private readonly mcpClient: McpClientService,
     private readonly pgStream: PgStreamService,
     private readonly dataTransfer: DataTransferWorker,
+    private readonly findingStats: FindingStatsWorker,
     private readonly runnerEvents: RunnerEventsGateway,
     private readonly notificationEvents: NotificationEventsGateway,
   ) {}
@@ -133,6 +136,7 @@ export class NamespaceWorkerManager
       this.cls.set(CLS_SCHEMA, ctx.schemaName);
       this.cls.set(CLS_NAMESPACE_ID, ctx.namespaceId);
       this.cls.set(CLS_SLUG, ctx.slug);
+      this.cls.set(CLS_DATABASE_LANE, 'background');
       return fn();
     });
   }
@@ -144,7 +148,7 @@ export class NamespaceWorkerManager
     // Keep this namespace's Prisma client resident while its workers run.
     try {
       this.cliRunner.activateForSchema(e.schemaName);
-      this.prismaManager.pin(e.schemaName);
+      this.prismaManager.pin(e.schemaName, 'background');
       await this.pgBoss.startForNamespace(e.schemaName, e.namespaceId);
 
       const ctx = this.store(e);
@@ -157,6 +161,7 @@ export class NamespaceWorkerManager
         await this.autopilot.registerForNamespace();
         await this.embedding.registerForNamespace();
         await this.dataTransfer.registerForNamespace();
+        await this.findingStats.registerForNamespace();
         this.dataTransfer.schedulePurge(e.schemaName);
         await this.mcpClient
           .refresh()

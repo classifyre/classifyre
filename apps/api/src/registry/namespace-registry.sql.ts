@@ -44,6 +44,20 @@ ALTER TABLE public.namespaces
 -- Legacy text thumbnail column (pre-blob); dropped so the model stays clean.
 ALTER TABLE public.namespaces
   DROP COLUMN IF EXISTS thumbnail;
+-- When the workspace was soft-deleted, which starts the retention clock before
+-- its schema is dropped for good. Separate from updated_at because that moves
+-- for any edit; this must only ever mean "deleted at".
+ALTER TABLE public.namespaces
+  ADD COLUMN IF NOT EXISTS deleted_at timestamptz;
+-- Backfill rows soft-deleted before this column existed. remove() has always
+-- stamped updated_at at the moment of deletion, so for a row already marked
+-- deleted that value *is* the deletion time — the honest backfill, not now(),
+-- which would silently restart the clock for workspaces deleted months ago.
+UPDATE public.namespaces
+  SET deleted_at = updated_at
+  WHERE status = 'deleted' AND deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS namespaces_status_deleted_at_idx
+  ON public.namespaces (status, deleted_at);
 `;
 
 /** libpq `options` value that pins a connection's search_path to `public`. */

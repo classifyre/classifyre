@@ -49,6 +49,7 @@ import { ChatGatewayService } from './chat-gateway/chat-gateway.service';
 import { ChatHarnessToolset } from './chat-gateway/chat-harness.toolset';
 import { ChatSessionService } from './chat-gateway/chat-session.service';
 import { EmbeddingModule } from './embedding/embedding.module';
+import { FindingStatsModule } from './stats/finding-stats.module';
 import { GlossaryController } from './glossary/glossary.controller';
 import { GlossaryService } from './glossary/glossary.service';
 import { CaseLeadsController } from './controllers/case-leads.controller';
@@ -103,6 +104,7 @@ import {
     ExportModule,
     DataTransferModule,
     EmbeddingModule,
+    FindingStatsModule,
   ],
   controllers: [
     HealthController,

@@ -142,8 +142,10 @@ docs/FindingsChartsTimelineBucketDto.md
 docs/FindingsChartsTopAssetDto.md
 docs/FindingsChartsTotalsDto.md
 docs/FindingsDiscoveryActivityDto.md
+docs/FindingsDiscoveryRefreshResponseDto.md
 docs/FindingsDiscoveryResponseDto.md
 docs/FindingsDiscoverySeverityBreakdownDto.md
+docs/FindingsDiscoveryStatsDto.md
 docs/FindingsDiscoveryStatusBreakdownDto.md
 docs/FindingsDiscoveryTopAssetDto.md
 docs/FindingsDiscoveryTotalsDto.md
@@ -487,8 +489,10 @@ src/models/FindingsChartsTimelineBucketDto.ts
 src/models/FindingsChartsTopAssetDto.ts
 src/models/FindingsChartsTotalsDto.ts
 src/models/FindingsDiscoveryActivityDto.ts
+src/models/FindingsDiscoveryRefreshResponseDto.ts
 src/models/FindingsDiscoveryResponseDto.ts
 src/models/FindingsDiscoverySeverityBreakdownDto.ts
+src/models/FindingsDiscoveryStatsDto.ts
 src/models/FindingsDiscoveryStatusBreakdownDto.ts
 src/models/FindingsDiscoveryTopAssetDto.ts
 src/models/FindingsDiscoveryTotalsDto.ts
