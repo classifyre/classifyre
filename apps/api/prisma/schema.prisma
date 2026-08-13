@@ -2169,3 +2169,43 @@ model FindingStatsState {
 
   @@map("finding_stats_state")
 }
+
+/// {@link FindingStatDaily} keyed on `first_detected_at` instead of
+/// `detected_at`.
+///
+/// The two dates answer different questions and the dashboard asks both: the
+/// overview reports findings by when they were last seen, while the charts plot
+/// when each finding first appeared. `detected_at` also *moves* — a re-scan
+/// stamps it with the new run's time — whereas `first_detected_at` is fixed at
+/// creation, so a timeline built on it does not rewrite its own history every
+/// time a corpus is rescanned.
+///
+/// Rows whose `first_detected_at` is NULL are omitted, matching the live query
+/// this replaces.
+model FindingStatFirstDaily {
+  day          DateTime      @db.Date
+  severity     Severity
+  status       FindingStatus
+  detectorType DetectorType  @map("detector_type")
+  sourceId     String        @map("source_id")
+  count        Int
+
+  @@id([day, severity, status, detectorType, sourceId])
+  @@index([day])
+  @@map("finding_stats_first_daily")
+}
+
+/// Per-asset counts keyed on `first_detected_at`, for the charts' top-assets
+/// panel. Carries no `lastDetectedAt`: that panel ranks by volume and severity
+/// only, so storing a timestamp nothing reads would be dead weight.
+model FindingStatFirstAssetDaily {
+  day      DateTime      @db.Date
+  assetId  String        @map("asset_id")
+  severity Severity
+  status   FindingStatus
+  count    Int
+
+  @@id([day, assetId, severity, status])
+  @@index([day])
+  @@map("finding_stats_first_asset_daily")
+}

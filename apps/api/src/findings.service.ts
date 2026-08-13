@@ -1787,6 +1787,162 @@ export class FindingsService {
     };
   }
 
+  /**
+   * Serve the findings charts from the first-detected rollup.
+   *
+   * Returns null — and the caller falls back to the live aggregate — when the
+   * rollup has not been built yet, or when the request filters on something the
+   * rollup grain does not carry (free text, a specific asset, a custom detector
+   * key). Those filters are usually selective, so the live path is fast for
+   * exactly the cases that land on it; the slow case is the unfiltered default
+   * the page opens with, and that is the one served here.
+   */
+  private async searchFindingsChartsFromRollup(
+    request: SearchFindingsChartsRequestDto,
+    windowStart: Date,
+    windowDays: number,
+    topAssetsLimit: number,
+  ): Promise<SearchFindingsChartsResponseDto | null> {
+    const filters = request.filters as Record<string, unknown> | undefined;
+    if (!this.stats?.canServe(filters)) return null;
+    if (!(await this.stats.isUsable())) return null;
+
+    const statuses = this.normalizeFilterValues(filters?.status).map((value) =>
+      value.toUpperCase(),
+    );
+    const rollupFilter: RollupFilter = {
+      sourceId: this.normalizeFilterValues(filters?.sourceId),
+      detectorType: this.normalizeFilterValues(filters?.detectorType).map(
+        (value) => value.toUpperCase(),
+      ),
+      severity: this.normalizeFilterValues(filters?.severity).map((value) =>
+        value.toUpperCase(),
+      ),
+      status: statuses,
+      excludeStatuses:
+        statuses.length === 0 && !filters?.includeResolved
+          ? [FindingStatus.RESOLVED]
+          : [],
+    };
+
+    const [points, topAssetRows] = await Promise.all([
+      this.stats.firstDetectedTimeline(windowStart, rollupFilter),
+      this.stats.firstDetectedTopAssets(
+        windowStart,
+        topAssetsLimit,
+        rollupFilter,
+      ),
+    ]);
+
+    const totals = {
+      total: 0,
+      critical: 0,
+      high: 0,
+      medium: 0,
+      low: 0,
+      info: 0,
+      open: 0,
+      resolved: 0,
+    };
+    const severityKey: Record<string, keyof typeof totals> = {
+      CRITICAL: 'critical',
+      HIGH: 'high',
+      MEDIUM: 'medium',
+      LOW: 'low',
+    };
+
+    // Pre-fill every day in the window so the chart has no gaps.
+    const dayMap = new Map<
+      string,
+      {
+        total: number;
+        critical: number;
+        high: number;
+        medium: number;
+        low: number;
+        info: number;
+      }
+    >();
+    for (let i = 0; i < windowDays; i++) {
+      const day = new Date(windowStart);
+      day.setDate(day.getDate() + i);
+      dayMap.set(this.formatDateKey(day), {
+        total: 0,
+        critical: 0,
+        high: 0,
+        medium: 0,
+        low: 0,
+        info: 0,
+      });
+    }
+
+    for (const point of points) {
+      const key = severityKey[point.severity] ?? 'info';
+      totals.total += point.count;
+      totals[key] += point.count;
+      if (point.status === 'OPEN') totals.open += point.count;
+      else if (point.status === FindingStatus.RESOLVED) {
+        totals.resolved += point.count;
+      }
+
+      // `day` is a DATE, so it arrives at UTC midnight; formatDateKey works off
+      // local components, which would shift it a day west of UTC.
+      const bucket = dayMap.get(this.formatDateKey(this.dateOnly(point.day)));
+      if (bucket) {
+        bucket.total += point.count;
+        bucket[key] += point.count;
+      }
+    }
+
+    const timeline = [...dayMap.entries()].map(([date, bucket]) => ({
+      date,
+      ...bucket,
+    }));
+
+    const severityOrder = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'INFO'];
+    const assets = topAssetRows.length
+      ? await this.prisma.asset.findMany({
+          where: { id: { in: topAssetRows.map((row) => row.assetId) } },
+          select: {
+            id: true,
+            name: true,
+            externalUrl: true,
+            source: { select: { id: true, name: true } },
+          },
+        })
+      : [];
+    const assetMap = new Map(assets.map((asset) => [asset.id, asset]));
+
+    return {
+      totals,
+      timeline,
+      topAssets: topAssetRows.map((row) => {
+        const asset = assetMap.get(row.assetId);
+        return {
+          assetId: row.assetId,
+          assetName: asset?.name ?? asset?.externalUrl ?? 'Unknown',
+          sourceId: asset?.source?.id ?? '',
+          sourceName: asset?.source?.name ?? null,
+          totalFindings: row.totalFindings,
+          highestSeverity:
+            severityOrder.find(
+              (severity) => (row.severityCounts[severity] ?? 0) > 0,
+            ) ?? 'INFO',
+        };
+      }),
+    };
+  }
+
+  /** Reinterpret a DATE (UTC midnight) as the same calendar day locally. */
+  private dateOnly(day: Date): Date {
+    return new Date(
+      day.getUTCFullYear(),
+      day.getUTCMonth(),
+      day.getUTCDate(),
+      12,
+    );
+  }
+
   async searchFindingsCharts(
     request: SearchFindingsChartsRequestDto,
   ): Promise<SearchFindingsChartsResponseDto> {
@@ -1800,6 +1956,14 @@ export class FindingsService {
     const windowStart = new Date(now);
     windowStart.setDate(windowStart.getDate() - (windowDays - 1));
     windowStart.setHours(0, 0, 0, 0);
+
+    const fromRollup = await this.searchFindingsChartsFromRollup(
+      request,
+      windowStart,
+      windowDays,
+      topAssetsLimit,
+    );
+    if (fromRollup) return fromRollup;
 
     // Build where clause from filters, then apply window on top
     const baseWhere = await this.buildSearchFindingsWhere(request.filters);

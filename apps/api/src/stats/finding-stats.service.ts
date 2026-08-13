@@ -84,6 +84,8 @@ export class FindingStatsService {
 
     await this.prisma.$executeRaw`DELETE FROM finding_stats_daily`;
     await this.prisma.$executeRaw`DELETE FROM finding_stats_asset_daily`;
+    await this.prisma.$executeRaw`DELETE FROM finding_stats_first_daily`;
+    await this.prisma.$executeRaw`DELETE FROM finding_stats_first_asset_daily`;
     await this.prisma.$executeRaw`
       INSERT INTO finding_stats_daily (day, severity, status, detector_type, source_id, count)
       SELECT detected_at::date, severity, status, detector_type, source_id, COUNT(*)::int
@@ -93,6 +95,20 @@ export class FindingStatsService {
       INSERT INTO finding_stats_asset_daily (day, asset_id, severity, status, count, last_detected_at)
       SELECT detected_at::date, asset_id, severity, status, COUNT(*)::int, MAX(detected_at)
       FROM findings
+      GROUP BY 1, 2, 3, 4`;
+    // first_detected_at is nullable and the live charts query skips those rows,
+    // so the rollup must too or the timeline would gain findings it never had.
+    await this.prisma.$executeRaw`
+      INSERT INTO finding_stats_first_daily (day, severity, status, detector_type, source_id, count)
+      SELECT first_detected_at::date, severity, status, detector_type, source_id, COUNT(*)::int
+      FROM findings
+      WHERE first_detected_at IS NOT NULL
+      GROUP BY 1, 2, 3, 4, 5`;
+    await this.prisma.$executeRaw`
+      INSERT INTO finding_stats_first_asset_daily (day, asset_id, severity, status, count)
+      SELECT first_detected_at::date, asset_id, severity, status, COUNT(*)::int
+      FROM findings
+      WHERE first_detected_at IS NOT NULL
       GROUP BY 1, 2, 3, 4`;
     await this.prisma.$executeRaw`DELETE FROM finding_stats_dirty_days`;
 
@@ -129,6 +145,10 @@ export class FindingStatsService {
       DELETE FROM finding_stats_daily WHERE day = ANY(${days}::date[])`;
     await this.prisma.$executeRaw`
       DELETE FROM finding_stats_asset_daily WHERE day = ANY(${days}::date[])`;
+    await this.prisma.$executeRaw`
+      DELETE FROM finding_stats_first_daily WHERE day = ANY(${days}::date[])`;
+    await this.prisma.$executeRaw`
+      DELETE FROM finding_stats_first_asset_daily WHERE day = ANY(${days}::date[])`;
 
     // One half-open range per day, never an expression over the column.
     //
@@ -156,6 +176,18 @@ export class FindingStatsService {
         SELECT detected_at::date, asset_id, severity, status, COUNT(*)::int, MAX(detected_at)
         FROM findings
         WHERE detected_at >= ${start} AND detected_at < ${end}
+        GROUP BY 1, 2, 3, 4`;
+      await this.prisma.$executeRaw`
+        INSERT INTO finding_stats_first_daily (day, severity, status, detector_type, source_id, count)
+        SELECT first_detected_at::date, severity, status, detector_type, source_id, COUNT(*)::int
+        FROM findings
+        WHERE first_detected_at >= ${start} AND first_detected_at < ${end}
+        GROUP BY 1, 2, 3, 4, 5`;
+      await this.prisma.$executeRaw`
+        INSERT INTO finding_stats_first_asset_daily (day, asset_id, severity, status, count)
+        SELECT first_detected_at::date, asset_id, severity, status, COUNT(*)::int
+        FROM findings
+        WHERE first_detected_at >= ${start} AND first_detected_at < ${end}
         GROUP BY 1, 2, 3, 4`;
     }
 
@@ -385,6 +417,82 @@ export class FindingStatsService {
       status: row.status,
       count: Number(row.count),
     }));
+  }
+
+  /**
+   * Daily counts keyed on first detection, for the charts timeline.
+   *
+   * Returns one row per (day, severity, status) actually present; the caller
+   * pre-fills the empty days so the chart has no gaps.
+   */
+  async firstDetectedTimeline(
+    since: Date,
+    filters?: RollupFilter,
+  ): Promise<RollupTimelinePoint[]> {
+    const rows = await this.prisma.$queryRaw<
+      Array<{ day: Date; severity: string; status: string; count: bigint }>
+    >(Prisma.sql`
+      SELECT day, severity::text AS severity, status::text AS status, SUM(count)::bigint AS count
+      FROM finding_stats_first_daily
+      ${this.whereFrom(filters, since)}
+      GROUP BY 1, 2, 3
+      ORDER BY 1`);
+    return rows.map((row) => ({
+      day: row.day,
+      severity: row.severity,
+      status: row.status,
+      count: Number(row.count),
+    }));
+  }
+
+  /** Top assets by first-detected volume, with their severity mix. */
+  async firstDetectedTopAssets(
+    since: Date,
+    limit: number,
+    filters?: RollupFilter,
+  ): Promise<Array<Omit<RollupTopAsset, 'lastDetectedAt'>>> {
+    // Filter once into a CTE and use it for both the ranking and the severity
+    // breakdown. Repeating the predicate in a self-join is how the two halves
+    // drift apart: the top-N would be chosen under one filter and described
+    // under another.
+    const rows = await this.prisma.$queryRaw<
+      Array<{
+        asset_id: string;
+        total: bigint;
+        severity: string;
+        sev_count: bigint;
+      }>
+    >(Prisma.sql`
+      WITH filtered AS (
+        SELECT asset_id, severity::text AS severity, count
+        FROM finding_stats_first_asset_daily
+        ${this.whereFrom(filters, since)}
+      ),
+      ranked AS (
+        SELECT asset_id, SUM(count)::bigint AS total
+        FROM filtered
+        GROUP BY asset_id
+        ORDER BY total DESC
+        LIMIT ${limit}
+      )
+      SELECT r.asset_id, r.total, f.severity, SUM(f.count)::bigint AS sev_count
+      FROM ranked r
+      JOIN filtered f ON f.asset_id = r.asset_id
+      GROUP BY r.asset_id, r.total, f.severity`);
+
+    const byAsset = new Map<string, Omit<RollupTopAsset, 'lastDetectedAt'>>();
+    for (const row of rows) {
+      const entry = byAsset.get(row.asset_id) ?? {
+        assetId: row.asset_id,
+        totalFindings: Number(row.total),
+        severityCounts: {},
+      };
+      entry.severityCounts[row.severity] = Number(row.sev_count);
+      byAsset.set(row.asset_id, entry);
+    }
+    return [...byAsset.values()].sort(
+      (a, b) => b.totalFindings - a.totalFindings,
+    );
   }
 
   /** Exact total for a rollup-servable filter, or null when it cannot serve. */
