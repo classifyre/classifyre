@@ -9,7 +9,9 @@ import {
   Post,
   Put,
   Query,
+  Res,
 } from '@nestjs/common';
+import type { FastifyReply } from 'fastify';
 import { ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { CorrelationService } from './correlation.service';
 import { DuplicatesFinderAgentService } from './duplicates-finder-agent.service';
@@ -49,12 +51,33 @@ export class CorrelationController {
   })
   @ApiResponse({ status: 200, type: CorrelationGraphResponseDto })
   async graph(
+    @Res() reply: FastifyReply,
     @Query('assetId') assetId?: string,
     @Query('sourceId') sourceId?: string,
-  ): Promise<CorrelationGraphResponseDto> {
-    if (assetId) return this.correlation.buildGraph({ assetId });
-    if (sourceId) return this.correlation.buildGraph({ sourceId });
-    return this.correlation.buildGraph();
+  ): Promise<void> {
+    if (assetId) {
+      await reply.send(await this.correlation.buildGraph({ assetId }));
+      return;
+    }
+    if (sourceId) {
+      await reply.send(await this.correlation.buildGraph({ sourceId }));
+      return;
+    }
+
+    // The unscoped graph is the large one and is served straight from the
+    // cached snapshot, so forward the stored JSON as-is rather than parsing it
+    // into objects only to serialize the same bytes back. Fastify writes a
+    // string payload verbatim once the content type says JSON, so this is one
+    // copy of the graph instead of three — see
+    // CorrelationGraphCacheService.readPayloadJson.
+    const cached = await this.correlation.getGraphSnapshotJson();
+    if (cached) {
+      await reply.type('application/json').send(cached);
+      return;
+    }
+
+    // No snapshot published yet: build one (and cache it) the normal way.
+    await reply.send(await this.correlation.buildGraph());
   }
 
   @Get('correlation/links-graph')

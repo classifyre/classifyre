@@ -20,6 +20,46 @@ export class CorrelationGraphCacheService {
     private readonly jobs: CorrelationJobScheduler,
   ) {}
 
+  /**
+   * The cached graph as raw JSON text, for handlers that only forward it.
+   *
+   * `getOrBuild` costs three full copies of the graph: Prisma parses the JSONB
+   * column into a JS object tree, and the framework serializes that tree back
+   * into a response body — with the driver's own text in between. On a real
+   * corpus (58k nodes / 252k edges) the 25 MB stored payload expands to a
+   * ~233 MB JSON string, and all three copies are live at once; that peak is
+   * what exhausts the desktop API's heap, and it grows with every scan.
+   *
+   * Reading `payload::text` and writing it straight to the response leaves one
+   * copy. It is still O(graph) — bounding that needs a scoped or paginated
+   * graph, not a cheaper read — but it removes the multiplier.
+   *
+   * @returns the payload, or null when no snapshot has been published yet (the
+   * caller should then fall back to {@link getOrBuild}, which builds one).
+   */
+  async readPayloadJson(): Promise<string | null> {
+    const rows = await this.prisma.$queryRaw<
+      Array<{
+        payload: string | null;
+        built_version: bigint;
+        requested_version: bigint;
+      }>
+    >(Prisma.sql`
+      SELECT payload::text AS payload, built_version, requested_version
+      FROM correlation_graph_snapshot
+      WHERE id = ${SNAPSHOT_ID}
+    `);
+
+    const row = rows[0];
+    if (!row?.payload) return null;
+    // Same staleness contract as getOrBuild: serve the last-good snapshot now,
+    // schedule the rebuild behind it.
+    if (row.built_version < row.requested_version) {
+      void this.jobs.scheduleGraphRefresh('stale graph read');
+    }
+    return row.payload;
+  }
+
   async getOrBuild(builder: GraphBuilder): Promise<CorrelationGraphResult> {
     const snapshot = await this.prisma.correlationGraphSnapshot.findUnique({
       where: { id: SNAPSHOT_ID },

@@ -418,8 +418,19 @@ app.on('ready', async () => {
   const menuDeps = {
     namespaceStore,
     updateChecker,
+    settingsManager,
     showHome,
     openNamespace,
+    // A new heap ceiling is only read when the API process is spawned, so the
+    // menu offers an immediate restart rather than silently deferring to the
+    // next launch.
+    restartApi: () =>
+      processManager.restartApiNow(
+        SHARED_API_ID,
+        Number(new URL(sharedApiBaseUrl).port),
+        pg.getConnectionString(),
+      ),
+    refreshMenu: () => rebuildMenu(),
   };
   const rebuildMenu = () => buildApplicationMenu(menuDeps);
   rebuildMenu();
