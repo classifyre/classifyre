@@ -69,6 +69,10 @@ import {
 } from '../dto/search-runners-assets-request.dto';
 import { SearchRunnersAssetsResponseDto } from '../dto/search-runners-assets-response.dto';
 import { PayloadCursorEntryDto, ScanCacheEntryDto } from './dto';
+import {
+  BoundedOutput,
+  type BoundedOutputOptions,
+} from '../utils/bounded-output';
 
 /** Narrow a JSONB column to a plain object, or null when it is anything else. */
 function asJsonRecord(value: unknown): Record<string, unknown> | null {
@@ -1284,6 +1288,9 @@ export class CliRunnerService {
         (chunk) => void this.appendLog(runnerId, chunk, 'stderr'),
         (chunk) => void this.appendLog(runnerId, chunk, 'stdout'),
         runnerId,
+        // A scan streams everything to the run log; all this needs to keep is
+        // enough of the end to explain a non-zero exit.
+        { mode: 'tail' },
       );
 
       if (await this.shouldSkipRunnerFinalTransition(runnerId, exitCode)) {
@@ -1644,6 +1651,12 @@ export class CliRunnerService {
             this.logger.log(`[CLI test] ${trimmed}`);
           }
         },
+        undefined,
+        undefined,
+        // A connection test prints its JSON result early and exits, so this one
+        // does need the front of the stream — bounded so that a source which
+        // streams instead of answering cannot fill the heap.
+        { mode: 'head', maxBytes: 4 * 1024 * 1024, maxLines: 20_000 },
       );
 
       if (stderr?.trim()) {
@@ -1751,11 +1764,22 @@ export class CliRunnerService {
     return payload;
   }
 
+  /**
+   * Runs a CLI command, streaming its output to the callbacks and retaining a
+   * bounded excerpt of it.
+   *
+   * The retained excerpt used to be the entire stream. A scan run writes a line
+   * per asset and per finding, so on a large corpus that was tens of MB of
+   * strings held for hours, duplicating what RunnerLogStorageService had
+   * already written to disk, to serve a failure path that only ever quotes the
+   * end of it. `capture` picks which end each caller keeps; both are O(cap).
+   */
   private executeCli(
     command: string,
     onStderr: (chunk: string) => void,
     onStdout?: (chunk: string) => void,
     runnerId?: string,
+    capture: BoundedOutputOptions = {},
   ): Promise<{ stdout: string; stderr: string; exitCode: number }> {
     return new Promise((resolve, reject) => {
       const namespacedDbUrl = this.namespacedDatabaseUrl();
@@ -1769,12 +1793,12 @@ export class CliRunnerService {
         },
       });
 
-      let stdout = '';
-      let stderr = '';
+      const stdout = new BoundedOutput(capture);
+      const stderr = new BoundedOutput(capture);
 
       child.stdout.on('data', (data) => {
         const chunk = data.toString();
-        stdout += chunk;
+        stdout.append(chunk);
         onStdout?.(chunk);
 
         // Log to API console for monitoring (not to database)
@@ -1789,7 +1813,7 @@ export class CliRunnerService {
       // stderr contains CLI logs; persist all lines for runner log pagination.
       child.stderr.on('data', (data) => {
         const chunk = data.toString();
-        stderr += chunk;
+        stderr.append(chunk);
 
         // Log all stderr to API console for monitoring
         this.logger.log(`[CLI] ${chunk.trim()}`);
@@ -1801,7 +1825,15 @@ export class CliRunnerService {
         if (runnerId) {
           this.runningProcessesByRunnerId.delete(runnerId);
         }
-        resolve({ stdout, stderr, exitCode: code || 0 });
+        // A CLI that dies mid-line still has its last (unterminated) line in
+        // the carry-over buffer, and that line is often the error itself.
+        stdout.finish();
+        stderr.finish();
+        resolve({
+          stdout: stdout.toString(),
+          stderr: stderr.toString(),
+          exitCode: code || 0,
+        });
       });
 
       child.on('error', (error) => {

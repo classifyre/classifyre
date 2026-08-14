@@ -47,7 +47,7 @@ All data is stored under the Electron `userData` directory (or `CLASSIFYRE_DATA_
 
 - `pgdata/` — PostgreSQL data directory
 - `postgres-credentials.bin` — OS-protected embedded-database credential journal
-- `settings.json` — app-wide settings (preferred database port)
+- `settings.json` — app-wide settings (preferred database port, background mode, notifications, API memory limit)
 - `python-runtime/` — relocated Python venv (only when the install dir is read-only)
 
 Namespace definitions and settings are stored in the embedded database's
@@ -223,6 +223,16 @@ The app checks GitHub Releases on launch and every 6 hours. Available updates ar
 - **Windows/Linux**: the matching zip/deb/rpm is downloaded to `~/Downloads` with progress; the badge then reveals the archive (zip) or opens the system package installer (deb/rpm).
 
 The same actions are available from the tray menu and "Check for Updates…" in the application menu.
+
+## API memory limit
+
+The API runs as a child process with an explicit V8 heap ceiling, sized
+automatically by `computeApiHeapMb` and overridable from **Settings ▸ API
+Memory Limit** (persisted as `memoryLimitMb`). Raising it is rarely the fix for
+a heap crash and is often the cause of one — see
+[`docs/development/desktop-memory.md`](../../docs/development/desktop-memory.md)
+for how the ceiling is chosen, which log line tells you a larger heap would
+actually help, and what sheds load before the process dies.
 
 ## Background mode & tray
 

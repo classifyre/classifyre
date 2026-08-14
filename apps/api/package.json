@@ -1,6 +1,6 @@
 {
   "name": "@classifyre/api",
-  "version": "0.4.113",
+  "version": "0.4.114",
   "description": "",
   "author": "",
   "private": true,
@@ -24,7 +24,8 @@
     "prisma:deploy": "bunx prisma migrate deploy",
     "prisma:studio": "bunx prisma studio",
     "openapi:generate": "bun run scripts/generate-openapi-spec.ts",
-    "test:i18n": "jest src/i18n/i18n-keys.spec.ts --no-coverage"
+    "test:i18n": "jest src/i18n/i18n-keys.spec.ts --no-coverage",
+    "test:soak": "node --max-old-space-size=128 --expose-gc -r ts-node/register/transpile-only src/utils/memory-soak.spec.ts"
   },
   "dependencies": {
     "@ai-sdk/openai-compatible": "^3.0.11",

@@ -4,6 +4,7 @@ import path from 'path';
 import { getLogFilePath } from './logger.js';
 import type { ApiNamespace, NamespaceStore } from './namespace-store.js';
 import type { UpdateChecker } from './update-checker.js';
+import type { SettingsManager } from './settings-manager.js';
 
 // The packaged GUI has no attached terminal, so the tee'd log file in userData
 // (see logger.ts) is the only window into what the app, API, and Postgres did.
@@ -51,11 +52,75 @@ const logsSubmenu: MenuItemConstructorOptions[] = [
   },
 ];
 
+/**
+ * Selectable values for the API's V8 heap ceiling, in MB.
+ *
+ * 0 means "automatic" (see computeApiHeapMb), which is the right answer for
+ * almost every install — a bigger heap makes V8 collect *less* often, so
+ * raising this is not a general performance knob and usually makes memory
+ * behaviour worse. It exists for the one case where the automatic value is
+ * genuinely too small: a workspace whose correlation graph is large enough
+ * that a single read does not fit, which fails as "Ineffective mark-compacts
+ * near heap limit" in the log. Values above 4 GB are not offered because
+ * Electron will not grant them (see ELECTRON_MAX_OLD_SPACE_MB).
+ */
+export const MEMORY_LIMIT_CHOICES: { label: string; value: number }[] = [
+  { label: 'Automatic (recommended)', value: 0 },
+  { label: '3 GB', value: 3072 },
+  { label: '4 GB (maximum)', value: 4096 },
+];
+
 export interface MenuDeps {
   namespaceStore: NamespaceStore;
   updateChecker: UpdateChecker;
+  settingsManager: SettingsManager;
   showHome: () => void;
   openNamespace: (namespace: ApiNamespace) => void;
+  /** Restarts the shared API so a new heap ceiling takes effect. */
+  restartApi: () => Promise<void>;
+  /** Re-renders the menu so the radio selection reflects the saved value. */
+  refreshMenu: () => void;
+}
+
+function memoryLimitSubmenu(deps: MenuDeps): MenuItemConstructorOptions[] {
+  const current = deps.settingsManager.get().memoryLimitMb;
+  return MEMORY_LIMIT_CHOICES.map(({ label, value }) => ({
+    label,
+    type: 'radio',
+    checked: current === value,
+    click: () => {
+      if (deps.settingsManager.get().memoryLimitMb === value) return;
+      deps.settingsManager.update({ memoryLimitMb: value });
+      deps.refreshMenu();
+      void promptRestart(deps);
+    },
+  }));
+}
+
+async function promptRestart(deps: MenuDeps): Promise<void> {
+  const { response } = await dialog.showMessageBox({
+    type: 'question',
+    title: 'Restart the Classifyre service?',
+    message: 'The memory limit applies when the Classifyre service restarts.',
+    detail:
+      'Restarting interrupts any scan that is running; it can be re-run ' +
+      'afterwards. Choosing Later applies the new limit the next time the ' +
+      'app starts.',
+    buttons: ['Restart Now', 'Later'],
+    defaultId: 1,
+    cancelId: 1,
+  });
+  if (response !== 0) return;
+  try {
+    await deps.restartApi();
+  } catch (error) {
+    await dialog.showMessageBox({
+      type: 'error',
+      title: 'Restart failed',
+      message: 'The Classifyre service could not be restarted.',
+      detail: error instanceof Error ? error.message : String(error),
+    });
+  }
 }
 
 function workspaceItems(deps: MenuDeps): MenuItemConstructorOptions[] {
@@ -88,6 +153,14 @@ export function buildApplicationMenu(deps: MenuDeps): void {
     ...workspaceItems(deps),
   ];
 
+  // Machine-level tuning, deliberately native rather than part of the in-app
+  // (web) settings: it configures the local API *process*, applies per
+  // installation rather than per workspace, and has to remain reachable when
+  // that process is unhealthy — which is exactly when someone needs it.
+  const settingsSubmenu: MenuItemConstructorOptions[] = [
+    { label: 'API Memory Limit', submenu: memoryLimitSubmenu(deps) },
+  ];
+
   const template: MenuItemConstructorOptions[] = [
     ...(isMac
       ? ([
@@ -96,6 +169,8 @@ export function buildApplicationMenu(deps: MenuDeps): void {
             submenu: [
               { role: 'about' },
               checkForUpdates,
+              { type: 'separator' },
+              { label: 'Settings', submenu: settingsSubmenu },
               { type: 'separator' },
               { role: 'services' },
               { type: 'separator' },
@@ -111,6 +186,11 @@ export function buildApplicationMenu(deps: MenuDeps): void {
     { role: 'fileMenu' },
     { role: 'editMenu' },
     { role: 'viewMenu' },
+    // Windows and Linux have no application menu to hang Settings off, so it
+    // becomes a top-level entry there.
+    ...(isMac
+      ? []
+      : ([{ label: 'Settings', submenu: settingsSubmenu }] as MenuItemConstructorOptions[])),
     { label: 'Workspaces', submenu: workspacesSubmenu },
     { role: 'windowMenu' },
     { label: 'Logs', submenu: logsSubmenu },

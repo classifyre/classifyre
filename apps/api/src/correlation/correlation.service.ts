@@ -1667,6 +1667,17 @@ export class CorrelationService {
     return this.buildGraphFromDatabase(opts);
   }
 
+  /**
+   * The unscoped graph as raw JSON text, or null when none is cached yet.
+   *
+   * Only for handlers that forward the body untouched — see
+   * CorrelationGraphCacheService.readPayloadJson for why that matters. Anything
+   * that inspects the graph should use {@link buildGraph}.
+   */
+  async getGraphSnapshotJson(): Promise<string | null> {
+    return this.graphCache.readPayloadJson();
+  }
+
   async refreshGraphSnapshot(): Promise<void> {
     await this.graphCache.refreshIfStale(() => this.buildGraphFromDatabase());
   }
