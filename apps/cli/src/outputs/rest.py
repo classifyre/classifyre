@@ -77,17 +77,32 @@ class _JitteredRetry(Retry):
 #   attempt 5 → ~16 s
 #   attempt 6 → ~32 s
 #   attempt 7 → ~60 s  (capped)
-#   attempt 8 → ~60 s  (capped)
-# Total extra wait: ~182 s (~3 min) — covers extended load spikes on a
-# single-node VPS before event-loop pressure drops.
+#   attempt 8+ → ~60 s (capped)
+#
+# Status retries are budgeted separately from — and much more generously than —
+# connect/read, because the two failures mean opposite things. A connect/read
+# failure is a broken request that will not fix itself by waiting much longer.
+# A 503 is the API *deliberately* shedding an idempotent batch it wants us to
+# send again (see AssetService.bulkIngest and CliBackpressureGuard); giving up
+# on it discards ingested work, which is the one outcome backpressure exists to
+# avoid. At 60 s per attempt past the ramp, _STATUS_RETRIES ≈ 30 minutes of
+# patience: the CLI stalls under sustained pressure but the data still lands.
+# Retry-After is honoured when the server sends it (urllib3 default), so the
+# API can shorten or lengthen this on its own.
+#
+# total=None so the status budget is not silently capped by a smaller overall
+# count — with total set, whichever limit is lowest wins.
 #
 # POST and PATCH are explicitly allowed: without this urllib3 only retries
 # idempotent methods (GET/HEAD) by default.
+_STATUS_RETRIES = 32
+
 _RETRY_POLICY = _JitteredRetry(
-    total=8,
+    total=None,
     connect=8,
     read=8,
-    status=8,
+    status=_STATUS_RETRIES,
+    other=8,
     backoff_factor=2,
     backoff_max=60,
     status_forcelist={408, 429, 502, 503, 504},

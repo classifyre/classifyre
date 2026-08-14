@@ -11,8 +11,15 @@ export interface AppSettings {
   desktopNotifications: boolean;
   /**
    * Override for the API process's V8 old-space cap, in MB. 0 (the default)
-   * means 'size it from installed RAM' — see computeApiHeapMb. Raise this only
-   * when scans of a very large corpus still hit heap-OOM crashes.
+   * means 'size it automatically' — see computeApiHeapMb, and note that the
+   * automatic value deliberately does not scale up with installed RAM.
+   *
+   * Raising this is rarely the answer to a heap-OOM crash and is often the
+   * cause of one: a larger cap lets V8 defer collection, so garbage piles up
+   * and the OS swaps it, and the failure arrives as an allocation that cannot
+   * be satisfied. Raise it only when a scan needs a genuinely larger *live*
+   * set — and values above ~4 GB are clamped, because Electron will not grant
+   * them under ELECTRON_RUN_AS_NODE.
    */
   memoryLimitMb: number;
 }
