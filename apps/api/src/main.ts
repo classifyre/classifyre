@@ -34,6 +34,7 @@ import { PrismaClientManager } from './prisma/prisma-client-manager';
 import { InternalApiKeyService } from './internal-api-key.service';
 import compress from '@fastify/compress';
 import { constants as zlibConstants } from 'node:zlib';
+import { resolveHeapGuard } from './utils/heap-guard';
 
 // No API-side ceiling on request bodies. The CLI posts whole assets in a single
 // bulk request and a single asset (large parquet/archive payloads, extracted
@@ -117,9 +118,10 @@ async function bootstrap() {
   // UNDER_PRESSURE_MAX_EVENT_LOOP_DELAY  (default: 1000 ms)
   //   Primary signal: event loop blocked above this threshold means Node is
   //   CPU-starved and genuinely cannot schedule new work.
-  // UNDER_PRESSURE_MAX_HEAP_USED_BYTES   (default: 768 MB)
-  //   Only fires near OOM — set well above steady-state (~250 MB for
-  //   NestJS+Prisma). Override lower only after measuring your actual heap.
+  // UNDER_PRESSURE_MAX_HEAP_USED_BYTES   (default: 80% of the real V8 ceiling)
+  //   Derived from v8.getHeapStatistics() rather than from whatever heap size
+  //   the launcher requested — see utils/heap-guard.ts. An override at or above
+  //   the ceiling is clamped, because such a value can never fire.
   // UNDER_PRESSURE_MAX_RSS_BYTES         (default: 1 GB)
   //   Total process memory guard. Override lower only after measuring RSS.
   // Register under-pressure for metrics sampling and the /api/health/pressure
@@ -127,16 +129,33 @@ async function bootstrap() {
   // so that normal UI/API traffic is never blocked. CliBackpressureGuard reads
   // fastify.isUnderPressure() and applies the 503 selectively on the 6 CLI
   // ingestion endpoints only.
+  const heapGuard = resolveHeapGuard();
+  const asMb = (bytes: number) => Math.round(bytes / 1024 / 1024);
+  // Logged at every boot: the requested-versus-enforced heap gap is invisible
+  // otherwise, and it is what let the desktop app run for months with a guard
+  // that could not fire.
+  logger.log(
+    `Heap guard: shedding CLI ingestion above ${asMb(
+      heapGuard.thresholdBytes,
+    )} MB of a ${asMb(heapGuard.limitBytes)} MB V8 ceiling (${heapGuard.source})`,
+  );
+  if (heapGuard.source === 'env-clamped') {
+    logger.warn(
+      `UNDER_PRESSURE_MAX_HEAP_USED_BYTES (${asMb(
+        Number.parseInt(process.env.UNDER_PRESSURE_MAX_HEAP_USED_BYTES!, 10),
+      )} MB) is at or above the ${asMb(
+        heapGuard.limitBytes,
+      )} MB ceiling V8 actually enforces and could never fire — using ${asMb(
+        heapGuard.thresholdBytes,
+      )} MB instead.`,
+    );
+  }
   await app.register(underPressure, {
     maxEventLoopDelay: parseInt(
       process.env.UNDER_PRESSURE_MAX_EVENT_LOOP_DELAY ?? '1000',
       10,
     ),
-    maxHeapUsedBytes: parseInt(
-      process.env.UNDER_PRESSURE_MAX_HEAP_USED_BYTES ??
-        String(768 * 1024 * 1024),
-      10,
-    ),
+    maxHeapUsedBytes: heapGuard.thresholdBytes,
     maxRssBytes: parseInt(
       process.env.UNDER_PRESSURE_MAX_RSS_BYTES ?? String(1024 * 1024 * 1024),
       10,

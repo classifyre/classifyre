@@ -213,35 +213,62 @@ function resourceDefaultEnv(): Record<string, string> {
 }
 
 /**
+ * Hard ceiling Electron enforces on `--max-old-space-size` under
+ * ELECTRON_RUN_AS_NODE. Requests above this are silently clamped: asking for
+ * 6144 or 12288 both yield a real `heap_size_limit` of ~4192 MB. Never return
+ * a value the runtime cannot grant — the gap is invisible at runtime and
+ * anything derived from the request (notably the shed threshold) is then wrong.
+ */
+export const ELECTRON_MAX_OLD_SPACE_MB = 4096;
+
+/**
  * Sizes the API's V8 old-space cap for this machine.
  *
- * The previous formula was `clamp(1024, RAM * 0.25, 2048)`, which meant every
- * machine with 8 GB or more got exactly 2 GB — the `* 0.25` term was dead above
- * 8 GB. That ceiling is what a finding-dense scan hit on a 34 GB laptop,
- * crashing the API with "Ineffective mark-compacts near heap limit".
+ * Counter-intuitively, bigger is worse here. V8 sizes its collection schedule
+ * against the ceiling it is given, so a large cap means garbage accumulates
+ * near that cap before a major GC runs. Measured on a 34 GB laptop mid-scan:
+ * `old_space` parked at ~3.1 GB while a forced full GC dropped the heap to
+ * 174 MB — over 90% of it was collectable. Those cold garbage pages are not
+ * free: `rss` was 414 MB against a 3237 MB heap because macOS had compressed
+ * and swapped the rest out, and an allocation eventually failed under that
+ * pressure and aborted the process with SIGABRT.
  *
- * Budget from what else has to fit rather than from a flat fraction: the
- * renderer and Electron main, embedded Postgres, and one resident Python
- * detector worker per pool slot (spaCy + torch are ~1 GB apiece). Whatever is
- * left goes to the API, floored so small machines still boot and capped so a
- * runaway allocation is still bounded rather than swapping the host to death.
+ * So the cap is a GC-frequency dial, not a workload budget. The live set of a
+ * normal scan is a few hundred MB, and the default below buys headroom over
+ * that and nothing more. The Helm chart runs each pod at 1536 MB in
+ * production; desktop gets more because one process is both roles
+ * (SERVICE_ROLE defaults to `all`, so the HTTP API and every pg-boss worker
+ * share this heap) — but nothing near what the machine could afford, because
+ * affording it is what caused the crash.
  *
- * Note this reserves nothing: V8 grows the heap lazily, so a higher ceiling
- * costs no memory until it is actually used.
+ * A very large workspace can still exceed this: reading a correlation graph
+ * snapshot expands a 25 MB JSONB payload (58k nodes / 252k edges on a real
+ * corpus) into a ~233 MB JSON string plus its parsed object tree, and that is
+ * genuinely live for the duration of the request. Rather than paying for that
+ * worst case on every install, the ceiling is raisable per machine from the
+ * Settings ▸ API Memory Limit menu (persisted as `memoryLimitMb`), which is
+ * what `overrideMb` carries here.
  */
+export const DEFAULT_API_HEAP_MB = 2048;
+
 export function computeApiHeapMb(
   totalMb: number,
   detectorWorkers: number,
   overrideMb?: number,
 ): number {
-  if (overrideMb && overrideMb > 0) return Math.floor(overrideMb);
+  if (overrideMb && overrideMb > 0) {
+    return Math.min(Math.floor(overrideMb), ELECTRON_MAX_OLD_SPACE_MB);
+  }
+  // Small machines still have to leave room for the renderer, embedded
+  // Postgres and one resident Python detector worker per pool slot (spaCy +
+  // torch are ~1 GB apiece); large machines gain nothing from a bigger heap.
   const reservedMb = 2000 + detectorWorkers * 1200;
   return Math.max(
     1024,
     Math.min(
-      6144, // absolute ceiling: past this a runaway allocation just swaps
-      totalMb - reservedMb, // what is actually left over
-      Math.floor(totalMb * 0.35), // never more than a third of the machine
+      DEFAULT_API_HEAP_MB,
+      Math.max(totalMb - reservedMb, 0),
+      Math.floor(totalMb * 0.35),
     ),
   );
 }
@@ -252,6 +279,10 @@ export function computeApiHeapMb(
 const RESTART_WINDOW_MS = 10 * 60 * 1000;
 const MAX_RESTARTS_PER_WINDOW = 3;
 const RESTART_DELAY_MS = 2000;
+// How long a restarted API must stay up and ready before its predecessors'
+// crashes stop counting against the budget. Longer than the readiness probe's
+// cold-start ceiling, so a slow boot is never mistaken for a healthy run.
+const HEALTHY_UPTIME_MS = 20 * 60 * 1000;
 
 /**
  * Coarse phase an API start is in: local preparation work (relocating the
@@ -472,10 +503,13 @@ export class ProcessManager {
       this.memoryLimitMb,
     );
     const nodeArgs: string[] = [`--max-old-space-size=${heapMb}`];
-    // Fastify under-pressure heap guard, just below the cap (85%): the API
-    // sheds ingestion (CLI 503 → retry, no lost batches) before V8 hard-crashes
-    // — the same graceful-degradation contract the server deployment uses.
-    const heapGuardBytes = Math.floor(heapMb * 1024 * 1024 * 0.85);
+    // The shed threshold is deliberately NOT computed here. It used to be
+    // 85% of the value requested above, which is only correct if Electron
+    // grants that request — it does not above ~4 GB, so the guard was set
+    // beyond the ceiling V8 enforced and never fired. The API derives it from
+    // v8.getHeapStatistics() at boot instead (see utils/heap-guard.ts), which
+    // is right on every machine, OS and container without anything to keep in
+    // sync here.
 
     const child = spawn(process.execPath, [...nodeArgs, entryPath], {
       env: {
@@ -526,7 +560,6 @@ export class ProcessManager {
           : {}),
         CORS_ORIGIN: "*",
         NODE_ENV: app.isPackaged ? "production" : "development",
-        UNDER_PRESSURE_MAX_HEAP_USED_BYTES: String(heapGuardBytes),
         // Conservative resource defaults sized to this machine; the CLI
         // inherits them through the API's env (uv run passes env through).
         ...resourceDefaultEnv(),
@@ -584,6 +617,7 @@ export class ProcessManager {
         this.waitForReady(port, () => lastOutputAt),
         spawnFailed,
       ]);
+      this.armBudgetReset(processId, child);
     } catch (err) {
       // If our child died on its own, its exit handler already scheduled the
       // retry — and may already have a replacement running. Killing "the"
@@ -690,6 +724,30 @@ export class ProcessManager {
 
       check();
     });
+  }
+
+  /**
+   * Forgives past crashes once a replacement has stayed healthy.
+   *
+   * The budget is "N crashes in a 10-minute window", which is the right shape
+   * for a crash-on-boot loop but not for a slow one: a fault that kills the API
+   * every few minutes eventually lands three deaths inside one window, and the
+   * service is then down for good until the user restarts the app. Recovering
+   * and serving for HEALTHY_UPTIME_MS is proof the crash was not a boot loop,
+   * so the budget is returned rather than being spent for the whole session.
+   */
+  private armBudgetReset(processId: string, child: ChildProcess): void {
+    const timer = setTimeout(() => {
+      // Only if *this* child is still the one running: a later crash will have
+      // replaced it, and that generation has to earn its own reset.
+      if (this.processes.get(processId)?.child !== child) return;
+      if (!this.restartTimestamps.get(processId)?.length) return;
+      this.restartTimestamps.delete(processId);
+      process.stderr.write(
+        `[API:${processId}] healthy for ${HEALTHY_UPTIME_MS / 60000} minutes; restart budget reset\n`,
+      );
+    }, HEALTHY_UPTIME_MS);
+    timer.unref?.();
   }
 
   private scheduleRestart(
