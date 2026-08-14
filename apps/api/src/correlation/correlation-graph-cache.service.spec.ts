@@ -29,6 +29,26 @@ describe('CorrelationGraphCacheService', () => {
             : [],
         ),
       ),
+      // buildAndPublish writes through raw SQL so the graph is serialized once,
+      // by us, instead of being walked by the client's parameter encoder. The
+      // fake mirrors that contract: parameters in declaration order, and the
+      // optimistic-concurrency check on requested_version decides the count.
+      $executeRaw: jest.fn((sql: any) => {
+        const [payload, builtVersion, buildDurationMs, , requestedVersion] =
+          sql.values;
+        if (!row || row.requestedVersion !== requestedVersion) {
+          return Promise.resolve(0);
+        }
+        row = {
+          ...row,
+          payload: JSON.parse(payload),
+          builtVersion,
+          buildDurationMs,
+          builtAt: new Date(),
+          lastError: null,
+        };
+        return Promise.resolve(1);
+      }),
       correlationGraphSnapshot: {
         findUnique: jest.fn(() => Promise.resolve(row)),
         upsert: jest.fn(({ create, update }: any) => {
@@ -204,6 +224,51 @@ describe('CorrelationGraphCacheService', () => {
     expect(second).toEqual(GRAPH);
     expect(builder).toHaveBeenCalledTimes(1);
     expect(h.row().payload).toEqual(GRAPH);
+  });
+
+  describe('publishing', () => {
+    it('serializes the graph itself instead of handing the client an object', async () => {
+      // The regression this guards: passing the assembled graph as a Prisma
+      // JSON value made the client walk and encode hundreds of thousands of
+      // nodes and edges, and that single allocation aborted the API on a large
+      // corpus. The payload parameter must be a string we produced.
+      const h = harness();
+
+      await h.service.getOrBuild(() => Promise.resolve(GRAPH));
+
+      expect(h.prisma.$executeRaw).toHaveBeenCalledTimes(1);
+      const [payload] = (h.prisma.$executeRaw as jest.Mock).mock.calls[0][0]
+        .values;
+      expect(typeof payload).toBe('string');
+      expect(JSON.parse(payload)).toEqual(GRAPH);
+      // And the model accessor is not used for the write at all.
+      expect(
+        h.prisma.correlationGraphSnapshot.updateMany,
+      ).not.toHaveBeenCalled();
+    });
+
+    it('keeps optimistic concurrency: a bumped version discards the build', async () => {
+      const old = { ...GRAPH, nodes: [] };
+      const h = harness({
+        id: 1,
+        requestedVersion: 2n,
+        builtVersion: 2n,
+        payload: old,
+      });
+
+      // Something invalidates the graph while this build is in flight.
+      await h.service.publishAfterRecomputeLocked(async () => {
+        await h.service.invalidate('changed mid-build');
+        return GRAPH;
+      }, 'test recompute');
+
+      // The last-good payload must survive: never publish a snapshot of a
+      // moving target.
+      expect(h.row().payload).toEqual(old);
+      expect(h.jobs.scheduleGraphRefresh).toHaveBeenCalledWith(
+        'graph changed during snapshot build',
+      );
+    });
   });
 
   it('keeps the old payload when publication fails and schedules retry', async () => {
