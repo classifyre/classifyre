@@ -10,13 +10,98 @@ tags:
 categories:
   - Field Notes
 author: Banandre
+image: /blog/assets/images/from-9601-clinton-email-files-to-eight-open-cases.jpg
+keywords:
+  - Hillary Clinton emails
+  - Clinton email investigation
+  - AI investigation
+  - autonomous AI agents
+  - FOIA redaction codes
+  - data classification
+  - custom detectors
+  - Classifyre
+alternates:
+  canonical: /blog/cases/from-9601-clinton-email-files-to-eight-open-cases
+openGraph:
+  type: article
+  title: How AI Investigated 9,601 Hillary Clinton Emails
+  description: See how Classifyre autonomously investigated 9,601 Hillary Clinton email files, tested 20 detectors, and opened eight evidence-backed cases.
+  url: /blog/cases/from-9601-clinton-email-files-to-eight-open-cases
+  siteName: Classifyre
+  publishedTime: 2026-08-11T00:00:00.000Z
+  modifiedTime: 2026-08-11T00:00:00.000Z
+  authors:
+    - Banandre
+  section: Field Notes
+  tags:
+    - AI investigation
+    - data classification
+    - custom detectors
+    - FOIA
+  images:
+    - /blog/assets/images/from-9601-clinton-email-files-to-eight-open-cases.jpg
+twitter:
+  card: summary
+  title: How AI Investigated 9,601 Hillary Clinton Emails
+  description: See how Classifyre autonomously investigated 9,601 Hillary Clinton email files, tested 20 detectors, and opened eight evidence-backed cases.
+  images:
+    - /blog/assets/images/from-9601-clinton-email-files-to-eight-open-cases.jpg
 ---
 
-# How AI Investigated 9,601 Hillary Clinton Emails
+<ArticleHero
+  image="/blog/assets/images/from-9601-clinton-email-files-to-eight-open-cases.jpg"
+  eyebrow="Field notes"
+  title="How AI Investigated 9,601 Hillary Clinton Emails"
+  description="See how Classifyre autonomously investigated 9,601 Hillary Clinton email files, tested 20 detectors, and opened eight evidence-backed cases."
+/>
 
-*Field notes · 11 August 2026 · 23 minute read*
+<ArticleJsonLd
+  headline="How AI Investigated 9,601 Hillary Clinton Emails"
+  description="See how Classifyre autonomously investigated 9,601 Hillary Clinton email files, tested 20 detectors, and opened eight evidence-backed cases."
+  path="/blog/cases/from-9601-clinton-email-files-to-eight-open-cases"
+  datePublished="2026-08-11T00:00:00.000Z"
+  dateModified="2026-08-11T00:00:00.000Z"
+  authorName="Banandre"
+  articleSection="Field Notes"
+  about={[
+    "Autonomous AI investigation",
+    "Hillary Clinton email corpus",
+    "Data classification",
+    "FOIA redaction analysis",
+  ]}
+  mentions={[
+    {
+      "@type": "Dataset",
+      name: "Hillary Clinton Emails - WikiLeaks",
+      url: "https://huggingface.co/datasets/from-our-page/hillary-clinton-emails-wikileaks",
+    },
+    {
+      "@type": "SoftwareApplication",
+      name: "Classifyre",
+      url: "https://demo.classifyre.com/hillary-clinton-emails",
+      applicationCategory: "Data classification software",
+    },
+  ]}
+  liveCaseUrl="https://demo.classifyre.com/hillary-clinton-emails"
+  liveCaseName="Hillary Clinton email investigation"
+/>
 
-At 10:22 UTC on 8 August 2026, Classifyre opened its first inquiry into the
+<LiveCaseLink
+  href="https://demo.classifyre.com/hillary-clinton-emails"
+  caseName="Hillary Clinton email investigation"
+/>
+
+<ArticleSideRail
+  title="How AI Investigated 9,601 Hillary Clinton Emails"
+  path="/blog/cases/from-9601-clinton-email-files-to-eight-open-cases/"
+  tags={["investigations", "detector-design", "public-data", "ai-agents"]}
+  backHref="/blog/cases"
+  backLabel="All case files"
+/>
+
+
+
+Early on Day One, Classifyre opened its first inquiry into the
 Clinton email corpus. It was not about classification markings, diplomatic
 cables, or legal privilege. It was about email addresses.
 
@@ -48,11 +133,9 @@ corpus, and a detector match is not proof of wrongdoing. The open cases are
 questions with evidence attached, not conclusions with question marks added
 afterward.
 
-> **Screenshot 1 — namespace overview.** Add the `hillary-clinton-emails`
-> overview with the system brief visible. Include the single source, 9,601
-> assets, seven active inquiries, and eight open cases. Capture the updated
-> brief beginning “This instance investigates…” and the public demo URL. Avoid
-> showing credentials.
+![Classifyre namespace overview for the Hillary Clinton email investigation, showing the hillary-clinton-emails case with 9,601 ingested email assets, seven active inquiries, and eight open cases](/blog/assets/images/hillary-clinton-emails-classifyre-case.webp)
+
+
 
 ## One source, deliberately
 
@@ -72,7 +155,9 @@ marking, address, or release code appears in this corpus. It cannot, from this
 source alone, settle why it appears, whether the underlying document is
 authentic in every respect, or what legal conclusion follows.
 
-The first scan used the built-in PII detector. That gave the harness names,
+You can follow the ingestion history yourself in the
+[full scan log](https://demo.classifyre.com/hillary-clinton-emails/scans/) for
+the namespace. The first scan used the built-in PII detector. That gave the harness names,
 places, dates, addresses, URLs, and other entities to work with. It also gave
 it a great deal of rubbish. Ordinary words such as “Thankfully,” “OBITUARY,”
 “IRELAND,” and “Breakthrough” were sometimes labelled as people or places.
@@ -85,11 +170,33 @@ important. The harness learned that lesson early and stored it in memory: in
 this corpus, generic PERSON, LOCATION, DATE_TIME, and NRP findings required
 scepticism; email addresses were the cleaner starting signal.
 
-> **Screenshot 2 — the source and scan state.** Add the Hugging Face source
-> detail showing its name, type, automatic sampling, completed status, and
-> catch-up cursor. If the configuration panel is visible, crop or redact the
-> encrypted token field. A second crop can show one 100-asset catch-up run and
-> its text-coverage result.
+![Classifyre source configuration for the Hillary Clinton email investigation, showing the Hugging Face hillary-clinton-emails-wikileaks dataset connected as an automatically sampled source with its scan status](/blog/assets/images/classifyre_hillary-clinton-emails_investigation-wikileaks-hugging-face-source.webp)
+
+### Evidence ranking made the noise visible
+
+One
+[LOCATION finding](https://demo.classifyre.com/hillary-clinton-emails/findings/be9415ac-d93d-49ee-8064-33de0fb83b99/)
+shows why. The PII detector had flagged the word `OBITUARY` at 85% confidence,
+and Classifyre's evidence ranking scored it importance 97 and evidence quality
+88 — high on paper, boosted by readable context and a value that looked unique
+in the corpus. The similar-findings graph attached to that finding tells the
+real story: its closest neighbours are a `LOCATION` extraction of the same
+`OBITUARY` string on a different asset, a `URL` finding pointing to
+`tnr.com/article/79956/richard-holbrooke-wieseltier-obituary`, and stray
+`PERSON`/`NRP` extractions such as `Historian`, `Emeritus`, and `Deaths`. A
+separate `Memorial Day` value recurred often enough to collapse into an
+explicit duplicate group across six assets. None of this is a person, a place,
+or a date in any useful sense — it is one obituary section of the archive
+being re-parsed by a general-purpose PII model.
+
+This is what let the harness discount the cluster instead of chasing it: the
+same semantic-similarity view that surfaces genuine duplicate evidence across
+documents also surfaces duplicate noise, so a detector can be judged on
+whether its neighbours are corroborating signal or the same mistake repeated.
+
+![Classifyre finding detail for an OBITUARY LOCATION extraction, showing the semantic similar-findings graph, evidence ranking score, and neighbouring PERSON, NRP, and duplicate-grouped DATE_TIME findings that reveal a PII noise cluster in the Hillary Clinton email corpus](/blog/assets/images/classifyre-simmilarity-detection-hillary-clinton-case.webp)
+
+
 
 ## What the harness actually did
 
@@ -112,7 +219,9 @@ nearly identical. The configuration agent reduced their correlation weight to
 zero, allowing shared addresses, names, and specific detector values to carry
 more of the comparison.
 
-As of 15:13 UTC on 11 August, the audit trail contained 743 agent runs:
+By Day Four, the audit trail contained 743 agent runs, each one inspectable as
+a flight in the
+[AI harness activity log](https://demo.classifyre.com/hillary-clinton-emails/harness/?tab=activity):
 
 | Run type | Runs |
 | --- | ---: |
@@ -146,17 +255,17 @@ namespace rather than disappearing at the end of a chat response.
 
 That distinction is visible in the sequence of events:
 
-| UTC time | What the AI did |
+| When | What the AI did |
 | --- | --- |
-| 8 Aug, 10:22 | Created the first inquiry after identifying email addresses as the cleanest useful signal in noisy PII output. |
-| 8 Aug, 10:30 | Opened the personal-versus-official email case, selected evidence, and drafted two hypotheses. |
-| 8 Aug, 10:38 | Began the first custom-detector probe, recovered from two invalid tool inputs, passed positive and counter-example tests, and sent the detector to the source. |
-| 8 Aug, 13:15–18:28 | Added handling, network, cable, and legal-privilege inquiries as their detector results became reviewable. |
-| 9 Aug, 00:20 | Opened the high-severity Top Secret case, then noticed that the related inquiry did not actually include `regex:top_secret`. |
-| 9 Aug, 01:34 | Widened the existing handling inquiry instead of creating a duplicate monitor. |
-| 9 Aug, 02:44 | Revisited the Top Secret case after a re-sweep, explained two new findings, attached them, and recorded that 427 other high-ranked items were PII noise. |
-| 9–10 Aug | Opened the FOIA and Foundation cases, linked new evidence, and identified FOIA release controls as a coherent group that still lacked an inquiry. |
-| 11 Aug | Rechecked open themes at full-corpus coverage and retained unresolved hypotheses rather than forcing closure. |
+| Day One, morning | Created the first inquiry after identifying email addresses as the cleanest useful signal in noisy PII output. |
+| Day One, morning | Opened the personal-versus-official email case, selected evidence, and drafted two hypotheses. |
+| Day One, late morning | Began the first custom-detector probe, recovered from two invalid tool inputs, passed positive and counter-example tests, and sent the detector to the source. |
+| Day One, afternoon into evening | Added handling, network, cable, and legal-privilege inquiries as their detector results became reviewable. |
+| Day Two, just after midnight | Opened the high-severity Top Secret case, then noticed that the related inquiry did not actually include `regex:top_secret`. |
+| Day Two, early hours | Widened the existing handling inquiry instead of creating a duplicate monitor. |
+| Day Two, early hours | Revisited the Top Secret case after a re-sweep, explained two new findings, attached them, and recorded that 427 other high-ranked items were PII noise. |
+| Day Two into Three | Opened the FOIA and Foundation cases, linked new evidence, and identified FOIA release controls as a coherent group that still lacked an inquiry. |
+| Day Four | Rechecked open themes at full-corpus coverage and retained unresolved hypotheses rather than forcing closure. |
 
 This is what the automation brought in practice: persistence. A detector author
 could create a new signal; the inquiry agent could notice it; the case agent
@@ -164,11 +273,15 @@ could attach selected evidence and state a hypothesis; and a later run could
 challenge, expand, or reject the earlier work. Every step left a timeline entry
 that an investigator can inspect.
 
-> **Screenshot 3 — flight recorder.** Add the first detector-author run from
-> 8 August. Show the business log from “No existing custom detectors” through
-> the failed input attempts, the positive test, the counter-example, detector
-> creation, source tuning, and rescan. This is the clearest visual proof that
-> the result came from an audited harness rather than a prepared demo script.
+The whole run was cheap. Every agent: detector author, inquiry agent, case
+agent, ran on DeepSeek V4 Flash, and the four-day investigation across
+9,601 assets, 20 detectors, seven inquiries, and eight cases cost **$4.91**
+in total model spend. The full run-by-run breakdown is visible in the
+[harness usage graph](https://demo.classifyre.com/hillary-clinton-emails/harness/?tab=usage).
+
+![DeepSeek V4 Flash cost breakdown for the Classifyre AI harness running the Hillary Clinton email investigation](/blog/assets/images/deepseek-v4-ai-harness-classifyre-investigation.webp)
+
+
 
 ## The first useful question was not the dramatic one
 
@@ -201,7 +314,7 @@ address pattern because it survived that review.
 
 ## How a detector probe became a real detector
 
-At 10:38 UTC, the detector-author agent took its first turn. It saw a State
+Later that same morning, the detector-author agent took its first turn. It saw a State
 Department email corpus with built-in PII findings but no custom detectors. It
 hypothesised that classification and handling markings were a missing class:
 `SECRET`, `CONFIDENTIAL`, `SBU`, `NOFORN`, `FOUO`, `EYES ONLY`, and related
@@ -234,7 +347,9 @@ that is absent is still an unsuccessful investigative probe.
 
 The harness created 20 detector concepts over the three-day review. Fourteen
 are active now. Thirteen currently have findings; the newest compartmented-
-access detector has none.
+access detector has none. The live configuration for all of them is browsable
+in the
+[custom detectors list](https://demo.classifyre.com/hillary-clinton-emails/detectors/).
 
 These are the active detectors at the article snapshot. “Finding rows” is the
 API’s current count, not a count of people, offences, or unique documents.
@@ -283,18 +398,13 @@ sensitive special-access terms. At this snapshot it has found nothing. The
 honest result is not “the corpus is clear”; it is “this detector has no matches
 and still needs a completed review or retirement decision.”
 
-> **Screenshot 4 — detector catalogue.** Add the active detector list with
-> finding counts. Include `classified_network_references` (4),
-> `top_secret_handling_marks` (12), and
-> `compartmented_access_handling_marks` (0) in the same frame. If space allows,
-> add a flight-recorder crop of the guardrail refusing a duplicate email
-> detector.
 
 ## The glossary became part of the method
 
 The agents proposed a glossary as they encountered names, aliases, damaged
 spellings, release codes, and institutional references. Operators verified all
-17 current entries.
+17 current entries, which you can browse in the
+[live glossary](https://demo.classifyre.com/hillary-clinton-emails/glossary/).
 
 The glossary is small enough to inspect:
 
@@ -317,17 +427,13 @@ A `Doc No. C057xxxxx` value identifies a released document. Treating all three
 as one “classification code” would destroy the structure needed for the FOIA
 case.
 
-> **Screenshot 5 — glossary.** Add a split view with the term list on the left
-> and one reference entry on the right. “FOIA exemption codes” or
-> “Classification reason code” best demonstrates aliases, notes, agent origin,
-> and operator verification. A second option is `clintonemail.com`, showing the
-> OCR variants.
 
 ## Seven inquiries: what the system keeps watching
 
 An inquiry is a saved monitor, not a case. It answers: “Which new findings
 belong to this question?” The seven active inquiries currently contain the
-following match rows:
+following match rows, and are browsable directly in the
+[inquiries tab](https://demo.classifyre.com/hillary-clinton-emails/investigations/?tab=inquiries):
 
 | Inquiry | Current matches | What it watches |
 | --- | ---: | --- |
@@ -358,15 +464,13 @@ advanced, the agent did not have to rediscover the question; it checked the new
 matches against the same rule. All seven were created by `ai-autopilot`, and
 each is linked to the case or cases that explain why the monitor exists.
 
-> **Screenshot 6 — inquiry list.** Add the seven active inquiries with match
-> counts. Then add a detail crop for “Classified handling marks” showing the
-> three custom detector keys and the exclusion of `regex:unclassified`.
 
 ## Eight cases: the questions left open
 
 Cases are narrower and more demanding than inquiries. They hold selected
 evidence, attached findings, hypotheses, notes, and links back to their
-monitors. The harness opened all eight current cases.
+monitors. The harness opened all eight current cases, which you can review in
+the [live case list](https://demo.classifyre.com/hillary-clinton-emails/investigations/).
 
 | Case | Status | Severity | Evidence assets / attached findings |
 | --- | --- | --- | ---: |
@@ -407,11 +511,6 @@ more useful than a one-line AI summary because a reviewer can inspect the claim,
 the evidence linked in support, the counter-position, and the chronology that
 produced them.
 
-> **Screenshot 7 — case threads and timeline.** Add the personal-email case
-> with its hypothesis and Autopilot discussion threads listed beside the case
-> timeline. Keep at least one evidence-added event, one hypothesis event, and
-> one later agent note visible. This is the clearest marketing view of the
-> investigation as maintained work rather than a generated report.
 
 ### Classification markings without a premature conclusion
 
@@ -430,10 +529,6 @@ main hypothesis remains `PROPOSED` at 0.40 confidence. That is the correct
 posture: the string is present; its document context and significance still
 need review.
 
-> **Screenshot 8 — Top Secret case.** Add the case detail with the proposed
-> 0.40-confidence hypothesis, five evidence assets, and attached
-> `regex:top_secret` findings. Keep the duplicate-group note visible. This
-> screenshot should make the uncertainty as visible as the severity.
 
 ### Network and cable references
 
@@ -489,11 +584,7 @@ That is both a surprising result and an honest gap. The system found the
 indexing material, but the current investigation has not yet converted it into
 a standing inquiry and completed overlap analysis.
 
-> **Screenshot 9 — FOIA case and release controls.** Add the FOIA exemption
-> case with B1, B5, and B6 evidence visible. Beside it, add the
-> `foia_release_control_numbers` detector count and one finding detail showing a
-> `Doc No. C057xxxxx` value. Do not show a whole email body if it makes the
-> release stamp unreadable.
+![FOIA exemption redaction codes B1, B5, and B6 attached as evidence in the Clinton email corpus, alongside the foia_release_control_numbers detector and a Doc No. release-control finding](/blog/assets/images/foia-exemption-redaction-codes-b1b5b6-in-the-clinton-emails-corpus.webp)
 
 ### Foundation references
 
@@ -630,11 +721,11 @@ updated, or challenged after the model run ends.
 Open the
 [live Classifyre demo namespace](https://demo.classifyre.com/hillary-clinton-emails)
 to inspect the current detectors, inquiries, cases, hypotheses, threads, and
-timelines. Counts may have changed since this article’s 11 August 2026
-snapshot.
+timelines.
 
----
 
-*Snapshot note: counts and statuses in this article were read from the
-`hillary-clinton-emails` namespace API on 11 August 2026. The namespace was
-still active, so later scans and agent runs may change them.*
+
+<RelatedCasePosts
+  section="cases"
+  currentPath="/blog/cases/from-9601-clinton-email-files-to-eight-open-cases"
+/>
