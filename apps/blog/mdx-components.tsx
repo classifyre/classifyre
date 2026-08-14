@@ -37,6 +37,11 @@ import {
   TabsTrigger,
 } from "@workspace/ui/components";
 import { cn } from "@workspace/ui/lib/utils";
+import { ArticleHero } from "@/components/article-hero";
+import { ArticleJsonLd } from "@/components/article-json-ld";
+import { LiveCaseLink } from "@/components/live-case-link";
+import { ArticleSideRail } from "@/components/article-side-rail";
+import { RelatedCasePosts } from "@/components/related-case-posts";
 
 function HeadingOne(props: React.ComponentPropsWithoutRef<"h1">) {
   const { className, ...rest } = props;
@@ -288,6 +293,11 @@ function TableCaptionElement(
 }
 
 const sharedMdxComponents: MDXComponents = {
+  ArticleHero,
+  ArticleJsonLd,
+  LiveCaseLink,
+  ArticleSideRail,
+  RelatedCasePosts,
   Accordion,
   AccordionCaption,
   AccordionContent,

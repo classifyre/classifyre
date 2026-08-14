@@ -81,6 +81,32 @@ corpus) into a ~233 MB JSON string plus its parsed object tree, all live for
 the duration of the request. If a workspace is large enough to hit that, raise
 the limit to 3 or 4 GB.
 
+### The correlation graph
+
+The graph is the largest single thing the API holds, and it grows with the
+corpus. Three things keep it survivable, and each has a lever:
+
+- **Reads** forward the stored JSON straight to the response instead of parsing
+  it into objects and serializing it back (~2× less heap per request).
+- **Writes** serialize once, explicitly, rather than handing the whole object
+  tree to the database client's parameter encoder. Every publish logs the
+  payload size:
+
+  ```
+  Published correlation graph snapshot v322 (61570 nodes, 272667 edges, 233 MB, 21867 ms)
+  ```
+
+  Watch that MB figure. A JS string cannot exceed ~512 MB regardless of how
+  much memory the machine has, so once it reads in the hundreds the answer is a
+  scoped or paginated graph, not a larger heap.
+- **Rebuild cadence** is coalesced by `CORRELATION_GRAPH_COALESCE_SECONDS`
+  (default 180). A rebuild takes 13–24 seconds on a large corpus, and an active
+  scan invalidates correlation continuously; with too short a window the API
+  rebuilds the graph back-to-back for the whole scan. Reads stay correct while
+  the window is open — a stale read serves the last-good snapshot and schedules
+  a refresh — so the cost is a graph that lags a running scan by a few minutes.
+  Lower it only if that lag matters more than headroom.
+
 Check the log before changing anything — **Logs ▸ Open Log File**, or:
 
 ```bash

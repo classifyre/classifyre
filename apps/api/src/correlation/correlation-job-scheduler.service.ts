@@ -13,6 +13,37 @@ export interface CorrelationJobPayload {
 
 const COALESCE_SECONDS = 5;
 
+/**
+ * Coalescing window for whole-graph rebuilds, which is a different problem from
+ * coalescing a recompute.
+ *
+ * A rebuild assembles every node and edge in the namespace at once. On a real
+ * corpus (61k nodes / 272k edges) that measured 13–24 seconds and drove the API
+ * heap from ~160 MB to ~1.8 GB per pass. With the 5-second window used for
+ * recomputes, an active scan — which invalidates correlation continuously —
+ * queues the next rebuild long before the current one finishes, so the API
+ * rebuilds the graph back-to-back for the entire scan and eventually dies of a
+ * failed allocation. The published versions tell the story plainly: v316 → v322
+ * inside twenty minutes.
+ *
+ * The window must therefore exceed the build itself by a wide margin. Reads
+ * stay correct while it is open: a stale read serves the last-good snapshot and
+ * nudges a refresh (see CorrelationGraphCacheService), so the cost of waiting
+ * is a graph that lags a scan by a couple of minutes — which is the right
+ * trade against an API that cannot stay up.
+ */
+const GRAPH_COALESCE_SECONDS = readPositiveIntEnv(
+  'CORRELATION_GRAPH_COALESCE_SECONDS',
+  180,
+);
+
+function readPositiveIntEnv(name: string, fallback: number): number {
+  const raw = process.env[name];
+  if (raw === undefined || raw.trim() === '') return fallback;
+  const parsed = Number.parseInt(raw, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
 /** One place for durable, replica-safe correlation job options. */
 @Injectable()
 export class CorrelationJobScheduler {
@@ -56,7 +87,7 @@ export class CorrelationJobScheduler {
       { refreshGraph: true },
       {
         singletonKey: 'correlation:graph-refresh',
-        singletonSeconds: COALESCE_SECONDS,
+        singletonSeconds: GRAPH_COALESCE_SECONDS,
         singletonNextSlot: true,
         expireInSeconds: 30 * 60,
         retryLimit: 3,

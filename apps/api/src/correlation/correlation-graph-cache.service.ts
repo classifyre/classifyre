@@ -155,17 +155,31 @@ export class CorrelationGraphCacheService {
   ): Promise<CorrelationGraphResult> {
     const started = Date.now();
     const graph = await builder();
-    const published = await this.prisma.correlationGraphSnapshot.updateMany({
-      where: { id: SNAPSHOT_ID, requestedVersion: version },
-      data: {
-        payload: graph as unknown as Prisma.InputJsonValue,
-        builtVersion: version,
-        builtAt: new Date(),
-        buildDurationMs: Date.now() - started,
-        lastError: null,
-      },
-    });
-    if (published.count === 0) {
+
+    // Serialize once, explicitly, and hand Postgres a string.
+    //
+    // Passing the object as `Prisma.InputJsonValue` makes the client walk and
+    // serialize a structure of hundreds of thousands of nodes and edges inside
+    // its own parameter encoding, which is where a publish on a large corpus
+    // died with "CALL_AND_RETRY_LAST Allocation failed" — an allocation the
+    // heap guard cannot pre-empt, because it is one request rather than a
+    // gradual climb. One `JSON.stringify` we control is bounded, measurable,
+    // and mirrors what readPayloadJson does in the other direction.
+    const payload = JSON.stringify(graph);
+    const payloadMb = Math.round(payload.length / (1024 * 1024));
+
+    const published = await this.prisma.$executeRaw(Prisma.sql`
+      UPDATE correlation_graph_snapshot
+      SET payload = ${payload}::jsonb,
+          built_version = ${version},
+          built_at = NOW(),
+          build_duration_ms = ${Date.now() - started},
+          last_error = NULL,
+          updated_at = NOW()
+      WHERE id = ${SNAPSHOT_ID} AND requested_version = ${version}
+    `);
+
+    if (published === 0) {
       // Something invalidated the graph while it was being assembled. Never
       // replace the last-good payload with a snapshot of that moving target.
       void this.jobs.scheduleGraphRefresh(
@@ -173,8 +187,13 @@ export class CorrelationGraphCacheService {
       );
       return graph;
     }
+    // Payload size is logged because it is the quantity that decides whether
+    // this survives: it grows with the corpus, every publish holds it in the
+    // heap at once, and a JS string cannot exceed ~512 MB however much memory
+    // the machine has. When this number starts reading in the hundreds, the
+    // answer is a scoped or paginated graph, not a larger heap.
     this.logger.log(
-      `Published correlation graph snapshot v${version.toString()} (${graph.nodes.length} nodes, ${graph.edges.length} edges, ${Date.now() - started} ms)`,
+      `Published correlation graph snapshot v${version.toString()} (${graph.nodes.length} nodes, ${graph.edges.length} edges, ${payloadMb} MB, ${Date.now() - started} ms)`,
     );
     return graph;
   }
