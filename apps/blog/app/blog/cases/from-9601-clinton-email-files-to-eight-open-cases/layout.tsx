@@ -91,7 +91,7 @@ const articleSchema = {
     {
       "@type": "SoftwareApplication",
       name: "Classifyre",
-      url: "https://demo.classifyre.com/hillary-clinton-emails-2",
+      url: "https://demo.classifyre.com/hillary-clinton-emails",
       applicationCategory: "Data classification software",
     },
   ],
