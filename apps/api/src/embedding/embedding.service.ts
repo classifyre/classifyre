@@ -463,16 +463,7 @@ export class EmbeddingService {
    * multi-million-row join. Paging keeps the peak flat regardless of how
    * popular a hash turns out to be.
    */
-  private async findingsForHashes(
-    contentHashes: string[],
-  ): Promise<
-    Array<{ id: string; embedContentHash: string; findingType: string }>
-  > {
-    const results: Array<{
-      id: string;
-      embedContentHash: string;
-      findingType: string;
-    }> = [];
+  private async *findingPagesForHashes(contentHashes: string[]) {
     let cursor: string | undefined;
     for (;;) {
       const page = await this.prisma.finding.findMany({
@@ -482,20 +473,11 @@ export class EmbeddingService {
         take: NEIGHBORHOOD_PAGE_SIZE,
         ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
       });
-      if (!page.length) break;
-      for (const row of page) {
-        if (row.embedContentHash) {
-          results.push({
-            id: row.id,
-            embedContentHash: row.embedContentHash,
-            findingType: String(row.findingType),
-          });
-        }
-      }
-      if (page.length < NEIGHBORHOOD_PAGE_SIZE) break;
+      if (!page.length) return;
+      yield page;
+      if (page.length < NEIGHBORHOOD_PAGE_SIZE) return;
       cursor = page.at(-1)?.id;
     }
-    return results;
   }
 
   private async calibrateNeighborhood(
@@ -570,22 +552,6 @@ export class EmbeddingService {
       }
     }
 
-    const grouped = new Map<string, NeighborhoodRow[]>();
-    for (const target of await this.findingsForHashes(contentHashes)) {
-      const seedsForTarget = seedsByKey.get(
-        `${target.embedContentHash}\u0000${target.findingType}`,
-      );
-      if (!seedsForTarget?.length) continue;
-      grouped.set(
-        target.id,
-        seedsForTarget.map((seed) => ({
-          findingId: target.id,
-          targetHash: seed.targetHash,
-          neighborHash: seed.neighborHash,
-          score: seed.score,
-        })),
-      );
-    }
     const componentMembers = new Map<string, string[]>();
     for (const hash of nearDuplicateComponents.ids()) {
       const root = nearDuplicateComponents.find(hash);
@@ -598,135 +564,166 @@ export class EmbeddingService {
       const groupHash = [...members].sort()[0];
       for (const hash of members) duplicateGroupByHash.set(hash, groupHash);
     }
-    const analyses = await this.prisma.findingEvidenceAnalysis.findMany({
-      where: { findingId: { in: [...grouped.keys()] } },
-    });
-    const analysisByFinding = new Map(
-      analyses.map((analysis) => [analysis.findingId, analysis]),
-    );
-    await mapBounded(
-      [...grouped.entries()],
-      8,
-      async ([findingId, neighbors]) => {
-        const analysis = analysisByFinding.get(findingId);
-        if (!analysis || !neighbors.length) return;
-        const meanSimilarity =
-          neighbors.reduce((sum, neighbor) => sum + neighbor.score, 0) /
-          neighbors.length;
-        const nearDuplicates = neighbors.filter(
-          (neighbor) => neighbor.score >= 0.95,
+    // Analysed a page at a time, holding one page rather than every finding
+    // that shares these hashes.
+    //
+    // Paging only the *read* was not enough: the rows were still accumulated
+    // into one array before processing, and a heap snapshot taken at the
+    // fatal moment showed 7.8 million UUID strings live, all of them elements
+    // of driver result arrays. The bound has to cover what is retained, not
+    // just what is fetched.
+    for await (const page of this.findingPagesForHashes(contentHashes)) {
+      const grouped = new Map<string, NeighborhoodRow[]>();
+      for (const target of page) {
+        const seedsForTarget = seedsByKey.get(
+          `${target.embedContentHash}\u0000${target.findingType}`,
         );
-        // A sparse neighbourhood (fewer than MIN_NEIGHBORHOOD same-type
-        // vectors in the space) says nothing about how unusual the evidence
-        // is — the first vectors analyzed would otherwise all read as extreme
-        // outliers and keep that bonus forever.
-        const neighborhoodReliable = neighbors.length >= MIN_NEIGHBORHOOD;
-        const semanticOutlier = neighborhoodReliable
-          ? Math.max(0, Math.min(1, 1 - meanSimilarity))
-          : 0;
-        const textQuality = analysis.qualityScore;
-        const qualityScore = neighborhoodReliable
-          ? Math.max(0, Math.min(1, textQuality * 0.8 + meanSimilarity * 0.2))
-          : textQuality;
-        // A tiny matched value ("LOCH", "=") is weak evidence however unusual
-        // its embedding looks; the outlier bonus needs substance to reward.
-        const valueLength = Number(
-          (analysis.signals as Record<string, unknown> | null)?.[
-            'valueLength'
-          ] ?? Number.MAX_SAFE_INTEGER,
+        if (!seedsForTarget?.length) continue;
+        grouped.set(
+          target.id,
+          seedsForTarget.map((seed) => ({
+            findingId: target.id,
+            targetHash: seed.targetHash,
+            neighborHash: seed.neighborHash,
+            score: seed.score,
+          })),
         );
-        const outlierAdjustment = !neighborhoodReliable
-          ? 0
-          : textQuality < 0.55
-            ? -semanticOutlier * 0.2
-            : semanticOutlier >= OUTLIER_BONUS_THRESHOLD && valueLength >= 5
-              ? semanticOutlier * 0.12
-              : 0;
-        const duplicatePenalty = Math.min(0.15, nearDuplicates.length * 0.025);
-        const importanceScore = Math.max(
-          0,
-          Math.min(
-            1,
-            analysis.importanceScore + outlierAdjustment - duplicatePenalty,
-          ),
-        );
-        const reasons = Array.isArray(analysis.reasons)
-          ? [...analysis.reasons]
-          : [];
-        if (nearDuplicates.length) {
-          reasons.push({
-            code: 'near_duplicate',
-            label: `${nearDuplicates.length} near-duplicate findings grouped semantically`,
-            impact: 'down',
-          });
-        }
-        reasons.push(
-          !neighborhoodReliable
-            ? {
-                code: 'insufficient_neighborhood',
-                label: 'Too few comparable findings for semantic analysis',
-                impact: 'neutral',
-              }
-            : textQuality < 0.55 && semanticOutlier > 0.45
+      }
+      if (!grouped.size) continue;
+
+      const analyses = await this.prisma.findingEvidenceAnalysis.findMany({
+        where: { findingId: { in: [...grouped.keys()] } },
+      });
+      const analysisByFinding = new Map(
+        analyses.map((analysis) => [analysis.findingId, analysis]),
+      );
+      await mapBounded(
+        [...grouped.entries()],
+        8,
+        async ([findingId, neighbors]) => {
+          const analysis = analysisByFinding.get(findingId);
+          if (!analysis || !neighbors.length) return;
+          const meanSimilarity =
+            neighbors.reduce((sum, neighbor) => sum + neighbor.score, 0) /
+            neighbors.length;
+          const nearDuplicates = neighbors.filter(
+            (neighbor) => neighbor.score >= 0.95,
+          );
+          // A sparse neighbourhood (fewer than MIN_NEIGHBORHOOD same-type
+          // vectors in the space) says nothing about how unusual the evidence
+          // is — the first vectors analyzed would otherwise all read as extreme
+          // outliers and keep that bonus forever.
+          const neighborhoodReliable = neighbors.length >= MIN_NEIGHBORHOOD;
+          const semanticOutlier = neighborhoodReliable
+            ? Math.max(0, Math.min(1, 1 - meanSimilarity))
+            : 0;
+          const textQuality = analysis.qualityScore;
+          const qualityScore = neighborhoodReliable
+            ? Math.max(0, Math.min(1, textQuality * 0.8 + meanSimilarity * 0.2))
+            : textQuality;
+          // A tiny matched value ("LOCH", "=") is weak evidence however unusual
+          // its embedding looks; the outlier bonus needs substance to reward.
+          const valueLength = Number(
+            (analysis.signals as Record<string, unknown> | null)?.[
+              'valueLength'
+            ] ?? Number.MAX_SAFE_INTEGER,
+          );
+          const outlierAdjustment = !neighborhoodReliable
+            ? 0
+            : textQuality < 0.55
+              ? -semanticOutlier * 0.2
+              : semanticOutlier >= OUTLIER_BONUS_THRESHOLD && valueLength >= 5
+                ? semanticOutlier * 0.12
+                : 0;
+          const duplicatePenalty = Math.min(
+            0.15,
+            nearDuplicates.length * 0.025,
+          );
+          const importanceScore = Math.max(
+            0,
+            Math.min(
+              1,
+              analysis.importanceScore + outlierAdjustment - duplicatePenalty,
+            ),
+          );
+          const reasons = Array.isArray(analysis.reasons)
+            ? [...analysis.reasons]
+            : [];
+          if (nearDuplicates.length) {
+            reasons.push({
+              code: 'near_duplicate',
+              label: `${nearDuplicates.length} near-duplicate findings grouped semantically`,
+              impact: 'down',
+            });
+          }
+          reasons.push(
+            !neighborhoodReliable
               ? {
-                  code: 'isolated_ocr',
-                  label: 'Isolated low-quality text; possible OCR noise',
-                  impact: 'down',
+                  code: 'insufficient_neighborhood',
+                  label: 'Too few comparable findings for semantic analysis',
+                  impact: 'neutral',
                 }
-              : semanticOutlier >= OUTLIER_BONUS_THRESHOLD
+              : textQuality < 0.55 && semanticOutlier > 0.45
                 ? {
-                    code: 'semantic_outlier',
-                    label: 'Semantically unusual for its neighbours',
-                    impact: 'up',
+                    code: 'isolated_ocr',
+                    label: 'Isolated low-quality text; possible OCR noise',
+                    impact: 'down',
                   }
-                : {
-                    code: 'semantic_support',
-                    label: 'Consistent with its semantic neighbours',
-                    impact: 'neutral',
-                  },
-        );
-        await this.prisma.findingEvidenceAnalysis.update({
-          where: { findingId },
-          data: {
-            importanceScore,
-            qualityScore,
-            semanticOutlier,
-            similarCount: analysis.similarCount + nearDuplicates.length,
-            duplicateGroupHash:
-              duplicateGroupByHash.get(neighbors[0].targetHash) ??
-              analysis.duplicateGroupHash,
-            reasons,
-            signals: {
-              ...(analysis.signals && typeof analysis.signals === 'object'
-                ? (analysis.signals as Record<string, unknown>)
-                : {}),
-              meanNeighborSimilarity: meanSimilarity,
-              ...(nearDuplicates.length
-                ? {
-                    duplicateSimilarity: Math.max(
-                      ...nearDuplicates.map((neighbor) => neighbor.score),
-                    ),
-                  }
-                : {}),
+                : semanticOutlier >= OUTLIER_BONUS_THRESHOLD
+                  ? {
+                      code: 'semantic_outlier',
+                      label: 'Semantically unusual for its neighbours',
+                      impact: 'up',
+                    }
+                  : {
+                      code: 'semantic_support',
+                      label: 'Consistent with its semantic neighbours',
+                      impact: 'neutral',
+                    },
+          );
+          await this.prisma.findingEvidenceAnalysis.update({
+            where: { findingId },
+            data: {
+              importanceScore,
+              qualityScore,
+              semanticOutlier,
+              similarCount: analysis.similarCount + nearDuplicates.length,
+              duplicateGroupHash:
+                duplicateGroupByHash.get(neighbors[0].targetHash) ??
+                analysis.duplicateGroupHash,
+              reasons,
+              signals: {
+                ...(analysis.signals && typeof analysis.signals === 'object'
+                  ? (analysis.signals as Record<string, unknown>)
+                  : {}),
+                meanNeighborSimilarity: meanSimilarity,
+                ...(nearDuplicates.length
+                  ? {
+                      duplicateSimilarity: Math.max(
+                        ...nearDuplicates.map((neighbor) => neighbor.score),
+                      ),
+                    }
+                  : {}),
+              },
+              analyzedAt: new Date(),
             },
-            analyzedAt: new Date(),
-          },
-        });
-      },
-    );
-    await mapBounded(
-      [...new Set(duplicateGroupByHash.values())],
-      8,
-      (groupHash) => {
-        const hashes = [...duplicateGroupByHash.entries()]
-          .filter(([, value]) => value === groupHash)
-          .map(([hash]) => hash);
-        return this.prisma.findingEvidenceAnalysis.updateMany({
-          where: { finding: { embedContentHash: { in: hashes } } },
-          data: { duplicateGroupHash: groupHash },
-        });
-      },
-    );
+          });
+        },
+      );
+      await mapBounded(
+        [...new Set(duplicateGroupByHash.values())],
+        8,
+        (groupHash) => {
+          const hashes = [...duplicateGroupByHash.entries()]
+            .filter(([, value]) => value === groupHash)
+            .map(([hash]) => hash);
+          return this.prisma.findingEvidenceAnalysis.updateMany({
+            where: { finding: { embedContentHash: { in: hashes } } },
+            data: { duplicateGroupHash: groupHash },
+          });
+        },
+      );
+    }
   }
 
   async putChunks(sourceId: string, dto: PutAssetChunksDto) {

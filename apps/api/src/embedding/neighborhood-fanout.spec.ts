@@ -27,7 +27,7 @@ describe('neighbourhood fan-out', () => {
         space: { id: string; dim: number },
         hashes: string[],
       ) => Promise<void>;
-      findingsForHashes: (hashes: string[]) => Promise<unknown[]>;
+      findingPagesForHashes: (hashes: string[]) => AsyncGenerator<unknown[]>;
     };
     const calibrated: string[][] = [];
     Object.assign(service, {
@@ -150,8 +150,11 @@ describe('neighbourhood fan-out', () => {
     expect(h.calibrated[0]).toEqual(['has-neighbours']);
   });
 
-  it('pages the finding read so a popular hash cannot arrive at once', async () => {
-    // 6,344 findings shared one hash on the corpus that triggered this.
+  it('yields findings a page at a time and retains none of them', async () => {
+    // 6,344 findings shared one hash on the corpus that triggered this. Paging
+    // only the read was not enough — the rows were still accumulated into one
+    // array, and a snapshot at the fatal moment showed 7.8M UUID strings live.
+    // A generator hands each page over and keeps nothing.
     const page = Array.from({ length: 2000 }, (_, i) => ({
       id: `f-${i}`,
       embedContentHash: 'h1',
@@ -159,10 +162,18 @@ describe('neighbourhood fan-out', () => {
     }));
     const h = harness([], [page, page, []]);
 
-    const rows = await h.service.findingsForHashes(['h1']);
+    let pages = 0;
+    let biggestHeld = 0;
+    for await (const yielded of h.service.findingPagesForHashes(['h1'])) {
+      pages++;
+      biggestHeld = Math.max(biggestHeld, yielded.length);
+    }
 
+    // Two pages of data; the third query comes back empty and ends the walk.
+    expect(pages).toBe(2);
     expect(h.findMany).toHaveBeenCalledTimes(3);
-    expect(rows).toHaveLength(4000);
+    // Never more than one page in hand, whatever the total.
+    expect(biggestHeld).toBe(2000);
     // Paged with a cursor rather than a growing offset.
     expect(
       (h.findMany.mock.calls[1]?.[0] as { cursor?: unknown })?.cursor,
