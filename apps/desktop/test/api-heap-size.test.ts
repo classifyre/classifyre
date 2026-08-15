@@ -28,6 +28,7 @@ import assert from "node:assert/strict";
 
 import {
   computeApiHeapMb,
+  namespaceJobConcurrency,
   DEFAULT_API_HEAP_MB,
   ELECTRON_MAX_OLD_SPACE_MB,
 } from "../src/main/process-manager";
@@ -97,3 +98,18 @@ assert.equal(computeApiHeapMb(34_359, 4, 0), DEFAULT_API_HEAP_MB);
 assert.equal(computeApiHeapMb(34_359, 4, undefined), DEFAULT_API_HEAP_MB);
 
 console.log("api-heap-size: all assertions passed");
+
+// Namespace job concurrency: the API default of 4 is sized for Kubernetes,
+// where each worker is a pod with its own memory limit. On desktop one process
+// serves every workspace, so four concurrent namespace jobs means four CLI
+// processes with their own detector pools allocating into one shared heap.
+assert.ok(
+  namespaceJobConcurrency() >= 2,
+  "one workspace must not block every other one",
+);
+assert.ok(
+  namespaceJobConcurrency() < 4,
+  "desktop must stay below the Kubernetes-sized default of 4",
+);
+
+console.log("namespace-job-concurrency: all assertions passed");

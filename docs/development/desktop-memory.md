@@ -120,6 +120,41 @@ starts shedding work:
 Heap guard: shedding CLI ingestion above 1638 MB of a 2048 MB V8 ceiling (derived)
 ```
 
+## How many workspaces scan at once
+
+`MAX_CONCURRENT_NAMESPACE_JOBS` caps how many workspaces run background jobs
+simultaneously. The API default is **4**, sized for Kubernetes where every
+worker is its own pod with its own memory limit. Desktop overrides it to 2 (3
+on 12+ cores) because one process serves every workspace here, and each
+namespace job spawns a CLI with its own detector pool — at 4 that is up to
+4 × `CLASSIFYRE_MAX_POOL_WORKERS` resident Python workers (~1 GB apiece for
+spaCy + torch) plus four ingest streams allocating into a single V8 heap.
+
+Measured on a laptop before the override: a sawtooth from 384 MB to 3435 MB
+every ~90 seconds, with `Namespace 'sec-edgar' acquired worker slot 4/4` while
+other workspaces queued behind it.
+
+## OCR and torch.compile
+
+The CLI disables `torch.compile` (`TORCH_COMPILE_DISABLE=1`, set in
+`src/utils/torch_runtime.py` before torch is imported). Inductor generates C++
+and shells out to a compiler at scan time, which needs a toolchain the desktop
+bundle and slim container images do not promise — and it builds the compiler
+command without quoting paths, so the desktop venv under
+`~/Library/Application Support/…` breaks it at the space:
+
+```
+clang++: error: no such file or directory: 'Support/Classifyre/…/torch/lib'
+```
+
+Docling falls back to eager execution, so this was never a visible failure —
+just 167 compile errors and 33 OCR extractions returning no text on one
+install. Measured on a single image with warm models: **58.5s compiling and
+failing versus 24.9s with compilation off**, identical extracted text.
+
+Set `TORCH_COMPILE_DISABLE` explicitly to override, if a deployment has a
+toolchain, space-free paths, and a measured reason to want inductor.
+
 ## What protects the process
 
 The API does not simply run until it dies:
