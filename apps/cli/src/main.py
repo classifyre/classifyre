@@ -8,10 +8,20 @@ import sys
 from pathlib import Path
 from typing import Any, cast
 
-from .outputs import create_output_sink
-from .sources import get_source, list_available_sources
-from .sources.dropbox.auth import add_dropbox_auth_arguments, run_dropbox_auth_command
-from .utils.validation import validate_input, validate_test_connection
+# Must run before anything that imports torch (docling does, transitively via
+# the source and parser modules below): torch reads this configuration at
+# import time, so a later call would have no effect. See torch_runtime.
+from .utils.torch_runtime import configure_torch_runtime
+
+configure_torch_runtime()
+
+from .outputs import create_output_sink  # noqa: E402
+from .sources import get_source, list_available_sources  # noqa: E402
+from .sources.dropbox.auth import (  # noqa: E402
+    add_dropbox_auth_arguments,
+    run_dropbox_auth_command,
+)
+from .utils.validation import validate_input, validate_test_connection  # noqa: E402
 
 logger = logging.getLogger(__name__)
 _SURROGATE_RE = re.compile(r"[\ud800-\udfff]")
