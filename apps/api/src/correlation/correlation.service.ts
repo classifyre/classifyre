@@ -260,7 +260,7 @@ export class CorrelationService {
       await onProgress(`Found ${touched.length} asset(s) to fingerprint.`, {
         total: touched.length,
       });
-    return this.runRecomputeAndPublish(`runner:${runnerId}`, () =>
+    return this.runRecomputeAndInvalidate(`runner:${runnerId}`, () =>
       this.recompute(
         touched.map((a) => a.id),
         false,
@@ -271,14 +271,14 @@ export class CorrelationService {
 
   /** On-demand correlation for a single asset (and its neighbourhood). */
   async recomputeForAsset(assetId: string): Promise<CorrelationRunSummary> {
-    return this.runRecomputeAndPublish(`asset:${assetId}`, () =>
+    return this.runRecomputeAndInvalidate(`asset:${assetId}`, () =>
       this.recompute([assetId]),
     );
   }
 
   async recomputeForAssets(assetIds: string[]): Promise<CorrelationRunSummary> {
     const unique = [...new Set(assetIds)].filter(Boolean);
-    return this.runRecomputeAndPublish(`assets:${unique.length}`, () =>
+    return this.runRecomputeAndInvalidate(`assets:${unique.length}`, () =>
       this.recompute(unique),
     );
   }
@@ -289,7 +289,7 @@ export class CorrelationService {
    * once. Fingerprint rebuild is also paged with GC yields between pages.
    */
   async recomputeAll(onProgress?: ProgressFn): Promise<CorrelationRunSummary> {
-    return this.runRecomputeAndPublish('full recompute', () =>
+    return this.runRecomputeAndInvalidate('full recompute', () =>
       this.recomputeAllUnlocked(onProgress),
     );
   }
@@ -490,18 +490,38 @@ export class CorrelationService {
     return config;
   }
 
-  private async runRecomputeAndPublish<T>(
+  /**
+   * Runs a correlation recompute and marks the graph snapshot stale.
+   *
+   * This used to rebuild and publish the whole graph inline, under the
+   * correlation lock, on *every* recompute — including `recomputeForAsset`,
+   * which can be one asset. A whole-graph build assembles every node and edge
+   * in the namespace: on a real corpus that is 61k nodes and 272k edges and
+   * over 2 GB of live JS objects, which is enough to exhaust the API's heap by
+   * itself ("Ineffective mark-compacts near heap limit" at 2041 MB of a
+   * 2144 MB ceiling, repeatedly, until the restart budget gave out).
+   *
+   * Worse, it was invisible to the coalescing added for graph refreshes: that
+   * only throttles the `refreshGraph` job, and this path never enqueued one.
+   * A scan ingesting steadily therefore rebuilt the entire graph per batch of
+   * touched assets, with no window between rebuilds at all.
+   *
+   * Invalidating instead costs a version bump and a coalesced job. Reads keep
+   * working throughout — a read against a stale snapshot serves the last-good
+   * payload and nudges the refresh — so what this trades away is graph
+   * freshness within the coalescing window, in exchange for the API surviving
+   * the scan that is updating it.
+   */
+  private async runRecomputeAndInvalidate<T>(
     reason: string,
     operation: () => Promise<T>,
   ): Promise<T> {
-    return this.correlationLock.runExclusive(async () => {
-      const result = await operation();
-      await this.graphCache.publishAfterRecomputeLocked(
-        () => this.buildGraphFromDatabase(),
-        reason,
-      );
-      return result;
-    });
+    const result = await this.correlationLock.runExclusive(operation);
+    // Outside the lock: invalidation only bumps a version and enqueues, and
+    // holding the correlation lock across it would serialise callers behind
+    // queue I/O for no benefit.
+    await this.graphCache.invalidate(reason);
+    return result;
   }
 
   private async recompute(

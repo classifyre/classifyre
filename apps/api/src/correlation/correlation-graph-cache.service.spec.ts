@@ -251,16 +251,16 @@ describe('CorrelationGraphCacheService', () => {
       const old = { ...GRAPH, nodes: [] };
       const h = harness({
         id: 1,
-        requestedVersion: 2n,
+        requestedVersion: 3n,
         builtVersion: 2n,
         payload: old,
       });
 
       // Something invalidates the graph while this build is in flight.
-      await h.service.publishAfterRecomputeLocked(async () => {
+      await h.service.refreshIfStale(async () => {
         await h.service.invalidate('changed mid-build');
         return GRAPH;
-      }, 'test recompute');
+      });
 
       // The last-good payload must survive: never publish a snapshot of a
       // moving target.
@@ -271,26 +271,25 @@ describe('CorrelationGraphCacheService', () => {
     });
   });
 
-  it('keeps the old payload when publication fails and schedules retry', async () => {
+  it('keeps the old payload when a rebuild fails, and lets the queue retry', async () => {
     const old = { ...GRAPH, nodes: [] };
     const h = harness({
       id: 1,
-      requestedVersion: 2n,
+      requestedVersion: 3n,
       builtVersion: 2n,
       payload: old,
     });
 
-    await h.service.publishAfterRecomputeLocked(
-      () => Promise.reject(new Error('assembly failed')),
-      'test recompute',
-    );
+    // Propagated rather than swallowed: the refresh runs as a queue job with
+    // its own retry budget, so failing loudly is what schedules the retry.
+    await expect(
+      h.service.refreshIfStale(() =>
+        Promise.reject(new Error('assembly failed')),
+      ),
+    ).rejects.toThrow('assembly failed');
 
     expect(h.row().payload).toEqual(old);
     expect(h.row().builtVersion).toBe(2n);
-    expect(h.row().requestedVersion).toBe(3n);
     expect(h.row().lastError).toBe('assembly failed');
-    expect(h.jobs.scheduleGraphRefresh).toHaveBeenCalledWith(
-      'snapshot publication failed',
-    );
   });
 });
