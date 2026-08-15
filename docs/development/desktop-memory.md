@@ -104,6 +104,14 @@ corpus. Three things keep it survivable, and each has a lever:
   job. Rebuilding inline was the single largest memory event in the API — a
   whole-graph assembly per changed asset, invisible to the coalescing below
   because it never enqueued a refresh job.
+- **Hub values are filtered out.** `CORRELATION_GRAPH_MAX_FANOUT` (default 10)
+  drops shared values bound to more than N assets from the *unscoped* graph. A
+  value held by hundreds of documents — a company name, a boilerplate footer —
+  connects everything to everything and carries no signal; the Fingerprints UI
+  already ranks values rarest-first for that reason. On a real corpus this kept
+  92% of distinct values while dropping half the edges. Scoped views
+  (`?assetId=`, `?sourceId=`) are never filtered — there the question is "what
+  touches this thing", and hiding an edge would be wrong. Set `0` to disable.
 - **Rebuild cadence** is coalesced by `CORRELATION_GRAPH_COALESCE_SECONDS`
   (default 180). A rebuild takes 13–24 seconds on a large corpus, and an active
   scan invalidates correlation continuously; with too short a window the API
