@@ -206,6 +206,21 @@ export interface ValueOccurrenceDto {
   }>;
 }
 
+export const DEFAULT_GRAPH_MAX_FAN_OUT = 10;
+
+/**
+ * Reads CORRELATION_GRAPH_MAX_FANOUT. 0 disables the filter; anything absent
+ * or malformed falls back to the default rather than silently disabling it,
+ * because an unfiltered graph is the failure mode, not the safe state.
+ */
+export function readGraphMaxFanOut(env: NodeJS.ProcessEnv): number {
+  const raw = env.CORRELATION_GRAPH_MAX_FANOUT;
+  if (raw === undefined || raw.trim() === '') return DEFAULT_GRAPH_MAX_FAN_OUT;
+  const parsed = Number.parseInt(raw, 10);
+  if (!Number.isFinite(parsed) || parsed < 0) return DEFAULT_GRAPH_MAX_FAN_OUT;
+  return parsed === 0 ? Number.POSITIVE_INFINITY : parsed;
+}
+
 /** Progress callback threaded into long-running recompute passes. */
 type ProgressFn = (
   msg: string,
@@ -227,6 +242,30 @@ function yieldToGC(): Promise<void> {
 @Injectable()
 export class CorrelationService {
   private readonly logger = new Logger(CorrelationService.name);
+
+  /**
+   * Largest number of assets a shared value may bind before the unscoped graph
+   * drops it.
+   *
+   * A value held by hundreds of documents — a company name, a boilerplate
+   * footer, a common date — connects everything to everything and tells an
+   * investigator nothing. The Fingerprints UI already knows this: it ranks
+   * shared values by *ascending* fan-out, rarest first, because two documents
+   * sharing one obscure account number is the finding and two hundred sharing
+   * "Enron" is not.
+   *
+   * Those hubs are also where the payload's weight is. Measured on a real
+   * corpus (11,598 clustered assets, 51,985 shared values, 288,274 edges):
+   * keeping only values bound to ≤10 assets retains 92% of distinct values
+   * while dropping half the edges. The graph gets smaller and more useful at
+   * the same time, which is why this is a fan-out filter and not the obvious
+   * `take: N` on clusters — capping by cluster size would have kept the hubs
+   * and discarded the rare pairs the page ranks highest.
+   *
+   * Raise it (or set 0 for no filter) when a corpus genuinely needs hub values
+   * in the overview.
+   */
+  private readonly graphMaxFanOut = readGraphMaxFanOut(process.env);
   private readonly batches: CorrelationBatchSizes;
 
   constructor(
@@ -260,7 +299,7 @@ export class CorrelationService {
       await onProgress(`Found ${touched.length} asset(s) to fingerprint.`, {
         total: touched.length,
       });
-    return this.runRecomputeAndPublish(`runner:${runnerId}`, () =>
+    return this.runRecomputeAndInvalidate(`runner:${runnerId}`, () =>
       this.recompute(
         touched.map((a) => a.id),
         false,
@@ -271,14 +310,14 @@ export class CorrelationService {
 
   /** On-demand correlation for a single asset (and its neighbourhood). */
   async recomputeForAsset(assetId: string): Promise<CorrelationRunSummary> {
-    return this.runRecomputeAndPublish(`asset:${assetId}`, () =>
+    return this.runRecomputeAndInvalidate(`asset:${assetId}`, () =>
       this.recompute([assetId]),
     );
   }
 
   async recomputeForAssets(assetIds: string[]): Promise<CorrelationRunSummary> {
     const unique = [...new Set(assetIds)].filter(Boolean);
-    return this.runRecomputeAndPublish(`assets:${unique.length}`, () =>
+    return this.runRecomputeAndInvalidate(`assets:${unique.length}`, () =>
       this.recompute(unique),
     );
   }
@@ -289,7 +328,7 @@ export class CorrelationService {
    * once. Fingerprint rebuild is also paged with GC yields between pages.
    */
   async recomputeAll(onProgress?: ProgressFn): Promise<CorrelationRunSummary> {
-    return this.runRecomputeAndPublish('full recompute', () =>
+    return this.runRecomputeAndInvalidate('full recompute', () =>
       this.recomputeAllUnlocked(onProgress),
     );
   }
@@ -490,18 +529,38 @@ export class CorrelationService {
     return config;
   }
 
-  private async runRecomputeAndPublish<T>(
+  /**
+   * Runs a correlation recompute and marks the graph snapshot stale.
+   *
+   * This used to rebuild and publish the whole graph inline, under the
+   * correlation lock, on *every* recompute — including `recomputeForAsset`,
+   * which can be one asset. A whole-graph build assembles every node and edge
+   * in the namespace: on a real corpus that is 61k nodes and 272k edges and
+   * over 2 GB of live JS objects, which is enough to exhaust the API's heap by
+   * itself ("Ineffective mark-compacts near heap limit" at 2041 MB of a
+   * 2144 MB ceiling, repeatedly, until the restart budget gave out).
+   *
+   * Worse, it was invisible to the coalescing added for graph refreshes: that
+   * only throttles the `refreshGraph` job, and this path never enqueued one.
+   * A scan ingesting steadily therefore rebuilt the entire graph per batch of
+   * touched assets, with no window between rebuilds at all.
+   *
+   * Invalidating instead costs a version bump and a coalesced job. Reads keep
+   * working throughout — a read against a stale snapshot serves the last-good
+   * payload and nudges the refresh — so what this trades away is graph
+   * freshness within the coalescing window, in exchange for the API surviving
+   * the scan that is updating it.
+   */
+  private async runRecomputeAndInvalidate<T>(
     reason: string,
     operation: () => Promise<T>,
   ): Promise<T> {
-    return this.correlationLock.runExclusive(async () => {
-      const result = await operation();
-      await this.graphCache.publishAfterRecomputeLocked(
-        () => this.buildGraphFromDatabase(),
-        reason,
-      );
-      return result;
-    });
+    const result = await this.correlationLock.runExclusive(operation);
+    // Outside the lock: invalidation only bumps a version and enqueues, and
+    // holding the correlation lock across it would serialise callers behind
+    // queue I/O for no benefit.
+    await this.graphCache.invalidate(reason);
+    return result;
   }
 
   private async recompute(
@@ -1695,6 +1754,7 @@ export class CorrelationService {
     sourceId?: string;
   }): Promise<CorrelationGraphResult> {
     const scopeSourceId = opts?.sourceId;
+    const isScoped = Boolean(opts?.assetId || scopeSourceId);
 
     let clusterIds: string[];
     if (opts?.assetId) {
@@ -1782,8 +1842,19 @@ export class CorrelationService {
     );
     const edges: GraphEdgeDto[] = [];
 
+    // Hub values are dropped from the unscoped graph — see graphMaxFanOut. A
+    // scoped view (one asset, one source) keeps everything: there the question
+    // is "what touches this thing", and answering it with a filtered edge set
+    // would quietly hide real connections.
+    const maxFanOut = isScoped ? Number.POSITIVE_INFINITY : this.graphMaxFanOut;
+    let droppedHubValues = 0;
+
     for (const [hash, info] of byHash) {
       if (info.assetIds.length < 2) continue;
+      if (info.assetIds.length > maxFanOut) {
+        droppedHubValues += 1;
+        continue;
+      }
       nodes.push({
         id: hash,
         type: 'finding',
@@ -1836,7 +1907,7 @@ export class CorrelationService {
         };
       });
 
-    return { nodes, edges, truncated: false, similarities };
+    return { nodes, edges, truncated: droppedHubValues > 0, similarities };
   }
 
   /**

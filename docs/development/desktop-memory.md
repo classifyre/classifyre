@@ -99,6 +99,19 @@ corpus. Three things keep it survivable, and each has a lever:
   Watch that MB figure. A JS string cannot exceed ~512 MB regardless of how
   much memory the machine has, so once it reads in the hundreds the answer is a
   scoped or paginated graph, not a larger heap.
+- **Recomputes do not rebuild.** A correlation recompute marks the snapshot
+  stale and returns; the rebuild happens once, later, in the coalesced refresh
+  job. Rebuilding inline was the single largest memory event in the API — a
+  whole-graph assembly per changed asset, invisible to the coalescing below
+  because it never enqueued a refresh job.
+- **Hub values are filtered out.** `CORRELATION_GRAPH_MAX_FANOUT` (default 10)
+  drops shared values bound to more than N assets from the *unscoped* graph. A
+  value held by hundreds of documents — a company name, a boilerplate footer —
+  connects everything to everything and carries no signal; the Fingerprints UI
+  already ranks values rarest-first for that reason. On a real corpus this kept
+  92% of distinct values while dropping half the edges. Scoped views
+  (`?assetId=`, `?sourceId=`) are never filtered — there the question is "what
+  touches this thing", and hiding an edge would be wrong. Set `0` to disable.
 - **Rebuild cadence** is coalesced by `CORRELATION_GRAPH_COALESCE_SECONDS`
   (default 180). A rebuild takes 13–24 seconds on a large corpus, and an active
   scan invalidates correlation continuously; with too short a window the API
@@ -119,6 +132,41 @@ starts shedding work:
 ```
 Heap guard: shedding CLI ingestion above 1638 MB of a 2048 MB V8 ceiling (derived)
 ```
+
+## How many workspaces scan at once
+
+`MAX_CONCURRENT_NAMESPACE_JOBS` caps how many workspaces run background jobs
+simultaneously. The API default is **4**, sized for Kubernetes where every
+worker is its own pod with its own memory limit. Desktop overrides it to 2 (3
+on 12+ cores) because one process serves every workspace here, and each
+namespace job spawns a CLI with its own detector pool — at 4 that is up to
+4 × `CLASSIFYRE_MAX_POOL_WORKERS` resident Python workers (~1 GB apiece for
+spaCy + torch) plus four ingest streams allocating into a single V8 heap.
+
+Measured on a laptop before the override: a sawtooth from 384 MB to 3435 MB
+every ~90 seconds, with `Namespace 'sec-edgar' acquired worker slot 4/4` while
+other workspaces queued behind it.
+
+## OCR and torch.compile
+
+The CLI disables `torch.compile` (`TORCH_COMPILE_DISABLE=1`, set in
+`src/utils/torch_runtime.py` before torch is imported). Inductor generates C++
+and shells out to a compiler at scan time, which needs a toolchain the desktop
+bundle and slim container images do not promise — and it builds the compiler
+command without quoting paths, so the desktop venv under
+`~/Library/Application Support/…` breaks it at the space:
+
+```
+clang++: error: no such file or directory: 'Support/Classifyre/…/torch/lib'
+```
+
+Docling falls back to eager execution, so this was never a visible failure —
+just 167 compile errors and 33 OCR extractions returning no text on one
+install. Measured on a single image with warm models: **58.5s compiling and
+failing versus 24.9s with compilation off**, identical extracted text.
+
+Set `TORCH_COMPILE_DISABLE` explicitly to override, if a deployment has a
+toolchain, space-free paths, and a measured reason to want inductor.
 
 ## What protects the process
 
