@@ -116,17 +116,17 @@ describe('EmbeddingQueueService', () => {
     ]);
     await new Promise((resolve) => setImmediate(resolve));
 
+    // Chunks travel grouped: one queue row carries many hashes, so the
+    // backlog stays small enough for pg-boss to fetch cheaply.
     expect(boss.insert).toHaveBeenCalledWith(
       'semantic-embeddings-9c85727f-8b6f-4de0-aee6-08a96b57f79b',
       [
         expect.objectContaining({
           data: {
             spaceId: '9c85727f-8b6f-4de0-aee6-08a96b57f79b',
-            hash: 'a'.repeat(64),
-            text: 'repeated text',
+            items: [{ hash: 'a'.repeat(64), text: 'repeated text' }],
           },
-          singletonKey: 'a'.repeat(64),
-          group: { id: 'embedding-inference' },
+          singletonKey: expect.any(String),
         }),
       ],
     );
@@ -368,7 +368,11 @@ describe('EmbeddingQueueService', () => {
       expect.arrayContaining([
         expect.objectContaining({
           data: expect.objectContaining({
-            text: 'Jane Doe J. Doe Person of interest',
+            items: expect.arrayContaining([
+              expect.objectContaining({
+                text: 'Jane Doe J. Doe Person of interest',
+              }),
+            ]),
           }),
         }),
       ]),

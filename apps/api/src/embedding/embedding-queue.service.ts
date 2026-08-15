@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { Injectable, Logger } from '@nestjs/common';
 import type { Job, JobInsert } from 'pg-boss';
 import { ClsService } from 'nestjs-cls';
@@ -20,6 +21,8 @@ const EMBEDDING_QUEUE_PREFIX = 'semantic-embeddings';
 const RECALIBRATE_QUEUE_PREFIX = 'semantic-recalibrate';
 const EMBEDDING_GROUP = 'embedding-inference';
 const INSERT_BATCH_SIZE = 500;
+/** Fallback when the configured queue batch size is unusable. */
+const DEFAULT_QUEUE_BATCH_SIZE = 64;
 // Insert-time analysis is order-dependent (early vectors see a sparse space),
 // so a full recalibration pass runs once the inference queue drains. The delay
 // batches bursts of scans into one pass; singletonKey collapses repeat requests.
@@ -34,7 +37,49 @@ const RECALIBRATE_DELAY_SECONDS = 120;
 const MAX_RECALIBRATION_DEFERRALS = 5;
 
 type QueuedContent = { hash: string; text: string };
-type EmbeddingJob = QueuedContent & { spaceId: string };
+
+/**
+ * A queue job carries a *group* of chunks.
+ *
+ * The single-chunk shape is still accepted because jobs enqueued by earlier
+ * versions are sitting in the queue right now; they drain through the same
+ * handler rather than being discarded.
+ */
+type EmbeddingJob = { spaceId: string } & (
+  | QueuedContent
+  | { items: QueuedContent[] }
+);
+
+/**
+ * Stable identity for a group of chunks.
+ *
+ * Order-independent so the same chunks always produce the same key however
+ * they were grouped, and hashed rather than concatenated because singleton_key
+ * is a single indexed column, not a place for 64 content hashes.
+ */
+function batchKey(items: QueuedContent[]): string {
+  const digest = createHash('sha256');
+  for (const hash of items.map((item) => item.hash).sort()) {
+    digest.update(hash);
+  }
+  return digest.digest('hex');
+}
+
+/** Chunks carried by a job, whichever shape it was enqueued in. */
+function jobItems(data: EmbeddingJob | undefined): QueuedContent[] {
+  if (!data) return [];
+  const batch = (data as { items?: unknown }).items;
+  if (Array.isArray(batch)) {
+    return batch.filter(
+      (item): item is QueuedContent =>
+        typeof item?.hash === 'string' && typeof item?.text === 'string',
+    );
+  }
+  const single = data as Partial<QueuedContent>;
+  return typeof single.hash === 'string' && typeof single.text === 'string'
+    ? [{ hash: single.hash, text: single.text }]
+    : [];
+}
 
 /** Captured namespace context so timers/setImmediate can re-enter CLS. */
 interface NsCtx {
@@ -388,10 +433,25 @@ export class EmbeddingQueueService {
     rt.pendingWrites += unique.size;
     try {
       const boss = await this.pgBoss.getBossAsync();
-      const jobs: JobInsert<EmbeddingJob>[] = [...unique].map(
-        ([hash, text]) => ({
-          data: { spaceId: rt.spaceId as string, hash, text },
-          singletonKey: hash,
+      const entries = [...unique];
+      // Never trust this to be a usable number: a non-positive or NaN size
+      // would slice nothing, and the loop would emit jobs carrying no chunks —
+      // work silently dropped rather than queued.
+      const size =
+        Math.max(1, Math.floor(this.config.queueBatchSize) || 0) ||
+        DEFAULT_QUEUE_BATCH_SIZE;
+      const jobs: JobInsert<EmbeddingJob>[] = [];
+      for (let offset = 0; offset < entries.length; offset += size) {
+        const items = entries
+          .slice(offset, offset + size)
+          .map(([hash, text]) => ({ hash, text }));
+        jobs.push({
+          data: { spaceId: rt.spaceId, items },
+          // The queue policy is `exclusive`, so singleton_key is what keeps a
+          // job unique; a null key would let only one job exist at a time.
+          // Deriving it from the group's contents keeps the old idempotency:
+          // re-enqueueing the same chunks collapses instead of duplicating.
+          singletonKey: batchKey(items),
           group: { id: EMBEDDING_GROUP },
           retryLimit: 5,
           retryDelay: this.config.retrySeconds,
@@ -399,8 +459,8 @@ export class EmbeddingQueueService {
           retryDelayMax: 3600,
           expireInSeconds: 3600,
           retentionSeconds: 86400,
-        }),
-      );
+        });
+      }
       for (let offset = 0; offset < jobs.length; offset += INSERT_BATCH_SIZE) {
         await boss.insert(
           rt.queueName,
@@ -414,14 +474,18 @@ export class EmbeddingQueueService {
 
   private async handle(jobs: Job<EmbeddingJob>[]): Promise<void> {
     const rt = this.runtime();
-    const contents = jobs
-      .map((job) => job.data)
-      .filter(
-        (data): data is EmbeddingJob =>
-          data?.spaceId === rt.spaceId &&
-          typeof data.hash === 'string' &&
-          typeof data.text === 'string',
-      );
+    const seen = new Set<string>();
+    const contents: QueuedContent[] = [];
+    for (const job of jobs) {
+      if (job.data?.spaceId !== rt.spaceId) continue;
+      for (const item of jobItems(job.data)) {
+        // A chunk can appear in more than one group when reconciliation
+        // regroups it; embedding it twice in one pass would be waste.
+        if (seen.has(item.hash)) continue;
+        seen.add(item.hash);
+        contents.push(item);
+      }
+    }
     if (!contents.length) return;
 
     const missing = new Set(
