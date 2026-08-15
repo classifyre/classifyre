@@ -1825,58 +1825,78 @@ export class CorrelationService {
     if (assetIds.length === 0)
       return { nodes: [], edges: [], truncated: false, similarities: [] };
 
-    const [assets, values] = await Promise.all([
+    // Values are grouped and filtered by Postgres, not by us.
+    //
+    // Fetching every correlation-value row and grouping in JS meant holding the
+    // whole table for the clustered assets in memory — 302,828 rows on the
+    // corpus that broke this — only to discard most of them: singletons connect
+    // nothing, and hub values are dropped by the fan-out filter anyway. Prisma
+    // deserialising those rows was measured as the dominant allocation in an
+    // API that died at 2 GB roughly ninety seconds after boot, with several
+    // namespaces building graphs at once.
+    //
+    // Doing the aggregation in SQL returns only the values that become nodes,
+    // already carrying their asset lists. Same graph, a fraction of the rows.
+    const maxFanOut = isScoped
+      ? Number.MAX_SAFE_INTEGER
+      : this.graphMaxFanOut === Number.POSITIVE_INFINITY
+        ? Number.MAX_SAFE_INTEGER
+        : this.graphMaxFanOut;
+
+    const [assets, grouped, hubCount] = await Promise.all([
       this.prisma.asset.findMany({
         where: { id: { in: assetIds } },
         select: ASSET_NODE_SELECT,
       }),
-      this.prisma.assetCorrelationValue.findMany({
-        where: { assetId: { in: assetIds } },
-        select: {
-          assetId: true,
-          valueHash: true,
-          label: true,
-          normalizedValue: true,
-        },
-      }),
+      this.prisma.$queryRaw<
+        Array<{
+          value_hash: string;
+          label: string;
+          value: string;
+          asset_ids: string[];
+        }>
+      >(Prisma.sql`
+        SELECT value_hash,
+               MIN(label) AS label,
+               MIN(normalized_value) AS value,
+               ARRAY_AGG(DISTINCT asset_id) AS asset_ids
+        FROM asset_correlation_values
+        WHERE asset_id IN (${Prisma.join(assetIds)})
+        GROUP BY value_hash
+        HAVING COUNT(DISTINCT asset_id) BETWEEN 2 AND ${maxFanOut}
+      `),
+      // Counted rather than inferred, so `truncated` still means "hub values
+      // were left out" even though they never reach this process.
+      this.prisma.$queryRaw<Array<{ count: bigint }>>(Prisma.sql`
+        SELECT COUNT(*)::bigint AS count FROM (
+          SELECT value_hash
+          FROM asset_correlation_values
+          WHERE asset_id IN (${Prisma.join(assetIds)})
+          GROUP BY value_hash
+          HAVING COUNT(DISTINCT asset_id) > ${maxFanOut}
+        ) hubs
+      `),
     ]);
 
-    // Group values; only those held by ≥2 assets connect the graph.
     const byHash = new Map<
       string,
       { label: string; value: string; assetIds: string[] }
-    >();
-    for (const v of values) {
-      const entry =
-        byHash.get(v.valueHash) ??
-        byHash
-          .set(v.valueHash, {
-            label: v.label,
-            value: v.normalizedValue,
-            assetIds: [],
-          })
-          .get(v.valueHash)!;
-      entry.assetIds.push(v.assetId);
-    }
+    >(
+      grouped.map((row) => [
+        row.value_hash,
+        { label: row.label, value: row.value, assetIds: row.asset_ids },
+      ]),
+    );
+    const droppedHubValues = Number(hubCount[0]?.count ?? 0);
 
     const nodes: GraphNodeDto[] = assets.map((a) =>
       assetNode(a, scopeSourceId),
     );
     const edges: GraphEdgeDto[] = [];
 
-    // Hub values are dropped from the unscoped graph — see graphMaxFanOut. A
-    // scoped view (one asset, one source) keeps everything: there the question
-    // is "what touches this thing", and answering it with a filtered edge set
-    // would quietly hide real connections.
-    const maxFanOut = isScoped ? Number.POSITIVE_INFINITY : this.graphMaxFanOut;
-    let droppedHubValues = 0;
-
+    // The ≥2-owner rule and the hub filter are applied by the query above, so
+    // everything still here becomes a node.
     for (const [hash, info] of byHash) {
-      if (info.assetIds.length < 2) continue;
-      if (info.assetIds.length > maxFanOut) {
-        droppedHubValues += 1;
-        continue;
-      }
       nodes.push({
         id: hash,
         type: 'finding',

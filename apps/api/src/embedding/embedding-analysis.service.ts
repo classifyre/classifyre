@@ -26,6 +26,8 @@ const RECURRENCE_HUB_CAP = 25;
 const RECURRENCE_BONUS = 0.12;
 const COMMON_VALUE_PENALTY = 0.1;
 const MIN_RECURRENCE_VALUE_LENGTH = 4;
+/** Findings analysed per page; the set for a hash list is corpus-sized. */
+const ANALYZE_PAGE_SIZE = 2000;
 const TEST_VALUE_PENALTY = 0.25;
 const REPEATED_DIGIT_PENALTY = 0.2;
 
@@ -157,192 +159,262 @@ export class EmbeddingAnalysisService {
     recurrenceSnapshot?: ValueRecurrence,
   ): Promise<void> {
     if (!contentHashes.length) return;
-    const findings = await this.prisma.finding.findMany({
+
+    // Occurrence counts come from a GROUP BY, not from counting rows here.
+    //
+    // The caller passes hashes derived from a batch of findings, but a hash is
+    // shared by many findings — 391 on average on the corpus this was measured
+    // against — so `findMany` over those hashes returned ~125,000 rows for a
+    // 500-finding batch, each carrying matched_content and both context
+    // windows. That read was the most frequent query in flight whenever the
+    // API's heap was climbing towards the 2 GB ceiling it died at.
+    //
+    // Counting in SQL and then walking the findings in pages keeps the peak
+    // flat. Every finding is still analyzed, with the same counts: the
+    // occurrence total is over all findings sharing the hash either way.
+    const countRows = await this.prisma.finding.groupBy({
+      by: ['embedContentHash'],
       where: { embedContentHash: { in: contentHashes } },
-      select: {
-        id: true,
-        embedContentHash: true,
-        severity: true,
-        confidence: true,
-        matchedContent: true,
-        contextBefore: true,
-        contextAfter: true,
-      },
+      _count: { _all: true },
     });
-    const counts = new Map<string, number>();
-    for (const finding of findings) {
-      if (finding.embedContentHash) {
-        counts.set(
-          finding.embedContentHash,
-          (counts.get(finding.embedContentHash) ?? 0) + 1,
-        );
-      }
-    }
-    const recurrence =
-      recurrenceSnapshot ??
-      (await this.valueRecurrence(
-        findings.map((finding) => this.normalizeValue(finding.matchedContent)),
-      ));
-
-    await Promise.all(
-      findings.map(async (finding) => {
-        const hash = finding.embedContentHash as string;
-        const similarCount = Math.max(0, (counts.get(hash) ?? 1) - 1);
-        const context = [
-          finding.contextBefore,
-          finding.matchedContent,
-          finding.contextAfter,
-        ]
-          .filter(Boolean)
-          .join(' ');
-        const qualityScore = this.textQuality(context);
-        const contextScore = Math.min(1, context.length / 320);
-        const noveltyScore = 1 / Math.sqrt(similarCount + 1);
-        const normalizedValue = this.normalizeValue(finding.matchedContent);
-        const valueSpread = recurrence.get(normalizedValue);
-        const crossAssetCount = valueSpread?.assets ?? 0;
-        const crossSourceCount = valueSpread?.sources ?? 0;
-        const testValue = isKnownTestValue(finding.matchedContent);
-        const repeatedDigits =
-          !testValue && isRepeatedDigitPattern(finding.matchedContent);
-        // Recurrence is a lead only when the value reappears in DIFFERENT
-        // contexts: the same value inside identical context windows is a
-        // copied template/fixture, already handled as a duplicate group.
-        const crossDocumentLead =
-          !testValue &&
-          !repeatedDigits &&
-          similarCount === 0 &&
-          crossAssetCount >= 2 &&
-          crossAssetCount <= RECURRENCE_HUB_CAP;
-        const commonValue = crossAssetCount > RECURRENCE_HUB_CAP;
-        let base =
-          qualityScore * 0.3 +
-          Number(finding.confidence) * 0.2 +
-          noveltyScore * 0.25 +
-          contextScore * 0.15 +
-          this.severityWeight(finding.severity) * 0.1;
-        // Below the gate, quality scales the whole score: an unreadable
-        // fragment must not keep the novelty/severity/confidence points that
-        // let OCR junk rank mid-table.
-        if (qualityScore < QUALITY_GATE) {
-          base *= qualityScore / QUALITY_GATE;
-        }
-        if (crossDocumentLead) base += RECURRENCE_BONUS;
-        if (commonValue) base -= COMMON_VALUE_PENALTY;
-        if (testValue) base -= TEST_VALUE_PENALTY;
-        if (repeatedDigits) base -= REPEATED_DIGIT_PENALTY;
-        const importanceScore =
-          Math.round(Math.max(0, Math.min(1, base)) * 1000) / 1000;
-        const reasons: Reason[] = [];
-        reasons.push(
-          qualityScore < 0.45
-            ? {
-                code: 'ocr_fragment',
-                label: 'Possible OCR fragment',
-                impact: 'down',
-              }
-            : {
-                code: 'readable_context',
-                label: 'Readable supporting context',
-                impact: 'up',
-              },
-        );
-        reasons.push(
-          similarCount > 0
-            ? {
-                code: 'duplicate_group',
-                label: `${similarCount} identical findings grouped`,
-                impact: 'down',
-              }
-            : {
-                code: 'unique_evidence',
-                label: 'Unique evidence in this corpus',
-                impact: 'up',
-              },
-        );
-        if (contextScore >= 0.5) {
-          reasons.push({
-            code: 'context',
-            label: 'Substantial surrounding context',
-            impact: 'up',
-          });
-        }
-        if (crossDocumentLead) {
-          reasons.push({
-            code: 'cross_document_recurrence',
-            label: `Same value found in ${crossAssetCount} assets${
-              crossSourceCount > 1 ? ` across ${crossSourceCount} sources` : ''
-            }`,
-            impact: 'up',
-          });
-        }
-        if (commonValue) {
-          reasons.push({
-            code: 'common_value',
-            label: `Common value shared by ${crossAssetCount} assets; not discriminating`,
-            impact: 'down',
-          });
-        }
-        if (testValue) {
-          reasons.push({
-            code: 'known_test_value',
-            label: 'Matches a documented payment-network test number',
-            impact: 'down',
-          });
-        }
-        if (repeatedDigits) {
-          reasons.push({
-            code: 'repeated_digit_pattern',
-            label: 'Digit string dominated by repeated digits; likely artifact',
-            impact: 'down',
-          });
-        }
-        reasons.push({
-          code: 'severity_separate',
-          label: `${finding.severity.toLowerCase()} detector severity (not importance)`,
-          impact: 'neutral',
-        });
-
-        await this.prisma.findingEvidenceAnalysis.upsert({
-          where: { findingId: finding.id },
-          create: {
-            findingId: finding.id,
-            spaceId,
-            importanceScore,
-            qualityScore,
-            similarCount,
-            duplicateGroupHash: similarCount ? hash : null,
-            reasons,
-            signals: {
-              contextScore,
-              noveltyScore,
-              detectorConfidence: Number(finding.confidence),
-              crossAssetCount,
-              crossSourceCount,
-              valueLength: normalizedValue.length,
-              ...(similarCount > 0 ? { duplicateSimilarity: 1 } : {}),
-            },
-          },
-          update: {
-            spaceId,
-            importanceScore,
-            qualityScore,
-            similarCount,
-            duplicateGroupHash: similarCount ? hash : null,
-            reasons,
-            signals: {
-              contextScore,
-              noveltyScore,
-              detectorConfidence: Number(finding.confidence),
-              crossAssetCount,
-              crossSourceCount,
-              valueLength: normalizedValue.length,
-              ...(similarCount > 0 ? { duplicateSimilarity: 1 } : {}),
-            },
-            analyzedAt: new Date(),
-          },
-        });
-      }),
+    const counts = new Map<string, number>(
+      countRows
+        .filter((row) => row.embedContentHash)
+        .map((row) => [row.embedContentHash as string, row._count._all]),
     );
+
+    // Computed once, before the walk. Doing it per page would re-run an
+    // aggregate over the findings table for every page — the walk exists to
+    // bound memory, not to multiply queries.
+    const recurrence =
+      recurrenceSnapshot ?? (await this.valueRecurrenceForHashes(contentHashes));
+
+    for await (const findings of this.findingPages(contentHashes)) {
+      await Promise.all(
+        findings.map(async (finding) => {
+          const hash = finding.embedContentHash as string;
+          const similarCount = Math.max(0, (counts.get(hash) ?? 1) - 1);
+          const context = [
+            finding.contextBefore,
+            finding.matchedContent,
+            finding.contextAfter,
+          ]
+            .filter(Boolean)
+            .join(' ');
+          const qualityScore = this.textQuality(context);
+          const contextScore = Math.min(1, context.length / 320);
+          const noveltyScore = 1 / Math.sqrt(similarCount + 1);
+          const normalizedValue = this.normalizeValue(finding.matchedContent);
+          const valueSpread = recurrence.get(normalizedValue);
+          const crossAssetCount = valueSpread?.assets ?? 0;
+          const crossSourceCount = valueSpread?.sources ?? 0;
+          const testValue = isKnownTestValue(finding.matchedContent);
+          const repeatedDigits =
+            !testValue && isRepeatedDigitPattern(finding.matchedContent);
+          // Recurrence is a lead only when the value reappears in DIFFERENT
+          // contexts: the same value inside identical context windows is a
+          // copied template/fixture, already handled as a duplicate group.
+          const crossDocumentLead =
+            !testValue &&
+            !repeatedDigits &&
+            similarCount === 0 &&
+            crossAssetCount >= 2 &&
+            crossAssetCount <= RECURRENCE_HUB_CAP;
+          const commonValue = crossAssetCount > RECURRENCE_HUB_CAP;
+          let base =
+            qualityScore * 0.3 +
+            Number(finding.confidence) * 0.2 +
+            noveltyScore * 0.25 +
+            contextScore * 0.15 +
+            this.severityWeight(finding.severity) * 0.1;
+          // Below the gate, quality scales the whole score: an unreadable
+          // fragment must not keep the novelty/severity/confidence points that
+          // let OCR junk rank mid-table.
+          if (qualityScore < QUALITY_GATE) {
+            base *= qualityScore / QUALITY_GATE;
+          }
+          if (crossDocumentLead) base += RECURRENCE_BONUS;
+          if (commonValue) base -= COMMON_VALUE_PENALTY;
+          if (testValue) base -= TEST_VALUE_PENALTY;
+          if (repeatedDigits) base -= REPEATED_DIGIT_PENALTY;
+          const importanceScore =
+            Math.round(Math.max(0, Math.min(1, base)) * 1000) / 1000;
+          const reasons: Reason[] = [];
+          reasons.push(
+            qualityScore < 0.45
+              ? {
+                  code: 'ocr_fragment',
+                  label: 'Possible OCR fragment',
+                  impact: 'down',
+                }
+              : {
+                  code: 'readable_context',
+                  label: 'Readable supporting context',
+                  impact: 'up',
+                },
+          );
+          reasons.push(
+            similarCount > 0
+              ? {
+                  code: 'duplicate_group',
+                  label: `${similarCount} identical findings grouped`,
+                  impact: 'down',
+                }
+              : {
+                  code: 'unique_evidence',
+                  label: 'Unique evidence in this corpus',
+                  impact: 'up',
+                },
+          );
+          if (contextScore >= 0.5) {
+            reasons.push({
+              code: 'context',
+              label: 'Substantial surrounding context',
+              impact: 'up',
+            });
+          }
+          if (crossDocumentLead) {
+            reasons.push({
+              code: 'cross_document_recurrence',
+              label: `Same value found in ${crossAssetCount} assets${
+                crossSourceCount > 1
+                  ? ` across ${crossSourceCount} sources`
+                  : ''
+              }`,
+              impact: 'up',
+            });
+          }
+          if (commonValue) {
+            reasons.push({
+              code: 'common_value',
+              label: `Common value shared by ${crossAssetCount} assets; not discriminating`,
+              impact: 'down',
+            });
+          }
+          if (testValue) {
+            reasons.push({
+              code: 'known_test_value',
+              label: 'Matches a documented payment-network test number',
+              impact: 'down',
+            });
+          }
+          if (repeatedDigits) {
+            reasons.push({
+              code: 'repeated_digit_pattern',
+              label:
+                'Digit string dominated by repeated digits; likely artifact',
+              impact: 'down',
+            });
+          }
+          reasons.push({
+            code: 'severity_separate',
+            label: `${finding.severity.toLowerCase()} detector severity (not importance)`,
+            impact: 'neutral',
+          });
+
+          await this.prisma.findingEvidenceAnalysis.upsert({
+            where: { findingId: finding.id },
+            create: {
+              findingId: finding.id,
+              spaceId,
+              importanceScore,
+              qualityScore,
+              similarCount,
+              duplicateGroupHash: similarCount ? hash : null,
+              reasons,
+              signals: {
+                contextScore,
+                noveltyScore,
+                detectorConfidence: Number(finding.confidence),
+                crossAssetCount,
+                crossSourceCount,
+                valueLength: normalizedValue.length,
+                ...(similarCount > 0 ? { duplicateSimilarity: 1 } : {}),
+              },
+            },
+            update: {
+              spaceId,
+              importanceScore,
+              qualityScore,
+              similarCount,
+              duplicateGroupHash: similarCount ? hash : null,
+              reasons,
+              signals: {
+                contextScore,
+                noveltyScore,
+                detectorConfidence: Number(finding.confidence),
+                crossAssetCount,
+                crossSourceCount,
+                valueLength: normalizedValue.length,
+                ...(similarCount > 0 ? { duplicateSimilarity: 1 } : {}),
+              },
+              analyzedAt: new Date(),
+            },
+          });
+        }),
+      );
+    }
+  }
+
+  /**
+   * Recurrence for exactly the values carried by these hashes, in one query.
+   *
+   * Equivalent to collecting every matched value for the hashes and asking
+   * valueRecurrence about them, without materialising the findings to do it.
+   */
+  private async valueRecurrenceForHashes(
+    contentHashes: string[],
+  ): Promise<ValueRecurrence> {
+    const rows = await this.prisma.$queryRaw<ValueRecurrenceRow[]>`
+      SELECT "normalizedValue",
+             count(DISTINCT asset_id) AS "assetCount",
+             count(DISTINCT source_id) AS "sourceCount"
+      FROM (
+        SELECT lower(btrim(regexp_replace(matched_content, '\s+', ' ', 'g'))) AS "normalizedValue",
+               asset_id, source_id
+        FROM findings
+        WHERE embed_content_hash = ANY(${contentHashes}::text[])
+      ) scoped
+      WHERE length("normalizedValue") >= ${MIN_RECURRENCE_VALUE_LENGTH}
+      GROUP BY 1
+    `;
+    return new Map(
+      rows.map((row) => [
+        row.normalizedValue,
+        { assets: Number(row.assetCount), sources: Number(row.sourceCount) },
+      ]),
+    );
+  }
+
+  /**
+   * Findings for a set of content hashes, in bounded pages.
+   *
+   * The page size is the bound that matters: the *number* of findings sharing
+   * these hashes is a property of the corpus, not of what the caller asked
+   * for, and on a real one it is hundreds of times larger.
+   */
+  private async *findingPages(contentHashes: string[]) {
+    let cursor: string | undefined;
+    for (;;) {
+      const page = await this.prisma.finding.findMany({
+        where: { embedContentHash: { in: contentHashes } },
+        select: {
+          id: true,
+          embedContentHash: true,
+          severity: true,
+          confidence: true,
+          matchedContent: true,
+          contextBefore: true,
+          contextAfter: true,
+        },
+        orderBy: { id: 'asc' },
+        take: ANALYZE_PAGE_SIZE,
+        ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
+      });
+      if (!page.length) return;
+      yield page;
+      if (page.length < ANALYZE_PAGE_SIZE) return;
+      cursor = page.at(-1)?.id;
+    }
   }
 }
