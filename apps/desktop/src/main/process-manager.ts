@@ -193,6 +193,25 @@ export function detectorWorkerCount(): number {
   return Math.max(1, Math.min(4, Math.floor(cores / 2) - 1));
 }
 
+export function namespaceJobConcurrency(): number {
+  // How many workspaces may run background jobs at once.
+  //
+  // The API default is 4, sized for Kubernetes where each worker is its own
+  // pod with its own memory limit. Desktop is the opposite: SERVICE_ROLE
+  // defaults to `all`, so one process serves every workspace, and each
+  // namespace job spawns a CLI with its own detector pool. At the default that
+  // is up to 4 × CLASSIFYRE_MAX_POOL_WORKERS resident Python workers (~1 GB
+  // apiece for spaCy + torch) plus four ingest streams allocating into one
+  // shared V8 heap — measured on a laptop as a sawtooth from 384 MB to
+  // 3435 MB every ~90 seconds, with `sec-edgar acquired slot 4/4` while other
+  // workspaces queued behind it.
+  //
+  // Two keeps a workspace making progress while another is busy, without
+  // letting the machine's memory be claimed four times over.
+  const cores = os.cpus().length;
+  return cores >= 12 ? 3 : 2;
+}
+
 function resourceDefaultEnv(): Record<string, string> {
   const cores = os.cpus().length;
   const detectorWorkers = detectorWorkerCount();
@@ -201,6 +220,7 @@ function resourceDefaultEnv(): Record<string, string> {
     // threads per worker so workers*threads stays well under core count.
     CLASSIFYRE_MAX_POOL_WORKERS: String(detectorWorkers),
     CLASSIFYRE_WORKER_THREADS: "2",
+    MAX_CONCURRENT_NAMESPACE_JOBS: String(namespaceJobConcurrency()),
     // Embedding inference: small batches, few threads — throughput matters
     // less than the machine staying responsive.
     EMBEDDING_BATCH_SIZE: "8",
