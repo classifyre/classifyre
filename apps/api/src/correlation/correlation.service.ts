@@ -1462,23 +1462,45 @@ export class CorrelationService {
     return data;
   }
 
-  /** Touched assets plus every asset that shares ≥1 value with them. */
+  /**
+   * Touched assets plus every asset that shares ≥1 value with them.
+   *
+   * The de-duplication has to happen in SQL. Prisma's `distinct` is applied by
+   * the query engine *after* the rows arrive, so `distinct: ['assetId']` over
+   * a chunk of value hashes fetched every matching row and threw away the
+   * duplicates in JS. With hub values — the corpus that broke this had values
+   * bound to 4,872 assets apiece — one chunk of 1,000 hashes pulled **803,341
+   * rows to yield 15,321 distinct assets**, a 52x amplification, and every one
+   * of those rows became a UUID string on the heap.
+   *
+   * That is what an OOM heap snapshot of the running API was full of: 1.93
+   * million UUID strings, 550 MB of the 731 MB captured, accumulated in
+   * roughly twenty seconds. `SELECT DISTINCT` moves the work to Postgres,
+   * which answers with the 15k rows that were actually wanted.
+   */
   private async incrementalWorkingSet(touchedIds: string[]): Promise<string[]> {
     const working = new Set(touchedIds);
     for (const ids of chunk(touchedIds, 1000)) {
-      const hashRows = await this.prisma.assetCorrelationValue.findMany({
-        where: { assetId: { in: ids } },
-        select: { valueHash: true },
-        distinct: ['valueHash'],
-      });
-      const hashes = hashRows.map((r) => r.valueHash);
+      const hashRows = await this.prisma.$queryRaw<
+        Array<{ value_hash: string }>
+      >(
+        Prisma.sql`
+          SELECT DISTINCT value_hash
+          FROM asset_correlation_values
+          WHERE asset_id IN (${Prisma.join(ids)})
+        `,
+      );
+      const hashes = hashRows.map((r) => r.value_hash);
       for (const hChunk of chunk(hashes, 1000)) {
-        const owners = await this.prisma.assetCorrelationValue.findMany({
-          where: { valueHash: { in: hChunk } },
-          select: { assetId: true },
-          distinct: ['assetId'],
-        });
-        for (const o of owners) working.add(o.assetId);
+        if (hChunk.length === 0) continue;
+        const owners = await this.prisma.$queryRaw<Array<{ asset_id: string }>>(
+          Prisma.sql`
+            SELECT DISTINCT asset_id
+            FROM asset_correlation_values
+            WHERE value_hash IN (${Prisma.join(hChunk)})
+          `,
+        );
+        for (const o of owners) working.add(o.asset_id);
       }
     }
     return Array.from(working);
