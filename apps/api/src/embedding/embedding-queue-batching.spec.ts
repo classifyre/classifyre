@@ -156,6 +156,71 @@ describe('embedding queue batching', () => {
     expect(h.provider.embedMany).toHaveBeenCalledWith(['chunk text 1']);
   });
 
+  describe('clearing a pre-upgrade backlog', () => {
+    function drainHarness(deletedPerPage: number[]) {
+      const executed: Array<{ sql: string; params: unknown[] }> = [];
+      const prisma = {
+        $executeRawUnsafe: jest.fn((sql: string, ...params: unknown[]) => {
+          executed.push({ sql, params });
+          return Promise.resolve(deletedPerPage.shift() ?? 0);
+        }),
+      };
+      const logger = { log: jest.fn(), warn: jest.fn(), error: jest.fn() };
+      const service = Object.create(EmbeddingQueueService.prototype) as {
+        dropUngroupedBacklog: (rt: unknown) => Promise<void>;
+      };
+      Object.assign(service, {
+        prisma,
+        logger,
+        cls: { get: () => 'a7914323-a0b2-47bf-b451-da1de451568d' },
+      });
+      return { service, prisma, executed, logger };
+    }
+    const rt = { queueName: 'semantic-embeddings-space-1', spaceId: 'space-1' };
+
+    it('deletes only queued single-chunk jobs, in bounded pages', async () => {
+      const h = drainHarness([20000, 20000, 137]);
+
+      await h.service.dropUngroupedBacklog(rt);
+
+      expect(h.prisma.$executeRawUnsafe).toHaveBeenCalledTimes(3);
+      const sql = h.executed[0].sql;
+      // Queued only: an in-flight or finished job must never be touched.
+      expect(sql).toMatch(/state = 'created'/);
+      // Legacy shape only: grouped jobs carry `items`, not `hash`.
+      expect(sql).toMatch(/data \? 'hash'/);
+      expect(sql).toMatch(/LIMIT 20000/);
+      expect(h.executed[0].params).toEqual([rt.queueName]);
+    });
+
+    it('stops as soon as a page comes back short', async () => {
+      const h = drainHarness([5]);
+
+      await h.service.dropUngroupedBacklog(rt);
+
+      expect(h.prisma.$executeRawUnsafe).toHaveBeenCalledTimes(1);
+    });
+
+    it('says nothing when there is no backlog', async () => {
+      const h = drainHarness([0]);
+
+      await h.service.dropUngroupedBacklog(rt);
+
+      expect(h.logger.log).not.toHaveBeenCalled();
+    });
+
+    it('never blocks worker startup when the delete fails', async () => {
+      // The queue still works without this cleanup — it is only slower.
+      const h = drainHarness([]);
+      h.prisma.$executeRawUnsafe.mockRejectedValueOnce(
+        new Error('permission denied'),
+      );
+
+      await expect(h.service.dropUngroupedBacklog(rt)).resolves.toBeUndefined();
+      expect(h.logger.warn).toHaveBeenCalled();
+    });
+  });
+
   it('ignores jobs belonging to another space', async () => {
     const h = harness(4);
 
