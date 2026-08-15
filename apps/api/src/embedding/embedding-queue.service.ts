@@ -21,6 +21,8 @@ const EMBEDDING_QUEUE_PREFIX = 'semantic-embeddings';
 const RECALIBRATE_QUEUE_PREFIX = 'semantic-recalibrate';
 const EMBEDDING_GROUP = 'embedding-inference';
 const INSERT_BATCH_SIZE = 500;
+/** How often to re-check queue depth while the backfill is paced. */
+const QUEUE_CAPACITY_POLL_MS = 5000;
 /** Fallback when the configured queue batch size is unusable. */
 const DEFAULT_QUEUE_BATCH_SIZE = 64;
 // Insert-time analysis is order-dependent (early vectors see a sparse space),
@@ -567,7 +569,55 @@ export class EmbeddingQueueService {
         rt.spaceId,
       ),
     );
-    await this.persist(contents.filter((content) => missing.has(content.hash)));
+    const work = contents.filter((content) => missing.has(content.hash));
+    if (!work.length) return;
+    await this.awaitQueueCapacity(rt);
+    await this.persist(work);
+  }
+
+  /**
+   * Holds the backfill while the queue is already full enough.
+   *
+   * Without this the producer runs at memory-and-disk speed and the consumer at
+   * inference speed — measured at ~70,000 enqueued per minute against ~3
+   * completed. The queue then grows without bound, and because pg-boss sorts
+   * the due backlog on every fetch, growing it is what makes the consumer
+   * slower still.
+   *
+   * This paces rather than discards. The walk resumes the moment there is room,
+   * covering exactly the same chunks; only the rate changes.
+   */
+  private async awaitQueueCapacity(rt: EmbeddingRuntime): Promise<void> {
+    if (!rt.queueName) return;
+    // A missing or nonsensical limit must not pause the backfill forever:
+    // pacing is an optimisation, and work never waits on a bad setting.
+    const limit = Number(this.config.queueHighWaterMark);
+    if (!Number.isFinite(limit) || limit <= 0) return;
+
+    for (let attempt = 0; !rt.disposed; attempt++) {
+      let queued: number;
+      try {
+        const boss = await this.pgBoss.getBossAsync();
+        const stats = await boss.getQueueStats(rt.queueName);
+        queued = stats?.queuedCount ?? 0;
+      } catch {
+        // Depth unknown: proceed rather than stall the backfill forever.
+        return;
+      }
+      if (queued < limit) return;
+
+      // Logged once per wait, not per poll: a long hold is normal on a large
+      // corpus and should read as pacing rather than as a fault.
+      if (attempt === 0) {
+        this.logger.log(
+          `Embedding backfill paused for space ${rt.spaceId}: ${queued} job(s) queued ` +
+            `(limit ${limit}); resuming as the queue drains`,
+        );
+      }
+      await new Promise((resolve) =>
+        setTimeout(resolve, QUEUE_CAPACITY_POLL_MS),
+      );
+    }
   }
 
   private async backfillFindings(rt: EmbeddingRuntime): Promise<void> {
