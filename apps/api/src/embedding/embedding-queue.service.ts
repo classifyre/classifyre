@@ -3,7 +3,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import type { Job, JobInsert } from 'pg-boss';
 import { ClsService } from 'nestjs-cls';
 import { PrismaService } from '../prisma.service';
-import { PgBossService } from '../scheduler/pg-boss.service';
+import { PgBossService, pgBossSchemaForId } from '../scheduler/pg-boss.service';
 import { EmbeddingCapabilityService } from './embedding-capability.service';
 import { embeddingContentHash, normalizeEmbeddingText } from './embedding-text';
 import { EmbeddingConfigService } from './embedding-config.service';
@@ -23,6 +23,8 @@ const EMBEDDING_GROUP = 'embedding-inference';
 const INSERT_BATCH_SIZE = 500;
 /** Fallback when the configured queue batch size is unusable. */
 const DEFAULT_QUEUE_BATCH_SIZE = 64;
+/** Rows per DELETE when clearing a pre-upgrade backlog, to bound lock time. */
+const LEGACY_DELETE_PAGE = 20000;
 // Insert-time analysis is order-dependent (early vectors see a sparse space),
 // so a full recalibration pass runs once the inference queue drains. The delay
 // batches bursts of scans into one pass; singletonKey collapses repeat requests.
@@ -199,6 +201,8 @@ export class EmbeddingQueueService {
     const rt = await this.ensureRuntime();
     rt.disposed = false;
     if (!runsBackgroundWorkers()) return;
+
+    await this.dropUngroupedBacklog(rt);
 
     await this.pgBoss.work(
       rt.queueName as string,
@@ -415,6 +419,65 @@ export class EmbeddingQueueService {
       rt.backfillPromise = undefined;
     });
     return { started: true, spaceId: rt.spaceId };
+  }
+
+  /**
+   * Clears any single-chunk jobs left queued by an earlier version.
+   *
+   * Upgrading does not help an install that is already buried: the millions of
+   * one-chunk rows are precisely what makes pg-boss's fetch sort expensive, so
+   * without this the new grouped jobs queue up *behind* a backlog that keeps
+   * the queue slow. One install had 3.3M and 1.1M of them in two namespaces.
+   *
+   * Deleting them loses no work. The queue is a work list, not a record:
+   * backfillStoredContent walks findings, asset chunks and glossary terms and
+   * enqueues whatever `missingHashes` says has no vector, so everything
+   * removed here is re-queued — in grouped form — by the reconciliation that
+   * already runs at startup. Only `created` jobs are touched, so nothing
+   * in-flight is disturbed, and the delete is paged so a large backlog does
+   * not hold a lock.
+   *
+   * Self-limiting: once an install is migrated there is nothing left to match.
+   */
+  private async dropUngroupedBacklog(rt: EmbeddingRuntime): Promise<void> {
+    if (!rt.queueName) return;
+    const schema = pgBossSchemaForId(
+      this.cls.get<string>(CLS_NAMESPACE_ID) ?? '',
+    );
+    if (!schema) return;
+
+    let removed = 0;
+    try {
+      for (;;) {
+        const deleted = await this.prisma.$executeRawUnsafe(
+          `DELETE FROM "${schema}".job
+             WHERE ctid IN (
+               SELECT ctid FROM "${schema}".job
+                WHERE name = $1 AND state = 'created' AND data ? 'hash'
+                LIMIT ${LEGACY_DELETE_PAGE}
+             )`,
+          rt.queueName,
+        );
+        removed += deleted;
+        if (deleted < LEGACY_DELETE_PAGE) break;
+      }
+    } catch (error) {
+      // Never block worker startup on a cleanup: the queue still functions,
+      // it is just slower until this succeeds on a later boot.
+      this.logger.warn(
+        `Could not clear ungrouped embedding backlog: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      return;
+    }
+
+    if (removed > 0) {
+      this.logger.log(
+        `Cleared ${removed} ungrouped embedding job(s) for space ${rt.spaceId}; ` +
+          `reconciliation will re-queue the missing chunks in groups`,
+      );
+    }
   }
 
   private async persist(contents: QueuedContent[]): Promise<void> {
