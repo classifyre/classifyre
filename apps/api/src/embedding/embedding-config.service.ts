@@ -42,6 +42,30 @@ export class EmbeddingConfigService {
   readonly pooling = process.env.EMBEDDING_POOLING ?? 'mean';
   readonly normalize = booleanEnv('EMBEDDING_NORMALIZE', true);
   readonly batchSize = integerEnv('EMBEDDING_BATCH_SIZE', 32, 1, 256);
+  /**
+   * Chunk texts packed into a single queue job.
+   *
+   * One job per chunk does not survive a real corpus. pg-boss orders its fetch
+   * by `priority DESC, created_on, id`, which its `(name, start_after)` index
+   * cannot satisfy, so every fetch sorts the whole due backlog to take a
+   * handful of rows. Measured on a desktop install with 1.1M queued chunks:
+   * a single fetch of 8 jobs scanned 1,123,734 index entries and took **9.9
+   * seconds**, reading 211 MB of buffers. Fetch cost therefore grows with the
+   * backlog, so the further behind the queue falls the slower it drains — and
+   * it never catches up.
+   *
+   * Packing chunks into one job divides the row count by this factor and takes
+   * the sort back to something trivial. It changes nothing about the work: the
+   * same chunks are embedded, by the same provider, in the same inference
+   * batches (see batchSize) — there is simply one queue row per group instead
+   * of one per chunk.
+   */
+  readonly queueBatchSize = integerEnv(
+    'EMBEDDING_QUEUE_BATCH_SIZE',
+    64,
+    1,
+    1000,
+  );
   readonly workerConcurrency = integerEnv(
     'EMBEDDING_WORKER_CONCURRENCY',
     1,
