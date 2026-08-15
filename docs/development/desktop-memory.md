@@ -99,6 +99,11 @@ corpus. Three things keep it survivable, and each has a lever:
   Watch that MB figure. A JS string cannot exceed ~512 MB regardless of how
   much memory the machine has, so once it reads in the hundreds the answer is a
   scoped or paginated graph, not a larger heap.
+- **Recomputes do not rebuild.** A correlation recompute marks the snapshot
+  stale and returns; the rebuild happens once, later, in the coalesced refresh
+  job. Rebuilding inline was the single largest memory event in the API — a
+  whole-graph assembly per changed asset, invisible to the coalescing below
+  because it never enqueued a refresh job.
 - **Rebuild cadence** is coalesced by `CORRELATION_GRAPH_COALESCE_SECONDS`
   (default 180). A rebuild takes 13–24 seconds on a large corpus, and an active
   scan invalidates correlation continuously; with too short a window the API

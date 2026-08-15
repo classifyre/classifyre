@@ -82,34 +82,6 @@ export class CorrelationGraphCacheService {
     });
   }
 
-  /** Called while the correlation write lock is already held. */
-  async publishAfterRecomputeLocked(
-    builder: GraphBuilder,
-    reason: string,
-  ): Promise<void> {
-    const state = await this.prisma.correlationGraphSnapshot.upsert({
-      where: { id: SNAPSHOT_ID },
-      create: {
-        id: SNAPSHOT_ID,
-        requestedVersion: 1n,
-        lastInvalidation: reason,
-      },
-      update: {
-        requestedVersion: { increment: 1n },
-        lastInvalidation: reason,
-      },
-    });
-    try {
-      await this.buildAndPublish(builder, state.requestedVersion);
-    } catch (error) {
-      await this.recordError(error);
-      void this.jobs.scheduleGraphRefresh('snapshot publication failed');
-      this.logger.warn(
-        `Correlation recompute succeeded but graph snapshot publication failed: ${String(error)}`,
-      );
-    }
-  }
-
   async invalidate(reason: string): Promise<void> {
     await this.prisma.correlationGraphSnapshot.upsert({
       where: { id: SNAPSHOT_ID },
