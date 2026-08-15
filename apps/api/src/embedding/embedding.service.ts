@@ -19,6 +19,14 @@ import { EmbeddingConfigService } from './embedding-config.service';
 import { embeddingContentHash } from './embedding-text';
 
 type SimilarityRow = { id: string; score: number };
+/** One neighbour of a (content hash, finding type) pair. */
+type NeighborhoodSeedRow = {
+  targetHash: string;
+  findingType: string;
+  neighborHash: string;
+  score: number;
+};
+
 type NeighborhoodRow = {
   findingId: string;
   targetHash: string;
@@ -44,6 +52,8 @@ const MIN_NEIGHBORHOOD = 5;
 // half the corpus.
 const OUTLIER_BONUS_THRESHOLD = 0.55;
 const RECALIBRATE_BATCH_SIZE = 500;
+/** Findings read per page when fanning a neighbourhood back out. */
+const NEIGHBORHOOD_PAGE_SIZE = 2000;
 
 /**
  * Batches of already-scored findings one pass will refresh, after it has
@@ -445,6 +455,49 @@ export class EmbeddingService {
     return analyzed;
   }
 
+  /**
+   * Findings sharing the given content hashes, read in bounded pages.
+   *
+   * The count is not bounded by the caller's batch: a hash is shared by
+   * hundreds of findings, so this is the set that used to arrive as one
+   * multi-million-row join. Paging keeps the peak flat regardless of how
+   * popular a hash turns out to be.
+   */
+  private async findingsForHashes(
+    contentHashes: string[],
+  ): Promise<
+    Array<{ id: string; embedContentHash: string; findingType: string }>
+  > {
+    const results: Array<{
+      id: string;
+      embedContentHash: string;
+      findingType: string;
+    }> = [];
+    let cursor: string | undefined;
+    for (;;) {
+      const page = await this.prisma.finding.findMany({
+        where: { embedContentHash: { in: contentHashes } },
+        select: { id: true, embedContentHash: true, findingType: true },
+        orderBy: { id: 'asc' },
+        take: NEIGHBORHOOD_PAGE_SIZE,
+        ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
+      });
+      if (!page.length) break;
+      for (const row of page) {
+        if (row.embedContentHash) {
+          results.push({
+            id: row.id,
+            embedContentHash: row.embedContentHash,
+            findingType: String(row.findingType),
+          });
+        }
+      }
+      if (page.length < NEIGHBORHOOD_PAGE_SIZE) break;
+      cursor = page.at(-1)?.id;
+    }
+    return results;
+  }
+
   private async calibrateNeighborhood(
     space: { id: string; dim: number },
     contentHashes: string[],
@@ -452,7 +505,7 @@ export class EmbeddingService {
     if (!contentHashes.length) return;
     const spaceId = this.spaceIdLiteral(space.id);
     const dim = Prisma.raw(String(space.dim));
-    const rows = await this.prisma.$transaction(async (tx) => {
+    const seeds = await this.prisma.$transaction(async (tx) => {
       await tx.$executeRaw(
         Prisma.raw(`SET LOCAL hnsw.ef_search = ${this.config.hnswEfSearch}`),
       );
@@ -460,11 +513,16 @@ export class EmbeddingService {
       // the index scan; relaxed_order lets the scan keep going until LIMIT is
       // filled instead of falling back to an exact full-table sort.
       await tx.$executeRaw`SET LOCAL hnsw.iterative_scan = relaxed_order`;
-      return tx.$queryRaw<NeighborhoodRow[]>(Prisma.sql`
-        SELECT target.id AS "findingId", target.embed_content_hash AS "targetHash",
+      return tx.$queryRaw<NeighborhoodSeedRow[]>(Prisma.sql`
+        SELECT target.embed_content_hash AS "targetHash",
+          target.finding_type AS "findingType",
           neighbor.content_hash AS "neighborHash",
           1 - (target_embedding.vec <=> neighbor.vec) AS score
-        FROM findings target
+        FROM (
+          SELECT DISTINCT embed_content_hash, finding_type
+          FROM findings
+          WHERE embed_content_hash = ANY(${contentHashes}::text[])
+        ) target
         JOIN content_embeddings target_embedding
           ON target_embedding.content_hash = target.embed_content_hash
          AND target_embedding.space_id = ${spaceId}
@@ -483,19 +541,50 @@ export class EmbeddingService {
             target_embedding.vec::public.vector(${dim})
           LIMIT 10
         ) neighbor
-        WHERE target.embed_content_hash = ANY(${contentHashes}::text[])
       `);
     });
-    const grouped = new Map<string, NeighborhoodRow[]>();
+
+    // Neighbours per (hash, finding_type), expanded to findings here.
+    //
+    // The query used to select `FROM findings target`, so it returned a row
+    // per finding per neighbour — and a content hash is shared by many
+    // findings: on a real corpus, 391 on average and 6,344 at the worst. A
+    // 500-finding batch therefore dissolved into ~156,000 targets and ~1.5M
+    // rows, which is how a bounded-looking batch allocated gigabytes and took
+    // the API down with "Ineffective mark-compacts near heap limit".
+    //
+    // The neighbourhood does not vary per finding: the candidate filter is on
+    // finding_type, so every finding sharing a (hash, type) has the same
+    // answer. Computing it once and fanning it out here is the same result
+    // from ~400 rows instead of ~1.5M — nothing is sampled or dropped.
+    const seedsByKey = new Map<string, NeighborhoodSeedRow[]>();
     const nearDuplicateComponents = new UnionFind([]);
-    for (const row of rows) {
-      const normalizedRow = { ...row, score: Number(row.score) };
-      const values = grouped.get(row.findingId) ?? [];
-      values.push(normalizedRow);
-      grouped.set(row.findingId, values);
-      if (normalizedRow.score >= 0.95) {
+    for (const row of seeds) {
+      const normalized = { ...row, score: Number(row.score) };
+      const key = `${row.targetHash}\u0000${row.findingType}`;
+      const values = seedsByKey.get(key) ?? [];
+      values.push(normalized);
+      seedsByKey.set(key, values);
+      if (normalized.score >= 0.95) {
         nearDuplicateComponents.union(row.targetHash, row.neighborHash);
       }
+    }
+
+    const grouped = new Map<string, NeighborhoodRow[]>();
+    for (const target of await this.findingsForHashes(contentHashes)) {
+      const seedsForTarget = seedsByKey.get(
+        `${target.embedContentHash}\u0000${target.findingType}`,
+      );
+      if (!seedsForTarget?.length) continue;
+      grouped.set(
+        target.id,
+        seedsForTarget.map((seed) => ({
+          findingId: target.id,
+          targetHash: seed.targetHash,
+          neighborHash: seed.neighborHash,
+          score: seed.score,
+        })),
+      );
     }
     const componentMembers = new Map<string, string[]>();
     for (const hash of nearDuplicateComponents.ids()) {
