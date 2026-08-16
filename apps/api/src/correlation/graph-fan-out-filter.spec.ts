@@ -117,13 +117,16 @@ describe('buildGraphFromDatabase fan-out filtering', () => {
     source: { name: 'Corpus' },
   });
 
-  /** Five assets: a rare value binds two of them, a hub value binds all five. */
+  /**
+   * The grouping and the fan-out bound now live in SQL, so the harness records
+   * the queries and answers them the way Postgres would.
+   */
   function harness(env: NodeJS.ProcessEnv = {}) {
     const assetIds = ['a1', 'a2', 'a3', 'a4', 'a5'];
+    const queries: string[] = [];
+    const params: unknown[][] = [];
     const prisma = {
-      assetCluster: {
-        findMany: jest.fn().mockResolvedValue([{ id: 'c1' }]),
-      },
+      assetCluster: { findMany: jest.fn().mockResolvedValue([{ id: 'c1' }]) },
       assetClusterMember: {
         findMany: jest
           .fn()
@@ -131,31 +134,42 @@ describe('buildGraphFromDatabase fan-out filtering', () => {
         findUnique: jest.fn().mockResolvedValue({ clusterId: 'c1' }),
       },
       asset: { findMany: jest.fn().mockResolvedValue(assetIds.map(asset)) },
+      // Must not be used any more: fetching every row was the bug.
       assetCorrelationValue: {
-        findMany: jest.fn().mockResolvedValue([
-          // rare: only a1 and a2 — the investigative signal
-          {
-            assetId: 'a1',
-            valueHash: 'rare',
-            label: 'account',
-            normalizedValue: 'ACC-9931',
-          },
-          {
-            assetId: 'a2',
-            valueHash: 'rare',
-            label: 'account',
-            normalizedValue: 'ACC-9931',
-          },
-          // hub: every asset — boilerplate
-          ...assetIds.map((id) => ({
-            assetId: id,
-            valueHash: 'hub',
-            label: 'organization',
-            normalizedValue: 'Enron',
-          })),
-        ]),
+        findMany: jest.fn(() => {
+          throw new Error('raw rows must not be fetched into JS');
+        }),
       },
       edge: { findMany: jest.fn().mockResolvedValue([]) },
+      $queryRaw: jest.fn((sql: { strings?: string[]; values?: unknown[] }) => {
+        const text = (sql.strings ?? []).join(' ').replace(/\s+/g, ' ');
+        queries.push(text);
+        params.push(sql.values ?? []);
+        const bound = Number((sql.values ?? []).at(-1));
+        if (/COUNT\(\*\)/.test(text)) {
+          // Hub count: the hub value binds all five assets.
+          return Promise.resolve([{ count: 5 > bound ? 1n : 0n }]);
+        }
+        const rows = [
+          {
+            value_hash: 'rare',
+            label: 'account',
+            value: 'ACC-9931',
+            asset_ids: ['a1', 'a2'],
+          },
+          {
+            value_hash: 'hub',
+            label: 'organization',
+            value: 'Enron',
+            asset_ids: assetIds,
+          },
+        ];
+        return Promise.resolve(
+          rows.filter(
+            (r) => r.asset_ids.length >= 2 && r.asset_ids.length <= bound,
+          ),
+        );
+      }),
     };
 
     const service = Object.create(CorrelationServiceProto) as {
@@ -169,13 +183,26 @@ describe('buildGraphFromDatabase fan-out filtering', () => {
       }>;
     };
     Object.assign(service, { prisma, graphMaxFanOut: readGraphMaxFanOut(env) });
-    return service;
+    return { service, queries, params, prisma };
   }
 
+  it('asks Postgres to group and bound, instead of fetching every row', async () => {
+    const h = harness({ CORRELATION_GRAPH_MAX_FANOUT: '3' });
+
+    await h.service.buildGraphFromDatabase();
+
+    expect(h.prisma.assetCorrelationValue.findMany).not.toHaveBeenCalled();
+    expect(h.queries[0]).toMatch(/GROUP BY value_hash/);
+    expect(h.queries[0]).toMatch(
+      /HAVING COUNT\(DISTINCT asset_id\) BETWEEN 2 AND/,
+    );
+    expect(h.params[0]?.at(-1)).toBe(3);
+  });
+
   it('drops the hub value from the unscoped graph and flags it', async () => {
-    const graph = await harness({ CORRELATION_GRAPH_MAX_FANOUT: '3' })[
-      'buildGraphFromDatabase'
-    ]();
+    const graph = await harness({
+      CORRELATION_GRAPH_MAX_FANOUT: '3',
+    }).service.buildGraphFromDatabase();
 
     const ids = graph.nodes.map((n) => n.id);
     expect(ids).toContain('rare');
@@ -186,9 +213,9 @@ describe('buildGraphFromDatabase fan-out filtering', () => {
   });
 
   it('keeps everything when the graph is scoped to one asset', async () => {
-    const graph = await harness({ CORRELATION_GRAPH_MAX_FANOUT: '3' })[
-      'buildGraphFromDatabase'
-    ]({ assetId: 'a1' });
+    const h = harness({ CORRELATION_GRAPH_MAX_FANOUT: '3' });
+
+    const graph = await h.service.buildGraphFromDatabase({ assetId: 'a1' });
 
     const ids = graph.nodes.map((n) => n.id);
     expect(ids).toContain('rare');
@@ -197,9 +224,9 @@ describe('buildGraphFromDatabase fan-out filtering', () => {
   });
 
   it('keeps everything when the filter is disabled', async () => {
-    const graph = await harness({ CORRELATION_GRAPH_MAX_FANOUT: '0' })[
-      'buildGraphFromDatabase'
-    ]();
+    const graph = await harness({
+      CORRELATION_GRAPH_MAX_FANOUT: '0',
+    }).service.buildGraphFromDatabase();
 
     expect(graph.nodes.map((n) => n.id)).toEqual(
       expect.arrayContaining(['rare', 'hub']),

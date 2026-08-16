@@ -42,11 +42,57 @@ export class EmbeddingConfigService {
   readonly pooling = process.env.EMBEDDING_POOLING ?? 'mean';
   readonly normalize = booleanEnv('EMBEDDING_NORMALIZE', true);
   readonly batchSize = integerEnv('EMBEDDING_BATCH_SIZE', 32, 1, 256);
+  /**
+   * Chunk texts packed into a single queue job.
+   *
+   * One job per chunk does not survive a real corpus. pg-boss orders its fetch
+   * by `priority DESC, created_on, id`, which its `(name, start_after)` index
+   * cannot satisfy, so every fetch sorts the whole due backlog to take a
+   * handful of rows. Measured on a desktop install with 1.1M queued chunks:
+   * a single fetch of 8 jobs scanned 1,123,734 index entries and took **9.9
+   * seconds**, reading 211 MB of buffers. Fetch cost therefore grows with the
+   * backlog, so the further behind the queue falls the slower it drains — and
+   * it never catches up.
+   *
+   * Packing chunks into one job divides the row count by this factor and takes
+   * the sort back to something trivial. It changes nothing about the work: the
+   * same chunks are embedded, by the same provider, in the same inference
+   * batches (see batchSize) — there is simply one queue row per group instead
+   * of one per chunk.
+   */
+  readonly queueBatchSize = integerEnv(
+    'EMBEDDING_QUEUE_BATCH_SIZE',
+    64,
+    1,
+    1000,
+  );
   readonly workerConcurrency = integerEnv(
     'EMBEDDING_WORKER_CONCURRENCY',
     1,
     1,
     32,
+  );
+  /**
+   * Queue depth at which reconciliation stops enqueueing and waits.
+   *
+   * The backfill walks every chunk in the corpus and enqueues whatever has no
+   * vector, as fast as it can, at every startup. Measured on a real install
+   * that is exactly what it does: **~70,000 jobs enqueued per minute against
+   * ~3 completed per minute**, so the queue reached half a million within six
+   * minutes of being emptied. A queue that deep is not merely untidy — pg-boss
+   * sorts the due backlog on every fetch, so depth is what makes the consumer
+   * slow, which makes the queue deeper.
+   *
+   * Waiting above this mark paces the producer to the consumer. Nothing is
+   * skipped: the same chunks are enqueued, in the same order, just not all at
+   * once. A crash mid-walk costs nothing either, since the next pass re-derives
+   * what is still missing.
+   */
+  readonly queueHighWaterMark = integerEnv(
+    'EMBEDDING_QUEUE_HIGH_WATER_MARK',
+    25_000,
+    100,
+    5_000_000,
   );
   readonly retrySeconds = integerEnv('EMBEDDING_RETRY_SECONDS', 30, 1, 3600);
   readonly autoBackfill = booleanEnv('EMBEDDING_AUTO_BACKFILL', true);

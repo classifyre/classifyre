@@ -1,8 +1,9 @@
+import { createHash } from 'node:crypto';
 import { Injectable, Logger } from '@nestjs/common';
 import type { Job, JobInsert } from 'pg-boss';
 import { ClsService } from 'nestjs-cls';
 import { PrismaService } from '../prisma.service';
-import { PgBossService } from '../scheduler/pg-boss.service';
+import { PgBossService, pgBossSchemaForId } from '../scheduler/pg-boss.service';
 import { EmbeddingCapabilityService } from './embedding-capability.service';
 import { embeddingContentHash, normalizeEmbeddingText } from './embedding-text';
 import { EmbeddingConfigService } from './embedding-config.service';
@@ -20,6 +21,12 @@ const EMBEDDING_QUEUE_PREFIX = 'semantic-embeddings';
 const RECALIBRATE_QUEUE_PREFIX = 'semantic-recalibrate';
 const EMBEDDING_GROUP = 'embedding-inference';
 const INSERT_BATCH_SIZE = 500;
+/** How often to re-check queue depth while the backfill is paced. */
+const QUEUE_CAPACITY_POLL_MS = 5000;
+/** Fallback when the configured queue batch size is unusable. */
+const DEFAULT_QUEUE_BATCH_SIZE = 64;
+/** Rows per DELETE when clearing a pre-upgrade backlog, to bound lock time. */
+const LEGACY_DELETE_PAGE = 20000;
 // Insert-time analysis is order-dependent (early vectors see a sparse space),
 // so a full recalibration pass runs once the inference queue drains. The delay
 // batches bursts of scans into one pass; singletonKey collapses repeat requests.
@@ -34,7 +41,49 @@ const RECALIBRATE_DELAY_SECONDS = 120;
 const MAX_RECALIBRATION_DEFERRALS = 5;
 
 type QueuedContent = { hash: string; text: string };
-type EmbeddingJob = QueuedContent & { spaceId: string };
+
+/**
+ * A queue job carries a *group* of chunks.
+ *
+ * The single-chunk shape is still accepted because jobs enqueued by earlier
+ * versions are sitting in the queue right now; they drain through the same
+ * handler rather than being discarded.
+ */
+type EmbeddingJob = { spaceId: string } & (
+  | QueuedContent
+  | { items: QueuedContent[] }
+);
+
+/**
+ * Stable identity for a group of chunks.
+ *
+ * Order-independent so the same chunks always produce the same key however
+ * they were grouped, and hashed rather than concatenated because singleton_key
+ * is a single indexed column, not a place for 64 content hashes.
+ */
+function batchKey(items: QueuedContent[]): string {
+  const digest = createHash('sha256');
+  for (const hash of items.map((item) => item.hash).sort()) {
+    digest.update(hash);
+  }
+  return digest.digest('hex');
+}
+
+/** Chunks carried by a job, whichever shape it was enqueued in. */
+function jobItems(data: EmbeddingJob | undefined): QueuedContent[] {
+  if (!data) return [];
+  const batch = (data as { items?: unknown }).items;
+  if (Array.isArray(batch)) {
+    return batch.filter(
+      (item): item is QueuedContent =>
+        typeof item?.hash === 'string' && typeof item?.text === 'string',
+    );
+  }
+  const single = data as Partial<QueuedContent>;
+  return typeof single.hash === 'string' && typeof single.text === 'string'
+    ? [{ hash: single.hash, text: single.text }]
+    : [];
+}
 
 /** Captured namespace context so timers/setImmediate can re-enter CLS. */
 interface NsCtx {
@@ -154,6 +203,8 @@ export class EmbeddingQueueService {
     const rt = await this.ensureRuntime();
     rt.disposed = false;
     if (!runsBackgroundWorkers()) return;
+
+    await this.dropUngroupedBacklog(rt);
 
     await this.pgBoss.work(
       rt.queueName as string,
@@ -372,6 +423,65 @@ export class EmbeddingQueueService {
     return { started: true, spaceId: rt.spaceId };
   }
 
+  /**
+   * Clears any single-chunk jobs left queued by an earlier version.
+   *
+   * Upgrading does not help an install that is already buried: the millions of
+   * one-chunk rows are precisely what makes pg-boss's fetch sort expensive, so
+   * without this the new grouped jobs queue up *behind* a backlog that keeps
+   * the queue slow. One install had 3.3M and 1.1M of them in two namespaces.
+   *
+   * Deleting them loses no work. The queue is a work list, not a record:
+   * backfillStoredContent walks findings, asset chunks and glossary terms and
+   * enqueues whatever `missingHashes` says has no vector, so everything
+   * removed here is re-queued — in grouped form — by the reconciliation that
+   * already runs at startup. Only `created` jobs are touched, so nothing
+   * in-flight is disturbed, and the delete is paged so a large backlog does
+   * not hold a lock.
+   *
+   * Self-limiting: once an install is migrated there is nothing left to match.
+   */
+  private async dropUngroupedBacklog(rt: EmbeddingRuntime): Promise<void> {
+    if (!rt.queueName) return;
+    const schema = pgBossSchemaForId(
+      this.cls.get<string>(CLS_NAMESPACE_ID) ?? '',
+    );
+    if (!schema) return;
+
+    let removed = 0;
+    try {
+      for (;;) {
+        const deleted = await this.prisma.$executeRawUnsafe(
+          `DELETE FROM "${schema}".job
+             WHERE ctid IN (
+               SELECT ctid FROM "${schema}".job
+                WHERE name = $1 AND state = 'created' AND data ? 'hash'
+                LIMIT ${LEGACY_DELETE_PAGE}
+             )`,
+          rt.queueName,
+        );
+        removed += deleted;
+        if (deleted < LEGACY_DELETE_PAGE) break;
+      }
+    } catch (error) {
+      // Never block worker startup on a cleanup: the queue still functions,
+      // it is just slower until this succeeds on a later boot.
+      this.logger.warn(
+        `Could not clear ungrouped embedding backlog: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      return;
+    }
+
+    if (removed > 0) {
+      this.logger.log(
+        `Cleared ${removed} ungrouped embedding job(s) for space ${rt.spaceId}; ` +
+          `reconciliation will re-queue the missing chunks in groups`,
+      );
+    }
+  }
+
   private async persist(contents: QueuedContent[]): Promise<void> {
     const rt = await this.ensureRuntime();
     if (rt.disposed) return;
@@ -388,10 +498,25 @@ export class EmbeddingQueueService {
     rt.pendingWrites += unique.size;
     try {
       const boss = await this.pgBoss.getBossAsync();
-      const jobs: JobInsert<EmbeddingJob>[] = [...unique].map(
-        ([hash, text]) => ({
-          data: { spaceId: rt.spaceId as string, hash, text },
-          singletonKey: hash,
+      const entries = [...unique];
+      // Never trust this to be a usable number: a non-positive or NaN size
+      // would slice nothing, and the loop would emit jobs carrying no chunks —
+      // work silently dropped rather than queued.
+      const size =
+        Math.max(1, Math.floor(this.config.queueBatchSize) || 0) ||
+        DEFAULT_QUEUE_BATCH_SIZE;
+      const jobs: JobInsert<EmbeddingJob>[] = [];
+      for (let offset = 0; offset < entries.length; offset += size) {
+        const items = entries
+          .slice(offset, offset + size)
+          .map(([hash, text]) => ({ hash, text }));
+        jobs.push({
+          data: { spaceId: rt.spaceId, items },
+          // The queue policy is `exclusive`, so singleton_key is what keeps a
+          // job unique; a null key would let only one job exist at a time.
+          // Deriving it from the group's contents keeps the old idempotency:
+          // re-enqueueing the same chunks collapses instead of duplicating.
+          singletonKey: batchKey(items),
           group: { id: EMBEDDING_GROUP },
           retryLimit: 5,
           retryDelay: this.config.retrySeconds,
@@ -399,8 +524,8 @@ export class EmbeddingQueueService {
           retryDelayMax: 3600,
           expireInSeconds: 3600,
           retentionSeconds: 86400,
-        }),
-      );
+        });
+      }
       for (let offset = 0; offset < jobs.length; offset += INSERT_BATCH_SIZE) {
         await boss.insert(
           rt.queueName,
@@ -414,14 +539,18 @@ export class EmbeddingQueueService {
 
   private async handle(jobs: Job<EmbeddingJob>[]): Promise<void> {
     const rt = this.runtime();
-    const contents = jobs
-      .map((job) => job.data)
-      .filter(
-        (data): data is EmbeddingJob =>
-          data?.spaceId === rt.spaceId &&
-          typeof data.hash === 'string' &&
-          typeof data.text === 'string',
-      );
+    const seen = new Set<string>();
+    const contents: QueuedContent[] = [];
+    for (const job of jobs) {
+      if (job.data?.spaceId !== rt.spaceId) continue;
+      for (const item of jobItems(job.data)) {
+        // A chunk can appear in more than one group when reconciliation
+        // regroups it; embedding it twice in one pass would be waste.
+        if (seen.has(item.hash)) continue;
+        seen.add(item.hash);
+        contents.push(item);
+      }
+    }
     if (!contents.length) return;
 
     const missing = new Set(
@@ -503,7 +632,55 @@ export class EmbeddingQueueService {
         rt.spaceId,
       ),
     );
-    await this.persist(contents.filter((content) => missing.has(content.hash)));
+    const work = contents.filter((content) => missing.has(content.hash));
+    if (!work.length) return;
+    await this.awaitQueueCapacity(rt);
+    await this.persist(work);
+  }
+
+  /**
+   * Holds the backfill while the queue is already full enough.
+   *
+   * Without this the producer runs at memory-and-disk speed and the consumer at
+   * inference speed — measured at ~70,000 enqueued per minute against ~3
+   * completed. The queue then grows without bound, and because pg-boss sorts
+   * the due backlog on every fetch, growing it is what makes the consumer
+   * slower still.
+   *
+   * This paces rather than discards. The walk resumes the moment there is room,
+   * covering exactly the same chunks; only the rate changes.
+   */
+  private async awaitQueueCapacity(rt: EmbeddingRuntime): Promise<void> {
+    if (!rt.queueName) return;
+    // A missing or nonsensical limit must not pause the backfill forever:
+    // pacing is an optimisation, and work never waits on a bad setting.
+    const limit = Number(this.config.queueHighWaterMark);
+    if (!Number.isFinite(limit) || limit <= 0) return;
+
+    for (let attempt = 0; !rt.disposed; attempt++) {
+      let queued: number;
+      try {
+        const boss = await this.pgBoss.getBossAsync();
+        const stats = await boss.getQueueStats(rt.queueName);
+        queued = stats?.queuedCount ?? 0;
+      } catch {
+        // Depth unknown: proceed rather than stall the backfill forever.
+        return;
+      }
+      if (queued < limit) return;
+
+      // Logged once per wait, not per poll: a long hold is normal on a large
+      // corpus and should read as pacing rather than as a fault.
+      if (attempt === 0) {
+        this.logger.log(
+          `Embedding backfill paused for space ${rt.spaceId}: ${queued} job(s) queued ` +
+            `(limit ${limit}); resuming as the queue drains`,
+        );
+      }
+      await new Promise((resolve) =>
+        setTimeout(resolve, QUEUE_CAPACITY_POLL_MS),
+      );
+    }
   }
 
   private async backfillFindings(rt: EmbeddingRuntime): Promise<void> {
