@@ -184,8 +184,17 @@ The API does not simply run until it dies:
   excerpt rather than in full, so retention does not grow with corpus size or
   scan duration.
 - **Restart supervision.** A crashed API is restarted up to 3 times in 10
-  minutes; the budget resets once a replacement has stayed healthy for 20
-  minutes, so a slow crash loop cannot quietly turn into a permanent outage.
+  minutes. Forgiveness is judged from the dead process's own uptime: a
+  generation that served for 5 minutes or more was not boot-looping, so the
+  earlier burst stops counting and it restarts on a fresh budget. Only deaths
+  that keep happening *during boot* exhaust it.
+
+  This used to be a 20-minute healthy-uptime timer — twice the window — which
+  could never fire for a service crashing more often than that, i.e. exactly
+  the service that needed it. Observed on a real install: three crashes inside
+  90 seconds, then eight minutes of healthy service, and that fourth death
+  retired the API for the session because the three timestamps were still
+  inside the 10-minute window.
 
 ## Related
 

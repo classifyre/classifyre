@@ -51,6 +51,15 @@ const FINDING_SELECT = {
   createdAt: true,
 } as const;
 
+/**
+ * Rows held in memory at once while walking candidates.
+ *
+ * Large enough that the walk is not query-bound on a corpus with millions of
+ * findings, small enough that one page plus its DTOs is a rounding error
+ * against the heap ceiling.
+ */
+const CANDIDATE_PAGE_SIZE = 2000;
+
 const PREVIEW_CAP = 50;
 
 /**
@@ -135,11 +144,19 @@ export class InquiryMatchingService {
     m: InquiryMatchers,
     seenAt: Date | null,
   ): Promise<{ total: number; newCount: number }> {
-    const matches = await this.candidateFindings(m, false);
-    const newCount = seenAt
-      ? matches.filter((f) => (f.createdAt ?? new Date(0)) > seenAt).length
-      : 0;
-    return { total: matches.length, newCount };
+    // Counters only: there is no reason to hold a single row past the moment
+    // it has been counted, and holding them all is what killed the process.
+    let total = 0;
+    let newCount = 0;
+    for await (const page of this.candidateFindingPages(m, false)) {
+      total += page.rows.length;
+      if (seenAt) {
+        for (const f of page.rows) {
+          if ((f.createdAt ?? new Date(0)) > seenAt) newCount += 1;
+        }
+      }
+    }
+    return { total, newCount };
   }
 
   /**
@@ -263,14 +280,16 @@ export class InquiryMatchingService {
       select: this.matcherSelect,
     });
     if (!q) return { landed: 0 };
-    const matches = await this.candidateFindings(q, false);
+    let matchCount = 0;
+    for await (const page of this.candidateFindingPages(q, false))
+      matchCount += page.rows.length;
     // newMatchCount resets to 0 because a rematch *is* the fresh baseline; the
     // next run recomputes it against matchesSeenAt like everything else.
     await this.prisma.inquiry.update({
       where: { id: inquiryId },
-      data: { matchCount: matches.length, newMatchCount: 0 },
+      data: { matchCount, newMatchCount: 0 },
     });
-    return { landed: matches.length };
+    return { landed: matchCount };
   }
 
   /**
@@ -293,8 +312,113 @@ export class InquiryMatchingService {
     if (!q) return empty;
     const seenAt = q.matchesSeenAt;
 
-    const rows = await this.candidateFindings(q, true);
-    let matches: InquiryMatchDto[] = rows.map((f) => ({
+    const term =
+      typeof query.search === 'string' ? query.search.trim().toLowerCase() : '';
+    const severities = (
+      Array.isArray(query.severity)
+        ? query.severity
+        : query.severity
+          ? [query.severity]
+          : []
+    ).map((s) => String(s).toUpperCase());
+    const onlyNew = query.onlyNew === true || String(query.onlyNew) === 'true';
+
+    // Only the requested page is ever retained. The counters below are still
+    // exact — every match is visited — but the sort no longer needs the whole
+    // match set resident, which on a large workspace was millions of DTOs.
+    const wanted = skip + limit;
+    const ranked: InquiryMatchDto[] = [];
+    let total = 0;
+    let newCount = 0;
+
+    for await (const page of this.candidateFindingPages(q, true)) {
+      for (const f of page.rows) {
+        const match = this.toMatchDto(f, seenAt);
+        if (
+          term.length > 0 &&
+          !(
+            match.label.toLowerCase().includes(term) ||
+            (match.assetName ?? '').toLowerCase().includes(term) ||
+            (match.matchedContent ?? '').toLowerCase().includes(term)
+          )
+        ) {
+          continue;
+        }
+        if (
+          severities.length > 0 &&
+          !severities.includes((match.severity ?? '').toUpperCase())
+        ) {
+          continue;
+        }
+        // Counted before `onlyNew` narrows the set, so "3 new" stays the same
+        // number whether or not the caller is filtering to new.
+        if (match.isNew) newCount += 1;
+        if (onlyNew && !match.isNew) continue;
+
+        total += 1;
+        this.keepTopMatch(ranked, match, wanted);
+      }
+    }
+
+    return {
+      items: ranked.slice(skip, skip + limit),
+      total,
+      newCount,
+      skip,
+      limit,
+    };
+  }
+
+  /**
+   * Importance-first: matches are a triage queue, not a log. Unanalyzed rows
+   * keep their recency order below the ranked ones.
+   */
+  private static compareMatches(
+    a: InquiryMatchDto,
+    b: InquiryMatchDto,
+  ): number {
+    const ai = a.ranking?.importance ?? -1;
+    const bi = b.ranking?.importance ?? -1;
+    if (ai !== bi) return bi - ai;
+    return (
+      (b.matchedAt instanceof Date ? b.matchedAt.getTime() : 0) -
+      (a.matchedAt instanceof Date ? a.matchedAt.getTime() : 0)
+    );
+  }
+
+  /**
+   * Insert into a descending-ranked buffer holding at most `capacity` entries.
+   *
+   * Equivalent to sorting everything and slicing, without holding everything:
+   * a candidate that cannot displace the current worst kept entry cannot appear
+   * on the requested page either.
+   */
+  private keepTopMatch(
+    ranked: InquiryMatchDto[],
+    match: InquiryMatchDto,
+    capacity: number,
+  ): void {
+    if (capacity <= 0) return;
+    if (
+      ranked.length >= capacity &&
+      InquiryMatchingService.compareMatches(match, ranked[capacity - 1]) >= 0
+    ) {
+      return;
+    }
+    let low = 0;
+    let high = ranked.length;
+    while (low < high) {
+      const mid = (low + high) >>> 1;
+      if (InquiryMatchingService.compareMatches(match, ranked[mid]) < 0)
+        high = mid;
+      else low = mid + 1;
+    }
+    ranked.splice(low, 0, match);
+    if (ranked.length > capacity) ranked.length = capacity;
+  }
+
+  private toMatchDto(f: FindingRow, seenAt: Date | null): InquiryMatchDto {
+    return {
       findingId: f.id,
       label: f.findingType,
       severity: String(f.severity),
@@ -321,51 +445,6 @@ export class InquiryMatchingService {
             reasons: [],
             coverage: 'pending' as const,
           },
-    }));
-    // Importance-first: matches are a triage queue, not a log. Unanalyzed
-    // rows keep their recency order below the ranked ones.
-    matches.sort((a, b) => {
-      const ai = a.ranking?.importance ?? -1;
-      const bi = b.ranking?.importance ?? -1;
-      if (ai !== bi) return bi - ai;
-      return (
-        (b.matchedAt instanceof Date ? b.matchedAt.getTime() : 0) -
-        (a.matchedAt instanceof Date ? a.matchedAt.getTime() : 0)
-      );
-    });
-
-    const term =
-      typeof query.search === 'string' ? query.search.trim().toLowerCase() : '';
-    if (term.length > 0) {
-      matches = matches.filter(
-        (m) =>
-          m.label.toLowerCase().includes(term) ||
-          (m.assetName ?? '').toLowerCase().includes(term) ||
-          (m.matchedContent ?? '').toLowerCase().includes(term),
-      );
-    }
-    const severities = (
-      Array.isArray(query.severity)
-        ? query.severity
-        : query.severity
-          ? [query.severity]
-          : []
-    ).map((s) => String(s).toUpperCase());
-    if (severities.length > 0) {
-      matches = matches.filter((m) =>
-        severities.includes((m.severity ?? '').toUpperCase()),
-      );
-    }
-    const onlyNew = query.onlyNew === true || String(query.onlyNew) === 'true';
-    const newCount = matches.filter((m) => m.isNew).length;
-    if (onlyNew) matches = matches.filter((m) => m.isNew);
-
-    return {
-      items: matches.slice(skip, skip + limit),
-      total: matches.length,
-      newCount,
-      skip,
-      limit,
     };
   }
 
@@ -376,8 +455,12 @@ export class InquiryMatchingService {
       select: this.matcherSelect,
     });
     if (!q) return [];
-    const rows = await this.candidateFindings(q, false);
-    return rows.map((r) => r.id);
+    // Ids only. The full rows carry `matched_content` and eight other columns
+    // apiece; the caller needs none of it.
+    const ids: string[] = [];
+    for await (const page of this.candidateFindingPages(q, false))
+      for (const row of page.rows) ids.push(row.id);
+    return ids;
   }
 
   /**
@@ -552,12 +635,25 @@ export class InquiryMatchingService {
     matchers: InquiryMatchers,
     scanLimit = PROBE_SCAN_LIMIT,
   ): Promise<{ findingIds: string[]; scanned: number; exhausted: boolean }> {
-    const rows = await this.candidateFindings(matchers, false, scanLimit);
-    const matcher = new CompiledMatcher(matchers);
+    const findingIds: string[] = [];
+    let scanned = 0;
+    for await (const page of this.candidateFindingPages(
+      matchers,
+      false,
+      scanLimit,
+    )) {
+      scanned += page.scanned;
+      for (const row of page.rows) findingIds.push(row.id);
+    }
     return {
-      findingIds: rows.filter((f) => matcher.matches(f)).map((f) => f.id),
-      scanned: rows.length,
-      exhausted: rows.length < scanLimit,
+      findingIds,
+      scanned,
+      // Candidates scanned, not matches found. Comparing the *filtered* count
+      // against the cap declared a scan exhausted whenever the regex rejected
+      // anything — which is nearly always — turning "no match in the first
+      // `scanLimit` candidates" into a definitive zero, the exact confusion
+      // the contract above warns callers about.
+      exhausted: scanned < scanLimit,
     };
   }
 
@@ -724,39 +820,109 @@ export class InquiryMatchingService {
     return where;
   }
 
-  /** SQL-prefilter by source/detector/exact-type, then app-filter (regex) via the matcher. */
+  /**
+   * SQL-prefilter by source/detector/exact-type, then app-filter (regex) via
+   * the matcher — a page at a time, retaining nothing between pages.
+   *
+   * The SQL half of a matcher is coarse: an inquiry watching "PII" prefilters
+   * to `status = OPEN AND detector_type IN ('PII')`, which on a real corpus is
+   * essentially the whole table. This used to be one `findMany` with no `take`,
+   * so the driver materialised every matching row — 6.7M findings × nine
+   * columns including `matched_content` — into a JS array before the regex
+   * filter saw the first one. Captured on the desktop API, two seconds apart,
+   * with exactly this statement in `pg_stat_activity` and no `LIMIT` on it:
+   *
+   *     18:34:16  rss=1461MB
+   *     18:34:18  rss=1667MB
+   *     18:34:20  rss=1952MB
+   *     18:34:21  FATAL ERROR: Ineffective mark-compacts near heap limit
+   *
+   * Paging is not a cap: every candidate is still visited and every match is
+   * still found. What changes is that only one page is live at a time, so the
+   * peak is a property of the page size rather than of the corpus.
+   *
+   * Yields the matching rows of each page together with how many candidates
+   * that page scanned, because a bounded probe needs the raw count to know
+   * whether it reached the end.
+   */
+  private async *candidateFindingPages(
+    m: InquiryMatchers,
+    withAsset: boolean,
+    scanLimit?: number,
+  ): AsyncGenerator<{ rows: FindingRow[]; scanned: number }> {
+    const where = this.candidateWhere(m);
+    const matcher = new CompiledMatcher(m);
+    const select = withAsset
+      ? {
+          ...FINDING_SELECT,
+          asset: { select: { name: true, sourceType: true } },
+          evidenceAnalysis: {
+            select: {
+              importanceScore: true,
+              qualityScore: true,
+              similarCount: true,
+              duplicateGroupHash: true,
+              reasons: true,
+            },
+          },
+        }
+      : FINDING_SELECT;
+
+    let cursor: string | null = null;
+    let scanned = 0;
+    for (;;) {
+      // Keyset, not OFFSET: a growing table makes offset paging skip and repeat
+      // rows, and the deep pages get slower the further in they go.
+      const take =
+        scanLimit != null
+          ? Math.min(CANDIDATE_PAGE_SIZE, scanLimit - scanned)
+          : CANDIDATE_PAGE_SIZE;
+      if (take <= 0) return;
+
+      const page = (await this.prisma.finding.findMany({
+        where: { ...where, ...(cursor ? { id: { gt: cursor } } : {}) },
+        // Deterministic order so a bounded probe scans the same window twice
+        // and its answers do not flicker between calls.
+        orderBy: { id: 'asc' as const },
+        take,
+        select,
+      })) as FindingRow[];
+      if (page.length === 0) return;
+
+      scanned += page.length;
+      cursor = page[page.length - 1].id;
+      yield {
+        rows: page.filter((f) => matcher.matches(f)),
+        scanned: page.length,
+      };
+
+      if (page.length < take) return;
+      // Hand the event loop back: this walk can span millions of rows and must
+      // not starve the HTTP server it shares a process with.
+      await new Promise((resolve) => setImmediate(resolve));
+    }
+  }
+
+  /**
+   * Every match, materialised.
+   *
+   * Only for callers that genuinely need every row at once and are already
+   * bounded by something else — `probeMatches` caps the scan explicitly. Paths
+   * that only need counts, ids, or one ranked page must stream instead; see
+   * {@link candidateFindingPages}.
+   */
   private async candidateFindings(
     m: InquiryMatchers,
     withAsset: boolean,
     scanLimit?: number,
   ): Promise<FindingRow[]> {
-    const where = this.candidateWhere(m);
-
-    const rows = (await this.prisma.finding.findMany({
-      where,
-      // Deterministic order so a bounded probe scans the same window twice and
-      // its answers do not flicker between calls.
-      ...(scanLimit != null
-        ? { take: scanLimit, orderBy: { id: 'asc' as const } }
-        : {}),
-      select: withAsset
-        ? {
-            ...FINDING_SELECT,
-            asset: { select: { name: true, sourceType: true } },
-            evidenceAnalysis: {
-              select: {
-                importanceScore: true,
-                qualityScore: true,
-                similarCount: true,
-                duplicateGroupHash: true,
-                reasons: true,
-              },
-            },
-          }
-        : FINDING_SELECT,
-    })) as FindingRow[];
-
-    const matcher = new CompiledMatcher(m);
-    return rows.filter((f) => matcher.matches(f));
+    const all: FindingRow[] = [];
+    for await (const page of this.candidateFindingPages(
+      m,
+      withAsset,
+      scanLimit,
+    ))
+      all.push(...page.rows);
+    return all;
   }
 }
