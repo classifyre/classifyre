@@ -309,8 +309,16 @@ export class FindingStatsService {
       : Prisma.empty;
   }
 
+  /**
+   * Severity/status counts, optionally bounded to days at or after `since`.
+   *
+   * Omitting `since` asks for every day the rollup holds. The rollup is a
+   * complete aggregate of `findings` with no retention window — `rebuildAll`
+   * groups the whole table and `refreshDirtyDays` only ever replaces days — so
+   * an unbounded total equals the live `count(*)`, not a truncated one.
+   */
   async severityStatusTotals(
-    since: Date,
+    since?: Date,
     filters?: RollupFilter,
   ): Promise<RollupSeverityStatusRow[]> {
     const rows = await this.prisma.$queryRaw<

@@ -296,13 +296,65 @@ export function computeApiHeapMb(
 // Unexpected API death (native crash, external kill) is respawned so the
 // service heals without the user restarting the app — but bounded, so a
 // crash-on-boot bug degrades to a logged failure instead of a spawn loop.
-const RESTART_WINDOW_MS = 10 * 60 * 1000;
-const MAX_RESTARTS_PER_WINDOW = 3;
+export const RESTART_WINDOW_MS = 10 * 60 * 1000;
+export const MAX_RESTARTS_PER_WINDOW = 3;
 const RESTART_DELAY_MS = 2000;
-// How long a restarted API must stay up and ready before its predecessors'
-// crashes stop counting against the budget. Longer than the readiness probe's
-// cold-start ceiling, so a slow boot is never mistaken for a healthy run.
-const HEALTHY_UPTIME_MS = 20 * 60 * 1000;
+/**
+ * How long a generation must have served before its death is judged on its own
+ * rather than as part of the burst that preceded it.
+ *
+ * This is measured at crash time from the generation's actual uptime, not by a
+ * timer. A timer cannot work here: the previous design armed one for 20
+ * minutes — twice {@link RESTART_WINDOW_MS} — so a service that recovered and
+ * ran for eight minutes never earned its reset, while the three crash
+ * timestamps from a burst nine minutes earlier were all still inside the
+ * window. The fourth crash then retired the API permanently, on a machine that
+ * had just demonstrated it could serve for eight minutes at a stretch. That is
+ * the "stopped 3 times in 10 minutes and is no longer being restarted" dialog
+ * appearing over a working system.
+ *
+ * Well above the readiness probe's cold-start ceiling (~100 s on a loaded
+ * database), so a slow boot is never mistaken for a healthy run.
+ */
+export const HEALTHY_RUN_MS = 5 * 60 * 1000;
+
+export interface RestartDecision {
+  /** Whether to respawn. False means the budget is spent. */
+  restart: boolean;
+  /** Crash timestamps to carry forward. */
+  crashes: number[];
+  /** 1-based attempt number within the window, when restarting. */
+  attempt: number;
+}
+
+/**
+ * Whether a crashed API generation earns a respawn.
+ *
+ * Pure so the budget can be tested without spawning anything — the failure it
+ * guards against (a permanently disabled service) only shows up after a
+ * specific sequence of crashes minutes apart.
+ */
+export function restartDecision(input: {
+  now: number;
+  crashes: readonly number[];
+  uptimeMs: number;
+}): RestartDecision {
+  const inWindow = input.crashes.filter(
+    (at) => input.now - at < RESTART_WINDOW_MS,
+  );
+  // A generation that served for a real stretch is proof this is not a crash
+  // loop on boot, so the earlier burst stops counting against it.
+  const recent = input.uptimeMs >= HEALTHY_RUN_MS ? [] : inWindow;
+
+  if (recent.length >= MAX_RESTARTS_PER_WINDOW) {
+    return { restart: false, crashes: recent, attempt: recent.length };
+  }
+  return {
+    restart: true,
+    crashes: [...recent, input.now],
+    attempt: recent.length + 1,
+  };
+}
 
 /**
  * Coarse phase an API start is in: local preparation work (relocating the
@@ -587,6 +639,10 @@ export class ProcessManager {
       stdio: ["ignore", "pipe", "pipe"],
     });
 
+    // When this generation started serving, so its death can be judged on how
+    // long it lasted rather than only on how many deaths preceded it.
+    const startedAt = Date.now();
+
     // Last sign of life from the child. A cold boot that is slowly working
     // through `prisma migrate deploy` on a loaded database keeps printing; a
     // genuinely wedged process goes quiet. waitForReady uses this to tell the
@@ -612,7 +668,7 @@ export class ProcessManager {
       const current = this.processes.get(processId);
       if (!current || current.child !== child) return;
       this.processes.delete(processId);
-      this.scheduleRestart(processId, port, databaseUrl);
+      this.scheduleRestart(processId, port, databaseUrl, startedAt);
     });
 
     // Without an 'error' listener a failed spawn (ENOENT/EACCES from a
@@ -637,7 +693,6 @@ export class ProcessManager {
         this.waitForReady(port, () => lastOutputAt),
         spawnFailed,
       ]);
-      this.armBudgetReset(processId, child);
     } catch (err) {
       // If our child died on its own, its exit handler already scheduled the
       // retry — and may already have a replacement running. Killing "the"
@@ -651,7 +706,7 @@ export class ProcessManager {
         // stop.
         await this.stopApi(processId);
         if (isRestart) {
-          this.scheduleRestart(processId, port, databaseUrl);
+          this.scheduleRestart(processId, port, databaseUrl, startedAt);
           return;
         }
       } else if (isRestart) {
@@ -746,53 +801,38 @@ export class ProcessManager {
     });
   }
 
-  /**
-   * Forgives past crashes once a replacement has stayed healthy.
-   *
-   * The budget is "N crashes in a 10-minute window", which is the right shape
-   * for a crash-on-boot loop but not for a slow one: a fault that kills the API
-   * every few minutes eventually lands three deaths inside one window, and the
-   * service is then down for good until the user restarts the app. Recovering
-   * and serving for HEALTHY_UPTIME_MS is proof the crash was not a boot loop,
-   * so the budget is returned rather than being spent for the whole session.
-   */
-  private armBudgetReset(processId: string, child: ChildProcess): void {
-    const timer = setTimeout(() => {
-      // Only if *this* child is still the one running: a later crash will have
-      // replaced it, and that generation has to earn its own reset.
-      if (this.processes.get(processId)?.child !== child) return;
-      if (!this.restartTimestamps.get(processId)?.length) return;
-      this.restartTimestamps.delete(processId);
-      process.stderr.write(
-        `[API:${processId}] healthy for ${HEALTHY_UPTIME_MS / 60000} minutes; restart budget reset\n`,
-      );
-    }, HEALTHY_UPTIME_MS);
-    timer.unref?.();
-  }
-
   private scheduleRestart(
     processId: string,
     port: number,
     databaseUrl: string,
+    startedAt: number,
   ): void {
     const now = Date.now();
-    const recent = (this.restartTimestamps.get(processId) ?? []).filter(
-      (at) => now - at < RESTART_WINDOW_MS,
-    );
-    if (recent.length >= MAX_RESTARTS_PER_WINDOW) {
-      const reason = `The Classifyre service stopped ${recent.length} times in ${RESTART_WINDOW_MS / 60000} minutes and is no longer being restarted automatically.`;
+    const uptimeMs = now - startedAt;
+    const decision = restartDecision({
+      now,
+      crashes: this.restartTimestamps.get(processId) ?? [],
+      uptimeMs,
+    });
+    this.restartTimestamps.set(processId, decision.crashes);
+
+    if (!decision.restart) {
+      const reason = `The Classifyre service stopped ${decision.attempt} times in ${RESTART_WINDOW_MS / 60000} minutes and is no longer being restarted automatically.`;
       process.stderr.write(
-        `[API:${processId}] crashed ${recent.length} times in ${RESTART_WINDOW_MS / 60000} minutes; not restarting again\n`,
+        `[API:${processId}] crashed ${decision.attempt} times in ${RESTART_WINDOW_MS / 60000} minutes; not restarting again\n`,
       );
       // Giving up silently is what made this look like a frozen app: the
       // renderer just retried forever against a port nobody was listening on.
       this.onUnavailable(processId, reason);
       return;
     }
-    recent.push(now);
-    this.restartTimestamps.set(processId, recent);
+    if (decision.attempt === 1 && uptimeMs >= HEALTHY_RUN_MS) {
+      process.stderr.write(
+        `[API:${processId}] served ${Math.round(uptimeMs / 60000)} minutes before dying; restart budget reset\n`,
+      );
+    }
     process.stderr.write(
-      `[API:${processId}] restarting in ${RESTART_DELAY_MS}ms (attempt ${recent.length}/${MAX_RESTARTS_PER_WINDOW})\n`,
+      `[API:${processId}] restarting in ${RESTART_DELAY_MS}ms (attempt ${decision.attempt}/${MAX_RESTARTS_PER_WINDOW})\n`,
     );
     setTimeout(() => {
       if (this.processes.has(processId)) return;
