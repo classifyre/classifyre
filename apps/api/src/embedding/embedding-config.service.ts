@@ -72,6 +72,28 @@ export class EmbeddingConfigService {
     1,
     32,
   );
+  /**
+   * Queue depth at which reconciliation stops enqueueing and waits.
+   *
+   * The backfill walks every chunk in the corpus and enqueues whatever has no
+   * vector, as fast as it can, at every startup. Measured on a real install
+   * that is exactly what it does: **~70,000 jobs enqueued per minute against
+   * ~3 completed per minute**, so the queue reached half a million within six
+   * minutes of being emptied. A queue that deep is not merely untidy — pg-boss
+   * sorts the due backlog on every fetch, so depth is what makes the consumer
+   * slow, which makes the queue deeper.
+   *
+   * Waiting above this mark paces the producer to the consumer. Nothing is
+   * skipped: the same chunks are enqueued, in the same order, just not all at
+   * once. A crash mid-walk costs nothing either, since the next pass re-derives
+   * what is still missing.
+   */
+  readonly queueHighWaterMark = integerEnv(
+    'EMBEDDING_QUEUE_HIGH_WATER_MARK',
+    25_000,
+    100,
+    5_000_000,
+  );
   readonly retrySeconds = integerEnv('EMBEDDING_RETRY_SECONDS', 30, 1, 3600);
   readonly autoBackfill = booleanEnv('EMBEDDING_AUTO_BACKFILL', true);
 
