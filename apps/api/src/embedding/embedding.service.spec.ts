@@ -164,10 +164,16 @@ describe('EmbeddingService', () => {
       embedContentHash: `hash-${index}`,
     }));
     const second = [{ id: 'finding-500', embedContentHash: 'hash-500' }];
-    prisma.finding.findMany
-      .mockResolvedValueOnce(first)
-      .mockResolvedValueOnce(second)
-      .mockResolvedValueOnce([]);
+    // Two different reads share this mock now: the batch walk, and the paged
+    // fan-out that maps a (hash, type) neighbourhood back onto its findings.
+    // Discriminate on the query rather than on call order, or the fan-out
+    // silently eats a batch.
+    const batches = [first, second, []];
+    prisma.finding.findMany.mockImplementation((args: any) =>
+      Promise.resolve(
+        args?.where?.embedContentHash?.in ? [] : (batches.shift() ?? []),
+      ),
+    );
     const snapshot = new Map([['shared value', { assets: 2, sources: 1 }]]);
     analysis.valueRecurrenceSnapshot.mockResolvedValue(snapshot);
     prisma.embeddingSpace.update.mockResolvedValue(activeSpace);
