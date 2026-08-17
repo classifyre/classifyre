@@ -27,6 +27,7 @@ import type { ApplySummary } from './decision-applier.service';
 import {
   AGENT_RUN_STALE_AFTER_MS,
   AUTOPILOT_DREAM_CRON,
+  AUTOPILOT_HEARTBEAT_CRON,
   AUTOPILOT_QUEUE,
   DETECTION_CHAIN,
   INVESTIGATION_CHAIN,
@@ -63,6 +64,8 @@ interface CycleInput {
   corpus?: boolean;
   /** Why this cycle skipped the coalescing window, if it did. */
   expressReason?: string | null;
+  /** Periodic wake-up: see AUTOPILOT_HEARTBEAT_CRON. */
+  heartbeat?: boolean;
 }
 
 /**
@@ -141,6 +144,21 @@ export class AutopilotWorker {
     } catch (error) {
       this.logger.warn(
         `Failed to register dream schedule: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+    // The only wake-up that does not depend on a scan having finished. Without
+    // it the staleness backstop is unreachable on a corpus that has gone quiet,
+    // which is the state the SETTLED agents are waiting for.
+    try {
+      await boss.schedule(
+        AUTOPILOT_QUEUE,
+        AUTOPILOT_HEARTBEAT_CRON,
+        { heartbeat: true, corpus: true },
+        { tz: 'UTC' },
+      );
+    } catch (error) {
+      this.logger.warn(
+        `Failed to register autopilot heartbeat: ${error instanceof Error ? error.message : String(error)}`,
       );
     }
     this.logger.log(`Registered worker for queue ${AUTOPILOT_QUEUE}`);
@@ -236,6 +254,7 @@ export class AutopilotWorker {
         only,
         corpus,
         expressReason,
+        heartbeat: data?.heartbeat === true,
         caseId: typeof data?.caseId === 'string' ? data.caseId : null,
         instruction,
         cycleKey:
@@ -281,7 +300,8 @@ export class AutopilotWorker {
     );
   }
 
-  async runCycle(cycle: CycleInput): Promise<void> {
+  async runCycle(input: CycleInput): Promise<void> {
+    let cycle = input;
     const settings = await this.prisma.instanceSettings.findUnique({
       where: { id: INSTANCE_SETTINGS_ID },
     });
@@ -351,15 +371,30 @@ export class AutopilotWorker {
     // pg-boss's retry, and a newer scan timestamp cannot be erased by this run.
     const dirtySources = cycle.corpus ? await this.readDirtySources() : [];
     const batchSources = dirtySources.map(({ id, name }) => ({ id, name }));
-    // Nothing new since the last batch. A readiness requeue always inserts (it
-    // must, or a deferred cycle would be lost), so a corpus job can outlive the
-    // batch it was queued for — and running five agents over "all sources" to
-    // rediscover nothing is precisely the churn this cadence exists to remove.
+    // Nothing new since the last batch. Running five agents over "all sources"
+    // to rediscover nothing is precisely the churn this cadence exists to
+    // remove, so an ordinary corpus job with an empty batch stops here.
+    //
+    // A heartbeat is the one exception, and only for the agents whose staleness
+    // backstop has actually expired. Without this the backstop is unreachable:
+    // it is evaluated inside a cycle, and on a corpus that has stopped being
+    // scanned there are no cycles — so the guarantee that a gated agent
+    // eventually runs would hold only while something else was already keeping
+    // the harness awake.
     if (cycle.corpus && batchSources.length === 0 && !cycle.manual) {
-      this.logger.debug(
-        'Corpus cycle skipped: no sources have been scanned since the last one.',
+      const overdue = cycle.heartbeat ? await this.overdueAgents(cycle) : [];
+      if (overdue.length === 0) {
+        this.logger.debug(
+          'Corpus cycle skipped: no sources have been scanned since the last one.',
+        );
+        return;
+      }
+      // Narrow to exactly those agents. `only` restricts which agents run; it
+      // does not authorise them, so the enable flags still apply below.
+      cycle = { ...cycle, only: overdue };
+      this.logger.log(
+        `Autopilot heartbeat: running ${overdue.join(', ')} past their staleness window with no new scans.`,
       );
-      return;
     }
 
     const sourceName = cycle.sourceId
@@ -765,6 +800,33 @@ export class AutopilotWorker {
       // transient database error, which is the deadlock this rework removes.
       return false;
     }
+  }
+
+  /**
+   * Enabled agents whose staleness backstop has expired.
+   *
+   * Deliberately asks only the backstop question — not the full policy — so a
+   * heartbeat cannot become a second cadence. An agent that is merely *ready*
+   * has nothing to do here: there are no dirty sources, so a run would
+   * re-examine a corpus nothing has changed. Only an agent the backstop says is
+   * overdue has a reason to run without new data, and that reason is precisely
+   * "it has been too long since anyone looked".
+   */
+  private async overdueAgents(cycle: CycleInput): Promise<AgentKind[]> {
+    const overdue: AgentKind[] = [];
+    for (const kind of PIPELINE_KINDS) {
+      if (!(await this.agentEnabled(kind, cycle))) continue;
+      const [policy, lastTriggeredAt] = await Promise.all([
+        this.agents.resolvePolicy(kind),
+        this.agents.lastTriggeredAt(kind),
+      ]);
+      if (policy.maxStalenessHours <= 0) continue;
+      const idleMs = lastTriggeredAt
+        ? Date.now() - lastTriggeredAt.getTime()
+        : Number.POSITIVE_INFINITY;
+      if (idleMs >= policy.maxStalenessHours * 3_600_000) overdue.push(kind);
+    }
+    return overdue;
   }
 
   /** Whether this agent may start now, per its own policy. */
