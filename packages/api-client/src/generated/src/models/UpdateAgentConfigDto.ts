@@ -43,7 +43,63 @@ export interface UpdateAgentConfigDto {
      * @memberof UpdateAgentConfigDto
      */
     toolNames?: Array<string> | null;
+    /**
+     * Trigger mode override; null resets to the factory default
+     * @type {string}
+     * @memberof UpdateAgentConfigDto
+     */
+    triggerMode?: UpdateAgentConfigDtoTriggerModeEnum | null;
+    /**
+     * Wait for inquiry matching to drain; null resets to factory default
+     * @type {boolean}
+     * @memberof UpdateAgentConfigDto
+     */
+    waitForMatching?: boolean | null;
+    /**
+     * Wait for evidence coverage; null resets to factory default
+     * @type {boolean}
+     * @memberof UpdateAgentConfigDto
+     */
+    waitForEvidence?: boolean | null;
+    /**
+     * Wait for scans to finish; null resets to factory default
+     * @type {boolean}
+     * @memberof UpdateAgentConfigDto
+     */
+    waitForScans?: boolean | null;
+    /**
+     * Minimum minutes between runs (0 disables); null resets to default
+     * @type {number}
+     * @memberof UpdateAgentConfigDto
+     */
+    minIntervalMinutes?: number | null;
+    /**
+     * Force a run after this many hours of being gated (0 disables); null resets to default
+     * @type {number}
+     * @memberof UpdateAgentConfigDto
+     */
+    maxStalenessHours?: number | null;
+    /**
+     * Per-agent run budget in minutes; null uses the instance value
+     * @type {number}
+     * @memberof UpdateAgentConfigDto
+     */
+    runBudgetMinutes?: number | null;
 }
+
+
+/**
+ * @export
+ */
+export const UpdateAgentConfigDtoTriggerModeEnum = {
+    Eager: 'EAGER',
+    Batch: 'BATCH',
+    Settled: 'SETTLED',
+    Scheduled: 'SCHEDULED',
+    Manual: 'MANUAL'
+} as const;
+export type UpdateAgentConfigDtoTriggerModeEnum = typeof UpdateAgentConfigDtoTriggerModeEnum[keyof typeof UpdateAgentConfigDtoTriggerModeEnum];
+
 
 /**
  * Check if a given object implements the UpdateAgentConfigDto interface.
@@ -66,6 +122,13 @@ export function UpdateAgentConfigDtoFromJSONTyped(json: any, ignoreDiscriminator
         'goal': json['goal'] == null ? undefined : json['goal'],
         'maxIterations': json['maxIterations'] == null ? undefined : json['maxIterations'],
         'toolNames': json['toolNames'] == null ? undefined : json['toolNames'],
+        'triggerMode': json['triggerMode'] == null ? undefined : json['triggerMode'],
+        'waitForMatching': json['waitForMatching'] == null ? undefined : json['waitForMatching'],
+        'waitForEvidence': json['waitForEvidence'] == null ? undefined : json['waitForEvidence'],
+        'waitForScans': json['waitForScans'] == null ? undefined : json['waitForScans'],
+        'minIntervalMinutes': json['minIntervalMinutes'] == null ? undefined : json['minIntervalMinutes'],
+        'maxStalenessHours': json['maxStalenessHours'] == null ? undefined : json['maxStalenessHours'],
+        'runBudgetMinutes': json['runBudgetMinutes'] == null ? undefined : json['runBudgetMinutes'],
     };
 }
 
@@ -84,6 +147,13 @@ export function UpdateAgentConfigDtoToJSONTyped(value?: UpdateAgentConfigDto | n
         'goal': value['goal'],
         'maxIterations': value['maxIterations'],
         'toolNames': value['toolNames'],
+        'triggerMode': value['triggerMode'],
+        'waitForMatching': value['waitForMatching'],
+        'waitForEvidence': value['waitForEvidence'],
+        'waitForScans': value['waitForScans'],
+        'minIntervalMinutes': value['minIntervalMinutes'],
+        'maxStalenessHours': value['maxStalenessHours'],
+        'runBudgetMinutes': value['runBudgetMinutes'],
     };
 }
 

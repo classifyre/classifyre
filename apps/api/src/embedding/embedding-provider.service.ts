@@ -9,10 +9,43 @@ type PendingRequest = {
 };
 
 // After this many consecutive spawn/exit failures, the Transformers.js worker
-// is assumed to be unrecoverable for this process (e.g. missing worker file
-// or native deps in a packaged build — see bundle-api.mjs) and we stop
-// respawning it rather than looping forever every ~2s.
+// is assumed to be unhealthy and we stop respawning it rather than looping
+// forever every ~2s.
 const MAX_CONSECUTIVE_WORKER_FAILURES = 3;
+
+/**
+ * How long the breaker stays open before letting one request probe the worker.
+ *
+ * The breaker was originally latched for the lifetime of the process, which
+ * suits exactly one of the two failures that trip it:
+ *
+ *  - **Permanent** — a missing worker file or native dep in a packaged build
+ *    (see bundle-api.mjs). Never recovers; respawning is a 2-second loop.
+ *  - **Transient** — onnxruntime aborting natively under host memory pressure
+ *    (`SIGTRAP` in `BFCArena::Extend`). Recovers on its own once the pressure
+ *    eases. Observed on desktop: 24 such aborts over two days, in bursts, on a
+ *    machine sitting at 5477 MB of 6144 MB swap.
+ *
+ * Latching for both meant one bad minute silently ended semantic embedding for
+ * the rest of the session — no retry, no recovery, and nothing in the UI to
+ * say so. Backing off instead serves both: transient pressure heals within a
+ * cooldown or two, while a genuinely broken install retries every few minutes
+ * rather than every two seconds, which is what the latch was really protecting
+ * against.
+ */
+const BREAKER_BASE_COOLDOWN_MS = 60_000;
+const BREAKER_MAX_COOLDOWN_MS = 15 * 60_000;
+
+/** Cooldown after `trips` consecutive breaker trips, doubling to a ceiling. */
+export function breakerCooldownMs(trips: number): number {
+  const exponent = Math.max(0, trips - 1);
+  // Shifting past 31 overflows; the ceiling clamps long before that anyway.
+  const scaled =
+    exponent > 30
+      ? BREAKER_MAX_COOLDOWN_MS
+      : BREAKER_BASE_COOLDOWN_MS * 2 ** exponent;
+  return Math.min(scaled, BREAKER_MAX_COOLDOWN_MS);
+}
 
 @Injectable()
 export class EmbeddingProviderService implements OnApplicationShutdown {
@@ -22,17 +55,33 @@ export class EmbeddingProviderService implements OnApplicationShutdown {
   private sequence = 0;
   private readonly pending = new Map<number, PendingRequest>();
   private consecutiveWorkerFailures = 0;
-  private workerDisabled = false;
+  /** Epoch ms the breaker reopens for a probe; undefined when closed. */
+  private disabledUntil?: number;
+  /** Consecutive trips, for the backoff. Reset by a successful embed. */
+  private breakerTrips = 0;
+  /** Injectable clock so the backoff can be tested without waiting minutes. */
+  private now: () => number = () => Date.now();
   private requestErrorCount = 0;
   private lastRequestError?: string;
   private lastRequestErrorAt?: string;
 
   constructor(private readonly config: EmbeddingConfigService) {}
 
+  /** True while the breaker is open and its cooldown has not yet elapsed. */
+  private get workerDisabled(): boolean {
+    return this.disabledUntil != null && this.now() < this.disabledUntil;
+  }
+
   /** Provider-level failure state, surfaced via GET /embeddings/status. */
   status() {
     return {
       workerDisabled: this.workerDisabled,
+      // When embedding resumes. Previously the answer was "never, restart the
+      // app", which the status endpoint had no way to express.
+      workerRetryAt:
+        this.disabledUntil != null
+          ? new Date(this.disabledUntil).toISOString()
+          : null,
       requestErrorCount: this.requestErrorCount,
       lastRequestError: this.lastRequestError ?? null,
       lastRequestErrorAt: this.lastRequestErrorAt ?? null,
@@ -90,10 +139,21 @@ export class EmbeddingProviderService implements OnApplicationShutdown {
 
   private embedLocal(texts: string[]): Promise<number[][]> {
     if (this.workerDisabled) {
+      const seconds = Math.ceil((this.disabledUntil! - this.now()) / 1000);
       return Promise.reject(
         new Error(
-          'Local embedding provider is disabled for this session: the Transformers.js worker failed to start too many times. Restart the app to retry.',
+          `Local embedding provider is paused: the Transformers.js worker failed ${MAX_CONSECUTIVE_WORKER_FAILURES} times in a row. Retrying in ${seconds}s.`,
         ),
+      );
+    }
+    if (this.disabledUntil != null) {
+      // Cooldown elapsed: this request is the probe. Carry the failure count so
+      // one more failure re-trips immediately rather than spending a fresh
+      // budget of spawns on every cooldown.
+      this.disabledUntil = undefined;
+      this.consecutiveWorkerFailures = MAX_CONSECUTIVE_WORKER_FAILURES - 1;
+      this.logger.log(
+        'Cooldown elapsed; probing the Transformers.js worker again',
       );
     }
     const worker = this.ensureWorker();
@@ -160,7 +220,16 @@ export class EmbeddingProviderService implements OnApplicationShutdown {
           }
           pending.reject(new Error(message.error));
         } else {
+          // A completed batch is the only proof the worker is healthy, so it
+          // is what clears the backoff — not merely surviving a spawn.
           this.consecutiveWorkerFailures = 0;
+          if (this.breakerTrips > 0) {
+            this.logger.log(
+              `Transformers.js worker recovered after ${this.breakerTrips} trip(s); embedding resumed`,
+            );
+          }
+          this.breakerTrips = 0;
+          this.disabledUntil = undefined;
           pending.resolve(message.vectors ?? []);
         }
       },
@@ -202,9 +271,11 @@ export class EmbeddingProviderService implements OnApplicationShutdown {
     ) {
       return;
     }
-    this.workerDisabled = true;
+    this.breakerTrips += 1;
+    const cooldown = breakerCooldownMs(this.breakerTrips);
+    this.disabledUntil = this.now() + cooldown;
     this.logger.error(
-      `Transformers.js worker failed ${this.consecutiveWorkerFailures} times; embedding provider disabled for this session`,
+      `Transformers.js worker failed ${this.consecutiveWorkerFailures} times; pausing embedding for ${Math.round(cooldown / 1000)}s (trip ${this.breakerTrips})`,
     );
   }
 

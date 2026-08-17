@@ -80,6 +80,90 @@ export interface AgentConfigDto {
      */
     mcpToolNames: Array<string>;
     /**
+     * When this agent is allowed to start. EAGER acts on any qualifying event; BATCH joins the coalesced batch; SETTLED waits for a quiet corpus; SCHEDULED runs on its own interval; MANUAL never starts on its own.
+     * @type {string}
+     * @memberof AgentConfigDto
+     */
+    triggerMode: AgentConfigDtoTriggerModeEnum;
+    /**
+     * Factory default
+     * @type {string}
+     * @memberof AgentConfigDto
+     */
+    defaultTriggerMode: AgentConfigDtoDefaultTriggerModeEnum;
+    /**
+     * Wait for the inquiry-matching queue to drain before running
+     * @type {boolean}
+     * @memberof AgentConfigDto
+     */
+    waitForMatching: boolean;
+    /**
+     * Factory default
+     * @type {boolean}
+     * @memberof AgentConfigDto
+     */
+    defaultWaitForMatching: boolean;
+    /**
+     * Wait until enough findings carry an importance score
+     * @type {boolean}
+     * @memberof AgentConfigDto
+     */
+    waitForEvidence: boolean;
+    /**
+     * Factory default
+     * @type {boolean}
+     * @memberof AgentConfigDto
+     */
+    defaultWaitForEvidence: boolean;
+    /**
+     * Wait until no source is mid-scan
+     * @type {boolean}
+     * @memberof AgentConfigDto
+     */
+    waitForScans: boolean;
+    /**
+     * Factory default
+     * @type {boolean}
+     * @memberof AgentConfigDto
+     */
+    defaultWaitForScans: boolean;
+    /**
+     * Minimum minutes between runs. Stops a burst of scans spawning a run apiece. 0 disables the floor.
+     * @type {number}
+     * @memberof AgentConfigDto
+     */
+    minIntervalMinutes: number;
+    /**
+     * Factory default
+     * @type {number}
+     * @memberof AgentConfigDto
+     */
+    defaultMinIntervalMinutes: number;
+    /**
+     * Force a run once gates have blocked the agent this long. This is the liveness guarantee for a gated agent. 0 disables the backstop.
+     * @type {number}
+     * @memberof AgentConfigDto
+     */
+    maxStalenessHours: number;
+    /**
+     * Factory default
+     * @type {number}
+     * @memberof AgentConfigDto
+     */
+    defaultMaxStalenessHours: number;
+    /**
+     * Per-agent run budget override; null uses the instance value
+     * @type {number}
+     * @memberof AgentConfigDto
+     */
+    runBudgetMinutes: number | null;
+    /**
+     * When this agent last started
+     * @type {Date}
+     * @memberof AgentConfigDto
+     */
+    lastTriggeredAt: Date | null;
+    /**
      * True when config differs from factory defaults
      * @type {boolean}
      * @memberof AgentConfigDto
@@ -103,6 +187,30 @@ export const AgentConfigDtoKindEnum = {
 } as const;
 export type AgentConfigDtoKindEnum = typeof AgentConfigDtoKindEnum[keyof typeof AgentConfigDtoKindEnum];
 
+/**
+ * @export
+ */
+export const AgentConfigDtoTriggerModeEnum = {
+    Eager: 'EAGER',
+    Batch: 'BATCH',
+    Settled: 'SETTLED',
+    Scheduled: 'SCHEDULED',
+    Manual: 'MANUAL'
+} as const;
+export type AgentConfigDtoTriggerModeEnum = typeof AgentConfigDtoTriggerModeEnum[keyof typeof AgentConfigDtoTriggerModeEnum];
+
+/**
+ * @export
+ */
+export const AgentConfigDtoDefaultTriggerModeEnum = {
+    Eager: 'EAGER',
+    Batch: 'BATCH',
+    Settled: 'SETTLED',
+    Scheduled: 'SCHEDULED',
+    Manual: 'MANUAL'
+} as const;
+export type AgentConfigDtoDefaultTriggerModeEnum = typeof AgentConfigDtoDefaultTriggerModeEnum[keyof typeof AgentConfigDtoDefaultTriggerModeEnum];
+
 
 /**
  * Check if a given object implements the AgentConfigDto interface.
@@ -118,6 +226,20 @@ export function instanceOfAgentConfigDto(value: object): value is AgentConfigDto
     if (!('toolNames' in value) || value['toolNames'] === undefined) return false;
     if (!('defaultToolNames' in value) || value['defaultToolNames'] === undefined) return false;
     if (!('mcpToolNames' in value) || value['mcpToolNames'] === undefined) return false;
+    if (!('triggerMode' in value) || value['triggerMode'] === undefined) return false;
+    if (!('defaultTriggerMode' in value) || value['defaultTriggerMode'] === undefined) return false;
+    if (!('waitForMatching' in value) || value['waitForMatching'] === undefined) return false;
+    if (!('defaultWaitForMatching' in value) || value['defaultWaitForMatching'] === undefined) return false;
+    if (!('waitForEvidence' in value) || value['waitForEvidence'] === undefined) return false;
+    if (!('defaultWaitForEvidence' in value) || value['defaultWaitForEvidence'] === undefined) return false;
+    if (!('waitForScans' in value) || value['waitForScans'] === undefined) return false;
+    if (!('defaultWaitForScans' in value) || value['defaultWaitForScans'] === undefined) return false;
+    if (!('minIntervalMinutes' in value) || value['minIntervalMinutes'] === undefined) return false;
+    if (!('defaultMinIntervalMinutes' in value) || value['defaultMinIntervalMinutes'] === undefined) return false;
+    if (!('maxStalenessHours' in value) || value['maxStalenessHours'] === undefined) return false;
+    if (!('defaultMaxStalenessHours' in value) || value['defaultMaxStalenessHours'] === undefined) return false;
+    if (!('runBudgetMinutes' in value) || value['runBudgetMinutes'] === undefined) return false;
+    if (!('lastTriggeredAt' in value) || value['lastTriggeredAt'] === undefined) return false;
     if (!('customized' in value) || value['customized'] === undefined) return false;
     return true;
 }
@@ -142,6 +264,20 @@ export function AgentConfigDtoFromJSONTyped(json: any, ignoreDiscriminator: bool
         'toolNames': json['toolNames'],
         'defaultToolNames': json['defaultToolNames'],
         'mcpToolNames': json['mcpToolNames'],
+        'triggerMode': json['triggerMode'],
+        'defaultTriggerMode': json['defaultTriggerMode'],
+        'waitForMatching': json['waitForMatching'],
+        'defaultWaitForMatching': json['defaultWaitForMatching'],
+        'waitForEvidence': json['waitForEvidence'],
+        'defaultWaitForEvidence': json['defaultWaitForEvidence'],
+        'waitForScans': json['waitForScans'],
+        'defaultWaitForScans': json['defaultWaitForScans'],
+        'minIntervalMinutes': json['minIntervalMinutes'],
+        'defaultMinIntervalMinutes': json['defaultMinIntervalMinutes'],
+        'maxStalenessHours': json['maxStalenessHours'],
+        'defaultMaxStalenessHours': json['defaultMaxStalenessHours'],
+        'runBudgetMinutes': json['runBudgetMinutes'],
+        'lastTriggeredAt': (json['lastTriggeredAt'] == null ? null : new Date(json['lastTriggeredAt'])),
         'customized': json['customized'],
     };
 }
@@ -167,6 +303,20 @@ export function AgentConfigDtoToJSONTyped(value?: AgentConfigDto | null, ignoreD
         'toolNames': value['toolNames'],
         'defaultToolNames': value['defaultToolNames'],
         'mcpToolNames': value['mcpToolNames'],
+        'triggerMode': value['triggerMode'],
+        'defaultTriggerMode': value['defaultTriggerMode'],
+        'waitForMatching': value['waitForMatching'],
+        'defaultWaitForMatching': value['defaultWaitForMatching'],
+        'waitForEvidence': value['waitForEvidence'],
+        'defaultWaitForEvidence': value['defaultWaitForEvidence'],
+        'waitForScans': value['waitForScans'],
+        'defaultWaitForScans': value['defaultWaitForScans'],
+        'minIntervalMinutes': value['minIntervalMinutes'],
+        'defaultMinIntervalMinutes': value['defaultMinIntervalMinutes'],
+        'maxStalenessHours': value['maxStalenessHours'],
+        'defaultMaxStalenessHours': value['defaultMaxStalenessHours'],
+        'runBudgetMinutes': value['runBudgetMinutes'],
+        'lastTriggeredAt': value['lastTriggeredAt'] == null ? value['lastTriggeredAt'] : value['lastTriggeredAt'].toISOString(),
         'customized': value['customized'],
     };
 }

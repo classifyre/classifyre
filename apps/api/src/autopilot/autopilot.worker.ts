@@ -1,6 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import type { Job } from 'pg-boss';
-import { AgentKind, AgentRunStatus, InstanceSettings } from '@prisma/client';
+import {
+  AgentKind,
+  AgentRunStatus,
+  InstanceSettings,
+  RunnerStatus,
+} from '@prisma/client';
 import { PrismaService } from '../prisma.service';
 import { PgBossService } from '../scheduler/pg-boss.service';
 import { AiSchemaError } from '../ai';
@@ -11,20 +16,20 @@ import { AgentLoggerService } from './audit/agent-logger.service';
 import { AgentSearchService } from './search/agent-search.service';
 import { HarnessService } from './harness/harness.service';
 import { AgentRunCancelledError } from './agent-runtime';
+import { AgentConfigService } from './harness/agent-config.service';
+import {
+  shouldRun,
+  type CycleTrigger,
+  type PolicyDecision,
+  type ReadinessSignals,
+} from './harness/agent-policy.service';
 import type { ApplySummary } from './decision-applier.service';
 import {
   AGENT_RUN_STALE_AFTER_MS,
-  AUTOPILOT_COALESCE_WINDOW_SECONDS,
-  AUTOPILOT_CORPUS_SINGLETON_KEY,
-  AUTOPILOT_CYCLE_BUDGET_MS,
   AUTOPILOT_DREAM_CRON,
-  AUTOPILOT_MAX_READINESS_REQUEUES,
+  AUTOPILOT_HEARTBEAT_CRON,
   AUTOPILOT_QUEUE,
-  AUTOPILOT_RETRY_AFTER_SECONDS,
   DETECTION_CHAIN,
-  EVIDENCE_ANALYSIS_MIN_COVERAGE,
-  EVIDENCE_ANALYSIS_USABLE_COVERAGE,
-  EVIDENCE_ANALYSIS_USABLE_FINDINGS,
   INVESTIGATION_CHAIN,
   PIPELINE_KINDS,
 } from './autopilot.constants';
@@ -59,8 +64,22 @@ interface CycleInput {
   corpus?: boolean;
   /** Why this cycle skipped the coalescing window, if it did. */
   expressReason?: string | null;
-  /** Requeue count for the readiness gate; bounded so it cannot spin forever. */
-  readinessAttempts?: number;
+  /** Periodic wake-up: see AUTOPILOT_HEARTBEAT_CRON. */
+  heartbeat?: boolean;
+}
+
+/**
+ * What kind of event produced this cycle, as the policy engine sees it.
+ *
+ * An express cycle is one new signal — a high-importance finding, an operator's
+ * inquiry matching, a failed scan. That is exactly what a SETTLED agent is
+ * waiting NOT to be woken by, so the distinction has to survive down to the
+ * policy rather than collapsing into "a cycle happened".
+ */
+function cycleTrigger(cycle: CycleInput): CycleTrigger {
+  if (cycle.manual) return 'manual';
+  if (cycle.expressReason) return 'express';
+  return 'scan';
 }
 
 /** What this particular cycle turned out to be looking at, resolved at run time. */
@@ -100,6 +119,7 @@ export class AutopilotWorker {
     private readonly search: AgentSearchService,
     private readonly harness: HarnessService,
     private readonly embeddings: EmbeddingQueueService,
+    private readonly agents: AgentConfigService,
   ) {}
 
   /**
@@ -126,6 +146,21 @@ export class AutopilotWorker {
         `Failed to register dream schedule: ${error instanceof Error ? error.message : String(error)}`,
       );
     }
+    // The only wake-up that does not depend on a scan having finished. Without
+    // it the staleness backstop is unreachable on a corpus that has gone quiet,
+    // which is the state the SETTLED agents are waiting for.
+    try {
+      await boss.schedule(
+        AUTOPILOT_QUEUE,
+        AUTOPILOT_HEARTBEAT_CRON,
+        { heartbeat: true, corpus: true },
+        { tz: 'UTC' },
+      );
+    } catch (error) {
+      this.logger.warn(
+        `Failed to register autopilot heartbeat: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
     this.logger.log(`Registered worker for queue ${AUTOPILOT_QUEUE}`);
   }
 
@@ -144,7 +179,14 @@ export class AutopilotWorker {
    */
   private async reapStaleRuns(): Promise<void> {
     try {
-      const cutoff = new Date(Date.now() - AGENT_RUN_STALE_AFTER_MS);
+      const settings = await this.prisma.instanceSettings.findUnique({
+        where: { id: INSTANCE_SETTINGS_ID },
+        select: { harnessRunStaleAfterMinutes: true },
+      });
+      const staleAfterMs =
+        (settings?.harnessRunStaleAfterMinutes ??
+          AGENT_RUN_STALE_AFTER_MS / 60_000) * 60_000;
+      const cutoff = new Date(Date.now() - staleAfterMs);
       const result = await this.prisma.agentRun.updateMany({
         where: {
           status: AgentRunStatus.RUNNING,
@@ -212,10 +254,7 @@ export class AutopilotWorker {
         only,
         corpus,
         expressReason,
-        readinessAttempts:
-          typeof data?.readinessAttempts === 'number'
-            ? data.readinessAttempts
-            : 0,
+        heartbeat: data?.heartbeat === true,
         caseId: typeof data?.caseId === 'string' ? data.caseId : null,
         instruction,
         cycleKey:
@@ -261,7 +300,8 @@ export class AutopilotWorker {
     );
   }
 
-  async runCycle(cycle: CycleInput): Promise<void> {
+  async runCycle(input: CycleInput): Promise<void> {
+    let cycle = input;
     const settings = await this.prisma.instanceSettings.findUnique({
       where: { id: INSTANCE_SETTINGS_ID },
     });
@@ -293,66 +333,21 @@ export class AutopilotWorker {
       return;
     }
 
-    // Deterministic ordering for scan cycles: if the work the agents reason
-    // FROM is still in flight, push the cycle back rather than race it.
+    // What the whole instance looks like right now, gathered once and shared by
+    // every agent below.
     //
-    // This used to wait on inquiry matching alone, so the TRIAGE DOCTRINE
-    // ("start from findings.ranked, read the importance reasons") was routinely
-    // applied to findings that had no importance score yet — every one of them
-    // reading as score 0, indistinguishable from genuinely unimportant.
-    const attempts = cycle.readinessAttempts ?? 0;
-    const blocked = cycle.manual ? null : await this.readinessBlocked();
-    if (blocked && attempts < AUTOPILOT_MAX_READINESS_REQUEUES) {
-      this.logger.log(
-        `${blocked} still pending — re-queueing autopilot cycle (attempt ${attempts + 1}) for ${cycle.corpus ? 'corpus' : `source ${cycle.sourceId}`}`,
-      );
-      const boss = await this.pgBoss.getBossAsync();
-      await boss.send(
-        AUTOPILOT_QUEUE,
-        {
-          sourceId: cycle.sourceId ?? undefined,
-          runnerId: cycle.runnerId ?? undefined,
-          corpus: cycle.corpus,
-          expressReason: cycle.expressReason ?? undefined,
-          agentKinds: cycle.only ?? undefined,
-          caseId: cycle.caseId ?? undefined,
-          instruction: cycle.instruction ?? undefined,
-          cycleKey: cycle.cycleKey,
-          readinessAttempts: attempts + 1,
-        },
-        {
-          startAfter: AUTOPILOT_RETRY_AFTER_SECONDS,
-          singletonKey: cycle.corpus
-            ? AUTOPILOT_CORPUS_SINGLETON_KEY
-            : `autopilot:${cycle.sourceId}`,
-          // `singletonKey` alone dedupes NOTHING on this queue: in pg-boss 12
-          // every single-job-per-key index is predicated on the queue policy,
-          // and this queue is `standard`. Without a slot width each requeue
-          // therefore inserted a brand-new job, and with a fresh corpus cycle
-          // arriving every window each one started its own chain counting to
-          // five. Measured on a live 151-source namespace: 29 completed cycle
-          // jobs spread across attempts 1..5, and exactly one of them ever
-          // reached the agents — the rest found the dirty set already claimed
-          // and exited. Same slot width as the coalescing window, so a retry
-          // and a fresh cycle landing together become one job rather than two.
-          singletonSeconds: AUTOPILOT_COALESCE_WINDOW_SECONDS,
-          // Deliberately NOT `singletonNextSlot` here, unlike the enqueue path
-          // in CorrelationWorker. There, a collision means the slot's job has
-          // already RUN, so dropping the insert would strand the sources that
-          // scan marked dirty — it has to move to the next slot. Here, a
-          // collision means a corpus cycle is already QUEUED, and it reads the
-          // same shared dirty set when it runs, so nothing is stranded by
-          // letting this retry go.
-          //
-          // Deferring instead cost throughput: each collision pushed a retry
-          // into the following slot rather than merging it, and a live
-          // 151-source namespace accumulated 55 queued cycles across attempts
-          // 2..5 while investigation had not run for three hours.
-          expireInSeconds: 3 * 3600,
-        },
-      );
-      return;
-    }
+    // This used to be a single `readinessBlocked()` that deferred the ENTIRE
+    // cycle whenever inquiry matching had work queued, so a three-minute
+    // escalation was paced by a two-and-a-half-hour matching backlog it does
+    // not read. Measured on a live 151-source workspace: for two days only the
+    // deterministic DUPLICATES step ran, and the escape hatch meant to rescue
+    // it — proceed anyway after five requeues — fired zero times, because a
+    // fresh cycle landing in the same coalescing slot dropped the escalating
+    // requeue and restarted the count.
+    //
+    // Each agent now answers for itself, against the gates it actually depends
+    // on, with a staleness backstop as the liveness guarantee.
+    const signals = await this.readinessSignals(settings);
     // Measured, not inferred from queue state. This used to be
     // `blocked != null` — "the queue was busy when we looked" — which on a
     // busy instance was true on every cycle and put the "scores are partial,
@@ -368,12 +363,7 @@ export class AutopilotWorker {
     const evidenceAnalysisPending =
       evidenceCoverage.open > 0 &&
       evidenceCoverage.analyzed / evidenceCoverage.open <
-        EVIDENCE_ANALYSIS_MIN_COVERAGE;
-    if (blocked) {
-      this.logger.warn(
-        `Proceeding with autopilot cycle after ${attempts} readiness requeue(s); ${blocked} is still pending.`,
-      );
-    }
+        settings.harnessEvidenceWarnCoverage;
 
     // A corpus cycle reads the dirty set without acknowledging it. The exact
     // timestamps are cleared only after every enabled agent finishes, giving
@@ -381,15 +371,30 @@ export class AutopilotWorker {
     // pg-boss's retry, and a newer scan timestamp cannot be erased by this run.
     const dirtySources = cycle.corpus ? await this.readDirtySources() : [];
     const batchSources = dirtySources.map(({ id, name }) => ({ id, name }));
-    // Nothing new since the last batch. A readiness requeue always inserts (it
-    // must, or a deferred cycle would be lost), so a corpus job can outlive the
-    // batch it was queued for — and running five agents over "all sources" to
-    // rediscover nothing is precisely the churn this cadence exists to remove.
+    // Nothing new since the last batch. Running five agents over "all sources"
+    // to rediscover nothing is precisely the churn this cadence exists to
+    // remove, so an ordinary corpus job with an empty batch stops here.
+    //
+    // A heartbeat is the one exception, and only for the agents whose staleness
+    // backstop has actually expired. Without this the backstop is unreachable:
+    // it is evaluated inside a cycle, and on a corpus that has stopped being
+    // scanned there are no cycles — so the guarantee that a gated agent
+    // eventually runs would hold only while something else was already keeping
+    // the harness awake.
     if (cycle.corpus && batchSources.length === 0 && !cycle.manual) {
-      this.logger.debug(
-        'Corpus cycle skipped: no sources have been scanned since the last one.',
+      const overdue = cycle.heartbeat ? await this.overdueAgents(cycle) : [];
+      if (overdue.length === 0) {
+        this.logger.debug(
+          'Corpus cycle skipped: no sources have been scanned since the last one.',
+        );
+        return;
+      }
+      // Narrow to exactly those agents. `only` restricts which agents run; it
+      // does not authorise them, so the enable flags still apply below.
+      cycle = { ...cycle, only: overdue };
+      this.logger.log(
+        `Autopilot heartbeat: running ${overdue.join(', ')} past their staleness window with no new scans.`,
       );
-      return;
     }
 
     const sourceName = cycle.sourceId
@@ -418,7 +423,8 @@ export class AutopilotWorker {
     // CASE mutated, and DETECTOR_AUTHOR reacts to what CONFIG left unaddressed
     // (they also write the same source config, so serialising them keeps them
     // off each other's optimistic-concurrency token).
-    const deadline = Date.now() + AUTOPILOT_CYCLE_BUDGET_MS;
+    const deadline = Date.now() + settings.harnessCycleBudgetMinutes * 60_000;
+    const deferred = new Set<AgentKind>();
     await Promise.all([
       this.runChain(
         INVESTIGATION_CHAIN,
@@ -427,6 +433,8 @@ export class AutopilotWorker {
         sourceName,
         scope,
         deadline,
+        signals,
+        deferred,
       ),
       this.runChain(
         DETECTION_CHAIN,
@@ -435,11 +443,24 @@ export class AutopilotWorker {
         sourceName,
         scope,
         deadline,
+        signals,
+        deferred,
       ),
     ]);
 
     if (cycle.corpus) {
-      await this.acknowledgeDirtySources(dirtySources);
+      // Only clear the dirty marks once every enabled agent has had its turn.
+      // A gated agent has not seen these sources yet, and acknowledging on its
+      // behalf would drop them permanently — the next cycle reads the dirty set
+      // and would find nothing. Leaving the marks costs a re-read; clearing
+      // them early costs the work.
+      if (deferred.size > 0) {
+        this.logger.log(
+          `Autopilot cycle deferred ${[...deferred].join(', ')}; keeping ${dirtySources.length} source(s) dirty for the next one.`,
+        );
+      } else {
+        await this.acknowledgeDirtySources(dirtySources);
+      }
     }
   }
 
@@ -456,6 +477,8 @@ export class AutopilotWorker {
     sourceName: string,
     scope: CycleScope,
     deadline: number,
+    signals: ReadinessSignals,
+    deferred: Set<AgentKind>,
   ): Promise<void> {
     for (const kind of chain) {
       if (Date.now() >= deadline) {
@@ -466,10 +489,23 @@ export class AutopilotWorker {
           `Autopilot cycle budget exhausted — skipping ${kind} and the rest of ` +
             `its chain for ${cycle.corpus ? 'corpus' : `source ${cycle.sourceId}`}.`,
         );
+        // The rest of this chain has not been considered, so the batch is not
+        // finished with them either.
+        for (const rest of chain.slice(chain.indexOf(kind))) deferred.add(rest);
         return;
       }
 
       if (await this.agentEnabled(kind, cycle)) {
+        const decision = await this.policyDecision(kind, cycle, signals);
+        if (!decision.run) {
+          // Not a SKIPPED row either: the agent is enabled and willing, its
+          // preconditions simply are not met yet. A row per gated agent per
+          // scan would bury the audit trail the SKIPPED rows exist to carry.
+          this.logger.debug(`Autopilot ${kind} deferred — ${decision.reason}`);
+          deferred.add(kind);
+          continue;
+        }
+        await this.agents.markTriggered(kind);
         await this.runAgent(kind, settings, cycle, sourceName, scope);
         continue;
       }
@@ -727,22 +763,89 @@ export class AutopilotWorker {
    * survives only for corpora too small for it to apply, where a few hundred
    * scored findings genuinely may be too thin to rank.
    */
-  private async readinessBlocked(): Promise<string | null> {
-    if (await this.queueBusy(INQUIRY_MATCH_QUEUE)) return 'Inquiry matching';
-    if (!(await this.evidenceAnalysisBusy())) return null;
+  private async readinessSignals(
+    settings: InstanceSettings,
+  ): Promise<ReadinessSignals> {
+    // Only asked for once per cycle: each is a query, and none can meaningfully
+    // change between two agents starting a second apart.
+    const [matchingBusy, evidenceBusy, scansActive, coverage] =
+      await Promise.all([
+        this.queueBusy(INQUIRY_MATCH_QUEUE),
+        this.evidenceAnalysisBusy(),
+        this.scansActive(),
+        this.evidenceCoverageSafe(),
+      ]);
+    return {
+      matchingBusy,
+      scansActive,
+      // With nothing left to analyze, coverage cannot improve by waiting, so
+      // the evidence gate has no reason to hold anyone back.
+      coverage: evidenceBusy ? coverage : { open: 0, analyzed: 0 },
+      evidence: {
+        usableFindings: settings.harnessEvidenceUsableFindings,
+        usableCoverage: settings.harnessEvidenceUsableCoverage,
+      },
+    };
+  }
 
-    const coverage = await this.evidenceCoverageSafe();
-    // Nothing scored and nothing to score: an instance with no semantic stack
-    // still needs its agents.
-    if (coverage.open === 0) return null;
-    if (coverage.analyzed >= EVIDENCE_ANALYSIS_USABLE_FINDINGS) return null;
-    const ratio = coverage.analyzed / coverage.open;
-    if (ratio >= EVIDENCE_ANALYSIS_USABLE_COVERAGE) return null;
-    return (
-      `Evidence analysis (only ${coverage.analyzed} of ${coverage.open} findings ` +
-      `scored — under both the ${EVIDENCE_ANALYSIS_USABLE_FINDINGS}-finding floor ` +
-      `and the ${Math.round(EVIDENCE_ANALYSIS_USABLE_COVERAGE * 100)}% fallback)`
-    );
+  /** Whether any source is mid-scan — the "corpus is not settled yet" signal. */
+  private async scansActive(): Promise<boolean> {
+    try {
+      const count = await this.prisma.runner.count({
+        where: { status: { in: [RunnerStatus.PENDING, RunnerStatus.RUNNING] } },
+      });
+      return count > 0;
+    } catch {
+      // Advisory. Failing closed here would stall every SETTLED agent on a
+      // transient database error, which is the deadlock this rework removes.
+      return false;
+    }
+  }
+
+  /**
+   * Enabled agents whose staleness backstop has expired.
+   *
+   * Deliberately asks only the backstop question — not the full policy — so a
+   * heartbeat cannot become a second cadence. An agent that is merely *ready*
+   * has nothing to do here: there are no dirty sources, so a run would
+   * re-examine a corpus nothing has changed. Only an agent the backstop says is
+   * overdue has a reason to run without new data, and that reason is precisely
+   * "it has been too long since anyone looked".
+   */
+  private async overdueAgents(cycle: CycleInput): Promise<AgentKind[]> {
+    const overdue: AgentKind[] = [];
+    for (const kind of PIPELINE_KINDS) {
+      if (!(await this.agentEnabled(kind, cycle))) continue;
+      const [policy, lastTriggeredAt] = await Promise.all([
+        this.agents.resolvePolicy(kind),
+        this.agents.lastTriggeredAt(kind),
+      ]);
+      if (policy.maxStalenessHours <= 0) continue;
+      const idleMs = lastTriggeredAt
+        ? Date.now() - lastTriggeredAt.getTime()
+        : Number.POSITIVE_INFINITY;
+      if (idleMs >= policy.maxStalenessHours * 3_600_000) overdue.push(kind);
+    }
+    return overdue;
+  }
+
+  /** Whether this agent may start now, per its own policy. */
+  private async policyDecision(
+    kind: AgentKind,
+    cycle: CycleInput,
+    signals: ReadinessSignals,
+  ): Promise<PolicyDecision> {
+    const [policy, lastTriggeredAt] = await Promise.all([
+      this.agents.resolvePolicy(kind),
+      this.agents.lastTriggeredAt(kind),
+    ]);
+    return shouldRun({
+      policy,
+      signals,
+      trigger: cycleTrigger(cycle),
+      lastTriggeredAt,
+      now: new Date(),
+    });
   }
 
   /**

@@ -85,13 +85,36 @@ export class SystemBriefService {
   ) {}
 
   /** Top glossary terms as brief entries: verified first, then newest. */
+  /**
+   * An instance-configured context cap, falling back to the shipped constant.
+   *
+   * These bound how much of the corpus a run is shown, which is both a token
+   * cost and a quality dial — too few glossary entries and the agent coins a
+   * new name for something already canonical.
+   */
+  private async cap(
+    key: 'harnessMaxGlossaryEntries' | 'harnessMaxRecalledMemories',
+    fallback: number,
+  ): Promise<number> {
+    try {
+      const settings = await this.prisma.instanceSettings.findUnique({
+        where: { id: 1 },
+        select: { [key]: true },
+      });
+      const value = (settings as Record<string, unknown> | null)?.[key];
+      return typeof value === 'number' ? value : fallback;
+    } catch {
+      return fallback;
+    }
+  }
+
   private async glossaryEntries(): Promise<BriefMemoryEntry[]> {
     const terms = await this.prisma.glossaryTerm.findMany({
       orderBy: [
         { verifiedAt: { sort: 'desc', nulls: 'last' } },
         { updatedAt: 'desc' },
       ],
-      take: MAX_GLOSSARY_ENTRIES,
+      take: await this.cap('harnessMaxGlossaryEntries', MAX_GLOSSARY_ENTRIES),
       select: { term: true, aliases: true, entityType: true, notes: true },
     });
     return terms.map((term) => ({

@@ -52,6 +52,21 @@ describe('AutopilotWorker agent gating (G-027/G-029)', () => {
       {} as any,
       {} as any,
       {} as any,
+      {
+        // Permissive policy: these suites are about the enable-flag and chain
+        // logic, not scheduling. The policy engine has its own spec.
+        resolvePolicy: jest.fn().mockResolvedValue({
+          triggerMode: 'BATCH',
+          waitForMatching: false,
+          waitForEvidence: false,
+          waitForScans: false,
+          minIntervalMinutes: 0,
+          maxStalenessHours: 0,
+        }),
+        lastTriggeredAt: jest.fn().mockResolvedValue(null),
+        markTriggered: jest.fn().mockResolvedValue(undefined),
+        runBudgetMinutes: jest.fn().mockResolvedValue(null),
+      } as any,
     );
   };
 
@@ -211,5 +226,142 @@ describe('AutopilotWorker agent gating (G-027/G-029)', () => {
 
       expect(findUnique).toHaveBeenCalledTimes(PIPELINE.length);
     });
+  });
+});
+
+/**
+ * Per-agent gating: the split the whole feature exists for.
+ *
+ * Before this, one `readinessBlocked()` deferred the entire cycle whenever
+ * inquiry matching had work queued. On a live 151-source workspace that queue
+ * held 16 jobs at ~579 s apiece, so a 2.8-minute escalation was paced by a
+ * 2.5-hour backlog it does not read, and for two days only the deterministic
+ * DUPLICATES step ran at all.
+ *
+ * This test fails against that design by construction: with matching busy,
+ * exactly one of these two agents must run.
+ */
+describe('AutopilotWorker per-agent gating', () => {
+  const OPEN_COVERAGE = { open: 0, analyzed: 0 };
+
+  const build = (policies: Record<string, unknown>) => {
+    const worker = new AutopilotWorker(
+      {
+        instanceSettings: {
+          findUnique: jest.fn().mockResolvedValue({
+            harnessAiProviderConfigId: 'p1',
+            autopilotInquiryEnabled: true,
+            autopilotEscalationEnabled: true,
+          }),
+        },
+      } as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {
+        resolvePolicy: jest.fn((kind: AgentKind) =>
+          Promise.resolve(policies[kind]),
+        ),
+        lastTriggeredAt: jest.fn().mockResolvedValue(null),
+        markTriggered: jest.fn().mockResolvedValue(undefined),
+        runBudgetMinutes: jest.fn().mockResolvedValue(null),
+      } as never,
+    );
+    return worker as unknown as {
+      policyDecision: (
+        kind: AgentKind,
+        cycle: Record<string, unknown>,
+        signals: Record<string, unknown>,
+      ) => Promise<{ run: boolean; reason: string }>;
+    };
+  };
+
+  const policy = (over: Record<string, unknown> = {}) => ({
+    triggerMode: 'BATCH',
+    waitForMatching: false,
+    waitForEvidence: false,
+    waitForScans: false,
+    minIntervalMinutes: 0,
+    maxStalenessHours: 0,
+    ...over,
+  });
+
+  it('runs the ungated agent while the gated one waits on the same signals', async () => {
+    const worker = build({
+      [AgentKind.ESCALATION]: policy({ triggerMode: 'EAGER' }),
+      [AgentKind.INQUIRY]: policy({ waitForMatching: true }),
+    });
+    const signals = {
+      matchingBusy: true,
+      scansActive: false,
+      coverage: OPEN_COVERAGE,
+      evidence: { usableFindings: 2000, usableCoverage: 0.25 },
+    };
+    const cycle = { manual: false, expressReason: null };
+
+    const escalation = await worker.policyDecision(
+      AgentKind.ESCALATION,
+      cycle,
+      signals,
+    );
+    const inquiry = await worker.policyDecision(
+      AgentKind.INQUIRY,
+      cycle,
+      signals,
+    );
+
+    expect(escalation.run).toBe(true);
+    expect(inquiry.run).toBe(false);
+    expect(inquiry.reason).toMatch(/matching/i);
+  });
+
+  it('holds a corpus-wide agent back while scans are still running', async () => {
+    const worker = build({
+      [AgentKind.CONFIG]: policy({
+        triggerMode: 'SETTLED',
+        waitForScans: true,
+      }),
+    });
+
+    const decision = await worker.policyDecision(
+      AgentKind.CONFIG,
+      { manual: false, expressReason: null },
+      {
+        matchingBusy: false,
+        scansActive: true,
+        coverage: OPEN_COVERAGE,
+        evidence: { usableFindings: 2000, usableCoverage: 0.25 },
+      },
+    );
+
+    expect(decision.run).toBe(false);
+    expect(decision.reason).toMatch(/scans/i);
+  });
+
+  it('lets a manual trigger through every gate', async () => {
+    const worker = build({
+      [AgentKind.CONFIG]: policy({
+        triggerMode: 'SETTLED',
+        waitForScans: true,
+        waitForMatching: true,
+        minIntervalMinutes: 600,
+      }),
+    });
+
+    const decision = await worker.policyDecision(
+      AgentKind.CONFIG,
+      { manual: true, expressReason: null },
+      {
+        matchingBusy: true,
+        scansActive: true,
+        coverage: OPEN_COVERAGE,
+        evidence: { usableFindings: 2000, usableCoverage: 0.25 },
+      },
+    );
+
+    expect(decision.run).toBe(true);
   });
 });

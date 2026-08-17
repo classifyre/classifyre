@@ -3,6 +3,7 @@ import {
   IsBoolean,
   IsIn,
   IsInt,
+  IsNumber,
   IsOptional,
   IsString,
   Max,
@@ -82,41 +83,12 @@ export class UpdateInstanceSettingsDto {
 
   @ApiPropertyOptional({
     description:
-      'Operator guidance for the inquiry agent: what is desired / worth investigating.',
-    nullable: true,
-  })
-  @IsOptional()
-  @IsString()
-  @MaxLength(4000)
-  autopilotInquiryDesired?: string | null;
-
-  @ApiPropertyOptional({
-    description:
-      'Operator guidance for the inquiry agent: what is searchable in this instance.',
-    nullable: true,
-  })
-  @IsOptional()
-  @IsString()
-  @MaxLength(4000)
-  autopilotInquirySearchable?: string | null;
-
-  @ApiPropertyOptional({
-    description:
       'When true, the autopilot case agent manages investigation cases automatically after scans.',
     example: true,
   })
   @IsOptional()
   @IsBoolean()
   autopilotCaseEnabled?: boolean;
-
-  @ApiPropertyOptional({
-    description: 'Operator guidance for the case agent.',
-    nullable: true,
-  })
-  @IsOptional()
-  @IsString()
-  @MaxLength(4000)
-  autopilotCaseGuidance?: string | null;
 
   @ApiPropertyOptional({
     description:
@@ -128,15 +100,6 @@ export class UpdateInstanceSettingsDto {
   autopilotConfigEnabled?: boolean;
 
   @ApiPropertyOptional({
-    description: 'Operator guidance for the config-tuning agent.',
-    nullable: true,
-  })
-  @IsOptional()
-  @IsString()
-  @MaxLength(4000)
-  autopilotConfigGuidance?: string | null;
-
-  @ApiPropertyOptional({
     description:
       'When true, the detector-authoring agent may create and train custom detectors.',
     example: true,
@@ -146,15 +109,6 @@ export class UpdateInstanceSettingsDto {
   autopilotDetectorEnabled?: boolean;
 
   @ApiPropertyOptional({
-    description: 'Operator guidance for the detector-authoring agent.',
-    nullable: true,
-  })
-  @IsOptional()
-  @IsString()
-  @MaxLength(4000)
-  autopilotDetectorGuidance?: string | null;
-
-  @ApiPropertyOptional({
     description:
       'When true, the escalation agent may raise operator notifications for high-severity cases.',
     example: true,
@@ -162,15 +116,6 @@ export class UpdateInstanceSettingsDto {
   @IsOptional()
   @IsBoolean()
   autopilotEscalationEnabled?: boolean;
-
-  @ApiPropertyOptional({
-    description: 'Operator guidance for the escalation agent.',
-    nullable: true,
-  })
-  @IsOptional()
-  @IsString()
-  @MaxLength(4000)
-  autopilotEscalationGuidance?: string | null;
 
   @ApiPropertyOptional({
     description:
@@ -218,4 +163,168 @@ export class UpdateInstanceSettingsDto {
   @IsString()
   @MinLength(1)
   hfToken?: string | null;
+
+  @ApiPropertyOptional({
+    description:
+      'How long one agent run may take before it is stopped. A run holds a namespace job slot, so a wedged one stalls every queue behind it.',
+    example: 20,
+    minimum: 1,
+    maximum: 480,
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(480)
+  harnessRunBudgetMinutes?: number;
+
+  @ApiPropertyOptional({
+    description:
+      'When a run still marked RUNNING is presumed dead and reaped. Keep it above the run budget: past this a run is not slow, it is gone.',
+    example: 60,
+    minimum: 1,
+    maximum: 1440,
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(1440)
+  harnessRunStaleAfterMinutes?: number;
+
+  @ApiPropertyOptional({
+    description:
+      'Wall-clock budget for one cycle. Checked before each agent starts, so a chain can overshoot by at most one run budget.',
+    example: 30,
+    minimum: 1,
+    maximum: 720,
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(720)
+  harnessCycleBudgetMinutes?: number;
+
+  @ApiPropertyOptional({
+    description:
+      'Scored findings above which the evidence gate opens regardless of coverage.',
+    example: 2000,
+    minimum: 0,
+    maximum: 10000000,
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(10000000)
+  harnessEvidenceUsableFindings?: number;
+
+  @ApiPropertyOptional({
+    description: 'Character cap on one tool result before it is truncated.',
+    example: 8000,
+    minimum: 1000,
+    maximum: 100000,
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(1000)
+  @Max(100000)
+  harnessObservationChars?: number;
+
+  @ApiPropertyOptional({
+    description:
+      'Character cap on all tool results in one turn. The transcript is resent every iteration, so this bounds its quadratic growth.',
+    example: 24000,
+    minimum: 1000,
+    maximum: 500000,
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(1000)
+  @Max(500000)
+  harnessTurnObservationChars?: number;
+
+  @ApiPropertyOptional({
+    description: 'How many ranked findings a run may see at once.',
+    example: 25,
+    minimum: 1,
+    maximum: 200,
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(200)
+  harnessMaxRankedFindings?: number;
+
+  @ApiPropertyOptional({
+    description: 'How many glossary entries are injected into each run.',
+    example: 20,
+    minimum: 0,
+    maximum: 200,
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(200)
+  harnessMaxGlossaryEntries?: number;
+
+  @ApiPropertyOptional({
+    description: 'How many recalled memories are injected into each run.',
+    example: 30,
+    minimum: 0,
+    maximum: 200,
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(200)
+  harnessMaxRecalledMemories?: number;
+
+  @ApiPropertyOptional({
+    description: 'How often the memory-consolidation agent runs, in days.',
+    example: 2,
+    minimum: 1,
+    maximum: 90,
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(90)
+  harnessDreamIntervalDays?: number;
+
+  @ApiPropertyOptional({
+    description:
+      'Fraction of open findings that must be scored for the evidence gate to open, when the absolute floor is not met.',
+    example: 0.25,
+    minimum: 0,
+    maximum: 1,
+  })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Max(1)
+  harnessEvidenceUsableCoverage?: number;
+
+  @ApiPropertyOptional({
+    description:
+      'Below this coverage the agents are told their triage order is partial. Shapes the prompt; does not block a run.',
+    example: 0.8,
+    minimum: 0,
+    maximum: 1,
+  })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Max(1)
+  harnessEvidenceWarnCoverage?: number;
+
+  @ApiPropertyOptional({
+    description:
+      'Importance at or above which a single new finding earns an immediate cycle instead of waiting for the batch.',
+    example: 0.75,
+    minimum: 0,
+    maximum: 1,
+  })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Max(1)
+  harnessExpressImportance?: number;
 }
