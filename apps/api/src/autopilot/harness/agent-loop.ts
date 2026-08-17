@@ -147,6 +147,8 @@ export async function runAgentLoop(
     systemBrief?: string;
     allowedTools?: string[];
     missionPrimer?: string;
+    /** Per-agent override of the instance run budget, in minutes. */
+    runBudgetMinutes?: number | null;
   } = {},
 ): Promise<AgentLoopResult> {
   const runId = ctx.run.id;
@@ -166,7 +168,14 @@ export async function runAgentLoop(
   // makes a single turn unbounded. The handler running this loop holds one of
   // the instance's job slots (default: one, shared by every namespace and
   // queue), so an unbounded run does not fail alone — it freezes everything.
-  const deadline = Date.now() + AGENT_RUN_BUDGET_MS;
+  // Configurable per instance, and overridable per agent for the one that is
+  // legitimately slower than the rest. The constant survives only as the
+  // fallback for a context assembled without settings (tests, probes).
+  const budgetMs =
+    (opts.runBudgetMinutes ??
+      ctx.settings?.harnessRunBudgetMinutes ??
+      AGENT_RUN_BUDGET_MS / 60_000) * 60_000;
+  const deadline = Date.now() + budgetMs;
   let outOfTime = false;
 
   while (!progress.done && progress.iteration < mission.maxIterations) {
@@ -244,7 +253,10 @@ export async function runAgentLoop(
 
     progress.messages.push({
       role: 'user',
-      content: renderObservations(progress.iteration, observations),
+      content: renderObservations(progress.iteration, observations, {
+        perObservation: ctx.settings?.harnessObservationChars,
+        perTurn: ctx.settings?.harnessTurnObservationChars,
+      }),
     });
     // Reduce older turns to their headers before persisting, so both what we
     // resend and what we store stay bounded.
@@ -254,7 +266,7 @@ export async function runAgentLoop(
 
   if (!progress.done) {
     progress.summary = outOfTime
-      ? `Stopped after ${Math.round(AGENT_RUN_BUDGET_MS / 60_000)} minutes without finishing — the model or a tool was not responding. Whatever was applied before this point stands; a later cycle picks the work up.`
+      ? `Stopped after ${Math.round(budgetMs / 60_000)} minutes without finishing — the model or a tool was not responding. Whatever was applied before this point stands; a later cycle picks the work up.`
       : `Reached the ${mission.maxIterations}-iteration budget without finishing.`;
     await deps.log.business(runId, progress.summary, undefined, 'WARN');
     await persist(ctx, deps.audit, progress);
@@ -366,17 +378,23 @@ export interface Observation {
 export function renderObservations(
   iteration: number,
   observations: Observation[],
+  // Defaulted to the shipped constants so the capability probes and any other
+  // caller keep working unchanged; the loop passes the instance's configured
+  // values.
+  caps: { perObservation?: number; perTurn?: number } = {},
 ): string {
+  const observationCharCap = caps.perObservation ?? MAX_OBSERVATION_CHARS;
+  const turnCharCap = caps.perTurn ?? MAX_TURN_OBSERVATION_CHARS;
   const header = `${OBSERVATION_HEADER} (iteration ${iteration}): ${
     observations.map((o) => `${o.tool} → ${o.outcome}`).join('; ') || 'none'
   }`;
   // Share the turn budget evenly rather than first-come-first-served: a single
   // huge read must not leave the four calls after it with nothing.
   const share = observations.length
-    ? Math.floor(MAX_TURN_OBSERVATION_CHARS / observations.length)
-    : MAX_OBSERVATION_CHARS;
+    ? Math.floor(turnCharCap / observations.length)
+    : observationCharCap;
   const budget = Math.min(
-    MAX_OBSERVATION_CHARS,
+    observationCharCap,
     Math.max(MIN_OBSERVATION_CHARS, share),
   );
   const capped = observations.map((o) => ({

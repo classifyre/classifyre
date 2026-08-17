@@ -68,29 +68,11 @@ export interface InstanceSettingsResponseDto {
      */
     autopilotInquiryEnabled: boolean;
     /**
-     * Operator guidance for the inquiry agent: what is desired / worth investigating.
-     * @type {string}
-     * @memberof InstanceSettingsResponseDto
-     */
-    autopilotInquiryDesired: string | null;
-    /**
-     * Operator guidance for the inquiry agent: what is searchable in this instance.
-     * @type {string}
-     * @memberof InstanceSettingsResponseDto
-     */
-    autopilotInquirySearchable: string | null;
-    /**
      * When true, the autopilot case agent manages investigation cases automatically after scans.
      * @type {boolean}
      * @memberof InstanceSettingsResponseDto
      */
     autopilotCaseEnabled: boolean;
-    /**
-     * Operator guidance for the case agent.
-     * @type {string}
-     * @memberof InstanceSettingsResponseDto
-     */
-    autopilotCaseGuidance: string | null;
     /**
      * When true, the config-tuning agent may change editable source config.
      * @type {boolean}
@@ -98,23 +80,11 @@ export interface InstanceSettingsResponseDto {
      */
     autopilotConfigEnabled: boolean;
     /**
-     * Operator guidance for the config-tuning agent.
-     * @type {string}
-     * @memberof InstanceSettingsResponseDto
-     */
-    autopilotConfigGuidance: string | null;
-    /**
      * When true, the detector-authoring agent may create/train detectors.
      * @type {boolean}
      * @memberof InstanceSettingsResponseDto
      */
     autopilotDetectorEnabled: boolean;
-    /**
-     * Operator guidance for the detector-authoring agent.
-     * @type {string}
-     * @memberof InstanceSettingsResponseDto
-     */
-    autopilotDetectorGuidance: string | null;
     /**
      * When true, the escalation agent may raise operator notifications for high-severity cases.
      * @type {boolean}
@@ -122,17 +92,89 @@ export interface InstanceSettingsResponseDto {
      */
     autopilotEscalationEnabled: boolean;
     /**
-     * Operator guidance for the escalation agent.
-     * @type {string}
-     * @memberof InstanceSettingsResponseDto
-     */
-    autopilotEscalationGuidance: string | null;
-    /**
      * When true, the harness may call tools from connected external MCP servers.
      * @type {boolean}
      * @memberof InstanceSettingsResponseDto
      */
     autopilotMcpEnabled: boolean;
+    /**
+     * How long one agent run may take before it is stopped. A run holds a namespace job slot, so a wedged one stalls every queue behind it.
+     * @type {number}
+     * @memberof InstanceSettingsResponseDto
+     */
+    harnessRunBudgetMinutes: number;
+    /**
+     * When a run still marked RUNNING is presumed dead and reaped. Must exceed the run budget: past this, a run is not slow, it is gone.
+     * @type {number}
+     * @memberof InstanceSettingsResponseDto
+     */
+    harnessRunStaleAfterMinutes: number;
+    /**
+     * Wall-clock budget for one cycle. Checked before each agent starts, so a chain can overshoot by at most one run budget.
+     * @type {number}
+     * @memberof InstanceSettingsResponseDto
+     */
+    harnessCycleBudgetMinutes: number;
+    /**
+     * Scored findings above which the evidence gate opens regardless of coverage. The absolute floor is the honest test; the ratio below is the fallback for small corpora.
+     * @type {number}
+     * @memberof InstanceSettingsResponseDto
+     */
+    harnessEvidenceUsableFindings: number;
+    /**
+     * Fraction of open findings that must be scored for the evidence gate to open, when the absolute floor is not met.
+     * @type {number}
+     * @memberof InstanceSettingsResponseDto
+     */
+    harnessEvidenceUsableCoverage: number;
+    /**
+     * Below this coverage the agents are told their triage order is partial. Shapes the prompt; does not block a run.
+     * @type {number}
+     * @memberof InstanceSettingsResponseDto
+     */
+    harnessEvidenceWarnCoverage: number;
+    /**
+     * Importance at or above which a single new finding earns an immediate cycle instead of waiting for the batch.
+     * @type {number}
+     * @memberof InstanceSettingsResponseDto
+     */
+    harnessExpressImportance: number;
+    /**
+     * Character cap on one tool result before it is truncated.
+     * @type {number}
+     * @memberof InstanceSettingsResponseDto
+     */
+    harnessObservationChars: number;
+    /**
+     * Character cap on all tool results in one turn. The transcript is resent every iteration, so this bounds the quadratic growth.
+     * @type {number}
+     * @memberof InstanceSettingsResponseDto
+     */
+    harnessTurnObservationChars: number;
+    /**
+     * How many ranked findings a run may see at once.
+     * @type {number}
+     * @memberof InstanceSettingsResponseDto
+     */
+    harnessMaxRankedFindings: number;
+    /**
+     * How many glossary entries are injected into each run.
+     * @type {number}
+     * @memberof InstanceSettingsResponseDto
+     */
+    harnessMaxGlossaryEntries: number;
+    /**
+     * How many recalled memories are injected into each run.
+     * @type {number}
+     * @memberof InstanceSettingsResponseDto
+     */
+    harnessMaxRecalledMemories: number;
+    /**
+     * How often the memory-consolidation agent runs, in days.
+     * @type {number}
+     * @memberof InstanceSettingsResponseDto
+     */
+    harnessDreamIntervalDays: number;
     /**
      * Master switch for adaptive ("automatic") source scheduling. When false, no AUTO source is started; each source keeps its phase, so turning this back on resumes exactly where it left off.
      * @type {boolean}
@@ -211,17 +253,24 @@ export function instanceOfInstanceSettingsResponseDto(value: object): value is I
     if (!('aiProviderConfigId' in value) || value['aiProviderConfigId'] === undefined) return false;
     if (!('harnessAiProviderConfigId' in value) || value['harnessAiProviderConfigId'] === undefined) return false;
     if (!('autopilotInquiryEnabled' in value) || value['autopilotInquiryEnabled'] === undefined) return false;
-    if (!('autopilotInquiryDesired' in value) || value['autopilotInquiryDesired'] === undefined) return false;
-    if (!('autopilotInquirySearchable' in value) || value['autopilotInquirySearchable'] === undefined) return false;
     if (!('autopilotCaseEnabled' in value) || value['autopilotCaseEnabled'] === undefined) return false;
-    if (!('autopilotCaseGuidance' in value) || value['autopilotCaseGuidance'] === undefined) return false;
     if (!('autopilotConfigEnabled' in value) || value['autopilotConfigEnabled'] === undefined) return false;
-    if (!('autopilotConfigGuidance' in value) || value['autopilotConfigGuidance'] === undefined) return false;
     if (!('autopilotDetectorEnabled' in value) || value['autopilotDetectorEnabled'] === undefined) return false;
-    if (!('autopilotDetectorGuidance' in value) || value['autopilotDetectorGuidance'] === undefined) return false;
     if (!('autopilotEscalationEnabled' in value) || value['autopilotEscalationEnabled'] === undefined) return false;
-    if (!('autopilotEscalationGuidance' in value) || value['autopilotEscalationGuidance'] === undefined) return false;
     if (!('autopilotMcpEnabled' in value) || value['autopilotMcpEnabled'] === undefined) return false;
+    if (!('harnessRunBudgetMinutes' in value) || value['harnessRunBudgetMinutes'] === undefined) return false;
+    if (!('harnessRunStaleAfterMinutes' in value) || value['harnessRunStaleAfterMinutes'] === undefined) return false;
+    if (!('harnessCycleBudgetMinutes' in value) || value['harnessCycleBudgetMinutes'] === undefined) return false;
+    if (!('harnessEvidenceUsableFindings' in value) || value['harnessEvidenceUsableFindings'] === undefined) return false;
+    if (!('harnessEvidenceUsableCoverage' in value) || value['harnessEvidenceUsableCoverage'] === undefined) return false;
+    if (!('harnessEvidenceWarnCoverage' in value) || value['harnessEvidenceWarnCoverage'] === undefined) return false;
+    if (!('harnessExpressImportance' in value) || value['harnessExpressImportance'] === undefined) return false;
+    if (!('harnessObservationChars' in value) || value['harnessObservationChars'] === undefined) return false;
+    if (!('harnessTurnObservationChars' in value) || value['harnessTurnObservationChars'] === undefined) return false;
+    if (!('harnessMaxRankedFindings' in value) || value['harnessMaxRankedFindings'] === undefined) return false;
+    if (!('harnessMaxGlossaryEntries' in value) || value['harnessMaxGlossaryEntries'] === undefined) return false;
+    if (!('harnessMaxRecalledMemories' in value) || value['harnessMaxRecalledMemories'] === undefined) return false;
+    if (!('harnessDreamIntervalDays' in value) || value['harnessDreamIntervalDays'] === undefined) return false;
     if (!('autoScheduleEnabled' in value) || value['autoScheduleEnabled'] === undefined) return false;
     if (!('maxConcurrentRunners' in value) || value['maxConcurrentRunners'] === undefined) return false;
     if (!('demoMode' in value) || value['demoMode'] === undefined) return false;
@@ -250,17 +299,24 @@ export function InstanceSettingsResponseDtoFromJSONTyped(json: any, ignoreDiscri
         'aiProviderConfigId': json['aiProviderConfigId'],
         'harnessAiProviderConfigId': json['harnessAiProviderConfigId'],
         'autopilotInquiryEnabled': json['autopilotInquiryEnabled'],
-        'autopilotInquiryDesired': json['autopilotInquiryDesired'],
-        'autopilotInquirySearchable': json['autopilotInquirySearchable'],
         'autopilotCaseEnabled': json['autopilotCaseEnabled'],
-        'autopilotCaseGuidance': json['autopilotCaseGuidance'],
         'autopilotConfigEnabled': json['autopilotConfigEnabled'],
-        'autopilotConfigGuidance': json['autopilotConfigGuidance'],
         'autopilotDetectorEnabled': json['autopilotDetectorEnabled'],
-        'autopilotDetectorGuidance': json['autopilotDetectorGuidance'],
         'autopilotEscalationEnabled': json['autopilotEscalationEnabled'],
-        'autopilotEscalationGuidance': json['autopilotEscalationGuidance'],
         'autopilotMcpEnabled': json['autopilotMcpEnabled'],
+        'harnessRunBudgetMinutes': json['harnessRunBudgetMinutes'],
+        'harnessRunStaleAfterMinutes': json['harnessRunStaleAfterMinutes'],
+        'harnessCycleBudgetMinutes': json['harnessCycleBudgetMinutes'],
+        'harnessEvidenceUsableFindings': json['harnessEvidenceUsableFindings'],
+        'harnessEvidenceUsableCoverage': json['harnessEvidenceUsableCoverage'],
+        'harnessEvidenceWarnCoverage': json['harnessEvidenceWarnCoverage'],
+        'harnessExpressImportance': json['harnessExpressImportance'],
+        'harnessObservationChars': json['harnessObservationChars'],
+        'harnessTurnObservationChars': json['harnessTurnObservationChars'],
+        'harnessMaxRankedFindings': json['harnessMaxRankedFindings'],
+        'harnessMaxGlossaryEntries': json['harnessMaxGlossaryEntries'],
+        'harnessMaxRecalledMemories': json['harnessMaxRecalledMemories'],
+        'harnessDreamIntervalDays': json['harnessDreamIntervalDays'],
         'autoScheduleEnabled': json['autoScheduleEnabled'],
         'maxConcurrentRunners': json['maxConcurrentRunners'],
         'demoMode': json['demoMode'],
@@ -290,17 +346,24 @@ export function InstanceSettingsResponseDtoToJSONTyped(value?: InstanceSettingsR
         'aiProviderConfigId': value['aiProviderConfigId'],
         'harnessAiProviderConfigId': value['harnessAiProviderConfigId'],
         'autopilotInquiryEnabled': value['autopilotInquiryEnabled'],
-        'autopilotInquiryDesired': value['autopilotInquiryDesired'],
-        'autopilotInquirySearchable': value['autopilotInquirySearchable'],
         'autopilotCaseEnabled': value['autopilotCaseEnabled'],
-        'autopilotCaseGuidance': value['autopilotCaseGuidance'],
         'autopilotConfigEnabled': value['autopilotConfigEnabled'],
-        'autopilotConfigGuidance': value['autopilotConfigGuidance'],
         'autopilotDetectorEnabled': value['autopilotDetectorEnabled'],
-        'autopilotDetectorGuidance': value['autopilotDetectorGuidance'],
         'autopilotEscalationEnabled': value['autopilotEscalationEnabled'],
-        'autopilotEscalationGuidance': value['autopilotEscalationGuidance'],
         'autopilotMcpEnabled': value['autopilotMcpEnabled'],
+        'harnessRunBudgetMinutes': value['harnessRunBudgetMinutes'],
+        'harnessRunStaleAfterMinutes': value['harnessRunStaleAfterMinutes'],
+        'harnessCycleBudgetMinutes': value['harnessCycleBudgetMinutes'],
+        'harnessEvidenceUsableFindings': value['harnessEvidenceUsableFindings'],
+        'harnessEvidenceUsableCoverage': value['harnessEvidenceUsableCoverage'],
+        'harnessEvidenceWarnCoverage': value['harnessEvidenceWarnCoverage'],
+        'harnessExpressImportance': value['harnessExpressImportance'],
+        'harnessObservationChars': value['harnessObservationChars'],
+        'harnessTurnObservationChars': value['harnessTurnObservationChars'],
+        'harnessMaxRankedFindings': value['harnessMaxRankedFindings'],
+        'harnessMaxGlossaryEntries': value['harnessMaxGlossaryEntries'],
+        'harnessMaxRecalledMemories': value['harnessMaxRecalledMemories'],
+        'harnessDreamIntervalDays': value['harnessDreamIntervalDays'],
         'autoScheduleEnabled': value['autoScheduleEnabled'],
         'maxConcurrentRunners': value['maxConcurrentRunners'],
         'demoMode': value['demoMode'],

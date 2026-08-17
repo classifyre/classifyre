@@ -30,17 +30,24 @@ export class InstanceSettingsService {
       aiProviderConfigId: settings.aiProviderConfigId,
       harnessAiProviderConfigId: settings.harnessAiProviderConfigId,
       autopilotInquiryEnabled: settings.autopilotInquiryEnabled,
-      autopilotInquiryDesired: settings.autopilotInquiryDesired,
-      autopilotInquirySearchable: settings.autopilotInquirySearchable,
       autopilotCaseEnabled: settings.autopilotCaseEnabled,
-      autopilotCaseGuidance: settings.autopilotCaseGuidance,
       autopilotConfigEnabled: settings.autopilotConfigEnabled,
-      autopilotConfigGuidance: settings.autopilotConfigGuidance,
       autopilotDetectorEnabled: settings.autopilotDetectorEnabled,
-      autopilotDetectorGuidance: settings.autopilotDetectorGuidance,
       autopilotEscalationEnabled: settings.autopilotEscalationEnabled,
-      autopilotEscalationGuidance: settings.autopilotEscalationGuidance,
       autopilotMcpEnabled: settings.autopilotMcpEnabled,
+      harnessRunBudgetMinutes: settings.harnessRunBudgetMinutes,
+      harnessRunStaleAfterMinutes: settings.harnessRunStaleAfterMinutes,
+      harnessCycleBudgetMinutes: settings.harnessCycleBudgetMinutes,
+      harnessEvidenceUsableFindings: settings.harnessEvidenceUsableFindings,
+      harnessEvidenceUsableCoverage: settings.harnessEvidenceUsableCoverage,
+      harnessEvidenceWarnCoverage: settings.harnessEvidenceWarnCoverage,
+      harnessExpressImportance: settings.harnessExpressImportance,
+      harnessObservationChars: settings.harnessObservationChars,
+      harnessTurnObservationChars: settings.harnessTurnObservationChars,
+      harnessMaxRankedFindings: settings.harnessMaxRankedFindings,
+      harnessMaxGlossaryEntries: settings.harnessMaxGlossaryEntries,
+      harnessMaxRecalledMemories: settings.harnessMaxRecalledMemories,
+      harnessDreamIntervalDays: settings.harnessDreamIntervalDays,
       autoScheduleEnabled: settings.autoScheduleEnabled,
       maxConcurrentRunners: settings.maxConcurrentRunners,
       hfTokenSet: !!settings.hfTokenEnc,
@@ -150,60 +157,65 @@ export class InstanceSettingsService {
       ...(updateDto.autopilotInquiryEnabled !== undefined
         ? { autopilotInquiryEnabled: updateDto.autopilotInquiryEnabled }
         : {}),
-      ...(updateDto.autopilotInquiryDesired !== undefined
-        ? {
-            autopilotInquiryDesired: emptyToNull(
-              updateDto.autopilotInquiryDesired,
-            ),
-          }
-        : {}),
-      ...(updateDto.autopilotInquirySearchable !== undefined
-        ? {
-            autopilotInquirySearchable: emptyToNull(
-              updateDto.autopilotInquirySearchable,
-            ),
-          }
-        : {}),
       ...(updateDto.autopilotCaseEnabled !== undefined
         ? { autopilotCaseEnabled: updateDto.autopilotCaseEnabled }
-        : {}),
-      ...(updateDto.autopilotCaseGuidance !== undefined
-        ? {
-            autopilotCaseGuidance: emptyToNull(updateDto.autopilotCaseGuidance),
-          }
         : {}),
       ...(updateDto.autopilotConfigEnabled !== undefined
         ? { autopilotConfigEnabled: updateDto.autopilotConfigEnabled }
         : {}),
-      ...(updateDto.autopilotConfigGuidance !== undefined
-        ? {
-            autopilotConfigGuidance: emptyToNull(
-              updateDto.autopilotConfigGuidance,
-            ),
-          }
-        : {}),
       ...(updateDto.autopilotDetectorEnabled !== undefined
         ? { autopilotDetectorEnabled: updateDto.autopilotDetectorEnabled }
-        : {}),
-      ...(updateDto.autopilotDetectorGuidance !== undefined
-        ? {
-            autopilotDetectorGuidance: emptyToNull(
-              updateDto.autopilotDetectorGuidance,
-            ),
-          }
         : {}),
       ...(updateDto.autopilotEscalationEnabled !== undefined
         ? { autopilotEscalationEnabled: updateDto.autopilotEscalationEnabled }
         : {}),
-      ...(updateDto.autopilotEscalationGuidance !== undefined
-        ? {
-            autopilotEscalationGuidance: emptyToNull(
-              updateDto.autopilotEscalationGuidance,
-            ),
-          }
-        : {}),
       ...(updateDto.autopilotMcpEnabled !== undefined
         ? { autopilotMcpEnabled: updateDto.autopilotMcpEnabled }
+        : {}),
+      ...(updateDto.harnessRunBudgetMinutes !== undefined
+        ? { harnessRunBudgetMinutes: updateDto.harnessRunBudgetMinutes }
+        : {}),
+      ...(updateDto.harnessRunStaleAfterMinutes !== undefined
+        ? { harnessRunStaleAfterMinutes: updateDto.harnessRunStaleAfterMinutes }
+        : {}),
+      ...(updateDto.harnessCycleBudgetMinutes !== undefined
+        ? { harnessCycleBudgetMinutes: updateDto.harnessCycleBudgetMinutes }
+        : {}),
+      ...(updateDto.harnessEvidenceUsableFindings !== undefined
+        ? {
+            harnessEvidenceUsableFindings:
+              updateDto.harnessEvidenceUsableFindings,
+          }
+        : {}),
+      ...(updateDto.harnessEvidenceUsableCoverage !== undefined
+        ? {
+            harnessEvidenceUsableCoverage:
+              updateDto.harnessEvidenceUsableCoverage,
+          }
+        : {}),
+      ...(updateDto.harnessEvidenceWarnCoverage !== undefined
+        ? { harnessEvidenceWarnCoverage: updateDto.harnessEvidenceWarnCoverage }
+        : {}),
+      ...(updateDto.harnessExpressImportance !== undefined
+        ? { harnessExpressImportance: updateDto.harnessExpressImportance }
+        : {}),
+      ...(updateDto.harnessObservationChars !== undefined
+        ? { harnessObservationChars: updateDto.harnessObservationChars }
+        : {}),
+      ...(updateDto.harnessTurnObservationChars !== undefined
+        ? { harnessTurnObservationChars: updateDto.harnessTurnObservationChars }
+        : {}),
+      ...(updateDto.harnessMaxRankedFindings !== undefined
+        ? { harnessMaxRankedFindings: updateDto.harnessMaxRankedFindings }
+        : {}),
+      ...(updateDto.harnessMaxGlossaryEntries !== undefined
+        ? { harnessMaxGlossaryEntries: updateDto.harnessMaxGlossaryEntries }
+        : {}),
+      ...(updateDto.harnessMaxRecalledMemories !== undefined
+        ? { harnessMaxRecalledMemories: updateDto.harnessMaxRecalledMemories }
+        : {}),
+      ...(updateDto.harnessDreamIntervalDays !== undefined
+        ? { harnessDreamIntervalDays: updateDto.harnessDreamIntervalDays }
         : {}),
       ...(updateDto.autoScheduleEnabled !== undefined
         ? { autoScheduleEnabled: updateDto.autoScheduleEnabled }
@@ -242,9 +254,4 @@ export class InstanceSettingsService {
     }
     return this.crypto.decryptString(settings.hfTokenEnc);
   }
-}
-
-function emptyToNull(value: string | null | undefined): string | null {
-  const trimmed = value?.trim();
-  return trimmed ? trimmed : null;
 }

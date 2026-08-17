@@ -1,4 +1,4 @@
-import { AgentKind } from '@prisma/client';
+import { AgentKind, AgentTriggerMode } from '@prisma/client';
 
 /**
  * A mission parameterizes the single agent-loop driver: the goal it pursues,
@@ -696,4 +696,117 @@ export const DEFAULT_MISSIONS: readonly Mission[] = [
 /** Resolve the factory mission for an AgentKind, or null when it has none. */
 export function missionFor(kind: AgentKind): Mission | null {
   return DEFAULT_MISSIONS.find((m) => m.kind === kind) ?? null;
+}
+
+/**
+ * When an agent is allowed to start, before any operator override.
+ *
+ * Sized from measured behaviour on a live 151-source workspace rather than
+ * guessed, because the whole point is that these agents are not alike:
+ *
+ *     ESCALATION       2.8 min   $0.008
+ *     CASE              15 min   $0.032
+ *     DETECTOR_AUTHOR   32 min   $0.026
+ *     CONFIG           2.2 h     $0.018
+ *     INQUIRY          2.4 h     $0.017
+ *
+ * A three-minute escalation and a two-hour config pass were paced by one gate,
+ * so the cheap urgent work inherited the expensive work's latency. The split
+ * here is the correction: the two agents that act on a single new finding run
+ * eagerly and wait for nothing, while the two that rewrite detector
+ * configuration wait for a settled corpus — a decision made from whatever the
+ * last scan happened to produce is the failure the old gate existed to prevent,
+ * and it is preserved for exactly those agents.
+ *
+ * INQUIRY keeps its matching gate: its whole output is match counts, and
+ * counting against a queue that has not drained yet produces numbers that are
+ * wrong the moment they are written.
+ */
+export interface AgentPolicy {
+  triggerMode: AgentTriggerMode;
+  waitForMatching: boolean;
+  waitForEvidence: boolean;
+  waitForScans: boolean;
+  /** Floor between runs. 0 disables it. */
+  minIntervalMinutes: number;
+  /** Force a run once gates have held this long. 0 disables the backstop. */
+  maxStalenessHours: number;
+}
+
+export const FACTORY_POLICY: Readonly<Record<AgentKind, AgentPolicy>> = {
+  [AgentKind.ESCALATION]: {
+    triggerMode: AgentTriggerMode.EAGER,
+    waitForMatching: false,
+    waitForEvidence: false,
+    waitForScans: false,
+    minIntervalMinutes: 5,
+    maxStalenessHours: 24,
+  },
+  [AgentKind.CASE]: {
+    triggerMode: AgentTriggerMode.EAGER,
+    waitForMatching: false,
+    waitForEvidence: false,
+    waitForScans: false,
+    minIntervalMinutes: 15,
+    maxStalenessHours: 24,
+  },
+  [AgentKind.INQUIRY]: {
+    triggerMode: AgentTriggerMode.BATCH,
+    waitForMatching: true,
+    waitForEvidence: false,
+    waitForScans: false,
+    minIntervalMinutes: 30,
+    maxStalenessHours: 24,
+  },
+  [AgentKind.CONFIG]: {
+    triggerMode: AgentTriggerMode.SETTLED,
+    waitForMatching: false,
+    waitForEvidence: true,
+    waitForScans: true,
+    minIntervalMinutes: 120,
+    maxStalenessHours: 168,
+  },
+  [AgentKind.DETECTOR_AUTHOR]: {
+    triggerMode: AgentTriggerMode.SETTLED,
+    waitForMatching: false,
+    waitForEvidence: true,
+    waitForScans: true,
+    minIntervalMinutes: 120,
+    maxStalenessHours: 168,
+  },
+  [AgentKind.DREAM]: {
+    triggerMode: AgentTriggerMode.SCHEDULED,
+    waitForMatching: false,
+    waitForEvidence: false,
+    waitForScans: false,
+    minIntervalMinutes: 0,
+    maxStalenessHours: 0,
+  },
+  // The two kinds the cycle never schedules. DUPLICATES is deterministic and
+  // driven from the correlation queue; CHAT is one run per inbound chat
+  // message. Neither has a mission, so neither reaches the policy engine —
+  // they are here because the record is exhaustive over AgentKind, and MANUAL
+  // is the truthful value should anything ever consult them: a cycle will not
+  // start either one.
+  [AgentKind.DUPLICATES]: {
+    triggerMode: AgentTriggerMode.MANUAL,
+    waitForMatching: false,
+    waitForEvidence: false,
+    waitForScans: false,
+    minIntervalMinutes: 0,
+    maxStalenessHours: 0,
+  },
+  [AgentKind.CHAT]: {
+    triggerMode: AgentTriggerMode.MANUAL,
+    waitForMatching: false,
+    waitForEvidence: false,
+    waitForScans: false,
+    minIntervalMinutes: 0,
+    maxStalenessHours: 0,
+  },
+};
+
+/** Factory policy for an AgentKind. */
+export function policyFor(kind: AgentKind): AgentPolicy {
+  return FACTORY_POLICY[kind];
 }

@@ -1,8 +1,14 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { AgentKind, InstanceSettings } from '@prisma/client';
+import { AgentKind, AgentTriggerMode, InstanceSettings } from '@prisma/client';
 import { PrismaService } from '../../prisma.service';
 import { ToolRegistry } from '../tools/tool-registry.service';
-import { DEFAULT_MISSIONS, missionFor, type Mission } from './missions';
+import {
+  DEFAULT_MISSIONS,
+  missionFor,
+  policyFor,
+  type AgentPolicy,
+  type Mission,
+} from './missions';
 
 const INSTANCE_SETTINGS_ID = 1;
 
@@ -21,6 +27,21 @@ const ENABLE_FLAG: Partial<Record<AgentKind, keyof InstanceSettings>> = {
   [AgentKind.ESCALATION]: 'autopilotEscalationEnabled',
 };
 
+/**
+ * Bounds for the policy numerics.
+ *
+ * Wide on purpose — these are an operator's dials, and the only job here is to
+ * reject values that cannot mean anything. A staleness backstop measured in
+ * years is useless but harmless; a negative one would silently disable the
+ * liveness guarantee, so it is refused.
+ */
+const LIMITS = {
+  maxIterations: { min: 1, max: 50 },
+  minIntervalMinutes: { min: 0, max: 7 * 24 * 60 },
+  maxStalenessHours: { min: 0, max: 365 * 24 },
+  runBudgetMinutes: { min: 1, max: 8 * 60 },
+} as const;
+
 /** Effective + default configuration for one agent, for the management UI. */
 export interface AgentSummary {
   kind: AgentKind;
@@ -34,7 +55,23 @@ export interface AgentSummary {
   defaultMaxIterations: number;
   toolNames: string[];
   defaultToolNames: string[];
-  /** True when the agent's goal/tools/iterations differ from factory defaults. */
+  /** Effective scheduling policy, and the factory values behind it. */
+  triggerMode: AgentTriggerMode;
+  defaultTriggerMode: AgentTriggerMode;
+  waitForMatching: boolean;
+  defaultWaitForMatching: boolean;
+  waitForEvidence: boolean;
+  defaultWaitForEvidence: boolean;
+  waitForScans: boolean;
+  defaultWaitForScans: boolean;
+  minIntervalMinutes: number;
+  defaultMinIntervalMinutes: number;
+  maxStalenessHours: number;
+  defaultMaxStalenessHours: number;
+  /** null = follow the instance-wide run budget. */
+  runBudgetMinutes: number | null;
+  lastTriggeredAt: Date | null;
+  /** True when anything about this agent differs from factory defaults. */
   customized: boolean;
 }
 
@@ -43,6 +80,13 @@ export interface UpdateAgentInput {
   goal?: string | null;
   maxIterations?: number | null;
   toolNames?: string[] | null;
+  triggerMode?: AgentTriggerMode | null;
+  waitForMatching?: boolean | null;
+  waitForEvidence?: boolean | null;
+  waitForScans?: boolean | null;
+  minIntervalMinutes?: number | null;
+  maxStalenessHours?: number | null;
+  runBudgetMinutes?: number | null;
 }
 
 /**
@@ -91,6 +135,19 @@ export class AgentConfigService {
         row?.toolsOverride ? row.toolNames : def.allowedTools,
       );
       const flag = ENABLE_FLAG[def.kind];
+      const factory = policyFor(def.kind);
+      // Every policy column is null = "follow the shipped default", so an agent
+      // nobody has touched keeps tracking the defaults instead of freezing at
+      // whatever they were the day its row happened to be created.
+      const policy = {
+        triggerMode: row?.triggerMode ?? factory.triggerMode,
+        waitForMatching: row?.waitForMatching ?? factory.waitForMatching,
+        waitForEvidence: row?.waitForEvidence ?? factory.waitForEvidence,
+        waitForScans: row?.waitForScans ?? factory.waitForScans,
+        minIntervalMinutes:
+          row?.minIntervalMinutes ?? factory.minIntervalMinutes,
+        maxStalenessHours: row?.maxStalenessHours ?? factory.maxStalenessHours,
+      };
       return {
         kind: def.kind,
         // A missing singleton is the same fresh-workspace state that
@@ -103,10 +160,26 @@ export class AgentConfigService {
         defaultMaxIterations: def.maxIterations,
         toolNames,
         defaultToolNames: def.allowedTools,
+        ...policy,
+        defaultTriggerMode: factory.triggerMode,
+        defaultWaitForMatching: factory.waitForMatching,
+        defaultWaitForEvidence: factory.waitForEvidence,
+        defaultWaitForScans: factory.waitForScans,
+        defaultMinIntervalMinutes: factory.minIntervalMinutes,
+        defaultMaxStalenessHours: factory.maxStalenessHours,
+        runBudgetMinutes: row?.runBudgetMinutes ?? null,
+        lastTriggeredAt: row?.lastTriggeredAt ?? null,
         customized:
           goal !== def.goal ||
           maxIterations !== def.maxIterations ||
-          !sameTools(toolNames, def.allowedTools),
+          !sameTools(toolNames, def.allowedTools) ||
+          policy.triggerMode !== factory.triggerMode ||
+          policy.waitForMatching !== factory.waitForMatching ||
+          policy.waitForEvidence !== factory.waitForEvidence ||
+          policy.waitForScans !== factory.waitForScans ||
+          policy.minIntervalMinutes !== factory.minIntervalMinutes ||
+          policy.maxStalenessHours !== factory.maxStalenessHours ||
+          row?.runBudgetMinutes != null,
       };
     });
   }
@@ -139,6 +212,13 @@ export class AgentConfigService {
       maxIterations?: number | null;
       toolNames?: string[];
       toolsOverride?: boolean;
+      triggerMode?: AgentTriggerMode | null;
+      waitForMatching?: boolean | null;
+      waitForEvidence?: boolean | null;
+      waitForScans?: boolean | null;
+      minIntervalMinutes?: number | null;
+      maxStalenessHours?: number | null;
+      runBudgetMinutes?: number | null;
     } = {};
 
     if (input.goal !== undefined) {
@@ -146,15 +226,52 @@ export class AgentConfigService {
       data.goal = trimmed ? trimmed : null;
     }
     if (input.maxIterations !== undefined) {
+      data.maxIterations = boundedInt(
+        input.maxIterations,
+        'maxIterations',
+        LIMITS.maxIterations,
+      );
+    }
+    if (input.minIntervalMinutes !== undefined) {
+      data.minIntervalMinutes = boundedInt(
+        input.minIntervalMinutes,
+        'minIntervalMinutes',
+        LIMITS.minIntervalMinutes,
+      );
+    }
+    if (input.maxStalenessHours !== undefined) {
+      data.maxStalenessHours = boundedInt(
+        input.maxStalenessHours,
+        'maxStalenessHours',
+        LIMITS.maxStalenessHours,
+      );
+    }
+    if (input.runBudgetMinutes !== undefined) {
+      data.runBudgetMinutes = boundedInt(
+        input.runBudgetMinutes,
+        'runBudgetMinutes',
+        LIMITS.runBudgetMinutes,
+      );
+    }
+    if (input.triggerMode !== undefined) {
       if (
-        input.maxIterations !== null &&
-        (!Number.isInteger(input.maxIterations) ||
-          input.maxIterations < 1 ||
-          input.maxIterations > 50)
+        input.triggerMode !== null &&
+        !Object.values(AgentTriggerMode).includes(input.triggerMode)
       ) {
-        throw new BadRequestException('maxIterations must be between 1 and 50');
+        throw new BadRequestException(
+          `Unknown trigger mode "${String(input.triggerMode)}"`,
+        );
       }
-      data.maxIterations = input.maxIterations;
+      data.triggerMode = input.triggerMode;
+    }
+    if (input.waitForMatching !== undefined) {
+      data.waitForMatching = input.waitForMatching;
+    }
+    if (input.waitForEvidence !== undefined) {
+      data.waitForEvidence = input.waitForEvidence;
+    }
+    if (input.waitForScans !== undefined) {
+      data.waitForScans = input.waitForScans;
     }
     if (input.toolNames !== undefined) {
       if (input.toolNames === null) {
@@ -183,6 +300,60 @@ export class AgentConfigService {
   }
 
   /**
+   * Effective scheduling policy for one agent, for the worker.
+   *
+   * Separate from {@link list} because the worker needs this per cycle and
+   * `list` renders every agent's goal — kilobytes of mission text — to answer
+   * a question about six numbers.
+   */
+  async resolvePolicy(kind: AgentKind): Promise<AgentPolicy> {
+    const factory = policyFor(kind);
+    const row = await this.prisma.agentConfig.findUnique({ where: { kind } });
+    if (!row) return factory;
+    return {
+      triggerMode: row.triggerMode ?? factory.triggerMode,
+      waitForMatching: row.waitForMatching ?? factory.waitForMatching,
+      waitForEvidence: row.waitForEvidence ?? factory.waitForEvidence,
+      waitForScans: row.waitForScans ?? factory.waitForScans,
+      minIntervalMinutes: row.minIntervalMinutes ?? factory.minIntervalMinutes,
+      maxStalenessHours: row.maxStalenessHours ?? factory.maxStalenessHours,
+    };
+  }
+
+  /** When this agent last started, or null if it never has. */
+  async lastTriggeredAt(kind: AgentKind): Promise<Date | null> {
+    const row = await this.prisma.agentConfig.findUnique({
+      where: { kind },
+      select: { lastTriggeredAt: true },
+    });
+    return row?.lastTriggeredAt ?? null;
+  }
+
+  /**
+   * Stamp an agent as started, which is what both guardrails compare against.
+   *
+   * Recorded here rather than derived from `agent_runs` because a run that was
+   * never created leaves no row, and the minimum-gap floor has to hold for
+   * attempts as well as completions.
+   */
+  async markTriggered(kind: AgentKind, at: Date = new Date()): Promise<void> {
+    await this.prisma.agentConfig.upsert({
+      where: { kind },
+      create: { kind, lastTriggeredAt: at },
+      update: { lastTriggeredAt: at },
+    });
+  }
+
+  /** Per-agent run budget override, or null to use the instance setting. */
+  async runBudgetMinutes(kind: AgentKind): Promise<number | null> {
+    const row = await this.prisma.agentConfig.findUnique({
+      where: { kind },
+      select: { runBudgetMinutes: true },
+    });
+    return row?.runBudgetMinutes ?? null;
+  }
+
+  /**
    * Validate that every assigned name is a known built-in tool. MCP tools are
    * scoped per-server (McpServerConfig.agentKinds), not assigned here, so they
    * are rejected. Returns a de-duplicated list.
@@ -201,6 +372,26 @@ export class AgentConfigService {
     }
     return unique;
   }
+}
+
+/**
+ * An integer within bounds, or null to mean "reset to the factory default".
+ *
+ * `null` has to survive: it is how every reset in this service is expressed,
+ * and validating it as a number would make "restore default" impossible.
+ */
+function boundedInt(
+  value: number | null,
+  field: string,
+  limits: { min: number; max: number },
+): number | null {
+  if (value === null) return null;
+  if (!Number.isInteger(value) || value < limits.min || value > limits.max) {
+    throw new BadRequestException(
+      `${field} must be an integer between ${limits.min} and ${limits.max}`,
+    );
+  }
+  return value;
 }
 
 function sameTools(a: string[], b: string[]): boolean {
