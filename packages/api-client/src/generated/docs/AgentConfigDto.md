@@ -28,6 +28,9 @@ Name | Type
 `defaultMinIntervalMinutes` | number
 `maxStalenessHours` | number
 `defaultMaxStalenessHours` | number
+`chain` | string
+`chainPosition` | number
+`runsAfter` | string
 `runBudgetMinutes` | number
 `lastTriggeredAt` | Date
 `customized` | boolean
@@ -61,6 +64,9 @@ const example = {
   "defaultMinIntervalMinutes": null,
   "maxStalenessHours": null,
   "defaultMaxStalenessHours": null,
+  "chain": null,
+  "chainPosition": null,
+  "runsAfter": null,
   "runBudgetMinutes": null,
   "lastTriggeredAt": null,
   "customized": null,

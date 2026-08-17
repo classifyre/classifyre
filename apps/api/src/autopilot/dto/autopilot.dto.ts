@@ -764,6 +764,28 @@ export class AgentConfigDto {
 
   @ApiProperty({
     nullable: true,
+    enum: ['INVESTIGATION', 'DETECTION'],
+    description:
+      'Which chain this agent runs in. Agents in a chain run in order because ' +
+      'each consumes what the one before it produced; the two chains run ' +
+      'concurrently. null for agents with no chain (DREAM).',
+  })
+  chain!: 'INVESTIGATION' | 'DETECTION' | null;
+
+  @ApiProperty({
+    description: '1-based position within the chain; 0 when it has none',
+  })
+  chainPosition!: number;
+
+  @ApiProperty({
+    enum: AgentKind,
+    nullable: true,
+    description: 'The agent immediately before this one, whose output it uses',
+  })
+  runsAfter!: AgentKind | null;
+
+  @ApiProperty({
+    nullable: true,
     description: 'Per-agent run budget override; null uses the instance value',
   })
   runBudgetMinutes!: number | null;

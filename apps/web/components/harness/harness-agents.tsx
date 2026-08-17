@@ -47,6 +47,7 @@ import { cn } from "@workspace/ui/lib/utils";
 import { useInstanceSettings } from "@/components/instance-settings-provider";
 import { useTranslation } from "@/hooks/use-translation";
 import { KindGlyph, kindLabelKey } from "./harness-kind";
+import { HarnessChain } from "./harness-chain";
 
 /** Trigger modes in the order an operator should consider them: most eager first. */
 const MODES = [
@@ -181,6 +182,8 @@ export function HarnessAgents() {
           {t("harness.agents.requiresAi")}
         </p>
       )}
+
+      <HarnessChain agents={agents} />
 
       {agents.map((agent) => (
         <AgentCard
