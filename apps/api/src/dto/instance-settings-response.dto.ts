@@ -75,30 +75,10 @@ export class InstanceSettingsResponseDto {
 
   @ApiProperty({
     description:
-      'Operator guidance for the inquiry agent: what is desired / worth investigating.',
-    nullable: true,
-  })
-  autopilotInquiryDesired: string | null;
-
-  @ApiProperty({
-    description:
-      'Operator guidance for the inquiry agent: what is searchable in this instance.',
-    nullable: true,
-  })
-  autopilotInquirySearchable: string | null;
-
-  @ApiProperty({
-    description:
       'When true, the autopilot case agent manages investigation cases automatically after scans.',
     example: true,
   })
   autopilotCaseEnabled: boolean;
-
-  @ApiProperty({
-    description: 'Operator guidance for the case agent.',
-    nullable: true,
-  })
-  autopilotCaseGuidance: string | null;
 
   @ApiProperty({
     description:
@@ -108,23 +88,11 @@ export class InstanceSettingsResponseDto {
   autopilotConfigEnabled: boolean;
 
   @ApiProperty({
-    description: 'Operator guidance for the config-tuning agent.',
-    nullable: true,
-  })
-  autopilotConfigGuidance: string | null;
-
-  @ApiProperty({
     description:
       'When true, the detector-authoring agent may create/train detectors.',
     example: true,
   })
   autopilotDetectorEnabled: boolean;
-
-  @ApiProperty({
-    description: 'Operator guidance for the detector-authoring agent.',
-    nullable: true,
-  })
-  autopilotDetectorGuidance: string | null;
 
   @ApiProperty({
     description:
@@ -134,17 +102,97 @@ export class InstanceSettingsResponseDto {
   autopilotEscalationEnabled: boolean;
 
   @ApiProperty({
-    description: 'Operator guidance for the escalation agent.',
-    nullable: true,
-  })
-  autopilotEscalationGuidance: string | null;
-
-  @ApiProperty({
     description:
       'When true, the harness may call tools from connected external MCP servers.',
     example: true,
   })
   autopilotMcpEnabled: boolean;
+
+  @ApiProperty({
+    description:
+      'How long one agent run may take before it is stopped. A run holds a namespace job slot, so a wedged one stalls every queue behind it.',
+    example: 20,
+  })
+  harnessRunBudgetMinutes: number;
+
+  @ApiProperty({
+    description:
+      'When a run still marked RUNNING is presumed dead and reaped. Must exceed the run budget: past this, a run is not slow, it is gone.',
+    example: 60,
+  })
+  harnessRunStaleAfterMinutes: number;
+
+  @ApiProperty({
+    description:
+      'Wall-clock budget for one cycle. Checked before each agent starts, so a chain can overshoot by at most one run budget.',
+    example: 30,
+  })
+  harnessCycleBudgetMinutes: number;
+
+  @ApiProperty({
+    description:
+      'Scored findings above which the evidence gate opens regardless of coverage. The absolute floor is the honest test; the ratio below is the fallback for small corpora.',
+    example: 2000,
+  })
+  harnessEvidenceUsableFindings: number;
+
+  @ApiProperty({
+    description:
+      'Fraction of open findings that must be scored for the evidence gate to open, when the absolute floor is not met.',
+    example: 0.25,
+  })
+  harnessEvidenceUsableCoverage: number;
+
+  @ApiProperty({
+    description:
+      'Below this coverage the agents are told their triage order is partial. Shapes the prompt; does not block a run.',
+    example: 0.8,
+  })
+  harnessEvidenceWarnCoverage: number;
+
+  @ApiProperty({
+    description:
+      'Importance at or above which a single new finding earns an immediate cycle instead of waiting for the batch.',
+    example: 0.75,
+  })
+  harnessExpressImportance: number;
+
+  @ApiProperty({
+    description: 'Character cap on one tool result before it is truncated.',
+    example: 8000,
+  })
+  harnessObservationChars: number;
+
+  @ApiProperty({
+    description:
+      'Character cap on all tool results in one turn. The transcript is resent every iteration, so this bounds the quadratic growth.',
+    example: 24000,
+  })
+  harnessTurnObservationChars: number;
+
+  @ApiProperty({
+    description: 'How many ranked findings a run may see at once.',
+    example: 25,
+  })
+  harnessMaxRankedFindings: number;
+
+  @ApiProperty({
+    description: 'How many glossary entries are injected into each run.',
+    example: 20,
+  })
+  harnessMaxGlossaryEntries: number;
+
+  @ApiProperty({
+    description: 'How many recalled memories are injected into each run.',
+    example: 30,
+  })
+  harnessMaxRecalledMemories: number;
+
+  @ApiProperty({
+    description: 'How often the memory-consolidation agent runs, in days.',
+    example: 2,
+  })
+  harnessDreamIntervalDays: number;
 
   @ApiProperty({
     description:

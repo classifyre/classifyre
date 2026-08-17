@@ -15,6 +15,13 @@ export interface AutopilotJob {
   /** Scheduled "dreaming" cycle: memory consolidation, no inquiry/case work. */
   dream?: boolean;
   /**
+   * Periodic wake-up rather than a reaction to a scan. Runs the ordinary cycle
+   * when sources are waiting, and otherwise only the agents whose staleness
+   * backstop has expired — so a quiet corpus costs a few queries, not a
+   * whole-corpus pass every quarter hour.
+   */
+  heartbeat?: boolean;
+  /**
    * Manual trigger of a specific set of pipeline agents (or a single-agent
    * rerun): execute exactly these, in canonical order, as one chained cycle and
    * treat the job as explicit operator intent (instance enable-flags bypassed).
@@ -33,8 +40,6 @@ export interface AutopilotJob {
   corpus?: boolean;
   /** Why an express cycle skipped the coalescing window. */
   expressReason?: string;
-  /** How many times the readiness gate has already pushed this cycle back. */
-  readinessAttempts?: number;
 }
 
 /** Aggregated view of one group of new findings (token-bounded). */

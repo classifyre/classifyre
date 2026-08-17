@@ -359,6 +359,31 @@ export const DETECTOR_VALUE_SCAN_LIMIT = 5000;
  */
 export const AUTOPILOT_DREAM_CRON = '10 3 */2 * *';
 
+/**
+ * Heartbeat that wakes the harness when nothing else will.
+ *
+ * A completed scan is otherwise the *only* thing that enqueues a cycle, so the
+ * per-agent policy is only ever consulted while the corpus is being scanned.
+ * That leaves two ways for an agent to be stranded, and both of them arrive
+ * exactly when scanning stops:
+ *
+ *  - a cycle deferred an agent and kept its sources dirty for the next one,
+ *    and no next one ever came;
+ *  - an agent passed its staleness backstop, which is meant to be its liveness
+ *    guarantee — but a backstop evaluated only inside a cycle cannot fire when
+ *    there are no cycles.
+ *
+ * Both are worst for the `SETTLED` agents, which is a small absurdity worth
+ * naming: they are told to wait for a quiet corpus, and a quiet corpus is
+ * precisely the state in which nothing was left to wake them.
+ *
+ * Fifteen minutes is not a cadence — it is the resolution at which
+ * "overdue" is noticed, and the things it notices are measured in hours and
+ * days. A tick with no dirty sources and nothing overdue costs three queries
+ * and enqueues nothing.
+ */
+export const AUTOPILOT_HEARTBEAT_CRON = '*/15 * * * *';
+
 // ── Context bounds (token budget guards) ─────────────────────────────────────
 export const MAX_FINDING_GROUPS = 40;
 export const MAX_SAMPLE_VALUES_PER_GROUP = 15;

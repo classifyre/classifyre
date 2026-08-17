@@ -13804,60 +13804,95 @@
             "description": "When true, the autopilot inquiry agent manages inquiries automatically after scans.",
             "example": true
           },
-          "autopilotInquiryDesired": {
-            "type": "string",
-            "description": "Operator guidance for the inquiry agent: what is desired / worth investigating.",
-            "nullable": true
-          },
-          "autopilotInquirySearchable": {
-            "type": "string",
-            "description": "Operator guidance for the inquiry agent: what is searchable in this instance.",
-            "nullable": true
-          },
           "autopilotCaseEnabled": {
             "type": "boolean",
             "description": "When true, the autopilot case agent manages investigation cases automatically after scans.",
             "example": true
-          },
-          "autopilotCaseGuidance": {
-            "type": "string",
-            "description": "Operator guidance for the case agent.",
-            "nullable": true
           },
           "autopilotConfigEnabled": {
             "type": "boolean",
             "description": "When true, the config-tuning agent may change editable source config.",
             "example": true
           },
-          "autopilotConfigGuidance": {
-            "type": "string",
-            "description": "Operator guidance for the config-tuning agent.",
-            "nullable": true
-          },
           "autopilotDetectorEnabled": {
             "type": "boolean",
             "description": "When true, the detector-authoring agent may create/train detectors.",
             "example": true
-          },
-          "autopilotDetectorGuidance": {
-            "type": "string",
-            "description": "Operator guidance for the detector-authoring agent.",
-            "nullable": true
           },
           "autopilotEscalationEnabled": {
             "type": "boolean",
             "description": "When true, the escalation agent may raise operator notifications for high-severity cases.",
             "example": true
           },
-          "autopilotEscalationGuidance": {
-            "type": "string",
-            "description": "Operator guidance for the escalation agent.",
-            "nullable": true
-          },
           "autopilotMcpEnabled": {
             "type": "boolean",
             "description": "When true, the harness may call tools from connected external MCP servers.",
             "example": true
+          },
+          "harnessRunBudgetMinutes": {
+            "type": "number",
+            "description": "How long one agent run may take before it is stopped. A run holds a namespace job slot, so a wedged one stalls every queue behind it.",
+            "example": 20
+          },
+          "harnessRunStaleAfterMinutes": {
+            "type": "number",
+            "description": "When a run still marked RUNNING is presumed dead and reaped. Must exceed the run budget: past this, a run is not slow, it is gone.",
+            "example": 60
+          },
+          "harnessCycleBudgetMinutes": {
+            "type": "number",
+            "description": "Wall-clock budget for one cycle. Checked before each agent starts, so a chain can overshoot by at most one run budget.",
+            "example": 30
+          },
+          "harnessEvidenceUsableFindings": {
+            "type": "number",
+            "description": "Scored findings above which the evidence gate opens regardless of coverage. The absolute floor is the honest test; the ratio below is the fallback for small corpora.",
+            "example": 2000
+          },
+          "harnessEvidenceUsableCoverage": {
+            "type": "number",
+            "description": "Fraction of open findings that must be scored for the evidence gate to open, when the absolute floor is not met.",
+            "example": 0.25
+          },
+          "harnessEvidenceWarnCoverage": {
+            "type": "number",
+            "description": "Below this coverage the agents are told their triage order is partial. Shapes the prompt; does not block a run.",
+            "example": 0.8
+          },
+          "harnessExpressImportance": {
+            "type": "number",
+            "description": "Importance at or above which a single new finding earns an immediate cycle instead of waiting for the batch.",
+            "example": 0.75
+          },
+          "harnessObservationChars": {
+            "type": "number",
+            "description": "Character cap on one tool result before it is truncated.",
+            "example": 8000
+          },
+          "harnessTurnObservationChars": {
+            "type": "number",
+            "description": "Character cap on all tool results in one turn. The transcript is resent every iteration, so this bounds the quadratic growth.",
+            "example": 24000
+          },
+          "harnessMaxRankedFindings": {
+            "type": "number",
+            "description": "How many ranked findings a run may see at once.",
+            "example": 25
+          },
+          "harnessMaxGlossaryEntries": {
+            "type": "number",
+            "description": "How many glossary entries are injected into each run.",
+            "example": 20
+          },
+          "harnessMaxRecalledMemories": {
+            "type": "number",
+            "description": "How many recalled memories are injected into each run.",
+            "example": 30
+          },
+          "harnessDreamIntervalDays": {
+            "type": "number",
+            "description": "How often the memory-consolidation agent runs, in days.",
+            "example": 2
           },
           "autoScheduleEnabled": {
             "type": "boolean",
@@ -13902,17 +13937,24 @@
           "aiProviderConfigId",
           "harnessAiProviderConfigId",
           "autopilotInquiryEnabled",
-          "autopilotInquiryDesired",
-          "autopilotInquirySearchable",
           "autopilotCaseEnabled",
-          "autopilotCaseGuidance",
           "autopilotConfigEnabled",
-          "autopilotConfigGuidance",
           "autopilotDetectorEnabled",
-          "autopilotDetectorGuidance",
           "autopilotEscalationEnabled",
-          "autopilotEscalationGuidance",
           "autopilotMcpEnabled",
+          "harnessRunBudgetMinutes",
+          "harnessRunStaleAfterMinutes",
+          "harnessCycleBudgetMinutes",
+          "harnessEvidenceUsableFindings",
+          "harnessEvidenceUsableCoverage",
+          "harnessEvidenceWarnCoverage",
+          "harnessExpressImportance",
+          "harnessObservationChars",
+          "harnessTurnObservationChars",
+          "harnessMaxRankedFindings",
+          "harnessMaxGlossaryEntries",
+          "harnessMaxRecalledMemories",
+          "harnessDreamIntervalDays",
           "autoScheduleEnabled",
           "maxConcurrentRunners",
           "demoMode",
@@ -13968,55 +14010,25 @@
             "description": "When true, the autopilot inquiry agent manages inquiries automatically after scans.",
             "example": true
           },
-          "autopilotInquiryDesired": {
-            "type": "string",
-            "description": "Operator guidance for the inquiry agent: what is desired / worth investigating.",
-            "nullable": true
-          },
-          "autopilotInquirySearchable": {
-            "type": "string",
-            "description": "Operator guidance for the inquiry agent: what is searchable in this instance.",
-            "nullable": true
-          },
           "autopilotCaseEnabled": {
             "type": "boolean",
             "description": "When true, the autopilot case agent manages investigation cases automatically after scans.",
             "example": true
-          },
-          "autopilotCaseGuidance": {
-            "type": "string",
-            "description": "Operator guidance for the case agent.",
-            "nullable": true
           },
           "autopilotConfigEnabled": {
             "type": "boolean",
             "description": "When true, the config-tuning agent may change editable source config (detectors, sampling, optional, resources) — never the base connection.",
             "example": true
           },
-          "autopilotConfigGuidance": {
-            "type": "string",
-            "description": "Operator guidance for the config-tuning agent.",
-            "nullable": true
-          },
           "autopilotDetectorEnabled": {
             "type": "boolean",
             "description": "When true, the detector-authoring agent may create and train custom detectors.",
             "example": true
           },
-          "autopilotDetectorGuidance": {
-            "type": "string",
-            "description": "Operator guidance for the detector-authoring agent.",
-            "nullable": true
-          },
           "autopilotEscalationEnabled": {
             "type": "boolean",
             "description": "When true, the escalation agent may raise operator notifications for high-severity cases.",
             "example": true
-          },
-          "autopilotEscalationGuidance": {
-            "type": "string",
-            "description": "Operator guidance for the escalation agent.",
-            "nullable": true
           },
           "autopilotMcpEnabled": {
             "type": "boolean",
@@ -14039,6 +14051,97 @@
             "type": "string",
             "description": "Hugging Face token to set. Pass a token value to store (encrypted at rest). Pass null or an empty string to clear the stored token. Ignored when an instance-level HF_TOKEN is configured.",
             "nullable": true
+          },
+          "harnessRunBudgetMinutes": {
+            "type": "number",
+            "description": "How long one agent run may take before it is stopped. A run holds a namespace job slot, so a wedged one stalls every queue behind it.",
+            "example": 20,
+            "minimum": 1,
+            "maximum": 480
+          },
+          "harnessRunStaleAfterMinutes": {
+            "type": "number",
+            "description": "When a run still marked RUNNING is presumed dead and reaped. Keep it above the run budget: past this a run is not slow, it is gone.",
+            "example": 60,
+            "minimum": 1,
+            "maximum": 1440
+          },
+          "harnessCycleBudgetMinutes": {
+            "type": "number",
+            "description": "Wall-clock budget for one cycle. Checked before each agent starts, so a chain can overshoot by at most one run budget.",
+            "example": 30,
+            "minimum": 1,
+            "maximum": 720
+          },
+          "harnessEvidenceUsableFindings": {
+            "type": "number",
+            "description": "Scored findings above which the evidence gate opens regardless of coverage.",
+            "example": 2000,
+            "minimum": 0,
+            "maximum": 10000000
+          },
+          "harnessObservationChars": {
+            "type": "number",
+            "description": "Character cap on one tool result before it is truncated.",
+            "example": 8000,
+            "minimum": 1000,
+            "maximum": 100000
+          },
+          "harnessTurnObservationChars": {
+            "type": "number",
+            "description": "Character cap on all tool results in one turn. The transcript is resent every iteration, so this bounds its quadratic growth.",
+            "example": 24000,
+            "minimum": 1000,
+            "maximum": 500000
+          },
+          "harnessMaxRankedFindings": {
+            "type": "number",
+            "description": "How many ranked findings a run may see at once.",
+            "example": 25,
+            "minimum": 1,
+            "maximum": 200
+          },
+          "harnessMaxGlossaryEntries": {
+            "type": "number",
+            "description": "How many glossary entries are injected into each run.",
+            "example": 20,
+            "minimum": 0,
+            "maximum": 200
+          },
+          "harnessMaxRecalledMemories": {
+            "type": "number",
+            "description": "How many recalled memories are injected into each run.",
+            "example": 30,
+            "minimum": 0,
+            "maximum": 200
+          },
+          "harnessDreamIntervalDays": {
+            "type": "number",
+            "description": "How often the memory-consolidation agent runs, in days.",
+            "example": 2,
+            "minimum": 1,
+            "maximum": 90
+          },
+          "harnessEvidenceUsableCoverage": {
+            "type": "number",
+            "description": "Fraction of open findings that must be scored for the evidence gate to open, when the absolute floor is not met.",
+            "example": 0.25,
+            "minimum": 0,
+            "maximum": 1
+          },
+          "harnessEvidenceWarnCoverage": {
+            "type": "number",
+            "description": "Below this coverage the agents are told their triage order is partial. Shapes the prompt; does not block a run.",
+            "example": 0.8,
+            "minimum": 0,
+            "maximum": 1
+          },
+          "harnessExpressImportance": {
+            "type": "number",
+            "description": "Importance at or above which a single new finding earns an immediate cycle instead of waiting for the batch.",
+            "example": 0.75,
+            "minimum": 0,
+            "maximum": 1
           }
         }
       },
@@ -19976,6 +20079,79 @@
               "type": "string"
             }
           },
+          "triggerMode": {
+            "type": "string",
+            "enum": [
+              "EAGER",
+              "BATCH",
+              "SETTLED",
+              "SCHEDULED",
+              "MANUAL"
+            ],
+            "description": "When this agent is allowed to start. EAGER acts on any qualifying event; BATCH joins the coalesced batch; SETTLED waits for a quiet corpus; SCHEDULED runs on its own interval; MANUAL never starts on its own."
+          },
+          "defaultTriggerMode": {
+            "type": "string",
+            "enum": [
+              "EAGER",
+              "BATCH",
+              "SETTLED",
+              "SCHEDULED",
+              "MANUAL"
+            ],
+            "description": "Factory default"
+          },
+          "waitForMatching": {
+            "type": "boolean",
+            "description": "Wait for the inquiry-matching queue to drain before running"
+          },
+          "defaultWaitForMatching": {
+            "type": "boolean",
+            "description": "Factory default"
+          },
+          "waitForEvidence": {
+            "type": "boolean",
+            "description": "Wait until enough findings carry an importance score"
+          },
+          "defaultWaitForEvidence": {
+            "type": "boolean",
+            "description": "Factory default"
+          },
+          "waitForScans": {
+            "type": "boolean",
+            "description": "Wait until no source is mid-scan"
+          },
+          "defaultWaitForScans": {
+            "type": "boolean",
+            "description": "Factory default"
+          },
+          "minIntervalMinutes": {
+            "type": "number",
+            "description": "Minimum minutes between runs. Stops a burst of scans spawning a run apiece. 0 disables the floor."
+          },
+          "defaultMinIntervalMinutes": {
+            "type": "number",
+            "description": "Factory default"
+          },
+          "maxStalenessHours": {
+            "type": "number",
+            "description": "Force a run once gates have blocked the agent this long. This is the liveness guarantee for a gated agent. 0 disables the backstop."
+          },
+          "defaultMaxStalenessHours": {
+            "type": "number",
+            "description": "Factory default"
+          },
+          "runBudgetMinutes": {
+            "type": "number",
+            "nullable": true,
+            "description": "Per-agent run budget override; null uses the instance value"
+          },
+          "lastTriggeredAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true,
+            "description": "When this agent last started"
+          },
           "customized": {
             "type": "boolean",
             "description": "True when config differs from factory defaults"
@@ -19992,6 +20168,20 @@
           "toolNames",
           "defaultToolNames",
           "mcpToolNames",
+          "triggerMode",
+          "defaultTriggerMode",
+          "waitForMatching",
+          "defaultWaitForMatching",
+          "waitForEvidence",
+          "defaultWaitForEvidence",
+          "waitForScans",
+          "defaultWaitForScans",
+          "minIntervalMinutes",
+          "defaultMinIntervalMinutes",
+          "maxStalenessHours",
+          "defaultMaxStalenessHours",
+          "runBudgetMinutes",
+          "lastTriggeredAt",
           "customized"
         ]
       },
@@ -20033,6 +20223,48 @@
             "items": {
               "type": "string"
             }
+          },
+          "triggerMode": {
+            "type": "string",
+            "enum": [
+              "EAGER",
+              "BATCH",
+              "SETTLED",
+              "SCHEDULED",
+              "MANUAL"
+            ],
+            "nullable": true,
+            "description": "Trigger mode override; null resets to the factory default"
+          },
+          "waitForMatching": {
+            "type": "boolean",
+            "nullable": true,
+            "description": "Wait for inquiry matching to drain; null resets to factory default"
+          },
+          "waitForEvidence": {
+            "type": "boolean",
+            "nullable": true,
+            "description": "Wait for evidence coverage; null resets to factory default"
+          },
+          "waitForScans": {
+            "type": "boolean",
+            "nullable": true,
+            "description": "Wait for scans to finish; null resets to factory default"
+          },
+          "minIntervalMinutes": {
+            "type": "number",
+            "nullable": true,
+            "description": "Minimum minutes between runs (0 disables); null resets to default"
+          },
+          "maxStalenessHours": {
+            "type": "number",
+            "nullable": true,
+            "description": "Force a run after this many hours of being gated (0 disables); null resets to default"
+          },
+          "runBudgetMinutes": {
+            "type": "number",
+            "nullable": true,
+            "description": "Per-agent run budget in minutes; null uses the instance value"
           }
         }
       },
