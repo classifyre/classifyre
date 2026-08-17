@@ -50,6 +50,10 @@ export class HarnessService {
     }
 
     const briefText = this.brief.render(await this.brief.compose());
+    // null here means "use the instance budget"; the loop resolves it.
+    const runBudgetMinutes = await this.agentConfig.runBudgetMinutes(
+      resolved.kind,
+    );
     // Mission tools + any external MCP tools scoped to this mission kind.
     const allowedTools = [
       ...resolved.allowedTools,
@@ -78,7 +82,12 @@ export class HarnessService {
                 audit: this.audit,
                 log: this.log,
               },
-              { systemBrief: briefText, allowedTools, missionPrimer },
+              {
+                systemBrief: briefText,
+                allowedTools,
+                missionPrimer,
+                runBudgetMinutes,
+              },
             ),
         },
       ],

@@ -379,6 +379,11 @@ export {
   CreateAiProviderConfigDtoProviderEnum,
   UpdateAiProviderConfigDtoProviderEnum,
   RunnerLogEntryDtoLevelEnum,
+  // Harness agent scheduling: the trigger mode is a runtime value, so it has
+  // to be re-exported here (not in the `export type` blocks) for the agents
+  // tab to render a Select over it.
+  AgentConfigDtoTriggerModeEnum,
+  UpdateAgentConfigDtoTriggerModeEnum,
   // Finding enums used by web components
   FindingResponseDtoDetectorTypeEnum,
   FindingResponseDtoSeverityEnum,

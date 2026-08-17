@@ -10,6 +10,13 @@ Name | Type
 `goal` | string
 `maxIterations` | number
 `toolNames` | Array&lt;string&gt;
+`triggerMode` | string
+`waitForMatching` | boolean
+`waitForEvidence` | boolean
+`waitForScans` | boolean
+`minIntervalMinutes` | number
+`maxStalenessHours` | number
+`runBudgetMinutes` | number
 
 ## Example
 
@@ -22,6 +29,13 @@ const example = {
   "goal": null,
   "maxIterations": null,
   "toolNames": null,
+  "triggerMode": null,
+  "waitForMatching": null,
+  "waitForEvidence": null,
+  "waitForScans": null,
+  "minIntervalMinutes": null,
+  "maxStalenessHours": null,
+  "runBudgetMinutes": null,
 } satisfies UpdateAgentConfigDto
 
 console.log(example)

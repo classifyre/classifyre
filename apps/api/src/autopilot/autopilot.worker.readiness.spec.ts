@@ -1,10 +1,4 @@
-import { AgentKind } from '@prisma/client';
 import { AutopilotWorker } from './autopilot.worker';
-import {
-  AUTOPILOT_COALESCE_WINDOW_SECONDS,
-  AUTOPILOT_CORPUS_SINGLETON_KEY,
-  AUTOPILOT_MAX_READINESS_REQUEUES,
-} from './autopilot.constants';
 
 /**
  * The corpus cycle: what it consumes, and what it waits for.
@@ -72,288 +66,111 @@ describe('AutopilotWorker readiness and batch consumption', () => {
       } as any,
       {} as any,
       embeddings as any,
+      {
+        // Permissive policy: these suites are about the enable-flag and chain
+        // logic, not scheduling. The policy engine has its own spec.
+        resolvePolicy: jest.fn().mockResolvedValue({
+          triggerMode: 'BATCH',
+          waitForMatching: false,
+          waitForEvidence: false,
+          waitForScans: false,
+          minIntervalMinutes: 0,
+          maxStalenessHours: 0,
+        }),
+        lastTriggeredAt: jest.fn().mockResolvedValue(null),
+        markTriggered: jest.fn().mockResolvedValue(undefined),
+        runBudgetMinutes: jest.fn().mockResolvedValue(null),
+      } as any,
     );
   };
 
-  const blocked = () =>
-    (worker as any).readinessBlocked() as Promise<string | null>;
+  const signals = () =>
+    (worker as any).readinessSignals({
+      harnessEvidenceUsableFindings: 2000,
+      harnessEvidenceUsableCoverage: 0.25,
+    }) as Promise<{
+      matchingBusy: boolean;
+      scansActive: boolean;
+      coverage: { open: number; analyzed: number };
+      evidence: { usableFindings: number; usableCoverage: number };
+    }>;
 
-  describe('readinessBlocked', () => {
-    it('is clear when both pipelines have drained', async () => {
+  /**
+   * The signals are gathered once and handed to every agent, which is the whole
+   * point of the rework: one agent's precondition must not become every
+   * agent's precondition. `agent-policy.service.spec.ts` owns what each agent
+   * then DOES with them; this suite owns whether they are read correctly.
+   */
+  describe('readiness signals', () => {
+    it('reports a quiet instance as clear on every axis', async () => {
       build();
-      await expect(blocked()).resolves.toBeNull();
+      await expect(signals()).resolves.toMatchObject({
+        matchingBusy: false,
+        scansActive: false,
+      });
     });
 
-    it('waits for inquiry matching', async () => {
+    it('reports inquiry matching as busy without blocking anything itself', async () => {
+      // Previously this single fact deferred the entire cycle. It is now just
+      // a fact, and only the agents that declared they need it will wait.
       build({ matchQueue: 4 });
-      await expect(blocked()).resolves.toBe('Inquiry matching');
+      await expect(signals()).resolves.toMatchObject({ matchingBusy: true });
     });
 
-    /**
-     * The gate is about the DATA, not the queue.
-     *
-     * It used to be "is the embedding queue non-empty", which under continuous
-     * ingestion is permanently true. A live 151-source namespace sat at 38%
-     * coverage while scans kept arriving, and the harness ran one investigation
-     * cycle in two hours — every other one deferred, requeued, and found the
-     * dirty set already claimed.
-     */
-    it('waits while too little of the corpus is scored to rank it', async () => {
-      build({
-        pendingEmbedJobs: 120,
-        openFindings: 1000,
-        analyzedFindings: 50,
+    it('carries the coverage numbers rather than a verdict', async () => {
+      // "Scores are partial" reads very differently at 700/749 than at 1/749,
+      // so the numbers travel and the thresholds are applied per agent.
+      build({ pendingEmbedJobs: 5, openFindings: 749, analyzedFindings: 700 });
+
+      await expect(signals()).resolves.toMatchObject({
+        coverage: { open: 749, analyzed: 700 },
       });
-      await expect(blocked()).resolves.toMatch(/only 50 of 1000/);
     });
 
-    it('proceeds once coverage is usable, even with inference still running', async () => {
-      // 38% — the live figure that used to defer indefinitely.
+    it('zeroes coverage when nothing is left to analyze', async () => {
+      // With no pending work, waiting cannot improve coverage, so the evidence
+      // gate has no reason to hold anyone back.
       build({
-        pendingEmbedJobs: 5000,
-        openFindings: 135772,
-        analyzedFindings: 51455,
+        pendingEmbedJobs: 0,
+        openFindings: 100_000,
+        analyzedFindings: 1,
       });
-      await expect(blocked()).resolves.toBeNull();
-    });
 
-    /**
-     * A ratio has a growing denominator, so where ingestion outpaces analysis
-     * it falls over time and the gate re-engages exactly when the corpus is
-     * largest. The live 151-source namespace reached 442,613 scored against
-     * 1,914,477 open — 23%, blocked — and stopped investigating for three
-     * hours, with 55 cycles queued behind the gate. Half a million scored
-     * findings is not "too little to reason from"; it is more than a cycle can
-     * read many times over.
-     */
-    it('proceeds on a huge corpus whose ratio is low but whose volume is not', async () => {
-      build({
-        pendingEmbedJobs: 20000,
-        openFindings: 1914477,
-        analyzedFindings: 442613,
+      await expect(signals()).resolves.toMatchObject({
+        coverage: { open: 0, analyzed: 0 },
       });
-      await expect(blocked()).resolves.toBeNull();
     });
 
-    // The ratio still governs corpora too small for the absolute floor to
-    // apply, where a handful of scores genuinely cannot support ranking.
-    it('still waits on a small corpus with almost nothing scored', async () => {
-      build({ pendingEmbedJobs: 50, openFindings: 400, analyzedFindings: 12 });
-      await expect(blocked()).resolves.toMatch(/only 12 of 400/);
-    });
-
-    it('proceeds on a small corpus once a quarter of it is scored', async () => {
-      build({ pendingEmbedJobs: 50, openFindings: 400, analyzedFindings: 120 });
-      await expect(blocked()).resolves.toBeNull();
-    });
-
-    it('proceeds when there is nothing to score', async () => {
-      build({ pendingEmbedJobs: 120, openFindings: 0, analyzedFindings: 0 });
-      await expect(blocked()).resolves.toBeNull();
-    });
-
-    // It used to. And that closed the gate permanently on any busy instance:
-    // handleRecalibration re-defers itself while inference drains, so with
-    // scans landing continuously the recalibrate queue is never empty. Every
-    // cycle burned all five requeues — five minutes of delay — and then ran
-    // flagged as degraded. Recalibration re-normalises existing scores; it does
-    // not create them, so it is not worth holding a cycle for.
-    it('does NOT wait for a scheduled recalibration', async () => {
-      build({ recalibrationScheduled: true });
-      await expect(blocked()).resolves.toBeNull();
-    });
-
-    it('treats an unconfigured semantic stack as ready, not as blocked', async () => {
-      build();
-      (worker as any).embeddings.status = jest
-        .fn()
-        .mockRejectedValue(new Error('embeddings not configured'));
-
-      await expect(blocked()).resolves.toBeNull();
-    });
-
-    it('treats a null pending count as ready', async () => {
+    it('treats an unconfigured semantic stack as clear, not as blocked', async () => {
       build({ pendingEmbedJobs: null });
-      await expect(blocked()).resolves.toBeNull();
-    });
-  });
-
-  describe('the wait is bounded', () => {
-    const runCycle = (readinessAttempts: number) =>
-      (worker as any).runCycle({
-        sourceId: null,
-        runnerId: null,
-        corpus: true,
-        cycleKey: 'corpus:x',
-        trigger: 'corpus',
-        manual: false,
-        instruction: null,
-        readinessAttempts,
-      }) as Promise<void>;
-
-    const withSettings = () => {
-      prisma.instanceSettings = {
-        findUnique: jest.fn().mockResolvedValue({
-          harnessAiProviderConfigId: 'p1',
-          autopilotInquiryEnabled: false,
-          autopilotCaseEnabled: false,
-          autopilotConfigEnabled: false,
-          autopilotDetectorEnabled: false,
-          autopilotEscalationEnabled: false,
-        }),
-      };
-    };
-
-    it('re-queues under the corpus key, incrementing the attempt count', async () => {
-      build({ pendingEmbedJobs: 50, openFindings: 1000, analyzedFindings: 10 });
-      withSettings();
-      // One agent enabled so the cycle is not short-circuited by the gate.
-      prisma.instanceSettings.findUnique.mockResolvedValue({
-        harnessAiProviderConfigId: 'p1',
-        autopilotInquiryEnabled: true,
-        autopilotCaseEnabled: false,
-        autopilotConfigEnabled: false,
-        autopilotDetectorEnabled: false,
-        autopilotEscalationEnabled: false,
+      await expect(signals()).resolves.toMatchObject({
+        coverage: { open: 0, analyzed: 0 },
       });
-
-      await runCycle(0);
-
-      expect(sent).toHaveLength(1);
-      expect(sent[0].opts.singletonKey).toBe(AUTOPILOT_CORPUS_SINGLETON_KEY);
-      expect(sent[0].data.readinessAttempts).toBe(1);
-      expect(sent[0].data.corpus).toBe(true);
-      // It must NOT have consumed the batch while deferring.
-      expect(prisma.source.updateMany).not.toHaveBeenCalled();
     });
 
-    /**
-     * `singletonKey` alone dedupes nothing on a pg-boss 12 `standard` queue —
-     * every single-job-per-key index is predicated on the queue policy. So each
-     * requeue inserted a NEW job, and with a fresh corpus cycle arriving every
-     * window each started its own chain counting to five. A live 151-source
-     * namespace accumulated 29 completed cycle jobs across attempts 1..5, of
-     * which exactly one reached the agents; the rest found the dirty set
-     * already claimed and exited.
-     */
-    it('gives the requeue a slot width so chains collapse instead of multiplying', async () => {
-      build({ pendingEmbedJobs: 50, openFindings: 1000, analyzedFindings: 10 });
-      withSettings();
-      prisma.instanceSettings.findUnique.mockResolvedValue({
-        harnessAiProviderConfigId: 'p1',
-        autopilotInquiryEnabled: true,
-        autopilotCaseEnabled: false,
-        autopilotConfigEnabled: false,
-        autopilotDetectorEnabled: false,
-        autopilotEscalationEnabled: false,
+    it('forwards the operator-configured evidence thresholds', async () => {
+      build();
+      await expect(signals()).resolves.toMatchObject({
+        evidence: { usableFindings: 2000, usableCoverage: 0.25 },
       });
-
-      await runCycle(0);
-
-      expect(sent[0].opts.singletonSeconds).toBe(
-        AUTOPILOT_COALESCE_WINDOW_SECONDS,
-      );
-      // NOT singletonNextSlot: unlike the enqueue path, a collision here means
-      // a cycle is already QUEUED and will read the same shared dirty set, so
-      // nothing is stranded by dropping this retry. Deferring instead stacked
-      // retries into successive slots — 55 queued cycles on a live instance.
-      expect(sent[0].opts.singletonNextSlot).toBeUndefined();
     });
 
-    it('preserves targeted agent scope and focus when re-queueing', async () => {
-      build({ matchQueue: 1 });
-      prisma.instanceSettings = {
-        findUnique: jest.fn().mockResolvedValue({
-          harnessAiProviderConfigId: 'p1',
-          autopilotInquiryEnabled: true,
-          autopilotCaseEnabled: true,
-          autopilotConfigEnabled: true,
-          autopilotDetectorEnabled: true,
-          autopilotEscalationEnabled: true,
-        }),
+    it('does not treat a counting failure as "everything is busy"', async () => {
+      // Failing closed here would stall every gated agent on a transient
+      // database error — the deadlock this rework exists to remove.
+      build();
+      prisma.runner = {
+        count: jest.fn().mockRejectedValue(new Error('db down')),
       };
 
-      await (worker as any).runCycle({
-        sourceId: 's1',
-        runnerId: 'r1',
-        corpus: false,
-        cycleKey: 'scan:s1:r1',
-        trigger: 'express',
-        manual: false,
-        instruction: 'inspect extraction failure',
-        caseId: 'case-1',
-        only: [AgentKind.CONFIG],
-        expressReason: 'scan failed',
-        readinessAttempts: 0,
-      });
-
-      expect(sent[0].data).toMatchObject({
-        sourceId: 's1',
-        runnerId: 'r1',
-        cycleKey: 'scan:s1:r1',
-        agentKinds: [AgentKind.CONFIG],
-        caseId: 'case-1',
-        instruction: 'inspect extraction failure',
-        expressReason: 'scan failed',
-        readinessAttempts: 1,
-      });
+      await expect(signals()).resolves.toMatchObject({ scansActive: false });
     });
 
-    // A permanently backed-up embedding queue must degrade the run, never
-    // deadlock the autopilot outright.
-    it('gives up waiting and proceeds after the requeue budget', async () => {
-      build({
-        pendingEmbedJobs: 50,
-        // Measured coverage, not the gate, is what flags the run as degraded:
-        // 10 of 100 open findings scored.
-        openFindings: 100,
-        analyzedFindings: 10,
-        dirty: [{ id: 's1', name: 'A', autopilotDirtyAt: DIRTY_AT }],
-      });
-      withSettings();
-      prisma.instanceSettings.findUnique.mockResolvedValue({
-        harnessAiProviderConfigId: 'p1',
-        autopilotInquiryEnabled: true,
-        autopilotCaseEnabled: false,
-        autopilotConfigEnabled: false,
-        autopilotDetectorEnabled: false,
-        autopilotEscalationEnabled: false,
-      });
-      (worker as any).runAgent = jest.fn().mockResolvedValue(undefined);
+    it('reports an active scan so corpus-wide agents can wait for it', async () => {
+      build();
+      prisma.runner = { count: jest.fn().mockResolvedValue(2) };
 
-      await runCycle(AUTOPILOT_MAX_READINESS_REQUEUES);
-
-      expect(sent).toHaveLength(0);
-      const scope = (worker as any).runAgent.mock.calls[0][4];
-      expect(scope.evidenceAnalysisPending).toBe(true);
-    });
-
-    // The flag used to be `blocked != null` — "a queue was busy when we
-    // looked". On a busy instance that was every cycle, so the missions were
-    // permanently told to "treat findings.ranked as partial and prefer
-    // deferring to concluding" even when every finding in scope was scored.
-    it('does not flag a run as degraded when the findings are actually scored', async () => {
-      build({
-        pendingEmbedJobs: 50,
-        openFindings: 100,
-        analyzedFindings: 100,
-        dirty: [{ id: 's1', name: 'A', autopilotDirtyAt: DIRTY_AT }],
-      });
-      withSettings();
-      prisma.instanceSettings.findUnique.mockResolvedValue({
-        harnessAiProviderConfigId: 'p1',
-        autopilotInquiryEnabled: true,
-        autopilotCaseEnabled: false,
-        autopilotConfigEnabled: false,
-        autopilotDetectorEnabled: false,
-        autopilotEscalationEnabled: false,
-      });
-      (worker as any).runAgent = jest.fn().mockResolvedValue(undefined);
-
-      await runCycle(AUTOPILOT_MAX_READINESS_REQUEUES);
-
-      const scope = (worker as any).runAgent.mock.calls[0][4];
-      expect(scope.evidenceAnalysisPending).toBe(false);
+      await expect(signals()).resolves.toMatchObject({ scansActive: true });
     });
   });
 
@@ -452,6 +269,55 @@ describe('AutopilotWorker readiness and batch consumption', () => {
       expect(prisma.source.updateMany).not.toHaveBeenCalled();
     });
 
+    it('keeps the batch dirty when an enabled agent was gated', async () => {
+      // The subtle half of per-agent gating. A gated agent has not seen these
+      // sources, so clearing the marks on its behalf drops them for good: the
+      // next cycle reads the dirty set and finds nothing. Leaving them costs a
+      // re-read; clearing them early costs the work.
+      build({
+        dirty: [{ id: 's1', name: 'A', autopilotDirtyAt: DIRTY_AT }],
+        matchQueue: 3,
+      });
+      prisma.instanceSettings = {
+        findUnique: jest.fn().mockResolvedValue({
+          harnessAiProviderConfigId: 'p1',
+          autopilotInquiryEnabled: true,
+          autopilotCaseEnabled: false,
+          autopilotConfigEnabled: false,
+          autopilotDetectorEnabled: false,
+          autopilotEscalationEnabled: false,
+          harnessCycleBudgetMinutes: 30,
+          harnessEvidenceWarnCoverage: 0.8,
+          harnessEvidenceUsableFindings: 2000,
+          harnessEvidenceUsableCoverage: 0.25,
+        }),
+      };
+      // The inquiry agent waits for matching, and matching is busy.
+      (worker as any).agents.resolvePolicy = jest.fn().mockResolvedValue({
+        triggerMode: 'BATCH',
+        waitForMatching: true,
+        waitForEvidence: false,
+        waitForScans: false,
+        minIntervalMinutes: 0,
+        maxStalenessHours: 0,
+      });
+      const runAgent = jest.fn().mockResolvedValue(undefined);
+      (worker as any).runAgent = runAgent;
+
+      await (worker as any).runCycle({
+        sourceId: null,
+        runnerId: null,
+        corpus: true,
+        cycleKey: 'corpus:x',
+        trigger: 'corpus',
+        manual: false,
+        instruction: null,
+      });
+
+      expect(runAgent).not.toHaveBeenCalled();
+      expect(prisma.source.updateMany).not.toHaveBeenCalled();
+    });
+
     it('acknowledges the observed batch after every enabled agent succeeds', async () => {
       build({
         dirty: [{ id: 's1', name: 'A', autopilotDirtyAt: DIRTY_AT }],
@@ -541,5 +407,169 @@ describe('AutopilotWorker readiness and batch consumption', () => {
 
       expect((worker as any).runAgent).toHaveBeenCalled();
     });
+  });
+});
+
+/**
+ * The heartbeat, and why it has to exist.
+ *
+ * A completed scan is otherwise the only thing that enqueues a cycle, so the
+ * per-agent policy is only ever consulted while the corpus is being scanned.
+ * That makes the staleness backstop — advertised as the liveness guarantee for
+ * a gated agent — unreachable on a corpus that has gone quiet: it is evaluated
+ * inside a cycle, and there are no cycles.
+ *
+ * The absurdity worth naming is that this bites the SETTLED agents hardest.
+ * They are told to wait for a quiet corpus, and a quiet corpus is exactly the
+ * state in which nothing was left to wake them.
+ */
+describe('AutopilotWorker heartbeat', () => {
+  const build = (over: {
+    dirty?: Array<{ id: string; name: string; autopilotDirtyAt: Date }>;
+    lastTriggered?: Date | null;
+    maxStalenessHours?: number;
+  }) => {
+    const runAgent = jest.fn().mockResolvedValue(undefined);
+    const worker = new AutopilotWorker(
+      {
+        instanceSettings: {
+          findUnique: jest.fn().mockResolvedValue({
+            harnessAiProviderConfigId: 'p1',
+            autopilotInquiryEnabled: true,
+            autopilotCaseEnabled: false,
+            autopilotConfigEnabled: false,
+            autopilotDetectorEnabled: false,
+            autopilotEscalationEnabled: false,
+            harnessCycleBudgetMinutes: 30,
+            harnessEvidenceWarnCoverage: 0.8,
+            harnessEvidenceUsableFindings: 2000,
+            harnessEvidenceUsableCoverage: 0.25,
+          }),
+        },
+        source: {
+          findMany: jest.fn().mockResolvedValue(over.dirty ?? []),
+          updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+        },
+        runner: { count: jest.fn().mockResolvedValue(0) },
+      } as never,
+      {
+        getBossAsync: jest.fn().mockResolvedValue({
+          getQueueStats: jest.fn().mockResolvedValue({
+            queuedCount: 0,
+            activeCount: 0,
+            deferredCount: 0,
+          }),
+        }),
+      } as never,
+      { recordSkippedRun: jest.fn() } as never,
+      {} as never,
+      {
+        sourceName: jest.fn().mockResolvedValue('a source'),
+        evidenceCoverage: jest.fn().mockResolvedValue({ open: 0, analyzed: 0 }),
+        unmonitoredFindings: jest.fn().mockResolvedValue({ total: 0 }),
+        detectionYield: jest.fn().mockResolvedValue({ blind: false }),
+      } as never,
+      {} as never,
+      { status: jest.fn().mockResolvedValue({ pendingEmbedJobs: 0 }) } as never,
+      {
+        resolvePolicy: jest.fn().mockResolvedValue({
+          triggerMode: 'SETTLED',
+          waitForMatching: false,
+          waitForEvidence: false,
+          waitForScans: false,
+          minIntervalMinutes: 0,
+          maxStalenessHours: over.maxStalenessHours ?? 24,
+        }),
+        lastTriggeredAt: jest
+          .fn()
+          .mockResolvedValue(
+            over.lastTriggered === undefined ? null : over.lastTriggered,
+          ),
+        markTriggered: jest.fn().mockResolvedValue(undefined),
+        runBudgetMinutes: jest.fn().mockResolvedValue(null),
+      } as never,
+    );
+    (worker as unknown as { runAgent: unknown }).runAgent = runAgent;
+    return { worker, runAgent };
+  };
+
+  const beat = (worker: AutopilotWorker, heartbeat = true) =>
+    (
+      worker as unknown as {
+        runCycle: (c: Record<string, unknown>) => Promise<void>;
+      }
+    ).runCycle({
+      sourceId: null,
+      runnerId: null,
+      corpus: true,
+      heartbeat,
+      cycleKey: 'corpus:beat',
+      trigger: 'heartbeat',
+      manual: false,
+      instruction: null,
+    });
+
+  it('runs an agent past its backstop even though no scan has happened', async () => {
+    // The whole point: no dirty sources, nothing to react to, and the agent
+    // still has to run because it has been too long since anyone looked.
+    const h = build({ dirty: [], lastTriggered: null });
+
+    await beat(h.worker);
+
+    expect(h.runAgent).toHaveBeenCalled();
+  });
+
+  it('does nothing when no agent is overdue', async () => {
+    // A quiet instance must stay quiet. A heartbeat that ran the pipeline every
+    // tick would be a second cadence, which is what this design removes.
+    const h = build({
+      dirty: [],
+      lastTriggered: new Date(Date.now() - 60_000),
+    });
+
+    await beat(h.worker);
+
+    expect(h.runAgent).not.toHaveBeenCalled();
+  });
+
+  it('respects a disabled backstop rather than running anyway', async () => {
+    const h = build({
+      dirty: [],
+      lastTriggered: null,
+      maxStalenessHours: 0,
+    });
+
+    await beat(h.worker);
+
+    expect(h.runAgent).not.toHaveBeenCalled();
+  });
+
+  it('leaves the ordinary empty-batch cycle short-circuiting as before', async () => {
+    // Only a heartbeat may bypass the empty-batch return; a scan-triggered
+    // corpus job that outlived its batch must still do nothing.
+    const h = build({ dirty: [], lastTriggered: null });
+
+    await beat(h.worker, false);
+
+    expect(h.runAgent).not.toHaveBeenCalled();
+  });
+
+  it('picks up sources a previous cycle deferred and left dirty', async () => {
+    // The second stranding case: agents deferred, their sources kept dirty for
+    // "the next cycle", and no next cycle ever arrived because scanning stopped.
+    const h = build({
+      dirty: [
+        {
+          id: 's1',
+          name: 'A',
+          autopilotDirtyAt: new Date('2026-08-17T10:00:00Z'),
+        },
+      ],
+      lastTriggered: new Date(),
+    });
+
+    await beat(h.worker);
+
+    expect(h.runAgent).toHaveBeenCalled();
   });
 });

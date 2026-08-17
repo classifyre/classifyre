@@ -187,7 +187,8 @@ export class EmbeddingAnalysisService {
     // aggregate over the findings table for every page — the walk exists to
     // bound memory, not to multiply queries.
     const recurrence =
-      recurrenceSnapshot ?? (await this.valueRecurrenceForHashes(contentHashes));
+      recurrenceSnapshot ??
+      (await this.valueRecurrenceForHashes(contentHashes));
 
     for await (const findings of this.findingPages(contentHashes)) {
       await Promise.all(

@@ -14,17 +14,24 @@ Name | Type
 `aiProviderConfigId` | string
 `harnessAiProviderConfigId` | string
 `autopilotInquiryEnabled` | boolean
-`autopilotInquiryDesired` | string
-`autopilotInquirySearchable` | string
 `autopilotCaseEnabled` | boolean
-`autopilotCaseGuidance` | string
 `autopilotConfigEnabled` | boolean
-`autopilotConfigGuidance` | string
 `autopilotDetectorEnabled` | boolean
-`autopilotDetectorGuidance` | string
 `autopilotEscalationEnabled` | boolean
-`autopilotEscalationGuidance` | string
 `autopilotMcpEnabled` | boolean
+`harnessRunBudgetMinutes` | number
+`harnessRunStaleAfterMinutes` | number
+`harnessCycleBudgetMinutes` | number
+`harnessEvidenceUsableFindings` | number
+`harnessEvidenceUsableCoverage` | number
+`harnessEvidenceWarnCoverage` | number
+`harnessExpressImportance` | number
+`harnessObservationChars` | number
+`harnessTurnObservationChars` | number
+`harnessMaxRankedFindings` | number
+`harnessMaxGlossaryEntries` | number
+`harnessMaxRecalledMemories` | number
+`harnessDreamIntervalDays` | number
 `autoScheduleEnabled` | boolean
 `maxConcurrentRunners` | number
 `demoMode` | boolean
@@ -48,17 +55,24 @@ const example = {
   "aiProviderConfigId": null,
   "harnessAiProviderConfigId": null,
   "autopilotInquiryEnabled": true,
-  "autopilotInquiryDesired": null,
-  "autopilotInquirySearchable": null,
   "autopilotCaseEnabled": true,
-  "autopilotCaseGuidance": null,
   "autopilotConfigEnabled": true,
-  "autopilotConfigGuidance": null,
   "autopilotDetectorEnabled": true,
-  "autopilotDetectorGuidance": null,
   "autopilotEscalationEnabled": true,
-  "autopilotEscalationGuidance": null,
   "autopilotMcpEnabled": true,
+  "harnessRunBudgetMinutes": 20,
+  "harnessRunStaleAfterMinutes": 60,
+  "harnessCycleBudgetMinutes": 30,
+  "harnessEvidenceUsableFindings": 2000,
+  "harnessEvidenceUsableCoverage": 0.25,
+  "harnessEvidenceWarnCoverage": 0.8,
+  "harnessExpressImportance": 0.75,
+  "harnessObservationChars": 8000,
+  "harnessTurnObservationChars": 24000,
+  "harnessMaxRankedFindings": 25,
+  "harnessMaxGlossaryEntries": 20,
+  "harnessMaxRecalledMemories": 30,
+  "harnessDreamIntervalDays": 2,
   "autoScheduleEnabled": true,
   "maxConcurrentRunners": 2,
   "demoMode": false,
