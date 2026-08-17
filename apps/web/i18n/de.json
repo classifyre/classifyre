@@ -3076,7 +3076,6 @@
       "runs": "Läufe",
       "usage": "Verbrauch",
       "agents": "Agenten",
-      "tools": "Werkzeuge",
       "memory": "Gedächtnis",
       "brief": "System-Briefing",
       "config": "Konfiguration"
@@ -3098,32 +3097,26 @@
       "payload": "Payload",
       "clearFilters": "Clear filters"
     },
-    "tools": {
-      "title": "Capability map",
-      "desc": "The tools the harness can call and the missions that wield them. New tools (including external MCP servers) register here automatically.",
-      "registry": "Tool registry",
-      "missions": "Missions",
-      "read": "read",
-      "mutate": "mutate",
-      "domain": "domain",
-      "toolCount": "{{count}} tools",
-      "allowedTools": "{{count}} tools",
-      "maxIterations": "max {{count}} steps",
-      "reactTitle": "How the harness thinks",
-      "reactStep1": "Observe — calls read tools to gather the slice of state it needs.",
-      "reactStep2": "Reason — proposes the next action with a short rationale.",
-      "reactStep3": "Act — a mutating tool runs through the gate (validated, OBSERVE_ONLY-checked, audited).",
-      "reactStep4": "Repeat — the result feeds back until the goal is met or the step budget is reached.",
-      "none": "No tools registered.",
-      "builtinBadge": "Integriert",
-      "mcpBadge": "MCP"
-    },
     "agents": {
       "title": "Agenten",
       "desc": "Jeder autonome Agent, was er kann und wie er arbeitet. Aktivieren Sie einen Agenten, bearbeiten Sie sein Ziel und weisen Sie beliebige integrierte Werkzeuge zu — auch Werkzeuge anderer Agenten.",
       "requiresAi": "Weisen Sie unter Harness AI → Konfiguration einen Harness-Anbieter zu, bevor Agenten handeln können.",
       "enabled": "Aktiviert",
       "alwaysOn": "Immer aktiv",
+      "chain": {
+        "title": "Kette",
+        "desc": "Agenten einer Kette laufen der Reihe nach, weil jeder liest, was der vorherige geschrieben hat. Die beiden Ketten laufen gleichzeitig.",
+        "investigation": "Untersuchung",
+        "detection": "Erkennung",
+        "off": "aus",
+        "unchained": "läuft allein, nach eigenem Zeitplan.",
+        "providerHalt": "Ein Anbieterfehler – Ratenbegrenzung, ungültiger Schlüssel, fehlendes Modell – stoppt den Rest dieser Kette, da der nächste Agent auf dieselbe Hürde träfe. Jeder andere Fehler betrifft nur den Agenten, bei dem er auftrat.",
+        "why": {
+          "case": "Case liest die Anfragen, die Inquiry gerade erstellt oder erweitert hat.",
+          "escalation": "Escalation meldet den Endzustand der von Case geänderten Fälle.",
+          "detectorAuthor": "Detector Author reagiert auf das, was Config offen ließ; beide schreiben dieselbe Quellkonfiguration."
+        }
+      },
       "runsWhen": "Läuft wenn",
       "modes": {
         "eager": "Sofort",

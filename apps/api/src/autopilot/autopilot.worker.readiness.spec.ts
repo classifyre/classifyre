@@ -1,4 +1,5 @@
 import { AutopilotWorker } from './autopilot.worker';
+import { AiRateLimitError } from '../ai';
 
 /**
  * The corpus cycle: what it consumes, and what it waits for.
@@ -236,7 +237,7 @@ describe('AutopilotWorker readiness and batch consumption', () => {
       expect(prisma.source.updateMany).not.toHaveBeenCalled();
     });
 
-    it('does not acknowledge a batch when an agent fails transiently', async () => {
+    it('does not acknowledge a batch when an agent fails on its own', async () => {
       build({
         dirty: [{ id: 's1', name: 'A', autopilotDirtyAt: DIRTY_AT }],
       });
@@ -252,7 +253,44 @@ describe('AutopilotWorker readiness and batch consumption', () => {
       };
       (worker as any).runAgent = jest
         .fn()
-        .mockRejectedValue(new Error('provider unavailable'));
+        .mockRejectedValue(new Error('tool blew up'));
+
+      // An agent-specific failure no longer aborts the cycle — its chain-mates
+      // still get their turn. What must NOT change is the dirty set: the agent
+      // did not finish against these sources, so clearing their marks would
+      // drop them for good.
+      await (worker as any).runCycle({
+        sourceId: null,
+        runnerId: null,
+        corpus: true,
+        cycleKey: 'corpus:x',
+        trigger: 'corpus',
+        manual: false,
+        instruction: null,
+      });
+
+      expect(prisma.source.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('does not acknowledge a batch when the provider fails', async () => {
+      // A provider-level failure still aborts the cycle outright, so pg-boss
+      // retries it once the provider recovers.
+      build({
+        dirty: [{ id: 's1', name: 'A', autopilotDirtyAt: DIRTY_AT }],
+      });
+      prisma.instanceSettings = {
+        findUnique: jest.fn().mockResolvedValue({
+          harnessAiProviderConfigId: 'p1',
+          autopilotInquiryEnabled: true,
+          autopilotCaseEnabled: false,
+          autopilotConfigEnabled: false,
+          autopilotDetectorEnabled: false,
+          autopilotEscalationEnabled: false,
+        }),
+      };
+      (worker as any).runAgent = jest
+        .fn()
+        .mockRejectedValue(new AiRateLimitError('rate limited'));
 
       await expect(
         (worker as any).runCycle({
@@ -264,7 +302,7 @@ describe('AutopilotWorker readiness and batch consumption', () => {
           manual: false,
           instruction: null,
         }),
-      ).rejects.toThrow('provider unavailable');
+      ).rejects.toThrow(/rate limit/i);
 
       expect(prisma.source.updateMany).not.toHaveBeenCalled();
     });
