@@ -188,6 +188,43 @@ The API does not simply run until it dies:
   generation that served for 5 minutes or more was not boot-looping, so the
   earlier burst stops counting and it restarts on a fresh budget. Only deaths
   that keep happening *during boot* exhaust it.
+- **The embedding worker is expendable.** Inference runs in a forked child, so
+  onnxruntime aborting natively takes only that child with it — see below.
+
+## "Quit unexpectedly" that is not the API
+
+A crash dialog does **not** always mean the API died. The embedding worker is a
+child process of the API, forked from the Electron binary, so when it aborts
+macOS attributes the report to `classifyre-desktop` exactly as it would for the
+API itself. Tell them apart before investigating:
+
+```bash
+grep -E "FATAL ERROR|worker exited with code" ~/Library/Application\ Support/Classifyre/logs/main.log
+```
+
+| Signature | What died | Impact |
+| --- | --- | --- |
+| `FATAL ERROR: Ineffective mark-compacts` | the API's V8 heap | scan interrupted; supervisor restarts it |
+| `worker exited with code null (signal SIGTRAP)` | the embedding worker | that batch fails and is retried; **the API keeps serving** |
+
+The crash report itself is decisive: `parentProc` is `classifyre-desktop` (the
+Electron main) for an API death, and the API's own pid for a worker death.
+
+The `SIGTRAP` is onnxruntime's allocator aborting when the host cannot satisfy
+a request — a machine-level pressure symptom, not a bug in the batch. It is
+already mitigated (`enableCpuMemArena: false`, `intraOpNumThreads` bounded) and
+inputs are truncated to the model's window by the pipeline, so the remaining
+trigger is genuine system pressure. Check swap before looking for a code cause:
+
+```bash
+sysctl vm.swapusage
+```
+
+Three consecutive worker failures pause local embedding, then it retries on a
+backoff (1, 2, 4… minutes, capped at 15) and resumes on the first batch that
+succeeds. `GET /embeddings/status` reports `workerDisabled` and `workerRetryAt`.
+The pause used to be permanent for the process, which meant one bad minute
+silently ended semantic embedding until the app was restarted.
 
   This used to be a 20-minute healthy-uptime timer — twice the window — which
   could never fire for a service crashing more often than that, i.e. exactly
