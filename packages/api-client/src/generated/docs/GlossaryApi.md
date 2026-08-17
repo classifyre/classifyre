@@ -4,12 +4,78 @@ All URIs are relative to *http://localhost*
 
 | Method | HTTP request | Description |
 |------------- | ------------- | -------------|
+| [**glossaryControllerBulkUpdate**](GlossaryApi.md#glossarycontrollerbulkupdate) | **POST** /glossary/bulk | Bulk verify/unverify or retype glossary terms (operator) |
 | [**glossaryControllerList**](GlossaryApi.md#glossarycontrollerlist) | **GET** /glossary | List glossary terms |
 | [**glossaryControllerLookup**](GlossaryApi.md#glossarycontrollerlookup) | **GET** /glossary/lookup | Resolve a name or alias to glossary terms (exact + semantic) |
 | [**glossaryControllerRemove**](GlossaryApi.md#glossarycontrollerremove) | **DELETE** /glossary/{id} | Delete a glossary term |
 | [**glossaryControllerUpsert**](GlossaryApi.md#glossarycontrollerupsert) | **POST** /glossary | Create or update a glossary term (operator) |
 | [**glossaryControllerVerify**](GlossaryApi.md#glossarycontrollerverify) | **PATCH** /glossary/{id}/verify | Mark an agent-proposed term as verified |
 
+
+
+## glossaryControllerBulkUpdate
+
+> BulkUpdateGlossaryTermsResponseDto glossaryControllerBulkUpdate(bulkUpdateGlossaryTermsDto)
+
+Bulk verify/unverify or retype glossary terms (operator)
+
+### Example
+
+```ts
+import {
+  Configuration,
+  GlossaryApi,
+} from '@workspace/api-client';
+import type { GlossaryControllerBulkUpdateRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new GlossaryApi();
+
+  const body = {
+    // BulkUpdateGlossaryTermsDto
+    bulkUpdateGlossaryTermsDto: ...,
+  } satisfies GlossaryControllerBulkUpdateRequest;
+
+  try {
+    const data = await api.glossaryControllerBulkUpdate(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **bulkUpdateGlossaryTermsDto** | [BulkUpdateGlossaryTermsDto](BulkUpdateGlossaryTermsDto.md) |  | |
+
+### Return type
+
+[**BulkUpdateGlossaryTermsResponseDto**](BulkUpdateGlossaryTermsResponseDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: `application/json`
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
 
 
 ## glossaryControllerList

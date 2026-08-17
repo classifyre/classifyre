@@ -72,13 +72,11 @@ export class GlossaryService {
       .join('\n');
   }
 
-  async list(params: {
+  private listWhere(params: {
     query?: string;
     entityType?: GlossaryEntityType;
-    take?: number;
-    skip?: number;
-  }) {
-    const where: Prisma.GlossaryTermWhereInput = {
+  }): Prisma.GlossaryTermWhereInput {
+    return {
       ...(params.entityType ? { entityType: params.entityType } : {}),
       ...(params.query
         ? {
@@ -90,6 +88,15 @@ export class GlossaryService {
           }
         : {}),
     };
+  }
+
+  async list(params: {
+    query?: string;
+    entityType?: GlossaryEntityType;
+    take?: number;
+    skip?: number;
+  }) {
+    const where = this.listWhere(params);
     const [terms, total] = await Promise.all([
       this.prisma.glossaryTerm.findMany({
         where,
@@ -332,6 +339,60 @@ export class GlossaryService {
       },
     });
     return this.toDto(updated);
+  }
+
+  /**
+   * Operator-only batch edit over a selection of terms: flip verification
+   * and/or retype them. Neither touches the embedded text (term, aliases,
+   * notes), so no re-embedding is needed.
+   */
+  async bulkUpdate(input: {
+    ids?: string[];
+    filters?: { query?: string; entityType?: GlossaryEntityType };
+    verified?: boolean;
+    entityType?: GlossaryEntityType;
+    verifiedBy?: string;
+  }): Promise<{ updatedCount: number; ids: string[] }> {
+    const hasIds = Boolean(input.ids?.length);
+    const hasFilters = input.filters !== undefined;
+    if (hasIds === hasFilters) {
+      throw new BadRequestException(
+        'Provide either glossary term ids or filters, but not both.',
+      );
+    }
+    if (input.verified === undefined && !input.entityType) {
+      throw new BadRequestException(
+        'Provide a verification change and/or a new entity type.',
+      );
+    }
+
+    const where: Prisma.GlossaryTermWhereInput = hasIds
+      ? { id: { in: input.ids } }
+      : this.listWhere(input.filters ?? {});
+    const selected = await this.prisma.glossaryTerm.findMany({
+      where,
+      select: { id: true },
+    });
+    if (selected.length === 0) return { updatedCount: 0, ids: [] };
+    const ids = selected.map((term) => term.id);
+
+    const data: Prisma.GlossaryTermUpdateManyMutationInput = {
+      ...(input.entityType ? { entityType: input.entityType } : {}),
+      ...(input.verified === true
+        ? {
+            verifiedAt: new Date(),
+            verifiedBy: input.verifiedBy ?? 'operator',
+          }
+        : {}),
+      ...(input.verified === false
+        ? { verifiedAt: null, verifiedBy: null }
+        : {}),
+    };
+    const updated = await this.prisma.glossaryTerm.updateMany({
+      where: { id: { in: ids } },
+      data,
+    });
+    return { updatedCount: updated.count, ids };
   }
 
   async remove(id: string) {

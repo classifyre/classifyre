@@ -10,6 +10,7 @@ import {
   useState,
 } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { formatDate, formatRelative, formatShortUTC } from "@/lib/date";
 import {
   ArrowDown,
@@ -74,7 +75,10 @@ import {
 import { getSourceLabel } from "@workspace/schemas/source-labels";
 import { getSourceIcon } from "../lib/source-type-icon";
 import { RunnerStatusBadge } from "./runner-status-badge";
-import { isRunnerStatusRunning } from "@/lib/runner-status-badge";
+import {
+  isRunnerStatusPending,
+  isRunnerStatusRunning,
+} from "@/lib/runner-status-badge";
 import { mergeRunnerIntoSearchSourceItem } from "@/lib/runner-ws-merge";
 import { DeleteSourceAction } from "./delete-source-action";
 import { useUrlParams } from "../lib/url-filters";
@@ -299,6 +303,7 @@ export function SourcesTable({ onTotalsChange }: SourcesTableProps) {
   >(() => new Map());
   const [isAllSelected, setIsAllSelected] = useState(false);
   const [bulkDialogOpen, setBulkDialogOpen] = useState(false);
+  const [isRunningSelection, setIsRunningSelection] = useState(false);
 
   const applyRunnerWsEvent = useCallback((runner: RunnerDto) => {
     setData((prev) => {
@@ -510,6 +515,44 @@ export function SourcesTable({ onTotalsChange }: SourcesTableProps) {
     }
   };
 
+  const handleRunSelected = async () => {
+    if (!selection) return;
+    try {
+      setIsRunningSelection(true);
+      setError(null);
+      const response = await api.sources.sourcesControllerBulkRunSources({
+        bulkRunSourcesDto:
+          selection.type === "ids"
+            ? { ids: selection.sources.map((source) => source.id) }
+            : { filters: selection.filters },
+      });
+      toast.success(
+        t("sources.bulkRun.started", {
+          count: response.startedCount.toLocaleString(),
+        }),
+      );
+      if (response.skipped.length > 0) {
+        toast.warning(
+          t("sources.bulkRun.skipped", {
+            count: response.skipped.length.toLocaleString(),
+          }),
+          { description: response.skipped[0]?.reason },
+        );
+      }
+      clearSelection();
+      setRefreshCount((count) => count + 1);
+    } catch (runError) {
+      console.error("Failed to start scans:", runError);
+      setError(
+        runError instanceof Error
+          ? runError.message
+          : t("sources.bulkRun.failed"),
+      );
+    } finally {
+      setIsRunningSelection(false);
+    }
+  };
+
   const handleStopRunner = async (sourceId: string, runnerId?: string) => {
     if (!runnerId) return;
     try {
@@ -632,8 +675,22 @@ export function SourcesTable({ onTotalsChange }: SourcesTableProps) {
           </span>
           <Button
             size="sm"
+            variant="outline"
+            disabled={isRunningSelection}
+            onClick={handleRunSelected}
+            className="ml-auto rounded-[4px] border-2 border-border font-mono text-xs font-bold uppercase tracking-[0.08em]"
+          >
+            {isRunningSelection ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Play className="h-3.5 w-3.5" />
+            )}
+            {t("sources.bulkRun.runAll")}
+          </Button>
+          <Button
+            size="sm"
             onClick={() => setBulkDialogOpen(true)}
-            className="ml-auto rounded-[4px] border-0 bg-accent font-mono text-xs font-bold uppercase tracking-[0.08em] text-accent-foreground hover:bg-accent/90"
+            className="rounded-[4px] border-0 bg-accent font-mono text-xs font-bold uppercase tracking-[0.08em] text-accent-foreground hover:bg-accent/90"
           >
             {selectionCount === 1
               ? t("sources.bulkUpdate.updateSource", {
@@ -747,7 +804,12 @@ export function SourcesTable({ onTotalsChange }: SourcesTableProps) {
               <TableBody>
                 {items.map((source) => {
                   const runner = source.latestRunner;
-                  const isRunning = isRunnerStatusRunning(source.runnerStatus);
+                  // A queued run reports PENDING on both the source and its
+                  // runner; a source that never ran is PENDING without one.
+                  const isInFlight =
+                    isRunnerStatusRunning(source.runnerStatus) ||
+                    (isRunnerStatusPending(source.runnerStatus) &&
+                      isRunnerStatusPending(runner?.status));
                   const isRowActionPending =
                     activeAction?.sourceId === source.id;
                   const isStopping =
@@ -1002,7 +1064,7 @@ export function SourcesTable({ onTotalsChange }: SourcesTableProps) {
                       {/* Actions */}
                       <TableCell className="py-3">
                         <div className="flex items-center justify-end gap-2">
-                          {isRunning ? (
+                          {isInFlight ? (
                             <>
                               <Button
                                 size="sm"

@@ -9,6 +9,7 @@ describe('GlossaryService', () => {
       count: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
+      updateMany: jest.fn(),
       delete: jest.fn(),
     },
     glossaryReference: { createMany: jest.fn() },
@@ -222,6 +223,58 @@ describe('GlossaryService', () => {
     await expect(
       service.upsert({ term: baseTerm.term, origin: 'AGENT' }),
     ).rejects.toThrow('was deleted by an operator');
+  });
+
+  it('bulk update unverifies the selected ids and retypes them in one pass', async () => {
+    prisma.glossaryTerm.findMany.mockResolvedValue([{ id: baseTerm.id }]);
+    prisma.glossaryTerm.updateMany.mockResolvedValue({ count: 1 });
+
+    const result = await service.bulkUpdate({
+      ids: [baseTerm.id],
+      verified: false,
+      entityType: 'PERSON' as never,
+    });
+
+    expect(prisma.glossaryTerm.updateMany).toHaveBeenCalledWith({
+      where: { id: { in: [baseTerm.id] } },
+      data: { entityType: 'PERSON', verifiedAt: null, verifiedBy: null },
+    });
+    expect(result).toEqual({ updatedCount: 1, ids: [baseTerm.id] });
+  });
+
+  it('bulk update resolves the filter snapshot and stamps the verifier', async () => {
+    prisma.glossaryTerm.findMany.mockResolvedValue([{ id: baseTerm.id }]);
+    prisma.glossaryTerm.updateMany.mockResolvedValue({ count: 1 });
+
+    await service.bulkUpdate({
+      filters: { query: 'james', entityType: 'LOCATION' as never },
+      verified: true,
+    });
+
+    expect(prisma.glossaryTerm.findMany).toHaveBeenCalledWith({
+      where: {
+        entityType: 'LOCATION',
+        OR: [
+          { term: { contains: 'james', mode: 'insensitive' } },
+          { aliases: { has: 'james' } },
+          { notes: { contains: 'james', mode: 'insensitive' } },
+        ],
+      },
+      select: { id: true },
+    });
+    const data = prisma.glossaryTerm.updateMany.mock.calls[0][0].data;
+    expect(data.verifiedBy).toBe('operator');
+    expect(data.verifiedAt).toBeInstanceOf(Date);
+  });
+
+  it('bulk update rejects a call with no change and a call with both selections', async () => {
+    await expect(service.bulkUpdate({ ids: [baseTerm.id] })).rejects.toThrow(
+      /verification change/,
+    );
+    await expect(
+      service.bulkUpdate({ ids: [baseTerm.id], filters: {}, verified: true }),
+    ).rejects.toThrow(/ids or filters/);
+    expect(prisma.glossaryTerm.updateMany).not.toHaveBeenCalled();
   });
 
   it('uses case-insensitive SQL alias matches for lexical lookup', async () => {

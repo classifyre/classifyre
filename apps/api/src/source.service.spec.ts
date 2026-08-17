@@ -262,6 +262,57 @@ describe('SourceService', () => {
     expect(prisma.source.delete).not.toHaveBeenCalled();
   });
 
+  describe('searchSources', () => {
+    it('reports a queued run as PENDING even though the source is claimed as RUNNING', async () => {
+      const runner = {
+        id: 'runner-1',
+        status: 'PENDING',
+        startedAt: null,
+        completedAt: null,
+        durationMs: null,
+        assetsCreated: 0,
+        assetsUpdated: 0,
+        assetsUnchanged: 0,
+        assetsDeleted: 0,
+        totalFindings: 0,
+        errorMessage: null,
+        triggeredAt: new Date(),
+      };
+      const { service } = createService({
+        source: {
+          findMany: jest.fn().mockResolvedValue([
+            {
+              id: 'src-1',
+              name: 'Queued source',
+              description: null,
+              type: 'WORDPRESS',
+              runnerStatus: 'RUNNING',
+              runners: [runner],
+              createdAt: new Date(),
+              updatedAt: new Date(),
+              scheduleEnabled: false,
+              scheduleCron: null,
+              scheduleTimezone: null,
+              scheduleNextAt: null,
+              scheduleMode: 'OFF',
+              autoPhase: null,
+              autoReason: null,
+            },
+          ]),
+          count: jest.fn().mockResolvedValue(1),
+          groupBy: jest
+            .fn()
+            .mockResolvedValue([{ runnerStatus: 'RUNNING', _count: { id: 1 } }]),
+        },
+      });
+
+      const response = await service.searchSources({});
+
+      expect(response.items[0].runnerStatus).toBe('PENDING');
+      expect(response.items[0].latestRunner?.status).toBe('PENDING');
+    });
+  });
+
   describe('purgeFindings', () => {
     it('deletes every finding of the source and schedules a correlation recompute', async () => {
       const deleteMany = jest.fn().mockResolvedValue({ count: 42 });
