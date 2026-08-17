@@ -15,6 +15,8 @@
 
 import * as runtime from '../runtime';
 import type {
+  BulkUpdateGlossaryTermsDto,
+  BulkUpdateGlossaryTermsResponseDto,
   DeleteGlossaryTermResponseDto,
   GlossaryListResponseDto,
   GlossaryLookupHitDto,
@@ -24,6 +26,10 @@ import type {
   VerifyGlossaryTermDto,
 } from '../models/index';
 import {
+    BulkUpdateGlossaryTermsDtoFromJSON,
+    BulkUpdateGlossaryTermsDtoToJSON,
+    BulkUpdateGlossaryTermsResponseDtoFromJSON,
+    BulkUpdateGlossaryTermsResponseDtoToJSON,
     DeleteGlossaryTermResponseDtoFromJSON,
     DeleteGlossaryTermResponseDtoToJSON,
     GlossaryListResponseDtoFromJSON,
@@ -39,6 +45,10 @@ import {
     VerifyGlossaryTermDtoFromJSON,
     VerifyGlossaryTermDtoToJSON,
 } from '../models/index';
+
+export interface GlossaryControllerBulkUpdateRequest {
+    bulkUpdateGlossaryTermsDto: BulkUpdateGlossaryTermsDto;
+}
 
 export interface GlossaryControllerListRequest {
     query?: string;
@@ -69,6 +79,45 @@ export interface GlossaryControllerVerifyRequest {
  * 
  */
 export class GlossaryApi extends runtime.BaseAPI {
+
+    /**
+     * Bulk verify/unverify or retype glossary terms (operator)
+     */
+    async glossaryControllerBulkUpdateRaw(requestParameters: GlossaryControllerBulkUpdateRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<BulkUpdateGlossaryTermsResponseDto>> {
+        if (requestParameters['bulkUpdateGlossaryTermsDto'] == null) {
+            throw new runtime.RequiredError(
+                'bulkUpdateGlossaryTermsDto',
+                'Required parameter "bulkUpdateGlossaryTermsDto" was null or undefined when calling glossaryControllerBulkUpdate().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/glossary/bulk`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+            body: BulkUpdateGlossaryTermsDtoToJSON(requestParameters['bulkUpdateGlossaryTermsDto']),
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => BulkUpdateGlossaryTermsResponseDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Bulk verify/unverify or retype glossary terms (operator)
+     */
+    async glossaryControllerBulkUpdate(requestParameters: GlossaryControllerBulkUpdateRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<BulkUpdateGlossaryTermsResponseDto> {
+        const response = await this.glossaryControllerBulkUpdateRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
 
     /**
      * List glossary terms
