@@ -409,3 +409,167 @@ describe('AutopilotWorker readiness and batch consumption', () => {
     });
   });
 });
+
+/**
+ * The heartbeat, and why it has to exist.
+ *
+ * A completed scan is otherwise the only thing that enqueues a cycle, so the
+ * per-agent policy is only ever consulted while the corpus is being scanned.
+ * That makes the staleness backstop — advertised as the liveness guarantee for
+ * a gated agent — unreachable on a corpus that has gone quiet: it is evaluated
+ * inside a cycle, and there are no cycles.
+ *
+ * The absurdity worth naming is that this bites the SETTLED agents hardest.
+ * They are told to wait for a quiet corpus, and a quiet corpus is exactly the
+ * state in which nothing was left to wake them.
+ */
+describe('AutopilotWorker heartbeat', () => {
+  const build = (over: {
+    dirty?: Array<{ id: string; name: string; autopilotDirtyAt: Date }>;
+    lastTriggered?: Date | null;
+    maxStalenessHours?: number;
+  }) => {
+    const runAgent = jest.fn().mockResolvedValue(undefined);
+    const worker = new AutopilotWorker(
+      {
+        instanceSettings: {
+          findUnique: jest.fn().mockResolvedValue({
+            harnessAiProviderConfigId: 'p1',
+            autopilotInquiryEnabled: true,
+            autopilotCaseEnabled: false,
+            autopilotConfigEnabled: false,
+            autopilotDetectorEnabled: false,
+            autopilotEscalationEnabled: false,
+            harnessCycleBudgetMinutes: 30,
+            harnessEvidenceWarnCoverage: 0.8,
+            harnessEvidenceUsableFindings: 2000,
+            harnessEvidenceUsableCoverage: 0.25,
+          }),
+        },
+        source: {
+          findMany: jest.fn().mockResolvedValue(over.dirty ?? []),
+          updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+        },
+        runner: { count: jest.fn().mockResolvedValue(0) },
+      } as never,
+      {
+        getBossAsync: jest.fn().mockResolvedValue({
+          getQueueStats: jest.fn().mockResolvedValue({
+            queuedCount: 0,
+            activeCount: 0,
+            deferredCount: 0,
+          }),
+        }),
+      } as never,
+      { recordSkippedRun: jest.fn() } as never,
+      {} as never,
+      {
+        sourceName: jest.fn().mockResolvedValue('a source'),
+        evidenceCoverage: jest.fn().mockResolvedValue({ open: 0, analyzed: 0 }),
+        unmonitoredFindings: jest.fn().mockResolvedValue({ total: 0 }),
+        detectionYield: jest.fn().mockResolvedValue({ blind: false }),
+      } as never,
+      {} as never,
+      { status: jest.fn().mockResolvedValue({ pendingEmbedJobs: 0 }) } as never,
+      {
+        resolvePolicy: jest.fn().mockResolvedValue({
+          triggerMode: 'SETTLED',
+          waitForMatching: false,
+          waitForEvidence: false,
+          waitForScans: false,
+          minIntervalMinutes: 0,
+          maxStalenessHours: over.maxStalenessHours ?? 24,
+        }),
+        lastTriggeredAt: jest
+          .fn()
+          .mockResolvedValue(
+            over.lastTriggered === undefined ? null : over.lastTriggered,
+          ),
+        markTriggered: jest.fn().mockResolvedValue(undefined),
+        runBudgetMinutes: jest.fn().mockResolvedValue(null),
+      } as never,
+    );
+    (worker as unknown as { runAgent: unknown }).runAgent = runAgent;
+    return { worker, runAgent };
+  };
+
+  const beat = (worker: AutopilotWorker, heartbeat = true) =>
+    (
+      worker as unknown as {
+        runCycle: (c: Record<string, unknown>) => Promise<void>;
+      }
+    ).runCycle({
+      sourceId: null,
+      runnerId: null,
+      corpus: true,
+      heartbeat,
+      cycleKey: 'corpus:beat',
+      trigger: 'heartbeat',
+      manual: false,
+      instruction: null,
+    });
+
+  it('runs an agent past its backstop even though no scan has happened', async () => {
+    // The whole point: no dirty sources, nothing to react to, and the agent
+    // still has to run because it has been too long since anyone looked.
+    const h = build({ dirty: [], lastTriggered: null });
+
+    await beat(h.worker);
+
+    expect(h.runAgent).toHaveBeenCalled();
+  });
+
+  it('does nothing when no agent is overdue', async () => {
+    // A quiet instance must stay quiet. A heartbeat that ran the pipeline every
+    // tick would be a second cadence, which is what this design removes.
+    const h = build({
+      dirty: [],
+      lastTriggered: new Date(Date.now() - 60_000),
+    });
+
+    await beat(h.worker);
+
+    expect(h.runAgent).not.toHaveBeenCalled();
+  });
+
+  it('respects a disabled backstop rather than running anyway', async () => {
+    const h = build({
+      dirty: [],
+      lastTriggered: null,
+      maxStalenessHours: 0,
+    });
+
+    await beat(h.worker);
+
+    expect(h.runAgent).not.toHaveBeenCalled();
+  });
+
+  it('leaves the ordinary empty-batch cycle short-circuiting as before', async () => {
+    // Only a heartbeat may bypass the empty-batch return; a scan-triggered
+    // corpus job that outlived its batch must still do nothing.
+    const h = build({ dirty: [], lastTriggered: null });
+
+    await beat(h.worker, false);
+
+    expect(h.runAgent).not.toHaveBeenCalled();
+  });
+
+  it('picks up sources a previous cycle deferred and left dirty', async () => {
+    // The second stranding case: agents deferred, their sources kept dirty for
+    // "the next cycle", and no next cycle ever arrived because scanning stopped.
+    const h = build({
+      dirty: [
+        {
+          id: 's1',
+          name: 'A',
+          autopilotDirtyAt: new Date('2026-08-17T10:00:00Z'),
+        },
+      ],
+      lastTriggered: new Date(),
+    });
+
+    await beat(h.worker);
+
+    expect(h.runAgent).toHaveBeenCalled();
+  });
+});

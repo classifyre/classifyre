@@ -79,6 +79,21 @@ clears — for example an inquiry-matching queue that is continuously refilled b
 new scans. Leave it set unless you specifically want that agent to be able to
 wait forever.
 
+### The heartbeat
+
+A finished scan is what normally wakes the harness, so on a corpus that has
+stopped being scanned there would be no cycle in which to notice that an agent
+is overdue. A heartbeat runs every 15 minutes and covers exactly that:
+
+- if sources are waiting from a cycle that deferred them, it runs the ordinary
+  cycle;
+- otherwise it runs **only** the agents whose backstop has expired;
+- if neither applies it does nothing — a quiet instance stays quiet.
+
+This is what makes "Run anyway after" mean what it says. It matters most for
+`When the corpus is settled`, which would otherwise be waiting for a state in
+which nothing was left to wake it.
+
 ---
 
 ## Defaults
@@ -184,7 +199,8 @@ Two things that will get an agent moving immediately:
   guardrails.
 - **Lower "Run anyway after".** The backstop overrides the gates, so setting it
   short forces the run without changing what the agent waits for the rest of
-  the time.
+  the time. The heartbeat picks it up within 15 minutes even if nothing is
+  being scanned.
 
 ---
 
