@@ -250,6 +250,24 @@ export class CorrelationWorker {
     sourceId: string,
     runnerId: string,
   ): Promise<{ reason: string; agentKinds?: AgentKind[] } | null> {
+    // The bar for "important enough to bypass the batch" is an operator dial:
+    // what counts as urgent depends on the corpus, and a fixed 0.75 was either
+    // deafening or silent depending on how the analyzer scored that workspace.
+    // Advisory: a fresh workspace has no settings row yet, and failing the
+    // whole hand-off because a threshold could not be read would lose the
+    // cycle entirely over a number that has a perfectly good default.
+    let expressImportance = EXPRESS_IMPORTANCE_SCORE;
+    try {
+      const settings = await this.prisma.instanceSettings.findUnique({
+        where: { id: 1 },
+        select: { harnessExpressImportance: true },
+      });
+      expressImportance =
+        settings?.harnessExpressImportance ?? EXPRESS_IMPORTANCE_SCORE;
+    } catch {
+      // Keep the shipped default.
+    }
+
     // 1. Operational failure. Routed to CONFIG + notification, deliberately NOT
     //    to the investigation agents: a source that will not scan is an
     //    operator problem, and 60 of the first run's 82 scans errored while the
@@ -315,7 +333,7 @@ export class CorrelationWorker {
       where: {
         runnerId,
         status: 'OPEN',
-        importanceScore: { gte: EXPRESS_IMPORTANCE_SCORE },
+        importanceScore: { gte: expressImportance },
       },
       orderBy: { importanceScore: 'desc' },
       select: { id: true, importanceScore: true },

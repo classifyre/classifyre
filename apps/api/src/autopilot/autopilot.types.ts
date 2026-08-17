@@ -33,8 +33,6 @@ export interface AutopilotJob {
   corpus?: boolean;
   /** Why an express cycle skipped the coalescing window. */
   expressReason?: string;
-  /** How many times the readiness gate has already pushed this cycle back. */
-  readinessAttempts?: number;
 }
 
 /** Aggregated view of one group of new findings (token-bounded). */

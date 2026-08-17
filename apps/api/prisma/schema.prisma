@@ -87,11 +87,10 @@ model Source {
 
 /**
  * Which scheduler owns a source.
- *
  * OFF   — nothing runs it automatically.
  * CRON  — a fixed pg-boss cron schedule (the operator picked a wall-clock time).
  * AUTO  — the adaptive scheduler: run back-to-back while there is still data to
- *         ingest, then settle into a slow "check only what's new" cadence.
+ * ingest, then settle into a slow "check only what's new" cadence.
  */
 enum SourceScheduleMode {
   OFF
@@ -99,15 +98,25 @@ enum SourceScheduleMode {
   AUTO
 }
 
-/** AUTO-mode phase. See AutoScheduleService for the transitions. */
+/**
+ * AUTO-mode phase. See AutoScheduleService for the transitions.
+ */
 enum AutoSchedulePhase {
-  /** The last run ingested new data — there is more to sweep, go again soon. */
+  /**
+   * The last run ingested new data — there is more to sweep, go again soon.
+   */
   CATCH_UP
-  /** The sweep converged — re-check on a slow, self-widening interval. */
+  /**
+   * The sweep converged — re-check on a slow, self-widening interval.
+   */
   STEADY
-  /** The last run failed — exponential backoff, capped. */
+  /**
+   * The last run failed — exponential backoff, capped.
+   */
   BACKOFF
-  /** Too many consecutive failures: auto runs stopped until an operator acts. */
+  /**
+   * Too many consecutive failures: auto runs stopped until an operator acts.
+   */
   PAUSED
 }
 
@@ -241,7 +250,7 @@ model Finding {
   // instead of a full join+sort across the whole findings/evidence tables.
   // Defaults to 0 so a finding with no evidence analysis yet sorts last under a
   // plain DESC order (no NULLS-ordering needed, so the @@index matches the DB).
-  importanceScore    Float        @default(0) @map("importance_score")
+  importanceScore Float @default(0) @map("importance_score")
 
   status           FindingStatus @default(OPEN)
   resolutionReason String?       @map("resolution_reason") @db.Text
@@ -563,36 +572,36 @@ model CustomDetectorTestResult {
 }
 
 model Runner {
-  id                String               @id @default(uuid())
-  sourceId          String               @map("source_id")
-  triggeredAt       DateTime             @default(now()) @map("triggered_at")
-  triggeredBy       String?              @map("triggered_by")
-  triggerType       TriggerType          @default(MANUAL) @map("trigger_type")
-  executionMode     RunnerExecutionMode? @map("execution_mode")
-  status            RunnerStatus         @default(PENDING)
-  startedAt         DateTime?            @map("started_at")
-  completedAt       DateTime?            @map("completed_at")
-  durationMs        Int?                 @map("duration_ms")
-  assetsCreated     Int                  @default(0) @map("assets_created")
-  assetsUpdated     Int                  @default(0) @map("assets_updated")
+  id                   String               @id @default(uuid())
+  sourceId             String               @map("source_id")
+  triggeredAt          DateTime             @default(now()) @map("triggered_at")
+  triggeredBy          String?              @map("triggered_by")
+  triggerType          TriggerType          @default(MANUAL) @map("trigger_type")
+  executionMode        RunnerExecutionMode? @map("execution_mode")
+  status               RunnerStatus         @default(PENDING)
+  startedAt            DateTime?            @map("started_at")
+  completedAt          DateTime?            @map("completed_at")
+  durationMs           Int?                 @map("duration_ms")
+  assetsCreated        Int                  @default(0) @map("assets_created")
+  assetsUpdated        Int                  @default(0) @map("assets_updated")
   // Findings currently associated with this run: every finding it created,
   // re-detected, or resolved. NOT a count of new discoveries — after
   // reconciliation it is closer to "the source's open set as of this run".
   // Use findingsCreated for "what did this run actually find that was new".
-  totalFindings     Int                  @default(0) @map("total_findings")
+  totalFindings        Int                  @default(0) @map("total_findings")
   // Findings first seen by this run. Accumulated as batches land, so it is a
   // true creation count rather than a post-reconciliation snapshot.
-  findingsCreated   Int                  @default(0) @map("findings_created")
-  findingsResolved  Int                  @default(0) @map("findings_resolved")
-  findingsRetained  Int                  @default(0) @map("findings_retained")
+  findingsCreated      Int                  @default(0) @map("findings_created")
+  findingsResolved     Int                  @default(0) @map("findings_resolved")
+  findingsRetained     Int                  @default(0) @map("findings_retained")
   // Assets that should have carried text but yielded none — mostly OCR and
   // transcription returning empty. Not errors: nothing failed, the content was
   // simply never read. Tracked because a run can otherwise report complete
   // success while silently covering none of the asset's actual content.
-  assetsWithoutText Int                  @default(0) @map("assets_without_text")
+  assetsWithoutText    Int                  @default(0) @map("assets_without_text")
   // Aggregate of runner_assets.text_extraction_status. Kept as JSON so new
   // coverage states can be added without widening the runner table again.
-  textCoverage      Json?                @map("text_coverage") @db.JsonB
+  textCoverage         Json?                @map("text_coverage") @db.JsonB
   // The source's AUTOMATIC sampling cursor as it stood when this run finished.
   //
   // Snapshotted so the adaptive scheduler can tell "the sweep moved through new
@@ -600,36 +609,36 @@ model Runner {
   // signal that distinguishes them, and the one whose absence stopped a sweep
   // at 900 of 9600 objects. Opaque and source-defined; compared for equality
   // only, never interpreted.
-  samplingCursor    Json?                @map("sampling_cursor") @db.JsonB
-  errorMessage      String?              @map("error_message")
-  errorDetails      Json?                @map("error_details")
-  jobName           String?              @map("job_name")
-  jobNamespace      String?              @map("job_namespace")
-  assetsUnchanged   Int                  @default(0) @map("assets_unchanged")
-  assetsDeleted     Int                  @default(0) @map("assets_deleted")
+  samplingCursor       Json?                @map("sampling_cursor") @db.JsonB
+  errorMessage         String?              @map("error_message")
+  errorDetails         Json?                @map("error_details")
+  jobName              String?              @map("job_name")
+  jobNamespace         String?              @map("job_namespace")
+  assetsUnchanged      Int                  @default(0) @map("assets_unchanged")
+  assetsDeleted        Int                  @default(0) @map("assets_deleted")
   // Assets retained despite being absent from this run because the source's
   // scope moved since they were ingested. They are NOT deleted and their
   // findings stay OPEN — see AssetService.finalizeIngestRun.
-  assetsOutOfScope  Int                  @default(0) @map("assets_out_of_scope")
+  assetsOutOfScope     Int                  @default(0) @map("assets_out_of_scope")
   // Assets this run skipped entirely because their content and every applicable
   // detector configuration were unchanged since their last completed scan. Their
   // findings were carried forward, not re-detected.
-  assetsSkippedCached Int                @default(0) @map("assets_skipped_cached")
+  assetsSkippedCached  Int                  @default(0) @map("assets_skipped_cached")
   // Individual detector runs avoided across all assets, including the partial
   // skips on assets where only some detectors had to re-run. This is the number
   // that shows what the cache is actually worth.
-  detectorRunsSkipped Int                @default(0) @map("detector_runs_skipped")
+  detectorRunsSkipped  Int                  @default(0) @map("detector_runs_skipped")
   // Fingerprint of the scope-determining config this run covered.
-  scopeFingerprint  String?              @map("scope_fingerprint") @db.VarChar(64)
+  scopeFingerprint     String?              @map("scope_fingerprint") @db.VarChar(64)
   // Fingerprint of the DETECTION-determining config (detectors, custom
   // detectors, sampling) this run covered. Lets the autopilot answer "has what
   // we look for changed since I last re-scanned this source?" — the difference
   // between a legitimate verification re-scan and a runaway loop.
-  detectionFingerprint String?           @map("detection_fingerprint") @db.VarChar(64)
-  assets            Asset[]
-  runnerAssets      RunnerAsset[]
-  source            Source               @relation(fields: [sourceId], references: [id], onDelete: Cascade)
-  notifications     Notification[]
+  detectionFingerprint String?              @map("detection_fingerprint") @db.VarChar(64)
+  assets               Asset[]
+  runnerAssets         RunnerAsset[]
+  source               Source               @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  notifications        Notification[]
 
   @@index([sourceId])
   @@index([executionMode])
@@ -716,36 +725,69 @@ model Notification {
 }
 
 model InstanceSettings {
-  id                 Int                @id @default(1)
-  mcpEnabled         Boolean            @default(true) @map("mcp_enabled")
-  language           InstanceLanguage   @default(AUTOMATIC)
-  timezone           String             @default("AUTOMATIC")
-  timeFormat         InstanceTimeFormat @default(AUTOMATIC) @map("time_format")
-  aiProviderConfigId String?            @map("ai_provider_config_id")
-  harnessAiProviderConfigId String?     @map("harness_ai_provider_config_id")
+  id                        Int                @id @default(1)
+  mcpEnabled                Boolean            @default(true) @map("mcp_enabled")
+  language                  InstanceLanguage   @default(AUTOMATIC)
+  timezone                  String             @default("AUTOMATIC")
+  timeFormat                InstanceTimeFormat @default(AUTOMATIC) @map("time_format")
+  aiProviderConfigId        String?            @map("ai_provider_config_id")
+  harnessAiProviderConfigId String?            @map("harness_ai_provider_config_id")
 
   hfTokenEnc String? @map("hf_token_enc")
 
   // Investigation autopilot — instance-wide defaults. Per-entity aiMode on
   // Inquiry/Case overrides these when not INHERIT.
-  autopilotInquiryEnabled     Boolean @default(true) @map("autopilot_inquiry_enabled")
-  autopilotInquiryDesired     String? @map("autopilot_inquiry_desired") @db.Text
-  autopilotInquirySearchable  String? @map("autopilot_inquiry_searchable") @db.Text
-  autopilotCaseEnabled        Boolean @default(true) @map("autopilot_case_enabled")
-  autopilotCaseGuidance       String? @map("autopilot_case_guidance") @db.Text
+  // Per-agent prompt steering lives on AgentConfig.goal, not here: the
+  // *Guidance/*Desired/*Searchable columns that used to sit alongside these
+  // flags were written by the settings API and read by nothing, so they were
+  // dropped rather than left to look configurable.
+  autopilotInquiryEnabled    Boolean @default(true) @map("autopilot_inquiry_enabled")
+  autopilotCaseEnabled       Boolean @default(true) @map("autopilot_case_enabled")
   // Config-tuning agent: may change editable source config (detectors,
   // sampling, optional, resources) — never base connection.
-  autopilotConfigEnabled      Boolean @default(true) @map("autopilot_config_enabled")
-  autopilotConfigGuidance     String? @map("autopilot_config_guidance") @db.Text
+  autopilotConfigEnabled     Boolean @default(true) @map("autopilot_config_enabled")
   // Detector-authoring agent: may create/train custom detectors.
-  autopilotDetectorEnabled    Boolean @default(true) @map("autopilot_detector_enabled")
-  autopilotDetectorGuidance   String? @map("autopilot_detector_guidance") @db.Text
+  autopilotDetectorEnabled   Boolean @default(true) @map("autopilot_detector_enabled")
   // Escalation agent: reviews open cases and raises operator notifications for
   // high-severity ones so the harness can run unattended.
-  autopilotEscalationEnabled  Boolean @default(true) @map("autopilot_escalation_enabled")
-  autopilotEscalationGuidance String? @map("autopilot_escalation_guidance") @db.Text
+  autopilotEscalationEnabled Boolean @default(true) @map("autopilot_escalation_enabled")
   // Allow the harness to call tools from connected external MCP servers.
-  autopilotMcpEnabled         Boolean @default(true) @map("autopilot_mcp_enabled")
+  autopilotMcpEnabled        Boolean @default(true) @map("autopilot_mcp_enabled")
+
+  // Harness limits, promoted from hardcoded constants so an operator can size
+  // them to their corpus. Defaults are the values those constants held, so an
+  // upgraded instance behaves exactly as before.
+  //
+  // A run holds one of the instance's namespace job slots, so a wedged run
+  // does not fail alone — it stalls every queue behind it. The budget is the
+  // per-run ceiling; stale-after is when a RUNNING row is presumed dead and
+  // reaped ("Run exceeded its maximum lifetime").
+  harnessRunBudgetMinutes       Int   @default(20) @map("harness_run_budget_minutes")
+  harnessRunStaleAfterMinutes   Int   @default(60) @map("harness_run_stale_after_minutes")
+  harnessCycleBudgetMinutes     Int   @default(30) @map("harness_cycle_budget_minutes")
+  // Below BOTH of these, findings.ranked is mostly zeros and the triage
+  // doctrine has nothing to stand on, so gated agents wait. The absolute floor
+  // is the honest question; the ratio is the fallback for small corpora.
+  harnessEvidenceUsableFindings Int   @default(2000) @map("harness_evidence_usable_findings")
+  harnessEvidenceUsableCoverage Float @default(0.25) @map("harness_evidence_usable_coverage")
+  // Above this coverage the missions are no longer warned that scores are
+  // partial. Distinct from the gate above: this shapes the prompt, not the run.
+  harnessEvidenceWarnCoverage   Float @default(0.8) @map("harness_evidence_warn_coverage")
+  // Importance at or above which a single finding earns an express cycle.
+  harnessExpressImportance      Float @default(0.75) @map("harness_express_importance")
+  // Transcript guards. The ReAct transcript is quadratic by construction —
+  // every iteration appends its tool results and resends the whole thing — so
+  // these bound one observation and one turn's worth of them. Characters, not
+  // tokens: the ratio is stable enough and a tokenizer per provider would be
+  // a lot of machinery for a budget that only has to be approximately right.
+  harnessObservationChars       Int   @default(8000) @map("harness_observation_chars")
+  harnessTurnObservationChars   Int   @default(24000) @map("harness_turn_observation_chars")
+  // How much of the corpus each run is shown.
+  harnessMaxRankedFindings      Int   @default(25) @map("harness_max_ranked_findings")
+  harnessMaxGlossaryEntries     Int   @default(20) @map("harness_max_glossary_entries")
+  harnessMaxRecalledMemories    Int   @default(30) @map("harness_max_recalled_memories")
+  // How often the DREAM agent consolidates memory, in days.
+  harnessDreamIntervalDays      Int   @default(2) @map("harness_dream_interval_days")
 
   // Master switch for the adaptive scheduler. Sources stay in AUTO mode when
   // this is off; the tick simply starts nothing, so flipping it back on resumes
@@ -785,7 +827,7 @@ model AiProviderConfig {
 
   assistantInstanceSettings InstanceSettings[] @relation("AssistantAiProvider")
   harnessInstanceSettings   InstanceSettings[] @relation("HarnessAiProvider")
-  customDetectors  CustomDetector[]
+  customDetectors           CustomDetector[]
 
   @@map("ai_provider_config")
 }
@@ -1285,22 +1327,22 @@ enum CaseLeadStatus {
 }
 
 model CaseLead {
-  id        String         @id @default(uuid())
-  caseId    String         @map("case_id")
-  findingId String         @map("finding_id")
-  assetId   String?        @map("asset_id")
-  origin    CaseLeadOrigin
-  status    CaseLeadStatus @default(PROPOSED)
-  rationale String         @db.Text
+  id         String         @id @default(uuid())
+  caseId     String         @map("case_id")
+  findingId  String         @map("finding_id")
+  assetId    String?        @map("asset_id")
+  origin     CaseLeadOrigin
+  status     CaseLeadStatus @default(PROPOSED)
+  rationale  String         @db.Text
   // Snapshots at proposal time (findings may be reconciled later).
   title      String
   importance Float?
   similarity Float?
-  proposedBy String    @map("proposed_by")
-  reviewedBy String?   @map("reviewed_by")
-  reviewedAt DateTime? @map("reviewed_at")
-  createdAt  DateTime  @default(now()) @map("created_at")
-  updatedAt  DateTime  @updatedAt @map("updated_at")
+  proposedBy String         @map("proposed_by")
+  reviewedBy String?        @map("reviewed_by")
+  reviewedAt DateTime?      @map("reviewed_at")
+  createdAt  DateTime       @default(now()) @map("created_at")
+  updatedAt  DateTime       @updatedAt @map("updated_at")
 
   investigation Case @relation(fields: [caseId], references: [id], onDelete: Cascade)
 
@@ -1463,18 +1505,18 @@ model CaseNote {
 
 // Thread container: hypothesis thread (replaces Hypothesis) or custom discussion thread.
 model CaseThread {
-  id         String            @id @default(uuid())
-  caseId     String            @map("case_id")
-  kind       CaseThreadKind    @default(HYPOTHESIS)
-  title      String
+  id                String            @id @default(uuid())
+  caseId            String            @map("case_id")
+  kind              CaseThreadKind    @default(HYPOTHESIS)
+  title             String
   // Hypothesis-only denormalized current state (for graph/quick queries)
-  status     HypothesisStatus? @default(PROPOSED)
-  confidence Decimal?          @db.Decimal(3, 2)
-  testablePredicate String?    @map("testable_predicate") @db.Text
-  color      String?
-  createdBy  String?           @map("created_by")
-  createdAt  DateTime          @default(now()) @map("created_at")
-  updatedAt  DateTime          @updatedAt @map("updated_at")
+  status            HypothesisStatus? @default(PROPOSED)
+  confidence        Decimal?          @db.Decimal(3, 2)
+  testablePredicate String?           @map("testable_predicate") @db.Text
+  color             String?
+  createdBy         String?           @map("created_by")
+  createdAt         DateTime          @default(now()) @map("created_at")
+  updatedAt         DateTime          @updatedAt @map("updated_at")
 
   investigation Case                @relation(fields: [caseId], references: [id], onDelete: Cascade)
   entries       CaseThreadEntry[]
@@ -1689,19 +1731,60 @@ model McpServerConfig {
 // hardcoded factory default, so an absent row means "fully default". The
 // operator edits these via the Harness → Agents UI to retune an agent's goal,
 // iteration budget and assigned built-in tools without a code change.
+/// When an agent is allowed to start. One global cadence could not serve both
+/// halves of the job: an escalation that takes three minutes was paced by the
+/// same gate as a config pass that takes two hours, so nothing urgent ever ran
+/// promptly and nothing deliberative ever saw a settled corpus.
+enum AgentTriggerMode {
+  /// Runs on any qualifying event, as soon as it happens.
+  EAGER
+  /// Joins the coalesced batch — one cycle per window rather than per scan.
+  BATCH
+  /// Runs only when the corpus is quiescent, for decisions that need the whole
+  /// picture rather than whatever the last scan happened to produce.
+  SETTLED
+  /// Runs on its own interval only.
+  SCHEDULED
+  /// Never starts on its own; only an operator trigger runs it.
+  MANUAL
+}
+
 model AgentConfig {
-  kind          AgentKind @id
+  kind               AgentKind         @id
   // Override for the mission goal (system prompt). null = factory default.
-  goal          String?   @db.Text
+  goal               String?           @db.Text
   // Override for the iteration budget. null = factory default.
-  maxIterations Int?      @map("max_iterations")
+  maxIterations      Int?              @map("max_iterations")
   // Assigned built-in tool names (used only when toolsOverride is true).
-  toolNames     String[]  @default([]) @map("tool_names")
+  toolNames          String[]          @default([]) @map("tool_names")
   // false = follow the factory toolset; true = use toolNames verbatim. Lets an
   // empty assignment ("no tools") differ from "never customised".
-  toolsOverride Boolean   @default(false) @map("tools_override")
-  createdAt     DateTime  @default(now()) @map("created_at")
-  updatedAt     DateTime  @updatedAt @map("updated_at")
+  toolsOverride      Boolean           @default(false) @map("tools_override")
+  // Scheduling policy. Every column below is null = factory default, matching
+  // the convention above, so an agent the operator has never touched keeps
+  // tracking the shipped defaults instead of freezing at whatever they were on
+  // the day the row was created.
+  triggerMode        AgentTriggerMode? @map("trigger_mode")
+  // Which readiness gates this agent waits for. Independent booleans rather
+  // than one "readiness" flag because the whole point is that an agent can
+  // need a settled corpus without needing inquiry matching to be idle.
+  waitForMatching    Boolean?          @map("wait_for_matching")
+  waitForEvidence    Boolean?          @map("wait_for_evidence")
+  waitForScans       Boolean?          @map("wait_for_scans")
+  // Guardrails, not triggers. The floor stops a burst of source completions
+  // spawning a run apiece; the backstop forces a run when gates have held the
+  // agent back for too long, and is the liveness guarantee for a gated agent.
+  minIntervalMinutes Int?              @map("min_interval_minutes")
+  maxStalenessHours  Int?              @map("max_staleness_hours")
+  // Per-agent override of the instance run budget, for one agent that is
+  // legitimately slower than the rest.
+  runBudgetMinutes   Int?              @map("run_budget_minutes")
+  // Last time this agent actually started, which is what the two guardrails
+  // above compare against. Not derived from agent_runs: a run that never
+  // started leaves no row, and the floor has to hold regardless.
+  lastTriggeredAt    DateTime?         @map("last_triggered_at")
+  createdAt          DateTime          @default(now()) @map("created_at")
+  updatedAt          DateTime          @updatedAt @map("updated_at")
 
   @@map("agent_configs")
 }
@@ -1823,22 +1906,22 @@ model AgentDecision {
 // source profiles, detector lessons and operator directives. Shared vocabulary
 // lives exclusively in GlossaryTerm. weight is a reinforcement counter.
 model AgentMemory {
-  id        String          @id @default(uuid())
-  kind      AgentMemoryKind
-  key       String
-  content   String          @db.Text
-  tags      String[]        @default([])
-  refType   String?         @map("ref_type")
-  refId     String?         @map("ref_id")
-  weight    Int             @default(1)
+  id         String            @id @default(uuid())
+  kind       AgentMemoryKind
+  key        String
+  content    String            @db.Text
+  tags       String[]          @default([])
+  refType    String?           @map("ref_type")
+  refId      String?           @map("ref_id")
+  weight     Int               @default(1)
   // Provenance: agent-authored memory is a hypothesis until verified against
   // real system state; operator-authored memory is authoritative. Refreshing
   // content clears verification — the new claim has not been checked yet.
   origin     AgentMemoryOrigin @default(AGENT)
   verifiedAt DateTime?         @map("verified_at")
   verifiedBy String?           @map("verified_by")
-  createdAt DateTime        @default(now()) @map("created_at")
-  updatedAt DateTime        @updatedAt @map("updated_at")
+  createdAt  DateTime          @default(now()) @map("created_at")
+  updatedAt  DateTime          @updatedAt @map("updated_at")
 
   @@unique([kind, key])
   @@index([kind])
@@ -1866,21 +1949,21 @@ enum GlossaryEntityType {
 }
 
 model GlossaryTerm {
-  id         String             @id @default(uuid())
-  term       String             @unique
-  aliases    String[]           @default([])
+  id               String              @id @default(uuid())
+  term             String              @unique
+  aliases          String[]            @default([])
   // Agent-suggested aliases stay out of lookup until an operator accepts them.
-  proposedAliases String[]      @default([]) @map("proposed_aliases")
-  entityType GlossaryEntityType @default(TERM) @map("entity_type")
-  notes      String?            @db.Text
-  origin     AgentMemoryOrigin  @default(OPERATOR)
-  verifiedAt DateTime?          @map("verified_at")
-  verifiedBy String?            @map("verified_by")
+  proposedAliases  String[]            @default([]) @map("proposed_aliases")
+  entityType       GlossaryEntityType  @default(TERM) @map("entity_type")
+  notes            String?             @db.Text
+  origin           AgentMemoryOrigin   @default(OPERATOR)
+  verifiedAt       DateTime?           @map("verified_at")
+  verifiedBy       String?             @map("verified_by")
   // Content hash of "term + aliases + notes" in the shared embedding store,
   // so glossary lookups can resolve semantically (alias/nearest-term match).
-  embedContentHash String? @map("embed_content_hash")
-  createdAt        DateTime @default(now()) @map("created_at")
-  updatedAt        DateTime @updatedAt @map("updated_at")
+  embedContentHash String?             @map("embed_content_hash")
+  createdAt        DateTime            @default(now()) @map("created_at")
+  updatedAt        DateTime            @updatedAt @map("updated_at")
   references       GlossaryReference[]
 
   @@index([entityType])
@@ -2046,13 +2129,13 @@ model DataTransferJob {
   currentTable  String? @map("current_table")
 
   /// Per-table row counts, e.g. `{ "sources": 12, "findings": 4310 }`.
-  counts Json @default("{}") @db.JsonB
+  counts   Json @default("{}") @db.JsonB
   /// Operator-facing notes: stripped credentials, rows skipped for missing
   /// references, archive-version drift.
   warnings Json @default("[]") @db.JsonB
 
-  errorMessage    String?  @map("error_message") @db.Text
-  cancelRequested Boolean  @default(false) @map("cancel_requested")
+  errorMessage    String? @map("error_message") @db.Text
+  cancelRequested Boolean @default(false) @map("cancel_requested")
 
   startedAt  DateTime? @map("started_at")
   finishedAt DateTime? @map("finished_at")

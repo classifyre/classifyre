@@ -3,10 +3,15 @@
 import * as React from "react";
 import {
   api,
+  AgentConfigDtoTriggerModeEnum as TriggerMode,
   type AgentConfigDto,
   type HarnessToolDto,
 } from "@workspace/api-client";
 import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
   Badge,
   Button,
   Checkbox,
@@ -17,11 +22,18 @@ import {
   Input,
   Label,
   ScrollArea,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
   Switch,
   Textarea,
 } from "@workspace/ui/components";
 import {
+  Clock,
   Eye,
+  FileText,
   Loader2,
   Pencil,
   Plug,
@@ -36,11 +48,70 @@ import { useInstanceSettings } from "@/components/instance-settings-provider";
 import { useTranslation } from "@/hooks/use-translation";
 import { KindGlyph, kindLabelKey } from "./harness-kind";
 
+/** Trigger modes in the order an operator should consider them: most eager first. */
+const MODES = [
+  TriggerMode.Eager,
+  TriggerMode.Batch,
+  TriggerMode.Settled,
+  TriggerMode.Scheduled,
+  TriggerMode.Manual,
+] as const;
+
+/** Explicit key map: `t()` is compile-time checked, so template keys defeat it. */
+const MODE_KEYS = {
+  [TriggerMode.Eager]: {
+    name: "harness.agents.modes.eager",
+    desc: "harness.agents.modes.eagerDesc",
+  },
+  [TriggerMode.Batch]: {
+    name: "harness.agents.modes.batch",
+    desc: "harness.agents.modes.batchDesc",
+  },
+  [TriggerMode.Settled]: {
+    name: "harness.agents.modes.settled",
+    desc: "harness.agents.modes.settledDesc",
+  },
+  [TriggerMode.Scheduled]: {
+    name: "harness.agents.modes.scheduled",
+    desc: "harness.agents.modes.scheduledDesc",
+  },
+  [TriggerMode.Manual]: {
+    name: "harness.agents.modes.manual",
+    desc: "harness.agents.modes.manualDesc",
+  },
+} as const;
+
 /**
- * Per-agent control surface: enable each agent, edit its goal and iteration
- * budget, and assign/remove any built-in tool (including tools that belong to
- * other agents by default). MCP tools are shown read-only — they are scoped per
- * server under the MCP section, not assigned here.
+ * The three preconditions an agent can insist on.
+ *
+ * Independent switches rather than one "readiness" toggle because that is the
+ * whole point: detector tuning needs a settled corpus but does not care about
+ * the inquiry-matching queue, while the inquiry agent is the exact opposite.
+ */
+const GATES = [
+  {
+    key: "waitForScans",
+    label: "harness.agents.gate.scans",
+    hint: "harness.agents.gate.scansHint",
+  },
+  {
+    key: "waitForMatching",
+    label: "harness.agents.gate.matching",
+    hint: "harness.agents.gate.matchingHint",
+  },
+  {
+    key: "waitForEvidence",
+    label: "harness.agents.gate.evidence",
+    hint: "harness.agents.gate.evidenceHint",
+  },
+] as const;
+
+/**
+ * Per-agent control surface: enable each agent, decide when it is allowed to
+ * run, and assign/remove any built-in tool (including tools that belong to
+ * other agents by default). The mission text lives in a dialog rather than
+ * inline. MCP tools are shown read-only — they are scoped per server under the
+ * MCP section, not assigned here.
  */
 export function HarnessAgents() {
   const { t } = useTranslation();
@@ -155,16 +226,34 @@ function AgentCard({
   onOpenPicker: () => void;
 }) {
   const { t } = useTranslation();
-  const [goal, setGoal] = React.useState(agent.goal);
   const [maxIterations, setMaxIterations] = React.useState(
     String(agent.maxIterations),
   );
+  const [runBudget, setRunBudget] = React.useState(
+    agent.runBudgetMinutes == null ? "" : String(agent.runBudgetMinutes),
+  );
+  const [minInterval, setMinInterval] = React.useState(
+    String(agent.minIntervalMinutes),
+  );
+  const [maxStaleness, setMaxStaleness] = React.useState(
+    String(agent.maxStalenessHours),
+  );
+  const [promptOpen, setPromptOpen] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
 
   React.useEffect(() => {
-    setGoal(agent.goal);
     setMaxIterations(String(agent.maxIterations));
-  }, [agent.goal, agent.maxIterations]);
+    setRunBudget(
+      agent.runBudgetMinutes == null ? "" : String(agent.runBudgetMinutes),
+    );
+    setMinInterval(String(agent.minIntervalMinutes));
+    setMaxStaleness(String(agent.maxStalenessHours));
+  }, [
+    agent.maxIterations,
+    agent.runBudgetMinutes,
+    agent.minIntervalMinutes,
+    agent.maxStalenessHours,
+  ]);
 
   const byName = React.useMemo(
     () => new Map(tools.map((tool) => [tool.name, tool])),
@@ -172,8 +261,10 @@ function AgentCard({
   );
 
   const dirty =
-    goal !== agent.goal || maxIterations !== String(agent.maxIterations);
-  const goalCustom = agent.goal !== agent.defaultGoal;
+    maxIterations !== String(agent.maxIterations) ||
+    minInterval !== String(agent.minIntervalMinutes) ||
+    maxStaleness !== String(agent.maxStalenessHours) ||
+    runBudget !== (agent.runBudgetMinutes == null ? "" : String(agent.runBudgetMinutes));
 
   const run = async (
     fn: () => Promise<void>,
@@ -189,11 +280,17 @@ function AgentCard({
     }
   };
 
-  const saveText = () =>
+  /** Empty means "follow the instance default", which the API reads as null. */
+  const optionalNumber = (raw: string) =>
+    raw.trim() === "" ? null : Number(raw);
+
+  const saveNumbers = () =>
     void run(() =>
       onPatch(agent.kind, {
-        goal,
         maxIterations: Number(maxIterations) || agent.defaultMaxIterations,
+        minIntervalMinutes: Number(minInterval) || 0,
+        maxStalenessHours: Number(maxStaleness) || 0,
+        runBudgetMinutes: optionalNumber(runBudget),
       }),
     );
 
@@ -204,8 +301,20 @@ function AgentCard({
       }),
     );
 
-  const resetGoal = () =>
-    void run(() => onPatch(agent.kind, { goal: null }));
+  const setMode = (mode: AgentConfigDto["triggerMode"]) =>
+    void run(() => onPatch(agent.kind, { triggerMode: mode }));
+
+  const setGate = (
+    gate: "waitForMatching" | "waitForEvidence" | "waitForScans",
+    value: boolean,
+  ) => void run(() => onPatch(agent.kind, { [gate]: value }));
+
+  // MANUAL never starts on its own and SCHEDULED runs on its own clock, so the
+  // gates are inert for both — shown disabled rather than hidden, because
+  // hiding them makes the card look like it lost settings when the mode changes.
+  const gatesApply =
+    agent.triggerMode !== TriggerMode.Manual &&
+    agent.triggerMode !== TriggerMode.Scheduled;
 
   return (
     <div
@@ -249,32 +358,132 @@ function AgentCard({
         )}
       </div>
 
-      {/* Goal */}
-      <div className="space-y-1">
-        <div className="flex items-center justify-between">
-          <Label className="font-mono text-[11px] uppercase tracking-[0.12em]">
-            {t("harness.agents.goal")}
-          </Label>
-          {goalCustom && (
-            <button
-              type="button"
-              onClick={resetGoal}
-              disabled={busy}
-              className="inline-flex items-center gap-1 font-mono text-[10px] uppercase tracking-wide text-muted-foreground hover:text-foreground"
+      {/* Runs when — the decision an operator is actually making here */}
+      <div className="space-y-2">
+        <Label className="flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-[0.12em]">
+          <Clock className="h-3 w-3" />
+          {t("harness.agents.runsWhen")}
+        </Label>
+
+        <Select
+          value={agent.triggerMode}
+          disabled={disabled || busy}
+          onValueChange={(v) => setMode(v as AgentConfigDto["triggerMode"])}
+        >
+          <SelectTrigger className="h-8 w-full rounded-[4px] border-2 border-border text-sm">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {MODES.map((mode) => (
+              <SelectItem key={mode} value={mode}>
+                {t(MODE_KEYS[mode].name)}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <p className="text-[11px] text-muted-foreground">
+          {t(MODE_KEYS[agent.triggerMode].desc)}
+        </p>
+
+        {/* Gates: what this agent refuses to reason without */}
+        <div className="grid gap-1.5 sm:grid-cols-3">
+          {GATES.map(({ key, label, hint }) => (
+            <label
+              key={key}
+              className={cn(
+                "flex items-start gap-2 rounded-[3px] border border-border px-2 py-1.5",
+                !gatesApply && "opacity-50",
+              )}
             >
-              <RotateCcw className="h-2.5 w-2.5" />
-              {t("harness.agents.resetGoal")}
-            </button>
-          )}
+              <Switch
+                checked={agent[key]}
+                disabled={disabled || busy || !gatesApply}
+                onCheckedChange={(v) => setGate(key, v)}
+                aria-label={t(label)}
+                className="mt-0.5 scale-75"
+              />
+              <span className="min-w-0">
+                <span className="block text-[11px] font-medium">
+                  {t(label)}
+                </span>
+                <span className="block text-[10px] leading-snug text-muted-foreground">
+                  {t(hint)}
+                </span>
+              </span>
+            </label>
+          ))}
         </div>
-        <Textarea
-          value={goal}
-          onChange={(e) => setGoal(e.target.value)}
-          rows={4}
-          maxLength={20000}
-          className="rounded-[4px] border-2 border-border text-sm"
-        />
+
+        {/* Guardrails: time bounds the trigger, it never IS the trigger */}
+        <div className="grid gap-2 sm:grid-cols-2">
+          <div className="space-y-1">
+            <Label className="text-[11px]">
+              {t("harness.agents.minInterval")}
+            </Label>
+            <Input
+              type="number"
+              min={0}
+              value={minInterval}
+              disabled={disabled || busy}
+              onChange={(e) => setMinInterval(e.target.value)}
+              className="h-8 rounded-[4px] border-2 border-border text-sm"
+            />
+            <p className="text-[10px] leading-snug text-muted-foreground">
+              {t("harness.agents.minIntervalHint")}
+            </p>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-[11px]">
+              {t("harness.agents.maxStaleness")}
+            </Label>
+            <Input
+              type="number"
+              min={0}
+              value={maxStaleness}
+              disabled={disabled || busy}
+              onChange={(e) => setMaxStaleness(e.target.value)}
+              className="h-8 rounded-[4px] border-2 border-border text-sm"
+            />
+            <p className="text-[10px] leading-snug text-muted-foreground">
+              {t("harness.agents.maxStalenessHint")}
+            </p>
+          </div>
+        </div>
       </div>
+
+      {/* System prompt: hidden behind a dialog — it is thousands of words and
+          made every other control on this card unreachable without scrolling. */}
+      <div className="flex items-center justify-between gap-2">
+        <Label className="font-mono text-[11px] uppercase tracking-[0.12em]">
+          {t("harness.agents.goal")}
+        </Label>
+        <div className="flex items-center gap-2">
+          {agent.goal !== agent.defaultGoal && (
+            <Badge
+              variant="outline"
+              className="border-[#d97706]/50 text-[#d97706] text-[9px] uppercase"
+            >
+              {t("harness.agents.edited")}
+            </Badge>
+          )}
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={busy}
+            onClick={() => setPromptOpen(true)}
+          >
+            <FileText className="h-3.5 w-3.5" />
+            {t("harness.agents.viewPrompt")}
+          </Button>
+        </div>
+      </div>
+
+      <SystemPromptDialog
+        agent={agent}
+        open={promptOpen}
+        onOpenChange={setPromptOpen}
+        onPatch={onPatch}
+      />
 
       {/* Tools */}
       <div className="space-y-1.5">
@@ -362,32 +571,163 @@ function AgentCard({
         )}
       </div>
 
-      {/* Footer: max steps + save */}
-      <div className="flex items-end justify-between gap-3 pt-1">
-        <div className="space-y-1">
-          <Label className="font-mono text-[11px] uppercase tracking-[0.12em]">
-            {t("harness.agents.maxIterations")}
-          </Label>
-          <Input
-            type="number"
-            min={1}
-            max={50}
-            value={maxIterations}
-            onChange={(e) => setMaxIterations(e.target.value)}
-            className="h-8 w-20 rounded-[4px] border-2 border-border text-sm"
-          />
-        </div>
+      {/* Advanced: the limits most operators never need to touch */}
+      <Accordion type="multiple">
+        <AccordionItem value="advanced" className="border-0">
+          <AccordionTrigger
+            data-testid={`accordion-trigger-advanced-${agent.kind}`}
+            className="py-1 font-mono text-[11px] uppercase tracking-[0.12em] hover:no-underline"
+          >
+            {t("harness.agents.advanced")}
+          </AccordionTrigger>
+          <AccordionContent className="grid gap-2 pt-1 sm:grid-cols-2">
+            <div className="space-y-1">
+              <Label className="text-[11px]">
+                {t("harness.agents.maxIterations")}
+              </Label>
+              <Input
+                type="number"
+                min={1}
+                max={50}
+                value={maxIterations}
+                onChange={(e) => setMaxIterations(e.target.value)}
+                className="h-8 rounded-[4px] border-2 border-border text-sm"
+              />
+              <p className="text-[10px] leading-snug text-muted-foreground">
+                {t("harness.agents.maxIterationsHint")}
+              </p>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-[11px]">
+                {t("harness.agents.runBudget")}
+              </Label>
+              <Input
+                type="number"
+                min={1}
+                max={480}
+                value={runBudget}
+                placeholder={t("harness.agents.runBudgetDefault")}
+                onChange={(e) => setRunBudget(e.target.value)}
+                className="h-8 rounded-[4px] border-2 border-border text-sm"
+              />
+              <p className="text-[10px] leading-snug text-muted-foreground">
+                {t("harness.agents.runBudgetHint")}
+              </p>
+            </div>
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
+
+      <div className="flex items-center justify-end pt-1">
         <Button
           size="sm"
           variant="outline"
           disabled={busy || !dirty}
-          onClick={saveText}
+          onClick={saveNumbers}
         >
           {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
           {t("harness.agents.save")}
         </Button>
       </div>
     </div>
+  );
+}
+
+/**
+ * The mission text, full width and out of the way.
+ *
+ * It used to sit inline as a four-row textarea holding thousands of words of
+ * doctrine, which made it both unreadable and the dominant element of every
+ * card. Here it gets the room it needs and the card gets its own back.
+ */
+function SystemPromptDialog({
+  agent,
+  open,
+  onOpenChange,
+  onPatch,
+}: {
+  agent: AgentConfigDto;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onPatch: (
+    kind: AgentConfigDto["kind"],
+    dto: Parameters<
+      typeof api.autopilot.autopilotControllerUpdateAgent
+    >[0]["updateAgentConfigDto"],
+    message?: string,
+  ) => Promise<void>;
+}) {
+  const { t } = useTranslation();
+  const [draft, setDraft] = React.useState(agent.goal);
+  const [busy, setBusy] = React.useState(false);
+
+  // Re-sync whenever it reopens or the server value changes, so a cancelled
+  // edit does not survive as a phantom draft.
+  React.useEffect(() => {
+    if (open) setDraft(agent.goal);
+  }, [open, agent.goal]);
+
+  const customized = agent.goal !== agent.defaultGoal;
+
+  const run = async (fn: () => Promise<void>) => {
+    try {
+      setBusy(true);
+      await fn();
+      onOpenChange(false);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : t("settings.failedToSave"));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="flex h-[85vh] max-w-5xl flex-col sm:max-w-5xl">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <KindGlyph kind={agent.kind} className="h-4 w-4" />
+            {t(kindLabelKey(agent.kind))} — {t("harness.agents.goal")}
+          </DialogTitle>
+        </DialogHeader>
+        <p className="text-xs text-muted-foreground">
+          {t("harness.agents.promptHint")}
+        </p>
+        <Textarea
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          maxLength={20000}
+          className="flex-1 resize-none rounded-[4px] border-2 border-border font-mono text-xs leading-relaxed"
+        />
+        <div className="flex items-center justify-between gap-2">
+          <span className="font-mono text-[10px] text-muted-foreground">
+            {t("harness.agents.promptChars", { count: draft.length })}
+          </span>
+          <div className="flex items-center gap-2">
+            {customized && (
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={busy}
+                onClick={() => void run(() => onPatch(agent.kind, { goal: null }))}
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+                {t("harness.agents.resetGoal")}
+              </Button>
+            )}
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={busy || draft === agent.goal}
+              onClick={() => void run(() => onPatch(agent.kind, { goal: draft }))}
+            >
+              {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+              {t("harness.agents.save")}
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
