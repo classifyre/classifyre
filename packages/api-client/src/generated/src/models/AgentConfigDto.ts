@@ -152,6 +152,24 @@ export interface AgentConfigDto {
      */
     defaultMaxStalenessHours: number;
     /**
+     * Which chain this agent runs in. Agents in a chain run in order because each consumes what the one before it produced; the two chains run concurrently. null for agents with no chain (DREAM).
+     * @type {string}
+     * @memberof AgentConfigDto
+     */
+    chain: AgentConfigDtoChainEnum | null;
+    /**
+     * 1-based position within the chain; 0 when it has none
+     * @type {number}
+     * @memberof AgentConfigDto
+     */
+    chainPosition: number;
+    /**
+     * The agent immediately before this one, whose output it uses
+     * @type {string}
+     * @memberof AgentConfigDto
+     */
+    runsAfter: AgentConfigDtoRunsAfterEnum | null;
+    /**
      * Per-agent run budget override; null uses the instance value
      * @type {number}
      * @memberof AgentConfigDto
@@ -211,6 +229,30 @@ export const AgentConfigDtoDefaultTriggerModeEnum = {
 } as const;
 export type AgentConfigDtoDefaultTriggerModeEnum = typeof AgentConfigDtoDefaultTriggerModeEnum[keyof typeof AgentConfigDtoDefaultTriggerModeEnum];
 
+/**
+ * @export
+ */
+export const AgentConfigDtoChainEnum = {
+    Investigation: 'INVESTIGATION',
+    Detection: 'DETECTION'
+} as const;
+export type AgentConfigDtoChainEnum = typeof AgentConfigDtoChainEnum[keyof typeof AgentConfigDtoChainEnum];
+
+/**
+ * @export
+ */
+export const AgentConfigDtoRunsAfterEnum = {
+    Inquiry: 'INQUIRY',
+    Case: 'CASE',
+    Dream: 'DREAM',
+    Duplicates: 'DUPLICATES',
+    Config: 'CONFIG',
+    DetectorAuthor: 'DETECTOR_AUTHOR',
+    Escalation: 'ESCALATION',
+    Chat: 'CHAT'
+} as const;
+export type AgentConfigDtoRunsAfterEnum = typeof AgentConfigDtoRunsAfterEnum[keyof typeof AgentConfigDtoRunsAfterEnum];
+
 
 /**
  * Check if a given object implements the AgentConfigDto interface.
@@ -238,6 +280,9 @@ export function instanceOfAgentConfigDto(value: object): value is AgentConfigDto
     if (!('defaultMinIntervalMinutes' in value) || value['defaultMinIntervalMinutes'] === undefined) return false;
     if (!('maxStalenessHours' in value) || value['maxStalenessHours'] === undefined) return false;
     if (!('defaultMaxStalenessHours' in value) || value['defaultMaxStalenessHours'] === undefined) return false;
+    if (!('chain' in value) || value['chain'] === undefined) return false;
+    if (!('chainPosition' in value) || value['chainPosition'] === undefined) return false;
+    if (!('runsAfter' in value) || value['runsAfter'] === undefined) return false;
     if (!('runBudgetMinutes' in value) || value['runBudgetMinutes'] === undefined) return false;
     if (!('lastTriggeredAt' in value) || value['lastTriggeredAt'] === undefined) return false;
     if (!('customized' in value) || value['customized'] === undefined) return false;
@@ -276,6 +321,9 @@ export function AgentConfigDtoFromJSONTyped(json: any, ignoreDiscriminator: bool
         'defaultMinIntervalMinutes': json['defaultMinIntervalMinutes'],
         'maxStalenessHours': json['maxStalenessHours'],
         'defaultMaxStalenessHours': json['defaultMaxStalenessHours'],
+        'chain': json['chain'],
+        'chainPosition': json['chainPosition'],
+        'runsAfter': json['runsAfter'],
         'runBudgetMinutes': json['runBudgetMinutes'],
         'lastTriggeredAt': (json['lastTriggeredAt'] == null ? null : new Date(json['lastTriggeredAt'])),
         'customized': json['customized'],
@@ -315,6 +363,9 @@ export function AgentConfigDtoToJSONTyped(value?: AgentConfigDto | null, ignoreD
         'defaultMinIntervalMinutes': value['defaultMinIntervalMinutes'],
         'maxStalenessHours': value['maxStalenessHours'],
         'defaultMaxStalenessHours': value['defaultMaxStalenessHours'],
+        'chain': value['chain'],
+        'chainPosition': value['chainPosition'],
+        'runsAfter': value['runsAfter'],
         'runBudgetMinutes': value['runBudgetMinutes'],
         'lastTriggeredAt': value['lastTriggeredAt'] == null ? value['lastTriggeredAt'] : value['lastTriggeredAt'].toISOString(),
         'customized': value['customized'],

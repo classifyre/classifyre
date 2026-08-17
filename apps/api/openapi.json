@@ -20141,6 +20141,34 @@
             "type": "number",
             "description": "Factory default"
           },
+          "chain": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "INVESTIGATION",
+              "DETECTION"
+            ],
+            "description": "Which chain this agent runs in. Agents in a chain run in order because each consumes what the one before it produced; the two chains run concurrently. null for agents with no chain (DREAM)."
+          },
+          "chainPosition": {
+            "type": "number",
+            "description": "1-based position within the chain; 0 when it has none"
+          },
+          "runsAfter": {
+            "type": "string",
+            "enum": [
+              "INQUIRY",
+              "CASE",
+              "DREAM",
+              "DUPLICATES",
+              "CONFIG",
+              "DETECTOR_AUTHOR",
+              "ESCALATION",
+              "CHAT"
+            ],
+            "nullable": true,
+            "description": "The agent immediately before this one, whose output it uses"
+          },
           "runBudgetMinutes": {
             "type": "number",
             "nullable": true,
@@ -20180,6 +20208,9 @@
           "defaultMinIntervalMinutes",
           "maxStalenessHours",
           "defaultMaxStalenessHours",
+          "chain",
+          "chainPosition",
+          "runsAfter",
           "runBudgetMinutes",
           "lastTriggeredAt",
           "customized"
