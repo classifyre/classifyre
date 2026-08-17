@@ -13,20 +13,27 @@ Name | Type
 `aiProviderConfigId` | string
 `harnessAiProviderConfigId` | string
 `autopilotInquiryEnabled` | boolean
-`autopilotInquiryDesired` | string
-`autopilotInquirySearchable` | string
 `autopilotCaseEnabled` | boolean
-`autopilotCaseGuidance` | string
 `autopilotConfigEnabled` | boolean
-`autopilotConfigGuidance` | string
 `autopilotDetectorEnabled` | boolean
-`autopilotDetectorGuidance` | string
 `autopilotEscalationEnabled` | boolean
-`autopilotEscalationGuidance` | string
 `autopilotMcpEnabled` | boolean
 `autoScheduleEnabled` | boolean
 `maxConcurrentRunners` | number
 `hfToken` | string
+`harnessRunBudgetMinutes` | number
+`harnessRunStaleAfterMinutes` | number
+`harnessCycleBudgetMinutes` | number
+`harnessEvidenceUsableFindings` | number
+`harnessObservationChars` | number
+`harnessTurnObservationChars` | number
+`harnessMaxRankedFindings` | number
+`harnessMaxGlossaryEntries` | number
+`harnessMaxRecalledMemories` | number
+`harnessDreamIntervalDays` | number
+`harnessEvidenceUsableCoverage` | number
+`harnessEvidenceWarnCoverage` | number
+`harnessExpressImportance` | number
 
 ## Example
 
@@ -42,20 +49,27 @@ const example = {
   "aiProviderConfigId": null,
   "harnessAiProviderConfigId": null,
   "autopilotInquiryEnabled": true,
-  "autopilotInquiryDesired": null,
-  "autopilotInquirySearchable": null,
   "autopilotCaseEnabled": true,
-  "autopilotCaseGuidance": null,
   "autopilotConfigEnabled": true,
-  "autopilotConfigGuidance": null,
   "autopilotDetectorEnabled": true,
-  "autopilotDetectorGuidance": null,
   "autopilotEscalationEnabled": true,
-  "autopilotEscalationGuidance": null,
   "autopilotMcpEnabled": true,
   "autoScheduleEnabled": true,
   "maxConcurrentRunners": 2,
   "hfToken": null,
+  "harnessRunBudgetMinutes": 20,
+  "harnessRunStaleAfterMinutes": 60,
+  "harnessCycleBudgetMinutes": 30,
+  "harnessEvidenceUsableFindings": 2000,
+  "harnessObservationChars": 8000,
+  "harnessTurnObservationChars": 24000,
+  "harnessMaxRankedFindings": 25,
+  "harnessMaxGlossaryEntries": 20,
+  "harnessMaxRecalledMemories": 30,
+  "harnessDreamIntervalDays": 2,
+  "harnessEvidenceUsableCoverage": 0.25,
+  "harnessEvidenceWarnCoverage": 0.8,
+  "harnessExpressImportance": 0.75,
 } satisfies UpdateInstanceSettingsDto
 
 console.log(example)

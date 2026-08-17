@@ -19,6 +19,7 @@ import {
   AgentLogLevel,
   AgentMemoryKind,
   AgentRunStatus,
+  AgentTriggerMode,
 } from '@prisma/client';
 
 export class QueryAgentRunsDto {
@@ -708,6 +709,69 @@ export class AgentConfigDto {
   mcpToolNames!: string[];
 
   @ApiProperty({
+    enum: AgentTriggerMode,
+    description:
+      'When this agent is allowed to start. EAGER acts on any qualifying event; ' +
+      'BATCH joins the coalesced batch; SETTLED waits for a quiet corpus; ' +
+      'SCHEDULED runs on its own interval; MANUAL never starts on its own.',
+  })
+  triggerMode!: AgentTriggerMode;
+
+  @ApiProperty({ enum: AgentTriggerMode, description: 'Factory default' })
+  defaultTriggerMode!: AgentTriggerMode;
+
+  @ApiProperty({
+    description: 'Wait for the inquiry-matching queue to drain before running',
+  })
+  waitForMatching!: boolean;
+
+  @ApiProperty({ description: 'Factory default' })
+  defaultWaitForMatching!: boolean;
+
+  @ApiProperty({
+    description: 'Wait until enough findings carry an importance score',
+  })
+  waitForEvidence!: boolean;
+
+  @ApiProperty({ description: 'Factory default' })
+  defaultWaitForEvidence!: boolean;
+
+  @ApiProperty({ description: 'Wait until no source is mid-scan' })
+  waitForScans!: boolean;
+
+  @ApiProperty({ description: 'Factory default' })
+  defaultWaitForScans!: boolean;
+
+  @ApiProperty({
+    description:
+      'Minimum minutes between runs. Stops a burst of scans spawning a run ' +
+      'apiece. 0 disables the floor.',
+  })
+  minIntervalMinutes!: number;
+
+  @ApiProperty({ description: 'Factory default' })
+  defaultMinIntervalMinutes!: number;
+
+  @ApiProperty({
+    description:
+      'Force a run once gates have blocked the agent this long. This is the ' +
+      'liveness guarantee for a gated agent. 0 disables the backstop.',
+  })
+  maxStalenessHours!: number;
+
+  @ApiProperty({ description: 'Factory default' })
+  defaultMaxStalenessHours!: number;
+
+  @ApiProperty({
+    nullable: true,
+    description: 'Per-agent run budget override; null uses the instance value',
+  })
+  runBudgetMinutes!: number | null;
+
+  @ApiProperty({ nullable: true, description: 'When this agent last started' })
+  lastTriggeredAt!: Date | null;
+
+  @ApiProperty({
     description: 'True when config differs from factory defaults',
   })
   customized!: boolean;
@@ -755,6 +819,74 @@ export class UpdateAgentConfigDto {
   @IsArray()
   @IsString({ each: true })
   toolNames?: string[] | null;
+
+  @ApiPropertyOptional({
+    enum: AgentTriggerMode,
+    nullable: true,
+    description: 'Trigger mode override; null resets to the factory default',
+  })
+  @IsOptional()
+  @IsEnum(AgentTriggerMode)
+  triggerMode?: AgentTriggerMode | null;
+
+  @ApiPropertyOptional({
+    nullable: true,
+    description:
+      'Wait for inquiry matching to drain; null resets to factory default',
+  })
+  @IsOptional()
+  @IsBoolean()
+  waitForMatching?: boolean | null;
+
+  @ApiPropertyOptional({
+    nullable: true,
+    description: 'Wait for evidence coverage; null resets to factory default',
+  })
+  @IsOptional()
+  @IsBoolean()
+  waitForEvidence?: boolean | null;
+
+  @ApiPropertyOptional({
+    nullable: true,
+    description: 'Wait for scans to finish; null resets to factory default',
+  })
+  @IsOptional()
+  @IsBoolean()
+  waitForScans?: boolean | null;
+
+  @ApiPropertyOptional({
+    nullable: true,
+    description:
+      'Minimum minutes between runs (0 disables); null resets to default',
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(10080)
+  minIntervalMinutes?: number | null;
+
+  @ApiPropertyOptional({
+    nullable: true,
+    description:
+      'Force a run after this many hours of being gated (0 disables); null ' +
+      'resets to default',
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(8760)
+  maxStalenessHours?: number | null;
+
+  @ApiPropertyOptional({
+    nullable: true,
+    description:
+      'Per-agent run budget in minutes; null uses the instance value',
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(480)
+  runBudgetMinutes?: number | null;
 }
 
 export class UpdateSystemBriefDto {

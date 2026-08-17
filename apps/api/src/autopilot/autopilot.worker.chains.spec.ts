@@ -42,6 +42,8 @@ describe('AutopilotWorker cycle chains', () => {
       sourceName: string,
       scope: unknown,
       deadline: number,
+      signals: unknown,
+      deferred: Set<AgentKind>,
     ) => Promise<void>;
   }
 
@@ -61,6 +63,19 @@ describe('AutopilotWorker cycle chains', () => {
       {} as never,
       {} as never,
       {} as never,
+      {
+        resolvePolicy: jest.fn().mockResolvedValue({
+          triggerMode: 'BATCH',
+          waitForMatching: false,
+          waitForEvidence: false,
+          waitForScans: false,
+          minIntervalMinutes: 0,
+          maxStalenessHours: 0,
+        }),
+        lastTriggeredAt: jest.fn().mockResolvedValue(null),
+        markTriggered: jest.fn().mockResolvedValue(undefined),
+        runBudgetMinutes: jest.fn().mockResolvedValue(null),
+      } as never,
     ) as unknown as WorkerInternals;
     jest
       .spyOn(worker, 'agentEnabled')
@@ -74,11 +89,39 @@ describe('AutopilotWorker cycle chains', () => {
     });
   };
 
-  const runChains = (deadline: number, on = cycle) =>
-    Promise.all([
-      worker.runChain(INVESTIGATION_CHAIN, settings, on, 'src', {}, deadline),
-      worker.runChain(DETECTION_CHAIN, settings, on, 'src', {}, deadline),
+  /** Signals with every gate open: this suite is about ordering and budgets. */
+  const OPEN_SIGNALS = {
+    matchingBusy: false,
+    scansActive: false,
+    coverage: { open: 0, analyzed: 0 },
+    evidence: { usableFindings: 2000, usableCoverage: 0.25 },
+  };
+
+  const runChains = (deadline: number, on = cycle) => {
+    const deferred = new Set<AgentKind>();
+    return Promise.all([
+      worker.runChain(
+        INVESTIGATION_CHAIN,
+        settings,
+        on,
+        'src',
+        {},
+        deadline,
+        OPEN_SIGNALS,
+        deferred,
+      ),
+      worker.runChain(
+        DETECTION_CHAIN,
+        settings,
+        on,
+        'src',
+        {},
+        deadline,
+        OPEN_SIGNALS,
+        deferred,
+      ),
     ]);
+  };
 
   beforeEach(() => {
     jest.useFakeTimers();

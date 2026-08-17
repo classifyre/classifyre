@@ -42,6 +42,21 @@ describe('AutopilotWorker.handle (no cross-namespace guard needed)', () => {
       {} as any,
       {} as any,
       {} as any,
+      {
+        // Permissive policy: these suites are about the enable-flag and chain
+        // logic, not scheduling. The policy engine has its own spec.
+        resolvePolicy: jest.fn().mockResolvedValue({
+          triggerMode: 'BATCH',
+          waitForMatching: false,
+          waitForEvidence: false,
+          waitForScans: false,
+          minIntervalMinutes: 0,
+          maxStalenessHours: 0,
+        }),
+        lastTriggeredAt: jest.fn().mockResolvedValue(null),
+        markTriggered: jest.fn().mockResolvedValue(undefined),
+        runBudgetMinutes: jest.fn().mockResolvedValue(null),
+      } as any,
     );
 
   it('runs the cycle for a scan-completed job', async () => {

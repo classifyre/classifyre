@@ -1,0 +1,210 @@
+---
+sidebarTitle: Harness Agents
+title: Harness Agents
+description: When each AI agent runs, what it waits for, and the limits that keep it bounded.
+---
+
+# Harness Agents
+
+The harness runs several agents, and they are not alike. One reviews open cases
+and raises an alert in under three minutes. Another rewrites detector
+configuration and takes over two hours. Running both on the same schedule means
+either the fast one is late or the slow one is working from half the picture.
+
+**Harness → Agents** is where you decide, per agent, which of those it is.
+
+---
+
+## The decision you are making
+
+Two questions, and they pull in opposite directions:
+
+- **Does this agent need to react to new data immediately?** A new asset that
+  should reach the glossary, an inquiry that just matched, a case worth
+  escalating — waiting is a cost with no benefit.
+- **Does this agent need the whole picture to decide well?** Detector tuning
+  and inquiry portfolio design are the opposite: a decision made from whatever
+  the last scan happened to produce is worse than no decision.
+
+**Time is not the trigger.** An agent runs when something happens or when a
+condition is met. The two time settings are guardrails around that: a floor so
+a burst of scans cannot spawn a run apiece, and a backstop so a blocked agent
+eventually runs anyway.
+
+---
+
+## Runs when
+
+| Mode | Fires when |
+|---|---|
+| `Immediately` | Any qualifying event — a new finding, a match, a failed scan. Best for cheap agents that must not lag behind new data. |
+| `In the next batch` | Joins the coalesced batch, so a burst of scans produces one run instead of one per scan. |
+| `When the corpus is settled` | Waits until nothing is scanning and its gates are satisfied. For decisions that need the whole picture. |
+| `On its own schedule` | Runs on its own interval and ignores scan cycles. |
+| `Only when I trigger it` | Never starts on its own. |
+
+A single new finding does **not** satisfy `When the corpus is settled` — one
+event is precisely what that mode is waiting not to be woken by.
+
+---
+
+## Waits for
+
+Three independent conditions. They are separate switches rather than one
+"readiness" toggle because that is the whole point: detector tuning needs a
+settled corpus but does not care about the inquiry-matching queue, and the
+inquiry agent is the exact opposite.
+
+| Gate | The agent will not start until… |
+|---|---|
+| **Scans finished** | no source is mid-scan. |
+| **Matching drained** | the inquiry-matching queue is empty. |
+| **Evidence scored** | enough findings carry an importance score (see [Evidence and urgency](#evidence-and-urgency)). |
+
+Gates are ignored for `Only when I trigger it` and `On its own schedule`, and a
+manual trigger always bypasses all of them.
+
+---
+
+## Guardrails
+
+| Setting | Meaning |
+|---|---|
+| **Minimum gap** | Never run more often than this, in minutes. Not pierced by an urgent event. `0` disables the floor. |
+| **Run anyway after** | Force a run once the gates have blocked this agent for this many hours. `0` disables the backstop. |
+
+**Important:** the backstop is the liveness guarantee. An agent with a gate and
+no backstop can be blocked indefinitely if the condition it waits on never
+clears — for example an inquiry-matching queue that is continuously refilled by
+new scans. Leave it set unless you specifically want that agent to be able to
+wait forever.
+
+### The heartbeat
+
+A finished scan is what normally wakes the harness, so on a corpus that has
+stopped being scanned there would be no cycle in which to notice that an agent
+is overdue. A heartbeat runs every 15 minutes and covers exactly that:
+
+- if sources are waiting from a cycle that deferred them, it runs the ordinary
+  cycle;
+- otherwise it runs **only** the agents whose backstop has expired;
+- if neither applies it does nothing — a quiet instance stays quiet.
+
+This is what makes "Run anyway after" mean what it says. It matters most for
+`When the corpus is settled`, which would otherwise be waiting for a state in
+which nothing was left to wake it.
+
+---
+
+## Defaults
+
+| Agent | Mode | Waits for | Min gap | Run anyway after |
+|---|---|---|---|---|
+| Escalation | Immediately | — | 5 min | 24 h |
+| Case | Immediately | — | 15 min | 24 h |
+| Inquiry | In the next batch | Matching | 30 min | 24 h |
+| Config | When settled | Scans + evidence | 2 h | 7 d |
+| Detector author | When settled | Scans + evidence | 2 h | 7 d |
+| Dream | On its own schedule | — | — | — |
+
+Escalation and Case act on a single new signal and are cheap, so they wait for
+nothing. Inquiry keeps its matching gate because its entire output is match
+counts, and counting against a queue that has not drained produces numbers that
+are wrong the moment they are written.
+
+---
+
+## The system prompt
+
+Each agent's mission is thousands of words. It lives behind the **System
+prompt** button rather than on the card.
+
+Editing it changes how that agent reasons. **Restore default** puts the shipped
+mission back — use it if results get worse after an edit. A card whose prompt
+differs from the default is marked **Edited**.
+
+---
+
+## Advanced
+
+| Setting | Meaning |
+|---|---|
+| **Max steps** | How many times the agent may think before it must stop. |
+| **Run budget** | Overrides the instance run budget for this agent alone. Leave empty to follow the instance value. |
+
+---
+
+## Instance limits
+
+These live under **Harness → Config** because they apply to every agent at
+once.
+
+### Run limits
+
+| Setting | Default | Meaning |
+|---|---|---|
+| Run budget | 20 min | Maximum wall-clock time for one agent run. A run holds a job slot, so a wedged one stalls everything behind it. |
+| Presume dead after | 60 min | A run still marked running past this is reaped and marked failed. Keep it above the run budget. |
+| Cycle budget | 30 min | Wall-clock budget for one full cycle. Checked before each agent starts, so a chain can overshoot by at most one run budget. |
+
+### Evidence and urgency
+
+| Setting | Default | Meaning |
+|---|---|---|
+| Scored findings floor | 2000 | Above this many scored findings the evidence gate opens regardless of coverage. |
+| Coverage fallback | 0.25 | Fraction that must be scored when the floor above is not met. |
+| Partial-ranking warning | 0.8 | Below this coverage, agents are told their triage order is incomplete. Shapes the prompt; does not block a run. |
+| Urgent finding score | 0.75 | A finding at or above this importance triggers an immediate cycle. |
+
+The floor and the fallback are deliberately two tests. On a large corpus the
+ratio falls as ingestion outpaces analysis, so a ratio alone re-engages the gate
+exactly when the corpus is largest — 1.5 million scored findings can read as
+"22%, not ready" while being far more than any single run could consume.
+
+### What each run sees
+
+| Setting | Default | Meaning |
+|---|---|---|
+| Characters per tool result | 8000 | One tool result is truncated beyond this. |
+| Characters per turn | 24000 | All tool results in one turn share this budget. |
+| Ranked findings | 25 | How many ranked findings a run may see at once. |
+| Glossary entries | 20 | Canonical names injected into each run. |
+| Recalled memories | 30 | Past lessons injected into each run. |
+| Memory consolidation | 2 days | How often the harness prunes and distils its own memory. |
+
+Larger values cost more tokens and can crowd out the reasoning: the transcript
+is resent on every iteration, so its growth is quadratic in the number of steps.
+
+---
+
+## Why are my agents not running?
+
+Work through this in order.
+
+1. **Is an AI provider configured?** Without one under **Harness → Config**, no
+   agent runs at all.
+2. **Is the agent switched on?** The toggle on its card.
+3. **Is it waiting on a gate?** The most common cause. Check the agent's
+   **Waits for** switches against what your instance is doing — an inquiry
+   agent gated on matching will not run while a large matching backlog is being
+   continuously refilled by new scans.
+4. **Is it inside its minimum gap?** Compare the gap against how recently it
+   last ran.
+5. **Is the mode right?** `Only when I trigger it` and `On its own schedule`
+   never start from a scan.
+
+Two things that will get an agent moving immediately:
+
+- **Trigger it manually.** A manual run bypasses every gate and both
+  guardrails.
+- **Lower "Run anyway after".** The backstop overrides the gates, so setting it
+  short forces the run without changing what the agent waits for the rest of
+  the time. The heartbeat picks it up within 15 minutes even if nothing is
+  being scanned.
+
+---
+
+## Related
+
+- [AI Providers](/settings/ai-providers) — the model each agent uses
+- [MCP Server](/settings/mcp-server) — external tools available to agents
