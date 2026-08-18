@@ -4,6 +4,8 @@ title: Harness Agents
 description: When each AI agent runs, what it waits for, and the limits that keep it bounded.
 ---
 
+import { Callout } from "nextra/components"
+
 # Harness Agents
 
 The harness runs several agents, and they are not alike. One reviews open cases
@@ -111,6 +113,50 @@ Escalation and Case act on a single new signal and are cheap, so they wait for
 nothing. Inquiry keeps its matching gate because its entire output is match
 counts, and counting against a queue that has not drained produces numbers that
 are wrong the moment they are written.
+
+---
+
+## How agents are chained
+
+Agents do not run as five independent jobs. They run as **two chains, side by
+side**, and within a chain the order is a real data dependency rather than a
+preference.
+
+| Chain | Order | Why that order |
+|---|---|---|
+| **Investigation** | Inquiry → Case → Escalation | Case reads the inquiries Inquiry just created or widened; Escalation alerts on the final state of the cases Case mutated. |
+| **Detection** | Config → Detector author | Detector author reacts to what Config left unaddressed, and both write the same source configuration — running them in series keeps them off each other's concurrency token. |
+
+The two chains run **concurrently**. Detection reads the finding landscape from
+the database rather than from what the investigation agents produced, so there
+is nothing to wait for. Running all five in series once cost a live instance
+roughly an order of magnitude in cycle throughput.
+
+**Dream** belongs to no chain: it consolidates memory on its own schedule,
+alone.
+
+The Agents tab shows this layout at the top, with each agent's trigger mode and
+whether it is switched off.
+
+### What stops a chain
+
+| Event | Effect |
+|---|---|
+| An agent is gated or inside its minimum gap | It is skipped; the rest of the chain still runs. |
+| An agent fails on its own logic | It is recorded as failed; the rest of the chain still runs. |
+| **A provider-level failure** — rate limit, bad key, missing model | The rest of that chain is abandoned and the cycle is retried later. |
+| The cycle budget expires | The rest of that chain is skipped until the next cycle. |
+
+The provider case is deliberately different: a 429 will meet the next agent
+exactly as it met this one, so continuing would only spend more calls into the
+same limit. Every other failure belongs to one agent, and its chain-mates run.
+
+<Callout type="warning">
+  If an agent shows no runs at all, check the agent *before* it in its chain.
+  A provider error there stops everything behind it — which is why a rate-limited
+  Inquiry agent can leave Case and Escalation with zero runs while both are
+  enabled, ungated and perfectly healthy.
+</Callout>
 
 ---
 

@@ -9,6 +9,38 @@ import {
   type AgentPolicy,
   type Mission,
 } from './missions';
+import { DETECTION_CHAIN, INVESTIGATION_CHAIN } from '../autopilot.constants';
+
+/** The two chains a pipeline agent can belong to. They run concurrently. */
+export type AgentChain = 'INVESTIGATION' | 'DETECTION';
+
+const CHAINS: ReadonlyArray<{ name: AgentChain; kinds: readonly AgentKind[] }> =
+  [
+    { name: 'INVESTIGATION', kinds: INVESTIGATION_CHAIN },
+    { name: 'DETECTION', kinds: DETECTION_CHAIN },
+  ];
+
+/**
+ * Where an agent sits in the pipeline, derived from the chain definitions so
+ * the UI cannot drift from the order the worker actually executes.
+ */
+function chainPlacement(kind: AgentKind): {
+  chain: AgentChain | null;
+  chainPosition: number;
+  runsAfter: AgentKind | null;
+} {
+  for (const { name, kinds } of CHAINS) {
+    const index = kinds.indexOf(kind);
+    if (index === -1) continue;
+    return {
+      chain: name,
+      chainPosition: index + 1,
+      runsAfter: index > 0 ? (kinds[index - 1] ?? null) : null,
+    };
+  }
+  // DREAM has no chain: it runs on its own schedule, alone.
+  return { chain: null, chainPosition: 0, runsAfter: null };
+}
 
 const INSTANCE_SETTINGS_ID = 1;
 
@@ -68,6 +100,19 @@ export interface AgentSummary {
   defaultMinIntervalMinutes: number;
   maxStalenessHours: number;
   defaultMaxStalenessHours: number;
+  /**
+   * Which chain this agent belongs to, and where in it.
+   *
+   * Structural, not cosmetic: within a chain the order is a real data
+   * dependency, and the two chains run concurrently. Sent to the UI so the
+   * operator can see what runs after what without reading the source — the
+   * order lives in one place (autopilot.constants) and the page follows it.
+   */
+  chain: AgentChain | null;
+  /** 1-based position within {@link chain}; 0 when the agent has none. */
+  chainPosition: number;
+  /** The agent immediately before this one, whose output it consumes. */
+  runsAfter: AgentKind | null;
   /** null = follow the instance-wide run budget. */
   runBudgetMinutes: number | null;
   lastTriggeredAt: Date | null;
@@ -167,6 +212,7 @@ export class AgentConfigService {
         defaultWaitForScans: factory.waitForScans,
         defaultMinIntervalMinutes: factory.minIntervalMinutes,
         defaultMaxStalenessHours: factory.maxStalenessHours,
+        ...chainPlacement(def.kind),
         runBudgetMinutes: row?.runBudgetMinutes ?? null,
         lastTriggeredAt: row?.lastTriggeredAt ?? null,
         customized:

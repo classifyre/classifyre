@@ -1,0 +1,110 @@
+---
+sidebarTitle: Harness Tools
+title: Harness Tools
+description: The capabilities the AI harness can call, how they are named and gated, and how to assign them per agent.
+---
+
+import { Callout } from "nextra/components"
+
+# Harness Tools
+
+An agent cannot do anything except through a tool. Every read it makes and
+every change it writes goes through a named capability with a declared side
+effect, which is what makes an agent's behaviour reviewable rather than
+mysterious.
+
+---
+
+## How a tool is named
+
+Every built-in tool is `namespace.verb`:
+
+```
+config.tune_source
+findings.ranked
+inquiries.create
+glossary.propose
+```
+
+The namespace says which part of the system it touches; the verb says what it
+does to it. Tools from a connected MCP server are prefixed `mcp.<server>.` so
+an external capability can never be mistaken for a native one.
+
+---
+
+## Namespaces
+
+| Namespace | What it covers |
+|---|---|
+| `observe` | Reading the corpus: findings, sources, assets, coverage |
+| `semantic` | Importance ranking, meaning-based search, neighbours, boilerplate |
+| `investigation` | Creating and maintaining inquiries and cases |
+| `hypotheses` | Recording and testing what a case is proposing |
+| `leads` | Following a case's open threads |
+| `fingerprints` | Shared values and asset correlation |
+| `detector` | Authoring, training and evaluating custom detectors |
+| `config` | Editable source configuration — detectors, sampling, resources |
+| `schedule` | What is scanning, and what is due |
+| `knowledge` | Memory: writing lessons, deferring work |
+| `glossary` | Canonical names for real-world entities |
+| `alert` | Operator notifications |
+
+---
+
+## Read and mutate
+
+Each tool declares a side effect, and the distinction is enforced rather than
+advisory.
+
+| Side effect | Meaning |
+|---|---|
+| `read` | Cannot change anything. Always available to an agent that has it. |
+| `mutate` | Writes. Subject to the per-entity `OBSERVE_ONLY` mode. |
+
+A mutating tool also declares the **domain** it writes to — inquiry, case,
+source, detector. An entity set to observe-only refuses writes in its domain
+even when the agent holds the tool, so restricting an agent and restricting an
+entity are two independent controls and neither can be bypassed by the other.
+
+<Callout type="info">
+  Never assume a tool is harmless because of its name. `config.tune_source`
+  rewrites which detectors run against a source, which changes what future scans
+  find. The detection churn budgets exist because of exactly that.
+</Callout>
+
+---
+
+## Assigning tools to an agent
+
+Tools are assigned per agent in **Harness → Agents**, on each agent's card:
+
+- **Tools** lists the built-in tools that agent currently holds. Add any tool
+  from the catalogue, including one that belongs to another agent by default.
+- **MCP tools** is read-only. Those are scoped per server under
+  **Harness → Config → MCP**, not assigned here — a server grants its tools to
+  the agent kinds it is configured for.
+
+Each agent ships with a factory toolset matched to its mission. Removing a tool
+an agent's mission depends on will not break the run, but the agent will
+usually notice it cannot do the thing it was asked to do and stop early.
+
+One tool is always present regardless of assignment: `glossary.lookup`. An
+agent that can propose canonical names but cannot look them up can only create
+duplicates.
+
+---
+
+## Seeing what an agent actually holds
+
+The live list — including tools from connected MCP servers — is on each agent's
+card in **Harness → Agents**. That is the authoritative view for a running
+instance, because it reflects the servers you have connected and any assignment
+you have changed.
+
+---
+
+## Related
+
+- [Harness Agents](/settings/harness-agents) — when each agent runs, and in what order
+- [MCP Server](/settings/mcp-server) — connecting external tool servers
+- [AI Providers](/settings/ai-providers) — the model each agent uses

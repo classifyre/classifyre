@@ -1,5 +1,6 @@
 import {
   api,
+  type BulkUpdateGlossaryTermsResponseDto,
   type DeleteGlossaryTermResponseDto,
   type GlossaryListResponseDto,
   type GlossaryTermDto,
@@ -43,6 +44,13 @@ type VerifyParams = Parameters<
 type RemoveParams = Parameters<
   typeof api.glossary.glossaryControllerRemove
 >[0];
+type BulkUpdateParams = Parameters<
+  typeof api.glossary.glossaryControllerBulkUpdate
+>[0];
+
+export type GlossaryBulkFilters = NonNullable<
+  BulkUpdateParams["bulkUpdateGlossaryTermsDto"]["filters"]
+>;
 
 export async function listGlossaryTerms(
   params: ListParams,
@@ -60,6 +68,12 @@ export async function verifyGlossaryTerm(
   params: VerifyParams,
 ): Promise<GlossaryTermDto> {
   return api.glossary.glossaryControllerVerify(params);
+}
+
+export async function bulkUpdateGlossaryTerms(
+  params: BulkUpdateParams,
+): Promise<BulkUpdateGlossaryTermsResponseDto> {
+  return api.glossary.glossaryControllerBulkUpdate(params);
 }
 
 export async function removeGlossaryTerm(

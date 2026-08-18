@@ -12,6 +12,7 @@ All URIs are relative to *http://localhost*
 | [**sourceFilesControllerDelete**](SourcesApi.md#sourcefilescontrollerdelete) | **DELETE** /sources/{sourceId}/files/{fileId} | Delete an uploaded source file |
 | [**sourceFilesControllerList**](SourcesApi.md#sourcefilescontrollerlist) | **GET** /sources/{sourceId}/files | List uploaded files for a Sandbox source |
 | [**sourceFilesControllerUpload**](SourcesApi.md#sourcefilescontrollerupload) | **POST** /sources/{sourceId}/files | Upload one file to a Sandbox source |
+| [**sourcesControllerBulkRunSources**](SourcesApi.md#sourcescontrollerbulkrunsources) | **POST** /sources/bulk-run | Start a scan for many data sources at once |
 | [**sourcesControllerBulkUpdateSources**](SourcesApi.md#sourcescontrollerbulkupdatesources) | **POST** /sources/bulk-update | Bulk update data sources |
 | [**sourcesControllerCreateSource**](SourcesApi.md#sourcescontrollercreatesource) | **POST** /sources | Create a new data source |
 | [**sourcesControllerDeleteSource**](SourcesApi.md#sourcescontrollerdeletesource) | **DELETE** /sources/{id} | Delete a data source |
@@ -587,6 +588,73 @@ No authorization required
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
 | **201** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## sourcesControllerBulkRunSources
+
+> BulkRunSourcesResponseDto sourcesControllerBulkRunSources(bulkRunSourcesDto)
+
+Start a scan for many data sources at once
+
+Queues a manual run for explicit source IDs or every source matching a filter snapshot. Runs beyond the configured concurrency limit stay PENDING until a slot frees up; sources that are already in flight are reported as skipped.
+
+### Example
+
+```ts
+import {
+  Configuration,
+  SourcesApi,
+} from '@workspace/api-client';
+import type { SourcesControllerBulkRunSourcesRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new SourcesApi();
+
+  const body = {
+    // BulkRunSourcesDto
+    bulkRunSourcesDto: ...,
+  } satisfies SourcesControllerBulkRunSourcesRequest;
+
+  try {
+    const data = await api.sourcesControllerBulkRunSources(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **bulkRunSourcesDto** | [BulkRunSourcesDto](BulkRunSourcesDto.md) |  | |
+
+### Return type
+
+[**BulkRunSourcesResponseDto**](BulkRunSourcesResponseDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: `application/json`
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** | Runs queued |  -  |
 
 [[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
 

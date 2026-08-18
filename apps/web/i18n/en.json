@@ -183,7 +183,22 @@
     "deleted": "Glossary term deleted",
     "deleteFailed": "Failed to delete glossary term",
     "deleteConfirmTitle": "Delete glossary term?",
-    "deleteConfirmDescription": "This action cannot be undone."
+    "deleteConfirmDescription": "This action cannot be undone.",
+    "unverified": "Unverified",
+    "bulk": {
+      "selected": "{{count}} term selected",
+      "selectedPlural": "{{count}} terms selected",
+      "allSelected": "All {{count}} matching terms selected",
+      "selectAllAria": "Select all terms matching the current filters",
+      "selectTermAria": "Select term {{term}}",
+      "selectAll": "Select all {{count}} terms matching the current filters",
+      "deselectAll": "Deselect all terms",
+      "verify": "Verify",
+      "unverify": "Unverify",
+      "changeType": "Change type",
+      "applied": "{{count}} term(s) updated",
+      "failed": "Failed to update the selected terms"
+    }
   },
   "common": {
     "duration": {
@@ -793,6 +808,12 @@
     },
     "schedule": {
       "resumed": "Automatic scanning resumed."
+    },
+    "bulkRun": {
+      "runAll": "Run all",
+      "started": "Queued {{count}} scan(s)",
+      "skipped": "{{count}} source(s) could not be started",
+      "failed": "Failed to start scans"
     }
   },
   "findings": {
@@ -3076,7 +3097,6 @@
       "runs": "Runs",
       "usage": "Usage",
       "agents": "Agents",
-      "tools": "Tools",
       "memory": "Memory",
       "brief": "System Brief",
       "config": "Configuration"
@@ -3098,32 +3118,26 @@
       "payload": "Payload",
       "clearFilters": "Clear filters"
     },
-    "tools": {
-      "title": "Capability map",
-      "desc": "The tools the harness can call and the missions that wield them. New tools (including external MCP servers) register here automatically.",
-      "registry": "Tool registry",
-      "missions": "Missions",
-      "read": "read",
-      "mutate": "mutate",
-      "domain": "domain",
-      "toolCount": "{{count}} tools",
-      "allowedTools": "{{count}} tools",
-      "maxIterations": "max {{count}} steps",
-      "reactTitle": "How the harness thinks",
-      "reactStep1": "Observe — calls read tools to gather the slice of state it needs.",
-      "reactStep2": "Reason — proposes the next action with a short rationale.",
-      "reactStep3": "Act — a mutating tool runs through the gate (validated, OBSERVE_ONLY-checked, audited).",
-      "reactStep4": "Repeat — the result feeds back until the goal is met or the step budget is reached.",
-      "none": "No tools registered.",
-      "builtinBadge": "Built-in",
-      "mcpBadge": "MCP"
-    },
     "agents": {
       "title": "Agents",
       "desc": "Each autonomous agent, what it can do, and how it works. Enable an agent, edit its goal, and assign any built-in tool — including tools from other agents.",
       "requiresAi": "Assign a Harness provider in Harness AI → Configuration before agents can act.",
       "enabled": "Enabled",
       "alwaysOn": "Always on",
+      "chain": {
+        "title": "Chain",
+        "desc": "Agents in a chain run in order, because each one reads what the one before it wrote. The two chains run at the same time.",
+        "investigation": "Investigation",
+        "detection": "Detection",
+        "off": "off",
+        "unchained": "runs alone, on its own schedule.",
+        "providerHalt": "A provider failure — rate limit, bad key, missing model — stops the rest of that chain, because the next agent would hit the same wall. Any other failure affects only the agent it happened to.",
+        "why": {
+          "case": "Case reads the inquiries Inquiry just created or widened.",
+          "escalation": "Escalation alerts on the final state of the cases Case mutated.",
+          "detectorAuthor": "Detector author reacts to what Config left unaddressed, and both write the same source configuration."
+        }
+      },
       "runsWhen": "Runs when",
       "modes": {
         "eager": "Immediately",

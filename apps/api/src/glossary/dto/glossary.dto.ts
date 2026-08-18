@@ -3,6 +3,7 @@ import { Type } from 'class-transformer';
 import {
   ArrayMaxSize,
   IsArray,
+  IsBoolean,
   IsEnum,
   IsInt,
   IsOptional,
@@ -10,6 +11,7 @@ import {
   Max,
   MaxLength,
   Min,
+  ValidateNested,
 } from 'class-validator';
 import { GlossaryEntityType } from '@prisma/client';
 
@@ -103,6 +105,72 @@ export class UpsertGlossaryTermDto {
   @IsOptional()
   @IsString()
   author?: string;
+}
+
+export class BulkUpdateGlossaryFiltersDto {
+  @ApiPropertyOptional({
+    description: 'Free-text filter over term, aliases and notes (ILIKE).',
+  })
+  @IsOptional()
+  @IsString()
+  query?: string;
+
+  @ApiPropertyOptional({ enum: GlossaryEntityType })
+  @IsOptional()
+  @IsEnum(GlossaryEntityType)
+  entityType?: GlossaryEntityType;
+}
+
+export class BulkUpdateGlossaryTermsDto {
+  @ApiPropertyOptional({
+    description: 'Explicit term IDs to update. Use either ids or filters.',
+    type: [String],
+  })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  ids?: string[];
+
+  @ApiPropertyOptional({
+    description: 'Update every term matching this filter snapshot.',
+    type: BulkUpdateGlossaryFiltersDto,
+  })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => BulkUpdateGlossaryFiltersDto)
+  filters?: BulkUpdateGlossaryFiltersDto;
+
+  @ApiPropertyOptional({
+    description:
+      'True marks the selected terms verified, false returns them to unverified. Omit to leave verification unchanged.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  verified?: boolean;
+
+  @ApiPropertyOptional({
+    enum: GlossaryEntityType,
+    description: 'New entity type. Omit to leave entity types unchanged.',
+  })
+  @IsOptional()
+  @IsEnum(GlossaryEntityType)
+  entityType?: GlossaryEntityType;
+
+  @ApiPropertyOptional({
+    description:
+      'Operator identity recorded as verifiedBy. Defaults to "operator".',
+  })
+  @IsOptional()
+  @IsString()
+  verifiedBy?: string;
+}
+
+export class BulkUpdateGlossaryTermsResponseDto {
+  @ApiProperty({ description: 'Number of terms updated' })
+  updatedCount!: number;
+
+  @ApiProperty({ type: [String], description: 'IDs of the updated terms' })
+  ids!: string[];
 }
 
 export class GlossaryTermDto {

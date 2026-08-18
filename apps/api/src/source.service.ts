@@ -412,12 +412,22 @@ export class SourceService {
           }
         : null;
 
+      // Requesting a run claims the source as RUNNING so nothing else can
+      // start it, but the run itself waits in the queue as PENDING until a
+      // concurrency slot frees up. Report what the run is actually doing so a
+      // queued scan is not shown as running.
+      const runnerStatus =
+        source.runnerStatus === RunnerStatus.RUNNING &&
+        runner?.status === RunnerStatus.PENDING
+          ? RunnerStatus.PENDING
+          : source.runnerStatus;
+
       return {
         id: source.id,
         name: source.name,
         description: source.description,
         type: source.type,
-        runnerStatus: source.runnerStatus,
+        runnerStatus,
         latestRunner,
         createdAt: source.createdAt,
         updatedAt: source.updatedAt,

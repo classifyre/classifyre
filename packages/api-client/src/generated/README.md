@@ -188,6 +188,7 @@ All URIs are relative to *http://localhost*
 *FindingsApi* | [**findingsControllerListAssetSummaries**](docs/FindingsApi.md#findingscontrollerlistassetsummaries) | **GET** /findings/assets | List asset finding summaries with optional filters
 *FindingsApi* | [**findingsControllerRefreshDiscoveryStats**](docs/FindingsApi.md#findingscontrollerrefreshdiscoverystats) | **POST** /findings/discovery/refresh | Queue a full rebuild of the pre-aggregated finding statistics
 *FindingsApi* | [**findingsControllerUpdate**](docs/FindingsApi.md#findingscontrollerupdate) | **PATCH** /findings/{id} | Update a finding
+*GlossaryApi* | [**glossaryControllerBulkUpdate**](docs/GlossaryApi.md#glossarycontrollerbulkupdate) | **POST** /glossary/bulk | Bulk verify/unverify or retype glossary terms (operator)
 *GlossaryApi* | [**glossaryControllerList**](docs/GlossaryApi.md#glossarycontrollerlist) | **GET** /glossary | List glossary terms
 *GlossaryApi* | [**glossaryControllerLookup**](docs/GlossaryApi.md#glossarycontrollerlookup) | **GET** /glossary/lookup | Resolve a name or alias to glossary terms (exact + semantic)
 *GlossaryApi* | [**glossaryControllerRemove**](docs/GlossaryApi.md#glossarycontrollerremove) | **DELETE** /glossary/{id} | Delete a glossary term
@@ -260,6 +261,7 @@ All URIs are relative to *http://localhost*
 *SourcesApi* | [**sourceFilesControllerDelete**](docs/SourcesApi.md#sourcefilescontrollerdelete) | **DELETE** /sources/{sourceId}/files/{fileId} | Delete an uploaded source file
 *SourcesApi* | [**sourceFilesControllerList**](docs/SourcesApi.md#sourcefilescontrollerlist) | **GET** /sources/{sourceId}/files | List uploaded files for a Sandbox source
 *SourcesApi* | [**sourceFilesControllerUpload**](docs/SourcesApi.md#sourcefilescontrollerupload) | **POST** /sources/{sourceId}/files | Upload one file to a Sandbox source
+*SourcesApi* | [**sourcesControllerBulkRunSources**](docs/SourcesApi.md#sourcescontrollerbulkrunsources) | **POST** /sources/bulk-run | Start a scan for many data sources at once
 *SourcesApi* | [**sourcesControllerBulkUpdateSources**](docs/SourcesApi.md#sourcescontrollerbulkupdatesources) | **POST** /sources/bulk-update | Bulk update data sources
 *SourcesApi* | [**sourcesControllerCreateSource**](docs/SourcesApi.md#sourcescontrollercreatesource) | **POST** /sources | Create a new data source
 *SourcesApi* | [**sourcesControllerDeleteSource**](docs/SourcesApi.md#sourcescontrollerdeletesource) | **DELETE** /sources/{id} | Delete a data source
@@ -335,8 +337,14 @@ All URIs are relative to *http://localhost*
 - [BulkIngestAssetsDto](docs/BulkIngestAssetsDto.md)
 - [BulkIngestEdgesDto](docs/BulkIngestEdgesDto.md)
 - [BulkIngestEdgesResponseDto](docs/BulkIngestEdgesResponseDto.md)
+- [BulkRunSourcesDto](docs/BulkRunSourcesDto.md)
+- [BulkRunSourcesResponseDto](docs/BulkRunSourcesResponseDto.md)
+- [BulkRunSourcesSkippedDto](docs/BulkRunSourcesSkippedDto.md)
 - [BulkUpdateFindingsDto](docs/BulkUpdateFindingsDto.md)
 - [BulkUpdateFindingsResponseDto](docs/BulkUpdateFindingsResponseDto.md)
+- [BulkUpdateGlossaryFiltersDto](docs/BulkUpdateGlossaryFiltersDto.md)
+- [BulkUpdateGlossaryTermsDto](docs/BulkUpdateGlossaryTermsDto.md)
+- [BulkUpdateGlossaryTermsResponseDto](docs/BulkUpdateGlossaryTermsResponseDto.md)
 - [BulkUpdateSourcesDto](docs/BulkUpdateSourcesDto.md)
 - [BulkUpdateSourcesResponseDto](docs/BulkUpdateSourcesResponseDto.md)
 - [BulkUpdateSourcesSamplingDto](docs/BulkUpdateSourcesSamplingDto.md)
