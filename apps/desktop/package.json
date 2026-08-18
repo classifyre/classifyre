@@ -1,9 +1,9 @@
 {
   "name": "classifyre-desktop",
   "productName": "Classifyre",
-  "version": "0.4.122-SNAPSHOT",
+  "version": "0.4.122",
   "private": true,
-  "description": "Classifyre Desktop \u2014 Electron app with embedded PostgreSQL",
+  "description": "Classifyre Desktop — Electron app with embedded PostgreSQL",
   "main": ".vite/build/index.js",
   "scripts": {
     "postinstall": "node scripts/postinstall.js",
