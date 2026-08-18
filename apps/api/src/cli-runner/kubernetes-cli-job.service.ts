@@ -16,7 +16,17 @@ import { InternalApiKeyService } from '../internal-api-key.service';
 
 type KubernetesModule = typeof import('@kubernetes/client-node');
 
-type CliJobMode = 'extract' | 'test' | 'evaluation';
+type CliJobMode = 'extract' | 'test' | 'evaluation' | 'notebook';
+
+/** Port the marimo editor listens on inside a notebook-session pod. */
+export const NOTEBOOK_SESSION_PORT = 2718;
+
+export interface InteractiveJobHandle {
+  jobName: string;
+  namespace: string;
+  /** `podIP:port`. The API dials this directly - see runInteractiveJob. */
+  endpoint: string;
+}
 type JobCleanupPolicy = 'none' | 'failed' | 'always';
 
 interface CliJobResult {
@@ -70,6 +80,7 @@ export class KubernetesCliJobService {
     onLogChunk?: CliJobLogHandler,
     onJobCreated?: CliJobCreatedHandler,
     samplingCursorB64?: string,
+    notebookRevision?: number,
   ): Promise<CliJobResult> {
     return this.runJob({
       runnerId,
@@ -79,6 +90,7 @@ export class KubernetesCliJobService {
       outputRestUrl,
       hasSuccessfulRuns,
       samplingCursorB64,
+      notebookRevision,
       onLogChunk,
       onJobCreated,
     });
@@ -126,6 +138,117 @@ export class KubernetesCliJobService {
       ).toString('base64'),
       jobTrackingKey: params.evaluationId,
     });
+  }
+
+  /**
+   * Launch a long-lived notebook editing session and return once it is
+   * reachable.
+   *
+   * Unlike every other job here, this one is not run to completion - it serves
+   * an HTTP/WebSocket editor until something stops it. So it deliberately does
+   * not go through `runJob`, whose contract is "block until terminal status".
+   *
+   * The API reaches the pod by its IP rather than through a Service. That needs
+   * no extra RBAC (the API's Role already grants `pods: get/list/watch`) and no
+   * NetworkPolicy change (its egress already permits any same-namespace pod),
+   * and it avoids leaving a Service behind if the reaper misses a session.
+   */
+  async runInteractiveJob(params: {
+    sourceId: string;
+    sessionId: string;
+    recipe: Record<string, unknown>;
+    outputRestUrl: string;
+    notebookToken: string;
+    baseUrl: string;
+    idleTimeoutSeconds: number;
+    readyTimeoutMs?: number;
+  }): Promise<InteractiveJobHandle> {
+    await this.ensureKubernetesClients();
+    if (!this.batchApi) {
+      throw new Error('Kubernetes client is not initialized');
+    }
+
+    const template = await this.loadTemplate();
+    const job = await this.buildJobFromTemplate(template, {
+      sourceId: params.sourceId,
+      runnerId: params.sessionId,
+      mode: 'notebook',
+      recipe: params.recipe,
+      outputRestUrl: params.outputRestUrl,
+      notebookToken: params.notebookToken,
+      notebookBaseUrl: params.baseUrl,
+      notebookIdleTimeoutSeconds: params.idleTimeoutSeconds,
+    });
+
+    const namespace = job.metadata?.namespace || this.namespace;
+    const jobName = job.metadata?.name;
+    if (!jobName) {
+      throw new Error('Notebook session manifest is missing metadata.name');
+    }
+
+    await this.createJob(namespace, job);
+
+    try {
+      const endpoint = await this.waitForPodEndpoint(
+        namespace,
+        jobName,
+        params.readyTimeoutMs ?? 300_000,
+      );
+      return { jobName, namespace, endpoint };
+    } catch (error) {
+      // A session that never became reachable is not something to leave behind.
+      await this.deleteJobBestEffort(namespace, jobName);
+      throw error;
+    }
+  }
+
+  async stopInteractiveJob(jobName: string, namespace?: string): Promise<void> {
+    await this.ensureKubernetesClients();
+    await this.deleteJobBestEffort(namespace || this.namespace, jobName);
+  }
+
+  /**
+   * Poll until the session pod has an IP and its container reports Ready.
+   *
+   * Ready (not merely Running) is the right gate: the container spends its first
+   * moments building the notebook's uv sandbox venv, and proxying to it before
+   * marimo binds the port would surface as a connection-refused in the browser.
+   */
+  private async waitForPodEndpoint(
+    namespace: string,
+    jobName: string,
+    timeoutMs: number,
+  ): Promise<string> {
+    const deadline = Date.now() + timeoutMs;
+    let lastReason = 'pod was never scheduled';
+
+    while (Date.now() < deadline) {
+      const pod = await this.findJobPod(namespace, jobName);
+      const phase = pod?.status?.phase;
+
+      if (phase === 'Failed' || phase === 'Succeeded') {
+        const reason =
+          this.extractTerminationReason(pod) || `pod ${phase.toLowerCase()}`;
+        throw new Error(`The notebook session stopped before it was ready: ${reason}`);
+      }
+
+      const podIp = pod?.status?.podIP;
+      const ready = (pod?.status?.containerStatuses || []).some(
+        (status) => status.ready,
+      );
+      if (podIp && ready) {
+        return `${podIp}:${NOTEBOOK_SESSION_PORT}`;
+      }
+
+      lastReason = podIp
+        ? 'the editor did not finish starting'
+        : `pod is ${phase ?? 'pending'}`;
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+    }
+
+    throw new Error(
+      `The notebook session was not ready within ${Math.round(timeoutMs / 1000)}s (${lastReason}).`,
+    );
   }
 
   async stopRunnerJob(
@@ -242,6 +365,7 @@ export class KubernetesCliJobService {
     evaluationInputsB64?: string;
     evaluationDetectorsB64?: string;
     jobTrackingKey?: string;
+    notebookRevision?: number;
     onLogChunk?: CliJobLogHandler;
     onJobCreated?: CliJobCreatedHandler;
   }): Promise<CliJobResult> {
@@ -425,6 +549,10 @@ export class KubernetesCliJobService {
       evaluationFileExt?: string;
       evaluationInputsB64?: string;
       evaluationDetectorsB64?: string;
+      notebookToken?: string;
+      notebookBaseUrl?: string;
+      notebookIdleTimeoutSeconds?: number;
+      notebookRevision?: number;
     },
   ): Promise<V1Job> {
     const job = JSON.parse(JSON.stringify(template)) as V1Job;
@@ -541,6 +669,33 @@ export class KubernetesCliJobService {
       });
     }
 
+    if (typeof params.notebookRevision === 'number') {
+      // Pin the exact notebook this scan runs, so an edit landing mid-run
+      // cannot change what the run executed.
+      envMap.set('CLASSIFYRE_NOTEBOOK_REVISION', {
+        name: 'CLASSIFYRE_NOTEBOOK_REVISION',
+        value: String(params.notebookRevision),
+      });
+    }
+    if (params.notebookToken) {
+      envMap.set('CLASSIFYRE_NOTEBOOK_TOKEN', {
+        name: 'CLASSIFYRE_NOTEBOOK_TOKEN',
+        value: params.notebookToken,
+      });
+    }
+    if (params.notebookBaseUrl) {
+      envMap.set('CLASSIFYRE_NOTEBOOK_BASE_URL', {
+        name: 'CLASSIFYRE_NOTEBOOK_BASE_URL',
+        value: params.notebookBaseUrl,
+      });
+    }
+    if (typeof params.notebookIdleTimeoutSeconds === 'number') {
+      envMap.set('CLASSIFYRE_NOTEBOOK_IDLE_TIMEOUT', {
+        name: 'CLASSIFYRE_NOTEBOOK_IDLE_TIMEOUT',
+        value: String(params.notebookIdleTimeoutSeconds),
+      });
+    }
+
     const workDir = process.env.K8S_CLI_JOB_WORKDIR || '/app/apps/cli';
     envMap.set('CLASSIFYRE_CLI_AUTO_INSTALL_OPTIONAL_DEPS', {
       name: 'CLASSIFYRE_CLI_AUTO_INSTALL_OPTIONAL_DEPS',
@@ -576,6 +731,10 @@ export class KubernetesCliJobService {
 
     if (params.mode === 'evaluation') {
       this.attachEvaluationInputVolume(jobAny, container, envMap);
+    }
+
+    if (params.mode === 'notebook') {
+      this.configureNotebookSessionPod(jobAny, container);
     }
 
     // Apply per-source resource overrides from recipe
@@ -704,6 +863,19 @@ export class KubernetesCliJobService {
         'export CLASSIFYRE_OUTPUT_REST_URL="${CLASSIFYRE_OUTPUT_REST_URL:?API did not provide a namespaced callback URL}"',
       );
       command = '"$PYTHON_BIN" -m src.main test /tmp/recipe.json';
+    } else if (mode === 'notebook') {
+      prelude.push('printf "%s" "$RECIPE_B64" | base64 -d > /tmp/recipe.json');
+      prelude.push('SOURCE_ID="${SOURCE_ID:-}"');
+      prelude.push(
+        'export CLASSIFYRE_OUTPUT_REST_URL="${CLASSIFYRE_OUTPUT_REST_URL:?API did not provide a namespaced callback URL}"',
+      );
+      command = [
+        '"$PYTHON_BIN" -m src.main notebook-session /tmp/recipe.json',
+        '--source-id "$SOURCE_ID"',
+        `--host 0.0.0.0 --port ${NOTEBOOK_SESSION_PORT}`,
+        '--base-url "$CLASSIFYRE_NOTEBOOK_BASE_URL"',
+        '--idle-timeout "${CLASSIFYRE_NOTEBOOK_IDLE_TIMEOUT:-3600}"',
+      ].join(' ');
     } else {
       // File evaluation: an init-container streams the ephemeral input from
       // the API into an emptyDir shared with the CLI container.
@@ -723,6 +895,53 @@ export class KubernetesCliJobService {
       'if [ -x ".venv/bin/python" ]; then PYTHON_BIN=".venv/bin/python"; else PYTHON_BIN="$(command -v python3 || command -v python)"; fi',
       command,
     ].join('; ');
+  }
+
+  /**
+   * Shape a job pod into a notebook editing session.
+   *
+   * Two things separate it from a scan pod. It exposes a port, because the API
+   * proxies HTTP and WebSocket traffic to it. And it runs code the user wrote,
+   * so it is hardened past the chart's defaults: no service-account token (the
+   * notebook has no business talking to the Kubernetes API), no privilege
+   * escalation, and every capability dropped.
+   *
+   * What this does NOT constrain is network reach - a connector's whole job is
+   * to call things - so the UI says as much when a session is started.
+   */
+  private configureNotebookSessionPod(jobAny: any, container: V1Container): void {
+    container.ports = [
+      { name: 'notebook', containerPort: NOTEBOOK_SESSION_PORT, protocol: 'TCP' },
+    ];
+
+    // Ready gates the proxy: waitForPodEndpoint refuses to hand out an endpoint
+    // until marimo is actually listening, so the first request cannot land on a
+    // socket that is still being bound.
+    container.readinessProbe = {
+      tcpSocket: { port: NOTEBOOK_SESSION_PORT },
+      initialDelaySeconds: 5,
+      periodSeconds: 3,
+      failureThreshold: 100,
+    };
+
+    container.securityContext = {
+      ...(container.securityContext || {}),
+      allowPrivilegeEscalation: false,
+      privileged: false,
+      capabilities: { drop: ['ALL'] },
+    };
+
+    const podSpec = jobAny.spec.template.spec;
+    podSpec.automountServiceAccountToken = false;
+    // A session is interactive; retrying it behind the user's back would give
+    // them a new pod without telling them why the old one vanished.
+    jobAny.spec.backoffLimit = 0;
+    jobAny.spec.activeDeadlineSeconds = Number(
+      process.env.K8S_NOTEBOOK_SESSION_MAX_SECONDS || 8 * 60 * 60,
+    );
+    // The reaper deletes sessions explicitly; this is the backstop for a pod
+    // whose reaper never ran.
+    jobAny.spec.ttlSecondsAfterFinished = 120;
   }
 
   /**

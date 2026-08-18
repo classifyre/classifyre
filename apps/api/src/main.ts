@@ -32,6 +32,8 @@ import {
 } from './namespace/namespace.constants';
 import { PrismaClientManager } from './prisma/prisma-client-manager';
 import { InternalApiKeyService } from './internal-api-key.service';
+import { CustomSourceSessionService } from './custom-sources/custom-source-session.service';
+import httpProxy from '@fastify/http-proxy';
 import compress from '@fastify/compress';
 import { constants as zlibConstants } from 'node:zlib';
 import { resolveHeapGuard } from './utils/heap-guard';
@@ -314,6 +316,67 @@ async function bootstrap() {
 
   fastify.post('/mcp', mcpHandler);
   fastify.post('/api/mcp', mcpHandler);
+
+  // ── Notebook editing session proxy ──────────────────────────────────
+  //
+  // Registered on the raw Fastify instance rather than as a Nest controller
+  // because the marimo editor needs a WebSocket upgrade, which the Nest routing
+  // layer (and the web app's own /api proxy) cannot carry.
+  //
+  // The browser only ever sees this API path. What sits behind it differs by
+  // runtime - a session pod's IP in Kubernetes, a loopback port on the desktop -
+  // and keeping the browser-facing URL identical is what lets one web component
+  // serve both.
+  const notebookSessions = app.get(CustomSourceSessionService);
+  const NOTEBOOK_PROXY_PREFIX = '/custom-sources/:sourceId/session/:sessionId/app';
+
+  await fastify.register(httpProxy, {
+    upstream: 'http://127.0.0.1:1', // never used; getUpstream decides
+    prefix: NOTEBOOK_PROXY_PREFIX,
+    rewritePrefix: '',
+    websocket: true,
+    // Resolve (and cache) the target before the proxy handler runs. This is the
+    // async half; the websocket upgrade below reads what this warms.
+    preHandler: async (request: any, reply: any) => {
+      const { sourceId, sessionId } = request.params ?? {};
+      try {
+        const target = await notebookSessions.resolveTarget(sourceId, sessionId);
+        request.notebookUpstream = `http://${target.endpoint}`;
+        request.notebookToken = target.token;
+      } catch (error: any) {
+        const status = error?.status ?? error?.getStatus?.() ?? 502;
+        return reply
+          .code(status)
+          .send({ message: error?.message ?? 'Notebook session unavailable' });
+      }
+    },
+    replyOptions: {
+      getUpstream(request: any) {
+        if (request.notebookUpstream) return request.notebookUpstream;
+        // WebSocket upgrades skip preHandler, so fall back to the in-process
+        // cache the preceding page load populated.
+        const { sourceId, sessionId } = request.params ?? {};
+        const cached = notebookSessions.cachedTarget(sourceId, sessionId);
+        if (!cached) {
+          throw new Error('That notebook session is not available on this node.');
+        }
+        return `http://${cached.endpoint}`;
+      },
+      rewriteRequestHeaders(request: any, headers: Record<string, string>) {
+        const token =
+          request.notebookToken ??
+          notebookSessions.cachedTarget(
+            request.params?.sourceId,
+            request.params?.sessionId,
+          )?.token;
+        // marimo authenticates with its own per-session token. It stays between
+        // the API and the editor; the browser never receives it.
+        return token
+          ? { ...headers, authorization: `Bearer ${token}` }
+          : headers;
+      },
+    },
+  });
 
   await app.listen(port, '0.0.0.0');
   logger.log(`Application is running on: http://localhost:${port}`);

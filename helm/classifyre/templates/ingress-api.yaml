@@ -16,6 +16,21 @@ metadata:
     # which would turn a still-running request into a 504 for the CLI.
     nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
     nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    # The custom-source notebook editor is proxied through the API and speaks
+    # WebSocket, so upgrades have to survive this hop. $connection_upgrade is the
+    # map ingress-nginx defines by default (upgrade when Upgrade is set, close
+    # otherwise) - the conditional form matters here because this ingress also
+    # carries ordinary REST traffic that must keep using keep-alive.
+    nginx.ingress.kubernetes.io/proxy-http-version: "1.1"
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      proxy_set_header Upgrade $http_upgrade;
+      proxy_set_header Connection $connection_upgrade;
+    # An editing session is pinned to the API replica that started it (its proxy
+    # target is resolved in that process), and marimo itself requires sticky
+    # sessions behind a load balancer.
+    nginx.ingress.kubernetes.io/affinity: "cookie"
+    nginx.ingress.kubernetes.io/session-cookie-name: "CLASSIFYRE_API"
+    nginx.ingress.kubernetes.io/session-cookie-hash: "sha1"
     {{- with .Values.ingress.annotations }}
     {{- toYaml . | nindent 4 }}
     {{- end }}

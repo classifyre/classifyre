@@ -1223,6 +1223,12 @@ export class CliRunnerService {
         this.runnerEventsGateway.emitRunnerUpdate(runnerDto as any);
       }
 
+      // For CUSTOM sources, decide now which notebook revision this run
+      // executes. Pinning it here means editing the notebook mid-run cannot
+      // change what the run meant, and leaves a record of what produced these
+      // results.
+      const notebookRevision = await this.pinNotebookRevision(runnerId, source);
+
       const environment = process.env.ENVIRONMENT || 'development';
       if (this.isKubernetesExecutionEnabled(environment)) {
         await this.executeCliInKubernetes(
@@ -1230,6 +1236,7 @@ export class CliRunnerService {
           source,
           hasSuccessfulRuns,
           namespaceId,
+          notebookRevision,
         );
       } else {
         await this.executeCliLocally(
@@ -1238,6 +1245,7 @@ export class CliRunnerService {
           environment,
           hasSuccessfulRuns,
           namespaceId,
+          notebookRevision,
         );
       }
     } catch (error) {
@@ -1247,6 +1255,39 @@ export class CliRunnerService {
         name: error.name,
       });
     }
+  }
+
+  /**
+   * Record which notebook revision a CUSTOM source's run will execute.
+   *
+   * Reads the table directly rather than depending on CustomSourceNotebookService,
+   * which would make CliRunnerModule and CustomSourcesModule mutually dependent.
+   */
+  private async pinNotebookRevision(
+    runnerId: string,
+    source: { id: string; type: AssetType },
+  ): Promise<number | undefined> {
+    if (source.type !== AssetType.CUSTOM) {
+      return undefined;
+    }
+
+    const latest = await this.prisma.customSourceNotebook.findFirst({
+      where: { sourceId: source.id },
+      orderBy: { revision: 'desc' },
+      select: { revision: true },
+    });
+
+    if (!latest) {
+      throw new Error(
+        'This custom source has no saved notebook yet. Open an editing session and save one before running a scan.',
+      );
+    }
+
+    await this.prisma.runner.update({
+      where: { id: runnerId },
+      data: { notebookRevision: latest.revision },
+    });
+    return latest.revision;
   }
 
   private isKubernetesExecutionEnabled(environment: string): boolean {
@@ -1262,6 +1303,7 @@ export class CliRunnerService {
     environment: string,
     hasSuccessfulRuns: boolean,
     namespaceId?: string,
+    notebookRevision?: number,
   ): Promise<void> {
     const cliPath = this.getCliPath(environment);
     const venvPath = this.getVenvPath(environment);
@@ -1278,6 +1320,7 @@ export class CliRunnerService {
         outputRestUrl,
         hasSuccessfulRuns,
         this.encodeSamplingCursor(source),
+        notebookRevision,
       );
       const { stdout, stderr, exitCode } = await this.executeCli(
         command,
@@ -1308,6 +1351,7 @@ export class CliRunnerService {
     source: any,
     hasSuccessfulRuns: boolean,
     namespaceId?: string,
+    notebookRevision?: number,
   ): Promise<void> {
     if (!this.kubernetesCliJobService) {
       throw new Error('Kubernetes CLI Job service is not available');
@@ -1323,6 +1367,7 @@ export class CliRunnerService {
       ({ jobName, namespace }) =>
         this.persistKubernetesExecutionIdentity(runnerId, jobName, namespace),
       this.encodeSamplingCursor(source),
+      notebookRevision,
     );
     const output = result.output || '';
     if (await this.shouldSkipRunnerFinalTransition(runnerId, result.exitCode)) {
@@ -1524,6 +1569,7 @@ export class CliRunnerService {
     outputRestUrl: string,
     hasSuccessfulRuns: boolean,
     samplingCursorB64?: string,
+    notebookRevision?: number,
   ): string {
     const escapedCliPath = this.shellEscape(cliPath);
     const escapedVenvPython = this.shellEscape(this.getVenvPython(venvPath));
@@ -1533,12 +1579,17 @@ export class CliRunnerService {
     const samplingCursorEnv = samplingCursorB64
       ? `CLASSIFYRE_SAMPLING_CURSOR=${this.shellEscape(samplingCursorB64)} `
       : '';
+    const notebookRevisionEnv =
+      typeof notebookRevision === 'number'
+        ? `CLASSIFYRE_NOTEBOOK_REVISION=${notebookRevision} `
+        : '';
     // Keep startup lightweight: core deps are preinstalled in the image, and optional
     // detector groups are installed lazily by the CLI on first use.
     return (
       `cd ${escapedCliPath} && ` +
       `CLASSIFYRE_SOURCE_HAS_SUCCESSFUL_RUN=${hasSuccessfulRuns ? '1' : '0'} ` +
       samplingCursorEnv +
+      notebookRevisionEnv +
       `uv run --locked --no-dev --python ${escapedVenvPython} ` +
       `python -m src.main extract ${this.shellEscape(recipeFile)} ` +
       `--output-type rest ` +
@@ -1584,6 +1635,108 @@ export class CliRunnerService {
         ? ` --output-rest-url ${this.shellEscape(outputRestUrl)}`
         : '')
     );
+  }
+
+  /**
+   * The namespaced API base a notebook session should call back to, for
+   * reading its notebook revision and saving new ones.
+   */
+  notebookCallbackUrl(): string {
+    return this.resolveOutputRestUrl(process.env.ENVIRONMENT || 'development');
+  }
+
+  /**
+   * Start a notebook editing session as a local child process.
+   *
+   * The desktop counterpart of KubernetesCliJobService.runInteractiveJob. It
+   * lives here because this service already owns how to find the bundled CLI
+   * and its relocated virtualenv, which differ between a dev checkout and a
+   * packaged app.
+   *
+   * Unlike a scan, the process is deliberately *not* awaited: it serves the
+   * editor until the session is stopped. It binds loopback only - the browser
+   * never reaches it directly, the API proxies.
+   */
+  async startLocalNotebookSession(params: {
+    sourceId: string;
+    config: Record<string, unknown>;
+    port: number;
+    baseUrl: string;
+    token: string;
+    idleTimeoutSeconds: number;
+  }): Promise<{ pid: number; endpoint: string }> {
+    const environment = process.env.ENVIRONMENT || 'development';
+    const cliPath = this.getCliPath(environment);
+    const venvPath = this.getVenvPath(environment);
+    const recipeFile = await this.createTempRecipeFile(params.config);
+
+    const command =
+      `cd ${this.shellEscape(cliPath)} && ` +
+      `uv run --locked --no-dev --python ${this.shellEscape(this.getVenvPython(venvPath))} ` +
+      `python -m src.main notebook-session ${this.shellEscape(recipeFile)} ` +
+      `--source-id ${this.shellEscape(params.sourceId)} ` +
+      `--host 127.0.0.1 --port ${params.port} ` +
+      `--base-url ${this.shellEscape(params.baseUrl)} ` +
+      `--idle-timeout ${params.idleTimeoutSeconds}`;
+
+    const child = spawn(command, {
+      shell: true,
+      detached: process.platform !== 'win32',
+      env: {
+        ...process.env,
+        CLASSIFYRE_NOTEBOOK_TOKEN: params.token,
+        CLASSIFYRE_OUTPUT_REST_URL: this.resolveOutputRestUrl(environment),
+        ...(this.namespacedDatabaseUrl()
+          ? { DATABASE_URL: this.namespacedDatabaseUrl() as string }
+          : {}),
+      },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+
+    child.stdout?.on('data', (chunk: Buffer) =>
+      this.logger.debug(`[notebook-session] ${chunk.toString().trimEnd()}`),
+    );
+    child.stderr?.on('data', (chunk: Buffer) =>
+      this.logger.debug(`[notebook-session] ${chunk.toString().trimEnd()}`),
+    );
+    // The recipe carries decrypted credentials; it only needs to survive long
+    // enough for the CLI to read it at startup.
+    child.on('spawn', () => {
+      setTimeout(
+        () => void fs.unlink(recipeFile).catch(() => undefined),
+        30_000,
+      );
+    });
+    child.on('error', (error) =>
+      this.logger.error(
+        `Notebook session for source ${params.sourceId} failed to start: ${error.message}`,
+      ),
+    );
+
+    if (!child.pid) {
+      throw new Error('Could not start the notebook session process');
+    }
+
+    return { pid: child.pid, endpoint: `127.0.0.1:${params.port}` };
+  }
+
+  /** Stop a local notebook session started by startLocalNotebookSession. */
+  stopLocalNotebookSession(pid: number): void {
+    try {
+      // Negative pid targets the detached process group, so marimo (a grandchild
+      // of the shell) dies with it rather than being orphaned.
+      if (process.platform !== 'win32') {
+        process.kill(-pid, 'SIGTERM');
+      } else {
+        process.kill(pid, 'SIGTERM');
+      }
+    } catch (error: any) {
+      if (error?.code !== 'ESRCH') {
+        this.logger.warn(
+          `Could not stop notebook session process ${pid}: ${error?.message}`,
+        );
+      }
+    }
   }
 
   private resolveOutputRestUrl(

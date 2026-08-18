@@ -120,6 +120,10 @@ COPY --from=uv-bin /uv /uvx /usr/local/bin/
 WORKDIR /app
 COPY apps/cli /app/apps/cli
 COPY packages/schemas /app/packages/schemas
+# Authoring SDK for custom (notebook-backed) sources. The CLI declares it as an
+# editable path dependency, and a notebook's own sandbox venv resolves
+# `import classifyre` against this path at run time.
+COPY packages/py-sdk /app/packages/py-sdk
 WORKDIR /app/apps/cli
 ENV UV_LINK_MODE=copy \
     UV_PYTHON_PREFERENCE=only-system
@@ -177,6 +181,7 @@ COPY --from=cli-builder /app/apps/cli/pyproject.toml /app/apps/cli/pyproject.tom
 COPY --from=cli-builder /app/apps/cli/uv.lock /app/apps/cli/uv.lock
 COPY --from=cli-builder /app/apps/cli/README.md /app/apps/cli/README.md
 COPY --from=cli-builder /app/packages/schemas /app/packages/schemas
+COPY --from=cli-builder /app/packages/py-sdk /app/packages/py-sdk
 COPY --from=api-builder /repo/packages/schemas/node_modules /app/packages/schemas/node_modules
 # Runtime user, created before anything can write into $HOME. Matches uid 10001
 # from the helm podSecurityContext so uv sync can modify the venv at runtime.

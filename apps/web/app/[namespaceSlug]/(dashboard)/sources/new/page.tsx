@@ -1,6 +1,7 @@
 "use client";
 
 import { nsPath } from "@/lib/ns-path";
+import { NotebookSessionPanel } from "@/components/notebook-session-panel";
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
@@ -179,7 +180,7 @@ export default function NewSourcePage() {
     if (selectedSourceType === type) return;
     setSelectedSourceType(type);
     resetSourceFlowState();
-    if (type === "SANDBOX") {
+    if (type === "SANDBOX" || type === "CUSTOM") {
       setShowExamples(false);
     }
   };
@@ -581,6 +582,7 @@ export default function NewSourcePage() {
           pendingRemovalIds={pendingRemovalIds}
           onPendingFilesChange={setPendingFiles}
           onPendingRemovalIdsChange={setPendingRemovalIds}
+          sourceId={sourceId}
         />
       )}
 
@@ -600,6 +602,7 @@ export default function NewSourcePage() {
 }
 
 function SourceStepperContent({
+  sourceId,
   selectedSourceType,
   formDefaultValues,
   detectorDefaults,
@@ -620,6 +623,7 @@ function SourceStepperContent({
   onPendingFilesChange,
   onPendingRemovalIdsChange,
 }: {
+  sourceId: string | null;
   selectedSourceType: SourceType;
   formDefaultValues: Record<string, unknown> | undefined;
   detectorDefaults: DetectorConfigInput[];
@@ -750,6 +754,11 @@ function SourceStepperContent({
                     pendingRemovalIds={pendingRemovalIds}
                     onPendingFilesChange={onPendingFilesChange}
                     onPendingRemovalIdsChange={onPendingRemovalIdsChange}
+                    disabled={isSavingConfig || isTestingConfig}
+                  />
+                ) : selectedSourceType === "CUSTOM" ? (
+                  <NotebookSessionPanel
+                    sourceId={sourceId ?? undefined}
                     disabled={isSavingConfig || isTestingConfig}
                   />
                 ) : undefined

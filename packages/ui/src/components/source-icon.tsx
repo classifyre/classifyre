@@ -35,6 +35,7 @@ import {
 import {
   BookOpen,
   Cloud,
+  Code2,
   Database,
   Folder,
   FlaskConical,
@@ -165,6 +166,8 @@ const SOURCE_SIMPLE_ICON_BY_INGESTION_TYPE: Record<
   [CreateSourceDtoTypeEnum.Dropbox]: siDropbox,
   [CreateSourceDtoTypeEnum.HuggingFace]: siHuggingface,
   [CreateSourceDtoTypeEnum.Git]: siGit,
+  // No brand mark: a custom source is whatever the user wrote.
+  [CreateSourceDtoTypeEnum.Custom]: null,
 };
 
 const SOURCE_CUSTOM_ICON_BY_INGESTION_TYPE: Partial<
@@ -226,6 +229,7 @@ const SOURCE_ICON_BY_INGESTION_TYPE: Record<ApiSourceType, IconComponent> = {
   [CreateSourceDtoTypeEnum.HuggingFace]:
     createSimpleIconComponent(siHuggingface),
   [CreateSourceDtoTypeEnum.Git]: createSimpleIconComponent(siGit),
+  [CreateSourceDtoTypeEnum.Custom]: Code2,
 };
 
 const SOURCE_ICON_BY_INGESTION_TYPE_LOWERCASE: Record<string, IconComponent> =

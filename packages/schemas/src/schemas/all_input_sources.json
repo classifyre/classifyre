@@ -113,6 +113,9 @@
     },
     {
       "$ref": "#/definitions/GitInput"
+    },
+    {
+      "$ref": "#/definitions/CustomInput"
     }
   ],
   "x-asset-metadata": {
@@ -3595,6 +3598,98 @@
             "repository_url"
           ]
         }
+      },
+      "CUSTOM": {
+        "record": {
+          "properties": {
+            "resource_id": {
+              "type": "string",
+              "description": "Identifier the notebook assigned to this asset"
+            },
+            "attributes": {
+              "type": "object",
+              "description": "Free-form metadata returned by the notebook"
+            }
+          },
+          "required": [
+            "resource_id"
+          ]
+        },
+        "page": {
+          "use": [
+            "text"
+          ],
+          "properties": {
+            "resource_id": {
+              "type": "string",
+              "description": "Identifier the notebook assigned to this asset"
+            },
+            "attributes": {
+              "type": "object",
+              "description": "Free-form metadata returned by the notebook"
+            },
+            "title": {
+              "type": "string",
+              "description": "Human-readable title"
+            },
+            "links_count": {
+              "type": "integer",
+              "description": "Number of linked or related assets"
+            }
+          },
+          "required": [
+            "resource_id"
+          ]
+        },
+        "file": {
+          "use": [
+            "attachment",
+            "image",
+            "document",
+            "spreadsheet",
+            "text",
+            "json"
+          ],
+          "properties": {
+            "resource_id": {
+              "type": "string",
+              "description": "Identifier the notebook assigned to this asset"
+            },
+            "attributes": {
+              "type": "object",
+              "description": "Free-form metadata returned by the notebook"
+            }
+          },
+          "required": [
+            "resource_id"
+          ]
+        },
+        "table": {
+          "use": [
+            "spreadsheet"
+          ],
+          "properties": {
+            "resource_id": {
+              "type": "string",
+              "description": "Identifier the notebook assigned to this asset"
+            },
+            "attributes": {
+              "type": "object",
+              "description": "Free-form metadata returned by the notebook"
+            },
+            "table_name": {
+              "type": "string",
+              "description": "Table name"
+            },
+            "schema": {
+              "type": "string",
+              "description": "Schema or namespace name"
+            }
+          },
+          "required": [
+            "resource_id"
+          ]
+        }
       }
     }
   },
@@ -3638,7 +3733,8 @@
         "DROPBOX",
         "HUGGING_FACE",
         "SANDBOX",
-        "GIT"
+        "GIT",
+        "CUSTOM"
       ],
       "description": "Type of the asset or source"
     },
@@ -12191,6 +12287,139 @@
             },
             "optional": {
               "$ref": "#/definitions/GitOptional"
+            },
+            "detectors": {
+              "$ref": "#/definitions/Detectors"
+            },
+            "custom_detectors": {
+              "$ref": "#/definitions/CustomDetectorSelections"
+            },
+            "sampling": {
+              "$ref": "#/definitions/SamplingConfig"
+            },
+            "scan_cache": {
+              "$ref": "#/definitions/ScanCacheConfig"
+            },
+            "resources": {
+              "$ref": "#/definitions/ResourceOverrides"
+            },
+            "cleanup_removed_detector_findings": {
+              "type": "boolean",
+              "default": true,
+              "description": "When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set."
+            }
+          },
+          "required": [
+            "required",
+            "sampling"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "CustomRequired": {
+      "title": "CustomRequired",
+      "label": "Notebook Variables",
+      "type": "object",
+      "description": "Non-secret key/value pairs made available to the notebook as ctx.variables. Keys must be valid environment-variable identifiers (letters, digits and underscores, not starting with a digit).",
+      "properties": {
+        "variables": {
+          "type": "object",
+          "label": "Variables",
+          "description": "Plain values the notebook reads with ctx.variables[\"KEY\"]. Stored and displayed in clear text \u2014 put anything sensitive in the secrets section instead.",
+          "propertyNames": {
+            "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,63}$"
+          },
+          "additionalProperties": {
+            "type": "string"
+          },
+          "default": {}
+        }
+      },
+      "additionalProperties": false
+    },
+    "CustomMasked": {
+      "title": "CustomMasked",
+      "label": "Notebook Secrets",
+      "type": "object",
+      "description": "Secret key/value pairs. Encrypted at rest and injected into the notebook process at run time as ctx.secrets \u2014 never written into the notebook source, so a saved or exported notebook carries no credential material.",
+      "properties": {
+        "secrets": {
+          "type": "object",
+          "label": "Secrets",
+          "description": "Values the notebook reads with ctx.secrets[\"KEY\"]. Keys must be valid environment-variable identifiers.",
+          "propertyNames": {
+            "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,63}$"
+          },
+          "additionalProperties": {
+            "type": "string"
+          },
+          "default": {}
+        }
+      },
+      "additionalProperties": false
+    },
+    "CustomOptionalExecution": {
+      "title": "CustomOptionalExecution",
+      "label": "Notebook Execution",
+      "type": "object",
+      "description": "Limits applied to the notebook process during a scan.",
+      "properties": {
+        "discover_timeout_seconds": {
+          "type": "integer",
+          "minimum": 10,
+          "maximum": 86400,
+          "default": 600,
+          "description": "Wall-clock limit for one discover() call before the notebook process is killed and the run fails."
+        },
+        "fetch_timeout_seconds": {
+          "type": "integer",
+          "minimum": 5,
+          "maximum": 3600,
+          "default": 120,
+          "description": "Wall-clock limit for a single fetch() call."
+        },
+        "max_assets": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000000,
+          "description": "Stop after this many assets from discover(). Unset means no ceiling beyond the sampling strategy."
+        }
+      },
+      "additionalProperties": false
+    },
+    "CustomOptional": {
+      "title": "CustomOptional",
+      "label": "Custom Source Options",
+      "type": "object",
+      "properties": {
+        "execution": {
+          "$ref": "#/definitions/CustomOptionalExecution"
+        }
+      },
+      "additionalProperties": false
+    },
+    "CustomInput": {
+      "title": "CustomInput",
+      "label": "Custom (Python notebook)",
+      "allOf": [
+        {
+          "$ref": "#/definitions/CoreInput"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "CUSTOM"
+            },
+            "required": {
+              "$ref": "#/definitions/CustomRequired"
+            },
+            "masked": {
+              "$ref": "#/definitions/CustomMasked"
+            },
+            "optional": {
+              "$ref": "#/definitions/CustomOptional"
             },
             "detectors": {
               "$ref": "#/definitions/Detectors"

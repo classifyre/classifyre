@@ -11,7 +11,8 @@ set -euo pipefail
 #                        CLI, NestJS framework — see scripts/bundle-api.mjs)
 #   resources/web/     — Next.js static export
 #   resources/pg/      — embedded-postgres npm tree (main app loads it from here)
-#   resources/pyapp/   — Python CLI (apps/cli) + schemas (packages/schemas),
+#   resources/pyapp/   — Python CLI (apps/cli) + schemas (packages/schemas)
+#                        + custom-source SDK (packages/py-sdk),
 #                        preserving the monorepo-relative editable-dep layout
 #   resources/python/  — standalone CPython (python-build-standalone via uv)
 #   resources/venv/    — pre-baked BASE venv (optional groups install on demand)
@@ -266,7 +267,12 @@ cp -R "$MONOREPO_ROOT/apps/web/out/." "$RESOURCES/web/"
 # exist inside the bundle.
 CLI_DEST="$RESOURCES/pyapp/apps/cli"
 SCHEMAS_PY_DEST="$RESOURCES/pyapp/packages/schemas"
-mkdir -p "$CLI_DEST" "$SCHEMAS_PY_DEST"
+# The authoring SDK for custom (notebook-backed) sources. Staged for the same
+# reason as schemas: the CLI pyproject declares it as an editable path
+# dependency, so runtime `uv sync` fails outright if the path is missing. It is
+# also what a notebook's own sandbox venv resolves `import classifyre` against.
+SDK_PY_DEST="$RESOURCES/pyapp/packages/py-sdk"
+mkdir -p "$CLI_DEST" "$SCHEMAS_PY_DEST" "$SDK_PY_DEST"
 cp -R "$MONOREPO_ROOT/apps/cli/src" "$CLI_DEST/src"
 cp "$MONOREPO_ROOT/apps/cli/pyproject.toml" "$CLI_DEST/pyproject.toml"
 cp "$MONOREPO_ROOT/apps/cli/uv.lock" "$CLI_DEST/uv.lock"
@@ -275,6 +281,9 @@ cp -R "$MONOREPO_ROOT/packages/schemas/src" "$SCHEMAS_PY_DEST/src"
 cp "$MONOREPO_ROOT/packages/schemas/pyproject.toml" "$SCHEMAS_PY_DEST/pyproject.toml"
 cp "$MONOREPO_ROOT/packages/schemas/uv.lock" "$SCHEMAS_PY_DEST/uv.lock" 2>/dev/null || true
 cp "$MONOREPO_ROOT/packages/schemas/README.md" "$SCHEMAS_PY_DEST/README.md" 2>/dev/null || true
+cp -R "$MONOREPO_ROOT/packages/py-sdk/src" "$SDK_PY_DEST/src"
+cp "$MONOREPO_ROOT/packages/py-sdk/pyproject.toml" "$SDK_PY_DEST/pyproject.toml"
+cp "$MONOREPO_ROOT/packages/py-sdk/README.md" "$SDK_PY_DEST/README.md" 2>/dev/null || true
 
 # --- Standalone CPython + pre-baked venv --------------------------------------
 if [ "${SKIP_PYTHON:-0}" != "1" ]; then

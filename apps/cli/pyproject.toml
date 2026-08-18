@@ -20,6 +20,7 @@ dependencies = [
 [tool.uv.sources]
 # Local editable install for development — ignored when published to PyPI
 classifyre-schemas = { path = "../../packages/schemas", editable = true }
+classifyre-sdk = { path = "../../packages/py-sdk", editable = true }
 en-core-web-sm = { url = "https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl" }
 # CPU-only torch on Linux. The default PyPI Linux wheels bundle the full NVIDIA
 # CUDA stack (~5-7 GB) which is dead weight on our CPU-only CLI jobs (no GPU
@@ -53,6 +54,8 @@ dev = [
     "pytest-asyncio>=0.24.0",
     # Real SQL engine for the lakehouse source tests (sampling over Parquet).
     "duckdb>=1.1.0",
+    # Notebook-backed CUSTOM source tests drive the real bridge subprocess.
+    { include-group = "custom-source" },
 ]
 privacy = [
     "presidio-analyzer>=2.2.362",
@@ -106,6 +109,13 @@ custom = [
 ]
 regex = [
     "google-re2>=1.1",
+]
+# Notebook-backed CUSTOM sources. Distinct from the `custom` group above,
+# which belongs to custom *detectors*. marimo is a pure-Python wheel, so it
+# satisfies every entry in [tool.uv.required-environments].
+custom-source = [
+    "marimo>=0.24.0",
+    "classifyre-sdk",
 ]
 llm = [
     "litellm>=1.86.2",

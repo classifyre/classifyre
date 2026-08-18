@@ -75,6 +75,8 @@ model Source {
   customDetectorExtractions  CustomDetectorExtraction[]
   assetChunks                AssetChunk[]
   uploadedFiles              UploadedSourceFile[]
+  notebooks                  CustomSourceNotebook[]
+  notebookSession            CustomSourceSession?
 
   @@index([currentRunnerId])
   @@index([scheduleEnabled])
@@ -138,6 +140,59 @@ model UploadedSourceFile {
   @@index([sourceId, createdAt(sort: Desc)])
   @@index([contentHash])
   @@map("source_files")
+}
+
+/**
+ * One saved version of a CUSTOM source's notebook.
+ * Immutable by construction: saving writes a new revision rather than updating
+ * one. That is what lets a run be pinned to the exact code it executed, and what
+ * makes a bad edit recoverable.
+ */
+model CustomSourceNotebook {
+  id          String   @id @default(uuid())
+  sourceId    String   @map("source_id")
+  revision    Int
+  content     String   @db.Text
+  contentHash String   @map("content_hash") @db.VarChar(64)
+  message     String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  source Source @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+
+  @@unique([sourceId, revision])
+  @@index([sourceId, createdAt(sort: Desc)])
+  @@map("custom_source_notebooks")
+}
+
+/**
+ * A live interactive editing session for a CUSTOM source's notebook.
+ * At most one per source. The row is what the reverse proxy resolves an incoming
+ * request against, and what the idle reaper works from — a session holds a pod,
+ * so it must be able to end itself.
+ */
+model CustomSourceSession {
+  id           String    @id @default(uuid())
+  sourceId     String    @unique @map("source_id")
+  status       String    @default("STARTING")
+  /// Where the editor is reachable, e.g. "10.42.0.9:2718" in Kubernetes or
+  /// "127.0.0.1:53412" on the desktop. The proxy target, never sent to a browser.
+  endpoint     String?
+  /// Per-session marimo access token, injected into the editor and replayed by
+  /// the proxy. Not a user credential.
+  token        String
+  jobName      String?   @map("job_name")
+  jobNamespace String?   @map("job_namespace")
+  processId    Int?      @map("process_id")
+  errorMessage String?   @map("error_message")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+  /// Last proxied request. The idle reaper's clock.
+  lastSeenAt   DateTime? @map("last_seen_at")
+
+  source Source @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+
+  @@index([status, lastSeenAt])
+  @@map("custom_source_sessions")
 }
 
 model Asset {
@@ -578,6 +633,10 @@ model Runner {
   triggeredBy          String?              @map("triggered_by")
   triggerType          TriggerType          @default(MANUAL) @map("trigger_type")
   executionMode        RunnerExecutionMode? @map("execution_mode")
+  // For CUSTOM sources: the notebook revision this run executed. Pinned when the
+  // run starts, so editing the notebook mid-run cannot change what the run meant,
+  // and "why did these results change?" stays answerable afterwards.
+  notebookRevision     Int?                 @map("notebook_revision")
   status               RunnerStatus         @default(PENDING)
   startedAt            DateTime?            @map("started_at")
   completedAt          DateTime?            @map("completed_at")

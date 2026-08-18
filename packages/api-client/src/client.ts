@@ -58,6 +58,7 @@ export type AiCapabilityProgressEvent =
 
 // Import APIs individually to avoid naming conflicts
 export { SourcesApi } from "./generated/src/apis/SourcesApi";
+export { CustomSourcesApi } from "./generated/src/apis/CustomSourcesApi";
 export { AssetsApi } from "./generated/src/apis/AssetsApi";
 export { HealthApi } from "./generated/src/apis/HealthApi";
 export { RunnersApi } from "./generated/src/apis/RunnersApi";
@@ -75,6 +76,11 @@ export { ChatBotsApi } from "./generated/src/apis/ChatBotsApi";
 export { EmbeddingsApi } from "./generated/src/apis/EmbeddingsApi";
 export { GlossaryApi } from "./generated/src/apis/GlossaryApi";
 export type {
+  NotebookDto,
+  NotebookRevisionDto,
+  NotebookSessionDto,
+  SaveNotebookDto,
+  SaveNotebookResponseDto,
   EmbeddingReindexResponseDto,
   UpsertGlossaryTermDto,
   VerifyGlossaryTermDto,
@@ -1001,6 +1007,7 @@ export type RunTestsResponseDto = {
 
 // Import API classes for the client
 import { SourcesApi } from "./generated/src/apis/SourcesApi";
+import { CustomSourcesApi } from "./generated/src/apis/CustomSourcesApi";
 import { AssetsApi } from "./generated/src/apis/AssetsApi";
 import { HealthApi } from "./generated/src/apis/HealthApi";
 import { RunnersApi } from "./generated/src/apis/RunnersApi";
@@ -1316,12 +1323,14 @@ class ApiClient {
   public embeddings: EmbeddingsApi;
   public glossary: GlossaryApi;
   public namespaces: NamespacesApi;
+  public customSources: CustomSourcesApi;
 
   constructor(baseUrl?: string) {
     this.config = createConfiguration(baseUrl);
     this.namespaces = new NamespacesApi(this.config.basePath);
 
     this.sources = new SourcesApi(this.config);
+    this.customSources = new CustomSourcesApi(this.config);
     this.assets = new AssetsApi(this.config);
     this.health = new HealthApi(this.config);
     this.runners = new RunnersApi(this.config);

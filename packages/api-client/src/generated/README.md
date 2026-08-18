@@ -163,6 +163,12 @@ All URIs are relative to *http://localhost*
 *CustomDetectorsApi* | [**customDetectorsControllerTrainingExamplesStats**](docs/CustomDetectorsApi.md#customdetectorscontrollertrainingexamplesstats) | **GET** /custom-detectors/{id}/training-examples/stats | Get training example counts grouped by label
 *CustomDetectorsApi* | [**customDetectorsControllerTrainingHistory**](docs/CustomDetectorsApi.md#customdetectorscontrollertraininghistory) | **GET** /custom-detectors/{id}/training-history | List training history for custom detector
 *CustomDetectorsApi* | [**customDetectorsControllerUpdate**](docs/CustomDetectorsApi.md#customdetectorscontrollerupdate) | **PATCH** /custom-detectors/{id} | Update custom detector
+*CustomSourcesApi* | [**customSourcesControllerGetNotebook**](docs/CustomSourcesApi.md#customsourcescontrollergetnotebook) | **GET** /sources/{sourceId}/notebook | Read a custom source\&#39;s notebook (the newest revision by default)
+*CustomSourcesApi* | [**customSourcesControllerGetSession**](docs/CustomSourcesApi.md#customsourcescontrollergetsession) | **GET** /sources/{sourceId}/session | Current notebook editing session, if any
+*CustomSourcesApi* | [**customSourcesControllerListRevisions**](docs/CustomSourcesApi.md#customsourcescontrollerlistrevisions) | **GET** /sources/{sourceId}/notebook/revisions | List saved notebook revisions, newest first
+*CustomSourcesApi* | [**customSourcesControllerSaveNotebook**](docs/CustomSourcesApi.md#customsourcescontrollersavenotebook) | **PUT** /sources/{sourceId}/notebook | Save a new notebook revision
+*CustomSourcesApi* | [**customSourcesControllerStartSession**](docs/CustomSourcesApi.md#customsourcescontrollerstartsession) | **POST** /sources/{sourceId}/session | Start a notebook editing session (returns the running one if any)
+*CustomSourcesApi* | [**customSourcesControllerStopSession**](docs/CustomSourcesApi.md#customsourcescontrollerstopsession) | **DELETE** /sources/{sourceId}/session | Stop the notebook editing session
 *DataTransferApi* | [**dataTransferControllerCancel**](docs/DataTransferApi.md#datatransfercontrollercancel) | **POST** /data-transfer/jobs/{id}/cancel | Ask a running transfer to stop
 *DataTransferApi* | [**dataTransferControllerDownload**](docs/DataTransferApi.md#datatransfercontrollerdownload) | **GET** /data-transfer/exports/{id}/download | Download a completed export archive
 *DataTransferApi* | [**dataTransferControllerJob**](docs/DataTransferApi.md#datatransfercontrollerjob) | **GET** /data-transfer/jobs/{id} | Poll one transfer job for progress
@@ -465,6 +471,9 @@ All URIs are relative to *http://localhost*
 - [McpTokenResponseDto](docs/McpTokenResponseDto.md)
 - [McpToolParameterDto](docs/McpToolParameterDto.md)
 - [McpToolSummaryDto](docs/McpToolSummaryDto.md)
+- [NotebookDto](docs/NotebookDto.md)
+- [NotebookRevisionDto](docs/NotebookRevisionDto.md)
+- [NotebookSessionDto](docs/NotebookSessionDto.md)
 - [NotificationListResponseDto](docs/NotificationListResponseDto.md)
 - [NotificationResponseDto](docs/NotificationResponseDto.md)
 - [NotificationsControllerDeleteNotification200Response](docs/NotificationsControllerDeleteNotification200Response.md)
@@ -496,6 +505,8 @@ All URIs are relative to *http://localhost*
 - [RunnersChartsTimelineBucketDto](docs/RunnersChartsTimelineBucketDto.md)
 - [RunnersChartsTopSourceDto](docs/RunnersChartsTopSourceDto.md)
 - [RunnersChartsTotalsDto](docs/RunnersChartsTotalsDto.md)
+- [SaveNotebookDto](docs/SaveNotebookDto.md)
+- [SaveNotebookResponseDto](docs/SaveNotebookResponseDto.md)
 - [SaveTrainingExamplesDto](docs/SaveTrainingExamplesDto.md)
 - [ScanCacheEntryDto](docs/ScanCacheEntryDto.md)
 - [SearchAssetFindingDto](docs/SearchAssetFindingDto.md)

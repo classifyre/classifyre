@@ -743,7 +743,15 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Classifyre Metadata Extraction CLI")
     parser.add_argument(
         "command",
-        choices=["test", "extract", "discover", "evaluate-file", "train", "dropbox-auth"],
+        choices=[
+            "test",
+            "extract",
+            "discover",
+            "evaluate-file",
+            "train",
+            "dropbox-auth",
+            "notebook-session",
+        ],
         help="Command to run",
     )
     parser.add_argument(
@@ -753,6 +761,27 @@ def main() -> None:
         help="Path to recipe JSON (or file path for evaluate-file)",
     )
     parser.add_argument("--debug", action="store_true", help="Enable debug logging")
+    # notebook-session: the interactive marimo editor for a CUSTOM source. The
+    # API reverse-proxies this server, so --base-url must match the path prefix
+    # the browser requests or marimo's own asset/websocket URLs will not resolve.
+    parser.add_argument(
+        "--port", type=int, default=2718, help="Port for the notebook editor"
+    )
+    parser.add_argument(
+        "--host", default="127.0.0.1", help="Interface for the notebook editor"
+    )
+    parser.add_argument(
+        "--base-url", default=None, help="Path prefix the editor is served under"
+    )
+    parser.add_argument(
+        "--idle-timeout",
+        type=float,
+        default=3600,
+        help="End the session after this many seconds without an edit",
+    )
+    parser.add_argument(
+        "--workspace", default=None, help="Directory to materialize the notebook into"
+    )
     parser.add_argument(
         "--output-type",
         choices=["rest", "file", "console"],
@@ -897,6 +926,17 @@ def main() -> None:
     except Exception as e:
         logger.error("Recipe validation failed: %s", e)
         sys.exit(1)
+
+    if args.command == "notebook-session":
+        if source_type != "custom":
+            logger.error("notebook-session is only available for CUSTOM sources")
+            sys.exit(1)
+        if not args.source_id:
+            logger.error("notebook-session requires --source-id")
+            sys.exit(1)
+        from .sources.custom_notebook import session as notebook_session
+
+        sys.exit(notebook_session.run(args.source_id, recipe, args))
 
     run_command(args, recipe)
 

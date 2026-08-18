@@ -1,6 +1,7 @@
 "use client";
 
 import { nsPath } from "@/lib/ns-path";
+import { NotebookSessionPanel } from "@/components/notebook-session-panel";
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { useRouter } from "next/navigation";
 import { useRouteId } from "@/lib/use-route-id";
@@ -804,6 +805,11 @@ function SourceEditStepperContent({
                         pendingRemovalIds={pendingRemovalIds}
                         onPendingFilesChange={onPendingFilesChange}
                         onPendingRemovalIdsChange={onPendingRemovalIdsChange}
+                        disabled={isSavingConfig || isTestingConfig}
+                      />
+                    ) : sourceType === "CUSTOM" ? (
+                      <NotebookSessionPanel
+                        sourceId={_sourceId}
                         disabled={isSavingConfig || isTestingConfig}
                       />
                     ) : undefined

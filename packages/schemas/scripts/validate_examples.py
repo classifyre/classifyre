@@ -46,6 +46,7 @@ TYPE_TO_DEFINITION = {
     "DROPBOX": "DropboxInput",
     "HUGGING_FACE": "HuggingFaceInput",
     "GIT": "GitInput",
+    "CUSTOM": "CustomInput",
 }
 
 SCHEMAS_DIR = Path(__file__).parent.parent / "src" / "schemas"

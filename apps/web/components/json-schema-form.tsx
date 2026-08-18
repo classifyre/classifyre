@@ -53,6 +53,7 @@ import {
   ToggleGroupItem,
 } from "@workspace/ui/components/toggle-group";
 import { FolderOpen, Plus, X } from "lucide-react";
+import { KeyValueEditor } from "@workspace/ui/components/key-value-editor";
 import { AiAssistedCard } from "@/components/ai-assisted-card";
 import {
   buildSourcePrompt,
@@ -187,6 +188,28 @@ function isBlobSecretField(name: string): boolean {
   return BLOB_SECRET_FIELD_NAMES.has(name.toLowerCase());
 }
 
+/**
+ * Whether a string map holds credentials, and so should render masked.
+ *
+ * Same name heuristic the scalar fields use, plus the `masked` block itself:
+ * anything under `masked` is a secret by definition.
+ */
+function isSensitiveMapName(
+  name: string,
+  forceMasked: boolean,
+  autoDetect: boolean,
+): boolean {
+  if (forceMasked) return true;
+  if (!autoDetect) return false;
+  const lower = name.toLowerCase();
+  return (
+    lower.includes("password") ||
+    lower.includes("token") ||
+    lower.includes("secret") ||
+    lower.includes("key")
+  );
+}
+
 function hasNullType(schema: JSONSchema7): boolean {
   if (schema.type === "null") return true;
   if (schema.anyOf && Array.isArray(schema.anyOf)) {
@@ -240,8 +263,40 @@ function isStructuredObjectSchema(schema: JSONSchema7): boolean {
   return isObjectSchema(schema) && Boolean(schema.properties);
 }
 
+/**
+ * A free-form object whose values are all plain strings, e.g. the variables and
+ * secrets on a CUSTOM source.
+ *
+ * These get a key/value editor rather than the JSON editor. Two reasons beyond
+ * ergonomics: the JSON editor is Monaco, which is fetched from a CDN and
+ * silently degrades to a bare textarea in the packaged desktop app; and a
+ * secret typed into a JSON blob cannot be masked, while a key/value row can.
+ */
+function isStringMapSchema(schema: JSONSchema7): boolean {
+  if (!isObjectSchema(schema) || schema.properties) return false;
+  const additional = schema.additionalProperties;
+  return (
+    !!additional &&
+    typeof additional === "object" &&
+    !Array.isArray(additional) &&
+    (additional as JSONSchema7).type === "string"
+  );
+}
+
+/** The key constraint declared by the schema, if it declares one. */
+function keyPatternFor(schema: JSONSchema7): RegExp | undefined {
+  const names = (schema as { propertyNames?: { pattern?: string } })
+    .propertyNames;
+  if (!names?.pattern) return undefined;
+  try {
+    return new RegExp(names.pattern);
+  } catch {
+    return undefined;
+  }
+}
+
 function shouldRenderObjectAsJsonEditor(schema: JSONSchema7): boolean {
-  return isObjectSchema(schema) && !schema.properties;
+  return isObjectSchema(schema) && !schema.properties && !isStringMapSchema(schema);
 }
 
 function isArraySchema(schema: JSONSchema7): boolean {
@@ -1525,6 +1580,58 @@ function SchemaField({
     );
   }
 
+  if (isStringMapSchema(normalizedSchema)) {
+    return (
+      <FormField
+        control={control}
+        name={fieldName}
+        render={({ field }) => (
+          <FormItem>
+            {!hideLabel && (
+              <FormLabel className="capitalize">
+                {label}
+                {required && <span className="text-destructive"> *</span>}
+              </FormLabel>
+            )}
+            {description && (
+              <p className="text-xs text-muted-foreground">{description}</p>
+            )}
+            <FormControl>
+              <KeyValueEditor
+                value={
+                  isPlainObject(field.value)
+                    ? (field.value as Record<string, string>)
+                    : {}
+                }
+                onChange={field.onChange}
+                masked={isSensitiveMapName(name, forceMasked, autoDetectSensitiveFields)}
+                keyPattern={keyPatternFor(normalizedSchema)}
+                disabled={disabled}
+                data-testid={`kv-${String(fieldName).replace(/[^a-zA-Z0-9]/g, "-")}`}
+                labels={{
+                  add: t("sources.custom.addPair"),
+                  keyPlaceholder: t("sources.custom.keyPlaceholder"),
+                  valuePlaceholder: t("sources.custom.valuePlaceholder"),
+                  invalidKey: t("sources.custom.invalidKey"),
+                  duplicateKey: t("sources.custom.duplicateKey"),
+                  empty:
+                    isSensitiveMapName(
+                      name,
+                      forceMasked,
+                      autoDetectSensitiveFields,
+                    )
+                      ? t("sources.custom.emptySecrets")
+                      : t("sources.custom.emptyVariables"),
+                }}
+              />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
+    );
+  }
+
   if (shouldRenderObjectAsJsonEditor(normalizedSchema)) {
     return (
       <ObjectJsonEditorField
@@ -2509,6 +2616,9 @@ export const JsonSchemaForm = React.forwardRef<
     DROPBOX: false,
     HUGGING_FACE: false,
     GIT: false,
+    // A notebook may well return rows, but the tabular assistant hints are
+    // about SQL sampling knobs this source has none of.
+    CUSTOM: false,
   };
   const isTabular =
     assistantSourceType && isIngestionSourceType(assistantSourceType)
