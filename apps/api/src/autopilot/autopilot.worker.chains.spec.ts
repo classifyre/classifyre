@@ -1,6 +1,12 @@
 import { AgentKind } from '@prisma/client';
 import { AutopilotWorker } from './autopilot.worker';
 import {
+  AiAuthError,
+  AiConfigError,
+  AiModelNotFoundError,
+  AiRateLimitError,
+} from '../ai';
+import {
   AUTOPILOT_CYCLE_BUDGET_MS,
   DETECTION_CHAIN,
   INVESTIGATION_CHAIN,
@@ -240,5 +246,120 @@ describe('AutopilotWorker cycle chains', () => {
     } as typeof cycle);
 
     expect(recordSkippedRun).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * A chain is an ordering, not a fate shared by its members.
+ *
+ * Every non-schema failure used to propagate straight out of `runChain`, so the
+ * agents behind the failing one were never even considered. Observed on a live
+ * instance: INQUIRY hit an OpenAI 429, rethrew, and CASE and ESCALATION
+ * recorded *zero* runs across two days — not disabled, not deferred, not
+ * skipped, simply never reached. DETECTOR_AUTHOR sat behind CONFIG the same way.
+ *
+ * The distinction that matters is whose failure it is. A provider-level error
+ * meets the next agent exactly as it met this one, so continuing only spends
+ * more calls into a rate limit. Anything else belongs to that agent alone.
+ */
+describe('AutopilotWorker chain failure isolation', () => {
+  const OPEN_SIGNALS = {
+    matchingBusy: false,
+    scansActive: false,
+    coverage: { open: 0, analyzed: 0 },
+    evidence: { usableFindings: 2000, usableCoverage: 0.25 },
+  };
+
+  const build = (failFirstWith?: Error) => {
+    const started: AgentKind[] = [];
+    const worker = new AutopilotWorker(
+      {} as never,
+      {} as never,
+      { recordSkippedRun: jest.fn() } as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {
+        resolvePolicy: jest.fn().mockResolvedValue({
+          triggerMode: 'BATCH',
+          waitForMatching: false,
+          waitForEvidence: false,
+          waitForScans: false,
+          minIntervalMinutes: 0,
+          maxStalenessHours: 0,
+        }),
+        lastTriggeredAt: jest.fn().mockResolvedValue(null),
+        markTriggered: jest.fn().mockResolvedValue(undefined),
+        runBudgetMinutes: jest.fn().mockResolvedValue(null),
+      } as never,
+    ) as unknown as {
+      agentEnabled: (k: AgentKind, c: unknown) => Promise<boolean>;
+      runAgent: (k: AgentKind) => Promise<void>;
+      runChain: (...args: unknown[]) => Promise<void>;
+    };
+    jest.spyOn(worker, 'agentEnabled').mockResolvedValue(true);
+    jest.spyOn(worker, 'runAgent').mockImplementation((kind: AgentKind) => {
+      started.push(kind);
+      if (failFirstWith && started.length === 1) {
+        return Promise.reject(failFirstWith);
+      }
+      return Promise.resolve();
+    });
+    return { worker, started };
+  };
+
+  const run = (worker: { runChain: (...a: unknown[]) => Promise<void> }) =>
+    worker.runChain(
+      INVESTIGATION_CHAIN,
+      {},
+      { manual: false, expressReason: null, sourceId: 's1' },
+      'src',
+      {},
+      Date.now() + 60_000,
+      OPEN_SIGNALS,
+      new Set<AgentKind>(),
+    );
+
+  it('runs the rest of the chain when one agent fails on its own', async () => {
+    // The regression: CASE and ESCALATION never got their turn.
+    const h = build(new Error('tool blew up'));
+
+    await run(h.worker);
+
+    expect(h.started).toEqual([
+      AgentKind.INQUIRY,
+      AgentKind.CASE,
+      AgentKind.ESCALATION,
+    ]);
+  });
+
+  it('stops the chain when the provider itself is the problem', async () => {
+    // A 429 will meet CASE exactly as it met INQUIRY; continuing would only
+    // spend more calls into the same rate limit.
+    const h = build(new AiRateLimitError('rate limited'));
+
+    await expect(run(h.worker)).rejects.toThrow(/rate limit/i);
+    expect(h.started).toEqual([AgentKind.INQUIRY]);
+  });
+
+  it.each([
+    ['auth', () => new AiAuthError('bad key')],
+    ['config', () => new AiConfigError('no provider')],
+    ['model not found', () => new AiModelNotFoundError('gone')],
+  ])('stops the chain on a %s failure too', async (_label, make) => {
+    const h = build(make());
+
+    await expect(run(h.worker)).rejects.toThrow();
+    expect(h.started).toEqual([AgentKind.INQUIRY]);
+  });
+
+  it('does not swallow the failure silently — the run row carries it', async () => {
+    // runAgent marks the AgentRun FAILED before rethrowing, so continuing the
+    // chain loses nothing an operator can see.
+    const h = build(new Error('tool blew up'));
+
+    await expect(run(h.worker)).resolves.toBeUndefined();
+    expect(h.started).toHaveLength(3);
   });
 });

@@ -3108,30 +3108,38 @@ export class CliRunnerService {
       throw new Error(`Runner ${runnerId} not found`);
     }
 
-    if (runner.status !== RunnerStatus.RUNNING) {
+    if (
+      runner.status !== RunnerStatus.RUNNING &&
+      runner.status !== RunnerStatus.PENDING
+    ) {
       throw new Error(
         `Runner ${runnerId} is not running (status: ${runner.status})`,
       );
     }
 
-    switch (runner.executionMode) {
-      case RunnerExecutionMode.KUBERNETES:
-        await this.stopKubernetesJobSafely(runnerId, runner);
-        break;
-      case RunnerExecutionMode.EXTERNAL:
-        throw new BadRequestException(
-          `Runner ${runnerId} is managed externally and cannot be stopped from the API`,
-        );
-      case RunnerExecutionMode.LOCAL:
-      default: {
-        const environment = process.env.ENVIRONMENT || 'development';
-        if (this.isKubernetesExecutionEnabled(environment)) {
+    // A PENDING runner is still waiting in the queue: there is no process or
+    // Kubernetes Job to tear down, so cancelling it is only the terminal
+    // transition below.
+    if (runner.status === RunnerStatus.RUNNING) {
+      switch (runner.executionMode) {
+        case RunnerExecutionMode.KUBERNETES:
           await this.stopKubernetesJobSafely(runnerId, runner);
           break;
-        }
+        case RunnerExecutionMode.EXTERNAL:
+          throw new BadRequestException(
+            `Runner ${runnerId} is managed externally and cannot be stopped from the API`,
+          );
+        case RunnerExecutionMode.LOCAL:
+        default: {
+          const environment = process.env.ENVIRONMENT || 'development';
+          if (this.isKubernetesExecutionEnabled(environment)) {
+            await this.stopKubernetesJobSafely(runnerId, runner);
+            break;
+          }
 
-        this.stopLocalRunnerProcess(runnerId);
-        break;
+          this.stopLocalRunnerProcess(runnerId);
+          break;
+        }
       }
     }
 

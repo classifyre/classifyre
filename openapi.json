@@ -99,6 +99,39 @@
         ]
       }
     },
+    "/sources/bulk-run": {
+      "post": {
+        "description": "Queues a manual run for explicit source IDs or every source matching a filter snapshot. Runs beyond the configured concurrency limit stay PENDING until a slot frees up; sources that are already in flight are reported as skipped.",
+        "operationId": "SourcesController_bulkRunSources",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkRunSourcesDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Runs queued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BulkRunSourcesResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Start a scan for many data sources at once",
+        "tags": [
+          "Sources"
+        ]
+      }
+    },
     "/sources": {
       "post": {
         "description": "Register a new data source for metadata ingestion (WordPress, Slack, S3-Compatible Storage, Azure Blob Storage, Google Cloud Storage, PostgreSQL, MySQL, MSSQL, Oracle, Hive, Databricks, Snowflake, MongoDB, PowerBI, Tableau, Confluence, Jira, Service Desk, Notion, Email, YouTube).",
@@ -6520,6 +6553,38 @@
         ]
       }
     },
+    "/glossary/bulk": {
+      "post": {
+        "operationId": "GlossaryController_bulkUpdate",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkUpdateGlossaryTermsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BulkUpdateGlossaryTermsResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Bulk verify/unverify or retype glossary terms (operator)",
+        "tags": [
+          "glossary"
+        ]
+      }
+    },
     "/glossary/{id}/verify": {
       "patch": {
         "operationId": "GlossaryController_verify",
@@ -9988,6 +10053,79 @@
         "required": [
           "updatedCount",
           "ids"
+        ]
+      },
+      "BulkRunSourcesDto": {
+        "type": "object",
+        "properties": {
+          "ids": {
+            "description": "Explicit source IDs to run. Use either ids or filters.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "filters": {
+            "description": "Run every source matching this filter snapshot.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SearchSourcesFiltersDto"
+              }
+            ]
+          },
+          "forceFullRescan": {
+            "type": "boolean",
+            "description": "Ignore the scan cache for every run started by this call.",
+            "default": false
+          }
+        }
+      },
+      "BulkRunSourcesSkippedDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string",
+            "description": "Why this source could not be started"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "reason"
+        ]
+      },
+      "BulkRunSourcesResponseDto": {
+        "type": "object",
+        "properties": {
+          "startedCount": {
+            "type": "number",
+            "description": "Number of runs queued. Runs beyond the concurrency limit stay PENDING until a slot frees up."
+          },
+          "ids": {
+            "description": "IDs of the started sources",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "skipped": {
+            "description": "Sources that could not be started, with the reason",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BulkRunSourcesSkippedDto"
+            }
+          }
+        },
+        "required": [
+          "startedCount",
+          "ids",
+          "skipped"
         ]
       },
       "CreateSourceDto": {
@@ -17709,6 +17847,86 @@
           "updatedAt"
         ]
       },
+      "BulkUpdateGlossaryFiltersDto": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "Free-text filter over term, aliases and notes (ILIKE)."
+          },
+          "entityType": {
+            "type": "string",
+            "enum": [
+              "PERSON",
+              "ORGANIZATION",
+              "LOCATION",
+              "REFERENCE",
+              "TERM",
+              "OTHER"
+            ]
+          }
+        }
+      },
+      "BulkUpdateGlossaryTermsDto": {
+        "type": "object",
+        "properties": {
+          "ids": {
+            "description": "Explicit term IDs to update. Use either ids or filters.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "filters": {
+            "description": "Update every term matching this filter snapshot.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/BulkUpdateGlossaryFiltersDto"
+              }
+            ]
+          },
+          "verified": {
+            "type": "boolean",
+            "description": "True marks the selected terms verified, false returns them to unverified. Omit to leave verification unchanged."
+          },
+          "entityType": {
+            "type": "string",
+            "enum": [
+              "PERSON",
+              "ORGANIZATION",
+              "LOCATION",
+              "REFERENCE",
+              "TERM",
+              "OTHER"
+            ],
+            "description": "New entity type. Omit to leave entity types unchanged."
+          },
+          "verifiedBy": {
+            "type": "string",
+            "description": "Operator identity recorded as verifiedBy. Defaults to \"operator\"."
+          }
+        }
+      },
+      "BulkUpdateGlossaryTermsResponseDto": {
+        "type": "object",
+        "properties": {
+          "updatedCount": {
+            "type": "number",
+            "description": "Number of terms updated"
+          },
+          "ids": {
+            "description": "IDs of the updated terms",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "updatedCount",
+          "ids"
+        ]
+      },
       "VerifyGlossaryTermDto": {
         "type": "object",
         "properties": {
@@ -20141,6 +20359,34 @@
             "type": "number",
             "description": "Factory default"
           },
+          "chain": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "INVESTIGATION",
+              "DETECTION"
+            ],
+            "description": "Which chain this agent runs in. Agents in a chain run in order because each consumes what the one before it produced; the two chains run concurrently. null for agents with no chain (DREAM)."
+          },
+          "chainPosition": {
+            "type": "number",
+            "description": "1-based position within the chain; 0 when it has none"
+          },
+          "runsAfter": {
+            "type": "string",
+            "enum": [
+              "INQUIRY",
+              "CASE",
+              "DREAM",
+              "DUPLICATES",
+              "CONFIG",
+              "DETECTOR_AUTHOR",
+              "ESCALATION",
+              "CHAT"
+            ],
+            "nullable": true,
+            "description": "The agent immediately before this one, whose output it uses"
+          },
           "runBudgetMinutes": {
             "type": "number",
             "nullable": true,
@@ -20180,6 +20426,9 @@
           "defaultMinIntervalMinutes",
           "maxStalenessHours",
           "defaultMaxStalenessHours",
+          "chain",
+          "chainPosition",
+          "runsAfter",
           "runBudgetMinutes",
           "lastTriggeredAt",
           "customized"

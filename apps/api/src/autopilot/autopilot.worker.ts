@@ -8,7 +8,14 @@ import {
 } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
 import { PgBossService } from '../scheduler/pg-boss.service';
-import { AiSchemaError } from '../ai';
+import {
+  AiAuthError,
+  AiConfigError,
+  AiModelNotFoundError,
+  AiProviderError,
+  AiRateLimitError,
+  AiSchemaError,
+} from '../ai';
 import { INQUIRY_MATCH_QUEUE } from '../matching/matching.constants';
 import { EmbeddingQueueService } from '../embedding/embedding-queue.service';
 import { AgentAuditService } from './audit/agent-audit.service';
@@ -66,6 +73,28 @@ interface CycleInput {
   expressReason?: string | null;
   /** Periodic wake-up: see AUTOPILOT_HEARTBEAT_CRON. */
   heartbeat?: boolean;
+}
+
+/**
+ * Whether a failure came from the provider rather than from the agent.
+ *
+ * These are the errors that are a property of the instance, not of the run:
+ * a missing key, a dead model, an exhausted quota. The next agent in the chain
+ * would meet the same wall a second later, so the chain stops and pg-boss
+ * retries the cycle when the provider has recovered.
+ *
+ * `AiSchemaError` is pointedly absent — a model that could not produce valid
+ * output for *this* mission says nothing about the next one, and it is already
+ * handled without failing the cycle.
+ */
+function isProviderLevelFailure(error: unknown): boolean {
+  return (
+    error instanceof AiRateLimitError ||
+    error instanceof AiAuthError ||
+    error instanceof AiConfigError ||
+    error instanceof AiModelNotFoundError ||
+    error instanceof AiProviderError
+  );
 }
 
 /**
@@ -424,7 +453,7 @@ export class AutopilotWorker {
     // (they also write the same source config, so serialising them keeps them
     // off each other's optimistic-concurrency token).
     const deadline = Date.now() + settings.harnessCycleBudgetMinutes * 60_000;
-    const deferred = new Set<AgentKind>();
+    const unfinished = new Set<AgentKind>();
     await Promise.all([
       this.runChain(
         INVESTIGATION_CHAIN,
@@ -434,7 +463,7 @@ export class AutopilotWorker {
         scope,
         deadline,
         signals,
-        deferred,
+        unfinished,
       ),
       this.runChain(
         DETECTION_CHAIN,
@@ -444,7 +473,7 @@ export class AutopilotWorker {
         scope,
         deadline,
         signals,
-        deferred,
+        unfinished,
       ),
     ]);
 
@@ -454,9 +483,9 @@ export class AutopilotWorker {
       // behalf would drop them permanently — the next cycle reads the dirty set
       // and would find nothing. Leaving the marks costs a re-read; clearing
       // them early costs the work.
-      if (deferred.size > 0) {
+      if (unfinished.size > 0) {
         this.logger.log(
-          `Autopilot cycle deferred ${[...deferred].join(', ')}; keeping ${dirtySources.length} source(s) dirty for the next one.`,
+          `Autopilot cycle did not finish ${[...unfinished].join(', ')}; keeping ${dirtySources.length} source(s) dirty for the next one.`,
         );
       } else {
         await this.acknowledgeDirtySources(dirtySources);
@@ -478,7 +507,7 @@ export class AutopilotWorker {
     scope: CycleScope,
     deadline: number,
     signals: ReadinessSignals,
-    deferred: Set<AgentKind>,
+    unfinished: Set<AgentKind>,
   ): Promise<void> {
     for (const kind of chain) {
       if (Date.now() >= deadline) {
@@ -491,7 +520,8 @@ export class AutopilotWorker {
         );
         // The rest of this chain has not been considered, so the batch is not
         // finished with them either.
-        for (const rest of chain.slice(chain.indexOf(kind))) deferred.add(rest);
+        for (const rest of chain.slice(chain.indexOf(kind)))
+          unfinished.add(rest);
         return;
       }
 
@@ -502,11 +532,40 @@ export class AutopilotWorker {
           // preconditions simply are not met yet. A row per gated agent per
           // scan would bury the audit trail the SKIPPED rows exist to carry.
           this.logger.debug(`Autopilot ${kind} deferred — ${decision.reason}`);
-          deferred.add(kind);
+          unfinished.add(kind);
           continue;
         }
         await this.agents.markTriggered(kind);
-        await this.runAgent(kind, settings, cycle, sourceName, scope);
+        try {
+          await this.runAgent(kind, settings, cycle, sourceName, scope);
+        } catch (error) {
+          // A chain is an ordering, not a fate shared by its members.
+          //
+          // Every non-schema failure used to propagate straight out of this
+          // loop, so the agents behind the failing one were never even
+          // considered. Observed on a live instance: INQUIRY hit an OpenAI 429,
+          // rethrew, and CASE and ESCALATION recorded *zero* runs across two
+          // days — they had not been disabled, deferred or skipped, they simply
+          // never got their turn. DETECTOR_AUTHOR sat behind CONFIG the same
+          // way.
+          //
+          // The distinction that matters is whose fault it is. A provider-level
+          // failure will meet the next agent exactly as it met this one, so
+          // continuing only spends more calls into a rate limit — abort, and
+          // let pg-boss retry the cycle once the provider recovers. Anything
+          // else belongs to this agent alone.
+          if (isProviderLevelFailure(error)) throw error;
+          this.logger.warn(
+            `Autopilot ${kind} failed; continuing its chain — ${error instanceof Error ? error.message : String(error)}`,
+          );
+          // Counted as unfinished for the same reason a deferred agent is: it
+          // did not complete against these sources, so clearing their dirty
+          // marks would drop them for good. Not rethrown — the failure is
+          // already durable on the AgentRun row, and re-running the whole cycle
+          // to retry one agent that failed on its own logic is the same bet
+          // AiSchemaError already declines to take.
+          unfinished.add(kind);
+        }
         continue;
       }
 

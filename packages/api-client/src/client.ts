@@ -83,6 +83,9 @@ export type {
   GlossaryLookupHitDto,
   UpsertGlossaryTermResponseDto,
   DeleteGlossaryTermResponseDto,
+  BulkUpdateGlossaryTermsDto,
+  BulkUpdateGlossaryFiltersDto,
+  BulkUpdateGlossaryTermsResponseDto,
   CaseLeadDto,
   ProposeCaseLeadDto,
   ReviewCaseLeadDto,
@@ -237,6 +240,9 @@ export type {
   UpdateSourceDto,
   BulkUpdateSourcesDto,
   BulkUpdateSourcesResponseDto,
+  BulkRunSourcesDto,
+  BulkRunSourcesResponseDto,
+  BulkRunSourcesSkippedDto,
   BulkUpdateSourcesSamplingDto,
   BulkUpdateSourcesScheduleDto,
   UpdateMcpTokenDto,
@@ -383,6 +389,9 @@ export {
   // to be re-exported here (not in the `export type` blocks) for the agents
   // tab to render a Select over it.
   AgentConfigDtoTriggerModeEnum,
+  // Chain placement: runtime values, so the agents page can group and order by
+  // them rather than duplicating the chain definition it is meant to reflect.
+  AgentConfigDtoChainEnum,
   UpdateAgentConfigDtoTriggerModeEnum,
   // Finding enums used by web components
   FindingResponseDtoDetectorTypeEnum,

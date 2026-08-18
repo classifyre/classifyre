@@ -373,6 +373,48 @@ describe('SourcesController', () => {
       });
     });
 
+    it('reports sources that could not be started instead of failing the batch', async () => {
+      const second = { ...mockSource, id: 'busy-source', name: 'Busy Source' };
+      mockSourceService.sources.mockResolvedValue([mockSource, second]);
+      mockCliRunnerService.startRun
+        .mockResolvedValueOnce({ id: 'runner-1' })
+        .mockRejectedValueOnce(
+          new Error('Source busy-source already has a running scan'),
+        );
+
+      const result = await controller.bulkRunSources({
+        filters: { search: 'test' },
+      });
+
+      expect(mockSourceService.sources).toHaveBeenCalledWith({
+        where: { name: { contains: 'test', mode: 'insensitive' } },
+      });
+      expect(mockCliRunnerService.startRun).toHaveBeenCalledWith(
+        mockSource.id,
+        'MANUAL',
+        undefined,
+        false,
+      );
+      expect(result).toEqual({
+        startedCount: 1,
+        ids: [mockSource.id],
+        skipped: [
+          {
+            id: 'busy-source',
+            name: 'Busy Source',
+            reason: 'Source busy-source already has a running scan',
+          },
+        ],
+      });
+    });
+
+    it('rejects a bulk run that mixes ids and filters', async () => {
+      await expect(
+        controller.bulkRunSources({ ids: [mockSource.id], filters: {} }),
+      ).rejects.toThrow(BadRequestException);
+      expect(mockCliRunnerService.startRun).not.toHaveBeenCalled();
+    });
+
     it('requires exactly one selection mode and at least one update', async () => {
       await expect(
         controller.bulkUpdateSources({

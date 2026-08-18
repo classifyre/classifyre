@@ -11,7 +11,6 @@ import {
   SlidersHorizontal,
   Users,
   Workflow,
-  Wrench,
   type LucideIcon,
 } from "lucide-react";
 import { api, type AutopilotStatsDto } from "@workspace/api-client";
@@ -31,7 +30,6 @@ import { AutopilotMemory } from "@/components/autopilot/autopilot-memory";
 import { RunAutopilotDialog } from "@/components/autopilot/run-autopilot-dialog";
 import { HarnessActivity } from "./harness-activity";
 import { HarnessAgents } from "./harness-agents";
-import { HarnessTools } from "./harness-tools";
 import { HarnessBrief } from "./harness-brief";
 import { HarnessConfig } from "./harness-config";
 import { HarnessStatTile } from "./harness-stat-tile";
@@ -42,7 +40,6 @@ type View =
   | "runs"
   | "usage"
   | "agents"
-  | "tools"
   | "memory"
   | "brief"
   | "config";
@@ -52,7 +49,7 @@ const POLL_MS = 8000;
 /**
  * Harness AI control plane. A mission-control header (live counters), a steer
  * trigger, and six observability surfaces: the decision activity timeline, the
- * per-run flight recorder (ReAct), the capability map (tools + missions),
+ * per-run flight recorder (ReAct), the agent roster and their missions,
  * learned memory, the living system brief, and configuration.
  */
 export function HarnessShell() {
@@ -92,7 +89,6 @@ export function HarnessShell() {
     { value: "runs", label: t("harness.nav.runs"), icon: Workflow },
     { value: "usage", label: t("harness.nav.usage"), icon: BarChart3 },
     { value: "agents", label: t("harness.nav.agents"), icon: Users },
-    { value: "tools", label: t("harness.nav.tools"), icon: Wrench },
     { value: "memory", label: t("harness.nav.memory"), icon: Brain },
     { value: "brief", label: t("harness.nav.brief"), icon: BookOpen },
     { value: "config", label: t("harness.nav.config"), icon: SlidersHorizontal },
@@ -167,9 +163,6 @@ export function HarnessShell() {
         </TabsContent>
         <TabsContent value="agents">
           <HarnessAgents />
-        </TabsContent>
-        <TabsContent value="tools">
-          <HarnessTools />
         </TabsContent>
         <TabsContent value="memory">
           <AutopilotMemory />
