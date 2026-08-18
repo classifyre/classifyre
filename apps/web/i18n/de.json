@@ -183,7 +183,22 @@
     "deleted": "Glossarbegriff gelöscht",
     "deleteFailed": "Glossarbegriff konnte nicht gelöscht werden",
     "deleteConfirmTitle": "Glossarbegriff löschen?",
-    "deleteConfirmDescription": "Diese Aktion kann nicht rückgängig gemacht werden."
+    "deleteConfirmDescription": "Diese Aktion kann nicht rückgängig gemacht werden.",
+    "unverified": "Ungeprüft",
+    "bulk": {
+      "selected": "{{count}} Begriff ausgewählt",
+      "selectedPlural": "{{count}} Begriffe ausgewählt",
+      "allSelected": "Alle {{count}} passenden Begriffe ausgewählt",
+      "selectAllAria": "Alle Begriffe auswählen, die den aktuellen Filtern entsprechen",
+      "selectTermAria": "Begriff {{term}} auswählen",
+      "selectAll": "Alle {{count}} Begriffe auswählen, die den aktuellen Filtern entsprechen",
+      "deselectAll": "Alle Begriffe abwählen",
+      "verify": "Prüfen",
+      "unverify": "Prüfung aufheben",
+      "changeType": "Typ ändern",
+      "applied": "{{count}} Begriff(e) aktualisiert",
+      "failed": "Ausgewählte Begriffe konnten nicht aktualisiert werden"
+    }
   },
   "common": {
     "duration": {
@@ -793,6 +808,12 @@
     },
     "schedule": {
       "resumed": "Automatische Scans fortgesetzt."
+    },
+    "bulkRun": {
+      "runAll": "Alle starten",
+      "started": "{{count}} Scan(s) eingereiht",
+      "skipped": "{{count}} Quelle(n) konnten nicht gestartet werden",
+      "failed": "Scans konnten nicht gestartet werden"
     }
   },
   "findings": {

@@ -183,7 +183,22 @@
     "deleted": "Glossary term deleted",
     "deleteFailed": "Failed to delete glossary term",
     "deleteConfirmTitle": "Delete glossary term?",
-    "deleteConfirmDescription": "This action cannot be undone."
+    "deleteConfirmDescription": "This action cannot be undone.",
+    "unverified": "Unverified",
+    "bulk": {
+      "selected": "{{count}} term selected",
+      "selectedPlural": "{{count}} terms selected",
+      "allSelected": "All {{count}} matching terms selected",
+      "selectAllAria": "Select all terms matching the current filters",
+      "selectTermAria": "Select term {{term}}",
+      "selectAll": "Select all {{count}} terms matching the current filters",
+      "deselectAll": "Deselect all terms",
+      "verify": "Verify",
+      "unverify": "Unverify",
+      "changeType": "Change type",
+      "applied": "{{count}} term(s) updated",
+      "failed": "Failed to update the selected terms"
+    }
   },
   "common": {
     "duration": {
@@ -793,6 +808,12 @@
     },
     "schedule": {
       "resumed": "Automatic scanning resumed."
+    },
+    "bulkRun": {
+      "runAll": "Run all",
+      "started": "Queued {{count}} scan(s)",
+      "skipped": "{{count}} source(s) could not be started",
+      "failed": "Failed to start scans"
     }
   },
   "findings": {

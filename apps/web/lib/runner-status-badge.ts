@@ -38,3 +38,7 @@ export function getRunnerStatusBadgeTone(status?: string | null) {
 export function isRunnerStatusRunning(status?: string | null) {
   return status?.toUpperCase() === "RUNNING";
 }
+
+export function isRunnerStatusPending(status?: string | null) {
+  return status?.toUpperCase() === "PENDING";
+}
