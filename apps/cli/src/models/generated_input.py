@@ -14,6 +14,7 @@ from pydantic import (
     EmailStr,
     Field,
     RootModel,
+    constr,
 )
 
 
@@ -59,6 +60,7 @@ class AssetType(StrEnum):
     HUGGING_FACE = 'HUGGING_FACE'
     SANDBOX = 'SANDBOX'
     GIT = 'GIT'
+    CUSTOM = 'CUSTOM'
 
 
 class DetectorType(StrEnum):
@@ -391,6 +393,7 @@ class Type(StrEnum):
     HUGGING_FACE = 'HUGGING_FACE'
     SANDBOX = 'SANDBOX'
     GIT = 'GIT'
+    CUSTOM = 'CUSTOM'
 
 
 class YouTubeRequired(BaseModel):
@@ -3473,6 +3476,7 @@ class Type22(StrEnum):
     HUGGING_FACE = 'HUGGING_FACE'
     SANDBOX = 'SANDBOX'
     GIT = 'GIT'
+    CUSTOM = 'CUSTOM'
 
 
 class ConfluenceInput(CoreInput):
@@ -5278,6 +5282,89 @@ class GitInput(CoreInput):
     )
 
 
+class CustomRequired(BaseModel):
+    """
+    Non-secret key/value pairs made available to the notebook as ctx.variables. Keys must be valid environment-variable identifiers (letters, digits and underscores, not starting with a digit).
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    variables: dict[constr(pattern=r'^[A-Za-z_][A-Za-z0-9_]{0,63}$'), str] | None = (
+        Field(
+            {},
+            description='Plain values the notebook reads with ctx.variables["KEY"]. Stored and displayed in clear text — put anything sensitive in the secrets section instead.',
+        )
+    )
+
+
+class CustomMasked(BaseModel):
+    """
+    Secret key/value pairs. Encrypted at rest and injected into the notebook process at run time as ctx.secrets — never written into the notebook source, so a saved or exported notebook carries no credential material.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    secrets: dict[constr(pattern=r'^[A-Za-z_][A-Za-z0-9_]{0,63}$'), str] | None = Field(
+        {},
+        description='Values the notebook reads with ctx.secrets["KEY"]. Keys must be valid environment-variable identifiers.',
+    )
+
+
+class CustomOptionalExecution(BaseModel):
+    """
+    Limits applied to the notebook process during a scan.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    discover_timeout_seconds: int | None = Field(
+        600,
+        description='Wall-clock limit for one discover() call before the notebook process is killed and the run fails.',
+        ge=10,
+        le=86400,
+    )
+    fetch_timeout_seconds: int | None = Field(
+        120, description='Wall-clock limit for a single fetch() call.', ge=5, le=3600
+    )
+    max_assets: int | None = Field(
+        None,
+        description='Stop after this many assets from discover(). Unset means no ceiling beyond the sampling strategy.',
+        ge=1,
+        le=1000000,
+    )
+
+
+class CustomOptional(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    execution: CustomOptionalExecution | None = None
+
+
+class CustomInput(CoreInput):
+    type: Literal['CUSTOM'] = Field(..., description='Type of the asset or source')
+    required: CustomRequired
+    masked: CustomMasked | None = None
+    optional: CustomOptional | None = None
+    detectors: list[Detector] | None = Field(
+        None, description='Detectors to run on ingested content'
+    )
+    custom_detectors: list[CustomDetectorSelection] | None = Field(
+        None,
+        description='Reusable custom detector IDs selected from the custom detector catalog.',
+    )
+    sampling: SamplingConfig
+    scan_cache: ScanCacheConfig | None = None
+    resources: ResourceOverrides | None = None
+    cleanup_removed_detector_findings: bool | None = Field(
+        True,
+        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
+    )
+
+
 class YouTubeInput(CoreInput):
     type: Literal['YOUTUBE'] = Field(..., description='Type of the asset or source')
     required: YouTubeRequired
@@ -5452,6 +5539,7 @@ class SourceInput(
         | DropboxInput
         | HuggingFaceInput
         | GitInput
+        | CustomInput
     ]
 ):
     root: (
@@ -5492,6 +5580,7 @@ class SourceInput(
         | DropboxInput
         | HuggingFaceInput
         | GitInput
+        | CustomInput
     ) = Field(
         ...,
         description='Merged configuration schema with all source types and common definitions',

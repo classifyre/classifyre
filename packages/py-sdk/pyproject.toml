@@ -1,0 +1,22 @@
+[project]
+name = "classifyre-sdk"
+version = "0.4.123.dev0"
+description = "Authoring SDK for Classifyre custom (notebook-backed) sources"
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "Apache-2.0" }
+
+# Intentionally dependency-free. This package is resolved from inside a
+# per-notebook uv sandbox venv (PEP 723 `[tool.uv.sources]`), so every
+# dependency it declares becomes a dependency of every user notebook.
+dependencies = []
+
+[tool.uv]
+package = true
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/classifyre"]

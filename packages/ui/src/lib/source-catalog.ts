@@ -414,6 +414,23 @@ export const SOURCE_TYPE_CATALOG_META: Record<string, SourceCatalogMetaBase> = {
       "ssh",
     ],
   },
+  CUSTOM: {
+    description:
+      "Write the connector yourself in Python, as a notebook you build and test interactively against the real system.",
+    icon: CreateSourceDtoTypeEnum.Custom,
+    category: "OTHER",
+    keywords: [
+      "custom",
+      "python",
+      "notebook",
+      "marimo",
+      "script",
+      "code",
+      "api",
+      "bespoke",
+      "internal",
+    ],
+  },
 };
 
 export function resolveSourceCatalogMeta(

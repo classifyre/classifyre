@@ -3531,5 +3531,62 @@
         ]
       }
     }
+  ],
+  "CUSTOM": [
+    {
+      "name": "Internal REST API",
+      "description": "Pull records from an in-house HTTP API using a token, with the request logic written as a Python notebook",
+      "config": {
+        "type": "CUSTOM",
+        "required": {
+          "variables": {
+            "BASE_URL": "https://api.internal.example.com/v1",
+            "PAGE_SIZE": "200"
+          }
+        },
+        "masked": {
+          "secrets": {
+            "API_TOKEN": ""
+          }
+        },
+        "sampling": {
+          "strategy": "AUTOMATIC"
+        }
+      }
+    },
+    {
+      "name": "Legacy archive format",
+      "description": "Walk a bespoke archive layout and emit one asset per member, with longer per-asset timeouts",
+      "config": {
+        "type": "CUSTOM",
+        "required": {
+          "variables": {
+            "ARCHIVE_ROOT": "/mnt/archive/2019"
+          }
+        },
+        "masked": {
+          "secrets": {}
+        },
+        "optional": {
+          "execution": {
+            "discover_timeout_seconds": 1800,
+            "fetch_timeout_seconds": 300
+          }
+        },
+        "sampling": {
+          "strategy": "ALL"
+        },
+        "detectors": [
+          {
+            "type": "PII",
+            "enabled": true
+          },
+          {
+            "type": "SECRETS",
+            "enabled": true
+          }
+        ]
+      }
+    }
   ]
 }

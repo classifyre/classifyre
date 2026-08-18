@@ -32,6 +32,7 @@
     "@anthropic-ai/sdk": "^0.111.0",
     "@aws-sdk/client-s3": "^3.1032.0",
     "@fastify/compress": "^9.2.0",
+    "@fastify/http-proxy": "^11.6.0",
     "@fastify/multipart": "^10.0.0",
     "@fastify/static": "^9.3.0",
     "@fastify/under-pressure": "^9.0.3",

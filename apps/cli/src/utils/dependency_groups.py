@@ -55,6 +55,7 @@ SOURCE_TYPE_GROUPS: dict[str, set[str]] = {
     "DROPBOX": {"dropbox"},
     "HUGGING_FACE": {"hugging-face"},
     "SLACK": {"slack"},
+    "CUSTOM": {"custom-source"},
 }
 
 

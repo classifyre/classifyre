@@ -9822,6 +9822,209 @@
           "data-transfer"
         ]
       }
+    },
+    "/sources/{sourceId}/notebook": {
+      "get": {
+        "operationId": "CustomSourcesController_getNotebook",
+        "parameters": [
+          {
+            "name": "sourceId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "revision",
+            "required": false,
+            "in": "query",
+            "description": "Read a specific revision instead of the newest",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotebookDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Read a custom source's notebook (the newest revision by default)",
+        "tags": [
+          "Custom Sources"
+        ]
+      },
+      "put": {
+        "operationId": "CustomSourcesController_saveNotebook",
+        "parameters": [
+          {
+            "name": "sourceId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveNotebookDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SaveNotebookResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Save a new notebook revision",
+        "tags": [
+          "Custom Sources"
+        ]
+      }
+    },
+    "/sources/{sourceId}/notebook/revisions": {
+      "get": {
+        "operationId": "CustomSourcesController_listRevisions",
+        "parameters": [
+          {
+            "name": "sourceId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/NotebookRevisionDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "List saved notebook revisions, newest first",
+        "tags": [
+          "Custom Sources"
+        ]
+      }
+    },
+    "/sources/{sourceId}/session": {
+      "get": {
+        "operationId": "CustomSourcesController_getSession",
+        "parameters": [
+          {
+            "name": "sourceId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotebookSessionDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Current notebook editing session, if any",
+        "tags": [
+          "Custom Sources"
+        ]
+      },
+      "post": {
+        "operationId": "CustomSourcesController_startSession",
+        "parameters": [
+          {
+            "name": "sourceId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotebookSessionDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Start a notebook editing session (returns the running one if any)",
+        "tags": [
+          "Custom Sources"
+        ]
+      },
+      "delete": {
+        "operationId": "CustomSourcesController_stopSession",
+        "parameters": [
+          {
+            "name": "sourceId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "summary": "Stop the notebook editing session",
+        "tags": [
+          "Custom Sources"
+        ]
+      }
     }
   },
   "info": {
@@ -10170,7 +10373,8 @@
               "DROPBOX",
               "HUGGING_FACE",
               "SANDBOX",
-              "GIT"
+              "GIT",
+              "CUSTOM"
             ],
             "description": "The type of the source",
             "example": "WORDPRESS"
@@ -10414,7 +10618,8 @@
               "DROPBOX",
               "HUGGING_FACE",
               "SANDBOX",
-              "GIT"
+              "GIT",
+              "CUSTOM"
             ],
             "description": "The type of the source",
             "example": "WORDPRESS"
@@ -22505,6 +22710,118 @@
         },
         "required": [
           "deleted"
+        ]
+      },
+      "NotebookDto": {
+        "type": "object",
+        "properties": {
+          "revision": {
+            "type": "number",
+            "description": "Revision number; 0 when nothing is saved yet"
+          },
+          "content": {
+            "type": "string",
+            "description": "Notebook source code"
+          },
+          "isStarter": {
+            "type": "boolean",
+            "description": "True when the source has no saved notebook yet"
+          }
+        },
+        "required": [
+          "revision",
+          "content",
+          "isStarter"
+        ]
+      },
+      "SaveNotebookDto": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "string",
+            "description": "Full notebook source code"
+          },
+          "message": {
+            "type": "string",
+            "description": "Short note describing the change"
+          }
+        },
+        "required": [
+          "content"
+        ]
+      },
+      "SaveNotebookResponseDto": {
+        "type": "object",
+        "properties": {
+          "revision": {
+            "type": "number"
+          },
+          "unchanged": {
+            "type": "boolean",
+            "description": "True when the content matched the current revision and no new one was written"
+          }
+        },
+        "required": [
+          "revision",
+          "unchanged"
+        ]
+      },
+      "NotebookRevisionDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "number"
+          },
+          "contentHash": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "revision",
+          "contentHash",
+          "createdAt"
+        ]
+      },
+      "NotebookSessionDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "description": "STARTING, READY or FAILED"
+          },
+          "path": {
+            "type": "string",
+            "description": "API path the editor is served under. Load it in an iframe; it is proxied to the session."
+          },
+          "error": {
+            "type": "string",
+            "description": "Why the session failed to start"
+          },
+          "startedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "path",
+          "startedAt"
         ]
       }
     }

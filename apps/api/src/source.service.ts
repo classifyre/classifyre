@@ -138,8 +138,12 @@ export class SourceService {
     const encryptedConfig = this.maskedConfigCryptoService.encryptMaskedConfig(
       normalizedIncomingConfig,
     );
+    // SANDBOX and CUSTOM opt out of config-based deduplication. What makes each
+    // of them distinct lives outside `config` - uploaded files for one, the
+    // notebook for the other - so two genuinely different sources can share a
+    // byte-identical config.
     const existingSource =
-      assetType === AssetType.SANDBOX
+      assetType === AssetType.SANDBOX || assetType === AssetType.CUSTOM
         ? null
         : await this.findExistingSourceByConfig(
             assetType,

@@ -1280,6 +1280,57 @@
           ]
         }
       }
+    },
+    "CUSTOM": {
+      "sections": {
+        "name": {
+          "title": "Source name",
+          "summary": "Name it after the system the notebook actually reads, not after the fact that it is custom.",
+          "suggestions": [
+            "Prefer the system name (example: Billing API, Legacy Claims Archive).",
+            "Add an environment marker when the same notebook runs against several."
+          ]
+        },
+        "required": {
+          "title": "Required",
+          "summary": "required.variables holds non-secret key/value pairs the notebook reads with ctx.variables. Keys must be valid environment-variable identifiers.",
+          "suggestions": [
+            "Put endpoints, page sizes and paths here, not credentials.",
+            "Use UPPER_SNAKE_CASE keys so they read the same way in the notebook."
+          ],
+          "questions": [
+            "What endpoint or root path should the notebook read from?",
+            "Which values change between environments?"
+          ]
+        },
+        "masked": {
+          "title": "Authentication",
+          "summary": "masked.secrets holds credentials. They are encrypted at rest and injected into the notebook process at run time, so they never appear in the notebook source.",
+          "suggestions": [
+            "Read them in the notebook with ctx.secrets[\"KEY\"] - never hardcode a token in a cell.",
+            "Add one entry per credential (token, password, private key)."
+          ],
+          "questions": [
+            "What credential does the target system require?"
+          ]
+        },
+        "optional": {
+          "title": "Optional",
+          "summary": "optional.execution bounds the notebook process: per-call timeouts and a ceiling on how many assets one run may produce.",
+          "suggestions": [
+            "Raise discover_timeout_seconds when listing is slow or deeply paginated.",
+            "Set max_assets while developing so a runaway loop cannot flood the corpus."
+          ]
+        },
+        "sampling": {
+          "title": "Sampling",
+          "summary": "Controls how many of the assets discover() returns are processed each run.",
+          "suggestions": [
+            "Use AUTOMATIC to ingest incrementally, a slice per run.",
+            "Use ALL once the notebook is proven and the volume is known."
+          ]
+        }
+      }
     }
   },
   "schedule": {

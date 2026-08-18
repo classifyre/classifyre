@@ -119,6 +119,7 @@ docs/CustomDetectorResponseDtoSourcesUsingInner.md
 docs/CustomDetectorTestsApi.md
 docs/CustomDetectorTrainingRunDto.md
 docs/CustomDetectorsApi.md
+docs/CustomSourcesApi.md
 docs/DataTransferApi.md
 docs/DataTransferJobDto.md
 docs/DataTransferJobListDto.md
@@ -200,6 +201,9 @@ docs/McpTokenResponseDto.md
 docs/McpToolParameterDto.md
 docs/McpToolSummaryDto.md
 docs/NamespacesApi.md
+docs/NotebookDto.md
+docs/NotebookRevisionDto.md
+docs/NotebookSessionDto.md
 docs/NotificationListResponseDto.md
 docs/NotificationResponseDto.md
 docs/NotificationsApi.md
@@ -233,6 +237,8 @@ docs/RunnersApi.md
 docs/RunnersChartsTimelineBucketDto.md
 docs/RunnersChartsTopSourceDto.md
 docs/RunnersChartsTotalsDto.md
+docs/SaveNotebookDto.md
+docs/SaveNotebookResponseDto.md
 docs/SaveTrainingExamplesDto.md
 docs/ScanCacheEntryDto.md
 docs/SearchAssetFindingDto.md
@@ -352,6 +358,7 @@ src/apis/CorrelationApi.ts
 src/apis/CustomDetectorExtractionsApi.ts
 src/apis/CustomDetectorTestsApi.ts
 src/apis/CustomDetectorsApi.ts
+src/apis/CustomSourcesApi.ts
 src/apis/DataTransferApi.ts
 src/apis/EmbeddingsApi.ts
 src/apis/FindingsApi.ts
@@ -547,6 +554,9 @@ src/models/McpTokenCreatedResponseDto.ts
 src/models/McpTokenResponseDto.ts
 src/models/McpToolParameterDto.ts
 src/models/McpToolSummaryDto.ts
+src/models/NotebookDto.ts
+src/models/NotebookRevisionDto.ts
+src/models/NotebookSessionDto.ts
 src/models/NotificationListResponseDto.ts
 src/models/NotificationResponseDto.ts
 src/models/NotificationsControllerDeleteNotification200Response.ts
@@ -578,6 +588,8 @@ src/models/RunnerLogsResponseDto.ts
 src/models/RunnersChartsTimelineBucketDto.ts
 src/models/RunnersChartsTopSourceDto.ts
 src/models/RunnersChartsTotalsDto.ts
+src/models/SaveNotebookDto.ts
+src/models/SaveNotebookResponseDto.ts
 src/models/SaveTrainingExamplesDto.ts
 src/models/ScanCacheEntryDto.ts
 src/models/SearchAssetFindingDto.ts
