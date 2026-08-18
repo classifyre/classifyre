@@ -69,7 +69,7 @@ export function upgradePgHbaToScram(contents: string): string {
     .join("");
 }
 
-function randomPassword(): string {
+export function randomPassword(): string {
   // base64url is URI-safe, while still carrying the full 256 bits of entropy.
   return crypto.randomBytes(32).toString("base64url");
 }
@@ -169,8 +169,11 @@ export class PostgresCredentialStore {
     baseDir: string,
     private readonly protection: CredentialProtection,
     private readonly now: () => Date = () => new Date(),
+    // The read-only login (see postgres-readonly.ts) reuses this store's
+    // encryption, permissions and atomic write under its own file name.
+    fileName = "postgres-credentials.bin",
   ) {
-    this.filePath = path.join(baseDir, "postgres-credentials.bin");
+    this.filePath = path.join(baseDir, fileName);
   }
 
   get path(): string {
@@ -214,6 +217,41 @@ export class PostgresCredentialStore {
     };
     await this.save(committed);
     return committed;
+  }
+
+  /**
+   * Replaces the stored credential outright, with no pending journal.
+   *
+   * Rotation of the *superuser* password has to survive an interruption
+   * between ALTER ROLE and the write, which is what {@link stageRotationIfDue}
+   * / {@link commitRotation} are for. A regenerated read-only login has no
+   * such hazard: it is only ever used by tools outside the app, so a lost
+   * write simply means the old password still works and the user can press
+   * the button again.
+   */
+  async replace(password: string): Promise<PostgresCredentialState> {
+    if (password.length < 8) {
+      throw new Error("Refusing to store a too-short PostgreSQL credential");
+    }
+    const state: PostgresCredentialState = {
+      version: CREDENTIAL_VERSION,
+      current: password,
+      rotatedAt: this.now().toISOString(),
+    };
+    await this.save(state);
+    return state;
+  }
+
+  /** Reads the stored credential without creating one. */
+  async read(): Promise<PostgresCredentialState | null> {
+    return this.load();
+  }
+
+  /** Removes the stored credential, if any. */
+  async clear(): Promise<void> {
+    await fs.promises.unlink(this.filePath).catch((error: NodeJS.ErrnoException) => {
+      if (error.code !== "ENOENT") throw error;
+    });
   }
 
   private async load(): Promise<PostgresCredentialState | null> {

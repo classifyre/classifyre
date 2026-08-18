@@ -26,6 +26,9 @@ describe('CliRunnerService', () => {
     process.env.CLASSIFYRE_MASKED_CONFIG_KEY = Buffer.alloc(32, 19).toString(
       'base64',
     );
+    // These tests are about what a run carries, not about rationing, so take
+    // the machine-wide scan budget out of the picture (0 means unlimited).
+    process.env.MAX_CONCURRENT_RUNNERS = '0';
   });
 
   afterAll(() => {
@@ -46,10 +49,8 @@ describe('CliRunnerService', () => {
       customDetectorFeedback: {
         findMany: jest.fn().mockResolvedValue([]),
       },
-      // Scan concurrency is a per-workspace setting; these tests are about
-      // what a run carries, not about rationing, so leave it unlimited.
       instanceSettings: {
-        findUnique: jest.fn().mockResolvedValue({ maxConcurrentRunners: 0 }),
+        findUnique: jest.fn().mockResolvedValue({}),
       },
       runner: {
         findUnique: jest.fn(),
@@ -825,10 +826,8 @@ describe('CliRunnerService', () => {
       customDetectorFeedback: {
         findMany: jest.fn().mockResolvedValue([]),
       },
-      // Scan concurrency is a per-workspace setting; these tests are about
-      // what a run carries, not about rationing, so leave it unlimited.
       instanceSettings: {
-        findUnique: jest.fn().mockResolvedValue({ maxConcurrentRunners: 0 }),
+        findUnique: jest.fn().mockResolvedValue({}),
       },
       runner: {
         findUnique: jest.fn(),

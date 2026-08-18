@@ -19,7 +19,6 @@ Name | Type
 `autopilotEscalationEnabled` | boolean
 `autopilotMcpEnabled` | boolean
 `autoScheduleEnabled` | boolean
-`maxConcurrentRunners` | number
 `hfToken` | string
 `harnessRunBudgetMinutes` | number
 `harnessRunStaleAfterMinutes` | number
@@ -55,7 +54,6 @@ const example = {
   "autopilotEscalationEnabled": true,
   "autopilotMcpEnabled": true,
   "autoScheduleEnabled": true,
-  "maxConcurrentRunners": 2,
   "hfToken": null,
   "harnessRunBudgetMinutes": 20,
   "harnessRunStaleAfterMinutes": 60,

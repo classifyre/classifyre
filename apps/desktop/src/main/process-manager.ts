@@ -212,7 +212,7 @@ export function namespaceJobConcurrency(): number {
   return cores >= 12 ? 3 : 2;
 }
 
-function resourceDefaultEnv(): Record<string, string> {
+function resourceDefaultEnv(maxConcurrentRunners: number): Record<string, string> {
   const cores = os.cpus().length;
   const detectorWorkers = detectorWorkerCount();
   return {
@@ -225,10 +225,12 @@ function resourceDefaultEnv(): Record<string, string> {
     // less than the machine staying responsive.
     EMBEDDING_BATCH_SIZE: "8",
     EMBEDDING_INTRA_OP_THREADS: cores >= 8 ? "2" : "1",
-    // Scan concurrency is deliberately NOT set here. It is a per-workspace
-    // setting (Workspace settings → Scanning), so a small workspace and a
-    // 151-source one on the same machine can differ; pinning the environment
-    // variable would override every workspace and make the control inert.
+    // How many scans may run at once across every workspace. This is a
+    // property of the machine, not of a workspace — two scans saturate the
+    // same cores whichever workspace started them — so it is owned by the
+    // desktop settings window here and by the Helm chart on Kubernetes,
+    // rather than by the in-app UI. 0 means unlimited.
+    MAX_CONCURRENT_RUNNERS: String(maxConcurrentRunners),
   };
 }
 
@@ -266,8 +268,8 @@ export const ELECTRON_MAX_OLD_SPACE_MB = 4096;
  * corpus) into a ~233 MB JSON string plus its parsed object tree, and that is
  * genuinely live for the duration of the request. Rather than paying for that
  * worst case on every install, the ceiling is raisable per machine from the
- * Settings ▸ API Memory Limit menu (persisted as `memoryLimitMb`), which is
- * what `overrideMb` carries here.
+ * desktop Settings window (persisted as `memoryLimitMb`), which is what
+ * `overrideMb` carries here.
  */
 export const DEFAULT_API_HEAP_MB = 2048;
 
@@ -362,6 +364,12 @@ export function restartDecision(input: {
  */
 export type ApiStartupPhase = "runtime" | "service";
 
+/** The slice of app settings that shapes an API process. */
+export interface ApiProcessSettings {
+  memoryLimitMb: number;
+  maxConcurrentRunners: number;
+}
+
 export type ApiStartupProgress = (
   detail: string,
   phase: ApiStartupPhase,
@@ -382,7 +390,12 @@ export class ProcessManager {
   // down, so the UI can say so instead of looping on connection-refused.
   constructor(
     private readonly onProgress: ApiStartupProgress = () => {},
-    private readonly memoryLimitMb: number = 0,
+    // Read at spawn time rather than captured once, so a restart triggered
+    // from the settings window picks up the values that were just saved.
+    private readonly getSettings: () => ApiProcessSettings = () => ({
+      memoryLimitMb: 0,
+      maxConcurrentRunners: 2,
+    }),
     private readonly onUnavailable: (
       processId: string,
       reason: string,
@@ -568,11 +581,12 @@ export class ProcessManager {
     // unreliable under ELECTRON_RUN_AS_NODE, so pin it explicitly — see
     // computeApiHeapMb for how the value is budgeted. `memoryLimitMb` in
     // settings.json overrides it for corpora that need more.
+    const settings = this.getSettings();
     const totalMb = Math.floor(os.totalmem() / (1024 * 1024));
     const heapMb = computeApiHeapMb(
       totalMb,
       detectorWorkerCount(),
-      this.memoryLimitMb,
+      settings.memoryLimitMb,
     );
     const nodeArgs: string[] = [`--max-old-space-size=${heapMb}`];
     // The shed threshold is deliberately NOT computed here. It used to be
@@ -634,7 +648,7 @@ export class ProcessManager {
         NODE_ENV: app.isPackaged ? "production" : "development",
         // Conservative resource defaults sized to this machine; the CLI
         // inherits them through the API's env (uv run passes env through).
-        ...resourceDefaultEnv(),
+        ...resourceDefaultEnv(settings.maxConcurrentRunners),
       },
       stdio: ["ignore", "pipe", "pipe"],
     });
