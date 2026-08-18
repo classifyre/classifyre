@@ -3,11 +3,16 @@ import {
   Injectable,
   Logger,
   NotFoundException,
-  OnModuleDestroy,
-  OnModuleInit,
 } from '@nestjs/common';
 import { randomBytes, randomUUID } from 'crypto';
 import { connect, createServer } from 'net';
+import { ClsService } from 'nestjs-cls';
+import {
+  CLS_DATABASE_LANE,
+  CLS_NAMESPACE_ID,
+  CLS_SCHEMA,
+  CLS_SLUG,
+} from '../namespace/namespace.constants';
 import { PrismaService } from '../prisma.service';
 import { MaskedConfigCryptoService } from '../masked-config-crypto.service';
 import { CliRunnerService } from '../cli-runner/cli-runner.service';
@@ -25,7 +30,6 @@ export const SESSION_STATUS = {
 const IDLE_TIMEOUT_SECONDS = Number(
   process.env.CLASSIFYRE_NOTEBOOK_IDLE_TIMEOUT_SECONDS || 30 * 60,
 );
-const REAPER_INTERVAL_MS = 60_000;
 
 export interface SessionView {
   id: string;
@@ -49,11 +53,8 @@ export interface SessionView {
  * restart.
  */
 @Injectable()
-export class CustomSourceSessionService
-  implements OnModuleInit, OnModuleDestroy
-{
+export class CustomSourceSessionService {
   private readonly logger = new Logger(CustomSourceSessionService.name);
-  private reaper?: NodeJS.Timeout;
 
   /**
    * Proxy targets, cached in process.
@@ -70,6 +71,7 @@ export class CustomSourceSessionService
   >();
 
   constructor(
+    private readonly cls: ClsService,
     private readonly prisma: PrismaService,
     private readonly maskedConfigCrypto: MaskedConfigCryptoService,
     private readonly notebooks: CustomSourceNotebookService,
@@ -77,38 +79,20 @@ export class CustomSourceSessionService
     private readonly kubernetesJobs: KubernetesCliJobService,
   ) {}
 
-  onModuleInit(): void {
-    // A session's backing process does not survive an API restart, so any row
-    // still marked live is a ghost. Clearing them on boot stops the UI from
-    // offering a Resume that would proxy into nothing.
-    void this.prisma.customSourceSession
-      .updateMany({
-        where: {
-          status: { in: [SESSION_STATUS.starting, SESSION_STATUS.ready] },
-        },
-        data: { status: SESSION_STATUS.stopped, endpoint: null },
-      })
-      .then(({ count }) => {
-        if (count > 0) {
-          this.logger.log(
-            `Cleared ${count} notebook session(s) left by a restart`,
-          );
-        }
-      })
-      .catch((error) =>
-        this.logger.warn(`Could not reconcile notebook sessions: ${error}`),
-      );
-
-    this.reaper = setInterval(
-      () => void this.reapIdleSessions(),
-      REAPER_INTERVAL_MS,
-    );
-    this.reaper.unref?.();
-  }
-
-  onModuleDestroy(): void {
-    if (this.reaper) clearInterval(this.reaper);
-  }
+  // No onModuleInit and no background timer here, deliberately.
+  //
+  // `PrismaService` is a CLS-scoped proxy: every tenant read must happen inside
+  // a resolved namespace, and bootstrap and `setInterval` callbacks have none.
+  // Touching it from either throws "PrismaService accessed outside a namespace
+  // context" - which is the guard doing its job, not a bug to work around.
+  //
+  // Nothing is lost by dropping them, because a session already expires without
+  // the API's help:
+  //   * the CLI session process exits on its own --idle-timeout;
+  //   * its Kubernetes Job carries activeDeadlineSeconds and
+  //     ttlSecondsAfterFinished, so the pod is collected after it ends;
+  //   * a stale row is recognised on read (see `isStale`) inside a request,
+  //     where a namespace *is* resolved.
 
   // ── public API ───────────────────────────────────────────────────────
 
@@ -133,11 +117,35 @@ export class CustomSourceSessionService
     );
   }
 
+  /**
+   * Whether a row that still claims to be live has actually been abandoned.
+   *
+   * `lastSeenAt` is bumped by every proxied request, and the session process
+   * ends itself after the same idle period, so a row older than that is
+   * describing something that is no longer running - typically an API restart
+   * that took its local child process with it.
+   */
+  private static isStale(session: { lastSeenAt: Date | null }): boolean {
+    const lastSeen = session.lastSeenAt?.getTime() ?? 0;
+    return Date.now() - lastSeen > IDLE_TIMEOUT_SECONDS * 1000;
+  }
+
   async get(sourceId: string): Promise<SessionView | null> {
     const session = await this.prisma.customSourceSession.findUnique({
       where: { sourceId },
     });
     if (!session || session.status === SESSION_STATUS.stopped) {
+      return null;
+    }
+    if (CustomSourceSessionService.isStale(session)) {
+      // Reap here rather than on a timer: this is the one place we are
+      // guaranteed to be inside a namespace context.
+      this.logger.log(
+        `Notebook session for source ${sourceId} went idle; cleaning it up`,
+      );
+      await this.stop(sourceId).catch((error) =>
+        this.logger.warn(`Could not clean up stale session: ${error}`),
+      );
       return null;
     }
     return {
@@ -192,7 +200,19 @@ export class CustomSourceSessionService
 
     // Launch in the background: building a sandbox venv takes minutes, and the
     // UI needs to render a "starting" state rather than hold a request open.
-    void this.launch(sourceId, sessionId, token, path).catch((error) =>
+    //
+    // The tenant is captured here and re-entered inside `launch`, rather than
+    // relying on the request's context outliving the request. This work
+    // continues long after the response is sent, and every database write it
+    // makes still has to land in this namespace's schema.
+    const tenant = {
+      schema: this.cls.get<string>(CLS_SCHEMA),
+      namespaceId: this.cls.get<string>(CLS_NAMESPACE_ID),
+      slug: this.cls.get<string>(CLS_SLUG),
+    };
+    void this.runInTenant(tenant, () =>
+      this.launch(sourceId, sessionId, token, path),
+    ).catch((error) =>
       this.logger.error(`Notebook session ${sessionId} failed: ${error}`),
     );
 
@@ -260,6 +280,26 @@ export class CustomSourceSessionService
   }
 
   // ── internals ────────────────────────────────────────────────────────
+
+  /**
+   * Run detached work inside a specific namespace.
+   *
+   * Mirrors NamespaceWorkerManager.runInNamespace. The 'background' lane keeps
+   * a long session launch off the pool the request path uses.
+   */
+  private runInTenant<T>(
+    tenant: { schema?: string; namespaceId?: string; slug?: string },
+    fn: () => Promise<T>,
+  ): Promise<T> {
+    return this.cls.run(() => {
+      if (tenant.schema) this.cls.set(CLS_SCHEMA, tenant.schema);
+      if (tenant.namespaceId)
+        this.cls.set(CLS_NAMESPACE_ID, tenant.namespaceId);
+      if (tenant.slug) this.cls.set(CLS_SLUG, tenant.slug);
+      this.cls.set(CLS_DATABASE_LANE, 'background');
+      return fn();
+    });
+  }
 
   private isKubernetes(): boolean {
     return (
@@ -368,26 +408,6 @@ export class CustomSourceSessionService
       }
     } catch (error) {
       this.logger.warn(`Could not stop a notebook session cleanly: ${error}`);
-    }
-  }
-
-  private async reapIdleSessions(): Promise<void> {
-    const cutoff = new Date(Date.now() - IDLE_TIMEOUT_SECONDS * 1000);
-    const stale = await this.prisma.customSourceSession.findMany({
-      where: {
-        status: { in: [SESSION_STATUS.starting, SESSION_STATUS.ready] },
-        lastSeenAt: { lt: cutoff },
-      },
-      take: 50,
-    });
-
-    for (const session of stale) {
-      this.logger.log(
-        `Reaping idle notebook session for source ${session.sourceId}`,
-      );
-      await this.stop(session.sourceId).catch((error) =>
-        this.logger.warn(`Could not reap session ${session.id}: ${error}`),
-      );
     }
   }
 }
