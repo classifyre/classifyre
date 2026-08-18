@@ -3,6 +3,8 @@ import {
   Controller,
   Delete,
   Get,
+  HttpCode,
+  HttpStatus,
   Param,
   Patch,
   Post,
@@ -11,6 +13,8 @@ import {
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { GlossaryService } from './glossary.service';
 import {
+  BulkUpdateGlossaryTermsDto,
+  BulkUpdateGlossaryTermsResponseDto,
   DeleteGlossaryTermResponseDto,
   GlossaryListResponseDto,
   GlossaryLookupHitDto,
@@ -62,6 +66,22 @@ export class GlossaryController {
       refId: dto.refId,
       origin: 'OPERATOR',
       author: dto.author,
+    });
+  }
+
+  @Post('bulk')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Bulk verify/unverify or retype glossary terms (operator)',
+  })
+  @ApiOkResponse({ type: BulkUpdateGlossaryTermsResponseDto })
+  bulkUpdate(@Body() dto: BulkUpdateGlossaryTermsDto) {
+    return this.glossary.bulkUpdate({
+      ids: dto.ids,
+      filters: dto.filters,
+      verified: dto.verified,
+      entityType: dto.entityType,
+      verifiedBy: dto.verifiedBy,
     });
   }
 

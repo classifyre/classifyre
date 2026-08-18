@@ -24,6 +24,7 @@ import {
   AlertDialogTrigger,
   Badge,
   Button,
+  Checkbox,
   Dialog,
   DialogContent,
   DialogFooter,
@@ -57,11 +58,13 @@ import {
 } from "@workspace/ui/components";
 import { extractApiErrorMessage } from "@/lib/extract-api-error-message";
 import {
+  bulkUpdateGlossaryTerms,
   GLOSSARY_ENTITY_TYPES,
   listGlossaryTerms,
   removeGlossaryTerm,
   upsertGlossaryTerm,
   verifyGlossaryTerm,
+  type GlossaryBulkFilters,
   type GlossaryEntityType,
   type GlossaryTermDto,
 } from "@/lib/glossary-api";
@@ -87,6 +90,11 @@ const EMPTY_FORM: FormState = {
   entityType: "TERM",
   notes: "",
 };
+
+const CHECKBOX_CLASS =
+  "border-2 border-foreground/25 rounded-[2px] data-[state=checked]:bg-accent data-[state=checked]:border-accent data-[state=checked]:text-accent-foreground data-[state=indeterminate]:bg-accent data-[state=indeterminate]:border-accent data-[state=indeterminate]:text-accent-foreground";
+
+type BulkAction = "verify" | "unverify" | "entityType";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -135,6 +143,14 @@ export function GlossaryWorkspace({
     id: string;
     action: "verify" | "delete";
   } | null>(null);
+
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(
+    () => new Set<string>(),
+  );
+  const [isAllSelected, setIsAllSelected] = useState(false);
+  const [bulkEntityType, setBulkEntityType] =
+    useState<GlossaryEntityType>("TERM");
+  const [bulkAction, setBulkAction] = useState<BulkAction | null>(null);
 
   // ── Debounce search input ────────────────────────────────────────────────
 
@@ -200,6 +216,54 @@ export function GlossaryWorkspace({
     () => getPageItems(clampedPage, totalPages),
     [clampedPage, totalPages],
   );
+
+  // ── Selection ────────────────────────────────────────────────────────────
+
+  const currentFilters = useMemo<GlossaryBulkFilters>(
+    () => ({
+      query: search.trim() || undefined,
+      entityType: entityTypeFilter !== ALL ? entityTypeFilter : undefined,
+    }),
+    [search, entityTypeFilter],
+  );
+
+  // A filter change invalidates both the id set and the "all matching" claim.
+  useEffect(() => {
+    setSelectedIds(new Set<string>());
+    setIsAllSelected(false);
+  }, [search, entityTypeFilter]);
+
+  const selectionCount = isAllSelected ? total : selectedIds.size;
+  const pageSelectedCount = isAllSelected
+    ? items.length
+    : items.filter((term) => selectedIds.has(term.id)).length;
+  const headerChecked =
+    isAllSelected || (items.length > 0 && pageSelectedCount === items.length);
+  const headerIndeterminate =
+    !isAllSelected && pageSelectedCount > 0 && !headerChecked;
+
+  function clearSelection() {
+    setIsAllSelected(false);
+    setSelectedIds(new Set<string>());
+  }
+
+  function toggleRow(term: GlossaryTermDto) {
+    setIsAllSelected(false);
+    setSelectedIds((previous) => {
+      const next = new Set(previous);
+      if (next.has(term.id)) next.delete(term.id);
+      else next.add(term.id);
+      return next;
+    });
+  }
+
+  function handleHeaderCheckbox() {
+    if (headerChecked || headerIndeterminate) clearSelection();
+    else {
+      setIsAllSelected(true);
+      setSelectedIds(new Set<string>());
+    }
+  }
 
   // ── Dialog helpers ───────────────────────────────────────────────────────
 
@@ -284,6 +348,37 @@ export function GlossaryWorkspace({
     }
   }
 
+  async function handleBulkAction(action: BulkAction) {
+    if (selectionCount === 0) return;
+    setBulkAction(action);
+    try {
+      const response = await bulkUpdateGlossaryTerms({
+        bulkUpdateGlossaryTermsDto: {
+          ...(isAllSelected
+            ? { filters: currentFilters }
+            : { ids: Array.from(selectedIds) }),
+          ...(action === "verify" ? { verified: true } : {}),
+          ...(action === "unverify" ? { verified: false } : {}),
+          ...(action === "entityType" ? { entityType: bulkEntityType } : {}),
+        },
+      });
+      toast.success(
+        t("glossary.bulk.applied", {
+          count: response.updatedCount.toLocaleString(),
+        }),
+      );
+      clearSelection();
+      setRefreshCount((n) => n + 1);
+    } catch (bulkError) {
+      console.error("Failed to bulk update glossary terms:", bulkError);
+      toast.error(
+        await extractApiErrorMessage(bulkError, t("glossary.bulk.failed")),
+      );
+    } finally {
+      setBulkAction(null);
+    }
+  }
+
   async function handleDelete(term: GlossaryTermDto) {
     setPendingAction({ id: term.id, action: "delete" });
     try {
@@ -358,6 +453,80 @@ export function GlossaryWorkspace({
         </Select>
       </div>
 
+      {selectionCount > 0 && (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-[4px] border-2 border-accent/30 bg-background px-4 py-2.5">
+          <span className="font-mono text-xs text-accent">
+            {isAllSelected
+              ? t("glossary.bulk.allSelected", {
+                  count: selectionCount.toLocaleString(),
+                })
+              : selectionCount === 1
+                ? t("glossary.bulk.selected", {
+                    count: selectionCount.toLocaleString(),
+                  })
+                : t("glossary.bulk.selectedPlural", {
+                    count: selectionCount.toLocaleString(),
+                  })}
+          </span>
+          <div className="ml-auto flex flex-wrap items-center gap-2">
+            <Select
+              value={bulkEntityType}
+              onValueChange={(value) =>
+                setBulkEntityType(value as GlossaryEntityType)
+              }
+            >
+              <SelectTrigger className="h-8 w-[170px] rounded-[4px] border-2 border-border">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {GLOSSARY_ENTITY_TYPES.map((type) => (
+                  <SelectItem key={type} value={type}>
+                    {t(`glossary.entityTypes.${type}` as TranslationKey)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={bulkAction !== null}
+              onClick={() => handleBulkAction("entityType")}
+              className="h-8 rounded-[4px] border-2 border-border font-mono text-xs font-bold uppercase tracking-[0.08em]"
+            >
+              {bulkAction === "entityType" && (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              )}
+              {t("glossary.bulk.changeType")}
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={bulkAction !== null}
+              onClick={() => handleBulkAction("unverify")}
+              className="h-8 rounded-[4px] border-2 border-border font-mono text-xs font-bold uppercase tracking-[0.08em]"
+            >
+              {bulkAction === "unverify" && (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              )}
+              {t("glossary.bulk.unverify")}
+            </Button>
+            <Button
+              size="sm"
+              disabled={bulkAction !== null}
+              onClick={() => handleBulkAction("verify")}
+              className="h-8 rounded-[4px] border-0 bg-accent font-mono text-xs font-bold uppercase tracking-[0.08em] text-accent-foreground hover:bg-accent/90"
+            >
+              {bulkAction === "verify" ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <ShieldCheck className="h-3.5 w-3.5" />
+              )}
+              {t("glossary.bulk.verify")}
+            </Button>
+          </div>
+        </div>
+      )}
+
       {error && (
         <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive">
           {error}
@@ -383,6 +552,31 @@ export function GlossaryWorkspace({
             <Table>
               <TableHeader className="sticky top-0 z-20 bg-white/95 dark:bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-white/80">
                 <TableRow>
+                  <TableHead className="w-10 bg-white/95 dark:bg-card/95">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="flex items-center justify-center">
+                          <Checkbox
+                            checked={
+                              headerIndeterminate
+                                ? "indeterminate"
+                                : headerChecked
+                            }
+                            onCheckedChange={handleHeaderCheckbox}
+                            aria-label={t("glossary.bulk.selectAllAria")}
+                            className={CHECKBOX_CLASS}
+                          />
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        {headerChecked || headerIndeterminate
+                          ? t("glossary.bulk.deselectAll")
+                          : t("glossary.bulk.selectAll", {
+                              count: total.toLocaleString(),
+                            })}
+                      </TooltipContent>
+                    </Tooltip>
+                  </TableHead>
                   <TableHead className="bg-white/95 dark:bg-card/95">
                     <span className="cursor-default px-1.5 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
                       {t("glossary.columns.term")}
@@ -417,8 +611,8 @@ export function GlossaryWorkspace({
               </TableHeader>
               <TableBody>
                 {items.map((term) => {
-                  const isUnverifiedAgent =
-                    term.origin === "AGENT" && !term.verified;
+                  const isUnverified = !term.verified;
+                  const isAgentProposal = term.origin === "AGENT";
                   const isRowActionPending = pendingAction?.id === term.id;
                   const isVerifying =
                     isRowActionPending && pendingAction?.action === "verify";
@@ -426,7 +620,26 @@ export function GlossaryWorkspace({
                     isRowActionPending && pendingAction?.action === "delete";
 
                   return (
-                    <TableRow key={term.id} className="align-top">
+                    <TableRow
+                      key={term.id}
+                      className={
+                        selectedIds.has(term.id)
+                          ? "align-top bg-accent/5"
+                          : "align-top"
+                      }
+                    >
+                      <TableCell className="py-3">
+                        <div className="flex items-center justify-center">
+                          <Checkbox
+                            checked={isAllSelected || selectedIds.has(term.id)}
+                            onCheckedChange={() => toggleRow(term)}
+                            aria-label={t("glossary.bulk.selectTermAria", {
+                              term: term.term,
+                            })}
+                            className={CHECKBOX_CLASS}
+                          />
+                        </div>
+                      </TableCell>
                       {/* Term */}
                       <TableCell className="max-w-[220px] py-3">
                         <span className="truncate text-sm font-semibold">
@@ -476,13 +689,15 @@ export function GlossaryWorkspace({
 
                       {/* Origin / verification */}
                       <TableCell className="py-3">
-                        {isUnverifiedAgent ? (
+                        {isUnverified ? (
                           <Badge
                             variant="outline"
                             className="gap-1 rounded-[4px] border-amber-500/30 bg-amber-50 text-[11px] text-amber-700 dark:bg-amber-950/30 dark:text-amber-400"
                           >
-                            <Bot className="h-3 w-3" />
-                            {t("glossary.unverifiedAgent")}
+                            {isAgentProposal && <Bot className="h-3 w-3" />}
+                            {isAgentProposal
+                              ? t("glossary.unverifiedAgent")
+                              : t("glossary.unverified")}
                           </Badge>
                         ) : (
                           <Badge
@@ -521,7 +736,7 @@ export function GlossaryWorkspace({
                       {/* Actions */}
                       <TableCell className="py-3">
                         <div className="flex items-center justify-end gap-2">
-                          {isUnverifiedAgent && (
+                          {isUnverified && (
                             <Tooltip>
                               <TooltipTrigger asChild>
                                 <Button

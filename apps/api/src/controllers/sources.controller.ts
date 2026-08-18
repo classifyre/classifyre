@@ -40,10 +40,17 @@ import {
   BulkUpdateSourcesDto,
   BulkUpdateSourcesResponseDto,
 } from '../dto/bulk-update-sources.dto';
+import {
+  BulkRunSourcesDto,
+  BulkRunSourcesResponseDto,
+} from '../dto/bulk-run-sources.dto';
 import { UpdateRunnerStatusDto } from '../dto/update-runner-status.dto';
 import { SourceResponseDto } from '../dto/source-response.dto';
 import { TestConnectionResponseDto } from '../dto/test-connection-response.dto';
-import { SearchSourcesRequestDto } from '../dto/search-sources-request.dto';
+import {
+  SearchSourcesFiltersDto,
+  SearchSourcesRequestDto,
+} from '../dto/search-sources-request.dto';
 import { SearchSourcesResponseDto } from '../dto/search-sources-response.dto';
 import { AllowInDemoMode } from '../demo-mode.decorator';
 import { ReadOnlyEndpoint } from '../db/read-only-endpoint.decorator';
@@ -78,13 +85,6 @@ export class SourcesController {
   async bulkUpdateSources(
     @Body() dto: BulkUpdateSourcesDto,
   ): Promise<BulkUpdateSourcesResponseDto> {
-    const hasIds = Boolean(dto.ids?.length);
-    const hasFilters = dto.filters !== undefined;
-    if (hasIds === hasFilters) {
-      throw new BadRequestException(
-        'Provide either source ids or filters, but not both.',
-      );
-    }
     if (!dto.schedule && !dto.sampling) {
       throw new BadRequestException(
         'Provide a schedule and/or sampling update.',
@@ -99,25 +99,9 @@ export class SourcesController {
       this.assertValidCronExpression(dto.schedule.cron);
     }
 
-    const where: Prisma.SourceWhereInput = hasIds
-      ? { id: { in: dto.ids } }
-      : {
-          ...(dto.filters?.search
-            ? {
-                name: {
-                  contains: dto.filters.search,
-                  mode: 'insensitive' as const,
-                },
-              }
-            : {}),
-          ...(dto.filters?.type?.length
-            ? { type: { in: dto.filters.type } }
-            : {}),
-          ...(dto.filters?.status?.length
-            ? { runnerStatus: { in: dto.filters.status } }
-            : {}),
-        };
-    const sources = await this.sourceService.sources({ where });
+    const sources = await this.sourceService.sources({
+      where: this.buildSourceSelectionWhere(dto),
+    });
 
     // Validate every sampling merge before the first write so an incompatible
     // source cannot leave an otherwise valid batch half-applied.
@@ -171,6 +155,83 @@ export class SourcesController {
     }
 
     return { updatedCount: updatedIds.length, ids: updatedIds };
+  }
+
+  @Post('bulk-run')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Start a scan for many data sources at once',
+    description:
+      'Queues a manual run for explicit source IDs or every source matching a filter snapshot. Runs beyond the configured concurrency limit stay PENDING until a slot frees up; sources that are already in flight are reported as skipped.',
+  })
+  @ApiBody({ type: BulkRunSourcesDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Runs queued',
+    type: BulkRunSourcesResponseDto,
+  })
+  async bulkRunSources(
+    @Body() dto: BulkRunSourcesDto,
+  ): Promise<BulkRunSourcesResponseDto> {
+    const sources = await this.sourceService.sources({
+      where: this.buildSourceSelectionWhere(dto),
+    });
+
+    const ids: string[] = [];
+    const skipped: BulkRunSourcesResponseDto['skipped'] = [];
+    // Sequential on purpose: startRun claims the source, decrypts the config
+    // and initialises log storage, and the queue is what absorbs the backlog.
+    for (const source of sources) {
+      try {
+        await this.cliRunnerService.startRun(
+          source.id,
+          'MANUAL',
+          undefined,
+          dto.forceFullRescan === true,
+        );
+        ids.push(source.id);
+      } catch (error) {
+        skipped.push({
+          id: source.id,
+          name: source.name,
+          reason: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+
+    return { startedCount: ids.length, ids, skipped };
+  }
+
+  private buildSourceSelectionWhere(dto: {
+    ids?: string[];
+    filters?: SearchSourcesFiltersDto;
+  }): Prisma.SourceWhereInput {
+    const hasIds = Boolean(dto.ids?.length);
+    const hasFilters = dto.filters !== undefined;
+    if (hasIds === hasFilters) {
+      throw new BadRequestException(
+        'Provide either source ids or filters, but not both.',
+      );
+    }
+
+    return hasIds
+      ? { id: { in: dto.ids } }
+      : {
+          ...(dto.filters?.search
+            ? {
+                name: {
+                  contains: dto.filters.search,
+                  mode: 'insensitive' as const,
+                },
+              }
+            : {}),
+          ...(dto.filters?.type?.length
+            ? { type: { in: dto.filters.type } }
+            : {}),
+          ...(dto.filters?.status?.length
+            ? { runnerStatus: { in: dto.filters.status } }
+            : {}),
+        };
   }
 
   @Post()

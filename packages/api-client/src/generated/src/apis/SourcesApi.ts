@@ -17,6 +17,8 @@ import * as runtime from '../runtime';
 import type {
   AssetListResponseDto,
   BulkIngestAssetsDto,
+  BulkRunSourcesDto,
+  BulkRunSourcesResponseDto,
   BulkUpdateSourcesDto,
   BulkUpdateSourcesResponseDto,
   CreateSourceDto,
@@ -36,6 +38,10 @@ import {
     AssetListResponseDtoToJSON,
     BulkIngestAssetsDtoFromJSON,
     BulkIngestAssetsDtoToJSON,
+    BulkRunSourcesDtoFromJSON,
+    BulkRunSourcesDtoToJSON,
+    BulkRunSourcesResponseDtoFromJSON,
+    BulkRunSourcesResponseDtoToJSON,
     BulkUpdateSourcesDtoFromJSON,
     BulkUpdateSourcesDtoToJSON,
     BulkUpdateSourcesResponseDtoFromJSON,
@@ -105,6 +111,10 @@ export interface SourceFilesControllerListRequest {
 export interface SourceFilesControllerUploadRequest {
     sourceId: string;
     file: Blob;
+}
+
+export interface SourcesControllerBulkRunSourcesRequest {
+    bulkRunSourcesDto: BulkRunSourcesDto;
 }
 
 export interface SourcesControllerBulkUpdateSourcesRequest {
@@ -546,6 +556,47 @@ export class SourcesApi extends runtime.BaseAPI {
      */
     async sourceFilesControllerUpload(requestParameters: SourceFilesControllerUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<UploadedSourceFileDto> {
         const response = await this.sourceFilesControllerUploadRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Queues a manual run for explicit source IDs or every source matching a filter snapshot. Runs beyond the configured concurrency limit stay PENDING until a slot frees up; sources that are already in flight are reported as skipped.
+     * Start a scan for many data sources at once
+     */
+    async sourcesControllerBulkRunSourcesRaw(requestParameters: SourcesControllerBulkRunSourcesRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<BulkRunSourcesResponseDto>> {
+        if (requestParameters['bulkRunSourcesDto'] == null) {
+            throw new runtime.RequiredError(
+                'bulkRunSourcesDto',
+                'Required parameter "bulkRunSourcesDto" was null or undefined when calling sourcesControllerBulkRunSources().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/sources/bulk-run`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+            body: BulkRunSourcesDtoToJSON(requestParameters['bulkRunSourcesDto']),
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => BulkRunSourcesResponseDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Queues a manual run for explicit source IDs or every source matching a filter snapshot. Runs beyond the configured concurrency limit stay PENDING until a slot frees up; sources that are already in flight are reported as skipped.
+     * Start a scan for many data sources at once
+     */
+    async sourcesControllerBulkRunSources(requestParameters: SourcesControllerBulkRunSourcesRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<BulkRunSourcesResponseDto> {
+        const response = await this.sourcesControllerBulkRunSourcesRaw(requestParameters, initOverrides);
         return await response.value();
     }
 
