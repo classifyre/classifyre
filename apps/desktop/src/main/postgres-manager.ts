@@ -12,9 +12,43 @@ import {
   type CredentialProtection,
   upgradePgHbaToScram,
 } from "./postgres-credentials.js";
+import {
+  applyManagedHba,
+  dropReadonlyRole,
+  ensureReadonlyRole,
+  generateReadonlyPassword,
+  grantSchemaToReadonlyRole,
+  listenAddresses,
+  READONLY_ROLE,
+  type SqlClient,
+} from "./postgres-readonly.js";
 
 const POSTGRES_USER = "classifyre";
 const POSTGRES_DATABASE = "classifyre";
+
+/** What the settings window shows for the read-only login. */
+export interface ReadonlyDbInfo {
+  host: string;
+  port: number;
+  database: string;
+  user: string;
+  password: string;
+  connectionString: string;
+}
+
+/**
+ * The address an external tool should dial. Loopback is what the app itself
+ * uses, but read-only access exists to be reached from another machine, so
+ * prefer the first non-internal IPv4 the host owns.
+ */
+export function lanHost(): string {
+  for (const addresses of Object.values(os.networkInterfaces())) {
+    for (const address of addresses ?? []) {
+      if (address.family === "IPv4" && !address.internal) return address.address;
+    }
+  }
+  return "127.0.0.1";
+}
 
 // In a packaged app, `embedded-postgres` lives in a self-contained npm tree
 // staged at resources/pg/node_modules (the Forge Vite plugin ships nothing
@@ -189,6 +223,8 @@ export class PostgresManager {
   private startPromise: Promise<void> | null = null;
   private password = "";
   private readonly credentialStore: PostgresCredentialStore;
+  private readonly readonlyStore: PostgresCredentialStore;
+  private readonlyEnabled = false;
 
   // `initdb` on a cold data dir takes a while (longer still under Rosetta), so
   // the caller can surface what the database is doing during first launch.
@@ -196,6 +232,7 @@ export class PostgresManager {
     preferredPort?: number,
     private readonly onProgress: (detail: string) => void = () => {},
     credentialStore?: PostgresCredentialStore,
+    readonlyEnabled = false,
   ) {
     const base = process.env["CLASSIFYRE_DATA_DIR"] || app.getPath("userData");
     this.dataDir = path.join(base, "pgdata");
@@ -229,6 +266,13 @@ export class PostgresManager {
     };
     this.credentialStore =
       credentialStore ?? new PostgresCredentialStore(base, protection);
+    this.readonlyStore = new PostgresCredentialStore(
+      base,
+      protection,
+      () => new Date(),
+      "postgres-readonly-credentials.bin",
+    );
+    this.readonlyEnabled = readonlyEnabled;
     if (preferredPort) this.preferredPort = preferredPort;
   }
 
@@ -304,6 +348,8 @@ export class PostgresManager {
 
     this.password = credentials.current;
     this.running = true;
+
+    await this.applyReadonlyAccess();
   }
 
   private postgresFlags(): string[] {
@@ -312,10 +358,12 @@ export class PostgresManager {
       detectorWorkerCount(),
     );
     return [
-      // The embedded database is an implementation detail of this app. Do
-      // not expose it on LAN interfaces even if host networking changes.
+      // The embedded database is an implementation detail of this app, so it
+      // stays on loopback unless the user has explicitly published a
+      // read-only login — and even then, the managed pg_hba block written by
+      // applyReadonlyAccess() rejects every non-loopback role but that one.
       "-c",
-      "listen_addresses=127.0.0.1",
+      `listen_addresses=${listenAddresses(this.readonlyEnabled)}`,
       "-c",
       "password_encryption=scram-sha-256",
       // The embedded server shares a laptop with the UI and the scan
@@ -427,17 +475,23 @@ export class PostgresManager {
     }
   }
 
-  private async hardenPgHba(): Promise<void> {
+  /**
+   * Rewrites pg_hba.conf through `transform`, atomically. Returns whether the
+   * file actually changed, so a caller can skip an unnecessary config reload.
+   */
+  private async rewritePgHba(
+    transform: (contents: string) => string,
+  ): Promise<boolean> {
     const hbaPath = path.join(this.dataDir, "pg_hba.conf");
     let before: string;
     try {
       before = await fs.promises.readFile(hbaPath, "utf-8");
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === "ENOENT") return;
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return false;
       throw error;
     }
-    const after = upgradePgHbaToScram(before);
-    if (after === before) return;
+    const after = transform(before);
+    if (after === before) return false;
 
     const tempPath = `${hbaPath}.${process.pid}.tmp`;
     try {
@@ -447,6 +501,98 @@ export class PostgresManager {
     } finally {
       await fs.promises.unlink(tempPath).catch(() => undefined);
     }
+    return true;
+  }
+
+  private async hardenPgHba(): Promise<void> {
+    await this.rewritePgHba(upgradePgHbaToScram);
+  }
+
+  /** Runs `fn` against the application database and always closes the client. */
+  private async withAppClient<T>(fn: (client: SqlClient) => Promise<T>): Promise<T> {
+    if (!this.pg) throw new Error("PostgreSQL not started");
+    const client = this.pg.getPgClient(POSTGRES_DATABASE);
+    await client.connect();
+    try {
+      return await fn(client);
+    } finally {
+      await client.end().catch(() => undefined);
+    }
+  }
+
+  /**
+   * Brings the read-only login and the host-based access rules in line with
+   * the current setting. Runs on every start, so a toggle needs nothing more
+   * than a restart, and a half-applied previous run self-corrects.
+   *
+   * Deliberately best-effort: a database that will not grant a secondary role
+   * is still a database the app can use, and failing startup over an optional
+   * convenience would be a worse outcome than logging it.
+   */
+  private async applyReadonlyAccess(): Promise<void> {
+    try {
+      if (this.readonlyEnabled) {
+        this.onProgress("Publishing the read-only database login…");
+        const state = await this.readonlyStore.read();
+        const password = state?.current ?? generateReadonlyPassword();
+        if (!state) await this.readonlyStore.replace(password);
+        await this.withAppClient((client) =>
+          ensureReadonlyRole(client, POSTGRES_DATABASE, password),
+        );
+      } else {
+        // The stored password is kept: re-enabling later should not silently
+        // invalidate a connection string the user already saved somewhere.
+        await this.withAppClient((client) => dropReadonlyRole(client));
+      }
+
+      const changed = await this.rewritePgHba((contents) =>
+        applyManagedHba(contents, this.readonlyEnabled, POSTGRES_USER),
+      );
+      if (changed) {
+        await this.withAppClient(async (client) => {
+          await client.query("SELECT pg_reload_conf()");
+        });
+      }
+    } catch (error) {
+      console.error("Could not apply read-only database access:", error);
+    }
+  }
+
+  /** Connection details for the read-only login, or null when it is off. */
+  async getReadonlyInfo(): Promise<ReadonlyDbInfo | null> {
+    if (!this.readonlyEnabled) return null;
+    const state = await this.readonlyStore.read();
+    if (!state) return null;
+    return this.buildReadonlyInfo(state.current);
+  }
+
+  /**
+   * Issues a new password for the read-only login and applies it immediately.
+   * No restart is involved: nothing inside the app authenticates with it, so
+   * only the external tools holding the old string are affected.
+   */
+  async regenerateReadonlyPassword(): Promise<ReadonlyDbInfo> {
+    if (!this.readonlyEnabled) {
+      throw new Error("Read-only database access is not enabled");
+    }
+    const password = generateReadonlyPassword();
+    await this.readonlyStore.replace(password);
+    await this.withAppClient((client) =>
+      ensureReadonlyRole(client, POSTGRES_DATABASE, password),
+    );
+    return this.buildReadonlyInfo(password);
+  }
+
+  private buildReadonlyInfo(password: string): ReadonlyDbInfo {
+    const host = lanHost();
+    return {
+      host,
+      port: this.port,
+      database: POSTGRES_DATABASE,
+      user: READONLY_ROLE,
+      password,
+      connectionString: `postgresql://${encodeURIComponent(READONLY_ROLE)}:${encodeURIComponent(password)}@${host}:${this.port}/${POSTGRES_DATABASE}`,
+    };
   }
 
   private async stopInstance(): Promise<void> {
@@ -504,6 +650,12 @@ export class PostgresManager {
     await client.connect();
     try {
       await client.query(`CREATE SCHEMA IF NOT EXISTS "${schemaName}"`);
+      // A workspace created after the read-only login was published would
+      // otherwise be invisible to it: the startup grants only cover schemas
+      // that existed at the time.
+      if (this.readonlyEnabled) {
+        await grantSchemaToReadonlyRole(client, schemaName);
+      }
     } finally {
       await client.end();
     }

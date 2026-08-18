@@ -182,12 +182,6 @@ export interface InstanceSettingsResponseDto {
      */
     autoScheduleEnabled: boolean;
     /**
-     * How many scans this workspace may run at once. 0 means unlimited.
-     * @type {number}
-     * @memberof InstanceSettingsResponseDto
-     */
-    maxConcurrentRunners: number;
-    /**
      * Read-only. When true, the instance runs in demo mode and all mutating operations are rejected.
      * @type {boolean}
      * @memberof InstanceSettingsResponseDto
@@ -272,7 +266,6 @@ export function instanceOfInstanceSettingsResponseDto(value: object): value is I
     if (!('harnessMaxRecalledMemories' in value) || value['harnessMaxRecalledMemories'] === undefined) return false;
     if (!('harnessDreamIntervalDays' in value) || value['harnessDreamIntervalDays'] === undefined) return false;
     if (!('autoScheduleEnabled' in value) || value['autoScheduleEnabled'] === undefined) return false;
-    if (!('maxConcurrentRunners' in value) || value['maxConcurrentRunners'] === undefined) return false;
     if (!('demoMode' in value) || value['demoMode'] === undefined) return false;
     if (!('hfTokenSet' in value) || value['hfTokenSet'] === undefined) return false;
     if (!('hfTokenInstanceSet' in value) || value['hfTokenInstanceSet'] === undefined) return false;
@@ -318,7 +311,6 @@ export function InstanceSettingsResponseDtoFromJSONTyped(json: any, ignoreDiscri
         'harnessMaxRecalledMemories': json['harnessMaxRecalledMemories'],
         'harnessDreamIntervalDays': json['harnessDreamIntervalDays'],
         'autoScheduleEnabled': json['autoScheduleEnabled'],
-        'maxConcurrentRunners': json['maxConcurrentRunners'],
         'demoMode': json['demoMode'],
         'hfTokenSet': json['hfTokenSet'],
         'hfTokenInstanceSet': json['hfTokenInstanceSet'],
@@ -365,7 +357,6 @@ export function InstanceSettingsResponseDtoToJSONTyped(value?: InstanceSettingsR
         'harnessMaxRecalledMemories': value['harnessMaxRecalledMemories'],
         'harnessDreamIntervalDays': value['harnessDreamIntervalDays'],
         'autoScheduleEnabled': value['autoScheduleEnabled'],
-        'maxConcurrentRunners': value['maxConcurrentRunners'],
         'demoMode': value['demoMode'],
         'hfTokenSet': value['hfTokenSet'],
         'hfTokenInstanceSet': value['hfTokenInstanceSet'],

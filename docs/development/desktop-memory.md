@@ -12,20 +12,20 @@ whether raising it is actually the right move.
 
 ## Changing the limit
 
-**Settings ▸ API Memory Limit** (macOS: the Classifyre application menu;
-Windows and Linux: the top-level Settings menu).
+**Settings ▸ Settings… ▸ Performance ▸ Service memory limit** (macOS: the
+Classifyre application menu, or `Cmd+,`; Windows and Linux: the top-level
+Settings menu, or `Ctrl+,`).
 
-| Choice | Meaning |
-| --- | --- |
-| Automatic (recommended) | Sized by the app — see below. This is the default. |
-| 3 GB | Fixed 3072 MB ceiling. |
-| 4 GB (maximum) | Fixed 4096 MB ceiling. The highest value Electron will grant. |
+Leave **Size automatically** checked — the default, and the right answer for
+almost every install — or uncheck it and type a ceiling in GB. Values above
+4 GB are accepted but clamped at spawn, because Electron will not grant a
+larger heap under `ELECTRON_RUN_AS_NODE`; the window says so inline.
 
 The choice is per installation, not per workspace, and persists in
 `settings.json` (`memoryLimitMb`, where `0` means automatic) alongside the
 embedded database in the app's data directory. It applies when the API process
-next starts, so the menu offers an immediate restart; declining simply defers
-it to the next launch.
+next starts, so saving offers an immediate restart; declining simply defers it
+to the next launch.
 
 The setting is native rather than part of the in-app settings pages on purpose:
 it configures the local API *process*, and it has to stay reachable when that

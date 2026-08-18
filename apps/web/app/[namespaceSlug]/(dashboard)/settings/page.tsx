@@ -26,7 +26,6 @@ import {
   Loader2,
   MessageSquare,
   Server,
-  Gauge,
   Settings,
   SlidersHorizontal,
 } from "lucide-react";
@@ -44,15 +43,7 @@ type SettingsDraft = {
   language: InstanceSettingsResponseDtoLanguageEnum;
   timezone: string;
   timeFormat: InstanceSettingsResponseDtoTimeFormatEnum;
-  maxConcurrentRunners: number;
 };
-
-/**
- * Scan-concurrency choices. Presented as named trade-offs rather than a free
- * number: the useful range is small, and "how many at once" only means
- * something to an operator in terms of what it costs the machine.
- */
-const CONCURRENCY_OPTIONS = [1, 2, 3, 4, 6, 8] as const;
 
 const COMMON_TIMEZONES = [
   "UTC",
@@ -75,7 +66,6 @@ function buildInitialDraft(settings: SettingsDraft): SettingsDraft {
     language: settings.language,
     timezone: settings.timezone,
     timeFormat: settings.timeFormat,
-    maxConcurrentRunners: settings.maxConcurrentRunners ?? 2,
   };
 }
 
@@ -152,7 +142,6 @@ export default function SettingsPage() {
           language: next.language,
           timezone: next.timezone,
           timeFormat: next.timeFormat,
-          maxConcurrentRunners: next.maxConcurrentRunners,
         });
         setSaveLabel("saved");
       } catch (saveError) {
@@ -239,55 +228,6 @@ export default function SettingsPage() {
           <Card className="panel-card rounded-[6px]">
             <CardContent className="p-5">
               <VersionSettingsSection />
-            </CardContent>
-          </Card>
-
-          <Card className="panel-card rounded-[6px]">
-            <CardContent className="space-y-6 p-5">
-              <div className="flex items-center gap-2">
-                <Gauge className="h-4 w-4" />
-                <p className="text-xs font-mono uppercase tracking-[0.14em]">
-                  {t("settings.scanningHeading")}
-                </p>
-              </div>
-              <p className="-mt-3 text-xs text-muted-foreground">
-                {t("settings.scanningDesc")}
-              </p>
-
-              <section className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <SlidersHorizontal className="h-4 w-4 text-muted-foreground" />
-                  <p className="text-xs font-mono uppercase tracking-[0.12em] text-muted-foreground">
-                    {t("settings.maxConcurrentRunners")}
-                  </p>
-                </div>
-
-                <div className="grid gap-2">
-                  <Select
-                    value={String(draft.maxConcurrentRunners)}
-                    onValueChange={(value) => {
-                      void persistSettings({
-                        ...draft,
-                        maxConcurrentRunners: Number(value),
-                      });
-                    }}
-                  >
-                    <SelectTrigger className="h-10 rounded-[4px] border-2 border-border">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {CONCURRENCY_OPTIONS.map((count) => (
-                        <SelectItem key={count} value={String(count)}>
-                          {t("settings.concurrencyOption", { count })}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <p className="text-xs text-muted-foreground">
-                    {t("settings.maxConcurrentRunnersHint")}
-                  </p>
-                </div>
-              </section>
             </CardContent>
           </Card>
 
