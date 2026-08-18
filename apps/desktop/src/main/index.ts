@@ -14,6 +14,10 @@ import { AppTray } from './tray.js';
 import { getAvailablePort } from './port-manager.js';
 import { NamespaceStore, type ApiNamespace } from './namespace-store.js';
 import { StartupWindow, type StartupStep } from './startup-window.js';
+import {
+  openSettingsWindow,
+  registerSettingsHandlers,
+} from './settings-window.js';
 
 /** Process id for the single shared, namespace-aware API. */
 const SHARED_API_ID = 'shared';
@@ -380,10 +384,21 @@ app.on('ready', async () => {
   };
 
   settingsManager = new SettingsManager();
-  pg = new PostgresManager(settingsManager.get().postgresPort, reportProgress);
+  pg = new PostgresManager(
+    settingsManager.get().postgresPort,
+    reportProgress,
+    undefined,
+    settingsManager.get().readonlyDbEnabled,
+  );
   processManager = new ProcessManager(
     reportProgress,
-    settingsManager.get().memoryLimitMb,
+    () => {
+      const settings = settingsManager.get();
+      return {
+        memoryLimitMb: settings.memoryLimitMb,
+        maxConcurrentRunners: settings.maxConcurrentRunners,
+      };
+    },
     (_processId, reason) => void reportApiUnavailable(reason),
   );
   updateChecker = new UpdateChecker();
@@ -400,7 +415,9 @@ app.on('ready', async () => {
 
   try {
     startupWindow.setStep('runtime');
-    const apiPort = await getAvailablePort();
+    // A configured port is a preference, not a demand: getAvailablePort falls
+    // forward to an ephemeral one rather than failing startup on a collision.
+    const apiPort = await getAvailablePort(settingsManager.get().apiPort || undefined);
     sharedApiBaseUrl = `http://127.0.0.1:${apiPort}`;
     await processManager.startApi(
       SHARED_API_ID,
@@ -418,19 +435,9 @@ app.on('ready', async () => {
   const menuDeps = {
     namespaceStore,
     updateChecker,
-    settingsManager,
     showHome,
     openNamespace,
-    // A new heap ceiling is only read when the API process is spawned, so the
-    // menu offers an immediate restart rather than silently deferring to the
-    // next launch.
-    restartApi: () =>
-      processManager.restartApiNow(
-        SHARED_API_ID,
-        Number(new URL(sharedApiBaseUrl).port),
-        pg.getConnectionString(),
-      ),
-    refreshMenu: () => rebuildMenu(),
+    openSettings: openSettingsWindow,
   };
   const rebuildMenu = () => buildApplicationMenu(menuDeps);
   rebuildMenu();
@@ -448,6 +455,17 @@ app.on('ready', async () => {
   tray.create();
 
   registerIpcHandlers(namespaceStore);
+  registerSettingsHandlers({
+    settingsManager,
+    getEffectivePorts: () => ({
+      apiPort: Number(new URL(sharedApiBaseUrl).port),
+      postgresPort: pg.getPort(),
+    }),
+    getReadonlyInfo: () => pg.getReadonlyInfo(),
+    regenerateReadonly: () => pg.regenerateReadonlyPassword(),
+    // The tray mirrors two of these settings as checkboxes.
+    onSaved: () => tray?.rebuildMenu(),
+  });
   registerNotificationHandlers({
     settingsManager,
     showWindow: showMainWindow,
