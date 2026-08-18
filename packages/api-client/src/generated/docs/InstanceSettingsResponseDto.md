@@ -33,7 +33,6 @@ Name | Type
 `harnessMaxRecalledMemories` | number
 `harnessDreamIntervalDays` | number
 `autoScheduleEnabled` | boolean
-`maxConcurrentRunners` | number
 `demoMode` | boolean
 `hfTokenSet` | boolean
 `hfTokenInstanceSet` | boolean
@@ -74,7 +73,6 @@ const example = {
   "harnessMaxRecalledMemories": 30,
   "harnessDreamIntervalDays": 2,
   "autoScheduleEnabled": true,
-  "maxConcurrentRunners": 2,
   "demoMode": false,
   "hfTokenSet": false,
   "hfTokenInstanceSet": false,

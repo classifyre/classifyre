@@ -49,7 +49,6 @@ export class InstanceSettingsService {
       harnessMaxRecalledMemories: settings.harnessMaxRecalledMemories,
       harnessDreamIntervalDays: settings.harnessDreamIntervalDays,
       autoScheduleEnabled: settings.autoScheduleEnabled,
-      maxConcurrentRunners: settings.maxConcurrentRunners,
       hfTokenSet: !!settings.hfTokenEnc,
       hfTokenInstanceSet: isInstanceTokenSet,
       demoMode: this.demoMode.isDemoMode,
@@ -219,9 +218,6 @@ export class InstanceSettingsService {
         : {}),
       ...(updateDto.autoScheduleEnabled !== undefined
         ? { autoScheduleEnabled: updateDto.autoScheduleEnabled }
-        : {}),
-      ...(updateDto.maxConcurrentRunners !== undefined
-        ? { maxConcurrentRunners: updateDto.maxConcurrentRunners }
         : {}),
       ...(aiProviderConfigUpdate ?? {}),
       ...(harnessAiProviderConfigUpdate ?? {}),

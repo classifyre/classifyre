@@ -391,12 +391,7 @@
       "removedToast": "Hugging Face-Token entfernt",
       "saveFailedToast": "Hugging Face-Token konnte nicht gespeichert werden",
       "removeFailedToast": "Hugging Face-Token konnte nicht entfernt werden"
-    },
-    "scanningHeading": "Scannen",
-    "scanningDesc": "Wie viel von diesem Rechner dieser Arbeitsbereich beim Scannen von Quellen nutzen darf.",
-    "maxConcurrentRunners": "Gleichzeitige Scans",
-    "maxConcurrentRunnersHint": "Scans sind CPU-intensiv. Mehr gleichzeitig durchsucht einen großen Bestand schneller; weniger hält den Rechner für alles andere reaktionsfähig.",
-    "concurrencyOption": "{{count}} gleichzeitig"
+    }
   },
   "dataTransfer": {
     "heading": "Export & Import",

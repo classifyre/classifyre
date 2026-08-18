@@ -14,7 +14,6 @@ import {
 import {
   INSTANCE_LANGUAGE_VALUES,
   INSTANCE_TIME_FORMAT_VALUES,
-  MAX_CONCURRENT_RUNNERS_LIMIT,
   type InstanceLanguageValue,
   type InstanceTimeFormatValue,
 } from './instance-settings-response.dto';
@@ -135,22 +134,6 @@ export class UpdateInstanceSettingsDto {
   @IsOptional()
   @IsBoolean()
   autoScheduleEnabled?: boolean;
-
-  @ApiPropertyOptional({
-    description:
-      'How many scans this workspace may run at once. Scans are CPU-heavy, so ' +
-      'this trades sweep speed against machine responsiveness: a workspace with ' +
-      'many sources finishes a full pass roughly twice as fast at 2 as at 1. ' +
-      '0 means unlimited.',
-    example: 2,
-    minimum: 0,
-    maximum: MAX_CONCURRENT_RUNNERS_LIMIT,
-  })
-  @IsOptional()
-  @IsInt()
-  @Min(0)
-  @Max(MAX_CONCURRENT_RUNNERS_LIMIT)
-  maxConcurrentRunners?: number;
 
   @ApiPropertyOptional({
     description:
