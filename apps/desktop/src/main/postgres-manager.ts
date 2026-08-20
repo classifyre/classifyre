@@ -696,6 +696,32 @@ export class PostgresManager {
     return this.running;
   }
 
+  /**
+   * Whether the database actually answers, as opposed to whether this process
+   * believes it started one. `running` is a record of our own calls: a
+   * postmaster killed by the OS, by a crash, or by a disk fault leaves it
+   * true, and every request the API makes then fails with nothing watching.
+   */
+  async ping(): Promise<boolean> {
+    if (!this.running || !this.pg) return false;
+    try {
+      await this.withAppClient((client) => client.query("SELECT 1"));
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Stops (best-effort) and starts again, for crash recovery. Callers must
+   * re-read {@link getConnectionString} afterwards and restart anything
+   * holding a pool against the old instance.
+   */
+  async restart(): Promise<void> {
+    await this.stop();
+    await this.start();
+  }
+
   async stop(): Promise<void> {
     // A quit can race an in-flight first start (which may take minutes on a
     // cold data dir). Wait for it so the just-spawned postgres process isn't
@@ -707,6 +733,12 @@ export class PostgresManager {
         // failed start — fall through and stop whatever was spawned
       }
     }
+    // Reset first and unconditionally: an early return here used to leave
+    // `running` true and `startPromise` resolved, so a later start() was a
+    // no-op and recovery from a crashed postmaster was impossible.
+    this.running = false;
+    this.password = "";
+    this.startPromise = null;
     if (!this.pg) return;
     try {
       await this.stopInstance();
@@ -715,8 +747,5 @@ export class PostgresManager {
       // blocks the next launch — it must be visible in main.log.
       console.error("Embedded PostgreSQL shutdown failed:", err);
     }
-    this.running = false;
-    this.password = "";
-    this.startPromise = null;
   }
 }
