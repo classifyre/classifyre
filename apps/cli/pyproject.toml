@@ -45,6 +45,13 @@ build-backend = "hatchling.build"
 packages = ["src"]
 
 [dependency-groups]
+# Notebook authoring only. `run_cell` is what makes a bare `df` on a cell's last
+# line display as a table instead of being discarded, and what gives rich
+# outputs a display protocol. Production never installs this: a productized
+# notebook is an ordinary Python module run with `python workflow.py`.
+interactive = [
+    "ipython>=8.30.0",
+]
 dev = [
     "ruff>=0.15.13",
     "mypy>=1.13.0",
@@ -338,6 +345,12 @@ ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 module = ["bs4.*", "lxml.*"]
+ignore_missing_imports = true
+
+# Notebook authoring extras: present only when the `interactive` group is
+# installed, so the executor imports them defensively.
+[[tool.mypy.overrides]]
+module = ["IPython.*", "matplotlib.*"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]

@@ -7,11 +7,24 @@ import { getSourceSchema, type SourceType } from "@/lib/schema-loader";
 import type { DetectorConfigInput } from "./source-scan-config";
 import type { AutoScheduleStatus, ScheduleValue } from "./schedule-card";
 import { useTranslation } from "@/hooks/use-translation";
+import {
+  CustomSourceConfig,
+  draftToConfig,
+  loadScaffold,
+  type CustomSourceDraft,
+} from "@/components/notebook/custom-source-config";
+import {
+  recordToEntries,
+  secretKeysToEntries,
+} from "@/components/key-value-field";
+import type { NotebookCell } from "@/components/notebook/notebook-editor";
 
 export type { SourceType } from "@/lib/schema-loader";
 
 interface SourceFormProps {
   sourceType: SourceType;
+  /** Present only once the source exists; a draft notebook cannot save or run. */
+  sourceId?: string;
   defaultValues?: Record<string, unknown>;
   detectors?: DetectorConfigInput[];
   onSubmit: (data: Record<string, unknown>) => void;
@@ -39,6 +52,7 @@ export const SourceForm = React.forwardRef<SourceFormHandle, SourceFormProps>(
   function SourceForm(
     {
       sourceType,
+      sourceId,
       defaultValues,
       detectors,
       onSubmit,
@@ -62,16 +76,62 @@ export const SourceForm = React.forwardRef<SourceFormHandle, SourceFormProps>(
     const { t } = useTranslation();
     const formRef = React.useRef<JsonSchemaFormHandle | null>(null);
     const schema = getSourceSchema(sourceType);
+    const isCustom = sourceType === "CUSTOM";
 
-    if (!schema) {
-      return (
-        <div className="p-4 text-sm text-muted-foreground">
-          Schema not found for source type: {sourceType}
-        </div>
-      );
-    }
+    // A CUSTOM source's config is a notebook plus two key/value maps, none of
+    // which the schema-driven renderer can express, so those sections are
+    // stripped here and rendered by CustomSourceConfig instead. SANDBOX does
+    // the same for its uploaded files.
+    const isSectionless = isCustom || sourceType === "SANDBOX";
+
+    const [customDraft, setCustomDraft] = React.useState<CustomSourceDraft>(
+      () => {
+        // The stored config is opaque JSON here; only the notebook block
+        // and the two key/value maps are read out of it.
+        const config = (defaultValues ?? {}) as {
+          required?: {
+            notebook?: { cells?: NotebookCell[]; revision?: number };
+          };
+          optional?: {
+            variables?: Record<string, string>;
+            packages?: Array<{ name: string; version?: string }>;
+          };
+          masked?: { secrets?: Record<string, string> };
+        };
+        const notebook = config?.required?.notebook;
+        const secretKeys = Object.keys(config?.masked?.secrets ?? {});
+        return {
+          // No cells yet means a new source: the scaffold is fetched below.
+          // Everything else still comes from the config, so a template that
+          // supplies packages or variables is not thrown away.
+          cells: notebook?.cells ?? [],
+          revision: notebook?.revision ?? 1,
+          packages: config?.optional?.packages ?? [],
+          variables: recordToEntries(config?.optional?.variables),
+          secrets: secretKeysToEntries(secretKeys),
+          originalSecretKeys: secretKeys,
+        };
+      },
+    );
+
+    // A new notebook opens on the scaffold rather than on an empty page: the
+    // starter cells already satisfy the contract, so the first edit is a change
+    // to working code instead of a guess at what is required.
+    React.useEffect(() => {
+      if (!isCustom || customDraft.cells.length > 0) return;
+      let cancelled = false;
+      void loadScaffold()
+        .then((cells) => {
+          if (!cancelled) setCustomDraft((draft) => ({ ...draft, cells }));
+        })
+        .catch(() => undefined);
+      return () => {
+        cancelled = true;
+      };
+    }, [isCustom, customDraft.cells.length]);
 
     const enhancedSchema = React.useMemo(() => {
+      if (!schema) return null;
       const {
         name: existingName,
         description: existingDescription,
@@ -80,14 +140,13 @@ export const SourceForm = React.forwardRef<SourceFormHandle, SourceFormProps>(
         ...restProperties
       } = schema.properties || {};
 
-      const sourceProperties =
-        sourceType === "SANDBOX"
-          ? Object.fromEntries(
-              Object.entries(restProperties).filter(
-                ([key]) => !["required", "masked", "optional"].includes(key),
-              ),
-            )
-          : restProperties;
+      const sourceProperties = isSectionless
+        ? Object.fromEntries(
+            Object.entries(restProperties).filter(
+              ([key]) => !["required", "masked", "optional"].includes(key),
+            ),
+          )
+        : restProperties;
 
       return {
         ...schema,
@@ -112,23 +171,31 @@ export const SourceForm = React.forwardRef<SourceFormHandle, SourceFormProps>(
             "name",
             ...(schema.required || []).filter(
               (key) =>
-                sourceType !== "SANDBOX" ||
+                !isSectionless ||
                 !["required", "masked", "optional"].includes(key),
             ),
           ]),
         ) as string[],
       };
-    }, [schema, sourceType, t]);
+    }, [schema, isSectionless, t]);
 
     const formDefaultValues = React.useMemo(
       () => ({
         type: sourceType,
-        ...(sourceType === "SANDBOX"
-          ? { required: {}, masked: {}, optional: {} }
-          : {}),
+        ...(isSectionless ? { required: {}, masked: {}, optional: {} } : {}),
         ...(defaultValues || {}),
       }),
-      [sourceType, defaultValues],
+      [sourceType, isSectionless, defaultValues],
+    );
+
+    const sectionPayload = React.useCallback(
+      () =>
+        isCustom
+          ? draftToConfig(customDraft)
+          : sourceType === "SANDBOX"
+            ? { required: {}, masked: {}, optional: {} }
+            : {},
+      [isCustom, customDraft, sourceType],
     );
 
     const handleSubmit = (data: Record<string, unknown>) => {
@@ -146,9 +213,7 @@ export const SourceForm = React.forwardRef<SourceFormHandle, SourceFormProps>(
       onSubmit({
         ...data,
         type: sourceType,
-        ...(sourceType === "SANDBOX"
-          ? { required: {}, masked: {}, optional: {} }
-          : {}),
+        ...sectionPayload(),
         ...(detectorPayload.length > 0 ? { detectors: detectorPayload } : {}),
       });
     };
@@ -172,9 +237,7 @@ export const SourceForm = React.forwardRef<SourceFormHandle, SourceFormProps>(
       onTest({
         ...data,
         type: sourceType,
-        ...(sourceType === "SANDBOX"
-          ? { required: {}, masked: {}, optional: {} }
-          : {}),
+        ...sectionPayload(),
         ...(detectorPayload.length > 0 ? { detectors: detectorPayload } : {}),
       });
     };
@@ -183,7 +246,15 @@ export const SourceForm = React.forwardRef<SourceFormHandle, SourceFormProps>(
       ref,
       () => ({
         getSchema: () => enhancedSchema,
-        getValues: () => formRef.current?.getValues() ?? {},
+        // Must return the same shape handleSubmit builds. Both source pages
+        // render with showActions={false} and read this handle directly, so a
+        // section rendered outside the schema form -- a CUSTOM notebook, a
+        // SANDBOX file list -- reaches the API through here or not at all.
+        getValues: () => ({
+          ...(formRef.current?.getValues() ?? {}),
+          type: sourceType,
+          ...sectionPayload(),
+        }),
         applyPatches: async (patches) => {
           await formRef.current?.applyPatches(patches);
         },
@@ -194,8 +265,16 @@ export const SourceForm = React.forwardRef<SourceFormHandle, SourceFormProps>(
             errors: ["Source form is not mounted"],
           },
       }),
-      [enhancedSchema],
+      [enhancedSchema, sourceType, sectionPayload],
     );
+
+    if (!schema || !enhancedSchema) {
+      return (
+        <div className="p-4 text-sm text-muted-foreground">
+          Schema not found for source type: {sourceType}
+        </div>
+      );
+    }
 
     return (
       <JsonSchemaForm
@@ -222,7 +301,21 @@ export const SourceForm = React.forwardRef<SourceFormHandle, SourceFormProps>(
         autoScheduleStatus={autoScheduleStatus}
         onResumeSchedule={onResumeSchedule}
         showActions={showActions}
-        afterNameContent={afterNameContent}
+        afterNameContent={
+          isCustom ? (
+            <>
+              {afterNameContent}
+              <CustomSourceConfig
+                sourceId={sourceId}
+                draft={customDraft}
+                onChange={setCustomDraft}
+                disabled={disabled}
+              />
+            </>
+          ) : (
+            afterNameContent
+          )
+        }
       />
     );
   },

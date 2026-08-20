@@ -638,7 +638,7 @@ export default function EditSourcePage() {
 
 function SourceEditStepperContent({
   sourceType,
-  sourceId: _sourceId,
+  sourceId,
   sourceFormRef,
   formDefaults,
   defaultDetectors,
@@ -786,6 +786,7 @@ function SourceEditStepperContent({
                 <SourceForm
                   ref={sourceFormRef}
                   sourceType={sourceType}
+                  sourceId={sourceId}
                   defaultValues={formDefaults}
                   onSubmit={() => undefined}
                   onTest={onTestConfig}

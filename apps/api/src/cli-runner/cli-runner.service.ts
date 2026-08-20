@@ -51,6 +51,8 @@ import { randomUUID } from 'crypto';
 import { KubernetesCliJobService } from './kubernetes-cli-job.service';
 import { MaskedConfigCryptoService } from '../masked-config-crypto.service';
 import { RunnerLogStorageService } from './runner-log-storage.service';
+import { buildNotebookEnvironment } from './notebook-env';
+import { parseNotebookResult } from './notebook-result';
 import { CustomDetectorsService } from '../custom-detectors.service';
 import {
   computeDetectionFingerprint,
@@ -1602,6 +1604,134 @@ export class CliRunnerService {
     return `'${value.replace(/'/g, "'\\''")}'`;
   }
 
+  /**
+   * Run one notebook execution and return the CLI's JSON result.
+   *
+   * Deliberately the same shape as testConnection: a short-lived process, a
+   * 0600 request file that is deleted in `finally`, and a bounded capture of
+   * the front of the stream -- the result line is printed and the process
+   * exits, so the interesting part is never at the end.
+   *
+   * Unlike testConnection this is not called straight from an HTTP handler:
+   * a Run All that replays a slow load would blow the request timeout, so the
+   * caller records an execution row and polls.
+   */
+  async runNotebookExecution(params: {
+    sourceId: string;
+    request: Record<string, any>;
+    onJobCreated?: (job: {
+      jobName: string;
+      namespace: string;
+    }) => void | Promise<void>;
+  }): Promise<{
+    payload: Record<string, any> | null;
+    stderr: string;
+    exitCode: number;
+  }> {
+    const source = await this.prisma.source.findUnique({
+      where: { id: params.sourceId },
+    });
+    if (!source) {
+      throw new NotFoundException(`Source ${params.sourceId} not found`);
+    }
+
+    const decryptedConfig = this.toDecryptedRecipeConfig(source.config);
+    const request = { ...params.request, recipe: decryptedConfig };
+    const environment = process.env.ENVIRONMENT || 'development';
+
+    if (this.isKubernetesExecutionEnabled(environment)) {
+      return this.runNotebookInKubernetes(
+        params.sourceId,
+        request,
+        params.onJobCreated,
+      );
+    }
+
+    const cliPath = this.getCliPath(environment);
+    const venvPath = this.getVenvPath(environment);
+    const requestFile = await this.createTempJsonFile('notebook', request);
+
+    try {
+      const command =
+        `cd ${this.shellEscape(cliPath)} && ` +
+        `uv run --locked --no-dev --python ${this.shellEscape(this.getVenvPython(venvPath))} ` +
+        `python -m src.main notebook ${this.shellEscape(requestFile)}`;
+
+      const { stdout, stderr, exitCode } = await this.executeCli(
+        command,
+        (chunk) => {
+          const trimmed = chunk.trim();
+          if (trimmed) {
+            this.logger.debug(`[notebook] ${trimmed.slice(0, 500)}`);
+          }
+        },
+        undefined,
+        undefined,
+        { mode: 'head', maxBytes: 8 * 1024 * 1024, maxLines: 50_000 },
+        buildNotebookEnvironment(),
+      );
+
+      return { payload: parseNotebookResult(stdout), stderr, exitCode };
+    } finally {
+      await fs.unlink(requestFile).catch(() => undefined);
+    }
+  }
+
+  private async runNotebookInKubernetes(
+    sourceId: string,
+    request: Record<string, any>,
+    onJobCreated?: (job: {
+      jobName: string;
+      namespace: string;
+    }) => void | Promise<void>,
+  ): Promise<{
+    payload: Record<string, any> | null;
+    stderr: string;
+    exitCode: number;
+  }> {
+    if (!this.kubernetesCliJobService) {
+      throw new Error(
+        'Kubernetes execution is enabled but the Kubernetes CLI job service is unavailable',
+      );
+    }
+    const result = await this.kubernetesCliJobService.runNotebookJob(
+      sourceId,
+      request,
+      onJobCreated,
+    );
+    return {
+      // A pod log interleaves everything that wrote to the stream, so the
+      // result is found by its marker rather than by assuming it is the
+      // last line.
+      payload: parseNotebookResult(result.output),
+      stderr: result.output,
+      exitCode: result.exitCode,
+    };
+  }
+
+  /** Delete the Kubernetes Job backing a notebook execution, if there is one. */
+  async cancelNotebookJob(executionId: string): Promise<boolean> {
+    if (!this.kubernetesCliJobService) return false;
+    return this.kubernetesCliJobService.cancelNotebookJob(executionId);
+  }
+
+  private async createTempJsonFile(
+    prefix: string,
+    payload: unknown,
+  ): Promise<string> {
+    const tmpDir = process.env.TEMP_DIR || '/tmp';
+    const filepath = path.join(
+      tmpDir,
+      `${prefix}-${Date.now()}-${randomUUID()}.json`,
+    );
+    await fs.writeFile(filepath, JSON.stringify(payload), {
+      encoding: 'utf8',
+      mode: 0o600,
+      flag: 'wx',
+    });
+    return filepath;
+  }
+
   async testConnection(sourceId: string): Promise<Record<string, any>> {
     const source = await this.prisma.source.findUnique({
       where: { id: sourceId },
@@ -1776,13 +1906,18 @@ export class CliRunnerService {
     onStdout?: (chunk: string) => void,
     runnerId?: string,
     capture: BoundedOutputOptions = {},
+    // Replaces the inherited environment entirely. Used by notebook
+    // executions, which have no reason to hold the tenant database URL or the
+    // callback key -- see notebook-env.ts. A scan does need those to write its
+    // results back, so it keeps the default.
+    envOverride?: NodeJS.ProcessEnv,
   ): Promise<{ stdout: string; stderr: string; exitCode: number }> {
     return new Promise((resolve, reject) => {
       const namespacedDbUrl = this.namespacedDatabaseUrl();
       const child = spawn(command, {
         shell: true,
         detached: process.platform !== 'win32',
-        env: {
+        env: envOverride ?? {
           ...process.env,
           // Point any direct DB access from the CLI at the tenant schema.
           ...(namespacedDbUrl ? { DATABASE_URL: namespacedDbUrl } : {}),

@@ -74,6 +74,19 @@ export { CorrelationApi } from "./generated/src/apis/CorrelationApi";
 export { ChatBotsApi } from "./generated/src/apis/ChatBotsApi";
 export { EmbeddingsApi } from "./generated/src/apis/EmbeddingsApi";
 export { GlossaryApi } from "./generated/src/apis/GlossaryApi";
+export { NotebooksApi } from "./generated/src/apis/NotebooksApi";
+// Notebook DTOs must be listed by name: this file re-exports selectively,
+// so a generated model that is not named here is not importable from the
+// package root however cleanly codegen produced it.
+export type {
+  NotebookDto,
+  NotebookCellDto,
+  UpdateNotebookDto,
+  UpdateNotebookResponseDto,
+  CreateNotebookExecutionDto,
+  NotebookExecutionDto,
+  NotebookScaffoldDto,
+} from "./generated/src/models";
 export type {
   EmbeddingReindexResponseDto,
   UpsertGlossaryTermDto,
@@ -1001,6 +1014,7 @@ export type RunTestsResponseDto = {
 
 // Import API classes for the client
 import { SourcesApi } from "./generated/src/apis/SourcesApi";
+import { NotebooksApi } from "./generated/src/apis/NotebooksApi";
 import { AssetsApi } from "./generated/src/apis/AssetsApi";
 import { HealthApi } from "./generated/src/apis/HealthApi";
 import { RunnersApi } from "./generated/src/apis/RunnersApi";
@@ -1299,6 +1313,7 @@ class ApiClient {
   private config: Configuration;
 
   public sources: SourcesApi;
+  public notebooks: NotebooksApi;
   public assets: AssetsApi;
   public health: HealthApi;
   public runners: RunnersApi;
@@ -1322,6 +1337,7 @@ class ApiClient {
     this.namespaces = new NamespacesApi(this.config.basePath);
 
     this.sources = new SourcesApi(this.config);
+    this.notebooks = new NotebooksApi(this.config);
     this.assets = new AssetsApi(this.config);
     this.health = new HealthApi(this.config);
     this.runners = new RunnersApi(this.config);
@@ -1399,11 +1415,14 @@ class ApiClient {
     request: GeneratedSearchFindingsChartsRequestDto = {},
   ): Promise<GeneratedSearchFindingsChartsResponseDto> {
     const basePath = this.searchBase();
-    const response = await resilientFetch(`${basePath}/search/findings/charts`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(request),
-    });
+    const response = await resilientFetch(
+      `${basePath}/search/findings/charts`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(request),
+      },
+    );
 
     if (!response.ok) {
       const message = await response.text();
@@ -1521,7 +1540,9 @@ class ApiClient {
 
   async listCustomDetectorExamples(): Promise<CustomDetectorExampleDto[]> {
     const basePath = this.searchBase();
-    const response = await resilientFetch(`${basePath}/custom-detectors/examples`);
+    const response = await resilientFetch(
+      `${basePath}/custom-detectors/examples`,
+    );
 
     if (!response.ok) {
       const message = await response.text();
@@ -1572,11 +1593,14 @@ class ApiClient {
     payload: UpdateCustomDetectorDto,
   ): Promise<CustomDetectorResponseDto> {
     const basePath = this.searchBase();
-    const response = await resilientFetch(`${basePath}/custom-detectors/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
+    const response = await resilientFetch(
+      `${basePath}/custom-detectors/${id}`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      },
+    );
 
     if (!response.ok) {
       const message = await response.text();
@@ -1593,11 +1617,14 @@ class ApiClient {
     payload: TrainCustomDetectorDto = {},
   ): Promise<CustomDetectorTrainingRunDto> {
     const basePath = this.searchBase();
-    const response = await resilientFetch(`${basePath}/custom-detectors/${id}/train`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
+    const response = await resilientFetch(
+      `${basePath}/custom-detectors/${id}/train`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      },
+    );
 
     if (!response.ok) {
       const message = await response.text();
@@ -1722,7 +1749,9 @@ class ApiClient {
 
   async getSchedule(sourceId: string): Promise<SourceScheduleDto> {
     const basePath = this.searchBase();
-    const response = await resilientFetch(`${basePath}/sources/${sourceId}/schedule`);
+    const response = await resilientFetch(
+      `${basePath}/sources/${sourceId}/schedule`,
+    );
 
     if (!response.ok) {
       const message = await response.text();
@@ -1833,10 +1862,13 @@ class ApiClient {
         : "upload.txt");
     formData.set("file", file, fallbackName);
 
-    const response = await resilientFetch(`${basePath}/assistant/parse-upload`, {
-      method: "POST",
-      body: formData,
-    });
+    const response = await resilientFetch(
+      `${basePath}/assistant/parse-upload`,
+      {
+        method: "POST",
+        body: formData,
+      },
+    );
 
     if (!response.ok) {
       const message = await response.text();
@@ -1921,9 +1953,12 @@ class ApiClient {
 
   async deleteCustomDetector(id: string): Promise<{ deleted: true }> {
     const basePath = this.searchBase();
-    const response = await resilientFetch(`${basePath}/custom-detectors/${id}`, {
-      method: "DELETE",
-    });
+    const response = await resilientFetch(
+      `${basePath}/custom-detectors/${id}`,
+      {
+        method: "DELETE",
+      },
+    );
 
     if (!response.ok) {
       const message = await response.text();
@@ -2018,11 +2053,14 @@ class ApiClient {
     },
   ): Promise<SourceScheduleDto> {
     const basePath = this.searchBase();
-    const response = await resilientFetch(`${basePath}/sources/${sourceId}/schedule`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(schedule),
-    });
+    const response = await resilientFetch(
+      `${basePath}/sources/${sourceId}/schedule`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(schedule),
+      },
+    );
 
     if (!response.ok) {
       const message = await response.text();

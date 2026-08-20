@@ -7919,6 +7919,265 @@
         ]
       }
     },
+    "/notebooks/scaffold": {
+      "get": {
+        "operationId": "NotebookController_scaffold",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotebookScaffoldDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "The starter cells and the functions a notebook must define",
+        "tags": [
+          "Notebooks"
+        ]
+      }
+    },
+    "/sources/{sourceId}/notebook": {
+      "get": {
+        "operationId": "NotebookController_get",
+        "parameters": [
+          {
+            "name": "sourceId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotebookDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Read a CUSTOM source's notebook",
+        "tags": [
+          "Notebooks"
+        ]
+      },
+      "put": {
+        "description": "Rejected with 409 when someone else saved since baseRevision, so two editors cannot silently overwrite each other.",
+        "operationId": "NotebookController_update",
+        "parameters": [
+          {
+            "name": "sourceId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateNotebookDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdateNotebookResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The notebook has moved on"
+          }
+        },
+        "summary": "Save a notebook",
+        "tags": [
+          "Notebooks"
+        ]
+      }
+    },
+    "/sources/{sourceId}/notebook/export": {
+      "get": {
+        "description": "Uses the `# %%` convention, so the result runs under plain `python workflow.py` with no notebook runtime.",
+        "operationId": "NotebookController_exportPython",
+        "parameters": [
+          {
+            "name": "sourceId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "The notebook as an ordinary Python module",
+        "tags": [
+          "Notebooks"
+        ]
+      }
+    },
+    "/sources/{sourceId}/notebook/executions": {
+      "post": {
+        "description": "Returns immediately; poll GET /notebook/executions/:id for the result.",
+        "operationId": "NotebookController_createExecution",
+        "parameters": [
+          {
+            "name": "sourceId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateNotebookExecutionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotebookExecutionDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Start a notebook execution",
+        "tags": [
+          "Notebooks"
+        ]
+      },
+      "get": {
+        "operationId": "NotebookController_listExecutions",
+        "parameters": [
+          {
+            "name": "sourceId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/NotebookExecutionDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Recent executions for a source",
+        "tags": [
+          "Notebooks"
+        ]
+      }
+    },
+    "/notebook/executions/{executionId}": {
+      "get": {
+        "operationId": "NotebookController_getExecution",
+        "parameters": [
+          {
+            "name": "executionId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotebookExecutionDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Poll one execution",
+        "tags": [
+          "Notebooks"
+        ]
+      }
+    },
+    "/notebook/executions/{executionId}/cancel": {
+      "post": {
+        "description": "Ends the process or deletes the Job. A cell that ignores ctx.should_abort is stopped this way and no other.",
+        "operationId": "NotebookController_cancel",
+        "parameters": [
+          {
+            "name": "executionId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Stop a running execution",
+        "tags": [
+          "Notebooks"
+        ]
+      }
+    },
     "/autopilot/trigger": {
       "post": {
         "operationId": "AutopilotController_trigger",
@@ -10170,7 +10429,8 @@
               "DROPBOX",
               "HUGGING_FACE",
               "SANDBOX",
-              "GIT"
+              "GIT",
+              "CUSTOM"
             ],
             "description": "The type of the source",
             "example": "WORDPRESS"
@@ -10414,7 +10674,8 @@
               "DROPBOX",
               "HUGGING_FACE",
               "SANDBOX",
-              "GIT"
+              "GIT",
+              "CUSTOM"
             ],
             "description": "The type of the source",
             "example": "WORDPRESS"
@@ -19781,6 +20042,255 @@
           "total",
           "skip",
           "limit"
+        ]
+      },
+      "NotebookCellDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "extract",
+            "pattern": "^[A-Za-z0-9_-]{1,64}$"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "code",
+              "markdown"
+            ]
+          },
+          "source": {
+            "type": "string",
+            "description": "Cell source text"
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "source"
+        ]
+      },
+      "NotebookScaffoldDto": {
+        "type": "object",
+        "properties": {
+          "cells": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NotebookCellDto"
+            }
+          },
+          "requiredFunctions": {
+            "description": "Function names every notebook must define",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "optionalFunctions": {
+            "description": "Function names a notebook may define",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "cells",
+          "requiredFunctions",
+          "optionalFunctions"
+        ]
+      },
+      "NotebookDto": {
+        "type": "object",
+        "properties": {
+          "revision": {
+            "type": "number",
+            "description": "Revision this notebook is currently at"
+          },
+          "cells": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NotebookCellDto"
+            }
+          },
+          "variables": {
+            "type": "object",
+            "description": "Non-secret values the notebook reads with ctx.var(name)",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "secretKeys": {
+            "description": "Names of configured secrets. Values are never returned -- they are write-only.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "contract": {
+            "type": "object",
+            "description": "Contract violations, if the notebook is not currently valid"
+          }
+        },
+        "required": [
+          "revision",
+          "cells",
+          "variables",
+          "secretKeys"
+        ]
+      },
+      "UpdateNotebookDto": {
+        "type": "object",
+        "properties": {
+          "baseRevision": {
+            "type": "number",
+            "description": "The revision the editor started from. A mismatch means someone else saved first and the request is rejected with 409."
+          },
+          "cells": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NotebookCellDto"
+            }
+          },
+          "variables": {
+            "type": "object",
+            "description": "Replaces the full variable map when present.",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "secrets": {
+            "type": "object",
+            "description": "Secrets to set. Only the keys present are changed; a null value deletes that key.",
+            "additionalProperties": {
+              "type": "string",
+              "nullable": true
+            }
+          }
+        },
+        "required": [
+          "baseRevision",
+          "cells"
+        ]
+      },
+      "UpdateNotebookResponseDto": {
+        "type": "object",
+        "properties": {
+          "revision": {
+            "type": "number"
+          },
+          "contractOk": {
+            "type": "boolean",
+            "description": "Whether the saved notebook satisfies the source contract"
+          },
+          "contract": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "revision",
+          "contractOk"
+        ]
+      },
+      "CreateNotebookExecutionDto": {
+        "type": "object",
+        "properties": {
+          "revision": {
+            "type": "number",
+            "description": "The revision to execute. Executions run a snapshot, never \"whatever is in the database now\"."
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "cell",
+              "all",
+              "test_connection",
+              "preview_extract"
+            ]
+          },
+          "targetCellId": {
+            "type": "string",
+            "description": "Required when mode is \"cell\""
+          },
+          "maxAssets": {
+            "type": "number",
+            "description": "Assets to sample in preview_extract mode"
+          }
+        },
+        "required": [
+          "revision",
+          "mode"
+        ]
+      },
+      "NotebookExecutionDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "sourceId": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "number"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "CELL",
+              "ALL",
+              "TEST_CONNECTION",
+              "PREVIEW_EXTRACT"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "RUNNING",
+              "SUCCESS",
+              "ERROR",
+              "CANCELLED",
+              "TIMEOUT"
+            ]
+          },
+          "targetCellId": {
+            "type": "string"
+          },
+          "outputs": {
+            "type": "object",
+            "description": "Per-cell outputs, keyed by cell id in execution order"
+          },
+          "failedCellId": {
+            "type": "string",
+            "description": "The cell that raised, which is not always the target cell"
+          },
+          "error": {
+            "type": "object"
+          },
+          "durationMs": {
+            "type": "number"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "startedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "finishedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "sourceId",
+          "revision",
+          "mode",
+          "status",
+          "createdAt"
         ]
       },
       "TriggerAutopilotDto": {

@@ -20,6 +20,7 @@ export { HealthApi } from './HealthApi';
 export { InquiriesApi } from './InquiriesApi';
 export { InstanceSettingsApi } from './InstanceSettingsApi';
 export { NamespacesApi } from './NamespacesApi';
+export { NotebooksApi } from './NotebooksApi';
 export { NotificationsApi } from './NotificationsApi';
 export { RunnersApi } from './RunnersApi';
 export { SitemapApi } from './SitemapApi';

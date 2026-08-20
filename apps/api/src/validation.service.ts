@@ -70,7 +70,9 @@ export class ValidationService {
    * The schema uses oneOf to support all source types, validation is automatic
    */
   validate(type: string, data: any): Record<string, unknown> {
-    if (String(type).toUpperCase() === 'LOCAL_FOLDER') {
+    const normalizedType = String(type).toUpperCase();
+
+    if (normalizedType === 'LOCAL_FOLDER') {
       const environment = (
         process.env.ENVIRONMENT || 'development'
       ).toLowerCase();
