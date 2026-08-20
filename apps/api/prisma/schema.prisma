@@ -75,6 +75,7 @@ model Source {
   customDetectorExtractions  CustomDetectorExtraction[]
   assetChunks                AssetChunk[]
   uploadedFiles              UploadedSourceFile[]
+  notebookExecutions         NotebookExecution[]
 
   @@index([currentRunnerId])
   @@index([scheduleEnabled])
@@ -118,6 +119,56 @@ enum AutoSchedulePhase {
    * Too many consecutive failures: auto runs stopped until an operator acts.
    */
   PAUSED
+}
+
+/**
+ * One run of a CUSTOM source's notebook.
+ * `cells` is a snapshot, not a reference. An execution has to be reproducible
+ * and auditable after the notebook has moved on, so it records the exact source
+ * that ran rather than pointing at a row someone will edit five minutes later.
+ */
+model NotebookExecution {
+  id           String                  @id @default(uuid())
+  sourceId     String                  @map("source_id")
+  revision     Int
+  mode         NotebookExecutionMode
+  targetCellId String?                 @map("target_cell_id")
+  status       NotebookExecutionStatus @default(PENDING)
+  // The cells as they were when this execution was requested.
+  cells        Json
+  outputs      Json?
+  failedCellId String?                 @map("failed_cell_id")
+  error        Json?
+  durationMs   Int?                    @map("duration_ms")
+  triggeredBy  String?                 @map("triggered_by")
+  // Set only for the Kubernetes path, so a cancel can find the Job to delete.
+  jobName      String?                 @map("job_name")
+  jobNamespace String?                 @map("job_namespace")
+  startedAt    DateTime?               @map("started_at")
+  finishedAt   DateTime?               @map("finished_at")
+  createdAt    DateTime                @default(now()) @map("created_at")
+
+  source Source @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+
+  @@index([sourceId, createdAt(sort: Desc)])
+  @@index([status])
+  @@map("notebook_executions")
+}
+
+enum NotebookExecutionMode {
+  CELL
+  ALL
+  TEST_CONNECTION
+  PREVIEW_EXTRACT
+}
+
+enum NotebookExecutionStatus {
+  PENDING
+  RUNNING
+  SUCCESS
+  ERROR
+  CANCELLED
+  TIMEOUT
 }
 
 model UploadedSourceFile {

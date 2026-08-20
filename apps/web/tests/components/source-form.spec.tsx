@@ -1,6 +1,7 @@
 import * as React from "react";
 import { expect, test } from "@playwright/experimental-ct-react";
 import { SourceForm } from "@/components/source-form";
+import { SourceFormHandleHarness } from "./fixtures/source-form-handle-harness";
 
 const validS3Defaults = {
   required: { bucket: "customer-exports" },
@@ -229,4 +230,72 @@ test("sandbox renders uploaded files immediately after the source name section",
     });
 
   expect(order).toEqual({ followsName: true, precedesSampling: true });
+});
+
+test("custom source carries its notebook through the imperative handle", async ({
+  mount,
+}) => {
+  // Both source pages render with showActions={false} and read getValues()
+  // rather than going through onSubmit. A CUSTOM source's notebook is rendered
+  // outside the schema form, so if the handle does not fold it in, the saved
+  // config has an empty `required` and every oneOf branch fails validation --
+  // which is exactly what shipped before this test existed.
+  const component = await mount(
+    <SourceFormHandleHarness
+      sourceType="CUSTOM"
+      sourceId="src-1"
+      defaultValues={{
+        name: "my-connector",
+        sampling: { strategy: "ALL" },
+        required: {
+          notebook: {
+            revision: 3,
+            cells: [
+              {
+                id: "extract",
+                type: "code",
+                source: "def extract():\n    pass\n",
+              },
+            ],
+          },
+        },
+        optional: { variables: { api_base: "https://api.example.com" } },
+        masked: { secrets: { api_token: "enc::v1::x" } },
+      }}
+    />,
+  );
+
+  await component.getByTestId("capture-values").click();
+  const raw = await component.getByTestId("captured-values").textContent();
+  const values = JSON.parse(raw ?? "null");
+
+  expect(values.type).toBe("CUSTOM");
+  expect(values.required.notebook.cells).toHaveLength(1);
+  expect(values.required.notebook.revision).toBe(3);
+  expect(values.optional.variables).toEqual({
+    api_base: "https://api.example.com",
+  });
+});
+
+test("sandbox still reports empty sections through the handle", async ({
+  mount,
+}) => {
+  const component = await mount(
+    <SourceFormHandleHarness
+      sourceType="SANDBOX"
+      defaultValues={{ name: "files", sampling: { strategy: "ALL" } }}
+    />,
+  );
+
+  await component.getByTestId("capture-values").click();
+  const values = JSON.parse(
+    (await component.getByTestId("captured-values").textContent()) ?? "null",
+  );
+
+  expect(values).toMatchObject({
+    type: "SANDBOX",
+    required: {},
+    masked: {},
+    optional: {},
+  });
 });

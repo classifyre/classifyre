@@ -26,8 +26,9 @@ describe('scan concurrency', () => {
   };
 
   const limit = () =>
-    (service as unknown as { resolveMaxConcurrentRunners: () => number })
-      .resolveMaxConcurrentRunners();
+    (
+      service as unknown as { resolveMaxConcurrentRunners: () => number }
+    ).resolveMaxConcurrentRunners();
 
   const canStart = () =>
     (

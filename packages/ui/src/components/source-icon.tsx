@@ -35,6 +35,7 @@ import {
 import {
   BookOpen,
   Cloud,
+  Code2,
   Database,
   Folder,
   FlaskConical,
@@ -44,6 +45,7 @@ import {
   Settings,
 } from "lucide-react";
 import { cn } from "../lib/utils";
+import { simpleIconComponent } from "./simple-icon";
 
 type IconComponent = React.ComponentType<{ className?: string }>;
 
@@ -108,22 +110,6 @@ const TableauIcon: IconComponent = ({ className }) => (
   </svg>
 );
 
-function createSimpleIconComponent(icon: SimpleIcon): IconComponent {
-  return function SimpleIconGlyph({ className }) {
-    return (
-      <svg
-        viewBox="0 0 24 24"
-        className={className}
-        fill="currentColor"
-        role="img"
-        aria-label={icon.title}
-      >
-        <path d={icon.path} />
-      </svg>
-    );
-  };
-}
-
 const SOURCE_SIMPLE_ICON_BY_INGESTION_TYPE: Record<
   ApiSourceType,
   SimpleIcon | null
@@ -165,6 +151,8 @@ const SOURCE_SIMPLE_ICON_BY_INGESTION_TYPE: Record<
   [CreateSourceDtoTypeEnum.Dropbox]: siDropbox,
   [CreateSourceDtoTypeEnum.HuggingFace]: siHuggingface,
   [CreateSourceDtoTypeEnum.Git]: siGit,
+  // No vendor logo: a custom connector is whatever its author made it.
+  [CreateSourceDtoTypeEnum.Custom]: null,
 };
 
 const SOURCE_CUSTOM_ICON_BY_INGESTION_TYPE: Partial<
@@ -186,46 +174,47 @@ export const MISSING_SIMPLE_ICON_SOURCE_TYPES = Object.values(
 
 const SOURCE_ICON_BY_INGESTION_TYPE: Record<ApiSourceType, IconComponent> = {
   [CreateSourceDtoTypeEnum.Sandbox]: FlaskConical,
-  [CreateSourceDtoTypeEnum.Wordpress]: createSimpleIconComponent(siWordpress),
+  [CreateSourceDtoTypeEnum.Wordpress]: simpleIconComponent(siWordpress),
   [CreateSourceDtoTypeEnum.Slack]: SlackIcon,
   [CreateSourceDtoTypeEnum.S3CompatibleStorage]: Cloud,
   [CreateSourceDtoTypeEnum.AzureBlobStorage]: Cloud,
   [CreateSourceDtoTypeEnum.GoogleCloudStorage]: Cloud,
-  [CreateSourceDtoTypeEnum.Postgresql]: createSimpleIconComponent(siPostgresql),
-  [CreateSourceDtoTypeEnum.Mysql]: createSimpleIconComponent(siMysql),
+  [CreateSourceDtoTypeEnum.Postgresql]: simpleIconComponent(siPostgresql),
+  [CreateSourceDtoTypeEnum.Mysql]: simpleIconComponent(siMysql),
   [CreateSourceDtoTypeEnum.Mssql]: FALLBACK_SOURCE_ICON,
   [CreateSourceDtoTypeEnum.Oracle]: OracleIcon,
-  [CreateSourceDtoTypeEnum.Hive]: createSimpleIconComponent(siApachehive),
-  [CreateSourceDtoTypeEnum.Databricks]: createSimpleIconComponent(siDatabricks),
-  [CreateSourceDtoTypeEnum.Snowflake]: createSimpleIconComponent(siSnowflake),
-  [CreateSourceDtoTypeEnum.Mongodb]: createSimpleIconComponent(siMongodb),
-  [CreateSourceDtoTypeEnum.Neo4J]: createSimpleIconComponent(siNeo4j),
+  [CreateSourceDtoTypeEnum.Hive]: simpleIconComponent(siApachehive),
+  [CreateSourceDtoTypeEnum.Databricks]: simpleIconComponent(siDatabricks),
+  [CreateSourceDtoTypeEnum.Snowflake]: simpleIconComponent(siSnowflake),
+  [CreateSourceDtoTypeEnum.Mongodb]: simpleIconComponent(siMongodb),
+  [CreateSourceDtoTypeEnum.Neo4J]: simpleIconComponent(siNeo4j),
   [CreateSourceDtoTypeEnum.Powerbi]: FALLBACK_SOURCE_ICON,
   [CreateSourceDtoTypeEnum.Tableau]: TableauIcon,
-  [CreateSourceDtoTypeEnum.Confluence]: createSimpleIconComponent(siConfluence),
-  [CreateSourceDtoTypeEnum.Jira]: createSimpleIconComponent(siJira),
+  [CreateSourceDtoTypeEnum.Confluence]: simpleIconComponent(siConfluence),
+  [CreateSourceDtoTypeEnum.Jira]: simpleIconComponent(siJira),
   [CreateSourceDtoTypeEnum.Servicedesk]: Monitor,
   [CreateSourceDtoTypeEnum.Sqlite]: FALLBACK_SOURCE_ICON,
-  [CreateSourceDtoTypeEnum.Notion]: createSimpleIconComponent(siNotion),
+  [CreateSourceDtoTypeEnum.Notion]: simpleIconComponent(siNotion),
   [CreateSourceDtoTypeEnum.Email]: Mail,
-  [CreateSourceDtoTypeEnum.Youtube]: createSimpleIconComponent(siYoutube),
-  [CreateSourceDtoTypeEnum.Reddit]: createSimpleIconComponent(siReddit),
+  [CreateSourceDtoTypeEnum.Youtube]: simpleIconComponent(siYoutube),
+  [CreateSourceDtoTypeEnum.Reddit]: simpleIconComponent(siReddit),
   [CreateSourceDtoTypeEnum.DeltaLake]: Layers,
   [CreateSourceDtoTypeEnum.Iceberg]: Layers,
-  [CreateSourceDtoTypeEnum.Kafka]: createSimpleIconComponent(siApachekafka),
+  [CreateSourceDtoTypeEnum.Kafka]: simpleIconComponent(siApachekafka),
   [CreateSourceDtoTypeEnum.Elasticsearch]:
-    createSimpleIconComponent(siElasticsearch),
-  [CreateSourceDtoTypeEnum.Opensearch]: createSimpleIconComponent(siOpensearch),
+    simpleIconComponent(siElasticsearch),
+  [CreateSourceDtoTypeEnum.Opensearch]: simpleIconComponent(siOpensearch),
   [CreateSourceDtoTypeEnum.Meilisearch]:
-    createSimpleIconComponent(siMeilisearch),
+    simpleIconComponent(siMeilisearch),
   [CreateSourceDtoTypeEnum.LocalFolder]: Folder,
   [CreateSourceDtoTypeEnum.Microsoft365]: Microsoft365Icon,
   [CreateSourceDtoTypeEnum.GoogleWorkspace]:
-    createSimpleIconComponent(siGoogledrive),
-  [CreateSourceDtoTypeEnum.Dropbox]: createSimpleIconComponent(siDropbox),
+    simpleIconComponent(siGoogledrive),
+  [CreateSourceDtoTypeEnum.Dropbox]: simpleIconComponent(siDropbox),
   [CreateSourceDtoTypeEnum.HuggingFace]:
-    createSimpleIconComponent(siHuggingface),
-  [CreateSourceDtoTypeEnum.Git]: createSimpleIconComponent(siGit),
+    simpleIconComponent(siHuggingface),
+  [CreateSourceDtoTypeEnum.Git]: simpleIconComponent(siGit),
+  [CreateSourceDtoTypeEnum.Custom]: Code2,
 };
 
 const SOURCE_ICON_BY_INGESTION_TYPE_LOWERCASE: Record<string, IconComponent> =
@@ -239,17 +228,17 @@ const SOURCE_ICON_BY_INGESTION_TYPE_LOWERCASE: Record<string, IconComponent> =
 
 export const SOURCE_ICON_BY_TYPE = {
   CROWD: BookOpen,
-  BITBUCKET: createSimpleIconComponent(siBitbucket),
+  BITBUCKET: simpleIconComponent(siBitbucket),
   XRAY: Monitor,
-  GOOGLE_DRIVE: createSimpleIconComponent(siGoogledrive),
-  GOOGLE_SHEETS: createSimpleIconComponent(siGooglesheets),
-  GOOGLE_DOCS: createSimpleIconComponent(siGoogledocs),
-  GOOGLE_SLIDES: createSimpleIconComponent(siGoogleslides),
+  GOOGLE_DRIVE: simpleIconComponent(siGoogledrive),
+  GOOGLE_SHEETS: simpleIconComponent(siGooglesheets),
+  GOOGLE_DOCS: simpleIconComponent(siGoogledocs),
+  GOOGLE_SLIDES: simpleIconComponent(siGoogleslides),
   ...SOURCE_ICON_BY_INGESTION_TYPE,
   ...SOURCE_ICON_BY_INGESTION_TYPE_LOWERCASE,
   CUSTOM: Settings,
   filesystem: Folder,
-  github: createSimpleIconComponent(siGithub),
+  github: simpleIconComponent(siGithub),
   s3: Cloud,
   database: Database,
   custom: Settings,
