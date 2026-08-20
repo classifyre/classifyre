@@ -16,7 +16,7 @@ import { InternalApiKeyService } from '../internal-api-key.service';
 
 type KubernetesModule = typeof import('@kubernetes/client-node');
 
-type CliJobMode = 'extract' | 'test' | 'evaluation';
+type CliJobMode = 'extract' | 'test' | 'evaluation' | 'notebook';
 type JobCleanupPolicy = 'none' | 'failed' | 'always';
 
 interface CliJobResult {
@@ -95,6 +95,42 @@ export class KubernetesCliJobService {
       mode: 'test',
       outputRestUrl,
     });
+  }
+
+  /**
+   * Run one notebook execution as a short-lived Job.
+   *
+   * Unlike an extract job this one is given neither CLASSIFYRE_INTERNAL_KEY nor
+   * HF_TOKEN: a notebook execution only runs cells and prints a result, so
+   * there is nothing for it to authenticate to. See buildContainerEnv.
+   */
+  async runNotebookJob(
+    sourceId: string,
+    request: Record<string, unknown>,
+    onJobCreated?: CliJobCreatedHandler,
+  ): Promise<CliJobResult> {
+    // request is an untyped JSON payload; only take executionId when it really
+    // is a string, or the Job tracking key becomes "[object Object]".
+    const rawExecutionId = request.executionId;
+    const executionId =
+      typeof rawExecutionId === 'string' ? rawExecutionId : undefined;
+    return this.runJob({
+      sourceId,
+      mode: 'notebook',
+      notebookRequestB64: Buffer.from(JSON.stringify(request), 'utf8').toString(
+        'base64',
+      ),
+      jobTrackingKey: executionId,
+      onJobCreated,
+    });
+  }
+
+  /** Cancel a running notebook execution by deleting its Job. */
+  async cancelNotebookJob(executionId: string): Promise<boolean> {
+    const ref = this.runningJobsByRunnerId.get(executionId);
+    if (!ref) return false;
+    await this.deleteJobBestEffort(ref.namespace, ref.jobName);
+    return true;
   }
 
   async runFileEvaluationJob(params: {
@@ -241,6 +277,7 @@ export class KubernetesCliJobService {
     evaluationFileExt?: string;
     evaluationInputsB64?: string;
     evaluationDetectorsB64?: string;
+    notebookRequestB64?: string;
     jobTrackingKey?: string;
     onLogChunk?: CliJobLogHandler;
     onJobCreated?: CliJobCreatedHandler;
@@ -425,6 +462,7 @@ export class KubernetesCliJobService {
       evaluationFileExt?: string;
       evaluationInputsB64?: string;
       evaluationDetectorsB64?: string;
+      notebookRequestB64?: string;
     },
   ): Promise<V1Job> {
     const job = JSON.parse(JSON.stringify(template)) as V1Job;
@@ -540,6 +578,12 @@ export class KubernetesCliJobService {
         value: params.evaluationDetectorsB64,
       });
     }
+    if (params.notebookRequestB64) {
+      envMap.set('NOTEBOOK_REQUEST_B64', {
+        name: 'NOTEBOOK_REQUEST_B64',
+        value: params.notebookRequestB64,
+      });
+    }
 
     const workDir = process.env.K8S_CLI_JOB_WORKDIR || '/app/apps/cli';
     envMap.set('CLASSIFYRE_CLI_AUTO_INSTALL_OPTIONAL_DEPS', {
@@ -551,19 +595,29 @@ export class KubernetesCliJobService {
       this.setEnvValue(envMap, 'UV_CACHE_DIR', process.env.UV_CACHE_DIR);
     }
 
+    // A notebook execution runs cells and prints a JSON result. It calls no
+    // API endpoint and downloads no model, so it is given neither the callback
+    // key nor the Hugging Face token -- the code it runs was written by a user,
+    // and a credential it has no use for is a credential worth withholding.
+    const isNotebook = params.mode === 'notebook';
+
     // Proves to the API that the callbacks this job makes (asset ingest,
     // runner status, graph edges) come from a job the API itself launched.
     // Injected here rather than in the Helm job template so every launch path
     // — chart, desktop, local dev — carries the same key the API validates.
     const internalKey = this.internalApiKey.value;
-    if (internalKey) {
+    if (internalKey && !isNotebook) {
       this.setEnvValue(envMap, 'CLASSIFYRE_INTERNAL_KEY', internalKey);
+    }
+    if (isNotebook) {
+      envMap.delete('CLASSIFYRE_INTERNAL_KEY');
+      envMap.delete('HF_TOKEN');
     }
 
     // If the job template does NOT carry an instance-level HF_TOKEN (provided via
     // the Helm chart's huggingFace.existingSecret), inject the user-configured
     // token from the database (encrypted at rest, decrypted here).
-    if (!envMap.has('HF_TOKEN')) {
+    if (!isNotebook && !envMap.has('HF_TOKEN')) {
       const userToken = await this.instanceSettings.getUserHfToken();
       if (userToken) {
         this.setEnvValue(envMap, 'HF_TOKEN', userToken);
@@ -698,6 +752,11 @@ export class KubernetesCliJobService {
         '--runner-id "$RUNNER_ID"',
         '--managed-runner',
       ].join(' ');
+    } else if (mode === 'notebook') {
+      prelude.push(
+        'printf "%s" "$NOTEBOOK_REQUEST_B64" | base64 -d > /tmp/notebook-request.json',
+      );
+      command = '"$PYTHON_BIN" -m src.main notebook /tmp/notebook-request.json';
     } else if (mode === 'test') {
       prelude.push('printf "%s" "$RECIPE_B64" | base64 -d > /tmp/recipe.json');
       prelude.push(

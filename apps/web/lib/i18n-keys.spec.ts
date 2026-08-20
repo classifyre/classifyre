@@ -6,6 +6,7 @@
  * - Every key in the target language file must exist in en.json (no extra keys).
  * - Keys must appear in the same order (same structure, no positional drift).
  * - Nested objects are validated recursively.
+ * - Placeholders use the {{name}} form that translate() actually substitutes.
  */
 
 import en from "../i18n/en.json";
@@ -101,6 +102,45 @@ function runParityChecks(
     }
   }
 }
+
+/**
+ * Placeholders the interpolator will never substitute.
+ *
+ * `translate()` matches /\{\{(\w+)\}\}/. A single-braced `{time}` therefore
+ * reaches the user verbatim -- which is exactly what shipped in
+ * `schedule.nextScan`, reading "Next scan {time}" on screen, until a sweep for
+ * the same mistake elsewhere turned it up.
+ */
+function findSingleBracePlaceholders(obj: JsonObject, prefix = ""): string[] {
+  const found: string[] = [];
+  for (const key of Object.keys(obj)) {
+    const path = prefix ? `${prefix}.${key}` : key;
+    const value = obj[key];
+    if (typeof value === "object" && value !== null) {
+      found.push(...findSingleBracePlaceholders(value as JsonObject, path));
+    } else if (
+      typeof value === "string" &&
+      /(?<!\{)\{\w+\}(?!\})/.test(value)
+    ) {
+      found.push(`${path}: ${value}`);
+    }
+  }
+  return found;
+}
+
+describe("i18n placeholders", () => {
+  it.each([
+    ["en.json", en],
+    ["de.json", de],
+  ])(
+    "%s uses {{name}} placeholders the interpolator substitutes",
+    (_name, file) => {
+      expect(
+        findSingleBracePlaceholders(file as unknown as JsonObject),
+      ).toEqual([]);
+    },
+  );
+});
 
 describe("i18n key parity", () => {
   it("de.json has identical keys and structure to en.json", () => {
