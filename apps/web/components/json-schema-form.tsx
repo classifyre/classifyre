@@ -1,11 +1,13 @@
 "use client";
 
 import * as React from "react";
+import dynamic from "next/dynamic";
 import { useTranslation } from "@/hooks/use-translation";
-import Editor from "@monaco-editor/react";
-// Side-effect import: points Monaco at the bundled copy instead of a CDN,
-// which is what makes this editor work in the desktop app and offline.
-import "@/lib/monaco/setup";
+// Loaded client-only: monaco-editor references `window` at module-evaluation
+// time, which crashes SSR if this is ever pulled into a server chunk.
+const Editor = dynamic(() => import("@/components/monaco-editor-lazy"), {
+  ssr: false,
+});
 import {
   useForm,
   useFieldArray,

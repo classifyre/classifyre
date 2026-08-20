@@ -1,7 +1,8 @@
 "use client";
 
 import * as React from "react";
-import Editor, { type Monaco } from "@monaco-editor/react";
+import dynamic from "next/dynamic";
+import type { Monaco } from "@monaco-editor/react";
 import type { editor } from "monaco-editor";
 import { useTheme } from "next-themes";
 import { Loader2, Play } from "lucide-react";
@@ -9,9 +10,11 @@ import { Button } from "@workspace/ui/components/button";
 import { Textarea } from "@workspace/ui/components/textarea";
 import { cn } from "@workspace/ui/lib/utils";
 import { useTranslation } from "@/hooks/use-translation";
-// Side-effect import: points Monaco at the bundled copy rather than a CDN, and
-// registers Python + SDK completions. Must land before any editor mounts.
-import "@/lib/monaco/setup";
+// Loaded client-only: monaco-editor references `window` at module-evaluation
+// time, which crashes SSR if this is ever pulled into a server chunk.
+const Editor = dynamic(() => import("@/components/monaco-editor-lazy"), {
+  ssr: false,
+});
 import { CellOutputs, ErrorView, type CellOutputValue } from "./cell-output";
 import { CellToolbar } from "./cell-toolbar";
 
