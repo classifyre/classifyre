@@ -22,7 +22,7 @@ import {
   packagesToConfig,
   type NotebookPackage,
 } from "@/lib/notebook-packages";
-import { CellList } from "./cell-list";
+import { CellList, type NotebookAiConfig } from "./cell-list";
 import type { NotebookCell } from "@/lib/notebook-cells";
 
 export interface CustomSourceDraft {
@@ -80,6 +80,14 @@ export function CustomSourceConfig({
   const patch = (changes: Partial<CustomSourceDraft>) =>
     onChange({ ...draft, ...changes });
 
+  // What the AI helper is shown. Secret *names* only — the browser is never
+  // sent the values, so there is nothing here to leak even by accident.
+  const ai = {
+    packages: draft.packages,
+    variables: entriesToRecord(draft.variables),
+    secretKeys: draft.secrets.map((entry) => entry.key).filter(Boolean),
+  };
+
   return (
     <div className="space-y-6">
       <Card>
@@ -135,6 +143,7 @@ export function CustomSourceConfig({
               cells={draft.cells}
               revision={draft.revision}
               disabled={disabled}
+              ai={ai}
               onSaved={(revision) => patch({ revision })}
               onCellsChange={(cells) => patch({ cells })}
             />
@@ -144,6 +153,7 @@ export function CustomSourceConfig({
             <DraftNotebook
               cells={draft.cells}
               disabled={disabled}
+              ai={ai}
               onChange={(cells) => patch({ cells })}
             />
           )}
@@ -164,10 +174,12 @@ export function CustomSourceConfig({
 function DraftNotebook({
   cells,
   disabled,
+  ai,
   onChange,
 }: {
   cells: NotebookCell[];
   disabled: boolean;
+  ai: NotebookAiConfig;
   onChange: (cells: NotebookCell[]) => void;
 }) {
   const { t } = useTranslation();
@@ -179,6 +191,7 @@ function DraftNotebook({
         cells={cells}
         onChange={onChange}
         disabled={disabled}
+        ai={ai}
       />
     </div>
   );

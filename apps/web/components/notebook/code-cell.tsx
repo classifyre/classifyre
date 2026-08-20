@@ -47,6 +47,8 @@ export interface CodeCellProps {
   onAddCodeBelow?: () => void;
   onAddMarkdownBelow?: () => void;
   onSave: () => void;
+  /** Extra toolbar controls, rendered at the bottom of the strip. */
+  toolbarFooter?: React.ReactNode;
 }
 
 /**
@@ -88,6 +90,7 @@ export function CodeCell({
   onAddCodeBelow,
   onAddMarkdownBelow,
   onSave,
+  toolbarFooter,
 }: CodeCellProps) {
   const { t } = useTranslation();
   const { resolvedTheme } = useTheme();
@@ -224,6 +227,7 @@ export function CodeCell({
           onMoveDown={onMoveDown}
           onAddCodeBelow={onAddCodeBelow}
           onAddMarkdownBelow={onAddMarkdownBelow}
+          footer={toolbarFooter}
         />
       </div>
 

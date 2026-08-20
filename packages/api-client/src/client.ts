@@ -75,6 +75,7 @@ export { ChatBotsApi } from "./generated/src/apis/ChatBotsApi";
 export { EmbeddingsApi } from "./generated/src/apis/EmbeddingsApi";
 export { GlossaryApi } from "./generated/src/apis/GlossaryApi";
 export { NotebooksApi } from "./generated/src/apis/NotebooksApi";
+export { AIApi } from "./generated/src/apis/AIApi";
 // Notebook DTOs must be listed by name: this file re-exports selectively,
 // so a generated model that is not named here is not importable from the
 // package root however cleanly codegen produced it.
@@ -1015,6 +1016,7 @@ export type RunTestsResponseDto = {
 // Import API classes for the client
 import { SourcesApi } from "./generated/src/apis/SourcesApi";
 import { NotebooksApi } from "./generated/src/apis/NotebooksApi";
+import { AIApi } from "./generated/src/apis/AIApi";
 import { AssetsApi } from "./generated/src/apis/AssetsApi";
 import { HealthApi } from "./generated/src/apis/HealthApi";
 import { RunnersApi } from "./generated/src/apis/RunnersApi";
@@ -1314,6 +1316,7 @@ class ApiClient {
 
   public sources: SourcesApi;
   public notebooks: NotebooksApi;
+  public ai: AIApi;
   public assets: AssetsApi;
   public health: HealthApi;
   public runners: RunnersApi;
@@ -1338,6 +1341,7 @@ class ApiClient {
 
     this.sources = new SourcesApi(this.config);
     this.notebooks = new NotebooksApi(this.config);
+    this.ai = new AIApi(this.config);
     this.assets = new AssetsApi(this.config);
     this.health = new HealthApi(this.config);
     this.runners = new RunnersApi(this.config);
