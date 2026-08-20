@@ -15,6 +15,7 @@
  */
 
 import { loader } from "@monaco-editor/react";
+import * as monaco from "monaco-editor";
 import { registerPythonCompletions } from "./python-completions";
 
 let configured = false;
@@ -40,11 +41,9 @@ function createInertWorker(): Worker {
   return new Worker(URL.createObjectURL(blob));
 }
 
-export async function configureMonaco(): Promise<void> {
-  if (configured) return;
+export function configureMonaco(): void {
+  if (configured || typeof window === "undefined") return;
   configured = true;
-
-  const monaco = await import("monaco-editor");
 
   (self as unknown as Record<string, unknown>).MonacoEnvironment = {
     getWorker: createInertWorker,
@@ -64,10 +63,6 @@ export async function configureMonaco(): Promise<void> {
 // time the loader has already started fetching from its default CDN path. Any
 // module that renders an editor imports this one, so the configuration is in
 // place before the component exists.
-//
-// Gated on `window` at the call site (not inside configureMonaco) so that
-// `monaco-editor` -- which references `window` at module-evaluation time --
-// is never imported while this module is evaluated for SSR.
-if (typeof window !== "undefined") {
-  void configureMonaco();
-}
+configureMonaco();
+
+export { monaco };
