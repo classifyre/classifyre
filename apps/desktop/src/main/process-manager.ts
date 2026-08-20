@@ -295,12 +295,30 @@ export function computeApiHeapMb(
   );
 }
 
-// Unexpected API death (native crash, external kill) is respawned so the
-// service heals without the user restarting the app — but bounded, so a
-// crash-on-boot bug degrades to a logged failure instead of a spawn loop.
+// Unexpected API death (native crash, OOM abort, external kill) is respawned
+// so the service heals without the user restarting the app.
+//
+// The supervisor never stops trying. A bounded budget was the previous design
+// and it is the wrong shape for this app: the common failure here is a slow
+// resource fault (heap exhaustion during a scan) that kills a *working*
+// service minutes apart, and retiring it means a running app with a dead
+// backend — the window sits on connection-refused until the user relaunches.
+// Instead the budget now only decides how *fast* to retry and when to say the
+// service is unhealthy; a genuine crash-on-boot loop settles at one attempt a
+// minute, which costs nothing and recovers on its own the moment the cause
+// clears (disk freed, other app closed, machine woken).
 export const RESTART_WINDOW_MS = 10 * 60 * 1000;
+/** Restarts inside the window before the service is reported as degraded. */
 export const MAX_RESTARTS_PER_WINDOW = 3;
 const RESTART_DELAY_MS = 2000;
+/** Ceiling for the backoff, so a boot loop retries forever but cheaply. */
+export const MAX_RESTART_DELAY_MS = 60_000;
+
+/** Exponential backoff for the nth consecutive restart in the window. */
+export function restartBackoffMs(attempt: number): number {
+  const exponent = Math.max(0, attempt - 1);
+  return Math.min(MAX_RESTART_DELAY_MS, RESTART_DELAY_MS * 2 ** exponent);
+}
 /**
  * How long a generation must have served before its death is judged on its own
  * rather than as part of the burst that preceded it.
@@ -321,20 +339,25 @@ const RESTART_DELAY_MS = 2000;
 export const HEALTHY_RUN_MS = 5 * 60 * 1000;
 
 export interface RestartDecision {
-  /** Whether to respawn. False means the budget is spent. */
-  restart: boolean;
   /** Crash timestamps to carry forward. */
   crashes: number[];
-  /** 1-based attempt number within the window, when restarting. */
+  /** 1-based attempt number within the window. */
   attempt: number;
+  /** How long to wait before respawning. */
+  delayMs: number;
+  /**
+   * Whether this crash is past the point of being routine, so the UI can say
+   * the service is unhealthy. Never means "stop restarting".
+   */
+  degraded: boolean;
 }
 
 /**
- * Whether a crashed API generation earns a respawn.
+ * How a crashed API generation should be respawned.
  *
- * Pure so the budget can be tested without spawning anything — the failure it
- * guards against (a permanently disabled service) only shows up after a
- * specific sequence of crashes minutes apart.
+ * Pure so the policy can be tested without spawning anything — the failures it
+ * guards against (a permanently disabled service; a hot spawn loop) only show
+ * up after specific sequences of crashes minutes apart.
  */
 export function restartDecision(input: {
   now: number;
@@ -347,14 +370,13 @@ export function restartDecision(input: {
   // A generation that served for a real stretch is proof this is not a crash
   // loop on boot, so the earlier burst stops counting against it.
   const recent = input.uptimeMs >= HEALTHY_RUN_MS ? [] : inWindow;
+  const attempt = recent.length + 1;
 
-  if (recent.length >= MAX_RESTARTS_PER_WINDOW) {
-    return { restart: false, crashes: recent, attempt: recent.length };
-  }
   return {
-    restart: true,
     crashes: [...recent, input.now],
-    attempt: recent.length + 1,
+    attempt,
+    delayMs: restartBackoffMs(attempt),
+    degraded: attempt > MAX_RESTARTS_PER_WINDOW,
   };
 }
 
@@ -370,6 +392,21 @@ export interface ApiProcessSettings {
   maxConcurrentRunners: number;
 }
 
+/**
+ * A change in whether the API is holding itself up. `degraded` is emitted once
+ * per episode, when crashes stop looking routine; `recovered` when a later
+ * generation comes up. Both are informational — the supervisor keeps retrying
+ * either way.
+ */
+export interface ApiHealthEvent {
+  processId: string;
+  state: "degraded" | "recovered";
+  /** Human-readable summary, present on `degraded`. */
+  reason?: string;
+  /** Backoff until the next attempt, present on `degraded`. */
+  nextRetryMs?: number;
+}
+
 export type ApiStartupProgress = (
   detail: string,
   phase: ApiStartupPhase,
@@ -378,6 +415,14 @@ export type ApiStartupProgress = (
 export class ProcessManager {
   private processes = new Map<string, ManagedProcess>();
   private restartTimestamps = new Map<string, number[]>();
+  // Pending backoff timers, so a deliberate stop or a manual restart cannot be
+  // raced by a respawn that was already scheduled for the process it replaced.
+  private restartTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  // A boot in progress. The readiness wait runs for minutes on a cold start, so
+  // the watchdog must be able to tell "still coming up" from "not answering".
+  private startsInFlight = new Set<string>();
+  /** Whether a degraded episode is open, so it is reported once, not per crash. */
+  private degradedProcesses = new Set<string>();
   private venvPathOverride: string | null = null;
   private venvPreparation: Promise<void> | null = null;
   private apiDirPromise: Promise<string> | null = null;
@@ -386,8 +431,10 @@ export class ProcessManager {
 
   // First-launch preparation (venv relocation, API unpacking) runs for minutes
   // with nothing else to show for it, so the caller can surface it to the user.
-  // onUnavailable fires when the restart budget is spent and the API is staying
-  // down, so the UI can say so instead of looping on connection-refused.
+  // onHealthChange reports whether the service is currently keeping itself up,
+  // so the UI can say "reconnecting" instead of looping silently on
+  // connection-refused. It is a status feed, not a prompt: recovery is
+  // automatic either way and must never wait on a user answering a dialog.
   constructor(
     private readonly onProgress: ApiStartupProgress = () => {},
     // Read at spawn time rather than captured once, so a restart triggered
@@ -396,11 +443,18 @@ export class ProcessManager {
       memoryLimitMb: 0,
       maxConcurrentRunners: 2,
     }),
-    private readonly onUnavailable: (
-      processId: string,
-      reason: string,
-    ) => void = () => {},
+    private readonly onHealthChange: (event: ApiHealthEvent) => void = () => {},
   ) {}
+
+  private reportHealth(event: ApiHealthEvent): void {
+    if (event.state === "degraded") {
+      if (this.degradedProcesses.has(event.processId)) return;
+      this.degradedProcesses.add(event.processId);
+    } else if (!this.degradedProcesses.delete(event.processId)) {
+      return;
+    }
+    this.onHealthChange(event);
+  }
 
   private progress(detail: string, phase: ApiStartupPhase): void {
     if (this.reportProgress) this.onProgress(detail, phase);
@@ -556,6 +610,20 @@ export class ProcessManager {
       return;
     }
 
+    this.startsInFlight.add(processId);
+    try {
+      await this.spawnApi(processId, port, databaseUrl, isRestart);
+    } finally {
+      this.startsInFlight.delete(processId);
+    }
+  }
+
+  private async spawnApi(
+    processId: string,
+    port: number,
+    databaseUrl: string,
+    isRestart: boolean,
+  ): Promise<void> {
     // A crash-restart runs concurrently with the original start's readiness
     // wait, so only the first attempt reports progress — otherwise two elapsed
     // counters interleave and the UI appears to count backwards.
@@ -729,6 +797,10 @@ export class ProcessManager {
       // A failed *first* start is fatal: the caller shows it and quits.
       throw err;
     }
+
+    // Up and answering. If a degraded episode was open, it is over — say so,
+    // so the UI stops telling the user the service is unhealthy.
+    this.reportHealth({ processId, state: "recovered" });
   }
 
   private waitForReady(
@@ -830,15 +902,18 @@ export class ProcessManager {
     });
     this.restartTimestamps.set(processId, decision.crashes);
 
-    if (!decision.restart) {
-      const reason = `The Classifyre service stopped ${decision.attempt} times in ${RESTART_WINDOW_MS / 60000} minutes and is no longer being restarted automatically.`;
+    if (decision.degraded) {
       process.stderr.write(
-        `[API:${processId}] crashed ${decision.attempt} times in ${RESTART_WINDOW_MS / 60000} minutes; not restarting again\n`,
+        `[API:${processId}] crashed ${decision.attempt} times in ${RESTART_WINDOW_MS / 60000} minutes; backing off, still restarting\n`,
       );
-      // Giving up silently is what made this look like a frozen app: the
-      // renderer just retried forever against a port nobody was listening on.
-      this.onUnavailable(processId, reason);
-      return;
+      this.reportHealth({
+        processId,
+        state: "degraded",
+        reason:
+          `The Classifyre service has stopped ${decision.attempt} times in the last ` +
+          `${RESTART_WINDOW_MS / 60000} minutes. It is being restarted automatically.`,
+        nextRetryMs: decision.delayMs,
+      });
     }
     if (decision.attempt === 1 && uptimeMs >= HEALTHY_RUN_MS) {
       process.stderr.write(
@@ -846,30 +921,54 @@ export class ProcessManager {
       );
     }
     process.stderr.write(
-      `[API:${processId}] restarting in ${RESTART_DELAY_MS}ms (attempt ${decision.attempt}/${MAX_RESTARTS_PER_WINDOW})\n`,
+      `[API:${processId}] restarting in ${decision.delayMs}ms (attempt ${decision.attempt})\n`,
     );
-    setTimeout(() => {
+    const timer = setTimeout(() => {
+      this.restartTimers.delete(processId);
       if (this.processes.has(processId)) return;
       this.startApi(processId, port, databaseUrl, true).catch((err) => {
         process.stderr.write(
           `[API:${processId}] restart failed: ${err instanceof Error ? err.message : String(err)}\n`,
         );
       });
-    }, RESTART_DELAY_MS);
+    }, decision.delayMs);
+    this.restartTimers.set(processId, timer);
   }
 
-  /** Lets the UI offer a manual retry after the automatic budget is spent. */
+  /**
+   * Restarts now, discarding any backoff. Used by the watchdog when the API is
+   * alive but not answering, and by the UI's manual retry.
+   */
   async restartApiNow(
     processId: string,
     port: number,
     databaseUrl: string,
   ): Promise<void> {
+    this.cancelPendingRestart(processId);
     this.restartTimestamps.delete(processId);
     await this.stopApi(processId);
     await this.startApi(processId, port, databaseUrl);
   }
 
+  /**
+   * Whether a start or a scheduled respawn is already under way. The health
+   * watchdog uses this to stay out of the supervisor's way: probing a process
+   * that is deliberately down, or still running migrations, would otherwise
+   * short-circuit its backoff and stack a restart on top of a restart.
+   */
+  isTransitioning(processId: string): boolean {
+    return this.restartTimers.has(processId) || this.startsInFlight.has(processId);
+  }
+
+  private cancelPendingRestart(processId: string): void {
+    const timer = this.restartTimers.get(processId);
+    if (!timer) return;
+    clearTimeout(timer);
+    this.restartTimers.delete(processId);
+  }
+
   async stopApi(processId: string): Promise<void> {
+    this.cancelPendingRestart(processId);
     const managed = this.processes.get(processId);
     if (!managed) return;
 
@@ -897,6 +996,9 @@ export class ProcessManager {
   }
 
   async stopAll(): Promise<void> {
+    for (const id of [...this.restartTimers.keys()]) {
+      this.cancelPendingRestart(id);
+    }
     const ids = [...this.processes.keys()];
     await Promise.all(ids.map((id) => this.stopApi(id)));
   }
