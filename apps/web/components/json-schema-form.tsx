@@ -3,6 +3,9 @@
 import * as React from "react";
 import { useTranslation } from "@/hooks/use-translation";
 import Editor from "@monaco-editor/react";
+// Side-effect import: points Monaco at the bundled copy instead of a CDN,
+// which is what makes this editor work in the desktop app and offline.
+import "@/lib/monaco/setup";
 import {
   useForm,
   useFieldArray,
@@ -2509,6 +2512,9 @@ export const JsonSchemaForm = React.forwardRef<
     DROPBOX: false,
     HUGGING_FACE: false,
     GIT: false,
+    // A notebook decides its own shape; the tabular sampling fields
+    // (order_by_column, include_column_names) have nothing to bind to.
+    CUSTOM: false,
   };
   const isTabular =
     assistantSourceType && isIngestionSourceType(assistantSourceType)

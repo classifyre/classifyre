@@ -302,7 +302,9 @@ describe('SourceService', () => {
           count: jest.fn().mockResolvedValue(1),
           groupBy: jest
             .fn()
-            .mockResolvedValue([{ runnerStatus: 'RUNNING', _count: { id: 1 } }]),
+            .mockResolvedValue([
+              { runnerStatus: 'RUNNING', _count: { id: 1 } },
+            ]),
         },
       });
 

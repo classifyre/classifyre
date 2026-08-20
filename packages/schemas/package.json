@@ -1,6 +1,6 @@
 {
   "name": "@workspace/schemas",
-  "version": "0.4.122",
+  "version": "0.4.123",
   "private": true,
   "type": "module",
   "exports": {
@@ -17,7 +17,8 @@
     "./all_input_examples": "./src/schemas/all_input_examples.json",
     "./all_detectors_examples": "./src/schemas/all_detectors_examples.ts",
     "./assistant_knowledge": "./src/schemas/assistant_knowledge.json",
-    "./assistant_contexts": "./src/schemas/assistant_contexts.json"
+    "./assistant_contexts": "./src/schemas/assistant_contexts.json",
+    "./notebook_completions": "./src/schemas/notebook_completions.json"
   },
   "files": [
     "src"

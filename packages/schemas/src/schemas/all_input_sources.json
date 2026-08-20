@@ -113,6 +113,9 @@
     },
     {
       "$ref": "#/definitions/GitInput"
+    },
+    {
+      "$ref": "#/definitions/CustomInput"
     }
   ],
   "x-asset-metadata": {
@@ -3595,6 +3598,135 @@
             "repository_url"
           ]
         }
+      },
+      "CUSTOM": {
+        "record": {
+          "open": true,
+          "description": "A structured item pulled from an API or store. The default kind for a custom connector. Open: the notebook chooses its own metadata keys, so the declared keys below are hints, not a closed set.",
+          "properties": {
+            "external_id": {
+              "type": "string",
+              "description": "Identifier of the record in the system the notebook read from"
+            },
+            "collection": {
+              "type": "string",
+              "description": "Container the record came from (table, index, folder, board, ...)"
+            },
+            "author": {
+              "type": "string",
+              "description": "Who created the record, if known"
+            }
+          },
+          "required": []
+        },
+        "document": {
+          "open": true,
+          "description": "A text document produced by a custom connector. Open: the notebook chooses its own metadata keys, so the declared keys below are hints, not a closed set.",
+          "properties": {
+            "external_id": {
+              "type": "string",
+              "description": "Identifier of the record in the system the notebook read from"
+            },
+            "collection": {
+              "type": "string",
+              "description": "Container the record came from (table, index, folder, board, ...)"
+            },
+            "author": {
+              "type": "string",
+              "description": "Who created the record, if known"
+            },
+            "encoding": {
+              "type": "string",
+              "description": "Text encoding of the content"
+            },
+            "word_count": {
+              "type": "integer",
+              "description": "Words in the extracted text"
+            }
+          },
+          "required": []
+        },
+        "page": {
+          "open": true,
+          "description": "A web or wiki page produced by a custom connector. Open: the notebook chooses its own metadata keys, so the declared keys below are hints, not a closed set.",
+          "properties": {
+            "external_id": {
+              "type": "string",
+              "description": "Identifier of the record in the system the notebook read from"
+            },
+            "collection": {
+              "type": "string",
+              "description": "Container the record came from (table, index, folder, board, ...)"
+            },
+            "author": {
+              "type": "string",
+              "description": "Who created the record, if known"
+            },
+            "encoding": {
+              "type": "string",
+              "description": "Text encoding of the content"
+            },
+            "title": {
+              "type": "string",
+              "description": "Page title"
+            }
+          },
+          "required": []
+        },
+        "file": {
+          "open": true,
+          "description": "A file a custom connector fetched. Use the normalized file keys where they apply. Open: the notebook chooses its own metadata keys, so the declared keys below are hints, not a closed set.",
+          "properties": {
+            "external_id": {
+              "type": "string",
+              "description": "Identifier of the record in the system the notebook read from"
+            },
+            "collection": {
+              "type": "string",
+              "description": "Container the record came from (table, index, folder, board, ...)"
+            },
+            "author": {
+              "type": "string",
+              "description": "Who created the record, if known"
+            },
+            "size_bytes": {
+              "type": "integer",
+              "description": "Size of the file in bytes"
+            },
+            "mime_type": {
+              "type": "string",
+              "description": "Content type of the file"
+            }
+          },
+          "required": []
+        },
+        "table": {
+          "open": true,
+          "description": "A tabular result set produced by a custom connector. Open: the notebook chooses its own metadata keys, so the declared keys below are hints, not a closed set.",
+          "properties": {
+            "external_id": {
+              "type": "string",
+              "description": "Identifier of the record in the system the notebook read from"
+            },
+            "collection": {
+              "type": "string",
+              "description": "Container the record came from (table, index, folder, board, ...)"
+            },
+            "author": {
+              "type": "string",
+              "description": "Who created the record, if known"
+            },
+            "row_count": {
+              "type": "integer",
+              "description": "Rows in the result set"
+            },
+            "columns": {
+              "type": "array",
+              "description": "Columns as [{name, type}] objects"
+            }
+          },
+          "required": []
+        }
       }
     }
   },
@@ -3638,7 +3770,8 @@
         "DROPBOX",
         "HUGGING_FACE",
         "SANDBOX",
-        "GIT"
+        "GIT",
+        "CUSTOM"
       ],
       "description": "Type of the asset or source"
     },
@@ -12220,6 +12353,272 @@
           "additionalProperties": false
         }
       ]
+    },
+    "NotebookCodeCell": {
+      "title": "NotebookCodeCell",
+      "label": "Code cell",
+      "type": "object",
+      "description": "A Python cell. Must remain valid standard Python -- IPython magics (%time, !pip) are rejected.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,64}$",
+          "description": "Stable cell identifier, unique within the notebook"
+        },
+        "type": {
+          "const": "code"
+        },
+        "source": {
+          "type": "string",
+          "maxLength": 100000,
+          "description": "Python source of this cell"
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "source"
+      ],
+      "additionalProperties": false
+    },
+    "NotebookMarkdownCell": {
+      "title": "NotebookMarkdownCell",
+      "label": "Markdown cell",
+      "type": "object",
+      "description": "Prose. Never executed; serialized as comments when the notebook is exported to Python.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,64}$",
+          "description": "Stable cell identifier, unique within the notebook"
+        },
+        "type": {
+          "const": "markdown"
+        },
+        "source": {
+          "type": "string",
+          "maxLength": 100000,
+          "description": "Markdown source of this cell"
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "source"
+      ],
+      "additionalProperties": false
+    },
+    "NotebookCell": {
+      "title": "NotebookCell",
+      "label": "Notebook cell",
+      "oneOf": [
+        {
+          "$ref": "#/definitions/NotebookCodeCell"
+        },
+        {
+          "$ref": "#/definitions/NotebookMarkdownCell"
+        }
+      ]
+    },
+    "CustomNotebook": {
+      "title": "CustomNotebook",
+      "label": "Notebook",
+      "type": "object",
+      "description": "Cells run in document order in one fresh process per execution. There is no persistent kernel: state is rebuilt from the current cell sources every time.",
+      "properties": {
+        "revision": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 1,
+          "description": "Monotonic revision, bumped on every save. Used for optimistic locking so two editors cannot silently overwrite each other."
+        },
+        "cells": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 200,
+          "items": {
+            "$ref": "#/definitions/NotebookCell"
+          },
+          "description": "Ordered notebook cells. The assembled code cells must define test_connection() and extract()."
+        }
+      },
+      "required": [
+        "cells"
+      ],
+      "additionalProperties": false
+    },
+    "CustomRequired": {
+      "title": "CustomRequired",
+      "label": "Notebook",
+      "type": "object",
+      "description": "The Python notebook that implements this connector.",
+      "properties": {
+        "notebook": {
+          "$ref": "#/definitions/CustomNotebook"
+        }
+      },
+      "required": [
+        "notebook"
+      ],
+      "additionalProperties": false
+    },
+    "CustomMasked": {
+      "title": "CustomMasked",
+      "label": "Notebook Secrets",
+      "type": "object",
+      "description": "Encrypted key/value pairs, stored the same way as any other source credential.",
+      "properties": {
+        "secrets": {
+          "type": "object",
+          "description": "Secret values the notebook reads with ctx.secret(\"name\"). Encrypted at rest and redacted from logs and cell output. Keys must be valid Python identifiers.",
+          "default": {},
+          "propertyNames": {
+            "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,62}$"
+          },
+          "additionalProperties": {
+            "type": "string",
+            "maxLength": 8192
+          },
+          "maxProperties": 64
+        }
+      },
+      "additionalProperties": false
+    },
+    "CustomOptionalLimits": {
+      "title": "CustomOptionalLimits",
+      "label": "Execution Limits",
+      "type": "object",
+      "description": "Bounds applied to every notebook execution and scan.",
+      "properties": {
+        "max_assets": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000000,
+          "description": "Stop a scan after this many assets. Unset means no cap."
+        },
+        "timeout_seconds": {
+          "type": "integer",
+          "minimum": 10,
+          "maximum": 86400,
+          "default": 900,
+          "description": "Kill an execution that runs longer than this. Cells cannot be interrupted from inside Python, so this is the real stop button."
+        },
+        "max_output_bytes": {
+          "type": "integer",
+          "minimum": 1024,
+          "maximum": 52428800,
+          "default": 2097152,
+          "description": "Total serialized cell output kept per execution. Larger outputs are truncated rather than stored."
+        }
+      },
+      "additionalProperties": false
+    },
+    "CustomOptional": {
+      "title": "CustomOptional",
+      "label": "Custom Source Options",
+      "type": "object",
+      "properties": {
+        "variables": {
+          "type": "object",
+          "description": "Non-secret values the notebook reads with ctx.var(\"name\"), such as a base URL or an account id. Stored in clear text. Keys must be valid Python identifiers.",
+          "default": {},
+          "propertyNames": {
+            "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,62}$"
+          },
+          "additionalProperties": {
+            "type": "string",
+            "maxLength": 8192
+          },
+          "maxProperties": 64
+        },
+        "limits": {
+          "$ref": "#/definitions/CustomOptionalLimits"
+        },
+        "packages": {
+          "type": "array",
+          "maxItems": 50,
+          "default": [],
+          "items": {
+            "$ref": "#/definitions/NotebookPackage"
+          },
+          "description": "Python packages installed into the run environment before any cell executes. Installed with uv; the base image's own dependencies are always present and do not need listing."
+        }
+      },
+      "additionalProperties": false
+    },
+    "CustomInput": {
+      "title": "CustomInput",
+      "label": "Custom Connector",
+      "allOf": [
+        {
+          "$ref": "#/definitions/CoreInput"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "CUSTOM"
+            },
+            "required": {
+              "$ref": "#/definitions/CustomRequired"
+            },
+            "masked": {
+              "$ref": "#/definitions/CustomMasked"
+            },
+            "optional": {
+              "$ref": "#/definitions/CustomOptional"
+            },
+            "detectors": {
+              "$ref": "#/definitions/Detectors"
+            },
+            "custom_detectors": {
+              "$ref": "#/definitions/CustomDetectorSelections"
+            },
+            "sampling": {
+              "$ref": "#/definitions/SamplingConfig"
+            },
+            "scan_cache": {
+              "$ref": "#/definitions/ScanCacheConfig"
+            },
+            "resources": {
+              "$ref": "#/definitions/ResourceOverrides"
+            },
+            "cleanup_removed_detector_findings": {
+              "type": "boolean",
+              "default": true,
+              "description": "When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set."
+            }
+          },
+          "required": [
+            "required",
+            "sampling"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "NotebookPackage": {
+      "title": "NotebookPackage",
+      "label": "Package",
+      "type": "object",
+      "description": "A Python distribution installed before the notebook runs.",
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$",
+          "description": "Distribution name as published on the index (for example 'pandas')."
+        },
+        "version": {
+          "type": "string",
+          "maxLength": 64,
+          "pattern": "^$|^(==|>=|<=|~=|!=|>|<).+$|^[0-9][A-Za-z0-9._*+!-]*$",
+          "description": "Optional version or specifier: '2.2.0', '>=2.0', '~=1.4'. Empty means latest."
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "additionalProperties": false
     }
   }
 }

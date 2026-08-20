@@ -119,7 +119,8 @@ export default function SourceViewPage() {
   const [autopilotOpen, setAutopilotOpen] = useState(false);
 
   // Findings tab bulk update
-  const [findingsSelection, setFindingsSelection] = useState<FindingSelection | null>(null);
+  const [findingsSelection, setFindingsSelection] =
+    useState<FindingSelection | null>(null);
   const [bulkDialogOpen, setBulkDialogOpen] = useState(false);
   const [findingsTableKey, setFindingsTableKey] = useState(0);
 
@@ -241,6 +242,37 @@ export default function SourceViewPage() {
   const requiredFields = useMemo(() => {
     if (!source?.type || !source?.config) return [];
     if (!isIngestionSourceType(source.type)) return [];
+
+    // A CUSTOM source's only required field is the notebook itself. Rendering
+    // it through the generic key/value list would print a serialized array of
+    // cells; a cell count and the configured variable names are what actually
+    // describes the source at a glance.
+    if (source.type === "CUSTOM") {
+      const config = source.config as Record<string, any>;
+      const notebook = config?.required?.notebook ?? {};
+      const variables = Object.keys(config?.optional?.variables ?? {});
+      const secrets = Object.keys(config?.masked?.secrets ?? {});
+      return [
+        {
+          key: "notebook",
+          label: "notebook",
+          value: `${(notebook.cells ?? []).length} cell(s), revision ${notebook.revision ?? 1}`,
+        },
+        ...(variables.length
+          ? [
+              {
+                key: "variables",
+                label: "variables",
+                value: variables.join(", "),
+              },
+            ]
+          : []),
+        ...(secrets.length
+          ? [{ key: "secrets", label: "secrets", value: secrets.join(", ") }]
+          : []),
+      ];
+    }
+
     const schema = getSourceSchema(source.type);
     if (!schema?.properties) return [];
 
@@ -355,10 +387,22 @@ export default function SourceViewPage() {
 
   const { totals } = assetCharts;
   const assetPanels = [
-    { key: "total", label: t("sources.totalAssets"), value: totals.totalAssets },
+    {
+      key: "total",
+      label: t("sources.totalAssets"),
+      value: totals.totalAssets,
+    },
     { key: "new", label: t("sources.assetNew"), value: totals.newAssets },
-    { key: "updated", label: t("sources.assetUpdated"), value: totals.updatedAssets },
-    { key: "unchanged", label: t("sources.assetUnchanged"), value: totals.unchangedAssets },
+    {
+      key: "updated",
+      label: t("sources.assetUpdated"),
+      value: totals.updatedAssets,
+    },
+    {
+      key: "unchanged",
+      label: t("sources.assetUnchanged"),
+      value: totals.unchangedAssets,
+    },
   ];
 
   useEffect(() => {
@@ -534,7 +578,9 @@ export default function SourceViewPage() {
               <CardContent>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-1">
-                    <p className="text-xs uppercase text-muted-foreground">{t("common.type")}</p>
+                    <p className="text-xs uppercase text-muted-foreground">
+                      {t("common.type")}
+                    </p>
                     <div className="inline-flex items-center gap-2">
                       <SourceTypeIcon className="h-4 w-4 text-muted-foreground" />
                       <Badge variant="outline" className="rounded-[4px]">
@@ -604,7 +650,9 @@ export default function SourceViewPage() {
                     {lastRunner ? (
                       <button
                         type="button"
-                        onClick={() => router.push(nsPath(`/scans/${lastRunner.id}`))}
+                        onClick={() =>
+                          router.push(nsPath(`/scans/${lastRunner.id}`))
+                        }
                         className="inline-flex cursor-pointer transition-opacity hover:opacity-80"
                       >
                         <RunnerStatusBadge status={lastRunner.status} />
@@ -620,7 +668,9 @@ export default function SourceViewPage() {
                       </p>
                       <button
                         type="button"
-                        onClick={() => router.push(nsPath(`/scans/${lastRunner.id}`))}
+                        onClick={() =>
+                          router.push(nsPath(`/scans/${lastRunner.id}`))
+                        }
                         className="inline-flex flex-wrap items-center gap-1.5 cursor-pointer transition-opacity hover:opacity-80"
                       >
                         <span className="text-sm">
@@ -669,7 +719,9 @@ export default function SourceViewPage() {
                         size="sm"
                         className="px-0"
                         onClick={() =>
-                          router.push(nsPath(`/scans/${source.currentRunnerId}`))
+                          router.push(
+                            nsPath(`/scans/${source.currentRunnerId}`),
+                          )
                         }
                       >
                         {t("sources.detail.viewRun")}
@@ -709,15 +761,19 @@ export default function SourceViewPage() {
                         <CalendarClock className="h-4 w-4 shrink-0" />
                         <span>{t("schedule.modeAutomatic")}</span>
                         <span className="text-xs text-muted-foreground font-normal">
-                          ({t(`schedule.phase${
-                            source.autoPhase === "STEADY"
-                              ? "Steady"
-                              : source.autoPhase === "BACKOFF"
-                                ? "Backoff"
-                                : source.autoPhase === "PAUSED"
-                                  ? "Paused"
-                                  : "CatchUp"
-                          }`)})
+                          (
+                          {t(
+                            `schedule.phase${
+                              source.autoPhase === "STEADY"
+                                ? "Steady"
+                                : source.autoPhase === "BACKOFF"
+                                  ? "Backoff"
+                                  : source.autoPhase === "PAUSED"
+                                    ? "Paused"
+                                    : "CatchUp"
+                            }`,
+                          )}
+                          )
                         </span>
                       </div>
                     ) : source.scheduleEnabled ? (
@@ -804,7 +860,9 @@ export default function SourceViewPage() {
               <Card>
                 <CardHeader>
                   <CardTitle>{t("sources.detail.recentRunners")}</CardTitle>
-                  <CardDescription>{t("sources.detail.recentRunnersDesc")}</CardDescription>
+                  <CardDescription>
+                    {t("sources.detail.recentRunnersDesc")}
+                  </CardDescription>
                 </CardHeader>
                 <CardContent>
                   {recentRunners.length === 0 ? (
@@ -817,13 +875,17 @@ export default function SourceViewPage() {
                         <button
                           key={runner.id}
                           type="button"
-                          onClick={() => router.push(nsPath(`/scans/${runner.id}`))}
+                          onClick={() =>
+                            router.push(nsPath(`/scans/${runner.id}`))
+                          }
                           className="flex w-full items-center justify-between gap-3 rounded-[4px] border px-2.5 py-2 text-left transition-colors hover:bg-muted/40"
                         >
                           <div className="min-w-0">
                             <div className="flex items-center gap-2">
                               <RunnerStatusBadge status={runner.status} />
-                              <span className="truncate text-xs text-muted-foreground">                                {formatRelative(runner.triggeredAt)}
+                              <span className="truncate text-xs text-muted-foreground">
+                                {" "}
+                                {formatRelative(runner.triggeredAt)}
                               </span>
                             </div>
                             <p className="mt-1 text-xs text-muted-foreground">

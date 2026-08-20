@@ -3531,5 +3531,107 @@
         ]
       }
     }
-  ]
+  ],
+    "CUSTOM": [
+      {
+        "name": "Starter notebook",
+        "description": "The minimum a custom connector needs: a connection test and an extract that yields one asset. Edit the cells to talk to your own system.",
+        "config": {
+          "type": "CUSTOM",
+          "required": {
+            "notebook": {
+              "revision": 1,
+              "cells": [
+                {
+                  "id": "intro",
+                  "type": "markdown",
+                  "source": "# Custom connector\n\nCells run top to bottom in a fresh process on every execution -- there is no\npersistent kernel, so state is rebuilt from these cells each time.\n\nThis notebook must define `test_connection()` and `extract()`. It may also\ndefine `discover()` and `fetch_content(asset_id)`.\n\nConfiguration comes from `ctx`:\n\n- `ctx.var(\"name\")` -- a value from **Variables**\n- `ctx.secret(\"name\")` -- a value from **Secrets** (encrypted, redacted from output)\n- `ctx.strategy` / `ctx.limit` / `ctx.offset` -- this run's sampling. Every\n  strategy works without you doing anything; pushing these into your own query\n  just makes it cheaper. Under LATEST, \"latest\" means whatever you yield first.\n  Reading `ctx.offset` means you apply it yourself and the runtime stops skipping.\n- `ctx.should_abort` -- check it in long loops so Stop can work.\n"
+                },
+                {
+                  "id": "imports",
+                  "type": "code",
+                  "source": "from classifyre import Asset, ctx\n"
+                },
+                {
+                  "id": "test-connection",
+                  "type": "code",
+                  "source": "def test_connection() -> dict:\n    \"\"\"Return {\"status\": \"SUCCESS\" | \"FAILURE\", \"message\": str}.\"\"\"\n    return {\"status\": \"SUCCESS\", \"message\": \"Ready.\"}\n"
+                },
+                {
+                  "id": "extract",
+                  "type": "code",
+                  "source": "def extract():\n    \"\"\"Yield Asset(...) objects. Runs on every scan.\"\"\"\n    yield Asset(\n        id=\"example-1\",\n        name=\"Example record\",\n        url=\"https://example.com/records/1\",\n        content=\"Hello from a custom connector.\",\n        kind=\"record\",\n        metadata={\"origin\": \"scaffold\"},\n    )\n"
+                }
+              ]
+            }
+          },
+          "masked": {
+            "secrets": {}
+          },
+          "optional": {
+            "variables": {},
+            "limits": {
+              "timeout_seconds": 900
+            }
+          },
+          "sampling": {
+            "strategy": "ALL",
+            "rows_per_page": 100
+          }
+        }
+      },
+      {
+        "name": "REST API with a bearer token",
+        "description": "Pages a JSON API, reading the base URL from a variable and the token from an encrypted secret. Related ticket ids become asset links.",
+        "config": {
+          "type": "CUSTOM",
+          "required": {
+            "notebook": {
+              "revision": 1,
+              "cells": [
+                {
+                  "id": "imports",
+                  "type": "code",
+                  "source": "from classifyre import Asset, ctx\n"
+                },
+                {
+                  "id": "test-connection",
+                  "type": "code",
+                  "source": "import requests\n\n\ndef test_connection() -> dict:\n    response = requests.get(\n        f\"{ctx.var('api_base')}/health\",\n        headers={\"Authorization\": f\"Bearer {ctx.secret('api_token')}\"},\n        timeout=10,\n    )\n    if response.ok:\n        return {\"status\": \"SUCCESS\", \"message\": \"API reachable.\"}\n    return {\"status\": \"FAILURE\", \"message\": f\"HTTP {response.status_code}\"}\n"
+                },
+                {
+                  "id": "extract",
+                  "type": "code",
+                  "source": "def extract():\n    session = requests.Session()\n    session.headers[\"Authorization\"] = f\"Bearer {ctx.secret('api_token')}\"\n\n    page = 1\n    while not ctx.should_abort:\n        payload = session.get(\n            f\"{ctx.var('api_base')}/tickets\",\n            params={\"page\": page, \"per_page\": 100},\n            timeout=30,\n        ).json()\n        if not payload[\"items\"]:\n            return\n\n        for item in payload[\"items\"]:\n            yield Asset(\n                id=str(item[\"id\"]),\n                name=item[\"subject\"],\n                url=f\"{ctx.var('api_base')}/tickets/{item['id']}\",\n                content=item[\"body\"],\n                kind=\"document\",\n                metadata={\"status\": item[\"status\"], \"assignee\": item[\"assignee\"]},\n                links=[str(related) for related in item.get(\"related_ids\", [])],\n            )\n\n        page += 1\n"
+                }
+              ]
+            }
+          },
+          "masked": {
+            "secrets": {
+              "api_token": "replace-with-your-token"
+            }
+          },
+          "optional": {
+            "variables": {
+              "api_base": "https://api.example.com/v2"
+            },
+            "limits": {
+              "timeout_seconds": 1800,
+              "max_assets": 50000
+            }
+          },
+          "sampling": {
+            "strategy": "AUTOMATIC",
+            "rows_per_page": 500
+          },
+          "detectors": [
+            {
+              "type": "PII",
+              "enabled": true
+            }
+          ]
+        }
+      }
+    ]
 }

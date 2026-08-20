@@ -229,6 +229,14 @@ All URIs are relative to *http://localhost*
 *NamespacesApi* | [**namespacesControllerStats**](docs/NamespacesApi.md#namespacescontrollerstats) | **GET** /namespaces/stats | Per-namespace source rollups (total + failing)
 *NamespacesApi* | [**namespacesControllerThumbnail**](docs/NamespacesApi.md#namespacescontrollerthumbnail) | **GET** /namespaces/{id}/thumbnail | Stream a namespace\&#39;s thumbnail image
 *NamespacesApi* | [**namespacesControllerUpdate**](docs/NamespacesApi.md#namespacescontrollerupdate) | **PATCH** /namespaces/{id} | Update a namespace
+*NotebooksApi* | [**notebookControllerCancel**](docs/NotebooksApi.md#notebookcontrollercancel) | **POST** /notebook/executions/{executionId}/cancel | Stop a running execution
+*NotebooksApi* | [**notebookControllerCreateExecution**](docs/NotebooksApi.md#notebookcontrollercreateexecution) | **POST** /sources/{sourceId}/notebook/executions | Start a notebook execution
+*NotebooksApi* | [**notebookControllerExportPython**](docs/NotebooksApi.md#notebookcontrollerexportpython) | **GET** /sources/{sourceId}/notebook/export | The notebook as an ordinary Python module
+*NotebooksApi* | [**notebookControllerGet**](docs/NotebooksApi.md#notebookcontrollerget) | **GET** /sources/{sourceId}/notebook | Read a CUSTOM source\&#39;s notebook
+*NotebooksApi* | [**notebookControllerGetExecution**](docs/NotebooksApi.md#notebookcontrollergetexecution) | **GET** /notebook/executions/{executionId} | Poll one execution
+*NotebooksApi* | [**notebookControllerListExecutions**](docs/NotebooksApi.md#notebookcontrollerlistexecutions) | **GET** /sources/{sourceId}/notebook/executions | Recent executions for a source
+*NotebooksApi* | [**notebookControllerScaffold**](docs/NotebooksApi.md#notebookcontrollerscaffold) | **GET** /notebooks/scaffold | The starter cells and the functions a notebook must define
+*NotebooksApi* | [**notebookControllerUpdate**](docs/NotebooksApi.md#notebookcontrollerupdate) | **PUT** /sources/{sourceId}/notebook | Save a notebook
 *NotificationsApi* | [**notificationsControllerDeleteNotification**](docs/NotificationsApi.md#notificationscontrollerdeletenotification) | **DELETE** /notifications/{id} | Delete a notification
 *NotificationsApi* | [**notificationsControllerListNotifications**](docs/NotificationsApi.md#notificationscontrollerlistnotifications) | **GET** /notifications | List notifications
 *NotificationsApi* | [**notificationsControllerMarkAllRead**](docs/NotificationsApi.md#notificationscontrollermarkallread) | **PATCH** /notifications/mark-all-read | Mark all notifications as read
@@ -387,6 +395,7 @@ All URIs are relative to *http://localhost*
 - [CreateManualEdgeDto](docs/CreateManualEdgeDto.md)
 - [CreateMcpServerDto](docs/CreateMcpServerDto.md)
 - [CreateMcpTokenDto](docs/CreateMcpTokenDto.md)
+- [CreateNotebookExecutionDto](docs/CreateNotebookExecutionDto.md)
 - [CreateSourceDto](docs/CreateSourceDto.md)
 - [CreateThreadDto](docs/CreateThreadDto.md)
 - [CustomDetectorExampleDto](docs/CustomDetectorExampleDto.md)
@@ -465,6 +474,10 @@ All URIs are relative to *http://localhost*
 - [McpTokenResponseDto](docs/McpTokenResponseDto.md)
 - [McpToolParameterDto](docs/McpToolParameterDto.md)
 - [McpToolSummaryDto](docs/McpToolSummaryDto.md)
+- [NotebookCellDto](docs/NotebookCellDto.md)
+- [NotebookDto](docs/NotebookDto.md)
+- [NotebookExecutionDto](docs/NotebookExecutionDto.md)
+- [NotebookScaffoldDto](docs/NotebookScaffoldDto.md)
 - [NotificationListResponseDto](docs/NotificationListResponseDto.md)
 - [NotificationResponseDto](docs/NotificationResponseDto.md)
 - [NotificationsControllerDeleteNotification200Response](docs/NotificationsControllerDeleteNotification200Response.md)
@@ -589,6 +602,8 @@ All URIs are relative to *http://localhost*
 - [UpdateInstanceSettingsDto](docs/UpdateInstanceSettingsDto.md)
 - [UpdateMcpServerDto](docs/UpdateMcpServerDto.md)
 - [UpdateMcpTokenDto](docs/UpdateMcpTokenDto.md)
+- [UpdateNotebookDto](docs/UpdateNotebookDto.md)
+- [UpdateNotebookResponseDto](docs/UpdateNotebookResponseDto.md)
 - [UpdateNotificationImportanceDto](docs/UpdateNotificationImportanceDto.md)
 - [UpdateRunnerAssetStatusDto](docs/UpdateRunnerAssetStatusDto.md)
 - [UpdateSourceDto](docs/UpdateSourceDto.md)
