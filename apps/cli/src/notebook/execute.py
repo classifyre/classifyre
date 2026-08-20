@@ -67,8 +67,8 @@ def _interactive_shell() -> Any | None:
     # first and not the second -- a result belongs in a typed display output,
     # not smuggled into the stdout stream as text with a prompt glued on. So the
     # writing half is disabled and the recording half left alone.
-    shell.displayhook.write_output_prompt = lambda: None  # type: ignore[method-assign]
-    shell.displayhook.write_format_data = (  # type: ignore[method-assign]
+    shell.displayhook.write_output_prompt = lambda: None  # type: ignore[method-assign,unused-ignore]
+    shell.displayhook.write_format_data = (  # type: ignore[method-assign,unused-ignore]
         lambda format_dict, md_dict=None: None  # noqa: ARG005 - inert by design
     )
     # Nothing reads `_`/`__`/`_oh` here, and caching them would pin every
