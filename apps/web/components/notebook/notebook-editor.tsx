@@ -16,7 +16,7 @@ import { Card, CardContent } from "@workspace/ui/components/card";
 import { cn } from "@workspace/ui/lib/utils";
 import { useTranslation } from "@/hooks/use-translation";
 import { extractApiErrorMessage } from "@/lib/extract-api-error-message";
-import { CellList } from "./cell-list";
+import { CellList, type NotebookAiConfig } from "./cell-list";
 import type { CellStatus } from "./code-cell";
 import type { CellOutputValue } from "./cell-output";
 import type { NotebookCell } from "@/lib/notebook-cells";
@@ -30,6 +30,8 @@ export interface NotebookEditorProps {
   cells: NotebookCell[];
   revision: number;
   disabled?: boolean;
+  /** What the AI helper may see. Omit to hide the AI control entirely. */
+  ai?: NotebookAiConfig;
   /** Called after a successful save so the container can track the revision. */
   onSaved?: (revision: number) => void;
   onCellsChange?: (cells: NotebookCell[]) => void;
@@ -42,6 +44,7 @@ export function NotebookEditor({
   cells: initialCells,
   revision: initialRevision,
   disabled = false,
+  ai,
   onSaved,
   onCellsChange,
 }: NotebookEditorProps) {
@@ -395,6 +398,7 @@ export function NotebookEditor({
         onChange={mutate}
         disabled={disabled}
         onSave={() => void save()}
+        ai={ai}
         onRunCell={(cellId) => void runMode("cell", cellId)}
         runState={(cellId) => ({
           status: cellStatus(cellId),

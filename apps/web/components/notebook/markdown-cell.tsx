@@ -32,6 +32,8 @@ export interface MarkdownCellProps {
   onAddCodeBelow?: () => void;
   onAddMarkdownBelow?: () => void;
   onSave: () => void;
+  /** Extra toolbar controls, rendered at the bottom of the strip. */
+  toolbarFooter?: React.ReactNode;
 }
 
 /**
@@ -165,6 +167,7 @@ export function MarkdownCell({
   onAddCodeBelow,
   onAddMarkdownBelow,
   onSave,
+  toolbarFooter,
 }: MarkdownCellProps) {
   const { t } = useTranslation();
   // A new, empty cell opens in edit mode -- nobody adds a markdown cell in

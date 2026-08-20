@@ -3612,6 +3612,20 @@
       "invalidName": "Use the name as published on the index: letters, digits, '.', '-' or '_'.",
       "invalidVersion": "Use a version like 2.2.0, or a specifier like >=2.0.",
       "duplicate": "This package is listed twice."
+    },
+    "ai": {
+      "title": "Ask AI",
+      "placeholder": "Ask about this cell, or describe what it should do…",
+      "placeholderHint": "It can see the whole notebook, your packages, your variables and the names of your secrets. Ask it to write the cell, or ask why something fails.",
+      "send": "Send",
+      "thinking": "Thinking…",
+      "updatedCell": "Updated the cell.",
+      "cellUpdated": "This cell was changed",
+      "undo": "Undo",
+      "failed": "The AI provider could not be reached.",
+      "notConfigured": "AI is not configured on this instance.",
+      "providerError": "The configured AI provider is not responding.",
+      "configureHint": "Set one up in Harness → Configuration."
     }
   }
 }

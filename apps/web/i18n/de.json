@@ -3612,6 +3612,20 @@
       "invalidName": "Verwenden Sie den Namen wie im Index veröffentlicht: Buchstaben, Ziffern, '.', '-' oder '_'.",
       "invalidVersion": "Verwenden Sie eine Version wie 2.2.0 oder einen Spezifizierer wie >=2.0.",
       "duplicate": "Dieses Paket ist doppelt aufgeführt."
+    },
+    "ai": {
+      "title": "KI fragen",
+      "placeholder": "Fragen Sie zu dieser Zelle oder beschreiben Sie, was sie tun soll…",
+      "placeholderHint": "Sie sieht das gesamte Notebook, Ihre Pakete, Ihre Variablen und die Namen Ihrer Geheimnisse. Bitten Sie sie, die Zelle zu schreiben, oder fragen Sie, warum etwas fehlschlägt.",
+      "send": "Senden",
+      "thinking": "Denkt nach…",
+      "updatedCell": "Zelle aktualisiert.",
+      "cellUpdated": "Diese Zelle wurde geändert",
+      "undo": "Rückgängig",
+      "failed": "Der KI-Anbieter konnte nicht erreicht werden.",
+      "notConfigured": "KI ist auf dieser Instanz nicht konfiguriert.",
+      "providerError": "Der konfigurierte KI-Anbieter antwortet nicht.",
+      "configureHint": "Richten Sie einen unter Harness → Konfiguration ein."
     }
   }
 }
