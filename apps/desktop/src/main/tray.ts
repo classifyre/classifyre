@@ -47,13 +47,17 @@ export interface TrayDeps {
 export class AppTray {
   private tray: Tray | null = null;
   private unsubscribeNamespaces: (() => void) | null = null;
+  // The backend is restarting itself. Shown here rather than in a dialog: the
+  // user needs somewhere to look when the UI is failing requests, not an
+  // interruption asking them to approve a recovery that is already running.
+  private serviceHealthy = true;
 
   constructor(private deps: TrayDeps) {}
 
   create(): void {
     if (this.tray) return;
     this.tray = new Tray(buildTrayIcon());
-    this.tray.setToolTip('Classifyre');
+    this.applyToolTip();
     // Windows: single left-click restores the window (menu stays on right-click).
     this.tray.on('click', () => {
       if (process.platform === 'win32') this.deps.showWindow();
@@ -61,6 +65,20 @@ export class AppTray {
     this.rebuildMenu();
     this.unsubscribeNamespaces = this.deps.namespaceStore.onChange(() => this.rebuildMenu());
     this.deps.updateChecker.onStatus(() => this.rebuildMenu());
+  }
+
+  /** Reflects whether the API is serving; false while it keeps crashing. */
+  setServiceHealthy(healthy: boolean): void {
+    if (this.serviceHealthy === healthy) return;
+    this.serviceHealthy = healthy;
+    this.applyToolTip();
+    this.rebuildMenu();
+  }
+
+  private applyToolTip(): void {
+    this.tray?.setToolTip(
+      this.serviceHealthy ? 'Classifyre' : 'Classifyre — restarting service…',
+    );
   }
 
   rebuildMenu(): void {
@@ -109,6 +127,12 @@ export class AppTray {
     }
 
     const menu = Menu.buildFromTemplate([
+      ...(this.serviceHealthy
+        ? []
+        : ([
+            { label: 'Service restarting…', enabled: false },
+            { type: 'separator' },
+          ] as MenuItemConstructorOptions[])),
       { label: 'Show Classifyre', click: showWindow },
       { label: 'Workspaces Home', click: showHome },
       { type: 'separator' },
