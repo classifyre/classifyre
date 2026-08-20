@@ -1,0 +1,235 @@
+---
+title: Notebook Reference
+description: Every ctx method and Asset field available to a Custom connector notebook, plus limits, binary content, and what to do when a scan goes wrong.
+---
+
+import { Callout } from "nextra/components";
+
+# Notebook Reference
+
+Everything a Custom connector notebook can use. For how notebooks work — running
+cells, previewing, packages and secrets — start with
+**[Custom Connectors](/sources/custom-connectors/)**.
+
+Two names are available in every cell, with or without the import:
+
+```python
+from classifyre import Asset, ctx
+```
+
+<Callout type="info">
+  The editor's autocomplete is generated from this same SDK, so `ctx.` and
+  `Asset(` always offer what actually exists. If something here disagrees with
+  what the editor shows, trust the editor.
+</Callout>
+
+---
+
+## The functions you define
+
+### `test_connection() -> dict`
+
+Called by **Test connection**, and once at the start of every scan — a scan
+stops before ingesting anything if this fails.
+
+```python
+def test_connection() -> dict:
+    response = httpx.get(f"{ctx.var('api_base')}/health", timeout=10)
+    if response.is_success:
+        return {"status": "SUCCESS", "message": "API reachable."}
+    return {"status": "FAILURE", "message": f"HTTP {response.status_code}"}
+```
+
+Return `{"status": "SUCCESS" | "FAILURE", "message": str}`. Anything else is
+treated as a failure, with a message saying so. Raising works too — the
+traceback becomes the failure message.
+
+### `extract()`
+
+The heart of a connector. Yields the things to scan.
+
+```python
+def extract():
+    for row in api.list(offset=ctx.offset, limit=ctx.limit):
+        yield Asset(id=str(row["id"]), name=row["title"], content=row["body"])
+```
+
+**Yield as you go.** A generator lets a large source start being scanned before
+it has finished listing; building a list first means holding all of it in memory
+and waiting.
+
+### `discover() -> dict` _(optional)_
+
+A summary of what this source can see — indexes, projects, buckets. Free-form.
+
+### `fetch_content(asset_id) -> tuple[str, str] | None` _(optional)_
+
+Content on demand for one asset. Only reached when the asset's content wasn't
+already supplied by `extract()`, so most connectors never need it. Return
+`(raw, text)`.
+
+---
+
+## `Asset`
+
+What `extract()` yields.
+
+| Field                       | Type        | Notes                                                                                                                                         |
+| --------------------------- | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`                        | `str`       | **Required.** Must be stable across runs — it's what ties this run's asset to the same asset last run, so findings and history stay attached. |
+| `name`                      | `str`       | Display name. Defaults to `id`.                                                                                                               |
+| `url`                       | `str`       | Where a person would go to see this. Defaults to a generated `custom://` reference.                                                           |
+| `content`                   | `str`       | The text detectors scan.                                                                                                                      |
+| `kind`                      | `str`       | `record` _(default)_, `document`, `page`, `file`, or `table`.                                                                                 |
+| `metadata`                  | `dict`      | Anything useful about the item. Free-form for Custom sources.                                                                                 |
+| `links`                     | `list[str]` | Other assets' **ids**, resolved into graph edges for you.                                                                                     |
+| `content_type`              | `str`       | Usually leave unset — inferred from the payload.                                                                                              |
+| `content_bytes`             | `bytes`     | For file connectors — see below.                                                                                                              |
+| `mime_type`                 | `str`       | Content type of `content_bytes`. Detected when omitted.                                                                                       |
+| `created_at` / `updated_at` | `datetime`  | Defaults to now.                                                                                                                              |
+| `location`                  | `str`       | Where inside the system this came from.                                                                                                       |
+
+### Linking assets
+
+`links` takes the ids you already use, and Classifyre resolves them into the
+investigation graph:
+
+```python
+yield Asset(
+    id="ticket-42",
+    name="Login fails on mobile",
+    content=body,
+    links=["ticket-17", "user-8801"],   # ids, not hashes
+)
+```
+
+### Files and images
+
+Set `content_bytes` and a connector that fetches files gets everything a
+built-in file source gets: text extraction, normalized file metadata, and the
+binary and image detectors.
+
+```python
+def extract():
+    for item in bucket.list():
+        yield Asset(
+            id=item.key,
+            name=item.filename,
+            content_bytes=bucket.download(item.key),
+            mime_type=item.content_type,   # detected if you omit it
+            kind="file",
+        )
+```
+
+You don't need to parse anything — a PDF's text, an image's dimensions and the
+file's size all get filled in for you.
+
+---
+
+## `ctx`
+
+### Configuration
+
+|                                              | Returns                                                                       |
+| -------------------------------------------- | ----------------------------------------------------------------------------- |
+| `ctx.var(name, default=None)`                | A **variable**. Raises if it isn't configured and no default is given.        |
+| `ctx.secret(name, default=None)`             | A **secret**. Same behaviour, and the value is redacted from logs and output. |
+| `ctx.has_var(name)` / `ctx.has_secret(name)` | Whether one is configured.                                                    |
+| `ctx.variables`                              | All variables, as a dict.                                                     |
+| `ctx.secret_names`                           | Secret **names** only — never the values.                                     |
+
+### This run
+
+|                        | Returns                                                        |
+| ---------------------- | -------------------------------------------------------------- |
+| `ctx.strategy`         | `"ALL"`, `"AUTOMATIC"`, `"LATEST"` or `"RANDOM"`.              |
+| `ctx.limit`            | How many assets this run wants, or `None` under **All**.       |
+| `ctx.offset`           | Where to start. **Reading it means you apply it** — see below. |
+| `ctx.page_size`        | The configured rows-per-page.                                  |
+| `ctx.sampling`         | The whole sampling config.                                     |
+| `ctx.cursor`           | What the previous run recorded. Empty on the first run.        |
+| `ctx.set_cursor(dict)` | Record where this run got to, for the next one.                |
+| `ctx.should_abort`     | `True` once the run has been asked to stop.                    |
+| `ctx.log(*parts)`      | Write to the scan log.                                         |
+| `ctx.now()`            | Current UTC time.                                              |
+
+<Callout type="warning">
+  **`ctx.offset` is a hand-off, not just a number.** Reading it tells Classifyre
+  you've applied it yourself, so it stops skipping on your behalf. Read it
+  *before* you yield anything, and use it in your query. Ignore it entirely and
+  paging still works — just less efficiently.
+</Callout>
+
+### Resuming with your own cursor
+
+If your system pages by something other than a count — a token, a timestamp —
+record it yourself and it wins over the positional offset:
+
+```python
+def extract():
+    token = ctx.cursor.get("page_token")
+    page = api.list(page_token=token, limit=ctx.limit)
+
+    for row in page.items:
+        yield Asset(id=str(row["id"]), name=row["title"], content=row["body"])
+
+    ctx.set_cursor({"page_token": page.next_token})
+```
+
+### Long-running work
+
+`ctx.should_abort` turns `True` when someone presses Stop or the run is
+cancelled. Python can't be interrupted from outside, so a loop that never checks
+it only ends when the execution times out.
+
+```python
+for row in huge_result_set:
+    if ctx.should_abort:
+        return
+    yield Asset(...)
+```
+
+---
+
+## Limits
+
+Set under the notebook's options:
+
+| Limit          | Default  | Does                                                              |
+| -------------- | -------- | ----------------------------------------------------------------- |
+| **Timeout**    | 900s     | Stops an execution that runs too long.                            |
+| **Max assets** | _(none)_ | Caps how many assets one scan ingests.                            |
+| **Max output** | 2 MB     | Caps stored cell output; larger output is truncated, not dropped. |
+
+---
+
+## Rules worth knowing
+
+- **Cells must be valid standard Python.** IPython magics (`%time`,
+  `!pip install`) are rejected, because the notebook has to run as an ordinary
+  module in production.
+- **Top-level functions only.** `test_connection` and `extract` have to be
+  defined at the top level of a cell — a function nested inside a class or
+  another function isn't found.
+- **Packages are declared, not installed in code.** Use the packages table
+  rather than a `pip install` cell; the declared list is what gets installed
+  before your cells run.
+
+---
+
+## When something goes wrong
+
+| What you see                                  | Usually means                                                                                            |
+| --------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| _"'extract' is not defined"_                  | The function isn't at the top level of a code cell, or is spelled differently.                           |
+| A cell you didn't run is highlighted          | That's the cell that raised while rebuilding state — the error is there, not in the one you clicked.     |
+| _"Could not install the notebook's packages"_ | A name or version in the packages table doesn't resolve. The installer's own message names which.        |
+| _"No variable named …"_                       | The key isn't in the variables table, or is spelled differently. Keys are case-sensitive.                |
+| Preview shows no assets                       | `extract()` returned without yielding. Check filters, and that it's a generator (`yield`, not `return`). |
+| `••••` where you expected a value             | Working as intended — that's a secret being redacted from output.                                        |
+| A scan is slower each run                     | Under **Automatic**, `extract()` is probably producing and discarding earlier items. Use `ctx.offset`.   |
+
+---
+
+The schema behind all of this — every field, with types and examples — is at
+**[Custom Connector](/sources/custom/)**.

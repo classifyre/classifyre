@@ -110,7 +110,8 @@ export const CreateSourceDtoTypeEnum = {
     Dropbox: 'DROPBOX',
     HuggingFace: 'HUGGING_FACE',
     Sandbox: 'SANDBOX',
-    Git: 'GIT'
+    Git: 'GIT',
+    Custom: 'CUSTOM'
 } as const;
 export type CreateSourceDtoTypeEnum = typeof CreateSourceDtoTypeEnum[keyof typeof CreateSourceDtoTypeEnum];
 

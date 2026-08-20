@@ -120,6 +120,18 @@ export function AiHealthProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
+/**
+ * The AI health verdict, or null when there is no provider above.
+ *
+ * For components that merely *offer* an AI feature. Throwing there would let a
+ * toolbar button take down the whole form it sits in when it is rendered
+ * outside the dashboard shell — and "no provider" and "not configured" mean the
+ * same thing to a button: show the disabled state.
+ */
+export function useOptionalAiHealth(): AiHealthValue | null {
+  return React.useContext(AiHealthContext);
+}
+
 export function useAiHealth(): AiHealthValue {
   const ctx = React.useContext(AiHealthContext);
   if (!ctx) {

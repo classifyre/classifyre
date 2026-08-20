@@ -55,6 +55,9 @@ SOURCE_TYPE_GROUPS: dict[str, set[str]] = {
     "DROPBOX": {"dropbox"},
     "HUGGING_FACE": {"hugging-face"},
     "SLACK": {"slack"},
+    # CUSTOM is deliberately absent: a scan runs the notebook with plain
+    # exec and needs nothing extra. The `interactive` group belongs to the
+    # notebook-execution path, which warms it itself (src/notebook/cli.py).
 }
 
 
