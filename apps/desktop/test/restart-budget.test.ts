@@ -1,26 +1,29 @@
 /**
- * The restart budget must not retire a service that demonstrably works.
+ * The supervisor must never leave the app running with a dead backend.
  *
- * The budget is "3 crashes in 10 minutes", which is the right shape for a
- * crash-on-boot loop. The forgiveness rule used to be a 20-minute healthy-
- * uptime timer — twice the window — so it could never fire for a service
- * crashing more often than that, which is precisely the service that needs it.
+ * Two earlier designs failed the same install in opposite directions:
  *
- * Observed on a real install: three crashes inside 90 seconds, then a
- * generation that served for eight minutes, and *its* death retired the API
- * permanently, because all three earlier timestamps were still inside the
- * 10-minute window. The user is shown "no longer being restarted
- * automatically" on a machine that had just run the service for eight minutes
- * straight, with a scan in flight.
+ *  - A 20-minute healthy-uptime timer (twice the crash window) meant a service
+ *    crashing every eight minutes never earned forgiveness, so the fourth
+ *    crash retired it permanently on a machine that had just demonstrated it
+ *    could serve for eight minutes at a stretch.
+ *  - Even with forgiveness judged from the dead generation's own uptime, a
+ *    three-crash burst (heap exhaustion during one heavy scan will produce
+ *    exactly that) still retired the API and put up "no longer being restarted
+ *    automatically" over a window the user was working in.
  *
- * Judging by the dead generation's own uptime is what closes that gap.
+ * So the budget no longer decides *whether* to restart — only how fast, and
+ * when to call the service degraded. What is tested here is that no input
+ * sequence stops the restarts, and that a hot boot loop still backs off.
  */
 import assert from "node:assert/strict";
 
 import {
   HEALTHY_RUN_MS,
+  MAX_RESTART_DELAY_MS,
   MAX_RESTARTS_PER_WINDOW,
   RESTART_WINDOW_MS,
+  restartBackoffMs,
   restartDecision,
 } from "../src/main/process-manager";
 
@@ -28,36 +31,59 @@ const now = 1_000_000_000;
 /** A death during boot — far below the healthy threshold. */
 const bootCrash = 5_000;
 
-// A first crash always earns a restart.
-assert.equal(
-  restartDecision({ now, crashes: [], uptimeMs: bootCrash }).restart,
-  true,
-);
+// A first crash restarts immediately-ish, and is not degraded.
+{
+  const decision = restartDecision({ now, crashes: [], uptimeMs: bootCrash });
+  assert.equal(decision.attempt, 1);
+  assert.equal(decision.degraded, false);
+  assert.equal(decision.delayMs, restartBackoffMs(1));
+}
 
-// A genuine boot loop spends the budget and stops.
+// A crash-on-boot loop keeps restarting forever, backing off to the ceiling.
 {
   let crashes: number[] = [];
-  const attempts: number[] = [];
+  let last = restartDecision({ now, crashes, uptimeMs: bootCrash });
+  for (let i = 0; i < 40; i += 1) {
+    crashes = last.crashes;
+    last = restartDecision({
+      now: now + (i + 1) * 60_000,
+      crashes,
+      uptimeMs: bootCrash,
+    });
+    assert.ok(
+      last.delayMs <= MAX_RESTART_DELAY_MS,
+      "backoff must stay bounded so recovery is never hours away",
+    );
+  }
+  assert.equal(
+    last.delayMs,
+    MAX_RESTART_DELAY_MS,
+    "a sustained boot loop settles at the ceiling",
+  );
+  assert.equal(last.degraded, true, "and is reported as degraded");
+}
+
+// Degraded starts exactly one crash past the window's allowance — before that
+// a short burst is routine and must not raise anything with the user.
+{
+  let crashes: number[] = [];
   for (let i = 0; i < MAX_RESTARTS_PER_WINDOW; i += 1) {
     const decision = restartDecision({
       now: now + i * 1000,
       crashes,
       uptimeMs: bootCrash,
     });
-    assert.equal(decision.restart, true);
-    attempts.push(decision.attempt);
+    assert.equal(decision.degraded, false, `attempt ${decision.attempt}`);
     crashes = decision.crashes;
   }
-  assert.deepEqual(attempts, [1, 2, 3]);
   assert.equal(
-    restartDecision({ now: now + 4000, crashes, uptimeMs: bootCrash }).restart,
-    false,
-    "a crash-on-boot loop must still degrade to a logged failure",
+    restartDecision({ now: now + 4000, crashes, uptimeMs: bootCrash }).degraded,
+    true,
   );
 }
 
 // The install's exact scenario: a burst nine minutes ago, then eight minutes of
-// service. The window has not expired and the old 20-minute timer never fired.
+// service. That generation's death is judged on its own.
 {
   const burst = [now - 9 * 60_000, now - 8.5 * 60_000, now - 8 * 60_000];
   const decision = restartDecision({
@@ -66,13 +92,10 @@ assert.equal(
     uptimeMs: 8 * 60_000,
   });
 
-  assert.equal(
-    decision.restart,
-    true,
-    "eight minutes of service is not a boot loop",
-  );
-  assert.equal(decision.attempt, 1);
-  // Discarded, not carried forward — otherwise the very next crash retires it.
+  assert.equal(decision.attempt, 1, "eight minutes of service is not a loop");
+  assert.equal(decision.degraded, false);
+  assert.equal(decision.delayMs, restartBackoffMs(1), "and no penalty delay");
+  // Discarded, not carried forward — otherwise the next crash reads as a burst.
   assert.deepEqual(decision.crashes, [now]);
 }
 
@@ -81,12 +104,12 @@ assert.equal(
   const burst = [now - 3000, now - 2000, now - 1000];
   assert.equal(
     restartDecision({ now, crashes: burst, uptimeMs: HEALTHY_RUN_MS - 1 })
-      .restart,
-    false,
+      .attempt,
+    4,
   );
   assert.equal(
-    restartDecision({ now, crashes: burst, uptimeMs: HEALTHY_RUN_MS }).restart,
-    true,
+    restartDecision({ now, crashes: burst, uptimeMs: HEALTHY_RUN_MS }).attempt,
+    1,
   );
 }
 
@@ -98,49 +121,33 @@ assert.equal(
     now - RESTART_WINDOW_MS - 3,
   ];
   const decision = restartDecision({ now, crashes: old, uptimeMs: bootCrash });
-  assert.equal(decision.restart, true);
+  assert.equal(decision.attempt, 1);
   assert.deepEqual(decision.crashes, [now]);
 }
 
-// A fault that kills the API every ~8 minutes must degrade to "restarts
-// forever", not "dead until the user relaunches": the service is usable
-// between crashes and the user has work in flight.
+// The observed fault — OOM every ~20-90 minutes under a scan — must look like
+// routine self-healing, never a degraded episode the user is told about.
 {
   let crashes: number[] = [];
-  for (let i = 0; i < 10; i += 1) {
+  for (let i = 0; i < 20; i += 1) {
     const decision = restartDecision({
-      now: now + i * 8 * 60_000,
+      now: now + i * 25 * 60_000,
       crashes,
-      uptimeMs: 8 * 60_000,
+      uptimeMs: 25 * 60_000,
     });
-    assert.equal(decision.restart, true, `slow crash ${i} must be restarted`);
+    assert.equal(decision.degraded, false, `slow crash ${i}`);
+    assert.equal(decision.delayMs, restartBackoffMs(1));
     crashes = decision.crashes;
   }
 }
 
-// …but once the restarts start dying on boot, the budget applies again.
+// Backoff shape: doubling from the base, capped, and never zero.
 {
-  let crashes = [now];
-  for (let i = 1; i <= MAX_RESTARTS_PER_WINDOW - 1; i += 1) {
-    crashes = restartDecision({
-      now: now + i * 1000,
-      crashes,
-      uptimeMs: bootCrash,
-    }).crashes;
-  }
-  assert.equal(
-    restartDecision({
-      now: now + MAX_RESTARTS_PER_WINDOW * 1000,
-      crashes,
-      uptimeMs: bootCrash,
-    }).restart,
-    false,
-  );
+  assert.ok(restartBackoffMs(1) > 0);
+  assert.equal(restartBackoffMs(2), restartBackoffMs(1) * 2);
+  assert.equal(restartBackoffMs(99), MAX_RESTART_DELAY_MS);
 }
 
-// The defect being fixed was a forgiveness threshold longer than the window,
-// which made forgiveness unreachable for any service crashing often enough to
-// need it.
 assert.ok(
   HEALTHY_RUN_MS < RESTART_WINDOW_MS,
   "forgiveness must be reachable inside the crash window",

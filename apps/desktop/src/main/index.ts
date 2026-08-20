@@ -1,8 +1,17 @@
-import { app, autoUpdater, BrowserWindow, dialog, protocol, shell } from 'electron';
+import {
+  app,
+  autoUpdater,
+  BrowserWindow,
+  dialog,
+  Notification,
+  protocol,
+  shell,
+} from 'electron';
 import fs from 'fs';
 import path from 'path';
 import { PostgresManager } from './postgres-manager.js';
-import { ProcessManager } from './process-manager.js';
+import { HealthMonitor } from './health-monitor.js';
+import { ProcessManager, type ApiHealthEvent } from './process-manager.js';
 import { registerIpcHandlers } from './ipc-handlers.js';
 import { registerNotificationHandlers } from './notification-service.js';
 import { registerAppProtocol } from './protocol-handler.js';
@@ -67,6 +76,7 @@ let updateChecker: UpdateChecker;
 let namespaceStore: NamespaceStore;
 let sharedApiBaseUrl = '';
 let tray: AppTray | null = null;
+let healthMonitor: HealthMonitor | null = null;
 let isQuitting = false;
 let shutdownStarted = false;
 
@@ -141,52 +151,44 @@ async function failStartup(summary: string, error: unknown): Promise<void> {
   app.quit();
 }
 
-// The automatic restart budget is spent and the API is staying down. Without
-// this the window just retries forever against a closed port and the app looks
-// frozen — say what happened and offer the one action that helps.
-let apiUnavailableDialogOpen = false;
-async function reportApiUnavailable(reason: string): Promise<void> {
-  if (apiUnavailableDialogOpen) return;
-  // A crash-on-boot exhausts the same budget, but there failStartup owns the
-  // error surface and is already quitting; and during shutdown the API is
-  // *supposed* to be going away. Only speak up when a running app lost it.
+// The service is crashing repeatedly. It is still being restarted — the
+// supervisor never gives up — so this is a status report, not a decision to
+// make. It used to be a modal dialog with a "Try Again" button, which was both
+// annoying (it interrupts whatever the user is doing, on a machine where the
+// fix is already under way) and misleading (it said the service was "no longer
+// being restarted automatically", so users relaunched the app for no reason).
+function reportApiHealth(event: ApiHealthEvent): void {
   if (startupState !== 'ready' || isQuitting || shutdownStarted) return;
-  apiUnavailableDialogOpen = true;
-  try {
-    const logFile = getLogFilePath();
-    const buttons = logFile
-      ? ['Try Again', 'Open Log', 'Quit']
-      : ['Try Again', 'Quit'];
-    const { response } = await dialog.showMessageBox({
-      type: 'error',
-      title: 'Classifyre service stopped',
-      message: reason,
-      detail:
-        'Scans in progress have been interrupted. Trying again restarts the ' +
-        'service; the scan can be re-run afterwards.',
-      buttons,
-      defaultId: 0,
-      cancelId: buttons.length - 1,
-    });
-    const choice = buttons[response];
-    if (choice === 'Open Log' && logFile) {
-      await shell.openPath(logFile);
-    } else if (choice === 'Quit') {
-      app.quit();
-    } else if (choice === 'Try Again') {
-      try {
-        await processManager.restartApiNow(
-          SHARED_API_ID,
-          Number(new URL(sharedApiBaseUrl).port),
-          pg.getConnectionString(),
-        );
-      } catch (error) {
-        console.error('Manual API restart failed:', error);
-      }
-    }
-  } finally {
-    apiUnavailableDialogOpen = false;
+  if (event.state === 'recovered') {
+    console.log('Classifyre service recovered');
+    tray?.setServiceHealthy(true);
+    return;
   }
+  console.error(event.reason ?? 'Classifyre service is unhealthy');
+  tray?.setServiceHealthy(false);
+  if (!settingsManager?.get().desktopNotifications) return;
+  if (!Notification.isSupported()) return;
+  const seconds = Math.round((event.nextRetryMs ?? 0) / 1000);
+  new Notification({
+    title: 'Classifyre is restarting its service',
+    body:
+      (event.reason ?? 'The service stopped unexpectedly.') +
+      (seconds ? ` Retrying in ${seconds}s.` : ''),
+    silent: true,
+  }).show();
+}
+
+// Postgres died out from under the app. Bring it back, then restart the API:
+// its pool, its port and possibly its password all belong to the instance that
+// just went away.
+async function recoverDatabase(): Promise<void> {
+  await pg.restart();
+  console.log(`Embedded PostgreSQL restarted on port ${pg.getPort()}`);
+  await processManager.restartApiNow(
+    SHARED_API_ID,
+    Number(new URL(sharedApiBaseUrl).port),
+    pg.getConnectionString(),
+  );
 }
 
 function showHome(): void {
@@ -399,7 +401,7 @@ app.on('ready', async () => {
         maxConcurrentRunners: settings.maxConcurrentRunners,
       };
     },
-    (_processId, reason) => void reportApiUnavailable(reason),
+    reportApiHealth,
   );
   updateChecker = new UpdateChecker();
   updateChecker.startPeriodicChecks();
@@ -484,6 +486,28 @@ app.on('ready', async () => {
   startupState = 'ready';
   mainWindow = createMainWindow();
 
+  // Only now: during startup a probe would race the boot it is watching, and
+  // the startup window already owns that failure surface.
+  healthMonitor = new HealthMonitor({
+    apiBaseUrl: () => sharedApiBaseUrl || null,
+    // A supervised restart is already in flight, or the app is on its way out.
+    isWatchable: () =>
+      startupState === 'ready' &&
+      !isQuitting &&
+      !shutdownStarted &&
+      !processManager.isTransitioning(SHARED_API_ID),
+    pingDatabase: () => pg.ping(),
+    recoverDatabase,
+    restartApi: () =>
+      processManager.restartApiNow(
+        SHARED_API_ID,
+        Number(new URL(sharedApiBaseUrl).port),
+        pg.getConnectionString(),
+      ),
+    log: (message) => console.error(message),
+  });
+  healthMonitor.start();
+
   // Startup update check runs once the window exists, so the "update available"
   // prompt doesn't arrive before the app itself does.
   setTimeout(() => void updateChecker.backgroundCheck(), 10_000).unref?.();
@@ -510,6 +534,7 @@ app.on('before-quit', (event) => {
   }, 30_000);
 
   tray?.destroy();
+  healthMonitor?.stop();
   namespaceStore?.stop();
   Promise.resolve()
     .then(() => processManager?.stopAll())
