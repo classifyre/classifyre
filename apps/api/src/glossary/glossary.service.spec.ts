@@ -232,7 +232,7 @@ describe('GlossaryService', () => {
     const result = await service.bulkUpdate({
       ids: [baseTerm.id],
       verified: false,
-      entityType: 'PERSON' as never,
+      entityType: 'PERSON',
     });
 
     expect(prisma.glossaryTerm.updateMany).toHaveBeenCalledWith({
