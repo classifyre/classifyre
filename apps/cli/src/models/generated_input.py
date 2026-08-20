@@ -14,6 +14,7 @@ from pydantic import (
     EmailStr,
     Field,
     RootModel,
+    constr,
 )
 
 
@@ -59,6 +60,7 @@ class AssetType(StrEnum):
     HUGGING_FACE = 'HUGGING_FACE'
     SANDBOX = 'SANDBOX'
     GIT = 'GIT'
+    CUSTOM = 'CUSTOM'
 
 
 class DetectorType(StrEnum):
@@ -391,6 +393,7 @@ class Type(StrEnum):
     HUGGING_FACE = 'HUGGING_FACE'
     SANDBOX = 'SANDBOX'
     GIT = 'GIT'
+    CUSTOM = 'CUSTOM'
 
 
 class YouTubeRequired(BaseModel):
@@ -3473,6 +3476,7 @@ class Type22(StrEnum):
     HUGGING_FACE = 'HUGGING_FACE'
     SANDBOX = 'SANDBOX'
     GIT = 'GIT'
+    CUSTOM = 'CUSTOM'
 
 
 class ConfluenceInput(CoreInput):
@@ -5278,6 +5282,151 @@ class GitInput(CoreInput):
     )
 
 
+class NotebookCodeCell(BaseModel):
+    """
+    A Python cell. Must remain valid standard Python -- IPython magics (%time, !pip) are rejected.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    id: str = Field(
+        ...,
+        description='Stable cell identifier, unique within the notebook',
+        pattern='^[A-Za-z0-9_-]{1,64}$',
+    )
+    type: Literal['code']
+    source: str = Field(
+        ..., description='Python source of this cell', max_length=100000
+    )
+
+
+class NotebookMarkdownCell(BaseModel):
+    """
+    Prose. Never executed; serialized as comments when the notebook is exported to Python.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    id: str = Field(
+        ...,
+        description='Stable cell identifier, unique within the notebook',
+        pattern='^[A-Za-z0-9_-]{1,64}$',
+    )
+    type: Literal['markdown']
+    source: str = Field(
+        ..., description='Markdown source of this cell', max_length=100000
+    )
+
+
+class CustomNotebook(BaseModel):
+    """
+    Cells run in document order in one fresh process per execution. There is no persistent kernel: state is rebuilt from the current cell sources every time.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    revision: int | None = Field(
+        1,
+        description='Monotonic revision, bumped on every save. Used for optimistic locking so two editors cannot silently overwrite each other.',
+        ge=1,
+    )
+    cells: list[NotebookCodeCell | NotebookMarkdownCell] = Field(
+        ...,
+        description='Ordered notebook cells. The assembled code cells must define test_connection() and extract().',
+        max_length=200,
+        min_length=1,
+    )
+
+
+class CustomRequired(BaseModel):
+    """
+    The Python notebook that implements this connector.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    notebook: CustomNotebook
+
+
+class Secrets(RootModel[str]):
+    root: str = Field(..., max_length=8192)
+
+
+class CustomMasked(BaseModel):
+    """
+    Encrypted key/value pairs, stored the same way as any other source credential.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    secrets: dict[constr(pattern=r'^[A-Za-z_][A-Za-z0-9_]{0,62}$'), Secrets] | None = (
+        Field(
+            {},
+            description='Secret values the notebook reads with ctx.secret("name"). Encrypted at rest and redacted from logs and cell output. Keys must be valid Python identifiers.',
+            max_length=64,
+            validate_default=True,
+        )
+    )
+
+
+class CustomOptionalLimits(BaseModel):
+    """
+    Bounds applied to every notebook execution and scan.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    max_assets: int | None = Field(
+        None,
+        description='Stop a scan after this many assets. Unset means no cap.',
+        ge=1,
+        le=1000000,
+    )
+    timeout_seconds: int | None = Field(
+        900,
+        description='Kill an execution that runs longer than this. Cells cannot be interrupted from inside Python, so this is the real stop button.',
+        ge=10,
+        le=86400,
+    )
+    max_output_bytes: int | None = Field(
+        2097152,
+        description='Total serialized cell output kept per execution. Larger outputs are truncated rather than stored.',
+        ge=1024,
+        le=52428800,
+    )
+
+
+class Variables(RootModel[str]):
+    root: str = Field(..., max_length=8192)
+
+
+class NotebookPackage(BaseModel):
+    """
+    A Python distribution installed before the notebook runs.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    name: str = Field(
+        ...,
+        description="Distribution name as published on the index (for example 'pandas').",
+        pattern='^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$',
+    )
+    version: str | None = Field(
+        None,
+        description="Optional version or specifier: '2.2.0', '>=2.0', '~=1.4'. Empty means latest.",
+        max_length=64,
+        pattern='^$|^(==|>=|<=|~=|!=|>|<).+$|^[0-9][A-Za-z0-9._*+!-]*$',
+    )
+
+
 class YouTubeInput(CoreInput):
     type: Literal['YOUTUBE'] = Field(..., description='Type of the asset or source')
     required: YouTubeRequired
@@ -5413,6 +5562,48 @@ class IcebergInput(CoreInput):
     )
 
 
+class CustomOptional(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    variables: (
+        dict[constr(pattern=r'^[A-Za-z_][A-Za-z0-9_]{0,62}$'), Variables] | None
+    ) = Field(
+        {},
+        description='Non-secret values the notebook reads with ctx.var("name"), such as a base URL or an account id. Stored in clear text. Keys must be valid Python identifiers.',
+        max_length=64,
+        validate_default=True,
+    )
+    limits: CustomOptionalLimits | None = None
+    packages: list[NotebookPackage] | None = Field(
+        [],
+        description="Python packages installed into the run environment before any cell executes. Installed with uv; the base image's own dependencies are always present and do not need listing.",
+        max_length=50,
+        validate_default=True,
+    )
+
+
+class CustomInput(CoreInput):
+    type: Literal['CUSTOM'] = Field(..., description='Type of the asset or source')
+    required: CustomRequired
+    masked: CustomMasked | None = None
+    optional: CustomOptional | None = None
+    detectors: list[Detector] | None = Field(
+        None, description='Detectors to run on ingested content'
+    )
+    custom_detectors: list[CustomDetectorSelection] | None = Field(
+        None,
+        description='Reusable custom detector IDs selected from the custom detector catalog.',
+    )
+    sampling: SamplingConfig
+    scan_cache: ScanCacheConfig | None = None
+    resources: ResourceOverrides | None = None
+    cleanup_removed_detector_findings: bool | None = Field(
+        True,
+        description='When enabled (default), findings produced by detectors that are no longer configured on this source (removed or disabled) are automatically resolved at the start of the next run, keeping the findings list in step with the current detector set.',
+    )
+
+
 class SourceInput(
     RootModel[
         SandboxInput
@@ -5452,6 +5643,7 @@ class SourceInput(
         | DropboxInput
         | HuggingFaceInput
         | GitInput
+        | CustomInput
     ]
 ):
     root: (
@@ -5492,6 +5684,7 @@ class SourceInput(
         | DropboxInput
         | HuggingFaceInput
         | GitInput
+        | CustomInput
     ) = Field(
         ...,
         description='Merged configuration schema with all source types and common definitions',

@@ -743,14 +743,24 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Classifyre Metadata Extraction CLI")
     parser.add_argument(
         "command",
-        choices=["test", "extract", "discover", "evaluate-file", "train", "dropbox-auth"],
+        choices=[
+            "test",
+            "extract",
+            "discover",
+            "notebook",
+            "evaluate-file",
+            "train",
+            "dropbox-auth",
+        ],
         help="Command to run",
     )
     parser.add_argument(
         "recipe",
         nargs="?",
         default=None,
-        help="Path to recipe JSON (or file path for evaluate-file)",
+        help=(
+            "Path to recipe JSON (a file path for evaluate-file, an execution request for notebook)"
+        ),
     )
     parser.add_argument("--debug", action="store_true", help="Enable debug logging")
     parser.add_argument(
@@ -855,6 +865,11 @@ def main() -> None:
 
     if args.command == "dropbox-auth":
         sys.exit(run_dropbox_auth_command(args))
+
+    if args.command == "notebook":
+        from .notebook.cli import run_notebook_command
+
+        sys.exit(run_notebook_command(args))
 
     if args.command == "evaluate-file":
         run_evaluate_file_command(args)

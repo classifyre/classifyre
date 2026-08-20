@@ -95,6 +95,13 @@ export const SOURCE_CATEGORY_ORDER: SourceCatalogCategory[] = [
 ];
 
 export const SOURCE_TYPE_CATALOG_META: Record<string, SourceCatalogMetaBase> = {
+  CUSTOM: {
+    description:
+      "Write the connector yourself in a Python notebook, for a system nothing else covers.",
+    icon: CreateSourceDtoTypeEnum.Custom,
+    category: "OTHER",
+    keywords: ["custom", "python", "notebook", "code", "script", "api", "bespoke"],
+  },
   SANDBOX: {
     description:
       "Upload files directly and scan them through the standard source lifecycle.",

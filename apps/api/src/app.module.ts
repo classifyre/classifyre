@@ -18,6 +18,7 @@ import { CustomDetectorsService } from './custom-detectors.service';
 import { CustomDetectorExtractionsService } from './custom-detector-extractions.service';
 import { CustomDetectorTestsService } from './custom-detector-tests.service';
 import { CliRunnerModule } from './cli-runner/cli-runner.module';
+import { NotebookModule } from './notebook/notebook.module';
 import { WebSocketModule } from './websocket/websocket.module';
 import { SchedulerModule } from './scheduler/scheduler.module';
 import { MatchingModule } from './matching/matching.module';
@@ -96,6 +97,7 @@ import {
     ClsModule.forRoot({ global: true }),
     PrismaCoreModule,
     CliRunnerModule,
+    NotebookModule,
     WebSocketModule,
     SchedulerModule,
     MatchingModule,

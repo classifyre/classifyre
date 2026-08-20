@@ -61,13 +61,8 @@ def describe_type(prop_schema: dict[str, Any]) -> str:
     return str(json_type) if json_type else "string"
 
 
-def resolve_fields(source_type: str, asset_kind: str) -> list[ResolvedField]:
-    """Resolve the declared fields for a (source, asset kind).
-
-    The asset entry composes one or more reusable ``contentTypes`` via ``use``
-    plus its own ``properties``; ``required`` is the union of each used content
-    type's required list and the entry's own. Raises if the entry is absent.
-    """
+def _entry(source_type: str, asset_kind: str) -> dict[str, Any]:
+    """Return the catalog entry for a (source, asset kind), or raise."""
     catalog = load_catalog()
     sources = catalog.get("sources", {})
     source_entry = sources.get(_source_key(source_type))
@@ -75,8 +70,32 @@ def resolve_fields(source_type: str, asset_kind: str) -> list[ResolvedField]:
         raise AssetMetadataContractError(
             f"No catalog entry for source '{source_type}' asset kind '{asset_kind}'"
         )
-    entry = source_entry[asset_kind]
-    content_types = catalog.get("contentTypes", {})
+    return source_entry[asset_kind]
+
+
+def is_open_kind(source_type: str, asset_kind: str) -> bool:
+    """Whether this kind accepts metadata keys the catalog does not declare.
+
+    Only user-authored connectors (CUSTOM) set ``open: true``: their metadata
+    keys are chosen in a notebook, so they cannot exist in a schema written
+    months earlier. Required keys are still enforced -- ``open`` widens the key
+    set, it does not switch validation off.
+    """
+    try:
+        return bool(_entry(source_type, asset_kind).get("open", False))
+    except AssetMetadataContractError:
+        return False
+
+
+def resolve_fields(source_type: str, asset_kind: str) -> list[ResolvedField]:
+    """Resolve the declared fields for a (source, asset kind).
+
+    The asset entry composes one or more reusable ``contentTypes`` via ``use``
+    plus its own ``properties``; ``required`` is the union of each used content
+    type's required list and the entry's own. Raises if the entry is absent.
+    """
+    entry = _entry(source_type, asset_kind)
+    content_types = load_catalog().get("contentTypes", {})
 
     properties: dict[str, dict[str, Any]] = {}
     required: set[str] = set()
@@ -109,7 +128,8 @@ def validate_metadata(
 
     Strict mode raises ``AssetMetadataContractError``; otherwise it logs a
     warning. Checks: no undeclared keys, and every required field is present
-    with a non-null value.
+    with a non-null value. A kind marked ``open`` in the catalog skips the
+    undeclared-key check (see :func:`is_open_kind`).
     """
     try:
         fields = resolve_fields(source_type, asset_kind)
@@ -123,7 +143,8 @@ def validate_metadata(
     required = {field["name"] for field in fields if field["required"]}
     present_non_null = {key for key, value in data.items() if value is not None}
 
-    undeclared = sorted(set(data) - declared)
+    is_open = is_open_kind(source_type, asset_kind)
+    undeclared = [] if is_open else sorted(set(data) - declared)
     missing_required = sorted(required - present_non_null)
 
     if undeclared or missing_required:
