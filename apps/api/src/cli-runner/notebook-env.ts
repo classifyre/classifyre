@@ -43,6 +43,11 @@ const ALLOWED_ENV_KEYS = new Set([
   'CLASSIFYRE_CLI_AUTO_INSTALL_OPTIONAL_DEPS',
   'CLASSIFYRE_UV_SYNC_STATE_DIR',
   'CLASSIFYRE_UV_SYNC_TIMEOUT_SECONDS',
+  // A directory of this source's uploaded files, written by the API before the
+  // execution starts. A path, not a credential: it is what makes ctx.files work
+  // while someone is authoring, without the notebook holding the means to fetch
+  // anything from the API itself.
+  'CLASSIFYRE_NOTEBOOK_FILES_DIR',
   // TLS trust and egress: dropping these looks to the author like a broken
   // connector rather than a policy decision.
   'SSL_CERT_FILE',

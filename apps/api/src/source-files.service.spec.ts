@@ -6,6 +6,10 @@ function sandboxSource(runnerStatus: RunnerStatus = RunnerStatus.COMPLETED) {
   return { id: 'source-1', type: AssetType.SANDBOX, runnerStatus };
 }
 
+function customSource(runnerStatus: RunnerStatus = RunnerStatus.COMPLETED) {
+  return { id: 'source-1', type: AssetType.CUSTOM, runnerStatus };
+}
+
 function createPrisma(overrides: Record<string, unknown> = {}) {
   return {
     source: { findUnique: jest.fn().mockResolvedValue(sandboxSource()) },
@@ -82,7 +86,7 @@ describe(SourceFilesService.name, () => {
     expect(prisma.uploadedSourceFile.create).toHaveBeenCalled();
   });
 
-  it('rejects non-Sandbox sources and active runners', async () => {
+  it('rejects a source type that has no use for uploads', async () => {
     const prisma = createPrisma();
     const service = new SourceFilesService(prisma as never);
     prisma.source.findUnique.mockResolvedValueOnce({
@@ -114,5 +118,92 @@ describe(SourceFilesService.name, () => {
     await expect(service.assertHasFiles('source-1')).rejects.toBeInstanceOf(
       BadRequestException,
     );
+  });
+
+  describe('custom notebook sources', () => {
+    function createCustomPrisma() {
+      const prisma = createPrisma();
+      prisma.source.findUnique.mockResolvedValue(customSource());
+      return prisma;
+    }
+
+    it('accepts uploads, so a notebook can read them as ctx.files', async () => {
+      const prisma = createCustomPrisma();
+      const service = new SourceFilesService(prisma as never);
+
+      await service.create({
+        sourceId: 'source-1',
+        fileName: 'dump.csv',
+        declaredMimeType: 'text/csv',
+        data: Buffer.from('a,b\n1,2\n'),
+      });
+
+      expect(
+        prisma.uploadedSourceFile.create.mock.calls[0][0].data.fileName,
+      ).toBe('dump.csv');
+    });
+
+    it('can run with no files at all', async () => {
+      // Unlike a sandbox, a notebook is the source -- it may talk to an API and
+      // never touch a file.
+      const prisma = createCustomPrisma();
+      prisma.uploadedSourceFile.count.mockResolvedValue(0);
+      const service = new SourceFilesService(prisma as never);
+
+      await expect(service.assertHasFiles('source-1')).resolves.toBeUndefined();
+    });
+
+    it('lets the last file be deleted', async () => {
+      const prisma = createCustomPrisma();
+      prisma.uploadedSourceFile.count.mockResolvedValue(1);
+      const tx = {
+        uploadedSourceFile: {
+          findFirst: jest.fn().mockResolvedValue({ id: 'file-1' }),
+          count: jest.fn().mockResolvedValue(1),
+          delete: jest.fn().mockResolvedValue({}),
+        },
+        asset: { findMany: jest.fn(), updateMany: jest.fn() },
+        finding: { findMany: jest.fn(), update: jest.fn() },
+      };
+      (prisma as unknown as { $transaction: unknown }).$transaction = jest
+        .fn()
+        .mockImplementation((callback: (t: unknown) => unknown) =>
+          callback(tx),
+        );
+      const service = new SourceFilesService(prisma as never);
+
+      await service.delete('source-1', 'file-1');
+
+      expect(tx.uploadedSourceFile.delete).toHaveBeenCalled();
+      // A notebook chooses its own asset ids, so nothing here can know which
+      // came from this file -- the next scan reconciles that.
+      expect(tx.asset.findMany).not.toHaveBeenCalled();
+    });
+
+    it('still refuses to delete the last file of a sandbox', async () => {
+      const prisma = createPrisma();
+      const tx = {
+        uploadedSourceFile: {
+          findFirst: jest.fn().mockResolvedValue({ id: 'file-1' }),
+          count: jest.fn().mockResolvedValue(1),
+          delete: jest.fn(),
+        },
+        asset: {
+          findMany: jest.fn().mockResolvedValue([]),
+          updateMany: jest.fn(),
+        },
+        finding: { findMany: jest.fn(), update: jest.fn() },
+      };
+      (prisma as unknown as { $transaction: unknown }).$transaction = jest
+        .fn()
+        .mockImplementation((callback: (t: unknown) => unknown) =>
+          callback(tx),
+        );
+      const service = new SourceFilesService(prisma as never);
+
+      await expect(service.delete('source-1', 'file-1')).rejects.toBeInstanceOf(
+        ConflictException,
+      );
+    });
   });
 });

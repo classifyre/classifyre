@@ -26,6 +26,7 @@ import {
   Loader2,
   MessageSquare,
   Server,
+  Sparkles,
   Settings,
   SlidersHorizontal,
 } from "lucide-react";
@@ -36,6 +37,7 @@ import { ChatBotsCard } from "@/components/chat-bots-card";
 import { HuggingFaceSettingsCard } from "@/components/huggingface-settings-card";
 import { VersionSettingsSection } from "@/components/version-update-notifier";
 import { DataTransferCard } from "@/components/data-transfer/data-transfer-card";
+import { EmbeddingSettingsCard } from "@/components/embedding-settings-card";
 
 import { useTranslation } from "@/hooks/use-translation";
 
@@ -215,6 +217,10 @@ export default function SettingsPage() {
             <MessageSquare className="h-3.5 w-3.5" />
             {t("settings.tabs.chat")}
           </TabsTrigger>
+          <TabsTrigger value="embedding" className={TAB_TRIGGER_CLASS}>
+            <Sparkles className="h-3.5 w-3.5" />
+            {t("settings.tabs.embedding")}
+          </TabsTrigger>
           <TabsTrigger value="data" className={TAB_TRIGGER_CLASS}>
             <DatabaseBackup className="h-3.5 w-3.5" />
             {t("settings.tabs.data")}
@@ -380,6 +386,13 @@ export default function SettingsPage() {
           className="duration-300 animate-in fade-in-50 slide-in-from-bottom-1"
         >
           <ChatBotsCard />
+        </TabsContent>
+
+        <TabsContent
+          value="embedding"
+          className="duration-300 animate-in fade-in-50 slide-in-from-bottom-1"
+        >
+          <EmbeddingSettingsCard />
         </TabsContent>
 
         <TabsContent

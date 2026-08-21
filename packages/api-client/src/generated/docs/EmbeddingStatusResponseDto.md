@@ -26,6 +26,13 @@ Name | Type
 `recalibrationRunning` | boolean
 `lastRecalibratedAt` | string
 `lastRecalibrationError` | string
+`embeddedRows` | number
+`pendingEmbedJobs` | number
+`embedJobFailureCount` | number
+`lastEmbedJobError` | string
+`lastEmbedJobErrorAt` | string
+`lastEmbedSuccessAt` | string
+`providerHealth` | [EmbeddingProviderHealthDto](EmbeddingProviderHealthDto.md)
 
 ## Example
 
@@ -54,6 +61,13 @@ const example = {
   "recalibrationRunning": null,
   "lastRecalibratedAt": null,
   "lastRecalibrationError": null,
+  "embeddedRows": null,
+  "pendingEmbedJobs": null,
+  "embedJobFailureCount": null,
+  "lastEmbedJobError": null,
+  "lastEmbedJobErrorAt": null,
+  "lastEmbedSuccessAt": null,
+  "providerHealth": null,
 } satisfies EmbeddingStatusResponseDto
 
 console.log(example)

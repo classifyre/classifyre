@@ -28,7 +28,7 @@ export class SourceFilesController {
   constructor(private readonly files: SourceFilesService) {}
 
   @Get()
-  @ApiOperation({ summary: 'List uploaded files for a Sandbox source' })
+  @ApiOperation({ summary: 'List uploaded files for a source' })
   @ApiResponse({ status: 200, type: [UploadedSourceFileDto] })
   list(@Param('sourceId') sourceId: string) {
     return this.files.list(sourceId);
@@ -37,7 +37,7 @@ export class SourceFilesController {
   @Post()
   @HttpCode(HttpStatus.CREATED)
   @ApiConsumes('multipart/form-data')
-  @ApiOperation({ summary: 'Upload one file to a Sandbox source' })
+  @ApiOperation({ summary: 'Upload one file to a source' })
   @ApiBody({
     schema: {
       type: 'object',

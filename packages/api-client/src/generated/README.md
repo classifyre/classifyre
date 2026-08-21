@@ -175,10 +175,13 @@ All URIs are relative to *http://localhost*
 *EmbeddingsApi* | [**embeddingControllerBoilerplate**](docs/EmbeddingsApi.md#embeddingcontrollerboilerplate) | **GET** /sources/{sourceId}/boilerplate-clusters | Near-duplicate finding clusters in a source (repeated boilerplate)
 *EmbeddingsApi* | [**embeddingControllerBoilerplateGlobal**](docs/EmbeddingsApi.md#embeddingcontrollerboilerplateglobal) | **GET** /embeddings/boilerplate-clusters | Near-duplicate finding clusters across the corpus, optionally filtered to specific sources
 *EmbeddingsApi* | [**embeddingControllerChunks**](docs/EmbeddingsApi.md#embeddingcontrollerchunks) | **POST** /sources/{sourceId}/embeddings/chunks | Store asset chunk-to-content mappings
+*EmbeddingsApi* | [**embeddingControllerGetSettings**](docs/EmbeddingsApi.md#embeddingcontrollergetsettings) | **GET** /embeddings/settings | Embedding configuration for this workspace, the deployment defaults behind it, and corpus size
+*EmbeddingsApi* | [**embeddingControllerRebuild**](docs/EmbeddingsApi.md#embeddingcontrollerrebuild) | **POST** /embeddings/rebuild | Purge every stored vector for this workspace and re-embed the corpus from scratch
 *EmbeddingsApi* | [**embeddingControllerRecalibrate**](docs/EmbeddingsApi.md#embeddingcontrollerrecalibrate) | **POST** /embeddings/recalibrate | Schedule a full evidence-ranking recalibration pass (importance scores, outliers, near-duplicate groups)
 *EmbeddingsApi* | [**embeddingControllerReindex**](docs/EmbeddingsApi.md#embeddingcontrollerreindex) | **POST** /embeddings/reindex | Reconcile stored findings and asset chunks into the configured embedding space
 *EmbeddingsApi* | [**embeddingControllerSimilar**](docs/EmbeddingsApi.md#embeddingcontrollersimilar) | **GET** /findings/{findingId}/similar | Find semantically similar findings with ranking evidence
 *EmbeddingsApi* | [**embeddingControllerStatus**](docs/EmbeddingsApi.md#embeddingcontrollerstatus) | **GET** /embeddings/status | Get semantic storage and search capability
+*EmbeddingsApi* | [**embeddingControllerUpdateSettings**](docs/EmbeddingsApi.md#embeddingcontrollerupdatesettings) | **PUT** /embeddings/settings | Change embedding configuration; redefining the vector space purges the corpus and re-embeds it
 *FindingsApi* | [**findingsControllerBulkUpdate**](docs/FindingsApi.md#findingscontrollerbulkupdate) | **POST** /findings/bulk-update | Bulk update findings
 *FindingsApi* | [**findingsControllerCreate**](docs/FindingsApi.md#findingscontrollercreate) | **POST** /findings/create | Create a new finding
 *FindingsApi* | [**findingsControllerFindOne**](docs/FindingsApi.md#findingscontrollerfindone) | **GET** /findings/{id} | Get a finding by ID
@@ -236,6 +239,7 @@ All URIs are relative to *http://localhost*
 *NotebooksApi* | [**notebookControllerGetExecution**](docs/NotebooksApi.md#notebookcontrollergetexecution) | **GET** /notebook/executions/{executionId} | Poll one execution
 *NotebooksApi* | [**notebookControllerListExecutions**](docs/NotebooksApi.md#notebookcontrollerlistexecutions) | **GET** /sources/{sourceId}/notebook/executions | Recent executions for a source
 *NotebooksApi* | [**notebookControllerScaffold**](docs/NotebooksApi.md#notebookcontrollerscaffold) | **GET** /notebooks/scaffold | The starter cells and the functions a notebook must define
+*NotebooksApi* | [**notebookControllerTemplates**](docs/NotebooksApi.md#notebookcontrollertemplates) | **GET** /notebooks/templates | Worked notebooks an author can start from or borrow cells out of
 *NotebooksApi* | [**notebookControllerUpdate**](docs/NotebooksApi.md#notebookcontrollerupdate) | **PUT** /sources/{sourceId}/notebook | Save a notebook
 *NotificationsApi* | [**notificationsControllerDeleteNotification**](docs/NotificationsApi.md#notificationscontrollerdeletenotification) | **DELETE** /notifications/{id} | Delete a notification
 *NotificationsApi* | [**notificationsControllerListNotifications**](docs/NotificationsApi.md#notificationscontrollerlistnotifications) | **GET** /notifications | List notifications
@@ -267,8 +271,8 @@ All URIs are relative to *http://localhost*
 *SourcesApi* | [**sourceAssetsControllerListSourceAssets**](docs/SourcesApi.md#sourceassetscontrollerlistsourceassets) | **GET** /sources/{sourceId}/assets | List assets for a source
 *SourcesApi* | [**sourceFilesControllerContent**](docs/SourcesApi.md#sourcefilescontrollercontent) | **GET** /sources/{sourceId}/files/{fileId}/content | Stream uploaded source file bytes
 *SourcesApi* | [**sourceFilesControllerDelete**](docs/SourcesApi.md#sourcefilescontrollerdelete) | **DELETE** /sources/{sourceId}/files/{fileId} | Delete an uploaded source file
-*SourcesApi* | [**sourceFilesControllerList**](docs/SourcesApi.md#sourcefilescontrollerlist) | **GET** /sources/{sourceId}/files | List uploaded files for a Sandbox source
-*SourcesApi* | [**sourceFilesControllerUpload**](docs/SourcesApi.md#sourcefilescontrollerupload) | **POST** /sources/{sourceId}/files | Upload one file to a Sandbox source
+*SourcesApi* | [**sourceFilesControllerList**](docs/SourcesApi.md#sourcefilescontrollerlist) | **GET** /sources/{sourceId}/files | List uploaded files for a source
+*SourcesApi* | [**sourceFilesControllerUpload**](docs/SourcesApi.md#sourcefilescontrollerupload) | **POST** /sources/{sourceId}/files | Upload one file to a source
 *SourcesApi* | [**sourcesControllerBulkRunSources**](docs/SourcesApi.md#sourcescontrollerbulkrunsources) | **POST** /sources/bulk-run | Start a scan for many data sources at once
 *SourcesApi* | [**sourcesControllerBulkUpdateSources**](docs/SourcesApi.md#sourcescontrollerbulkupdatesources) | **POST** /sources/bulk-update | Bulk update data sources
 *SourcesApi* | [**sourcesControllerCreateSource**](docs/SourcesApi.md#sourcescontrollercreatesource) | **POST** /sources | Create a new data source
@@ -410,8 +414,15 @@ All URIs are relative to *http://localhost*
 - [DiscoveryRecentRunDto](docs/DiscoveryRecentRunDto.md)
 - [DiscoveryRunSourceDto](docs/DiscoveryRunSourceDto.md)
 - [EdgeDetailDto](docs/EdgeDetailDto.md)
+- [EmbeddingAiProviderOptionDto](docs/EmbeddingAiProviderOptionDto.md)
+- [EmbeddingProviderHealthDto](docs/EmbeddingProviderHealthDto.md)
+- [EmbeddingRebuildResponseDto](docs/EmbeddingRebuildResponseDto.md)
 - [EmbeddingRecalibrateResponseDto](docs/EmbeddingRecalibrateResponseDto.md)
 - [EmbeddingReindexResponseDto](docs/EmbeddingReindexResponseDto.md)
+- [EmbeddingSettingValueDto](docs/EmbeddingSettingValueDto.md)
+- [EmbeddingSettingsResponseDto](docs/EmbeddingSettingsResponseDto.md)
+- [EmbeddingSpaceStatsDto](docs/EmbeddingSpaceStatsDto.md)
+- [EmbeddingStatsDto](docs/EmbeddingStatsDto.md)
 - [EmbeddingStatusResponseDto](docs/EmbeddingStatusResponseDto.md)
 - [EvidenceEntityDto](docs/EvidenceEntityDto.md)
 - [ExclusionRuleDto](docs/ExclusionRuleDto.md)
@@ -478,6 +489,7 @@ All URIs are relative to *http://localhost*
 - [NotebookDto](docs/NotebookDto.md)
 - [NotebookExecutionDto](docs/NotebookExecutionDto.md)
 - [NotebookScaffoldDto](docs/NotebookScaffoldDto.md)
+- [NotebookTemplateDto](docs/NotebookTemplateDto.md)
 - [NotificationListResponseDto](docs/NotificationListResponseDto.md)
 - [NotificationResponseDto](docs/NotificationResponseDto.md)
 - [NotificationsControllerDeleteNotification200Response](docs/NotificationsControllerDeleteNotification200Response.md)
@@ -596,6 +608,8 @@ All URIs are relative to *http://localhost*
 - [UpdateCorrelationConfigDto](docs/UpdateCorrelationConfigDto.md)
 - [UpdateCustomDetectorDto](docs/UpdateCustomDetectorDto.md)
 - [UpdateEdgeDto](docs/UpdateEdgeDto.md)
+- [UpdateEmbeddingSettingsDto](docs/UpdateEmbeddingSettingsDto.md)
+- [UpdateEmbeddingSettingsResponseDto](docs/UpdateEmbeddingSettingsResponseDto.md)
 - [UpdateEvidenceNoteDto](docs/UpdateEvidenceNoteDto.md)
 - [UpdateFindingDto](docs/UpdateFindingDto.md)
 - [UpdateInquiryDto](docs/UpdateInquiryDto.md)

@@ -3632,6 +3632,210 @@
             }
           ]
         }
+      },
+      {
+        "name": "Parse files of any format",
+        "description": "Turns a PDF, image, spreadsheet or JSON payload into text with parse(), the same parser every built-in source uses. Keeps the raw bytes on the asset so the image and binary detectors see the real file.",
+        "config": {
+          "type": "CUSTOM",
+          "required": {
+            "notebook": {
+              "revision": 1,
+              "cells": [
+                {
+                  "id": "intro",
+                  "type": "markdown",
+                  "source": "# Parsing files\n\n`parse()` takes a path, raw bytes, an open handle or a file from `ctx.files`,\nworks out what it is, and extracts its text. PDF, DOCX, XLSX, PPTX, ODF, EML,\nMSG, RTF, HTML, JSON, CSV, Parquet, archives and images all go through it, and\nan image or a scanned PDF is OCR'd.\n\nIt never raises: a corrupt file comes back with `.error` set and empty text, so\none bad attachment costs one asset rather than the run.\n\nTwo fields, and why you want both:\n\n- `content=` is the text detectors read.\n- `content_bytes=` is the file itself. Set it and the image, binary and\n  file-metadata detectors work too, and the asset keeps its real MIME type.\n\nFor something too large to hold whole -- a Parquet dump, a million-line CSV --\nuse `pages()` instead and emit an asset per page.\n"
+                },
+                {
+                  "id": "imports",
+                  "type": "code",
+                  "source": "from classifyre import Asset, ctx, pages, parse\n"
+                },
+                {
+                  "id": "test-connection",
+                  "type": "code",
+                  "source": "def test_connection() -> dict:\n    \"\"\"Nothing to reach: this connector reads files it is given.\"\"\"\n    return {\"status\": \"SUCCESS\", \"message\": f\"{len(ctx.files)} file(s) available.\"}\n"
+                },
+                {
+                  "id": "extract",
+                  "type": "code",
+                  "source": "def extract():\n    \"\"\"One asset per file, with both its text and its bytes.\"\"\"\n    for file in ctx.files:\n        parsed = file.parse()\n        if parsed.error:\n            # Worth recording rather than skipping: a file that cannot be read\n            # is a fact about the source, not an absence.\n            ctx.log(f\"could not parse {file.name}: {parsed.error}\")\n            continue\n\n        yield Asset(\n            id=file.name,\n            name=file.name,\n            kind=\"file\",\n            content=parsed.text,\n            # The bytes, so the image/binary detectors run against the real file\n            # rather than against extracted text.\n            content_bytes=file.read_bytes(),\n            mime_type=parsed.mime_type,\n            metadata={\"size_bytes\": file.size_bytes},\n        )\n"
+                },
+                {
+                  "id": "large-files",
+                  "type": "code",
+                  "source": "def extract_large_file():\n    \"\"\"Not part of the contract -- an alternative for a payload too big to hold.\n\n    `pages()` yields rows for a tabular file and lines for anything else, so a\n    multi-gigabyte dump becomes many assets and is never in memory at once.\n    \"\"\"\n    for file in ctx.files:\n        for index, page in enumerate(pages(file, page_size=500)):\n            if ctx.should_abort:\n                return\n            yield Asset(\n                id=f\"{file.name}#{index}\",\n                name=f\"{file.name} (page {index + 1})\",\n                kind=\"table\",\n                content=page,\n            )\n"
+                }
+              ]
+            }
+          },
+          "masked": {
+            "secrets": {}
+          },
+          "optional": {
+            "variables": {},
+            "limits": {
+              "timeout_seconds": 900
+            }
+          },
+          "sampling": {
+            "strategy": "ALL",
+            "rows_per_page": 100
+          }
+        }
+      },
+      {
+        "name": "Read files uploaded to this source",
+        "description": "Reads the files attached to this source through ctx.files. Works in every deployment, including Kubernetes, where there is no local disk to point at.",
+        "config": {
+          "type": "CUSTOM",
+          "required": {
+            "notebook": {
+              "revision": 1,
+              "cells": [
+                {
+                  "id": "intro",
+                  "type": "markdown",
+                  "source": "# Uploaded files\n\nUpload files to this source in the form above and they arrive as `ctx.files`.\n\nThey are downloaded to local disk before any cell runs, so each one is an\nordinary path:\n\n- `ctx.files` -- every file, ordered by name\n- `ctx.file(\"dump.csv\")` -- one by name\n- `file.path` / `file.open()` / `file.read_bytes()` / `file.read_text()`\n- `file.parse()` -- text extraction for any format\n- `file.pages()` -- read it a page at a time instead of whole\n\nThis is the mechanism to use in a Kubernetes deployment: the runner is an\nephemeral pod with no filesystem of yours to reach, so files travel with the\nsource. On desktop you can also point at a folder instead -- see the\n\"Read a folder on this machine\" template.\n"
+                },
+                {
+                  "id": "imports",
+                  "type": "code",
+                  "source": "from classifyre import Asset, ctx\n"
+                },
+                {
+                  "id": "test-connection",
+                  "type": "code",
+                  "source": "def test_connection() -> dict:\n    if not ctx.files:\n        return {\n            \"status\": \"FAILURE\",\n            \"message\": \"No files uploaded to this source yet.\",\n        }\n    names = \", \".join(file.name for file in ctx.files[:5])\n    return {\"status\": \"SUCCESS\", \"message\": f\"{len(ctx.files)} file(s): {names}\"}\n"
+                },
+                {
+                  "id": "extract",
+                  "type": "code",
+                  "source": "def extract():\n    for file in ctx.files:\n        if ctx.should_abort:\n            return\n        yield Asset(\n            id=file.name,\n            name=file.name,\n            kind=\"file\",\n            content=file.parse().text,\n            content_bytes=file.read_bytes(),\n            metadata={\"size_bytes\": file.size_bytes},\n        )\n"
+                },
+                {
+                  "id": "one-file",
+                  "type": "code",
+                  "source": "def extract_one_known_file():\n    \"\"\"When the connector expects a particular file rather than all of them.\n\n    `ctx.file(...)` raises with the names that *are* there, so a renamed upload\n    is a clear message rather than an empty scan.\n    \"\"\"\n    manifest = ctx.file(\"manifest.json\")\n    for line in manifest.read_text().splitlines():\n        yield Asset(id=line, content=line)\n"
+                }
+              ]
+            }
+          },
+          "masked": {
+            "secrets": {}
+          },
+          "optional": {
+            "variables": {},
+            "limits": {
+              "timeout_seconds": 900
+            }
+          },
+          "sampling": {
+            "strategy": "ALL",
+            "rows_per_page": 100
+          }
+        }
+      },
+      {
+        "name": "Read a folder on this machine (desktop)",
+        "description": "Walks a folder configured on the source and turns each file into an asset. Desktop only -- a Kubernetes deployment has no such machine, so upload the files to the source instead.",
+        "config": {
+          "type": "CUSTOM",
+          "required": {
+            "notebook": {
+              "revision": 1,
+              "cells": [
+                {
+                  "id": "intro",
+                  "type": "markdown",
+                  "source": "# A folder on this machine\n\nAdd a folder in **Local folders** above and reach it with `ctx.folder(\"name\")`,\nwhich hands back a `pathlib.Path`. Nothing is copied: the notebook opens the\nfiles where they are, which is what makes this workable for a dump too large to\nupload.\n\n**Desktop only.** In a Kubernetes deployment the runner is a pod with none of\nyour filesystem, so saving a source with local folders is refused there. Upload\nthe files to the source instead and read them with `ctx.files`.\n\nThis is a convenience rather than a boundary: the notebook process runs as you\nand can open any path you can. The folder list exists so the connector has a\nname to refer to instead of a hard-coded path.\n"
+                },
+                {
+                  "id": "imports",
+                  "type": "code",
+                  "source": "from pathlib import Path\n\nfrom classifyre import Asset, ctx, parse\n"
+                },
+                {
+                  "id": "test-connection",
+                  "type": "code",
+                  "source": "def test_connection() -> dict:\n    try:\n        root = ctx.folder(\"dumps\")\n    except KeyError as exc:\n        return {\"status\": \"FAILURE\", \"message\": str(exc)}\n    if not root.is_dir():\n        return {\"status\": \"FAILURE\", \"message\": f\"{root} is not a directory.\"}\n    return {\"status\": \"SUCCESS\", \"message\": f\"Reading {root}.\"}\n"
+                },
+                {
+                  "id": "extract",
+                  "type": "code",
+                  "source": "#: Everything else in the folder is skipped rather than guessed at.\nWANTED_SUFFIXES = {\".json\", \".csv\", \".txt\", \".log\", \".pdf\", \".docx\", \".xlsx\"}\n\n\ndef extract():\n    root = ctx.folder(\"dumps\")\n    for path in sorted(root.rglob(\"*\")):\n        # A walk over a real folder can run for a long time, and Python cannot\n        # be interrupted from outside -- this check is what makes Stop work.\n        if ctx.should_abort:\n            return\n        if not path.is_file() or path.suffix.lower() not in WANTED_SUFFIXES:\n            continue\n\n        parsed = parse(path)\n        if parsed.error:\n            ctx.log(f\"skipping {path.name}: {parsed.error}\")\n            continue\n\n        relative = path.relative_to(root)\n        yield Asset(\n            # Relative to the folder, so moving the folder does not orphan every\n            # asset and its findings.\n            id=str(relative),\n            name=path.name,\n            url=path.as_uri(),\n            kind=\"file\",\n            content=parsed.text,\n            content_bytes=path.read_bytes(),\n            mime_type=parsed.mime_type,\n            metadata={\"size_bytes\": path.stat().st_size, \"folder\": str(relative.parent)},\n        )\n"
+                }
+              ]
+            }
+          },
+          "masked": {
+            "secrets": {}
+          },
+          "optional": {
+            "variables": {},
+            "local_folders": [
+              {
+                "name": "dumps",
+                "path": "/absolute/path/to/your/folder"
+              }
+            ],
+            "limits": {
+              "timeout_seconds": 900
+            }
+          },
+          "sampling": {
+            "strategy": "ALL",
+            "rows_per_page": 100
+          }
+        }
+      },
+      {
+        "name": "Linked assets",
+        "description": "Emits assets that reference each other -- a ticket and its attachments, a document and the records it cites -- so the graph shows how they connect.",
+        "config": {
+          "type": "CUSTOM",
+          "required": {
+            "notebook": {
+              "revision": 1,
+              "cells": [
+                {
+                  "id": "intro",
+                  "type": "markdown",
+                  "source": "# Linking assets to each other\n\n`Asset.links` holds the ids of *other assets this notebook yields*. Those\nbecome edges in the graph, and they are what lets a finding on one asset be read\nin the context of the others.\n\nUse the ids you assign, not hashes or URLs -- the runtime resolves them:\n\n    yield Asset(id=\"ticket-1\", links=[\"attachment-1\", \"attachment-2\"])\n    yield Asset(id=\"attachment-1\", ...)\n\nOrder does not matter: a link to an asset yielded later resolves fine. A link to\nan id this run never yields simply has nothing on the other end.\n\nLinks are directional as written. Link both ways when both directions are worth\nfollowing.\n"
+                },
+                {
+                  "id": "imports",
+                  "type": "code",
+                  "source": "from classifyre import Asset, ctx\n"
+                },
+                {
+                  "id": "test-connection",
+                  "type": "code",
+                  "source": "def test_connection() -> dict:\n    return {\"status\": \"SUCCESS\", \"message\": \"Ready.\"}\n"
+                },
+                {
+                  "id": "extract",
+                  "type": "code",
+                  "source": "#: Stand-in for whatever you actually read from. Replace with your own client.\nTICKETS = [\n    {\n        \"id\": \"SUP-1041\",\n        \"title\": \"Refund request\",\n        \"body\": \"Customer asked for a refund on order 88213.\",\n        \"attachments\": [\n            {\"id\": \"SUP-1041-a1\", \"name\": \"receipt.txt\", \"body\": \"Order 88213 - $240.00\"},\n        ],\n        \"related\": [\"SUP-1039\"],\n    },\n    {\n        \"id\": \"SUP-1039\",\n        \"title\": \"Duplicate charge\",\n        \"body\": \"Charged twice for order 88213.\",\n        \"attachments\": [],\n        \"related\": [],\n    },\n]\n\n\ndef extract():\n    for ticket in TICKETS:\n        if ctx.should_abort:\n            return\n\n        attachment_ids = [item[\"id\"] for item in ticket[\"attachments\"]]\n        yield Asset(\n            id=ticket[\"id\"],\n            name=ticket[\"title\"],\n            kind=\"document\",\n            content=ticket[\"body\"],\n            # Both its own attachments and the tickets it references. These are\n            # this notebook's ids; the runtime turns them into graph edges.\n            links=[*attachment_ids, *ticket[\"related\"]],\n            metadata={\"external_id\": ticket[\"id\"]},\n        )\n\n        for attachment in ticket[\"attachments\"]:\n            yield Asset(\n                id=attachment[\"id\"],\n                name=attachment[\"name\"],\n                kind=\"file\",\n                content=attachment[\"body\"],\n                # Linked back, so the edge is followable from either end.\n                links=[ticket[\"id\"]],\n                metadata={\"parent_ticket\": ticket[\"id\"]},\n            )\n"
+                }
+              ]
+            }
+          },
+          "masked": {
+            "secrets": {}
+          },
+          "optional": {
+            "variables": {},
+            "limits": {
+              "timeout_seconds": 900
+            }
+          },
+          "sampling": {
+            "strategy": "ALL",
+            "rows_per_page": 100
+          }
+        }
       }
     ]
 }

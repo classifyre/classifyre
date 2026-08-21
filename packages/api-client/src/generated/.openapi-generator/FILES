@@ -129,8 +129,15 @@ docs/DeleteRunnerResponseDto.md
 docs/DiscoveryRecentRunDto.md
 docs/DiscoveryRunSourceDto.md
 docs/EdgeDetailDto.md
+docs/EmbeddingAiProviderOptionDto.md
+docs/EmbeddingProviderHealthDto.md
+docs/EmbeddingRebuildResponseDto.md
 docs/EmbeddingRecalibrateResponseDto.md
 docs/EmbeddingReindexResponseDto.md
+docs/EmbeddingSettingValueDto.md
+docs/EmbeddingSettingsResponseDto.md
+docs/EmbeddingSpaceStatsDto.md
+docs/EmbeddingStatsDto.md
 docs/EmbeddingStatusResponseDto.md
 docs/EmbeddingsApi.md
 docs/EvidenceEntityDto.md
@@ -205,6 +212,7 @@ docs/NotebookCellDto.md
 docs/NotebookDto.md
 docs/NotebookExecutionDto.md
 docs/NotebookScaffoldDto.md
+docs/NotebookTemplateDto.md
 docs/NotebooksApi.md
 docs/NotificationListResponseDto.md
 docs/NotificationResponseDto.md
@@ -329,6 +337,8 @@ docs/UpdateChatBotDto.md
 docs/UpdateCorrelationConfigDto.md
 docs/UpdateCustomDetectorDto.md
 docs/UpdateEdgeDto.md
+docs/UpdateEmbeddingSettingsDto.md
+docs/UpdateEmbeddingSettingsResponseDto.md
 docs/UpdateEvidenceNoteDto.md
 docs/UpdateFindingDto.md
 docs/UpdateInquiryDto.md
@@ -493,8 +503,15 @@ src/models/DeleteRunnerResponseDto.ts
 src/models/DiscoveryRecentRunDto.ts
 src/models/DiscoveryRunSourceDto.ts
 src/models/EdgeDetailDto.ts
+src/models/EmbeddingAiProviderOptionDto.ts
+src/models/EmbeddingProviderHealthDto.ts
+src/models/EmbeddingRebuildResponseDto.ts
 src/models/EmbeddingRecalibrateResponseDto.ts
 src/models/EmbeddingReindexResponseDto.ts
+src/models/EmbeddingSettingValueDto.ts
+src/models/EmbeddingSettingsResponseDto.ts
+src/models/EmbeddingSpaceStatsDto.ts
+src/models/EmbeddingStatsDto.ts
 src/models/EmbeddingStatusResponseDto.ts
 src/models/EvidenceEntityDto.ts
 src/models/ExclusionRuleDto.ts
@@ -561,6 +578,7 @@ src/models/NotebookCellDto.ts
 src/models/NotebookDto.ts
 src/models/NotebookExecutionDto.ts
 src/models/NotebookScaffoldDto.ts
+src/models/NotebookTemplateDto.ts
 src/models/NotificationListResponseDto.ts
 src/models/NotificationResponseDto.ts
 src/models/NotificationsControllerDeleteNotification200Response.ts
@@ -679,6 +697,8 @@ src/models/UpdateChatBotDto.ts
 src/models/UpdateCorrelationConfigDto.ts
 src/models/UpdateCustomDetectorDto.ts
 src/models/UpdateEdgeDto.ts
+src/models/UpdateEmbeddingSettingsDto.ts
+src/models/UpdateEmbeddingSettingsResponseDto.ts
 src/models/UpdateEvidenceNoteDto.ts
 src/models/UpdateFindingDto.ts
 src/models/UpdateInquiryDto.ts
