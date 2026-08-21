@@ -9528,6 +9528,80 @@
         ]
       }
     },
+    "/embeddings/settings": {
+      "get": {
+        "operationId": "EmbeddingController_getSettings",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmbeddingSettingsResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Embedding configuration for this workspace, the deployment defaults behind it, and corpus size",
+        "tags": [
+          "embeddings"
+        ]
+      },
+      "put": {
+        "operationId": "EmbeddingController_updateSettings",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateEmbeddingSettingsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdateEmbeddingSettingsResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Change embedding configuration; redefining the vector space purges the corpus and re-embeds it",
+        "tags": [
+          "embeddings"
+        ]
+      }
+    },
+    "/embeddings/rebuild": {
+      "post": {
+        "operationId": "EmbeddingController_rebuild",
+        "parameters": [],
+        "responses": {
+          "202": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmbeddingRebuildResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Purge every stored vector for this workspace and re-embed the corpus from scratch",
+        "tags": [
+          "embeddings"
+        ]
+      }
+    },
     "/embeddings/status": {
       "get": {
         "operationId": "EmbeddingController_status",
@@ -22279,6 +22353,459 @@
           "assets"
         ]
       },
+      "EmbeddingSettingValueDto": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "object",
+            "description": "Value currently in force for this workspace"
+          },
+          "deploymentDefault": {
+            "type": "object",
+            "description": "What the deployment configured (Helm values, or the desktop defaults)"
+          },
+          "overridden": {
+            "type": "boolean",
+            "description": "Whether this workspace overrides the default"
+          }
+        },
+        "required": [
+          "value",
+          "deploymentDefault",
+          "overridden"
+        ]
+      },
+      "EmbeddingAiProviderOptionDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "provider": {
+            "type": "string"
+          },
+          "baseUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "hasApiKey": {
+            "type": "boolean",
+            "description": "Whether an API key is stored for it"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "provider",
+          "hasApiKey"
+        ]
+      },
+      "EmbeddingSpaceStatsDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "provider": {
+            "type": "string"
+          },
+          "model": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "string"
+          },
+          "dimensions": {
+            "type": "number"
+          },
+          "pooling": {
+            "type": "string"
+          },
+          "normalized": {
+            "type": "boolean"
+          },
+          "isActive": {
+            "type": "boolean",
+            "description": "Whether new vectors and searches use this space"
+          },
+          "vectors": {
+            "type": "number"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "lastRecalibratedAt": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "provider",
+          "model",
+          "revision",
+          "dimensions",
+          "pooling",
+          "normalized",
+          "isActive",
+          "vectors",
+          "createdAt"
+        ]
+      },
+      "EmbeddingStatsDto": {
+        "type": "object",
+        "properties": {
+          "spaces": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EmbeddingSpaceStatsDto"
+            }
+          },
+          "vectors": {
+            "type": "number",
+            "description": "Vectors stored in the active space"
+          },
+          "vectorsAllSpaces": {
+            "type": "number",
+            "description": "Vectors across every space — what actually occupies disk"
+          },
+          "storageBytes": {
+            "type": "number",
+            "nullable": true,
+            "description": "Bytes held by the vector table and its HNSW indexes"
+          },
+          "analysisStorageBytes": {
+            "type": "number",
+            "nullable": true,
+            "description": "Bytes held by the evidence-ranking table derived from vectors"
+          },
+          "chunks": {
+            "type": "number",
+            "description": "Text chunks eligible for embedding"
+          },
+          "embeddableFindings": {
+            "type": "number",
+            "description": "Findings carrying embeddable evidence text"
+          },
+          "rankedFindings": {
+            "type": "number",
+            "description": "Findings ranked from the active space"
+          }
+        },
+        "required": [
+          "spaces",
+          "vectors",
+          "vectorsAllSpaces",
+          "chunks",
+          "embeddableFindings",
+          "rankedFindings"
+        ]
+      },
+      "EmbeddingSettingsResponseDto": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "description": "Semantic embedding is on for this workspace"
+          },
+          "provider": {
+            "type": "string",
+            "description": "transformers-js (local inference) or openai-compatible"
+          },
+          "model": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "string"
+          },
+          "dimensions": {
+            "type": "number"
+          },
+          "pooling": {
+            "type": "string"
+          },
+          "normalize": {
+            "type": "boolean"
+          },
+          "batchSize": {
+            "type": "number"
+          },
+          "workerConcurrency": {
+            "type": "number"
+          },
+          "maxParallelCalls": {
+            "type": "number"
+          },
+          "intraOpThreads": {
+            "type": "number"
+          },
+          "dtype": {
+            "type": "string"
+          },
+          "device": {
+            "type": "string"
+          },
+          "autoBackfill": {
+            "type": "boolean"
+          },
+          "hnswM": {
+            "type": "number"
+          },
+          "hnswEfConstruction": {
+            "type": "number"
+          },
+          "hnswEfSearch": {
+            "type": "number"
+          },
+          "aiProviderConfigId": {
+            "type": "string",
+            "nullable": true,
+            "description": "AI provider supplying the remote embedding endpoint and key"
+          },
+          "allowRemoteModels": {
+            "type": "boolean",
+            "description": "Whether this deployment may download models from Hugging Face. False in the packaged desktop app, which ships one pinned model and runs offline — so a different local model cannot be fetched there."
+          },
+          "fields": {
+            "type": "object",
+            "description": "Per-field deployment defaults and whether this workspace overrides them",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/EmbeddingSettingValueDto"
+            }
+          },
+          "aiProviders": {
+            "description": "AI providers available to serve embeddings",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EmbeddingAiProviderOptionDto"
+            }
+          },
+          "rebuildTriggerFields": {
+            "description": "Fields that redefine the vector space, so changing them forces a rebuild",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "stats": {
+            "$ref": "#/components/schemas/EmbeddingStatsDto"
+          },
+          "rebuildRunning": {
+            "type": "boolean",
+            "description": "A rebuild is in flight right now"
+          },
+          "rebuildStartedAt": {
+            "type": "string",
+            "nullable": true
+          },
+          "rebuildCompletedAt": {
+            "type": "string",
+            "nullable": true
+          },
+          "rebuildError": {
+            "type": "string",
+            "nullable": true
+          },
+          "rebuildReason": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "enabled",
+          "provider",
+          "model",
+          "revision",
+          "dimensions",
+          "pooling",
+          "normalize",
+          "batchSize",
+          "workerConcurrency",
+          "maxParallelCalls",
+          "intraOpThreads",
+          "dtype",
+          "device",
+          "autoBackfill",
+          "hnswM",
+          "hnswEfConstruction",
+          "hnswEfSearch",
+          "allowRemoteModels",
+          "fields",
+          "aiProviders",
+          "rebuildTriggerFields",
+          "stats",
+          "rebuildRunning"
+        ]
+      },
+      "UpdateEmbeddingSettingsDto": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "provider": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "transformers-js",
+              "openai-compatible"
+            ]
+          },
+          "model": {
+            "type": "string",
+            "nullable": true
+          },
+          "revision": {
+            "type": "string",
+            "nullable": true
+          },
+          "dimensions": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1,
+            "maximum": 2000
+          },
+          "pooling": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "mean",
+              "cls",
+              "none"
+            ]
+          },
+          "normalize": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "aiProviderConfigId": {
+            "type": "string",
+            "nullable": true
+          },
+          "batchSize": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1,
+            "maximum": 256
+          },
+          "workerConcurrency": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1,
+            "maximum": 32
+          },
+          "maxParallelCalls": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1,
+            "maximum": 32
+          },
+          "intraOpThreads": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1,
+            "maximum": 16
+          },
+          "dtype": {
+            "type": "string",
+            "nullable": true
+          },
+          "device": {
+            "type": "string",
+            "nullable": true
+          },
+          "autoBackfill": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "hnswM": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 2,
+            "maximum": 100
+          },
+          "hnswEfConstruction": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 4,
+            "maximum": 2000
+          },
+          "hnswEfSearch": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 1,
+            "maximum": 2000
+          }
+        }
+      },
+      "UpdateEmbeddingSettingsResponseDto": {
+        "type": "object",
+        "properties": {
+          "settings": {
+            "$ref": "#/components/schemas/EmbeddingSettingsResponseDto"
+          },
+          "rebuildStarted": {
+            "type": "boolean",
+            "description": "The change redefined the vector space, so a rebuild was started"
+          },
+          "changedFields": {
+            "description": "Fields whose value changed",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "settings",
+          "rebuildStarted",
+          "changedFields"
+        ]
+      },
+      "EmbeddingRebuildResponseDto": {
+        "type": "object",
+        "properties": {
+          "started": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "started"
+        ]
+      },
+      "EmbeddingProviderHealthDto": {
+        "type": "object",
+        "properties": {
+          "workerDisabled": {
+            "type": "boolean",
+            "description": "The local inference worker is paused after repeated native failures"
+          },
+          "workerRetryAt": {
+            "type": "string",
+            "nullable": true,
+            "description": "When the paused worker is probed again"
+          },
+          "requestErrorCount": {
+            "type": "number"
+          },
+          "lastRequestError": {
+            "type": "string",
+            "nullable": true
+          },
+          "lastRequestErrorAt": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "workerDisabled",
+          "requestErrorCount"
+        ]
+      },
       "EmbeddingStatusResponseDto": {
         "type": "object",
         "properties": {
@@ -22349,6 +22876,40 @@
           "lastRecalibrationError": {
             "type": "string",
             "nullable": true
+          },
+          "embeddedRows": {
+            "type": "number",
+            "nullable": true,
+            "description": "Vectors stored in the active space"
+          },
+          "pendingEmbedJobs": {
+            "type": "number",
+            "nullable": true,
+            "description": "Embedding batches queued, active or deferred"
+          },
+          "embedJobFailureCount": {
+            "type": "number",
+            "description": "Embedding batches that failed since startup"
+          },
+          "lastEmbedJobError": {
+            "type": "string",
+            "nullable": true
+          },
+          "lastEmbedJobErrorAt": {
+            "type": "string",
+            "nullable": true
+          },
+          "lastEmbedSuccessAt": {
+            "type": "string",
+            "nullable": true
+          },
+          "providerHealth": {
+            "description": "Inference worker health and circuit-breaker state",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EmbeddingProviderHealthDto"
+              }
+            ]
           }
         },
         "required": [
@@ -22364,7 +22925,9 @@
           "autoBackfill",
           "backfillRunning",
           "recalibrationScheduled",
-          "recalibrationRunning"
+          "recalibrationRunning",
+          "embedJobFailureCount",
+          "providerHealth"
         ]
       },
       "EmbeddingReindexResponseDto": {

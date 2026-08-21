@@ -175,10 +175,13 @@ All URIs are relative to *http://localhost*
 *EmbeddingsApi* | [**embeddingControllerBoilerplate**](docs/EmbeddingsApi.md#embeddingcontrollerboilerplate) | **GET** /sources/{sourceId}/boilerplate-clusters | Near-duplicate finding clusters in a source (repeated boilerplate)
 *EmbeddingsApi* | [**embeddingControllerBoilerplateGlobal**](docs/EmbeddingsApi.md#embeddingcontrollerboilerplateglobal) | **GET** /embeddings/boilerplate-clusters | Near-duplicate finding clusters across the corpus, optionally filtered to specific sources
 *EmbeddingsApi* | [**embeddingControllerChunks**](docs/EmbeddingsApi.md#embeddingcontrollerchunks) | **POST** /sources/{sourceId}/embeddings/chunks | Store asset chunk-to-content mappings
+*EmbeddingsApi* | [**embeddingControllerGetSettings**](docs/EmbeddingsApi.md#embeddingcontrollergetsettings) | **GET** /embeddings/settings | Embedding configuration for this workspace, the deployment defaults behind it, and corpus size
+*EmbeddingsApi* | [**embeddingControllerRebuild**](docs/EmbeddingsApi.md#embeddingcontrollerrebuild) | **POST** /embeddings/rebuild | Purge every stored vector for this workspace and re-embed the corpus from scratch
 *EmbeddingsApi* | [**embeddingControllerRecalibrate**](docs/EmbeddingsApi.md#embeddingcontrollerrecalibrate) | **POST** /embeddings/recalibrate | Schedule a full evidence-ranking recalibration pass (importance scores, outliers, near-duplicate groups)
 *EmbeddingsApi* | [**embeddingControllerReindex**](docs/EmbeddingsApi.md#embeddingcontrollerreindex) | **POST** /embeddings/reindex | Reconcile stored findings and asset chunks into the configured embedding space
 *EmbeddingsApi* | [**embeddingControllerSimilar**](docs/EmbeddingsApi.md#embeddingcontrollersimilar) | **GET** /findings/{findingId}/similar | Find semantically similar findings with ranking evidence
 *EmbeddingsApi* | [**embeddingControllerStatus**](docs/EmbeddingsApi.md#embeddingcontrollerstatus) | **GET** /embeddings/status | Get semantic storage and search capability
+*EmbeddingsApi* | [**embeddingControllerUpdateSettings**](docs/EmbeddingsApi.md#embeddingcontrollerupdatesettings) | **PUT** /embeddings/settings | Change embedding configuration; redefining the vector space purges the corpus and re-embeds it
 *FindingsApi* | [**findingsControllerBulkUpdate**](docs/FindingsApi.md#findingscontrollerbulkupdate) | **POST** /findings/bulk-update | Bulk update findings
 *FindingsApi* | [**findingsControllerCreate**](docs/FindingsApi.md#findingscontrollercreate) | **POST** /findings/create | Create a new finding
 *FindingsApi* | [**findingsControllerFindOne**](docs/FindingsApi.md#findingscontrollerfindone) | **GET** /findings/{id} | Get a finding by ID
@@ -410,8 +413,15 @@ All URIs are relative to *http://localhost*
 - [DiscoveryRecentRunDto](docs/DiscoveryRecentRunDto.md)
 - [DiscoveryRunSourceDto](docs/DiscoveryRunSourceDto.md)
 - [EdgeDetailDto](docs/EdgeDetailDto.md)
+- [EmbeddingAiProviderOptionDto](docs/EmbeddingAiProviderOptionDto.md)
+- [EmbeddingProviderHealthDto](docs/EmbeddingProviderHealthDto.md)
+- [EmbeddingRebuildResponseDto](docs/EmbeddingRebuildResponseDto.md)
 - [EmbeddingRecalibrateResponseDto](docs/EmbeddingRecalibrateResponseDto.md)
 - [EmbeddingReindexResponseDto](docs/EmbeddingReindexResponseDto.md)
+- [EmbeddingSettingValueDto](docs/EmbeddingSettingValueDto.md)
+- [EmbeddingSettingsResponseDto](docs/EmbeddingSettingsResponseDto.md)
+- [EmbeddingSpaceStatsDto](docs/EmbeddingSpaceStatsDto.md)
+- [EmbeddingStatsDto](docs/EmbeddingStatsDto.md)
 - [EmbeddingStatusResponseDto](docs/EmbeddingStatusResponseDto.md)
 - [EvidenceEntityDto](docs/EvidenceEntityDto.md)
 - [ExclusionRuleDto](docs/ExclusionRuleDto.md)
@@ -596,6 +606,8 @@ All URIs are relative to *http://localhost*
 - [UpdateCorrelationConfigDto](docs/UpdateCorrelationConfigDto.md)
 - [UpdateCustomDetectorDto](docs/UpdateCustomDetectorDto.md)
 - [UpdateEdgeDto](docs/UpdateEdgeDto.md)
+- [UpdateEmbeddingSettingsDto](docs/UpdateEmbeddingSettingsDto.md)
+- [UpdateEmbeddingSettingsResponseDto](docs/UpdateEmbeddingSettingsResponseDto.md)
 - [UpdateEvidenceNoteDto](docs/UpdateEvidenceNoteDto.md)
 - [UpdateFindingDto](docs/UpdateFindingDto.md)
 - [UpdateInquiryDto](docs/UpdateInquiryDto.md)

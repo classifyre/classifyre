@@ -6,6 +6,7 @@ import {
   HttpStatus,
   Param,
   Post,
+  Put,
   Query,
 } from '@nestjs/common';
 import {
@@ -28,6 +29,47 @@ import {
 } from './dto/embedding.dto';
 import { EmbeddingQueueService } from './embedding-queue.service';
 import { InternalOnly } from '../internal-only.decorator';
+import { AiProviderConfigService } from '../ai-provider-config.service';
+import {
+  EmbeddingSettingsService,
+  SPACE_DEFINING_FIELDS,
+  type ResolvedEmbeddingConfig,
+} from './embedding-settings.service';
+import { EmbeddingStatsService } from './embedding-stats.service';
+import { EmbeddingRebuildService } from './embedding-rebuild.service';
+import {
+  EmbeddingRebuildResponseDto,
+  EmbeddingSettingsResponseDto,
+  EmbeddingSettingValueDto,
+  UpdateEmbeddingSettingsDto,
+  UpdateEmbeddingSettingsResponseDto,
+} from './dto/embedding-settings.dto';
+
+/**
+ * Knobs the settings page exposes. Deliberately narrower than
+ * ResolvedEmbeddingConfig: cacheDir, localModelPath and the queue-internal
+ * pacing values are deployment concerns (a path inside a container, a pg-boss
+ * fetch-size trade-off) that no workspace should be retuning from a browser.
+ */
+const EXPOSED_FIELDS = [
+  'enabled',
+  'provider',
+  'model',
+  'revision',
+  'dimensions',
+  'pooling',
+  'normalize',
+  'batchSize',
+  'workerConcurrency',
+  'maxParallelCalls',
+  'intraOpThreads',
+  'dtype',
+  'device',
+  'autoBackfill',
+  'hnswM',
+  'hnswEfConstruction',
+  'hnswEfSearch',
+] as const satisfies readonly (keyof ResolvedEmbeddingConfig)[];
 
 @ApiTags('embeddings')
 @Controller()
@@ -35,7 +77,123 @@ export class EmbeddingController {
   constructor(
     private readonly embeddings: EmbeddingService,
     private readonly queue: EmbeddingQueueService,
+    private readonly settings: EmbeddingSettingsService,
+    private readonly stats: EmbeddingStatsService,
+    private readonly rebuilds: EmbeddingRebuildService,
+    private readonly aiProviders: AiProviderConfigService,
   ) {}
+
+  @Get('embeddings/settings')
+  @ApiOperation({
+    summary:
+      'Embedding configuration for this workspace, the deployment defaults behind it, and corpus size',
+  })
+  @ApiOkResponse({ type: EmbeddingSettingsResponseDto })
+  async getSettings(): Promise<EmbeddingSettingsResponseDto> {
+    return this.describeSettings();
+  }
+
+  @Put('embeddings/settings')
+  @ApiOperation({
+    summary:
+      'Change embedding configuration; redefining the vector space purges the corpus and re-embeds it',
+  })
+  @ApiOkResponse({ type: UpdateEmbeddingSettingsResponseDto })
+  async updateSettings(
+    @Body() dto: UpdateEmbeddingSettingsDto,
+  ): Promise<UpdateEmbeddingSettingsResponseDto> {
+    const { requiresRebuild, changedFields } = await this.settings.update(dto);
+
+    // Started here rather than left to the operator: a workspace whose stored
+    // vectors no longer match its configuration would keep answering searches
+    // with distances that mean nothing. There is no useful state between the
+    // two configurations, so the change and the rebuild are one action.
+    let rebuildStarted = false;
+    if (requiresRebuild) {
+      rebuildStarted = this.rebuilds.start(
+        `Configuration changed: ${changedFields.join(', ')}`,
+      ).started;
+    }
+
+    return {
+      settings: await this.describeSettings(),
+      rebuildStarted,
+      changedFields,
+    };
+  }
+
+  @Post('embeddings/rebuild')
+  @HttpCode(HttpStatus.ACCEPTED)
+  @ApiOperation({
+    summary:
+      'Purge every stored vector for this workspace and re-embed the corpus from scratch',
+  })
+  @ApiAcceptedResponse({ type: EmbeddingRebuildResponseDto })
+  rebuild(): EmbeddingRebuildResponseDto {
+    return this.rebuilds.start('Requested from the settings page');
+  }
+
+  private async describeSettings(): Promise<EmbeddingSettingsResponseDto> {
+    const [effective, overrides, providers] = await Promise.all([
+      this.settings.resolve(),
+      this.settings.overrides(),
+      this.aiProviders.list().catch(() => []),
+    ]);
+    const defaults = this.settings.deploymentDefaults();
+    const space = effective.enabled
+      ? await this.embeddings.configuredSpace().catch(() => null)
+      : null;
+    const stats = await this.stats.collect(space?.id);
+
+    const fields: Record<string, EmbeddingSettingValueDto> = {};
+    for (const field of EXPOSED_FIELDS) {
+      fields[field] = {
+        value: effective[field],
+        deploymentDefault: defaults[field],
+        overridden:
+          overrides != null &&
+          (overrides as Record<string, unknown>)[field] !== null &&
+          (overrides as Record<string, unknown>)[field] !== undefined,
+      };
+    }
+
+    return {
+      enabled: effective.enabled,
+      provider: effective.provider,
+      model: effective.model,
+      revision: effective.revision,
+      dimensions: effective.dimensions,
+      pooling: effective.pooling,
+      normalize: effective.normalize,
+      batchSize: effective.batchSize,
+      workerConcurrency: effective.workerConcurrency,
+      maxParallelCalls: effective.maxParallelCalls,
+      intraOpThreads: effective.intraOpThreads,
+      dtype: effective.dtype,
+      device: effective.device,
+      autoBackfill: effective.autoBackfill,
+      hnswM: effective.hnswM,
+      hnswEfConstruction: effective.hnswEfConstruction,
+      hnswEfSearch: effective.hnswEfSearch,
+      aiProviderConfigId: effective.aiProviderConfigId ?? null,
+      allowRemoteModels: effective.allowRemoteModels,
+      fields,
+      aiProviders: providers.map((provider) => ({
+        id: provider.id,
+        name: provider.name,
+        provider: provider.provider,
+        baseUrl: provider.baseUrl ?? null,
+        hasApiKey: provider.hasApiKey,
+      })),
+      rebuildTriggerFields: [...SPACE_DEFINING_FIELDS, 'enabled'],
+      stats,
+      rebuildRunning: this.rebuilds.isRunning(),
+      rebuildStartedAt: overrides?.rebuildStartedAt?.toISOString() ?? null,
+      rebuildCompletedAt: overrides?.rebuildCompletedAt?.toISOString() ?? null,
+      rebuildError: overrides?.rebuildError ?? null,
+      rebuildReason: overrides?.rebuildReason ?? null,
+    };
+  }
 
   @Get('embeddings/status')
   @ApiOperation({ summary: 'Get semantic storage and search capability' })

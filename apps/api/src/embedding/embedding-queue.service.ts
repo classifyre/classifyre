@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import type { Job, JobInsert } from 'pg-boss';
 import { ClsService } from 'nestjs-cls';
 import { PrismaService } from '../prisma.service';
@@ -7,6 +7,11 @@ import { PgBossService, pgBossSchemaForId } from '../scheduler/pg-boss.service';
 import { EmbeddingCapabilityService } from './embedding-capability.service';
 import { embeddingContentHash, normalizeEmbeddingText } from './embedding-text';
 import { EmbeddingConfigService } from './embedding-config.service';
+import {
+  resolvedFromEnv,
+  type EmbeddingSettingsService,
+  type ResolvedEmbeddingConfig,
+} from './embedding-settings.service';
 import { EmbeddingProviderService } from './embedding-provider.service';
 import { EmbeddingService } from './embedding.service';
 import { runsBackgroundWorkers } from '../service-role';
@@ -130,7 +135,14 @@ export class EmbeddingQueueService {
     private readonly pgBoss: PgBossService,
     private readonly capability: EmbeddingCapabilityService,
     private readonly cls: ClsService,
+    // Optional and last: the unit tests construct this service positionally.
+    @Optional() private readonly settings?: EmbeddingSettingsService,
   ) {}
+
+  /** Effective configuration for the current namespace. */
+  private get cfg(): ResolvedEmbeddingConfig {
+    return this.settings?.cached() ?? resolvedFromEnv(this.config);
+  }
 
   /** Resolve (or create) the runtime object for the current namespace schema. */
   private runtime(): EmbeddingRuntime {
@@ -182,6 +194,9 @@ export class EmbeddingQueueService {
   private async ensureRuntime(): Promise<EmbeddingRuntime> {
     const rt = this.runtime();
     if (rt.queueName) return rt;
+    // Warms the per-schema configuration cache that every synchronous `cfg`
+    // read below depends on, before the space is bound to it.
+    await this.settings?.resolve();
     await this.capability.ensureReady();
     const space = await this.embeddings.configuredSpace();
     rt.spaceId = space.id;
@@ -199,7 +214,11 @@ export class EmbeddingQueueService {
    * embeddings are disabled.
    */
   async registerForNamespace(): Promise<void> {
-    if (!this.config.enabled) return;
+    // Resolve before the check: a workspace that turned embeddings off in its
+    // settings must not have a worker registered just because the deployment
+    // default says they are on.
+    await this.settings?.resolve();
+    if (!this.cfg.enabled) return;
     const rt = await this.ensureRuntime();
     rt.disposed = false;
     if (!runsBackgroundWorkers()) return;
@@ -209,9 +228,9 @@ export class EmbeddingQueueService {
     await this.pgBoss.work(
       rt.queueName as string,
       {
-        batchSize: this.config.batchSize,
+        batchSize: this.cfg.batchSize,
         localConcurrency: 1,
-        groupConcurrency: this.config.workerConcurrency,
+        groupConcurrency: this.cfg.workerConcurrency,
       },
       (jobs) => this.handle(jobs as Job<EmbeddingJob>[]),
     );
@@ -222,9 +241,9 @@ export class EmbeddingQueueService {
     );
     rt.workerRegistered = true;
     this.logger.log(
-      `Registered persistent embedding worker for space ${rt.spaceId} (batch=${this.config.batchSize}, global concurrency=${this.config.workerConcurrency})`,
+      `Registered persistent embedding worker for space ${rt.spaceId} (batch=${this.cfg.batchSize}, global concurrency=${this.cfg.workerConcurrency})`,
     );
-    if (this.config.autoBackfill) {
+    if (this.cfg.autoBackfill) {
       const ctx = rt.ctx;
       setImmediate(() => this.runCtx(ctx, () => this.requestBackfill()));
     }
@@ -241,7 +260,7 @@ export class EmbeddingQueueService {
   }
 
   enqueue(contents: QueuedContent[]): void {
-    if (!this.config.enabled || !contents.length) return;
+    if (!this.cfg.enabled || !contents.length) return;
     void this.persist(contents).catch((error) => {
       this.logger.error(
         `Failed to persist embedding jobs: ${
@@ -313,10 +332,10 @@ export class EmbeddingQueueService {
       lastEmbedJobErrorAt: rt.lastEmbedJobErrorAt ?? null,
       lastEmbedSuccessAt: rt.lastEmbedSuccessAt ?? null,
       providerHealth: this.provider.status(),
-      provider: this.config.provider,
-      model: this.config.model,
+      provider: this.cfg.provider,
+      model: this.cfg.model,
       spaceId: rt.spaceId,
-      autoBackfill: this.config.autoBackfill,
+      autoBackfill: this.cfg.autoBackfill,
       backfillRunning: Boolean(rt.backfillPromise),
       backfillStartedAt: rt.backfillStartedAt,
       backfillCompletedAt: rt.backfillCompletedAt,
@@ -329,7 +348,7 @@ export class EmbeddingQueueService {
   }
 
   async scheduleRecalibration(): Promise<boolean> {
-    if (!this.config.enabled) return false;
+    if (!this.cfg.enabled) return false;
     try {
       return await this.persistRecalibration();
     } catch (error) {
@@ -353,7 +372,7 @@ export class EmbeddingQueueService {
         ...(singleton ? { singletonKey: rt.spaceId } : {}),
         startAfter: RECALIBRATE_DELAY_SECONDS,
         retryLimit: 3,
-        retryDelay: this.config.retrySeconds,
+        retryDelay: this.cfg.retrySeconds,
         expireInSeconds: 3600,
         retentionSeconds: 86400,
       },
@@ -503,7 +522,7 @@ export class EmbeddingQueueService {
       // would slice nothing, and the loop would emit jobs carrying no chunks —
       // work silently dropped rather than queued.
       const size =
-        Math.max(1, Math.floor(this.config.queueBatchSize) || 0) ||
+        Math.max(1, Math.floor(this.cfg.queueBatchSize) || 0) ||
         DEFAULT_QUEUE_BATCH_SIZE;
       const jobs: JobInsert<EmbeddingJob>[] = [];
       for (let offset = 0; offset < entries.length; offset += size) {
@@ -519,7 +538,7 @@ export class EmbeddingQueueService {
           singletonKey: batchKey(items),
           group: { id: EMBEDDING_GROUP },
           retryLimit: 5,
-          retryDelay: this.config.retrySeconds,
+          retryDelay: this.cfg.retrySeconds,
           retryBackoff: true,
           retryDelayMax: 3600,
           expireInSeconds: 3600,
@@ -565,6 +584,7 @@ export class EmbeddingQueueService {
     try {
       const vectors = await this.provider.embedMany(
         work.map((content) => content.text),
+        this.cfg,
       );
       await this.embeddings.putVectors({
         spaceId: rt.spaceId as string,
@@ -598,7 +618,7 @@ export class EmbeddingQueueService {
     rt.recoveryTimer = setTimeout(() => {
       rt.recoveryTimer = undefined;
       this.runCtx(rt.ctx, () => this.requestBackfill());
-    }, this.config.retrySeconds * 1000);
+    }, this.cfg.retrySeconds * 1000);
   }
 
   private async backfillStoredContent(rt: EmbeddingRuntime): Promise<void> {
@@ -654,7 +674,7 @@ export class EmbeddingQueueService {
     if (!rt.queueName) return;
     // A missing or nonsensical limit must not pause the backfill forever:
     // pacing is an optimisation, and work never waits on a bad setting.
-    const limit = Number(this.config.queueHighWaterMark);
+    const limit = Number(this.cfg.queueHighWaterMark);
     if (!Number.isFinite(limit) || limit <= 0) return;
 
     for (let attempt = 0; !rt.disposed; attempt++) {

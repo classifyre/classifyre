@@ -1,0 +1,232 @@
+---
+sidebarTitle: Embeddings
+title: Embeddings
+description: What embeddings do for an investigation, how to choose a model, and what happens to your data when you change one.
+---
+
+import { Callout } from "nextra/components"
+
+# Embeddings
+
+Open **Settings → Embedding** to see and change how this workspace turns
+evidence into meaning.
+
+Detectors find *matches*. Embeddings are what let Classifyre reason about
+whether two matches are **the same thing said twice**, whether one is
+**unusual for your corpus**, and whether a search for "invoices from a shell
+company" should return a document that never uses either word.
+
+---
+
+## What an embedding actually is
+
+An embedding is a list of numbers — a **vector** — that stands for a piece of
+text's meaning. Text that means similar things gets similar vectors, so
+"meaning" becomes something the database can measure: two pieces of evidence
+are related when their vectors sit close together.
+
+Classifyre embeds two kinds of text:
+
+| What is embedded | Where it comes from |
+| --- | --- |
+| **Evidence text of a finding** | The match itself plus the text before and after it |
+| **Document chunks** | Passages of ingested documents, split during scanning |
+
+Nothing is embedded that a detector did not already surface or that a scan did
+not already read. Turning embeddings off does not change what is scanned — it
+changes what can be *concluded* from it.
+
+---
+
+## What stops working without it
+
+Three features are built directly on this layer, and all three go quiet when
+embeddings are off or still building:
+
+- **Importance ranking** — the 0–1 score that sorts findings by "worth my
+  time" rather than by severity label. See
+  [Ranking & the Semantic Layer](/how-it-works/ranking-and-semantics).
+- **Near-duplicate clusters** — the grouping that collapses one boilerplate
+  template repeated 4,000 times into a single item.
+- **Semantic search and AI answers** — searching by meaning, and the evidence
+  the Assistant and the Harness retrieve to answer questions.
+
+Detectors, scans, findings, assets and cases all keep working normally. What
+you lose is the layer that tells you *which* findings to open first.
+
+---
+
+## Choosing a model
+
+The **Model** section offers two ways to produce vectors.
+
+### Local inference
+
+Runs on the same machine as Classifyre, using Transformers.js. **No evidence
+text leaves the deployment**, which is usually the deciding factor for
+regulated corpora. It costs CPU: embedding a large corpus is the heaviest
+sustained work the system does.
+
+The bundled default, `all-MiniLM-L6-v2`, is small and fast and handles general
+English well. The dropdown offers alternatives that trade speed for quality —
+`bge-base-en-v1.5` is noticeably better at English retrieval and noticeably
+slower, and `multilingual-e5-small` is the one to pick for a corpus that is not
+mostly English.
+
+<Callout type="info">
+  The packaged desktop app ships one pinned model and runs offline. It cannot
+  download a different local model — the settings page says so when that
+  applies. Use a remote provider there, or run a deployment that permits model
+  downloads.
+</Callout>
+
+### Remote provider
+
+Sends evidence text to an OpenAI-compatible embeddings API, using a provider
+you have already saved under [AI Providers](/settings/ai-providers). The
+endpoint and the API key come from that provider, so the credential stays
+encrypted in one place and rotating it fixes every consumer at once.
+
+This moves the CPU cost off your machine and generally improves quality — at
+the price of sending evidence text to a third party. That is a data-governance
+decision, not a performance one.
+
+### Dimensions must match the model
+
+**Dimensions** is not a preference. It is a property of the model you chose,
+and a mismatch fails every batch rather than degrading quietly. Picking a model
+from the dropdown fills in the right number automatically; if you type a custom
+model, you must supply the number its documentation states. Values above 2000
+cannot be indexed for search.
+
+---
+
+## Changing a model rebuilds the corpus
+
+This is the part worth reading before you touch anything.
+
+Vectors are only comparable **within one model**. A distance measured between a
+vector made by one model and a vector made by another is still a number — the
+system will happily sort by it — but it means nothing. There is no partial
+migration and no gradual cutover: the old vectors are not stale, they are
+incompatible.
+
+So when you change any of these, Classifyre deletes the stored vectors and
+embeds the corpus again from scratch:
+
+- Model
+- Revision
+- Dimensions
+- Pooling
+- Normalization
+- Provider (local ↔ remote)
+- Turning embeddings **off** (or back on)
+
+The page tells you what that costs before you confirm — how many vectors and
+how much disk will be deleted.
+
+### What is deleted, and what is not
+
+| Deleted | Kept |
+| --- | --- |
+| Stored vectors for this workspace | Every finding, asset, source and scan |
+| Importance and quality scores derived from them | Cases, leads, events, notes and fingerprints |
+| Near-duplicate groupings | Detector configuration and results |
+
+**Your investigation is not lost.** What resets is the ranking layer: while the
+rebuild runs, importance scores read as zero and near-duplicate clusters are
+unavailable, because the evidence they were computed from no longer exists.
+Both come back on their own — re-embedding is followed automatically by a
+recalibration pass that rewrites the scores.
+
+### It runs in the background
+
+A rebuild walks the entire corpus, so on a real workspace it takes minutes to
+hours. It runs asynchronously: you can close the page, and progress is on the
+same **Corpus** panel — vectors written, batches still queued, and whether a
+reconciliation or recalibration pass is currently running.
+
+You can also start one at any time with **Rebuild now**, which is the right
+move if you suspect the index is incomplete or inconsistent.
+
+---
+
+## Tuning throughput
+
+The **Throughput** settings change how fast vectors are produced and never what
+a vector means, so none of them requires a rebuild.
+
+They do differ in *when* they take hold. Batch size, worker concurrency and
+startup reconciliation are read once, when the embedding worker registers with
+the job queue — so they apply after the service next starts. The rest are read
+per batch and apply to the next one.
+
+| Setting | What it does | Takes effect | When to change it |
+| --- | --- | --- | --- |
+| **Inference batch size** | Rows sent to the model at once | Next service start | Lower it if the machine runs short of memory during scans; raise it on a dedicated server |
+| **Worker concurrency** | Embedding batches processed at once | Next service start | Raise it only when embedding is the bottleneck and the machine has headroom |
+| **Reconcile on startup** | Embed anything missing when the service starts | Next service start | Leave on unless you are deliberately pausing the work |
+| **Inference threads** | CPU threads per batch (local only) | Next batch | Lower it to keep the machine responsive while embedding |
+| **Parallel remote calls** | Concurrent requests (remote only) | Next batch | Match your provider's rate limit |
+
+If the machine is under memory pressure, a smaller batch size is the first
+lever to reach for — it is the single setting that most directly bounds how
+much memory one inference step needs.
+
+---
+
+## Search index settings
+
+**Search index** tunes the HNSW index that makes similarity search fast on
+large corpora.
+
+| Setting | Effect |
+| --- | --- |
+| **Graph degree (m)** | Higher builds a denser, more accurate, larger index |
+| **Build quality (ef_construction)** | Higher builds a better index, more slowly |
+| **Search breadth (ef_search)** | Higher returns better matches, more slowly, at query time |
+
+Only **ef_search** applies to existing data, and it applies to the very next
+query. The other two are baked into an index when it is built, so changing them
+affects indexes created afterwards — in practice, after the next rebuild.
+
+The defaults are appropriate for corpora up to a few million vectors. There is
+rarely a reason to change them without a measured problem.
+
+---
+
+## Defaults, and where they come from
+
+Every setting on this page has a **deployment default** underneath it:
+
+- On **Kubernetes**, from the Helm chart's `api.embedding` values.
+- In the **desktop app**, from the bundled defaults sized to the machine.
+
+The page shows that default under any setting you have overridden, along with
+**Use default** to return to it. An override applies to **one workspace** —
+other workspaces on the same instance are unaffected and continue to follow the
+deployment default, including when an administrator later changes it.
+
+This is deliberate. A workspace holding a multilingual corpus can run a
+multilingual model without forcing that choice — and its cost — on every other
+workspace in the instance.
+
+---
+
+## Reading the Corpus panel
+
+| Figure | Meaning |
+| --- | --- |
+| **Vectors** | Embeddings stored in the active model's space |
+| **On disk** | Space taken by those vectors and their search index |
+| **Text chunks** | Document passages eligible for embedding |
+| **Embeddable findings** | Findings that carry evidence text |
+| **Ranked findings** | Findings that already have an importance score |
+
+The gap between **Embeddable findings** and **Ranked findings** is the honest
+measure of how far along the semantic layer is. While that gap is wide, treat
+importance-sorted views as partial — the Harness does the same, and stands down
+from conclusions that need ranked evidence until coverage is sufficient.
+
+**Vector spaces** lists every coordinate system this workspace holds vectors
+in. After a normal rebuild there is exactly one, marked active.
