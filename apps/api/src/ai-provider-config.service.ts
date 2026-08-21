@@ -55,6 +55,7 @@ export class AiProviderConfigService {
       baseUrl: config.baseUrl,
       contextSize: config.contextSize,
       supportsVision: config.supportsVision,
+      supportsEmbedding: config.supportsEmbedding,
       inputCostPerMTok:
         config.inputCostPerMTok != null
           ? Number(config.inputCostPerMTok)
@@ -104,6 +105,7 @@ export class AiProviderConfigService {
         baseUrl: dto.baseUrl && dto.baseUrl.length > 0 ? dto.baseUrl : null,
         contextSize: dto.contextSize ?? null,
         supportsVision: dto.supportsVision ?? false,
+        supportsEmbedding: dto.supportsEmbedding ?? false,
         inputCostPerMTok: dto.inputCostPerMTok ?? null,
         outputCostPerMTok: dto.outputCostPerMTok ?? null,
       },
@@ -140,6 +142,9 @@ export class AiProviderConfigService {
     }
     if (dto.supportsVision !== undefined) {
       data.supportsVision = dto.supportsVision;
+    }
+    if (dto.supportsEmbedding !== undefined) {
+      data.supportsEmbedding = dto.supportsEmbedding;
     }
     if (dto.inputCostPerMTok !== undefined) {
       data.inputCostPerMTok = dto.inputCostPerMTok;

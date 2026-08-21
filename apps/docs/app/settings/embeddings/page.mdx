@@ -8,8 +8,13 @@ import { Callout } from "nextra/components"
 
 # Embeddings
 
-Open **Settings → Embedding** to see and change how this workspace turns
+Open **Harness AI → Embedding** to see and change how this workspace turns
 evidence into meaning.
+
+Embeddings live beside the Harness rather than in general settings because
+they are the retrieval half of the same AI stack: the model chosen here is what
+the agents' evidence lookups, the Assistant's answers and every semantic search
+actually run against.
 
 Detectors find *matches*. Embeddings are what let Classifyre reason about
 whether two matches are **the same thing said twice**, whether one is
@@ -86,6 +91,12 @@ Sends evidence text to an OpenAI-compatible embeddings API, using a provider
 you have already saved under [AI Providers](/settings/ai-providers). The
 endpoint and the API key come from that provider, so the credential stays
 encrypted in one place and rotating it fixes every consumer at once.
+
+Only providers marked **Embedding model** appear in the picker. Embeddings and
+chat completions are different endpoints with different model names — a chat
+provider selected here would fail on its first batch — so the flag is set
+deliberately when you create or edit the provider. If nothing is listed, the
+page offers a direct link to create one.
 
 This moves the CPU cost off your machine and generally improves quality — at
 the price of sending evidence text to a third party. That is a data-governance
@@ -230,3 +241,17 @@ from conclusions that need ranked evidence until coverage is sufficient.
 
 **Vector spaces** lists every coordinate system this workspace holds vectors
 in. After a normal rebuild there is exactly one, marked active.
+
+---
+
+## Text only, for now
+
+Everything on this page embeds **text**: the evidence around a finding, and
+passages of documents read during a scan. Images are handled elsewhere — by
+vision-capable detectors that classify or read them — and what those detectors
+produce is text, which is then embedded like anything else.
+
+That means an image is currently findable by what a detector *said* about it,
+not by what it looks like. Multimodal embedding models, which place pictures
+and text in a single space so "a photo of a passport" retrieves the picture
+itself, are not wired in.

@@ -72,6 +72,7 @@ type Draft = {
   baseUrl: string;
   contextSize: string;
   supportsVision: boolean;
+  supportsEmbedding: boolean;
   inputCostPerMTok: string;
   outputCostPerMTok: string;
 };
@@ -141,6 +142,7 @@ function buildDraft(config: AiProviderConfigResponseDto | null): Draft {
       baseUrl: "",
       contextSize: "",
       supportsVision: false,
+      supportsEmbedding: false,
       inputCostPerMTok: "",
       outputCostPerMTok: "",
     };
@@ -153,6 +155,7 @@ function buildDraft(config: AiProviderConfigResponseDto | null): Draft {
     baseUrl: config.baseUrl ?? "",
     contextSize: config.contextSize != null ? String(config.contextSize) : "",
     supportsVision: config.supportsVision ?? false,
+    supportsEmbedding: config.supportsEmbedding ?? false,
     inputCostPerMTok:
       config.inputCostPerMTok != null ? String(config.inputCostPerMTok) : "",
     outputCostPerMTok:
@@ -192,6 +195,7 @@ function buildCreatePayload(draft: Draft): CreateAiProviderConfigDto {
       ? { contextSize: parseContextSize(draft.contextSize) }
       : {}),
     supportsVision: draft.supportsVision,
+    supportsEmbedding: draft.supportsEmbedding,
     ...(typeof inputCost === "number" ? { inputCostPerMTok: inputCost } : {}),
     ...(typeof outputCost === "number"
       ? { outputCostPerMTok: outputCost }
@@ -576,6 +580,23 @@ export function AiProviderForm({
                   checked={draft.supportsVision}
                   onCheckedChange={(supportsVision) =>
                     setDraft((current) => ({ ...current, supportsVision }))
+                  }
+                />
+              </div>
+              <div className="flex items-start justify-between gap-4 rounded-[4px] border-2 border-border bg-muted/20 p-4 sm:col-span-2">
+                <div className="space-y-1">
+                  <Label htmlFor="ai-provider-supports-embedding">
+                    {t("aiProvider.supportsEmbedding")}
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    {t("aiProvider.supportsEmbeddingDesc")}
+                  </p>
+                </div>
+                <Switch
+                  id="ai-provider-supports-embedding"
+                  checked={draft.supportsEmbedding}
+                  onCheckedChange={(supportsEmbedding) =>
+                    setDraft((current) => ({ ...current, supportsEmbedding }))
                   }
                 />
               </div>

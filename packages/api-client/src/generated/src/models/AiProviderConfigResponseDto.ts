@@ -74,6 +74,12 @@ export interface AiProviderConfigResponseDto {
      */
     supportsVision: boolean;
     /**
+     * Whether this provider serves an embeddings endpoint. Embeddings and chat completions are separate APIs with separate models, so the embedding configuration only offers providers marked this way.
+     * @type {boolean}
+     * @memberof AiProviderConfigResponseDto
+     */
+    supportsEmbedding: boolean;
+    /**
      * Cost in USD per 1M input tokens. Null when pricing is not configured.
      * @type {number}
      * @memberof AiProviderConfigResponseDto
@@ -124,6 +130,7 @@ export function instanceOfAiProviderConfigResponseDto(value: object): value is A
     if (!('baseUrl' in value) || value['baseUrl'] === undefined) return false;
     if (!('contextSize' in value) || value['contextSize'] === undefined) return false;
     if (!('supportsVision' in value) || value['supportsVision'] === undefined) return false;
+    if (!('supportsEmbedding' in value) || value['supportsEmbedding'] === undefined) return false;
     if (!('inputCostPerMTok' in value) || value['inputCostPerMTok'] === undefined) return false;
     if (!('outputCostPerMTok' in value) || value['outputCostPerMTok'] === undefined) return false;
     if (!('createdAt' in value) || value['createdAt'] === undefined) return false;
@@ -150,6 +157,7 @@ export function AiProviderConfigResponseDtoFromJSONTyped(json: any, ignoreDiscri
         'baseUrl': json['baseUrl'],
         'contextSize': json['contextSize'],
         'supportsVision': json['supportsVision'],
+        'supportsEmbedding': json['supportsEmbedding'],
         'inputCostPerMTok': json['inputCostPerMTok'],
         'outputCostPerMTok': json['outputCostPerMTok'],
         'createdAt': (new Date(json['createdAt'])),
@@ -177,6 +185,7 @@ export function AiProviderConfigResponseDtoToJSONTyped(value?: AiProviderConfigR
         'baseUrl': value['baseUrl'],
         'contextSize': value['contextSize'],
         'supportsVision': value['supportsVision'],
+        'supportsEmbedding': value['supportsEmbedding'],
         'inputCostPerMTok': value['inputCostPerMTok'],
         'outputCostPerMTok': value['outputCostPerMTok'],
         'createdAt': value['createdAt'].toISOString(),

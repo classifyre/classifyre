@@ -9,6 +9,7 @@ import {
   Brain,
   Play,
   SlidersHorizontal,
+  Sparkles,
   Users,
   Workflow,
   type LucideIcon,
@@ -32,6 +33,7 @@ import { HarnessActivity } from "./harness-activity";
 import { HarnessAgents } from "./harness-agents";
 import { HarnessBrief } from "./harness-brief";
 import { HarnessConfig } from "./harness-config";
+import { EmbeddingSettingsCard } from "@/components/embedding-settings-card";
 import { HarnessStatTile } from "./harness-stat-tile";
 import { HarnessUsage, formatCost, formatTokens } from "./harness-usage";
 
@@ -42,7 +44,8 @@ type View =
   | "agents"
   | "memory"
   | "brief"
-  | "config";
+  | "config"
+  | "embedding";
 
 const POLL_MS = 8000;
 
@@ -92,6 +95,10 @@ export function HarnessShell() {
     { value: "memory", label: t("harness.nav.memory"), icon: Brain },
     { value: "brief", label: t("harness.nav.brief"), icon: BookOpen },
     { value: "config", label: t("harness.nav.config"), icon: SlidersHorizontal },
+    // Embeddings sit here rather than in Settings because they are the
+    // retrieval half of the same AI stack: the model chosen here is what the
+    // agents' evidence lookups run against.
+    { value: "embedding", label: t("harness.nav.embedding"), icon: Sparkles },
   ];
 
   return (
@@ -169,6 +176,9 @@ export function HarnessShell() {
         </TabsContent>
         <TabsContent value="brief">
           <HarnessBrief key={`brief-${epoch}`} />
+        </TabsContent>
+        <TabsContent value="embedding">
+          <EmbeddingSettingsCard />
         </TabsContent>
         <TabsContent value="config">
           <HarnessConfig />
