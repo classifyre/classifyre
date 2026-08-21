@@ -104,6 +104,75 @@ test("the contract functions are offered as snippets", async ({
   await expect(suggestions).toContainText("test_connection");
 });
 
+test("an import line offers the runtime's own packages, with versions", async ({
+  mount,
+  page,
+}) => {
+  // The whole point of the read-only package list: an author has no other way
+  // to learn that duckdb is already there, or at which version.
+  const component = await mount(<CellListHarness initialCells={one("")} />);
+  await typeInCell(component, page, "import duck");
+
+  const suggestions = component.locator(".suggest-widget");
+  await expect(suggestions).toBeVisible({ timeout: 10_000 });
+  await expect(suggestions).toContainText("duckdb");
+  await expect(suggestions).toContainText(/duckdb \d+\./);
+});
+
+test("an import line offers the import name, not the distribution name", async ({
+  mount,
+  page,
+}) => {
+  // `pip install beautifulsoup4`, `import bs4`. Offering the wrong half of that
+  // is worse than offering nothing.
+  const component = await mount(<CellListHarness initialCells={one("")} />);
+  await typeInCell(component, page, "from bs");
+
+  const suggestions = component.locator(".suggest-widget");
+  await expect(suggestions).toBeVisible({ timeout: 10_000 });
+  await expect(suggestions).toContainText("bs4");
+  await expect(suggestions).toContainText("beautifulsoup4");
+});
+
+test("an import line does not offer language keywords", async ({
+  mount,
+  page,
+}) => {
+  // "re" prefixes both the `return` keyword and two real modules. On an import
+  // line only the modules can be right, and burying them under the language is
+  // what makes a completion list useless.
+  const component = await mount(<CellListHarness initialCells={one("")} />);
+  await typeInCell(component, page, "import re");
+
+  const suggestions = component.locator(".suggest-widget");
+  await expect(suggestions).toBeVisible({ timeout: 10_000 });
+  await expect(suggestions).toContainText("requests");
+  await expect(suggestions).not.toContainText("return");
+});
+
+test("the SDK sorts above the runtime packages on an import line", async ({
+  mount,
+  page,
+}) => {
+  const component = await mount(<CellListHarness initialCells={one("")} />);
+  await typeInCell(component, page, "from cl");
+
+  const suggestions = component.locator(".suggest-widget");
+  await expect(suggestions).toBeVisible({ timeout: 10_000 });
+  await expect(suggestions.locator(".monaco-list-row").first()).toContainText(
+    "classifyre",
+  );
+});
+
+test("parse() is offered as an SDK global", async ({ mount, page }) => {
+  const component = await mount(<CellListHarness initialCells={one("")} />);
+  await typeInCell(component, page, "par");
+
+  const suggestions = component.locator(".suggest-widget");
+  await expect(suggestions).toBeVisible({ timeout: 10_000 });
+  await expect(suggestions).toContainText("parse");
+});
+
 test("ordinary Python keywords still complete", async ({ mount, page }) => {
   const component = await mount(<CellListHarness initialCells={one("")} />);
   await typeInCell(component, page, "ret");

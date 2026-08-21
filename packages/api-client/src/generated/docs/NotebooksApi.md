@@ -11,6 +11,7 @@ All URIs are relative to *http://localhost*
 | [**notebookControllerGetExecution**](NotebooksApi.md#notebookcontrollergetexecution) | **GET** /notebook/executions/{executionId} | Poll one execution |
 | [**notebookControllerListExecutions**](NotebooksApi.md#notebookcontrollerlistexecutions) | **GET** /sources/{sourceId}/notebook/executions | Recent executions for a source |
 | [**notebookControllerScaffold**](NotebooksApi.md#notebookcontrollerscaffold) | **GET** /notebooks/scaffold | The starter cells and the functions a notebook must define |
+| [**notebookControllerTemplates**](NotebooksApi.md#notebookcontrollertemplates) | **GET** /notebooks/templates | Worked notebooks an author can start from or borrow cells out of |
 | [**notebookControllerUpdate**](NotebooksApi.md#notebookcontrollerupdate) | **PUT** /sources/{sourceId}/notebook | Save a notebook |
 
 
@@ -455,6 +456,63 @@ This endpoint does not need any parameter.
 ### Return type
 
 [**NotebookScaffoldDto**](NotebookScaffoldDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## notebookControllerTemplates
+
+> Array&lt;NotebookTemplateDto&gt; notebookControllerTemplates()
+
+Worked notebooks an author can start from or borrow cells out of
+
+### Example
+
+```ts
+import {
+  Configuration,
+  NotebooksApi,
+} from '@workspace/api-client';
+import type { NotebookControllerTemplatesRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new NotebooksApi();
+
+  try {
+    const data = await api.notebookControllerTemplates();
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+This endpoint does not need any parameter.
+
+### Return type
+
+[**Array&lt;NotebookTemplateDto&gt;**](NotebookTemplateDto.md)
 
 ### Authorization
 

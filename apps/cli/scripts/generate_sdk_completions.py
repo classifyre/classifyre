@@ -30,7 +30,14 @@ from src.notebook.contract import (  # noqa: E402
     OPTIONAL_FUNCTIONS,
     REQUIRED_FUNCTIONS,
 )
-from src.notebook.sdk import Asset, Context  # noqa: E402
+from src.notebook.sdk import (  # noqa: E402
+    Asset,
+    Context,
+    NotebookFile,
+    ParsedContent,
+    pages,
+    parse,
+)
 
 OUTPUT_PATH = (
     CLI_ROOT.parents[1] / "packages" / "schemas" / "src" / "schemas" / "notebook_completions.json"
@@ -156,6 +163,22 @@ def _fields(cls: type) -> list[dict[str, Any]]:
     return fields
 
 
+#: Module-level helpers a notebook can call directly. Offered alongside `ctx`
+#: and `Asset` because `namespace()` pre-binds them, so they are as available as
+#: the import line says they are.
+MODULE_FUNCTIONS = (("parse", parse), ("pages", pages))
+
+
+def _function_entry(name: str, func: Any) -> dict[str, Any]:
+    return {
+        "label": name,
+        "kind": "function",
+        "detail": _signature(func, drop_self=False),
+        "documentation": _summary(func),
+        "insertText": _snippet(name, func),
+    }
+
+
 def build() -> dict[str, Any]:
     return {
         "$comment": (
@@ -178,6 +201,7 @@ def build() -> dict[str, Any]:
                 "documentation": _summary(Asset),
                 "insertText": "Asset",
             },
+            *(_function_entry(name, func) for name, func in MODULE_FUNCTIONS),
         ],
         "objects": {
             "ctx": {"type": "Context", "members": _members(Context)},
@@ -186,6 +210,17 @@ def build() -> dict[str, Any]:
             "Asset": {
                 "documentation": _summary(Asset),
                 "fields": _fields(Asset),
+            },
+            # Returned by `parse()` and reached as `ctx.file(...)`, so an author
+            # who never writes their name still needs their members offered.
+            "ParsedContent": {
+                "documentation": _summary(ParsedContent),
+                "fields": _fields(ParsedContent),
+            },
+            "NotebookFile": {
+                "documentation": _summary(NotebookFile),
+                "fields": _fields(NotebookFile),
+                "members": _members(NotebookFile),
             },
         },
         "contract": {

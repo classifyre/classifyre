@@ -87,6 +87,7 @@ export type {
   CreateNotebookExecutionDto,
   NotebookExecutionDto,
   NotebookScaffoldDto,
+  NotebookTemplateDto,
 } from "./generated/src/models";
 export type {
   EmbeddingReindexResponseDto,

@@ -7,7 +7,9 @@ sampling windows, content caching -- is done here, so a connector author writes
 
 User code runs in a child process (``runner.py``) with a scrubbed environment.
 That process, not an AST check, is what keeps a notebook away from this one's
-credentials.
+credentials. Uploaded files are downloaded *here* for the same reason: fetching
+them needs the API base URL, and the notebook gets the directory rather than the
+means to reach the API itself.
 """
 
 from __future__ import annotations
@@ -27,6 +29,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+import requests
+
 from ...models.generated_input import CustomInput, SamplingStrategy
 from ...models.generated_single_asset_scan_results import (
     AssetType as OutputAssetType,
@@ -37,8 +41,10 @@ from ...models.generated_single_asset_scan_results import (
     SingleAssetScanResults,
 )
 from ...notebook.contract import NotebookContractError, validate_notebook
+from ...notebook.groups import warm_declared_groups
 from ...notebook.packages import install as install_packages
 from ...utils.hashing import hash_id, unhash_id
+from ...utils.source_files import api_base_url, download_source_files
 from ..base import BaseSource
 from .env import scrubbed_environment
 
@@ -77,6 +83,7 @@ class CustomSource(BaseSource):
         self._cells = [cell.model_dump(mode="json") for cell in self.config.required.notebook.cells]
         self._process: subprocess.Popen[str] | None = None
         self._content_dir: Path | None = None
+        self._files_dir: Path | None = None
         self._id_by_hash: dict[str, str] = {}
         self._url_by_hash: dict[str, str] = {}
         self._mime_by_hash: dict[str, str] = {}
@@ -127,10 +134,18 @@ class CustomSource(BaseSource):
         if not report.ok:
             raise NotebookContractError(report)
 
-        # Installed in the parent, before the child is spawned: the child runs
-        # with a scrubbed environment and no package index credentials, and one
-        # install serves every call it will handle.
+        # Both installs happen in the parent, before the child is spawned: the
+        # child runs with a scrubbed environment and no package index
+        # credentials, and one install serves every call it will handle.
+        #
+        # Order matters. Warming a uv group runs `uv sync --frozen`, which
+        # prunes anything `uv pip install` put in the venv -- so the groups the
+        # notebook's imports need go first, and its own declared packages after.
+        warm_declared_groups(self._cells)
         self._install_packages()
+
+        self._assert_folders_exist()
+        files_dir = self._materialize_uploaded_files()
 
         cli_root = Path(__file__).resolve().parents[3]
         process = subprocess.Popen(
@@ -149,6 +164,9 @@ class CustomSource(BaseSource):
             {
                 "recipe": self._plain_recipe(),
                 "cursor": self.sampling_cursor(),
+                # A path, not a URL: the child has no way to reach the API and
+                # is not meant to have one.
+                "filesDir": str(files_dir) if files_dir else None,
             }
         )
 
@@ -178,6 +196,56 @@ class CustomSource(BaseSource):
             raise CustomSourceError(f"Could not install the notebook's packages: {report.error}")
         if report.skipped_reason:
             logger.warning("%s", report.skipped_reason)
+
+    def _local_folders(self) -> list[Any]:
+        optional = self.config.optional
+        return list(getattr(optional, "local_folders", None) or []) if optional else []
+
+    def _assert_folders_exist(self) -> None:
+        """Fail before the run rather than at the first ``ctx.folder(...)``.
+
+        A folder that was renamed or lives on an unmounted drive is a
+        configuration problem, and finding out about it from a traceback inside
+        ``extract()`` costs a run to learn.
+        """
+        for folder in self._local_folders():
+            path = Path(str(folder.path))
+            if not path.is_dir():
+                raise CustomSourceError(
+                    f"Local folder {folder.name!r} points at {path}, which is not a directory. "
+                    "Local folders are only available in the desktop application."
+                )
+
+    def _materialize_uploaded_files(self) -> Path | None:
+        """Download the source's uploaded files so the notebook can open them.
+
+        Downloaded up front rather than on demand because the child process is
+        the *responder* on the NDJSON channel: it has no way to ask for bytes
+        without a second, reverse-direction protocol, and giving it the API URL
+        instead would undo the isolation the child process exists for.
+        """
+        if not self.source_id:
+            return None
+        if self._files_dir is not None:
+            return self._files_dir
+
+        destination = Path(tempfile.mkdtemp(prefix="classifyre-custom-files-"))
+        session = requests.Session()
+        try:
+            count = download_source_files(session, api_base_url(), self.source_id, destination)
+        except Exception as exc:
+            # A connector that talks to an API and ignores ctx.files should not
+            # fail because the files endpoint was unreachable.
+            logger.warning("Could not fetch uploaded files for this source: %s", exc)
+            shutil.rmtree(destination, ignore_errors=True)
+            return None
+        finally:
+            session.close()
+
+        if count:
+            logger.info("Made %d uploaded file(s) available to the notebook", count)
+        self._files_dir = destination
+        return destination
 
     def _send(self, payload: dict[str, Any]) -> None:
         process = self._process
@@ -576,9 +644,11 @@ class CustomSource(BaseSource):
 
     def cleanup(self) -> None:
         self._terminate()
-        if self._content_dir:
-            shutil.rmtree(self._content_dir, ignore_errors=True)
-            self._content_dir = None
+        for attribute in ("_content_dir", "_files_dir"):
+            directory = getattr(self, attribute)
+            if directory:
+                shutil.rmtree(directory, ignore_errors=True)
+                setattr(self, attribute, None)
 
 
 def _describe(error: Any) -> str:

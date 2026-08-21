@@ -44,15 +44,10 @@ export class NotebookService {
    * required function, the example gains a cell, and every surface follows.
    */
   scaffold(): { cells: NotebookCellDto[] } {
-    const path = resolveSchemaFile(__dirname, 'all_input_examples.json');
-    const examples = JSON.parse(fs.readFileSync(path, 'utf8')) as Record<
-      string,
-      Array<{ name?: string; config?: any }>
-    >;
+    const examples = this.customExamples();
     const starter =
-      (examples.CUSTOM ?? []).find(
-        (entry) => entry.name === STARTER_EXAMPLE_NAME,
-      ) ?? (examples.CUSTOM ?? [])[0];
+      examples.find((entry) => entry.name === STARTER_EXAMPLE_NAME) ??
+      examples[0];
     const cells = starter?.config?.required?.notebook?.cells;
     if (!Array.isArray(cells) || cells.length === 0) {
       throw new Error(
@@ -60,6 +55,42 @@ export class NotebookService {
       );
     }
     return { cells: cells as NotebookCellDto[] };
+  }
+
+  /**
+   * Every worked example an author can start from, including the starter.
+   *
+   * The same file the scaffold comes from, for the same reason: the templates
+   * teach the SDK, and a copy of them in the frontend would go stale the moment
+   * the SDK gained a method. An example with no cells is skipped rather than
+   * served -- an empty template in the picker is worse than a missing one.
+   */
+  templates(): Array<{
+    name: string;
+    description: string;
+    cells: NotebookCellDto[];
+  }> {
+    return this.customExamples()
+      .map((entry) => ({
+        name: String(entry.name ?? ''),
+        description: String(entry.description ?? ''),
+        cells: (entry.config?.required?.notebook?.cells ??
+          []) as NotebookCellDto[],
+      }))
+      .filter((entry) => entry.name && entry.cells.length > 0);
+  }
+
+  private customExamples(): Array<{
+    name?: string;
+    description?: string;
+    config?: any;
+  }> {
+    const path = resolveSchemaFile(__dirname, 'all_input_examples.json');
+    const examples = JSON.parse(fs.readFileSync(path, 'utf8')) as Record<
+      string,
+      Array<{ name?: string; description?: string; config?: any }>
+    >;
+    return examples.CUSTOM ?? [];
   }
 
   async getSource(sourceId: string) {

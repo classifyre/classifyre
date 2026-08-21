@@ -11,11 +11,14 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import signal
 import sys
 from typing import Any
 
 from .execute import execute_notebook
+from .files import local_folders
+from .groups import warm_declared_groups
 from .packages import install as install_packages
 from .protocol import (
     RESULT_PREFIX,
@@ -46,12 +49,24 @@ def _string_map(value: Any) -> dict[str, str]:
     return {str(key): str(item) for key, item in value.items() if item is not None}
 
 
+#: Where the API put this source's uploaded files before starting us. Set for an
+#: execution that runs cells; absent for one that only validates.
+NOTEBOOK_FILES_DIR_ENV = "CLASSIFYRE_NOTEBOOK_FILES_DIR"
+
+
 def build_context(recipe: dict[str, Any], *, should_abort: Any = None) -> Context:
-    """The `ctx` a notebook sees, assembled from its recipe."""
+    """The `ctx` a notebook sees, assembled from its recipe.
+
+    Authoring and scanning have to agree here: a cell that reads ``ctx.files``
+    while someone is writing it must see the same files the scan will, or the
+    notebook is tested against a different source than it runs against.
+    """
     return Context(
         variables=_string_map(_section(recipe, "optional").get("variables")),
         secrets=_string_map(_section(recipe, "masked").get("secrets")),
         sampling=_section(recipe, "sampling"),
+        files_dir=os.environ.get(NOTEBOOK_FILES_DIR_ENV) or None,
+        folders=local_folders(recipe),
         should_abort=should_abort,
     )
 
@@ -129,6 +144,10 @@ def run_request(raw_request: dict[str, Any]) -> ExecutionResponse:
     sys.stderr = RedactingStream(sys.stderr, redactor)
 
     warm_interactive_group()
+    # What the notebook imports from the runtime's own optional groups. Warmed
+    # before the declared packages below because `uv sync --frozen` prunes
+    # anything `uv pip install` added -- the reverse order uninstalls them.
+    warm_declared_groups(cells)
 
     # Before any cell: a connector's client library has to be importable by the
     # first line that imports it, and resolving on every Run would make the

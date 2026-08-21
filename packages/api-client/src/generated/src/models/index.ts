@@ -191,6 +191,7 @@ export * from './NotebookCellDto';
 export * from './NotebookDto';
 export * from './NotebookExecutionDto';
 export * from './NotebookScaffoldDto';
+export * from './NotebookTemplateDto';
 export * from './NotificationListResponseDto';
 export * from './NotificationResponseDto';
 export * from './NotificationsControllerDeleteNotification200Response';

@@ -15,6 +15,20 @@
       "detail": "Asset(...)",
       "documentation": "One thing worth scanning.\n\n``id`` is the only field that must be stable across runs: it is what ties\nthis run's asset to the same asset in the last run, so findings, history and\nthe scan cache line up. Everything else can change freely.",
       "insertText": "Asset"
+    },
+    {
+      "label": "parse",
+      "kind": "function",
+      "detail": "(source: 'Any', *, name: 'str' = '', mime_type: 'str | None' = None) -> 'ParsedContent'",
+      "documentation": "Detect a payload's type and extract its text.\n\nAccepts a path, raw bytes, an open binary file, or a ``NotebookFile`` from\n``ctx.files``. ``mime_type`` is a hint: it is trusted over sniffing when the\ncaller already knows, which matters for a payload downloaded from an API\nthat declared one.\n\n    for file in ctx.files:\n        parsed = parse(file)\n        yield Asset(id=file.name, content=parsed.text, content_bytes=file.read_bytes())",
+      "insertText": "parse(${1:source})"
+    },
+    {
+      "label": "pages",
+      "kind": "function",
+      "detail": "(source: 'Any', *, name: 'str' = '', mime_type: 'str | None' = None, page_size: 'int' = 100) -> 'Iterator[str]'",
+      "documentation": "Read a payload in pages instead of all at once.\n\nFor a Parquet file or a large CSV, ``parse()`` materialises the whole thing\nas one string. This yields rows (tabular) or lines (everything else) a page\nat a time, so a multi-gigabyte dump can become many assets without ever\nbeing held whole.\n\n    for index, page in enumerate(pages(ctx.file(\"dump.parquet\"))):\n        yield Asset(id=f\"dump-{index}\", content=page, kind=\"table\")",
+      "insertText": "pages(${1:source})"
     }
   ],
   "objects": {
@@ -27,6 +41,34 @@
           "detail": "dict[str, Any]",
           "documentation": "What the previous run recorded. Empty on the first run.",
           "insertText": "cursor"
+        },
+        {
+          "label": "file",
+          "kind": "method",
+          "detail": "(name: 'str') -> 'NotebookFile'",
+          "documentation": "One uploaded file by name.",
+          "insertText": "file(${1:name})"
+        },
+        {
+          "label": "files",
+          "kind": "property",
+          "detail": "list[NotebookFile]",
+          "documentation": "Files uploaded to this source, already downloaded and on local disk.\n\nEmpty is a normal state, not an error -- a connector that talks to an API\nhas no files. Order is by name, so a notebook that pairs files with each\nother gets the same pairing every run::\n\n    for file in ctx.files:\n        yield Asset(id=file.name, content=file.parse().text)",
+          "insertText": "files"
+        },
+        {
+          "label": "folder",
+          "kind": "method",
+          "detail": "(name: 'str') -> 'Path'",
+          "documentation": "One configured local folder by name.",
+          "insertText": "folder(${1:name})"
+        },
+        {
+          "label": "folders",
+          "kind": "property",
+          "detail": "dict[str, Path]",
+          "documentation": "Local folders this source was configured with, by name.\n\nDesktop only -- a Kubernetes deployment has no filesystem to point at, so\nthe API refuses to save them there and this is empty.",
+          "insertText": "folders"
         },
         {
           "label": "has_secret",
@@ -230,6 +272,116 @@
           "detail": "str | None",
           "required": false,
           "insertText": "location="
+        }
+      ]
+    },
+    "ParsedContent": {
+      "documentation": "What one file turned out to be.\n\n``error`` is populated rather than raised: a corrupt attachment in the\nmiddle of a long scan should cost that one asset, not the run.",
+      "fields": [
+        {
+          "label": "mime_type",
+          "kind": "field",
+          "detail": "str",
+          "required": true,
+          "insertText": "mime_type="
+        },
+        {
+          "label": "text",
+          "kind": "field",
+          "detail": "str",
+          "required": true,
+          "insertText": "text="
+        },
+        {
+          "label": "is_binary",
+          "kind": "field",
+          "detail": "bool",
+          "required": true,
+          "insertText": "is_binary="
+        },
+        {
+          "label": "size_bytes",
+          "kind": "field",
+          "detail": "int",
+          "required": true,
+          "insertText": "size_bytes="
+        },
+        {
+          "label": "error",
+          "kind": "field",
+          "detail": "str | None",
+          "required": false,
+          "insertText": "error="
+        }
+      ]
+    },
+    "NotebookFile": {
+      "documentation": "One file this source can read, already on local disk.\n\nThe bytes are put there before any notebook code runs -- uploaded files are\ndownloaded by the parent process, which is what keeps the notebook away from\nthe API credentials that fetched them. By the time a notebook sees this, it\nis an ordinary path.",
+      "fields": [
+        {
+          "label": "name",
+          "kind": "field",
+          "detail": "str",
+          "required": true,
+          "insertText": "name="
+        },
+        {
+          "label": "path",
+          "kind": "field",
+          "detail": "Path",
+          "required": true,
+          "insertText": "path="
+        },
+        {
+          "label": "size_bytes",
+          "kind": "field",
+          "detail": "int",
+          "required": false,
+          "insertText": "size_bytes="
+        },
+        {
+          "label": "mime_type",
+          "kind": "field",
+          "detail": "str | None",
+          "required": false,
+          "insertText": "mime_type="
+        }
+      ],
+      "members": [
+        {
+          "label": "open",
+          "kind": "method",
+          "detail": "() -> 'IO[bytes]'",
+          "documentation": "A binary handle. The caller closes it.",
+          "insertText": "open()"
+        },
+        {
+          "label": "pages",
+          "kind": "method",
+          "detail": "(page_size: 'int' = 100) -> 'Iterable[str]'",
+          "documentation": "Read this file a page at a time rather than whole.",
+          "insertText": "pages()"
+        },
+        {
+          "label": "parse",
+          "kind": "method",
+          "detail": "() -> 'ParsedContent'",
+          "documentation": "Detect this file's type and extract its text.",
+          "insertText": "parse()"
+        },
+        {
+          "label": "read_bytes",
+          "kind": "method",
+          "detail": "() -> 'bytes'",
+          "documentation": "Every byte, in memory. Prefer ``open()`` or ``pages()`` for a big file.",
+          "insertText": "read_bytes()"
+        },
+        {
+          "label": "read_text",
+          "kind": "method",
+          "detail": "(encoding: 'str' = 'utf-8') -> 'str'",
+          "documentation": "",
+          "insertText": "read_text()"
         }
       ]
     }

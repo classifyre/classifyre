@@ -72,6 +72,29 @@ export function addCell(
   return [...cells.slice(0, position), cell, ...cells.slice(position)];
 }
 
+/**
+ * Append a template's cells to a notebook, renaming any id already taken.
+ *
+ * Appended rather than replacing what is there: a template is something you
+ * borrow from part-way through writing a connector, and losing the work already
+ * on the page to read an example would be a bad trade. Ids are reassigned
+ * because two cells with the same id is a save the API rejects.
+ */
+export function appendCells(
+  cells: NotebookCell[],
+  incoming: NotebookCell[],
+): NotebookCell[] {
+  const next = [...cells];
+  for (const cell of incoming) {
+    const taken = new Set(next.map((existing) => existing.id));
+    next.push({
+      ...cell,
+      id: taken.has(cell.id) ? newCellId(next, cell.type) : cell.id,
+    });
+  }
+  return next;
+}
+
 export function duplicateCell(
   cells: NotebookCell[],
   index: number,

@@ -3704,7 +3704,35 @@
       "nameRequired": "Ein Paketname ist erforderlich.",
       "invalidName": "Verwenden Sie den Namen wie im Index veröffentlicht: Buchstaben, Ziffern, '.', '-' oder '_'.",
       "invalidVersion": "Verwenden Sie eine Version wie 2.2.0 oder einen Spezifizierer wie >=2.0.",
-      "duplicate": "Dieses Paket ist doppelt aufgeführt."
+      "duplicate": "Dieses Paket ist doppelt aufgeführt.",
+      "available": {
+        "title": "Bereits verfügbar ({{count}} Pakete)",
+        "description": "In dieser Version in der Scan-Laufzeit installiert -- importierbar, ohne sie oben aufzuführen. Ein Paket \"bei Bedarf\" wird automatisch installiert, sobald eine Zelle es importiert.",
+        "filter": "Nach Paket- oder Importname filtern",
+        "noMatches": "Kein passendes Paket.",
+        "installed": "installiert",
+        "onDemand": "bei Bedarf"
+      }
+    },
+    "files": {
+      "hint": "Hier hochgeladene Dateien werden vor dem Start des Notebooks auf den Runner geladen und stehen als ctx.files bereit -- file.parse() liest jedes Format. Die Vorlage \"Read files uploaded to this source\" zeigt ein lauffähiges Beispiel."
+    },
+    "folders": {
+      "title": "Lokale Ordner",
+      "description": "Ordner auf diesem Rechner, die das Notebook mit ctx.folder(\"name\") liest. Es wird nichts kopiert. Nur für die Desktop-App: In einer Kubernetes-Installation gibt es keinen solchen Rechner -- laden Sie die Dateien stattdessen zur Quelle hoch.",
+      "empty": "Keine Ordner. Das Notebook liest nur, was Sie hochladen.",
+      "add": "Ordner hinzufügen",
+      "pathPlaceholder": "/absoluter/pfad/zum/ordner",
+      "nameRequired": "Ein Name ist erforderlich -- ihn erwartet ctx.folder().",
+      "invalidName": "Verwenden Sie einen Python-Bezeichner: Buchstaben, Ziffern und '_', nicht mit einer Ziffer beginnend.",
+      "duplicate": "Dieser Name wird doppelt verwendet.",
+      "pathRequired": "Ein Ordnerpfad ist erforderlich.",
+      "pathNotAbsolute": "Verwenden Sie einen absoluten Pfad, etwa /Users/sie/dumps oder C:\\\\data\\\\dumps."
+    },
+    "templates": {
+      "button": "Vorlagen",
+      "hint": "Fügt die Zellen der Vorlage unter Ihren eigenen ein. Nichts wird ersetzt.",
+      "failed": "Vorlagen konnten nicht geladen werden."
     },
     "ai": {
       "title": "KI fragen",

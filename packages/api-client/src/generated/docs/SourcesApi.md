@@ -10,8 +10,8 @@ All URIs are relative to *http://localhost*
 | [**sourceAssetsControllerListSourceAssets**](SourcesApi.md#sourceassetscontrollerlistsourceassets) | **GET** /sources/{sourceId}/assets | List assets for a source |
 | [**sourceFilesControllerContent**](SourcesApi.md#sourcefilescontrollercontent) | **GET** /sources/{sourceId}/files/{fileId}/content | Stream uploaded source file bytes |
 | [**sourceFilesControllerDelete**](SourcesApi.md#sourcefilescontrollerdelete) | **DELETE** /sources/{sourceId}/files/{fileId} | Delete an uploaded source file |
-| [**sourceFilesControllerList**](SourcesApi.md#sourcefilescontrollerlist) | **GET** /sources/{sourceId}/files | List uploaded files for a Sandbox source |
-| [**sourceFilesControllerUpload**](SourcesApi.md#sourcefilescontrollerupload) | **POST** /sources/{sourceId}/files | Upload one file to a Sandbox source |
+| [**sourceFilesControllerList**](SourcesApi.md#sourcefilescontrollerlist) | **GET** /sources/{sourceId}/files | List uploaded files for a source |
+| [**sourceFilesControllerUpload**](SourcesApi.md#sourcefilescontrollerupload) | **POST** /sources/{sourceId}/files | Upload one file to a source |
 | [**sourcesControllerBulkRunSources**](SourcesApi.md#sourcescontrollerbulkrunsources) | **POST** /sources/bulk-run | Start a scan for many data sources at once |
 | [**sourcesControllerBulkUpdateSources**](SourcesApi.md#sourcescontrollerbulkupdatesources) | **POST** /sources/bulk-update | Bulk update data sources |
 | [**sourcesControllerCreateSource**](SourcesApi.md#sourcescontrollercreatesource) | **POST** /sources | Create a new data source |
@@ -463,7 +463,7 @@ No authorization required
 
 > Array&lt;UploadedSourceFileDto&gt; sourceFilesControllerList(sourceId)
 
-List uploaded files for a Sandbox source
+List uploaded files for a source
 
 ### Example
 
@@ -528,7 +528,7 @@ No authorization required
 
 > UploadedSourceFileDto sourceFilesControllerUpload(sourceId, file)
 
-Upload one file to a Sandbox source
+Upload one file to a source
 
 ### Example
 

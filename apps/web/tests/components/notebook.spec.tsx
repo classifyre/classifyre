@@ -4,6 +4,8 @@ import { CellOutput } from "@/components/notebook/cell-output";
 import { CodeCell } from "@/components/notebook/code-cell";
 import { KeyValueField } from "@/components/key-value-field";
 import { PackageTable } from "@/components/notebook/package-table";
+import { AvailablePackages } from "@/components/notebook/available-packages";
+import { LocalFolders } from "@/components/notebook/local-folders";
 import type { KeyValueEntry } from "@/lib/key-value";
 
 // -- output sanitization -----------------------------------------------------
@@ -281,4 +283,88 @@ test("an empty version reads as latest rather than blank", async ({
     "placeholder",
     "latest",
   );
+});
+
+test("the runtime's own packages are listed with their versions", async ({
+  mount,
+}) => {
+  // Collapsed by default: this is a reference, not a decision. Opening it is
+  // the only way an author learns pdfplumber is already there.
+  const component = await mount(<AvailablePackages />);
+  await expect(component.getByText("pdfplumber")).toBeHidden();
+
+  await component.getByRole("button").first().click();
+  await expect(component.getByText("pdfplumber")).toBeVisible();
+  await expect(component.getByText("on demand").first()).toBeVisible();
+});
+
+test("available packages can be searched by import name", async ({ mount }) => {
+  const component = await mount(<AvailablePackages />);
+  await component.getByRole("button").first().click();
+  await component.getByTestId("available-packages-filter").fill("bs4");
+
+  // Searching for what you would type in an import line has to find the
+  // distribution it comes from.
+  await expect(component.getByText("beautifulsoup4")).toBeVisible();
+  await expect(component.getByText("pdfplumber")).toBeHidden();
+});
+
+// -- local folders -----------------------------------------------------------
+
+test("a folder name ctx.folder() could not take is rejected", async ({
+  mount,
+}) => {
+  const component = await mount(
+    <LocalFolders
+      folders={[{ name: "my dumps", path: "/data/dumps" }]}
+      onChange={() => undefined}
+    />,
+  );
+  await expect(component.getByTestId("folder-name-0")).toHaveAttribute(
+    "aria-invalid",
+    "true",
+  );
+});
+
+test("a relative folder path is rejected", async ({ mount }) => {
+  // It would resolve against the runner's working directory, silently reading
+  // nothing rather than failing.
+  const component = await mount(
+    <LocalFolders
+      folders={[{ name: "dumps", path: "./dumps" }]}
+      onChange={() => undefined}
+    />,
+  );
+  await expect(component.getByTestId("folder-name-0")).toHaveAttribute(
+    "aria-invalid",
+    "true",
+  );
+});
+
+test("an absolute folder path is accepted", async ({ mount }) => {
+  const component = await mount(
+    <LocalFolders
+      folders={[{ name: "dumps", path: "/data/dumps" }]}
+      onChange={() => undefined}
+    />,
+  );
+  await expect(component.getByTestId("folder-name-0")).not.toHaveAttribute(
+    "aria-invalid",
+    "true",
+  );
+});
+
+test("the browse button is hidden outside the desktop app", async ({
+  mount,
+}) => {
+  // window.electronAPI is exposed only by the desktop preload script, so in a
+  // browser the field degrades to plain text rather than offering a control
+  // that cannot work.
+  const component = await mount(
+    <LocalFolders
+      folders={[{ name: "dumps", path: "/data/dumps" }]}
+      onChange={() => undefined}
+    />,
+  );
+  await expect(component.getByTestId("browse-folder-path-0")).toHaveCount(0);
 });

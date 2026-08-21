@@ -84,6 +84,20 @@ describe('notebook execution environment', () => {
       expect(isEnvKeyAllowedForNotebooks(key)).toBe(false);
     }
   });
+
+  it('passes through the directory holding the source uploaded files', () => {
+    // ctx.files is a path, not a credential: it is how a notebook reaches its
+    // uploads without holding the means to fetch anything from the API.
+    const env = buildNotebookEnvironment(hostile, {
+      CLASSIFYRE_NOTEBOOK_FILES_DIR: '/tmp/notebook-files-abc',
+    });
+    expect(env.CLASSIFYRE_NOTEBOOK_FILES_DIR).toBe('/tmp/notebook-files-abc');
+    expect(isEnvKeyAllowedForNotebooks('CLASSIFYRE_NOTEBOOK_FILES_DIR')).toBe(
+      true,
+    );
+    // Still nothing to authenticate with.
+    expect(env.CLASSIFYRE_INTERNAL_KEY).toBeUndefined();
+  });
 });
 
 describe('parseNotebookResult', () => {

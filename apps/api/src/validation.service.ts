@@ -72,13 +72,25 @@ export class ValidationService {
   validate(type: string, data: any): Record<string, unknown> {
     const normalizedType = String(type).toUpperCase();
 
-    if (normalizedType === 'LOCAL_FOLDER') {
-      const environment = (
-        process.env.ENVIRONMENT || 'development'
-      ).toLowerCase();
-      if (environment === 'kubernetes') {
+    const environment = (
+      process.env.ENVIRONMENT || 'development'
+    ).toLowerCase();
+    if (normalizedType === 'LOCAL_FOLDER' && environment === 'kubernetes') {
+      throw new BadRequestException(
+        'LOCAL_FOLDER sources are only available in the desktop application',
+      );
+    }
+    // A notebook's local folders are paths on the machine running the app. In
+    // Kubernetes there is no such machine -- the runner is an ephemeral pod --
+    // so the folder would silently be empty rather than wrong. Refused here,
+    // with the mechanism that does work in its place.
+    if (normalizedType === 'CUSTOM' && environment === 'kubernetes') {
+      const folders = (data as { optional?: { local_folders?: unknown[] } })
+        ?.optional?.local_folders;
+      if (Array.isArray(folders) && folders.length > 0) {
         throw new BadRequestException(
-          'LOCAL_FOLDER sources are only available in the desktop application',
+          'Local folders are only available in the desktop application. ' +
+            'Upload the files to this source instead and read them with ctx.files.',
         );
       }
     }

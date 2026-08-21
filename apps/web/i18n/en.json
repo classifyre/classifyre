@@ -3704,7 +3704,35 @@
       "nameRequired": "A package name is required.",
       "invalidName": "Use the name as published on the index: letters, digits, '.', '-' or '_'.",
       "invalidVersion": "Use a version like 2.2.0, or a specifier like >=2.0.",
-      "duplicate": "This package is listed twice."
+      "duplicate": "This package is listed twice.",
+      "available": {
+        "title": "Already available ({{count}} packages)",
+        "description": "Installed in the scan runtime at these versions -- import them without listing them above. An \"on demand\" package is installed automatically the first time a cell imports it.",
+        "filter": "Filter by package or import name",
+        "noMatches": "No package matches that.",
+        "installed": "installed",
+        "onDemand": "on demand"
+      }
+    },
+    "files": {
+      "hint": "Files uploaded here are downloaded to the runner before the notebook starts and arrive as ctx.files -- use file.parse() to read any format. Insert the \"Read files uploaded to this source\" template for a working example."
+    },
+    "folders": {
+      "title": "Local folders",
+      "description": "Folders on this machine the notebook reads with ctx.folder(\"name\"). Nothing is copied. Desktop only: a Kubernetes deployment has no such machine, so upload the files to the source instead.",
+      "empty": "No folders. The notebook reads only what you upload.",
+      "add": "Add folder",
+      "pathPlaceholder": "/absolute/path/to/folder",
+      "nameRequired": "A name is required -- it is what ctx.folder() takes.",
+      "invalidName": "Use a Python identifier: letters, digits and '_', not starting with a digit.",
+      "duplicate": "This name is used twice.",
+      "pathRequired": "A folder path is required.",
+      "pathNotAbsolute": "Use an absolute path, such as /Users/you/dumps or C:\\\\data\\\\dumps."
+    },
+    "templates": {
+      "button": "Templates",
+      "hint": "Adds the template's cells below your own. Nothing is replaced.",
+      "failed": "Templates could not be loaded."
     },
     "ai": {
       "title": "Ask AI",

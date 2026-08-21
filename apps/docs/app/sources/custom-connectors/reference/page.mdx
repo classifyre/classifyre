@@ -126,6 +126,100 @@ file's size all get filled in for you.
 
 ---
 
+## `parse` and `pages`
+
+`from classifyre import pages, parse` — the same extractor every built-in file
+source uses, so a notebook never implements format handling.
+
+### `parse(source, *, name="", mime_type=None) -> ParsedContent`
+
+`source` may be a path, `bytes`, an open binary handle, or a `NotebookFile` from
+`ctx.files`. `mime_type` is a hint, trusted over sniffing when you already know
+it — useful for a payload an API declared.
+
+| Field                | Is                                                          |
+| -------------------- | ----------------------------------------------------------- |
+| `.text`              | Extracted text, ready for `Asset(content=...)`.             |
+| `.mime_type`         | Detected content type.                                      |
+| `.is_binary`         | Whether the payload is binary rather than plain text.       |
+| `.size_bytes`        | Size of what was parsed.                                    |
+| `.error`             | Why extraction produced nothing. `None` on success.         |
+
+**It never raises.** A corrupt or unreadable file comes back with `.error` set
+and empty text, so one bad attachment costs one asset rather than the run. The
+object is falsey when `.error` is set:
+
+```python
+parsed = parse(path)
+if not parsed:
+    ctx.log(f"skipping {path.name}: {parsed.error}")
+    continue
+```
+
+Handled formats include PDF, DOCX, XLSX, PPTX, the OpenDocument formats, EML and
+MSG, RTF, HTML, JSON, CSV/TSV, Parquet and Arrow, archives, and images — images
+and scanned PDFs are OCR'd.
+
+### `pages(source, *, page_size=100) -> Iterator[str]`
+
+Reads a payload a page at a time instead of whole: rows for a tabular file,
+lines for everything else. A multi-gigabyte dump becomes many assets and is
+never in memory at once.
+
+```python
+for index, page in enumerate(pages(ctx.file("dump.parquet"), page_size=500)):
+    yield Asset(id=f"dump-{index}", content=page, kind="table")
+```
+
+---
+
+## Files the source carries
+
+### `ctx.files` — uploaded files
+
+Files uploaded to the source, downloaded to local disk before any cell runs.
+Empty is a normal state, not an error. Available in every deployment.
+
+|                        | Returns                                                   |
+| ---------------------- | ---------------------------------------------------------- |
+| `ctx.files`            | Every file, ordered by name.                               |
+| `ctx.file(name)`       | One by name. Raises naming the files that *are* there.     |
+
+Each entry is a `NotebookFile`:
+
+|                       | Is                                                       |
+| --------------------- | -------------------------------------------------------- |
+| `.name`               | The name it was uploaded under.                          |
+| `.path`               | A `pathlib.Path` on local disk.                          |
+| `.size_bytes`         | Size on disk.                                            |
+| `.read_bytes()`       | Every byte, in memory.                                   |
+| `.read_text()`        | Decoded as UTF-8, replacing what won't decode.           |
+| `.open()`             | A binary handle. You close it.                           |
+| `.parse()`            | `ParsedContent` for this file.                           |
+| `.pages(page_size)`   | Read it a page at a time.                                |
+
+### `ctx.folders` — local folders _(desktop only)_
+
+Folders configured on the source, as `pathlib.Path`. Nothing is copied — the
+notebook opens files where they are.
+
+|                    | Returns                                                    |
+| ------------------ | ---------------------------------------------------------- |
+| `ctx.folders`      | All configured folders, as `{name: Path}`.                 |
+| `ctx.folder(name)` | One by name. Raises naming the folders that are configured. |
+
+Empty in a Kubernetes deployment: there is no such machine there, and the API
+refuses to save a source that carries folders. Upload the files instead.
+
+<Callout type="warning">
+  This is not a sandbox. The notebook process runs as you and can already open
+  any path you can. The folder list exists so a connector refers to a folder by
+  name instead of by a hard-coded path, and so the deployment can refuse what it
+  cannot honour.
+</Callout>
+
+---
+
 ## `ctx`
 
 ### Configuration
