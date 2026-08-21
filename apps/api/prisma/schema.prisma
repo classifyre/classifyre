@@ -360,6 +360,76 @@ model Finding {
   @@map("findings")
 }
 
+/// Workspace-level overrides for the embedding subsystem.
+///
+/// Every column is nullable and every null means "inherit the deployment
+/// default" — the Helm values on Kubernetes, the bundled defaults in the
+/// desktop app, read through EmbeddingConfigService. That is the whole point
+/// of the table: an operator can retune one workspace from the settings page
+/// without redeploying, and the UI can still show what the deployment asked
+/// for next to what this workspace chose. A row of all-nulls is therefore
+/// indistinguishable from having no row at all, which is what a fresh
+/// workspace gets.
+///
+/// Singleton per namespace schema, mirroring InstanceSettings.
+model EmbeddingSettings {
+  id Int @id @default(1)
+
+  // ── Space identity ────────────────────────────────────────────────────────
+  // These six define the vector coordinate system (see EmbeddingSpace's unique
+  // tuple). Changing any of them means existing vectors are no longer
+  // comparable to new ones, so the API purges and re-embeds rather than
+  // letting two incompatible generations share a space.
+  enabled    Boolean?
+  provider   String?
+  model      String?
+  revision   String?
+  dimensions Int?
+  pooling    String?
+  normalize  Boolean?
+
+  // ── Remote provider ───────────────────────────────────────────────────────
+  // When provider = openai-compatible, the base URL and API key come from a
+  // saved AI provider rather than being re-entered here: the key is already
+  // encrypted at rest there and rotating it in one place fixes every consumer.
+  aiProviderConfigId String? @map("ai_provider_config_id")
+
+  // ── Throughput and inference ──────────────────────────────────────────────
+  // Safe to change without a rebuild: they affect how vectors are produced,
+  // never what a vector means.
+  batchSize         Int?     @map("batch_size")
+  workerConcurrency Int?     @map("worker_concurrency")
+  maxParallelCalls  Int?     @map("max_parallel_calls")
+  intraOpThreads    Int?     @map("intra_op_threads")
+  dtype             String?
+  device            String?
+  autoBackfill      Boolean? @map("auto_backfill")
+
+  // ── Index tuning ──────────────────────────────────────────────────────────
+  // m and efConstruction are baked into an HNSW index at build time, so
+  // changing them only takes effect for indexes built afterwards.
+  hnswM              Int? @map("hnsw_m")
+  hnswEfConstruction Int? @map("hnsw_ef_construction")
+  hnswEfSearch       Int? @map("hnsw_ef_search")
+
+  // ── Rebuild bookkeeping ───────────────────────────────────────────────────
+  // Persisted rather than held in memory so the settings page can still report
+  // "a rebuild was interrupted" after an API restart — which, given a rebuild
+  // is the longest-running operation this system has, is a real state.
+  rebuildStartedAt   DateTime? @map("rebuild_started_at")
+  rebuildCompletedAt DateTime? @map("rebuild_completed_at")
+  rebuildError       String?   @map("rebuild_error")
+  /// What the rebuild was for, shown in the UI's history line.
+  rebuildReason      String?   @map("rebuild_reason")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  aiProviderConfig AiProviderConfig? @relation("EmbeddingAiProvider", fields: [aiProviderConfigId], references: [id], onDelete: SetNull)
+
+  @@map("embedding_settings")
+}
+
 // A model revision is an immutable vector coordinate system. Model changes
 // create a new space so old and new embeddings can coexist during validation.
 model EmbeddingSpace {
@@ -870,9 +940,10 @@ model AiProviderConfig {
   createdAt         DateTime       @default(now()) @map("created_at")
   updatedAt         DateTime       @updatedAt @map("updated_at")
 
-  assistantInstanceSettings InstanceSettings[] @relation("AssistantAiProvider")
-  harnessInstanceSettings   InstanceSettings[] @relation("HarnessAiProvider")
+  assistantInstanceSettings InstanceSettings[]  @relation("AssistantAiProvider")
+  harnessInstanceSettings   InstanceSettings[]  @relation("HarnessAiProvider")
   customDetectors           CustomDetector[]
+  embeddingSettings         EmbeddingSettings[] @relation("EmbeddingAiProvider")
 
   @@map("ai_provider_config")
 }

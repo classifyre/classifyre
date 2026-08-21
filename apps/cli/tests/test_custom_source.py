@@ -588,3 +588,158 @@ def extract():
     # The notebook produced exactly what was wanted: nothing was generated and
     # thrown away, and the runtime did not skip on top of it.
     assert stats["seen"] == 10
+
+
+# -- files a notebook can reach ----------------------------------------------
+
+FILES_NOTEBOOK = """from classifyre import Asset, ctx
+
+
+def test_connection() -> dict:
+    return {"status": "SUCCESS", "message": f"{len(ctx.files)}: " + ",".join(f.name for f in ctx.files)}
+
+
+def extract():
+    for file in ctx.files:
+        parsed = file.parse()
+        yield Asset(
+            id=file.name,
+            name=file.name,
+            kind="file",
+            content=parsed.text,
+            content_bytes=file.read_bytes(),
+        )
+"""
+
+
+@pytest.fixture
+def uploaded_files(monkeypatch: pytest.MonkeyPatch, tmp_path):
+    """Stand in for the API's uploaded-file endpoints.
+
+    The download itself is not what these tests are about -- what matters is
+    that the *parent* does it and the child only ever sees a directory.
+    """
+    staged = tmp_path / "uploads"
+    staged.mkdir()
+    (staged / "notes.txt").write_text("customer email ada@example.com", encoding="utf-8")
+    (staged / "rows.csv").write_text("name,email\nAda,ada@example.com\n", encoding="utf-8")
+
+    def fake_download(_session, _api_url, _source_id, destination) -> int:
+        destination.mkdir(parents=True, exist_ok=True)
+        for path in staged.iterdir():
+            (destination / path.name).write_bytes(path.read_bytes())
+        return 2
+
+    monkeypatch.setattr("src.sources.custom.source.download_source_files", fake_download)
+    return staged
+
+
+@pytest.mark.usefixtures("uploaded_files")
+def test_uploaded_files_reach_the_notebook_as_ctx_files(source) -> None:
+    result = source(build_recipe(FILES_NOTEBOOK)).test_connection()
+    assert result["status"] == "SUCCESS"
+    assert result["message"] == "2: notes.txt,rows.csv"
+
+
+@pytest.mark.usefixtures("uploaded_files")
+def test_uploaded_files_are_parsed_into_asset_content(source) -> None:
+    instance = source(build_recipe(FILES_NOTEBOOK))
+    assets = collect(instance)
+    by_name = {asset.name: asset for asset in assets}
+    assert set(by_name) == {"notes.txt", "rows.csv"}
+
+    # Parsed through the same extractor every built-in file source uses, so the
+    # notebook wrote no format handling of its own.
+    _, text = asyncio.run(instance.fetch_content(by_name["rows.csv"].hash))
+    assert "ada@example.com" in text
+
+    # And the bytes came through, so the binary/image detectors have something.
+    raw, _mime = asyncio.run(instance.fetch_content_bytes(by_name["notes.txt"].hash))
+    assert raw == b"customer email ada@example.com"
+
+
+@pytest.mark.usefixtures("uploaded_files")
+def test_the_notebook_process_never_gets_the_api_url(
+    source, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # The parent downloads with this; handing it to the child would undo the
+    # reason the child process exists.
+    monkeypatch.setenv("CLASSIFYRE_OUTPUT_REST_URL", "http://api.internal:8000/ns")
+    notebook = """import os
+from classifyre import Asset, ctx
+
+
+def test_connection() -> dict:
+    leaked = os.environ.get("CLASSIFYRE_OUTPUT_REST_URL", "")
+    return {"status": "SUCCESS", "message": f"files={len(ctx.files)} url={leaked!r}"}
+
+
+def extract():
+    yield Asset(id="1", content="x")
+"""
+    result = source(build_recipe(notebook)).test_connection()
+    assert result["message"] == "files=2 url=''"
+
+
+def test_a_source_with_no_uploads_sees_an_empty_list(
+    source, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # A connector that talks to an API is the common case; no files is normal.
+    monkeypatch.setattr(
+        "src.sources.custom.source.download_source_files",
+        lambda *_args, **_kwargs: 0,
+    )
+    result = source(build_recipe(FILES_NOTEBOOK)).test_connection()
+    assert result["status"] == "SUCCESS"
+    assert result["message"] == "0: "
+
+
+def test_an_unreachable_files_endpoint_does_not_fail_the_scan(
+    source, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def explode(*_args, **_kwargs):
+        raise RuntimeError("connection refused")
+
+    monkeypatch.setattr("src.sources.custom.source.download_source_files", explode)
+    result = source(build_recipe(SIMPLE_NOTEBOOK)).test_connection()
+    assert result["status"] == "SUCCESS"
+
+
+# -- local folders -----------------------------------------------------------
+
+
+def folder_recipe(path: str, notebook: str) -> dict[str, Any]:
+    recipe = build_recipe(notebook)
+    recipe["optional"]["local_folders"] = [{"name": "dumps", "path": path}]
+    return recipe
+
+
+FOLDER_NOTEBOOK = """from classifyre import Asset, ctx, parse
+
+
+def test_connection() -> dict:
+    return {"status": "SUCCESS", "message": str(ctx.folder("dumps"))}
+
+
+def extract():
+    for path in sorted(ctx.folder("dumps").rglob("*.txt")):
+        yield Asset(id=path.name, name=path.name, content=parse(path).text)
+"""
+
+
+def test_a_configured_folder_is_readable_by_name(source, tmp_path) -> None:
+    root = tmp_path / "dumps"
+    root.mkdir()
+    (root / "one.txt").write_text("first dump", encoding="utf-8")
+    (root / "two.txt").write_text("second dump", encoding="utf-8")
+
+    assets = collect(source(folder_recipe(str(root), FOLDER_NOTEBOOK)))
+    assert [asset.name for asset in assets] == ["one.txt", "two.txt"]
+
+
+def test_a_folder_that_is_not_there_fails_before_the_scan_starts(source, tmp_path) -> None:
+    # Learning this from a traceback inside extract() costs a run.
+    missing = tmp_path / "not-created"
+    result = source(folder_recipe(str(missing), FOLDER_NOTEBOOK)).test_connection()
+    assert result["status"] == "FAILURE"
+    assert "dumps" in result["message"]

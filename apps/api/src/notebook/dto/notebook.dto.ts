@@ -206,6 +206,20 @@ export class NotebookExecutionDto {
   finishedAt?: Date | null;
 }
 
+export class NotebookTemplateDto {
+  @ApiProperty({ description: 'Shown in the template picker' })
+  name!: string;
+
+  @ApiProperty({ description: 'One line on what this template does' })
+  description!: string;
+
+  @ApiProperty({
+    type: [NotebookCellDto],
+    description: 'Cells to append. The editor assigns fresh ids on insert.',
+  })
+  cells!: NotebookCellDto[];
+}
+
 export class NotebookScaffoldDto {
   @ApiProperty({ type: [NotebookCellDto] })
   cells!: NotebookCellDto[];

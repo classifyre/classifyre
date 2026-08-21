@@ -1,7 +1,17 @@
-import { Injectable, Logger, OnApplicationShutdown } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  Optional,
+  OnApplicationShutdown,
+} from '@nestjs/common';
 import { fork, type ChildProcess } from 'node:child_process';
 import path from 'node:path';
 import { EmbeddingConfigService } from './embedding-config.service';
+import {
+  resolvedFromEnv,
+  type EmbeddingSettingsService,
+  type ResolvedEmbeddingConfig,
+} from './embedding-settings.service';
 
 type PendingRequest = {
   resolve: (vectors: number[][]) => void;
@@ -65,7 +75,24 @@ export class EmbeddingProviderService implements OnApplicationShutdown {
   private lastRequestError?: string;
   private lastRequestErrorAt?: string;
 
-  constructor(private readonly config: EmbeddingConfigService) {}
+  constructor(
+    private readonly config: EmbeddingConfigService,
+    // Optional and last: the unit tests construct this service positionally.
+    @Optional() private readonly settings?: EmbeddingSettingsService,
+  ) {}
+
+  /**
+   * Effective configuration, unless the caller passes its own.
+   *
+   * The worker is deliberately one process for the whole API, so when two
+   * workspaces run different models it re-creates its pipeline as requests
+   * alternate. That is a throughput cost, not a correctness one — each request
+   * carries the configuration it must be answered with — and it is the reason
+   * callers that already know their workspace's configuration pass it in.
+   */
+  private resolve(override?: ResolvedEmbeddingConfig): ResolvedEmbeddingConfig {
+    return override ?? this.settings?.cached() ?? resolvedFromEnv(this.config);
+  }
 
   /** True while the breaker is open and its cooldown has not yet elapsed. */
   private get workerDisabled(): boolean {
@@ -88,56 +115,67 @@ export class EmbeddingProviderService implements OnApplicationShutdown {
     };
   }
 
-  async embedMany(texts: string[]): Promise<number[][]> {
+  async embedMany(
+    texts: string[],
+    override?: ResolvedEmbeddingConfig,
+  ): Promise<number[][]> {
     if (!texts.length) return [];
+    const cfg = this.resolve(override);
     const vectors =
-      this.config.provider === 'openai-compatible'
-        ? await this.embedRemote(texts)
-        : await this.embedLocal(texts);
-    const invalid = vectors.find(
-      (vector) => vector.length !== this.config.dimensions,
-    );
+      cfg.provider === 'openai-compatible'
+        ? await this.embedRemote(texts, cfg)
+        : await this.embedLocal(texts, cfg);
+    const invalid = vectors.find((vector) => vector.length !== cfg.dimensions);
     if (invalid) {
       throw new Error(
-        `Embedding model ${this.config.model} returned ${invalid.length} dimensions; EMBEDDING_DIMENSIONS is ${this.config.dimensions}`,
+        `Embedding model ${cfg.model} returned ${invalid.length} dimensions, but this workspace is configured for ${cfg.dimensions}`,
       );
     }
-    if (!this.config.normalize) return vectors;
+    if (!cfg.normalize) return vectors;
     return vectors.map((vector) => {
       const norm = Math.sqrt(
         vector.reduce((sum, value) => sum + value * value, 0),
       );
       if (!Number.isFinite(norm) || norm === 0) {
         throw new Error(
-          `Embedding model ${this.config.model} returned a zero or invalid vector`,
+          `Embedding model ${cfg.model} returned a zero or invalid vector`,
         );
       }
       return vector.map((value) => value / norm);
     });
   }
 
-  private async embedRemote(texts: string[]): Promise<number[][]> {
+  private async embedRemote(
+    texts: string[],
+    cfg: ResolvedEmbeddingConfig = this.resolve(),
+  ): Promise<number[][]> {
     const [{ createOpenAICompatible }, { embedMany }] = await Promise.all([
       import('@ai-sdk/openai-compatible'),
       import('ai'),
     ]);
     const provider = createOpenAICompatible({
       name: 'classifyreEmbedding',
-      baseURL: this.config.baseUrl as string,
-      apiKey: this.config.apiKey,
+      baseURL: cfg.baseUrl as string,
+      apiKey: cfg.apiKey,
     });
     const result = await embedMany({
-      model: provider.embeddingModel(this.config.model),
+      model: provider.embeddingModel(cfg.model),
       values: texts,
-      maxParallelCalls: this.config.maxParallelCalls,
+      maxParallelCalls: cfg.maxParallelCalls,
       providerOptions: {
-        classifyreEmbedding: { dimensions: this.config.dimensions },
+        classifyreEmbedding: { dimensions: cfg.dimensions },
       },
     });
     return result.embeddings;
   }
 
-  private embedLocal(texts: string[]): Promise<number[][]> {
+  private embedLocal(
+    texts: string[],
+    // Defaulted rather than required: the breaker tests drive this directly to
+    // exercise spawn failures, and a configuration is never the thing they are
+    // varying.
+    cfg: ResolvedEmbeddingConfig = this.resolve(),
+  ): Promise<number[][]> {
     if (this.workerDisabled) {
       const seconds = Math.ceil((this.disabledUntil! - this.now()) / 1000);
       return Promise.reject(
@@ -164,16 +202,16 @@ export class EmbeddingProviderService implements OnApplicationShutdown {
         id,
         texts,
         config: {
-          model: this.config.model,
-          revision: this.config.revision,
-          pooling: this.config.pooling,
-          normalize: this.config.normalize,
-          dtype: this.config.dtype,
-          device: this.config.device,
-          intraOpThreads: this.config.intraOpThreads,
-          cacheDir: this.config.cacheDir,
-          localModelPath: this.config.localModelPath,
-          allowRemoteModels: this.config.allowRemoteModels,
+          model: cfg.model,
+          revision: cfg.revision,
+          pooling: cfg.pooling,
+          normalize: cfg.normalize,
+          dtype: cfg.dtype,
+          device: cfg.device,
+          intraOpThreads: cfg.intraOpThreads,
+          cacheDir: cfg.cacheDir,
+          localModelPath: cfg.localModelPath,
+          allowRemoteModels: cfg.allowRemoteModels,
         },
       });
     });

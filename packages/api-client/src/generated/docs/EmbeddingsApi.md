@@ -7,10 +7,13 @@ All URIs are relative to *http://localhost*
 | [**embeddingControllerBoilerplate**](EmbeddingsApi.md#embeddingcontrollerboilerplate) | **GET** /sources/{sourceId}/boilerplate-clusters | Near-duplicate finding clusters in a source (repeated boilerplate) |
 | [**embeddingControllerBoilerplateGlobal**](EmbeddingsApi.md#embeddingcontrollerboilerplateglobal) | **GET** /embeddings/boilerplate-clusters | Near-duplicate finding clusters across the corpus, optionally filtered to specific sources |
 | [**embeddingControllerChunks**](EmbeddingsApi.md#embeddingcontrollerchunks) | **POST** /sources/{sourceId}/embeddings/chunks | Store asset chunk-to-content mappings |
+| [**embeddingControllerGetSettings**](EmbeddingsApi.md#embeddingcontrollergetsettings) | **GET** /embeddings/settings | Embedding configuration for this workspace, the deployment defaults behind it, and corpus size |
+| [**embeddingControllerRebuild**](EmbeddingsApi.md#embeddingcontrollerrebuild) | **POST** /embeddings/rebuild | Purge every stored vector for this workspace and re-embed the corpus from scratch |
 | [**embeddingControllerRecalibrate**](EmbeddingsApi.md#embeddingcontrollerrecalibrate) | **POST** /embeddings/recalibrate | Schedule a full evidence-ranking recalibration pass (importance scores, outliers, near-duplicate groups) |
 | [**embeddingControllerReindex**](EmbeddingsApi.md#embeddingcontrollerreindex) | **POST** /embeddings/reindex | Reconcile stored findings and asset chunks into the configured embedding space |
 | [**embeddingControllerSimilar**](EmbeddingsApi.md#embeddingcontrollersimilar) | **GET** /findings/{findingId}/similar | Find semantically similar findings with ranking evidence |
 | [**embeddingControllerStatus**](EmbeddingsApi.md#embeddingcontrollerstatus) | **GET** /embeddings/status | Get semantic storage and search capability |
+| [**embeddingControllerUpdateSettings**](EmbeddingsApi.md#embeddingcontrollerupdatesettings) | **PUT** /embeddings/settings | Change embedding configuration; redefining the vector space purges the corpus and re-embeds it |
 
 
 
@@ -220,6 +223,120 @@ No authorization required
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
 | **201** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## embeddingControllerGetSettings
+
+> EmbeddingSettingsResponseDto embeddingControllerGetSettings()
+
+Embedding configuration for this workspace, the deployment defaults behind it, and corpus size
+
+### Example
+
+```ts
+import {
+  Configuration,
+  EmbeddingsApi,
+} from '@workspace/api-client';
+import type { EmbeddingControllerGetSettingsRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new EmbeddingsApi();
+
+  try {
+    const data = await api.embeddingControllerGetSettings();
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+This endpoint does not need any parameter.
+
+### Return type
+
+[**EmbeddingSettingsResponseDto**](EmbeddingSettingsResponseDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## embeddingControllerRebuild
+
+> EmbeddingRebuildResponseDto embeddingControllerRebuild()
+
+Purge every stored vector for this workspace and re-embed the corpus from scratch
+
+### Example
+
+```ts
+import {
+  Configuration,
+  EmbeddingsApi,
+} from '@workspace/api-client';
+import type { EmbeddingControllerRebuildRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new EmbeddingsApi();
+
+  try {
+    const data = await api.embeddingControllerRebuild();
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+This endpoint does not need any parameter.
+
+### Return type
+
+[**EmbeddingRebuildResponseDto**](EmbeddingRebuildResponseDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **202** |  |  -  |
 
 [[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
 
@@ -452,6 +569,71 @@ No authorization required
 ### HTTP request headers
 
 - **Content-Type**: Not defined
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## embeddingControllerUpdateSettings
+
+> UpdateEmbeddingSettingsResponseDto embeddingControllerUpdateSettings(updateEmbeddingSettingsDto)
+
+Change embedding configuration; redefining the vector space purges the corpus and re-embeds it
+
+### Example
+
+```ts
+import {
+  Configuration,
+  EmbeddingsApi,
+} from '@workspace/api-client';
+import type { EmbeddingControllerUpdateSettingsRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new EmbeddingsApi();
+
+  const body = {
+    // UpdateEmbeddingSettingsDto
+    updateEmbeddingSettingsDto: ...,
+  } satisfies EmbeddingControllerUpdateSettingsRequest;
+
+  try {
+    const data = await api.embeddingControllerUpdateSettings(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **updateEmbeddingSettingsDto** | [UpdateEmbeddingSettingsDto](UpdateEmbeddingSettingsDto.md) |  | |
+
+### Return type
+
+[**UpdateEmbeddingSettingsResponseDto**](UpdateEmbeddingSettingsResponseDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: `application/json`
 - **Accept**: `application/json`
 
 

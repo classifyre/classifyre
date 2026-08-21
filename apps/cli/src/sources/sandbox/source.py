@@ -1,16 +1,14 @@
 from __future__ import annotations
 
 import logging
-import os
 from collections.abc import Iterator
 from datetime import UTC, datetime
 from typing import Any
-from urllib.parse import quote
 
 import requests
 
 from ...models.generated_input import SandboxInput
-from ...outputs.base import DEFAULT_REST_TIMEOUT_SEC
+from ...utils.source_files import api_base_url, list_source_files, stream_source_file
 from ..object_storage.base import ObjectRef, ObjectStorageSourceBase
 
 logger = logging.getLogger(__name__)
@@ -32,11 +30,7 @@ class SandboxSource(ObjectStorageSourceBase):
         if not source_id:
             raise ValueError("SANDBOX requires a source ID")
         super().__init__(recipe, source_id=source_id, runner_id=runner_id)
-        self._api_url = (
-            os.environ.get("CLASSIFYRE_OUTPUT_REST_URL")
-            or os.environ.get("API_URL")
-            or "http://localhost:8000"
-        ).rstrip("/")
+        self._api_url = api_base_url()
         self._session = requests.Session()
         self._file_by_id: dict[str, dict[str, Any]] = {}
 
@@ -54,30 +48,9 @@ class SandboxSource(ObjectStorageSourceBase):
         # family's conservative 5 MiB default because these files are local.
         return 50 * 1024 * 1024
 
-    def _request(self, method: str, path: str, *, stream: bool = False) -> requests.Response:
-        response = self._session.request(
-            method,
-            f"{self._api_url}{path}",
-            # (connect, read). The read budget applies per socket read, so 5
-            # minutes is generous for a streamed download of any size; the old
-            # flat 120 s applied to connect and read alike.
-            timeout=(30, DEFAULT_REST_TIMEOUT_SEC),
-            stream=stream,
-            headers={"Connection": "close"},
-        )
-        response.raise_for_status()
-        return response
-
     def _list_objects(self) -> Iterator[ObjectRef]:
-        response = self._request("GET", f"/sources/{self.source_id}/files")
-        payload = response.json()
-        if not isinstance(payload, list):
-            raise ValueError("Source files API returned a non-array response")
-
         self._file_by_id = {}
-        for item in payload:
-            if not isinstance(item, dict) or not item.get("id"):
-                continue
+        for item in list_source_files(self._session, self._api_url, str(self.source_id)):
             file_id = str(item["id"])
             self._file_by_id[file_id] = item
             created_at = str(item.get("createdAt") or "").replace("Z", "+00:00")
@@ -96,16 +69,10 @@ class SandboxSource(ObjectStorageSourceBase):
             )
 
     def _download_object(self, ref: ObjectRef) -> tuple[bytes, str | None]:
-        response = self._request(
-            "GET",
-            f"/sources/{self.source_id}/files/{quote(ref.key, safe='')}/content",
-            stream=True,
+        stream, content_type = stream_source_file(
+            self._session, self._api_url, str(self.source_id), ref.key
         )
-        chunks: list[bytes] = []
-        for chunk in response.iter_content(chunk_size=1024 * 1024):
-            if chunk:
-                chunks.append(chunk)
-        return b"".join(chunks), response.headers.get("Content-Type")
+        return b"".join(chunk for chunk in stream if chunk), content_type
 
     def _external_url(self, key: str) -> str:
         return f"sandbox://{self.source_id}/{key}"

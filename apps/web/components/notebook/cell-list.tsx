@@ -8,6 +8,7 @@ import { Button } from "@workspace/ui/components/button";
 import { useTranslation } from "@/hooks/use-translation";
 import {
   addCell,
+  appendCells,
   deleteCell,
   duplicateCell,
   moveCell,
@@ -18,6 +19,7 @@ import {
 import { CodeCell, type CellStatus } from "./code-cell";
 import { CellAiAssistant, CellAiButton } from "./cell-ai-assistant";
 import { MarkdownCell } from "./markdown-cell";
+import { TemplatePicker } from "./template-picker";
 import type { CellOutputValue } from "./cell-output";
 import type { NotebookPackage } from "@/lib/notebook-packages";
 
@@ -192,6 +194,10 @@ export function CellList({
           <MarkdownIcon className="mr-1.5 h-3.5 w-3.5" />
           {t("notebook.addMarkdown")}
         </Button>
+        <TemplatePicker
+          disabled={disabled}
+          onInsert={(incoming) => onChange(appendCells(cells, incoming))}
+        />
       </div>
     </div>
   );

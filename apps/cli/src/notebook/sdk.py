@@ -4,6 +4,13 @@ This is the whole public surface a connector author sees. It stays small on
 purpose -- the adapter in ``sources/custom`` is what turns an ``Asset`` into a
 ``SingleAssetScanResults``, computes hashes and checksums, resolves links and
 validates metadata, so none of that leaks into the notebook.
+
+``parse`` is the one addition that earns its place. Reading a PDF, a .docx, an
+.eml or a Parquet file is not connector logic, every other source in the system
+already delegates it to the same parser, and a notebook that had to reimplement
+it would get it wrong. It arrives with the files it operates on: ``ctx.files``
+for what was uploaded to the source, ``ctx.folder(...)`` for a folder on a
+desktop machine.
 """
 
 from __future__ import annotations
@@ -13,7 +20,10 @@ import types
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import Any
+from pathlib import Path
+from typing import IO, Any
+
+from .files import DEFAULT_PAGE_SIZE, ParsedContent, pages, parse
 
 MODULE_NAME = "classifyre"
 
@@ -81,6 +91,41 @@ class Asset:
         self.links = [str(link) for link in self.links if str(link).strip()]
 
 
+@dataclass(frozen=True)
+class NotebookFile:
+    """One file this source can read, already on local disk.
+
+    The bytes are put there before any notebook code runs -- uploaded files are
+    downloaded by the parent process, which is what keeps the notebook away from
+    the API credentials that fetched them. By the time a notebook sees this, it
+    is an ordinary path.
+    """
+
+    name: str
+    path: Path
+    size_bytes: int = 0
+    mime_type: str | None = None
+
+    def read_bytes(self) -> bytes:
+        """Every byte, in memory. Prefer ``open()`` or ``pages()`` for a big file."""
+        return self.path.read_bytes()
+
+    def read_text(self, encoding: str = "utf-8") -> str:
+        return self.path.read_text(encoding=encoding, errors="replace")
+
+    def open(self) -> IO[bytes]:
+        """A binary handle. The caller closes it."""
+        return self.path.open("rb")
+
+    def parse(self) -> ParsedContent:
+        """Detect this file's type and extract its text."""
+        return parse(self.path, name=self.name, mime_type=self.mime_type)
+
+    def pages(self, page_size: int = DEFAULT_PAGE_SIZE) -> Iterable[str]:
+        """Read this file a page at a time rather than whole."""
+        return pages(self.path, name=self.name, mime_type=self.mime_type, page_size=page_size)
+
+
 class Context:
     """The notebook's window onto its configuration and this run.
 
@@ -97,11 +142,15 @@ class Context:
         sampling: Mapping[str, Any] | None = None,
         cursor: Mapping[str, Any] | None = None,
         offset: int = 0,
+        files_dir: str | Path | None = None,
+        folders: Mapping[str, str] | None = None,
         logger: Callable[[str], None] | None = None,
         should_abort: Callable[[], bool] | None = None,
     ) -> None:
         self._variables = dict(variables or {})
         self._secrets = dict(secrets or {})
+        self._files_dir = Path(files_dir) if files_dir else None
+        self._folders = {str(name): Path(path) for name, path in (folders or {}).items()}
         self._sampling = dict(sampling or {})
         self._cursor = dict(cursor or {})
         self._offset = int(offset or 0)
@@ -148,6 +197,55 @@ class Context:
     def secret_names(self) -> list[str]:
         """Names only. Listing values would defeat redaction."""
         return sorted(self._secrets)
+
+    # -- files ---------------------------------------------------------------
+
+    @property
+    def files(self) -> list[NotebookFile]:
+        """Files uploaded to this source, already downloaded and on local disk.
+
+        Empty is a normal state, not an error -- a connector that talks to an API
+        has no files. Order is by name, so a notebook that pairs files with each
+        other gets the same pairing every run::
+
+            for file in ctx.files:
+                yield Asset(id=file.name, content=file.parse().text)
+        """
+        if self._files_dir is None or not self._files_dir.is_dir():
+            return []
+        entries = [entry for entry in self._files_dir.iterdir() if entry.is_file()]
+        return [
+            NotebookFile(name=entry.name, path=entry, size_bytes=entry.stat().st_size)
+            for entry in sorted(entries, key=lambda entry: entry.name)
+        ]
+
+    def file(self, name: str) -> NotebookFile:
+        """One uploaded file by name."""
+        for candidate in self.files:
+            if candidate.name == name:
+                return candidate
+        raise KeyError(
+            f"No uploaded file named {name!r}. Files on this source: "
+            f"{', '.join(entry.name for entry in self.files) or '(none)'}"
+        )
+
+    @property
+    def folders(self) -> dict[str, Path]:
+        """Local folders this source was configured with, by name.
+
+        Desktop only -- a Kubernetes deployment has no filesystem to point at, so
+        the API refuses to save them there and this is empty.
+        """
+        return dict(self._folders)
+
+    def folder(self, name: str) -> Path:
+        """One configured local folder by name."""
+        if name in self._folders:
+            return self._folders[name]
+        raise KeyError(
+            f"No folder named {name!r}. Configured folders: "
+            f"{', '.join(sorted(self._folders)) or '(none)'}"
+        )
 
     # -- this run ------------------------------------------------------------
 
@@ -248,8 +346,20 @@ def build_module(context: Context) -> types.ModuleType:
     module.__doc__ = "Runtime helpers available to a Classifyre custom connector."
     module.Asset = Asset  # type: ignore[attr-defined]
     module.Context = Context  # type: ignore[attr-defined]
+    module.NotebookFile = NotebookFile  # type: ignore[attr-defined]
+    module.ParsedContent = ParsedContent  # type: ignore[attr-defined]
     module.ctx = context  # type: ignore[attr-defined]
-    module.__all__ = ["Asset", "Context", "ctx"]  # type: ignore[attr-defined]
+    module.parse = parse  # type: ignore[attr-defined]
+    module.pages = pages  # type: ignore[attr-defined]
+    module.__all__ = [  # type: ignore[attr-defined]
+        "Asset",
+        "Context",
+        "NotebookFile",
+        "ParsedContent",
+        "ctx",
+        "pages",
+        "parse",
+    ]
     return module
 
 
@@ -263,9 +373,9 @@ def install(context: Context) -> types.ModuleType:
 def namespace(context: Context) -> dict[str, Any]:
     """Globals for the assembled module.
 
-    ``Asset`` and ``ctx`` are pre-bound as well as importable, so a notebook
-    that forgets the import line still runs -- the import is documentation, not
-    a hurdle.
+    ``Asset``, ``ctx`` and ``parse`` are pre-bound as well as importable, so a
+    notebook that forgets the import line still runs -- the import is
+    documentation, not a hurdle.
     """
     install(context)
     return {
@@ -273,6 +383,8 @@ def namespace(context: Context) -> dict[str, Any]:
         "__builtins__": __builtins__,
         "Asset": Asset,
         "ctx": context,
+        "parse": parse,
+        "pages": pages,
     }
 
 

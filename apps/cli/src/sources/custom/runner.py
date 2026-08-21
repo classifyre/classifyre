@@ -23,6 +23,7 @@ from typing import Any
 
 from ...notebook.contract import validate_module
 from ...notebook.execute import cell_filename
+from ...notebook.files import local_folders
 from ...notebook.redact import RedactingStream, Redactor
 from ...notebook.sdk import Asset, Context, iter_assets, namespace
 from ...notebook.serialize import (
@@ -92,6 +93,7 @@ class NotebookRuntime:
         recipe: dict[str, Any],
         cursor: dict[str, Any] | None = None,
         offset: int = 0,
+        files_dir: str | None = None,
     ) -> None:
         self.recipe = recipe
         notebook = _section(recipe, "required", "notebook")
@@ -102,6 +104,10 @@ class NotebookRuntime:
             sampling=_section(recipe, "sampling"),
             cursor=cursor,
             offset=offset,
+            # The parent downloaded these before spawning us; all that crosses
+            # the boundary is a path.
+            files_dir=files_dir,
+            folders=local_folders(recipe),
             logger=self._log,
             should_abort=_aborted,
         )
@@ -313,6 +319,7 @@ def main() -> int:
         recipe,
         cursor=payload.get("cursor"),
         offset=int(payload.get("offset") or 0),
+        files_dir=payload.get("filesDir") or None,
     )
     try:
         runtime.load()

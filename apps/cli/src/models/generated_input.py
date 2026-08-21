@@ -5427,6 +5427,27 @@ class NotebookPackage(BaseModel):
     )
 
 
+class NotebookLocalFolder(BaseModel):
+    """
+    A folder on the machine running the desktop application.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    name: str = Field(
+        ...,
+        description='How the notebook refers to it: ctx.folder("name"). Must be a valid Python identifier.',
+        pattern='^[A-Za-z_][A-Za-z0-9_]{0,62}$',
+    )
+    path: str = Field(
+        ...,
+        description='Absolute path to the folder, for example /Users/me/dumps.',
+        max_length=4096,
+        min_length=1,
+    )
+
+
 class YouTubeInput(CoreInput):
     type: Literal['YOUTUBE'] = Field(..., description='Type of the asset or source')
     required: YouTubeRequired
@@ -5579,6 +5600,12 @@ class CustomOptional(BaseModel):
         [],
         description="Python packages installed into the run environment before any cell executes. Installed with uv; the base image's own dependencies are always present and do not need listing.",
         max_length=50,
+        validate_default=True,
+    )
+    local_folders: list[NotebookLocalFolder] | None = Field(
+        [],
+        description='Desktop only. Folders on this machine the notebook reads with ctx.folder("name"). Not available in Kubernetes deployments, where files are uploaded to the source instead. This is a convenience, not a sandbox: the notebook process runs as you and can open any path you can.',
+        max_length=10,
         validate_default=True,
     )
 

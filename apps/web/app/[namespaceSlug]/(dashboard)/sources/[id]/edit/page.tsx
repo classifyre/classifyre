@@ -325,7 +325,7 @@ export default function EditSourcePage() {
 
   useRegisterAssistantBridge(assistantBridge);
 
-  const persistSandboxFiles = async () => {
+  const persistUploadedFiles = async () => {
     if (source?.type !== "SANDBOX") return true;
     const retained = uploadedFiles.filter(
       (file) => !pendingRemovalIds.has(file.id),
@@ -429,7 +429,7 @@ export default function EditSourcePage() {
         },
       });
 
-      if (!(await persistSandboxFiles())) return false;
+      if (!(await persistUploadedFiles())) return false;
 
       if (updated) {
         setSource({
@@ -798,7 +798,7 @@ function SourceEditStepperContent({
                   autoScheduleStatus={autoStatus}
                   onResumeSchedule={onResumeSchedule}
                   afterNameContent={
-                    sourceType === "SANDBOX" ? (
+                    sourceType === "SANDBOX" || sourceType === "CUSTOM" ? (
                       <UploadedFiles
                         existingFiles={uploadedFiles}
                         pendingFiles={pendingFiles}

@@ -188,8 +188,19 @@ runs. Leave the version empty for the latest.
 | `pandas`  | `2.2.0`   | exactly that  |
 | `pymssql` | `>=2.3`   | that or newer |
 
-The base image's own libraries — `requests`, `pandas`, and the rest of what
-Classifyre uses — are already there and don't need listing.
+Beneath the table is **Already available** — a read-only list of everything the
+scan runtime already has, with the version it will actually be. Search it before
+adding a row: `requests`, `lxml` and `beautifulsoup4` are always importable, and
+so are `pdfplumber`, `duckdb`, `pyarrow`, `boto3`, `psycopg2`, `pymongo`,
+`confluent-kafka` and the rest of the connector stack.
+
+Anything marked **on demand** is installed automatically the first time one of
+your cells imports it — you don't list it, you just `import duckdb`. The editor
+completes these on an import line and shows the version on hover.
+
+Declare a package only when it genuinely isn't there. Re-declaring one that is
+costs an install on every run, at a version that may not be the one the rest of
+the runtime was resolved against.
 
 ### Variables and secrets
 
@@ -226,6 +237,84 @@ Two things secrets do **not** protect against, worth being clear about:
 - If your `extract()` puts a secret into an asset's **content**, it gets stored
   and scanned like any other text. That's deliberate: a connector leaking its own
   token into every record is a finding you want to see.
+
+---
+
+## Files
+
+A notebook reaches files two ways. Which one you use is decided by where
+Classifyre is running, not by preference.
+
+### Uploaded files — everywhere
+
+Upload files to the source and they arrive as `ctx.files`. They're downloaded to
+the runner before any cell runs, so each one is an ordinary path:
+
+```python
+from classifyre import Asset, ctx
+
+def extract():
+    for file in ctx.files:
+        parsed = file.parse()          # PDF, DOCX, XLSX, EML, images, Parquet…
+        yield Asset(
+            id=file.name,
+            name=file.name,
+            kind="file",
+            content=parsed.text,
+            content_bytes=file.read_bytes(),
+        )
+```
+
+This is the mechanism that works in a Kubernetes deployment, where the runner is
+an ephemeral pod with no filesystem of yours to reach.
+
+### Local folders — desktop only
+
+In the desktop app you can also point the source at a folder on your machine and
+read it in place — the right choice for a dump too large to upload. Add it under
+**Local folders**, then:
+
+```python
+def extract():
+    for path in ctx.folder("dumps").rglob("*.json"):
+        if ctx.should_abort:
+            return
+        yield Asset(id=str(path.name), content=parse(path).text)
+```
+
+Nothing is copied. Saving a source with local folders is refused in a Kubernetes
+deployment, with a message pointing at uploads instead.
+
+<Callout type="warning">
+  Local folders are a convenience, not a sandbox. The notebook process runs as
+  you and can open any path you can; the list exists so your connector refers to
+  a folder by name rather than by a hard-coded path.
+</Callout>
+
+### Parsing
+
+`parse()` is the same extractor every built-in file source uses. Hand it a path,
+raw bytes, an open handle or a `ctx.files` entry and it works out what it is:
+
+```python
+parsed = parse(some_bytes, name="report.pdf")
+parsed.text        # extracted text, OCR'd if it needed to be
+parsed.mime_type   # detected
+parsed.error       # set instead of raising, when the file can't be read
+```
+
+For something too big to hold whole, `pages()` yields rows (tabular) or lines
+(everything else) a page at a time.
+
+Full details in the [reference](/sources/custom-connectors/reference/).
+
+---
+
+## Templates
+
+The **Templates** button under the cells inserts a complete worked notebook —
+uploaded files, local folders, file parsing, linked assets, a paged REST API.
+Its cells are added below what you already have; nothing you wrote is replaced.
 
 ---
 

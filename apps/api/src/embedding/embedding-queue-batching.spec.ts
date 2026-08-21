@@ -106,11 +106,10 @@ describe('embedding queue batching', () => {
       { data: { spaceId: 'space-1', items: chunks(3) } },
     ]);
 
-    expect(h.provider.embedMany).toHaveBeenCalledWith([
-      'chunk text 0',
-      'chunk text 1',
-      'chunk text 2',
-    ]);
+    expect(h.provider.embedMany).toHaveBeenCalledWith(
+      ['chunk text 0', 'chunk text 1', 'chunk text 2'],
+      expect.anything(),
+    );
     expect(h.embeddings.putVectors).toHaveBeenCalledTimes(1);
   });
 
@@ -124,11 +123,10 @@ describe('embedding queue batching', () => {
       { data: { spaceId: 'space-1', items: chunks(2) } },
     ]);
 
-    expect(h.provider.embedMany).toHaveBeenCalledWith([
-      'old shape',
-      'chunk text 0',
-      'chunk text 1',
-    ]);
+    expect(h.provider.embedMany).toHaveBeenCalledWith(
+      ['old shape', 'chunk text 0', 'chunk text 1'],
+      expect.anything(),
+    );
   });
 
   it('does not embed the same chunk twice within one fetch', async () => {
@@ -139,10 +137,10 @@ describe('embedding queue batching', () => {
       { data: { spaceId: 'space-1', items: chunks(2) } },
     ]);
 
-    expect(h.provider.embedMany).toHaveBeenCalledWith([
-      'chunk text 0',
-      'chunk text 1',
-    ]);
+    expect(h.provider.embedMany).toHaveBeenCalledWith(
+      ['chunk text 0', 'chunk text 1'],
+      expect.anything(),
+    );
   });
 
   it('skips chunks that already have vectors', async () => {
@@ -153,7 +151,10 @@ describe('embedding queue batching', () => {
       { data: { spaceId: 'space-1', items: chunks(3) } },
     ]);
 
-    expect(h.provider.embedMany).toHaveBeenCalledWith(['chunk text 1']);
+    expect(h.provider.embedMany).toHaveBeenCalledWith(
+      ['chunk text 1'],
+      expect.anything(),
+    );
   });
 
   describe('clearing a pre-upgrade backlog', () => {

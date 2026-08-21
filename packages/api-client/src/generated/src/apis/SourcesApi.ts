@@ -458,7 +458,7 @@ export class SourcesApi extends runtime.BaseAPI {
     }
 
     /**
-     * List uploaded files for a Sandbox source
+     * List uploaded files for a source
      */
     async sourceFilesControllerListRaw(requestParameters: SourceFilesControllerListRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Array<UploadedSourceFileDto>>> {
         if (requestParameters['sourceId'] == null) {
@@ -487,7 +487,7 @@ export class SourcesApi extends runtime.BaseAPI {
     }
 
     /**
-     * List uploaded files for a Sandbox source
+     * List uploaded files for a source
      */
     async sourceFilesControllerList(requestParameters: SourceFilesControllerListRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Array<UploadedSourceFileDto>> {
         const response = await this.sourceFilesControllerListRaw(requestParameters, initOverrides);
@@ -495,7 +495,7 @@ export class SourcesApi extends runtime.BaseAPI {
     }
 
     /**
-     * Upload one file to a Sandbox source
+     * Upload one file to a source
      */
     async sourceFilesControllerUploadRaw(requestParameters: SourceFilesControllerUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<UploadedSourceFileDto>> {
         if (requestParameters['sourceId'] == null) {
@@ -552,7 +552,7 @@ export class SourcesApi extends runtime.BaseAPI {
     }
 
     /**
-     * Upload one file to a Sandbox source
+     * Upload one file to a source
      */
     async sourceFilesControllerUpload(requestParameters: SourceFilesControllerUploadRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<UploadedSourceFileDto> {
         const response = await this.sourceFilesControllerUploadRaw(requestParameters, initOverrides);

@@ -184,7 +184,7 @@ export default function NewSourcePage() {
     }
   };
 
-  const persistSandboxFiles = async (
+  const persistUploadedFiles = async (
     savedId: string,
     newlyCreated: boolean,
   ) => {
@@ -307,7 +307,7 @@ export default function NewSourcePage() {
         },
       });
       const savedId = updated?.id || sourceId;
-      return (await persistSandboxFiles(savedId, false)) ? savedId : null;
+      return (await persistUploadedFiles(savedId, false)) ? savedId : null;
     }
 
     const createPayload = {
@@ -323,7 +323,7 @@ export default function NewSourcePage() {
     });
     const savedId = created?.id || null;
     if (!savedId) return null;
-    return (await persistSandboxFiles(savedId, true)) ? savedId : null;
+    return (await persistUploadedFiles(savedId, true)) ? savedId : null;
   };
 
   const persistSource = async (data: Record<string, unknown>) => {
@@ -743,7 +743,8 @@ function SourceStepperContent({
               schedule={schedule}
               onScheduleChange={onScheduleChange}
               afterNameContent={
-                selectedSourceType === "SANDBOX" ? (
+                selectedSourceType === "SANDBOX" ||
+                selectedSourceType === "CUSTOM" ? (
                   <UploadedFiles
                     existingFiles={uploadedFiles}
                     pendingFiles={pendingFiles}

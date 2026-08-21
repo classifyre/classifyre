@@ -19,8 +19,22 @@ import { HistoryEventType } from './types/finding-history.types';
 import { CorrelationJobScheduler } from './correlation/correlation-job-scheduler.service';
 
 // Uploads are not size-capped by the API; the transport (Fastify bodyLimit /
-// @fastify/multipart) is unbounded too, so a large sandbox file is stored
+// @fastify/multipart) is unbounded too, so a large uploaded file is stored
 // rather than rejected with 413.
+
+/**
+ * Source types that can hold uploaded files.
+ *
+ * SANDBOX turns each file into an asset directly. CUSTOM hands them to its
+ * notebook as `ctx.files`, which is how a connector gets at a dump in a
+ * Kubernetes deployment, where there is no local folder to point at. The two
+ * differ in the guards below: a sandbox with no files has nothing to scan, a
+ * notebook with no files is perfectly normal.
+ */
+const FILE_CAPABLE_SOURCE_TYPES = [
+  AssetType.SANDBOX,
+  AssetType.CUSTOM,
+] as const;
 
 const fileMetadataSelect = {
   id: true,
@@ -42,7 +56,7 @@ export class SourceFilesService {
   ) {}
 
   async list(sourceId: string) {
-    await this.assertSandboxSource(sourceId);
+    await this.assertFileCapableSource(sourceId);
     return this.prisma.uploadedSourceFile.findMany({
       where: { sourceId },
       select: fileMetadataSelect,
@@ -56,7 +70,7 @@ export class SourceFilesService {
     declaredMimeType: string;
     data: Buffer;
   }) {
-    const source = await this.assertSandboxSource(params.sourceId);
+    const source = await this.assertFileCapableSource(params.sourceId);
     this.assertSourceIdle(source);
     if (params.data.length === 0) {
       throw new BadRequestException('No file uploaded');
@@ -104,7 +118,7 @@ export class SourceFilesService {
   }
 
   async content(sourceId: string, fileId: string) {
-    await this.assertSandboxSource(sourceId);
+    await this.assertFileCapableSource(sourceId);
     const file = await this.prisma.uploadedSourceFile.findFirst({
       where: { id: fileId, sourceId },
       select: {
@@ -120,8 +134,9 @@ export class SourceFilesService {
   }
 
   async delete(sourceId: string, fileId: string): Promise<void> {
-    const source = await this.assertSandboxSource(sourceId);
+    const source = await this.assertFileCapableSource(sourceId);
     this.assertSourceIdle(source);
+    const isSandbox = source.type === AssetType.SANDBOX;
 
     let graphAffected = false;
     await this.prisma.$transaction(async (tx) => {
@@ -135,24 +150,33 @@ export class SourceFilesService {
       if (!file) {
         throw new NotFoundException(`Source file ${fileId} not found`);
       }
-      if (count <= 1) {
+      // Only for SANDBOX: its files *are* the source, so removing the last one
+      // leaves nothing to scan. A CUSTOM notebook owns its own assets and is
+      // free to have no files at all.
+      if (isSandbox && count <= 1) {
         throw new ConflictException(
           'The final file cannot be deleted; delete the source instead.',
         );
       }
 
       const externalUrl = this.externalUrl(sourceId, fileId);
-      const assets = await tx.asset.findMany({
-        where: {
-          sourceId,
-          status: { not: AssetStatus.DELETED },
-          OR: [
-            { externalUrl },
-            { externalUrl: { startsWith: `${externalUrl}#` } },
-          ],
-        },
-        select: { id: true },
-      });
+      // A sandbox asset is addressed by `sandbox://<source>/<file>`, so deleting
+      // the file identifies exactly the assets to retire. A notebook chooses its
+      // own asset ids, and nothing here can know which of them came from this
+      // file -- the next scan is what reconciles that.
+      const assets = isSandbox
+        ? await tx.asset.findMany({
+            where: {
+              sourceId,
+              status: { not: AssetStatus.DELETED },
+              OR: [
+                { externalUrl },
+                { externalUrl: { startsWith: `${externalUrl}#` } },
+              ],
+            },
+            select: { id: true },
+          })
+        : [];
       const assetIds = assets.map((asset) => asset.id);
       if (assetIds.length > 0) {
         graphAffected = true;
@@ -217,7 +241,7 @@ export class SourceFilesService {
     return `sandbox://${sourceId}/${fileId}`;
   }
 
-  private async assertSandboxSource(sourceId: string) {
+  private async assertFileCapableSource(sourceId: string) {
     const source = await this.prisma.source.findUnique({
       where: { id: sourceId },
       select: { id: true, type: true, runnerStatus: true },
@@ -225,7 +249,9 @@ export class SourceFilesService {
     if (!source) {
       throw new NotFoundException(`Source ${sourceId} not found`);
     }
-    if (source.type !== AssetType.SANDBOX) {
+    if (
+      !(FILE_CAPABLE_SOURCE_TYPES as readonly AssetType[]).includes(source.type)
+    ) {
       throw new BadRequestException(
         `Source ${sourceId} does not support uploaded files`,
       );
