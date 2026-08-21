@@ -77,6 +77,13 @@ export class AiProviderConfigResponseDto {
 
   @ApiProperty({
     description:
+      'Whether this provider serves an embeddings endpoint. Embeddings and chat completions are separate APIs with separate models, so the embedding configuration only offers providers marked this way.',
+    example: false,
+  })
+  supportsEmbedding: boolean;
+
+  @ApiProperty({
+    description:
       'Cost in USD per 1M input tokens. Null when pricing is not configured.',
     example: 3,
     nullable: true,
@@ -158,6 +165,15 @@ export class CreateAiProviderConfigDto {
   @IsOptional()
   @IsBoolean()
   supportsVision?: boolean;
+
+  @ApiPropertyOptional({
+    description:
+      'Whether this provider serves an embeddings endpoint (e.g. text-embedding-3-small). Defaults to false.',
+    example: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  supportsEmbedding?: boolean;
 
   @ApiPropertyOptional({
     description:
@@ -245,6 +261,15 @@ export class UpdateAiProviderConfigDto {
   @IsOptional()
   @IsBoolean()
   supportsVision?: boolean;
+
+  @ApiPropertyOptional({
+    description:
+      'Whether this provider serves an embeddings endpoint. Defaults to false.',
+    example: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  supportsEmbedding?: boolean;
 
   @ApiPropertyOptional({
     description:

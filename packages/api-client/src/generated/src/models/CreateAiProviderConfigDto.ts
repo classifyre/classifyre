@@ -62,6 +62,12 @@ export interface CreateAiProviderConfigDto {
      */
     supportsVision?: boolean;
     /**
+     * Whether this provider serves an embeddings endpoint (e.g. text-embedding-3-small). Defaults to false.
+     * @type {boolean}
+     * @memberof CreateAiProviderConfigDto
+     */
+    supportsEmbedding?: boolean;
+    /**
      * Optional cost in USD per 1M input tokens (enables cost estimates on autopilot runs).
      * @type {number}
      * @memberof CreateAiProviderConfigDto
@@ -113,6 +119,7 @@ export function CreateAiProviderConfigDtoFromJSONTyped(json: any, ignoreDiscrimi
         'baseUrl': json['baseUrl'] == null ? undefined : json['baseUrl'],
         'contextSize': json['contextSize'] == null ? undefined : json['contextSize'],
         'supportsVision': json['supportsVision'] == null ? undefined : json['supportsVision'],
+        'supportsEmbedding': json['supportsEmbedding'] == null ? undefined : json['supportsEmbedding'],
         'inputCostPerMTok': json['inputCostPerMTok'] == null ? undefined : json['inputCostPerMTok'],
         'outputCostPerMTok': json['outputCostPerMTok'] == null ? undefined : json['outputCostPerMTok'],
     };
@@ -136,6 +143,7 @@ export function CreateAiProviderConfigDtoToJSONTyped(value?: CreateAiProviderCon
         'baseUrl': value['baseUrl'],
         'contextSize': value['contextSize'],
         'supportsVision': value['supportsVision'],
+        'supportsEmbedding': value['supportsEmbedding'],
         'inputCostPerMTok': value['inputCostPerMTok'],
         'outputCostPerMTok': value['outputCostPerMTok'],
     };

@@ -9,6 +9,7 @@ import {
   Database,
   Gauge,
   Loader2,
+  Plus,
   RotateCcw,
   Search,
   Sparkles,
@@ -44,11 +45,13 @@ import {
   Spinner,
   Switch,
 } from "@workspace/ui/components";
+import Link from "next/link";
 import type { TranslationKey } from "@/i18n";
 import { useTranslation } from "@/hooks/use-translation";
+import { useNsPath } from "@/lib/ns-path";
 import { formatDate } from "@/lib/date";
 
-const PREFIX = "settings.embedding" as const;
+const PREFIX = "harness.embedding" as const;
 function key(suffix: string): TranslationKey {
   return `${PREFIX}.${suffix}` as TranslationKey;
 }
@@ -189,6 +192,7 @@ export function EmbeddingSettingsCard() {
   const [saving, setSaving] = React.useState(false);
   const [confirmOpen, setConfirmOpen] = React.useState(false);
   const [customModel, setCustomModel] = React.useState(false);
+  const nsPath = useNsPath();
 
   const refresh = React.useCallback(async () => {
     try {
@@ -471,9 +475,28 @@ export function EmbeddingSettingsCard() {
                     hint={t(key("aiProviderHint"))}
                   >
                     {settings.aiProviders.length === 0 ? (
-                      <p className="rounded-[4px] border border-muted bg-muted/30 px-3 py-2 text-[11px] text-muted-foreground">
-                        {t(key("aiProviderEmpty"))}
-                      </p>
+                      // Nowhere to go from here otherwise: the picker is empty
+                      // precisely because no provider is marked as serving
+                      // embeddings, and the place to fix that is another page.
+                      <div className="space-y-2 rounded-[4px] border-2 border-dashed border-border bg-muted/20 px-3 py-3">
+                        <p className="text-[11px] text-muted-foreground">
+                          {t(key("aiProviderEmpty"))}
+                        </p>
+                        <Button
+                          asChild
+                          size="sm"
+                          variant="outline"
+                          className="h-8 gap-1 rounded-[4px] text-[11px]"
+                        >
+                          <Link href={nsPath("/harness/providers/new")}>
+                            <Plus className="h-3 w-3" />
+                            {t(key("aiProviderCreate"))}
+                          </Link>
+                        </Button>
+                        <p className="text-[10px] text-muted-foreground/80">
+                          {t(key("aiProviderCreateHint"))}
+                        </p>
+                      </div>
                     ) : (
                       <Select
                         value={String(value("aiProviderConfigId") ?? "")}
@@ -491,6 +514,7 @@ export function EmbeddingSettingsCard() {
                             <SelectItem key={option.id} value={option.id}>
                               {option.name}
                               {option.baseUrl ? ` — ${option.baseUrl}` : ""}
+                              {option.supportsEmbedding ? "" : " ⚠"}
                             </SelectItem>
                           ))}
                         </SelectContent>

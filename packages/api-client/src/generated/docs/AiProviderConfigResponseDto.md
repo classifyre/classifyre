@@ -15,6 +15,7 @@ Name | Type
 `baseUrl` | string
 `contextSize` | number
 `supportsVision` | boolean
+`supportsEmbedding` | boolean
 `inputCostPerMTok` | number
 `outputCostPerMTok` | number
 `createdAt` | Date
@@ -36,6 +37,7 @@ const example = {
   "baseUrl": https://openrouter.ai/api/v1,
   "contextSize": 200000,
   "supportsVision": false,
+  "supportsEmbedding": false,
   "inputCostPerMTok": 3,
   "outputCostPerMTok": 15,
   "createdAt": null,
