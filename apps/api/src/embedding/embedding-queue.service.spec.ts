@@ -159,7 +159,10 @@ describe('EmbeddingQueueService', () => {
       },
     ]);
 
-    expect(provider.embedMany).toHaveBeenCalledWith(['needs embedding']);
+    expect(provider.embedMany).toHaveBeenCalledWith(
+      ['needs embedding'],
+      expect.anything(),
+    );
     expect(embeddings.missingHashes).toHaveBeenCalledWith(
       ['a'.repeat(64), 'b'.repeat(64)],
       '9c85727f-8b6f-4de0-aee6-08a96b57f79b',

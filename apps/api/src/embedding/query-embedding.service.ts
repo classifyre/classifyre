@@ -1,23 +1,37 @@
-import { Injectable, ServiceUnavailableException } from '@nestjs/common';
+import {
+  Injectable,
+  Optional,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { EmbeddingProviderService } from './embedding-provider.service';
 import { EmbeddingConfigService } from './embedding-config.service';
+import {
+  resolvedFromEnv,
+  type EmbeddingSettingsService,
+} from './embedding-settings.service';
 
 @Injectable()
 export class QueryEmbeddingService {
   constructor(
     private readonly provider?: EmbeddingProviderService,
     private readonly config: EmbeddingConfigService = new EmbeddingConfigService(),
+    @Optional() private readonly settings?: EmbeddingSettingsService,
   ) {}
 
   async embed(text: string): Promise<number[]> {
-    if (!this.config.enabled) {
+    // A query has to be embedded in the same coordinate system the corpus was,
+    // so this resolves the workspace's configuration rather than the
+    // deployment's.
+    const cfg =
+      (await this.settings?.resolve()) ?? resolvedFromEnv(this.config);
+    if (!cfg.enabled) {
       throw new ServiceUnavailableException(
-        'Semantic query embedding is disabled by EMBEDDING_ENABLED=false',
+        'Semantic search is turned off for this workspace',
       );
     }
     try {
       if (!this.provider) throw new Error('embedding provider is unavailable');
-      const vector = (await this.provider.embedMany([text]))[0];
+      const vector = (await this.provider.embedMany([text], cfg))[0];
       if (!vector?.length) throw new Error('provider returned no vector');
       return vector;
     } catch (error) {

@@ -8,6 +8,11 @@ import { QueryEmbeddingService } from './query-embedding.service';
 import { EmbeddingConfigService } from './embedding-config.service';
 import { EmbeddingProviderService } from './embedding-provider.service';
 import { EmbeddingQueueService } from './embedding-queue.service';
+import { EmbeddingSettingsService } from './embedding-settings.service';
+import { EmbeddingStatsService } from './embedding-stats.service';
+import { EmbeddingRebuildService } from './embedding-rebuild.service';
+import { AiProviderConfigService } from '../ai-provider-config.service';
+import { MaskedConfigCryptoService } from '../masked-config-crypto.service';
 
 /**
  * Shared semantic-embedding subsystem. A single module instance so every
@@ -20,6 +25,14 @@ import { EmbeddingQueueService } from './embedding-queue.service';
   providers: [
     PrismaService,
     EmbeddingConfigService,
+    EmbeddingSettingsService,
+    EmbeddingStatsService,
+    EmbeddingRebuildService,
+    // Re-provided rather than imported: AiProviderConfigService is a leaf
+    // service several modules construct for themselves (see cli-runner and
+    // autopilot), and importing AppModule here would be a cycle.
+    AiProviderConfigService,
+    MaskedConfigCryptoService,
     EmbeddingCapabilityService,
     EmbeddingAnalysisService,
     EmbeddingService,
@@ -29,6 +42,9 @@ import { EmbeddingQueueService } from './embedding-queue.service';
   ],
   exports: [
     EmbeddingConfigService,
+    EmbeddingSettingsService,
+    EmbeddingStatsService,
+    EmbeddingRebuildService,
     EmbeddingCapabilityService,
     EmbeddingAnalysisService,
     EmbeddingService,

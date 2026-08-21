@@ -16,25 +16,37 @@
 import * as runtime from '../runtime';
 import type {
   BoilerplateClusterDto,
+  EmbeddingRebuildResponseDto,
   EmbeddingRecalibrateResponseDto,
   EmbeddingReindexResponseDto,
+  EmbeddingSettingsResponseDto,
   EmbeddingStatusResponseDto,
   PutAssetChunksDto,
   SimilarFindingDto,
+  UpdateEmbeddingSettingsDto,
+  UpdateEmbeddingSettingsResponseDto,
 } from '../models/index';
 import {
     BoilerplateClusterDtoFromJSON,
     BoilerplateClusterDtoToJSON,
+    EmbeddingRebuildResponseDtoFromJSON,
+    EmbeddingRebuildResponseDtoToJSON,
     EmbeddingRecalibrateResponseDtoFromJSON,
     EmbeddingRecalibrateResponseDtoToJSON,
     EmbeddingReindexResponseDtoFromJSON,
     EmbeddingReindexResponseDtoToJSON,
+    EmbeddingSettingsResponseDtoFromJSON,
+    EmbeddingSettingsResponseDtoToJSON,
     EmbeddingStatusResponseDtoFromJSON,
     EmbeddingStatusResponseDtoToJSON,
     PutAssetChunksDtoFromJSON,
     PutAssetChunksDtoToJSON,
     SimilarFindingDtoFromJSON,
     SimilarFindingDtoToJSON,
+    UpdateEmbeddingSettingsDtoFromJSON,
+    UpdateEmbeddingSettingsDtoToJSON,
+    UpdateEmbeddingSettingsResponseDtoFromJSON,
+    UpdateEmbeddingSettingsResponseDtoToJSON,
 } from '../models/index';
 
 export interface EmbeddingControllerBoilerplateRequest {
@@ -57,6 +69,10 @@ export interface EmbeddingControllerChunksRequest {
 export interface EmbeddingControllerSimilarRequest {
     findingId: string;
     limit?: object;
+}
+
+export interface EmbeddingControllerUpdateSettingsRequest {
+    updateEmbeddingSettingsDto: UpdateEmbeddingSettingsDto;
 }
 
 /**
@@ -197,6 +213,64 @@ export class EmbeddingsApi extends runtime.BaseAPI {
     }
 
     /**
+     * Embedding configuration for this workspace, the deployment defaults behind it, and corpus size
+     */
+    async embeddingControllerGetSettingsRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<EmbeddingSettingsResponseDto>> {
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/embeddings/settings`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => EmbeddingSettingsResponseDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Embedding configuration for this workspace, the deployment defaults behind it, and corpus size
+     */
+    async embeddingControllerGetSettings(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<EmbeddingSettingsResponseDto> {
+        const response = await this.embeddingControllerGetSettingsRaw(initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Purge every stored vector for this workspace and re-embed the corpus from scratch
+     */
+    async embeddingControllerRebuildRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<EmbeddingRebuildResponseDto>> {
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/embeddings/rebuild`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => EmbeddingRebuildResponseDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Purge every stored vector for this workspace and re-embed the corpus from scratch
+     */
+    async embeddingControllerRebuild(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<EmbeddingRebuildResponseDto> {
+        const response = await this.embeddingControllerRebuildRaw(initOverrides);
+        return await response.value();
+    }
+
+    /**
      * Schedule a full evidence-ranking recalibration pass (importance scores, outliers, near-duplicate groups)
      */
     async embeddingControllerRecalibrateRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<EmbeddingRecalibrateResponseDto>> {
@@ -321,6 +395,45 @@ export class EmbeddingsApi extends runtime.BaseAPI {
      */
     async embeddingControllerStatus(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<EmbeddingStatusResponseDto> {
         const response = await this.embeddingControllerStatusRaw(initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Change embedding configuration; redefining the vector space purges the corpus and re-embeds it
+     */
+    async embeddingControllerUpdateSettingsRaw(requestParameters: EmbeddingControllerUpdateSettingsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<UpdateEmbeddingSettingsResponseDto>> {
+        if (requestParameters['updateEmbeddingSettingsDto'] == null) {
+            throw new runtime.RequiredError(
+                'updateEmbeddingSettingsDto',
+                'Required parameter "updateEmbeddingSettingsDto" was null or undefined when calling embeddingControllerUpdateSettings().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/embeddings/settings`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'PUT',
+            headers: headerParameters,
+            query: queryParameters,
+            body: UpdateEmbeddingSettingsDtoToJSON(requestParameters['updateEmbeddingSettingsDto']),
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => UpdateEmbeddingSettingsResponseDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Change embedding configuration; redefining the vector space purges the corpus and re-embeds it
+     */
+    async embeddingControllerUpdateSettings(requestParameters: EmbeddingControllerUpdateSettingsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<UpdateEmbeddingSettingsResponseDto> {
+        const response = await this.embeddingControllerUpdateSettingsRaw(requestParameters, initOverrides);
         return await response.value();
     }
 

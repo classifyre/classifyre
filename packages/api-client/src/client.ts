@@ -114,6 +114,15 @@ export type {
   BoilerplateClusterDto,
   EmbeddingRecalibrateResponseDto,
   EmbeddingStatusResponseDto,
+  EmbeddingSettingsResponseDto,
+  EmbeddingSettingValueDto,
+  EmbeddingProviderHealthDto,
+  EmbeddingSpaceStatsDto,
+  EmbeddingStatsDto,
+  EmbeddingAiProviderOptionDto,
+  EmbeddingRebuildResponseDto,
+  UpdateEmbeddingSettingsDto,
+  UpdateEmbeddingSettingsResponseDto,
 } from "./generated/src/models";
 export type {
   ChatBotResponseDto,

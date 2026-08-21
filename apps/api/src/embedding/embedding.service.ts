@@ -16,6 +16,11 @@ import { EmbeddingCapabilityService } from './embedding-capability.service';
 import { EmbeddingAnalysisService } from './embedding-analysis.service';
 import { PutAssetChunksDto } from './dto/embedding.dto';
 import { EmbeddingConfigService } from './embedding-config.service';
+import {
+  resolvedFromEnv,
+  type EmbeddingSettingsService,
+  type ResolvedEmbeddingConfig,
+} from './embedding-settings.service';
 import { embeddingContentHash } from './embedding-text';
 
 type SimilarityRow = { id: string; score: number };
@@ -83,8 +88,24 @@ export class EmbeddingService {
     private readonly analysis: EmbeddingAnalysisService,
     config?: EmbeddingConfigService,
     @Optional() private readonly cls?: ClsService,
+    // Optional and last so the unit tests that construct this service
+    // positionally keep working; without it every read falls back to the
+    // deployment defaults, which is exactly what those tests assume.
+    @Optional() private readonly settings?: EmbeddingSettingsService,
   ) {
     this.config = config ?? new EmbeddingConfigService();
+  }
+
+  /**
+   * Effective configuration for the current workspace.
+   *
+   * Synchronous by design: this is read inside open transactions and inside
+   * SQL string interpolation. The settings service keeps a per-schema cache
+   * that is warmed before any of those paths run and dropped whenever the
+   * settings change.
+   */
+  private get cfg(): ResolvedEmbeddingConfig {
+    return this.settings?.cached() ?? resolvedFromEnv(this.config);
   }
 
   private schemaKey(): string {
@@ -93,13 +114,13 @@ export class EmbeddingService {
 
   status() {
     return {
-      enabled: this.config.enabled,
+      enabled: this.cfg.enabled,
       pgvector: true,
       pgvectorVersion: this.capability.version(),
       searchStrategy: 'per-space-hnsw',
-      provider: this.config.provider,
-      model: this.config.model,
-      dimensions: this.config.dimensions,
+      provider: this.cfg.provider,
+      model: this.cfg.model,
+      dimensions: this.cfg.dimensions,
       spaceId: this.configuredSpaceIds.get(this.schemaKey()),
     };
   }
@@ -108,13 +129,33 @@ export class EmbeddingService {
     const key = this.schemaKey();
     let promise = this.configuredSpacePromises.get(key);
     if (!promise) {
-      promise = this.ensureSpace(this.config.space()).then((space) => {
-        this.configuredSpaceIds.set(key, space.id);
-        return space;
-      });
+      promise = this.resolveSpaceInput()
+        .then((input) => this.ensureSpace(input))
+        .then((space) => {
+          this.configuredSpaceIds.set(key, space.id);
+          return space;
+        });
       this.configuredSpacePromises.set(key, promise);
     }
     return promise;
+  }
+
+  /**
+   * The coordinate system this workspace is configured for.
+   *
+   * Awaiting the resolver here is what warms the synchronous cache {@link cfg}
+   * reads: every path that touches a space goes through configuredSpace first.
+   */
+  private async resolveSpaceInput() {
+    const cfg = this.settings ? await this.settings.resolve() : this.cfg;
+    return {
+      provider: cfg.provider,
+      model: cfg.model,
+      revision: cfg.revision,
+      dim: cfg.dimensions,
+      pooling: cfg.pooling,
+      normalized: cfg.normalize,
+    };
   }
 
   clearForSchema(schema: string): void {
@@ -127,7 +168,7 @@ export class EmbeddingService {
       provider?: ReturnType<EmbeddingConfigService['space']>['provider'];
     },
   ) {
-    const provider = input.provider ?? this.config.provider;
+    const provider = input.provider ?? this.cfg.provider;
     const space = await this.prisma.$transaction(async (tx) => {
       // All replicas in a rollout serialize space creation/activation. Without
       // this lock, two new pods can race the unique key or leave two spaces
@@ -199,12 +240,12 @@ export class EmbeddingService {
         `CREATE INDEX IF NOT EXISTS "${indexName}"
          ON "content_embeddings"
          USING hnsw (("vec"::public.vector(${dim})) public.vector_cosine_ops)
-         WITH (m = ${this.config.hnswM}, ef_construction = ${this.config.hnswEfConstruction})
+         WITH (m = ${this.cfg.hnswM}, ef_construction = ${this.cfg.hnswEfConstruction})
          WHERE "space_id" = '${spaceId}'`,
       ),
     );
     this.logger.log(
-      `Embedding space ${spaceId} ready (${this.config.provider}:${this.config.model}, ${dim} dimensions)`,
+      `Embedding space ${spaceId} ready (${this.cfg.provider}:${this.cfg.model}, ${dim} dimensions)`,
     );
   }
 
@@ -230,7 +271,7 @@ export class EmbeddingService {
   ) {
     const space = await this.ensureSpace({
       ...spaceInput,
-      provider: spaceInput.provider ?? this.config.provider,
+      provider: spaceInput.provider ?? this.cfg.provider,
     });
     const present = await this.prisma.contentEmbedding.findMany({
       where: {
@@ -489,7 +530,7 @@ export class EmbeddingService {
     const dim = Prisma.raw(String(space.dim));
     const seeds = await this.prisma.$transaction(async (tx) => {
       await tx.$executeRaw(
-        Prisma.raw(`SET LOCAL hnsw.ef_search = ${this.config.hnswEfSearch}`),
+        Prisma.raw(`SET LOCAL hnsw.ef_search = ${this.cfg.hnswEfSearch}`),
       );
       // The candidate pre-filters (space, hash, finding_type) are applied after
       // the index scan; relaxed_order lets the scan keep going until LIMIT is
@@ -787,7 +828,7 @@ export class EmbeddingService {
         : Prisma.sql`AND f.status <> ${FindingStatus.RESOLVED}::"FindingStatus"`;
     return this.prisma.$transaction(async (tx) => {
       await tx.$executeRaw(
-        Prisma.raw(`SET LOCAL hnsw.ef_search = ${this.config.hnswEfSearch}`),
+        Prisma.raw(`SET LOCAL hnsw.ef_search = ${this.cfg.hnswEfSearch}`),
       );
       await tx.$executeRaw`SET LOCAL hnsw.iterative_scan = strict_order`;
       return tx.$queryRaw<SimilarityRow[]>(Prisma.sql`
@@ -839,7 +880,7 @@ export class EmbeddingService {
     const vector = JSON.stringify(queryVector);
     return this.prisma.$transaction(async (tx) => {
       await tx.$executeRaw(
-        Prisma.raw(`SET LOCAL hnsw.ef_search = ${this.config.hnswEfSearch}`),
+        Prisma.raw(`SET LOCAL hnsw.ef_search = ${this.cfg.hnswEfSearch}`),
       );
       await tx.$executeRaw`SET LOCAL hnsw.iterative_scan = strict_order`;
       return tx.$queryRaw<SimilarityRow[]>(Prisma.sql`

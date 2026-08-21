@@ -13,6 +13,14 @@
  */
 
 import { mapValues } from '../runtime';
+import type { EmbeddingProviderHealthDto } from './EmbeddingProviderHealthDto';
+import {
+    EmbeddingProviderHealthDtoFromJSON,
+    EmbeddingProviderHealthDtoFromJSONTyped,
+    EmbeddingProviderHealthDtoToJSON,
+    EmbeddingProviderHealthDtoToJSONTyped,
+} from './EmbeddingProviderHealthDto';
+
 /**
  * 
  * @export
@@ -139,6 +147,48 @@ export interface EmbeddingStatusResponseDto {
      * @memberof EmbeddingStatusResponseDto
      */
     lastRecalibrationError?: string | null;
+    /**
+     * Vectors stored in the active space
+     * @type {number}
+     * @memberof EmbeddingStatusResponseDto
+     */
+    embeddedRows?: number | null;
+    /**
+     * Embedding batches queued, active or deferred
+     * @type {number}
+     * @memberof EmbeddingStatusResponseDto
+     */
+    pendingEmbedJobs?: number | null;
+    /**
+     * Embedding batches that failed since startup
+     * @type {number}
+     * @memberof EmbeddingStatusResponseDto
+     */
+    embedJobFailureCount: number;
+    /**
+     * 
+     * @type {string}
+     * @memberof EmbeddingStatusResponseDto
+     */
+    lastEmbedJobError?: string | null;
+    /**
+     * 
+     * @type {string}
+     * @memberof EmbeddingStatusResponseDto
+     */
+    lastEmbedJobErrorAt?: string | null;
+    /**
+     * 
+     * @type {string}
+     * @memberof EmbeddingStatusResponseDto
+     */
+    lastEmbedSuccessAt?: string | null;
+    /**
+     * Inference worker health and circuit-breaker state
+     * @type {EmbeddingProviderHealthDto}
+     * @memberof EmbeddingStatusResponseDto
+     */
+    providerHealth: EmbeddingProviderHealthDto;
 }
 
 /**
@@ -158,6 +208,8 @@ export function instanceOfEmbeddingStatusResponseDto(value: object): value is Em
     if (!('backfillRunning' in value) || value['backfillRunning'] === undefined) return false;
     if (!('recalibrationScheduled' in value) || value['recalibrationScheduled'] === undefined) return false;
     if (!('recalibrationRunning' in value) || value['recalibrationRunning'] === undefined) return false;
+    if (!('embedJobFailureCount' in value) || value['embedJobFailureCount'] === undefined) return false;
+    if (!('providerHealth' in value) || value['providerHealth'] === undefined) return false;
     return true;
 }
 
@@ -191,6 +243,13 @@ export function EmbeddingStatusResponseDtoFromJSONTyped(json: any, ignoreDiscrim
         'recalibrationRunning': json['recalibrationRunning'],
         'lastRecalibratedAt': json['lastRecalibratedAt'] == null ? undefined : json['lastRecalibratedAt'],
         'lastRecalibrationError': json['lastRecalibrationError'] == null ? undefined : json['lastRecalibrationError'],
+        'embeddedRows': json['embeddedRows'] == null ? undefined : json['embeddedRows'],
+        'pendingEmbedJobs': json['pendingEmbedJobs'] == null ? undefined : json['pendingEmbedJobs'],
+        'embedJobFailureCount': json['embedJobFailureCount'],
+        'lastEmbedJobError': json['lastEmbedJobError'] == null ? undefined : json['lastEmbedJobError'],
+        'lastEmbedJobErrorAt': json['lastEmbedJobErrorAt'] == null ? undefined : json['lastEmbedJobErrorAt'],
+        'lastEmbedSuccessAt': json['lastEmbedSuccessAt'] == null ? undefined : json['lastEmbedSuccessAt'],
+        'providerHealth': EmbeddingProviderHealthDtoFromJSON(json['providerHealth']),
     };
 }
 
@@ -225,6 +284,13 @@ export function EmbeddingStatusResponseDtoToJSONTyped(value?: EmbeddingStatusRes
         'recalibrationRunning': value['recalibrationRunning'],
         'lastRecalibratedAt': value['lastRecalibratedAt'],
         'lastRecalibrationError': value['lastRecalibrationError'],
+        'embeddedRows': value['embeddedRows'],
+        'pendingEmbedJobs': value['pendingEmbedJobs'],
+        'embedJobFailureCount': value['embedJobFailureCount'],
+        'lastEmbedJobError': value['lastEmbedJobError'],
+        'lastEmbedJobErrorAt': value['lastEmbedJobErrorAt'],
+        'lastEmbedSuccessAt': value['lastEmbedSuccessAt'],
+        'providerHealth': EmbeddingProviderHealthDtoToJSON(value['providerHealth']),
     };
 }
 

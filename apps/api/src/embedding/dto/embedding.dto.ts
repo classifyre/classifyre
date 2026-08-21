@@ -93,6 +93,30 @@ export class EmbeddingRecalibrateResponseDto {
   scheduled!: boolean;
 }
 
+/** Inference worker health, as the provider service reports it. */
+export class EmbeddingProviderHealthDto {
+  @ApiProperty({
+    description:
+      'The local inference worker is paused after repeated native failures',
+  })
+  workerDisabled!: boolean;
+
+  @ApiPropertyOptional({
+    nullable: true,
+    description: 'When the paused worker is probed again',
+  })
+  workerRetryAt?: string | null;
+
+  @ApiProperty()
+  requestErrorCount!: number;
+
+  @ApiPropertyOptional({ nullable: true })
+  lastRequestError?: string | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  lastRequestErrorAt?: string | null;
+}
+
 export class EmbeddingStatusResponseDto {
   @ApiProperty()
   enabled!: boolean;
@@ -156,6 +180,38 @@ export class EmbeddingStatusResponseDto {
 
   @ApiPropertyOptional({ nullable: true })
   lastRecalibrationError?: string | null;
+
+  // Returned by the queue since it was written, but never declared — so the
+  // generated client could not see the numbers the settings page needs.
+  @ApiPropertyOptional({
+    nullable: true,
+    description: 'Vectors stored in the active space',
+  })
+  embeddedRows?: number | null;
+
+  @ApiPropertyOptional({
+    nullable: true,
+    description: 'Embedding batches queued, active or deferred',
+  })
+  pendingEmbedJobs?: number | null;
+
+  @ApiProperty({ description: 'Embedding batches that failed since startup' })
+  embedJobFailureCount!: number;
+
+  @ApiPropertyOptional({ nullable: true })
+  lastEmbedJobError?: string | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  lastEmbedJobErrorAt?: string | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  lastEmbedSuccessAt?: string | null;
+
+  @ApiProperty({
+    type: EmbeddingProviderHealthDto,
+    description: 'Inference worker health and circuit-breaker state',
+  })
+  providerHealth!: EmbeddingProviderHealthDto;
 }
 
 export class EmbeddingReindexResponseDto {
