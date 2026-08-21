@@ -3,6 +3,10 @@
 import type { Monaco } from "@monaco-editor/react";
 import type { editor, Position } from "monaco-editor";
 import completions from "@workspace/schemas/notebook_completions";
+import {
+  RUNTIME_MODULES,
+  findRuntimeModule,
+} from "@/lib/notebook-runtime-packages";
 
 /**
  * Completions for notebook cells.
@@ -14,6 +18,12 @@ import completions from "@workspace/schemas/notebook_completions";
  * actually exist, with their real signatures and docstrings. A hand-written list
  * would be wrong the first time someone added a parameter; a test fails when the
  * generated file drifts.
+ *
+ * The **runtime packages** half is generated too, from `apps/cli/pyproject.toml`
+ * and `uv.lock`: an import line offers what the runner actually has, at the
+ * version it actually has. That is where the intelligence stops for a third
+ * party library -- knowing what `duckdb` exports, rather than that it exists,
+ * is inference, not a manifest.
  *
  * The **Python** half is keywords and common builtins. Real type inference --
  * knowing that `df` is a DataFrame -- needs a language server, and a language
@@ -165,9 +175,14 @@ const CONTRACT_SNIPPETS = [
   },
 ];
 
+/** `import x`, `from x import y` -- but not the `y` half, which we know nothing about. */
+const IMPORT_LINE = /^\s*(?:import|from)\s+[A-Za-z0-9_.]*$/;
+
 function monacoKind(monaco: Monaco, kind: string) {
   const kinds = monaco.languages.CompletionItemKind;
   switch (kind) {
+    case "function":
+      return kinds.Function;
     case "method":
       return kinds.Method;
     case "property":
@@ -211,6 +226,38 @@ export function registerPythonCompletions(monaco: Monaco): void {
         endLineNumber: position.lineNumber,
         endColumn: position.column,
       });
+
+      // On an import line, offer what the runner has rather than the language:
+      // every keyword and builtin in the list is noise where only a module name
+      // can go, and the version is the thing an author cannot otherwise find.
+      if (IMPORT_LINE.test(linePrefix)) {
+        return {
+          suggestions: [
+            {
+              label: manifest.module,
+              kind: monaco.languages.CompletionItemKind.Module,
+              detail: "Classifyre SDK",
+              insertText: manifest.module,
+              sortText: `0${manifest.module}`,
+              range,
+            },
+            ...RUNTIME_MODULES.map(({ module, package: entry }) => ({
+              label: module,
+              kind: monaco.languages.CompletionItemKind.Module,
+              detail: `${entry.name} ${entry.version}`,
+              documentation:
+                entry.availability === "always"
+                  ? `${entry.name} ${entry.version} is installed in the scan runtime.`
+                  : `${entry.name} ${entry.version} is installed automatically when this notebook imports it (uv group "${entry.group}").`,
+              insertText: module,
+              // Below the SDK, above nothing else -- this list is the whole
+              // completion set on an import line.
+              sortText: `1${module}`,
+              range,
+            })),
+          ],
+        };
+      }
 
       // Member access: `ctx.` offers only what Context actually has, rather
       // than burying it under every keyword in the language.
@@ -290,6 +337,22 @@ export function registerPythonCompletions(monaco: Monaco): void {
     provideHover(model: editor.ITextModel, position: Position) {
       const word = model.getWordAtPosition(position);
       if (!word) return null;
+      const runtime = findRuntimeModule(word.word);
+      if (runtime) {
+        const { name, version, availability, group } = runtime.package;
+        return {
+          contents: [
+            { value: `**${name}** \`${version}\`` },
+            {
+              value:
+                availability === "always"
+                  ? "Installed in the scan runtime."
+                  : `Installed automatically when this notebook imports it (uv group \`${group}\`).`,
+            },
+          ],
+        };
+      }
+
       const entry =
         manifest.objects.ctx?.members.find((m) => m.label === word.word) ??
         manifest.globals.find((g) => g.label === word.word);

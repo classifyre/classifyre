@@ -18,7 +18,8 @@
     "./all_detectors_examples": "./src/schemas/all_detectors_examples.ts",
     "./assistant_knowledge": "./src/schemas/assistant_knowledge.json",
     "./assistant_contexts": "./src/schemas/assistant_contexts.json",
-    "./notebook_completions": "./src/schemas/notebook_completions.json"
+    "./notebook_completions": "./src/schemas/notebook_completions.json",
+    "./notebook_runtime_packages": "./src/schemas/notebook_runtime_packages.json"
   },
   "files": [
     "src"

@@ -35,6 +35,19 @@ interface JobRef {
   namespace: string;
 }
 
+/** One uploaded file an init container should place where a notebook can read it. */
+export interface NotebookInputFile {
+  /** Absolute API URL streaming the file's bytes. */
+  url: string;
+  /** The name the notebook knows it by, and the name it lands under. */
+  name: string;
+}
+
+const EVALUATION_INPUT_MOUNT_PATH = '/evaluation-input';
+
+/** Where a notebook execution's uploaded files land; read by notebook/cli.py. */
+const NOTEBOOK_FILES_MOUNT_PATH = '/notebook-files';
+
 @Injectable()
 export class KubernetesCliJobService {
   private readonly logger = new Logger(KubernetesCliJobService.name);
@@ -108,6 +121,7 @@ export class KubernetesCliJobService {
     sourceId: string,
     request: Record<string, unknown>,
     onJobCreated?: CliJobCreatedHandler,
+    files: NotebookInputFile[] = [],
   ): Promise<CliJobResult> {
     // request is an untyped JSON payload; only take executionId when it really
     // is a string, or the Job tracking key becomes "[object Object]".
@@ -122,6 +136,11 @@ export class KubernetesCliJobService {
       ),
       jobTrackingKey: executionId,
       onJobCreated,
+      // The notebook itself cannot fetch these: it holds no callback key and no
+      // API URL. An init container puts them on a volume before the cells run.
+      notebookFilesB64: files.length
+        ? Buffer.from(JSON.stringify(files), 'utf8').toString('base64')
+        : undefined,
     });
   }
 
@@ -278,6 +297,7 @@ export class KubernetesCliJobService {
     evaluationInputsB64?: string;
     evaluationDetectorsB64?: string;
     notebookRequestB64?: string;
+    notebookFilesB64?: string;
     jobTrackingKey?: string;
     onLogChunk?: CliJobLogHandler;
     onJobCreated?: CliJobCreatedHandler;
@@ -463,6 +483,7 @@ export class KubernetesCliJobService {
       evaluationInputsB64?: string;
       evaluationDetectorsB64?: string;
       notebookRequestB64?: string;
+      notebookFilesB64?: string;
     },
   ): Promise<V1Job> {
     const job = JSON.parse(JSON.stringify(template)) as V1Job;
@@ -584,6 +605,18 @@ export class KubernetesCliJobService {
         value: params.notebookRequestB64,
       });
     }
+    if (params.notebookFilesB64) {
+      envMap.set('NOTEBOOK_FILES_B64', {
+        name: 'NOTEBOOK_FILES_B64',
+        value: params.notebookFilesB64,
+      });
+      // Where the CLI looks for them. Read by notebook/cli.py, which turns the
+      // directory into ctx.files.
+      envMap.set('CLASSIFYRE_NOTEBOOK_FILES_DIR', {
+        name: 'CLASSIFYRE_NOTEBOOK_FILES_DIR',
+        value: NOTEBOOK_FILES_MOUNT_PATH,
+      });
+    }
 
     const workDir = process.env.K8S_CLI_JOB_WORKDIR || '/app/apps/cli';
     envMap.set('CLASSIFYRE_CLI_AUTO_INSTALL_OPTIONAL_DEPS', {
@@ -630,6 +663,9 @@ export class KubernetesCliJobService {
 
     if (params.mode === 'evaluation') {
       this.attachEvaluationInputVolume(jobAny, container, envMap);
+    }
+    if (params.notebookFilesB64) {
+      this.attachNotebookFilesVolume(jobAny, container, envMap);
     }
 
     // Apply per-source resource overrides from recipe
@@ -795,66 +831,152 @@ export class KubernetesCliJobService {
     container: V1Container,
     envMap: Map<string, V1EnvVar>,
   ): void {
-    const mountPath = '/evaluation-input';
+    this.attachFetchedInputVolume(jobAny, container, {
+      volumeName: 'evaluation-input',
+      mountPath: EVALUATION_INPUT_MOUNT_PATH,
+      initContainerName: 'evaluation-input-fetch',
+      envKeys: [
+        'EVALUATION_INPUT_URL',
+        'EVALUATION_FILE_EXT',
+        'EVALUATION_INPUTS_B64',
+      ],
+      envMap,
+      fetchCommand: this.buildEvaluationFetchCommand(
+        EVALUATION_INPUT_MOUNT_PATH,
+      ),
+    });
+  }
+
+  /**
+   * The same transport for a notebook execution's uploaded files.
+   *
+   * A notebook execution is deliberately given neither the callback key nor an
+   * API URL, so it cannot fetch its own source's files -- an init container,
+   * which is not the thing running user code, does it instead and leaves them
+   * on a volume that dies with the pod.
+   */
+  private attachNotebookFilesVolume(
+    jobAny: any,
+    container: V1Container,
+    envMap: Map<string, V1EnvVar>,
+  ): void {
+    this.attachFetchedInputVolume(jobAny, container, {
+      volumeName: 'notebook-files',
+      mountPath: NOTEBOOK_FILES_MOUNT_PATH,
+      initContainerName: 'notebook-files-fetch',
+      envKeys: ['NOTEBOOK_FILES_B64'],
+      envMap,
+      fetchCommand: this.buildNotebookFilesFetchCommand(
+        NOTEBOOK_FILES_MOUNT_PATH,
+      ),
+    });
+  }
+
+  private attachFetchedInputVolume(
+    jobAny: any,
+    container: V1Container,
+    options: {
+      volumeName: string;
+      mountPath: string;
+      initContainerName: string;
+      envKeys: string[];
+      envMap: Map<string, V1EnvVar>;
+      fetchCommand: string;
+    },
+  ): void {
+    const { volumeName, mountPath } = options;
     const podSpec = jobAny.spec.template.spec;
 
     podSpec.volumes = [
       ...(podSpec.volumes || []),
-      { name: 'evaluation-input', emptyDir: {} },
+      { name: volumeName, emptyDir: {} },
     ];
     container.volumeMounts = [
       ...(container.volumeMounts || []),
-      { name: 'evaluation-input', mountPath },
-    ];
-
-    const initEnv: V1EnvVar[] = [
-      {
-        name: 'EVALUATION_INPUT_URL',
-        value: envMap.get('EVALUATION_INPUT_URL')?.value || '',
-      },
-      {
-        name: 'EVALUATION_FILE_EXT',
-        value: envMap.get('EVALUATION_FILE_EXT')?.value || '',
-      },
-      {
-        name: 'EVALUATION_INPUTS_B64',
-        value: envMap.get('EVALUATION_INPUTS_B64')?.value || '',
-      },
+      { name: volumeName, mountPath },
     ];
 
     const initContainer: V1Container = {
-      name: 'evaluation-input-fetch',
+      name: options.initContainerName,
       image: container.image,
       imagePullPolicy: container.imagePullPolicy,
       ...(container.securityContext
         ? { securityContext: container.securityContext }
         : {}),
-      env: initEnv,
-      volumeMounts: [{ name: 'evaluation-input', mountPath }],
+      env: options.envKeys.map((name) => ({
+        name,
+        value: options.envMap.get(name)?.value || '',
+      })),
+      volumeMounts: [{ name: volumeName, mountPath }],
       command: ['/bin/sh', '-lc'],
-      args: [this.buildEvaluationFetchCommand(mountPath)],
+      args: [options.fetchCommand],
     };
 
     podSpec.initContainers = [...(podSpec.initContainers || []), initContainer];
   }
 
+  /**
+   * The URL guards every init-container download shares.
+   *
+   * Kept in one place on purpose: this is the part that decides whether a URL
+   * built from stored configuration is allowed to be fetched from inside the
+   * cluster, and a second copy of it is a second place to get it wrong.
+   */
+  private safeFetchPrelude(label: string): string[] {
+    return [
+      'import base64,ipaddress,json,os,socket,sys,time,urllib.parse,urllib.request',
+      'def safe(raw,allow_private=False):',
+      '    parsed=urllib.parse.urlparse(raw)',
+      "    if parsed.scheme == 'data': return",
+      `    if parsed.scheme not in ('http','https') or parsed.username or parsed.password: raise ValueError('unsafe ${label} URL')`,
+      '    for info in socket.getaddrinfo(parsed.hostname, parsed.port or (443 if parsed.scheme == "https" else 80), type=socket.SOCK_STREAM):',
+      '        ip=ipaddress.ip_address(info[4][0])',
+      `        if not allow_private and not ip.is_global: raise ValueError('${label} URL resolves to a non-public address')`,
+      'class SafeRedirect(urllib.request.HTTPRedirectHandler):',
+      '    def redirect_request(self,req,fp,code,msg,headers,newurl):',
+      '        safe(newurl,self.allow_private); return super().redirect_request(req,fp,code,msg,headers,newurl)',
+    ];
+  }
+
+  /**
+   * Download a notebook execution's uploaded files, keeping their own names.
+   *
+   * The name matters here in a way it does not for file evaluation: a notebook
+   * reaches for `ctx.file("dump.csv")`, so a positional `input-000` would make
+   * the authoring run disagree with the scan.
+   */
+  private buildNotebookFilesFetchCommand(mountPath: string): string {
+    const py = [
+      ...this.safeFetchPrelude('notebook file'),
+      "files=json.loads(base64.b64decode(os.environ.get('NOTEBOOK_FILES_B64','') or 'W10='))",
+      'for item in files:',
+      '    src=item["url"]; name=os.path.basename(item["name"]) or "upload"',
+      '    safe(src,True)',
+      '    redirect=SafeRedirect(); redirect.allow_private=True',
+      '    opener=urllib.request.build_opener(redirect)',
+      `    dst=os.path.join("${mountPath}",name)`,
+      '    try:',
+      '        with opener.open(src, timeout=60) as r, open(dst,"wb") as f:',
+      '            while True:',
+      '                chunk=r.read(1048576)',
+      '                if not chunk: break',
+      '                f.write(chunk)',
+      '        print(f"notebook file ready: {dst}", flush=True)',
+      '    except Exception as e:',
+      // One unreadable attachment must not stop the other twenty from arriving:
+      // the notebook sees the files that made it and fails on the one it needs.
+      '        print(f"could not download {name}: {e}", file=sys.stderr, flush=True)',
+    ].join('\n');
+    return `set -eu; python3 - <<'PYEOF'\n${py}\nPYEOF`;
+  }
+
   private buildEvaluationFetchCommand(mountPath: string): string {
     const py = [
-      'import base64,ipaddress,json,os,socket,sys,time,urllib.parse,urllib.request',
+      ...this.safeFetchPrelude('evaluation'),
       "batch=os.environ.get('EVALUATION_INPUTS_B64','')",
       "url=os.environ.get('EVALUATION_INPUT_URL','')",
       "ext=os.environ.get('EVALUATION_FILE_EXT','')",
       "inputs=json.loads(base64.b64decode(batch)) if batch else [{'url':url,'fileExtension':ext,'allowPrivate':True}]",
-      'def safe(raw,allow_private=False):',
-      '    parsed=urllib.parse.urlparse(raw)',
-      "    if parsed.scheme == 'data': return",
-      "    if parsed.scheme not in ('http','https') or parsed.username or parsed.password: raise ValueError('unsafe evaluation URL')",
-      '    for info in socket.getaddrinfo(parsed.hostname, parsed.port or (443 if parsed.scheme == "https" else 80), type=socket.SOCK_STREAM):',
-      '        ip=ipaddress.ip_address(info[4][0])',
-      "        if not allow_private and not ip.is_global: raise ValueError('evaluation URL resolves to a non-public address')",
-      'class SafeRedirect(urllib.request.HTTPRedirectHandler):',
-      '    def redirect_request(self,req,fp,code,msg,headers,newurl):',
-      '        safe(newurl,self.allow_private); return super().redirect_request(req,fp,code,msg,headers,newurl)',
       'last=None',
       'for index,item in enumerate(inputs):',
       '    src=item["url"]',

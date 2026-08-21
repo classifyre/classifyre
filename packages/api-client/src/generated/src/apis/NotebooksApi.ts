@@ -19,6 +19,7 @@ import type {
   NotebookDto,
   NotebookExecutionDto,
   NotebookScaffoldDto,
+  NotebookTemplateDto,
   UpdateNotebookDto,
   UpdateNotebookResponseDto,
 } from '../models/index';
@@ -31,6 +32,8 @@ import {
     NotebookExecutionDtoToJSON,
     NotebookScaffoldDtoFromJSON,
     NotebookScaffoldDtoToJSON,
+    NotebookTemplateDtoFromJSON,
+    NotebookTemplateDtoToJSON,
     UpdateNotebookDtoFromJSON,
     UpdateNotebookDtoToJSON,
     UpdateNotebookResponseDtoFromJSON,
@@ -346,6 +349,35 @@ export class NotebooksApi extends runtime.BaseAPI {
      */
     async notebookControllerScaffold(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<NotebookScaffoldDto> {
         const response = await this.notebookControllerScaffoldRaw(initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Worked notebooks an author can start from or borrow cells out of
+     */
+    async notebookControllerTemplatesRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<Array<NotebookTemplateDto>>> {
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/notebooks/templates`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => jsonValue.map(NotebookTemplateDtoFromJSON));
+    }
+
+    /**
+     * Worked notebooks an author can start from or borrow cells out of
+     */
+    async notebookControllerTemplates(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Array<NotebookTemplateDto>> {
+        const response = await this.notebookControllerTemplatesRaw(initOverrides);
         return await response.value();
     }
 

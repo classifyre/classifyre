@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { AssetType } from '@prisma/client';
-import { NotebookService } from './notebook.service';
+import { NotebookService, REQUIRED_FUNCTIONS } from './notebook.service';
 
 const CELLS = [
   {
@@ -253,6 +253,47 @@ describe('NotebookService', () => {
       const code = cells.map((cell) => cell.source).join('\n');
       expect(code).toContain('def test_connection(');
       expect(code).toContain('def extract(');
+    });
+  });
+
+  describe('templates', () => {
+    it('serves every worked example, each with cells', () => {
+      const { service } = buildService(configWith());
+      const templates = service.templates();
+
+      expect(templates.length).toBeGreaterThan(1);
+      for (const template of templates) {
+        expect(template.name).toBeTruthy();
+        expect(template.description).toBeTruthy();
+        expect(template.cells.length).toBeGreaterThan(0);
+      }
+    });
+
+    it('every template satisfies the contract it teaches', () => {
+      // A template that does not define the required functions would hand an
+      // author a notebook that cannot run -- exactly the state the scaffold
+      // exists to avoid.
+      const { service } = buildService(configWith());
+      for (const template of service.templates()) {
+        const code = template.cells.map((cell) => cell.source).join('\n');
+        for (const name of REQUIRED_FUNCTIONS) {
+          expect(code).toContain(`def ${name}(`);
+        }
+      }
+    });
+
+    it('includes the file, upload, folder and link examples', () => {
+      const { service } = buildService(configWith());
+      const names = service.templates().map((template) => template.name);
+      expect(names).toEqual(
+        expect.arrayContaining([
+          'Starter notebook',
+          'Parse files of any format',
+          'Read files uploaded to this source',
+          'Read a folder on this machine (desktop)',
+          'Linked assets',
+        ]),
+      );
     });
   });
 });

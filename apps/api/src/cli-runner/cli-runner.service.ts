@@ -48,7 +48,10 @@ import * as path from 'path';
 import * as fs from 'fs/promises';
 import * as fsSync from 'fs';
 import { randomUUID } from 'crypto';
-import { KubernetesCliJobService } from './kubernetes-cli-job.service';
+import {
+  KubernetesCliJobService,
+  type NotebookInputFile,
+} from './kubernetes-cli-job.service';
 import { MaskedConfigCryptoService } from '../masked-config-crypto.service';
 import { RunnerLogStorageService } from './runner-log-storage.service';
 import { buildNotebookEnvironment } from './notebook-env';
@@ -1639,17 +1642,26 @@ export class CliRunnerService {
     const request = { ...params.request, recipe: decryptedConfig };
     const environment = process.env.ENVIRONMENT || 'development';
 
+    // `validate` parses and contract-checks without running a cell, so nothing
+    // can read ctx.files -- and the editor calls it on a debounce while someone
+    // types. Materializing the source's uploads for that would be pure cost.
+    const needsFiles = String(params.request.mode || '') !== 'validate';
+
     if (this.isKubernetesExecutionEnabled(environment)) {
       return this.runNotebookInKubernetes(
         params.sourceId,
         request,
         params.onJobCreated,
+        needsFiles ? await this.notebookInputFiles(params.sourceId) : [],
       );
     }
 
     const cliPath = this.getCliPath(environment);
     const venvPath = this.getVenvPath(environment);
     const requestFile = await this.createTempJsonFile('notebook', request);
+    const filesDir = needsFiles
+      ? await this.writeNotebookFiles(params.sourceId)
+      : null;
 
     try {
       const command =
@@ -1668,13 +1680,82 @@ export class CliRunnerService {
         undefined,
         undefined,
         { mode: 'head', maxBytes: 8 * 1024 * 1024, maxLines: 50_000 },
-        buildNotebookEnvironment(),
+        buildNotebookEnvironment(
+          process.env,
+          filesDir ? { CLASSIFYRE_NOTEBOOK_FILES_DIR: filesDir } : {},
+        ),
       );
 
       return { payload: parseNotebookResult(stdout), stderr, exitCode };
     } finally {
       await fs.unlink(requestFile).catch(() => undefined);
+      if (filesDir) {
+        await fs
+          .rm(filesDir, { recursive: true, force: true })
+          .catch(() => undefined);
+      }
     }
+  }
+
+  /**
+   * URLs an init container can stream this source's uploaded files from.
+   *
+   * The notebook job holds neither the callback key nor an API URL by design,
+   * so it is handed finished files rather than the means to fetch them.
+   */
+  private async notebookInputFiles(
+    sourceId: string,
+  ): Promise<NotebookInputFile[]> {
+    const files = await this.prisma.uploadedSourceFile.findMany({
+      where: { sourceId },
+      select: { id: true, fileName: true },
+      orderBy: [{ fileName: 'asc' }, { id: 'asc' }],
+    });
+    if (files.length === 0) return [];
+
+    const base = this.resolveOutputRestUrl(
+      process.env.ENVIRONMENT || 'development',
+    );
+    return files.map((file) => ({
+      url: `${base}/sources/${encodeURIComponent(sourceId)}/files/${encodeURIComponent(file.id)}/content`,
+      name: file.fileName,
+    }));
+  }
+
+  /**
+   * The same files, on local disk, for a notebook run outside Kubernetes.
+   *
+   * Read straight from the database rather than over HTTP: the API is this
+   * process, and a loopback request to itself to fetch its own rows would be a
+   * detour with its own failure modes.
+   */
+  private async writeNotebookFiles(sourceId: string): Promise<string | null> {
+    const files = await this.prisma.uploadedSourceFile.findMany({
+      where: { sourceId },
+      select: { id: true, fileName: true, data: true },
+      orderBy: [{ fileName: 'asc' }, { id: 'asc' }],
+    });
+    if (files.length === 0) return null;
+
+    const directory = path.join(
+      process.env.TEMP_DIR || '/tmp',
+      `notebook-files-${randomUUID()}`,
+    );
+    await fs.mkdir(directory, { recursive: true, mode: 0o700 });
+    const used = new Set<string>();
+    for (const file of files) {
+      // Two uploads can share a name (dedupe is by content hash), and the
+      // second silently replacing the first would hand the notebook fewer
+      // files than the source has.
+      let name = path.basename(file.fileName || 'upload') || 'upload';
+      if (used.has(name)) {
+        const extension = path.extname(name);
+        name = `${path.basename(name, extension)}-${file.id.slice(0, 8)}${extension}`;
+      }
+      used.add(name);
+      await fs.writeFile(path.join(directory, name), Buffer.from(file.data));
+    }
+    return directory;
   }
 
   private async runNotebookInKubernetes(
@@ -1684,6 +1765,7 @@ export class CliRunnerService {
       jobName: string;
       namespace: string;
     }) => void | Promise<void>,
+    files: NotebookInputFile[] = [],
   ): Promise<{
     payload: Record<string, any> | null;
     stderr: string;
@@ -1698,6 +1780,7 @@ export class CliRunnerService {
       sourceId,
       request,
       onJobCreated,
+      files,
     );
     return {
       // A pod log interleaves everything that wrote to the stream, so the

@@ -57,7 +57,8 @@ import {
   ToggleGroup,
   ToggleGroupItem,
 } from "@workspace/ui/components/toggle-group";
-import { FolderOpen, Plus, X } from "lucide-react";
+import { Plus, X } from "lucide-react";
+import { FolderPathInput } from "@/components/folder-path-input";
 import { AiAssistedCard } from "@/components/ai-assisted-card";
 import {
   buildSourcePrompt,
@@ -2143,10 +2144,11 @@ function SchemaField({
 }
 
 /**
- * Text input for the LOCAL_FOLDER source's `required.path` field. Adds a
- * native "Browse..." button when running inside the Classifyre desktop app
- * (`window.electronAPI.selectFolder` is only exposed by the Electron
- * preload script). Falls back to a plain text input in the browser.
+ * Text input for the LOCAL_FOLDER source's `required.path` field.
+ *
+ * Thin wrapper over the shared FolderPathInput, which owns the desktop
+ * "Browse..." affordance -- react-hook-form's field object is the only thing
+ * this adds.
  */
 function FolderPathField({
   field,
@@ -2165,60 +2167,20 @@ function FolderPathField({
   placeholder: string;
   disabled?: boolean;
 }) {
-  const { t } = useTranslation();
-  const [canBrowse, setCanBrowse] = React.useState(false);
-  const [isBrowsing, setIsBrowsing] = React.useState(false);
-
-  React.useEffect(() => {
-    setCanBrowse(
-      typeof window !== "undefined" &&
-        typeof window.electronAPI?.selectFolder === "function",
-    );
-  }, []);
-
   const testId = fieldName.toLowerCase().replace(/[^a-z0-9]/g, "-");
-
-  const handleBrowse = async () => {
-    if (!window.electronAPI?.selectFolder) return;
-    setIsBrowsing(true);
-    try {
-      const result = await window.electronAPI.selectFolder();
-      if (!result.canceled && result.path) {
-        field.onChange(result.path);
-      }
-    } finally {
-      setIsBrowsing(false);
-    }
-  };
-
   return (
-    <div className="flex gap-2">
-      <Input
-        type="text"
-        placeholder={placeholder}
-        name={field.name}
-        ref={field.ref}
-        onBlur={field.onBlur}
-        onChange={(event) => field.onChange(event.target.value)}
-        value={(field.value as string | undefined) ?? ""}
-        autoComplete="off"
-        disabled={disabled}
-        data-testid={`input-${testId}`}
-        className="flex-1"
-      />
-      {canBrowse && (
-        <Button
-          type="button"
-          variant="outline"
-          onClick={handleBrowse}
-          disabled={disabled || isBrowsing}
-          data-testid={`browse-${testId}`}
-        >
-          <FolderOpen className="h-4 w-4 mr-1" />
-          {t("forms.browse")}
-        </Button>
-      )}
-    </div>
+    <FolderPathInput
+      value={(field.value as string | undefined) ?? ""}
+      onChange={(path) => field.onChange(path)}
+      placeholder={placeholder}
+      disabled={disabled}
+      testId={testId}
+      inputProps={{
+        name: field.name,
+        ref: field.ref,
+        onBlur: field.onBlur,
+      }}
+    />
   );
 }
 

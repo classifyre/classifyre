@@ -1051,7 +1051,7 @@
             }
           }
         },
-        "summary": "List uploaded files for a Sandbox source",
+        "summary": "List uploaded files for a source",
         "tags": [
           "Sources"
         ]
@@ -1099,7 +1099,7 @@
             }
           }
         },
-        "summary": "Upload one file to a Sandbox source",
+        "summary": "Upload one file to a source",
         "tags": [
           "Sources"
         ]
@@ -7936,6 +7936,31 @@
           }
         },
         "summary": "The starter cells and the functions a notebook must define",
+        "tags": [
+          "Notebooks"
+        ]
+      }
+    },
+    "/notebooks/templates": {
+      "get": {
+        "operationId": "NotebookController_templates",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/NotebookTemplateDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Worked notebooks an author can start from or borrow cells out of",
         "tags": [
           "Notebooks"
         ]
@@ -20172,6 +20197,31 @@
           "cells",
           "requiredFunctions",
           "optionalFunctions"
+        ]
+      },
+      "NotebookTemplateDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Shown in the template picker"
+          },
+          "description": {
+            "type": "string",
+            "description": "One line on what this template does"
+          },
+          "cells": {
+            "description": "Cells to append. The editor assigns fresh ids on insert.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NotebookCellDto"
+            }
+          }
+        },
+        "required": [
+          "name",
+          "description",
+          "cells"
         ]
       },
       "NotebookDto": {

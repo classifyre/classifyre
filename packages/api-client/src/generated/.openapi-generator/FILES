@@ -212,6 +212,7 @@ docs/NotebookCellDto.md
 docs/NotebookDto.md
 docs/NotebookExecutionDto.md
 docs/NotebookScaffoldDto.md
+docs/NotebookTemplateDto.md
 docs/NotebooksApi.md
 docs/NotificationListResponseDto.md
 docs/NotificationResponseDto.md
@@ -577,6 +578,7 @@ src/models/NotebookCellDto.ts
 src/models/NotebookDto.ts
 src/models/NotebookExecutionDto.ts
 src/models/NotebookScaffoldDto.ts
+src/models/NotebookTemplateDto.ts
 src/models/NotificationListResponseDto.ts
 src/models/NotificationResponseDto.ts
 src/models/NotificationsControllerDeleteNotification200Response.ts

@@ -12542,6 +12542,15 @@
             "$ref": "#/definitions/NotebookPackage"
           },
           "description": "Python packages installed into the run environment before any cell executes. Installed with uv; the base image's own dependencies are always present and do not need listing."
+        },
+        "local_folders": {
+          "type": "array",
+          "maxItems": 10,
+          "default": [],
+          "items": {
+            "$ref": "#/definitions/NotebookLocalFolder"
+          },
+          "description": "Desktop only. Folders on this machine the notebook reads with ctx.folder(\"name\"). Not available in Kubernetes deployments, where files are uploaded to the source instead. This is a convenience, not a sandbox: the notebook process runs as you and can open any path you can."
         }
       },
       "additionalProperties": false
@@ -12617,6 +12626,30 @@
       },
       "required": [
         "name"
+      ],
+      "additionalProperties": false
+    },
+    "NotebookLocalFolder": {
+      "title": "NotebookLocalFolder",
+      "label": "Local Folder",
+      "type": "object",
+      "description": "A folder on the machine running the desktop application.",
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,62}$",
+          "description": "How the notebook refers to it: ctx.folder(\"name\"). Must be a valid Python identifier."
+        },
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096,
+          "description": "Absolute path to the folder, for example /Users/me/dumps."
+        }
+      },
+      "required": [
+        "name",
+        "path"
       ],
       "additionalProperties": false
     }

@@ -95,6 +95,7 @@ export const SourceForm = React.forwardRef<SourceFormHandle, SourceFormProps>(
           optional?: {
             variables?: Record<string, string>;
             packages?: Array<{ name: string; version?: string }>;
+            local_folders?: Array<{ name: string; path: string }>;
           };
           masked?: { secrets?: Record<string, string> };
         };
@@ -107,6 +108,7 @@ export const SourceForm = React.forwardRef<SourceFormHandle, SourceFormProps>(
           cells: notebook?.cells ?? [],
           revision: notebook?.revision ?? 1,
           packages: config?.optional?.packages ?? [],
+          localFolders: config?.optional?.local_folders ?? [],
           variables: recordToEntries(config?.optional?.variables),
           secrets: secretKeysToEntries(secretKeys),
           originalSecretKeys: secretKeys,
@@ -303,15 +305,16 @@ export const SourceForm = React.forwardRef<SourceFormHandle, SourceFormProps>(
         showActions={showActions}
         afterNameContent={
           isCustom ? (
-            <>
-              {afterNameContent}
-              <CustomSourceConfig
-                sourceId={sourceId}
-                draft={customDraft}
-                onChange={setCustomDraft}
-                disabled={disabled}
-              />
-            </>
+            // The uploader goes inside the notebook config rather than above
+            // it: uploaded files are one of the two ways a notebook reaches a
+            // file, and the other one is right beside it.
+            <CustomSourceConfig
+              sourceId={sourceId}
+              draft={customDraft}
+              onChange={setCustomDraft}
+              disabled={disabled}
+              filesSlot={afterNameContent}
+            />
           ) : (
             afterNameContent
           )

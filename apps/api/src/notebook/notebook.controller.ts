@@ -23,6 +23,7 @@ import {
   NotebookDto,
   NotebookExecutionDto,
   NotebookScaffoldDto,
+  NotebookTemplateDto,
   UpdateNotebookDto,
   UpdateNotebookResponseDto,
 } from './dto/notebook.dto';
@@ -46,6 +47,15 @@ export class NotebookController {
       requiredFunctions: REQUIRED_FUNCTIONS,
       optionalFunctions: OPTIONAL_FUNCTIONS,
     };
+  }
+
+  @Get('notebooks/templates')
+  @ApiOperation({
+    summary: 'Worked notebooks an author can start from or borrow cells out of',
+  })
+  @ApiResponse({ status: 200, type: [NotebookTemplateDto] })
+  templates(): NotebookTemplateDto[] {
+    return this.notebooks.templates();
   }
 
   @Get('sources/:sourceId/notebook')

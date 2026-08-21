@@ -16,12 +16,19 @@ import {
   secretKeysToEntries,
   type KeyValueEntry,
 } from "@/components/key-value-field";
+import { isDesktopRuntime } from "@/lib/desktop";
 import { NotebookEditor } from "./notebook-editor";
 import { PackageTable } from "./package-table";
+import { AvailablePackages } from "./available-packages";
+import { LocalFolders } from "./local-folders";
 import {
   packagesToConfig,
   type NotebookPackage,
 } from "@/lib/notebook-packages";
+import {
+  localFoldersToConfig,
+  type NotebookLocalFolder,
+} from "@/lib/notebook-local-folders";
 import { CellList, type NotebookAiConfig } from "./cell-list";
 import type { NotebookCell } from "@/lib/notebook-cells";
 
@@ -29,6 +36,8 @@ export interface CustomSourceDraft {
   cells: NotebookCell[];
   revision: number;
   packages: NotebookPackage[];
+  /** Desktop only; the API refuses to save these in a Kubernetes deployment. */
+  localFolders: NotebookLocalFolder[];
   variables: KeyValueEntry[];
   secrets: KeyValueEntry[];
   /** Secret names the server already holds, so a save can tell edits from deletions. */
@@ -40,6 +49,7 @@ export function emptyDraft(): CustomSourceDraft {
     cells: [],
     revision: 1,
     packages: [],
+    localFolders: [],
     variables: [],
     secrets: [],
     originalSecretKeys: [],
@@ -67,6 +77,8 @@ export interface CustomSourceConfigProps {
   draft: CustomSourceDraft;
   onChange: (draft: CustomSourceDraft) => void;
   disabled?: boolean;
+  /** The file uploader, owned by the page that persists uploads. */
+  filesSlot?: React.ReactNode;
 }
 
 export function CustomSourceConfig({
@@ -74,8 +86,14 @@ export function CustomSourceConfig({
   draft,
   onChange,
   disabled = false,
+  filesSlot,
 }: CustomSourceConfigProps) {
   const { t } = useTranslation();
+  // Local folders are paths on the machine running the app. There is no such
+  // machine behind a browser tab talking to a cluster, and the API refuses to
+  // save them there -- so the control is not offered either.
+  const [desktop, setDesktop] = React.useState(false);
+  React.useEffect(() => setDesktop(isDesktopRuntime()), []);
 
   const patch = (changes: Partial<CustomSourceDraft>) =>
     onChange({ ...draft, ...changes });
@@ -90,6 +108,33 @@ export function CustomSourceConfig({
 
   return (
     <div className="space-y-6">
+      {(filesSlot || desktop) && (
+        <div className="space-y-6" data-testid="notebook-files-config">
+          {filesSlot}
+          {filesSlot && (
+            <p className="rounded-md border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+              {t("notebook.files.hint")}
+            </p>
+          )}
+          {desktop && (
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">
+                  {t("notebook.folders.title")}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <LocalFolders
+                  folders={draft.localFolders}
+                  onChange={(localFolders) => patch({ localFolders })}
+                  disabled={disabled}
+                />
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      )}
+
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base">
@@ -102,6 +147,7 @@ export function CustomSourceConfig({
             onChange={(packages) => patch({ packages })}
             disabled={disabled}
           />
+          <AvailablePackages />
           <KeyValueField
             entries={draft.variables}
             onChange={(variables) => patch({ variables })}
@@ -216,6 +262,7 @@ export function draftToConfig(
     optional: {
       variables: entriesToRecord(draft.variables),
       packages: packagesToConfig(draft.packages),
+      local_folders: localFoldersToConfig(draft.localFolders),
     },
   };
 }
@@ -225,6 +272,7 @@ export function draftFromNotebook(notebook: {
   revision: number;
   cells: NotebookCell[];
   packages?: NotebookPackage[];
+  localFolders?: NotebookLocalFolder[];
   variables?: Record<string, string>;
   secretKeys?: string[];
 }): CustomSourceDraft {
@@ -232,6 +280,7 @@ export function draftFromNotebook(notebook: {
     cells: notebook.cells,
     revision: notebook.revision,
     packages: notebook.packages ?? [],
+    localFolders: notebook.localFolders ?? [],
     variables: recordToEntries(notebook.variables),
     secrets: secretKeysToEntries(notebook.secretKeys),
     originalSecretKeys: notebook.secretKeys ?? [],
