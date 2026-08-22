@@ -382,8 +382,37 @@ function toStatus(raw: string): WorkerQueueStatus {
     : 'idle';
 }
 
+/**
+ * A short, human-readable label for whatever a handler threw.
+ *
+ * Non-Error throws are narrowed to primitives before stringifying rather than
+ * passed to `String()` wholesale: a thrown plain object would otherwise be
+ * recorded as `[object Object]`, which tells an operator nothing. Objects fall
+ * back to JSON, which at least carries the fields.
+ */
 function describeError(error: unknown): string {
-  const message =
-    error instanceof Error ? error.message : String(error ?? 'unknown error');
+  return truncate(errorMessage(error));
+}
+
+function errorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (error === null || error === undefined) return 'unknown error';
+  if (
+    typeof error === 'string' ||
+    typeof error === 'number' ||
+    typeof error === 'boolean' ||
+    typeof error === 'bigint' ||
+    typeof error === 'symbol'
+  ) {
+    return String(error);
+  }
+  try {
+    return JSON.stringify(error) ?? 'unknown error';
+  } catch {
+    return 'unserializable error';
+  }
+}
+
+function truncate(message: string): string {
   return message.slice(0, MAX_ERROR_LENGTH);
 }
