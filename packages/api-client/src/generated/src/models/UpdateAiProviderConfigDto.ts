@@ -68,6 +68,18 @@ export interface UpdateAiProviderConfigDto {
      */
     supportsEmbedding?: boolean;
     /**
+     * Dimensions the embedding model outputs.
+     * @type {number}
+     * @memberof UpdateAiProviderConfigDto
+     */
+    embeddingDimensions?: number;
+    /**
+     * Pooling strategy.
+     * @type {string}
+     * @memberof UpdateAiProviderConfigDto
+     */
+    embeddingPooling?: string;
+    /**
      * Cost in USD per 1M input tokens. Pass null to clear the price.
      * @type {number}
      * @memberof UpdateAiProviderConfigDto
@@ -118,6 +130,8 @@ export function UpdateAiProviderConfigDtoFromJSONTyped(json: any, ignoreDiscrimi
         'contextSize': json['contextSize'] == null ? undefined : json['contextSize'],
         'supportsVision': json['supportsVision'] == null ? undefined : json['supportsVision'],
         'supportsEmbedding': json['supportsEmbedding'] == null ? undefined : json['supportsEmbedding'],
+        'embeddingDimensions': json['embeddingDimensions'] == null ? undefined : json['embeddingDimensions'],
+        'embeddingPooling': json['embeddingPooling'] == null ? undefined : json['embeddingPooling'],
         'inputCostPerMTok': json['inputCostPerMTok'] == null ? undefined : json['inputCostPerMTok'],
         'outputCostPerMTok': json['outputCostPerMTok'] == null ? undefined : json['outputCostPerMTok'],
     };
@@ -142,6 +156,8 @@ export function UpdateAiProviderConfigDtoToJSONTyped(value?: UpdateAiProviderCon
         'contextSize': value['contextSize'],
         'supportsVision': value['supportsVision'],
         'supportsEmbedding': value['supportsEmbedding'],
+        'embeddingDimensions': value['embeddingDimensions'],
+        'embeddingPooling': value['embeddingPooling'],
         'inputCostPerMTok': value['inputCostPerMTok'],
         'outputCostPerMTok': value['outputCostPerMTok'],
     };

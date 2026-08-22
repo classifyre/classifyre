@@ -7,6 +7,7 @@ import {
   EmbeddingConfigService,
   type EmbeddingProviderKind,
 } from './embedding-config.service';
+import { MAX_VECTOR_DIMENSIONS } from './embedding-vector';
 
 /**
  * The fields that define a vector coordinate system.
@@ -219,6 +220,21 @@ export class EmbeddingSettingsService {
           );
           resolved.baseUrl = runtime.baseUrl ?? resolved.baseUrl;
           resolved.apiKey = runtime.apiKey ?? resolved.apiKey;
+          // The provider already knows what model it serves and what that
+          // model outputs, so a remote workspace does not restate any of it.
+          // An explicit workspace override still wins — it is the only way to
+          // run two models from one credential — but the provider is the
+          // default, which is why `row.model` is checked rather than
+          // `resolved.model` (that already holds the deployment default).
+          if (resolved.provider === 'openai-compatible') {
+            if (!row.model && runtime.model) resolved.model = runtime.model;
+            if (row.dimensions == null && runtime.embeddingDimensions != null) {
+              resolved.dimensions = runtime.embeddingDimensions;
+            }
+            if (row.pooling == null && runtime.embeddingPooling) {
+              resolved.pooling = runtime.embeddingPooling;
+            }
+          }
         } catch (error) {
           this.logger.warn(
             `Embedding AI provider ${row.aiProviderConfigId} could not be resolved: ${
@@ -340,9 +356,12 @@ export class EmbeddingSettingsService {
     if (patch.model != null && !patch.model.trim()) {
       fail('model must not be empty');
     }
-    // pgvector's HNSW implementation indexes at most 2000 dimensions, so a
-    // larger model would store vectors that can never be searched.
-    range('dimensions', 1, 2000);
+    // pgvector stores up to 16,000 dimensions. The old cap of 2,000 was the
+    // *index* limit borrowed as a validation rule, which rejected ordinary
+    // modern models (2,048 and 3,072 are common) that store and search fine —
+    // see vectorCast, which picks halfvec up to 4,000 and drops the index
+    // above that rather than refusing the configuration.
+    range('dimensions', 1, MAX_VECTOR_DIMENSIONS);
     range('batchSize', 1, 256);
     range('workerConcurrency', 1, 32);
     range('maxParallelCalls', 1, 32);

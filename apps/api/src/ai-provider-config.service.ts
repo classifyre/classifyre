@@ -56,6 +56,8 @@ export class AiProviderConfigService {
       contextSize: config.contextSize,
       supportsVision: config.supportsVision,
       supportsEmbedding: config.supportsEmbedding,
+      embeddingDimensions: config.embeddingDimensions,
+      embeddingPooling: config.embeddingPooling,
       inputCostPerMTok:
         config.inputCostPerMTok != null
           ? Number(config.inputCostPerMTok)
@@ -106,6 +108,8 @@ export class AiProviderConfigService {
         contextSize: dto.contextSize ?? null,
         supportsVision: dto.supportsVision ?? false,
         supportsEmbedding: dto.supportsEmbedding ?? false,
+        embeddingDimensions: dto.embeddingDimensions ?? null,
+        embeddingPooling: dto.embeddingPooling ?? null,
         inputCostPerMTok: dto.inputCostPerMTok ?? null,
         outputCostPerMTok: dto.outputCostPerMTok ?? null,
       },
@@ -145,6 +149,12 @@ export class AiProviderConfigService {
     }
     if (dto.supportsEmbedding !== undefined) {
       data.supportsEmbedding = dto.supportsEmbedding;
+    }
+    if (dto.embeddingDimensions !== undefined) {
+      data.embeddingDimensions = dto.embeddingDimensions;
+    }
+    if (dto.embeddingPooling !== undefined) {
+      data.embeddingPooling = dto.embeddingPooling;
     }
     if (dto.inputCostPerMTok !== undefined) {
       data.inputCostPerMTok = dto.inputCostPerMTok;
@@ -222,6 +232,9 @@ export class AiProviderConfigService {
       baseUrl: config.baseUrl,
       contextSize: config.contextSize,
       supportsVision: config.supportsVision,
+      supportsEmbedding: config.supportsEmbedding,
+      embeddingDimensions: config.embeddingDimensions,
+      embeddingPooling: config.embeddingPooling,
     };
   }
 }

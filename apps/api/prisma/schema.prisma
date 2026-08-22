@@ -939,6 +939,13 @@ model AiProviderConfig {
   // embedding picker filters on this rather than offering every saved
   // provider and letting the user find out later.
   supportsEmbedding Boolean        @default(false) @map("supports_embedding")
+  // Properties of the embedding model itself, captured here rather than in the
+  // embedding configuration: they belong to the model, not to the workspace
+  // that uses it, and a workspace picking this provider should not have to
+  // re-state facts the provider already knows. Only meaningful when
+  // supportsEmbedding is true.
+  embeddingDimensions Int?         @map("embedding_dimensions")
+  embeddingPooling    String?      @map("embedding_pooling")
   // Optional pricing in USD per 1M tokens — enables cost estimates on
   // autopilot runs and the harness usage charts. Null = unknown/not billed.
   inputCostPerMTok  Decimal?       @map("input_cost_per_mtok") @db.Decimal(10, 4)

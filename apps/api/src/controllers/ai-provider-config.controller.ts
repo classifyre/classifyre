@@ -36,6 +36,9 @@ import {
 } from '../dto/ai-provider-config.dto';
 import { AssistantCapabilityReportDto } from '../dto/assistant-capability.dto';
 import { AssistantCapabilityService } from '../autopilot/capability/assistant-capability.service';
+import { EmbeddingProviderService } from '../embedding/embedding-provider.service';
+import { resolvedFromEnv } from '../embedding/embedding-settings.service';
+import { EmbeddingConfigService } from '../embedding/embedding-config.service';
 
 const TEST_MESSAGES = [
   {
@@ -57,6 +60,8 @@ export class AiProviderConfigController {
     private readonly service: AiProviderConfigService,
     private readonly aiClient: AiClientService,
     private readonly capability: AssistantCapabilityService,
+    private readonly embeddingProvider: EmbeddingProviderService,
+    private readonly embeddingDefaults: EmbeddingConfigService,
   ) {}
 
   @Get()
@@ -128,6 +133,11 @@ export class AiProviderConfigController {
   async test(@Param('id') id: string): Promise<AiProviderConfigTestResultDto> {
     const startedAt = Date.now();
     const config = await this.service.get(id);
+    // An embeddings endpoint cannot answer a chat completion, so testing one
+    // with the generic probe reports a working credential as broken.
+    if (config.supportsEmbedding) {
+      return this.testEmbedding(id, startedAt);
+    }
     try {
       const result = await this.aiClient.completeText(TEST_MESSAGES, {
         configId: id,
@@ -165,6 +175,86 @@ export class AiProviderConfigController {
         };
       }
       throw err;
+    }
+  }
+
+  /**
+   * Connection test for a provider that serves embeddings.
+   *
+   * Passing means three separate things worked: the key decrypted, the
+   * endpoint accepted an embeddings request for this model, and the returned
+   * vector is the width the provider claims. The third is the one worth
+   * checking — a dimension mismatch does not fail here, it fails on the first
+   * batch of a rebuild, hours later, with the corpus already deleted.
+   */
+  private async testEmbedding(
+    id: string,
+    startedAt: number,
+  ): Promise<AiProviderConfigTestResultDto> {
+    const config = await this.service.get(id);
+    try {
+      const runtime = await this.service.getRuntimeConfig(id);
+      const result = await this.embeddingProvider.testConnection({
+        ...resolvedFromEnv(this.embeddingDefaults),
+        provider: 'openai-compatible',
+        model: config.model,
+        baseUrl: runtime.baseUrl ?? undefined,
+        apiKey: runtime.apiKey,
+        // Declared width, so a mismatch is reported rather than normalised
+        // away. Falls back to what the deployment expects when the provider
+        // does not state one.
+        dimensions:
+          config.embeddingDimensions ?? this.embeddingDefaults.dimensions,
+        // The probe must not be rejected for the width it came back with —
+        // testConnection reports the mismatch, embedMany would throw on it.
+        normalize: false,
+      });
+
+      const mismatch = result.dimensions !== result.expectedDimensions;
+      return {
+        status: mismatch ? 'FAIL' : 'PASS',
+        category: mismatch ? 'CONFIGURATION' : 'CONNECTION',
+        provider: config.provider,
+        model: config.model,
+        message: mismatch
+          ? `${config.name} embedded the probe text, but ${config.model} returned ` +
+            `${result.dimensions} dimensions while this provider is configured for ` +
+            `${result.expectedDimensions}. Set dimensions to ${result.dimensions}.`
+          : `${config.name} connected successfully and ${config.model} returned a ` +
+            `${result.dimensions}-dimension vector.`,
+        details: [
+          'The stored credential was decrypted successfully.',
+          'The provider accepted a real embeddings request.',
+          mismatch
+            ? `Returned ${result.dimensions} dimensions, expected ${result.expectedDimensions}.`
+            : `The returned vector width matches the configured ${result.expectedDimensions} dimensions.`,
+        ],
+        durationMs: Date.now() - startedAt,
+        inputTokens: null,
+        outputTokens: null,
+        responsePreview: null,
+      };
+    } catch (err) {
+      const diagnostic = connectionFailure(err);
+      return {
+        status: 'FAIL',
+        category: diagnostic?.category ?? 'CONNECTION',
+        provider: config.provider,
+        model: config.model,
+        message:
+          diagnostic?.message ??
+          `The embeddings request failed: ${
+            err instanceof Error ? err.message : String(err)
+          }`,
+        details: diagnostic?.details ?? [
+          'The provider was reachable but did not return a usable vector.',
+          'Check that the model name is an embeddings model for this endpoint.',
+        ],
+        durationMs: Date.now() - startedAt,
+        inputTokens: null,
+        outputTokens: null,
+        responsePreview: null,
+      };
     }
   }
 

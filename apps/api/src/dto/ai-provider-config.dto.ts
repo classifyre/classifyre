@@ -84,6 +84,21 @@ export class AiProviderConfigResponseDto {
 
   @ApiProperty({
     description:
+      'Dimensions this embedding model outputs. Null when unknown or not an embedding provider.',
+    nullable: true,
+    example: 2048,
+  })
+  embeddingDimensions: number | null;
+
+  @ApiProperty({
+    description: 'Pooling strategy for this embedding model.',
+    nullable: true,
+    example: 'mean',
+  })
+  embeddingPooling: string | null;
+
+  @ApiProperty({
+    description:
       'Cost in USD per 1M input tokens. Null when pricing is not configured.',
     example: 3,
     nullable: true,
@@ -174,6 +189,24 @@ export class CreateAiProviderConfigDto {
   @IsOptional()
   @IsBoolean()
   supportsEmbedding?: boolean;
+
+  @ApiPropertyOptional({
+    description:
+      'Dimensions the embedding model outputs. Required when supportsEmbedding is true.',
+    example: 2048,
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  embeddingDimensions?: number;
+
+  @ApiPropertyOptional({
+    description: 'Pooling strategy for the embedding model.',
+    example: 'mean',
+  })
+  @IsOptional()
+  @IsString()
+  embeddingPooling?: string;
 
   @ApiPropertyOptional({
     description:
@@ -270,6 +303,20 @@ export class UpdateAiProviderConfigDto {
   @IsOptional()
   @IsBoolean()
   supportsEmbedding?: boolean;
+
+  @ApiPropertyOptional({
+    description: 'Dimensions the embedding model outputs.',
+    example: 2048,
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  embeddingDimensions?: number;
+
+  @ApiPropertyOptional({ description: 'Pooling strategy.', example: 'mean' })
+  @IsOptional()
+  @IsString()
+  embeddingPooling?: string;
 
   @ApiPropertyOptional({
     description:
