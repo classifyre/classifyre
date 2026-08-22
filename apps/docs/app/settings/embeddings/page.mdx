@@ -98,6 +98,22 @@ provider selected here would fail on its first batch — so the flag is set
 deliberately when you create or edit the provider. If nothing is listed, the
 page offers a direct link to create one.
 
+An embedding provider also stores the **dimensions** its model returns (and
+optionally the pooling strategy). Those describe the model, not the workspace,
+so selecting a remote provider here inherits them — there is nothing further to
+fill in. Use **Test connection** on the provider to confirm the dimensions are
+right: the test sends a real embeddings request and compares the width of the
+vector that comes back. A mismatch caught there costs a second; the same
+mismatch caught later fails the first batch of a rebuild, after the old corpus
+is already gone.
+
+<Callout type="info">
+  The provider test knows the difference. A provider marked as an embedding
+  model is tested by embedding a probe string, not by asking for a chat
+  completion — which is what an embeddings endpoint refuses, and why a working
+  embedding credential used to test as broken.
+</Callout>
+
 This moves the CPU cost off your machine and generally improves quality — at
 the price of sending evidence text to a third party. That is a data-governance
 decision, not a performance one.
@@ -107,8 +123,17 @@ decision, not a performance one.
 **Dimensions** is not a preference. It is a property of the model you chose,
 and a mismatch fails every batch rather than degrading quietly. Picking a model
 from the dropdown fills in the right number automatically; if you type a custom
-model, you must supply the number its documentation states. Values above 2000
-cannot be indexed for search.
+model, you must supply the number its documentation states. For a remote
+provider the number comes from the provider itself.
+
+How large a model can be is a question about the *index*, not about storage:
+
+| Dimensions | What happens |
+| --- | --- |
+| Up to 2,000 | Indexed normally |
+| 2,001 – 4,000 | Indexed at half precision — a negligible accuracy cost, and how 2,048- and 3,072-dimension models are served |
+| Above 4,000 | Stored and searched correctly, but with no index — similarity queries scan the whole space and will be slow on a large corpus |
+| Above 16,000 | Rejected; pgvector cannot store the vector |
 
 ---
 
@@ -135,6 +160,10 @@ embeds the corpus again from scratch:
 
 The page tells you what that costs before you confirm — how many vectors and
 how much disk will be deleted.
+
+Turning embeddings **off** is the one case that only deletes. The corpus is
+purged and nothing is re-embedded; the confirmation says so, and turning them
+back on later starts a fresh build.
 
 ### What is deleted, and what is not
 

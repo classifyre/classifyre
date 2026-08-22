@@ -71,6 +71,10 @@ export interface AiProviderRuntimeConfig {
   baseUrl?: string | null;
   contextSize?: number | null;
   supportsVision: boolean;
+  supportsEmbedding?: boolean;
+  /** Shape of the embedding model, when this provider serves one. */
+  embeddingDimensions?: number | null;
+  embeddingPooling?: string | null;
 }
 
 /** One provider request's result: the raw text plus reported token usage. */

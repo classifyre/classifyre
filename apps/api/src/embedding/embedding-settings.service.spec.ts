@@ -125,10 +125,24 @@ describe('EmbeddingSettingsService', () => {
     );
   });
 
-  it('rejects a dimension pgvector cannot index', async () => {
+  // Reported from a live instance: saving nemotron-3-embed-1b (2,048 dims)
+  // answered 400 "dimensions must be between 1 and 2000". The old cap was
+  // pgvector's HNSW *index* limit applied as a validation rule, which rejects
+  // models pgvector stores and searches perfectly well.
+  it.each([2048, 3072, 4096, 8192])(
+    'accepts %i dimensions, which pgvector can store',
+    async (dimensions) => {
+      const service = build();
+      await expect(service.update({ dimensions })).resolves.toEqual(
+        expect.objectContaining({ requiresRebuild: true }),
+      );
+    },
+  );
+
+  it('still rejects a dimension pgvector cannot store at all', async () => {
     const service = build();
-    await expect(service.update({ dimensions: 4096 })).rejects.toThrow(
-      'dimensions must be between 1 and 2000',
+    await expect(service.update({ dimensions: 16001 })).rejects.toThrow(
+      'dimensions must be between 1 and 16000',
     );
   });
 

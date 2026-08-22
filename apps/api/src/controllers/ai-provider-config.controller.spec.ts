@@ -13,6 +13,8 @@ function buildController(completeText: jest.Mock) {
     } as never,
     { completeText } as never,
     {} as never,
+    { testConnection: jest.fn() } as never,
+    {} as never,
   );
 }
 

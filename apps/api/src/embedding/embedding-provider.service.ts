@@ -115,6 +115,38 @@ export class EmbeddingProviderService implements OnApplicationShutdown {
     };
   }
 
+  /**
+   * Proves a provider can actually embed, for the "test connection" button.
+   *
+   * The generic AI-provider test sends a chat completion, which an embeddings
+   * endpoint answers with a 404 or a model-not-found — so a perfectly working
+   * embedding credential tested as broken. This asks the endpoint the only
+   * question it can answer, and checks the one thing that silently breaks
+   * later: whether the vector that comes back is the width the workspace is
+   * configured for.
+   */
+  async testConnection(cfg: ResolvedEmbeddingConfig): Promise<{
+    dimensions: number;
+    expectedDimensions: number;
+    durationMs: number;
+  }> {
+    const startedAt = Date.now();
+    const probe = 'Classifyre embedding connection test.';
+    const vectors =
+      cfg.provider === 'openai-compatible'
+        ? await this.embedRemote([probe], cfg)
+        : await this.embedLocal([probe], cfg);
+    const vector = vectors[0];
+    if (!vector?.length) {
+      throw new Error('The provider returned no vector for the probe text.');
+    }
+    return {
+      dimensions: vector.length,
+      expectedDimensions: cfg.dimensions,
+      durationMs: Date.now() - startedAt,
+    };
+  }
+
   async embedMany(
     texts: string[],
     override?: ResolvedEmbeddingConfig,

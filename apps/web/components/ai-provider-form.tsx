@@ -73,6 +73,8 @@ type Draft = {
   contextSize: string;
   supportsVision: boolean;
   supportsEmbedding: boolean;
+  embeddingDimensions: string;
+  embeddingPooling: string;
   inputCostPerMTok: string;
   outputCostPerMTok: string;
 };
@@ -143,6 +145,8 @@ function buildDraft(config: AiProviderConfigResponseDto | null): Draft {
       contextSize: "",
       supportsVision: false,
       supportsEmbedding: false,
+      embeddingDimensions: "",
+      embeddingPooling: "mean",
       inputCostPerMTok: "",
       outputCostPerMTok: "",
     };
@@ -156,6 +160,11 @@ function buildDraft(config: AiProviderConfigResponseDto | null): Draft {
     contextSize: config.contextSize != null ? String(config.contextSize) : "",
     supportsVision: config.supportsVision ?? false,
     supportsEmbedding: config.supportsEmbedding ?? false,
+    embeddingDimensions:
+      config.embeddingDimensions != null
+        ? String(config.embeddingDimensions)
+        : "",
+    embeddingPooling: config.embeddingPooling ?? "mean",
     inputCostPerMTok:
       config.inputCostPerMTok != null ? String(config.inputCostPerMTok) : "",
     outputCostPerMTok:
@@ -196,6 +205,14 @@ function buildCreatePayload(draft: Draft): CreateAiProviderConfigDto {
       : {}),
     supportsVision: draft.supportsVision,
     supportsEmbedding: draft.supportsEmbedding,
+    // Only meaningful for an embedding provider; cleared otherwise so a
+    // provider that stops serving embeddings does not keep a stale width.
+    embeddingDimensions: draft.supportsEmbedding
+      ? parseContextSize(draft.embeddingDimensions)
+      : undefined,
+    embeddingPooling: draft.supportsEmbedding
+      ? draft.embeddingPooling || undefined
+      : undefined,
     ...(typeof inputCost === "number" ? { inputCostPerMTok: inputCost } : {}),
     ...(typeof outputCost === "number"
       ? { outputCostPerMTok: outputCost }
@@ -600,6 +617,52 @@ export function AiProviderForm({
                   }
                 />
               </div>
+              {draft.supportsEmbedding ? (
+                // Captured here rather than in the embedding configuration:
+                // these describe the model, so every workspace that selects
+                // this provider inherits them instead of restating them.
+                <div className="grid gap-4 rounded-[4px] border-2 border-border bg-muted/20 p-4 sm:col-span-2 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="ai-provider-embedding-dimensions">
+                      {t("aiProvider.embeddingDimensions")}
+                    </Label>
+                    <Input
+                      id="ai-provider-embedding-dimensions"
+                      type="number"
+                      placeholder="1536"
+                      value={draft.embeddingDimensions}
+                      onChange={(event) =>
+                        setDraft((current) => ({
+                          ...current,
+                          embeddingDimensions: event.target.value,
+                        }))
+                      }
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      {t("aiProvider.embeddingDimensionsDesc")}
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="ai-provider-embedding-pooling">
+                      {t("aiProvider.embeddingPooling")}
+                    </Label>
+                    <Input
+                      id="ai-provider-embedding-pooling"
+                      placeholder="mean"
+                      value={draft.embeddingPooling}
+                      onChange={(event) =>
+                        setDraft((current) => ({
+                          ...current,
+                          embeddingPooling: event.target.value,
+                        }))
+                      }
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      {t("aiProvider.embeddingPoolingDesc")}
+                    </p>
+                  </div>
+                </div>
+              ) : null}
             </CardContent>
           </Card>
         </div>
