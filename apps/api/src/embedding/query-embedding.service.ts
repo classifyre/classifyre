@@ -7,7 +7,11 @@ import { EmbeddingProviderService } from './embedding-provider.service';
 import { EmbeddingConfigService } from './embedding-config.service';
 import {
   resolvedFromEnv,
-  type EmbeddingSettingsService,
+  // A value import, not `import type`: see embedding.service.ts — a type-only
+  // import erases the binding before design:paramtypes is emitted, and an
+  // @Optional() parameter Nest cannot resolve is silently injected as
+  // undefined.
+  EmbeddingSettingsService,
 } from './embedding-settings.service';
 
 @Injectable()

@@ -72,6 +72,9 @@ type Draft = {
   baseUrl: string;
   contextSize: string;
   supportsVision: boolean;
+  supportsEmbedding: boolean;
+  embeddingDimensions: string;
+  embeddingPooling: string;
   inputCostPerMTok: string;
   outputCostPerMTok: string;
 };
@@ -141,6 +144,9 @@ function buildDraft(config: AiProviderConfigResponseDto | null): Draft {
       baseUrl: "",
       contextSize: "",
       supportsVision: false,
+      supportsEmbedding: false,
+      embeddingDimensions: "",
+      embeddingPooling: "mean",
       inputCostPerMTok: "",
       outputCostPerMTok: "",
     };
@@ -153,6 +159,12 @@ function buildDraft(config: AiProviderConfigResponseDto | null): Draft {
     baseUrl: config.baseUrl ?? "",
     contextSize: config.contextSize != null ? String(config.contextSize) : "",
     supportsVision: config.supportsVision ?? false,
+    supportsEmbedding: config.supportsEmbedding ?? false,
+    embeddingDimensions:
+      config.embeddingDimensions != null
+        ? String(config.embeddingDimensions)
+        : "",
+    embeddingPooling: config.embeddingPooling ?? "mean",
     inputCostPerMTok:
       config.inputCostPerMTok != null ? String(config.inputCostPerMTok) : "",
     outputCostPerMTok:
@@ -192,6 +204,15 @@ function buildCreatePayload(draft: Draft): CreateAiProviderConfigDto {
       ? { contextSize: parseContextSize(draft.contextSize) }
       : {}),
     supportsVision: draft.supportsVision,
+    supportsEmbedding: draft.supportsEmbedding,
+    // Only meaningful for an embedding provider; cleared otherwise so a
+    // provider that stops serving embeddings does not keep a stale width.
+    embeddingDimensions: draft.supportsEmbedding
+      ? parseContextSize(draft.embeddingDimensions)
+      : undefined,
+    embeddingPooling: draft.supportsEmbedding
+      ? draft.embeddingPooling || undefined
+      : undefined,
     ...(typeof inputCost === "number" ? { inputCostPerMTok: inputCost } : {}),
     ...(typeof outputCost === "number"
       ? { outputCostPerMTok: outputCost }
@@ -216,6 +237,18 @@ function buildUpdatePayload(draft: Draft): UpdateAiProviderConfigDto {
       ? { contextSize: parseContextSize(draft.contextSize) }
       : {}),
     supportsVision: draft.supportsVision,
+    // Sent on update as well as on create: omitting them meant the embedding
+    // toggle, the dimensions and the pooling could be edited on screen and
+    // saved to nothing — the credential kept whatever it was created with, so
+    // toggling embeddings on, or entering a width, silently did not happen.
+    supportsEmbedding: draft.supportsEmbedding,
+    ...(draft.supportsEmbedding &&
+    parseContextSize(draft.embeddingDimensions) !== undefined
+      ? { embeddingDimensions: parseContextSize(draft.embeddingDimensions) }
+      : {}),
+    ...(draft.supportsEmbedding && draft.embeddingPooling
+      ? { embeddingPooling: draft.embeddingPooling }
+      : {}),
     ...(inputCost !== undefined ? { inputCostPerMTok: inputCost } : {}),
     ...(outputCost !== undefined ? { outputCostPerMTok: outputCost } : {}),
   };
@@ -579,6 +612,69 @@ export function AiProviderForm({
                   }
                 />
               </div>
+              <div className="flex items-start justify-between gap-4 rounded-[4px] border-2 border-border bg-muted/20 p-4 sm:col-span-2">
+                <div className="space-y-1">
+                  <Label htmlFor="ai-provider-supports-embedding">
+                    {t("aiProvider.supportsEmbedding")}
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    {t("aiProvider.supportsEmbeddingDesc")}
+                  </p>
+                </div>
+                <Switch
+                  id="ai-provider-supports-embedding"
+                  checked={draft.supportsEmbedding}
+                  onCheckedChange={(supportsEmbedding) =>
+                    setDraft((current) => ({ ...current, supportsEmbedding }))
+                  }
+                />
+              </div>
+              {draft.supportsEmbedding ? (
+                // Captured here rather than in the embedding configuration:
+                // these describe the model, so every workspace that selects
+                // this provider inherits them instead of restating them.
+                <div className="grid gap-4 rounded-[4px] border-2 border-border bg-muted/20 p-4 sm:col-span-2 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="ai-provider-embedding-dimensions">
+                      {t("aiProvider.embeddingDimensions")}
+                    </Label>
+                    <Input
+                      id="ai-provider-embedding-dimensions"
+                      type="number"
+                      placeholder="1536"
+                      value={draft.embeddingDimensions}
+                      onChange={(event) =>
+                        setDraft((current) => ({
+                          ...current,
+                          embeddingDimensions: event.target.value,
+                        }))
+                      }
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      {t("aiProvider.embeddingDimensionsDesc")}
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="ai-provider-embedding-pooling">
+                      {t("aiProvider.embeddingPooling")}
+                    </Label>
+                    <Input
+                      id="ai-provider-embedding-pooling"
+                      placeholder="mean"
+                      value={draft.embeddingPooling}
+                      onChange={(event) =>
+                        setDraft((current) => ({
+                          ...current,
+                          embeddingPooling: event.target.value,
+                        }))
+                      }
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      {t("aiProvider.embeddingPoolingDesc")}
+                    </p>
+                  </div>
+                </div>
+              ) : null}
             </CardContent>
           </Card>
         </div>

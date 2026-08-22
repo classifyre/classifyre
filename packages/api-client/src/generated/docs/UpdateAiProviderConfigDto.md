@@ -13,6 +13,9 @@ Name | Type
 `baseUrl` | string
 `contextSize` | number
 `supportsVision` | boolean
+`supportsEmbedding` | boolean
+`embeddingDimensions` | number
+`embeddingPooling` | string
 `inputCostPerMTok` | number
 `outputCostPerMTok` | number
 
@@ -30,6 +33,9 @@ const example = {
   "baseUrl": https://openrouter.ai/api/v1,
   "contextSize": 200000,
   "supportsVision": false,
+  "supportsEmbedding": false,
+  "embeddingDimensions": 2048,
+  "embeddingPooling": mean,
   "inputCostPerMTok": 3,
   "outputCostPerMTok": 15,
 } satisfies UpdateAiProviderConfigDto

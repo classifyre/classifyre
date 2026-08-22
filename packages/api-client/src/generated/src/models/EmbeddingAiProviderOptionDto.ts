@@ -49,6 +49,12 @@ export interface EmbeddingAiProviderOptionDto {
      * @memberof EmbeddingAiProviderOptionDto
      */
     hasApiKey: boolean;
+    /**
+     * Whether the provider is marked as serving an embeddings endpoint
+     * @type {boolean}
+     * @memberof EmbeddingAiProviderOptionDto
+     */
+    supportsEmbedding: boolean;
 }
 
 /**
@@ -59,6 +65,7 @@ export function instanceOfEmbeddingAiProviderOptionDto(value: object): value is 
     if (!('name' in value) || value['name'] === undefined) return false;
     if (!('provider' in value) || value['provider'] === undefined) return false;
     if (!('hasApiKey' in value) || value['hasApiKey'] === undefined) return false;
+    if (!('supportsEmbedding' in value) || value['supportsEmbedding'] === undefined) return false;
     return true;
 }
 
@@ -77,6 +84,7 @@ export function EmbeddingAiProviderOptionDtoFromJSONTyped(json: any, ignoreDiscr
         'provider': json['provider'],
         'baseUrl': json['baseUrl'] == null ? undefined : json['baseUrl'],
         'hasApiKey': json['hasApiKey'],
+        'supportsEmbedding': json['supportsEmbedding'],
     };
 }
 
@@ -96,6 +104,7 @@ export function EmbeddingAiProviderOptionDtoToJSONTyped(value?: EmbeddingAiProvi
         'provider': value['provider'],
         'baseUrl': value['baseUrl'],
         'hasApiKey': value['hasApiKey'],
+        'supportsEmbedding': value['supportsEmbedding'],
     };
 }
 

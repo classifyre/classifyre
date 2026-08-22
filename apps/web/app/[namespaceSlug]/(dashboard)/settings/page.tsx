@@ -20,13 +20,13 @@ import {
 } from "@workspace/api-client";
 import {
   Clock3,
+  Cpu,
   DatabaseBackup,
   Globe,
   Languages,
   Loader2,
   MessageSquare,
   Server,
-  Sparkles,
   Settings,
   SlidersHorizontal,
 } from "lucide-react";
@@ -37,7 +37,7 @@ import { ChatBotsCard } from "@/components/chat-bots-card";
 import { HuggingFaceSettingsCard } from "@/components/huggingface-settings-card";
 import { VersionSettingsSection } from "@/components/version-update-notifier";
 import { DataTransferCard } from "@/components/data-transfer/data-transfer-card";
-import { EmbeddingSettingsCard } from "@/components/embedding-settings-card";
+import { WorkerQueuesCard } from "@/components/worker-queues-card";
 
 import { useTranslation } from "@/hooks/use-translation";
 
@@ -217,13 +217,13 @@ export default function SettingsPage() {
             <MessageSquare className="h-3.5 w-3.5" />
             {t("settings.tabs.chat")}
           </TabsTrigger>
-          <TabsTrigger value="embedding" className={TAB_TRIGGER_CLASS}>
-            <Sparkles className="h-3.5 w-3.5" />
-            {t("settings.tabs.embedding")}
-          </TabsTrigger>
           <TabsTrigger value="data" className={TAB_TRIGGER_CLASS}>
             <DatabaseBackup className="h-3.5 w-3.5" />
             {t("settings.tabs.data")}
+          </TabsTrigger>
+          <TabsTrigger value="workers" className={TAB_TRIGGER_CLASS}>
+            <Cpu className="h-3.5 w-3.5" />
+            {t("settings.tabs.workers")}
           </TabsTrigger>
         </TabsList>
 
@@ -389,17 +389,17 @@ export default function SettingsPage() {
         </TabsContent>
 
         <TabsContent
-          value="embedding"
-          className="duration-300 animate-in fade-in-50 slide-in-from-bottom-1"
-        >
-          <EmbeddingSettingsCard />
-        </TabsContent>
-
-        <TabsContent
           value="data"
           className="duration-300 animate-in fade-in-50 slide-in-from-bottom-1"
         >
           <DataTransferCard />
+        </TabsContent>
+
+        <TabsContent
+          value="workers"
+          className="duration-300 animate-in fade-in-50 slide-in-from-bottom-1"
+        >
+          <WorkerQueuesCard />
         </TabsContent>
       </Tabs>
     </div>

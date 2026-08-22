@@ -9,6 +9,7 @@ import {
   Database,
   Gauge,
   Loader2,
+  Plus,
   RotateCcw,
   Search,
   Sparkles,
@@ -44,11 +45,14 @@ import {
   Spinner,
   Switch,
 } from "@workspace/ui/components";
+import Link from "next/link";
 import type { TranslationKey } from "@/i18n";
 import { useTranslation } from "@/hooks/use-translation";
+import { useNsPath } from "@/lib/ns-path";
+import { extractApiErrorMessage } from "@/lib/extract-api-error-message";
 import { formatDate } from "@/lib/date";
 
-const PREFIX = "settings.embedding" as const;
+const PREFIX = "harness.embedding" as const;
 function key(suffix: string): TranslationKey {
   return `${PREFIX}.${suffix}` as TranslationKey;
 }
@@ -189,6 +193,7 @@ export function EmbeddingSettingsCard() {
   const [saving, setSaving] = React.useState(false);
   const [confirmOpen, setConfirmOpen] = React.useState(false);
   const [customModel, setCustomModel] = React.useState(false);
+  const nsPath = useNsPath();
 
   const refresh = React.useCallback(async () => {
     try {
@@ -200,9 +205,7 @@ export function EmbeddingSettingsCard() {
       setStatus(queue);
       setLoadError(null);
     } catch (error) {
-      setLoadError(
-        error instanceof Error ? error.message : t(key("loadFailed")),
-      );
+      setLoadError(await extractApiErrorMessage(error, t(key("loadFailed"))));
     }
   }, [t]);
 
@@ -266,6 +269,13 @@ export function EmbeddingSettingsCard() {
     [dirtyFields, settings],
   );
 
+  // Turning embeddings off purges the corpus and stops. Offering "delete and
+  // re-embed" there described the opposite of what the server does.
+  const purgeOnly = React.useMemo(
+    () => dirtyFields.includes("enabled") && draft.enabled === false,
+    [dirtyFields, draft.enabled],
+  );
+
   const save = React.useCallback(async () => {
     if (!settings) return;
     setSaving(true);
@@ -283,8 +293,11 @@ export function EmbeddingSettingsCard() {
       );
       void refresh();
     } catch (error) {
+      // The generated client throws a ResponseError whose message is just the
+      // status line, so a 400 explaining exactly which field was rejected used
+      // to surface as nothing at all.
       toast.error(
-        error instanceof Error ? error.message : t(key("saveFailedToast")),
+        await extractApiErrorMessage(error, t(key("saveFailedToast"))),
       );
     } finally {
       setSaving(false);
@@ -299,7 +312,7 @@ export function EmbeddingSettingsCard() {
       void refresh();
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : t(key("saveFailedToast")),
+        await extractApiErrorMessage(error, t(key("saveFailedToast"))),
       );
     }
   }, [refresh, t]);
@@ -471,9 +484,28 @@ export function EmbeddingSettingsCard() {
                     hint={t(key("aiProviderHint"))}
                   >
                     {settings.aiProviders.length === 0 ? (
-                      <p className="rounded-[4px] border border-muted bg-muted/30 px-3 py-2 text-[11px] text-muted-foreground">
-                        {t(key("aiProviderEmpty"))}
-                      </p>
+                      // Nowhere to go from here otherwise: the picker is empty
+                      // precisely because no provider is marked as serving
+                      // embeddings, and the place to fix that is another page.
+                      <div className="space-y-2 rounded-[4px] border-2 border-dashed border-border bg-muted/20 px-3 py-3">
+                        <p className="text-[11px] text-muted-foreground">
+                          {t(key("aiProviderEmpty"))}
+                        </p>
+                        <Button
+                          asChild
+                          size="sm"
+                          variant="outline"
+                          className="h-8 gap-1 rounded-[4px] text-[11px]"
+                        >
+                          <Link href={nsPath("/harness/providers/new")}>
+                            <Plus className="h-3 w-3" />
+                            {t(key("aiProviderCreate"))}
+                          </Link>
+                        </Button>
+                        <p className="text-[10px] text-muted-foreground/80">
+                          {t(key("aiProviderCreateHint"))}
+                        </p>
+                      </div>
                     ) : (
                       <Select
                         value={String(value("aiProviderConfigId") ?? "")}
@@ -491,25 +523,31 @@ export function EmbeddingSettingsCard() {
                             <SelectItem key={option.id} value={option.id}>
                               {option.name}
                               {option.baseUrl ? ` — ${option.baseUrl}` : ""}
+                              {option.supportsEmbedding ? "" : " ⚠"}
                             </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
                     )}
                   </Field>
-                  <Field
-                    label={t(key("modelLabel"))}
-                    defaultLabel={defaultLabelFor("model")}
-                    overridden={settings.fields.model?.overridden}
-                    onReset={() => reset("model")}
-                  >
-                    <Input
-                      value={model}
-                      onChange={(event) => set({ model: event.target.value })}
-                      placeholder="text-embedding-3-small"
-                      className="h-9 rounded-[4px] border-2 border-border font-mono text-xs"
-                    />
-                  </Field>
+                  {/*
+                    No model, dimensions or pooling inputs here on purpose:
+                    they are properties of the provider's model, the provider
+                    already stores them, and asking twice is how the two drift
+                    apart. What is in force is shown instead.
+                  */}
+                  <div className="space-y-1 rounded-[4px] border border-border bg-muted/20 px-3 py-2">
+                    <p className="text-[10px] font-mono uppercase tracking-[0.12em] text-muted-foreground">
+                      {t(key("inheritedHeading"))}
+                    </p>
+                    <p className="font-mono text-[11px]">
+                      {model || "—"} · {String(value("dimensions"))}d ·{" "}
+                      {String(value("pooling"))}
+                    </p>
+                    <p className="text-[10px] text-muted-foreground">
+                      {t(key("inheritedHint"))}
+                    </p>
+                  </div>
                 </div>
               ) : (
                 <div className="space-y-4">
@@ -636,6 +674,8 @@ export function EmbeddingSettingsCard() {
                 </div>
               )}
 
+              {isRemote ? null : (
+                <>
               <Separator className="bg-border" />
 
               <div className="grid gap-4 sm:grid-cols-2">
@@ -697,6 +737,8 @@ export function EmbeddingSettingsCard() {
                   onCheckedChange={(checked) => set({ normalize: checked })}
                 />
               </div>
+                </>
+              )}
             </CardContent>
           </Card>
 
@@ -957,7 +999,7 @@ export function EmbeddingSettingsCard() {
               className="gap-1 border-amber-600/50 text-[10px] uppercase text-amber-700 dark:text-amber-500"
             >
               <Trash2 className="h-3 w-3" />
-              {t(key("confirmTitle"))}
+              {t(key(purgeOnly ? "confirmDisableTitle" : "confirmTitle"))}
             </Badge>
           ) : null}
           <div className="ml-auto flex items-center gap-2">
@@ -989,10 +1031,12 @@ export function EmbeddingSettingsCard() {
         <AlertDialogContent className="rounded-[6px]">
           <AlertDialogHeader>
             <AlertDialogTitle className="font-serif text-lg font-black uppercase tracking-[0.06em]">
-              {t(key("confirmTitle"))}
+              {t(key(purgeOnly ? "confirmDisableTitle" : "confirmTitle"))}
             </AlertDialogTitle>
             <AlertDialogDescription className="space-y-2 text-xs">
-              <span className="block">{t(key("confirmBody"))}</span>
+              <span className="block">
+                {t(key(purgeOnly ? "confirmDisableBody" : "confirmBody"))}
+              </span>
               <span className="block font-mono text-[11px] text-amber-700 dark:text-amber-500">
                 {t(key("confirmDeletes"), {
                   vectors: formatCount(stats.vectorsAllSpaces),
@@ -1000,11 +1044,13 @@ export function EmbeddingSettingsCard() {
                 })}
               </span>
               <span className="block">{t(key("confirmKeeps"))}</span>
-              <span className="block font-mono text-[11px] text-muted-foreground">
-                {t(key("confirmChanges"), {
-                  fields: rebuildFields.join(", "),
-                })}
-              </span>
+              {purgeOnly ? null : (
+                <span className="block font-mono text-[11px] text-muted-foreground">
+                  {t(key("confirmChanges"), {
+                    fields: rebuildFields.join(", "),
+                  })}
+                </span>
+              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -1015,7 +1061,7 @@ export function EmbeddingSettingsCard() {
               onClick={() => void save()}
               className="rounded-[4px] text-xs"
             >
-              {t(key("confirmProceed"))}
+              {t(key(purgeOnly ? "confirmDisableProceed" : "confirmProceed"))}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

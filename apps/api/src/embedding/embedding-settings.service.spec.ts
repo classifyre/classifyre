@@ -125,10 +125,24 @@ describe('EmbeddingSettingsService', () => {
     );
   });
 
-  it('rejects a dimension pgvector cannot index', async () => {
+  // Reported from a live instance: saving nemotron-3-embed-1b (2,048 dims)
+  // answered 400 "dimensions must be between 1 and 2000". The old cap was
+  // pgvector's HNSW *index* limit applied as a validation rule, which rejects
+  // models pgvector stores and searches perfectly well.
+  it.each([2048, 3072, 4096, 8192])(
+    'accepts %i dimensions, which pgvector can store',
+    async (dimensions) => {
+      const service = build();
+      await expect(service.update({ dimensions })).resolves.toEqual(
+        expect.objectContaining({ requiresRebuild: true }),
+      );
+    },
+  );
+
+  it('still rejects a dimension pgvector cannot store at all', async () => {
     const service = build();
-    await expect(service.update({ dimensions: 4096 })).rejects.toThrow(
-      'dimensions must be between 1 and 2000',
+    await expect(service.update({ dimensions: 16001 })).rejects.toThrow(
+      'dimensions must be between 1 and 16000',
     );
   });
 
@@ -140,6 +154,41 @@ describe('EmbeddingSettingsService', () => {
         aiProviderConfigId: null,
       }),
     ).rejects.toThrow('needs an AI provider');
+  });
+
+  it('rejects switching to a remote provider when the binding is only implicitly absent', async () => {
+    // The page saves the provider and the binding separately, and a workspace
+    // whose bound credential was removed has neither field in the patch.
+    stored = { id: 1 };
+    const service = build();
+
+    await expect(
+      service.update({ provider: 'openai-compatible' }),
+    ).rejects.toThrow('needs an AI provider');
+  });
+
+  it('drops a local model override when the workspace switches to a remote provider', async () => {
+    // The remote section of the settings page has no model input — it says the
+    // provider owns that — so an override left behind here is unreachable and
+    // would be sent to the remote endpoint as a model it has never heard of.
+    stored = { id: 1, model: 'Xenova/bge-small-en-v1.5', dimensions: 512 };
+    aiProviders.getRuntimeConfig.mockResolvedValue({
+      baseUrl: 'https://integrate.api.nvidia.com/v1',
+      apiKey: 'secret',
+      model: 'nvidia/nemotron-3-embed-1b',
+      embeddingDimensions: 2048,
+      embeddingPooling: 'mean',
+    });
+    const service = build();
+
+    await service.update({
+      provider: 'openai-compatible',
+      aiProviderConfigId: 'provider-1',
+    });
+    const resolved = await service.resolve();
+
+    expect(resolved.model).toBe('nvidia/nemotron-3-embed-1b');
+    expect(resolved.dimensions).toBe(2048);
   });
 
   it('never reports the API key as a changed field', async () => {

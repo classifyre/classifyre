@@ -12,6 +12,9 @@ function createService() {
     customDetector: {
       count: jest.fn(),
     },
+    embeddingSettings: {
+      findFirst: jest.fn().mockResolvedValue(null),
+    },
   };
   const crypto = {
     encryptString: jest.fn((s: string) => `enc:${s}`),
@@ -48,6 +51,23 @@ describe('AiProviderConfigService.remove', () => {
     expect(prisma.aiProviderConfig.delete).toHaveBeenCalledWith({
       where: { id: 'ai-1' },
     });
+  });
+
+  it('refuses to delete the credential the workspace embeds with', async () => {
+    // The FK is onDelete: SetNull, so deleting it used to succeed and leave the
+    // workspace on a remote provider with no endpoint behind it.
+    const { service, prisma } = createService();
+    prisma.aiProviderConfig.findUnique.mockResolvedValue({
+      id: 'ai-1',
+      name: 'Prod',
+    });
+    prisma.customDetector.count.mockResolvedValue(0);
+    prisma.embeddingSettings.findFirst.mockResolvedValue({ id: 1 });
+
+    await expect(service.remove('ai-1')).rejects.toBeInstanceOf(
+      ConflictException,
+    );
+    expect(prisma.aiProviderConfig.delete).not.toHaveBeenCalled();
   });
 
   it('throws NotFoundException for an unknown id', async () => {
