@@ -59,6 +59,13 @@
         }
       }
     },
+    "worker": {
+      "type": "object",
+      "properties": {
+        "maxConcurrentNamespaceJobs": { "type": "integer", "minimum": 0 },
+        "namespaceJobSlotTimeoutSeconds": { "type": "integer", "minimum": 0 }
+      }
+    },
     "frontend": {
       "type": "object",
       "properties": {

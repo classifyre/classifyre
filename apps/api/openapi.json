@@ -7185,6 +7185,71 @@
         ]
       }
     },
+    "/worker-queues": {
+      "get": {
+        "description": "Aggregates every worker process reporting on each queue. A row whose heartbeat has gone quiet is reported as stale rather than believed, so an OOM-killed pod cannot leave a queue looking busy forever.",
+        "operationId": "WorkerQueuesController_overview",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkerOverviewDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "List background queues with live worker state and backlog",
+        "tags": [
+          "Worker Queues"
+        ]
+      }
+    },
+    "/worker-queues/{queue}/paused": {
+      "put": {
+        "description": "Pausing is database-backed, so it applies to every worker replica rather than only the pod that served this request. A batch handed to a paused queue is refused and retried by pg-boss, so nothing is lost. Jobs already running cannot be cancelled — pause and let them drain, or restart the worker.",
+        "operationId": "WorkerQueuesController_setPaused",
+        "parameters": [
+          {
+            "name": "queue",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetWorkerQueuePausedDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkerQueueDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Pause or resume a background queue",
+        "tags": [
+          "Worker Queues"
+        ]
+      }
+    },
     "/sources/{sourceId}/run": {
       "post": {
         "operationId": "CliRunnerController_startRunner",
@@ -18802,6 +18867,209 @@
           "chunk",
           "chunkSize",
           "entries"
+        ]
+      },
+      "WorkerQueueInstanceDto": {
+        "type": "object",
+        "properties": {
+          "instanceId": {
+            "type": "string",
+            "description": "Worker process reporting this row (hostname:pid).",
+            "example": "classifyre-worker-7c9f8b6d4-2xkzq:1"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "idle",
+              "waiting_slot",
+              "running",
+              "failed",
+              "stale"
+            ],
+            "example": "running"
+          },
+          "activeJobs": {
+            "type": "number",
+            "example": 1
+          },
+          "jobIds": {
+            "example": [
+              "0f9c..."
+            ],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "startedAt": {
+            "type": "string",
+            "nullable": true
+          },
+          "elapsedMs": {
+            "type": "number",
+            "nullable": true,
+            "description": "How long the current batch has been running, in ms."
+          },
+          "lastFinishedAt": {
+            "type": "string",
+            "nullable": true
+          },
+          "lastDurationMs": {
+            "type": "number",
+            "nullable": true
+          },
+          "runCount": {
+            "type": "number",
+            "example": 42
+          },
+          "failureCount": {
+            "type": "number",
+            "example": 0
+          },
+          "lastError": {
+            "type": "string",
+            "nullable": true
+          },
+          "lastErrorAt": {
+            "type": "string",
+            "nullable": true
+          },
+          "heartbeatAt": {
+            "type": "string",
+            "description": "Last time this process reported. A row that stops beating is shown as stale rather than believed."
+          }
+        },
+        "required": [
+          "instanceId",
+          "status",
+          "activeJobs",
+          "jobIds",
+          "startedAt",
+          "elapsedMs",
+          "lastFinishedAt",
+          "lastDurationMs",
+          "runCount",
+          "failureCount",
+          "lastError",
+          "lastErrorAt",
+          "heartbeatAt"
+        ]
+      },
+      "WorkerQueueDto": {
+        "type": "object",
+        "properties": {
+          "queue": {
+            "type": "string",
+            "example": "embedding"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "idle",
+              "waiting_slot",
+              "running",
+              "failed",
+              "stale"
+            ],
+            "example": "idle",
+            "description": "Worst status reported by any worker serving this queue; stale when no worker is reporting at all."
+          },
+          "paused": {
+            "type": "boolean",
+            "example": false
+          },
+          "activeJobs": {
+            "type": "number",
+            "example": 0
+          },
+          "queuedCount": {
+            "type": "number",
+            "example": 26000,
+            "description": "Jobs waiting to be picked up, reported by pg-boss."
+          },
+          "deferredCount": {
+            "type": "number",
+            "example": 0
+          },
+          "totalCount": {
+            "type": "number",
+            "example": 26000
+          },
+          "runCount": {
+            "type": "number",
+            "example": 128
+          },
+          "failureCount": {
+            "type": "number",
+            "example": 2
+          },
+          "lastError": {
+            "type": "string",
+            "nullable": true
+          },
+          "lastErrorAt": {
+            "type": "string",
+            "nullable": true
+          },
+          "instances": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WorkerQueueInstanceDto"
+            }
+          }
+        },
+        "required": [
+          "queue",
+          "status",
+          "paused",
+          "activeJobs",
+          "queuedCount",
+          "deferredCount",
+          "totalCount",
+          "runCount",
+          "failureCount",
+          "lastError",
+          "lastErrorAt",
+          "instances"
+        ]
+      },
+      "WorkerOverviewDto": {
+        "type": "object",
+        "properties": {
+          "concurrencyLimit": {
+            "type": "number",
+            "example": 4,
+            "description": "Global concurrency slots shared by every namespace and queue. 0 means unlimited."
+          },
+          "slotWaitTimeoutSeconds": {
+            "type": "number",
+            "example": 900,
+            "description": "How long a batch may wait for a slot before it fails and pg-boss retries it. 0 means it waits forever."
+          },
+          "queues": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WorkerQueueDto"
+            }
+          }
+        },
+        "required": [
+          "concurrencyLimit",
+          "slotWaitTimeoutSeconds",
+          "queues"
+        ]
+      },
+      "SetWorkerQueuePausedDto": {
+        "type": "object",
+        "properties": {
+          "paused": {
+            "type": "boolean",
+            "example": true,
+            "description": "Pause stops new batches from running; jobs already executing are not interrupted and cannot be cancelled."
+          }
+        },
+        "required": [
+          "paused"
         ]
       },
       "StartRunnerDto": {

@@ -30,7 +30,7 @@
     },
     {
       "name": "boto3",
-      "version": "1.43.76",
+      "version": "1.43.77",
       "modules": [
         "boto3"
       ],
@@ -119,7 +119,7 @@
     },
     {
       "name": "google-api-python-client",
-      "version": "2.198.0",
+      "version": "2.199.0",
       "modules": [
         "googleapiclient"
       ],

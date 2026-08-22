@@ -28,3 +28,4 @@ export {
 } from './case-threads.controller';
 export { GraphController } from './graph.controller';
 export { ChatBotsController } from './chat-bots.controller';
+export { WorkerQueuesController } from './worker-queues.controller';

@@ -30,6 +30,7 @@ import {
 import { EmbeddingQueueService } from './embedding-queue.service';
 import { InternalOnly } from '../internal-only.decorator';
 import { AiProviderConfigService } from '../ai-provider-config.service';
+import type { AiProviderConfigResponseDto } from '../dto/ai-provider-config.dto';
 import {
   EmbeddingSettingsService,
   SPACE_DEFINING_FIELDS,
@@ -137,7 +138,10 @@ export class EmbeddingController {
     const [effective, overrides, providers] = await Promise.all([
       this.settings.resolve(),
       this.settings.overrides(),
-      this.aiProviders.list().catch(() => []),
+      // Annotated so the fallback does not widen the tuple element to
+      // `AiProviderConfigResponseDto[] | never[]`, which collapses the
+      // `.filter()` callback parameter to `never`.
+      this.aiProviders.list().catch((): AiProviderConfigResponseDto[] => []),
     ]);
     const defaults = this.settings.deploymentDefaults();
     const space = effective.enabled

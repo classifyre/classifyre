@@ -1,4 +1,7 @@
-import { NamespaceJobConcurrencyService } from './namespace-job-concurrency.service';
+import {
+  NamespaceJobConcurrencyService,
+  NamespaceJobSlotTimeoutError,
+} from './namespace-job-concurrency.service';
 
 type HeldLocks = Set<string>;
 
@@ -181,6 +184,58 @@ describe('NamespaceJobConcurrencyService', () => {
     expect(started.sort()).toEqual(['a', 'b']);
     mayFinish.resolve();
     await Promise.all(jobs);
+  });
+
+  // An unbounded wait is indistinguishable from a hang: the handler never
+  // runs, never fails and never reports, so the queue looks idle while it is
+  // actually starved. Failing instead hands the job back to pg-boss (which
+  // retries it, so no work is lost) and makes the starvation observable.
+  it('gives up waiting for a slot once the ceiling elapses', async () => {
+    process.env.MAX_CONCURRENT_NAMESPACE_JOBS = '1';
+    process.env.NAMESPACE_JOB_SLOT_TIMEOUT_MS = '40';
+    const held = new Set<string>();
+    const holder = new NamespaceJobConcurrencyService();
+    const waiter = new NamespaceJobConcurrencyService();
+    (holder as any).pool = fakePool(held);
+    (waiter as any).pool = fakePool(held);
+
+    const holderMayFinish = deferred();
+    const holderStarted = deferred();
+    const holding = holder.withSlot(
+      { namespaceId: 'namespace-a', queue: 'queue-a' },
+      async () => {
+        holderStarted.resolve();
+        await holderMayFinish.promise;
+      },
+    );
+    await holderStarted.promise;
+
+    let ran = false;
+    await expect(
+      waiter.withSlot({ namespaceId: 'namespace-b', queue: 'queue-b' }, () => {
+        ran = true;
+        return Promise.resolve();
+      }),
+    ).rejects.toBeInstanceOf(NamespaceJobSlotTimeoutError);
+    expect(ran).toBe(false);
+
+    holderMayFinish.resolve();
+    await holding;
+    expect(held.size).toBe(0);
+  });
+
+  it('waits forever when the ceiling is explicitly disabled', () => {
+    process.env.NAMESPACE_JOB_SLOT_TIMEOUT_MS = '0';
+
+    expect(new NamespaceJobConcurrencyService().getWaitTimeoutMs()).toBe(0);
+  });
+
+  it('bounds the slot wait by default', () => {
+    delete process.env.NAMESPACE_JOB_SLOT_TIMEOUT_MS;
+
+    expect(
+      new NamespaceJobConcurrencyService().getWaitTimeoutMs(),
+    ).toBeGreaterThan(0);
   });
 
   it('supports zero as an explicit unlimited setting', async () => {
