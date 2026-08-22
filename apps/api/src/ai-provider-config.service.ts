@@ -186,6 +186,22 @@ export class AiProviderConfigService {
       );
     }
 
+    // The embedding binding is an onDelete: SetNull FK, so deleting a bound
+    // credential succeeded and left the workspace on a remote provider with no
+    // endpoint behind it: every embed failed, and the settings page still
+    // showed a remote configuration — filled in with the local defaults.
+    // Refuse, the same way a dependent detector does.
+    const boundToEmbeddings = await this.prisma.embeddingSettings.findFirst({
+      where: { aiProviderConfigId: id },
+      select: { id: true },
+    });
+    if (boundToEmbeddings) {
+      throw new ConflictException(
+        'Cannot delete this AI provider: it is the embedding provider for this workspace. ' +
+          'Choose another provider (or switch back to the local model) under Settings -> Embeddings first.',
+      );
+    }
+
     await this.prisma.aiProviderConfig.delete({ where: { id } });
   }
 

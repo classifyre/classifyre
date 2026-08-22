@@ -288,7 +288,43 @@ export class EmbeddingSettingsService {
     const before = await this.resolve();
     this.validate(patch);
 
+    // Checked against the state the patch produces, not the patch alone: the
+    // page saves `provider` and `aiProviderConfigId` separately, and a
+    // workspace whose bound credential was removed reaches "remote with
+    // nowhere to send" without either field ever being explicitly nulled.
+    const providerAfter =
+      patch.provider !== undefined
+        ? (patch.provider ?? this.defaults.provider)
+        : before.provider;
+    const bindingAfter =
+      patch.aiProviderConfigId !== undefined
+        ? patch.aiProviderConfigId
+        : before.aiProviderConfigId;
+    if (
+      providerAfter === 'openai-compatible' &&
+      !bindingAfter &&
+      !this.defaults.baseUrl
+    ) {
+      throw new BadRequestException(
+        'A remote embedding provider needs an AI provider to supply its endpoint and key',
+      );
+    }
+
     const data = { ...patch };
+    // Switching to a remote provider hands model, width and pooling to the
+    // credential — the settings page stops showing inputs for them and says
+    // so. A model override left over from the local provider would survive
+    // that invisibly and be sent to the remote endpoint as a model name it has
+    // never heard of, so the switch clears what it is taking over.
+    if (
+      patch.provider === 'openai-compatible' &&
+      before.provider !== 'openai-compatible'
+    ) {
+      if (patch.model === undefined) data.model = null;
+      if (patch.dimensions === undefined) data.dimensions = null;
+      if (patch.pooling === undefined) data.pooling = null;
+      if (patch.revision === undefined) data.revision = null;
+    }
     await this.prisma.embeddingSettings.upsert({
       where: { id: 1 },
       create: { id: 1, ...data },

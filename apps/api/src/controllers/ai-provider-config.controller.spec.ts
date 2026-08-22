@@ -15,6 +15,8 @@ function buildController(completeText: jest.Mock) {
     {} as never,
     { testConnection: jest.fn() } as never,
     {} as never,
+    { overrides: jest.fn().mockResolvedValue(null) } as never,
+    { start: jest.fn() } as never,
   );
 }
 
