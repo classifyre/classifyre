@@ -302,7 +302,8 @@
       "global": "General",
       "mcp": "MCP Servers",
       "chat": "Chat Bots",
-      "data": "Export & Import"
+      "data": "Export & Import",
+      "workers": "Workers"
     },
     "version": {
       "heading": "Software Version",
@@ -392,6 +393,49 @@
       "removedToast": "Hugging Face token removed",
       "saveFailedToast": "Failed to save Hugging Face token",
       "removeFailedToast": "Failed to remove Hugging Face token"
+    },
+    "workers": {
+      "heading": "Background workers",
+      "desc": "What each background queue is doing right now, across every worker process serving this workspace.",
+      "concurrency": "{{limit}} concurrent job slot(s), shared by every workspace and queue",
+      "concurrencyUnlimited": "Unlimited concurrent job slots",
+      "slotTimeout": "A batch that waits more than {{seconds}}s for a slot fails and is retried",
+      "slotTimeoutDisabled": "A batch waits for a slot indefinitely",
+      "queue": "Queue",
+      "state": "State",
+      "backlog": "Backlog",
+      "runs": "Runs",
+      "workers": "Workers",
+      "refresh": "Refresh",
+      "empty": "No background queue has reported yet. Workers register their queues when they start.",
+      "loadFailed": "Could not load worker state",
+      "pause": "Pause",
+      "resume": "Resume",
+      "paused": "Paused",
+      "pausedToast": "Queue paused. Jobs already running finish; new batches are retried until you resume.",
+      "resumedToast": "Queue resumed",
+      "pauseFailedToast": "Could not change the queue's paused state",
+      "cancelNote": "A job that is already running cannot be cancelled — only queued work is held back. Pause the queue and let it drain, or restart the worker.",
+      "queued": "{{count}} queued",
+      "elapsed": "running for {{duration}}",
+      "lastRun": "last run {{duration}}",
+      "lastError": "Last error",
+      "instance": "Process",
+      "failures": "{{count}} failure(s)",
+      "status": {
+        "idle": "Idle",
+        "running": "Running",
+        "waiting_slot": "Waiting for slot",
+        "failed": "Failed",
+        "stale": "No heartbeat"
+      },
+      "statusHint": {
+        "idle": "Registered and waiting for work.",
+        "running": "A batch is executing right now.",
+        "waiting_slot": "Queued behind the global concurrency limit rather than executing.",
+        "failed": "The last batch threw. pg-boss retries on its own schedule.",
+        "stale": "No worker has reported recently. The process may have been killed mid-job."
+      }
     }
   },
   "dataTransfer": {

@@ -20,6 +20,7 @@ import {
 } from "@workspace/api-client";
 import {
   Clock3,
+  Cpu,
   DatabaseBackup,
   Globe,
   Languages,
@@ -36,6 +37,7 @@ import { ChatBotsCard } from "@/components/chat-bots-card";
 import { HuggingFaceSettingsCard } from "@/components/huggingface-settings-card";
 import { VersionSettingsSection } from "@/components/version-update-notifier";
 import { DataTransferCard } from "@/components/data-transfer/data-transfer-card";
+import { WorkerQueuesCard } from "@/components/worker-queues-card";
 
 import { useTranslation } from "@/hooks/use-translation";
 
@@ -219,6 +221,10 @@ export default function SettingsPage() {
             <DatabaseBackup className="h-3.5 w-3.5" />
             {t("settings.tabs.data")}
           </TabsTrigger>
+          <TabsTrigger value="workers" className={TAB_TRIGGER_CLASS}>
+            <Cpu className="h-3.5 w-3.5" />
+            {t("settings.tabs.workers")}
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent
@@ -387,6 +393,13 @@ export default function SettingsPage() {
           className="duration-300 animate-in fade-in-50 slide-in-from-bottom-1"
         >
           <DataTransferCard />
+        </TabsContent>
+
+        <TabsContent
+          value="workers"
+          className="duration-300 animate-in fade-in-50 slide-in-from-bottom-1"
+        >
+          <WorkerQueuesCard />
         </TabsContent>
       </Tabs>
     </div>

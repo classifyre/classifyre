@@ -543,17 +543,34 @@ worker:
   # -- Maximum namespace-scoped background job batches executing concurrently
   # across all worker replicas. All tenant queues remain registered; excess
   # jobs wait on a PostgreSQL advisory-lock slot. Set 0 for unlimited.
-  maxConcurrentNamespaceJobs: 1
+  #
+  # This is a GLOBAL semaphore spanning every namespace AND every queue, so at
+  # 1 a single slow handler stalls the whole instance — scheduler ticks, scan
+  # hand-offs and autopilot runs all queue behind it. 4 keeps the rationing
+  # that makes the limit worth having while leaving room for control-plane
+  # work to get through alongside one long job.
+  maxConcurrentNamespaceJobs: 4
+
+  # -- Seconds a job batch may wait for a concurrency slot before it gives up.
+  # An unbounded wait is indistinguishable from a hang: the handler never runs,
+  # never fails and never reports. On timeout the batch throws, pg-boss retries
+  # it later, and the stall becomes visible in the worker queue view instead of
+  # silent. Set 0 to wait forever (the previous behaviour).
+  namespaceJobSlotTimeoutSeconds: 900
 
   resources:
     # -- Worker resource requests.
     requests:
       cpu: 100m
       memory: 512Mi
-    # -- Worker resource limits.
+    # -- Worker resource limits. The worker holds one Prisma query engine and
+    # -- pg-boss pool per resident namespace plus the forked onnxruntime child,
+    # -- all outside the V8 heap, so `api.maxOldSpaceSizeMb` (1536) + native
+    # -- exceeded a 2Gi limit and the cgroup OOM-killed the pod before V8 ever
+    # -- felt pressure. 3Gi leaves ~1.5 GB for native allocations.
     limits:
       cpu: "1"
-      memory: 2Gi
+      memory: 3Gi
 
 frontend:
   # -- Deploy the web app in-cluster. Set false to run it externally (e.g. a

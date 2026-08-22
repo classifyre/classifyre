@@ -349,6 +349,8 @@ which each deployment sets on its own after including this block.
   value: {{ .Values.api.database.retryAttempts | quote }}
 - name: MAX_CONCURRENT_NAMESPACE_JOBS
   value: {{ .Values.worker.maxConcurrentNamespaceJobs | quote }}
+- name: NAMESPACE_JOB_SLOT_TIMEOUT_MS
+  value: {{ mul (int .Values.worker.namespaceJobSlotTimeoutSeconds) 1000 | quote }}
 - name: NAMESPACE_RETENTION_DAYS
   value: {{ .Values.api.namespaceRetentionDays | quote }}
 {{- if not (hasKey .Values.api.env "CLASSIFYRE_INTERNAL_API_URL") }}

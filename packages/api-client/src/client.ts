@@ -76,6 +76,7 @@ export { EmbeddingsApi } from "./generated/src/apis/EmbeddingsApi";
 export { GlossaryApi } from "./generated/src/apis/GlossaryApi";
 export { NotebooksApi } from "./generated/src/apis/NotebooksApi";
 export { AIApi } from "./generated/src/apis/AIApi";
+export { WorkerQueuesApi } from "./generated/src/apis/WorkerQueuesApi";
 // Notebook DTOs must be listed by name: this file re-exports selectively,
 // so a generated model that is not named here is not importable from the
 // package root however cleanly codegen produced it.
@@ -135,6 +136,12 @@ export type {
   ChatBotTestCheckDto,
   CreateChatBotDto,
   UpdateChatBotDto,
+} from "./generated/src/models";
+export type {
+  WorkerOverviewDto,
+  WorkerQueueDto,
+  WorkerQueueInstanceDto,
+  SetWorkerQueuePausedDto,
 } from "./generated/src/models";
 export {
   ChatBotResponseDtoPlatformEnum,
@@ -1043,6 +1050,7 @@ import { CorrelationApi } from "./generated/src/apis/CorrelationApi";
 import { ChatBotsApi } from "./generated/src/apis/ChatBotsApi";
 import { EmbeddingsApi } from "./generated/src/apis/EmbeddingsApi";
 import { GlossaryApi } from "./generated/src/apis/GlossaryApi";
+import { WorkerQueuesApi } from "./generated/src/apis/WorkerQueuesApi";
 
 // Determine the correct base URL
 // In browser: use relative path /api which is proxied by Next.js
@@ -1343,6 +1351,7 @@ class ApiClient {
   public chatBots: ChatBotsApi;
   public embeddings: EmbeddingsApi;
   public glossary: GlossaryApi;
+  public workerQueues: WorkerQueuesApi;
   public namespaces: NamespacesApi;
 
   constructor(baseUrl?: string) {
@@ -1368,6 +1377,7 @@ class ApiClient {
     this.chatBots = new ChatBotsApi(this.config);
     this.embeddings = new EmbeddingsApi(this.config);
     this.glossary = new GlossaryApi(this.config);
+    this.workerQueues = new WorkerQueuesApi(this.config);
   }
 
   /**

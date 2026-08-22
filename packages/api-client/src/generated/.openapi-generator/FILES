@@ -292,6 +292,7 @@ docs/SearchSourcesRequestDto.md
 docs/SearchSourcesResponseDto.md
 docs/SearchSourcesTotalsDto.md
 docs/SemanticFindingsSearchDto.md
+docs/SetWorkerQueuePausedDto.md
 docs/SimilarFindingAssetDto.md
 docs/SimilarFindingDto.md
 docs/SimilarFindingEvidenceAnalysisDto.md
@@ -358,6 +359,10 @@ docs/UpsertGlossaryTermResponseDto.md
 docs/ValueOccurrenceAssetDto.md
 docs/ValueOccurrencesResponseDto.md
 docs/VerifyGlossaryTermDto.md
+docs/WorkerOverviewDto.md
+docs/WorkerQueueDto.md
+docs/WorkerQueueInstanceDto.md
+docs/WorkerQueuesApi.md
 package.json
 src/apis/AIApi.ts
 src/apis/AIProviderConfigsApi.ts
@@ -385,6 +390,7 @@ src/apis/RunnersApi.ts
 src/apis/SitemapApi.ts
 src/apis/SourcesApi.ts
 src/apis/ThreadsApi.ts
+src/apis/WorkerQueuesApi.ts
 src/apis/index.ts
 src/index.ts
 src/models/AddEvidenceDto.ts
@@ -655,6 +661,7 @@ src/models/SearchSourcesRequestDto.ts
 src/models/SearchSourcesResponseDto.ts
 src/models/SearchSourcesTotalsDto.ts
 src/models/SemanticFindingsSearchDto.ts
+src/models/SetWorkerQueuePausedDto.ts
 src/models/SimilarFindingAssetDto.ts
 src/models/SimilarFindingDto.ts
 src/models/SimilarFindingEvidenceAnalysisDto.ts
@@ -718,6 +725,9 @@ src/models/UpsertGlossaryTermResponseDto.ts
 src/models/ValueOccurrenceAssetDto.ts
 src/models/ValueOccurrencesResponseDto.ts
 src/models/VerifyGlossaryTermDto.ts
+src/models/WorkerOverviewDto.ts
+src/models/WorkerQueueDto.ts
+src/models/WorkerQueueInstanceDto.ts
 src/models/index.ts
 src/runtime.ts
 tsconfig.esm.json

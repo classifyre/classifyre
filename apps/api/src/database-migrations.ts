@@ -8,6 +8,7 @@ import {
   publicConnectionString,
   PUBLIC_SEARCH_PATH_OPTION,
 } from './registry/namespace-registry.sql';
+import { WORKER_QUEUE_STATE_DDL } from './scheduler/worker-queue-state.sql';
 
 const logger = new Logger('DatabaseMigrations');
 const MIGRATION_LOCK_SCOPE = 1_127_074_643;
@@ -57,6 +58,7 @@ export async function ensureNamespaceRegistry(): Promise<void> {
   }
   await withDatabaseMigrationLock(async (client) => {
     await client.query(REGISTRY_TABLE_DDL);
+    await client.query(WORKER_QUEUE_STATE_DDL);
   });
 }
 
@@ -226,6 +228,7 @@ export async function applyAllPendingMigrations(): Promise<void> {
     }> = [];
 
     await client.query(REGISTRY_TABLE_DDL);
+    await client.query(WORKER_QUEUE_STATE_DDL);
     // Namespace deletion is a soft-delete (status = 'deleted'): the tenant
     // schema and its data are retained, so there is nothing to drop on boot.
     const { rows } = await client.query<{

@@ -294,6 +294,8 @@ All URIs are relative to *http://localhost*
 *ThreadsApi* | [**caseThreadsControllerRemove**](docs/ThreadsApi.md#casethreadscontrollerremove) | **DELETE** /threads/{id} | Delete a thread
 *ThreadsApi* | [**caseThreadsControllerUnlinkSupport**](docs/ThreadsApi.md#casethreadscontrollerunlinksupport) | **DELETE** /threads/{id}/support/{linkId} | Unlink evidence or finding from a thread
 *ThreadsApi* | [**caseThreadsControllerUpdate**](docs/ThreadsApi.md#casethreadscontrollerupdate) | **PATCH** /threads/{id} | Update thread title / status / confidence / color
+*WorkerQueuesApi* | [**workerQueuesControllerOverview**](docs/WorkerQueuesApi.md#workerqueuescontrolleroverview) | **GET** /worker-queues | List background queues with live worker state and backlog
+*WorkerQueuesApi* | [**workerQueuesControllerSetPaused**](docs/WorkerQueuesApi.md#workerqueuescontrollersetpaused) | **PUT** /worker-queues/{queue}/paused | Pause or resume a background queue
 
 
 ### Models
@@ -566,6 +568,7 @@ All URIs are relative to *http://localhost*
 - [SearchSourcesResponseDto](docs/SearchSourcesResponseDto.md)
 - [SearchSourcesTotalsDto](docs/SearchSourcesTotalsDto.md)
 - [SemanticFindingsSearchDto](docs/SemanticFindingsSearchDto.md)
+- [SetWorkerQueuePausedDto](docs/SetWorkerQueuePausedDto.md)
 - [SimilarFindingAssetDto](docs/SimilarFindingAssetDto.md)
 - [SimilarFindingDto](docs/SimilarFindingDto.md)
 - [SimilarFindingEvidenceAnalysisDto](docs/SimilarFindingEvidenceAnalysisDto.md)
@@ -629,6 +632,9 @@ All URIs are relative to *http://localhost*
 - [ValueOccurrenceAssetDto](docs/ValueOccurrenceAssetDto.md)
 - [ValueOccurrencesResponseDto](docs/ValueOccurrencesResponseDto.md)
 - [VerifyGlossaryTermDto](docs/VerifyGlossaryTermDto.md)
+- [WorkerOverviewDto](docs/WorkerOverviewDto.md)
+- [WorkerQueueDto](docs/WorkerQueueDto.md)
+- [WorkerQueueInstanceDto](docs/WorkerQueueInstanceDto.md)
 
 ### Authorization
 

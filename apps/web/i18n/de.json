@@ -302,7 +302,8 @@
       "global": "Allgemein",
       "mcp": "MCP-Server",
       "chat": "Chat-Bots",
-      "data": "Export & Import"
+      "data": "Export & Import",
+      "workers": "Worker"
     },
     "version": {
       "heading": "Softwareversion",
@@ -392,6 +393,49 @@
       "removedToast": "Hugging Face-Token entfernt",
       "saveFailedToast": "Hugging Face-Token konnte nicht gespeichert werden",
       "removeFailedToast": "Hugging Face-Token konnte nicht entfernt werden"
+    },
+    "workers": {
+      "heading": "Hintergrund-Worker",
+      "desc": "Was jede Hintergrund-Queue gerade tut – über alle Worker-Prozesse dieses Arbeitsbereichs hinweg.",
+      "concurrency": "{{limit}} gleichzeitige Job-Slots, geteilt von allen Arbeitsbereichen und Queues",
+      "concurrencyUnlimited": "Unbegrenzte gleichzeitige Job-Slots",
+      "slotTimeout": "Ein Batch, der länger als {{seconds}}s auf einen Slot wartet, schlägt fehl und wird wiederholt",
+      "slotTimeoutDisabled": "Ein Batch wartet unbegrenzt auf einen Slot",
+      "queue": "Queue",
+      "state": "Status",
+      "backlog": "Rückstand",
+      "runs": "Läufe",
+      "workers": "Worker",
+      "refresh": "Aktualisieren",
+      "empty": "Noch keine Hintergrund-Queue hat sich gemeldet. Worker registrieren ihre Queues beim Start.",
+      "loadFailed": "Worker-Status konnte nicht geladen werden",
+      "pause": "Pausieren",
+      "resume": "Fortsetzen",
+      "paused": "Pausiert",
+      "pausedToast": "Queue pausiert. Laufende Jobs werden beendet; neue Batches werden bis zum Fortsetzen wiederholt.",
+      "resumedToast": "Queue fortgesetzt",
+      "pauseFailedToast": "Pausenstatus der Queue konnte nicht geändert werden",
+      "cancelNote": "Ein bereits laufender Job kann nicht abgebrochen werden – nur wartende Arbeit wird zurückgehalten. Pausieren Sie die Queue und lassen Sie sie leerlaufen, oder starten Sie den Worker neu.",
+      "queued": "{{count}} wartend",
+      "elapsed": "läuft seit {{duration}}",
+      "lastRun": "letzter Lauf {{duration}}",
+      "lastError": "Letzter Fehler",
+      "instance": "Prozess",
+      "failures": "{{count}} Fehlschlag/-schläge",
+      "status": {
+        "idle": "Leerlauf",
+        "running": "Läuft",
+        "waiting_slot": "Wartet auf Slot",
+        "failed": "Fehlgeschlagen",
+        "stale": "Kein Heartbeat"
+      },
+      "statusHint": {
+        "idle": "Registriert und wartet auf Arbeit.",
+        "running": "Ein Batch wird gerade ausgeführt.",
+        "waiting_slot": "Steht hinter dem globalen Parallelitätslimit an, statt zu laufen.",
+        "failed": "Der letzte Batch ist fehlgeschlagen. pg-boss wiederholt ihn nach eigenem Zeitplan.",
+        "stale": "Kein Worker hat sich kürzlich gemeldet. Der Prozess wurde möglicherweise mitten im Job beendet."
+      }
     }
   },
   "dataTransfer": {

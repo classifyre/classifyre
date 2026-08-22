@@ -87,6 +87,7 @@ import {
   CaseTimelineController,
   GraphController,
   ChatBotsController,
+  WorkerQueuesController,
 } from './controllers';
 
 @Module({
@@ -137,6 +138,7 @@ import {
     CaseEventsController,
     NamespacesController,
     SitemapController,
+    WorkerQueuesController,
   ],
   providers: [
     { provide: APP_GUARD, useClass: InternalApiKeyGuard },
