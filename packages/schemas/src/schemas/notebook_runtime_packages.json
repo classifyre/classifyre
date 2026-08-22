@@ -30,7 +30,7 @@
     },
     {
       "name": "boto3",
-      "version": "1.43.77",
+      "version": "1.43.78",
       "modules": [
         "boto3"
       ],
@@ -75,7 +75,7 @@
     },
     {
       "name": "deltalake",
-      "version": "1.6.2",
+      "version": "1.6.3",
       "modules": [
         "deltalake"
       ],
