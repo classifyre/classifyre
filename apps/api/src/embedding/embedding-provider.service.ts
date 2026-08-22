@@ -9,7 +9,13 @@ import path from 'node:path';
 import { EmbeddingConfigService } from './embedding-config.service';
 import {
   resolvedFromEnv,
-  type EmbeddingSettingsService,
+  // A value import, not `import type`: `emitDecoratorMetadata` writes
+  // design:paramtypes from the imported binding, and a type-only import is
+  // erased before that metadata is emitted. Nest then cannot resolve the
+  // parameter and — because it is @Optional() — quietly injects undefined, so
+  // every read here fell back to the deployment defaults and the workspace's
+  // own embedding settings were ignored by everything but the settings page.
+  EmbeddingSettingsService,
   type ResolvedEmbeddingConfig,
 } from './embedding-settings.service';
 
@@ -47,6 +53,25 @@ const BREAKER_BASE_COOLDOWN_MS = 60_000;
 const BREAKER_MAX_COOLDOWN_MS = 15 * 60_000;
 
 /** Cooldown after `trips` consecutive breaker trips, doubling to a ceiling. */
+/**
+ * Base URL an OpenAI-compatible embeddings client should be pointed at.
+ *
+ * The AI SDK appends `/embeddings` to whatever base it is given, so the URL a
+ * user naturally copies out of a provider's own curl example — the complete
+ * endpoint — becomes `/v1/embeddings/embeddings` and comes back as a bare 404.
+ * That 404 is indistinguishable from a wrong model name in the UI, which is
+ * exactly the wrong place to send someone whose credential is fine. Both forms
+ * are accepted here and mean the same endpoint.
+ */
+export function normalizeEmbeddingBaseUrl(url?: string): string | undefined {
+  const trimmed = url?.trim().replace(/\/+$/, '');
+  if (!trimmed) return undefined;
+  const stripped = trimmed.replace(/\/embeddings$/i, '');
+  // A base of exactly "https://host/embeddings" would otherwise strip down to
+  // an origin the provider does not serve; keep whichever form is non-empty.
+  return stripped || trimmed;
+}
+
 export function breakerCooldownMs(trips: number): number {
   const exponent = Math.max(0, trips - 1);
   // Shifting past 31 overflows; the ceiling clamps long before that anyway.
@@ -125,16 +150,26 @@ export class EmbeddingProviderService implements OnApplicationShutdown {
    * later: whether the vector that comes back is the width the workspace is
    * configured for.
    */
-  async testConnection(cfg: ResolvedEmbeddingConfig): Promise<{
+  async testConnection(
+    cfg: ResolvedEmbeddingConfig,
+    options: { declaredDimensions?: number | null } = {},
+  ): Promise<{
     dimensions: number;
-    expectedDimensions: number;
+    expectedDimensions: number | null;
     durationMs: number;
   }> {
     const startedAt = Date.now();
     const probe = 'Classifyre embedding connection test.';
+    // A width the operator never stated must not be asked for: providers that
+    // honour `dimensions` (OpenAI does) truncate to it and hand back a vector
+    // that matches the guess, so the probe passes while proving nothing about
+    // the model's real width.
+    const declared = options.declaredDimensions ?? null;
     const vectors =
       cfg.provider === 'openai-compatible'
-        ? await this.embedRemote([probe], cfg)
+        ? await this.embedRemote([probe], cfg, {
+            sendDimensions: declared != null,
+          })
         : await this.embedLocal([probe], cfg);
     const vector = vectors[0];
     if (!vector?.length) {
@@ -142,7 +177,7 @@ export class EmbeddingProviderService implements OnApplicationShutdown {
     }
     return {
       dimensions: vector.length,
-      expectedDimensions: cfg.dimensions,
+      expectedDimensions: declared,
       durationMs: Date.now() - startedAt,
     };
   }
@@ -180,25 +215,45 @@ export class EmbeddingProviderService implements OnApplicationShutdown {
   private async embedRemote(
     texts: string[],
     cfg: ResolvedEmbeddingConfig = this.resolve(),
+    options: { sendDimensions?: boolean } = {},
   ): Promise<number[][]> {
+    const baseURL = normalizeEmbeddingBaseUrl(cfg.baseUrl);
+    if (!baseURL) {
+      throw new Error(
+        'This workspace is set to a remote embedding provider but no endpoint is bound. ' +
+          'Pick an AI provider under Settings -> Embeddings, or switch back to the local model.',
+      );
+    }
     const [{ createOpenAICompatible }, { embedMany }] = await Promise.all([
       import('@ai-sdk/openai-compatible'),
       import('ai'),
     ]);
     const provider = createOpenAICompatible({
       name: 'classifyreEmbedding',
-      baseURL: cfg.baseUrl as string,
+      baseURL,
       apiKey: cfg.apiKey,
     });
-    const result = await embedMany({
-      model: provider.embeddingModel(cfg.model),
-      values: texts,
-      maxParallelCalls: cfg.maxParallelCalls,
-      providerOptions: {
-        classifyreEmbedding: { dimensions: cfg.dimensions },
-      },
-    });
-    return result.embeddings;
+    try {
+      const result = await embedMany({
+        model: provider.embeddingModel(cfg.model),
+        values: texts,
+        maxParallelCalls: cfg.maxParallelCalls,
+        providerOptions:
+          options.sendDimensions === false
+            ? {}
+            : { classifyreEmbedding: { dimensions: cfg.dimensions } },
+      });
+      return result.embeddings;
+    } catch (error) {
+      // The SDK's message is the bare status ("Not Found"), which reads as a
+      // wrong model name however the request was actually malformed. Say what
+      // was asked of whom.
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(
+        `${message} (POST ${baseURL}/embeddings, model "${cfg.model}")`,
+        { cause: error },
+      );
+    }
   }
 
   private embedLocal(

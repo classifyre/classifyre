@@ -37,7 +37,12 @@ import {
 import { AssistantCapabilityReportDto } from '../dto/assistant-capability.dto';
 import { AssistantCapabilityService } from '../autopilot/capability/assistant-capability.service';
 import { EmbeddingProviderService } from '../embedding/embedding-provider.service';
-import { resolvedFromEnv } from '../embedding/embedding-settings.service';
+import {
+  EmbeddingSettingsService,
+  SPACE_DEFINING_FIELDS,
+  resolvedFromEnv,
+} from '../embedding/embedding-settings.service';
+import { EmbeddingRebuildService } from '../embedding/embedding-rebuild.service';
 import { EmbeddingConfigService } from '../embedding/embedding-config.service';
 
 const TEST_MESSAGES = [
@@ -62,7 +67,42 @@ export class AiProviderConfigController {
     private readonly capability: AssistantCapabilityService,
     private readonly embeddingProvider: EmbeddingProviderService,
     private readonly embeddingDefaults: EmbeddingConfigService,
+    private readonly embeddingSettings: EmbeddingSettingsService,
+    private readonly embeddingRebuilds: EmbeddingRebuildService,
   ) {}
+
+  /**
+   * Runs a change to a credential, keeping the embedding subsystem honest.
+   *
+   * The resolved embedding configuration is cached per workspace and inherits
+   * model, dimensions and pooling from the bound provider, so editing the
+   * provider redefined the vector space while every reader kept answering with
+   * the old one until the API restarted — and the stored vectors were never
+   * rebuilt for the new space. Re-resolving around the write catches both.
+   */
+  private async withEmbeddingRebind<T>(
+    id: string,
+    apply: () => Promise<T>,
+  ): Promise<T> {
+    const overrides = await this.embeddingSettings
+      .overrides()
+      .catch(() => null);
+    if (overrides?.aiProviderConfigId !== id) return apply();
+
+    const before = await this.embeddingSettings.resolve();
+    const result = await apply();
+    this.embeddingSettings.invalidate();
+    const after = await this.embeddingSettings.resolve();
+    const changed = SPACE_DEFINING_FIELDS.filter(
+      (field) => before[field] !== after[field],
+    );
+    if (changed.length > 0) {
+      this.embeddingRebuilds.start(
+        `Embedding provider changed: ${changed.join(', ')}`,
+      );
+    }
+    return result;
+  }
 
   @Get()
   @ApiOperation({
@@ -109,7 +149,7 @@ export class AiProviderConfigController {
     @Param('id') id: string,
     @Body() body: UpdateAiProviderConfigDto,
   ): Promise<AiProviderConfigResponseDto> {
-    return this.service.update(id, body);
+    return this.withEmbeddingRebind(id, () => this.service.update(id, body));
   }
 
   @Delete(':id')
@@ -194,23 +234,40 @@ export class AiProviderConfigController {
     const config = await this.service.get(id);
     try {
       const runtime = await this.service.getRuntimeConfig(id);
-      const result = await this.embeddingProvider.testConnection({
-        ...resolvedFromEnv(this.embeddingDefaults),
-        provider: 'openai-compatible',
-        model: config.model,
-        baseUrl: runtime.baseUrl ?? undefined,
-        apiKey: runtime.apiKey,
-        // Declared width, so a mismatch is reported rather than normalised
-        // away. Falls back to what the deployment expects when the provider
-        // does not state one.
-        dimensions:
-          config.embeddingDimensions ?? this.embeddingDefaults.dimensions,
-        // The probe must not be rejected for the width it came back with —
-        // testConnection reports the mismatch, embedMany would throw on it.
-        normalize: false,
-      });
+      const declared = config.embeddingDimensions ?? null;
+      const result = await this.embeddingProvider.testConnection(
+        {
+          ...resolvedFromEnv(this.embeddingDefaults),
+          provider: 'openai-compatible',
+          model: config.model,
+          baseUrl: runtime.baseUrl ?? undefined,
+          apiKey: runtime.apiKey,
+          dimensions: declared ?? this.embeddingDefaults.dimensions,
+          // The probe must not be rejected for the width it came back with —
+          // testConnection reports the mismatch, embedMany would throw on it.
+          normalize: false,
+        },
+        // Declared width only: a provider *told* to produce 384 dimensions
+        // produces them, and the check meant to catch a misconfiguration
+        // passes on a vector the deployment default asked for.
+        { declaredDimensions: declared },
+      );
 
-      const mismatch = result.dimensions !== result.expectedDimensions;
+      const mismatch =
+        declared != null && result.dimensions !== result.expectedDimensions;
+      // Nothing else can learn this width, and leaving it unset is what makes
+      // the first rebuild fail hours later. Record what the model actually
+      // returned so the vector space is built for it.
+      const learned =
+        declared == null
+          ? await this.withEmbeddingRebind(id, () =>
+              this.service.update(id, {
+                embeddingDimensions: result.dimensions,
+              }),
+            )
+              .then(() => true)
+              .catch(() => false)
+          : false;
       return {
         status: mismatch ? 'FAIL' : 'PASS',
         category: mismatch ? 'CONFIGURATION' : 'CONNECTION',
@@ -227,7 +284,11 @@ export class AiProviderConfigController {
           'The provider accepted a real embeddings request.',
           mismatch
             ? `Returned ${result.dimensions} dimensions, expected ${result.expectedDimensions}.`
-            : `The returned vector width matches the configured ${result.expectedDimensions} dimensions.`,
+            : declared != null
+              ? `The returned vector width matches the configured ${result.expectedDimensions} dimensions.`
+              : learned
+                ? `Dimensions were not set; saved the ${result.dimensions} this model returned.`
+                : `This model returns ${result.dimensions} dimensions.`,
         ],
         durationMs: Date.now() - startedAt,
         inputTokens: null,

@@ -237,6 +237,18 @@ function buildUpdatePayload(draft: Draft): UpdateAiProviderConfigDto {
       ? { contextSize: parseContextSize(draft.contextSize) }
       : {}),
     supportsVision: draft.supportsVision,
+    // Sent on update as well as on create: omitting them meant the embedding
+    // toggle, the dimensions and the pooling could be edited on screen and
+    // saved to nothing — the credential kept whatever it was created with, so
+    // toggling embeddings on, or entering a width, silently did not happen.
+    supportsEmbedding: draft.supportsEmbedding,
+    ...(draft.supportsEmbedding &&
+    parseContextSize(draft.embeddingDimensions) !== undefined
+      ? { embeddingDimensions: parseContextSize(draft.embeddingDimensions) }
+      : {}),
+    ...(draft.supportsEmbedding && draft.embeddingPooling
+      ? { embeddingPooling: draft.embeddingPooling }
+      : {}),
     ...(inputCost !== undefined ? { inputCostPerMTok: inputCost } : {}),
     ...(outputCost !== undefined ? { outputCostPerMTok: outputCost } : {}),
   };
