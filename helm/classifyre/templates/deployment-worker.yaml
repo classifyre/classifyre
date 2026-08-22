@@ -95,7 +95,7 @@ spec:
               containerPort: {{ .Values.api.service.port }}
               protocol: TCP
           env:
-            {{- include "classifyre.api.env" . | nindent 12 }}
+            {{- include "classifyre.api.env" (dict "root" . "role" "worker") | nindent 12 }}
             - name: SERVICE_ROLE
               value: "worker"
           {{- with .Values.api.extraEnvFrom }}

@@ -63,7 +63,17 @@
       "type": "object",
       "properties": {
         "maxConcurrentNamespaceJobs": { "type": "integer", "minimum": 0 },
-        "namespaceJobSlotTimeoutSeconds": { "type": "integer", "minimum": 0 }
+        "namespaceJobSlotTimeoutSeconds": { "type": "integer", "minimum": 0 },
+        "maxOldSpaceSizeMb": { "type": ["integer", "null"], "minimum": 256 },
+        "autoscaling": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "minReplicas": { "type": "integer", "minimum": 1 },
+            "maxReplicas": { "type": "integer", "minimum": 1 },
+            "targetCPUUtilizationPercentage": { "type": "integer", "minimum": 1 }
+          }
+        }
       }
     },
     "frontend": {

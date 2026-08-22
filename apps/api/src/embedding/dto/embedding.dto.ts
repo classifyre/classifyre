@@ -115,6 +115,30 @@ export class EmbeddingProviderHealthDto {
 
   @ApiPropertyOptional({ nullable: true })
   lastRequestErrorAt?: string | null;
+
+  @ApiProperty({
+    description:
+      'Native aborts of the forked inference child since this process started. onnxruntime can abort natively when an allocation fails under memory pressure; the fork contains that (the batch fails and is retried) but leaves nothing visible in the product, so it is counted here.',
+    example: 0,
+  })
+  workerCrashCount!: number;
+
+  @ApiPropertyOptional({ nullable: true })
+  lastWorkerCrashAt?: string | null;
+
+  @ApiProperty({
+    description:
+      'Native aborts since the last successful embed. The breaker opens when this reaches its threshold.',
+    example: 0,
+  })
+  consecutiveWorkerFailures!: number;
+
+  @ApiProperty({
+    description:
+      'How many times the breaker has opened. Drives the cooldown backoff and resets on a successful embed.',
+    example: 0,
+  })
+  breakerTrips!: number;
 }
 
 export class EmbeddingStatusResponseDto {

@@ -97,6 +97,18 @@ export class EmbeddingProviderService implements OnApplicationShutdown {
   /** Injectable clock so the backoff can be tested without waiting minutes. */
   private now: () => number = () => Date.now();
   private requestErrorCount = 0;
+  /**
+   * Native aborts of the forked inference child, cumulative for this process.
+   *
+   * Separate from `requestErrorCount`, which counts requests the child
+   * answered with an error while staying alive. A native abort leaves no trace
+   * inside the product at all — the child dies, the batch fails, pg-boss
+   * retries — so on desktop the only evidence was a macOS crash report,
+   * which reads like the app crashed when the fork is what stopped it from
+   * doing so. Counting it here is what makes the containment visible.
+   */
+  private workerCrashCount = 0;
+  private lastWorkerCrashAt?: string;
   private lastRequestError?: string;
   private lastRequestErrorAt?: string;
 
@@ -137,6 +149,10 @@ export class EmbeddingProviderService implements OnApplicationShutdown {
       requestErrorCount: this.requestErrorCount,
       lastRequestError: this.lastRequestError ?? null,
       lastRequestErrorAt: this.lastRequestErrorAt ?? null,
+      workerCrashCount: this.workerCrashCount,
+      lastWorkerCrashAt: this.lastWorkerCrashAt ?? null,
+      consecutiveWorkerFailures: this.consecutiveWorkerFailures,
+      breakerTrips: this.breakerTrips,
     };
   }
 
@@ -390,6 +406,8 @@ export class EmbeddingProviderService implements OnApplicationShutdown {
 
   private registerWorkerFailure(): void {
     this.consecutiveWorkerFailures += 1;
+    this.workerCrashCount += 1;
+    this.lastWorkerCrashAt = new Date(this.now()).toISOString();
     if (
       this.workerDisabled ||
       this.consecutiveWorkerFailures < MAX_CONSECUTIVE_WORKER_FAILURES

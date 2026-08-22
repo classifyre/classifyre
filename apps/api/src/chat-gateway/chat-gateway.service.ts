@@ -62,12 +62,13 @@ const CONFIG_WATCH_INTERVAL_MS = 60_000;
  * ring buffer served by the diagnostics endpoint; entries carry a stable
  * code + params so the web UI can translate them.
  *
- * NOTE: connectors assume a single running instance. In a scaled-out
- * deployment only the SERVICE_ROLE=worker process starts connectors —
- * multiple pollers would double-poll Telegram (surfaces as 409 lastError)
- * and double-reply on Slack. API pods that change bot config bump the
- * ChatBot rows; the worker picks the change up via a periodic revision
- * check instead of a direct refresh() call.
+ * NOTE: connectors assume a single running instance — multiple pollers would
+ * double-poll Telegram (surfaces as 409 lastError) and double-reply on Slack.
+ * Only SERVICE_ROLE=worker processes start connectors, and among those only
+ * the one holding worker leadership (see WorkerLeadershipService), so the
+ * deployment can be scaled past one replica. API pods that change bot config
+ * bump the ChatBot rows; the leader picks the change up via a periodic
+ * revision check instead of a direct refresh() call.
  */
 @Injectable()
 export class ChatGatewayService implements OnModuleDestroy {
@@ -446,6 +447,20 @@ export class ChatGatewayService implements OnModuleDestroy {
         },
       })
       .catch(() => undefined); // bot deleted mid-flight — nothing to record
+  }
+
+  /**
+   * Stop every connector this process runs, without touching their config.
+   *
+   * Called when the process loses worker leadership: another replica is now
+   * the one poller, and a demoted leader that keeps polling is the
+   * double-reply this is all here to prevent.
+   */
+  async stopAllConnectors(): Promise<void> {
+    await this.stopAll();
+    // Forget the revisions too, so regaining leadership rebuilds from scratch
+    // rather than deciding nothing changed and starting nothing.
+    this.lastConfigRevision.clear();
   }
 
   private async stopAll(): Promise<void> {

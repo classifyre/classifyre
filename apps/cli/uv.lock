@@ -942,7 +942,7 @@ wheels = [
 
 [[package]]
 name = "classifyre-cli"
-version = "0.4.127"
+version = "0.4.128"
 source = { editable = "." }
 dependencies = [
     { name = "beautifulsoup4" },
@@ -1485,7 +1485,7 @@ youtube = [
 
 [[package]]
 name = "classifyre-schemas"
-version = "0.4.127"
+version = "0.4.128"
 source = { editable = "../../packages/schemas" }
 dependencies = [
     { name = "fastjsonschema" },
@@ -1508,11 +1508,11 @@ wheels = [
 
 [[package]]
 name = "cloudpathlib"
-version = "0.24.0"
+version = "0.25.0"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/06/19/58bc6b5d7d0f81c7209b05445af477e147c486552f96665a5912211839b9/cloudpathlib-0.24.0.tar.gz", hash = "sha256:c521a984e77b47e656fe78e20a7e3e260e0ab45fc69e33ac01094227c979e34a", size = 53600, upload-time = "2026-04-30T00:54:43.265Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/07/9f/1791893f3d51ec36cd9e3f8da0130d278ee909a68bc17c83b3b3de98c91b/cloudpathlib-0.25.0.tar.gz", hash = "sha256:63612e17778c5e3a51b472def8d785d0aaaf347486d6b6786dc7be627556d4c6", size = 56441, upload-time = "2026-08-22T18:41:21.493Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/c2/5b/ba933f896d9b0b07608d575a8501e2b4e32166b60d84c430a4a7285ebe64/cloudpathlib-0.24.0-py3-none-any.whl", hash = "sha256:b1c51e2d2ec7dc4fed6538991f4aea849d6cf11a7e6b9069f86e461aa1f9b5b4", size = 63214, upload-time = "2026-04-30T00:54:42.06Z" },
+    { url = "https://files.pythonhosted.org/packages/37/f9/9084c945d0b3ef8f129b4f0dd21baec759761a337902b70f17a3945015dd/cloudpathlib-0.25.0-py3-none-any.whl", hash = "sha256:8faef3ed3a0dd71d134e8617b4fdc5ce56a12a6b485c080cfe80106e5f1d1f5d", size = 66109, upload-time = "2026-08-22T18:41:20.417Z" },
 ]
 
 [[package]]
