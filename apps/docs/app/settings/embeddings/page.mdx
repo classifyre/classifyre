@@ -8,8 +8,13 @@ import { Callout } from "nextra/components"
 
 # Embeddings
 
-Open **Settings → Embedding** to see and change how this workspace turns
+Open **Harness AI → Embedding** to see and change how this workspace turns
 evidence into meaning.
+
+Embeddings live beside the Harness rather than in general settings because
+they are the retrieval half of the same AI stack: the model chosen here is what
+the agents' evidence lookups, the Assistant's answers and every semantic search
+actually run against.
 
 Detectors find *matches*. Embeddings are what let Classifyre reason about
 whether two matches are **the same thing said twice**, whether one is
@@ -87,6 +92,28 @@ you have already saved under [AI Providers](/settings/ai-providers). The
 endpoint and the API key come from that provider, so the credential stays
 encrypted in one place and rotating it fixes every consumer at once.
 
+Only providers marked **Embedding model** appear in the picker. Embeddings and
+chat completions are different endpoints with different model names — a chat
+provider selected here would fail on its first batch — so the flag is set
+deliberately when you create or edit the provider. If nothing is listed, the
+page offers a direct link to create one.
+
+An embedding provider also stores the **dimensions** its model returns (and
+optionally the pooling strategy). Those describe the model, not the workspace,
+so selecting a remote provider here inherits them — there is nothing further to
+fill in. Use **Test connection** on the provider to confirm the dimensions are
+right: the test sends a real embeddings request and compares the width of the
+vector that comes back. A mismatch caught there costs a second; the same
+mismatch caught later fails the first batch of a rebuild, after the old corpus
+is already gone.
+
+<Callout type="info">
+  The provider test knows the difference. A provider marked as an embedding
+  model is tested by embedding a probe string, not by asking for a chat
+  completion — which is what an embeddings endpoint refuses, and why a working
+  embedding credential used to test as broken.
+</Callout>
+
 This moves the CPU cost off your machine and generally improves quality — at
 the price of sending evidence text to a third party. That is a data-governance
 decision, not a performance one.
@@ -96,8 +123,17 @@ decision, not a performance one.
 **Dimensions** is not a preference. It is a property of the model you chose,
 and a mismatch fails every batch rather than degrading quietly. Picking a model
 from the dropdown fills in the right number automatically; if you type a custom
-model, you must supply the number its documentation states. Values above 2000
-cannot be indexed for search.
+model, you must supply the number its documentation states. For a remote
+provider the number comes from the provider itself.
+
+How large a model can be is a question about the *index*, not about storage:
+
+| Dimensions | What happens |
+| --- | --- |
+| Up to 2,000 | Indexed normally |
+| 2,001 – 4,000 | Indexed at half precision — a negligible accuracy cost, and how 2,048- and 3,072-dimension models are served |
+| Above 4,000 | Stored and searched correctly, but with no index — similarity queries scan the whole space and will be slow on a large corpus |
+| Above 16,000 | Rejected; pgvector cannot store the vector |
 
 ---
 
@@ -124,6 +160,10 @@ embeds the corpus again from scratch:
 
 The page tells you what that costs before you confirm — how many vectors and
 how much disk will be deleted.
+
+Turning embeddings **off** is the one case that only deletes. The corpus is
+purged and nothing is re-embedded; the confirmation says so, and turning them
+back on later starts a fresh build.
 
 ### What is deleted, and what is not
 
@@ -230,3 +270,17 @@ from conclusions that need ranked evidence until coverage is sufficient.
 
 **Vector spaces** lists every coordinate system this workspace holds vectors
 in. After a normal rebuild there is exactly one, marked active.
+
+---
+
+## Text only, for now
+
+Everything on this page embeds **text**: the evidence around a finding, and
+passages of documents read during a scan. Images are handled elsewhere — by
+vision-capable detectors that classify or read them — and what those detectors
+produce is text, which is then embedded like anything else.
+
+That means an image is currently findable by what a detector *said* about it,
+not by what it looks like. Multimodal embedding models, which place pictures
+and text in a single space so "a photo of a passport" retrieves the picture
+itself, are not wired in.

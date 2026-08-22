@@ -55,6 +55,9 @@ export class AiProviderConfigService {
       baseUrl: config.baseUrl,
       contextSize: config.contextSize,
       supportsVision: config.supportsVision,
+      supportsEmbedding: config.supportsEmbedding,
+      embeddingDimensions: config.embeddingDimensions,
+      embeddingPooling: config.embeddingPooling,
       inputCostPerMTok:
         config.inputCostPerMTok != null
           ? Number(config.inputCostPerMTok)
@@ -104,6 +107,9 @@ export class AiProviderConfigService {
         baseUrl: dto.baseUrl && dto.baseUrl.length > 0 ? dto.baseUrl : null,
         contextSize: dto.contextSize ?? null,
         supportsVision: dto.supportsVision ?? false,
+        supportsEmbedding: dto.supportsEmbedding ?? false,
+        embeddingDimensions: dto.embeddingDimensions ?? null,
+        embeddingPooling: dto.embeddingPooling ?? null,
         inputCostPerMTok: dto.inputCostPerMTok ?? null,
         outputCostPerMTok: dto.outputCostPerMTok ?? null,
       },
@@ -141,6 +147,15 @@ export class AiProviderConfigService {
     if (dto.supportsVision !== undefined) {
       data.supportsVision = dto.supportsVision;
     }
+    if (dto.supportsEmbedding !== undefined) {
+      data.supportsEmbedding = dto.supportsEmbedding;
+    }
+    if (dto.embeddingDimensions !== undefined) {
+      data.embeddingDimensions = dto.embeddingDimensions;
+    }
+    if (dto.embeddingPooling !== undefined) {
+      data.embeddingPooling = dto.embeddingPooling;
+    }
     if (dto.inputCostPerMTok !== undefined) {
       data.inputCostPerMTok = dto.inputCostPerMTok;
     }
@@ -168,6 +183,22 @@ export class AiProviderConfigService {
       throw new ConflictException(
         `Cannot delete this AI provider: it is used by ${dependentDetectors} custom detector` +
           `${dependentDetectors === 1 ? '' : 's'}. Reassign or delete them first.`,
+      );
+    }
+
+    // The embedding binding is an onDelete: SetNull FK, so deleting a bound
+    // credential succeeded and left the workspace on a remote provider with no
+    // endpoint behind it: every embed failed, and the settings page still
+    // showed a remote configuration — filled in with the local defaults.
+    // Refuse, the same way a dependent detector does.
+    const boundToEmbeddings = await this.prisma.embeddingSettings.findFirst({
+      where: { aiProviderConfigId: id },
+      select: { id: true },
+    });
+    if (boundToEmbeddings) {
+      throw new ConflictException(
+        'Cannot delete this AI provider: it is the embedding provider for this workspace. ' +
+          'Choose another provider (or switch back to the local model) under Settings -> Embeddings first.',
       );
     }
 
@@ -217,6 +248,9 @@ export class AiProviderConfigService {
       baseUrl: config.baseUrl,
       contextSize: config.contextSize,
       supportsVision: config.supportsVision,
+      supportsEmbedding: config.supportsEmbedding,
+      embeddingDimensions: config.embeddingDimensions,
+      embeddingPooling: config.embeddingPooling,
     };
   }
 }

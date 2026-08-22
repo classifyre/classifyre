@@ -9,7 +9,13 @@ import { embeddingContentHash, normalizeEmbeddingText } from './embedding-text';
 import { EmbeddingConfigService } from './embedding-config.service';
 import {
   resolvedFromEnv,
-  type EmbeddingSettingsService,
+  // A value import, not `import type`: `emitDecoratorMetadata` writes
+  // design:paramtypes from the imported binding, and a type-only import is
+  // erased before that metadata is emitted. Nest then cannot resolve the
+  // parameter and — because it is @Optional() — quietly injects undefined, so
+  // every read here fell back to the deployment defaults and the workspace's
+  // own embedding settings were ignored by everything but the settings page.
+  EmbeddingSettingsService,
   type ResolvedEmbeddingConfig,
 } from './embedding-settings.service';
 import { EmbeddingProviderService } from './embedding-provider.service';

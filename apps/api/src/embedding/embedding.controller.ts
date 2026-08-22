@@ -30,6 +30,7 @@ import {
 import { EmbeddingQueueService } from './embedding-queue.service';
 import { InternalOnly } from '../internal-only.decorator';
 import { AiProviderConfigService } from '../ai-provider-config.service';
+import type { AiProviderConfigResponseDto } from '../dto/ai-provider-config.dto';
 import {
   EmbeddingSettingsService,
   SPACE_DEFINING_FIELDS,
@@ -137,7 +138,10 @@ export class EmbeddingController {
     const [effective, overrides, providers] = await Promise.all([
       this.settings.resolve(),
       this.settings.overrides(),
-      this.aiProviders.list().catch(() => []),
+      // Annotated so the fallback does not widen the tuple element to
+      // `AiProviderConfigResponseDto[] | never[]`, which collapses the
+      // `.filter()` callback parameter to `never`.
+      this.aiProviders.list().catch((): AiProviderConfigResponseDto[] => []),
     ]);
     const defaults = this.settings.deploymentDefaults();
     const space = effective.enabled
@@ -178,13 +182,26 @@ export class EmbeddingController {
       aiProviderConfigId: effective.aiProviderConfigId ?? null,
       allowRemoteModels: effective.allowRemoteModels,
       fields,
-      aiProviders: providers.map((provider) => ({
-        id: provider.id,
-        name: provider.name,
-        provider: provider.provider,
-        baseUrl: provider.baseUrl ?? null,
-        hasApiKey: provider.hasApiKey,
-      })),
+      // Only providers marked as serving embeddings. Chat completions and
+      // embeddings are separate endpoints with separate model names, so
+      // offering every saved provider here would mostly offer choices that
+      // fail on the first batch. The currently bound provider is kept in the
+      // list even if the flag was cleared later, so the page can still show
+      // what is in force rather than rendering an empty selector.
+      aiProviders: providers
+        .filter(
+          (provider) =>
+            provider.supportsEmbedding ||
+            provider.id === effective.aiProviderConfigId,
+        )
+        .map((provider) => ({
+          id: provider.id,
+          name: provider.name,
+          provider: provider.provider,
+          baseUrl: provider.baseUrl ?? null,
+          hasApiKey: provider.hasApiKey,
+          supportsEmbedding: provider.supportsEmbedding,
+        })),
       rebuildTriggerFields: [...SPACE_DEFINING_FIELDS, 'enabled'],
       stats,
       rebuildRunning: this.rebuilds.isRunning(),

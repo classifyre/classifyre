@@ -74,6 +74,24 @@ export interface AiProviderConfigResponseDto {
      */
     supportsVision: boolean;
     /**
+     * Whether this provider serves an embeddings endpoint. Embeddings and chat completions are separate APIs with separate models, so the embedding configuration only offers providers marked this way.
+     * @type {boolean}
+     * @memberof AiProviderConfigResponseDto
+     */
+    supportsEmbedding: boolean;
+    /**
+     * Dimensions this embedding model outputs. Null when unknown or not an embedding provider.
+     * @type {number}
+     * @memberof AiProviderConfigResponseDto
+     */
+    embeddingDimensions: number | null;
+    /**
+     * Pooling strategy for this embedding model.
+     * @type {string}
+     * @memberof AiProviderConfigResponseDto
+     */
+    embeddingPooling: string | null;
+    /**
      * Cost in USD per 1M input tokens. Null when pricing is not configured.
      * @type {number}
      * @memberof AiProviderConfigResponseDto
@@ -124,6 +142,9 @@ export function instanceOfAiProviderConfigResponseDto(value: object): value is A
     if (!('baseUrl' in value) || value['baseUrl'] === undefined) return false;
     if (!('contextSize' in value) || value['contextSize'] === undefined) return false;
     if (!('supportsVision' in value) || value['supportsVision'] === undefined) return false;
+    if (!('supportsEmbedding' in value) || value['supportsEmbedding'] === undefined) return false;
+    if (!('embeddingDimensions' in value) || value['embeddingDimensions'] === undefined) return false;
+    if (!('embeddingPooling' in value) || value['embeddingPooling'] === undefined) return false;
     if (!('inputCostPerMTok' in value) || value['inputCostPerMTok'] === undefined) return false;
     if (!('outputCostPerMTok' in value) || value['outputCostPerMTok'] === undefined) return false;
     if (!('createdAt' in value) || value['createdAt'] === undefined) return false;
@@ -150,6 +171,9 @@ export function AiProviderConfigResponseDtoFromJSONTyped(json: any, ignoreDiscri
         'baseUrl': json['baseUrl'],
         'contextSize': json['contextSize'],
         'supportsVision': json['supportsVision'],
+        'supportsEmbedding': json['supportsEmbedding'],
+        'embeddingDimensions': json['embeddingDimensions'],
+        'embeddingPooling': json['embeddingPooling'],
         'inputCostPerMTok': json['inputCostPerMTok'],
         'outputCostPerMTok': json['outputCostPerMTok'],
         'createdAt': (new Date(json['createdAt'])),
@@ -177,6 +201,9 @@ export function AiProviderConfigResponseDtoToJSONTyped(value?: AiProviderConfigR
         'baseUrl': value['baseUrl'],
         'contextSize': value['contextSize'],
         'supportsVision': value['supportsVision'],
+        'supportsEmbedding': value['supportsEmbedding'],
+        'embeddingDimensions': value['embeddingDimensions'],
+        'embeddingPooling': value['embeddingPooling'],
         'inputCostPerMTok': value['inputCostPerMTok'],
         'outputCostPerMTok': value['outputCostPerMTok'],
         'createdAt': value['createdAt'].toISOString(),

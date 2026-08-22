@@ -18,10 +18,17 @@ import { PutAssetChunksDto } from './dto/embedding.dto';
 import { EmbeddingConfigService } from './embedding-config.service';
 import {
   resolvedFromEnv,
-  type EmbeddingSettingsService,
+  // A value import, not `import type`: `emitDecoratorMetadata` writes
+  // design:paramtypes from the imported binding, and a type-only import is
+  // erased before that metadata is emitted. Nest then cannot resolve the
+  // parameter and — because it is @Optional() — quietly injects undefined, so
+  // every read here fell back to the deployment defaults and the workspace's
+  // own embedding settings were ignored by everything but the settings page.
+  EmbeddingSettingsService,
   type ResolvedEmbeddingConfig,
 } from './embedding-settings.service';
 import { embeddingContentHash } from './embedding-text';
+import { MAX_INDEXED_DIMENSIONS, vectorCast } from './embedding-vector';
 
 type SimilarityRow = { id: string; score: number };
 /** One neighbour of a (content hash, finding type) pair. */
@@ -235,17 +242,26 @@ export class EmbeddingService {
       throw new Error(`Invalid embedding space id ${spaceId}`);
     }
     const indexName = `content_embeddings_${spaceId.replaceAll('-', '')}_hnsw`;
+    const cast = vectorCast(dim);
+    if (!cast.indexed) {
+      this.logger.warn(
+        `Embedding space ${spaceId} uses ${dim} dimensions, above the ${MAX_INDEXED_DIMENSIONS} ` +
+          'an HNSW index can cover. Vectors are stored and searched correctly, but by ' +
+          'sequential scan — expect slow similarity queries on a large corpus.',
+      );
+      return;
+    }
     await this.prisma.$executeRaw(
       Prisma.raw(
         `CREATE INDEX IF NOT EXISTS "${indexName}"
          ON "content_embeddings"
-         USING hnsw (("vec"::public.vector(${dim})) public.vector_cosine_ops)
+         USING hnsw (("vec"::public.${cast.type}(${dim})) ${cast.ops})
          WITH (m = ${this.cfg.hnswM}, ef_construction = ${this.cfg.hnswEfConstruction})
          WHERE "space_id" = '${spaceId}'`,
       ),
     );
     this.logger.log(
-      `Embedding space ${spaceId} ready (${this.cfg.provider}:${this.cfg.model}, ${dim} dimensions)`,
+      `Embedding space ${spaceId} ready (${this.cfg.provider}:${this.cfg.model}, ${dim} dimensions, ${cast.type} index)`,
     );
   }
 
@@ -528,6 +544,9 @@ export class EmbeddingService {
     if (!contentHashes.length) return;
     const spaceId = this.spaceIdLiteral(space.id);
     const dim = Prisma.raw(String(space.dim));
+    // Must match the expression ensureHnswIndex built, or the planner ignores
+    // the index and silently falls back to a sequential scan.
+    const vecType = Prisma.raw(vectorCast(space.dim).type);
     const seeds = await this.prisma.$transaction(async (tx) => {
       await tx.$executeRaw(
         Prisma.raw(`SET LOCAL hnsw.ef_search = ${this.cfg.hnswEfSearch}`),
@@ -560,8 +579,8 @@ export class EmbeddingService {
               WHERE neighbor_finding.embed_content_hash = candidate.content_hash
                 AND neighbor_finding.finding_type = target.finding_type
             )
-          ORDER BY candidate.vec::public.vector(${dim}) <=>
-            target_embedding.vec::public.vector(${dim})
+          ORDER BY candidate.vec::public.${vecType}(${dim}) <=>
+            target_embedding.vec::public.${vecType}(${dim})
           LIMIT 10
         ) neighbor
       `);
@@ -820,6 +839,9 @@ export class EmbeddingService {
     const sourceFilter = sourceIds?.length ? sourceIds : null;
     const statusFilter = statuses?.length ? statuses : null;
     const dim = Prisma.raw(String(space.dim));
+    // Must match the expression ensureHnswIndex built, or the planner ignores
+    // the index and silently falls back to a sequential scan.
+    const vecType = Prisma.raw(vectorCast(space.dim).type);
     const queryVector = JSON.stringify(vector);
     const statusScope = statusFilter
       ? Prisma.sql`AND f.status = ANY(${statusFilter}::"FindingStatus"[])`
@@ -833,16 +855,16 @@ export class EmbeddingService {
       await tx.$executeRaw`SET LOCAL hnsw.iterative_scan = strict_order`;
       return tx.$queryRaw<SimilarityRow[]>(Prisma.sql`
         SELECT f.id, 1 - (
-          ce.vec::public.vector(${dim}) <=>
-          ${queryVector}::public.vector(${dim})
+          ce.vec::public.${vecType}(${dim}) <=>
+          ${queryVector}::public.${vecType}(${dim})
         ) AS score
         FROM content_embeddings ce
         JOIN findings f ON f.embed_content_hash = ce.content_hash
         WHERE ce.space_id = ${this.spaceIdLiteral(space.id)}
           AND (${sourceFilter}::text[] IS NULL OR f.source_id = ANY(${sourceFilter}::text[]))
           ${statusScope}
-        ORDER BY ce.vec::public.vector(${dim}) <=>
-          ${queryVector}::public.vector(${dim})
+        ORDER BY ce.vec::public.${vecType}(${dim}) <=>
+          ${queryVector}::public.${vecType}(${dim})
         LIMIT ${limit}
       `);
     });
@@ -877,6 +899,9 @@ export class EmbeddingService {
     }
     const candidateLimit = Math.max(limit * 5, 200);
     const dim = Prisma.raw(String(space.dim));
+    // Must match the expression ensureHnswIndex built, or the planner ignores
+    // the index and silently falls back to a sequential scan.
+    const vecType = Prisma.raw(vectorCast(space.dim).type);
     const vector = JSON.stringify(queryVector);
     return this.prisma.$transaction(async (tx) => {
       await tx.$executeRaw(
@@ -887,15 +912,15 @@ export class EmbeddingService {
         WITH ranked_chunks AS (
           SELECT ac.asset_id AS id,
             1 - (
-              ce.vec::public.vector(${dim}) <=>
-              ${vector}::public.vector(${dim})
+              ce.vec::public.${vecType}(${dim}) <=>
+              ${vector}::public.${vecType}(${dim})
             ) AS score
           FROM content_embeddings ce
           JOIN asset_chunks ac ON ac.content_hash = ce.content_hash
           WHERE ce.space_id = ${this.spaceIdLiteral(space.id)}
             AND (${sourceId ?? null}::text IS NULL OR ac.source_id = ${sourceId ?? null})
-          ORDER BY ce.vec::public.vector(${dim}) <=>
-            ${vector}::public.vector(${dim})
+          ORDER BY ce.vec::public.${vecType}(${dim}) <=>
+            ${vector}::public.${vecType}(${dim})
           LIMIT ${candidateLimit}
         )
         SELECT id, MAX(score) AS score

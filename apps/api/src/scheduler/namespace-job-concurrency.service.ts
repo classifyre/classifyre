@@ -15,6 +15,27 @@ export interface NamespaceJobIdentity {
 }
 
 /**
+ * Thrown when a job batch gave up waiting for a concurrency slot.
+ *
+ * Nothing is lost: the batch never ran, so pg-boss marks the job failed and
+ * retries it on its configured schedule. The point of the ceiling is that an
+ * unbounded wait is indistinguishable from a hang — the handler never runs,
+ * never fails and never reports — whereas this surfaces the starvation as a
+ * failure an operator can see.
+ */
+export class NamespaceJobSlotTimeoutError extends Error {
+  constructor(
+    readonly identity: NamespaceJobIdentity,
+    readonly waitedMs: number,
+  ) {
+    super(
+      `Namespace '${identity.namespaceSlug ?? identity.namespaceId ?? 'unknown'}' gave up after ${Math.round(waitedMs / 1000)}s waiting for a worker slot for ${identity.queue}; pg-boss will retry this job`,
+    );
+    this.name = 'NamespaceJobSlotTimeoutError';
+  }
+}
+
+/**
  * Database-backed semaphore shared by every worker replica and namespace.
  *
  * Worker registrations remain active for every tenant so no tenant starves.
@@ -31,6 +52,9 @@ export class NamespaceJobConcurrencyService {
   private readonly retryDelayMs = parseRetryDelay(
     process.env.NAMESPACE_JOB_SLOT_RETRY_MS,
   );
+  private readonly waitTimeoutMs = parseWaitTimeout(
+    process.env.NAMESPACE_JOB_SLOT_TIMEOUT_MS,
+  );
   private readonly pool =
     this.limit === 0
       ? null
@@ -42,9 +66,23 @@ export class NamespaceJobConcurrencyService {
           max: Math.max(2, this.limit * 2),
         });
   private closing = false;
+  private onWaiting?: (identity: NamespaceJobIdentity) => void;
+
+  /**
+   * Observe the moment a batch starts queueing for a slot. Used by the worker
+   * queue registry to distinguish "running" from "waiting for a slot" — from
+   * pg-boss's side both look like a handler that has not returned yet.
+   */
+  setWaitObserver(observer: (identity: NamespaceJobIdentity) => void): void {
+    this.onWaiting = observer;
+  }
 
   getLimit(): number {
     return this.limit;
+  }
+
+  getWaitTimeoutMs(): number {
+    return this.waitTimeoutMs;
   }
 
   async withSlot<T>(
@@ -88,6 +126,7 @@ export class NamespaceJobConcurrencyService {
     identity: NamespaceJobIdentity,
   ): Promise<number> {
     let loggedWaiting = false;
+    const startedAt = Date.now();
     while (!this.closing) {
       // Start at a stable tenant-specific offset to avoid every replica always
       // contending for slot zero when the configured limit is greater than one.
@@ -116,6 +155,12 @@ export class NamespaceJobConcurrencyService {
         this.logger.log(
           `Namespace '${identity.namespaceSlug ?? identity.namespaceId ?? 'unknown'}' waiting for one of ${this.limit} global worker slot(s) for ${identity.queue}`,
         );
+        this.onWaiting?.(identity);
+      }
+
+      const waitedMs = Date.now() - startedAt;
+      if (this.waitTimeoutMs > 0 && waitedMs >= this.waitTimeoutMs) {
+        throw new NamespaceJobSlotTimeoutError(identity, waitedMs);
       }
       await delay(this.retryDelayMs);
     }
@@ -150,6 +195,26 @@ function parseLimit(raw: string | undefined): number {
   if (!Number.isFinite(value) || value < 0) {
     throw new Error(
       `MAX_CONCURRENT_NAMESPACE_JOBS must be an integer >= 0 (got ${JSON.stringify(raw)})`,
+    );
+  }
+  return value;
+}
+
+/**
+ * Default ceiling on how long one batch may queue for a slot: 15 minutes.
+ *
+ * Long enough that a genuinely busy instance still drains its backlog rather
+ * than churning retries, short enough that a wedged holder becomes visible
+ * within one coffee break instead of never.
+ */
+const DEFAULT_WAIT_TIMEOUT_MS = 15 * 60 * 1000;
+
+function parseWaitTimeout(raw: string | undefined): number {
+  if (raw === undefined || raw.trim() === '') return DEFAULT_WAIT_TIMEOUT_MS;
+  const value = Number.parseInt(raw, 10);
+  if (!Number.isFinite(value) || value < 0) {
+    throw new Error(
+      `NAMESPACE_JOB_SLOT_TIMEOUT_MS must be an integer >= 0 (got ${JSON.stringify(raw)})`,
     );
   }
   return value;

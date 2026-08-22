@@ -11,6 +11,7 @@ Name | Type
 `provider` | string
 `baseUrl` | string
 `hasApiKey` | boolean
+`supportsEmbedding` | boolean
 
 ## Example
 
@@ -24,6 +25,7 @@ const example = {
   "provider": null,
   "baseUrl": null,
   "hasApiKey": null,
+  "supportsEmbedding": null,
 } satisfies EmbeddingAiProviderOptionDto
 
 console.log(example)

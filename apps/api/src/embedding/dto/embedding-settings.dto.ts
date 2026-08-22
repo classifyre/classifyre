@@ -88,6 +88,12 @@ export class EmbeddingAiProviderOptionDto {
   @ApiPropertyOptional({ nullable: true }) baseUrl?: string | null;
   @ApiProperty({ description: 'Whether an API key is stored for it' })
   hasApiKey!: boolean;
+
+  @ApiProperty({
+    description:
+      'Whether the provider is marked as serving an embeddings endpoint',
+  })
+  supportsEmbedding!: boolean;
 }
 
 @ApiExtraModels(EmbeddingSettingValueDto)

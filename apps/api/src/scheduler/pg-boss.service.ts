@@ -10,6 +10,30 @@ import {
 
 import type { Job } from 'pg-boss';
 import { NamespaceJobConcurrencyService } from './namespace-job-concurrency.service';
+import { WorkerQueueRegistryService } from './worker-queue-registry.service';
+
+/** Depth of one queue as reported by pg-boss itself. */
+export interface QueueDepth {
+  queue: string;
+  queuedCount: number;
+  activeCount: number;
+  deferredCount: number;
+  totalCount: number;
+}
+
+/**
+ * Thrown when a paused queue receives a batch.
+ *
+ * Pausing must not lose work, so the batch is refused rather than dropped;
+ * pg-boss marks the job failed and retries it, and it runs for real once the
+ * queue is resumed.
+ */
+export class QueuePausedError extends Error {
+  constructor(queue: string) {
+    super(`Queue '${queue}' is paused; pg-boss will retry this job`);
+    this.name = 'QueuePausedError';
+  }
+}
 
 type PgBossModule = typeof import('pg-boss');
 type PgBossInstance = InstanceType<PgBossModule['PgBoss']>;
@@ -37,7 +61,20 @@ export class PgBossService implements OnApplicationShutdown {
   constructor(
     private readonly cls: ClsService,
     private readonly namespaceConcurrency: NamespaceJobConcurrencyService,
-  ) {}
+    private readonly queueRegistry: WorkerQueueRegistryService,
+  ) {
+    // Waiting for a slot happens inside the semaphore, before the handler is
+    // ever called - from pg-boss's side it is indistinguishable from a job
+    // that is simply taking a long time, so the semaphore has to say so.
+    this.namespaceConcurrency.setWaitObserver((identity) => {
+      if (identity.namespaceId) {
+        this.queueRegistry.markWaiting({
+          namespaceId: identity.namespaceId,
+          queue: identity.queue,
+        });
+      }
+    });
+  }
 
   /** Start (idempotently) the pg-boss instance for a namespace schema. */
   async startForNamespace(
@@ -117,18 +154,43 @@ export class PgBossService implements OnApplicationShutdown {
     const namespaceId = this.cls.get<string>(CLS_NAMESPACE_ID);
     const slug = this.cls.get<string>(CLS_SLUG);
     const boss = this.currentBoss();
-    const wrapped = (jobs: Job<T>[]): Promise<unknown> =>
-      this.namespaceConcurrency.withSlot(
-        { namespaceId, namespaceSlug: slug, queue },
-        () =>
-          this.cls.run(() => {
-            this.cls.set(CLS_SCHEMA, schema);
-            this.cls.set(CLS_NAMESPACE_ID, namespaceId);
-            this.cls.set(CLS_SLUG, slug);
-            this.cls.set(CLS_DATABASE_LANE, 'background');
-            return handler(jobs);
-          }),
-      );
+    // Every background queue in the product registers through this one method,
+    // so instrumenting here covers all of them - and every queue added later.
+    const observed = namespaceId ? { namespaceId, queue } : undefined;
+    if (observed) this.queueRegistry.register(observed);
+
+    const wrapped = async (jobs: Job<T>[]): Promise<unknown> => {
+      // Refuse before taking a slot: a paused queue must not occupy one of the
+      // few global slots just to fail.
+      if (observed && this.queueRegistry.isPaused(observed)) {
+        throw new QueuePausedError(queue);
+      }
+      try {
+        const result = await this.namespaceConcurrency.withSlot(
+          { namespaceId, namespaceSlug: slug, queue },
+          () => {
+            if (observed) {
+              this.queueRegistry.markRunning(
+                observed,
+                jobs.map((job) => String(job.id)),
+              );
+            }
+            return this.cls.run(() => {
+              this.cls.set(CLS_SCHEMA, schema);
+              this.cls.set(CLS_NAMESPACE_ID, namespaceId);
+              this.cls.set(CLS_SLUG, slug);
+              this.cls.set(CLS_DATABASE_LANE, 'background');
+              return handler(jobs);
+            });
+          },
+        );
+        if (observed) this.queueRegistry.markFinished(observed);
+        return result;
+      } catch (error) {
+        if (observed) this.queueRegistry.markFinished(observed, error);
+        throw error;
+      }
+    };
     // pg-boss's overloaded work() signatures don't unify with a generic
     // wrapper; the runtime contract (queue, options, batch handler) is correct.
     return (
@@ -138,6 +200,25 @@ export class PgBossService implements OnApplicationShutdown {
         h: (jobs: Job<T>[]) => Promise<unknown>,
       ) => Promise<string>
     )(queue, options, wrapped);
+  }
+
+  /**
+   * Backlog per queue for the current namespace.
+   *
+   * Read from pg-boss rather than inferred from worker heartbeats: an idle
+   * queue with thirty thousand jobs waiting looks identical to a genuinely
+   * idle one otherwise.
+   */
+  async queueDepths(): Promise<QueueDepth[]> {
+    const boss = await this.getBossAsync();
+    const queues = await boss.getQueues();
+    return queues.map((queue) => ({
+      queue: queue.name,
+      queuedCount: Number(queue.queuedCount ?? 0),
+      activeCount: Number(queue.activeCount ?? 0),
+      deferredCount: Number(queue.deferredCount ?? 0),
+      totalCount: Number(queue.totalCount ?? 0),
+    }));
   }
 
   private requireSchema(): string {
