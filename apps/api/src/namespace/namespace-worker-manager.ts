@@ -7,6 +7,7 @@ import {
 import { ClsService } from 'nestjs-cls';
 import { runsBackgroundWorkers } from '../service-role';
 import { PgBossService } from '../scheduler/pg-boss.service';
+import { WorkerLeadershipService } from '../scheduler/worker-leadership.service';
 import { PrismaClientManager } from '../prisma/prisma-client-manager';
 import { NamespaceRegistryService } from '../registry/namespace-registry.service';
 import { SchedulerService } from '../scheduler/scheduler.service';
@@ -75,6 +76,7 @@ export class NamespaceWorkerManager
     private readonly findingStats: FindingStatsWorker,
     private readonly runnerEvents: RunnerEventsGateway,
     private readonly notificationEvents: NotificationEventsGateway,
+    private readonly leadership: WorkerLeadershipService,
   ) {}
 
   async onApplicationBootstrap(): Promise<void> {
@@ -107,12 +109,41 @@ export class NamespaceWorkerManager
 
     this.registry.onCreated((e) => this.start(e));
 
+    // Chat connectors are the only piece that must not run twice, so they are
+    // gated on a cross-replica election rather than on "am I the worker".
+    // Everything else above is already replica-safe: pg-boss hands each job to
+    // one consumer and the slot semaphore is a shared advisory lock.
+    this.leadership.start({
+      onAcquired: () => this.startConnectorsEverywhere(),
+      onLost: () => this.chat.stopAllConnectors(),
+    });
+
     // Single loop that picks up per-namespace chat-bot config changes made via
-    // API pods (the connectors run only here on the worker).
+    // API pods (the connectors run only on the leader).
     this.configWatchTimer = setInterval(() => {
       void this.watchConfigs();
     }, ChatGatewayService.CONFIG_WATCH_INTERVAL_MS);
     this.configWatchTimer.unref();
+  }
+
+  /**
+   * Bring up chat connectors for every namespace already running here.
+   *
+   * Leadership can be won long after the namespaces started — that is the
+   * normal case on failover — so this cannot live in `start()` alone.
+   */
+  private async startConnectorsEverywhere(): Promise<void> {
+    for (const ctx of [...this.active.values()]) {
+      await this.runInNamespace(ctx, () =>
+        this.chat
+          .refresh()
+          .catch((error) =>
+            this.logger.warn(
+              `Chat gateway refresh failed for '${ctx.slug}': ${String(error)}`,
+            ),
+          ),
+      );
+    }
   }
 
   async onApplicationShutdown(): Promise<void> {
@@ -171,13 +202,17 @@ export class NamespaceWorkerManager
             ),
           );
         // Long-poll chat connectors + orphaned-runner recovery (non-pg-boss).
-        await this.chat
-          .refresh()
-          .catch((error) =>
-            this.logger.warn(
-              `Chat gateway refresh failed for '${e.slug}': ${String(error)}`,
-            ),
-          );
+        // Connectors only on the elected leader; a second poller double-polls
+        // Telegram and double-replies on Slack.
+        if (this.leadership.isLeader()) {
+          await this.chat
+            .refresh()
+            .catch((error) =>
+              this.logger.warn(
+                `Chat gateway refresh failed for '${e.slug}': ${String(error)}`,
+              ),
+            );
+        }
         if (typeof this.cliRunner.reconcileOnStartup === 'function') {
           await this.cliRunner
             .reconcileOnStartup()
@@ -268,6 +303,7 @@ export class NamespaceWorkerManager
   }
 
   private async watchConfigs(): Promise<void> {
+    if (!this.leadership.isLeader()) return;
     for (const ns of await this.registry.list().catch(() => [])) {
       if (!this.active.has(ns.schemaName)) continue;
       await this.runInNamespace(

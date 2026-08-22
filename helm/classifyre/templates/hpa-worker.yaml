@@ -1,0 +1,55 @@
+{{- if .Values.worker.autoscaling.enabled }}
+{{- /*
+Worker HPA. Off by default, and deliberately CPU-only.
+
+Scaling the worker on MEMORY would be actively wrong: worker memory tracks how
+many namespaces are resident in the process, not how much work is queued, so a
+memory-triggered scale-up adds a replica that pins its own Prisma engines and
+pg-boss pools and RAISES total memory instead of relieving it.
+
+Correctness with more than one replica rests on two things that are already
+true: pg-boss hands each job to exactly one consumer, and the job-slot
+semaphore is a Postgres advisory lock shared across replicas, so the configured
+concurrency still holds in aggregate. The one piece that must not run twice —
+the chat connectors — is gated on WorkerLeadershipService.
+*/}}
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ include "classifyre.worker.fullname" . }}
+  labels:
+    {{- include "classifyre.commonLabels" . | nindent 4 }}
+    app.kubernetes.io/component: worker
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "classifyre.worker.fullname" . }}
+  minReplicas: {{ .Values.worker.autoscaling.minReplicas }}
+  maxReplicas: {{ .Values.worker.autoscaling.maxReplicas }}
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.worker.autoscaling.targetCPUUtilizationPercentage }}
+  behavior:
+    scaleUp:
+      # Background work is bursty and a new worker pays a real start-up cost
+      # (Prisma engines and pg-boss instances per resident namespace), so add
+      # capacity deliberately rather than on every spike.
+      stabilizationWindowSeconds: {{ .Values.worker.autoscaling.scaleUpStabilizationSeconds }}
+      policies:
+        - type: Pods
+          value: 1
+          periodSeconds: 120
+    scaleDown:
+      # Long enough to outlast a slow job batch: removing a pod mid-batch
+      # costs a pg-boss retry of work that was nearly finished.
+      stabilizationWindowSeconds: {{ .Values.worker.autoscaling.scaleDownStabilizationSeconds }}
+      policies:
+        - type: Pods
+          value: 1
+          periodSeconds: 300
+{{- end }}

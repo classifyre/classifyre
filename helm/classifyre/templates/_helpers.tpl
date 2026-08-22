@@ -294,7 +294,18 @@ which each deployment sets on its own after including this block.
     {{- end }}
 {{- end -}}
 
+{{- /*
+  Shared container env for every API-image workload.
+
+  Takes a dict rather than the bare root context so the caller can say which
+  role it is rendering: the worker has its own memory limit and therefore needs
+  its own JS heap cap. `$root` is captured before the `with`, because inside it
+  `$` refers to the dict, not the chart root.
+*/ -}}
 {{- define "classifyre.api.env" -}}
+{{- $role := .role | default "api" -}}
+{{- $root := .root -}}
+{{- with $root -}}
 - name: DB_HOST
   value: {{ include "classifyre.databaseHost" . | quote }}
 - name: DB_PORT
@@ -364,10 +375,14 @@ which each deployment sets on its own after including this block.
      the CLI ingestion endpoints shed with 503 (CLI retries → no lost batches)
      before V8 hard-crashes. Both are overridable via `.Values.api.env`, which
      is spread after this block. */}}
+{{- $heapMb := int .Values.api.maxOldSpaceSizeMb }}
+{{- if and (eq $role "worker") .Values.worker.maxOldSpaceSizeMb }}
+{{- $heapMb = int .Values.worker.maxOldSpaceSizeMb }}
+{{- end }}
 - name: NODE_OPTIONS
-  value: "--max-old-space-size={{ .Values.api.maxOldSpaceSizeMb }}"
+  value: "--max-old-space-size={{ $heapMb }}"
 - name: UNDER_PRESSURE_MAX_HEAP_USED_BYTES
-  value: {{ div (mul (int .Values.api.maxOldSpaceSizeMb) 1024 1024 85) 100 | quote }}
+  value: {{ div (mul $heapMb 1024 1024 85) 100 | quote }}
 {{- if and (eq .Values.postgres.mode "external") .Values.postgres.external.existingSecret .Values.postgres.external.existingSecretUrlKey }}
 - name: DATABASE_URL
   valueFrom:
@@ -427,7 +442,7 @@ which each deployment sets on its own after including this block.
   valueFrom:
     secretKeyRef:
       name: {{ . }}
-      key: {{ $.Values.api.embedding.external.apiKeyKey }}
+      key: {{ $root.Values.api.embedding.external.apiKeyKey }}
 {{- end }}
 {{- end }}
 {{- range $key, $value := .Values.api.env }}
@@ -505,4 +520,5 @@ which each deployment sets on its own after including this block.
 {{- with .Values.api.extraEnv }}
 {{- toYaml . | nindent 0 }}
 {{- end }}
+{{- end -}}
 {{- end -}}

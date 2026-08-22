@@ -23172,11 +23172,33 @@
           "lastRequestErrorAt": {
             "type": "string",
             "nullable": true
+          },
+          "workerCrashCount": {
+            "type": "number",
+            "description": "Native aborts of the forked inference child since this process started. onnxruntime can abort natively when an allocation fails under memory pressure; the fork contains that (the batch fails and is retried) but leaves nothing visible in the product, so it is counted here.",
+            "example": 0
+          },
+          "lastWorkerCrashAt": {
+            "type": "string",
+            "nullable": true
+          },
+          "consecutiveWorkerFailures": {
+            "type": "number",
+            "description": "Native aborts since the last successful embed. The breaker opens when this reaches its threshold.",
+            "example": 0
+          },
+          "breakerTrips": {
+            "type": "number",
+            "description": "How many times the breaker has opened. Drives the cooldown backoff and resets on a successful embed.",
+            "example": 0
           }
         },
         "required": [
           "workerDisabled",
-          "requestErrorCount"
+          "requestErrorCount",
+          "workerCrashCount",
+          "consecutiveWorkerFailures",
+          "breakerTrips"
         ]
       },
       "EmbeddingStatusResponseDto": {

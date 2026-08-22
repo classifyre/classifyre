@@ -207,8 +207,26 @@ grep -E "FATAL ERROR|worker exited with code" ~/Library/Application\ Support/Cla
 | `FATAL ERROR: Ineffective mark-compacts` | the API's V8 heap | scan interrupted; supervisor restarts it |
 | `worker exited with code null (signal SIGTRAP)` | the embedding worker | that batch fails and is retried; **the API keeps serving** |
 
-The crash report itself is decisive: `parentProc` is `classifyre-desktop` (the
-Electron main) for an API death, and the API's own pid for a worker death.
+The crash report itself is decisive, but read the **pid**, not the name:
+`parentProc` says `classifyre-desktop` either way, because the API and its
+forked worker are both that binary. It is `parentPid` that separates them —
+the Electron main's pid for an API death, the API's own pid for a worker
+death — alongside `procRole`, which is `Unspecified` for the forked child.
+
+```bash
+python3 -c 'import json,sys,pathlib;
+p=sorted(pathlib.Path.home().glob("Library/Logs/DiagnosticReports/classifyre-desktop-*.ips"))[-1];
+d=json.loads(p.read_text().split(chr(10),1)[1]);
+print(p.name, d["pid"], "parent", d.get("parentPid"), d.get("procRole"))'
+```
+
+Measured on 2026-08-22: five of eight recent reports were the forked embedding
+child (`parentPid` = the API, `procRole: Unspecified`, onnxruntime
+`Tensor::Tensor` on the faulting thread). The containment worked every time —
+and nothing in the product said so, which is the actual problem. Since then
+`GET /embeddings/status` also reports `workerCrashCount`, `lastWorkerCrashAt`,
+`consecutiveWorkerFailures` and `breakerTrips`, so repeated native aborts are
+visible without reading `.ips` files.
 
 The `SIGTRAP` is onnxruntime's allocator aborting when the host cannot satisfy
 a request — a machine-level pressure symptom, not a bug in the batch. It is
