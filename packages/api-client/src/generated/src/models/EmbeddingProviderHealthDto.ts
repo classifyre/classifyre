@@ -49,6 +49,30 @@ export interface EmbeddingProviderHealthDto {
      * @memberof EmbeddingProviderHealthDto
      */
     lastRequestErrorAt?: string | null;
+    /**
+     * Native aborts of the forked inference child since this process started. onnxruntime can abort natively when an allocation fails under memory pressure; the fork contains that (the batch fails and is retried) but leaves nothing visible in the product, so it is counted here.
+     * @type {number}
+     * @memberof EmbeddingProviderHealthDto
+     */
+    workerCrashCount: number;
+    /**
+     * 
+     * @type {string}
+     * @memberof EmbeddingProviderHealthDto
+     */
+    lastWorkerCrashAt?: string | null;
+    /**
+     * Native aborts since the last successful embed. The breaker opens when this reaches its threshold.
+     * @type {number}
+     * @memberof EmbeddingProviderHealthDto
+     */
+    consecutiveWorkerFailures: number;
+    /**
+     * How many times the breaker has opened. Drives the cooldown backoff and resets on a successful embed.
+     * @type {number}
+     * @memberof EmbeddingProviderHealthDto
+     */
+    breakerTrips: number;
 }
 
 /**
@@ -57,6 +81,9 @@ export interface EmbeddingProviderHealthDto {
 export function instanceOfEmbeddingProviderHealthDto(value: object): value is EmbeddingProviderHealthDto {
     if (!('workerDisabled' in value) || value['workerDisabled'] === undefined) return false;
     if (!('requestErrorCount' in value) || value['requestErrorCount'] === undefined) return false;
+    if (!('workerCrashCount' in value) || value['workerCrashCount'] === undefined) return false;
+    if (!('consecutiveWorkerFailures' in value) || value['consecutiveWorkerFailures'] === undefined) return false;
+    if (!('breakerTrips' in value) || value['breakerTrips'] === undefined) return false;
     return true;
 }
 
@@ -75,6 +102,10 @@ export function EmbeddingProviderHealthDtoFromJSONTyped(json: any, ignoreDiscrim
         'requestErrorCount': json['requestErrorCount'],
         'lastRequestError': json['lastRequestError'] == null ? undefined : json['lastRequestError'],
         'lastRequestErrorAt': json['lastRequestErrorAt'] == null ? undefined : json['lastRequestErrorAt'],
+        'workerCrashCount': json['workerCrashCount'],
+        'lastWorkerCrashAt': json['lastWorkerCrashAt'] == null ? undefined : json['lastWorkerCrashAt'],
+        'consecutiveWorkerFailures': json['consecutiveWorkerFailures'],
+        'breakerTrips': json['breakerTrips'],
     };
 }
 
@@ -94,6 +125,10 @@ export function EmbeddingProviderHealthDtoToJSONTyped(value?: EmbeddingProviderH
         'requestErrorCount': value['requestErrorCount'],
         'lastRequestError': value['lastRequestError'],
         'lastRequestErrorAt': value['lastRequestErrorAt'],
+        'workerCrashCount': value['workerCrashCount'],
+        'lastWorkerCrashAt': value['lastWorkerCrashAt'],
+        'consecutiveWorkerFailures': value['consecutiveWorkerFailures'],
+        'breakerTrips': value['breakerTrips'],
     };
 }
 

@@ -60,6 +60,10 @@ describe('NamespaceWorkerManager teardown isolation', () => {
     findingStats: { registerForNamespace: asyncNoop },
     runnerEvents: { stopForSchema: noop },
     notificationEvents: { stopForSchema: noop },
+    // Never the leader in these tests, so start() takes the branch that skips
+    // chat connectors — the teardown paths under test are unaffected either
+    // way, and a double that claimed leadership would start pollers here.
+    leadership: { start: noop, isLeader: () => false },
     ...over,
   });
 
@@ -87,6 +91,7 @@ describe('NamespaceWorkerManager teardown isolation', () => {
       d.findingStats as never,
       d.runnerEvents as never,
       d.notificationEvents as never,
+      d.leadership as never,
     );
     return { manager, deps: d };
   };

@@ -551,12 +551,51 @@ worker:
   # work to get through alongside one long job.
   maxConcurrentNamespaceJobs: 4
 
+  # -- V8 old-space (JS heap) cap in MB for the WORKER pods, overriding
+  # `api.maxOldSpaceSizeMb`. Leave empty to inherit the API's value.
+  #
+  # The worker needs its own number because it has its own memory limit. With
+  # the shared 1536 MB cap inside a 3Gi worker the container stopped being
+  # OOMKilled and started dying of `FATAL ERROR: Reached heap limit` (SIGSEGV,
+  # exit 139) roughly 40s after boot instead — the cgroup was no longer the
+  # binding constraint, the heap cap was, and 1.5 GB of the pod's 3 GB simply
+  # went unused. Same 0.75x rule of thumb as the API: 2304 ≈ 0.75 × 3072.
+  maxOldSpaceSizeMb: 2304
+
   # -- Seconds a job batch may wait for a concurrency slot before it gives up.
   # An unbounded wait is indistinguishable from a hang: the handler never runs,
   # never fails and never reports. On timeout the batch throws, pg-boss retries
   # it later, and the stall becomes visible in the worker queue view instead of
   # silent. Set 0 to wait forever (the previous behaviour).
   namespaceJobSlotTimeoutSeconds: 900
+
+  autoscaling:
+    # -- Enable the worker HPA. OFF by default, and not a default you should
+    # flip without looking at your node pool first.
+    #
+    # More replicas add throughput safely — pg-boss gives each job to one
+    # consumer, the job-slot semaphore is a Postgres advisory lock shared
+    # across replicas, and the chat connectors (the only single-instance
+    # piece) run on an elected leader. What more replicas do NOT add is
+    # capacity: on a single-node cluster a second 3Gi worker competes with the
+    # first for the same RAM, and the usual result is eviction rather than
+    # throughput. Scale out only when there is somewhere for the pod to go,
+    # and soak two replicas manually — a scan plus a chat bot for a few
+    # minutes — before turning this on.
+    enabled: false
+    # -- Minimum worker replicas under HPA.
+    minReplicas: 1
+    # -- Maximum worker replicas under HPA.
+    maxReplicas: 3
+    # -- Target average CPU utilization. CPU only, on purpose: worker memory
+    # tracks resident namespaces rather than queue depth, so scaling on memory
+    # adds replicas that raise total memory instead of relieving it.
+    targetCPUUtilizationPercentage: 75
+    # -- Seconds of sustained load before another worker is added.
+    scaleUpStabilizationSeconds: 300
+    # -- Seconds of sustained idleness before a worker is removed. Generous so
+    # a pod is not taken away mid-batch, which costs a pg-boss retry.
+    scaleDownStabilizationSeconds: 900
 
   resources:
     # -- Worker resource requests.

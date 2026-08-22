@@ -11,6 +11,10 @@ Name | Type
 `requestErrorCount` | number
 `lastRequestError` | string
 `lastRequestErrorAt` | string
+`workerCrashCount` | number
+`lastWorkerCrashAt` | string
+`consecutiveWorkerFailures` | number
+`breakerTrips` | number
 
 ## Example
 
@@ -24,6 +28,10 @@ const example = {
   "requestErrorCount": null,
   "lastRequestError": null,
   "lastRequestErrorAt": null,
+  "workerCrashCount": 0,
+  "lastWorkerCrashAt": null,
+  "consecutiveWorkerFailures": 0,
+  "breakerTrips": 0,
 } satisfies EmbeddingProviderHealthDto
 
 console.log(example)
