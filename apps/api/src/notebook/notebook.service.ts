@@ -69,6 +69,7 @@ export class NotebookService {
     name: string;
     description: string;
     cells: NotebookCellDto[];
+    desktopOnly: boolean;
   }> {
     return this.customExamples()
       .map((entry) => ({
@@ -76,6 +77,12 @@ export class NotebookService {
         description: String(entry.description ?? ''),
         cells: (entry.config?.required?.notebook?.cells ??
           []) as NotebookCellDto[],
+        // A template that configures local_folders reads a path on the machine
+        // running the app. Derived from the example rather than hard-coded by
+        // name so a new folder-reading template is gated the day it is added.
+        desktopOnly:
+          Array.isArray(entry.config?.optional?.local_folders) &&
+          entry.config.optional.local_folders.length > 0,
       }))
       .filter((entry) => entry.name && entry.cells.length > 0);
   }

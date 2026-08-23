@@ -14,10 +14,18 @@ import {
   type CustomSourceDraft,
 } from "@/components/notebook/custom-source-config";
 import {
+  entriesToRecord,
   recordToEntries,
   secretKeysToEntries,
 } from "@/components/key-value-field";
-import type { NotebookCell } from "@/components/notebook/notebook-editor";
+import type { NotebookPackage } from "@/lib/notebook-packages";
+import type { NotebookLocalFolder } from "@/lib/notebook-local-folders";
+import type {
+  NotebookCell,
+  NotebookEditorHandle,
+} from "@/components/notebook/notebook-editor";
+import { applyNotebookOperations } from "@/lib/notebook-cells";
+import type { AssistantNotebookOperation } from "@workspace/api-client";
 
 export type { SourceType } from "@/lib/schema-loader";
 
@@ -44,8 +52,24 @@ interface SourceFormProps {
   afterNameContent?: React.ReactNode;
 }
 
+/** Everything a CUSTOM source's notebook is configured with, read live. */
+export interface NotebookContext {
+  cells: NotebookCell[];
+  packages: NotebookPackage[];
+  localFolders: NotebookLocalFolder[];
+  variables: Record<string, string>;
+  /** Names only — the browser is never sent secret values. */
+  secretKeys: string[];
+}
+
 export interface SourceFormHandle extends JsonSchemaFormHandle {
   getSchema: () => JSONSchema7 | null;
+  /** The CUSTOM notebook and its config, or null for every other type. */
+  getNotebookContext: () => NotebookContext | null;
+  /** Applies the assistant's cell edits. Returns what it actually changed. */
+  applyNotebookOperations: (
+    operations: AssistantNotebookOperation[],
+  ) => string[];
 }
 
 export const SourceForm = React.forwardRef<SourceFormHandle, SourceFormProps>(
@@ -75,6 +99,9 @@ export const SourceForm = React.forwardRef<SourceFormHandle, SourceFormProps>(
   ) {
     const { t } = useTranslation();
     const formRef = React.useRef<JsonSchemaFormHandle | null>(null);
+    // Whichever notebook is mounted (draft or saved editor) installs itself
+    // here, so the page above never has to know which one that is.
+    const notebookRef = React.useRef<NotebookEditorHandle | null>(null);
     const schema = getSourceSchema(sourceType);
     const isCustom = sourceType === "CUSTOM";
 
@@ -115,6 +142,11 @@ export const SourceForm = React.forwardRef<SourceFormHandle, SourceFormProps>(
         };
       },
     );
+
+    // Read by the imperative handle, which must see the draft as it is now
+    // rather than as it was when the handle was last rebuilt.
+    const draftRef = React.useRef(customDraft);
+    draftRef.current = customDraft;
 
     // A new notebook opens on the scaffold rather than on an empty page: the
     // starter cells already satisfy the contract, so the first edit is a change
@@ -248,6 +280,39 @@ export const SourceForm = React.forwardRef<SourceFormHandle, SourceFormProps>(
       ref,
       () => ({
         getSchema: () => enhancedSchema,
+        getNotebookContext: () => {
+          const cells = isCustom ? notebookRef.current?.getCells() : null;
+          if (!cells) {
+            return null;
+          }
+          const draft = draftRef.current;
+          return {
+            cells,
+            packages: draft.packages,
+            localFolders: draft.localFolders,
+            variables: entriesToRecord(draft.variables),
+            // Names only. The browser never receives secret values, so there is
+            // nothing here to leak even if the model asked -- and it does not
+            // need them to write ctx.secret("api_token").
+            secretKeys: draft.secrets
+              .map((entry) => entry.key)
+              .filter(Boolean),
+          };
+        },
+        applyNotebookOperations: (operations) => {
+          const handle = notebookRef.current;
+          if (!isCustom || !handle) {
+            return [];
+          }
+          const { cells, touched } = applyNotebookOperations(
+            handle.getCells(),
+            operations,
+          );
+          if (touched.length > 0) {
+            handle.setCells(cells);
+          }
+          return touched;
+        },
         // Must return the same shape handleSubmit builds. Both source pages
         // render with showActions={false} and read this handle directly, so a
         // section rendered outside the schema form -- a CUSTOM notebook, a
@@ -267,7 +332,7 @@ export const SourceForm = React.forwardRef<SourceFormHandle, SourceFormProps>(
             errors: ["Source form is not mounted"],
           },
       }),
-      [enhancedSchema, sourceType, sectionPayload],
+      [enhancedSchema, isCustom, sourceType, sectionPayload],
     );
 
     if (!schema || !enhancedSchema) {
@@ -314,6 +379,7 @@ export const SourceForm = React.forwardRef<SourceFormHandle, SourceFormProps>(
               onChange={setCustomDraft}
               disabled={disabled}
               filesSlot={afterNameContent}
+              notebookRef={notebookRef}
             />
           ) : (
             afterNameContent

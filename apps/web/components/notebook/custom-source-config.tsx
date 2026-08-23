@@ -17,7 +17,7 @@ import {
   type KeyValueEntry,
 } from "@/components/key-value-field";
 import { isDesktopRuntime } from "@/lib/desktop";
-import { NotebookEditor } from "./notebook-editor";
+import { NotebookEditor, type NotebookEditorHandle } from "./notebook-editor";
 import { PackageTable } from "./package-table";
 import { AvailablePackages } from "./available-packages";
 import { LocalFolders } from "./local-folders";
@@ -29,7 +29,7 @@ import {
   localFoldersToConfig,
   type NotebookLocalFolder,
 } from "@/lib/notebook-local-folders";
-import { CellList, type NotebookAiConfig } from "./cell-list";
+import { CellList } from "./cell-list";
 import type { NotebookCell } from "@/lib/notebook-cells";
 
 export interface CustomSourceDraft {
@@ -79,6 +79,11 @@ export interface CustomSourceConfigProps {
   disabled?: boolean;
   /** The file uploader, owned by the page that persists uploads. */
   filesSlot?: React.ReactNode;
+  /**
+   * Filled in with a live handle on the notebook, so the page (and through it
+   * the assistant) can read and rewrite cells whichever editor is mounted.
+   */
+  notebookRef?: React.RefObject<NotebookEditorHandle | null>;
 }
 
 export function CustomSourceConfig({
@@ -87,6 +92,7 @@ export function CustomSourceConfig({
   onChange,
   disabled = false,
   filesSlot,
+  notebookRef,
 }: CustomSourceConfigProps) {
   const { t } = useTranslation();
   // Local folders are paths on the machine running the app. There is no such
@@ -97,14 +103,6 @@ export function CustomSourceConfig({
 
   const patch = (changes: Partial<CustomSourceDraft>) =>
     onChange({ ...draft, ...changes });
-
-  // What the AI helper is shown. Secret *names* only — the browser is never
-  // sent the values, so there is nothing here to leak even by accident.
-  const ai = {
-    packages: draft.packages,
-    variables: entriesToRecord(draft.variables),
-    secretKeys: draft.secrets.map((entry) => entry.key).filter(Boolean),
-  };
 
   return (
     <div className="space-y-6">
@@ -189,7 +187,7 @@ export function CustomSourceConfig({
               cells={draft.cells}
               revision={draft.revision}
               disabled={disabled}
-              ai={ai}
+              handleRef={notebookRef}
               onSaved={(revision) => patch({ revision })}
               onCellsChange={(cells) => patch({ cells })}
             />
@@ -199,7 +197,7 @@ export function CustomSourceConfig({
             <DraftNotebook
               cells={draft.cells}
               disabled={disabled}
-              ai={ai}
+              handleRef={notebookRef}
               onChange={(cells) => patch({ cells })}
             />
           )}
@@ -220,15 +218,28 @@ export function CustomSourceConfig({
 function DraftNotebook({
   cells,
   disabled,
-  ai,
+  handleRef,
   onChange,
 }: {
   cells: NotebookCell[];
   disabled: boolean;
-  ai: NotebookAiConfig;
+  handleRef?: React.RefObject<NotebookEditorHandle | null>;
   onChange: (cells: NotebookCell[]) => void;
 }) {
   const { t } = useTranslation();
+  const cellsRef = React.useRef(cells);
+  cellsRef.current = cells;
+
+  // Same handle the saved editor installs, so a caller never has to know which
+  // of the two is on screen.
+  React.useEffect(() => {
+    if (!handleRef) return;
+    handleRef.current = { getCells: () => cellsRef.current, setCells: onChange };
+    return () => {
+      handleRef.current = null;
+    };
+  }, [handleRef, onChange]);
+
   return (
     <div className="space-y-3" data-testid="notebook-draft">
       <p className="text-xs text-muted-foreground">{t("notebook.draftNote")}</p>
@@ -237,7 +248,6 @@ function DraftNotebook({
         cells={cells}
         onChange={onChange}
         disabled={disabled}
-        ai={ai}
       />
     </div>
   );

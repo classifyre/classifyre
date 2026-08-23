@@ -734,7 +734,8 @@
       "incompleteSettings": "Source settings are incomplete. Please fix validation errors and try again.",
       "detectorsSaved": "Detector settings saved",
       "setupAssistant": "Source Setup Assistant",
-      "editAssistant": "Source Edit Assistant"
+      "editAssistant": "Source Edit Assistant",
+      "notebookUpdated": "The assistant updated the notebook"
     },
     "testConnection": {
       "titleTesting": "Testing Connection",
@@ -3791,20 +3792,6 @@
       "button": "Templates",
       "hint": "Adds the template's cells below your own. Nothing is replaced.",
       "failed": "Templates could not be loaded."
-    },
-    "ai": {
-      "title": "Ask AI",
-      "placeholder": "Ask about this cell, or describe what it should do…",
-      "placeholderHint": "It can see the whole notebook, your packages, your variables and the names of your secrets. Ask it to write the cell, or ask why something fails.",
-      "send": "Send",
-      "thinking": "Thinking…",
-      "updatedCell": "Updated the cell.",
-      "cellUpdated": "This cell was changed",
-      "undo": "Undo",
-      "failed": "The AI provider could not be reached.",
-      "notConfigured": "AI is not configured on this instance.",
-      "providerError": "The configured AI provider is not responding.",
-      "configureHint": "Set one up in Harness → Configuration."
     }
   }
 }

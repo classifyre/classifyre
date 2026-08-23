@@ -16,7 +16,7 @@ import { Card, CardContent } from "@workspace/ui/components/card";
 import { cn } from "@workspace/ui/lib/utils";
 import { useTranslation } from "@/hooks/use-translation";
 import { extractApiErrorMessage } from "@/lib/extract-api-error-message";
-import { CellList, type NotebookAiConfig } from "./cell-list";
+import { CellList } from "./cell-list";
 import type { CellStatus } from "./code-cell";
 import type { CellOutputValue } from "./cell-output";
 import type { NotebookCell } from "@/lib/notebook-cells";
@@ -30,8 +30,13 @@ export interface NotebookEditorProps {
   cells: NotebookCell[];
   revision: number;
   disabled?: boolean;
-  /** What the AI helper may see. Omit to hide the AI control entirely. */
-  ai?: NotebookAiConfig;
+  /**
+   * Lets the page reach the notebook the editor owns — the assistant applies
+   * its cell edits through this. Kept imperative because the editor is the
+   * source of truth for a saved notebook (it autosaves and tracks revisions),
+   * so lifting the cells into a parent would mean two owners of one thing.
+   */
+  handleRef?: React.RefObject<NotebookEditorHandle | null>;
   /** Called after a successful save so the container can track the revision. */
   onSaved?: (revision: number) => void;
   onCellsChange?: (cells: NotebookCell[]) => void;
@@ -39,12 +44,18 @@ export interface NotebookEditorProps {
 
 const AUTOSAVE_DELAY_MS = 1500;
 
+/** The notebook, for callers that live outside the editor. */
+export interface NotebookEditorHandle {
+  getCells: () => NotebookCell[];
+  setCells: (cells: NotebookCell[]) => void;
+}
+
 export function NotebookEditor({
   sourceId,
   cells: initialCells,
   revision: initialRevision,
   disabled = false,
-  ai,
+  handleRef,
   onSaved,
   onCellsChange,
 }: NotebookEditorProps) {
@@ -74,6 +85,17 @@ export function NotebookEditor({
     },
     [onCellsChange],
   );
+
+  React.useEffect(() => {
+    if (!handleRef) return;
+    handleRef.current = {
+      getCells: () => cellsRef.current,
+      setCells: mutate,
+    };
+    return () => {
+      handleRef.current = null;
+    };
+  }, [handleRef, mutate]);
 
   /**
    * Persist the notebook.
@@ -398,7 +420,6 @@ export function NotebookEditor({
         onChange={mutate}
         disabled={disabled}
         onSave={() => void save()}
-        ai={ai}
         onRunCell={(cellId) => void runMode("cell", cellId)}
         runState={(cellId) => ({
           status: cellStatus(cellId),

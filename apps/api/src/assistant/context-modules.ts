@@ -1,5 +1,13 @@
 import type { AssistantContextKey } from '@workspace/schemas/assistant';
 
+/** The UI actions a model is ever allowed to emit itself. */
+export type AssistantEmittableAction =
+  | 'patch_fields'
+  | 'navigate'
+  | 'show_toast'
+  | 'notebook_edit'
+  | 'set_detectors';
+
 /**
  * Server-side definition of one assistant context ("module"). A module scopes
  * the agent loop to a page domain: which MCP tools are its FOCUS, which UI
@@ -16,7 +24,7 @@ export interface AssistantContextModule {
   /** MCP tool names to foreground for this page (rendered with full schemas). */
   tools: string[];
   /** UI action types the model may emit for this context. */
-  uiActions: Array<'patch_fields' | 'navigate' | 'show_toast'>;
+  uiActions: AssistantEmittableAction[];
   /** Extra domain knowledge appended to the system prompt. */
   knowledge?: string;
 }
@@ -69,6 +77,45 @@ const DETECTOR_KNOWLEDGE = [
   'ALWAYS call validate_detector_config on the pipeline schema before proposing create/update.',
   'After creating a detector, proactively add at least one positive and one negative test scenario (create_detector_test_scenario) and run run_detector_tests.',
   'Expected outcome format for scenarios: RULESET {"shouldMatch":true|false}; CLASSIFIER {"label":"advice","minConfidence":0.6}; ENTITY {"entities":[{"label":"PersonName","text":"Ostap"}]}. Labels compare case-insensitively with underscores treated as spaces. Re-run a single scenario via run_detector_tests scenario_ids to avoid paying for a full re-run.',
+].join('\n');
+
+const CUSTOM_NOTEBOOK_KNOWLEDGE = [
+  '## CUSTOM source = a Python notebook connector',
+  'This source type has no config form to fill in: its behaviour IS the notebook. Your main job on this page is writing that notebook.',
+  '',
+  'How the notebook runs:',
+  '  - Cells run top to bottom in a FRESH process on every run. There is no persistent kernel.',
+  '  - The notebook MUST define test_connection() and extract() at the TOP LEVEL of a code cell.',
+  '  - extract() yields Asset(...) objects; yield as you go rather than building a list.',
+  '  - discover() and fetch_content() are optional.',
+  '  - Cells must be valid standard Python. IPython magics (%time, !pip install) are rejected.',
+  '  - Packages are declared in the packages table (patch path optional.packages), never installed from a cell.',
+  '  - Configuration is read with ctx.var("name") (plain values) and ctx.secret("name") (encrypted). NEVER hard-code a credential, and never invent a variable that is not configured.',
+  '',
+  '## Editing the notebook — uiAction "notebook_edit"',
+  '  {"type":"notebook_edit","summary":"what you changed","operations":[',
+  '     {"op":"set_cell","cellId":"extract","source":"<COMPLETE new source for that cell>"},',
+  '     {"op":"insert_cell","cellType":"code|markdown","source":"...","afterCellId":"imports"},',
+  '     {"op":"delete_cell","cellId":"scratch"}]}',
+  'Rules:',
+  '  - set_cell REPLACES the cell entirely. Always send the complete cell source, never a fragment or a diff.',
+  '  - Only touch the cells you actually need to change. Leave the rest alone.',
+  '  - afterCellId omitted (or null) appends the new cell at the end.',
+  '  - When the user asks for "the whole connector", emit several operations in ONE notebook_edit.',
+  '  - Documentation belongs in markdown cells: when you write or substantially rewrite code, add or update a short markdown cell above it explaining what it does and what must be configured.',
+  '  - A notebook_edit applies immediately in the editor; it is a local change, not a save. Do not claim the source was saved.',
+  '',
+  '## Non-notebook parts of this page',
+  '  Packages, variables and secret NAMES are patched with patch_fields on these exact paths:',
+  '    optional.packages    — [{"name":"httpx","version":">=0.27"}]',
+  '    optional.variables   — {"api_base":"https://api.example.com"}',
+  '    masked.secrets       — {"api_token":"<only from explicit user input>"}',
+  '  Detectors are NOT in the form schema. Change them with:',
+  '    {"type":"set_detectors","detectors":[{"type":"PII","enabled":true,"config":{}}]}',
+  '  This REPLACES the whole selection, so include every detector that should stay enabled. Read the current selection from context metadata "detectors" and the catalogue from metadata "availableDetectors".',
+  '',
+  '## The @ references in the user message',
+  'The user can point at things with @cell:<id-or-number>, @file:<name> and @detector:<name>. Anything they referenced is expanded verbatim under "## Referenced by the user" — treat that as the exact thing they mean.',
 ].join('\n');
 
 const SOURCE_KNOWLEDGE = [
@@ -129,7 +176,13 @@ export const assistantContextModules: Record<
       'search_sources',
       'list_custom_detectors',
     ],
-    uiActions: ['patch_fields', 'navigate', 'show_toast'],
+    uiActions: [
+      'patch_fields',
+      'navigate',
+      'show_toast',
+      'notebook_edit',
+      'set_detectors',
+    ],
     knowledge: SOURCE_KNOWLEDGE,
   },
   'source.edit': {
@@ -144,7 +197,13 @@ export const assistantContextModules: Record<
       'get_run_logs',
       'list_custom_detectors',
     ],
-    uiActions: ['patch_fields', 'navigate', 'show_toast'],
+    uiActions: [
+      'patch_fields',
+      'navigate',
+      'show_toast',
+      'notebook_edit',
+      'set_detectors',
+    ],
     knowledge: SOURCE_KNOWLEDGE,
   },
   'detector.create': {
@@ -287,12 +346,27 @@ export const assistantContextModules: Record<
   },
 };
 
-/** Domain knowledge plus the navigation map (which helps in every context). */
-export function contextKnowledge(key: AssistantContextKey): string {
+/**
+ * Domain knowledge plus the navigation map (which helps in every context).
+ *
+ * `sourceType` is the page's selected source type where there is one. A CUSTOM
+ * source has no config form to speak of -- it is a Python notebook -- so that
+ * page gets a whole extra body of knowledge that would be noise anywhere else.
+ */
+export function contextKnowledge(
+  key: AssistantContextKey,
+  sourceType?: string | null,
+): string {
   const module = assistantContextModules[key];
   const parts =
     module.knowledge === NAVIGATION_MAP
       ? [NAVIGATION_MAP]
       : [module.knowledge, NAVIGATION_MAP];
+  if (
+    (key === 'source.create' || key === 'source.edit') &&
+    sourceType === 'CUSTOM'
+  ) {
+    parts.unshift(CUSTOM_NOTEBOOK_KNOWLEDGE);
+  }
   return parts.filter(Boolean).join('\n\n');
 }

@@ -10,7 +10,11 @@ import {
   type AssistantUiAction,
   type StartRunnerDto,
 } from "@workspace/api-client";
-import { useRegisterAssistantBridge } from "@/components/assistant-workflow-provider";
+import {
+  useRegisterAssistantBridge,
+  type AssistantPageBridge,
+} from "@/components/assistant-workflow-provider";
+import { buildSourceMentions } from "@/lib/assistant-source-mentions";
 import { getSourceLabel } from "@workspace/schemas/source-labels";
 import { SourceTypeSelector } from "@/components/source-type-selector";
 import {
@@ -434,14 +438,54 @@ export default function NewSourcePage() {
     ? getSourceExamples(selectedSourceType)
     : [];
 
-  const assistantBridge = useMemo(() => {
+  const assistantBridge = useMemo<AssistantPageBridge | null>(() => {
     if (!selectedSourceType || showExamples) {
       return null;
+    }
+
+    // Only CUSTOM sources get an assistant. Every other type is a form the
+    // schema already explains better than a chat window can, and one offered on
+    // all of them was noise on the ones that did not need it. A registered
+    // bridge that cannot open is what turns it off here — returning no bridge
+    // would instead fall back to the global assistant.
+    if (selectedSourceType !== "CUSTOM") {
+      return {
+        contextKey: "source.create" as const,
+        canOpen: false,
+        getContext: () => ({
+          key: "source.create" as const,
+          route: "/sources/new",
+          title: t("sources.new.setupAssistant"),
+          entityId: null,
+          values: {},
+          schema: null,
+          validation: { isValid: true, missingFields: [], errors: [] },
+          metadata: { sourceType: selectedSourceType },
+        }),
+        applyAction: () => undefined,
+      };
     }
 
     return {
       contextKey: "source.create" as const,
       canOpen: true,
+      getMentions: () =>
+        buildSourceMentions({
+          cells: sourceFormRef.current?.getNotebookContext()?.cells ?? null,
+          files: [
+            ...uploadedFiles.map((file) => ({
+              name: file.fileName,
+              detail: "uploaded",
+            })),
+            ...pendingFiles.map((file) => ({
+              name: file.name,
+              detail: "pending upload — saved with the source",
+            })),
+          ],
+          localFolders:
+            sourceFormRef.current?.getNotebookContext()?.localFolders ?? [],
+          detectors,
+        }),
       getContext: async () => {
         const formValues = sourceFormRef.current?.getValues() ?? {
           type: selectedSourceType,
@@ -468,6 +512,11 @@ export default function NewSourcePage() {
             schedule,
             detectors: normalizeDetectors(detectors),
             customDetectorIds: selectedCustomDetectorIds,
+            notebookConfig: sourceFormRef.current?.getNotebookContext() ?? null,
+            attachedFiles: [
+              ...uploadedFiles.map((file) => file.fileName),
+              ...pendingFiles.map((file) => file.name),
+            ],
           },
         };
       },
@@ -499,6 +548,32 @@ export default function NewSourcePage() {
           return;
         }
 
+        if (action.type === "notebook_edit") {
+          const touched = sourceFormRef.current?.applyNotebookOperations(
+            action.operations,
+          );
+          if (touched && touched.length > 0) {
+            toast.success(t("sources.new.notebookUpdated"), {
+              description: action.summary ?? touched.join(", "),
+            });
+          }
+          return;
+        }
+
+        if (action.type === "set_detectors") {
+          const next = action.detectors.map((detector) => ({
+            type: detector.type,
+            enabled: detector.enabled ?? true,
+            config: detector.config ?? {},
+          }));
+          // Both, on purpose: the selection the page submits AND the defaults
+          // the detector card seeds itself from. Setting only the first leaves
+          // every switch showing the old answer.
+          setDetectors(next);
+          setDetectorDefaults(next);
+          return;
+        }
+
         if (action.type === "sync_source") {
           await sourceFormRef.current?.applyPatches(
             flattenObjectToPatches(action.values),
@@ -517,12 +592,14 @@ export default function NewSourcePage() {
     };
   }, [
     detectors,
+    pendingFiles,
     schedule,
     selectedCustomDetectorIds,
     selectedSourceType,
     showExamples,
     sourceId,
     t,
+    uploadedFiles,
   ]);
 
   useRegisterAssistantBridge(assistantBridge);

@@ -734,7 +734,8 @@
       "incompleteSettings": "Quelleinstellungen sind unvollständig. Bitte Validierungsfehler beheben.",
       "detectorsSaved": "Detector-Einstellungen gespeichert",
       "setupAssistant": "Quellen-Einrichtungsassistent",
-      "editAssistant": "Quellen-Bearbeitungsassistent"
+      "editAssistant": "Quellen-Bearbeitungsassistent",
+      "notebookUpdated": "Der Assistent hat das Notebook aktualisiert"
     },
     "testConnection": {
       "titleTesting": "Verbindung testen",
@@ -3791,20 +3792,6 @@
       "button": "Vorlagen",
       "hint": "Fügt die Zellen der Vorlage unter Ihren eigenen ein. Nichts wird ersetzt.",
       "failed": "Vorlagen konnten nicht geladen werden."
-    },
-    "ai": {
-      "title": "KI fragen",
-      "placeholder": "Fragen Sie zu dieser Zelle oder beschreiben Sie, was sie tun soll…",
-      "placeholderHint": "Sie sieht das gesamte Notebook, Ihre Pakete, Ihre Variablen und die Namen Ihrer Geheimnisse. Bitten Sie sie, die Zelle zu schreiben, oder fragen Sie, warum etwas fehlschlägt.",
-      "send": "Senden",
-      "thinking": "Denkt nach…",
-      "updatedCell": "Zelle aktualisiert.",
-      "cellUpdated": "Diese Zelle wurde geändert",
-      "undo": "Rückgängig",
-      "failed": "Der KI-Anbieter konnte nicht erreicht werden.",
-      "notConfigured": "KI ist auf dieser Instanz nicht konfiguriert.",
-      "providerError": "Der konfigurierte KI-Anbieter antwortet nicht.",
-      "configureHint": "Richten Sie einen unter Harness → Konfiguration ein."
     }
   }
 }

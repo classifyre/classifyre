@@ -11,7 +11,11 @@ import {
   CardHeader,
   CardTitle,
 } from "@workspace/ui/components/card";
-import { useRegisterAssistantBridge } from "@/components/assistant-workflow-provider";
+import {
+  useRegisterAssistantBridge,
+  type AssistantPageBridge,
+} from "@/components/assistant-workflow-provider";
+import { buildSourceMentions } from "@/lib/assistant-source-mentions";
 import {
   SourceForm,
   type SourceFormHandle,
@@ -192,7 +196,7 @@ export default function EditSourcePage() {
     };
   }, [source?.config, source?.name, source?.description]);
 
-  const defaultDetectors = useMemo(() => {
+  const configuredDetectors = useMemo(() => {
     const configDetectors = (source?.config as { detectors?: unknown })
       ?.detectors;
     if (!Array.isArray(configDetectors)) {
@@ -205,9 +209,17 @@ export default function EditSourcePage() {
     }));
   }, [source?.config]);
 
+  // What the detector card seeds its switches from. It starts as whatever the
+  // source was saved with, but the assistant can replace it -- which is why it
+  // is state here rather than the memo it is derived from.
+  const [defaultDetectors, setDetectorDefaults] = useState<
+    DetectorConfigInput[]
+  >([]);
+
   useEffect(() => {
-    setDetectors(defaultDetectors);
-  }, [defaultDetectors]);
+    setDetectors(configuredDetectors);
+    setDetectorDefaults(configuredDetectors);
+  }, [configuredDetectors]);
 
   useEffect(() => {
     const configured = (source?.config as { custom_detectors?: unknown })
@@ -223,14 +235,53 @@ export default function EditSourcePage() {
     );
   }, [source?.config]);
 
-  const assistantBridge = useMemo(() => {
+  const assistantBridge = useMemo<AssistantPageBridge | null>(() => {
     if (!source) {
       return null;
+    }
+
+    // CUSTOM only, for the same reason as the create page: the assistant is
+    // here to write the notebook, and no other source type has one. Registered
+    // but closed rather than absent -- with no bridge at all the global
+    // assistant would take over the page.
+    if (source.type !== "CUSTOM") {
+      return {
+        contextKey: "source.edit" as const,
+        canOpen: false,
+        getContext: () => ({
+          key: "source.edit" as const,
+          route: `/sources/${sourceId}/edit`,
+          title: t("sources.new.editAssistant"),
+          entityId: source.id,
+          values: {},
+          schema: null,
+          validation: { isValid: true, missingFields: [], errors: [] },
+          metadata: { sourceType: source.type },
+        }),
+        applyAction: () => undefined,
+      };
     }
 
     return {
       contextKey: "source.edit" as const,
       canOpen: true,
+      getMentions: () =>
+        buildSourceMentions({
+          cells: sourceFormRef.current?.getNotebookContext()?.cells ?? null,
+          files: [
+            ...uploadedFiles.map((file) => ({
+              name: file.fileName,
+              detail: "uploaded",
+            })),
+            ...pendingFiles.map((file) => ({
+              name: file.name,
+              detail: "pending upload — saved with the source",
+            })),
+          ],
+          localFolders:
+            sourceFormRef.current?.getNotebookContext()?.localFolders ?? [],
+          detectors,
+        }),
       getContext: async () => {
         const formValues = sourceFormRef.current?.getValues() ?? formDefaults;
         const validation = (await sourceFormRef.current?.validate()) ?? {
@@ -255,6 +306,11 @@ export default function EditSourcePage() {
             schedule,
             detectors: normalizeDetectors(detectors),
             customDetectorIds: selectedCustomDetectorIds,
+            notebookConfig: sourceFormRef.current?.getNotebookContext() ?? null,
+            attachedFiles: [
+              ...uploadedFiles.map((file) => file.fileName),
+              ...pendingFiles.map((file) => file.name),
+            ],
           },
         };
       },
@@ -283,6 +339,32 @@ export default function EditSourcePage() {
               }, current),
             );
           }
+          return;
+        }
+
+        if (action.type === "notebook_edit") {
+          const touched = sourceFormRef.current?.applyNotebookOperations(
+            action.operations,
+          );
+          if (touched && touched.length > 0) {
+            toast.success(t("sources.new.notebookUpdated"), {
+              description: action.summary ?? touched.join(", "),
+            });
+          }
+          return;
+        }
+
+        if (action.type === "set_detectors") {
+          const next = action.detectors.map((detector) => ({
+            type: detector.type,
+            enabled: detector.enabled ?? true,
+            config: detector.config ?? {},
+          }));
+          // Both, on purpose: the selection the page submits AND the defaults
+          // the detector card seeds itself from. Setting only the first leaves
+          // every switch showing the old answer.
+          setDetectors(next);
+          setDetectorDefaults(next);
           return;
         }
 
@@ -317,10 +399,13 @@ export default function EditSourcePage() {
   }, [
     detectors,
     formDefaults,
+    pendingFiles,
     schedule,
     selectedCustomDetectorIds,
     source,
     sourceId,
+    t,
+    uploadedFiles,
   ]);
 
   useRegisterAssistantBridge(assistantBridge);

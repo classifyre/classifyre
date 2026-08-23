@@ -17,11 +17,9 @@ import {
   type NotebookCell,
 } from "@/lib/notebook-cells";
 import { CodeCell, type CellStatus } from "./code-cell";
-import { CellAiAssistant, CellAiButton } from "./cell-ai-assistant";
 import { MarkdownCell } from "./markdown-cell";
 import { TemplatePicker } from "./template-picker";
 import type { CellOutputValue } from "./cell-output";
-import type { NotebookPackage } from "@/lib/notebook-packages";
 
 export interface CellRunState {
   status: CellStatus;
@@ -36,13 +34,6 @@ export interface CellRunState {
   blamed?: boolean;
 }
 
-/** What the AI helper is allowed to see. Values for variables, names only for secrets. */
-export interface NotebookAiConfig {
-  packages: NotebookPackage[];
-  variables: Record<string, string>;
-  secretKeys: string[];
-}
-
 export interface CellListProps {
   notebookId: string;
   cells: NotebookCell[];
@@ -52,8 +43,6 @@ export interface CellListProps {
   /** Absent while drafting: there is no stored revision to execute yet. */
   onRunCell?: (cellId: string) => void;
   runState?: (cellId: string) => CellRunState;
-  /** Omitted where there is nothing to give the model — the button then hides. */
-  ai?: NotebookAiConfig;
 }
 
 const IDLE: CellRunState = { status: "idle", outputs: [] };
@@ -76,14 +65,10 @@ export function CellList({
   onSave,
   onRunCell,
   runState,
-  ai,
 }: CellListProps) {
   const { t } = useTranslation();
   const locked = React.useMemo(() => protectedCellIds(cells), [cells]);
   const noop = React.useCallback(() => undefined, []);
-  // One cell's assistant open at a time: two panels arguing about the same
-  // notebook is confusing, and the panel is tall.
-  const [aiCellId, setAiCellId] = React.useState<string | null>(null);
 
   return (
     <div className="space-y-3" data-testid="notebook-cells">
@@ -112,16 +97,6 @@ export function CellList({
           onAddCodeBelow: () => onChange(addCell(cells, "code", index)),
           onAddMarkdownBelow: () => onChange(addCell(cells, "markdown", index)),
           onSave: onSave ?? noop,
-          toolbarFooter: ai ? (
-            <CellAiButton
-              cellId={cell.id}
-              open={aiCellId === cell.id}
-              disabled={disabled}
-              onToggle={() =>
-                setAiCellId((current) => (current === cell.id ? null : cell.id))
-              }
-            />
-          ) : undefined,
         };
 
         const state = runState?.(cell.id) ?? IDLE;
@@ -141,26 +116,6 @@ export function CellList({
                 blamed={state.blamed}
                 runnable={Boolean(onRunCell)}
                 onRun={() => onRunCell?.(cell.id)}
-              />
-            )}
-
-            {ai && aiCellId === cell.id && (
-              <CellAiAssistant
-                context={{
-                  cells,
-                  targetCellId: cell.id,
-                  packages: ai.packages,
-                  variables: ai.variables,
-                  secretKeys: ai.secretKeys,
-                }}
-                disabled={disabled}
-                onApplyCode={(source) =>
-                  onChange(updateCellSource(cells, cell.id, source))
-                }
-                onUndo={(source) =>
-                  onChange(updateCellSource(cells, cell.id, source))
-                }
-                onClose={() => setAiCellId(null)}
               />
             )}
           </div>

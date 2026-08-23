@@ -60,6 +60,36 @@ jest.mock('@workspace/schemas/assistant', () => {
       values: z.record(z.string(), z.unknown()),
     }),
     z.object({
+      type: z.literal('notebook_edit'),
+      operations: z.array(
+        z.discriminatedUnion('op', [
+          z.object({
+            op: z.literal('set_cell'),
+            cellId: z.string(),
+            source: z.string(),
+          }),
+          z.object({
+            op: z.literal('insert_cell'),
+            cellType: z.enum(['code', 'markdown']).default('code'),
+            source: z.string().default(''),
+            afterCellId: z.string().nullable().optional(),
+          }),
+          z.object({ op: z.literal('delete_cell'), cellId: z.string() }),
+        ]),
+      ),
+      summary: z.string().optional(),
+    }),
+    z.object({
+      type: z.literal('set_detectors'),
+      detectors: z.array(
+        z.object({
+          type: z.string(),
+          enabled: z.boolean().default(true),
+          config: z.record(z.string(), z.unknown()).optional(),
+        }),
+      ),
+    }),
+    z.object({
       type: z.literal('attach_result'),
       kind: z.enum(['source_test', 'detector_train', 'operation']),
       title: z.string(),
@@ -340,6 +370,141 @@ describe('AssistantService', () => {
     expect(response.actions).toEqual([
       expect.objectContaining({ type: 'patch_fields' }),
     ]);
+  });
+
+  it('passes a notebook edit through and narrates it when the model wrote no prose', async () => {
+    // The model spends its output budget on the code, so a turn that rewrites
+    // four cells and says nothing is the common case. "Done" would hide it.
+    completeJson.mockResolvedValueOnce({
+      content: {
+        uiActions: [
+          {
+            type: 'notebook_edit',
+            summary: 'Wrote the REST connector',
+            operations: [
+              {
+                op: 'set_cell',
+                cellId: 'extract',
+                source: 'def extract():\n    yield',
+              },
+              {
+                op: 'insert_cell',
+                cellType: 'markdown',
+                source: '## What this does',
+                afterCellId: 'extract',
+              },
+            ],
+          },
+        ],
+        proposeOperation: null,
+      },
+      raw: '{}',
+    });
+
+    const response = await service.respond({
+      messages: [{ role: 'user', content: 'write the connector' }],
+      context: {
+        ...baseContext,
+        values: { type: 'CUSTOM' },
+        metadata: { sourceType: 'CUSTOM' },
+      },
+    });
+
+    expect(response.actions).toEqual([
+      expect.objectContaining({ type: 'notebook_edit' }),
+    ]);
+    expect(response.reply).toContain('Wrote the REST connector');
+    expect(response.reply).toContain('rewrote 1 cell(s)');
+    expect(response.reply).toContain('added 1 cell(s)');
+  });
+
+  it('drops a notebook edit in a context that cannot apply one', async () => {
+    completeJson.mockResolvedValueOnce({
+      content: {
+        reply: 'Here you go.',
+        uiActions: [
+          {
+            type: 'notebook_edit',
+            operations: [{ op: 'delete_cell', cellId: 'extract' }],
+          },
+        ],
+        proposeOperation: null,
+      },
+      raw: '{}',
+    });
+
+    const response = await service.respond({
+      messages: [{ role: 'user', content: 'delete it' }],
+      context: { ...baseContext, key: 'case.manage' as const },
+    });
+
+    expect(response.actions).toEqual([]);
+  });
+
+  it('renders the notebook and the @ references as their own prompt sections', async () => {
+    completeJson.mockResolvedValueOnce({
+      content: { reply: 'ok', uiActions: [], proposeOperation: null },
+      raw: '{}',
+    });
+
+    await service.respond({
+      messages: [{ role: 'user', content: 'rewrite @cell:2' }],
+      context: {
+        ...baseContext,
+        values: {
+          type: 'CUSTOM',
+          required: {
+            notebook: {
+              revision: 3,
+              cells: [
+                { id: 'imports', type: 'code', source: 'import httpx' },
+                { id: 'extract', type: 'code', source: 'def extract():' },
+              ],
+            },
+          },
+        },
+        metadata: {
+          sourceType: 'CUSTOM',
+          mentions: [
+            { token: '@cell:2', label: 'extract', body: 'def extract():' },
+          ],
+        },
+      },
+    });
+
+    const [messages] = completeJson.mock.calls[0] as [
+      Array<{ role: string; content: string }>,
+    ];
+    const system = messages[0].content;
+    const user = messages[1].content;
+
+    // The notebook contract only belongs on a CUSTOM page.
+    expect(system).toContain('CUSTOM source = a Python notebook connector');
+    expect(system).toContain('notebook_edit');
+    // Cells are pulled out of the truncated value dump and addressed by id.
+    expect(user).toContain('The notebook right now (revision 3, 2 cell(s))');
+    expect(user).toContain('id="extract"');
+    expect(user).toContain('Referenced by the user');
+    expect(user).toContain('@cell:2');
+  });
+
+  it('leaves the notebook contract out of a non-CUSTOM source page', async () => {
+    completeJson.mockResolvedValueOnce({
+      content: { reply: 'ok', uiActions: [], proposeOperation: null },
+      raw: '{}',
+    });
+
+    await service.respond({
+      messages: [{ role: 'user', content: 'hello' }],
+      context: { ...baseContext, metadata: { sourceType: 'JIRA' } },
+    });
+
+    const [messages] = completeJson.mock.calls[0] as [
+      Array<{ role: string; content: string }>,
+    ];
+    expect(messages[0].content).not.toContain(
+      'CUSTOM source = a Python notebook connector',
+    );
   });
 
   it('executes a confirmed operation and appends server-built sync actions', async () => {

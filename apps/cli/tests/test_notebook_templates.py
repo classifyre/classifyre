@@ -103,9 +103,7 @@ def test_the_file_parser_template_reads_any_format(
 ) -> None:
     def fake_download(_session, _api_url, _source_id, destination: Path) -> int:
         destination.mkdir(parents=True, exist_ok=True)
-        (destination / "record.json").write_text(
-            json.dumps({"customer": "ACME"}), encoding="utf-8"
-        )
+        (destination / "record.json").write_text(json.dumps({"customer": "ACME"}), encoding="utf-8")
         (destination / "notes.txt").write_text("plain notes", encoding="utf-8")
         return 2
 
