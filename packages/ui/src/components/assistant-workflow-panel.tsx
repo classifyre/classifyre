@@ -1,7 +1,14 @@
 "use client";
 
 import * as React from "react";
-import { Bot, Loader2, Send, Upload, X } from "lucide-react";
+import {
+  Bot,
+  Loader2,
+  MessageSquarePlus,
+  Send,
+  Upload,
+  X,
+} from "lucide-react";
 
 import { cn } from "../lib/utils";
 import { Badge } from "./badge";
@@ -37,6 +44,73 @@ export type AssistantPanelUploadedFile = {
   label: string;
 };
 
+/**
+ * One thing the user can point the assistant at with "@".
+ *
+ * `token` is what gets inserted into the message ("@cell:2"); `group` only
+ * drives the heading the option is listed under. The panel does not know what
+ * a cell or a detector is — the page that owns them supplies these.
+ */
+export type AssistantPanelMention = {
+  token: string;
+  label: string;
+  hint?: string;
+  group: string;
+};
+
+export type AssistantPanelThread = {
+  id: string;
+  title: string;
+};
+
+/** How far back from the caret a mention token may start. */
+const MENTION_MAX_LENGTH = 64;
+
+/**
+ * The "@..." the caret currently sits inside, or null.
+ *
+ * A mention starts at an "@" that follows the start of the text or whitespace,
+ * and runs to the caret with no whitespace in between — so "email @ me" and a
+ * finished "@cell:2 now" both close the menu, while "@cel" keeps it open.
+ */
+export function activeMentionQuery(
+  value: string,
+  caret: number,
+): { start: number; query: string } | null {
+  const from = Math.max(0, caret - MENTION_MAX_LENGTH);
+  const slice = value.slice(from, caret);
+  const at = slice.lastIndexOf("@");
+  if (at === -1) {
+    return null;
+  }
+  const start = from + at;
+  const before = start === 0 ? "" : value[start - 1];
+  if (before && !/\s/.test(before)) {
+    return null;
+  }
+  const query = value.slice(start + 1, caret);
+  if (/\s/.test(query)) {
+    return null;
+  }
+  return { start, query };
+}
+
+/** Mentions matching what has been typed after the "@", best-effort substring. */
+export function filterMentions(
+  mentions: readonly AssistantPanelMention[],
+  query: string,
+): AssistantPanelMention[] {
+  const needle = query.trim().toLowerCase();
+  if (!needle) {
+    return mentions.slice(0, 40);
+  }
+  return mentions
+    .filter((mention) =>
+      `${mention.token} ${mention.label}`.toLowerCase().includes(needle),
+    )
+    .slice(0, 40);
+}
+
 type AssistantWorkflowPanelProps = {
   title: string;
   subtitle?: string;
@@ -59,6 +133,13 @@ type AssistantWorkflowPanelProps = {
   onClose?: () => void;
   className?: string;
   headerClassName?: string;
+  /** Things the user can reference with "@". Omit to disable the menu. */
+  mentions?: readonly AssistantPanelMention[];
+  /** Past conversations in this context. Omit to hide the thread controls. */
+  threads?: readonly AssistantPanelThread[];
+  activeThreadId?: string | null;
+  onNewThread?: () => void;
+  onSelectThread?: (id: string) => void;
 };
 
 export function AssistantWorkflowPanel({
@@ -83,8 +164,55 @@ export function AssistantWorkflowPanel({
   onClose,
   className,
   headerClassName,
+  mentions,
+  threads,
+  activeThreadId = null,
+  onNewThread,
+  onSelectThread,
 }: AssistantWorkflowPanelProps) {
   const messagesScrollRef = React.useRef<HTMLDivElement | null>(null);
+  const inputRef = React.useRef<HTMLTextAreaElement | null>(null);
+  const [caret, setCaret] = React.useState(0);
+  const [mentionOpen, setMentionOpen] = React.useState(false);
+  const [highlighted, setHighlighted] = React.useState(0);
+  const [threadsOpen, setThreadsOpen] = React.useState(false);
+
+  const mentionQuery =
+    mentions && mentions.length > 0 && mentionOpen
+      ? activeMentionQuery(input, caret)
+      : null;
+  const mentionMatches = React.useMemo(
+    () => (mentionQuery ? filterMentions(mentions ?? [], mentionQuery.query) : []),
+    [mentionQuery, mentions],
+  );
+  const mentionActive = mentionMatches.length > 0;
+
+  React.useEffect(() => {
+    setHighlighted(0);
+  }, [mentionQuery?.query]);
+
+  /** Swap the "@..." under the caret for the chosen token, then keep typing. */
+  const insertMention = React.useCallback(
+    (mention: AssistantPanelMention) => {
+      if (!mentionQuery) {
+        return;
+      }
+      const next = `${input.slice(0, mentionQuery.start)}${mention.token} ${input.slice(caret)}`;
+      const nextCaret = mentionQuery.start + mention.token.length + 1;
+      onInputChange(next);
+      setMentionOpen(false);
+      requestAnimationFrame(() => {
+        const element = inputRef.current;
+        if (!element) {
+          return;
+        }
+        element.focus();
+        element.setSelectionRange(nextCaret, nextCaret);
+        setCaret(nextCaret);
+      });
+    },
+    [caret, input, mentionQuery, onInputChange],
+  );
 
   React.useEffect(() => {
     const frame = requestAnimationFrame(() => {
@@ -133,20 +261,81 @@ export function AssistantWorkflowPanel({
               </div>
             </div>
           </div>
-          {onClose ? (
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="rounded-[4px] border border-primary-foreground/30 text-primary-foreground hover:bg-primary-foreground/15 hover:text-primary-foreground"
-              onClick={onClose}
-            >
-              <X className="h-4 w-4" />
-              <span className="sr-only">Close assistant</span>
-            </Button>
-          ) : null}
+          <div className="flex shrink-0 items-center gap-1">
+            {onNewThread ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="rounded-[4px] border border-primary-foreground/30 text-primary-foreground hover:bg-primary-foreground/15 hover:text-primary-foreground"
+                onClick={() => {
+                  setThreadsOpen(false);
+                  onNewThread();
+                }}
+                title="New chat"
+                data-testid="assistant-new-thread"
+              >
+                <MessageSquarePlus className="h-4 w-4" />
+                <span className="sr-only">New chat</span>
+              </Button>
+            ) : null}
+            {threads && threads.length > 1 && onSelectThread ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="rounded-[4px] border border-primary-foreground/30 px-2 font-mono text-[10px] uppercase tracking-[0.14em] text-primary-foreground hover:bg-primary-foreground/15 hover:text-primary-foreground"
+                onClick={() => setThreadsOpen((open) => !open)}
+                data-testid="assistant-threads-toggle"
+              >
+                {`Chats (${threads.length})`}
+              </Button>
+            ) : null}
+            {onClose ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="rounded-[4px] border border-primary-foreground/30 text-primary-foreground hover:bg-primary-foreground/15 hover:text-primary-foreground"
+                onClick={onClose}
+              >
+                <X className="h-4 w-4" />
+                <span className="sr-only">Close assistant</span>
+              </Button>
+            ) : null}
+          </div>
         </div>
       </header>
+
+      {threadsOpen && threads && onSelectThread ? (
+        <div
+          className="max-h-40 shrink-0 overflow-y-auto border-b-2 border-border bg-muted/40"
+          data-testid="assistant-thread-list"
+        >
+          {threads.map((thread) => (
+            <button
+              key={thread.id}
+              type="button"
+              onClick={() => {
+                onSelectThread(thread.id);
+                setThreadsOpen(false);
+              }}
+              className={cn(
+                "flex w-full items-center justify-between gap-2 border-b border-border/60 px-4 py-2 text-left text-xs last:border-b-0 hover:bg-accent hover:text-accent-foreground",
+                thread.id === activeThreadId && "bg-accent/60 font-semibold",
+              )}
+              data-testid={`assistant-thread-${thread.id}`}
+            >
+              <span className="truncate">{thread.title}</span>
+              {thread.id === activeThreadId ? (
+                <span className="shrink-0 font-mono text-[9px] uppercase tracking-[0.16em] text-muted-foreground">
+                  current
+                </span>
+              ) : null}
+            </button>
+          ))}
+        </div>
+      ) : null}
 
       <div className="assistant-window-body flex min-h-0 flex-1 flex-col">
         <div
@@ -244,19 +433,102 @@ export function AssistantWorkflowPanel({
 
         <div className="shrink-0 border-t-2 border-border px-4 py-4">
           <div className="space-y-3">
-            <Textarea
-              value={input}
-              onChange={(event) => onInputChange(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" && !event.shiftKey) {
-                  event.preventDefault();
-                  onSend();
+            <div className="relative">
+              {mentionActive && mentionQuery ? (
+                <div
+                  className="absolute bottom-full left-0 z-10 mb-1 max-h-56 w-full overflow-y-auto rounded-[6px] border-2 border-black bg-popover text-popover-foreground shadow-[4px_4px_0_var(--color-border)]"
+                  data-testid="assistant-mention-menu"
+                >
+                  {mentionMatches.map((mention, index) => (
+                    <button
+                      key={mention.token}
+                      type="button"
+                      // Mouse-down, not click: a click fires after the textarea
+                      // has already lost focus and moved the caret.
+                      onMouseDown={(event) => {
+                        event.preventDefault();
+                        insertMention(mention);
+                      }}
+                      onMouseEnter={() => setHighlighted(index)}
+                      className={cn(
+                        "flex w-full flex-col items-start gap-0.5 border-b border-border/60 px-3 py-1.5 text-left last:border-b-0",
+                        index === highlighted && "bg-accent text-accent-foreground",
+                      )}
+                      data-testid={`assistant-mention-${mention.token}`}
+                    >
+                      <span className="font-mono text-[11px]">
+                        {mention.token}
+                        <span className="ml-2 font-sans text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+                          {mention.group}
+                        </span>
+                      </span>
+                      <span className="truncate text-xs">{mention.label}</span>
+                      {mention.hint ? (
+                        <span className="truncate text-[10px] text-muted-foreground">
+                          {mention.hint}
+                        </span>
+                      ) : null}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+              <Textarea
+                ref={inputRef}
+                value={input}
+                onChange={(event) => {
+                  onInputChange(event.target.value);
+                  setCaret(event.target.selectionStart ?? 0);
+                  setMentionOpen(true);
+                }}
+                onSelect={(event) =>
+                  setCaret(event.currentTarget.selectionStart ?? 0)
                 }
-              }}
-              disabled={disabled}
-              placeholder={placeholder}
-              className="min-h-[108px] rounded-[6px] border-2 border-black bg-background shadow-[4px_4px_0_var(--color-border)]"
-            />
+                onBlur={() => setMentionOpen(false)}
+                onKeyDown={(event) => {
+                  // While the mention menu is up it owns the arrows, Enter/Tab
+                  // and Escape; otherwise Enter still sends.
+                  if (mentionActive) {
+                    if (event.key === "ArrowDown") {
+                      event.preventDefault();
+                      setHighlighted(
+                        (current) => (current + 1) % mentionMatches.length,
+                      );
+                      return;
+                    }
+                    if (event.key === "ArrowUp") {
+                      event.preventDefault();
+                      setHighlighted(
+                        (current) =>
+                          (current - 1 + mentionMatches.length) %
+                          mentionMatches.length,
+                      );
+                      return;
+                    }
+                    if (event.key === "Enter" || event.key === "Tab") {
+                      const chosen = mentionMatches[highlighted];
+                      if (chosen) {
+                        event.preventDefault();
+                        insertMention(chosen);
+                        return;
+                      }
+                    }
+                    if (event.key === "Escape") {
+                      event.preventDefault();
+                      setMentionOpen(false);
+                      return;
+                    }
+                  }
+                  if (event.key === "Enter" && !event.shiftKey) {
+                    event.preventDefault();
+                    onSend();
+                  }
+                }}
+                disabled={disabled}
+                placeholder={placeholder}
+                className="min-h-[108px] rounded-[6px] border-2 border-black bg-background shadow-[4px_4px_0_var(--color-border)]"
+                data-testid="assistant-input"
+              />
+            </div>
             {uploadedFiles.length > 0 ? (
               <div className="flex flex-wrap items-center gap-2">
                 {uploadedFiles.map((file) => (

@@ -57,11 +57,27 @@ export type AssistantPageContext = z.infer<typeof assistantPageContextSchema>;
  * `tool` is the MCP tool name and `input` the exact arguments that will be
  * passed to it on confirmation — the client echoes this object back verbatim.
  */
+/**
+ * The one client-side operation the assistant may propose.
+ *
+ * Everything else it proposes is an MCP tool the server executes on confirm.
+ * Running a notebook cannot work that way: the notebook being edited lives in
+ * the browser, unsaved, and running it means saving the page's form first. So
+ * the browser executes this one and feeds the result back as the next message
+ * — which is what lets the assistant write code, watch it fail, and fix it.
+ */
+export const RUN_NOTEBOOK_TOOL = "run_notebook";
+
 export const assistantPendingConfirmationSchema = z.object({
   tool: z.string().min(1),
   input: z.record(z.string(), z.unknown()),
   title: z.string().min(1),
   detail: z.string().min(1),
+  /**
+   * Who runs it on confirm. "client" is only ever RUN_NOTEBOOK_TOOL; the
+   * browser intercepts Confirm, executes it, and replies with the outcome.
+   */
+  runtime: z.enum(["mcp", "client"]).default("mcp"),
 });
 
 export type AssistantPendingConfirmation = z.infer<
@@ -108,6 +124,63 @@ const assistantSyncDetectorActionSchema = z.object({
   values: z.record(z.string(), z.unknown()),
 });
 
+/**
+ * One edit to the notebook of a CUSTOM source.
+ *
+ * Cell-granular rather than "here is the whole notebook": the author is usually
+ * looking at the notebook while the assistant works, and replacing every cell to
+ * change one of them throws away their cursor, their scroll position and any
+ * cell the model did not think to repeat.
+ */
+const assistantNotebookOperationSchema = z.discriminatedUnion("op", [
+  z.object({
+    op: z.literal("set_cell"),
+    /** Existing cell id. The source replaces the cell entirely. */
+    cellId: z.string().min(1),
+    source: z.string(),
+  }),
+  z.object({
+    op: z.literal("insert_cell"),
+    cellType: z.enum(["code", "markdown"]).default("code"),
+    source: z.string().default(""),
+    /** Insert after this cell; omitted/null appends to the end. */
+    afterCellId: z.string().nullable().optional(),
+  }),
+  z.object({
+    op: z.literal("delete_cell"),
+    cellId: z.string().min(1),
+  }),
+]);
+
+export type AssistantNotebookOperation = z.infer<
+  typeof assistantNotebookOperationSchema
+>;
+
+const assistantNotebookEditActionSchema = z.object({
+  type: z.literal("notebook_edit"),
+  operations: z.array(assistantNotebookOperationSchema).min(1),
+  /** One line for the transcript, e.g. "rewrote extract() to page the API". */
+  summary: z.string().optional(),
+});
+
+/**
+ * Replace the detector selection on the source form.
+ *
+ * Detectors are not part of the source JSON schema, so `patch_fields` cannot
+ * reach them; without this the assistant can describe a detector change but
+ * never make one.
+ */
+const assistantSetDetectorsActionSchema = z.object({
+  type: z.literal("set_detectors"),
+  detectors: z.array(
+    z.object({
+      type: z.string().min(1),
+      enabled: z.boolean().default(true),
+      config: z.record(z.string(), z.unknown()).optional(),
+    }),
+  ),
+});
+
 const assistantAttachResultActionSchema = z.object({
   type: z.literal("attach_result"),
   kind: z.enum(["source_test", "detector_train", "operation"]),
@@ -121,6 +194,8 @@ export const assistantUiActionSchema = z.discriminatedUnion("type", [
   assistantNavigateActionSchema,
   assistantSyncSourceActionSchema,
   assistantSyncDetectorActionSchema,
+  assistantNotebookEditActionSchema,
+  assistantSetDetectorsActionSchema,
   assistantAttachResultActionSchema,
 ]);
 
@@ -169,14 +244,14 @@ export const assistantContextRegistrySchema = z.record(
 
 export const assistantContexts = assistantContextRegistrySchema.parse({
   "source.create": {
-    title: "Source Setup Assistant",
+    title: "Custom Source Builder",
     summary:
-      "Guide source creation, patch source fields, validate the config, and confirm source creation or connection testing.",
+      "I build custom connectors with you: I can write and rewrite notebook cells, add documentation, set variables, secrets and packages, pick detectors, and validate the whole thing before you save. Reference things with @ — @cell:2, @file:name, @detector:name.",
   },
   "source.edit": {
-    title: "Source Edit Assistant",
+    title: "Custom Source Builder",
     summary:
-      "Refine an existing source, patch source fields, and confirm updates or connection tests.",
+      "I edit this connector's notebook with you: rewrite cells, add documentation, adjust packages, variables and detectors, then test the connection. Reference things with @ — @cell:2, @file:name, @detector:name.",
   },
   "detector.create": {
     title: "Detector Studio Assistant",

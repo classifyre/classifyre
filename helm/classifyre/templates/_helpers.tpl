@@ -522,3 +522,32 @@ which each deployment sets on its own after including this block.
 {{- end }}
 {{- end -}}
 {{- end -}}
+
+{{/*
+Mounted folders (`api.localFolders`), rendered as JSON fragments for the CLI
+job template.
+
+A folder-backed source — the "Mounted Folder" type, or a CUSTOM notebook's
+`ctx.folder(...)` — reads a path on the machine that runs the scan. On desktop
+that machine is the user's laptop. In Kubernetes it is the CLI job pod, so the
+data has to be mounted into that pod, and these two helpers are what put it
+there. Each entry becomes one volume plus one volumeMount, so an operator
+declares the corpus once and every scan, notebook run and connection test sees
+it at the same path.
+
+Only CLI job pods get these mounts: the API and worker never open the folder,
+they only store and hand on the path the user typed.
+*/}}
+{{- define "classifyre.localFolders.volumeMountsJson" -}}
+{{- range $i, $folder := .Values.api.localFolders }}
+{{- if $i }},{{ end }}
+{"name": "local-folder-{{ $folder.name }}", "mountPath": {{ $folder.mountPath | quote }}, "readOnly": {{ ne $folder.readOnly false }}}
+{{- end }}
+{{- end }}
+
+{{- define "classifyre.localFolders.volumesJson" -}}
+{{- range $i, $folder := .Values.api.localFolders }}
+{{- if $i }},{{ end }}
+{{ merge (dict "name" (printf "local-folder-%s" $folder.name)) (omit $folder "name" "mountPath" "readOnly") | toJson }}
+{{- end }}
+{{- end }}

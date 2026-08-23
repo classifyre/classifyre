@@ -583,7 +583,11 @@
       "uploadFailures": "{{count}} file(s) failed to upload.",
       "deletionFailures": "{{count}} file(s) could not be removed.",
       "requiredBeforeSave": "Add at least one file before saving this Sandbox source.",
-      "requiredBeforeContinue": "Add at least one file before continuing."
+      "requiredBeforeContinue": "Add at least one file before continuing.",
+      "empty": "No files attached yet.",
+      "uploading": "uploading {{percent}}%",
+      "uploadFailed": "The upload failed",
+      "deleteFailed": "The file could not be removed"
     },
     "totalSources": "Total Sources",
     "connectedSources": "Connected sources",
@@ -734,7 +738,10 @@
       "incompleteSettings": "Source settings are incomplete. Please fix validation errors and try again.",
       "detectorsSaved": "Detector settings saved",
       "setupAssistant": "Source Setup Assistant",
-      "editAssistant": "Source Edit Assistant"
+      "editAssistant": "Source Edit Assistant",
+      "notebookUpdated": "The assistant updated the notebook",
+      "customDraftName": "New custom source",
+      "createFailed": "Could not create the source"
     },
     "testConnection": {
       "titleTesting": "Testing Connection",
@@ -749,6 +756,14 @@
     "stepper": {
       "sourceDetails": "Source details",
       "sourceDetailsDesc": "Required, secrets, and optional source settings.",
+      "files": "Files & folders",
+      "filesDesc": "What the connector reads from disk",
+      "packages": "Packages",
+      "packagesDesc": "Python dependencies installed before the run",
+      "variables": "Variables & secrets",
+      "variablesDesc": "Configuration the notebook reads by name",
+      "notebook": "Notebook",
+      "notebookDesc": "The Python that defines this connector",
       "detectors": "Detectors",
       "detectorsDesc": "Choose coverage and fine-tune thresholds.",
       "step": "Step {{index}}",
@@ -3663,7 +3678,7 @@
     "ICEBERG": "Apache Iceberg",
     "JIRA": "Jira",
     "KAFKA": "Apache Kafka",
-    "LOCAL_FOLDER": "Local Folder",
+    "LOCAL_FOLDER": "Mounted Folder",
     "MEILISEARCH": "Meilisearch",
     "MICROSOFT_365": "Microsoft 365",
     "MONGODB": "MongoDB",
@@ -3731,7 +3746,14 @@
       "ok": "Defines test_connection() and extract()",
       "syntaxError": "Cell '{{cell}}' has a syntax error on line {{line}}: {{message}}"
     },
+    "data": {
+      "title": "Files & folders",
+      "description": "Upload files to this source, or point at a folder the scan can read.",
+      "count": "{{count}} attached"
+    },
     "config": {
+      "title": "Variables & secrets",
+      "description": "{{count}} configured. Variables are stored as typed; secrets are encrypted and never shown again.",
       "variablesTitle": "Variables",
       "variablesDescription": "Plain values the notebook reads with ctx.var(\"name\"). Stored unencrypted.",
       "variablesEmpty": "No variables yet.",
@@ -3776,9 +3798,9 @@
       "hint": "Files uploaded here are downloaded to the runner before the notebook starts and arrive as ctx.files -- use file.parse() to read any format. Insert the \"Read files uploaded to this source\" template for a working example."
     },
     "folders": {
-      "title": "Local folders",
-      "description": "Folders on this machine the notebook reads with ctx.folder(\"name\"). Nothing is copied. Desktop only: a Kubernetes deployment has no such machine, so upload the files to the source instead.",
-      "empty": "No folders. The notebook reads only what you upload.",
+      "title": "Folders",
+      "description": "Folders the notebook reads with ctx.folder(\"name\"). Nothing is copied. The path is resolved where the scan runs: this computer on desktop, or a folder mounted into scan pods by the chart (api.localFolders) in Kubernetes.",
+      "empty": "No folders yet. Add one to read files in place instead of uploading them.",
       "add": "Add folder",
       "pathPlaceholder": "/absolute/path/to/folder",
       "nameRequired": "A name is required -- it is what ctx.folder() takes.",
@@ -3791,20 +3813,6 @@
       "button": "Templates",
       "hint": "Adds the template's cells below your own. Nothing is replaced.",
       "failed": "Templates could not be loaded."
-    },
-    "ai": {
-      "title": "Ask AI",
-      "placeholder": "Ask about this cell, or describe what it should do…",
-      "placeholderHint": "It can see the whole notebook, your packages, your variables and the names of your secrets. Ask it to write the cell, or ask why something fails.",
-      "send": "Send",
-      "thinking": "Thinking…",
-      "updatedCell": "Updated the cell.",
-      "cellUpdated": "This cell was changed",
-      "undo": "Undo",
-      "failed": "The AI provider could not be reached.",
-      "notConfigured": "AI is not configured on this instance.",
-      "providerError": "The configured AI provider is not responding.",
-      "configureHint": "Set one up in Harness → Configuration."
     }
   }
 }

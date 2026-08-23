@@ -229,6 +229,26 @@ api:
   migration:
     enabled: false
 
+  # Folders a "Mounted Folder" source (or a notebook's ctx.folder) can read.
+  # Both paths live inside the k3d node: `dump_files` comes from this checkout,
+  # which create-cluster.sh mounts at /var/lib/classifyre/source, and
+  # `downloads` is the host's ~/Downloads, mounted by create-cluster.sh so there
+  # is real, changing data to point a scan at. A cluster created before that
+  # mount existed has no ~/Downloads inside the node, so the entry uses
+  # DirectoryOrCreate and simply comes up empty there instead of wedging every
+  # CLI job on a failed mount.
+  localFolders:
+    - name: dumps
+      mountPath: /mnt/corpora/dumps
+      hostPath:
+        path: /var/lib/classifyre/source/dump_files
+        type: Directory
+    - name: downloads
+      mountPath: /mnt/corpora/downloads
+      hostPath:
+        path: /var/lib/classifyre/host-folders/downloads
+        type: DirectoryOrCreate
+
   cliJobs:
     enabled: true
     image:

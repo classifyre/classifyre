@@ -1031,7 +1031,7 @@ class LocalFolderRequired(BaseModel):
     )
     path: str = Field(
         ...,
-        description='Absolute path of the local folder to scan (for example, /Users/jane/Documents)',
+        description="Absolute path of the folder to scan, as seen by the machine that runs the scan. On desktop that is this computer (for example /Users/jane/Documents). In Kubernetes it is the scan pod, so the folder must be mounted into CLI jobs first via the chart's `api.localFolders` — then use the `mountPath` you gave it there (for example /mnt/corpora/invoices).",
     )
 
 
@@ -1063,7 +1063,7 @@ class SandboxOptional(BaseModel):
 
 class LocalFolderMasked(BaseModel):
     """
-    Local folder scans run with the desktop application's filesystem permissions; no credentials are required.
+    A folder scan reads the filesystem it runs on with that process's own permissions — the desktop app's, or the CLI job pod's. No credentials are required.
     """
 
     model_config = ConfigDict(
@@ -5429,7 +5429,7 @@ class NotebookPackage(BaseModel):
 
 class NotebookLocalFolder(BaseModel):
     """
-    A folder on the machine running the desktop application.
+    A folder the notebook can read on the machine that runs the scan: this computer on desktop, or a path mounted into CLI jobs by the chart's `api.localFolders` in Kubernetes.
     """
 
     model_config = ConfigDict(
@@ -5442,7 +5442,7 @@ class NotebookLocalFolder(BaseModel):
     )
     path: str = Field(
         ...,
-        description='Absolute path to the folder, for example /Users/me/dumps.',
+        description='Absolute path to the folder, as seen by the machine that runs the scan — for example /Users/me/dumps on desktop, or /mnt/corpora/dumps for a folder mounted by the chart.',
         max_length=4096,
         min_length=1,
     )

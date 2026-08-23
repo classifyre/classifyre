@@ -1,4 +1,16 @@
 import type { AssistantContextKey } from '@workspace/schemas/assistant';
+import {
+  notebookRuntimePackages,
+  notebookSdkSurface,
+} from './notebook-knowledge';
+
+/** The UI actions a model is ever allowed to emit itself. */
+export type AssistantEmittableAction =
+  | 'patch_fields'
+  | 'navigate'
+  | 'show_toast'
+  | 'notebook_edit'
+  | 'set_detectors';
 
 /**
  * Server-side definition of one assistant context ("module"). A module scopes
@@ -16,7 +28,7 @@ export interface AssistantContextModule {
   /** MCP tool names to foreground for this page (rendered with full schemas). */
   tools: string[];
   /** UI action types the model may emit for this context. */
-  uiActions: Array<'patch_fields' | 'navigate' | 'show_toast'>;
+  uiActions: AssistantEmittableAction[];
   /** Extra domain knowledge appended to the system prompt. */
   knowledge?: string;
 }
@@ -71,10 +83,85 @@ const DETECTOR_KNOWLEDGE = [
   'Expected outcome format for scenarios: RULESET {"shouldMatch":true|false}; CLASSIFIER {"label":"advice","minConfidence":0.6}; ENTITY {"entities":[{"label":"PersonName","text":"Ostap"}]}. Labels compare case-insensitively with underscores treated as spaces. Re-run a single scenario via run_detector_tests scenario_ids to avoid paying for a full re-run.',
 ].join('\n');
 
+const CUSTOM_NOTEBOOK_KNOWLEDGE = [
+  '## CUSTOM source = a Python notebook connector',
+  'This source type has no config form to fill in: its behaviour IS the notebook. Your main job on this page is writing that notebook.',
+  '',
+  'How the notebook runs:',
+  '  - Cells run top to bottom in a FRESH process on every run. There is no persistent kernel.',
+  '  - The notebook MUST define test_connection() and extract() at the TOP LEVEL of a code cell.',
+  '  - extract() yields Asset(...) objects; yield as you go rather than building a list.',
+  '  - discover() and fetch_content() are optional.',
+  '  - Cells must be valid standard Python. IPython magics (%time, !pip install) are rejected.',
+  '  - Packages are declared in the packages table (patch path optional.packages), never installed from a cell.',
+  '  - Configuration is read with ctx.var("name") (plain values) and ctx.secret("name") (encrypted). NEVER hard-code a credential, and never invent a variable that is not configured.',
+  '',
+  '## The SDK — this is the API that exists, use nothing else',
+  notebookSdkSurface(),
+  '',
+  'The two mistakes worth naming, because they are the ones models make:',
+  '  - ctx.files is a LIST, not a lookup. `ctx.files["report.xlsx"]` is a TypeError.',
+  '    Use ctx.file("report.xlsx") for one file, or iterate ctx.files.',
+  '  - An attached file is a NotebookFile, not a path string. Pass file.path to a',
+  '    library that wants a path (pd.read_excel(file.path)), or use file.parse()',
+  '    for text and file.read_bytes() for bytes. Never build a path yourself and',
+  '    never raise "file not found" — the exact attached names are listed in the',
+  '    context below, so use one of those.',
+  '',
+  '## Packages already in the runtime',
+  notebookRuntimePackages(),
+  '',
+  '## Editing the notebook — uiAction "notebook_edit"',
+  '  {"type":"notebook_edit","summary":"what you changed","operations":[',
+  '     {"op":"set_cell","cellId":"extract","source":"<COMPLETE new source for that cell>"},',
+  '     {"op":"insert_cell","cellType":"code|markdown","source":"...","afterCellId":"imports"},',
+  '     {"op":"delete_cell","cellId":"scratch"}]}',
+  'Rules:',
+  '  - set_cell REPLACES the cell entirely. Always send the complete cell source, never a fragment or a diff.',
+  '  - Only touch the cells you actually need to change. Leave the rest alone.',
+  '  - FIXING a cell means set_cell on THAT cell id. Adding a second cell with the',
+  '    corrected code leaves the broken one running above it and is almost never',
+  '    what the user asked for. insert_cell is for genuinely new work.',
+  '  - afterCellId omitted (or null) appends the new cell at the end.',
+  '  - When the user asks for "the whole connector", emit several operations in ONE notebook_edit.',
+  '  - Documentation belongs in markdown cells: when you write or substantially rewrite code, add or update a short markdown cell above it explaining what it does and what must be configured.',
+  '  - A notebook_edit applies immediately in the editor; it is a local change, not a save. Do not claim the source was saved.',
+  '',
+  '## Non-notebook parts of this page',
+  '  Packages, variables and secret NAMES are patched with patch_fields on these exact paths:',
+  '    optional.packages    — [{"name":"httpx","version":">=0.27"}]',
+  '    optional.variables   — {"api_base":"https://api.example.com"}',
+  '    masked.secrets       — {"api_token":"<only from explicit user input>"}',
+  '  Detectors are NOT in the form schema. Change them with:',
+  '    {"type":"set_detectors","detectors":[{"type":"PII","enabled":true,"config":{}}]}',
+  '  This REPLACES the whole selection, so include every detector that should stay enabled. Read the current selection from context metadata "detectors" and the catalogue from metadata "availableDetectors".',
+  '',
+  '## Verify by running it — this is expected of you, not optional',
+  'You can run the notebook. Propose it exactly like a mutation:',
+  '  proposeOperation: {"tool":"run_notebook","input":{"mode":"cell","cellId":"extract"},',
+  '                     "title":"Run cell extract","detail":"save the source and run that cell"}',
+  '  modes: "cell" (needs cellId) | "all" | "test_connection" | "preview_extract".',
+  'The user confirms, the browser saves the source and runs it, and the RESULT —',
+  'stdout, the exception, the traceback with the failing line, the assets',
+  'extract() produced — comes back to you as the next message.',
+  '',
+  'Work in that loop rather than handing over code you have not seen run:',
+  '  1. Write or fix the cell with notebook_edit.',
+  '  2. In the SAME reply, propose run_notebook for the cell you just changed.',
+  '  3. Read the result. If it raised, fix THAT cell with set_cell and propose the',
+  '     run again. If it worked, say so plainly and stop proposing runs.',
+  'Give up after about three failed attempts on the same error and explain what',
+  'you tried and what you need from the user. Never claim a cell works when you',
+  'have not seen it run.',
+  '',
+  '## The @ references in the user message',
+  'The user can point at things with @cell:<id-or-number>, @file:<name> and @detector:<name>. Anything they referenced is expanded verbatim under "## Referenced by the user" — treat that as the exact thing they mean.',
+].join('\n');
+
 const SOURCE_KNOWLEDGE = [
   '## Source workflow',
   'Use get_source_schema for the exact config schema of the chosen source type.',
-  'ALWAYS call validate_source_config with the assembled config BEFORE proposing create_source or update_source — fix every reported error first (patch the form via patch_fields so the user sees the corrections).',
+  'Call validate_source_config ONLY when you are about to propose create_source or update_source, and pass just the config sections (required/masked/optional/sampling) — never the page values wholesale. Editing the form or the notebook is not a mutation and needs no validation call; the user saves with the buttons on the page.',
   'Credentials/secrets: set them only from explicit user input, never invent them.',
   'After creating a source, offer a connection test (test_source_connection).',
 ].join('\n');
@@ -129,7 +216,13 @@ export const assistantContextModules: Record<
       'search_sources',
       'list_custom_detectors',
     ],
-    uiActions: ['patch_fields', 'navigate', 'show_toast'],
+    uiActions: [
+      'patch_fields',
+      'navigate',
+      'show_toast',
+      'notebook_edit',
+      'set_detectors',
+    ],
     knowledge: SOURCE_KNOWLEDGE,
   },
   'source.edit': {
@@ -144,7 +237,13 @@ export const assistantContextModules: Record<
       'get_run_logs',
       'list_custom_detectors',
     ],
-    uiActions: ['patch_fields', 'navigate', 'show_toast'],
+    uiActions: [
+      'patch_fields',
+      'navigate',
+      'show_toast',
+      'notebook_edit',
+      'set_detectors',
+    ],
     knowledge: SOURCE_KNOWLEDGE,
   },
   'detector.create': {
@@ -287,12 +386,27 @@ export const assistantContextModules: Record<
   },
 };
 
-/** Domain knowledge plus the navigation map (which helps in every context). */
-export function contextKnowledge(key: AssistantContextKey): string {
+/**
+ * Domain knowledge plus the navigation map (which helps in every context).
+ *
+ * `sourceType` is the page's selected source type where there is one. A CUSTOM
+ * source has no config form to speak of -- it is a Python notebook -- so that
+ * page gets a whole extra body of knowledge that would be noise anywhere else.
+ */
+export function contextKnowledge(
+  key: AssistantContextKey,
+  sourceType?: string | null,
+): string {
   const module = assistantContextModules[key];
   const parts =
     module.knowledge === NAVIGATION_MAP
       ? [NAVIGATION_MAP]
       : [module.knowledge, NAVIGATION_MAP];
+  if (
+    (key === 'source.create' || key === 'source.edit') &&
+    sourceType === 'CUSTOM'
+  ) {
+    parts.unshift(CUSTOM_NOTEBOOK_KNOWLEDGE);
+  }
   return parts.filter(Boolean).join('\n\n');
 }

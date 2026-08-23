@@ -290,7 +290,7 @@ describe('NotebookService', () => {
           'Starter notebook',
           'Parse files of any format',
           'Read files uploaded to this source',
-          'Read a folder on this machine (desktop)',
+          'Read a mounted folder',
           'Linked assets',
         ]),
       );
