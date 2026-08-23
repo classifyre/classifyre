@@ -105,10 +105,11 @@ export function notebookSdkSurface(): string {
 /**
  * Packages already in the scan runtime.
  *
- * Rendered so the assistant stops declaring a package that is already there,
- * and stops writing an import for one that is not. "always" packages can be
- * imported with nothing declared; "on-demand" ones install on first import; a
- * name in neither list has to be added to `optional.packages`.
+ * Rendered so the assistant stops writing an import for a package nobody
+ * declared. Only the "always" group is importable with nothing declared;
+ * everything else — including a backend a library reaches for internally, like
+ * openpyxl under `pandas.read_excel` — has to be in `optional.packages` or the
+ * cell dies on an ImportError the model then cannot explain.
  */
 export function notebookRuntimePackages(): string {
   const always: string[] = [];
@@ -119,13 +120,24 @@ export function notebookRuntimePackages(): string {
   }
   return [
     `Python ${runtime.pythonVersion} runtime.`,
-    `Always importable (do NOT declare these): ${always.join(', ') || '(none)'}`,
-    `Installed on first import (declaring them is harmless but unnecessary): ${
+    `Already in the image, import them with nothing declared: ${
+      always.join(', ') || '(none)'
+    }`,
+    `Known to the installer (a declaration resolves to this version): ${
       onDemand.join(', ') || '(none)'
     }`,
-    'ANYTHING ELSE — pandas, openpyxl, pyarrow, … — must be added to',
-    '`optional.packages` with patch_fields in the SAME reply that imports it,',
-    'as [{"name":"pandas"},{"name":"openpyxl"}]. Omit "version" unless the user',
+    '',
+    'DECLARE EVERY OTHER IMPORT in `optional.packages`, with patch_fields, in',
+    'the SAME reply that writes the import — as',
+    '[{"name":"pandas"},{"name":"openpyxl"}]. Omit "version" unless the user',
     'asked for one: a pinned version that does not exist fails the whole run.',
+    '',
+    'Declare the libraries an import needs underneath it too, not just the one',
+    'you typed. These are the ones that actually bite:',
+    '  pandas reading .xlsx  -> also openpyxl',
+    '  pandas reading .xls   -> also xlrd',
+    '  pandas reading parquet-> also pyarrow',
+    'An "ImportError: `Import openpyxl` failed" from inside pandas means exactly',
+    'this: add the missing name to optional.packages and run again.',
   ].join('\n');
 }

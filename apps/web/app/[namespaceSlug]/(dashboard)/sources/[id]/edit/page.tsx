@@ -140,7 +140,11 @@ export default function EditSourcePage() {
           type: (data.type as SourceType) || "WORDPRESS",
           config: data.config as Record<string, unknown> | undefined,
         });
-        if (data.type === "SANDBOX") {
+        // Both file-capable types, not just SANDBOX. A CUSTOM source's files
+        // are what `ctx.files` reads, and skipping this left the page showing
+        // an empty uploader over files the connector could already see — and
+        // told the assistant the source had nothing attached.
+        if (data.type === "SANDBOX" || data.type === "CUSTOM") {
           setUploadedFiles(await listSourceFiles(sourceId));
         }
         // Read schedule fields from source response. `scheduleMode` is the

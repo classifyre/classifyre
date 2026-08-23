@@ -619,7 +619,9 @@ describe('AssistantService', () => {
     // The SDK surface is what stops ctx.files["name"], the mistake models make.
     expect(system).toContain('ctx.file(');
     expect(system).toContain('ctx.files is a LIST');
-    expect(system).toContain('Always importable');
+    // The package list is what stops it importing something nobody declared.
+    expect(system).toContain('DECLARE EVERY OTHER IMPORT');
+    expect(system).toContain('also openpyxl');
   });
 
   it('says plainly when a source has nothing attached', async () => {

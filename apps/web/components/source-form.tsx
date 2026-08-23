@@ -27,6 +27,10 @@ import type {
 import type { CustomSectionId } from "@/components/notebook/custom-source-config";
 import type { UploadedFileMetadata } from "@/components/uploaded-files";
 import { applyNotebookOperations } from "@/lib/notebook-cells";
+import {
+  applyDraftPatches,
+  isDraftPatchPath,
+} from "@/lib/custom-draft-patches";
 import type { AssistantNotebookOperation } from "@workspace/api-client";
 
 export type { SourceType } from "@/lib/schema-loader";
@@ -360,7 +364,25 @@ export const SourceForm = React.forwardRef<SourceFormHandle, SourceFormProps>(
           ...sectionPayload(),
         }),
         applyPatches: async (patches) => {
-          await formRef.current?.applyPatches(patches);
+          // A CUSTOM source's packages, variables, secrets and folders are not
+          // in the schema form — this component strips those sections out and
+          // renders them itself — so patching them through the form silently
+          // did nothing. Route them to the draft instead.
+          const draftPatches = isCustom
+            ? patches.filter((patch) => isDraftPatchPath(patch.path))
+            : [];
+          const formPatches = isCustom
+            ? patches.filter((patch) => !isDraftPatchPath(patch.path))
+            : patches;
+
+          if (draftPatches.length > 0) {
+            setCustomDraft(
+              (current) => applyDraftPatches(current, draftPatches).draft,
+            );
+          }
+          if (formPatches.length > 0) {
+            await formRef.current?.applyPatches(formPatches);
+          }
         },
         validate: async () =>
           (await formRef.current?.validate()) ?? {
