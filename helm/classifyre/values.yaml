@@ -226,6 +226,68 @@ api:
     # -- Generated key is persisted via Kubernetes Secret lookup across upgrades.
     autoGenerate: true
 
+  # ── Mounted folders ────────────────────────────────────────────────────────
+  # Data on disk that folder-backed sources read: the "Mounted Folder" source
+  # type, and a CUSTOM notebook's `ctx.folder("name")`.
+  #
+  # On desktop the folder is a path on the user's own machine and they pick it
+  # with a file dialog. In Kubernetes the machine that runs a scan is an
+  # ephemeral CLI job pod, so the data has to be mounted into that pod — and
+  # this is where you say so. Each entry becomes one volume plus one volumeMount
+  # on every CLI job pod, which covers scans, notebook runs and connection
+  # tests alike. The API and worker do not get the mount: they only store the
+  # path, they never open it.
+  #
+  # After mounting, create the source in the UI and type the `mountPath` as its
+  # folder path (e.g. `/mnt/corpora/invoices`). Nothing else is needed — the
+  # same config works on desktop and in the cluster.
+  #
+  # Each entry is `{name, mountPath, readOnly?}` plus EXACTLY ONE Kubernetes
+  # volume source (`persistentVolumeClaim`, `configMap`, `secret`, `hostPath`,
+  # `nfs`, `csi`, …) spelled the way the Pod spec spells it. `name` must be a
+  # DNS label (lowercase alphanumerics and `-`); it names the volume, not the
+  # source. `readOnly` defaults to true — a scan only ever reads, and a
+  # read-only mount means a notebook bug cannot damage the corpus.
+  #
+  # An existing PVC holding a corpus:
+  #   localFolders:
+  #     - name: invoices
+  #       mountPath: /mnt/corpora/invoices
+  #       persistentVolumeClaim:
+  #         claimName: invoice-archive
+  #
+  # A ConfigMap of small text/CSV files (1 MiB total limit — fine for samples,
+  # not for a corpus):
+  #   localFolders:
+  #     - name: samples
+  #       mountPath: /mnt/corpora/samples
+  #       configMap:
+  #         name: sample-documents
+  #
+  # An NFS export shared with the rest of your estate:
+  #   localFolders:
+  #     - name: shared
+  #       mountPath: /mnt/corpora/shared
+  #       nfs:
+  #         server: nfs.internal
+  #         path: /exports/documents
+  #
+  # A host path (single-node clusters and local development only — on a
+  # multi-node cluster the job may land on a node that does not have it):
+  #   localFolders:
+  #     - name: dumps
+  #       mountPath: /mnt/corpora/dumps
+  #       hostPath:
+  #         path: /var/lib/classifyre/host-folders/downloads
+  #         type: Directory
+  #
+  # A PVC with `accessModes: [ReadWriteOnce]` can only be mounted by pods on one
+  # node at a time, so concurrent scans on a multi-node cluster will hang with
+  # a Multi-Attach error. Use ReadWriteMany (EFS, NFS, CephFS, …) when more than
+  # one scan may run at once.
+  # -- Folders mounted into every CLI job pod for folder-backed sources.
+  localFolders: []
+
   # -- Extra environment variables for API container.
   extraEnv: []
   # -- Extra envFrom sources for API container.

@@ -13,15 +13,12 @@ import {
   DropdownMenuTrigger,
 } from "@workspace/ui/components/dropdown-menu";
 import { useTranslation } from "@/hooks/use-translation";
-import { isDesktopRuntime } from "@/lib/desktop";
 import type { NotebookCell } from "@/lib/notebook-cells";
 
 interface NotebookTemplate {
   name: string;
   description: string;
   cells: NotebookCell[];
-  /** Reads a folder on the machine running the app; hidden off desktop. */
-  desktopOnly?: boolean;
 }
 
 /**
@@ -45,14 +42,6 @@ export function TemplatePicker({
   );
   const [loading, setLoading] = React.useState(false);
   const [failed, setFailed] = React.useState(false);
-  // A template that walks a local folder is unusable behind a browser tab
-  // talking to a cluster -- the API refuses to save the paths it needs -- so it
-  // is not offered there at all.
-  const [desktop, setDesktop] = React.useState(false);
-  React.useEffect(() => setDesktop(isDesktopRuntime()), []);
-  const visible = (templates ?? []).filter(
-    (template) => desktop || !template.desktopOnly,
-  );
 
   // Loaded when the menu is first opened: most sessions never open it, and the
   // payload is every template's full source.
@@ -104,7 +93,7 @@ export function TemplatePicker({
         )}
         {!loading &&
           !failed &&
-          visible.map((template) => (
+          templates?.map((template) => (
             <DropdownMenuItem
               key={template.name}
               className="flex-col items-start gap-0.5 whitespace-normal"

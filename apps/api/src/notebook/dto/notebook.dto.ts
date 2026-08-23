@@ -218,13 +218,6 @@ export class NotebookTemplateDto {
     description: 'Cells to append. The editor assigns fresh ids on insert.',
   })
   cells!: NotebookCellDto[];
-
-  @ApiProperty({
-    description:
-      'The template reads a folder on the machine running the app, so it is ' +
-      'only offered on desktop. A Kubernetes deployment has no such machine.',
-  })
-  desktopOnly!: boolean;
 }
 
 export class NotebookScaffoldDto {

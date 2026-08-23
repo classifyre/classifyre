@@ -131,7 +131,7 @@ def test_the_local_folder_template_walks_a_real_folder(
     (root / "ignored.bin").write_bytes(b"\x00\x01")
 
     config = recipe_for(
-        "Read a folder on this machine (desktop)",
+        "Read a mounted folder",
         local_folders=[{"name": "dumps", "path": str(root)}],
     )
     instance = build(request, config)

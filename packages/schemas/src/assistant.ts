@@ -57,11 +57,27 @@ export type AssistantPageContext = z.infer<typeof assistantPageContextSchema>;
  * `tool` is the MCP tool name and `input` the exact arguments that will be
  * passed to it on confirmation — the client echoes this object back verbatim.
  */
+/**
+ * The one client-side operation the assistant may propose.
+ *
+ * Everything else it proposes is an MCP tool the server executes on confirm.
+ * Running a notebook cannot work that way: the notebook being edited lives in
+ * the browser, unsaved, and running it means saving the page's form first. So
+ * the browser executes this one and feeds the result back as the next message
+ * — which is what lets the assistant write code, watch it fail, and fix it.
+ */
+export const RUN_NOTEBOOK_TOOL = "run_notebook";
+
 export const assistantPendingConfirmationSchema = z.object({
   tool: z.string().min(1),
   input: z.record(z.string(), z.unknown()),
   title: z.string().min(1),
   detail: z.string().min(1),
+  /**
+   * Who runs it on confirm. "client" is only ever RUN_NOTEBOOK_TOOL; the
+   * browser intercepts Confirm, executes it, and replies with the outcome.
+   */
+  runtime: z.enum(["mcp", "client"]).default("mcp"),
 });
 
 export type AssistantPendingConfirmation = z.infer<

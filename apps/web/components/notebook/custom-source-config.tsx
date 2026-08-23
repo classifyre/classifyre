@@ -3,6 +3,13 @@
 import * as React from "react";
 import { api } from "@workspace/api-client";
 import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@workspace/ui/components/accordion";
+import { Badge } from "@workspace/ui/components/badge";
+import {
   Card,
   CardContent,
   CardHeader,
@@ -16,7 +23,10 @@ import {
   secretKeysToEntries,
   type KeyValueEntry,
 } from "@/components/key-value-field";
-import { isDesktopRuntime } from "@/lib/desktop";
+import {
+  UploadedFiles,
+  type UploadedFileMetadata,
+} from "@/components/uploaded-files";
 import { NotebookEditor, type NotebookEditorHandle } from "./notebook-editor";
 import { PackageTable } from "./package-table";
 import { AvailablePackages } from "./available-packages";
@@ -36,7 +46,6 @@ export interface CustomSourceDraft {
   cells: NotebookCell[];
   revision: number;
   packages: NotebookPackage[];
-  /** Desktop only; the API refuses to save these in a Kubernetes deployment. */
   localFolders: NotebookLocalFolder[];
   variables: KeyValueEntry[];
   secrets: KeyValueEntry[];
@@ -71,73 +80,141 @@ export async function loadScaffold(): Promise<NotebookCell[]> {
   return scaffold.cells;
 }
 
+/** The page-anchored sections a CUSTOM source is built from, in order. */
+export const CUSTOM_SECTION_IDS = [
+  "files",
+  "packages",
+  "variables",
+  "notebook",
+] as const;
+
+export type CustomSectionId = (typeof CUSTOM_SECTION_IDS)[number];
+
 export interface CustomSourceConfigProps {
-  /** Absent while creating: there is nothing to save against or execute on yet. */
+  /** Absent only while a non-CUSTOM flow reuses this; a CUSTOM source is saved first. */
   sourceId?: string;
   draft: CustomSourceDraft;
   onChange: (draft: CustomSourceDraft) => void;
   disabled?: boolean;
-  /** The file uploader, owned by the page that persists uploads. */
-  filesSlot?: React.ReactNode;
-  /**
-   * Filled in with a live handle on the notebook, so the page (and through it
-   * the assistant) can read and rewrite cells whichever editor is mounted.
-   */
+  /** Files already stored on the source. */
+  files?: UploadedFileMetadata[];
+  onFilesChange?: (files: UploadedFileMetadata[]) => void;
   notebookRef?: React.RefObject<NotebookEditorHandle | null>;
+  /** Told when the notebook starts or stops executing. */
+  onBusyChange?: (busy: boolean) => void;
+  /** Run controls live in the page's sticky toolbar, which owns save-then-run. */
+  onRunCell?: (cellId: string) => void;
+  /** Anchors for the page's stepper. */
+  sectionRef?: (id: CustomSectionId, element: HTMLElement | null) => void;
 }
 
+/**
+ * Everything a CUSTOM source is, other than its name.
+ *
+ * Grouped rather than stacked: a notebook author touches the notebook
+ * constantly and the three supporting sections rarely, so data (files and
+ * folders), dependencies (packages) and configuration (variables and secrets)
+ * each get one section, and the notebook gets the rest of the page. The data
+ * section is an accordion that opens only when it holds something — an empty
+ * dropzone above the code is noise on the many connectors that call an API and
+ * never touch a file.
+ */
 export function CustomSourceConfig({
   sourceId,
   draft,
   onChange,
   disabled = false,
-  filesSlot,
+  files = [],
+  onFilesChange,
   notebookRef,
+  onBusyChange,
+  onRunCell,
+  sectionRef,
 }: CustomSourceConfigProps) {
   const { t } = useTranslation();
-  // Local folders are paths on the machine running the app. There is no such
-  // machine behind a browser tab talking to a cluster, and the API refuses to
-  // save them there -- so the control is not offered either.
-  const [desktop, setDesktop] = React.useState(false);
-  React.useEffect(() => setDesktop(isDesktopRuntime()), []);
-
   const patch = (changes: Partial<CustomSourceDraft>) =>
     onChange({ ...draft, ...changes });
 
+  const dataCount = files.length + draft.localFolders.length;
+  // Opened when there is something in it, closed when there is not — decided on
+  // the first render for this source and then left to the user, so their own
+  // collapse is not undone by the next upload.
+  const [openSections, setOpenSections] = React.useState<string[]>(() =>
+    dataCount > 0 ? ["files"] : [],
+  );
+  const seededRef = React.useRef(dataCount > 0);
+  React.useEffect(() => {
+    if (seededRef.current || dataCount === 0) return;
+    seededRef.current = true;
+    setOpenSections((current) =>
+      current.includes("files") ? current : [...current, "files"],
+    );
+  }, [dataCount]);
+
+  const configCount = draft.variables.length + draft.secrets.length;
+
   return (
     <div className="space-y-6">
-      {(filesSlot || desktop) && (
-        <div className="space-y-6" data-testid="notebook-files-config">
-          {filesSlot}
-          {filesSlot && (
-            <p className="rounded-md border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
-              {t("notebook.files.hint")}
-            </p>
-          )}
-          {desktop && (
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base">
-                  {t("notebook.folders.title")}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <LocalFolders
-                  folders={draft.localFolders}
-                  onChange={(localFolders) => patch({ localFolders })}
+      <section
+        ref={(element) => sectionRef?.("files", element)}
+        data-testid="notebook-files-config"
+      >
+        <Accordion
+          type="multiple"
+          value={openSections}
+          onValueChange={setOpenSections}
+        >
+          <AccordionItem value="files">
+            <AccordionTrigger
+              caption={t("notebook.data.description")}
+              action={
+                dataCount > 0 ? (
+                  <Badge
+                    variant="outline"
+                    className="rounded-[4px] border-primary-foreground/40 font-mono text-[10px] text-primary-foreground"
+                    data-testid="notebook-data-count"
+                  >
+                    {t("notebook.data.count", { count: dataCount })}
+                  </Badge>
+                ) : null
+              }
+              data-testid="notebook-data-trigger"
+            >
+              {t("notebook.data.title")}
+            </AccordionTrigger>
+            <AccordionContent className="space-y-6">
+              <div>
+                <h4 className="text-sm font-semibold">
+                  {t("sources.uploadedFiles.title")}
+                </h4>
+                <p className="mb-3 mt-1 text-xs text-muted-foreground">
+                  {t("notebook.files.hint")}
+                </p>
+                <UploadedFiles
+                  existingFiles={files}
+                  sourceId={sourceId}
+                  onFilesChange={onFilesChange}
                   disabled={disabled}
                 />
-              </CardContent>
-            </Card>
-          )}
-        </div>
-      )}
+              </div>
+              <LocalFolders
+                folders={draft.localFolders}
+                onChange={(localFolders) => patch({ localFolders })}
+                disabled={disabled}
+              />
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
+      </section>
 
-      <Card>
+      <Card ref={(element) => sectionRef?.("packages", element)}>
         <CardHeader className="pb-3">
           <CardTitle className="text-base">
-            {t("notebook.config.variablesTitle")}
+            {t("notebook.packages.title")}
           </CardTitle>
+          <p className="text-sm text-muted-foreground">
+            {t("notebook.packages.description")}
+          </p>
         </CardHeader>
         <CardContent className="space-y-6">
           <PackageTable
@@ -146,6 +223,19 @@ export function CustomSourceConfig({
             disabled={disabled}
           />
           <AvailablePackages />
+        </CardContent>
+      </Card>
+
+      <Card ref={(element) => sectionRef?.("variables", element)}>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">
+            {t("notebook.config.title")}
+          </CardTitle>
+          <p className="text-sm text-muted-foreground">
+            {t("notebook.config.description", { count: configCount })}
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-6">
           <KeyValueField
             entries={draft.variables}
             onChange={(variables) => patch({ variables })}
@@ -173,7 +263,7 @@ export function CustomSourceConfig({
         </CardContent>
       </Card>
 
-      <Card>
+      <Card ref={(element) => sectionRef?.("notebook", element)}>
         <CardHeader className="pb-3">
           <CardTitle className="text-base">{t("notebook.title")}</CardTitle>
           <p className="text-sm text-muted-foreground">
@@ -188,12 +278,12 @@ export function CustomSourceConfig({
               revision={draft.revision}
               disabled={disabled}
               handleRef={notebookRef}
+              onBusyChange={onBusyChange}
+              onRunCell={onRunCell}
               onSaved={(revision) => patch({ revision })}
               onCellsChange={(cells) => patch({ cells })}
             />
           ) : (
-            // Before the source exists there is nothing to save against and
-            // nothing to run: the cells travel with the create request instead.
             <DraftNotebook
               cells={draft.cells}
               disabled={disabled}
@@ -210,10 +300,10 @@ export function CustomSourceConfig({
 /**
  * The notebook before the source exists.
  *
- * Same cells and the same editing controls as the saved editor -- it is the same
- * component -- but no Run and no autosave: an execution names a revision of a
- * stored notebook, and there is not one yet. The cells travel with the create
- * request instead.
+ * A CUSTOM source is saved the moment its starting point is chosen, so this is
+ * only reached by a flow that reuses the config without one. Same cells and the
+ * same editing controls — it is the same component — but no Run: an execution
+ * names a revision of a stored notebook.
  */
 function DraftNotebook({
   cells,
@@ -230,11 +320,19 @@ function DraftNotebook({
   const cellsRef = React.useRef(cells);
   cellsRef.current = cells;
 
-  // Same handle the saved editor installs, so a caller never has to know which
-  // of the two is on screen.
   React.useEffect(() => {
     if (!handleRef) return;
-    handleRef.current = { getCells: () => cellsRef.current, setCells: onChange };
+    handleRef.current = {
+      getCells: () => cellsRef.current,
+      setCells: onChange,
+      // Nothing to run against: an execution names a revision of a stored
+      // notebook, and there is no stored source in this path.
+      run: async () => null,
+      runAndSummarize: async () =>
+        "This source has not been saved yet, so there is no notebook to run.",
+      cancel: () => undefined,
+      save: async () => null,
+    };
     return () => {
       handleRef.current = null;
     };

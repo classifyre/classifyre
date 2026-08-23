@@ -681,7 +681,12 @@ export type AssistantPendingConfirmation = {
   input: Record<string, unknown>;
   title: string;
   detail: string;
+  /** "client" means the browser executes it on confirm (a notebook run). */
+  runtime?: "mcp" | "client";
 };
+
+/** The one operation the assistant proposes that the browser executes. */
+export const RUN_NOTEBOOK_TOOL = "run_notebook";
 
 export type AssistantFieldPatch = {
   path: string;

@@ -19,20 +19,3 @@ export function getSourceExamples(sourceType: SourceType): SourceExample[] {
   const examplesByType = all_input_examples as Record<string, SourceExample[]>;
   return examplesByType[sourceType] || [];
 }
-
-/**
- * True for an example that only works on the machine running the app.
- *
- * Detected from the config it ships rather than by name: an example that
- * configures `local_folders` points at an absolute path on local disk, which a
- * browser tab talking to a Kubernetes cluster does not have — and the API
- * refuses to store those paths there anyway.
- */
-export function isDesktopOnlyExample(example: SourceExample): boolean {
-  const optional = (example.config as { optional?: unknown })?.optional as
-    | { local_folders?: unknown }
-    | undefined;
-  return (
-    Array.isArray(optional?.local_folders) && optional.local_folders.length > 0
-  );
-}

@@ -3697,7 +3697,7 @@
                 {
                   "id": "intro",
                   "type": "markdown",
-                  "source": "# Uploaded files\n\nUpload files to this source in the form above and they arrive as `ctx.files`.\n\nThey are downloaded to local disk before any cell runs, so each one is an\nordinary path:\n\n- `ctx.files` -- every file, ordered by name\n- `ctx.file(\"dump.csv\")` -- one by name\n- `file.path` / `file.open()` / `file.read_bytes()` / `file.read_text()`\n- `file.parse()` -- text extraction for any format\n- `file.pages()` -- read it a page at a time instead of whole\n\nThis is the mechanism to use in a Kubernetes deployment: the runner is an\nephemeral pod with no filesystem of yours to reach, so files travel with the\nsource. On desktop you can also point at a folder instead -- see the\n\"Read a folder on this machine\" template.\n"
+                  "source": "# Uploaded files\n\nUpload files to this source in the form above and they arrive as `ctx.files`.\n\nThey are downloaded to local disk before any cell runs, so each one is an\nordinary path:\n\n- `ctx.files` -- every file, ordered by name\n- `ctx.file(\"dump.csv\")` -- one by name\n- `file.path` / `file.open()` / `file.read_bytes()` / `file.read_text()`\n- `file.parse()` -- text extraction for any format\n- `file.pages()` -- read it a page at a time instead of whole\n\nThis is the mechanism to use in a Kubernetes deployment: the runner is an\nephemeral pod with no filesystem of yours to reach, so files travel with the\nsource. You can also point at a folder instead -- see the\n\"Read a mounted folder\" template.\n"
                 },
                 {
                   "id": "imports",
@@ -3738,8 +3738,8 @@
         }
       },
       {
-        "name": "Read a folder on this machine (desktop)",
-        "description": "Walks a folder configured on the source and turns each file into an asset. Desktop only -- a Kubernetes deployment has no such machine, so upload the files to the source instead.",
+        "name": "Read a mounted folder",
+        "description": "Walks a folder configured on the source and turns each file into an asset. Works in both deployments: a path on this computer on desktop, or a volume mounted into scan pods by the chart in Kubernetes.",
         "config": {
           "type": "CUSTOM",
           "required": {
@@ -3749,7 +3749,7 @@
                 {
                   "id": "intro",
                   "type": "markdown",
-                  "source": "# A folder on this machine\n\nAdd a folder in **Local folders** above and reach it with `ctx.folder(\"name\")`,\nwhich hands back a `pathlib.Path`. Nothing is copied: the notebook opens the\nfiles where they are, which is what makes this workable for a dump too large to\nupload.\n\n**Desktop only.** In a Kubernetes deployment the runner is a pod with none of\nyour filesystem, so saving a source with local folders is refused there. Upload\nthe files to the source instead and read them with `ctx.files`.\n\nThis is a convenience rather than a boundary: the notebook process runs as you\nand can open any path you can. The folder list exists so the connector has a\nname to refer to instead of a hard-coded path.\n"
+                  "source": "# A folder the scan can read\n\nAdd a folder in **Files & folders** above and reach it with `ctx.folder(\"name\")`,\nwhich hands back a `pathlib.Path`. Nothing is copied: the notebook opens the\nfiles where they are, which is what makes this workable for a dump too large to\nupload.\n\nThe path is resolved on the machine that runs the scan. On desktop that is this\ncomputer, so any path you can open works. In Kubernetes it is an ephemeral scan\npod, so the folder has to be mounted into CLI jobs first -- set\n`api.localFolders` in the chart, then enter the `mountPath` you gave it (for\nexample `/mnt/corpora/dumps`).\n\nIf you would rather not mount anything, upload the files to the source and read\nthem with `ctx.files` instead.\n"
                 },
                 {
                   "id": "imports",

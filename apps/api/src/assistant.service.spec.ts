@@ -25,6 +25,7 @@ jest.mock('@workspace/schemas/assistant', () => {
     input: z.record(z.string(), z.unknown()),
     title: z.string(),
     detail: z.string(),
+    runtime: z.enum(['mcp', 'client']).default('mcp'),
   });
 
   const assistantUiActionSchema = z.discriminatedUnion('type', [
@@ -143,6 +144,7 @@ jest.mock('@workspace/schemas/assistant', () => {
   }
 
   return {
+    RUN_NOTEBOOK_TOOL: 'run_notebook',
     assistantContexts: contexts,
     assistantContextKeySchema,
     assistantFieldPatchSchema,
@@ -505,6 +507,159 @@ describe('AssistantService', () => {
     expect(messages[0].content).not.toContain(
       'CUSTOM source = a Python notebook connector',
     );
+  });
+
+  it('proposes a notebook run as a client-executed confirmation', async () => {
+    // The notebook lives in the browser and running it means saving the page
+    // first, so this one proposal is executed by the client — which is what
+    // lets the assistant watch its own code fail and fix it.
+    completeJson.mockResolvedValueOnce({
+      content: {
+        reply: 'Rewrote extract(); let us check it.',
+        uiActions: [],
+        proposeOperation: {
+          tool: 'run_notebook',
+          input: { mode: 'cell', cellId: 'extract' },
+          title: 'Run cell extract',
+          detail: 'save the source and run that cell',
+        },
+      },
+      raw: '{}',
+    });
+
+    const response = await service.respond({
+      messages: [{ role: 'user', content: 'write extract()' }],
+      context: {
+        ...baseContext,
+        values: { type: 'CUSTOM' },
+        metadata: { sourceType: 'CUSTOM' },
+      },
+    });
+
+    expect(response.pendingConfirmation).toEqual(
+      expect.objectContaining({
+        tool: 'run_notebook',
+        runtime: 'client',
+        input: { mode: 'cell', cellId: 'extract' },
+      }),
+    );
+    // It never touches MCP — there is no such tool there.
+    expect(callTool).not.toHaveBeenCalled();
+  });
+
+  it('falls back to a whole-notebook run when the model names no valid mode', async () => {
+    completeJson.mockResolvedValueOnce({
+      content: {
+        reply: 'Checking.',
+        uiActions: [],
+        proposeOperation: {
+          tool: 'run_notebook',
+          input: { mode: 'sideways' },
+        },
+      },
+      raw: '{}',
+    });
+
+    const response = await service.respond({
+      messages: [{ role: 'user', content: 'check it' }],
+      context: {
+        ...baseContext,
+        metadata: { sourceType: 'CUSTOM' },
+      },
+    });
+
+    expect(response.pendingConfirmation?.input).toEqual({ mode: 'all' });
+  });
+
+  it('refuses to execute a client-run confirmation on the server', async () => {
+    await expect(
+      service.respond({
+        messages: [{ role: 'user', content: 'Confirm' }],
+        context: baseContext,
+        confirmationDecision: 'confirm',
+        pendingConfirmation: {
+          tool: 'run_notebook',
+          input: { mode: 'all' },
+          title: 'Run',
+          detail: 'run',
+          runtime: 'client',
+        },
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('names the attached files so the model cannot invent one', async () => {
+    completeJson.mockResolvedValueOnce({
+      content: { reply: 'ok', uiActions: [], proposeOperation: null },
+      raw: '{}',
+    });
+
+    await service.respond({
+      messages: [{ role: 'user', content: 'read the spreadsheet' }],
+      context: {
+        ...baseContext,
+        metadata: {
+          sourceType: 'CUSTOM',
+          attachedFiles: ['audit.xlsx'],
+          notebookConfig: {
+            localFolders: [{ name: 'dumps', path: '/mnt/corpora/dumps' }],
+          },
+        },
+      },
+    });
+
+    const [messages] = completeJson.mock.calls[0] as [
+      Array<{ role: string; content: string }>,
+    ];
+    const system = messages[0].content;
+    const user = messages[1].content;
+
+    expect(user).toContain('"audit.xlsx"');
+    expect(user).toContain('dumps -> /mnt/corpora/dumps');
+    // The SDK surface is what stops ctx.files["name"], the mistake models make.
+    expect(system).toContain('ctx.file(');
+    expect(system).toContain('ctx.files is a LIST');
+    expect(system).toContain('Always importable');
+  });
+
+  it('says plainly when a source has nothing attached', async () => {
+    completeJson.mockResolvedValueOnce({
+      content: { reply: 'ok', uiActions: [], proposeOperation: null },
+      raw: '{}',
+    });
+
+    await service.respond({
+      messages: [{ role: 'user', content: 'read my file' }],
+      context: { ...baseContext, metadata: { sourceType: 'CUSTOM' } },
+    });
+
+    const [messages] = completeJson.mock.calls[0] as [
+      Array<{ role: string; content: string }>,
+    ];
+    expect(messages[1].content).toContain('NO uploaded files');
+  });
+
+  it('asks again when a turn comes back completely empty', async () => {
+    // A model that produced no structured output has not finished; replying
+    // "Done" for it would claim the request was handled when nothing was.
+    completeJson
+      .mockResolvedValueOnce({ content: {}, raw: '{}' })
+      .mockResolvedValueOnce({
+        content: {
+          reply: 'Here you go.',
+          uiActions: [],
+          proposeOperation: null,
+        },
+        raw: '{}',
+      });
+
+    const response = await service.respond({
+      messages: [{ role: 'user', content: 'write it' }],
+      context: baseContext,
+    });
+
+    expect(response.reply).toBe('Here you go.');
+    expect(completeJson).toHaveBeenCalledTimes(2);
   });
 
   it('executes a confirmed operation and appends server-built sync actions', async () => {

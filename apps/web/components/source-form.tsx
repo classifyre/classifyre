@@ -24,6 +24,8 @@ import type {
   NotebookCell,
   NotebookEditorHandle,
 } from "@/components/notebook/notebook-editor";
+import type { CustomSectionId } from "@/components/notebook/custom-source-config";
+import type { UploadedFileMetadata } from "@/components/uploaded-files";
 import { applyNotebookOperations } from "@/lib/notebook-cells";
 import type { AssistantNotebookOperation } from "@workspace/api-client";
 
@@ -50,6 +52,15 @@ interface SourceFormProps {
   onResumeSchedule?: () => Promise<void>;
   showActions?: boolean;
   afterNameContent?: React.ReactNode;
+  /** CUSTOM: files already stored on the source, and the live uploader's callback. */
+  files?: UploadedFileMetadata[];
+  onFilesChange?: (files: UploadedFileMetadata[]) => void;
+  /** CUSTOM: told when the notebook starts or stops executing. */
+  onNotebookBusyChange?: (busy: boolean) => void;
+  /** CUSTOM: a cell's play button. Validates and saves before it runs. */
+  onRunCell?: (cellId: string) => void;
+  /** CUSTOM: anchors for the page's stepper. */
+  customSectionRef?: (id: CustomSectionId, element: HTMLElement | null) => void;
 }
 
 /** Everything a CUSTOM source's notebook is configured with, read live. */
@@ -66,6 +77,20 @@ export interface SourceFormHandle extends JsonSchemaFormHandle {
   getSchema: () => JSONSchema7 | null;
   /** The CUSTOM notebook and its config, or null for every other type. */
   getNotebookContext: () => NotebookContext | null;
+  /**
+   * Runs the notebook. The caller is expected to have validated and saved
+   * first — running an unsaved notebook would execute the stored revision.
+   */
+  runNotebook: (
+    mode: "cell" | "all" | "test_connection" | "preview_extract",
+    targetCellId?: string,
+  ) => Promise<void>;
+  /** The same run, rendered as text the assistant can read and act on. */
+  runNotebookAndSummarize: (
+    mode: "cell" | "all" | "test_connection" | "preview_extract",
+    targetCellId?: string,
+  ) => Promise<string>;
+  cancelNotebook: () => void;
   /** Applies the assistant's cell edits. Returns what it actually changed. */
   applyNotebookOperations: (
     operations: AssistantNotebookOperation[],
@@ -94,6 +119,11 @@ export const SourceForm = React.forwardRef<SourceFormHandle, SourceFormProps>(
       onResumeSchedule,
       showActions = true,
       afterNameContent,
+      files,
+      onFilesChange,
+      onNotebookBusyChange,
+      onRunCell,
+      customSectionRef,
     },
     ref,
   ) {
@@ -280,6 +310,13 @@ export const SourceForm = React.forwardRef<SourceFormHandle, SourceFormProps>(
       ref,
       () => ({
         getSchema: () => enhancedSchema,
+        runNotebook: async (mode, targetCellId) => {
+          await notebookRef.current?.run(mode, targetCellId);
+        },
+        runNotebookAndSummarize: async (mode, targetCellId) =>
+          (await notebookRef.current?.runAndSummarize(mode, targetCellId)) ??
+          "There is no notebook on this source to run.",
+        cancelNotebook: () => notebookRef.current?.cancel(),
         getNotebookContext: () => {
           const cells = isCustom ? notebookRef.current?.getCells() : null;
           if (!cells) {
@@ -370,16 +407,17 @@ export const SourceForm = React.forwardRef<SourceFormHandle, SourceFormProps>(
         showActions={showActions}
         afterNameContent={
           isCustom ? (
-            // The uploader goes inside the notebook config rather than above
-            // it: uploaded files are one of the two ways a notebook reaches a
-            // file, and the other one is right beside it.
             <CustomSourceConfig
               sourceId={sourceId}
               draft={customDraft}
               onChange={setCustomDraft}
               disabled={disabled}
-              filesSlot={afterNameContent}
+              files={files}
+              onFilesChange={onFilesChange}
               notebookRef={notebookRef}
+              onBusyChange={onNotebookBusyChange}
+              onRunCell={onRunCell}
+              sectionRef={customSectionRef}
             />
           ) : (
             afterNameContent

@@ -5,6 +5,7 @@ import {
   assistantChatResponseSchema,
   assistantContexts,
   assistantUiActionSchema,
+  RUN_NOTEBOOK_TOOL,
   type AssistantChatRequest,
   type AssistantChatResponse,
   type AssistantPageContext,
@@ -254,6 +255,26 @@ export class AssistantService {
         continue;
       }
 
+      // A turn with nothing in it at all — no prose, no actions, no proposal —
+      // is a model that failed to produce structured output, not a model that
+      // is finished. Returning "Done" for it tells the user their request was
+      // handled when nothing happened, so ask once more instead.
+      if (
+        !turn.reply?.trim() &&
+        turn.uiActions.length === 0 &&
+        !turn.proposeOperation &&
+        iteration < budget - 1
+      ) {
+        state.messages.push({
+          role: 'user',
+          content:
+            'That turn was empty. Answer the request now: return JSON with a ' +
+            '"reply", plus any uiActions and at most one proposeOperation. Do ' +
+            'not return an empty object.',
+        });
+        continue;
+      }
+
       // Final turn: collect UI actions and an optional mutation proposal.
       this.collectUiActions(state, turn.uiActions);
       const pendingConfirmation = this.buildPendingConfirmation(
@@ -369,6 +390,35 @@ export class AssistantService {
     if (!proposal) {
       return null;
     }
+
+    // Running the notebook is not an MCP tool: the notebook lives in the
+    // browser, and running it means saving the page first. The client
+    // intercepts Confirm for this one and answers with what happened.
+    if (proposal.tool === RUN_NOTEBOOK_TOOL) {
+      const module = assistantContextModules[state.context.key];
+      if (!module.uiActions.includes('notebook_edit')) {
+        return null;
+      }
+      const rawMode = proposal.input?.mode;
+      const mode = typeof rawMode === 'string' ? rawMode : 'all';
+      const allowed = ['cell', 'all', 'test_connection', 'preview_extract'];
+      const input: Record<string, unknown> = {
+        mode: allowed.includes(mode) ? mode : 'all',
+      };
+      if (typeof proposal.input?.cellId === 'string') {
+        input.cellId = proposal.input.cellId;
+      }
+      return {
+        tool: RUN_NOTEBOOK_TOOL,
+        input,
+        runtime: 'client',
+        title: proposal.title?.trim() || 'Run the notebook',
+        detail:
+          proposal.detail?.trim() ||
+          `save this source and run the notebook (${String(input.mode)})`,
+      };
+    }
+
     const tool = state.tools.find((entry) => entry.name === proposal.tool);
     if (!tool) {
       this.logger.warn(
@@ -384,6 +434,7 @@ export class AssistantService {
     return {
       tool: proposal.tool,
       input: proposal.input,
+      runtime: 'mcp',
       title: proposal.title?.trim() || `Run ${proposal.tool} via MCP`,
       detail: proposal.detail?.trim() || `execute ${proposal.tool}`,
     };
@@ -397,6 +448,13 @@ export class AssistantService {
     const pending = request.pendingConfirmation;
     if (!pending) {
       throw new BadRequestException('No pending assistant confirmation found');
+    }
+    if (pending.tool === RUN_NOTEBOOK_TOOL || pending.runtime === 'client') {
+      // The browser runs this one and reports back as a normal message; the
+      // server never sees a confirm for it unless a client got it wrong.
+      throw new BadRequestException(
+        `"${pending.tool}" is executed by the client, not the API.`,
+      );
     }
 
     // Any live MCP tool may be confirmed — the catalog is exposed in full. The
@@ -837,6 +895,56 @@ function renderMentions(context: AssistantPageContext): string {
  * ids (which is what `notebook_edit` addresses), and the dump gets a placeholder
  * in their place.
  */
+/**
+ * The files and folders this source actually has.
+ *
+ * Named explicitly because a model that has to guess writes a filename it
+ * invented and then a `FileNotFoundError` it raised itself. These are the only
+ * names `ctx.file(...)` and `ctx.folder(...)` will answer to.
+ */
+function renderAttachments(context: AssistantPageContext): string {
+  const metadata = context.metadata ?? {};
+  const files = Array.isArray(metadata.attachedFiles)
+    ? metadata.attachedFiles.filter(
+        (entry): entry is string => typeof entry === 'string',
+      )
+    : [];
+  const folders = Array.isArray(
+    (metadata.notebookConfig as { localFolders?: unknown })?.localFolders,
+  )
+    ? (
+        (metadata.notebookConfig as { localFolders: unknown[] }).localFolders ??
+        []
+      ).map((entry) => {
+        const folder = (entry ?? {}) as Record<string, unknown>;
+        const name = typeof folder.name === 'string' ? folder.name : '?';
+        const path = typeof folder.path === 'string' ? folder.path : '?';
+        return `${name} -> ${path}`;
+      })
+    : [];
+
+  if (files.length === 0 && folders.length === 0) {
+    return [
+      '',
+      '## Attached data',
+      'This source has NO uploaded files and NO configured folders. ctx.files is',
+      'empty and ctx.folder(...) will raise. Do not write code that reads one —',
+      'ask the user to upload a file or add a folder first.',
+    ].join('\n');
+  }
+
+  return [
+    '',
+    '## Attached data — the ONLY names ctx.file()/ctx.folder() accept',
+    files.length > 0
+      ? `Uploaded files (ctx.file("name")): ${files.map((name) => `"${name}"`).join(', ')}`
+      : 'Uploaded files: (none)',
+    folders.length > 0
+      ? `Configured folders (ctx.folder("name")): ${folders.join(', ')}`
+      : 'Configured folders: (none)',
+  ].join('\n');
+}
+
 function renderNotebook(context: AssistantPageContext): {
   section: string;
   values: Record<string, unknown>;
@@ -904,6 +1012,7 @@ function buildUserMessage(request: AssistantChatRequest): string {
     '## Current form values',
     safeJsonStringify(notebook.values, 8000),
     notebook.section,
+    renderAttachments(request.context),
     renderMentions(request.context),
     '',
     '## Client-side validation snapshot (advisory — server validation is authoritative)',

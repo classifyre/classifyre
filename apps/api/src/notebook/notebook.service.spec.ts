@@ -282,19 +282,6 @@ describe('NotebookService', () => {
       }
     });
 
-    it('marks only the folder-reading template as desktop-only', () => {
-      // The flag is what lets the editor hide a template that cannot work
-      // behind a browser tab talking to a cluster: it configures an absolute
-      // path on local disk, which the API refuses to store there anyway.
-      const { service } = buildService(configWith());
-      const desktopOnly = service
-        .templates()
-        .filter((template) => template.desktopOnly)
-        .map((template) => template.name);
-
-      expect(desktopOnly).toEqual(['Read a folder on this machine (desktop)']);
-    });
-
     it('includes the file, upload, folder and link examples', () => {
       const { service } = buildService(configWith());
       const names = service.templates().map((template) => template.name);
@@ -303,7 +290,7 @@ describe('NotebookService', () => {
           'Starter notebook',
           'Parse files of any format',
           'Read files uploaded to this source',
-          'Read a folder on this machine (desktop)',
+          'Read a mounted folder',
           'Linked assets',
         ]),
       );

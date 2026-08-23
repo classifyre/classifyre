@@ -1,13 +1,11 @@
 "use client";
 
-import * as React from "react";
 import { Badge, Card } from "@workspace/ui/components";
 import { FileText, Sparkles } from "lucide-react";
 import { AiAssistedCard } from "@/components/ai-assisted-card";
 import type { SourceType } from "@/components/source-form";
 import { cn } from "@workspace/ui/lib/utils";
-import { isDesktopOnlyExample, type SourceExample } from "@/lib/example-loader";
-import { isDesktopRuntime } from "@/lib/desktop";
+import type { SourceExample } from "@/lib/example-loader";
 import { useTranslation } from "@/hooks/use-translation";
 
 interface SourceExampleSelectorProps {
@@ -24,14 +22,6 @@ export function SourceExampleSelector({
   onStartBlank,
 }: SourceExampleSelectorProps) {
   const { t } = useTranslation();
-  // Resolved after mount, not during render: the flag reads `window`, and the
-  // page is prerendered by the static export.
-  const [desktop, setDesktop] = React.useState(false);
-  React.useEffect(() => setDesktop(isDesktopRuntime()), []);
-  const visibleExamples = examples.filter(
-    (example) => desktop || !isDesktopOnlyExample(example),
-  );
-
   return (
     <AiAssistedCard
       title={t("ai.assistantQuickStart")}
@@ -66,7 +56,7 @@ export function SourceExampleSelector({
             </Card>
           </button>
 
-          {visibleExamples.map((example, index) => (
+          {examples.map((example, index) => (
             <button
               key={`${example.name}-${index}`}
               type="button"
@@ -102,7 +92,7 @@ export function SourceExampleSelector({
           ))}
         </div>
 
-        {visibleExamples.length === 0 ? (
+        {examples.length === 0 ? (
           <p className="text-[10px] font-mono uppercase tracking-[0.16em] text-muted-foreground">
             {t("ai.noTemplatesAvailable")}
           </p>

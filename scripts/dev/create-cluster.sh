@@ -23,9 +23,14 @@ if [[ -z "${k3d_version}" || -z "${k3d_latest_version}" || "${k3d_version}" != "
 fi
 
 if ! k3d cluster list --no-headers 2>/dev/null | awk '{print $1}' | grep -qx classifyre; then
+  # ~/Downloads is mounted so there is a real, changing folder on the host to
+  # point a "Mounted Folder" source at — the Kubernetes equivalent of picking a
+  # folder in the desktop app. helm/classifyre/values-dev.yaml mounts it
+  # into every CLI job pod at /mnt/corpora/downloads.
   k3d cluster create \
     --config "${repo_root}/deploy/dev/k3d.yaml" \
-    --volume "${repo_root}:/var/lib/classifyre/source@server:0"
+    --volume "${repo_root}:/var/lib/classifyre/source@server:0" \
+    --volume "${HOME}/Downloads:/var/lib/classifyre/host-folders/downloads@server:0"
 fi
 
 mounted_source="$(

@@ -11,6 +11,7 @@ import {
   type AssistantToolCallSummary,
   type AssistantUiAction,
   type AssistantPageContext,
+  RUN_NOTEBOOK_TOOL,
 } from "@workspace/api-client";
 import { assistantContexts } from "@workspace/schemas/assistant";
 import {
@@ -57,6 +58,17 @@ export type AssistantPageBridge = {
    * and read live state (a ref, not a captured value).
    */
   getMentions?: () => AssistantMention[];
+  /**
+   * Runs the notebook after saving the page, and resolves with what happened.
+   *
+   * This is what lets the assistant check its own work: it proposes a run, the
+   * user confirms, and the result — stdout, or the traceback with the failing
+   * line — comes back as the next message for it to react to.
+   */
+  runNotebook?: (input: {
+    mode: "cell" | "all" | "test_connection" | "preview_extract";
+    cellId?: string;
+  }) => Promise<string>;
 };
 
 type AssistantThread = {
@@ -435,6 +447,46 @@ export function AssistantWorkflowProvider({
     ],
   );
 
+  /**
+   * Confirm the pending proposal.
+   *
+   * A notebook run is executed here rather than by the API: the notebook is in
+   * the browser, and running it means saving the page's form first. Its outcome
+   * is then sent as an ordinary message, so the assistant reads the traceback
+   * the same way it would read anything else the user told it.
+   */
+  const confirmPending = React.useCallback(async () => {
+    const pending = pendingConfirmation;
+    if (pending?.tool === RUN_NOTEBOOK_TOOL && bridge?.runNotebook) {
+      setPendingConfirmation(null);
+      setSubmitting(true);
+      let outcome: string;
+      try {
+        outcome = await bridge.runNotebook({
+          mode:
+            (pending.input?.mode as
+              | "cell"
+              | "all"
+              | "test_connection"
+              | "preview_extract") ?? "all",
+          cellId:
+            typeof pending.input?.cellId === "string"
+              ? pending.input.cellId
+              : undefined,
+        });
+      } catch (error) {
+        outcome = `The run could not be started: ${
+          error instanceof Error ? error.message : "unknown error"
+        }`;
+      } finally {
+        setSubmitting(false);
+      }
+      await sendMessage(`Result of the run you asked for:\n\n${outcome}`);
+      return;
+    }
+    await sendMessage("Confirm", "confirm");
+  }, [bridge, pendingConfirmation, sendMessage, setPendingConfirmation]);
+
   const handleFileUpload = React.useCallback(
     async (event: React.ChangeEvent<HTMLInputElement>) => {
       const file = event.target.files?.[0];
@@ -527,6 +579,13 @@ export function AssistantWorkflowProvider({
   // "the notebook" would hand the menu stale cells.
   const mentions = open && active ? (bridge?.getMentions?.() ?? []) : [];
 
+  // Chat-side uploads exist so the assistant can read a spreadsheet you are
+  // asking questions *about*. On a source page that is the wrong door: the
+  // page's own uploader puts the file where the connector will find it.
+  const supportsUpload =
+    bridge?.contextKey !== "source.create" &&
+    bridge?.contextKey !== "source.edit";
+
   return (
     <AssistantWorkflowContext.Provider value={contextValue}>
       {children}
@@ -546,7 +605,7 @@ export function AssistantWorkflowProvider({
             title={contextMeta?.title ?? "Assistant"}
             messages={messages}
             pendingConfirmation={pendingConfirmation}
-            onConfirm={() => void sendMessage("Confirm", "confirm")}
+            onConfirm={() => void confirmPending()}
             onCancelConfirmation={() => {
               setPendingConfirmation(null);
               toast("Assistant action cancelled");
@@ -562,17 +621,26 @@ export function AssistantWorkflowProvider({
                 ? "Describe what you want built. Type @ to reference a cell, an uploaded file or a detector…"
                 : "Assistant is unavailable for this page."
             }
-            uploadedFiles={uploadedFiles.map((file, index) => ({
-              id: `${file.fileName}-${index}`,
-              label: `${file.fileName} · ${formatBytes(file.bytes)}`,
-            }))}
-            onUploadClick={() => uploadInputRef.current?.click()}
+            uploadedFiles={
+              supportsUpload
+                ? uploadedFiles.map((file, index) => ({
+                    id: `${file.fileName}-${index}`,
+                    label: `${file.fileName} · ${formatBytes(file.bytes)}`,
+                  }))
+                : []
+            }
+            // A source page has its own uploader, whose files the connector can
+            // actually read. A second button here uploaded into the chat
+            // instead, which looked identical and did something else.
+            onUploadClick={
+              supportsUpload
+                ? () => uploadInputRef.current?.click()
+                : undefined
+            }
             uploadDisabled={!active || submitting || uploadingFile}
             uploadingFile={uploadingFile}
             footerNote={
-              active
-                ? "Patches apply locally first. MCP mutations stay behind confirmation."
-                : "Enable AI in settings to activate the assistant."
+              active ? undefined : "Enable AI in settings to activate the assistant."
             }
             onClose={() => setOpen(false)}
             mentions={mentions}

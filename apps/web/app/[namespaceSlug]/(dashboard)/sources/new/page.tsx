@@ -30,6 +30,12 @@ import {
 } from "@/components/source-scan-config";
 import { SourceDetectorConfigCard } from "@/components/source-detector-config-card";
 import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@workspace/ui/components/card";
+import {
   HorizontalStepperNav,
   VerticalStepperNav,
   type SourceStepId,
@@ -58,6 +64,7 @@ import {
   type UploadedFileMetadata,
 } from "@/components/uploaded-files";
 import { deleteSourceFile, uploadSourceFile } from "@/lib/source-files-api";
+import { loadScaffold } from "@/components/notebook/custom-source-config";
 
 /**
  * A brand-new source starts on the adaptive schedule: it is the right choice
@@ -67,6 +74,22 @@ import { deleteSourceFile, uploadSourceFile } from "@/lib/source-files-api";
 const newSourceSchedule = (
   schedule?: Parameters<typeof defaultScheduleValue>[0],
 ) => defaultScheduleValue(schedule ?? { mode: "AUTO" });
+
+/**
+ * A CUSTOM source is created the moment its starting point is chosen, rather
+ * than at the end of the form.
+ *
+ * Everything a notebook author actually does needs an id: uploading a file,
+ * running a cell, testing the connection, previewing extract(). Deferring
+ * creation meant the whole page carried a second, worse implementation of each
+ * of those — files queued as "pending" and silently dropped, Run disabled until
+ * a save that could not happen until a name was typed. So the source is saved
+ * first with a placeholder name and the author edits a real thing from the
+ * first keystroke. It appears in the source list straight away, which is the
+ * honest thing for a record that exists; renaming it is the next field they
+ * fill in.
+ */
+const CUSTOM_DRAFT_NAME_KEY = "sources.new.customDraftName";
 
 const normalizeDetectors = (detectors: DetectorConfigInput[]) =>
   detectors
@@ -118,6 +141,68 @@ export default function NewSourcePage() {
     message: "Testing connection...",
   });
 
+  /**
+   * Create the source now and hand the author its edit page.
+   *
+   * Only for CUSTOM. Every other type is a form that is answered before it is
+   * worth saving; a notebook is a thing you work on, and working on it needs an
+   * id (uploads, runs, connection tests all address one).
+   */
+  const createCustomDraft = async (
+    config: Record<string, unknown> | undefined,
+    extras?: {
+      detectors?: DetectorConfigInput[];
+      customDetectorIds?: string[];
+      schedule?: SourceExample["schedule"];
+    },
+  ) => {
+    setIsSavingConfig(true);
+    try {
+      const notebook = (
+        config as { required?: { notebook?: { cells?: unknown[] } } } | undefined
+      )?.required?.notebook;
+      // A blank start still gets the scaffold: the starter cells already
+      // satisfy the connector contract, so the first edit is a change to
+      // working code rather than a guess at what is required.
+      const cells =
+        Array.isArray(notebook?.cells) && notebook.cells.length > 0
+          ? notebook.cells
+          : await loadScaffold();
+
+      const created = await api.sources.sourcesControllerCreateSource({
+        createSourceDto: {
+          name: t(CUSTOM_DRAFT_NAME_KEY),
+          type: "CUSTOM",
+          config: {
+            ...(config ?? {}),
+            type: "CUSTOM",
+            required: { notebook: { revision: 1, cells } },
+            masked: { secrets: {} },
+            optional:
+              (config as { optional?: Record<string, unknown> } | undefined)
+                ?.optional ?? {},
+            ...(extras?.detectors?.length
+              ? { detectors: normalizeDetectors(extras.detectors) }
+              : {}),
+            ...(extras?.customDetectorIds?.length
+              ? { custom_detectors: extras.customDetectorIds }
+              : {}),
+          },
+          ...scheduleFieldsFor(newSourceSchedule(extras?.schedule)),
+        } as never,
+      });
+      if (!created?.id) {
+        throw new Error("The API returned no source id");
+      }
+      router.replace(nsPath(`/sources/${created.id}/edit`));
+    } catch (error) {
+      setIsSavingConfig(false);
+      toast.error(
+        await extractApiErrorMessage(error, t("sources.new.createFailed")),
+      );
+    }
+  };
+
   const handleSelectExample = (example: SourceExample) => {
     const {
       type: _type,
@@ -125,26 +210,36 @@ export default function NewSourcePage() {
       custom_detectors: exampleCustomDetectors,
       ...configData
     } = example.config as Record<string, unknown>;
-    setFormDefaultValues(sanitizeTemplateConfig(configData));
-    setSelectedCustomDetectorIds(
-      Array.isArray(exampleCustomDetectors)
-        ? exampleCustomDetectors
-            .map((entry) => String(entry).trim())
-            .filter((entry) => entry.length > 0)
-        : [],
-    );
-    if (Array.isArray(exampleDetectors)) {
-      const normalized = exampleDetectors.map((detector) => ({
-        type: String((detector as { type?: unknown }).type ?? ""),
-        enabled: Boolean((detector as { enabled?: unknown }).enabled ?? true),
-        config: (detector as { config?: Record<string, unknown> }).config ?? {},
-      }));
-      setDetectors(normalized);
-      setDetectorDefaults(normalized);
-    } else {
-      setDetectors([]);
-      setDetectorDefaults([]);
+    const templateDetectors = Array.isArray(exampleDetectors)
+      ? exampleDetectors.map((detector) => ({
+          type: String((detector as { type?: unknown }).type ?? ""),
+          enabled: Boolean((detector as { enabled?: unknown }).enabled ?? true),
+          config:
+            (detector as { config?: Record<string, unknown> }).config ?? {},
+        }))
+      : [];
+    const templateCustomDetectorIds = Array.isArray(exampleCustomDetectors)
+      ? exampleCustomDetectors
+          .map((entry) => String(entry).trim())
+          .filter((entry) => entry.length > 0)
+      : [];
+
+    // A CUSTOM source is saved here rather than at the end of the form, so the
+    // template's detectors travel with the create request instead of into form
+    // state this page is about to navigate away from.
+    if (selectedSourceType === "CUSTOM") {
+      void createCustomDraft(sanitizeTemplateConfig(configData), {
+        detectors: templateDetectors,
+        customDetectorIds: templateCustomDetectorIds,
+        schedule: example.schedule,
+      });
+      return;
     }
+
+    setFormDefaultValues(sanitizeTemplateConfig(configData));
+    setSelectedCustomDetectorIds(templateCustomDetectorIds);
+    setDetectors(templateDetectors);
+    setDetectorDefaults(templateDetectors);
     setSchedule(newSourceSchedule(example.schedule));
     setSourceId(null);
     setUploadedFiles([]);
@@ -154,6 +249,10 @@ export default function NewSourcePage() {
   };
 
   const handleStartBlank = () => {
+    if (selectedSourceType === "CUSTOM") {
+      void createCustomDraft(undefined);
+      return;
+    }
     setShowExamples(false);
     setFormDefaultValues(undefined);
     setDetectors([]);
@@ -820,16 +919,28 @@ function SourceStepperContent({
               schedule={schedule}
               onScheduleChange={onScheduleChange}
               afterNameContent={
-                selectedSourceType === "SANDBOX" ||
-                selectedSourceType === "CUSTOM" ? (
-                  <UploadedFiles
-                    existingFiles={uploadedFiles}
-                    pendingFiles={pendingFiles}
-                    pendingRemovalIds={pendingRemovalIds}
-                    onPendingFilesChange={onPendingFilesChange}
-                    onPendingRemovalIdsChange={onPendingRemovalIdsChange}
-                    disabled={isSavingConfig || isTestingConfig}
-                  />
+                // SANDBOX only. A CUSTOM source is saved the moment its
+                // starting point is chosen, so it is never created from this
+                // page and its files upload straight to the server.
+                selectedSourceType === "SANDBOX" ? (
+                  <Card className="rounded-[6px] border-2 border-border">
+                    <CardHeader>
+                      <CardTitle className="uppercase tracking-[0.06em]">
+                        {t("sources.uploadedFiles.title")}
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <UploadedFiles
+                        existingFiles={uploadedFiles}
+                        pendingFiles={pendingFiles}
+                        pendingRemovalIds={pendingRemovalIds}
+                        onPendingFilesChange={onPendingFilesChange}
+                        onPendingRemovalIdsChange={onPendingRemovalIdsChange}
+                        requireAtLeastOne
+                        disabled={isSavingConfig || isTestingConfig}
+                      />
+                    </CardContent>
+                  </Card>
                 ) : undefined
               }
             />
