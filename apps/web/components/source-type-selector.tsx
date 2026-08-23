@@ -7,18 +7,20 @@ import {
   type SourceCatalogEntry,
 } from "@workspace/ui/lib/source-catalog";
 import type { SourceType } from "@/components/source-form";
-import { isDesktopRuntime } from "@/lib/desktop";
 
 interface SourceTypeSelectorProps {
   onSelect: (type: SourceType) => void;
 }
 
-// Source types that scan the machine the API runs on. Only safe to expose in
-// the desktop (Electron) app or local development — never in a hosted /
-// Kubernetes deployment. Kept data-driven so filtering doesn't need
-// per-type string checks scattered around the UI.
-const DESKTOP_ONLY_SOURCE_TYPES = new Set<string>(["LOCAL_FOLDER"]);
-
+/**
+ * Every source type, in both deployments.
+ *
+ * The folder source used to be filtered out here unless the app was running on
+ * the desktop, on the reasoning that a hosted deployment has no local disk to
+ * scan. That is true of the API pod and irrelevant to the scan: a scan runs in
+ * a CLI job pod, and the chart's `api.localFolders` mounts a PVC, an NFS export
+ * or a ConfigMap into it. Nothing is deployment-gated any more.
+ */
 const ALL_SOURCE_CATALOG_ENTRIES: SourceCatalogEntry[] = Object.keys(
   SOURCE_TYPE_CATALOG_META,
 )
@@ -29,15 +31,9 @@ const ALL_SOURCE_CATALOG_ENTRIES: SourceCatalogEntry[] = Object.keys(
   .sort((left, right) => left.label.localeCompare(right.label));
 
 export function SourceTypeSelector({ onSelect }: SourceTypeSelectorProps) {
-  const entries = isDesktopRuntime()
-    ? ALL_SOURCE_CATALOG_ENTRIES
-    : ALL_SOURCE_CATALOG_ENTRIES.filter(
-        (entry) => !DESKTOP_ONLY_SOURCE_TYPES.has(entry.type),
-      );
-
   return (
     <SourceCatalog
-      entries={entries}
+      entries={ALL_SOURCE_CATALOG_ENTRIES}
       onSelect={(sourceType) => onSelect(sourceType as SourceType)}
     />
   );

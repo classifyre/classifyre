@@ -35,6 +35,59 @@ export async function uploadSourceFile(
   return response.json() as Promise<UploadedFileMetadata>;
 }
 
+/**
+ * Upload one file, reporting progress as it goes.
+ *
+ * XHR rather than fetch: `fetch` has no upload-progress event, and a 50 MB dump
+ * uploading behind a spinner that never moves is indistinguishable from one
+ * that has hung. The response is the stored file's metadata, same as the
+ * fetch-based call above.
+ */
+export function uploadSourceFileWithProgress(
+  sourceId: string,
+  file: File,
+  onProgress: (fraction: number) => void,
+): { promise: Promise<UploadedFileMetadata>; abort: () => void } {
+  const request = new XMLHttpRequest();
+  const promise = new Promise<UploadedFileMetadata>((resolve, reject) => {
+    request.open("POST", `${apiBase()}/sources/${sourceId}/files`);
+    request.upload.onprogress = (event) => {
+      if (event.lengthComputable && event.total > 0) {
+        onProgress(event.loaded / event.total);
+      }
+    };
+    request.onload = () => {
+      if (request.status >= 200 && request.status < 300) {
+        onProgress(1);
+        try {
+          resolve(JSON.parse(request.responseText) as UploadedFileMetadata);
+        } catch {
+          reject(new Error("The server returned an unreadable response"));
+        }
+        return;
+      }
+      // The API answers a duplicate with 409 and a JSON body naming the file
+      // that already holds those bytes; surface that rather than the status.
+      let message = `Upload failed with HTTP ${request.status}`;
+      try {
+        const body = JSON.parse(request.responseText) as { message?: unknown };
+        if (typeof body.message === "string") message = body.message;
+      } catch {
+        if (request.responseText) message = request.responseText;
+      }
+      reject(new Error(message));
+    };
+    request.onerror = () => reject(new Error("The upload could not be sent"));
+    request.onabort = () => reject(new DOMException("Aborted", "AbortError"));
+
+    const form = new FormData();
+    form.append("file", file);
+    request.send(form);
+  });
+
+  return { promise, abort: () => request.abort() };
+}
+
 export async function deleteSourceFile(
   sourceId: string,
   fileId: string,

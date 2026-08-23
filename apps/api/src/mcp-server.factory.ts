@@ -42,6 +42,32 @@ import { AutopilotService } from './autopilot/autopilot.service';
 
 const jsonObjectSchema = z.record(z.string(), z.unknown());
 
+/**
+ * A JSON object, or the JSON text of one.
+ *
+ * Models hand a config over as a string often enough that rejecting it costs a
+ * whole turn to relearn something the caller could simply have accepted. The
+ * shape that reaches the tool is identical either way.
+ */
+const jsonObjectOrTextSchema = z.union([
+  jsonObjectSchema,
+  z.string().transform((text, ctx): Record<string, unknown> => {
+    try {
+      const parsed: unknown = JSON.parse(text);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        return parsed as Record<string, unknown>;
+      }
+    } catch {
+      // fall through to the issue below
+    }
+    ctx.addIssue({
+      code: 'custom',
+      message: 'Expected a JSON object, or the JSON text of one.',
+    });
+    return z.NEVER;
+  }),
+]);
+
 // Zod 4.4.x introduced a type incompatibility with @modelcontextprotocol/sdk's AnySchema.
 // This adapter type uses z.ZodTypeAny (which Zod 4.4.x classic types do extend) so that
 // raw shape objects can be passed to registerTool/registerPrompt without type errors.
@@ -1176,7 +1202,7 @@ export class McpServerFactoryService {
           'Dry-run validate a source config against its JSON Schema without creating anything. Returns normalized config on success or a list of validation errors on failure.',
         inputSchema: {
           type: z.string(),
-          config: jsonObjectSchema,
+          config: jsonObjectOrTextSchema,
         },
         annotations: {
           readOnlyHint: true,
@@ -1185,9 +1211,17 @@ export class McpServerFactoryService {
       },
       ({ type, config }) => {
         try {
+          // `name`, `description` and the detector selection travel with the
+          // form the caller copied this from, but they are not part of a source
+          // *config* and the schema forbids unknown keys. Dropping them here
+          // turns a confusing "must NOT have additional properties" into a
+          // validation that answers the question actually being asked.
+          const { name, description, ...configFields } = config;
+          void name;
+          void description;
           const normalizedConfig = this.validationService.validate(
             type,
-            config,
+            configFields,
           );
           return jsonResult({ valid: true, normalizedConfig });
         } catch (error) {

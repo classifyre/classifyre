@@ -130,11 +130,12 @@ data:
                   {
                     "name": "uv-cache",
                     "mountPath": "{{ .Values.api.cliJobs.uvCache.mountPath }}"
-                  }{{ if .Values.api.cliJobs.extraVolumeMounts }},{{ end }}
+                  }{{ if or .Values.api.cliJobs.extraVolumeMounts .Values.api.localFolders }},{{ end }}
                   {{- end }}
                   {{- range $i, $vm := .Values.api.cliJobs.extraVolumeMounts }}
-                  {{ $vm | toJson }}{{ if lt (add1 $i) (len $.Values.api.cliJobs.extraVolumeMounts) }},{{ end }}
+                  {{ $vm | toJson }}{{ if or (lt (add1 $i) (len $.Values.api.cliJobs.extraVolumeMounts)) $.Values.api.localFolders }},{{ end }}
                   {{- end }}
+                  {{- include "classifyre.localFolders.volumeMountsJson" . | nindent 18 }}
                 ],
                 "workingDir": "{{ .Values.api.cliJobs.workDir }}"
               }
@@ -146,11 +147,12 @@ data:
                 "persistentVolumeClaim": {
                   "claimName": "{{ default (printf "%s-cli-uv-cache" (include "classifyre.fullname" .)) .Values.api.cliJobs.uvCache.existingClaim }}"
                 }
-              }{{ if .Values.api.cliJobs.extraVolumes }},{{ end }}
+              }{{ if or .Values.api.cliJobs.extraVolumes .Values.api.localFolders }},{{ end }}
               {{- end }}
               {{- range $i, $vol := .Values.api.cliJobs.extraVolumes }}
-              {{ $vol | toJson }}{{ if lt (add1 $i) (len $.Values.api.cliJobs.extraVolumes) }},{{ end }}
+              {{ $vol | toJson }}{{ if or (lt (add1 $i) (len $.Values.api.cliJobs.extraVolumes)) $.Values.api.localFolders }},{{ end }}
               {{- end }}
+              {{- include "classifyre.localFolders.volumesJson" . | nindent 14 }}
             ]
           }
         }
