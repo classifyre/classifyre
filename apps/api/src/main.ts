@@ -186,10 +186,31 @@ async function bootstrap() {
         'above so "Try it out" targets a real workspace. The only unscoped ' +
         'routes are `/namespaces`, `/ping` and `/api/health/pressure`.',
     )
-    // Server variable so the interactive docs prepend the tenant segment that
-    // `namespaceRewriteUrl` strips; without it every "Try it out" call 404s
-    // with `Unknown namespace '<first path segment>'`.
-    .addServer('/{namespace}', 'Namespace-scoped API', {
+    // Two servers, because the API is reachable at two different roots and a
+    // relative server URL is resolved against whatever origin is serving this
+    // page:
+    //
+    //  * Behind the ingress / the desktop shell the API only exists under
+    //    `/api` (nginx routes `/api/(.*)` to the API service and strips the
+    //    prefix; the web app proxies the same path). This page itself is
+    //    served as `<host>/api/docs`, so `/api/{namespace}` is the default.
+    //  * Talking to the API process directly (`localhost:8000/docs`, in-cluster
+    //    service DNS) there is no `/api` prefix — pick the second entry.
+    //
+    // The `{namespace}` variable exists because `namespaceRewriteUrl` strips
+    // the leading path segment as a tenant; without it every "Try it out" call
+    // 404s with `Unknown namespace '<first path segment>'`.
+    .addServer(
+      '/api/{namespace}',
+      'Through the web gateway (ingress/desktop)',
+      {
+        namespace: {
+          default: 'your-workspace-slug',
+          description: 'Workspace slug or namespace UUID',
+        },
+      },
+    )
+    .addServer('/{namespace}', 'Directly against the API service', {
       namespace: {
         default: 'your-workspace-slug',
         description: 'Workspace slug or namespace UUID',
@@ -213,7 +234,19 @@ async function bootstrap() {
     .build();
 
   const documentFactory = () => SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api', app, documentFactory);
+  // Mounted at `/docs`, NOT `/api`. The ingress routes `/api/(.*)` to this
+  // service with the `/api` prefix stripped (and the web app's `/api/[...path]`
+  // proxy does the same), so anything served at `/api` on the API process is
+  // unreachable from a browser — the request arrives here as `/`. `/docs`
+  // survives that strip, which makes the one URL `<host>/api/docs` work through
+  // the ingress, through the desktop/dev proxy, and `<api>/docs` work when
+  // talking to the process directly.
+  //
+  // `docs`, `docs-json` and `docs-yaml` are all in RESERVED_PREFIXES so
+  // `namespaceRewriteUrl` does not mistake them for a tenant slug. Swagger UI's
+  // own assets are requested relative to the page, so they inherit whatever
+  // prefix the caller used and need no further routing.
+  SwaggerModule.setup('docs', app, documentFactory);
 
   const fastify = app.getHttpAdapter().getInstance();
   const mcpServerFactory = app.get(McpServerFactoryService);
