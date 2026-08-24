@@ -2537,6 +2537,10 @@ class TableauOptionalExtraction(BaseModel):
     extract_usage_stats: bool | None = Field(
         False, description='Extract Tableau usage statistics when accessible'
     )
+    include_lineage: bool | None = Field(
+        True,
+        description='Resolve the database tables behind each published data source via the Tableau Metadata API, so lineage reaches the warehouse those tables live in. Needs the Metadata API enabled on the server.',
+    )
 
 
 class TableauOptional(BaseModel):

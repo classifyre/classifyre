@@ -88,6 +88,9 @@ class BaseSource(ABC):
         self._aborted = False
         self._discovery_only = False
         self._attachment_name_by_hash: dict[str, str] = {}
+        # Relationship edges discovered mid-extraction (see add_edge).
+        self._pending_edges: list[Any] = []
+        self._pending_edges_lock = threading.Lock()
         # Set by main.py for API runs (see attach_payload_windows). None means
         # payloads stream whole.
         self._payload_windows: Any = None
@@ -515,12 +518,67 @@ class BaseSource(ABC):
         """
         return normalize_http_url(link)
 
-    async def collect_relationships(self) -> list[IngestEdge]:
-        """Return source-derived relationship edges for the investigation graph.
+    # ── Relationships ────────────────────────────────────────────────────
+    #
+    # Two ways in, for two shapes of connector.
+    #
+    # ``add_edge`` is for a connector that learns a relationship while it is
+    # walking the source — the natural shape for lineage, where every table
+    # brings its own upstreams. Edges are buffered and drained periodically, so
+    # a warehouse scan does not hold every column mapping in memory until the
+    # end, and a run that dies partway still lands what it found.
+    #
+    # ``collect_relationships`` is for a connector that can only answer the
+    # question once everything is known — the email source pairs messages with
+    # attachments this way. It stays because it is the right shape for that job.
+    #
+    # Both are typed through ``src.graph.edges``: the builders there are what
+    # keep a containment relation from being filed as lineage.
 
-        Connectors override this to emit typed edges (READS, ATTACHED_TO,
-        SENT_TO, OWNS, ACCESSED, etc.) discovered during extraction. The caller
-        (main.py) will forward these to ``RestOutputSink.emit_edges()``.
+    def add_edge(self, edge: Any) -> None:
+        """Buffer one relationship edge, to be flushed during the run.
+
+        Safe to call from worker threads.
+        """
+        if edge is None:
+            return
+        with self._pending_edges_lock:
+            self._pending_edges.append(edge)
+
+    def add_edges(self, edges: Any) -> None:
+        """Buffer several edges. Ignores None and empty iterables."""
+        if not edges:
+            return
+        with self._pending_edges_lock:
+            self._pending_edges.extend(edge for edge in edges if edge is not None)
+
+    def pending_edge_count(self) -> int:
+        with self._pending_edges_lock:
+            return len(self._pending_edges)
+
+    def drain_edges(self) -> list[IngestEdge]:
+        """Take everything buffered so far, converted to the wire model.
+
+        Called by ``main.py`` between batches and again before the run is
+        finalized. Returns wire models rather than SDK objects so the sink stays
+        unaware of the builder vocabulary.
+        """
+        with self._pending_edges_lock:
+            buffered = self._pending_edges
+            self._pending_edges = []
+        return [self._to_ingest_edge(edge) for edge in buffered]
+
+    @staticmethod
+    def _to_ingest_edge(edge: Any) -> IngestEdge:
+        to_ingest = getattr(edge, "to_ingest", None)
+        return to_ingest() if callable(to_ingest) else edge
+
+    async def collect_relationships(self) -> list[IngestEdge]:
+        """Return relationships that can only be known once extraction is done.
+
+        Override when the relationship is between two things the connector has
+        to see both of first — an email and the attachment it carried. For a
+        relationship discovered as you go, prefer ``add_edge``.
 
         Default: no relationships (empty list).
         """

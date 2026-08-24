@@ -21,11 +21,12 @@ import sys
 from dataclasses import asdict
 from typing import Any
 
+from ...graph.edges import edge_to_payload
 from ...notebook.contract import validate_module
 from ...notebook.execute import cell_filename
 from ...notebook.files import local_folders
 from ...notebook.redact import RedactingStream, Redactor
-from ...notebook.sdk import Asset, Context, iter_assets, namespace
+from ...notebook.sdk import Asset, Context, iter_assets, iter_relationships, namespace
 from ...notebook.serialize import (
     cell_id_of,
     cell_source_of,
@@ -250,6 +251,18 @@ class NotebookRuntime:
             "cursor": self.context.next_cursor,
         }
 
+    def relationships(self) -> list[dict[str, Any]]:
+        """Typed relationships the notebook declared, if it declared any.
+
+        Returned in one response rather than streamed like assets: a notebook
+        knows its relationships only after it has decided what to yield, and the
+        set is bounded by what one notebook can describe by hand.
+        """
+        function = self.globals.get("relationships")
+        if not callable(function):
+            return []
+        return [edge_to_payload(edge) for edge in iter_relationships(function())]
+
     def fetch_content(self, asset_id: str) -> dict[str, Any] | None:
         function = self.globals.get("fetch_content")
         if not callable(function):
@@ -290,6 +303,8 @@ def _handle(runtime: NotebookRuntime, request: dict[str, Any]) -> dict[str, Any]
             sampling=str(request.get("sampling") or "window"),
             offset=int(request.get("offset") or 0),
         )
+    if command == "relationships":
+        return {"result": runtime.relationships()}
     if command == "fetch_content":
         return {"result": runtime.fetch_content(str(request.get("assetId") or ""))}
     raise ValueError(f"Unknown command {command!r}")

@@ -28,6 +28,12 @@ import {
  */
 export interface BulkIngestEdgesDto {
     /**
+     * Which source the hashes belong to. An asset hash is only unique per source, so without this the API has to guess which of two assets sharing a hash an edge meant. Cross-source targeting goes through fromUrn/toUrn instead.
+     * @type {string}
+     * @memberof BulkIngestEdgesDto
+     */
+    sourceId?: string;
+    /**
      * 
      * @type {Array<IngestEdgeDto>}
      * @memberof BulkIngestEdgesDto
@@ -53,6 +59,7 @@ export function BulkIngestEdgesDtoFromJSONTyped(json: any, ignoreDiscriminator: 
     }
     return {
         
+        'sourceId': json['sourceId'] == null ? undefined : json['sourceId'],
         'edges': ((json['edges'] as Array<any>).map(IngestEdgeDtoFromJSON)),
     };
 }
@@ -68,6 +75,7 @@ export function BulkIngestEdgesDtoToJSONTyped(value?: BulkIngestEdgesDto | null,
 
     return {
         
+        'sourceId': value['sourceId'],
         'edges': ((value['edges'] as Array<any>).map(IngestEdgeDtoToJSON)),
     };
 }

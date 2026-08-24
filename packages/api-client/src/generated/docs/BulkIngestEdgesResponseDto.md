@@ -7,6 +7,8 @@
 Name | Type
 ------------ | -------------
 `upserted` | number
+`external` | number
+`dropped` | number
 
 ## Example
 
@@ -16,6 +18,8 @@ import type { BulkIngestEdgesResponseDto } from '@workspace/api-client'
 // TODO: Update the object below with actual values
 const example = {
   "upserted": null,
+  "external": null,
+  "dropped": null,
 } satisfies BulkIngestEdgesResponseDto
 
 console.log(example)

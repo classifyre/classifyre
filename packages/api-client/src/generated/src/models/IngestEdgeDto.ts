@@ -56,11 +56,65 @@ export interface IngestEdgeDto {
      */
     toHash?: string;
     /**
-     * Relation type: OWNS | ACCESSED | READS | WRITES | GENERATED_FROM | EXPORTED_TO | ATTACHED_TO | SENT_TO | EXECUTED | MENTIONS | CONTAINS | REFERENCES
+     * Target named by its platform URN (e.g. snowflake://acct/db/schema/table). Use instead of toId/toHash to point at an object owned by another source — including one that has not been scanned yet, which is kept and stitched later.
+     * @type {string}
+     * @memberof IngestEdgeDto
+     */
+    toUrn?: string;
+    /**
+     * Source named by its platform URN (see toUrn)
+     * @type {string}
+     * @memberof IngestEdgeDto
+     */
+    fromUrn?: string;
+    /**
+     * Relation type: free-form. Flow subtypes TRANSFORM | VIEW | COPY | WRITE | EXPORT | SEND; also OWNS | ACCESSED | READS | ATTACHED_TO | EXECUTED | MENTIONS | CONTAINS | REFERENCES | FOREIGN_KEY
      * @type {string}
      * @memberof IngestEdgeDto
      */
     relationType: string;
+    /**
+     * What traversing this edge means: FLOW (lineage) | CONTAINMENT | IDENTITY | REFERENCE | USAGE. Derived from relationType when omitted, so an older connector still classes correctly.
+     * @type {string}
+     * @memberof IngestEdgeDto
+     */
+    relationClass?: IngestEdgeDtoRelationClassEnum;
+    /**
+     * DATASET | FIELD — whether fieldMappings are present
+     * @type {string}
+     * @memberof IngestEdgeDto
+     */
+    granularity?: IngestEdgeDtoGranularityEnum;
+    /**
+     * How the edge was derived, which is how far it should be trusted: RUNTIME_OBSERVED | SYSTEM_CATALOG | SQL_PARSED | HEURISTIC | MANUAL
+     * @type {string}
+     * @memberof IngestEdgeDto
+     */
+    method?: IngestEdgeDtoMethodEnum;
+    /**
+     * Column-level dependencies: [{ downstream, upstreams[], transform, type }]. A null downstream is an indirect dependency (ORDER BY, join key) recorded once against the dataset rather than fanned out across every output column.
+     * @type {Array<{ [key: string]: any; }>}
+     * @memberof IngestEdgeDto
+     */
+    fieldMappings?: Array<{ [key: string]: any; }>;
+    /**
+     * What this edge was read from: { sql, queryId, runId }
+     * @type {{ [key: string]: any; }}
+     * @memberof IngestEdgeDto
+     */
+    evidence?: { [key: string]: any; };
+    /**
+     * Asset hash of the job/query/notebook that moved the data
+     * @type {string}
+     * @memberof IngestEdgeDto
+     */
+    viaId?: string;
+    /**
+     * URN of the process that moved the data
+     * @type {string}
+     * @memberof IngestEdgeDto
+     */
+    viaUrn?: string;
     /**
      * 
      * @type {number}
@@ -68,6 +122,41 @@ export interface IngestEdgeDto {
      */
     confidence?: number;
 }
+
+
+/**
+ * @export
+ */
+export const IngestEdgeDtoRelationClassEnum = {
+    Flow: 'FLOW',
+    Containment: 'CONTAINMENT',
+    Identity: 'IDENTITY',
+    Reference: 'REFERENCE',
+    Usage: 'USAGE'
+} as const;
+export type IngestEdgeDtoRelationClassEnum = typeof IngestEdgeDtoRelationClassEnum[keyof typeof IngestEdgeDtoRelationClassEnum];
+
+/**
+ * @export
+ */
+export const IngestEdgeDtoGranularityEnum = {
+    Dataset: 'DATASET',
+    Field: 'FIELD'
+} as const;
+export type IngestEdgeDtoGranularityEnum = typeof IngestEdgeDtoGranularityEnum[keyof typeof IngestEdgeDtoGranularityEnum];
+
+/**
+ * @export
+ */
+export const IngestEdgeDtoMethodEnum = {
+    RuntimeObserved: 'RUNTIME_OBSERVED',
+    SystemCatalog: 'SYSTEM_CATALOG',
+    SqlParsed: 'SQL_PARSED',
+    Heuristic: 'HEURISTIC',
+    Manual: 'MANUAL'
+} as const;
+export type IngestEdgeDtoMethodEnum = typeof IngestEdgeDtoMethodEnum[keyof typeof IngestEdgeDtoMethodEnum];
+
 
 /**
  * Check if a given object implements the IngestEdgeDto interface.
@@ -95,7 +184,16 @@ export function IngestEdgeDtoFromJSONTyped(json: any, ignoreDiscriminator: boole
         'toType': json['toType'],
         'toId': json['toId'] == null ? undefined : json['toId'],
         'toHash': json['toHash'] == null ? undefined : json['toHash'],
+        'toUrn': json['toUrn'] == null ? undefined : json['toUrn'],
+        'fromUrn': json['fromUrn'] == null ? undefined : json['fromUrn'],
         'relationType': json['relationType'],
+        'relationClass': json['relationClass'] == null ? undefined : json['relationClass'],
+        'granularity': json['granularity'] == null ? undefined : json['granularity'],
+        'method': json['method'] == null ? undefined : json['method'],
+        'fieldMappings': json['fieldMappings'] == null ? undefined : json['fieldMappings'],
+        'evidence': json['evidence'] == null ? undefined : json['evidence'],
+        'viaId': json['viaId'] == null ? undefined : json['viaId'],
+        'viaUrn': json['viaUrn'] == null ? undefined : json['viaUrn'],
         'confidence': json['confidence'] == null ? undefined : json['confidence'],
     };
 }
@@ -117,7 +215,16 @@ export function IngestEdgeDtoToJSONTyped(value?: IngestEdgeDto | null, ignoreDis
         'toType': value['toType'],
         'toId': value['toId'],
         'toHash': value['toHash'],
+        'toUrn': value['toUrn'],
+        'fromUrn': value['fromUrn'],
         'relationType': value['relationType'],
+        'relationClass': value['relationClass'],
+        'granularity': value['granularity'],
+        'method': value['method'],
+        'fieldMappings': value['fieldMappings'],
+        'evidence': value['evidence'],
+        'viaId': value['viaId'],
+        'viaUrn': value['viaUrn'],
         'confidence': value['confidence'],
     };
 }

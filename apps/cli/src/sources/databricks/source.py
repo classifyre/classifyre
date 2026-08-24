@@ -12,6 +12,14 @@ from urllib.parse import urlparse
 
 import requests
 
+from ...graph.edges import (
+    FieldMapping,
+    FieldTransform,
+    FlowType,
+    Method,
+    Ref,
+    flow,
+)
 from ...models.generated_input import (
     AzureServicePrincipal,
     DatabricksInput,
@@ -33,6 +41,7 @@ from ...models.generated_single_asset_scan_results import (
     SingleAssetScanResults,
 )
 from ...utils.file_parser import render_bytes_cell
+from ...utils.urn import Urn, UrnError
 from ..dependencies import require_module
 from ..tabular_base import BaseTabularSource
 from ..tabular_utils import TableRef
@@ -390,6 +399,16 @@ class DatabricksSource(BaseTabularSource):
 
     # ── Databricks uses string interpolation for info_schema queries ─────
 
+    # ── Cross-system identity ────────────────────────────────────────────
+
+    def _urn_authority(self) -> str:
+        # Just the host: the workspace URL is configured with a scheme and
+        # sometimes a trailing slash, and a URN that varies with either would
+        # never match the one another connector wrote.
+        raw = str(self.config.required.workspace_url or "").strip()
+        without_scheme = raw.split("://", 1)[-1]
+        return without_scheme.strip("/").split("/", 1)[0]
+
     def _available_columns(self, table_ref: TableRef) -> list[str]:
         query = (
             "SELECT column_name "
@@ -644,6 +663,110 @@ class DatabricksSource(BaseTabularSource):
                             refs.add(parsed)
         return refs
 
+    def _emit_table_lineage(
+        self,
+        table_ref: TableRef,
+        upstream_refs: set[tuple[str, str, str]],
+        table_hash_by_key: dict[tuple[str, ...], str],
+    ) -> None:
+        """Turn Unity Catalog's lineage into typed edges.
+
+        Unity Catalog is one of the few catalogs that answers the column
+        question directly, so nothing here is parsed out of SQL — these edges
+        are as trustworthy as lineage gets, and are marked SYSTEM_CATALOG.
+
+        The upstreams that are *not* part of this scan are the important half.
+        They used to be dropped on the floor (``if target in table_hash_by_key``),
+        which meant a table fed by a catalog outside the configured scope looked
+        like it had no lineage at all. Now they are named by URN and bind
+        themselves if that catalog is ever scanned.
+        """
+        downstream_hash = table_hash_by_key.get(table_ref.table_key)
+        if not downstream_hash:
+            return
+
+        column_mappings = self._column_mappings_for_table(table_ref)
+        for upstream in sorted(upstream_refs):
+            upstream_hash = table_hash_by_key.get(upstream)
+            upstream_ref = (
+                Ref.asset(upstream_hash) if upstream_hash else self._urn_ref_for_key(upstream)
+            )
+            if upstream_ref is None:
+                continue
+            self.add_edge(
+                flow(
+                    upstream=upstream_ref,
+                    downstream=Ref.asset(downstream_hash),
+                    type=FlowType.TRANSFORM,
+                    fields=column_mappings.get(upstream, []),
+                    method=Method.SYSTEM_CATALOG,
+                )
+            )
+
+    def _column_mappings_for_table(
+        self, table_ref: TableRef
+    ) -> dict[tuple[str, str, str], list[FieldMapping]]:
+        """Column-level lineage per upstream table, from Unity Catalog.
+
+        One request per column, which is why this is opt-in: a wide table costs
+        a request per column and the table-level edges are already useful
+        without it.
+        """
+        if not self._extraction_options().include_column_lineage:
+            return {}
+
+        by_upstream: dict[tuple[str, str, str], dict[str, set[str]]] = {}
+        full_name = f"{table_ref.database}.{table_ref.schema}.{table_ref.table}"
+        for column in self._cached_columns(table_ref):
+            if self._aborted:
+                break
+            try:
+                response = self._request_json(
+                    "get",
+                    "/api/2.0/lineage-tracking/column-lineage",
+                    params={"table_name": full_name, "column_name": column},
+                )
+            except Exception as exc:
+                logger.debug("No column lineage for %s.%s: %s", full_name, column, exc)
+                continue
+
+            for entry in response.get("upstream_cols") or []:
+                if not isinstance(entry, dict):
+                    continue
+                catalog = entry.get("catalog_name")
+                schema = entry.get("schema_name")
+                table = entry.get("table_name")
+                name = entry.get("name")
+                if not (catalog and schema and table and name):
+                    continue
+                key = (str(catalog), str(schema), str(table))
+                by_upstream.setdefault(key, {}).setdefault(column, set()).add(str(name))
+
+        return {
+            upstream: [
+                FieldMapping(
+                    downstream=downstream,
+                    upstreams=sorted(sources),
+                    type=(
+                        FieldTransform.IDENTITY
+                        if sources == {downstream}
+                        else FieldTransform.TRANSFORMED
+                    ),
+                )
+                for downstream, sources in sorted(columns.items())
+            ]
+            for upstream, columns in by_upstream.items()
+        }
+
+    def _urn_ref_for_key(self, table_key: tuple[str, ...]) -> Ref | None:
+        authority = self._urn_authority()
+        if not authority:
+            return None
+        try:
+            return Ref.urn(Urn.of(self.source_type, authority, *table_key))
+        except UrnError:
+            return None
+
     # ── Notebooks ────────────────────────────────────────────────────────
 
     def _iter_notebooks(self) -> Generator[NotebookRef, None, None]:
@@ -834,6 +957,7 @@ class DatabricksSource(BaseTabularSource):
                         for target in sorted(upstream_refs)
                         if target in table_hash_by_key
                     ]
+                    self._emit_table_lineage(table_ref, upstream_refs, table_hash_by_key)
                 except Exception as exc:
                     logger.warning(
                         "Could not resolve Databricks lineage for %s: %s", table_label, exc

@@ -6,10 +6,11 @@ import random
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from typing import Any
+from typing import Any, ClassVar
 
 import requests
 
+from ...graph.edges import FlowType, Method, Ref, contains, flow
 from ...models.generated_input import (
     PowerBIInput,
     PowerBIMaskedAccessToken,
@@ -31,6 +32,7 @@ from ...models.generated_single_asset_scan_results import (
     SingleAssetScanResults,
 )
 from ...utils.hashing import hash_id, unhash_id
+from ...utils.urn import Urn, UrnError
 from ..base import BaseSource
 
 logger = logging.getLogger(__name__)
@@ -686,12 +688,106 @@ class PowerBISource(BaseSource):
 
     STREAM_DETECTIONS = True
 
+    # ── Relationships ────────────────────────────────────────────────────
+    #
+    # A workspace *holding* a report and a report *reading* a dataset are two
+    # different statements, and `links` could only say that both were connected
+    # to something. Separating them is what lets "what breaks if this dataset
+    # changes" stop at the reports rather than sweeping in the whole workspace.
+
+    #: Power BI's datasource type -> the URN platform, where they differ.
+    _DATASOURCE_PLATFORMS: ClassVar[dict[str, str]] = {
+        "sql": "mssql",
+        "postgresql": "postgres",
+        "snowflake": "snowflake",
+        "oracle": "oracle",
+        "mysql": "mysql",
+        "databricks": "databricks",
+        "googlebigquery": "bigquery",
+        "teradata": "teradata",
+    }
+
+    def _dataset_upstream_urns(self, workspace_id: str, dataset_id: str) -> list[str]:
+        """The systems a dataset reads from, named the way they name themselves.
+
+        Power BI's REST API reports the server and database a dataset connects
+        to, but not the tables — table-level detail needs the admin Scanner API.
+        So these URNs are database-grained: enough to say "this dashboard reads
+        production", not enough to stitch onto a specific table.
+        """
+        try:
+            response = self._request_json(
+                "get", f"groups/{workspace_id}/datasets/{dataset_id}/datasources"
+            )
+        except Exception as exc:
+            logger.debug("No datasources for Power BI dataset %s: %s", dataset_id, exc)
+            return []
+
+        urns: list[str] = []
+        for entry in (response or {}).get("value") or []:
+            if not isinstance(entry, dict):
+                continue
+            details = entry.get("connectionDetails")
+            details = details if isinstance(details, dict) else {}
+            server = str(details.get("server") or "").strip()
+            database = str(details.get("database") or "").strip()
+            raw_type = str(entry.get("datasourceType") or "").strip().lower()
+            if not (server and raw_type):
+                # A file or web datasource has no server to scope a name to.
+                continue
+            platform = self._DATASOURCE_PLATFORMS.get(raw_type, raw_type)
+            try:
+                urns.append(str(Urn.of(platform, server, database)))
+            except UrnError:
+                continue
+        return urns
+
+    def _emit_relationships(self, refs: list[PowerBIAssetRef], hash_by_raw: dict[str, str]) -> None:
+        by_raw = {ref.raw_id: ref for ref in refs}
+        for ref in refs:
+            child_hash = hash_by_raw.get(ref.raw_id)
+            if not child_hash:
+                continue
+
+            for linked_raw in ref.linked_raw_ids:
+                linked_hash = hash_by_raw.get(linked_raw)
+                if not linked_hash:
+                    continue
+                parent = by_raw.get(linked_raw)
+                if parent is not None and parent.kind == "workspace":
+                    # Structural: the workspace holds this thing.
+                    self.add_edge(contains(Ref.asset(linked_hash), Ref.asset(child_hash)))
+                else:
+                    # A report or dashboard reading its dataset. Data moves, so
+                    # this is the edge an impact question follows.
+                    self.add_edge(
+                        flow(
+                            upstream=Ref.asset(linked_hash),
+                            downstream=Ref.asset(child_hash),
+                            type=FlowType.VIEW,
+                            method=Method.SYSTEM_CATALOG,
+                        )
+                    )
+
+            if ref.kind != "dataset":
+                continue
+            for urn in self._dataset_upstream_urns(ref.workspace_id, ref.asset_id):
+                self.add_edge(
+                    flow(
+                        upstream=Ref.urn(urn),
+                        downstream=Ref.asset(child_hash),
+                        type=FlowType.VIEW,
+                        method=Method.SYSTEM_CATALOG,
+                    )
+                )
+
     async def extract_raw(self) -> AsyncGenerator[list[SingleAssetScanResults], None]:
         if self._aborted:
             return
 
         refs = self._sample_refs(self._discover_assets())
         hash_by_raw = {ref.raw_id: self.generate_hash_id(ref.raw_id) for ref in refs}
+        self._emit_relationships(refs, hash_by_raw)
 
         batch: list[SingleAssetScanResults] = []
         for ref in refs:

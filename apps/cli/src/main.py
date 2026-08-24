@@ -166,6 +166,57 @@ def _asset_to_payload(asset: Any) -> dict[str, Any]:
     raise TypeError(f"Unsupported asset payload type: {type(asset)}")
 
 
+async def _emit_relationships(source: Any, sink: Any, *, partial: bool = False) -> None:
+    """Send everything the connector learned about how its assets relate.
+
+    Two sources, one flush: edges buffered mid-scan via ``add_edge`` and edges a
+    connector can only assemble at the end via ``collect_relationships``.
+
+    Best-effort by design — a connector that cannot describe its relationships
+    should still deliver its assets — but *loudly* best-effort. Edge loss used
+    to be invisible at three separate layers, so a scan could report success
+    having silently produced no lineage at all. Anything dropped is counted and
+    logged here, and the count travels with the run.
+    """
+    if not hasattr(sink, "emit_edges"):
+        return
+
+    edges: list[Any] = []
+    try:
+        if hasattr(source, "drain_edges"):
+            edges.extend(source.drain_edges())
+        # A partial run never reaches the end of extraction, so asking a
+        # connector to assemble end-of-run relationships would give it an
+        # incomplete picture to draw conclusions from.
+        if not partial and hasattr(source, "collect_relationships"):
+            collected = await source.collect_relationships()
+            if collected:
+                edges.extend(collected)
+    except Exception as collect_error:
+        logger.warning("Could not collect relationships (non-fatal): %s", collect_error)
+
+    if not edges:
+        return
+
+    try:
+        result = await sink.emit_edges(edges)
+    except Exception as emit_error:
+        logger.warning(
+            "Relationship emission failed, %d edge(s) lost (non-fatal): %s",
+            len(edges),
+            emit_error,
+        )
+        return
+
+    unresolved = (result or {}).get("dropped", 0) if isinstance(result, dict) else 0
+    logger.info(
+        "Emitted %d relationship edge(s)%s%s",
+        len(edges),
+        " (partial run)" if partial else "",
+        f"; {unresolved} had an endpoint the API could not resolve" if unresolved else "",
+    )
+
+
 async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) -> None:
     """Initialize the source and execute the specified command."""
     runner_id = args.runner_id or os.environ.get("RUNNER_ID") or "local-run"
@@ -570,32 +621,27 @@ async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) ->
                     if hasattr(sink, "set_sampling_cursor"):
                         sink.set_sampling_cursor(source.current_sampling_cursor())
 
+                    # Relationships go *before* finish(): finish() finalizes the
+                    # run and marks it COMPLETED, and edges that land after that
+                    # belong to a run that already claimed to be done.
+                    await _emit_relationships(source, sink)
+
                     await sink.finish()
                     logger.info(
                         "Extraction completed: %s assets in %s batches",
                         total_assets,
                         output_batch_count,
                     )
-
-                    # Phase 1: emit source-derived relationship edges (best-effort).
-                    if hasattr(source, "collect_relationships") and hasattr(sink, "emit_edges"):
-                        try:
-                            edges = await source.collect_relationships()
-                            if edges:
-                                await sink.emit_edges(edges)
-                                logger.info(
-                                    "Emitted %d source-derived relationship edges", len(edges)
-                                )
-                        except Exception as rel_error:
-                            logger.warning(
-                                "Relationship emission failed (non-fatal): %s", rel_error
-                            )
                 except Exception as extraction_error:
                     if _is_timeout_error(extraction_error):
                         logger.warning(
                             "Source timed out during extraction, partial results flushed: %s",
                             extraction_error,
                         )
+                        # The assets this run did ingest keep their
+                        # relationships. Dropping them here is what made a slow
+                        # warehouse scan produce a graph with no lineage at all.
+                        await _emit_relationships(source, sink, partial=True)
                         await sink.finish()
                         return
                     if sink_started:

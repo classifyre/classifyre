@@ -26,7 +26,7 @@ export interface GraphNodeDto {
      */
     id: string;
     /**
-     * "asset" | "finding"
+     * "asset" | "finding" | "external". An "external" node names an object by its platform URN that no scan has produced yet — the far end of a cross-system lineage edge, drawn as a ghost until that source is scanned.
      * @type {string}
      * @memberof GraphNodeDto
      */
@@ -55,6 +55,12 @@ export interface GraphNodeDto {
      * @memberof GraphNodeDto
      */
     sourceType?: string;
+    /**
+     * Platform-qualified name of the underlying object, when known. On an "external" node this is also its id.
+     * @type {string}
+     * @memberof GraphNodeDto
+     */
+    urn?: string;
     /**
      * For asset nodes: parent source id
      * @type {string}
@@ -156,6 +162,7 @@ export function GraphNodeDtoFromJSONTyped(json: any, ignoreDiscriminator: boolea
         'depth': json['depth'],
         'assetType': json['assetType'] == null ? undefined : json['assetType'],
         'sourceType': json['sourceType'] == null ? undefined : json['sourceType'],
+        'urn': json['urn'] == null ? undefined : json['urn'],
         'sourceId': json['sourceId'] == null ? undefined : json['sourceId'],
         'sourceName': json['sourceName'] == null ? undefined : json['sourceName'],
         'severity': json['severity'] == null ? undefined : json['severity'],
@@ -188,6 +195,7 @@ export function GraphNodeDtoToJSONTyped(value?: GraphNodeDto | null, ignoreDiscr
         'depth': value['depth'],
         'assetType': value['assetType'],
         'sourceType': value['sourceType'],
+        'urn': value['urn'],
         'sourceId': value['sourceId'],
         'sourceName': value['sourceName'],
         'severity': value['severity'],

@@ -3802,7 +3802,7 @@
                 {
                   "id": "intro",
                   "type": "markdown",
-                  "source": "# Linking assets to each other\n\n`Asset.links` holds the ids of *other assets this notebook yields*. Those\nbecome edges in the graph, and they are what lets a finding on one asset be read\nin the context of the others.\n\nUse the ids you assign, not hashes or URLs -- the runtime resolves them:\n\n    yield Asset(id=\"ticket-1\", links=[\"attachment-1\", \"attachment-2\"])\n    yield Asset(id=\"attachment-1\", ...)\n\nOrder does not matter: a link to an asset yielded later resolves fine. A link to\nan id this run never yields simply has nothing on the other end.\n\nLinks are directional as written. Link both ways when both directions are worth\nfollowing.\n"
+                  "source": "# Linking assets to each other\n\n`Asset.links` holds the ids of *other assets this notebook yields*. Those\nbecome edges in the graph, and they are what lets a finding on one asset be read\nin the context of the others.\n\nUse the ids you assign, not hashes or URLs -- the runtime resolves them:\n\n    yield Asset(id=\"ticket-1\", links=[\"attachment-1\", \"attachment-2\"])\n    yield Asset(id=\"attachment-1\", ...)\n\nOrder does not matter: a link to an asset yielded later resolves fine. A link to\nan id this run never yields simply has nothing on the other end.\n\nLinks are directional as written. Link both ways when both directions are worth\nfollowing.\n\n---\n\n`links` says two assets are connected but not *how*. When the difference\nmatters -- when one table is derived from another, or one thing is part of\nanother -- see the **Lineage and links** template, which types the\nrelationship instead of flattening it.\n"
                 },
                 {
                   "id": "imports",
@@ -3836,6 +3836,45 @@
             "rows_per_page": 100
           }
         }
+      },
+    {
+      "name": "Lineage and links",
+      "description": "Says how assets relate, not just that they do: which one derives from another (lineage, down to the column), which contains which, and which are the same thing in two systems — including objects in sources this notebook never touches.",
+      "config": {
+        "type": "CUSTOM",
+        "required": {
+          "notebook": {
+            "revision": 1,
+            "cells": [
+              {
+                "id": "intro",
+                "type": "markdown",
+                "source": "# Saying *how* two assets are related\n\n`Asset.links` says two things are connected. It does not say **how**, and that\nturns out to be the whole question.\n\nAn attachment, a foreign key and a derived table are three different\nrelationships, and only one of them answers *\"if I change this, what breaks?\"*.\nOnce they are all in one `links` list nothing can tell them apart, so a lineage\nview has to walk them all and shows you a hairball.\n\nSo there is a second, typed way to say it. Return relationships from a\n`relationships()` function and pick the builder that matches what you mean:\n\n| Builder | Means | Answers |\n| --- | --- | --- |\n| `flow(upstream=, downstream=)` | the values in one came from the other | **this is lineage** |\n| `contains(parent, child)` | one is a part of the other | what lives inside what |\n| `references(a, b)` | one points at the other | what relates to what |\n| `same_as(a, b)` | the same real thing, twice | is this a duplicate |\n| `uses(actor, target)` | someone touched it | who touched this |\n\n`flow` takes both ends as keyword arguments on purpose. Reversing a lineage edge\nis the easiest mistake in the subject and the hardest to notice afterwards, so\nit is not something you can do by accident.\n\n`links` still works exactly as before. This sits alongside it."
+              },
+              {
+                "id": "imports",
+                "type": "code",
+                "source": "from classifyre import (\n    Asset,\n    FieldMapping,\n    FlowType,\n    Ref,\n    contains,\n    ctx,\n    flow,\n    references,\n    same_as,\n    urn_for,\n)"
+              },
+              {
+                "id": "test-connection",
+                "type": "code",
+                "source": "def test_connection() -> dict:\n    \"\"\"Nothing to reach here -- this template makes its data up.\"\"\"\n    return {\"status\": \"SUCCESS\", \"message\": \"Ready.\"}"
+              },
+              {
+                "id": "extract",
+                "type": "code",
+                "source": "TOP_DELIVERIES_SQL = \"\"\"\n    SELECT id, DATEDIFF(placed_on, delivered_on) AS delivery_time\n    FROM orders\n    ORDER BY placed_on\n\"\"\"\n\n\ndef extract():\n    \"\"\"Two tables, so the relationships below have something to connect.\"\"\"\n    yield Asset(\n        id=\"orders\",\n        name=\"orders\",\n        kind=\"table\",\n        content=\"id,placed_on,delivered_on\\n1,2026-01-01,2026-01-03\",\n        # Optional. Set it when this object also exists in a system Classifyre\n        # scans separately -- it is what lets that source's lineage point here.\n        urn=urn_for(\"postgres\", \"db.internal\", \"shop\", \"public\", \"orders\"),\n    )\n    yield Asset(\n        id=\"top_deliveries\",\n        name=\"top_deliveries\",\n        kind=\"table\",\n        content=\"id,delivery_time\\n1,2\",\n    )"
+              },
+              {
+                "id": "relationships",
+                "type": "code",
+                "source": "def relationships():\n    \"\"\"How the assets from extract() relate to each other.\n\n    Optional. Name assets by the same ids you gave them in extract() -- the\n    runtime resolves them, so you never deal in hashes.\n    \"\"\"\n    # Lineage: top_deliveries is computed from orders, so changing orders can\n    # break it. This is the edge an impact question follows.\n    yield flow(\n        upstream=Ref.asset(\"orders\"),\n        downstream=Ref.asset(\"top_deliveries\"),\n        type=FlowType.TRANSFORM,\n        # Optional, and worth it: without column mappings you know the table\n        # depends on orders, but not that dropping `placed_on` breaks exactly\n        # one column.\n        fields=[\n            FieldMapping(\n                \"delivery_time\",\n                [\"placed_on\", \"delivered_on\"],\n                \"DATEDIFF(placed_on, delivered_on)\",\n            ),\n            # A null downstream is an *indirect* dependency: this column shaped\n            # which rows came out (an ORDER BY, a join key, a WHERE) without\n            # feeding any one output column.\n            FieldMapping(None, [\"placed_on\"]),\n        ],\n        sql=TOP_DELIVERIES_SQL,\n    )\n\n    # Lineage that leaves this connector entirely. `Ref.urn(...)` names an\n    # object by what its *platform* calls it, so you can point at a table this\n    # notebook does not produce and has never seen. If that Snowflake source is\n    # scanned -- before this run or a month after it -- the two halves find each\n    # other and the edge completes itself.\n    #\n    # Build the URN with `urn_for(...)` rather than writing the string: the\n    # Snowflake connector folds capitalisation its own way, and a URN that\n    # differs by one letter never matches.\n    yield flow(\n        upstream=Ref.urn(urn_for(\"snowflake\", \"acme\", \"PROD\", \"PUBLIC\", \"RAW_ORDERS\")),\n        downstream=Ref.asset(\"orders\"),\n        # A copy preserves identity -- same rows, different place. Keeping the\n        # type lets the graph hide these hops when you want the logical picture.\n        type=FlowType.COPY,\n    )\n\n    # ── The three that are *not* lineage ─────────────────────────────────\n    #\n    # Filing any of these as lineage is the mistake this API exists to prevent:\n    # an impact query would walk them and answer a question nobody asked.\n\n    # A partition is *part of* the table. Structural, not temporal -- and it is\n    # what the lineage view collapses by, so it never adds a hop to a path.\n    yield contains(Ref.asset(\"orders\"), Ref.asset(\"orders_2024\"))\n\n    # A foreign key moves no data. Useful for suggesting joins, and a good hint\n    # about where lineage might be -- never lineage itself.\n    yield references(Ref.asset(\"orders\"), Ref.asset(\"customers\"))\n\n    # The same table mirrored into another system: one thing, not two, so a\n    # path across it costs one hop instead of two.\n    yield same_as(\n        Ref.asset(\"orders\"),\n        Ref.urn(urn_for(\"postgres\", \"db.internal\", \"shop\", \"public\", \"orders\")),\n    )"
+              }
+            ]
+          }
+        }
       }
-    ]
+    }
+  ]
 }

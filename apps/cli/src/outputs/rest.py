@@ -140,17 +140,42 @@ class IngestEdge(BaseModel):
     from_type: str = Field(serialization_alias="fromType")
     from_id: str | None = Field(None, serialization_alias="fromId")
     from_hash: str | None = Field(None, serialization_alias="fromHash")
+    from_urn: str | None = Field(None, serialization_alias="fromUrn")
     to_type: str = Field(serialization_alias="toType")
     to_id: str | None = Field(None, serialization_alias="toId")
     to_hash: str | None = Field(None, serialization_alias="toHash")
+    to_urn: str | None = Field(None, serialization_alias="toUrn")
     relation_type: str = Field(serialization_alias="relationType")
     confidence: float = 1.0
+
+    # ── Lineage ──────────────────────────────────────────────────────────
+    #
+    # All optional, so a CLI built before lineage existed still ingests against
+    # a newer API, and a newer CLI still ingests against an older one. When
+    # ``relation_class`` is absent the API derives it from ``relation_type``,
+    # using the same table the backfill migration used.
+    relation_class: str | None = Field(None, serialization_alias="relationClass")
+    granularity: str | None = Field(None, serialization_alias="granularity")
+    method: str | None = Field(None, serialization_alias="method")
+    #: Column-level dependencies: ``[{downstream, upstreams[], transform, type}]``.
+    #: A null ``downstream`` is an indirect dependency (an ORDER BY or a join
+    #: key) recorded against the dataset rather than against every output column.
+    field_mappings: list[dict[str, Any]] | None = Field(None, serialization_alias="fieldMappings")
+    #: What this edge was read from: ``{sql, queryId, runId}``.
+    evidence: dict[str, Any] | None = Field(None, serialization_alias="evidence")
+    #: The job/query/notebook that moved the data, when one is known.
+    via_id: str | None = Field(None, serialization_alias="viaId")
+    via_urn: str | None = Field(None, serialization_alias="viaUrn")
 
 
 class BulkIngestEdgesRequest(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     edges: list[IngestEdge]
+    #: Which source these hashes belong to. An asset hash is only unique per
+    #: source, so without this the API has to guess which of two assets sharing
+    #: a hash an edge meant. Cross-source targeting goes through a URN instead.
+    source_id: str | None = Field(None, serialization_alias="sourceId")
 
 
 class FinalizeIngestRunRequest(BaseModel):
@@ -346,29 +371,42 @@ class RestOutputSink:
                 update_error,
             )
 
-    async def emit_edges(self, edges: list[IngestEdge]) -> None:
+    async def emit_edges(self, edges: list[IngestEdge]) -> dict[str, int]:
         """Bulk-upsert source-derived relationship edges to the investigation graph.
 
-        Idempotent — safe to call multiple times with overlapping data.
-        Silently skips if the list is empty.
+        Idempotent — safe to call repeatedly with overlapping data, which is
+        what makes mid-scan flushing safe.
+
+        Returns the API's tally: ``upserted`` written, ``external`` parked
+        against a URN whose asset has not been ingested yet, and ``dropped``
+        thrown away because an endpoint could not be resolved at all. The caller
+        logs it; a silent zero here used to be indistinguishable from success.
         """
+        totals = {"upserted": 0, "external": 0, "dropped": 0}
         if not edges:
-            return
+            return totals
 
         _edge_batch = 500
         for i in range(0, len(edges), _edge_batch):
             chunk = edges[i : i + _edge_batch]
-            payload = BulkIngestEdgesRequest(edges=chunk)
+            payload = BulkIngestEdgesRequest(edges=chunk, source_id=self.context.source_id)
             try:
-                self._request_json(
+                response = self._request_json(
                     "POST",
                     "/graph/edges",
                     payload.model_dump(mode="json", by_alias=True),
                 )
+                if isinstance(response, dict):
+                    for key in totals:
+                        value = response.get(key)
+                        if isinstance(value, int):
+                            totals[key] += value
                 logger.debug("Emitted %d source-derived edges to graph", len(chunk))
             except Exception as exc:
                 # Edge emission is best-effort: log and continue.
+                totals["dropped"] += len(chunk)
                 logger.warning("Failed to emit edges to graph: %s", exc)
+        return totals
 
     async def register_discovered_assets(
         self,

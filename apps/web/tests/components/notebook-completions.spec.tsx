@@ -227,3 +227,46 @@ test("suggestions are not clipped by the cell they sit in", async ({
   expect(report.rows).toBeGreaterThan(3);
   expect(report.lastRowClickable).toBe(true);
 });
+
+test("the relationship builders are offered, and flow keeps its ends named", async ({
+  mount,
+  page,
+}) => {
+  // The distinction between lineage and every other kind of link only exists if
+  // the author can see that `flow` and `contains` are different functions. An
+  // author who cannot find them reaches for `links` and flattens it back out.
+  const component = await mount(<CellListHarness initialCells={one("")} />);
+  await typeInCell(component, page, "flo");
+
+  const suggestions = component.locator(".suggest-widget");
+  await expect(suggestions).toBeVisible({ timeout: 10_000 });
+  await expect(suggestions).toContainText("flow");
+  // Both ends keyword-only: a reversed lineage edge is silently wrong rather
+  // than loudly broken, so the snippet must not fill them positionally.
+  await expect(suggestions).toContainText("upstream");
+  await expect(suggestions).toContainText("downstream");
+});
+
+test("the other relationship kinds are offered too", async ({
+  mount,
+  page,
+}) => {
+  const component = await mount(<CellListHarness initialCells={one("")} />);
+  await typeInCell(component, page, "conta");
+
+  const suggestions = component.locator(".suggest-widget");
+  await expect(suggestions).toBeVisible({ timeout: 10_000 });
+  await expect(suggestions).toContainText("contains");
+});
+
+test("Asset offers the platform name that makes cross-system lineage work", async ({
+  mount,
+  page,
+}) => {
+  const component = await mount(<CellListHarness initialCells={one("")} />);
+  await typeInCell(component, page, "Asset(ur");
+
+  const suggestions = component.locator(".suggest-widget");
+  await expect(suggestions).toBeVisible({ timeout: 10_000 });
+  await expect(suggestions).toContainText("urn");
+});

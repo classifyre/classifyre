@@ -229,6 +229,12 @@ export type {
   PivotGraphDto,
   BulkIngestEdgesDto,
   BulkIngestEdgesResponseDto,
+  LineageGraphDto,
+  ColumnLineageDto,
+  ColumnLineageStepDto,
+  ColumnLineageResponseDto,
+  FieldMappingDto,
+  RelationTypeDto,
 } from "./generated/src/models";
 export { PivotGraphDtoPivotEnum } from "./generated/src/models";
 export {

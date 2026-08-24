@@ -5948,6 +5948,72 @@
         ]
       }
     },
+    "/graph/lineage": {
+      "post": {
+        "description": "Walks FLOW edges only. Containment and identity are controls here rather than hops: collapseContainers rolls tables up into their schemas, and mergeIdentity folds an asset and its twin in another system into one node so a path across them costs one hop instead of two.",
+        "operationId": "GraphController_lineage",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LineageGraphDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GraphResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Trace where an asset came from, or what breaks if it changes",
+        "tags": [
+          "graph"
+        ]
+      }
+    },
+    "/graph/lineage/column": {
+      "post": {
+        "description": "Indirect dependencies — an ORDER BY or a join key that shaped which rows came out without feeding the value — are returned separately, so they do not read as if the column was computed from them.",
+        "operationId": "GraphController_columnLineage",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ColumnLineageDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ColumnLineageResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Trace one column back through the transformations that produced it",
+        "tags": [
+          "graph"
+        ]
+      }
+    },
     "/graph/expand": {
       "post": {
         "operationId": "GraphController_expand",
@@ -16248,7 +16314,7 @@
           },
           "type": {
             "type": "string",
-            "description": "\"asset\" | \"finding\""
+            "description": "\"asset\" | \"finding\" | \"external\". An \"external\" node names an object by its platform URN that no scan has produced yet — the far end of a cross-system lineage edge, drawn as a ghost until that source is scanned."
           },
           "label": {
             "type": "string"
@@ -16262,6 +16328,10 @@
           },
           "sourceType": {
             "type": "string"
+          },
+          "urn": {
+            "type": "string",
+            "description": "Platform-qualified name of the underlying object, when known. On an \"external\" node this is also its id."
           },
           "sourceId": {
             "type": "string",
@@ -16319,6 +16389,34 @@
           "depth"
         ]
       },
+      "FieldMappingDto": {
+        "type": "object",
+        "properties": {
+          "downstream": {
+            "type": "string",
+            "description": "The output column. Null means the dependency is indirect: the upstream shaped which rows came out (ORDER BY, WHERE, a join key) without feeding any particular output column. Recorded once against the dataset rather than fanned out across every column, which is the only reason indirect dependencies are affordable to keep at all.",
+            "nullable": true
+          },
+          "upstreams": {
+            "description": "Input columns it depends on",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "transform": {
+            "type": "string",
+            "description": "The expression, when one is known"
+          },
+          "type": {
+            "type": "string",
+            "description": "IDENTITY | TRANSFORMED | AGGREGATED | INDIRECT"
+          }
+        },
+        "required": [
+          "upstreams"
+        ]
+      },
       "GraphEdgeDto": {
         "type": "object",
         "properties": {
@@ -16354,6 +16452,37 @@
           "crossHypothesis": {
             "type": "boolean",
             "description": "True when this edge bridges nodes affiliated with different hypotheses"
+          },
+          "relationClass": {
+            "type": "string",
+            "description": "What traversing this edge means: FLOW (lineage) | CONTAINMENT | IDENTITY | REFERENCE | USAGE. The lineage view walks FLOW only; CONTAINMENT collapses nodes into their parent and IDENTITY merges nodes that are the same thing twice.",
+            "enum": [
+              "FLOW",
+              "CONTAINMENT",
+              "IDENTITY",
+              "REFERENCE",
+              "USAGE"
+            ]
+          },
+          "granularity": {
+            "type": "string",
+            "description": "DATASET | FIELD — whether column-level mappings are present"
+          },
+          "method": {
+            "type": "string",
+            "description": "How the edge was derived, which is how far it should be trusted: RUNTIME_OBSERVED | SYSTEM_CATALOG | SQL_PARSED | HEURISTIC | MANUAL"
+          },
+          "fieldMappings": {
+            "description": "Column-level dependencies. A null downstream is an indirect dependency (an ORDER BY, a join key) that shaped which rows came out without feeding any one output column.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FieldMappingDto"
+            }
+          },
+          "evidence": {
+            "type": "object",
+            "description": "What this edge was read from: { sql, queryId, runId }",
+            "additionalProperties": true
           }
         },
         "required": [
@@ -17382,6 +17511,134 @@
           "targetId"
         ]
       },
+      "LineageGraphDto": {
+        "type": "object",
+        "properties": {
+          "assetId": {
+            "type": "string",
+            "description": "Asset to trace from"
+          },
+          "direction": {
+            "type": "string",
+            "description": "\"up\" for where this came from, \"down\" for what breaks if it changes, \"both\" for the full picture. Flow edges point the way the data moves, so upstream is an inward walk.",
+            "enum": [
+              "up",
+              "down",
+              "both"
+            ],
+            "default": "both"
+          },
+          "depth": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 3,
+            "default": 2
+          },
+          "collapseContainers": {
+            "type": "boolean",
+            "description": "Roll each node up into its container (table -> schema, chart -> dashboard). Containment is never a hop in a lineage path; it is what the path is collapsed *by*, which is how 400 tables become 12 schemas without losing an edge.",
+            "default": false
+          },
+          "mergeIdentity": {
+            "type": "boolean",
+            "description": "Merge nodes joined by an IDENTITY edge into one. Without this a dbt model and the warehouse table it is show up as two hops in every path that crosses them, silently doubling the graph.",
+            "default": true
+          }
+        },
+        "required": [
+          "assetId"
+        ]
+      },
+      "ColumnLineageDto": {
+        "type": "object",
+        "properties": {
+          "assetId": {
+            "type": "string"
+          },
+          "column": {
+            "type": "string",
+            "description": "The column to trace back"
+          },
+          "depth": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 5,
+            "default": 3
+          }
+        },
+        "required": [
+          "assetId",
+          "column"
+        ]
+      },
+      "ColumnLineageStepDto": {
+        "type": "object",
+        "properties": {
+          "assetId": {
+            "type": "string",
+            "description": "The asset the upstream columns live in"
+          },
+          "assetLabel": {
+            "type": "string"
+          },
+          "urn": {
+            "type": "string",
+            "description": "Set when the upstream is not yet ingested"
+          },
+          "column": {
+            "type": "string",
+            "description": "The column being explained at this step"
+          },
+          "upstreams": {
+            "description": "Columns it was computed from",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "transform": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "description": "IDENTITY | TRANSFORMED | AGGREGATED | INDIRECT"
+          },
+          "depth": {
+            "type": "number",
+            "description": "Hops from the column asked about"
+          }
+        },
+        "required": [
+          "assetId",
+          "assetLabel",
+          "column",
+          "upstreams",
+          "type",
+          "depth"
+        ]
+      },
+      "ColumnLineageResponseDto": {
+        "type": "object",
+        "properties": {
+          "steps": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ColumnLineageStepDto"
+            }
+          },
+          "indirect": {
+            "description": "Dependencies that shaped which rows came out (ORDER BY, WHERE, join keys) without feeding this column's values. Kept separate so they do not read as if the column was computed from them.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ColumnLineageStepDto"
+            }
+          }
+        },
+        "required": [
+          "steps",
+          "indirect"
+        ]
+      },
       "ExpandGraphDto": {
         "type": "object",
         "properties": {
@@ -17484,9 +17741,68 @@
             "type": "string",
             "description": "Target asset hash (alternative to toId — API resolves to UUID)"
           },
+          "toUrn": {
+            "type": "string",
+            "description": "Target named by its platform URN (e.g. snowflake://acct/db/schema/table). Use instead of toId/toHash to point at an object owned by another source — including one that has not been scanned yet, which is kept and stitched later."
+          },
+          "fromUrn": {
+            "type": "string",
+            "description": "Source named by its platform URN (see toUrn)"
+          },
           "relationType": {
             "type": "string",
-            "description": "Relation type: OWNS | ACCESSED | READS | WRITES | GENERATED_FROM | EXPORTED_TO | ATTACHED_TO | SENT_TO | EXECUTED | MENTIONS | CONTAINS | REFERENCES"
+            "description": "Relation type: free-form. Flow subtypes TRANSFORM | VIEW | COPY | WRITE | EXPORT | SEND; also OWNS | ACCESSED | READS | ATTACHED_TO | EXECUTED | MENTIONS | CONTAINS | REFERENCES | FOREIGN_KEY"
+          },
+          "relationClass": {
+            "type": "string",
+            "description": "What traversing this edge means: FLOW (lineage) | CONTAINMENT | IDENTITY | REFERENCE | USAGE. Derived from relationType when omitted, so an older connector still classes correctly.",
+            "enum": [
+              "FLOW",
+              "CONTAINMENT",
+              "IDENTITY",
+              "REFERENCE",
+              "USAGE"
+            ]
+          },
+          "granularity": {
+            "type": "string",
+            "description": "DATASET | FIELD — whether fieldMappings are present",
+            "enum": [
+              "DATASET",
+              "FIELD"
+            ]
+          },
+          "method": {
+            "type": "string",
+            "description": "How the edge was derived, which is how far it should be trusted: RUNTIME_OBSERVED | SYSTEM_CATALOG | SQL_PARSED | HEURISTIC | MANUAL",
+            "enum": [
+              "RUNTIME_OBSERVED",
+              "SYSTEM_CATALOG",
+              "SQL_PARSED",
+              "HEURISTIC",
+              "MANUAL"
+            ]
+          },
+          "fieldMappings": {
+            "type": "array",
+            "description": "Column-level dependencies: [{ downstream, upstreams[], transform, type }]. A null downstream is an indirect dependency (ORDER BY, join key) recorded once against the dataset rather than fanned out across every output column.",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "evidence": {
+            "type": "object",
+            "description": "What this edge was read from: { sql, queryId, runId }",
+            "additionalProperties": true
+          },
+          "viaId": {
+            "type": "string",
+            "description": "Asset hash of the job/query/notebook that moved the data"
+          },
+          "viaUrn": {
+            "type": "string",
+            "description": "URN of the process that moved the data"
           },
           "confidence": {
             "type": "number",
@@ -17504,6 +17820,10 @@
       "BulkIngestEdgesDto": {
         "type": "object",
         "properties": {
+          "sourceId": {
+            "type": "string",
+            "description": "Which source the hashes belong to. An asset hash is only unique per source, so without this the API has to guess which of two assets sharing a hash an edge meant. Cross-source targeting goes through fromUrn/toUrn instead."
+          },
           "edges": {
             "type": "array",
             "items": {
@@ -17521,6 +17841,14 @@
           "upserted": {
             "type": "number",
             "description": "Number of edges upserted"
+          },
+          "external": {
+            "type": "number",
+            "description": "Edges whose endpoint named a URN that has not been ingested yet. Kept as an \"external\" endpoint and bound once that source is scanned, in either order."
+          },
+          "dropped": {
+            "type": "number",
+            "description": "Edges thrown away because an endpoint could not be resolved at all. Reported so silent edge loss is visible in the run log."
           }
         },
         "required": [
@@ -17539,6 +17867,26 @@
           "edgeCount"
         ]
       },
+      "RelationTypeDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string"
+          },
+          "relationClass": {
+            "type": "string",
+            "description": "FLOW | CONTAINMENT | IDENTITY | REFERENCE | USAGE"
+          },
+          "count": {
+            "type": "number",
+            "description": "Edges currently carrying this type"
+          }
+        },
+        "required": [
+          "type",
+          "relationClass"
+        ]
+      },
       "RelationTypesResponseDto": {
         "type": "object",
         "properties": {
@@ -17554,6 +17902,13 @@
             "type": "array",
             "items": {
               "type": "string"
+            }
+          },
+          "classified": {
+            "description": "Every suggestion with the class it belongs to, so the UI can group by question (\"what flows\", \"who touched it\") instead of by raw string. Served rather than hard-coded in the client: the vocabulary is open, and a TS enum would drift from the database the first time a connector added a subtype.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RelationTypeDto"
             }
           }
         },

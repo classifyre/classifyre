@@ -25,7 +25,7 @@ from .serialize import ModuleSource, cell_id_of, to_module_source
 REQUIRED_FUNCTIONS = ("test_connection", "extract")
 
 #: Implemented when the source can support them; absence is not an error.
-OPTIONAL_FUNCTIONS = ("discover", "fetch_content")
+OPTIONAL_FUNCTIONS = ("discover", "fetch_content", "relationships")
 
 MISSING_FUNCTION = "missing_function"
 SYNTAX_ERROR = "syntax_error"
