@@ -8,6 +8,7 @@ Name | Type
 ------------ | -------------
 `inUse` | Array&lt;string&gt;
 `suggestions` | Array&lt;string&gt;
+`classified` | [Array&lt;RelationTypeDto&gt;](RelationTypeDto.md)
 
 ## Example
 
@@ -18,6 +19,7 @@ import type { RelationTypesResponseDto } from '@workspace/api-client'
 const example = {
   "inUse": null,
   "suggestions": null,
+  "classified": null,
 } satisfies RelationTypesResponseDto
 
 console.log(example)

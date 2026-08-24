@@ -22,9 +22,10 @@ from ...models.generated_input import (
     SnowflakeRequiredOauthAuthenticatorToken,
 )
 from ...utils.file_parser import render_bytes_cell
+from ...utils.sql_lineage import upstream_tables_from_sql
 from ..dependencies import require_module
 from ..tabular_base import BaseTabularSource
-from ..tabular_utils import TableRef
+from ..tabular_utils import TableRef, ViewLineage
 
 logger = logging.getLogger(__name__)
 
@@ -523,6 +524,104 @@ class SnowflakeSource(BaseTabularSource):
             ]
 
     # ── Lineage via OBJECT_DEPENDENCIES ──────────────────────────────────
+
+    # ── Cross-system identity ────────────────────────────────────────────
+
+    def _urn_authority(self) -> str:
+        # The account identifier is what every other tool naming a Snowflake
+        # table uses — a Tableau data source records exactly this string.
+        return str(self.config.required.account_id)
+
+    # ── View lineage (OBJECT_DEPENDENCIES, falling back to the DDL) ──────
+
+    def _collect_view_lineage(self, tables: list[TableRef]) -> list[ViewLineage]:
+        """What each view selects from.
+
+        ``SNOWFLAKE.ACCOUNT_USAGE.OBJECT_DEPENDENCIES`` is the catalog's own
+        answer and covers the whole account, but reading it needs a grant many
+        service accounts do not have. When it is unavailable the view text from
+        ``INFORMATION_SCHEMA.VIEWS`` is parsed instead — a weaker answer, marked
+        as such by the SQL_PARSED method on the resulting edges.
+        """
+        if not self._extraction_options().include_view_lineage:
+            return []
+
+        scoped_keys = {t.table_key for t in tables}
+        by_database: dict[str, set[tuple[str, ...]]] = {}
+        for t in tables:
+            by_database.setdefault(t.database, set()).add(t.table_key)
+
+        catalog = self._object_dependencies(scoped_keys)
+        if catalog:
+            return catalog
+
+        results: list[ViewLineage] = []
+        for database, keys in by_database.items():
+            try:
+                conn = self._get_cached_connection(database)
+                cursor = conn.cursor()
+                try:
+                    cursor.execute(
+                        f"SELECT TABLE_SCHEMA, TABLE_NAME, VIEW_DEFINITION "
+                        f'FROM "{database}".INFORMATION_SCHEMA.VIEWS'
+                    )
+                    rows = cursor.fetchall()
+                finally:
+                    cursor.close()
+            except Exception as exc:
+                logger.warning("Could not resolve view lineage for %s: %s", database, exc)
+                continue
+
+            for schema, name, definition in rows:
+                view_key = (database, schema, name)
+                if view_key not in keys or not definition:
+                    continue
+                upstreams = [
+                    key
+                    for key in upstream_tables_from_sql(
+                        definition,
+                        dialect="snowflake",
+                        default_database=database,
+                        default_schema=schema,
+                    )
+                    if key != view_key
+                ]
+                if upstreams:
+                    results.append(ViewLineage(view_key, tuple(upstreams), definition))
+        return results
+
+    def _object_dependencies(self, scoped_keys: set[tuple[str, ...]]) -> list[ViewLineage]:
+        """Account-level dependencies, or an empty list when not readable."""
+        try:
+            conn = self._get_cached_connection(None)
+            cursor = conn.cursor()
+            try:
+                cursor.execute(
+                    """
+                    SELECT REFERENCING_DATABASE, REFERENCING_SCHEMA, REFERENCING_OBJECT_NAME,
+                           REFERENCED_DATABASE, REFERENCED_SCHEMA, REFERENCED_OBJECT_NAME
+                    FROM SNOWFLAKE.ACCOUNT_USAGE.OBJECT_DEPENDENCIES
+                    WHERE REFERENCING_OBJECT_DOMAIN IN ('VIEW', 'MATERIALIZED VIEW')
+                    """
+                )
+                rows = cursor.fetchall()
+            finally:
+                cursor.close()
+        except Exception as exc:
+            logger.debug("ACCOUNT_USAGE.OBJECT_DEPENDENCIES not readable: %s", exc)
+            return []
+
+        upstreams: dict[tuple[str, ...], set[tuple[str, ...]]] = {}
+        for ref_db, ref_schema, ref_name, src_db, src_schema, src_name in rows:
+            view_key = (ref_db, ref_schema, ref_name)
+            if view_key not in scoped_keys:
+                continue
+            source_key = (src_db, src_schema, src_name)
+            if source_key != view_key:
+                upstreams.setdefault(view_key, set()).add(source_key)
+        return [
+            ViewLineage(key, tuple(sorted(sources)), None) for key, sources in upstreams.items()
+        ]
 
     def _collect_foreign_key_links(
         self,

@@ -135,6 +135,11 @@ const PYTHON_BUILTINS = [
   "zip",
 ];
 
+const SNIPPET_DOC =
+  '    """${1:How the assets from extract() relate to each other.}"""';
+const SNIPPET_UP = '        upstream=Ref.asset("${2:orders}"),';
+const SNIPPET_DOWN = '        downstream=Ref.asset("${3:top_deliveries}"),';
+
 /** Snippets for the shape of a connector, not just its vocabulary. */
 const CONTRACT_SNIPPETS = [
   {
@@ -157,6 +162,21 @@ const CONTRACT_SNIPPETS = [
       '        name="${3:Example}",',
       '        content="${4:...}",',
       "    )",
+    ].join("\n"),
+  },
+  {
+    label: "def relationships",
+    detail: "Optional: how the assets relate (lineage, containment, references)",
+    insertText: [
+      "def relationships():",
+      SNIPPET_DOC,
+      "    # flow() is lineage: the values in one came from the other.",
+      "    yield flow(",
+      SNIPPET_UP,
+      SNIPPET_DOWN,
+      "    )",
+      "    # contains() / references() / same_as() say how else two assets",
+      "    # relate. They are deliberately not lineage.",
     ].join("\n"),
   },
   {

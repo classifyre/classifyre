@@ -12,7 +12,16 @@ Name | Type
 `toType` | string
 `toId` | string
 `toHash` | string
+`toUrn` | string
+`fromUrn` | string
 `relationType` | string
+`relationClass` | string
+`granularity` | string
+`method` | string
+`fieldMappings` | Array&lt;{ [key: string]: any; }&gt;
+`evidence` | { [key: string]: any; }
+`viaId` | string
+`viaUrn` | string
 `confidence` | number
 
 ## Example
@@ -28,7 +37,16 @@ const example = {
   "toType": null,
   "toId": null,
   "toHash": null,
+  "toUrn": null,
+  "fromUrn": null,
   "relationType": null,
+  "relationClass": null,
+  "granularity": null,
+  "method": null,
+  "fieldMappings": null,
+  "evidence": null,
+  "viaId": null,
+  "viaUrn": null,
   "confidence": null,
 } satisfies IngestEdgeDto
 

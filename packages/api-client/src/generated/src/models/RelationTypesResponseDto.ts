@@ -13,6 +13,14 @@
  */
 
 import { mapValues } from '../runtime';
+import type { RelationTypeDto } from './RelationTypeDto';
+import {
+    RelationTypeDtoFromJSON,
+    RelationTypeDtoFromJSONTyped,
+    RelationTypeDtoToJSON,
+    RelationTypeDtoToJSONTyped,
+} from './RelationTypeDto';
+
 /**
  * 
  * @export
@@ -31,6 +39,12 @@ export interface RelationTypesResponseDto {
      * @memberof RelationTypesResponseDto
      */
     suggestions: Array<string>;
+    /**
+     * Every suggestion with the class it belongs to, so the UI can group by question ("what flows", "who touched it") instead of by raw string. Served rather than hard-coded in the client: the vocabulary is open, and a TS enum would drift from the database the first time a connector added a subtype.
+     * @type {Array<RelationTypeDto>}
+     * @memberof RelationTypesResponseDto
+     */
+    classified?: Array<RelationTypeDto>;
 }
 
 /**
@@ -54,6 +68,7 @@ export function RelationTypesResponseDtoFromJSONTyped(json: any, ignoreDiscrimin
         
         'inUse': json['inUse'],
         'suggestions': json['suggestions'],
+        'classified': json['classified'] == null ? undefined : ((json['classified'] as Array<any>).map(RelationTypeDtoFromJSON)),
     };
 }
 
@@ -70,6 +85,7 @@ export function RelationTypesResponseDtoToJSONTyped(value?: RelationTypesRespons
         
         'inUse': value['inUse'],
         'suggestions': value['suggestions'],
+        'classified': value['classified'] == null ? undefined : ((value['classified'] as Array<any>).map(RelationTypeDtoToJSON)),
     };
 }
 

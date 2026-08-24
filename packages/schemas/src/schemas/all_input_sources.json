@@ -7577,6 +7577,11 @@
           "type": "boolean",
           "default": false,
           "description": "Extract Tableau usage statistics when accessible"
+        },
+        "include_lineage": {
+          "type": "boolean",
+          "default": true,
+          "description": "Resolve the database tables behind each published data source via the Tableau Metadata API, so lineage reaches the warehouse those tables live in. Needs the Metadata API enabled on the server."
         }
       },
       "additionalProperties": false

@@ -9,9 +9,10 @@ from ...models.generated_input import (
     HiveOptionalScope,
     SamplingConfig,
 )
+from ...utils.sql_lineage import upstream_tables_from_sql
 from ..dependencies import require_module
 from ..tabular_base import BaseTabularSource
-from ..tabular_utils import TableRef
+from ..tabular_utils import TableRef, ViewLineage
 
 logger = logging.getLogger(__name__)
 
@@ -263,6 +264,54 @@ class HiveSource(BaseTabularSource):
         return []
 
     # ── Column metadata (HiveQL DESCRIBE) ────────────────────────────────
+
+    # ── Cross-system identity ────────────────────────────────────────────
+
+    def _urn_authority(self) -> str:
+        return f"{self._host}:{self._port}"
+
+    # ── View lineage (SHOW CREATE TABLE + SQL) ───────────────────────────
+
+    def _collect_view_lineage(self, tables: list[TableRef]) -> list[ViewLineage]:
+        """What each Hive view selects from.
+
+        Hive's metastore records that an object is a view and keeps its text,
+        but not what the text depends on, so the upstreams are recovered from
+        the SQL. That is a weaker answer than a dependency table and the edges
+        are marked SQL_PARSED to say so.
+        """
+        views = [t for t in tables if (t.object_type or "").upper().endswith("VIEW")]
+        if not views:
+            return []
+
+        scoped = {t.table_key for t in tables}
+        results: list[ViewLineage] = []
+        for view in views:
+            definition = self._view_definition(view)
+            if not definition:
+                continue
+            upstreams = [
+                key
+                for key in upstream_tables_from_sql(
+                    definition, dialect="hive", default_database=view.database
+                )
+                if key != view.table_key and key in scoped
+            ]
+            if upstreams:
+                results.append(ViewLineage(view.table_key, tuple(upstreams), definition))
+        return results
+
+    def _view_definition(self, table_ref: TableRef) -> str | None:
+        try:
+            conn = self._get_cached_connection(table_ref.database)
+            with conn.cursor() as cursor:
+                cursor.execute(f"SHOW CREATE TABLE `{table_ref.database}`.`{table_ref.table}`")
+                rows = cursor.fetchall()
+        except Exception as exc:
+            logger.debug("Could not read Hive view %s: %s", table_ref.display_name, exc)
+            return None
+        # One row per line of DDL.
+        return "\n".join(str(row[0]) for row in rows if row and row[0] is not None) or None
 
     def _available_columns(self, table_ref: TableRef) -> list[str]:
         query = (

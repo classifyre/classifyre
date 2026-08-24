@@ -13,6 +13,14 @@
  */
 
 import { mapValues } from '../runtime';
+import type { FieldMappingDto } from './FieldMappingDto';
+import {
+    FieldMappingDtoFromJSON,
+    FieldMappingDtoFromJSONTyped,
+    FieldMappingDtoToJSON,
+    FieldMappingDtoToJSONTyped,
+} from './FieldMappingDto';
+
 /**
  * 
  * @export
@@ -73,6 +81,36 @@ export interface GraphEdgeDto {
      * @memberof GraphEdgeDto
      */
     crossHypothesis?: boolean;
+    /**
+     * What traversing this edge means: FLOW (lineage) | CONTAINMENT | IDENTITY | REFERENCE | USAGE. The lineage view walks FLOW only; CONTAINMENT collapses nodes into their parent and IDENTITY merges nodes that are the same thing twice.
+     * @type {string}
+     * @memberof GraphEdgeDto
+     */
+    relationClass?: GraphEdgeDtoRelationClassEnum;
+    /**
+     * DATASET | FIELD — whether column-level mappings are present
+     * @type {string}
+     * @memberof GraphEdgeDto
+     */
+    granularity?: string;
+    /**
+     * How the edge was derived, which is how far it should be trusted: RUNTIME_OBSERVED | SYSTEM_CATALOG | SQL_PARSED | HEURISTIC | MANUAL
+     * @type {string}
+     * @memberof GraphEdgeDto
+     */
+    method?: string;
+    /**
+     * Column-level dependencies. A null downstream is an indirect dependency (an ORDER BY, a join key) that shaped which rows came out without feeding any one output column.
+     * @type {Array<FieldMappingDto>}
+     * @memberof GraphEdgeDto
+     */
+    fieldMappings?: Array<FieldMappingDto>;
+    /**
+     * What this edge was read from: { sql, queryId, runId }
+     * @type {{ [key: string]: any; }}
+     * @memberof GraphEdgeDto
+     */
+    evidence?: { [key: string]: any; };
 }
 
 
@@ -85,6 +123,18 @@ export const GraphEdgeDtoOriginEnum = {
     Manual: 'MANUAL'
 } as const;
 export type GraphEdgeDtoOriginEnum = typeof GraphEdgeDtoOriginEnum[keyof typeof GraphEdgeDtoOriginEnum];
+
+/**
+ * @export
+ */
+export const GraphEdgeDtoRelationClassEnum = {
+    Flow: 'FLOW',
+    Containment: 'CONTAINMENT',
+    Identity: 'IDENTITY',
+    Reference: 'REFERENCE',
+    Usage: 'USAGE'
+} as const;
+export type GraphEdgeDtoRelationClassEnum = typeof GraphEdgeDtoRelationClassEnum[keyof typeof GraphEdgeDtoRelationClassEnum];
 
 
 /**
@@ -121,6 +171,11 @@ export function GraphEdgeDtoFromJSONTyped(json: any, ignoreDiscriminator: boolea
         'confidence': json['confidence'],
         'origin': json['origin'],
         'crossHypothesis': json['crossHypothesis'] == null ? undefined : json['crossHypothesis'],
+        'relationClass': json['relationClass'] == null ? undefined : json['relationClass'],
+        'granularity': json['granularity'] == null ? undefined : json['granularity'],
+        'method': json['method'] == null ? undefined : json['method'],
+        'fieldMappings': json['fieldMappings'] == null ? undefined : ((json['fieldMappings'] as Array<any>).map(FieldMappingDtoFromJSON)),
+        'evidence': json['evidence'] == null ? undefined : json['evidence'],
     };
 }
 
@@ -144,6 +199,11 @@ export function GraphEdgeDtoToJSONTyped(value?: GraphEdgeDto | null, ignoreDiscr
         'confidence': value['confidence'],
         'origin': value['origin'],
         'crossHypothesis': value['crossHypothesis'],
+        'relationClass': value['relationClass'],
+        'granularity': value['granularity'],
+        'method': value['method'],
+        'fieldMappings': value['fieldMappings'] == null ? undefined : ((value['fieldMappings'] as Array<any>).map(FieldMappingDtoToJSON)),
+        'evidence': value['evidence'],
     };
 }
 

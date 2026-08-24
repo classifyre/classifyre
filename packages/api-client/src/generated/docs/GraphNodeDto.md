@@ -12,6 +12,7 @@ Name | Type
 `depth` | number
 `assetType` | string
 `sourceType` | string
+`urn` | string
 `sourceId` | string
 `sourceName` | string
 `severity` | string
@@ -38,6 +39,7 @@ const example = {
   "depth": null,
   "assetType": null,
   "sourceType": null,
+  "urn": null,
   "sourceId": null,
   "sourceName": null,
   "severity": null,

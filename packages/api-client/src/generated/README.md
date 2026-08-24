@@ -197,10 +197,12 @@ All URIs are relative to *http://localhost*
 *GlossaryApi* | [**glossaryControllerRemove**](docs/GlossaryApi.md#glossarycontrollerremove) | **DELETE** /glossary/{id} | Delete a glossary term
 *GlossaryApi* | [**glossaryControllerUpsert**](docs/GlossaryApi.md#glossarycontrollerupsert) | **POST** /glossary | Create or update a glossary term (operator)
 *GlossaryApi* | [**glossaryControllerVerify**](docs/GlossaryApi.md#glossarycontrollerverify) | **PATCH** /glossary/{id}/verify | Mark an agent-proposed term as verified
+*GraphApi* | [**graphControllerColumnLineage**](docs/GraphApi.md#graphcontrollercolumnlineage) | **POST** /graph/lineage/column | Trace one column back through the transformations that produced it
 *GraphApi* | [**graphControllerCreateManualEdge**](docs/GraphApi.md#graphcontrollercreatemanualedge) | **POST** /graph/edges/manual | Create a manual edge between two entities (user-defined relation type)
 *GraphApi* | [**graphControllerDeleteEdge**](docs/GraphApi.md#graphcontrollerdeleteedge) | **DELETE** /graph/edges/{id} | Delete an edge
 *GraphApi* | [**graphControllerExpand**](docs/GraphApi.md#graphcontrollerexpand) | **POST** /graph/expand | Expand the graph around a seed entity (recursive traversal)
 *GraphApi* | [**graphControllerIngestEdges**](docs/GraphApi.md#graphcontrolleringestedges) | **POST** /graph/edges | Bulk-upsert source-derived edges from a connector. Idempotent.
+*GraphApi* | [**graphControllerLineage**](docs/GraphApi.md#graphcontrollerlineage) | **POST** /graph/lineage | Trace where an asset came from, or what breaks if it changes
 *GraphApi* | [**graphControllerPivot**](docs/GraphApi.md#graphcontrollerpivot) | **POST** /graph/pivot | Named pivot question on a node (e.g. who_touched, upstream_lineage, emails)
 *GraphApi* | [**graphControllerRebuildEdges**](docs/GraphApi.md#graphcontrollerrebuildedges) | **POST** /graph/rebuild-edges | Rebuild all inferred edges from existing assets and findings
 *GraphApi* | [**graphControllerRelationTypes**](docs/GraphApi.md#graphcontrollerrelationtypes) | **GET** /graph/relation-types | Get all relation types in use + vocabulary suggestions
@@ -386,6 +388,9 @@ All URIs are relative to *http://localhost*
 - [CliRunnerControllerUpdateRunnerStatusRequest](docs/CliRunnerControllerUpdateRunnerStatusRequest.md)
 - [CloseCaseDto](docs/CloseCaseDto.md)
 - [CloseCaseResponseDto](docs/CloseCaseResponseDto.md)
+- [ColumnLineageDto](docs/ColumnLineageDto.md)
+- [ColumnLineageResponseDto](docs/ColumnLineageResponseDto.md)
+- [ColumnLineageStepDto](docs/ColumnLineageStepDto.md)
 - [CorrelationConfigResponseDto](docs/CorrelationConfigResponseDto.md)
 - [CorrelationGraphResponseDto](docs/CorrelationGraphResponseDto.md)
 - [CorrelationLabelWeightDto](docs/CorrelationLabelWeightDto.md)
@@ -429,6 +434,7 @@ All URIs are relative to *http://localhost*
 - [EvidenceEntityDto](docs/EvidenceEntityDto.md)
 - [ExclusionRuleDto](docs/ExclusionRuleDto.md)
 - [ExpandGraphDto](docs/ExpandGraphDto.md)
+- [FieldMappingDto](docs/FieldMappingDto.md)
 - [FinalizeIngestRunDto](docs/FinalizeIngestRunDto.md)
 - [FindingEvidenceAnalysisDto](docs/FindingEvidenceAnalysisDto.md)
 - [FindingHistoryEntryDto](docs/FindingHistoryEntryDto.md)
@@ -468,6 +474,7 @@ All URIs are relative to *http://localhost*
 - [InquiryResponseDto](docs/InquiryResponseDto.md)
 - [InstanceSettingsResponseDto](docs/InstanceSettingsResponseDto.md)
 - [LatestRunnerSummaryDto](docs/LatestRunnerSummaryDto.md)
+- [LineageGraphDto](docs/LineageGraphDto.md)
 - [LinkInquiriesDto](docs/LinkInquiriesDto.md)
 - [LinkThreadSupportDto](docs/LinkThreadSupportDto.md)
 - [ListRunnersResponseDto](docs/ListRunnersResponseDto.md)
@@ -511,6 +518,7 @@ All URIs are relative to *http://localhost*
 - [RecomputeCorrelationResponseDto](docs/RecomputeCorrelationResponseDto.md)
 - [RegisterDiscoveredAssetsDto](docs/RegisterDiscoveredAssetsDto.md)
 - [RegisterDiscoveredAssetsResponseDto](docs/RegisterDiscoveredAssetsResponseDto.md)
+- [RelationTypeDto](docs/RelationTypeDto.md)
 - [RelationTypesResponseDto](docs/RelationTypesResponseDto.md)
 - [RematchResponseDto](docs/RematchResponseDto.md)
 - [ReviewCaseLeadDto](docs/ReviewCaseLeadDto.md)

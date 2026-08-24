@@ -17,10 +17,13 @@ import * as runtime from '../runtime';
 import type {
   BulkIngestEdgesDto,
   BulkIngestEdgesResponseDto,
+  ColumnLineageDto,
+  ColumnLineageResponseDto,
   CreateManualEdgeDto,
   EdgeDetailDto,
   ExpandGraphDto,
   GraphResponseDto,
+  LineageGraphDto,
   PivotGraphDto,
   RebuildEdgesResponseDto,
   RelationTypesResponseDto,
@@ -31,6 +34,10 @@ import {
     BulkIngestEdgesDtoToJSON,
     BulkIngestEdgesResponseDtoFromJSON,
     BulkIngestEdgesResponseDtoToJSON,
+    ColumnLineageDtoFromJSON,
+    ColumnLineageDtoToJSON,
+    ColumnLineageResponseDtoFromJSON,
+    ColumnLineageResponseDtoToJSON,
     CreateManualEdgeDtoFromJSON,
     CreateManualEdgeDtoToJSON,
     EdgeDetailDtoFromJSON,
@@ -39,6 +46,8 @@ import {
     ExpandGraphDtoToJSON,
     GraphResponseDtoFromJSON,
     GraphResponseDtoToJSON,
+    LineageGraphDtoFromJSON,
+    LineageGraphDtoToJSON,
     PivotGraphDtoFromJSON,
     PivotGraphDtoToJSON,
     RebuildEdgesResponseDtoFromJSON,
@@ -48,6 +57,10 @@ import {
     UpdateEdgeDtoFromJSON,
     UpdateEdgeDtoToJSON,
 } from '../models/index';
+
+export interface GraphControllerColumnLineageRequest {
+    columnLineageDto: ColumnLineageDto;
+}
 
 export interface GraphControllerCreateManualEdgeRequest {
     createManualEdgeDto: CreateManualEdgeDto;
@@ -65,6 +78,10 @@ export interface GraphControllerIngestEdgesRequest {
     bulkIngestEdgesDto: BulkIngestEdgesDto;
 }
 
+export interface GraphControllerLineageRequest {
+    lineageGraphDto: LineageGraphDto;
+}
+
 export interface GraphControllerPivotRequest {
     pivotGraphDto: PivotGraphDto;
 }
@@ -78,6 +95,47 @@ export interface GraphControllerUpdateEdgeRequest {
  * 
  */
 export class GraphApi extends runtime.BaseAPI {
+
+    /**
+     * Indirect dependencies — an ORDER BY or a join key that shaped which rows came out without feeding the value — are returned separately, so they do not read as if the column was computed from them.
+     * Trace one column back through the transformations that produced it
+     */
+    async graphControllerColumnLineageRaw(requestParameters: GraphControllerColumnLineageRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ColumnLineageResponseDto>> {
+        if (requestParameters['columnLineageDto'] == null) {
+            throw new runtime.RequiredError(
+                'columnLineageDto',
+                'Required parameter "columnLineageDto" was null or undefined when calling graphControllerColumnLineage().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/graph/lineage/column`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+            body: ColumnLineageDtoToJSON(requestParameters['columnLineageDto']),
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => ColumnLineageResponseDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Indirect dependencies — an ORDER BY or a join key that shaped which rows came out without feeding the value — are returned separately, so they do not read as if the column was computed from them.
+     * Trace one column back through the transformations that produced it
+     */
+    async graphControllerColumnLineage(requestParameters: GraphControllerColumnLineageRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ColumnLineageResponseDto> {
+        const response = await this.graphControllerColumnLineageRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
 
     /**
      * Create a manual edge between two entities (user-defined relation type)
@@ -229,6 +287,47 @@ export class GraphApi extends runtime.BaseAPI {
      */
     async graphControllerIngestEdges(requestParameters: GraphControllerIngestEdgesRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<BulkIngestEdgesResponseDto> {
         const response = await this.graphControllerIngestEdgesRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Walks FLOW edges only. Containment and identity are controls here rather than hops: collapseContainers rolls tables up into their schemas, and mergeIdentity folds an asset and its twin in another system into one node so a path across them costs one hop instead of two.
+     * Trace where an asset came from, or what breaks if it changes
+     */
+    async graphControllerLineageRaw(requestParameters: GraphControllerLineageRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<GraphResponseDto>> {
+        if (requestParameters['lineageGraphDto'] == null) {
+            throw new runtime.RequiredError(
+                'lineageGraphDto',
+                'Required parameter "lineageGraphDto" was null or undefined when calling graphControllerLineage().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+
+        let urlPath = `/graph/lineage`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+            body: LineageGraphDtoToJSON(requestParameters['lineageGraphDto']),
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => GraphResponseDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Walks FLOW edges only. Containment and identity are controls here rather than hops: collapseContainers rolls tables up into their schemas, and mergeIdentity folds an asset and its twin in another system into one node so a path across them costs one hop instead of two.
+     * Trace where an asset came from, or what breaks if it changes
+     */
+    async graphControllerLineage(requestParameters: GraphControllerLineageRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<GraphResponseDto> {
+        const response = await this.graphControllerLineageRaw(requestParameters, initOverrides);
         return await response.value();
     }
 
