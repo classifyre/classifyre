@@ -134,3 +134,68 @@ export function updateCellSource(
 ): NotebookCell[] {
   return cells.map((cell) => (cell.id === id ? { ...cell, source } : cell));
 }
+
+/**
+ * Apply the assistant's notebook edits.
+ *
+ * Cell-granular rather than "here is the whole notebook": the author is usually
+ * looking at the notebook while the assistant works, so replacing every cell to
+ * change one of them would throw away anything the model did not think to
+ * repeat. Unknown cell ids are skipped rather than throwing — a model that
+ * invents an id should cost the user one ignored operation, not the whole reply.
+ *
+ * Returns the cells plus the ids actually touched, so the caller can say what
+ * changed and can tell a no-op reply from a real edit.
+ */
+export function applyNotebookOperations(
+  cells: NotebookCell[],
+  operations: readonly NotebookOperation[],
+): { cells: NotebookCell[]; touched: string[] } {
+  let next = [...cells];
+  const touched: string[] = [];
+
+  for (const operation of operations) {
+    if (operation.op === "set_cell") {
+      if (!next.some((cell) => cell.id === operation.cellId)) continue;
+      next = updateCellSource(next, operation.cellId, operation.source);
+      touched.push(operation.cellId);
+      continue;
+    }
+
+    if (operation.op === "delete_cell") {
+      // The cell defining a required function is the notebook's contract with
+      // the scanner; the assistant may rewrite it, never remove it.
+      if (protectedCellIds(next).has(operation.cellId)) continue;
+      if (!next.some((cell) => cell.id === operation.cellId)) continue;
+      next = deleteCell(next, operation.cellId);
+      touched.push(operation.cellId);
+      continue;
+    }
+
+    const type = operation.cellType ?? "code";
+    const cell: NotebookCell = {
+      id: newCellId(next, type),
+      type,
+      source: operation.source ?? "",
+    };
+    const after = operation.afterCellId
+      ? next.findIndex((existing) => existing.id === operation.afterCellId)
+      : -1;
+    const position = after === -1 ? next.length : after + 1;
+    next = [...next.slice(0, position), cell, ...next.slice(position)];
+    touched.push(cell.id);
+  }
+
+  return { cells: next, touched };
+}
+
+/** The edit shape `applyNotebookOperations` understands. */
+export type NotebookOperation =
+  | { op: "set_cell"; cellId: string; source: string }
+  | {
+      op: "insert_cell";
+      cellType?: "code" | "markdown";
+      source?: string;
+      afterCellId?: string | null;
+    }
+  | { op: "delete_cell"; cellId: string };

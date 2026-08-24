@@ -11,9 +11,13 @@ import {
   type AssistantToolCallSummary,
   type AssistantUiAction,
   type AssistantPageContext,
+  RUN_NOTEBOOK_TOOL,
 } from "@workspace/api-client";
 import { assistantContexts } from "@workspace/schemas/assistant";
-import { AssistantWorkflowPanel } from "@workspace/ui/components";
+import {
+  AssistantWorkflowPanel,
+  type AssistantPanelMention,
+} from "@workspace/ui/components";
 import { toast } from "sonner";
 import { usePathname, useRouter } from "next/navigation";
 import { useInstanceSettings } from "@/components/instance-settings-provider";
@@ -32,11 +36,47 @@ type AssistantTranscriptMessage = AssistantChatMessage & {
   isIntro?: boolean;
 };
 
+/**
+ * One thing the user can point at with "@" in the composer.
+ *
+ * `body` is what the model is actually shown for the reference — the full text
+ * of a notebook cell, a file's metadata, a detector's configuration — so a
+ * message saying "rewrite @cell:2" never depends on the model guessing which
+ * cell that is.
+ */
+export type AssistantMention = AssistantPanelMention & {
+  body: string;
+};
+
 export type AssistantPageBridge = {
   contextKey: keyof typeof assistantContexts;
   canOpen: boolean;
   getContext: () => Promise<AssistantPageContext> | AssistantPageContext;
   applyAction: (action: AssistantUiAction) => Promise<void> | void;
+  /**
+   * Called on every keystroke while the composer is open, so it must be cheap
+   * and read live state (a ref, not a captured value).
+   */
+  getMentions?: () => AssistantMention[];
+  /**
+   * Runs the notebook after saving the page, and resolves with what happened.
+   *
+   * This is what lets the assistant check its own work: it proposes a run, the
+   * user confirms, and the result — stdout, or the traceback with the failing
+   * line — comes back as the next message for it to react to.
+   */
+  runNotebook?: (input: {
+    mode: "cell" | "all" | "test_connection" | "preview_extract";
+    cellId?: string;
+  }) => Promise<string>;
+};
+
+type AssistantThread = {
+  id: string;
+  title: string;
+  messages: AssistantTranscriptMessage[];
+  pendingConfirmation: AssistantPendingConfirmation | null;
+  uploadedFiles: AssistantParsedUpload[];
 };
 
 type AssistantWorkflowContextValue = {
@@ -46,6 +86,52 @@ type AssistantWorkflowContextValue = {
   bridge: AssistantPageBridge | null;
   registerBridge: (bridge: AssistantPageBridge | null) => void;
 };
+
+/**
+ * The mentions a message actually references.
+ *
+ * Matched by exact token followed by a non-token character, so "@cell:1" in the
+ * text never drags in "@cell:12" as well.
+ */
+export function mentionsInMessage(
+  message: string,
+  mentions: readonly AssistantMention[],
+): AssistantMention[] {
+  return mentions.filter((mention) => {
+    let from = 0;
+    for (;;) {
+      const at = message.indexOf(mention.token, from);
+      if (at === -1) {
+        return false;
+      }
+      const next = message[at + mention.token.length];
+      if (!next || /[\s.,;:!?)\]]/.test(next)) {
+        return true;
+      }
+      from = at + 1;
+    }
+  });
+}
+
+/** A thread's label in the switcher: the first thing the user actually asked. */
+function threadTitle(messages: AssistantTranscriptMessage[]): string {
+  const firstUser = messages.find((message) => message.role === "user");
+  if (!firstUser) {
+    return "New chat";
+  }
+  const text = firstUser.content.replace(/\s+/g, " ").trim();
+  return text.length > 48 ? `${text.slice(0, 48)}…` : text;
+}
+
+function newThread(): AssistantThread {
+  return {
+    id: nextId("thread"),
+    title: "New chat",
+    messages: [],
+    pendingConfirmation: null,
+    uploadedFiles: [],
+  };
+}
 
 const AssistantWorkflowContext =
   React.createContext<AssistantWorkflowContextValue | null>(null);
@@ -78,18 +164,89 @@ export function AssistantWorkflowProvider({
   const pathname = usePathname();
   const [bridge, setBridge] = React.useState<AssistantPageBridge | null>(null);
   const [open, setOpen] = React.useState(false);
-  const [messages, setMessages] = React.useState<AssistantTranscriptMessage[]>(
-    [],
+  // Several conversations per context. One long thread that drifts from "write
+  // extract()" to "why does the token fail" makes both harder for the model, so
+  // starting a fresh one is a button rather than a page reload.
+  const [threads, setThreads] = React.useState<AssistantThread[]>(() => [
+    newThread(),
+  ]);
+  const [activeThreadId, setActiveThreadId] = React.useState<string>(
+    () => threads[0]!.id,
   );
-  const [pendingConfirmation, setPendingConfirmation] =
-    React.useState<AssistantPendingConfirmation | null>(null);
   const [input, setInput] = React.useState("");
   const [submitting, setSubmitting] = React.useState(false);
   const [uploadingFile, setUploadingFile] = React.useState(false);
-  const [uploadedFiles, setUploadedFiles] = React.useState<
-    AssistantParsedUpload[]
-  >([]);
   const uploadInputRef = React.useRef<HTMLInputElement | null>(null);
+
+  const activeThread =
+    threads.find((thread) => thread.id === activeThreadId) ?? threads[0]!;
+  const messages = activeThread.messages;
+  const pendingConfirmation = activeThread.pendingConfirmation;
+  const uploadedFiles = activeThread.uploadedFiles;
+
+  const patchActiveThread = React.useCallback(
+    (change: (thread: AssistantThread) => AssistantThread) => {
+      setThreads((current) =>
+        current.map((thread) => {
+          if (thread.id !== activeThreadId) {
+            return thread;
+          }
+          const next = change(thread);
+          return { ...next, title: threadTitle(next.messages) };
+        }),
+      );
+    },
+    [activeThreadId],
+  );
+
+  const setMessages = React.useCallback(
+    (
+      update:
+        | AssistantTranscriptMessage[]
+        | ((
+            current: AssistantTranscriptMessage[],
+          ) => AssistantTranscriptMessage[]),
+    ) => {
+      patchActiveThread((thread) => ({
+        ...thread,
+        messages:
+          typeof update === "function" ? update(thread.messages) : update,
+      }));
+    },
+    [patchActiveThread],
+  );
+
+  const setPendingConfirmation = React.useCallback(
+    (next: AssistantPendingConfirmation | null) => {
+      patchActiveThread((thread) => ({
+        ...thread,
+        pendingConfirmation: next,
+      }));
+    },
+    [patchActiveThread],
+  );
+
+  const setUploadedFiles = React.useCallback(
+    (
+      update:
+        | AssistantParsedUpload[]
+        | ((current: AssistantParsedUpload[]) => AssistantParsedUpload[]),
+    ) => {
+      patchActiveThread((thread) => ({
+        ...thread,
+        uploadedFiles:
+          typeof update === "function" ? update(thread.uploadedFiles) : update,
+      }));
+    },
+    [patchActiveThread],
+  );
+
+  const startThread = React.useCallback(() => {
+    const thread = newThread();
+    setThreads((current) => [...current, thread]);
+    setActiveThreadId(thread.id);
+    setInput("");
+  }, []);
 
   // Reset the conversation only when the assistant context actually changes
   // (e.g. navigating from source.create to detector.create). Incidental bridge
@@ -103,10 +260,10 @@ export function AssistantWorkflowProvider({
       return;
     }
     prevContextKeyRef.current = contextKey;
-    setMessages([]);
-    setPendingConfirmation(null);
+    const fresh = newThread();
+    setThreads([fresh]);
+    setActiveThreadId(fresh.id);
     setInput("");
-    setUploadedFiles([]);
     setOpen(false);
   }, [contextKey]);
 
@@ -207,6 +364,18 @@ export function AssistantWorkflowProvider({
         content: trimmed,
       };
 
+      // Resolved here rather than server-side: only the page knows what
+      // "@cell:2" points at, and it knows it right now, before the user's next
+      // edit changes it.
+      const referenced = mentionsInMessage(
+        trimmed,
+        bridge?.getMentions?.() ?? [],
+      ).map((mention) => ({
+        token: mention.token,
+        label: mention.label,
+        body: mention.body,
+      }));
+
       setSubmitting(true);
       setMessages((current) => [...current, nextUserMessage]);
       setInput("");
@@ -227,6 +396,7 @@ export function AssistantWorkflowProvider({
             ...context,
             metadata: {
               ...(context.metadata ?? {}),
+              ...(referenced.length > 0 ? { mentions: referenced } : {}),
               assistant_uploads: uploadedFiles.map((file) => ({
                 fileName: file.fileName,
                 fileType: file.fileType,
@@ -271,9 +441,51 @@ export function AssistantWorkflowProvider({
       handleResponse,
       messages,
       pendingConfirmation,
+      setMessages,
+      setPendingConfirmation,
       uploadedFiles,
     ],
   );
+
+  /**
+   * Confirm the pending proposal.
+   *
+   * A notebook run is executed here rather than by the API: the notebook is in
+   * the browser, and running it means saving the page's form first. Its outcome
+   * is then sent as an ordinary message, so the assistant reads the traceback
+   * the same way it would read anything else the user told it.
+   */
+  const confirmPending = React.useCallback(async () => {
+    const pending = pendingConfirmation;
+    if (pending?.tool === RUN_NOTEBOOK_TOOL && bridge?.runNotebook) {
+      setPendingConfirmation(null);
+      setSubmitting(true);
+      let outcome: string;
+      try {
+        outcome = await bridge.runNotebook({
+          mode:
+            (pending.input?.mode as
+              | "cell"
+              | "all"
+              | "test_connection"
+              | "preview_extract") ?? "all",
+          cellId:
+            typeof pending.input?.cellId === "string"
+              ? pending.input.cellId
+              : undefined,
+        });
+      } catch (error) {
+        outcome = `The run could not be started: ${
+          error instanceof Error ? error.message : "unknown error"
+        }`;
+      } finally {
+        setSubmitting(false);
+      }
+      await sendMessage(`Result of the run you asked for:\n\n${outcome}`);
+      return;
+    }
+    await sendMessage("Confirm", "confirm");
+  }, [bridge, pendingConfirmation, sendMessage, setPendingConfirmation]);
 
   const handleFileUpload = React.useCallback(
     async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -310,7 +522,7 @@ export function AssistantWorkflowProvider({
         setUploadingFile(false);
       }
     },
-    [],
+    [setMessages, setUploadedFiles],
   );
 
   // Provider assignment is the Assistant enablement switch. Pages with a
@@ -360,7 +572,19 @@ export function AssistantWorkflowProvider({
         },
       ];
     });
-  }, [active, introMessage, open]);
+  }, [active, introMessage, open, setMessages]);
+
+  // Recomputed on every render (so every keystroke) rather than memoized: the
+  // bridge reads live page state, and a memo keyed on anything cheaper than
+  // "the notebook" would hand the menu stale cells.
+  const mentions = open && active ? (bridge?.getMentions?.() ?? []) : [];
+
+  // Chat-side uploads exist so the assistant can read a spreadsheet you are
+  // asking questions *about*. On a source page that is the wrong door: the
+  // page's own uploader puts the file where the connector will find it.
+  const supportsUpload =
+    bridge?.contextKey !== "source.create" &&
+    bridge?.contextKey !== "source.edit";
 
   return (
     <AssistantWorkflowContext.Provider value={contextValue}>
@@ -381,7 +605,7 @@ export function AssistantWorkflowProvider({
             title={contextMeta?.title ?? "Assistant"}
             messages={messages}
             pendingConfirmation={pendingConfirmation}
-            onConfirm={() => void sendMessage("Confirm", "confirm")}
+            onConfirm={() => void confirmPending()}
             onCancelConfirmation={() => {
               setPendingConfirmation(null);
               toast("Assistant action cancelled");
@@ -394,22 +618,39 @@ export function AssistantWorkflowProvider({
             submitting={submitting}
             placeholder={
               active
-                ? "Ask about your data or describe what to do — I can fill forms, run MCP tools, and navigate for you…"
+                ? "Describe what you want built. Type @ to reference a cell, an uploaded file or a detector…"
                 : "Assistant is unavailable for this page."
             }
-            uploadedFiles={uploadedFiles.map((file, index) => ({
-              id: `${file.fileName}-${index}`,
-              label: `${file.fileName} · ${formatBytes(file.bytes)}`,
-            }))}
-            onUploadClick={() => uploadInputRef.current?.click()}
+            uploadedFiles={
+              supportsUpload
+                ? uploadedFiles.map((file, index) => ({
+                    id: `${file.fileName}-${index}`,
+                    label: `${file.fileName} · ${formatBytes(file.bytes)}`,
+                  }))
+                : []
+            }
+            // A source page has its own uploader, whose files the connector can
+            // actually read. A second button here uploaded into the chat
+            // instead, which looked identical and did something else.
+            onUploadClick={
+              supportsUpload
+                ? () => uploadInputRef.current?.click()
+                : undefined
+            }
             uploadDisabled={!active || submitting || uploadingFile}
             uploadingFile={uploadingFile}
             footerNote={
-              active
-                ? "Patches apply locally first. MCP mutations stay behind confirmation."
-                : "Enable AI in settings to activate the assistant."
+              active ? undefined : "Enable AI in settings to activate the assistant."
             }
             onClose={() => setOpen(false)}
+            mentions={mentions}
+            threads={threads.map((thread) => ({
+              id: thread.id,
+              title: thread.title,
+            }))}
+            activeThreadId={activeThreadId}
+            onNewThread={startThread}
+            onSelectThread={setActiveThreadId}
           />
         </div>
       ) : null}

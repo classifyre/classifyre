@@ -121,6 +121,7 @@
     "scans": "Scans",
     "operations": "Operationen",
     "settings": "Einstellungen",
+    "documentation": "Dokumentation",
     "harness": "Harness AI",
     "group": {
       "intelligence": "Erkenntnisse",
@@ -583,7 +584,11 @@
       "uploadFailures": "Fehlgeschlagene Datei-Uploads: {{count}}.",
       "deletionFailures": "Dateien konnten nicht entfernt werden: {{count}}.",
       "requiredBeforeSave": "Fügen Sie vor dem Speichern dieser Sandbox-Quelle mindestens eine Datei hinzu.",
-      "requiredBeforeContinue": "Fügen Sie mindestens eine Datei hinzu, bevor Sie fortfahren."
+      "requiredBeforeContinue": "Fügen Sie mindestens eine Datei hinzu, bevor Sie fortfahren.",
+      "empty": "Noch keine Dateien angehängt.",
+      "uploading": "lädt hoch {{percent}}%",
+      "uploadFailed": "Der Upload ist fehlgeschlagen",
+      "deleteFailed": "Die Datei konnte nicht entfernt werden"
     },
     "totalSources": "Quellen gesamt",
     "connectedSources": "Verbundene Quellen",
@@ -734,7 +739,10 @@
       "incompleteSettings": "Quelleinstellungen sind unvollständig. Bitte Validierungsfehler beheben.",
       "detectorsSaved": "Detector-Einstellungen gespeichert",
       "setupAssistant": "Quellen-Einrichtungsassistent",
-      "editAssistant": "Quellen-Bearbeitungsassistent"
+      "editAssistant": "Quellen-Bearbeitungsassistent",
+      "notebookUpdated": "Der Assistent hat das Notebook aktualisiert",
+      "customDraftName": "Neue benutzerdefinierte Quelle",
+      "createFailed": "Die Quelle konnte nicht erstellt werden"
     },
     "testConnection": {
       "titleTesting": "Verbindung testen",
@@ -749,6 +757,14 @@
     "stepper": {
       "sourceDetails": "Quellendetails",
       "sourceDetailsDesc": "Pflichtfelder, Zugangsdaten und optionale Einstellungen.",
+      "files": "Dateien & Ordner",
+      "filesDesc": "Was der Konnektor von der Festplatte liest",
+      "packages": "Pakete",
+      "packagesDesc": "Python-Abhängigkeiten, vor dem Lauf installiert",
+      "variables": "Variablen & Secrets",
+      "variablesDesc": "Konfiguration, die das Notebook per Name liest",
+      "notebook": "Notebook",
+      "notebookDesc": "Der Python-Code, der diesen Konnektor definiert",
       "detectors": "Detektoren",
       "detectorsDesc": "Abdeckung wählen und Schwellenwerte anpassen.",
       "step": "Schritt {{index}}",
@@ -3663,7 +3679,7 @@
     "ICEBERG": "Apache Iceberg",
     "JIRA": "Jira",
     "KAFKA": "Apache Kafka",
-    "LOCAL_FOLDER": "Lokaler Ordner",
+    "LOCAL_FOLDER": "Eingebundener Ordner",
     "MEILISEARCH": "Meilisearch",
     "MICROSOFT_365": "Microsoft 365",
     "MONGODB": "MongoDB",
@@ -3731,7 +3747,14 @@
       "ok": "Definiert test_connection() und extract()",
       "syntaxError": "Zelle '{{cell}}' hat einen Syntaxfehler in Zeile {{line}}: {{message}}"
     },
+    "data": {
+      "title": "Dateien & Ordner",
+      "description": "Laden Sie Dateien in diese Quelle hoch oder verweisen Sie auf einen Ordner, den der Scan lesen kann.",
+      "count": "{{count}} angehängt"
+    },
     "config": {
+      "title": "Variablen & Secrets",
+      "description": "{{count}} konfiguriert. Variablen werden im Klartext gespeichert, Secrets verschlüsselt und nie wieder angezeigt.",
       "variablesTitle": "Variablen",
       "variablesDescription": "Klartextwerte, die das Notebook mit ctx.var(\"name\") liest. Unverschlüsselt gespeichert.",
       "variablesEmpty": "Noch keine Variablen.",
@@ -3776,9 +3799,9 @@
       "hint": "Hier hochgeladene Dateien werden vor dem Start des Notebooks auf den Runner geladen und stehen als ctx.files bereit -- file.parse() liest jedes Format. Die Vorlage \"Read files uploaded to this source\" zeigt ein lauffähiges Beispiel."
     },
     "folders": {
-      "title": "Lokale Ordner",
-      "description": "Ordner auf diesem Rechner, die das Notebook mit ctx.folder(\"name\") liest. Es wird nichts kopiert. Nur für die Desktop-App: In einer Kubernetes-Installation gibt es keinen solchen Rechner -- laden Sie die Dateien stattdessen zur Quelle hoch.",
-      "empty": "Keine Ordner. Das Notebook liest nur, was Sie hochladen.",
+      "title": "Ordner",
+      "description": "Ordner, die das Notebook mit ctx.folder(\"name\") liest. Es wird nichts kopiert. Der Pfad wird dort aufgelöst, wo der Scan läuft: auf diesem Rechner im Desktop-Modus oder in einem per Chart (api.localFolders) in die Scan-Pods eingebundenen Ordner unter Kubernetes.",
+      "empty": "Noch keine Ordner. Fügen Sie einen hinzu, um Dateien direkt zu lesen, statt sie hochzuladen.",
       "add": "Ordner hinzufügen",
       "pathPlaceholder": "/absoluter/pfad/zum/ordner",
       "nameRequired": "Ein Name ist erforderlich -- ihn erwartet ctx.folder().",
@@ -3791,20 +3814,6 @@
       "button": "Vorlagen",
       "hint": "Fügt die Zellen der Vorlage unter Ihren eigenen ein. Nichts wird ersetzt.",
       "failed": "Vorlagen konnten nicht geladen werden."
-    },
-    "ai": {
-      "title": "KI fragen",
-      "placeholder": "Fragen Sie zu dieser Zelle oder beschreiben Sie, was sie tun soll…",
-      "placeholderHint": "Sie sieht das gesamte Notebook, Ihre Pakete, Ihre Variablen und die Namen Ihrer Geheimnisse. Bitten Sie sie, die Zelle zu schreiben, oder fragen Sie, warum etwas fehlschlägt.",
-      "send": "Senden",
-      "thinking": "Denkt nach…",
-      "updatedCell": "Zelle aktualisiert.",
-      "cellUpdated": "Diese Zelle wurde geändert",
-      "undo": "Rückgängig",
-      "failed": "Der KI-Anbieter konnte nicht erreicht werden.",
-      "notConfigured": "KI ist auf dieser Instanz nicht konfiguriert.",
-      "providerError": "Der konfigurierte KI-Anbieter antwortet nicht.",
-      "configureHint": "Richten Sie einen unter Harness → Konfiguration ein."
     }
   }
 }

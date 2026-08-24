@@ -70,30 +70,14 @@ export class ValidationService {
    * The schema uses oneOf to support all source types, validation is automatic
    */
   validate(type: string, data: any): Record<string, unknown> {
-    const normalizedType = String(type).toUpperCase();
-
-    const environment = (
-      process.env.ENVIRONMENT || 'development'
-    ).toLowerCase();
-    if (normalizedType === 'LOCAL_FOLDER' && environment === 'kubernetes') {
-      throw new BadRequestException(
-        'LOCAL_FOLDER sources are only available in the desktop application',
-      );
-    }
-    // A notebook's local folders are paths on the machine running the app. In
-    // Kubernetes there is no such machine -- the runner is an ephemeral pod --
-    // so the folder would silently be empty rather than wrong. Refused here,
-    // with the mechanism that does work in its place.
-    if (normalizedType === 'CUSTOM' && environment === 'kubernetes') {
-      const folders = (data as { optional?: { local_folders?: unknown[] } })
-        ?.optional?.local_folders;
-      if (Array.isArray(folders) && folders.length > 0) {
-        throw new BadRequestException(
-          'Local folders are only available in the desktop application. ' +
-            'Upload the files to this source instead and read them with ctx.files.',
-        );
-      }
-    }
+    // A folder path used to be refused outright in Kubernetes, on the reasoning
+    // that a scan pod has no local disk worth pointing at. That was true of the
+    // pod's own filesystem and false of the cluster: a PVC, a hostPath or a
+    // ConfigMap mounted into the CLI job is a perfectly ordinary way to hand an
+    // instance a corpus, and `api.localFolders` in the chart exists to do
+    // exactly that. Both deployments now take the same config; whether the path
+    // resolves is answered by the run, which reports a missing folder plainly,
+    // rather than guessed at by the API.
     const normalized = normalizeSourceConfig(type, data);
     const valid = this.inputValidator(normalized);
     if (!valid) {

@@ -1,5 +1,6 @@
 import {
   addCell,
+  applyNotebookOperations,
   definesFunction,
   deleteCell,
   duplicateCell,
@@ -159,5 +160,77 @@ describe("newCellId", () => {
   it("uses a prefix that reflects the cell type", () => {
     expect(newCellId([], "code")).toMatch(/^cell-/);
     expect(newCellId([], "markdown")).toMatch(/^note-/);
+  });
+});
+
+describe("applyNotebookOperations", () => {
+  const notebook = (): NotebookCell[] => [
+    { id: "imports", type: "code", source: "from classifyre import Asset, ctx" },
+    {
+      id: "extract",
+      type: "code",
+      source: "def test_connection():\n    pass\n\ndef extract():\n    yield",
+    },
+  ];
+
+  it("replaces a cell's source and reports which cell it touched", () => {
+    const result = applyNotebookOperations(notebook(), [
+      { op: "set_cell", cellId: "imports", source: "import httpx" },
+    ]);
+
+    expect(result.cells[0]!.source).toBe("import httpx");
+    expect(result.cells).toHaveLength(2);
+    expect(result.touched).toEqual(["imports"]);
+  });
+
+  it("inserts after the named cell, and appends when none is named", () => {
+    const result = applyNotebookOperations(notebook(), [
+      {
+        op: "insert_cell",
+        cellType: "markdown",
+        source: "## What this does",
+        afterCellId: "imports",
+      },
+      { op: "insert_cell", source: "print('last')" },
+    ]);
+
+    expect(result.cells.map((cell) => cell.type)).toEqual([
+      "code",
+      "markdown",
+      "code",
+      "code",
+    ]);
+    expect(result.cells[1]!.source).toBe("## What this does");
+    expect(result.cells[3]!.source).toBe("print('last')");
+    // Fresh ids, so the notebook still saves.
+    expect(new Set(result.cells.map((cell) => cell.id)).size).toBe(4);
+  });
+
+  it("refuses to delete the cell that defines the required functions", () => {
+    const result = applyNotebookOperations(notebook(), [
+      { op: "delete_cell", cellId: "extract" },
+    ]);
+
+    expect(result.cells).toHaveLength(2);
+    expect(result.touched).toEqual([]);
+  });
+
+  it("deletes an ordinary cell", () => {
+    const result = applyNotebookOperations(notebook(), [
+      { op: "delete_cell", cellId: "imports" },
+    ]);
+
+    expect(result.cells.map((cell) => cell.id)).toEqual(["extract"]);
+    expect(result.touched).toEqual(["imports"]);
+  });
+
+  it("skips an operation naming a cell that does not exist", () => {
+    const result = applyNotebookOperations(notebook(), [
+      { op: "set_cell", cellId: "invented", source: "nope" },
+      { op: "set_cell", cellId: "imports", source: "import json" },
+    ]);
+
+    expect(result.touched).toEqual(["imports"]);
+    expect(result.cells[0]!.source).toBe("import json");
   });
 });

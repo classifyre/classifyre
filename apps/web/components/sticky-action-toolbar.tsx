@@ -57,6 +57,13 @@ type StickyActionToolbarProps = {
   saveAndRunTestId?: string;
   testIcon?: ReactNode;
   runIcon?: ReactNode;
+  /**
+   * Flow-specific buttons, rendered before Test. A CUSTOM source puts Run all
+   * and Preview assets here: they belong with Save and Test because, like them,
+   * they save the source first — which is why they are not buttons inside the
+   * notebook editor.
+   */
+  extraActions?: ReactNode;
 };
 
 export function StickyActionToolbar({
@@ -78,6 +85,7 @@ export function StickyActionToolbar({
   saveAndRunTestId,
   testIcon,
   runIcon,
+  extraActions,
 }: StickyActionToolbarProps) {
   const toolbarRef = useRef<HTMLDivElement | null>(null);
   useAssistantFabOffset(toolbarRef);
@@ -87,7 +95,7 @@ export function StickyActionToolbar({
       ref={toolbarRef}
       className={cn("sticky bottom-0 z-30 p-4", className)}
     >
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-2">
           {onCancel && cancelLabel && (
             <Button
@@ -119,6 +127,7 @@ export function StickyActionToolbar({
               {hint}
             </span>
           )}
+          {extraActions}
           {onTest && testLabel && (
             <Button
               type="button"

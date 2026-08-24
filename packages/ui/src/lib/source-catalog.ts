@@ -329,7 +329,7 @@ export const SOURCE_TYPE_CATALOG_META: Record<string, SourceCatalogMetaBase> = {
   },
   LOCAL_FOLDER: {
     description:
-      "Scan a folder on this computer for documents, spreadsheets, and images.",
+      "Scan a folder of documents, spreadsheets and images — on this computer, or mounted into the cluster.",
     icon: CreateSourceDtoTypeEnum.LocalFolder,
     category: "WAREHOUSE_LAKEHOUSE",
     keywords: [
@@ -339,6 +339,11 @@ export const SOURCE_TYPE_CATALOG_META: Record<string, SourceCatalogMetaBase> = {
       "filesystem",
       "desktop",
       "documents",
+      "mount",
+      "volume",
+      "pvc",
+      "directory",
+      "path",
     ],
   },
   MICROSOFT_365: {

@@ -225,6 +225,7 @@ helm upgrade --install classifyre ./helm/classifyre \
 | api.livenessProbe.path | string | `"/ping"` | HTTP path for API liveness probe. |
 | api.livenessProbe.periodSeconds | int | `15` | API liveness check period. |
 | api.livenessProbe.timeoutSeconds | int | `5` | API liveness check timeout. |
+| api.localFolders | list | `[]` | Folders mounted into every CLI job pod for folder-backed sources. |
 | api.maskedConfigEncryption.autoGenerate | bool | `true` | Generated key is persisted via Kubernetes Secret lookup across upgrades. |
 | api.maskedConfigEncryption.existingSecret | string | `""` | When set, chart will not create or manage this secret. |
 | api.maskedConfigEncryption.secretKey | string | `"CLASSIFYRE_MASKED_CONFIG_KEY"` | Secret key name used for CLASSIFYRE_MASKED_CONFIG_KEY. |

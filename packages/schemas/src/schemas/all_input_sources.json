@@ -5119,12 +5119,12 @@
     },
     "LocalFolderRequired": {
       "title": "LocalFolderRequired",
-      "label": "Local Folder Settings",
+      "label": "Mounted Folder Settings",
       "type": "object",
       "properties": {
         "path": {
           "type": "string",
-          "description": "Absolute path of the local folder to scan (for example, /Users/jane/Documents)"
+          "description": "Absolute path of the folder to scan, as seen by the machine that runs the scan. On desktop that is this computer (for example /Users/jane/Documents). In Kubernetes it is the scan pod, so the folder must be mounted into CLI jobs first via the chart's `api.localFolders` \u2014 then use the `mountPath` you gave it there (for example /mnt/corpora/invoices)."
         }
       },
       "required": [
@@ -5157,15 +5157,15 @@
     },
     "LocalFolderMasked": {
       "title": "LocalFolderMasked",
-      "label": "Local Folder Credentials",
+      "label": "Mounted Folder Credentials",
       "type": "object",
-      "description": "Local folder scans run with the desktop application's filesystem permissions; no credentials are required.",
+      "description": "A folder scan reads the filesystem it runs on with that process's own permissions \u2014 the desktop app's, or the CLI job pod's. No credentials are required.",
       "properties": {},
       "additionalProperties": false
     },
     "LocalFolderOptionalTraversal": {
       "title": "LocalFolderOptionalTraversal",
-      "label": "Local Folder Traversal",
+      "label": "Mounted Folder Traversal",
       "type": "object",
       "description": "Directory traversal controls.",
       "properties": {
@@ -5197,7 +5197,7 @@
     },
     "LocalFolderOptional": {
       "title": "LocalFolderOptional",
-      "label": "Local Folder Options",
+      "label": "Mounted Folder Options",
       "type": "object",
       "properties": {
         "traversal": {
@@ -7787,7 +7787,7 @@
     },
     "LocalFolderInput": {
       "title": "LocalFolderInput",
-      "label": "Local Folder",
+      "label": "Mounted Folder",
       "allOf": [
         {
           "$ref": "#/definitions/CoreInput"
@@ -12631,9 +12631,9 @@
     },
     "NotebookLocalFolder": {
       "title": "NotebookLocalFolder",
-      "label": "Local Folder",
+      "label": "Mounted Folder",
       "type": "object",
-      "description": "A folder on the machine running the desktop application.",
+      "description": "A folder the notebook can read on the machine that runs the scan: this computer on desktop, or a path mounted into CLI jobs by the chart's `api.localFolders` in Kubernetes.",
       "properties": {
         "name": {
           "type": "string",
@@ -12644,7 +12644,7 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 4096,
-          "description": "Absolute path to the folder, for example /Users/me/dumps."
+          "description": "Absolute path to the folder, as seen by the machine that runs the scan \u2014 for example /Users/me/dumps on desktop, or /mnt/corpora/dumps for a folder mounted by the chart."
         }
       },
       "required": [

@@ -231,15 +231,17 @@ class Context:
 
     @property
     def folders(self) -> dict[str, Path]:
-        """Local folders this source was configured with, by name.
+        """Folders this source was configured with, by name.
 
-        Desktop only -- a Kubernetes deployment has no filesystem to point at, so
-        the API refuses to save them there and this is empty.
+        The paths are resolved on whatever machine runs the scan: this computer
+        on desktop, an ephemeral CLI job pod in Kubernetes. In a cluster the
+        folder has to be mounted into those pods first (the chart's
+        ``api.localFolders``); an unmounted path simply will not exist.
         """
         return dict(self._folders)
 
     def folder(self, name: str) -> Path:
-        """One configured local folder by name."""
+        """One configured folder by name."""
         if name in self._folders:
             return self._folders[name]
         raise KeyError(

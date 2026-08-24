@@ -5,6 +5,7 @@ import {
   assistantChatResponseSchema,
   assistantContexts,
   assistantUiActionSchema,
+  RUN_NOTEBOOK_TOOL,
   type AssistantChatRequest,
   type AssistantChatResponse,
   type AssistantPageContext,
@@ -20,6 +21,7 @@ import {
 import {
   assistantContextModules,
   contextKnowledge,
+  type AssistantEmittableAction,
 } from './assistant/context-modules';
 import {
   safeJsonStringify,
@@ -253,6 +255,26 @@ export class AssistantService {
         continue;
       }
 
+      // A turn with nothing in it at all — no prose, no actions, no proposal —
+      // is a model that failed to produce structured output, not a model that
+      // is finished. Returning "Done" for it tells the user their request was
+      // handled when nothing happened, so ask once more instead.
+      if (
+        !turn.reply?.trim() &&
+        turn.uiActions.length === 0 &&
+        !turn.proposeOperation &&
+        iteration < budget - 1
+      ) {
+        state.messages.push({
+          role: 'user',
+          content:
+            'That turn was empty. Answer the request now: return JSON with a ' +
+            '"reply", plus any uiActions and at most one proposeOperation. Do ' +
+            'not return an empty object.',
+        });
+        continue;
+      }
+
       // Final turn: collect UI actions and an optional mutation proposal.
       this.collectUiActions(state, turn.uiActions);
       const pendingConfirmation = this.buildPendingConfirmation(
@@ -264,7 +286,11 @@ export class AssistantService {
         turn.reply?.trim() ||
         (pendingConfirmation
           ? `I prepared "${pendingConfirmation.title}".`
-          : 'Done — let me know what to do next.');
+          : // A turn that rewrote the notebook but wrote no prose is common --
+            // the model spends its output on the code. Saying "Done" there
+            // would hide the fact that four cells just changed.
+            describeActions(state.actions) ||
+            'Done — let me know what to do next.');
       if (pendingConfirmation) {
         reply = `${reply} Confirm to ${pendingConfirmation.detail}.`;
       }
@@ -341,12 +367,12 @@ export class AssistantService {
         'patch_fields',
         'navigate',
         'show_toast',
+        'notebook_edit',
+        'set_detectors',
       ];
       if (
         !modelEmittable.includes(action.type) ||
-        !module.uiActions.includes(
-          action.type as 'patch_fields' | 'navigate' | 'show_toast',
-        )
+        !module.uiActions.includes(action.type as AssistantEmittableAction)
       ) {
         this.logger.warn(
           `Dropping UI action "${action.type}" not allowed in context ${state.context.key}`,
@@ -364,6 +390,35 @@ export class AssistantService {
     if (!proposal) {
       return null;
     }
+
+    // Running the notebook is not an MCP tool: the notebook lives in the
+    // browser, and running it means saving the page first. The client
+    // intercepts Confirm for this one and answers with what happened.
+    if (proposal.tool === RUN_NOTEBOOK_TOOL) {
+      const module = assistantContextModules[state.context.key];
+      if (!module.uiActions.includes('notebook_edit')) {
+        return null;
+      }
+      const rawMode = proposal.input?.mode;
+      const mode = typeof rawMode === 'string' ? rawMode : 'all';
+      const allowed = ['cell', 'all', 'test_connection', 'preview_extract'];
+      const input: Record<string, unknown> = {
+        mode: allowed.includes(mode) ? mode : 'all',
+      };
+      if (typeof proposal.input?.cellId === 'string') {
+        input.cellId = proposal.input.cellId;
+      }
+      return {
+        tool: RUN_NOTEBOOK_TOOL,
+        input,
+        runtime: 'client',
+        title: proposal.title?.trim() || 'Run the notebook',
+        detail:
+          proposal.detail?.trim() ||
+          `save this source and run the notebook (${String(input.mode)})`,
+      };
+    }
+
     const tool = state.tools.find((entry) => entry.name === proposal.tool);
     if (!tool) {
       this.logger.warn(
@@ -379,6 +434,7 @@ export class AssistantService {
     return {
       tool: proposal.tool,
       input: proposal.input,
+      runtime: 'mcp',
       title: proposal.title?.trim() || `Run ${proposal.tool} via MCP`,
       detail: proposal.detail?.trim() || `execute ${proposal.tool}`,
     };
@@ -392,6 +448,13 @@ export class AssistantService {
     const pending = request.pendingConfirmation;
     if (!pending) {
       throw new BadRequestException('No pending assistant confirmation found');
+    }
+    if (pending.tool === RUN_NOTEBOOK_TOOL || pending.runtime === 'client') {
+      // The browser runs this one and reports back as a normal message; the
+      // server never sees a confirm for it unless a client got it wrong.
+      throw new BadRequestException(
+        `"${pending.tool}" is executed by the client, not the API.`,
+      );
     }
 
     // Any live MCP tool may be confirmed — the catalog is exposed in full. The
@@ -612,7 +675,7 @@ function buildSystemPrompt(
 ): string {
   const definition = assistantContexts[context.key];
   const module = assistantContextModules[context.key];
-  const knowledge = contextKnowledge(context.key);
+  const knowledge = contextKnowledge(context.key, sourceTypeOf(context));
 
   const schemaSummary = summarizeSchemaForPrompt(context.schema);
   const schemaSection = schemaSummary
@@ -640,6 +703,16 @@ function buildSystemPrompt(
   uiActionDocs.push(
     '  {"type":"show_toast","tone":"info|success|error","title":"...","description":"..."} — brief notification; use sparingly.',
   );
+  if (module.uiActions.includes('notebook_edit')) {
+    uiActionDocs.push(
+      '  {"type":"notebook_edit","summary":"...","operations":[{"op":"set_cell","cellId":"...","source":"..."},{"op":"insert_cell","cellType":"code|markdown","source":"...","afterCellId":"..."},{"op":"delete_cell","cellId":"..."}]} — edit the notebook of a CUSTOM source. set_cell replaces the cell entirely.',
+    );
+  }
+  if (module.uiActions.includes('set_detectors')) {
+    uiActionDocs.push(
+      '  {"type":"set_detectors","detectors":[{"type":"...","enabled":true,"config":{}}]} — replace the detector selection on the form (send the COMPLETE list).',
+    );
+  }
 
   return [
     'You are the Classifyre assistant, embedded in the product UI. You act on behalf of the user through MCP tools and UI actions.',
@@ -729,6 +802,190 @@ function renderToolCatalog(
   return sections.join('\n\n');
 }
 
+/**
+ * A one-line account of what the turn changed, for a model that emitted actions
+ * and no prose. Empty when there is nothing worth narrating.
+ */
+function describeActions(actions: AssistantUiAction[]): string {
+  const parts: string[] = [];
+  for (const action of actions) {
+    if (action.type === 'notebook_edit') {
+      const counts = { set_cell: 0, insert_cell: 0, delete_cell: 0 };
+      for (const operation of action.operations) {
+        counts[operation.op] += 1;
+      }
+      const changes = [
+        counts.set_cell ? `rewrote ${counts.set_cell} cell(s)` : '',
+        counts.insert_cell ? `added ${counts.insert_cell} cell(s)` : '',
+        counts.delete_cell ? `removed ${counts.delete_cell} cell(s)` : '',
+      ].filter(Boolean);
+      parts.push(
+        action.summary?.trim()
+          ? `${action.summary.trim()} (${changes.join(', ')}).`
+          : `I ${changes.join(', ')} in the notebook.`,
+      );
+      continue;
+    }
+    if (action.type === 'set_detectors') {
+      const enabled = action.detectors.filter(
+        (detector) => detector.enabled !== false,
+      );
+      parts.push(
+        `Detectors set to ${enabled.map((detector) => detector.type).join(', ') || 'none'}.`,
+      );
+      continue;
+    }
+    if (action.type === 'patch_fields') {
+      parts.push(
+        `Filled in ${action.patches.map((patch) => patch.path).join(', ')}.`,
+      );
+    }
+  }
+  if (parts.length === 0) {
+    return '';
+  }
+  return `${parts.join(' ')} Review it and tell me what to change.`;
+}
+
+/** The source type this page is working on, when the page reports one. */
+function sourceTypeOf(context: AssistantPageContext): string | null {
+  const fromMetadata = (context.metadata ?? {}).sourceType;
+  if (typeof fromMetadata === 'string' && fromMetadata) {
+    return fromMetadata;
+  }
+  const fromValues = context.values?.type;
+  return typeof fromValues === 'string' && fromValues ? fromValues : null;
+}
+
+/**
+ * What the user pointed at with "@".
+ *
+ * Rendered as its own section rather than left inside the metadata blob: an
+ * "@cell:2" in the message is only useful if the exact text of cell 2 is
+ * somewhere the model will actually read, and metadata is truncated.
+ */
+function renderMentions(context: AssistantPageContext): string {
+  const raw = (context.metadata ?? {}).mentions;
+  if (!Array.isArray(raw) || raw.length === 0) {
+    return '';
+  }
+  const rendered = raw
+    .map((entry) => {
+      const item = (entry ?? {}) as Record<string, unknown>;
+      const token = typeof item.token === 'string' ? item.token : '@?';
+      const label = typeof item.label === 'string' ? item.label : '';
+      const body =
+        typeof item.body === 'string'
+          ? item.body
+          : safeJsonStringify(item.body, 4000);
+      return `### ${token}${label ? ` — ${label}` : ''}\n${body}`;
+    })
+    .join('\n\n');
+  return ['', '## Referenced by the user (expanded verbatim)', rendered].join(
+    '\n',
+  );
+}
+
+/**
+ * The notebook, rendered as cells rather than left inside the JSON value dump.
+ *
+ * A CUSTOM source's whole behaviour lives in `required.notebook.cells`, and the
+ * value dump is capped -- so on any notebook worth editing the cells were the
+ * first thing to be truncated away. They are pulled out here, listed with their
+ * ids (which is what `notebook_edit` addresses), and the dump gets a placeholder
+ * in their place.
+ */
+/**
+ * The files and folders this source actually has.
+ *
+ * Named explicitly because a model that has to guess writes a filename it
+ * invented and then a `FileNotFoundError` it raised itself. These are the only
+ * names `ctx.file(...)` and `ctx.folder(...)` will answer to.
+ */
+function renderAttachments(context: AssistantPageContext): string {
+  const metadata = context.metadata ?? {};
+  const files = Array.isArray(metadata.attachedFiles)
+    ? metadata.attachedFiles.filter(
+        (entry): entry is string => typeof entry === 'string',
+      )
+    : [];
+  const folders = Array.isArray(
+    (metadata.notebookConfig as { localFolders?: unknown })?.localFolders,
+  )
+    ? (
+        (metadata.notebookConfig as { localFolders: unknown[] }).localFolders ??
+        []
+      ).map((entry) => {
+        const folder = (entry ?? {}) as Record<string, unknown>;
+        const name = typeof folder.name === 'string' ? folder.name : '?';
+        const path = typeof folder.path === 'string' ? folder.path : '?';
+        return `${name} -> ${path}`;
+      })
+    : [];
+
+  if (files.length === 0 && folders.length === 0) {
+    return [
+      '',
+      '## Attached data',
+      'This source has NO uploaded files and NO configured folders. ctx.files is',
+      'empty and ctx.folder(...) will raise. Do not write code that reads one —',
+      'ask the user to upload a file or add a folder first.',
+    ].join('\n');
+  }
+
+  return [
+    '',
+    '## Attached data — the ONLY names ctx.file()/ctx.folder() accept',
+    files.length > 0
+      ? `Uploaded files (ctx.file("name")): ${files.map((name) => `"${name}"`).join(', ')}`
+      : 'Uploaded files: (none)',
+    folders.length > 0
+      ? `Configured folders (ctx.folder("name")): ${folders.join(', ')}`
+      : 'Configured folders: (none)',
+  ].join('\n');
+}
+
+function renderNotebook(context: AssistantPageContext): {
+  section: string;
+  values: Record<string, unknown>;
+} {
+  const values = context.values ?? {};
+  const required = values.required as Record<string, unknown> | undefined;
+  const notebook = required?.notebook as
+    | { revision?: unknown; cells?: unknown }
+    | undefined;
+  const cells = Array.isArray(notebook?.cells) ? notebook.cells : null;
+  if (!cells) {
+    return { section: '', values };
+  }
+
+  const rendered = cells
+    .map((entry, index) => {
+      const cell = (entry ?? {}) as Record<string, unknown>;
+      const id = typeof cell.id === 'string' ? cell.id : `#${index + 1}`;
+      const type = typeof cell.type === 'string' ? cell.type : 'code';
+      const source = typeof cell.source === 'string' ? cell.source : '';
+      return `--- cell ${index + 1} id="${id}" type=${type}\n${source}`;
+    })
+    .join('\n\n');
+
+  return {
+    section: [
+      '',
+      `## The notebook right now (revision ${typeof notebook?.revision === 'number' ? notebook.revision : 1}, ${cells.length} cell(s))`,
+      'Address cells by their id in notebook_edit operations.',
+      rendered.slice(0, 24000),
+    ].join('\n'),
+    values: {
+      ...values,
+      required: {
+        ...required,
+        notebook: '(rendered separately below — see "The notebook right now")',
+      },
+    },
+  };
+}
+
 function buildUserMessage(request: AssistantChatRequest): string {
   const conversationText = request.messages
     .map((m) => `[${m.role}]: ${m.content}`)
@@ -749,9 +1006,14 @@ function buildUserMessage(request: AssistantChatRequest): string {
       ].join('\n')
     : '';
 
+  const notebook = renderNotebook(request.context);
+
   return [
     '## Current form values',
-    safeJsonStringify(request.context.values, 8000),
+    safeJsonStringify(notebook.values, 8000),
+    notebook.section,
+    renderAttachments(request.context),
+    renderMentions(request.context),
     '',
     '## Client-side validation snapshot (advisory — server validation is authoritative)',
     `isValid: ${validation.isValid}`,

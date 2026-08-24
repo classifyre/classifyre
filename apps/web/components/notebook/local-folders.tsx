@@ -13,12 +13,12 @@ import {
 } from "@/lib/notebook-local-folders";
 
 /**
- * Folders on this machine a notebook may read, as `ctx.folder("name")`.
+ * Folders the notebook may read, as `ctx.folder("name")`.
  *
- * Desktop only, and the caller decides that -- in Kubernetes the runner is a
- * pod with none of your filesystem, and the API refuses to save a source that
- * carries folders there. Uploading the files to the source is the mechanism
- * that works everywhere.
+ * The path is resolved wherever the scan runs: this computer on desktop, a CLI
+ * job pod in Kubernetes. In a cluster the folder is mounted into those pods by
+ * the chart (`api.localFolders`) and the user enters the mountPath here, so the
+ * form is the same in both deployments and only the path differs.
  *
  * A name and a path rather than a bare path: the notebook refers to the folder
  * by name, so moving the directory is a change to this form rather than an edit
