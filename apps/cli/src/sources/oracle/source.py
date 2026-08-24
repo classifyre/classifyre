@@ -14,7 +14,7 @@ from ...models.generated_input import (
 from ...utils.file_parser import render_bytes_cell
 from ..dependencies import require_module
 from ..tabular_base import BaseTabularSource
-from ..tabular_utils import TableRef
+from ..tabular_utils import TableRef, ViewLineage
 
 logger = logging.getLogger(__name__)
 
@@ -448,6 +448,88 @@ class OracleSource(BaseTabularSource):
             ]
 
     # ── Foreign key + view dependency links (merged) ─────────────────────
+
+    # ── Cross-system identity ────────────────────────────────────────────
+
+    def _urn_authority(self) -> str:
+        return f"{self._host}:{self._port}"
+
+    # ── View lineage (ALL_DEPENDENCIES) ──────────────────────────────────
+
+    def _collect_view_lineage(self, tables: list[TableRef]) -> list[ViewLineage]:
+        """What each view selects from, per the data dictionary.
+
+        Oracle's ``TEXT`` column is a LONG, which many drivers will not read
+        alongside other columns, so the definition is fetched separately and a
+        failure there only costs the column-level detail — the table-level edges
+        still land.
+        """
+        if not self._scope_options().include_view_lineage:
+            return []
+
+        by_database: dict[str, set[tuple[str, ...]]] = {}
+        for t in tables:
+            by_database.setdefault(t.database, set()).add(t.table_key)
+
+        results: list[ViewLineage] = []
+        for database, scoped_keys in by_database.items():
+            schemas = sorted({key[1] for key in scoped_keys if len(key) > 2})
+            if not schemas:
+                continue
+            placeholders = ", ".join(f":s{i}" for i in range(len(schemas)))
+            try:
+                conn = self._get_cached_connection(database)
+                with conn.cursor() as cursor:
+                    cursor.execute(
+                        f"""
+                        SELECT d.OWNER, d.NAME, d.REFERENCED_OWNER, d.REFERENCED_NAME
+                        FROM ALL_DEPENDENCIES d
+                        WHERE d.TYPE = 'VIEW'
+                          AND d.REFERENCED_TYPE IN ('TABLE', 'VIEW')
+                          AND d.OWNER IN ({placeholders})
+                        """,
+                        {f"s{i}": schema for i, schema in enumerate(schemas)},
+                    )
+                    rows = cursor.fetchall()
+            except Exception as exc:
+                logger.warning("Could not resolve view lineage for %s: %s", database, exc)
+                continue
+
+            upstreams: dict[tuple[str, ...], set[tuple[str, ...]]] = {}
+            for owner, name, ref_owner, ref_name in rows:
+                view_key = (database, owner, name)
+                if view_key not in scoped_keys:
+                    continue
+                source_key = (database, ref_owner, ref_name)
+                if source_key == view_key:
+                    continue
+                upstreams.setdefault(view_key, set()).add(source_key)
+
+            for view_key, sources in upstreams.items():
+                results.append(
+                    ViewLineage(
+                        view_key,
+                        tuple(sorted(sources)),
+                        self._view_definition(database, view_key[1], view_key[2]),
+                    )
+                )
+        return results
+
+    def _view_definition(self, database: str, owner: str, name: str) -> str | None:
+        try:
+            conn = self._get_cached_connection(database)
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    "SELECT TEXT FROM ALL_VIEWS WHERE OWNER = :owner AND VIEW_NAME = :name",
+                    {"owner": owner, "name": name},
+                )
+                row = cursor.fetchone()
+            value = row[0] if row else None
+            return str(value) if value is not None else None
+        except Exception as exc:
+            # Only the column-level detail is lost; the edge still stands.
+            logger.debug("Could not read definition of view %s.%s: %s", owner, name, exc)
+            return None
 
     def _collect_foreign_key_links(
         self,

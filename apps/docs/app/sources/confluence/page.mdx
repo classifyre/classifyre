@@ -1,0 +1,63 @@
+---
+title: Confluence
+description: Scan Confluence Cloud spaces, pages, comments and attachments — API token setup, space filters, what gets extracted, and every setting.
+---
+
+import { SourceFacts, SourceParameters, SourceMetadata } from "@/components/source-reference";
+import { AtlassianNotes, LineageNote, SharedSettingsNote, FileHandlingNote } from "@/components/source-notes";
+
+# Confluence
+
+<SourceFacts
+  type="CONFLUENCE"
+  vendor={{ label: "Confluence", href: "https://www.atlassian.com/software/confluence" }}
+  auth={{ label: "Manage API tokens for your Atlassian account", href: "https://support.atlassian.com/atlassian-account/docs/manage-api-tokens-for-your-atlassian-account/" }}
+/>
+
+Confluence is the company's memory — runbooks, onboarding guides, meeting notes,
+and the page called "temp credentials" that someone made in 2021 and never
+deleted. It's consistently one of the highest-yield sources to scan.
+
+## What you need to connect
+
+Your **Confluence Cloud URL** (`https://your-domain.atlassian.net`), the
+**account email**, and an **API token**.
+
+<AtlassianNotes product="Confluence" />
+
+## What Classifyre reads
+
+- **Pages** — the body text of every page in scope.
+- **Comments** — inline and footer comments, gathered into one comments asset
+  per page.
+- **Attachments** — every attached file, as its own asset.
+- **Linked files** — file URLs referenced in a page body, materialised as assets
+  so a document linked from a page is scanned even if it isn't attached.
+
+Scope the scan by space: by key, by id, by label, by type (global, personal,
+knowledge base…), and by status (current or archived).
+
+<FileHandlingNote what="Attachments" />
+
+## Metadata on every asset
+
+<SourceMetadata type="CONFLUENCE" />
+
+## Lineage
+
+<LineageNote />
+
+## Worth knowing
+
+- **Personal spaces are where surprises live.** They're included by type filter
+  and are worth a scan of their own.
+- **Archived spaces still hold data.** Include them explicitly if retention
+  matters to you.
+- **Rate limiting is handled** with retries and an optional fixed delay for big
+  tenants.
+
+## Configuration
+
+<SharedSettingsNote />
+
+<SourceParameters type="CONFLUENCE" />

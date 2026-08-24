@@ -1,3 +1,47 @@
+// Concept guides are listed; the 38 per-source reference pages are reachable
+// from the catalog on the overview page and from search. Listing all of them
+// here would bury the concepts under an alphabetical wall of vendor names.
+const sourcePages = [
+  "azure-blob-storage",
+  "confluence",
+  "custom",
+  "databricks",
+  "delta-lake",
+  "dropbox",
+  "elasticsearch",
+  "email",
+  "git",
+  "google-cloud-storage",
+  "google-workspace",
+  "hive",
+  "hugging-face",
+  "iceberg",
+  "jira",
+  "kafka",
+  "local-folder",
+  "meilisearch",
+  "microsoft-365",
+  "mongodb",
+  "mssql",
+  "mysql",
+  "neo4j",
+  "notion",
+  "opensearch",
+  "oracle",
+  "postgresql",
+  "powerbi",
+  "reddit",
+  "s3-compatible-storage",
+  "sandbox",
+  "servicedesk",
+  "slack",
+  "snowflake",
+  "sqlite",
+  "tableau",
+  "wordpress",
+  "youtube",
+];
+
 export default {
   index: "Overview & Catalog",
   "how-it-works": "How Sources Work",
@@ -8,4 +52,8 @@ export default {
   "file-formats": "File Formats",
   testing: "Testing & Scheduling",
   "assets-and-metadata": "Assets & Metadata",
+  lineage: "Lineage & Relationships",
+  ...Object.fromEntries(
+    sourcePages.map((slug) => [slug, { display: "hidden" }]),
+  ),
 };

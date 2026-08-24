@@ -1,0 +1,60 @@
+---
+title: Jira Service Management
+sidebarTitle: Service Management
+description: Scan Jira Service Management requests, comments and attachments — API token setup, service desk and request-type scoping, and every setting.
+---
+
+import { SourceFacts, SourceParameters, SourceMetadata } from "@/components/source-reference";
+import { AtlassianNotes, LineageNote, SharedSettingsNote, FileHandlingNote } from "@/components/source-notes";
+
+# Jira Service Management
+
+<SourceFacts
+  type="SERVICEDESK"
+  vendor={{ label: "Jira Service Management", href: "https://www.atlassian.com/software/jira/service-management" }}
+  auth={{ label: "Manage API tokens for your Atlassian account", href: "https://support.atlassian.com/atlassian-account/docs/manage-api-tokens-for-your-atlassian-account/" }}
+/>
+
+A service desk is where **customers** send you their data — screenshots with
+account numbers, exported spreadsheets, ID documents attached to a verification
+request. That makes it one of the most sensitive systems most organisations run,
+and one of the least reviewed.
+
+## What you need to connect
+
+Your **tenant URL**, the **account email**, and an **API token**.
+
+<AtlassianNotes product="Jira Service Management" />
+
+## What Classifyre reads
+
+- **Requests** — summary and description.
+- **Comments** — both customer-visible and internal, as one comments asset per
+  request.
+- **Attachments** — each as its own asset.
+
+Scope by service desk, request type, request status, ownership, organisation, or
+a search term.
+
+<FileHandlingNote what="Request attachments" />
+
+## Metadata on every asset
+
+<SourceMetadata type="SERVICEDESK" />
+
+## Lineage
+
+<LineageNote />
+
+## Worth knowing
+
+- **Internal comments are included.** Agents write things there they'd never put
+  in a customer-facing reply, which is exactly why they're worth scanning.
+- **Customer attachments are the highest-yield material** in most service desks
+  — leave attachment scanning on.
+
+## Configuration
+
+<SharedSettingsNote />
+
+<SourceParameters type="SERVICEDESK" />

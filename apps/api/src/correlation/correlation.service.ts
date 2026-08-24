@@ -2013,10 +2013,24 @@ export class CorrelationService {
             relationType: 'links_to',
             confidence: 1,
             origin: EdgeOrigin.INFERRED,
+            // `links` says two assets are connected but not how, so this is a
+            // reference and nothing more. A typed edge from the same pair (see
+            // below) is the one that carries meaning.
+            relationClass: 'REFERENCE',
           });
         }
       }
     }
+
+    // Typed relationships the connector actually declared: lineage,
+    // containment, identity. `links` cannot express any of these — it is a flat
+    // list of hashes — so without this the source view can only ever show that
+    // things are connected, never which way the data flows.
+    const typed = await this.typedEdgesFor(
+      Array.from(nodeById.keys()),
+      nodeById,
+    );
+    edges.push(...typed);
 
     return {
       nodes: Array.from(nodeById.values()),
@@ -2024,6 +2038,69 @@ export class CorrelationService {
       truncated: false,
       similarities: [],
     };
+  }
+
+  /**
+   * Persisted edges among a set of nodes, plus the unresolved endpoints they
+   * point at.
+   *
+   * An `external` endpoint names an object by platform URN that nothing has
+   * scanned yet. It is hydrated into a ghost node here rather than filtered
+   * out: an edge whose far end is missing from `nodes` renders as an arrow to
+   * nowhere, and quietly dropping it would hide the most interesting thing on
+   * the canvas — that this source feeds something nobody is watching.
+   */
+  private async typedEdgesFor(
+    assetIds: string[],
+    nodeById: Map<string, GraphNodeDto>,
+  ): Promise<GraphEdgeDto[]> {
+    if (assetIds.length === 0) return [];
+    const rows = await this.prisma.edge.findMany({
+      where: {
+        origin: { in: [EdgeOrigin.SOURCE_DERIVED, EdgeOrigin.MANUAL] },
+        OR: [
+          { fromType: ASSET_REL, fromId: { in: assetIds } },
+          { toType: ASSET_REL, toId: { in: assetIds } },
+        ],
+      },
+      take: 2000,
+    });
+
+    const edges: GraphEdgeDto[] = [];
+    for (const row of rows) {
+      for (const [type, id] of [
+        [row.fromType, row.fromId],
+        [row.toType, row.toId],
+      ] as const) {
+        if (type === 'external' && !nodeById.has(id)) {
+          nodeById.set(id, {
+            id,
+            type: 'external',
+            label: id,
+            depth: 1,
+            status: 'external',
+            urn: id,
+          });
+        }
+      }
+      // Both ends have to be on the canvas; an edge to an asset in a source
+      // this view is not showing has nothing to attach to.
+      if (!nodeById.has(row.fromId) || !nodeById.has(row.toId)) continue;
+      edges.push({
+        id: row.id,
+        fromType: row.fromType,
+        fromId: row.fromId,
+        toType: row.toType,
+        toId: row.toId,
+        relationType: row.relationType,
+        confidence: Number(row.confidence),
+        origin: row.origin,
+        relationClass: row.relationClass,
+        granularity: row.granularity,
+        method: row.method,
+      });
+    }
+    return edges;
   }
 
   async getValueOccurrences(args: {

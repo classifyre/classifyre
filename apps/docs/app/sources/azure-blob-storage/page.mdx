@@ -1,0 +1,67 @@
+---
+title: Azure Blob Storage
+sidebarTitle: Azure Blob
+description: Scan blobs in an Azure Storage container — account key, SAS, connection string, service principal or managed identity auth, and every setting.
+---
+
+import { SourceFacts, SourceParameters, SourceMetadata } from "@/components/source-reference";
+import { ObjectStorageNotes, LineageNote, SharedSettingsNote, FileHandlingNote } from "@/components/source-notes";
+
+# Azure Blob Storage
+
+<SourceFacts
+  type="AZURE_BLOB_STORAGE"
+  vendor={{ label: "Azure Blob Storage", href: "https://azure.microsoft.com/products/storage/blobs" }}
+  auth={{ label: "Authorize access to blobs", href: "https://learn.microsoft.com/azure/storage/blobs/authorize-data-operations-portal" }}
+  links={[{ label: "Shared access signatures (SAS)", href: "https://learn.microsoft.com/azure/storage/common/storage-sas-overview" }]}
+/>
+
+Azure Blob Storage holds the flat files of the Microsoft-estate data platform:
+landing zones, exports, archives, and whatever a pipeline dropped along the way.
+
+## What you need to connect
+
+The **account URL** (`https://<account>.blob.core.windows.net`) and a
+**container**. Then pick whichever credential you already have — the source
+accepts all the usual Azure options:
+
+| Credential | Notes |
+|---|---|
+| **Connection string** | Takes precedence over everything else |
+| **Account key** | Full access to the account — prefer something narrower |
+| **SAS token** | Scope it to read + list on one container |
+| **Service principal** | Entra client ID, secret and tenant ID |
+| **Managed identity** | Leave all credentials empty — the default Azure credential chain is used |
+
+`Storage Blob Data Reader` is the right role for the Entra-based options.
+
+## What Classifyre reads
+
+Every blob in the container, narrowed by prefix and by extension allow- and
+denylists.
+
+<ObjectStorageNotes container="container" />
+
+<FileHandlingNote what="Blobs from this container" />
+
+## Metadata on every asset
+
+<SourceMetadata type="AZURE_BLOB_STORAGE" />
+
+## Lineage
+
+<LineageNote />
+
+## Worth knowing
+
+- **Managed identity is the cleanest deployment** in AKS — no secret to store or
+  rotate at all.
+- **Archives and embedded files** are expanded into child assets, under
+  configurable caps.
+- Turning off content preview gives you a **blob inventory** with no downloads.
+
+## Configuration
+
+<SharedSettingsNote />
+
+<SourceParameters type="AZURE_BLOB_STORAGE" />

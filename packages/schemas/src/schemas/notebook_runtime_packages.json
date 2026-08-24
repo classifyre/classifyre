@@ -411,6 +411,15 @@
       "group": "snowflake"
     },
     {
+      "name": "sqlglot",
+      "version": "30.17.0",
+      "modules": [
+        "sqlglot"
+      ],
+      "availability": "on-demand",
+      "group": "lineage"
+    },
+    {
       "name": "striprtf",
       "version": "0.0.33",
       "modules": [

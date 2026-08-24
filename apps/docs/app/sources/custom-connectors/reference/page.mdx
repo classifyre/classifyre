@@ -83,6 +83,7 @@ What `extract()` yields.
 | `kind`                      | `str`       | `record` _(default)_, `document`, `page`, `file`, or `table`.                                                                                 |
 | `metadata`                  | `dict`      | Anything useful about the item. Free-form for Custom sources.                                                                                 |
 | `links`                     | `list[str]` | Other assets' **ids**, resolved into graph edges for you.                                                                                     |
+| `urn`                       | `str`       | What the *platform* calls this object. Only for things another source also sees — see [Lineage](#lineage).                                     |
 | `content_type`              | `str`       | Usually leave unset — inferred from the payload.                                                                                              |
 | `content_bytes`             | `bytes`     | For file connectors — see below.                                                                                                              |
 | `mime_type`                 | `str`       | Content type of `content_bytes`. Detected when omitted.                                                                                       |
@@ -102,6 +103,74 @@ yield Asset(
     links=["ticket-17", "user-8801"],   # ids, not hashes
 )
 ```
+
+### Lineage
+
+`links` says two assets are connected. It does not say **how**, and that turns
+out to be the whole question: an attachment, a foreign key and a derived table
+are three different relationships, and only one of them answers *"if I change
+this, what breaks?"*.
+
+Define a `relationships()` function and pick the builder that matches what you
+mean. Assets are named by the same ids you gave them in `extract()`.
+
+```python
+from classifyre import Ref, FieldMapping, FlowType, flow, contains, references, same_as
+
+def relationships():
+    # Lineage. The only class an impact question follows.
+    yield flow(
+        upstream=Ref.asset("orders"),
+        downstream=Ref.asset("top_deliveries"),
+        type=FlowType.TRANSFORM,
+        fields=[
+            FieldMapping("delivery_time", ["placed_on", "delivered_on"],
+                         "DATEDIFF(placed_on, delivered_on)"),
+            # A null downstream is an *indirect* dependency: it shaped which
+            # rows came out without feeding any one output column.
+            FieldMapping(None, ["placed_on"]),
+        ],
+    )
+
+    yield contains(Ref.asset("orders"), Ref.asset("orders_2024"))   # part of
+    yield references(Ref.asset("orders"), Ref.asset("customers"))   # points at
+```
+
+| Builder | Means | In the lineage graph? |
+| --- | --- | --- |
+| `flow(upstream=, downstream=)` | the values in one came from the other | **yes — this is lineage** |
+| `contains(parent, child)` | one is a part of the other | no — used to collapse it |
+| `same_as(a, b)` | the same real thing, twice | no — used to merge nodes |
+| `references(a, b)` | one points at the other | no |
+| `uses(actor, target)` | someone touched it | as weight, not as a path |
+
+`flow` takes both ends as keyword arguments on purpose. A reversed lineage edge
+is silently wrong rather than loudly broken, so it is not something you can
+write by accident.
+
+#### Lineage across systems
+
+`Ref.urn(...)` names an object by what its *platform* calls it, so you can point
+at a table this connector does not produce and has never seen. If a source for
+that system is scanned — before this run or a month after it — the two halves
+find each other and the edge completes itself.
+
+```python
+from classifyre import urn_for
+
+yield flow(
+    upstream=Ref.urn(urn_for("snowflake", "acme", "PROD", "PUBLIC", "RAW_ORDERS")),
+    downstream=Ref.asset("orders"),
+    type=FlowType.COPY,
+)
+```
+
+Build the URN with `urn_for(...)` rather than writing the string yourself: each
+connector folds capitalisation and default ports its own way, and a URN that
+differs by one letter never matches. Setting `Asset.urn` does the same thing in
+the other direction — it lets another source's lineage point at *your* asset.
+
+Start from the **Lineage and links** template, which has all of this running.
 
 ### Files and images
 

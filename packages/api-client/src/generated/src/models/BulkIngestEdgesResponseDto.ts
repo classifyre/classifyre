@@ -25,6 +25,18 @@ export interface BulkIngestEdgesResponseDto {
      * @memberof BulkIngestEdgesResponseDto
      */
     upserted: number;
+    /**
+     * Edges whose endpoint named a URN that has not been ingested yet. Kept as an "external" endpoint and bound once that source is scanned, in either order.
+     * @type {number}
+     * @memberof BulkIngestEdgesResponseDto
+     */
+    external?: number;
+    /**
+     * Edges thrown away because an endpoint could not be resolved at all. Reported so silent edge loss is visible in the run log.
+     * @type {number}
+     * @memberof BulkIngestEdgesResponseDto
+     */
+    dropped?: number;
 }
 
 /**
@@ -46,6 +58,8 @@ export function BulkIngestEdgesResponseDtoFromJSONTyped(json: any, ignoreDiscrim
     return {
         
         'upserted': json['upserted'],
+        'external': json['external'] == null ? undefined : json['external'],
+        'dropped': json['dropped'] == null ? undefined : json['dropped'],
     };
 }
 
@@ -61,6 +75,8 @@ export function BulkIngestEdgesResponseDtoToJSONTyped(value?: BulkIngestEdgesRes
     return {
         
         'upserted': value['upserted'],
+        'external': value['external'],
+        'dropped': value['dropped'],
     };
 }
 

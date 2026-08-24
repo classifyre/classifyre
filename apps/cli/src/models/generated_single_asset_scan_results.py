@@ -360,6 +360,11 @@ class SingleAssetScanResults(BaseModel):
     links: list[str] = Field(
         ..., description='Linked asset hashes referenced by this asset', title='Links'
     )
+    urn: str | None = Field(
+        None,
+        description='Platform-qualified name for the underlying object (snowflake://account/db/schema/table, s3://bucket/key). Optional. `hash` identifies this asset to the connector that produced it; `urn` identifies the object itself to any connector, which is what lets another source draw a lineage edge at it without knowing the hash.',
+        title='Urn',
+    )
     asset_type: AssetType = Field(
         ...,
         description='Canonical asset content type (used for detector routing)',

@@ -1,0 +1,59 @@
+---
+title: Delta Lake
+description: Scan Delta Lake tables straight out of object storage — no Spark, no catalog service. Table discovery, row sampling, versions, and every setting.
+---
+
+import { SourceFacts, SourceParameters, SourceMetadata } from "@/components/source-reference";
+import { LakehouseNotes, LineageNote, SharedSettingsNote } from "@/components/source-notes";
+
+# Delta Lake
+
+<SourceFacts
+  type="DELTA_LAKE"
+  vendor={{ label: "Delta Lake", href: "https://delta.io/" }}
+  links={[{ label: "Delta table format", href: "https://docs.delta.io/latest/delta-intro.html" }]}
+/>
+
+Delta Lake tables are the storage layer under most lakehouse platforms. This
+source reads them **where they live** — as files in a bucket — so you can scan a
+warehouse path without a Databricks workspace, a Spark cluster, or a catalog
+service in front of it.
+
+## What you need to connect
+
+A **bucket** and, unless the scanning environment already has ambient cloud
+credentials, an access key pair. For MinIO, Cloudflare R2, Backblaze B2 and
+other S3-compatible providers, add the custom endpoint URL and region.
+
+Then either give a **prefix** and let table discovery find every Delta table
+under it (recognised by its `_delta_log` directory), or list exact table paths
+when you know them.
+
+<LakehouseNotes format="Delta" />
+
+## What Classifyre reads
+
+One asset per table. Its metadata is the table's real structure — columns and
+types, row count, current version — and its content is a sample of rows drawn
+through the sampling strategy you chose.
+
+## Metadata on every asset
+
+<SourceMetadata type="DELTA_LAKE" />
+
+## Lineage
+
+<LineageNote />
+
+## Worth knowing
+
+- **Reads are non-destructive and version-aware** — the table's current snapshot
+  is read; nothing is compacted, vacuumed or written.
+- **Discovery costs list calls.** On a very large bucket, a narrower prefix or
+  an explicit table list is much faster than scanning from the root.
+
+## Configuration
+
+<SharedSettingsNote />
+
+<SourceParameters type="DELTA_LAKE" />

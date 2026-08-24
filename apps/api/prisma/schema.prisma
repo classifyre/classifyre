@@ -198,6 +198,15 @@ model Asset {
   name                      String
   externalUrl               String                     @map("external_url")
   links                     Json                       @default("[]") @db.JsonB
+  // Platform-qualified name for this object — `snowflake://acct/db/schema/table`,
+  // `s3://bucket/key`. `hash` identifies the asset to the connector that made
+  // it; `urn` identifies the underlying object to *any* connector, which is
+  // what lets a Tableau scan name a Snowflake table it never touched.
+  //
+  // Deliberately not unique: two source configs may legitimately scan the same
+  // warehouse, and a unique constraint would make the second scan fail. See
+  // GraphService.resolveUrns for the tie-break.
+  urn                       String?
   // Catalog asset kind (file, image, page, comment, table, ...) — free-form
   // string, not a database enum.
   assetType                 String                     @map("asset_type")
@@ -251,6 +260,7 @@ model Asset {
   chunks                    AssetChunk[]
 
   @@unique([sourceId, hash])
+  @@index([urn])
   @@index([hash])
   @@index([sourceType])
   @@index([assetType])
@@ -1161,6 +1171,35 @@ enum EdgeOrigin {
   MANUAL
 }
 
+// What traversing an edge *means*. One property graph, several traversals: the
+// lineage view walks FLOW only, CONTAINMENT collapses nodes into their parent,
+// IDENTITY merges nodes that are the same thing twice, and REFERENCE/USAGE stay
+// out of both. Without this axis a governance tag propagates through a join and
+// a dbt model becomes an extra hop in every lineage path.
+enum EdgeClass {
+  FLOW
+  CONTAINMENT
+  IDENTITY
+  REFERENCE
+  USAGE
+}
+
+enum EdgeGranularity {
+  DATASET
+  FIELD
+}
+
+// How the edge was derived, which is how far it should be trusted. Ordered
+// strongest first: an observation saw the data move, a parse only read the
+// intent, a heuristic guessed.
+enum EdgeMethod {
+  RUNTIME_OBSERVED
+  SYSTEM_CATALOG
+  SQL_PARSED
+  HEURISTIC
+  MANUAL
+}
+
 enum CaseStatus {
   OPEN
   IN_PROGRESS
@@ -1239,10 +1278,34 @@ model Edge {
   metadata     Json?      @db.JsonB
   createdAt    DateTime   @default(now()) @map("created_at")
 
+  // What this relationship means. Defaults to REFERENCE because that is the
+  // class that propagates nothing: an edge whose meaning nobody declared must
+  // not silently become a lineage hop.
+  relationClass EdgeClass       @default(REFERENCE) @map("relation_class")
+  granularity   EdgeGranularity @default(DATASET)
+  method        EdgeMethod      @default(SYSTEM_CATALOG)
+  // Column-level dependencies, present when `granularity` is FIELD:
+  // `[{ downstream, upstreams[], transform, type }]`. A null `downstream` is an
+  // indirect dependency (an ORDER BY, a join key) recorded once against the
+  // dataset instead of fanned out across every output column.
+  fieldMappings Json?           @map("field_mappings") @db.JsonB
+  // What this edge was read from: `{ sql, queryId, runId }`.
+  evidence      Json?           @db.JsonB
+  // The job / query / notebook that moved the data, when one is known.
+  viaType       String?         @map("via_type")
+  viaId         String?         @map("via_id")
+  // Refreshed on every re-ingest, so edges can be expired rather than
+  // accumulating a decade of dead links — the failure mode of long-lived
+  // catalogs. Manual edges are never expired automatically.
+  lastSeenAt    DateTime        @default(now()) @map("last_seen_at")
+
   @@unique([fromType, fromId, toType, toId, relationType])
   @@index([fromType, fromId])
   @@index([toType, toId])
   @@index([relationType])
+  // The lineage traversal's access pattern: always class-first, then endpoint.
+  @@index([relationClass, fromType, fromId])
+  @@index([relationClass, toType, toId])
   @@map("edges")
 }
 

@@ -3133,6 +3133,9 @@
     "legendAsset": "Asset in this source",
     "legendExternal": "Linked asset in another source"
   },
+  "lineage": {
+    "tab": "Lineage"
+  },
   "harness": {
     "title": "Harness AI Autopilot",
     "subtitle": "Autonomous control plane",

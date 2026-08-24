@@ -83,6 +83,71 @@ export function findingCategoryCode(node: GraphNodeDto): string {
     .toUpperCase();
 }
 
+/**
+ * What each relationship class looks like.
+ *
+ * The classes answer different questions, so they should not look alike. FLOW
+ * is the only one that is lineage, and it is the only one drawn as a solid
+ * arrow: the arrow follows the data. CONTAINMENT is deliberately faint because
+ * in a lineage view it is scaffolding — it is what the graph collapses *by*,
+ * not a hop in a path. IDENTITY is dotted because the two nodes it joins are
+ * really one thing. REFERENCE and USAGE are present but recessive; they
+ * propagate nothing.
+ */
+export const EDGE_CLASS_STYLE: Record<
+  string,
+  { color: string; dash?: number[]; width: number; arrow: boolean; label: string }
+> = {
+  FLOW: { color: "#0ea5e9", width: 1.8, arrow: true, label: "Lineage" },
+  CONTAINMENT: {
+    color: "#a8a29e",
+    dash: [2, 3],
+    width: 1,
+    arrow: false,
+    label: "Contains",
+  },
+  IDENTITY: {
+    color: "#a855f7",
+    dash: [1, 3],
+    width: 1.5,
+    arrow: false,
+    label: "Same as",
+  },
+  REFERENCE: {
+    color: "#78716c",
+    dash: [5, 4],
+    width: 1.2,
+    arrow: true,
+    label: "References",
+  },
+  USAGE: { color: "#f59e0b", width: 1, arrow: true, label: "Used by" },
+};
+
+/** The class that is lineage. Everything else answers a different question. */
+export const LINEAGE_CLASS = "FLOW";
+
+/**
+ * Human wording for a flow subtype.
+ *
+ * The stored types are direction-neutral nouns so they cannot read backwards on
+ * an edge, which makes them slightly stiff to look at; these are what goes on
+ * the canvas.
+ */
+export const FLOW_SUBTYPE_LABEL: Record<string, string> = {
+  TRANSFORM: "derived",
+  VIEW: "view of",
+  COPY: "copy of",
+  WRITE: "written by",
+  EXPORT: "exported to",
+  SEND: "sent to",
+};
+
+/** The class an edge belongs to, tolerating edges written before classes existed. */
+export function edgeClassOf(edge: GraphEdgeDto): string {
+  const declared = (edge as { relationClass?: string }).relationClass;
+  return declared && declared in EDGE_CLASS_STYLE ? declared : "REFERENCE";
+}
+
 export const MANUAL_EDGE_COLOR = "#d97706";
 export const CROSS_HYP_COLOR = "#a855f7";
 export const ACCENT = "#b7ff00";

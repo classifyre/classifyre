@@ -32,6 +32,19 @@
       "title": "Links",
       "type": "array"
     },
+    "urn": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Platform-qualified name for the underlying object (snowflake://account/db/schema/table, s3://bucket/key). Optional. `hash` identifies this asset to the connector that produced it; `urn` identifies the object itself to any connector, which is what lets another source draw a lineage edge at it without knowing the hash.",
+      "title": "Urn"
+    },
     "asset_type": {
       "$ref": "#/definitions/AssetType",
       "description": "Canonical asset content type (used for detector routing)",
@@ -336,7 +349,7 @@
           "type": "integer"
         },
         "empty_text": {
-          "description": "True when an asset that should carry text yielded none. Most significant for assets whose text is derived rather than native (OCR'd images and scanned PDFs, transcribed audio/video): empty derived text means the content may have been missed entirely, not that the document is blank. Distinct from an error — nothing failed — so it is reported as coverage, not as a run failure.",
+          "description": "True when an asset that should carry text yielded none. Most significant for assets whose text is derived rather than native (OCR'd images and scanned PDFs, transcribed audio/video): empty derived text means the content may have been missed entirely, not that the document is blank. Distinct from an error \u2014 nothing failed \u2014 so it is reported as coverage, not as a run failure.",
           "type": "boolean"
         },
         "text_extraction_status": {
@@ -643,7 +656,7 @@
         "exhausted": {
           "type": "boolean",
           "default": false,
-          "description": "The last run reached the end of the payload. The scan cache may only skip this asset while this is true — otherwise unread rows would be mistaken for a finished scan.",
+          "description": "The last run reached the end of the payload. The scan cache may only skip this asset while this is true \u2014 otherwise unread rows would be mistaken for a finished scan.",
           "title": "Exhausted"
         },
         "checksum": {
