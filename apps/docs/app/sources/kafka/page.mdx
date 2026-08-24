@@ -1,0 +1,62 @@
+---
+title: Apache Kafka
+sidebarTitle: Kafka
+description: Discover Kafka topics and sample messages — broker or REST Proxy transports, SASL and mTLS auth, topic scoping, and every setting.
+---
+
+import { SourceFacts, SourceParameters, SourceMetadata } from "@/components/source-reference";
+import { LineageNote, SharedSettingsNote } from "@/components/source-notes";
+
+# Apache Kafka
+
+<SourceFacts
+  type="KAFKA"
+  vendor={{ label: "Apache Kafka", href: "https://kafka.apache.org/" }}
+  auth={{ label: "Kafka security (SASL and TLS)", href: "https://kafka.apache.org/documentation/#security" }}
+  links={[{ label: "Confluent REST Proxy", href: "https://docs.confluent.io/platform/current/kafka-rest/index.html" }]}
+/>
+
+Event streams carry the same personal data as the databases they feed, often
+with less scrutiny — a topic is a pipe, and nobody reads what goes through a
+pipe.
+
+## What you need to connect
+
+A **bootstrap host and port**, and one of four connection modes:
+
+| Mode | What you supply |
+|---|---|
+| **None** | Nothing — a plaintext broker, typically internal |
+| **SASL** | Username, password, mechanism, and a CA certificate |
+| **Client certificate** | An access key, certificate and CA bundle (mTLS) |
+| **REST Proxy** | Username and password for a Kafka REST Proxy over HTTP(S) |
+
+The REST Proxy mode needs no broker-protocol access at all, which is often the
+only way in from outside a cluster's network.
+
+## What Classifyre reads
+
+One asset per **topic**, whose content is a sample of messages from it. Scope by
+topic allow- and denylist, cap the topic count, and choose whether internal
+topics (`__consumer_offsets` and friends) are included.
+
+## Metadata on every asset
+
+<SourceMetadata type="KAFKA" />
+
+## Lineage
+
+<LineageNote />
+
+## Worth knowing
+
+- **Reading does not disturb consumers.** Messages are sampled without
+  committing offsets on your consumer groups.
+- **A dedicated read-only principal** is the right credential — it needs
+  describe and read on the topics you want.
+
+## Configuration
+
+<SharedSettingsNote />
+
+<SourceParameters type="KAFKA" />

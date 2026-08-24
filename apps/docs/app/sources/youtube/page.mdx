@@ -1,0 +1,60 @@
+---
+title: YouTube
+description: Scan YouTube channels and videos — transcripts from captions or speech recognition, on-screen text, and every setting.
+---
+
+import { SourceFacts, SourceParameters, SourceMetadata } from "@/components/source-reference";
+import { LineageNote, SharedSettingsNote } from "@/components/source-notes";
+
+# YouTube
+
+<SourceFacts
+  type="YOUTUBE"
+  vendor={{ label: "YouTube", href: "https://www.youtube.com/" }}
+/>
+
+Video is data nobody searches. A demo recording that shows a live dashboard, a
+webinar where someone reads out an account number, a training video with a
+staging environment on screen — all invisible until the words and the pixels are
+turned into text.
+
+## What you need to connect
+
+Either **channel URLs or handles** (`@YourCompany`), or explicit **video URLs** —
+at least one of the two. Public videos need no credentials. For age-restricted
+or members-only videos, supply a cookie file.
+
+## What Classifyre reads
+
+One asset per video, whose content is a **transcript**:
+
+1. If the video has captions, they are used — in your preferred language order.
+2. If it doesn't, the audio is transcribed by speech recognition.
+3. On-screen text is read from sampled frames, so a password visible in a screen
+   recording is found even when nobody says it out loud.
+
+Video metadata — title, description, channel, upload date, view count — is
+recorded alongside.
+
+## Metadata on every asset
+
+<SourceMetadata type="YOUTUBE" />
+
+## Lineage
+
+<LineageNote />
+
+## Worth knowing
+
+- **Transcription costs time.** A channel of hour-long videos is a long scan;
+  the sampling strategy is what keeps each run bounded.
+- **Unlisted videos are scannable** if you have the URL — and are exactly where
+  internal recordings tend to live.
+- A **proxy** can be configured when scanning at a scale that attracts rate
+  limiting.
+
+## Configuration
+
+<SharedSettingsNote />
+
+<SourceParameters type="YOUTUBE" />

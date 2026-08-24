@@ -1,0 +1,81 @@
+---
+title: Microsoft SQL Server
+sidebarTitle: SQL Server
+description: Scan Microsoft SQL Server tables and views — extraction, metadata, view and query lineage, stored procedures, LDAP and AWS RDS support, and every connection setting.
+---
+
+import { SourceFacts, SourceParameters, SourceMetadata } from "@/components/source-reference";
+import { SqlSourceNotes, LineageNote, SharedSettingsNote } from "@/components/source-notes";
+
+# Microsoft SQL Server
+
+<SourceFacts
+  type="MSSQL"
+  vendor={{ label: "Microsoft SQL Server", href: "https://www.microsoft.com/sql-server" }}
+  auth={{ label: "Create a database user", href: "https://learn.microsoft.com/sql/relational-databases/security/authentication-access/create-a-database-user" }}
+  links={[{ label: "Query Store", href: "https://learn.microsoft.com/sql/relational-databases/performance/monitoring-performance-by-using-the-query-store" }]}
+/>
+
+SQL Server sits at the centre of most Microsoft-estate data platforms, usually
+holding the systems of record — finance, HR, CRM. It is also the source with the
+richest lineage story of the classic databases, because SQL Server itself tracks
+what depends on what.
+
+## What you need to connect
+
+Host, port, and a login. Two authentication modes are supported: a plain SQL
+Server login, or **LDAP / Active Directory**, where the domain is prefixed to
+the username for you. Amazon RDS instances are detected automatically from the
+host name, and can be forced either way if detection guesses wrong.
+
+Grant the login read access only — `db_datareader` plus `VIEW DEFINITION` where
+you want lineage from views and stored procedures.
+
+## What Classifyre reads
+
+Tables and views, across one database or all of them, scoped by schema allow-
+and denylists or by an explicit object list.
+
+<SqlSourceNotes />
+
+## Metadata on every asset
+
+<SourceMetadata type="MSSQL" />
+
+## Lineage
+
+<LineageNote>
+
+SQL Server exposes dependency metadata directly, which makes it one of the
+strongest lineage sources available:
+
+- **View lineage** — every view and the tables and views it reads, optionally
+  with **column-level** detail straight from SQL Server's own dependency
+  information rather than parsed from text.
+- **Query lineage** — what the queries that actually ran did, read from Query
+  Store and the dynamic management views. You control how many queries are
+  analysed, how often a query must have run to count, and which patterns to
+  ignore.
+- **Foreign keys** as references, and **stored procedures** and **Agent jobs**
+  as metadata when you enable them.
+
+Each of these is a separate switch under the extraction settings, so you can
+take table lineage without paying for a query-history sweep. See
+[Lineage & Relationships](/sources/lineage/).
+
+</LineageNote>
+
+## Worth knowing
+
+- **Query lineage costs more than view lineage.** It reads execution history and
+  parses statements; start with view lineage and add it if you need to see what
+  pipelines actually do.
+- **Stored procedure source code** is captured as metadata when enabled, which
+  means detectors can find credentials hard-coded inside procedures.
+- The driver is bundled — there is no separate ODBC installation to manage.
+
+## Configuration
+
+<SharedSettingsNote />
+
+<SourceParameters type="MSSQL" />

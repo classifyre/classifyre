@@ -1,0 +1,67 @@
+---
+title: Dropbox
+description: Scan a Dropbox account or an entire Dropbox Business team — OAuth setup, team and member scoping, Paper docs, and every setting.
+---
+
+import { SourceFacts, SourceParameters, SourceMetadata } from "@/components/source-reference";
+import { ObjectStorageNotes, LineageNote, SharedSettingsNote, FileHandlingNote } from "@/components/source-notes";
+
+# Dropbox
+
+<SourceFacts
+  type="DROPBOX"
+  vendor={{ label: "Dropbox", href: "https://www.dropbox.com/" }}
+  auth={{ label: "Create a Dropbox app and get OAuth tokens", href: "https://www.dropbox.com/developers/reference/getting-started" }}
+/>
+
+Dropbox holds the documents that get shared outside the company — contracts sent
+to counsel, files exchanged with vendors, the folder a departing employee still
+has a link to.
+
+## What you need to connect
+
+A Dropbox app, and one of three credential shapes:
+
+| Method | What you supply |
+|---|---|
+| **OAuth** | App key, app secret and a refresh token — the durable option |
+| **OAuth (PKCE)** | App key and refresh token, no secret |
+| **Access token** | A single short-lived token, easiest for a quick test |
+
+For **Dropbox Business**, the same credential can scan the whole team: the team
+space, each member's own folder, or a named list of members. Team-owned folders
+can be traversed with administrator privileges to reach content no individual
+member has mounted.
+
+## What Classifyre reads
+
+Everything under the folder you choose — recursively if you want, including
+shared folders mounted into the account — filtered by extension.
+
+**Dropbox Paper docs** have no downloadable file behind them, so they're
+exported to Markdown and scanned as text.
+
+<ObjectStorageNotes container="folder" />
+
+<FileHandlingNote what="Files in Dropbox" />
+
+## Metadata on every asset
+
+<SourceMetadata type="DROPBOX" />
+
+## Lineage
+
+<LineageNote />
+
+## Worth knowing
+
+- **Team scans grow fast.** Start with the team space or a handful of members
+  before scanning everyone.
+- **Suspended members** are excluded by default and can be included explicitly —
+  their folders are often exactly the ones worth reviewing.
+
+## Configuration
+
+<SharedSettingsNote />
+
+<SourceParameters type="DROPBOX" />

@@ -1,0 +1,69 @@
+---
+title: MySQL
+description: Scan MySQL and MariaDB tables — what Classifyre extracts, the metadata it records, view lineage and foreign keys, TLS options, and every connection setting.
+---
+
+import { SourceFacts, SourceParameters, SourceMetadata } from "@/components/source-reference";
+import { SqlSourceNotes, LineageNote, SharedSettingsNote } from "@/components/source-notes";
+
+# MySQL
+
+<SourceFacts
+  type="MYSQL"
+  vendor={{ label: "MySQL", href: "https://www.mysql.com/" }}
+  auth={{ label: "Granting read-only privileges (GRANT)", href: "https://dev.mysql.com/doc/refman/8.0/en/grant.html" }}
+  links={[{ label: "Encrypted connections", href: "https://dev.mysql.com/doc/refman/8.0/en/encrypted-connections.html" }]}
+/>
+
+MySQL — and MariaDB, which connects identically — is the database under a great
+many web applications, e-commerce platforms and internal tools. Connect it and
+Classifyre reads the values in your tables, so a column called `notes` that
+quietly accumulated customer identifiers is found for what it contains.
+
+## What you need to connect
+
+Host, port, and a user with `SELECT` on the databases you want scanned. Nothing
+is ever written.
+
+Managed MySQL (Amazon RDS and Aurora, Azure Database for MySQL, Google Cloud
+SQL, PlanetScale) works the same way. If your provider requires TLS, set the SSL
+mode accordingly and paste its CA certificate — that field is stored as a secret
+like any password.
+
+## What Classifyre reads
+
+Tables across one database or every database the user can see, with a denylist
+for the ones you don't want and an allowlist for the ones you do.
+
+<SqlSourceNotes />
+
+## Metadata on every asset
+
+<SourceMetadata type="MYSQL" />
+
+## Lineage
+
+<LineageNote>
+
+Views and the tables behind them are recovered from MySQL's own catalog and
+recorded as lineage, with column detail parsed from the view definition where it
+can be. **Foreign keys** become references — a useful map of how tables relate,
+but not a path data travels. See [Lineage & Relationships](/sources/lineage/).
+
+</LineageNote>
+
+## Worth knowing
+
+- **MySQL 8 authentication.** Accounts using `caching_sha2_password` over an
+  unencrypted connection need public-key retrieval allowed; there's a setting
+  for it. Using TLS is the better answer.
+- **System databases** — `mysql`, `sys`, `information_schema`,
+  `performance_schema` — are excluded automatically.
+- **MariaDB** connects through the same driver and needs no special
+  configuration.
+
+## Configuration
+
+<SharedSettingsNote />
+
+<SourceParameters type="MYSQL" />

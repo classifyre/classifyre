@@ -1,0 +1,59 @@
+---
+title: Jira
+description: Scan Jira Cloud issues, comments and attachments — API token setup, JQL and project scoping, what gets extracted, and every setting.
+---
+
+import { SourceFacts, SourceParameters, SourceMetadata } from "@/components/source-reference";
+import { AtlassianNotes, LineageNote, SharedSettingsNote, FileHandlingNote } from "@/components/source-notes";
+
+# Jira
+
+<SourceFacts
+  type="JIRA"
+  vendor={{ label: "Jira", href: "https://www.atlassian.com/software/jira" }}
+  auth={{ label: "Manage API tokens for your Atlassian account", href: "https://support.atlassian.com/atlassian-account/docs/manage-api-tokens-for-your-atlassian-account/" }}
+  links={[{ label: "JQL reference", href: "https://support.atlassian.com/jira-software-cloud/docs/what-is-advanced-search-in-jira-cloud/" }]}
+/>
+
+Tickets accumulate everything: production logs pasted into a description,
+customer details in a bug report, a database dump attached "for reproduction".
+Jira is a rich source precisely because people paste into it without thinking.
+
+## What you need to connect
+
+Your **Jira Cloud URL**, the **account email**, and an **API token**.
+
+<AtlassianNotes product="Jira" />
+
+## What Classifyre reads
+
+- **Issues** — summary and description.
+- **Comments** — gathered into one comments asset per issue.
+- **Attachments** — each attached file as its own asset, linked to its issue.
+
+Scope by project key or id, and narrow further with **JQL** — which lets you
+target exactly what you care about (`created >= -90d`, a label, a component, a
+custom field).
+
+<FileHandlingNote what="Issue attachments" />
+
+## Metadata on every asset
+
+<SourceMetadata type="JIRA" />
+
+## Lineage
+
+<LineageNote />
+
+## Worth knowing
+
+- **Start with a JQL filter** on a large instance. Scanning every issue ever
+  filed is rarely the fastest way to learn something.
+- **Issue links are recorded** as relationships, so related tickets stay
+  connected in the graph.
+
+## Configuration
+
+<SharedSettingsNote />
+
+<SourceParameters type="JIRA" />

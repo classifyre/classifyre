@@ -1,0 +1,70 @@
+---
+title: S3-Compatible Storage
+sidebarTitle: S3 Storage
+description: Scan objects in AWS S3, MinIO, Cloudflare R2, Backblaze B2 and other S3-compatible buckets — what Classifyre reads, how large files and archives are handled, and every setting.
+---
+
+import { SourceFacts, SourceParameters, SourceMetadata } from "@/components/source-reference";
+import { ObjectStorageNotes, LineageNote, SharedSettingsNote, FileHandlingNote } from "@/components/source-notes";
+
+# S3-Compatible Storage
+
+<SourceFacts
+  type="S3_COMPATIBLE_STORAGE"
+  vendor={{ label: "Amazon S3", href: "https://aws.amazon.com/s3/" }}
+  auth={{ label: "IAM policies for S3 read access", href: "https://docs.aws.amazon.com/AmazonS3/latest/userguide/security-iam.html" }}
+  links={[
+    { label: "MinIO", href: "https://min.io/" },
+    { label: "Cloudflare R2", href: "https://developers.cloudflare.com/r2/" },
+  ]}
+/>
+
+Buckets are where data goes to be forgotten: exports, backups, log dumps,
+"temporary" copies from three years ago. This source scans **any S3-compatible
+endpoint** — AWS S3, MinIO, Cloudflare R2, Backblaze B2, Garage, Ceph, Wasabi
+and the rest — through the same connection.
+
+## What you need to connect
+
+A **bucket name**, plus either an access key pair or nothing at all — leave the
+credentials empty and the environment's ambient AWS credential chain (instance
+role, workload identity, `~/.aws`) is used. For non-AWS providers, add the
+endpoint URL and, where the provider needs it, a region.
+
+Read-only credentials are enough: `s3:ListBucket` and `s3:GetObject` on the
+prefix you want scanned.
+
+## What Classifyre reads
+
+Every object under the prefix you choose, filtered by extension allow- and
+denylists if you want to narrow it further.
+
+<ObjectStorageNotes container="bucket" />
+
+<FileHandlingNote what="Objects from this bucket" />
+
+## Metadata on every asset
+
+<SourceMetadata type="S3_COMPATIBLE_STORAGE" />
+
+## Lineage
+
+<LineageNote />
+
+## Worth knowing
+
+- **Object type is detected from content.** S3-compatible providers routinely
+  label uploads as generic binary data; the format is worked out from the bytes,
+  so those objects are still read properly.
+- **Archives are expanded** into child assets, with caps on member count, member
+  size, and total uncompressed bytes — the guard against a zip bomb.
+- **Big objects don't blow up memory.** Anything past the in-memory threshold is
+  streamed to a temporary file or read by byte range instead.
+- **Metadata-only inventories** are possible: turn off content preview and you
+  get a catalogue of what's in the bucket without downloading anything.
+
+## Configuration
+
+<SharedSettingsNote />
+
+<SourceParameters type="S3_COMPATIBLE_STORAGE" />

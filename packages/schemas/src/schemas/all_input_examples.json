@@ -3873,6 +3873,19 @@
               }
             ]
           }
+        },
+        "masked": {
+          "secrets": {}
+        },
+        "optional": {
+          "variables": {},
+          "limits": {
+            "timeout_seconds": 900
+          }
+        },
+        "sampling": {
+          "strategy": "ALL",
+          "rows_per_page": 100
         }
       }
     }
