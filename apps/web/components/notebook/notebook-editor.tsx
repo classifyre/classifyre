@@ -7,8 +7,6 @@ import {
   CheckCircle2,
   Download,
   Info,
-  Loader2,
-  Play,
   Square,
 } from "lucide-react";
 import { Button } from "@workspace/ui/components/button";
@@ -16,11 +14,16 @@ import { Card, CardContent } from "@workspace/ui/components/card";
 import { cn } from "@workspace/ui/lib/utils";
 import { useTranslation } from "@/hooks/use-translation";
 import { extractApiErrorMessage } from "@/lib/extract-api-error-message";
-import { CellList, type NotebookAiConfig } from "./cell-list";
+import { CellList } from "./cell-list";
 import type { CellStatus } from "./code-cell";
 import type { CellOutputValue } from "./cell-output";
 import type { NotebookCell } from "@/lib/notebook-cells";
-import { useNotebookExecution } from "./use-notebook-execution";
+import {
+  awaitExecution,
+  summarizeExecution,
+  useNotebookExecution,
+  type ExecutionRecord,
+} from "./use-notebook-execution";
 
 // Re-exported so existing imports of the cell shape keep working.
 export type { NotebookCell } from "@/lib/notebook-cells";
@@ -30,8 +33,21 @@ export interface NotebookEditorProps {
   cells: NotebookCell[];
   revision: number;
   disabled?: boolean;
-  /** What the AI helper may see. Omit to hide the AI control entirely. */
-  ai?: NotebookAiConfig;
+  /**
+   * Lets the page reach the notebook the editor owns — the assistant applies
+   * its cell edits through this. Kept imperative because the editor is the
+   * source of truth for a saved notebook (it autosaves and tracks revisions),
+   * so lifting the cells into a parent would mean two owners of one thing.
+   */
+  handleRef?: React.RefObject<NotebookEditorHandle | null>;
+  /** Told when an execution starts and stops, so the page can disable its toolbar. */
+  onBusyChange?: (busy: boolean) => void;
+  /**
+   * Runs one cell. Supplied by the page so a cell's play button goes through
+   * the same validate-then-save path as the toolbar; without it the editor runs
+   * the cell itself.
+   */
+  onRunCell?: (cellId: string) => void;
   /** Called after a successful save so the container can track the revision. */
   onSaved?: (revision: number) => void;
   onCellsChange?: (cells: NotebookCell[]) => void;
@@ -39,12 +55,41 @@ export interface NotebookEditorProps {
 
 const AUTOSAVE_DELAY_MS = 1500;
 
+/**
+ * The notebook, for callers that live outside the editor.
+ *
+ * Run is here rather than on a button inside the editor because running is not
+ * a notebook-local act: the source has to be saved first, and only the page
+ * knows whether the rest of the form is valid. The page's sticky toolbar
+ * validates, saves, then calls `run` — which is also what a cell's own play
+ * button does, so the two cannot drift.
+ */
+export interface NotebookEditorHandle {
+  getCells: () => NotebookCell[];
+  setCells: (cells: NotebookCell[]) => void;
+  /** Resolves once the execution reaches a terminal state. */
+  run: (
+    mode: "cell" | "all" | "test_connection" | "preview_extract",
+    targetCellId?: string,
+  ) => Promise<ExecutionRecord | null>;
+  /** The same run, rendered as text an assistant can read and act on. */
+  runAndSummarize: (
+    mode: "cell" | "all" | "test_connection" | "preview_extract",
+    targetCellId?: string,
+  ) => Promise<string>;
+  cancel: () => void;
+  /** Persists the notebook and resolves with the revision the server assigned. */
+  save: () => Promise<number | null>;
+}
+
 export function NotebookEditor({
   sourceId,
   cells: initialCells,
   revision: initialRevision,
   disabled = false,
-  ai,
+  handleRef,
+  onBusyChange,
+  onRunCell,
   onSaved,
   onCellsChange,
 }: NotebookEditorProps) {
@@ -74,6 +119,8 @@ export function NotebookEditor({
     },
     [onCellsChange],
   );
+
+
 
   /**
    * Persist the notebook.
@@ -156,17 +203,46 @@ export function NotebookEditor({
     async (
       mode: "cell" | "all" | "test_connection" | "preview_extract",
       targetCellId?: string,
-    ) => {
+    ): Promise<ExecutionRecord | null> => {
       const current = dirty ? await save() : revisionRef.current;
-      if (current == null) return;
+      if (current == null) return null;
       try {
-        await run({ revision: current, mode, targetCellId, maxAssets: 10 });
+        const started = await run({
+          revision: current,
+          mode,
+          targetCellId,
+          maxAssets: 10,
+        });
+        // The hook drives the editor's live view; this waits for the answer,
+        // which is what a caller that has to react to the result needs.
+        return await awaitExecution(started.id);
       } catch (error) {
         setSaveError(await extractApiErrorMessage(error, t("notebook.failed")));
+        return null;
       }
     },
     [dirty, save, run, t],
   );
+
+  React.useEffect(() => {
+    if (!handleRef) return;
+    handleRef.current = {
+      getCells: () => cellsRef.current,
+      setCells: mutate,
+      run: runMode,
+      runAndSummarize: async (mode, targetCellId) =>
+        summarizeExecution(await runMode(mode, targetCellId)),
+      cancel: () => void cancel(),
+      save,
+    };
+    return () => {
+      handleRef.current = null;
+    };
+  }, [cancel, handleRef, mutate, runMode, save]);
+
+  React.useEffect(() => {
+    onBusyChange?.(busy);
+  }, [busy, onBusyChange]);
 
   const reload = React.useCallback(async () => {
     const fresh = (await api.notebooks.notebookControllerGet({
@@ -218,21 +294,12 @@ export function NotebookEditor({
   return (
     <div className="space-y-4" data-testid="notebook-editor">
       <div className="flex flex-wrap items-center justify-between gap-2">
+        {/* Run, Test connection and Preview live in the page's sticky toolbar:
+            all three need the source saved first, which is the page's job, and
+            two rows of run buttons on one screen invited the wrong one. Only
+            Stop stays, because it is only meaningful while this editor is
+            executing. */}
         <div className="flex items-center gap-2">
-          <Button
-            type="button"
-            size="sm"
-            onClick={() => void runMode("all")}
-            disabled={disabled || busy}
-            data-testid="notebook-run-all"
-          >
-            {busy ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <Play className="mr-2 h-4 w-4" />
-            )}
-            {t("notebook.runAll")}
-          </Button>
           {busy && (
             <Button
               type="button"
@@ -245,25 +312,6 @@ export function NotebookEditor({
               {t("notebook.cancel")}
             </Button>
           )}
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            onClick={() => void runMode("test_connection")}
-            disabled={disabled || busy}
-          >
-            {t("notebook.testConnection")}
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            onClick={() => void runMode("preview_extract")}
-            disabled={disabled || busy}
-            data-testid="notebook-preview"
-          >
-            {t("notebook.previewExtract")}
-          </Button>
         </div>
 
         <div className="flex items-center gap-3 text-xs text-muted-foreground">
@@ -398,8 +446,9 @@ export function NotebookEditor({
         onChange={mutate}
         disabled={disabled}
         onSave={() => void save()}
-        ai={ai}
-        onRunCell={(cellId) => void runMode("cell", cellId)}
+        onRunCell={(cellId) =>
+          onRunCell ? onRunCell(cellId) : void runMode("cell", cellId)
+        }
         runState={(cellId) => ({
           status: cellStatus(cellId),
           outputs: resultByCell.get(cellId)?.outputs ?? [],

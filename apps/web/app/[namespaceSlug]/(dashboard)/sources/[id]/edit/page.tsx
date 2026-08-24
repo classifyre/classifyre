@@ -11,7 +11,11 @@ import {
   CardHeader,
   CardTitle,
 } from "@workspace/ui/components/card";
-import { useRegisterAssistantBridge } from "@/components/assistant-workflow-provider";
+import {
+  useRegisterAssistantBridge,
+  type AssistantPageBridge,
+} from "@/components/assistant-workflow-provider";
+import { buildSourceMentions } from "@/lib/assistant-source-mentions";
 import {
   SourceForm,
   type SourceFormHandle,
@@ -24,6 +28,8 @@ import {
 } from "@/components/source-scan-config";
 import { SourceDetectorConfigCard } from "@/components/source-detector-config-card";
 import {
+  CUSTOM_SOURCE_STEP_IDS,
+  DEFAULT_SOURCE_STEP_IDS,
   HorizontalStepperNav,
   VerticalStepperNav,
   type SourceStepId,
@@ -61,6 +67,8 @@ import {
   listSourceFiles,
   uploadSourceFile,
 } from "@/lib/source-files-api";
+import { Eye, Play } from "lucide-react";
+import { Button } from "@workspace/ui/components/button";
 
 const normalizeDetectors = (detectors: DetectorConfigInput[]) =>
   detectors
@@ -132,7 +140,11 @@ export default function EditSourcePage() {
           type: (data.type as SourceType) || "WORDPRESS",
           config: data.config as Record<string, unknown> | undefined,
         });
-        if (data.type === "SANDBOX") {
+        // Both file-capable types, not just SANDBOX. A CUSTOM source's files
+        // are what `ctx.files` reads, and skipping this left the page showing
+        // an empty uploader over files the connector could already see — and
+        // told the assistant the source had nothing attached.
+        if (data.type === "SANDBOX" || data.type === "CUSTOM") {
           setUploadedFiles(await listSourceFiles(sourceId));
         }
         // Read schedule fields from source response. `scheduleMode` is the
@@ -192,7 +204,7 @@ export default function EditSourcePage() {
     };
   }, [source?.config, source?.name, source?.description]);
 
-  const defaultDetectors = useMemo(() => {
+  const configuredDetectors = useMemo(() => {
     const configDetectors = (source?.config as { detectors?: unknown })
       ?.detectors;
     if (!Array.isArray(configDetectors)) {
@@ -205,9 +217,17 @@ export default function EditSourcePage() {
     }));
   }, [source?.config]);
 
+  // What the detector card seeds its switches from. It starts as whatever the
+  // source was saved with, but the assistant can replace it -- which is why it
+  // is state here rather than the memo it is derived from.
+  const [defaultDetectors, setDetectorDefaults] = useState<
+    DetectorConfigInput[]
+  >([]);
+
   useEffect(() => {
-    setDetectors(defaultDetectors);
-  }, [defaultDetectors]);
+    setDetectors(configuredDetectors);
+    setDetectorDefaults(configuredDetectors);
+  }, [configuredDetectors]);
 
   useEffect(() => {
     const configured = (source?.config as { custom_detectors?: unknown })
@@ -223,14 +243,83 @@ export default function EditSourcePage() {
     );
   }, [source?.config]);
 
-  const assistantBridge = useMemo(() => {
+  const assistantBridge = useMemo<AssistantPageBridge | null>(() => {
     if (!source) {
       return null;
+    }
+
+    // CUSTOM only, for the same reason as the create page: the assistant is
+    // here to write the notebook, and no other source type has one. Registered
+    // but closed rather than absent -- with no bridge at all the global
+    // assistant would take over the page.
+    if (source.type !== "CUSTOM") {
+      return {
+        contextKey: "source.edit" as const,
+        canOpen: false,
+        getContext: () => ({
+          key: "source.edit" as const,
+          route: `/sources/${sourceId}/edit`,
+          title: t("sources.new.editAssistant"),
+          entityId: source.id,
+          values: {},
+          schema: null,
+          validation: { isValid: true, missingFields: [], errors: [] },
+          metadata: { sourceType: source.type },
+        }),
+        applyAction: () => undefined,
+      };
     }
 
     return {
       contextKey: "source.edit" as const,
       canOpen: true,
+      // The assistant checks its own work: it proposes a run, the user confirms,
+      // and this saves the source and hands back what happened — stdout, or the
+      // traceback with the failing line — for the assistant to fix.
+      runNotebook: async ({ mode, cellId }) => {
+        const validation = await sourceFormRef.current?.validate();
+        if (!validation?.isValid) {
+          return [
+            "The run did not start: the source form is not valid yet.",
+            validation?.missingFields?.length
+              ? `Missing: ${validation.missingFields.join(", ")}`
+              : "",
+            validation?.errors?.length
+              ? `Errors: ${validation.errors.join("; ")}`
+              : "",
+          ]
+            .filter(Boolean)
+            .join("\n");
+        }
+        const values = sourceFormRef.current?.getValues() ?? {};
+        const persisted = await persistSource(values);
+        if (!persisted) {
+          return "The run did not start: saving the source failed.";
+        }
+        return (
+          (await sourceFormRef.current?.runNotebookAndSummarize(
+            mode,
+            cellId,
+          )) ?? "The notebook could not be run."
+        );
+      },
+      getMentions: () =>
+        buildSourceMentions({
+          cells: sourceFormRef.current?.getNotebookContext()?.cells ?? null,
+          files: [
+            ...uploadedFiles.map((file) => ({
+              name: file.fileName,
+              detail: "uploaded",
+            })),
+            ...pendingFiles.map((file) => ({
+              name: file.name,
+              detail: "pending upload — saved with the source",
+            })),
+          ],
+          localFolders:
+            sourceFormRef.current?.getNotebookContext()?.localFolders ?? [],
+          detectors,
+        }),
       getContext: async () => {
         const formValues = sourceFormRef.current?.getValues() ?? formDefaults;
         const validation = (await sourceFormRef.current?.validate()) ?? {
@@ -255,6 +344,11 @@ export default function EditSourcePage() {
             schedule,
             detectors: normalizeDetectors(detectors),
             customDetectorIds: selectedCustomDetectorIds,
+            notebookConfig: sourceFormRef.current?.getNotebookContext() ?? null,
+            attachedFiles: [
+              ...uploadedFiles.map((file) => file.fileName),
+              ...pendingFiles.map((file) => file.name),
+            ],
           },
         };
       },
@@ -283,6 +377,32 @@ export default function EditSourcePage() {
               }, current),
             );
           }
+          return;
+        }
+
+        if (action.type === "notebook_edit") {
+          const touched = sourceFormRef.current?.applyNotebookOperations(
+            action.operations,
+          );
+          if (touched && touched.length > 0) {
+            toast.success(t("sources.new.notebookUpdated"), {
+              description: action.summary ?? touched.join(", "),
+            });
+          }
+          return;
+        }
+
+        if (action.type === "set_detectors") {
+          const next = action.detectors.map((detector) => ({
+            type: detector.type,
+            enabled: detector.enabled ?? true,
+            config: detector.config ?? {},
+          }));
+          // Both, on purpose: the selection the page submits AND the defaults
+          // the detector card seeds itself from. Setting only the first leaves
+          // every switch showing the old answer.
+          setDetectors(next);
+          setDetectorDefaults(next);
           return;
         }
 
@@ -317,10 +437,13 @@ export default function EditSourcePage() {
   }, [
     detectors,
     formDefaults,
+    pendingFiles,
     schedule,
     selectedCustomDetectorIds,
     source,
     sourceId,
+    t,
+    uploadedFiles,
   ]);
 
   useRegisterAssistantBridge(assistantBridge);
@@ -619,6 +742,7 @@ export default function EditSourcePage() {
         pendingRemovalIds={pendingRemovalIds}
         onPendingFilesChange={setPendingFiles}
         onPendingRemovalIdsChange={setPendingRemovalIds}
+        onUploadedFilesChange={setUploadedFiles}
       />
 
       <TestConnectionDialog
@@ -659,6 +783,7 @@ function SourceEditStepperContent({
   pendingRemovalIds,
   onPendingFilesChange,
   onPendingRemovalIdsChange,
+  onUploadedFilesChange,
 }: {
   sourceType: SourceType;
   sourceId: string;
@@ -682,25 +807,36 @@ function SourceEditStepperContent({
   pendingRemovalIds: Set<string>;
   onPendingFilesChange: (files: File[]) => void;
   onPendingRemovalIdsChange: (ids: Set<string>) => void;
+  onUploadedFilesChange: (files: UploadedFileMetadata[]) => void;
 }) {
   const { t } = useTranslation();
+  const isCustom = sourceType === "CUSTOM";
   const configRef = useRef<HTMLDivElement>(null);
   const detectorsRef = useRef<HTMLDivElement>(null);
+  // A CUSTOM source registers one anchor per section of its config, so the
+  // stepper walks the page the way it actually reads instead of calling four
+  // screens of scrolling "Source details".
+  const customSectionsRef = useRef(new Map<SourceStepId, HTMLElement>());
   const [activeStepId, setActiveStepId] = useState<SourceStepId>("config");
+  const [notebookBusy, setNotebookBusy] = useState(false);
   const [scanSummary, setScanSummary] = useState({
     visibleCount: 0,
     enabledCount: 0,
   });
+  const stepIds = isCustom ? CUSTOM_SOURCE_STEP_IDS : DEFAULT_SOURCE_STEP_IDS;
+
+  const sectionElement = (id: SourceStepId): HTMLElement | null => {
+    if (id === "config") return configRef.current;
+    if (id === "detectors") return detectorsRef.current;
+    return customSectionsRef.current.get(id) ?? null;
+  };
 
   // IntersectionObserver: highlight whichever section is in the top half of the viewport.
   // Works correctly regardless of which DOM element is the actual scroll container.
   useEffect(() => {
-    const els = [
-      { id: "config" as SourceStepId, el: configRef.current },
-      { id: "detectors" as SourceStepId, el: detectorsRef.current },
-    ].filter(
-      (x): x is { id: SourceStepId; el: HTMLDivElement } => x.el !== null,
-    );
+    const els = stepIds
+      .map((id) => ({ id, el: sectionElement(id) }))
+      .filter((x): x is { id: SourceStepId; el: HTMLElement } => x.el !== null);
 
     const map = new Map<Element, SourceStepId>(
       els.map(({ id, el }) => [el, id]),
@@ -721,11 +857,11 @@ function SourceEditStepperContent({
 
     els.forEach(({ el }) => observer.observe(el));
     return () => observer.disconnect();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stepIds.join(",")]);
 
   const scrollToSection = (id: SourceStepId) => {
-    const el = id === "config" ? configRef.current : detectorsRef.current;
-    el?.scrollIntoView({ behavior: "smooth", block: "start" });
+    sectionElement(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
   const scanConfigRef = useRef<SourceScanConfigHandle>(null);
@@ -757,6 +893,23 @@ function SourceEditStepperContent({
     await handler(sourceFormRef.current?.getValues() ?? {});
   };
 
+  /**
+   * Save the source, then execute the notebook.
+   *
+   * Every way of running goes through here — the toolbar's Run all and Preview,
+   * and a cell's own play button — because an execution names a stored revision
+   * of a stored source. Running before saving would execute the previous
+   * version, which is worse than refusing.
+   */
+  const saveThenRun = (
+    mode: "cell" | "all" | "test_connection" | "preview_extract",
+    targetCellId?: string,
+  ) =>
+    withValidFormData(async (data) => {
+      await onSave(data);
+      await sourceFormRef.current?.runNotebook(mode, targetCellId);
+    });
+
   return (
     <div>
       {/* Mobile sticky horizontal nav */}
@@ -765,6 +918,7 @@ function SourceEditStepperContent({
           activeStepId={activeStepId}
           configSaved={true}
           onNavigate={scrollToSection}
+          stepIds={stepIds}
         />
       </div>
 
@@ -797,16 +951,34 @@ function SourceEditStepperContent({
                   onScheduleChange={onScheduleChange}
                   autoScheduleStatus={autoStatus}
                   onResumeSchedule={onResumeSchedule}
+                  files={uploadedFiles}
+                  onFilesChange={onUploadedFilesChange}
+                  onNotebookBusyChange={setNotebookBusy}
+                  onRunCell={(cellId) => void saveThenRun("cell", cellId)}
+                  customSectionRef={(id, element) => {
+                    if (element) customSectionsRef.current.set(id, element);
+                    else customSectionsRef.current.delete(id);
+                  }}
                   afterNameContent={
-                    sourceType === "SANDBOX" || sourceType === "CUSTOM" ? (
-                      <UploadedFiles
-                        existingFiles={uploadedFiles}
-                        pendingFiles={pendingFiles}
-                        pendingRemovalIds={pendingRemovalIds}
-                        onPendingFilesChange={onPendingFilesChange}
-                        onPendingRemovalIdsChange={onPendingRemovalIdsChange}
-                        disabled={isSavingConfig || isTestingConfig}
-                      />
+                    sourceType === "SANDBOX" ? (
+                      // SANDBOX keeps its own card: its files are the source,
+                      // not one input among several.
+                      <Card className="rounded-[6px] border-2 border-border">
+                        <CardHeader>
+                          <CardTitle className="uppercase tracking-[0.06em]">
+                            {t("sources.uploadedFiles.title")}
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <UploadedFiles
+                            existingFiles={uploadedFiles}
+                            sourceId={sourceId}
+                            onFilesChange={onUploadedFilesChange}
+                            requireAtLeastOne
+                            disabled={isSavingConfig || isTestingConfig}
+                          />
+                        </CardContent>
+                      </Card>
                     ) : undefined
                   }
                 />
@@ -845,6 +1017,32 @@ function SourceEditStepperContent({
             isBusy={isSavingConfig || isTestingConfig}
             disabled={!hasRequiredFiles}
             className="mt-0"
+            extraActions={
+              isCustom ? (
+                <>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => void saveThenRun("all")}
+                    disabled={isSavingConfig || isTestingConfig || notebookBusy}
+                    data-testid="notebook-run-all"
+                  >
+                    <Play className="mr-2 h-4 w-4" />
+                    {t("notebook.runAll")}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => void saveThenRun("preview_extract")}
+                    disabled={isSavingConfig || isTestingConfig || notebookBusy}
+                    data-testid="notebook-preview"
+                  >
+                    <Eye className="mr-2 h-4 w-4" />
+                    {t("notebook.previewExtract")}
+                  </Button>
+                </>
+              ) : null
+            }
           />
         </div>
 
@@ -854,6 +1052,7 @@ function SourceEditStepperContent({
             activeStepId={activeStepId}
             configSaved={true}
             onNavigate={scrollToSection}
+            stepIds={stepIds}
           />
         </aside>
       </div>

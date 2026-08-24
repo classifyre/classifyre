@@ -14,10 +14,24 @@ import {
   type CustomSourceDraft,
 } from "@/components/notebook/custom-source-config";
 import {
+  entriesToRecord,
   recordToEntries,
   secretKeysToEntries,
 } from "@/components/key-value-field";
-import type { NotebookCell } from "@/components/notebook/notebook-editor";
+import type { NotebookPackage } from "@/lib/notebook-packages";
+import type { NotebookLocalFolder } from "@/lib/notebook-local-folders";
+import type {
+  NotebookCell,
+  NotebookEditorHandle,
+} from "@/components/notebook/notebook-editor";
+import type { CustomSectionId } from "@/components/notebook/custom-source-config";
+import type { UploadedFileMetadata } from "@/components/uploaded-files";
+import { applyNotebookOperations } from "@/lib/notebook-cells";
+import {
+  applyDraftPatches,
+  isDraftPatchPath,
+} from "@/lib/custom-draft-patches";
+import type { AssistantNotebookOperation } from "@workspace/api-client";
 
 export type { SourceType } from "@/lib/schema-loader";
 
@@ -42,10 +56,49 @@ interface SourceFormProps {
   onResumeSchedule?: () => Promise<void>;
   showActions?: boolean;
   afterNameContent?: React.ReactNode;
+  /** CUSTOM: files already stored on the source, and the live uploader's callback. */
+  files?: UploadedFileMetadata[];
+  onFilesChange?: (files: UploadedFileMetadata[]) => void;
+  /** CUSTOM: told when the notebook starts or stops executing. */
+  onNotebookBusyChange?: (busy: boolean) => void;
+  /** CUSTOM: a cell's play button. Validates and saves before it runs. */
+  onRunCell?: (cellId: string) => void;
+  /** CUSTOM: anchors for the page's stepper. */
+  customSectionRef?: (id: CustomSectionId, element: HTMLElement | null) => void;
+}
+
+/** Everything a CUSTOM source's notebook is configured with, read live. */
+export interface NotebookContext {
+  cells: NotebookCell[];
+  packages: NotebookPackage[];
+  localFolders: NotebookLocalFolder[];
+  variables: Record<string, string>;
+  /** Names only — the browser is never sent secret values. */
+  secretKeys: string[];
 }
 
 export interface SourceFormHandle extends JsonSchemaFormHandle {
   getSchema: () => JSONSchema7 | null;
+  /** The CUSTOM notebook and its config, or null for every other type. */
+  getNotebookContext: () => NotebookContext | null;
+  /**
+   * Runs the notebook. The caller is expected to have validated and saved
+   * first — running an unsaved notebook would execute the stored revision.
+   */
+  runNotebook: (
+    mode: "cell" | "all" | "test_connection" | "preview_extract",
+    targetCellId?: string,
+  ) => Promise<void>;
+  /** The same run, rendered as text the assistant can read and act on. */
+  runNotebookAndSummarize: (
+    mode: "cell" | "all" | "test_connection" | "preview_extract",
+    targetCellId?: string,
+  ) => Promise<string>;
+  cancelNotebook: () => void;
+  /** Applies the assistant's cell edits. Returns what it actually changed. */
+  applyNotebookOperations: (
+    operations: AssistantNotebookOperation[],
+  ) => string[];
 }
 
 export const SourceForm = React.forwardRef<SourceFormHandle, SourceFormProps>(
@@ -70,11 +123,19 @@ export const SourceForm = React.forwardRef<SourceFormHandle, SourceFormProps>(
       onResumeSchedule,
       showActions = true,
       afterNameContent,
+      files,
+      onFilesChange,
+      onNotebookBusyChange,
+      onRunCell,
+      customSectionRef,
     },
     ref,
   ) {
     const { t } = useTranslation();
     const formRef = React.useRef<JsonSchemaFormHandle | null>(null);
+    // Whichever notebook is mounted (draft or saved editor) installs itself
+    // here, so the page above never has to know which one that is.
+    const notebookRef = React.useRef<NotebookEditorHandle | null>(null);
     const schema = getSourceSchema(sourceType);
     const isCustom = sourceType === "CUSTOM";
 
@@ -115,6 +176,11 @@ export const SourceForm = React.forwardRef<SourceFormHandle, SourceFormProps>(
         };
       },
     );
+
+    // Read by the imperative handle, which must see the draft as it is now
+    // rather than as it was when the handle was last rebuilt.
+    const draftRef = React.useRef(customDraft);
+    draftRef.current = customDraft;
 
     // A new notebook opens on the scaffold rather than on an empty page: the
     // starter cells already satisfy the contract, so the first edit is a change
@@ -248,6 +314,46 @@ export const SourceForm = React.forwardRef<SourceFormHandle, SourceFormProps>(
       ref,
       () => ({
         getSchema: () => enhancedSchema,
+        runNotebook: async (mode, targetCellId) => {
+          await notebookRef.current?.run(mode, targetCellId);
+        },
+        runNotebookAndSummarize: async (mode, targetCellId) =>
+          (await notebookRef.current?.runAndSummarize(mode, targetCellId)) ??
+          "There is no notebook on this source to run.",
+        cancelNotebook: () => notebookRef.current?.cancel(),
+        getNotebookContext: () => {
+          const cells = isCustom ? notebookRef.current?.getCells() : null;
+          if (!cells) {
+            return null;
+          }
+          const draft = draftRef.current;
+          return {
+            cells,
+            packages: draft.packages,
+            localFolders: draft.localFolders,
+            variables: entriesToRecord(draft.variables),
+            // Names only. The browser never receives secret values, so there is
+            // nothing here to leak even if the model asked -- and it does not
+            // need them to write ctx.secret("api_token").
+            secretKeys: draft.secrets
+              .map((entry) => entry.key)
+              .filter(Boolean),
+          };
+        },
+        applyNotebookOperations: (operations) => {
+          const handle = notebookRef.current;
+          if (!isCustom || !handle) {
+            return [];
+          }
+          const { cells, touched } = applyNotebookOperations(
+            handle.getCells(),
+            operations,
+          );
+          if (touched.length > 0) {
+            handle.setCells(cells);
+          }
+          return touched;
+        },
         // Must return the same shape handleSubmit builds. Both source pages
         // render with showActions={false} and read this handle directly, so a
         // section rendered outside the schema form -- a CUSTOM notebook, a
@@ -258,7 +364,25 @@ export const SourceForm = React.forwardRef<SourceFormHandle, SourceFormProps>(
           ...sectionPayload(),
         }),
         applyPatches: async (patches) => {
-          await formRef.current?.applyPatches(patches);
+          // A CUSTOM source's packages, variables, secrets and folders are not
+          // in the schema form — this component strips those sections out and
+          // renders them itself — so patching them through the form silently
+          // did nothing. Route them to the draft instead.
+          const draftPatches = isCustom
+            ? patches.filter((patch) => isDraftPatchPath(patch.path))
+            : [];
+          const formPatches = isCustom
+            ? patches.filter((patch) => !isDraftPatchPath(patch.path))
+            : patches;
+
+          if (draftPatches.length > 0) {
+            setCustomDraft(
+              (current) => applyDraftPatches(current, draftPatches).draft,
+            );
+          }
+          if (formPatches.length > 0) {
+            await formRef.current?.applyPatches(formPatches);
+          }
         },
         validate: async () =>
           (await formRef.current?.validate()) ?? {
@@ -267,7 +391,7 @@ export const SourceForm = React.forwardRef<SourceFormHandle, SourceFormProps>(
             errors: ["Source form is not mounted"],
           },
       }),
-      [enhancedSchema, sourceType, sectionPayload],
+      [enhancedSchema, isCustom, sourceType, sectionPayload],
     );
 
     if (!schema || !enhancedSchema) {
@@ -305,15 +429,17 @@ export const SourceForm = React.forwardRef<SourceFormHandle, SourceFormProps>(
         showActions={showActions}
         afterNameContent={
           isCustom ? (
-            // The uploader goes inside the notebook config rather than above
-            // it: uploaded files are one of the two ways a notebook reaches a
-            // file, and the other one is right beside it.
             <CustomSourceConfig
               sourceId={sourceId}
               draft={customDraft}
               onChange={setCustomDraft}
               disabled={disabled}
-              filesSlot={afterNameContent}
+              files={files}
+              onFilesChange={onFilesChange}
+              notebookRef={notebookRef}
+              onBusyChange={onNotebookBusyChange}
+              onRunCell={onRunCell}
+              sectionRef={customSectionRef}
             />
           ) : (
             afterNameContent

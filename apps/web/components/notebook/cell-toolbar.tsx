@@ -13,8 +13,6 @@ const PythonIcon = simpleIconComponent(siPython);
 const MarkdownIcon = simpleIconComponent(siMarkdown);
 
 export interface CellToolbarProps {
-  /** Rendered at the bottom of the strip, below a separator. */
-  footer?: React.ReactNode;
   cellId: string;
   disabled?: boolean;
   deletable?: boolean;
@@ -48,7 +46,6 @@ export function CellToolbar({
   onMoveDown,
   onAddCodeBelow,
   onAddMarkdownBelow,
-  footer,
 }: CellToolbarProps) {
   const { t } = useTranslation();
 
@@ -145,12 +142,6 @@ export function CellToolbar({
         </>
       )}
 
-      {footer && (
-        <>
-          <div className="mx-1 my-0.5 border-t" />
-          {footer}
-        </>
-      )}
     </div>
   );
 }

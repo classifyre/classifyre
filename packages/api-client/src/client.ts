@@ -681,7 +681,12 @@ export type AssistantPendingConfirmation = {
   input: Record<string, unknown>;
   title: string;
   detail: string;
+  /** "client" means the browser executes it on confirm (a notebook run). */
+  runtime?: "mcp" | "client";
 };
+
+/** The one operation the assistant proposes that the browser executes. */
+export const RUN_NOTEBOOK_TOOL = "run_notebook";
 
 export type AssistantFieldPatch = {
   path: string;
@@ -724,11 +729,35 @@ export type AssistantUiAction =
       values: Record<string, unknown>;
     }
   | {
+      type: "notebook_edit";
+      operations: AssistantNotebookOperation[];
+      summary?: string;
+    }
+  | {
+      type: "set_detectors";
+      detectors: Array<{
+        type: string;
+        enabled?: boolean;
+        config?: Record<string, unknown>;
+      }>;
+    }
+  | {
       type: "attach_result";
       kind: "source_test" | "detector_train" | "operation";
       title: string;
       payload: Record<string, unknown>;
     };
+
+/** One edit the assistant makes to a CUSTOM source's notebook. */
+export type AssistantNotebookOperation =
+  | { op: "set_cell"; cellId: string; source: string }
+  | {
+      op: "insert_cell";
+      cellType?: "code" | "markdown";
+      source?: string;
+      afterCellId?: string | null;
+    }
+  | { op: "delete_cell"; cellId: string };
 
 export type AssistantToolCallSummary = {
   name: string;

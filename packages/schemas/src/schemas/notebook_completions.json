@@ -60,14 +60,14 @@
           "label": "folder",
           "kind": "method",
           "detail": "(name: 'str') -> 'Path'",
-          "documentation": "One configured local folder by name.",
+          "documentation": "One configured folder by name.",
           "insertText": "folder(${1:name})"
         },
         {
           "label": "folders",
           "kind": "property",
           "detail": "dict[str, Path]",
-          "documentation": "Local folders this source was configured with, by name.\n\nDesktop only -- a Kubernetes deployment has no filesystem to point at, so\nthe API refuses to save them there and this is empty.",
+          "documentation": "Folders this source was configured with, by name.\n\nThe paths are resolved on whatever machine runs the scan: this computer\non desktop, an ephemeral CLI job pod in Kubernetes. In a cluster the\nfolder has to be mounted into those pods first (the chart's\n``api.localFolders``); an unmounted path simply will not exist.",
           "insertText": "folders"
         },
         {

@@ -147,3 +147,108 @@ export function useNotebookExecution(sourceId: string) {
 }
 
 export { isTerminal };
+
+/**
+ * Watch one execution to completion, outside React.
+ *
+ * The hook above owns the editor's live view of a run. This is for callers that
+ * simply need the answer — the assistant, which runs the notebook and then has
+ * to read what happened before it can react to it.
+ */
+export async function awaitExecution(
+  executionId: string,
+  { timeoutMs = 10 * 60 * 1000 }: { timeoutMs?: number } = {},
+): Promise<ExecutionRecord | null> {
+  const deadline = Date.now() + timeoutMs;
+  let record: ExecutionRecord | null = null;
+  while (Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
+    try {
+      record = (await api.notebooks.notebookControllerGetExecution({
+        executionId,
+      })) as unknown as ExecutionRecord;
+      if (isTerminal(record.status)) return record;
+    } catch {
+      // Transient. Keep watching until the deadline rather than reporting a
+      // result that never arrived.
+      await new Promise((resolve) => setTimeout(resolve, BACKOFF_MS));
+    }
+  }
+  return record;
+}
+
+/** Truncate a long value without hiding that it was truncated. */
+function clip(value: string, max: number): string {
+  return value.length > max ? `${value.slice(0, max)}\n…(truncated)…` : value;
+}
+
+/**
+ * What a run did, as text an assistant can act on.
+ *
+ * The traceback matters more than anything else here: it names the cell, the
+ * line and the exception, which is exactly what a fix needs and exactly what a
+ * "the run failed" summary throws away.
+ */
+export function summarizeExecution(
+  record: ExecutionRecord | null,
+): string {
+  if (!record) {
+    return "The run did not report a result before the client stopped waiting.";
+  }
+
+  const lines: string[] = [
+    `Execution ${record.status} (mode: ${record.mode}${
+      record.targetCellId ? `, cell: ${record.targetCellId}` : ""
+    })`,
+  ];
+
+  const contract = record.outputs?.contract;
+  if (contract && !contract.ok) {
+    lines.push(
+      `Contract violations: ${clip(JSON.stringify(contract.violations), 600)}`,
+    );
+  }
+
+  if (record.error) {
+    lines.push(
+      `Failed in cell "${record.error.cellId ?? record.failedCellId ?? "?"}"`,
+      `${record.error.type ?? "Error"}: ${record.error.message ?? ""}`,
+    );
+    if (record.error.traceback?.length) {
+      lines.push("Traceback:", clip(record.error.traceback.join("\n"), 2500));
+    }
+  }
+
+  const stdout = (record.outputs?.cells ?? [])
+    .flatMap((cell) =>
+      (cell.outputs ?? []).map((output) => {
+        const entry = (output ?? {}) as Record<string, unknown>;
+        if (typeof entry.text === "string") return entry.text;
+        const data = entry.data as Record<string, unknown> | undefined;
+        if (data && typeof data["text/plain"] === "string") {
+          return data["text/plain"];
+        }
+        return "";
+      }),
+    )
+    .filter(Boolean)
+    .join("\n");
+  if (stdout) {
+    lines.push("Cell output:", clip(stdout, 2500));
+  }
+
+  const verdict = record.outputs?.result;
+  if (verdict) {
+    lines.push(`test_connection: ${verdict.status} — ${verdict.message}`);
+  }
+
+  const assets = record.outputs?.assets;
+  if (Array.isArray(assets)) {
+    lines.push(
+      `extract() produced ${assets.length} asset(s).`,
+      assets.length > 0 ? clip(JSON.stringify(assets.slice(0, 3)), 1200) : "",
+    );
+  }
+
+  return lines.filter(Boolean).join("\n");
+}
