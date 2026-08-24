@@ -19,7 +19,8 @@
  * name that its own URL cannot address.
  *
  * Keep this in sync with:
- *  - `SwaggerModule.setup('api', …)` in `main.ts` (the `api` prefix),
+ *  - `SwaggerModule.setup('docs', …)` in `main.ts` (`docs`, `docs-json`,
+ *    `docs-yaml`),
  *  - the health route (`/ping`, `/health`),
  *  - the registry controller (`@Controller('namespaces')`),
  *  - every top-level route of the web app (`apps/web/app/*`) and the matching
@@ -29,16 +30,21 @@
  */
 export const RESERVED_PREFIXES = new Set<string>([
   '', // bare `/`
-  'api', // Swagger UI + `/api/health/pressure` + `/api/mcp`
-  'api-json', // Swagger's generated OpenAPI JSON document
-  'api-yaml', // Swagger's generated OpenAPI YAML document
+  'api', // `/api/health/pressure` + `/api/mcp`
   'ping', // health probe
   'health', // health endpoints
   'namespaces', // namespace registry CRUD
   'socket.io', // Socket.IO transport handshake path
   'favicon.ico',
-  // Web app top-level routes (apps/web/app/*).
-  'docs', // bundled documentation site
+  // Swagger UI and its generated OpenAPI documents. Mounted at `/docs` rather
+  // than `/api` because the ingress strips the `/api` prefix before the request
+  // reaches this process — see `SwaggerModule.setup` in `main.ts`. On the API
+  // this is `/docs`; from a browser it is `<host>/api/docs`.
+  'docs-json',
+  'docs-yaml',
+  // Web app top-level routes (apps/web/app/*). `docs` is shared: the web serves
+  // the bundled documentation site there, the API serves Swagger UI.
+  'docs',
   'remote', // desktop's embedded remote-workspace browser
   'classifyre-usr', // analytics proxy route
   '_next', // Next.js build assets
