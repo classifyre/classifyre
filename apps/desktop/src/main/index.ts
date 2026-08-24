@@ -242,9 +242,47 @@ function configureWebContents(win: BrowserWindow): void {
     return url.protocol === 'app:' && url.host === 'classifyre';
   };
 
+  // The bundled documentation site (apps/docs, exported into the web bundle at
+  // resources/web/docs) is the one in-app destination allowed to open a second
+  // window. The header's docs button is a plain `target="_blank"` link, so in
+  // the packaged app it arrives here as `app://classifyre/docs/…` and in
+  // `bun dev` as `http://localhost:3000/docs/…`; both open the same way.
+  const isBundledDocsUrl = (target: string): boolean => {
+    try {
+      if (!isAppUrl(target)) return false;
+      const { pathname } = new URL(target);
+      return pathname === '/docs' || pathname.startsWith('/docs/');
+    } catch {
+      return false;
+    }
+  };
+
   contents.setWindowOpenHandler(({ url }) => {
+    if (isBundledDocsUrl(url)) {
+      return {
+        action: 'allow',
+        overrideBrowserWindowOptions: {
+          width: 1200,
+          height: 900,
+          title: 'Classifyre Documentation',
+          // Static content we ship, but it has no business reaching the
+          // renderer bridge: a docs window gets no preload and no Node.
+          webPreferences: {
+            preload: undefined,
+            nodeIntegration: false,
+            contextIsolation: true,
+          },
+        },
+      };
+    }
     if (/^https?:/.test(url)) void shell.openExternal(url);
     return { action: 'deny' };
+  });
+  // The docs window is a real BrowserWindow, so give it the same navigation
+  // rules as its opener — otherwise an outbound link inside the docs would
+  // navigate the docs window itself instead of going to the system browser.
+  contents.on('did-create-window', (childWindow) => {
+    configureWebContents(childWindow);
   });
   contents.on('will-navigate', (event, target) => {
     if (isAppUrl(target)) return;
