@@ -246,6 +246,8 @@ export function GraphCanvas({
       let dash: number[] | undefined;
       let width: number;
       let drawArrow = false;
+      let label = e.relationType;
+      let curvature = 0;
 
       if (isOnPath) {
         stroke = ACCENT;
@@ -289,6 +291,8 @@ export function GraphCanvas({
           dash = o.dash ?? dash;
           width = o.width ?? width;
           drawArrow = o.arrow ?? drawArrow;
+          label = o.label ?? label;
+          curvature = o.curvature ?? curvature;
         }
       }
 
@@ -297,9 +301,19 @@ export function GraphCanvas({
       ctx.lineWidth = width;
       ctx.setLineDash(dash ?? []);
 
+      // Control point for a bowed edge. Offset perpendicular to the line so
+      // parallel edges between the same pair fan out instead of overlapping.
+      const bow = curvature * len;
+      const cx = (sx + tx) / 2 - uy * bow;
+      const cy = (sy + ty) / 2 + ux * bow;
+
       ctx.beginPath();
       ctx.moveTo(sx, sy);
-      ctx.lineTo(tx, ty);
+      if (bow === 0) {
+        ctx.lineTo(tx, ty);
+      } else {
+        ctx.quadraticCurveTo(cx, cy, tx, ty);
+      }
       ctx.stroke();
 
       // Arrowhead
@@ -320,8 +334,9 @@ export function GraphCanvas({
 
       // Edge label — only when the edge is long enough on screen to read.
       if (showLabels && len * t.k > 70) {
-        const midX = (sx + tx) / 2;
-        const midY = (sy + ty) / 2;
+        // On the curve, not the chord, so a bowed edge's label follows it.
+        const midX = bow === 0 ? (sx + tx) / 2 : (sx + 2 * cx + tx) / 4;
+        const midY = bow === 0 ? (sy + ty) / 2 : (sy + 2 * cy + ty) / 4;
         let angle = (Math.atan2(dy, dx) * 180) / Math.PI;
         if (angle > 90 || angle < -90) angle += 180;
 
@@ -334,9 +349,9 @@ export function GraphCanvas({
         ctx.strokeStyle = colors.background;
         ctx.lineWidth = 3;
         ctx.lineJoin = "round";
-        ctx.strokeText(e.relationType, 0, -5);
+        ctx.strokeText(label, 0, -5);
         ctx.fillStyle = isOnPath ? colors.foreground : colors.mutedForeground;
-        ctx.fillText(e.relationType, 0, -5);
+        ctx.fillText(label, 0, -5);
         ctx.restore();
       }
 

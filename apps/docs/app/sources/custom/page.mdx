@@ -1,0 +1,75 @@
+---
+title: Custom Connector
+description: Write a connector yourself in a Python notebook — for the system nothing else covers. What it can do, how it is isolated, and every setting.
+---
+
+import { SourceFacts, SourceParameters, SourceMetadata } from "@/components/source-reference";
+import { LineageNote, SharedSettingsNote, FileHandlingNote } from "@/components/source-notes";
+
+# Custom Connector
+
+<SourceFacts type="CUSTOM" />
+
+Every organisation has the one system nothing supports — an internal API, a
+mainframe export, a vendor portal, a homegrown store. A **custom connector** is
+a small Python notebook you write in the app that turns that system into a
+normal source: it produces assets, and everything downstream treats them like
+any other.
+
+> **Start here:** [Custom Connectors](/sources/custom-connectors/) walks through
+> writing one, and the [notebook reference](/sources/custom-connectors/reference/)
+> documents every function and field.
+
+## What you need to connect
+
+Nothing but the notebook. Whatever your connector needs — a base URL, an account
+id — goes in **variables**; whatever must stay secret goes in **secrets**,
+encrypted exactly like any other source credential and redacted from logs and
+cell output.
+
+The notebook defines a handful of plain functions: one to test the connection,
+one to yield assets, and optionally one to declare relationships.
+
+## What Classifyre reads
+
+Whatever you yield. Assets can be records, documents, pages, files or tables,
+with free-form metadata. Return file bytes and you get the whole file pipeline
+for free — format detection, text extraction, OCR, archive expansion.
+
+<FileHandlingNote what="Files your connector yields" />
+
+## Metadata on every asset
+
+<SourceMetadata type="CUSTOM" />
+
+## Lineage
+
+<LineageNote>
+
+Custom connectors can declare **every** relationship class — lineage, containment,
+identity, reference and usage — including column-level field mappings, and
+including edges that point at objects in systems this connector doesn't scan.
+That last part is how a connector for your in-house pipeline can wire its
+outputs to the warehouse tables another source ingests.
+
+See the [lineage section of the notebook reference](/sources/custom-connectors/reference/#lineage)
+and [Lineage & Relationships](/sources/lineage/).
+
+</LineageNote>
+
+## Worth knowing
+
+- **Your code runs isolated.** The notebook executes in a separate process with
+  a scrubbed environment, so it never sees the platform's own credentials.
+- **Packages are declared, not installed by hand.** List the Python
+  distributions your connector needs and they're installed before it runs.
+- **Executions are bounded** by a timeout, an asset cap, and an output-size
+  limit, so a runaway loop can't consume a cluster.
+- **Local folders** can be exposed to the notebook by name on desktop
+  deployments.
+
+## Configuration
+
+<SharedSettingsNote />
+
+<SourceParameters type="CUSTOM" />

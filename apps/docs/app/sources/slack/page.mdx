@@ -1,0 +1,73 @@
+---
+title: Slack
+description: Scan Slack channel messages, threads and shared files — bot-token setup and scopes, which conversations are visible, time ranges, and every setting.
+---
+
+import { SourceFacts, SourceParameters, SourceMetadata } from "@/components/source-reference";
+import { LineageNote, SharedSettingsNote, FileHandlingNote } from "@/components/source-notes";
+
+# Slack
+
+<SourceFacts
+  type="SLACK"
+  vendor={{ label: "Slack", href: "https://slack.com/" }}
+  auth={{ label: "Creating a Slack app and installing a bot token", href: "https://api.slack.com/authentication/basics" }}
+  links={[{ label: "OAuth scopes reference", href: "https://api.slack.com/scopes" }]}
+/>
+
+Slack is where the data that shouldn't be in Slack ends up: a password pasted
+into a channel, a customer list dropped as a CSV, a screenshot of a dashboard
+full of account numbers. Every one of those is scannable.
+
+## What you need to connect
+
+Your **workspace name** and a **bot token** (`xoxb-…`). Create a Slack app,
+install it into the workspace, and copy the bot token.
+
+The token needs read scopes for the conversations you want:
+`channels:read`, `channels:history` for public channels; `groups:read`,
+`groups:history` for private ones; `mpim:*` and `im:*` for group and direct
+messages; and `files:read` if you want shared files scanned.
+
+> **Bot tokens only, on purpose.** A bot token is the credential a workspace
+> admin can scope, audit and revoke. The bot sees only conversations it has been
+> invited to — that boundary is the point, not a limitation.
+
+## What Classifyre reads
+
+Each **message** becomes an asset, and each **file** shared in a message becomes
+an asset of its own linked back to the message.
+
+You control:
+
+- **Which conversations** — by type (public, private, group DM, DM), by explicit
+  channel IDs, and whether archived channels are included.
+- **Thread replies** — fetched alongside their parent message when enabled.
+- **A time window** — scan only messages between two timestamps.
+- **Which files** — extension allow/denylists and a size cap.
+
+Public channels the bot isn't in can be **joined automatically** before reading;
+without that, Slack simply reports no access.
+
+<FileHandlingNote what="Files shared in Slack" />
+
+## Metadata on every asset
+
+<SourceMetadata type="SLACK" />
+
+## Lineage
+
+<LineageNote />
+
+## Worth knowing
+
+- **Rate limits are handled for you** — throttled responses are retried, and you
+  can add a fixed pause between calls for very large workspaces.
+- **A finding points at the message**, with its channel, author and timestamp,
+  so triage starts with a permalink into Slack.
+
+## Configuration
+
+<SharedSettingsNote />
+
+<SourceParameters type="SLACK" />

@@ -25,12 +25,14 @@ import sys
 import tempfile
 import time
 from collections.abc import AsyncGenerator
+from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 import requests
 
+from ...graph.edges import Ref, edge_from_payload
 from ...models.generated_input import CustomInput, SamplingStrategy
 from ...models.generated_single_asset_scan_results import (
     AssetType as OutputAssetType,
@@ -45,6 +47,7 @@ from ...notebook.groups import warm_declared_groups
 from ...notebook.packages import install as install_packages
 from ...utils.hashing import hash_id, unhash_id
 from ...utils.source_files import api_base_url, download_source_files
+from ...utils.urn import normalize_urn_or_none
 from ..base import BaseSource
 from .env import scrubbed_environment
 
@@ -514,12 +517,18 @@ class CustomSource(BaseSource):
             "content_sha256": hashlib.sha256(content.encode("utf-8")).hexdigest(),
         }
 
+        # Normalized here rather than trusted as typed: a notebook can write
+        # any string, and a URN spelled differently from the one the owning
+        # connector writes never stitches — which looks like nothing happening.
+        urn = normalize_urn_or_none(data.get("urn"))
+
         return SingleAssetScanResults(
             hash=asset_hash,
             checksum=self.calculate_checksum(checksum_basis),
             name=name,
             external_url=external_url,
             links=links,
+            urn=urn,
             asset_type=_content_type(data.get("content_type"), mime_type),
             source_id=self.source_id,
             created_at=_timestamp(data.get("created_at")),
@@ -571,6 +580,64 @@ class CustomSource(BaseSource):
             logger.warning("Could not cache bytes for %s: %s", asset_hash, exc)
             return
         self._mime_by_hash[asset_hash] = mime_type or "application/octet-stream"
+
+    async def collect_relationships(self) -> list[Any]:
+        """Typed relationships the notebook declared.
+
+        A notebook names assets by *its own* ids, because those are the ids it
+        yielded and the only ones it knows. Turning them into hashes is this
+        adapter's job — the same translation ``Asset.links`` already gets — so an
+        author never has to learn that hashes exist.
+
+        A ``Ref.urn(...)`` endpoint is passed through untouched: it names an
+        object in another system on purpose, and hashing it would destroy the
+        one thing that can ever resolve it.
+        """
+        if not self._notebook_defines("relationships"):
+            return []
+        try:
+            payloads = self._call("relationships") or []
+        except Exception as exc:
+            logger.warning("Notebook relationships() failed (non-fatal): %s", exc)
+            return []
+
+        edges: list[Any] = []
+        for payload in payloads:
+            if not isinstance(payload, dict):
+                continue
+            try:
+                edge = edge_from_payload(payload)
+            except Exception as exc:
+                logger.warning("Ignoring malformed relationship from notebook: %s", exc)
+                continue
+            edges.append(
+                replace(
+                    edge,
+                    frm=self._resolve_ref(edge.frm),
+                    to=self._resolve_ref(edge.to),
+                    via=None if edge.via is None else self._resolve_ref(edge.via),
+                ).to_ingest()
+            )
+        return edges
+
+    def _resolve_ref(self, ref: Ref) -> Ref:
+        """Notebook id -> asset hash. URNs and findings pass through."""
+        if ref.kind != "asset":
+            return ref
+        return Ref("asset", self.generate_hash_id(ref.value))
+
+    def _notebook_defines(self, function: str) -> bool:
+        """Whether the notebook implements an optional contract function.
+
+        Checked before calling so an ordinary notebook — one that never declares
+        relationships — costs nothing rather than a subprocess round trip that
+        returns an empty list.
+        """
+        try:
+            return function in validate_notebook(self._cells).defined_functions
+        except Exception:
+            # A notebook that will not parse has already failed louder elsewhere.
+            return False
 
     async def fetch_content_bytes(self, asset_id: str) -> tuple[bytes, str] | None:
         """Raw bytes for the binary and image detectors.

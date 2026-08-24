@@ -1,0 +1,46 @@
+---
+title: Meilisearch
+description: Discover Meilisearch indexes and sample documents — API key auth, index scoping, what gets extracted, and every setting.
+---
+
+import { SourceFacts, SourceParameters, SourceMetadata } from "@/components/source-reference";
+import { SearchIndexNotes, LineageNote, SharedSettingsNote } from "@/components/source-notes";
+
+# Meilisearch
+
+<SourceFacts
+  type="MEILISEARCH"
+  vendor={{ label: "Meilisearch", href: "https://www.meilisearch.com/" }}
+  auth={{ label: "Meilisearch API keys", href: "https://www.meilisearch.com/docs/learn/security/basic_security" }}
+/>
+
+Meilisearch powers the search box in front of an application — which means the
+documents it holds are a copy of whatever that application shows users, indexed
+for speed and rarely reviewed for content.
+
+## What you need to connect
+
+The **instance URL**, and an **API key** if the instance has one. Meilisearch has
+no username-and-password authentication — it's a key or nothing. A search-scoped
+key is enough.
+
+## What Classifyre reads
+
+<SearchIndexNotes indexWord="index" />
+
+Scope by index uid allow- and denylist, with a cap on how many indexes a run
+produces.
+
+## Metadata on every asset
+
+<SourceMetadata type="MEILISEARCH" />
+
+## Lineage
+
+<LineageNote />
+
+## Configuration
+
+<SharedSettingsNote />
+
+<SourceParameters type="MEILISEARCH" />

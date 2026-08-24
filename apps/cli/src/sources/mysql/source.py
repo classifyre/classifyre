@@ -11,9 +11,10 @@ from ...models.generated_input import (
     MySQLSSLMode,
     SamplingConfig,
 )
+from ...utils.sql_lineage import upstream_tables_from_sql
 from ..dependencies import require_module
 from ..tabular_base import BaseTabularSource
-from ..tabular_utils import TableRef
+from ..tabular_utils import TableRef, ViewLineage
 
 logger = logging.getLogger(__name__)
 
@@ -264,6 +265,57 @@ class MySQLSource(BaseTabularSource):
             return result
 
     # ── Foreign key links ────────────────────────────────────────────────
+
+    # ── Cross-system identity ────────────────────────────────────────────
+
+    def _urn_authority(self) -> str:
+        return f"{self.config.required.host}:{self.config.required.port}"
+
+    # ── View lineage (INFORMATION_SCHEMA.VIEWS) ──────────────────────────
+
+    def _collect_view_lineage(self, tables: list[TableRef]) -> list[ViewLineage]:
+        """What each view selects from.
+
+        MySQL exposes the view's text but, before 8.0's VIEW_TABLE_USAGE, not
+        what it depends on — so the upstreams are recovered from the SQL and the
+        resulting edges are marked SQL_PARSED rather than catalog-derived.
+        """
+        by_database: dict[str, set[tuple[str, ...]]] = {}
+        for t in tables:
+            by_database.setdefault(t.database, set()).add(t.table_key)
+
+        results: list[ViewLineage] = []
+        for database, scoped_keys in by_database.items():
+            try:
+                conn = self._get_cached_connection(database)
+                with conn.cursor() as cursor:
+                    cursor.execute(
+                        """
+                        SELECT TABLE_NAME, VIEW_DEFINITION
+                        FROM information_schema.VIEWS
+                        WHERE TABLE_SCHEMA = %s
+                        """,
+                        (database,),
+                    )
+                    rows = cursor.fetchall()
+            except Exception as exc:
+                logger.warning("Could not resolve view lineage for %s: %s", database, exc)
+                continue
+
+            for view_name, definition in rows:
+                view_key = (database, view_name)
+                if view_key not in scoped_keys or not definition:
+                    continue
+                upstreams = [
+                    key
+                    for key in upstream_tables_from_sql(
+                        definition, dialect="mysql", default_database=database
+                    )
+                    if key != view_key
+                ]
+                if upstreams:
+                    results.append(ViewLineage(view_key, tuple(upstreams), definition))
+        return results
 
     def _collect_foreign_key_links(
         self,

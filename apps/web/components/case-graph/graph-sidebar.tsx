@@ -11,7 +11,13 @@ import {
   MultiSelectTrigger,
   MultiSelectValue,
 } from "@workspace/ui/components/multi-select";
-import { ACCENT, CROSS_HYP_COLOR, MANUAL_EDGE_COLOR } from "../graph-explorer/graph-types";
+import {
+  ACCENT,
+  CROSS_HYP_COLOR,
+  EDGE_CLASS_STYLE,
+  FLOW_SUBTYPE_LABEL,
+  MANUAL_EDGE_COLOR,
+} from "../graph-explorer/graph-types";
 import { useTranslation } from "@/hooks/use-translation";
 
 export function SectionTitle({ children }: { children: React.ReactNode }) {
@@ -196,10 +202,32 @@ export function HighlightFilters({
 }
 
 export interface EdgeTypeFiltersProps {
-  edgeTypes: Array<{ type: string; count: number }>;
+  edgeTypes: EdgeTypeCount[];
   activeEdgeTypes: Set<string>;
   onToggle: (type: string) => void;
   onClear: () => void;
+}
+
+/** One relation type in use, with how many edges carry it and what it means. */
+export interface EdgeTypeCount {
+  type: string;
+  count: number;
+  /** FLOW | CONTAINMENT | IDENTITY | REFERENCE | USAGE. */
+  relationClass?: string;
+}
+
+/** Relation types bucketed by class, in the order the classes are declared. */
+function groupByClass(
+  edgeTypes: EdgeTypeCount[],
+): [string, EdgeTypeCount[]][] {
+  const buckets = new Map<string, EdgeTypeCount[]>();
+  for (const entry of edgeTypes) {
+    const cls = entry.relationClass ?? "REFERENCE";
+    (buckets.get(cls) ?? buckets.set(cls, []).get(cls)!).push(entry);
+  }
+  return Object.keys(EDGE_CLASS_STYLE)
+    .filter((cls) => buckets.has(cls))
+    .map((cls) => [cls, buckets.get(cls)!] as [string, EdgeTypeCount[]]);
 }
 
 export function EdgeTypeFilters({ edgeTypes, activeEdgeTypes, onToggle, onClear }: EdgeTypeFiltersProps) {
@@ -215,24 +243,42 @@ export function EdgeTypeFilters({ edgeTypes, activeEdgeTypes, onToggle, onClear 
           </button>
         )}
       </div>
-      <div className="flex flex-wrap gap-1">
-        {edgeTypes.map(({ type, count }) => {
-          const active = activeEdgeTypes.size === 0 || activeEdgeTypes.has(type);
-          return (
-            <button
-              key={type}
-              onClick={() => onToggle(type)}
-              className={`border-2 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wide transition-colors ${
-                active
-                  ? "border-foreground bg-foreground text-background"
-                  : "border-border text-muted-foreground hover:border-foreground/50"
-              }`}
-            >
-              {type} <span className="opacity-60">{count}</span>
-            </button>
-          );
-        })}
-      </div>
+      {/*
+        Grouped by class rather than listed as raw strings. An investigator is
+        choosing between questions -- what flows, what contains what, who
+        touched it -- not between vocabulary items, and a flat list of uppercase
+        tokens makes them work that mapping out for themselves every time.
+      */}
+      {groupByClass(edgeTypes).map(([relationClass, types]) => (
+        <div key={relationClass} className="space-y-1">
+          <p
+            className="font-mono text-[9px] uppercase tracking-wide"
+            style={{ color: EDGE_CLASS_STYLE[relationClass]?.color }}
+          >
+            {EDGE_CLASS_STYLE[relationClass]?.label ?? relationClass}
+          </p>
+          <div className="flex flex-wrap gap-1">
+            {types.map(({ type, count }) => {
+              const active =
+                activeEdgeTypes.size === 0 || activeEdgeTypes.has(type);
+              return (
+                <button
+                  key={type}
+                  onClick={() => onToggle(type)}
+                  className={`border-2 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wide transition-colors ${
+                    active
+                      ? "border-foreground bg-foreground text-background"
+                      : "border-border text-muted-foreground hover:border-foreground/50"
+                  }`}
+                >
+                  {FLOW_SUBTYPE_LABEL[type] ?? type}{" "}
+                  <span className="opacity-60">{count}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

@@ -1,0 +1,82 @@
+---
+title: Snowflake
+description: Scan Snowflake tables and views — the four authentication methods, what Classifyre extracts, table and view lineage, and every connection setting.
+---
+
+import { SourceFacts, SourceParameters, SourceMetadata } from "@/components/source-reference";
+import { SqlSourceNotes, LineageNote, SharedSettingsNote } from "@/components/source-notes";
+
+# Snowflake
+
+<SourceFacts
+  type="SNOWFLAKE"
+  vendor={{ label: "Snowflake", href: "https://www.snowflake.com/" }}
+  auth={{ label: "Key-pair authentication", href: "https://docs.snowflake.com/en/user-guide/key-pair-auth" }}
+  links={[
+    { label: "Access control overview (roles and grants)", href: "https://docs.snowflake.com/en/user-guide/security-access-control-overview" },
+    { label: "Account identifiers", href: "https://docs.snowflake.com/en/user-guide/admin-account-identifier" },
+  ]}
+/>
+
+Snowflake is where a lot of organisations concentrate everything — the customer
+records, the event stream, the third-party data, the exports nobody remembers
+requesting. Scanning it usually produces the largest single picture of where
+sensitive data actually lives.
+
+## What you need to connect
+
+An **account identifier** (for example `xy12345.us-east-2.aws`) and one of four
+authentication methods:
+
+| Method | What you supply | Use it when |
+|---|---|---|
+| **Password** | Username and password | Simplest; fine for a dedicated service user |
+| **Key pair** | Username and a private key PEM | Recommended — no password to rotate, and what Snowflake pushes for service accounts |
+| **OAuth token** | An OAuth access token | Your identity provider issues short-lived tokens |
+| **External browser** | Username only, browser-based SSO | Interactive use against an SSO-protected account |
+
+Point the source at a **warehouse** and a **role**. Give that role `USAGE` on
+the warehouse and databases plus `SELECT` on the objects you want scanned —
+nothing more. Scanning consumes warehouse credits, and the sampling strategy is
+what keeps that bill small.
+
+## What Classifyre reads
+
+Tables and views, in one database or every database the role can see, scoped by
+schema allow- and denylists or by an explicit object list.
+
+<SqlSourceNotes />
+
+## Metadata on every asset
+
+<SourceMetadata type="SNOWFLAKE" />
+
+## Lineage
+
+<LineageNote>
+
+Snowflake's dependency metadata is read where the role has access to it, giving
+both **view lineage** (a view and the objects it reads) and **table lineage**.
+You can set a start time to bound how far back the lineage history is read.
+
+Snowflake folds unquoted identifiers to upper case; Classifyre names objects the
+same way, which is what lets a Tableau workbook pointing at
+`PROD.PUBLIC.ORDERS` line up with the table a Snowflake scan produced. See
+[Lineage & Relationships](/sources/lineage/).
+
+</LineageNote>
+
+## Worth knowing
+
+- **Lineage needs privileges.** Dependency and access history live in
+  `SNOWFLAKE.ACCOUNT_USAGE`; a role without access to those views produces
+  assets but no lineage, and the scan continues rather than failing.
+- **Warehouse cost is under your control.** Sampling caps how many rows each
+  scan reads; a small warehouse with auto-suspend is the usual setup.
+- **China regions** need the alternate domain suffix, which is a setting.
+
+## Configuration
+
+<SharedSettingsNote />
+
+<SourceParameters type="SNOWFLAKE" />

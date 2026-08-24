@@ -33,10 +33,19 @@ from src.notebook.contract import (  # noqa: E402
 from src.notebook.sdk import (  # noqa: E402
     Asset,
     Context,
+    FieldMapping,
+    FlowType,
     NotebookFile,
     ParsedContent,
+    Ref,
+    contains,
+    flow,
     pages,
     parse,
+    references,
+    same_as,
+    urn_for,
+    uses,
 )
 
 OUTPUT_PATH = (
@@ -94,8 +103,22 @@ def _snippet(name: str, func: Any) -> str:
     ]
     if not required:
         return f"{name}()"
+    # Keyword-only parameters are spelled `name=` in the snippet. `flow` makes
+    # both its ends keyword-only precisely so a reversed lineage edge cannot be
+    # written by accident; a snippet that filled them positionally would hand
+    # the author code that does not run.
+    keyword_only = {
+        parameter_name
+        for parameter_name, parameter in signature.parameters.items()
+        if parameter.kind is inspect.Parameter.KEYWORD_ONLY
+    }
     placeholders = ", ".join(
-        f"${{{index}:{parameter}}}" for index, parameter in enumerate(required, start=1)
+        (
+            f"{parameter}=${{{index}:{parameter}}}"
+            if parameter in keyword_only
+            else f"${{{index}:{parameter}}}"
+        )
+        for index, parameter in enumerate(required, start=1)
     )
     return f"{name}({placeholders})"
 
@@ -166,7 +189,21 @@ def _fields(cls: type) -> list[dict[str, Any]]:
 #: Module-level helpers a notebook can call directly. Offered alongside `ctx`
 #: and `Asset` because `namespace()` pre-binds them, so they are as available as
 #: the import line says they are.
-MODULE_FUNCTIONS = (("parse", parse), ("pages", pages))
+#:
+#: The relationship builders are here rather than left to be typed from memory
+#: for the same reason they exist at all: an author who cannot see that `flow`
+#: and `contains` are different functions will reach for `links` and flatten the
+#: distinction back out.
+MODULE_FUNCTIONS = (
+    ("parse", parse),
+    ("pages", pages),
+    ("flow", flow),
+    ("contains", contains),
+    ("references", references),
+    ("same_as", same_as),
+    ("uses", uses),
+    ("urn_for", urn_for),
+)
 
 
 def _function_entry(name: str, func: Any) -> dict[str, Any]:
@@ -201,6 +238,27 @@ def build() -> dict[str, Any]:
                 "documentation": _summary(Asset),
                 "insertText": "Asset",
             },
+            {
+                "label": "Ref",
+                "kind": "class",
+                "detail": "Ref.asset(id) | Ref.urn(urn)",
+                "documentation": _summary(Ref),
+                "insertText": "Ref",
+            },
+            {
+                "label": "FieldMapping",
+                "kind": "class",
+                "detail": "FieldMapping(downstream, upstreams, transform)",
+                "documentation": _summary(FieldMapping),
+                "insertText": "FieldMapping",
+            },
+            {
+                "label": "FlowType",
+                "kind": "class",
+                "detail": "TRANSFORM | VIEW | COPY | WRITE | EXPORT | SEND",
+                "documentation": _summary(FlowType),
+                "insertText": "FlowType",
+            },
             *(_function_entry(name, func) for name, func in MODULE_FUNCTIONS),
         ],
         "objects": {
@@ -221,6 +279,10 @@ def build() -> dict[str, Any]:
                 "documentation": _summary(NotebookFile),
                 "fields": _fields(NotebookFile),
                 "members": _members(NotebookFile),
+            },
+            "FieldMapping": {
+                "documentation": _summary(FieldMapping),
+                "fields": _fields(FieldMapping),
             },
         },
         "contract": {

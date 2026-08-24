@@ -1,0 +1,75 @@
+---
+title: PostgreSQL
+description: Scan PostgreSQL tables and views — what Classifyre extracts, the metadata it records, the lineage it recovers from views and foreign keys, and every connection setting.
+---
+
+import { SourceFacts, SourceParameters, SourceMetadata } from "@/components/source-reference";
+import { SqlSourceNotes, LineageNote, SharedSettingsNote } from "@/components/source-notes";
+
+# PostgreSQL
+
+<SourceFacts
+  type="POSTGRESQL"
+  vendor={{ label: "PostgreSQL", href: "https://www.postgresql.org/" }}
+  auth={{ label: "Creating a read-only role (CREATE ROLE)", href: "https://www.postgresql.org/docs/current/sql-createrole.html" }}
+  links={[{ label: "SSL / TLS connection modes", href: "https://www.postgresql.org/docs/current/libpq-ssl.html" }]}
+/>
+
+PostgreSQL is the open-source relational database behind a large share of
+application backends — and, in practice, behind a large share of the personal
+data an organisation holds. Connect it and Classifyre inspects the real contents
+of your tables, not just their column names.
+
+## What you need to connect
+
+A host and port, and a database user. **Read access is enough** — give it a
+role with `CONNECT` on the database and `SELECT` on the schemas you want
+scanned, and nothing can be modified even by accident.
+
+Managed PostgreSQL (Amazon RDS and Aurora, Azure Database for PostgreSQL, Google
+Cloud SQL, Supabase, Neon) connects like any other host. Set the SSL mode your
+provider requires — most managed services expect `require` or stricter.
+
+## What Classifyre reads
+
+Tables **and views**, across one database or every database the user can see.
+You can scope the scan tightly: pick a single database, allow or deny specific
+schemas, list exact tables, or cap how many tables a scan will take.
+
+<SqlSourceNotes />
+
+## Metadata on every asset
+
+<SourceMetadata type="POSTGRESQL" />
+
+## Lineage
+
+<LineageNote>
+
+PostgreSQL's catalog knows what every view is built from, so each view and its
+base tables are recorded as real lineage — with column-level detail where the
+view's SQL names its columns. **Foreign keys** are recorded too, as references
+rather than lineage: they suggest where data is related, but no data moves along
+them.
+
+A view that reads from a schema outside the scan's scope still produces an edge.
+It's held against the table's platform name and completes itself if that schema
+is ever scanned — see [Lineage & Relationships](/sources/lineage/).
+
+</LineageNote>
+
+## Worth knowing
+
+- **`include_all_databases` needs a maintenance database.** To enumerate every
+  database, Classifyre first connects to one it can list from — `postgres` by
+  default. Change it if that database doesn't exist in your cluster.
+- **System schemas are skipped** automatically, so `pg_catalog` and
+  `information_schema` never produce assets.
+- **Row-count estimates** come from the planner's statistics rather than a
+  `COUNT(*)`, so a huge table costs nothing to describe.
+
+## Configuration
+
+<SharedSettingsNote />
+
+<SourceParameters type="POSTGRESQL" />

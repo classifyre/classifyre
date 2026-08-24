@@ -45,6 +45,22 @@ class TableRef:
 
 
 @dataclass(frozen=True)
+class ViewLineage:
+    """One derived object and the objects it reads from.
+
+    Emitted by dialects that can answer "what does this view select from?" —
+    ``pg_depend``/``pg_rewrite``, ``sys.sql_expression_dependencies``,
+    ``ALL_DEPENDENCIES``, ``OBJECT_DEPENDENCIES``. ``sql`` is the view's own
+    definition, kept so column-level mappings can be recovered from it where the
+    catalog does not provide them.
+    """
+
+    view: tuple[str, ...]
+    upstreams: tuple[tuple[str, ...], ...]
+    sql: str | None = None
+
+
+@dataclass(frozen=True)
 class TabularCellMatch:
     row_index: int
     column_name: str

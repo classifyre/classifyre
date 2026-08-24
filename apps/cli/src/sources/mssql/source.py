@@ -16,7 +16,7 @@ from ...models.generated_single_asset_scan_results import (
 )
 from ..dependencies import require_module
 from ..tabular_base import BaseTabularSource
-from ..tabular_utils import TableRef
+from ..tabular_utils import TableRef, ViewLineage
 
 logger = logging.getLogger(__name__)
 
@@ -450,6 +450,69 @@ class MSSQLSource(BaseTabularSource):
             ]
 
     # ── Foreign key + view dependency links (merged) ─────────────────────
+
+    # ── Cross-system identity ────────────────────────────────────────────
+
+    def _urn_authority(self) -> str:
+        return f"{self._host}:{self._port}"
+
+    # ── View lineage (sys.sql_expression_dependencies) ───────────────────
+
+    def _collect_view_lineage(self, tables: list[TableRef]) -> list[ViewLineage]:
+        """What each view selects from, straight from the catalog.
+
+        SQL Server tracks this itself, so the table-level answer needs no
+        parsing. The definition still comes back because the catalog records
+        *which columns are referenced*, not which output column each one feeds —
+        that mapping only exists in the SQL.
+        """
+        if not self._extraction_options().include_view_lineage:
+            return []
+
+        by_database: dict[str, set[tuple[str, ...]]] = {}
+        for t in tables:
+            by_database.setdefault(t.database, set()).add(t.table_key)
+
+        results: list[ViewLineage] = []
+        for database, scoped_keys in by_database.items():
+            try:
+                conn = self._get_cached_connection(database)
+                with conn.cursor() as cursor:
+                    cursor.execute(
+                        """
+                        SELECT
+                            SCHEMA_NAME(v.schema_id) AS view_schema,
+                            v.name                   AS view_name,
+                            COALESCE(d.referenced_schema_name, SCHEMA_NAME(v.schema_id))
+                                                     AS source_schema,
+                            d.referenced_entity_name AS source_table,
+                            OBJECT_DEFINITION(v.object_id) AS view_sql
+                        FROM sys.views AS v
+                        JOIN sys.sql_expression_dependencies AS d
+                          ON d.referencing_id = v.object_id
+                        WHERE d.referenced_entity_name IS NOT NULL
+                          AND d.referenced_id <> v.object_id
+                        """
+                    )
+                    rows = cursor.fetchall()
+            except Exception as exc:
+                logger.warning("Could not resolve view lineage for %s: %s", database, exc)
+                continue
+
+            upstreams: dict[tuple[str, ...], set[tuple[str, ...]]] = {}
+            definitions: dict[tuple[str, ...], str | None] = {}
+            for view_schema, view_name, src_schema, src_table, view_sql in rows:
+                view_key = (database, view_schema, view_name)
+                if view_key not in scoped_keys:
+                    continue
+                upstreams.setdefault(view_key, set()).add((database, src_schema, src_table))
+                definitions.setdefault(view_key, view_sql)
+
+            results.extend(
+                ViewLineage(key, tuple(sorted(sources)), definitions.get(key))
+                for key, sources in upstreams.items()
+            )
+        return results
 
     def _collect_foreign_key_links(
         self,

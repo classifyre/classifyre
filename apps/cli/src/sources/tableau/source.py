@@ -7,12 +7,13 @@ from collections.abc import AsyncGenerator
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, ClassVar
 from urllib.parse import urljoin
 
 from requests.adapters import HTTPAdapter
 from urllib3 import Retry
 
+from ...graph.edges import FlowType, Method, Ref, contains, flow
 from ...models.generated_input import (
     SamplingConfig,
     SamplingStrategy,
@@ -34,6 +35,7 @@ from ...models.generated_single_asset_scan_results import (
     SingleAssetScanResults,
 )
 from ...utils.hashing import hash_id, unhash_id
+from ...utils.urn import Urn, UrnError
 from ..base import BaseSource
 from ..dependencies import require_module
 
@@ -710,12 +712,149 @@ class TableauSource(BaseSource):
 
     STREAM_DETECTIONS = True
 
+    # ── Relationships ────────────────────────────────────────────────────
+    #
+    # Tableau is where cross-system lineage earns its keep. A published data
+    # source is a view onto a warehouse table that this connector will never
+    # scan and has no hash for — the only thing the two sides share is the name
+    # the *database* uses, which is exactly what a URN is.
+
+    #: Tableau's connection type -> the URN platform, where they differ. An
+    #: unlisted type is passed through: an unknown platform still produces a
+    #: stable URN, it just will not match anything until a connector for it
+    #: exists, which is the correct outcome rather than a dropped edge.
+    _CONNECTION_PLATFORMS: ClassVar[dict[str, str]] = {
+        "sqlserver": "mssql",
+        "postgres": "postgres",
+        "redshift": "redshift",
+        "bigquery": "bigquery",
+        "snowflake": "snowflake",
+        "databricks": "databricks",
+        "athena": "athena",
+        "oracle": "oracle",
+        "mysql": "mysql",
+        "spark": "hive",
+        "hive": "hive",
+    }
+
+    _UPSTREAM_TABLES_QUERY = """
+    {
+      publishedDatasources {
+        luid
+        upstreamTables {
+          name
+          schema
+          fullName
+          database { name connectionType hostName }
+        }
+      }
+    }
+    """
+
+    def _upstream_tables_by_datasource(self) -> dict[str, list[str]]:
+        """Datasource LUID -> URNs of the database tables behind it.
+
+        Uses the Metadata API, which is a separate service from the REST API
+        this connector otherwise speaks and is not enabled on every Tableau
+        deployment. A failure here costs lineage, not the scan.
+        """
+        if not self._extraction_options().include_lineage:
+            return {}
+        try:
+            with self._signed_in_server() as server:
+                metadata = getattr(server, "metadata", None)
+                if metadata is None:
+                    logger.info("Tableau client has no Metadata API support; skipping lineage")
+                    return {}
+                response = metadata.query(self._UPSTREAM_TABLES_QUERY)
+        except Exception as exc:
+            logger.warning("Tableau Metadata API unavailable, no lineage this run: %s", exc)
+            return {}
+
+        datasources = ((response or {}).get("data") or {}).get("publishedDatasources") or []
+        upstreams: dict[str, list[str]] = {}
+        for entry in datasources:
+            if not isinstance(entry, dict):
+                continue
+            luid = entry.get("luid")
+            if not luid:
+                continue
+            urns = [
+                urn
+                for table in entry.get("upstreamTables") or []
+                if isinstance(table, dict)
+                for urn in [self._table_urn(table)]
+                if urn
+            ]
+            if urns:
+                upstreams[str(luid)] = urns
+        return upstreams
+
+    def _table_urn(self, table: dict[str, Any]) -> str | None:
+        """The URN the owning database connector would write for this table."""
+        database = table.get("database")
+        database = database if isinstance(database, dict) else {}
+        host = str(database.get("hostName") or "").strip()
+        connection = str(database.get("connectionType") or "").strip().lower()
+        name = str(table.get("name") or "").strip()
+        if not (host and connection and name):
+            # Without a host there is nothing to scope the name to, and a URN
+            # scoped to the wrong host would stitch two unrelated systems.
+            return None
+
+        platform = self._CONNECTION_PLATFORMS.get(connection, connection)
+        parts = [
+            str(database.get("name") or "").strip(),
+            str(table.get("schema") or "").strip(),
+            name,
+        ]
+        try:
+            return str(Urn.of(platform, host, *parts))
+        except UrnError:
+            return None
+
+    def _emit_relationships(
+        self,
+        refs: list[TableauAssetRef],
+        hash_by_raw: dict[str, str],
+        upstream_urns: dict[str, list[str]],
+    ) -> None:
+        """Containment inside Tableau, flow out of it.
+
+        A project holding a workbook and a workbook using a data source are
+        containment: structural, and what a lineage view collapses by. The data
+        source reading a warehouse table is flow, and it is the only one of the
+        two that answers "what breaks if this table changes".
+        """
+        for ref in refs:
+            child_hash = hash_by_raw.get(ref.raw_id)
+            if not child_hash:
+                continue
+            for parent_raw in ref.linked_raw_ids:
+                parent_hash = hash_by_raw.get(parent_raw)
+                if parent_hash:
+                    self.add_edge(contains(Ref.asset(parent_hash), Ref.asset(child_hash)))
+
+            if ref.kind != "datasource":
+                continue
+            for urn in upstream_urns.get(ref.asset_id, []):
+                self.add_edge(
+                    flow(
+                        upstream=Ref.urn(urn),
+                        downstream=Ref.asset(child_hash),
+                        type=FlowType.VIEW,
+                        # Tableau's own catalog said so; nothing was parsed.
+                        method=Method.SYSTEM_CATALOG,
+                    )
+                )
+
     async def extract_raw(self) -> AsyncGenerator[list[SingleAssetScanResults], None]:
         if self._aborted:
             return
 
         refs = self._sample_refs(self._discover_assets())
         hash_by_raw = {ref.raw_id: self.generate_hash_id(ref.raw_id) for ref in refs}
+        self._emit_relationships(refs, hash_by_raw, self._upstream_tables_by_datasource())
 
         batch: list[SingleAssetScanResults] = []
         for ref in refs:

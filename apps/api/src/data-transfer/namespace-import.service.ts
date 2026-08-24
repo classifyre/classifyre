@@ -52,6 +52,27 @@ import { cursorArg, keyOf } from './namespace-export.service';
  *  - **A table that refuses everything.** One exploding table is reported and
  *    stepped over; the remaining tables still import.
  */
+
+/**
+ * True when this id column is really a URN.
+ *
+ * Cross-system lineage parks an unresolved endpoint as
+ * `(fromType: 'external', fromId: '<urn>')`. That column is declared in
+ * `idRefs` because it usually *is* an id — but when the paired type column says
+ * external, the value is a name in another system's vocabulary and must survive
+ * import verbatim, or the edge can never be stitched.
+ */
+function isExternalEndpoint(
+  model: string,
+  column: string,
+  row: Record<string, unknown>,
+): boolean {
+  if (model !== 'edge') return false;
+  if (column === 'fromId') return row.fromType === 'external';
+  if (column === 'toId') return row.toType === 'external';
+  return false;
+}
+
 @Injectable()
 export class NamespaceImportService {
   private readonly logger = new Logger(NamespaceImportService.name);
@@ -448,6 +469,10 @@ export class NamespaceImportService {
     // pass through untouched (see id-remap.ts).
     for (const column of table.idRefs ?? []) {
       if (prepared[column] === undefined || prepared[column] === null) continue;
+      // An edge endpoint whose *Type is 'external' holds a platform URN, not an
+      // id: it names an object in a system that has not been scanned here yet.
+      // Remapping it would destroy the only thing that can ever resolve it.
+      if (isExternalEndpoint(table.model, column, prepared)) continue;
       prepared[column] = remapId(prepared[column]);
     }
 

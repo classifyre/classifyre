@@ -1,0 +1,65 @@
+---
+title: Hugging Face
+description: Scan a Hugging Face dataset, model or space repository — streamed file by file, never cloned. Filters, revisions, private repos, and every setting.
+---
+
+import { SourceFacts, SourceParameters, SourceMetadata } from "@/components/source-reference";
+import { ObjectStorageNotes, LineageNote, SharedSettingsNote, FileHandlingNote } from "@/components/source-notes";
+
+# Hugging Face
+
+<SourceFacts
+  type="HUGGING_FACE"
+  vendor={{ label: "Hugging Face Hub", href: "https://huggingface.co/" }}
+  auth={{ label: "User access tokens", href: "https://huggingface.co/docs/hub/security-tokens" }}
+/>
+
+Training data is data. A dataset repository your team published — or one a model
+was fine-tuned on — can carry customer records, internal documents, or
+credentials in a config file, and nothing about being on the Hub changes that.
+
+## What you need to connect
+
+A **repository id** (`namespace/name`) and its **kind**: dataset, model, or
+space. Public repositories need no credential; private and gated ones need a
+read-scoped access token. Self-hosted Enterprise Hubs are supported by setting
+the endpoint.
+
+## What Classifyre reads
+
+Files inside the repository, at whichever **revision** you choose — a branch, a
+tag, or a commit SHA. The repository is **never cloned**: files are listed, then
+streamed one at a time, so scanning a repository with terabytes of weights in it
+costs nothing if you filter the weights out.
+
+Narrow the scan with folder paths, glob allow/deny patterns, and extension
+filters. Excluding `.safetensors`, `.bin` and `.gguf` is usually the first thing
+you want.
+
+<ObjectStorageNotes container="repository" />
+
+<FileHandlingNote what="Files in this repository" />
+
+## Metadata on every asset
+
+<SourceMetadata type="HUGGING_FACE" />
+
+## Lineage
+
+<LineageNote />
+
+## Worth knowing
+
+- **Parquet data files are read as tables**, so a dataset's rows are what
+  detectors see — not an opaque binary blob.
+- **Last-commit dates cost extra requests.** They're what `Latest` and
+  `Automatic` sampling order by; leave them off if ordering doesn't matter to
+  you and listing is slow.
+- Very large files are read by **byte range**, so a sampling window reads only
+  the part it needs.
+
+## Configuration
+
+<SharedSettingsNote />
+
+<SourceParameters type="HUGGING_FACE" />

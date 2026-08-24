@@ -9,16 +9,33 @@ import { Button } from "@workspace/ui/components/button";
 import { EmptyState } from "@workspace/ui/components/empty-state";
 import { Spinner } from "@workspace/ui/components/spinner";
 import { GraphExplorer } from "./graph-explorer/graph-explorer";
-import { ACCENT, keyOf } from "./graph-explorer/graph-types";
-import type { NodeDecoration } from "./graph-explorer/explorer-types";
+import {
+  ACCENT,
+  EDGE_CLASS_STYLE,
+  FLOW_SUBTYPE_LABEL,
+  edgeClassOf,
+  keyOf,
+} from "./graph-explorer/graph-types";
+import type {
+  EdgeStyleOverride,
+  NodeDecoration,
+} from "./graph-explorer/explorer-types";
 import { useTranslation } from "@/hooks/use-translation";
 
 const EXTERNAL_DECO: NodeDecoration = { ringColor: ACCENT };
 
 /**
- * Asset-link graph for a source: assets connected by their `links` (hash refs).
- * Thin adapter over GraphExplorer. Assets in other sources are ringed
- * (external) and can be hidden; lone assets still render. Read-only.
+ * Relationship graph for a source.
+ *
+ * Two kinds of edge arrive here. The old kind comes from `Asset.links`, a flat
+ * list of hashes that says two assets are connected without saying how — those
+ * are drawn as plain references, because that is all they claim. The new kind
+ * is what a connector declared: lineage, containment, identity. They are
+ * styled apart so the difference is visible, since "orders feeds this table"
+ * and "this file was attached to that email" are not the same statement.
+ *
+ * Assets in other sources are ringed, and so are objects named by URN that no
+ * scan has produced yet. Read-only.
  */
 export function AssetLinksGraph({ sourceId }: { sourceId: string }) {
   const nsPath = useNsPath();
@@ -70,9 +87,26 @@ export function AssetLinksGraph({ sourceId }: { sourceId: string }) {
   }, [nodes, edges, showExternal]);
 
   const nodeDecorator = React.useCallback(
-    (n: GraphNodeDto) => (n.status === "external" ? EXTERNAL_DECO : null),
+    (n: GraphNodeDto) =>
+      n.status === "external" || n.type === "external" ? EXTERNAL_DECO : null,
     [],
   );
+
+  /**
+   * Colour and dash by relationship class, and print the flow subtype rather
+   * than the stored relation type. `links_to` keeps the recessive reference
+   * styling: it is the edge that says the least.
+   */
+  const edgeStyle = React.useCallback((edge: GraphEdgeDto): EdgeStyleOverride => {
+    const style = EDGE_CLASS_STYLE[edgeClassOf(edge)] ?? EDGE_CLASS_STYLE.REFERENCE!;
+    return {
+      stroke: style.color,
+      dash: style.dash,
+      width: style.width,
+      arrow: style.arrow,
+      label: FLOW_SUBTYPE_LABEL[edge.relationType] ?? edge.relationType,
+    };
+  }, []);
 
   const showEmpty = !loading && !error && dNodes.length === 0;
 
@@ -84,6 +118,7 @@ export function AssetLinksGraph({ sourceId }: { sourceId: string }) {
       onReload={load}
       focusComponentOnClick
       nodeDecorator={nodeDecorator}
+      edgeStyle={edgeStyle}
       header={
         <>
           <Link2 className="h-4 w-4 text-muted-foreground" />
@@ -149,6 +184,20 @@ export function AssetLinksGraph({ sourceId }: { sourceId: string }) {
                 <span className="inline-block h-3 w-3 rounded-full border-2 border-[#b7ff00] bg-muted" />
                 {t("links.legendExternal")}
               </li>
+            </ul>
+            <ul className="space-y-2 border-t border-border pt-3 text-xs">
+              {Object.entries(EDGE_CLASS_STYLE).map(([cls, style]) => (
+                <li key={cls} className="flex items-center gap-2">
+                  <span
+                    className="inline-block h-0 w-6 shrink-0 border-t-2"
+                    style={{
+                      borderColor: style.color,
+                      borderTopStyle: style.dash ? "dashed" : "solid",
+                    }}
+                  />
+                  {style.label}
+                </li>
+              ))}
             </ul>
           </div>
         )

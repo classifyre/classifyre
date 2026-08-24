@@ -1,0 +1,59 @@
+---
+title: Google Cloud Storage
+sidebarTitle: Cloud Storage
+description: Scan objects in a Google Cloud Storage bucket using Application Default Credentials, workload identity, or a service account key — plus every setting.
+---
+
+import { SourceFacts, SourceParameters, SourceMetadata } from "@/components/source-reference";
+import { ObjectStorageNotes, LineageNote, SharedSettingsNote, FileHandlingNote } from "@/components/source-notes";
+
+# Google Cloud Storage
+
+<SourceFacts
+  type="GOOGLE_CLOUD_STORAGE"
+  vendor={{ label: "Google Cloud Storage", href: "https://cloud.google.com/storage" }}
+  auth={{ label: "Application Default Credentials", href: "https://cloud.google.com/docs/authentication/application-default-credentials" }}
+  links={[{ label: "IAM roles for Cloud Storage", href: "https://cloud.google.com/storage/docs/access-control/iam-roles" }]}
+/>
+
+Cloud Storage is the landing zone of the Google Cloud data stack — the bucket
+BigQuery exports to, the one Dataflow writes to, the one a partner drops files
+into.
+
+## What you need to connect
+
+A **bucket name**. For credentials, either supply a service account key JSON, or
+supply nothing and let Application Default Credentials handle it — which on GKE
+means workload identity, and no secret in the configuration at all.
+
+`roles/storage.objectViewer` is sufficient.
+
+## What Classifyre reads
+
+Objects under the prefix you choose, filtered by extension where you want to
+narrow it.
+
+<ObjectStorageNotes container="bucket" />
+
+<FileHandlingNote what="Objects from this bucket" />
+
+## Metadata on every asset
+
+<SourceMetadata type="GOOGLE_CLOUD_STORAGE" />
+
+## Lineage
+
+<LineageNote />
+
+## Worth knowing
+
+- **Workload identity is the recommended setup** for Kubernetes deployments —
+  nothing to store, nothing to rotate.
+- **A project ID override** is available when the credential's default project
+  isn't the one holding the bucket.
+
+## Configuration
+
+<SharedSettingsNote />
+
+<SourceParameters type="GOOGLE_CLOUD_STORAGE" />

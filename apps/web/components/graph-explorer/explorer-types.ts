@@ -41,6 +41,20 @@ export interface EdgeStyleOverride {
   dash?: number[];
   width?: number;
   arrow?: boolean;
+  /**
+   * Text drawn at the edge midpoint instead of `relationType`.
+   *
+   * A lineage view wants to print the subtype a person recognises ("derived",
+   * "copy") rather than the stored relation type, and a collapsed cluster edge
+   * wants to print how many edges it stands for.
+   */
+  label?: string;
+  /**
+   * Bow the edge sideways, as a fraction of its length. Two nodes can be joined
+   * by several edges at once — one per class — and drawn straight they land on
+   * top of each other and read as one.
+   */
+  curvature?: number;
 }
 
 export type NodeDecorator = (node: GraphNodeDto) => NodeDecoration | null;
