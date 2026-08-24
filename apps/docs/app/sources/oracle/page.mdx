@@ -1,0 +1,68 @@
+---
+title: Oracle
+description: Scan Oracle Database schemas, tables and views — extraction, metadata, view and column lineage from Oracle dependency metadata, and every connection setting.
+---
+
+import { SourceFacts, SourceParameters, SourceMetadata } from "@/components/source-reference";
+import { SqlSourceNotes, LineageNote, SharedSettingsNote } from "@/components/source-notes";
+
+# Oracle
+
+<SourceFacts
+  type="ORACLE"
+  vendor={{ label: "Oracle Database", href: "https://www.oracle.com/database/" }}
+  auth={{ label: "Privilege and role authorization", href: "https://docs.oracle.com/en/database/oracle/oracle-database/19/dbseg/configuring-privilege-and-role-authorization.html" }}
+/>
+
+Oracle Database holds the transactional systems of record in most large
+enterprises — and typically the oldest data, in the schemas nobody has audited
+in a decade. That combination is exactly what a scan is for.
+
+## What you need to connect
+
+Host, port, and a **service name** (for example `TEST_PDB` — not an SID), plus a
+database user. Read privileges are sufficient: `CREATE SESSION`, `SELECT` on the
+objects you want scanned, and `SELECT_CATALOG_ROLE` if you want view lineage.
+
+The Oracle client is bundled in thin mode, so there is no Instant Client
+installation to manage on the scanning host.
+
+## What Classifyre reads
+
+Tables and views across the schemas you allow. Oracle instances tend to be
+large, so scope them: allow specific schemas, deny the ones you don't care
+about, name exact objects, or cap the number of objects per scan.
+
+<SqlSourceNotes />
+
+## Metadata on every asset
+
+<SourceMetadata type="ORACLE" />
+
+## Lineage
+
+<LineageNote>
+
+Oracle's dependency metadata records what each view reads, so views and their
+base objects are recorded as lineage. Turn on **view column lineage** to also
+recover which upstream columns feed each view column.
+
+Oracle folds unquoted names to upper case, and Classifyre names objects the same
+way — so a table referenced by a Tableau or Power BI scan matches the one an
+Oracle scan produced instead of appearing twice. See
+[Lineage & Relationships](/sources/lineage/).
+
+</LineageNote>
+
+## Worth knowing
+
+- **Oracle's built-in schemas** (`SYS`, `SYSTEM`, `XDB` and friends) are
+  excluded automatically — you don't have to deny them by hand.
+- **Autonomous Database and RDS for Oracle** connect the same way; supply the
+  service name from your connection descriptor.
+
+## Configuration
+
+<SharedSettingsNote />
+
+<SourceParameters type="ORACLE" />

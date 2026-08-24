@@ -1,0 +1,59 @@
+---
+title: MongoDB
+description: Scan MongoDB collections on Atlas or on-premises — connection and auth options, database and collection scoping, sampled documents, and every setting.
+---
+
+import { SourceFacts, SourceParameters, SourceMetadata } from "@/components/source-reference";
+import { LineageNote, SharedSettingsNote } from "@/components/source-notes";
+
+# MongoDB
+
+<SourceFacts
+  type="MONGODB"
+  vendor={{ label: "MongoDB", href: "https://www.mongodb.com/" }}
+  auth={{ label: "Built-in roles and read-only access", href: "https://www.mongodb.com/docs/manual/reference/built-in-roles/" }}
+/>
+
+MongoDB's flexibility is exactly why it's worth scanning: documents in the same
+collection can have completely different shapes, and a field nobody declared can
+quietly start carrying personal data.
+
+## What you need to connect
+
+Either an **Atlas cluster host** or an on-premises **host and port**, plus a
+username and password (or no credentials for an unauthenticated deployment).
+`read` on the databases you want scanned is enough.
+
+Advanced options cover the rest of the real world: authentication mechanism and
+source database, replica set, TLS, direct connection, and any additional driver
+arguments.
+
+## What Classifyre reads
+
+One asset per **collection**, whose content is a sample of real documents.
+Because the sample is of documents rather than a declared schema, fields that
+only appear in some documents are still seen.
+
+Scope by database and by collection, with allow- and denylists, a per-database
+collection cap, and a switch for system collections.
+
+## Metadata on every asset
+
+<SourceMetadata type="MONGODB" />
+
+## Lineage
+
+<LineageNote />
+
+## Worth knowing
+
+- **Reads are non-blocking.** Only find and count operations are issued; nothing
+  is written and no index is built.
+- **A secondary replica is a fine target** if you'd rather keep the scan off the
+  primary.
+
+## Configuration
+
+<SharedSettingsNote />
+
+<SourceParameters type="MONGODB" />

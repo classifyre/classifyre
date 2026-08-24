@@ -1,0 +1,61 @@
+---
+title: Mounted Folder
+description: Scan a folder of files on this computer or mounted into the cluster — traversal controls, what gets read, and every setting.
+---
+
+import { SourceFacts, SourceParameters, SourceMetadata } from "@/components/source-reference";
+import { ObjectStorageNotes, LineageNote, SharedSettingsNote, FileHandlingNote } from "@/components/source-notes";
+
+# Mounted Folder
+
+<SourceFacts type="LOCAL_FOLDER" />
+
+The simplest source there is: point Classifyre at a **folder** and it scans what
+is in it. On the desktop application that's a folder on your own machine; in
+Kubernetes it's a volume mounted into the cluster — a file share, a NAS export,
+a migrated archive.
+
+## What you need to connect
+
+A **path**, as seen by the machine running the scan. There are no credentials:
+the scan reads the filesystem with the permissions of the process doing the
+scanning — the desktop app's, or the scan job's in the cluster. That's the whole
+security model, and it's worth being deliberate about which folders you expose.
+
+In the desktop application you pick the folder with a normal file browser.
+
+## What Classifyre reads
+
+Every file below the folder, subject to the traversal controls:
+
+| Control | What it does |
+|---|---|
+| **Max depth** | How far below the folder to descend |
+| **Include hidden** | Whether dot-files and dot-directories are scanned |
+| **Follow symlinks** | Off by default — link loops are not detected |
+| **Extension allow / denylist** | Narrow it to the file types you care about |
+
+<ObjectStorageNotes container="folder" />
+
+<FileHandlingNote what="Files in this folder" />
+
+## Metadata on every asset
+
+<SourceMetadata type="LOCAL_FOLDER" />
+
+## Lineage
+
+<LineageNote />
+
+## Worth knowing
+
+- **A mounted network share behaves like a local folder**, so SMB and NFS
+  exports can be scanned without a dedicated connector.
+- **Deleted files are noticed.** A file that disappears between scans is marked
+  deleted, and the findings it produced can be resolved automatically.
+
+## Configuration
+
+<SharedSettingsNote />
+
+<SourceParameters type="LOCAL_FOLDER" />

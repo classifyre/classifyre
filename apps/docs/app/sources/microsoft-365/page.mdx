@@ -1,0 +1,71 @@
+---
+title: Microsoft 365
+description: Scan SharePoint sites, OneDrive and Teams files through Microsoft Graph — app registration and permissions, ecosystem scoping, and every setting.
+---
+
+import { SourceFacts, SourceParameters, SourceMetadata } from "@/components/source-reference";
+import { LineageNote, SharedSettingsNote, FileHandlingNote } from "@/components/source-notes";
+
+# Microsoft 365
+
+<SourceFacts
+  type="MICROSOFT_365"
+  vendor={{ label: "Microsoft 365", href: "https://www.microsoft.com/microsoft-365" }}
+  auth={{ label: "Register an app with Microsoft identity platform", href: "https://learn.microsoft.com/entra/identity-platform/quickstart-register-app" }}
+  links={[{ label: "Microsoft Graph permissions reference", href: "https://learn.microsoft.com/graph/permissions-reference" }]}
+/>
+
+SharePoint, OneDrive and Teams are one filesystem with three front doors, and
+between them they hold most of the documents an organisation produces. This
+source reads all three through Microsoft Graph.
+
+## What you need to connect
+
+An **Entra (Azure AD) app registration**: tenant ID, client ID, and one of
+
+| Mode | What you supply |
+|---|---|
+| **Client secret** | The app's secret |
+| **Certificate** | A PEM certificate and its password |
+| **Managed identity** | Nothing — the workload's own identity is used |
+
+Grant the app read-only application permissions — `Sites.Read.All` and
+`Files.Read.All` are the usual pair. Permission metadata needs more
+(`Sites.FullControl.All`), which is why it's a separate switch.
+
+## What Classifyre reads
+
+Pick which **ecosystems** to scan — SharePoint sites, OneDrive, Teams files —
+then narrow by site, by drive, by folder path, and by file extension.
+
+Every file becomes an asset and is read with the full file pipeline. Optionally
+also:
+
+- **Site and drive assets**, so the structure itself is inventoried.
+- **Sharing permissions** on each item — useful when the question is not just
+  *what* is sensitive but *who can see it*.
+
+<FileHandlingNote what="Files in SharePoint, OneDrive and Teams" />
+
+## Metadata on every asset
+
+<SourceMetadata type="MICROSOFT_365" />
+
+## Lineage
+
+<LineageNote />
+
+## Worth knowing
+
+- **Teams files are SharePoint files.** Scanning Teams reads each team's
+  document library — chat messages are not included.
+- **Graph throttling is handled** with backoff and retries; a large tenant is a
+  matter of time, not failure.
+- **Start with one site collection.** A tenant-wide first scan is rarely the
+  quickest way to a useful answer.
+
+## Configuration
+
+<SharedSettingsNote />
+
+<SourceParameters type="MICROSOFT_365" />

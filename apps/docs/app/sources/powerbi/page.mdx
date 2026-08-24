@@ -1,0 +1,72 @@
+---
+title: Power BI
+description: Scan Power BI workspaces, datasets, reports and dashboards — service principal setup, what gets extracted, the lineage it records, and every setting.
+---
+
+import { SourceFacts, SourceParameters, SourceMetadata } from "@/components/source-reference";
+import { LineageNote, SharedSettingsNote } from "@/components/source-notes";
+
+# Power BI
+
+<SourceFacts
+  type="POWERBI"
+  vendor={{ label: "Power BI", href: "https://www.microsoft.com/power-platform/products/power-bi" }}
+  auth={{ label: "Service principal access to the Power BI API", href: "https://learn.microsoft.com/power-bi/enterprise/service-premium-service-principal" }}
+  links={[{ label: "Power BI REST API reference", href: "https://learn.microsoft.com/rest/api/power-bi/" }]}
+/>
+
+A BI platform is where warehouse data becomes *visible* — and where a table with
+restricted columns turns into a dashboard shared with three hundred people.
+Scanning Power BI answers a question the warehouse can't: who is actually
+looking at this.
+
+## What you need to connect
+
+Either a **service principal** (tenant ID, client ID and secret) or a
+short-lived **access token**. For the service principal route, enable
+service-principal API access in the Power BI admin portal and add the principal
+to the workspaces you want scanned.
+
+## What Classifyre reads
+
+**Workspaces**, and inside them **datasets**, **reports** and **dashboards** —
+each a switchable extraction option. Dataset table schemas and owner metadata
+can be captured too.
+
+Scope by workspace name or id, and choose whether personal workspaces are
+included.
+
+## Metadata on every asset
+
+<SourceMetadata type="POWERBI" />
+
+## Lineage
+
+<LineageNote>
+
+Power BI is one of the sources that produces genuine lineage:
+
+- A **report or dashboard over its dataset** is recorded as lineage — change the
+  dataset and you know exactly which reports are affected.
+- A **dataset over its upstream databases** is recorded too, named the way the
+  database platform names itself. So a dataset pulling from a Snowflake or SQL
+  Server database links to the real table once that system is scanned — even if
+  it's scanned months later.
+- A **workspace holding** a report is containment, not lineage: structural, and
+  used to collapse the graph rather than to add a hop to it.
+
+See [Lineage & Relationships](/sources/lineage/).
+
+</LineageNote>
+
+## Worth knowing
+
+- **Personal workspaces are off by default.** They're frequently where
+  ungoverned copies of production data end up.
+- **Sovereign clouds** are supported by overriding the API and authority URLs.
+
+## Configuration
+
+<SharedSettingsNote />
+
+<SourceParameters type="POWERBI" />
