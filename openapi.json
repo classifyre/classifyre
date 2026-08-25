@@ -15030,6 +15030,18 @@
             "description": "Whether the token can currently authorize MCP requests.",
             "example": true
           },
+          "toolGroupIds": {
+            "description": "MCP capability group ids this token is restricted to. Null means unrestricted (every group).",
+            "nullable": true,
+            "example": [
+              "sources",
+              "custom_detectors"
+            ],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
           "lastUsedAt": {
             "format": "date-time",
             "type": "string",
@@ -15065,6 +15077,18 @@
             "type": "string",
             "description": "Human-readable label for this MCP access token.",
             "example": "Cursor local agent"
+          },
+          "toolGroupIds": {
+            "description": "MCP capability group ids this token may call (see GET .../mcp/tools for the group list). Omit or send null for unrestricted access to every current and future group.",
+            "nullable": true,
+            "example": [
+              "sources",
+              "custom_detectors"
+            ],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         },
         "required": [
@@ -15092,6 +15116,18 @@
             "type": "boolean",
             "description": "Whether the token can currently authorize MCP requests.",
             "example": true
+          },
+          "toolGroupIds": {
+            "description": "MCP capability group ids this token is restricted to. Null means unrestricted (every group).",
+            "nullable": true,
+            "example": [
+              "sources",
+              "custom_detectors"
+            ],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           },
           "lastUsedAt": {
             "format": "date-time",
@@ -15139,6 +15175,18 @@
             "type": "boolean",
             "description": "When false, the token is revoked and can no longer authorize MCP requests.",
             "example": false
+          },
+          "toolGroupIds": {
+            "description": "MCP capability group ids this token may call (see GET .../mcp/tools for the group list). Omit or send null for unrestricted access to every current and future group.",
+            "nullable": true,
+            "example": [
+              "sources",
+              "custom_detectors"
+            ],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         }
       },

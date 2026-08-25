@@ -982,6 +982,12 @@ model McpAccessToken {
   name         String
   tokenHash    String    @unique @map("token_hash")
   tokenPreview String    @map("token_preview")
+  // JSON string[], not a native array: Prisma has no nullable-list type, and
+  // NULL vs. an array is the whole point here. NULL = unrestricted (every
+  // tool group). A non-null array is an explicit allowlist of
+  // MCP_CAPABILITY_GROUPS ids. Existing tokens stay NULL on migration so
+  // nothing that already worked starts failing.
+  toolGroupIds Json? @map("tool_group_ids")
   lastUsedAt   DateTime? @map("last_used_at")
   revokedAt    DateTime? @map("revoked_at")
   createdAt    DateTime  @default(now()) @map("created_at")
