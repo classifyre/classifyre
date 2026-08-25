@@ -1,0 +1,86 @@
+---
+title: Databricks
+description: Scan Databricks Unity Catalog tables, notebooks and Delta Live Tables pipelines — authentication modes, extraction options, true column-level lineage, and every setting.
+---
+
+import { SourceFacts, SourceParameters, SourceMetadata } from "@/components/source-reference";
+import { SqlSourceNotes, LineageNote, SharedSettingsNote } from "@/components/source-notes";
+
+# Databricks
+
+<SourceFacts
+  type="DATABRICKS"
+  vendor={{ label: "Databricks", href: "https://www.databricks.com/" }}
+  auth={{ label: "Databricks authentication", href: "https://docs.databricks.com/aws/en/dev-tools/auth/" }}
+  links={[
+    { label: "Unity Catalog", href: "https://docs.databricks.com/aws/en/data-governance/unity-catalog/" },
+    { label: "Data lineage in Unity Catalog", href: "https://docs.databricks.com/aws/en/data-governance/unity-catalog/data-lineage" },
+  ]}
+/>
+
+Databricks is a lakehouse and a compute platform in one, and Unity Catalog knows
+more about how data moves than almost any other system Classifyre connects to —
+including, uniquely, which *columns* feed which.
+
+## What you need to connect
+
+A **workspace URL** and a **SQL warehouse ID** (the warehouse used to sample
+rows), plus one of three authentication modes:
+
+| Mode | What you supply |
+|---|---|
+| **Personal access token** | A workspace PAT |
+| **Service principal** | Client ID and secret — the right choice for automation |
+| **Azure service principal** | Client ID, tenant ID and secret, for Azure Databricks |
+
+The identity needs `USE CATALOG` / `USE SCHEMA` / `SELECT` on what you want
+scanned, and `CAN USE` on the SQL warehouse.
+
+## What Classifyre reads
+
+Unity Catalog tables and views by default, scoped by catalog, schema, or an
+explicit table list — including or excluding the legacy `hive_metastore`
+catalog. Optionally also:
+
+- **Notebooks** — as assets in their own right, so a credential pasted into a
+  notebook cell is found like any other secret.
+- **Delta Live Tables pipelines** — pipeline metadata as assets.
+
+<SqlSourceNotes viewLineage={false} foreignKeys={false} />
+
+## Metadata on every asset
+
+<SourceMetadata type="DATABRICKS" />
+
+## Lineage
+
+<LineageNote>
+
+Unity Catalog answers the lineage question directly, so nothing here is guessed
+from SQL text — these are among the most trustworthy lineage edges in the
+product.
+
+- **Table lineage** records what each table was derived from.
+- **Column lineage** is optional because it costs one request per column, but
+  when enabled it gives genuine column-to-column mappings rather than parsed
+  approximations.
+- Upstreams in catalogs **outside your scan scope** are not dropped. They're
+  recorded by name, and if that catalog is scanned later the edge completes
+  itself.
+
+See [Lineage & Relationships](/sources/lineage/).
+
+</LineageNote>
+
+## Worth knowing
+
+- **Sampling runs on your SQL warehouse**, so scan cost is warehouse cost. A
+  serverless warehouse with a short auto-stop is the cheapest setup.
+- **Column lineage on wide tables is slow.** Leave it off for a first scan and
+  turn it on once you know which catalogs matter.
+
+## Configuration
+
+<SharedSettingsNote />
+
+<SourceParameters type="DATABRICKS" />

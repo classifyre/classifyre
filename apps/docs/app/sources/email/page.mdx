@@ -1,0 +1,67 @@
+---
+title: Email
+description: Scan an IMAP mailbox — Gmail, Outlook/Microsoft 365, Fastmail or self-hosted. App passwords, folder and date scoping, attachments, and every setting.
+---
+
+import { SourceFacts, SourceParameters, SourceMetadata } from "@/components/source-reference";
+import { LineageNote, SharedSettingsNote, FileHandlingNote } from "@/components/source-notes";
+
+# Email
+
+<SourceFacts
+  type="EMAIL"
+  vendor={{ label: "IMAP", href: "https://datatracker.ietf.org/doc/html/rfc3501" }}
+  auth={{ label: "Gmail app passwords", href: "https://support.google.com/accounts/answer/185833" }}
+  links={[{ label: "Outlook / Microsoft 365 IMAP settings", href: "https://support.microsoft.com/office/pop-imap-and-smtp-settings-for-outlook-com-d088b986-291d-42b8-9564-9c414e2aa040" }]}
+/>
+
+Mailboxes are the least-governed data store in most organisations. Contracts,
+invoices, spreadsheets of customer data, credentials sent "just this once" —
+they all live there indefinitely, in attachments nobody has looked at in years.
+
+## What you need to connect
+
+An **IMAP host and port** (993 for IMAPS), and the mailbox login. For Gmail and
+Outlook / Microsoft 365, use an **app password** rather than the account
+password — it's revocable and scoped to one application.
+
+Any IMAP server works: Gmail, Outlook, Yahoo, Fastmail, Zimbra, Dovecot,
+whatever you run yourself.
+
+## What Classifyre reads
+
+Each **message** becomes an asset — sender, recipients, subject and body — and
+each **attachment** becomes a separate asset linked back to its email.
+
+Scope the scan by:
+
+- **Folders** — Inbox only, or Sent, Archive, and any custom folder.
+- **Date range** — messages on or after a date, before a date, or both.
+- **Unread only** — for a monitoring-style scan.
+- **Attachment size cap** — oversized attachments still produce an asset with
+  their metadata; only the bytes are skipped.
+
+<FileHandlingNote what="Attachments" />
+
+## Metadata on every asset
+
+<SourceMetadata type="EMAIL" />
+
+## Lineage
+
+<LineageNote />
+
+## Worth knowing
+
+- **Messages are read, never modified.** Nothing is marked as read, moved or
+  deleted by a scan.
+- **Attachments are where the findings are.** The body of an email is usually
+  innocuous; the spreadsheet attached to it usually is not.
+- **A shared or archive mailbox** is often the better target than an individual
+  one — it's where retention actually accumulates.
+
+## Configuration
+
+<SharedSettingsNote />
+
+<SourceParameters type="EMAIL" />

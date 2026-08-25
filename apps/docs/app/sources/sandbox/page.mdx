@@ -1,0 +1,50 @@
+---
+title: Sandbox
+description: Upload files directly to Classifyre and scan them through the normal pipeline — the fastest way to try detectors on real documents.
+---
+
+import { SourceFacts, SourceParameters, SourceMetadata } from "@/components/source-reference";
+import { ObjectStorageNotes, LineageNote, SharedSettingsNote, FileHandlingNote } from "@/components/source-notes";
+
+# Sandbox
+
+<SourceFacts type="SANDBOX" />
+
+A Sandbox source has no system behind it — **you upload the files yourself**.
+It's the fastest way to see what Classifyre does with your actual documents:
+drop in a folder of contracts, a database export, a handful of screenshots, and
+run a scan.
+
+## What you need to connect
+
+Nothing. No host, no credentials. Create the source and upload files to it.
+
+## What Classifyre reads
+
+Everything you uploaded, through exactly the same pipeline every other file
+source uses — so what you see in a Sandbox scan is what you'd see once the real
+system is connected.
+
+<ObjectStorageNotes container="upload" />
+
+<FileHandlingNote what="Uploaded files" />
+
+## Metadata on every asset
+
+<SourceMetadata type="SANDBOX" />
+
+## Lineage
+
+<LineageNote />
+
+## Worth knowing
+
+- **Good for tuning detectors.** Iterate on a custom detector against a small,
+  fixed set of files before pointing it at a production system.
+- **Uploads live with the source.** Deleting the source deletes them.
+
+## Configuration
+
+<SharedSettingsNote />
+
+<SourceParameters type="SANDBOX" />

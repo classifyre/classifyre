@@ -1,0 +1,67 @@
+---
+title: Reddit
+description: Scan subreddits — posts, threaded comments, attached media and linked video transcripts. Always read-only. App setup, listings, and every setting.
+---
+
+import { SourceFacts, SourceParameters, SourceMetadata } from "@/components/source-reference";
+import { LineageNote, SharedSettingsNote, FileHandlingNote } from "@/components/source-notes";
+
+# Reddit
+
+<SourceFacts
+  type="REDDIT"
+  vendor={{ label: "Reddit", href: "https://www.reddit.com/" }}
+  auth={{ label: "Create a Reddit app (API access)", href: "https://www.reddit.com/prefs/apps" }}
+  links={[{ label: "Reddit API terms and rules", href: "https://support.reddithelp.com/hc/en-us/articles/16160319875092-Reddit-Data-API-Wiki" }]}
+/>
+
+Public discussion is where leaks surface first — a frustrated employee pasting a
+config file, a customer posting a screenshot of their invoice, a support thread
+quoting an internal ticket. Monitoring the subreddits that matter to you turns
+that into something you find rather than hear about.
+
+## What you need to connect
+
+A Reddit app (client ID and secret), a **user agent** string, and the
+**subreddits** to watch. Three app types are supported: read-only, script (with
+a username and password), and web/installed (with a refresh token).
+
+**Scanning is always read-only** — nothing is posted, voted or commented.
+
+## What Classifyre reads
+
+- **Posts** from the listing you choose — new, hot, top, rising or controversial,
+  with a time window for top and controversial.
+- **Comments**, each as its own asset, linked parent-to-reply so a thread stays
+  navigable. Capped per post, with optional expansion of "load more comments".
+- **Media** attached to a post — images, video, audio, documents, gallery items —
+  each as a scannable asset.
+- **Linked external videos** (YouTube, Vimeo and similar), analysed with the same
+  captions, transcription and on-screen-text pipeline as the
+  [YouTube source](/sources/youtube/).
+
+NSFW and stickied posts can be excluded.
+
+<FileHandlingNote what="Media attached to posts" />
+
+## Metadata on every asset
+
+<SourceMetadata type="REDDIT" />
+
+## Lineage
+
+<LineageNote />
+
+## Worth knowing
+
+- **Comment forests are unbounded.** The per-post comment cap is what keeps a
+  busy subreddit from consuming an entire scan.
+- **Rate limits are absorbed** by pacing requests rather than failing.
+- **Self-hosted Reddit-compatible instances** can be pointed at by overriding
+  the site endpoints.
+
+## Configuration
+
+<SharedSettingsNote />
+
+<SourceParameters type="REDDIT" />

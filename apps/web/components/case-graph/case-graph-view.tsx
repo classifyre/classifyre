@@ -63,6 +63,7 @@ import {
   type GraphMode,
   type GraphSelection,
   type PathResult,
+  edgeClassOf,
 } from "../graph-explorer/graph-types";
 import type { NodeBadge, NodeDecoration } from "../graph-explorer/explorer-types";
 import { useTranslation } from "@/hooks/use-translation";
@@ -139,10 +140,16 @@ export function CaseGraphView({
   const [activeEdgeTypes, setActiveEdgeTypes] = React.useState<Set<string>>(new Set());
 
   const edgeTypes = React.useMemo(() => {
-    const counts = new Map<string, number>();
-    edges.forEach((e) => counts.set(e.relationType, (counts.get(e.relationType) ?? 0) + 1));
+    // The class travels with each edge, so the filter can group by it without
+    // the sidebar having to keep its own copy of the type -> class table.
+    const counts = new Map<string, { count: number; relationClass: string }>();
+    edges.forEach((e) => {
+      const entry = counts.get(e.relationType);
+      if (entry) entry.count += 1;
+      else counts.set(e.relationType, { count: 1, relationClass: edgeClassOf(e) });
+    });
     return Array.from(counts.entries())
-      .map(([type, count]) => ({ type, count }))
+      .map(([type, { count, relationClass }]) => ({ type, count, relationClass }))
       .sort((a, b) => a.type.localeCompare(b.type));
   }, [edges]);
 

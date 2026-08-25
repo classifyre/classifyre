@@ -236,6 +236,21 @@ class BaseLakehouseSource(BaseTabularSource):
             self._handles[root] = handle
         return handle
 
+    def _urn_authority(self) -> str | None:
+        """The bucket the table lives in.
+
+        Table formats record where their data is, not where it came from: an
+        Iceberg or Delta table's metadata has snapshots and manifests, not a
+        statement about which other table produced it. So a lakehouse source
+        contributes *identity* rather than derivation — a stable name another
+        connector (a Databricks scan, a BI tool) can point its lineage at.
+        """
+        try:
+            bucket = self._bucket()
+        except Exception:
+            return None
+        return str(bucket).strip() or None
+
     def _table_uri(self, root: str) -> str:
         return f"s3://{self._bucket()}/{root}"
 

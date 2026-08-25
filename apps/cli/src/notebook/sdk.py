@@ -5,6 +5,13 @@ purpose -- the adapter in ``sources/custom`` is what turns an ``Asset`` into a
 ``SingleAssetScanResults``, computes hashes and checksums, resolves links and
 validates metadata, so none of that leaks into the notebook.
 
+``Ref`` and the four relationship builders are the other half of the surface.
+``Asset.links`` still works and still means "these two are related somehow", but
+*somehow* is the problem: an attachment, a foreign key and a derived table are
+three different questions, and once they are in the same list nothing can tell
+them apart. The builders make the author say which one they mean, and that is
+the only place the distinction can come from.
+
 ``parse`` is the one addition that earns its place. Reading a PDF, a .docx, an
 .eml or a Parquet file is not connector logic, every other source in the system
 already delegates it to the same parser, and a notebook that had to reimplement
@@ -23,6 +30,18 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import IO, Any
 
+from ..graph.edges import (
+    Edge,
+    FieldMapping,
+    FlowType,
+    Ref,
+    contains,
+    flow,
+    references,
+    same_as,
+    uses,
+)
+from ..utils.urn import Urn
 from .files import DEFAULT_PAGE_SIZE, ParsedContent, pages, parse
 
 MODULE_NAME = "classifyre"
@@ -63,6 +82,12 @@ class Asset:
     created_at: datetime | str | None = None
     updated_at: datetime | str | None = None
     location: str | None = None
+    #: What the *platform* calls this object -- ``snowflake://acct/db/schema/table``,
+    #: ``s3://bucket/key``. Optional, and only worth setting for something that
+    #: also exists in a system Classifyre scans separately: it is what lets that
+    #: other source's lineage point here, and what lets your ``Ref.urn(...)``
+    #: point there. Build one with ``urn_for(...)`` so the spelling matches.
+    urn: str | None = None
 
     def __post_init__(self) -> None:
         self.id = str(self.id).strip()
@@ -89,6 +114,21 @@ class Asset:
                 f"{type(self.content_bytes).__name__}); encode text first"
             )
         self.links = [str(link) for link in self.links if str(link).strip()]
+
+
+def urn_for(platform: str, authority: str, *path: str) -> str:
+    """The name another system would know this object by.
+
+    ``urn_for("snowflake", "acme", "PROD", "PUBLIC", "ORDERS")``. The point of
+    building it here rather than writing the string yourself is that the same
+    folding rules apply as when the Snowflake connector names that table --
+    capitalisation and default ports differ between tools, and a URN that
+    differs by either never matches.
+
+    ``authority`` is the account, host, workspace or bucket; the rest is the
+    path within it.
+    """
+    return str(Urn.of(platform, authority, *path))
 
 
 @dataclass(frozen=True)
@@ -347,6 +387,15 @@ def build_module(context: Context) -> types.ModuleType:
     module = types.ModuleType(MODULE_NAME)
     module.__doc__ = "Runtime helpers available to a Classifyre custom connector."
     module.Asset = Asset  # type: ignore[attr-defined]
+    module.Ref = Ref  # type: ignore[attr-defined]
+    module.FieldMapping = FieldMapping  # type: ignore[attr-defined]
+    module.FlowType = FlowType  # type: ignore[attr-defined]
+    module.flow = flow  # type: ignore[attr-defined]
+    module.contains = contains  # type: ignore[attr-defined]
+    module.references = references  # type: ignore[attr-defined]
+    module.same_as = same_as  # type: ignore[attr-defined]
+    module.uses = uses  # type: ignore[attr-defined]
+    module.urn_for = urn_for  # type: ignore[attr-defined]
     module.Context = Context  # type: ignore[attr-defined]
     module.NotebookFile = NotebookFile  # type: ignore[attr-defined]
     module.ParsedContent = ParsedContent  # type: ignore[attr-defined]
@@ -356,11 +405,20 @@ def build_module(context: Context) -> types.ModuleType:
     module.__all__ = [  # type: ignore[attr-defined]
         "Asset",
         "Context",
+        "FieldMapping",
+        "FlowType",
         "NotebookFile",
         "ParsedContent",
+        "Ref",
+        "contains",
         "ctx",
+        "flow",
         "pages",
         "parse",
+        "references",
+        "same_as",
+        "urn_for",
+        "uses",
     ]
     return module
 
@@ -384,6 +442,15 @@ def namespace(context: Context) -> dict[str, Any]:
         "__name__": "classifyre_notebook",
         "__builtins__": __builtins__,
         "Asset": Asset,
+        "Ref": Ref,
+        "FieldMapping": FieldMapping,
+        "FlowType": FlowType,
+        "flow": flow,
+        "contains": contains,
+        "references": references,
+        "same_as": same_as,
+        "uses": uses,
+        "urn_for": urn_for,
         "ctx": context,
         "parse": parse,
         "pages": pages,
@@ -409,4 +476,28 @@ def iter_assets(value: Any) -> Iterable[Asset]:
             raise TypeError(
                 "extract() must yield Asset objects (or dicts of Asset fields), "
                 f"got {type(item).__name__}"
+            )
+
+
+def iter_relationships(value: Any) -> Iterable[Edge]:
+    """Normalize whatever ``relationships()`` returned into Edges.
+
+    Only the builders are accepted. A raw dict is *not*, deliberately: the whole
+    value of this function is that the author had to choose between ``flow``,
+    ``contains``, ``references`` and ``same_as``, and letting a dict through
+    would put the class back into free text.
+    """
+    if value is None:
+        return
+    if isinstance(value, Edge):
+        value = [value]
+    for item in value:
+        if isinstance(item, Edge):
+            yield item
+        else:
+            raise TypeError(
+                "relationships() must yield edges built with flow(), contains(), "
+                "references(), same_as() or uses() -- got "
+                f"{type(item).__name__}. These are not interchangeable: only "
+                "flow() is lineage, and only it answers 'what breaks if this changes'."
             )

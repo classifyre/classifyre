@@ -1,0 +1,69 @@
+---
+title: Tableau
+description: Scan Tableau workbooks and published data sources — personal access token setup, project scoping, warehouse lineage, and every setting.
+---
+
+import { SourceFacts, SourceParameters, SourceMetadata } from "@/components/source-reference";
+import { LineageNote, SharedSettingsNote } from "@/components/source-notes";
+
+# Tableau
+
+<SourceFacts
+  type="TABLEAU"
+  vendor={{ label: "Tableau", href: "https://www.tableau.com/" }}
+  auth={{ label: "Personal access tokens", href: "https://help.tableau.com/current/server/en-us/security_personal_access_tokens.htm" }}
+  links={[{ label: "Tableau Metadata API", href: "https://help.tableau.com/current/api/metadata_api/en-us/index.html" }]}
+/>
+
+Tableau is where the warehouse becomes a decision — and where a published data
+source quietly extracts a copy of a table that had access controls on it.
+
+## What you need to connect
+
+The **server URL** and **site**, plus either a username and password or a
+**personal access token** (token name and value). A token is the better choice:
+it's revocable on its own and doesn't break when a password policy changes.
+
+Tableau Cloud and Tableau Server connect the same way. A read-only site role is
+enough; the Metadata API needs to be enabled on the server for lineage.
+
+## What Classifyre reads
+
+**Workbooks** and **published data sources**, scoped by project, workbook or
+data source name. Owner metadata, tags, and usage statistics can be captured
+alongside.
+
+## Metadata on every asset
+
+<SourceMetadata type="TABLEAU" />
+
+## Lineage
+
+<LineageNote>
+
+With lineage enabled, the Metadata API is asked what each published data source
+actually reads — and those **warehouse tables** are recorded as upstream
+lineage, named the way their own platform names them. A data source over a
+Snowflake table links to the real table once Snowflake is scanned, whichever
+order the two scans happen in.
+
+Projects holding workbooks, and workbooks using data sources, are recorded as
+**containment**: structural relationships used to collapse the graph, not extra
+hops in a lineage path.
+
+See [Lineage & Relationships](/sources/lineage/).
+
+</LineageNote>
+
+## Worth knowing
+
+- **Lineage requires the Metadata API.** If it's disabled on the server, the
+  scan still produces assets — it just produces no upstream tables.
+- **Extracts are copies.** A published data source with an extract holds real
+  data, which is why it's worth scanning rather than only cataloguing.
+
+## Configuration
+
+<SharedSettingsNote />
+
+<SourceParameters type="TABLEAU" />

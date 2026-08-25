@@ -80,6 +80,9 @@ INCLUDED_GROUPS = (
     "kafka",
     "delta-lake",
     "iceberg",
+    # sqlglot: pure Python and small, and the thing a connector author reaches
+    # for when they want to derive column lineage from a query they already have.
+    "lineage",
 )
 
 #: Everything else in `[dependency-groups]`, listed rather than inferred so that

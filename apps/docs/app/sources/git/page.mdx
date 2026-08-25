@@ -1,0 +1,80 @@
+---
+title: Git Repository
+sidebarTitle: Git
+description: Scan one branch of any Git repository — GitHub, GitLab, Bitbucket, Azure DevOps, Gitea or self-hosted. Auth methods, clone strategies, path filters, and every setting.
+---
+
+import { SourceFacts, SourceParameters, SourceMetadata } from "@/components/source-reference";
+import { ObjectStorageNotes, LineageNote, SharedSettingsNote, FileHandlingNote } from "@/components/source-notes";
+
+# Git Repository
+
+<SourceFacts
+  type="GIT"
+  vendor={{ label: "Git", href: "https://git-scm.com/" }}
+  auth={{ label: "GitHub personal access tokens", href: "https://docs.github.com/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens" }}
+  links={[
+    { label: "GitLab deploy tokens", href: "https://docs.gitlab.com/user/project/deploy_tokens/" },
+    { label: "Bitbucket app passwords", href: "https://support.atlassian.com/bitbucket-cloud/docs/app-passwords/" },
+  ]}
+/>
+
+Source repositories are where credentials go to hide — a key in a config file, a
+token in a test fixture, a customer export committed "just for debugging". This
+source scans the files on **one branch** of a repository, provider-agnostically.
+
+## What you need to connect
+
+A **repository URL**. Everything is done over the standard Git protocol rather
+than a provider API, so GitHub, GitLab, Bitbucket, Azure DevOps, Gitea and a
+bare repository on a server are all the same source.
+
+| Auth method | What you supply |
+|---|---|
+| **None** | Nothing — a public repository over HTTPS |
+| **Token** | A personal access, deploy, or app installation token with read access |
+| **Basic** | Username and password |
+| **SSH key** | An OpenSSH private key, optional passphrase, and `known_hosts` |
+| **Client certificate** | A PEM certificate and key, for mutual-TLS servers |
+
+For an internal server with a private CA, paste the CA bundle rather than
+turning off certificate verification.
+
+## What Classifyre reads
+
+The files on one branch or tag — the working tree, not the history. Scan a
+second branch by adding a second source.
+
+Narrow it with include and exclude path globs (`src/config`, `**/*.sql`,
+`node_modules`) and extension filters. `.env`, `.py`, `.yaml`, `.tf` and `.sql`
+are usually where the interesting things are.
+
+<ObjectStorageNotes container="repository" />
+
+<FileHandlingNote what="Files in this repository" />
+
+## Metadata on every asset
+
+<SourceMetadata type="GIT" />
+
+## Lineage
+
+<LineageNote />
+
+## Worth knowing
+
+- **Nothing is shared between runs.** Each scan clones into its own throwaway
+  workspace, so a scan can never be poisoned by a previous one.
+- **Clone strategy controls the transfer cost.** The default fetches the file
+  tree plus the contents it needs rather than the whole history — a repository
+  with a large past is not a large download.
+- **Last-commit dates per file** are optional; they're what `Latest` sampling
+  orders by, and they cost an extra pass over the branch.
+- **Credentials never reach the disk in the clear**, and are redacted from any
+  Git error the scan reports.
+
+## Configuration
+
+<SharedSettingsNote />
+
+<SourceParameters type="GIT" />

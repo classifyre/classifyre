@@ -19,6 +19,7 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 
+from ..graph.edges import FlowType, Method, Ref, ReferenceType, flow, references
 from ..models.generated_input import SamplingConfig, SamplingStrategy
 from ..models.generated_single_asset_scan_results import (
     AssetType as OutputAssetType,
@@ -30,8 +31,15 @@ from ..models.generated_single_asset_scan_results import (
 from ..utils.file_metadata import build_columns
 from ..utils.file_parser import render_bytes_cell
 from ..utils.hashing import hash_id, unhash_id
+from ..utils.sql_lineage import column_mappings_from_sql, sqlglot_dialect
+from ..utils.urn import Urn, UrnError
 from .base import BaseSource
-from .tabular_utils import TableRef, build_tabular_location, format_tabular_sample_content
+from .tabular_utils import (
+    TableRef,
+    ViewLineage,
+    build_tabular_location,
+    format_tabular_sample_content,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -734,6 +742,36 @@ class BaseTabularSource(BaseSource):
 
     # ── Asset creation ───────────────────────────────────────────────────
 
+    # ── Cross-system identity ────────────────────────────────────────────
+    #
+    # A table's hash is scoped to the connector that produced it, so a Tableau
+    # scan and a Snowflake scan looking at the same table produce different
+    # hashes and can never be joined. A URN is the second name that *is*
+    # shared: derived only from what the platform calls the object.
+    #
+    # `source_type` doubles as the URN platform — the registry aliases
+    # `postgresql` to `postgres`, `delta_lake` to `delta` and so on — so a
+    # dialect only has to say where it connected.
+
+    def _urn_authority(self) -> str | None:
+        """``host:port`` / account / workspace for this connection.
+
+        None means this dialect cannot name its objects in a way another
+        connector would recognise, so it emits no URN rather than a guess that
+        would stitch two unrelated systems together.
+        """
+        return None
+
+    def _table_urn(self, table_ref: TableRef) -> str | None:
+        authority = self._urn_authority()
+        if not authority:
+            return None
+        try:
+            return str(Urn.of(self.source_type, authority, *table_ref.fqn_parts))
+        except UrnError as exc:
+            logger.debug("No URN for %s: %s", table_ref.display_name, exc)
+            return None
+
     def _table_to_asset(
         self, table_ref: TableRef, *, links: list[str] | None = None
     ) -> SingleAssetScanResults:
@@ -781,6 +819,7 @@ class BaseTabularSource(BaseSource):
             name=table_ref.display_name,
             external_url=external_url,
             links=links or [],
+            urn=self._table_urn(table_ref),
             asset_type=self._output_asset_type(table_ref),
             source_id=self.source_id,
             created_at=now,
@@ -788,6 +827,107 @@ class BaseTabularSource(BaseSource):
             runner_id=self.runner_id,
             **self.metadata_fields("table", asset_metadata),
         )
+
+    # ── Relationships ────────────────────────────────────────────────────
+
+    def _collect_view_lineage(self, tables: list[TableRef]) -> list[ViewLineage]:
+        """Return what each derived object in ``tables`` reads from.
+
+        Default: nothing. Override in a dialect that can ask its catalog — every
+        engine here can, through some spelling of a dependency view.
+        """
+        return []
+
+    def _emit_relationship_edges(
+        self,
+        tables: list[TableRef],
+        table_hash_by_key: dict[tuple[str, ...], str],
+        fk_links: dict[tuple[str, ...], set[tuple[str, ...]]],
+    ) -> None:
+        """Turn what the catalog knows into typed, classified edges.
+
+        Two kinds, and the distinction is the point:
+
+        A **view** derives its rows from its base tables, so changing a base
+        table can break it — that is FLOW, and it is what a lineage question
+        traverses.
+
+        A **foreign key** moves no data at all. It is worth having (it suggests
+        joins, and it is a hint about where lineage might exist) but it must
+        never be a hop in a lineage path, so it is emitted as REFERENCE. These
+        used to be indistinguishable from every other kind of link.
+        """
+        for source_key, target_keys in fk_links.items():
+            source_hash = table_hash_by_key.get(source_key)
+            if not source_hash:
+                continue
+            for target_key in sorted(target_keys):
+                target_hash = table_hash_by_key.get(target_key)
+                if not target_hash:
+                    continue
+                self.add_edge(
+                    references(
+                        Ref.asset(source_hash),
+                        Ref.asset(target_hash),
+                        type=ReferenceType.FOREIGN_KEY,
+                    )
+                )
+
+        try:
+            view_lineage = self._collect_view_lineage(tables)
+        except Exception as exc:
+            logger.warning("Could not resolve view lineage for %s: %s", self._source_label, exc)
+            return
+
+        dialect = sqlglot_dialect(self.source_type)
+        for entry in view_lineage:
+            view_hash = table_hash_by_key.get(entry.view)
+            if not view_hash:
+                continue
+            # Columns are read from the view's own SQL once, not once per
+            # upstream: the mapping describes the view, and re-deriving it for
+            # each base table would both cost more and claim that every column
+            # came from every upstream.
+            fields = column_mappings_from_sql(entry.sql, dialect=dialect) if entry.sql else []
+            for upstream_key in entry.upstreams:
+                upstream_hash = table_hash_by_key.get(upstream_key)
+                upstream_ref = (
+                    Ref.asset(upstream_hash)
+                    if upstream_hash
+                    else self._urn_ref_for_key(upstream_key)
+                )
+                if upstream_ref is None:
+                    # Outside this scan and unnameable — a schema the scope
+                    # excludes. Dropping it is better than inventing a node.
+                    continue
+                self.add_edge(
+                    flow(
+                        upstream=upstream_ref,
+                        downstream=Ref.asset(view_hash),
+                        type=FlowType.VIEW,
+                        fields=fields,
+                        sql=entry.sql,
+                        # The catalog said these objects depend on each other;
+                        # only the column detail was parsed out of SQL.
+                        method=Method.SQL_PARSED if fields else Method.SYSTEM_CATALOG,
+                    )
+                )
+
+    def _urn_ref_for_key(self, table_key: tuple[str, ...]) -> Ref | None:
+        """Name a table this scan did not ingest, so the edge survives anyway.
+
+        A view frequently reads from a schema the scan's scope excludes. Before
+        URNs the only options were to drop the edge or to invent an asset; now
+        it is parked against a platform name and binds itself if that schema is
+        ever scanned.
+        """
+        authority = self._urn_authority()
+        if not authority:
+            return None
+        try:
+            return Ref.urn(Urn.of(self.source_type, authority, *table_key))
+        except UrnError:
+            return None
 
     # ── extract_raw (discovery) ──────────────────────────────────────────
 
@@ -800,6 +940,7 @@ class BaseTabularSource(BaseSource):
             t.table_key: self.generate_hash_id(t.raw_id) for t in tables
         }
         fk_links = self._collect_foreign_key_links(tables)
+        self._emit_relationship_edges(tables, table_hash_by_key, fk_links)
 
         batch: list[SingleAssetScanResults] = []
         for table_ref in tables:

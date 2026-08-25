@@ -14,10 +14,13 @@ import { GraphService } from '../graph.service';
 import {
   BulkIngestEdgesDto,
   BulkIngestEdgesResponseDto,
+  ColumnLineageDto,
+  ColumnLineageResponseDto,
   CreateManualEdgeDto,
   EdgeDetailDto,
   ExpandGraphDto,
   GraphResponseDto,
+  LineageGraphDto,
   PivotGraphDto,
   RebuildEdgesResponseDto,
   RelationTypesResponseDto,
@@ -25,11 +28,48 @@ import {
 } from '../dto/graph.dto';
 import { InternalOnly } from '../internal-only.decorator';
 import { AllowInDemoMode } from '../demo-mode.decorator';
+import { ReadOnlyEndpoint } from '../db/read-only-endpoint.decorator';
 
 @ApiTags('graph')
 @Controller('graph')
 export class GraphController {
   constructor(private readonly graphService: GraphService) {}
+
+  @AllowInDemoMode()
+  @ReadOnlyEndpoint()
+  @Post('lineage')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Trace where an asset came from, or what breaks if it changes',
+    description:
+      'Walks FLOW edges only. Containment and identity are controls here rather ' +
+      'than hops: collapseContainers rolls tables up into their schemas, and ' +
+      'mergeIdentity folds an asset and its twin in another system into one node ' +
+      'so a path across them costs one hop instead of two.',
+  })
+  @ApiResponse({ status: 200, type: GraphResponseDto })
+  async lineage(@Body() dto: LineageGraphDto): Promise<GraphResponseDto> {
+    return this.graphService.lineage(dto);
+  }
+
+  @AllowInDemoMode()
+  @ReadOnlyEndpoint()
+  @Post('lineage/column')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'Trace one column back through the transformations that produced it',
+    description:
+      'Indirect dependencies — an ORDER BY or a join key that shaped which rows ' +
+      'came out without feeding the value — are returned separately, so they do ' +
+      'not read as if the column was computed from them.',
+  })
+  @ApiResponse({ status: 200, type: ColumnLineageResponseDto })
+  async columnLineage(
+    @Body() dto: ColumnLineageDto,
+  ): Promise<ColumnLineageResponseDto> {
+    return this.graphService.columnLineage(dto);
+  }
 
   @AllowInDemoMode()
   @Post('expand')

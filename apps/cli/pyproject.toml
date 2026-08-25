@@ -1,6 +1,6 @@
 [project]
 name = "classifyre-cli"
-version = "0.4.129"
+version = "0.4.130"
 description = "Classifyre CLI — scan and classify unstructured data sources"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -113,6 +113,13 @@ custom = [
 ]
 regex = [
     "google-re2>=1.1",
+]
+# Column-level lineage for dialects whose catalog only hands back the view SQL.
+# Kept out of the base image: a warehouse connector needs it, a folder scan
+# never does, and it is loaded through require_module like every other optional
+# source dependency.
+lineage = [
+    "sqlglot>=25.0.0",
 ]
 llm = [
     "litellm>=1.86.2",

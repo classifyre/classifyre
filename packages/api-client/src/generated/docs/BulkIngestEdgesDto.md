@@ -6,6 +6,7 @@
 
 Name | Type
 ------------ | -------------
+`sourceId` | string
 `edges` | [Array&lt;IngestEdgeDto&gt;](IngestEdgeDto.md)
 
 ## Example
@@ -15,6 +16,7 @@ import type { BulkIngestEdgesDto } from '@workspace/api-client'
 
 // TODO: Update the object below with actual values
 const example = {
+  "sourceId": null,
   "edges": null,
 } satisfies BulkIngestEdgesDto
 

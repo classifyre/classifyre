@@ -1,0 +1,55 @@
+---
+title: Neo4j
+description: Scan Neo4j node labels and relationships — Bolt connection options, label scoping, sampled node properties, and every setting.
+---
+
+import { SourceFacts, SourceParameters, SourceMetadata } from "@/components/source-reference";
+import { LineageNote, SharedSettingsNote } from "@/components/source-notes";
+
+# Neo4j
+
+<SourceFacts
+  type="NEO4J"
+  vendor={{ label: "Neo4j", href: "https://neo4j.com/" }}
+  auth={{ label: "Neo4j authentication and authorization", href: "https://neo4j.com/docs/operations-manual/current/authentication-authorization/" }}
+/>
+
+Graph databases hold relationships — customers to accounts, people to
+organisations, identities to devices. That makes the *properties* on those nodes
+some of the most identity-rich data in an estate.
+
+## What you need to connect
+
+A **Bolt or Neo4j URI** (`bolt://`, `neo4j://`, `neo4j+s://` for Aura), a
+database name, and — unless the instance is unauthenticated — a username and
+password. A read-only role is sufficient.
+
+## What Classifyre reads
+
+One asset per **node label**, whose content is a sample of the properties on
+nodes with that label. Scope by label allow- and denylist, with a cap on how
+many label assets a run produces.
+
+When relationship extraction is enabled, the **relationships between labels** are
+resolved and recorded as links, so the shape of the graph is visible alongside
+its contents.
+
+## Metadata on every asset
+
+<SourceMetadata type="NEO4J" />
+
+## Lineage
+
+<LineageNote />
+
+## Worth knowing
+
+- **Only read queries are issued** — the scan never writes to the graph.
+- **Neo4j Aura** connects with a `neo4j+s://` URI and needs no extra TLS
+  configuration.
+
+## Configuration
+
+<SharedSettingsNote />
+
+<SourceParameters type="NEO4J" />

@@ -5,9 +5,16 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from './prisma.service';
+import { resolveEdgeClass, LINEAGE_CLASS } from './graph/edge-class';
+import { tryNormalizeUrn } from './graph/urn';
 import {
   BulkIngestEdgesDto,
   BulkIngestEdgesResponseDto,
+  ColumnLineageDto,
+  ColumnLineageResponseDto,
+  ColumnLineageStepDto,
+  FieldMappingDto,
+  LineageGraphDto,
   CreateManualEdgeDto,
   EdgeDetailDto,
   ExpandGraphDto,
@@ -24,6 +31,44 @@ import {
 /** Upper bound on nodes returned by a single traversal to keep the graph curated. */
 const NODE_CAP = 200;
 const MAX_DEPTH = 3;
+
+/**
+ * Entity kind for an endpoint that names a URN instead of an ingested asset.
+ *
+ * Reusing the existing free-form `fromType`/`toType` rather than adding nullable
+ * endpoint columns: the unique constraint, the recursive traversal and the
+ * transfer scopes all keep working untouched, and the id column already holds
+ * an opaque string.
+ */
+const EXTERNAL_NODE = 'external';
+
+const EDGE_METHODS = new Set([
+  'RUNTIME_OBSERVED',
+  'SYSTEM_CATALOG',
+  'SQL_PARSED',
+  'HEURISTIC',
+  'MANUAL',
+]);
+
+/** Unknown or absent methods fall back to the catalog default. */
+function normalizeMethod(method: string | null | undefined): string {
+  return method && EDGE_METHODS.has(method) ? method : 'SYSTEM_CATALOG';
+}
+
+/**
+ * Readable label for an unresolved URN endpoint.
+ *
+ * The last segment is the object's own name, which is what a person is looking
+ * for; the platform says which system it lives in. The middle of a fully
+ * qualified name is the least useful part on a crowded canvas.
+ */
+function externalLabel(urn: string): string {
+  const [platform, rest] = urn.split('://');
+  if (!rest) return urn;
+  const segments = rest.split('/').filter(Boolean);
+  const name = segments[segments.length - 1] ?? rest;
+  return `${name} (${platform})`;
+}
 
 /** Compose a finding node label from its type and (optionally) a truncated match. */
 function findingLabel(type: string, matched?: string | null): string {
@@ -83,6 +128,118 @@ interface EdgeRow {
   relation_type: string;
   confidence: string | number;
   origin: GraphEdgeDto['origin'];
+  relation_class?: string;
+  granularity?: string;
+  method?: string;
+  field_mappings?: unknown;
+  evidence?: unknown;
+  last_seen_at?: Date | string | null;
+}
+
+/** One row of the edges table as the UI wants it. */
+function toGraphEdge(e: EdgeRow): GraphEdgeDto {
+  const mappings = Array.isArray(e.field_mappings)
+    ? e.field_mappings
+    : undefined;
+  return {
+    id: e.id,
+    fromType: e.from_type,
+    fromId: e.from_id,
+    toType: e.to_type,
+    toId: e.to_id,
+    relationType: e.relation_type,
+    confidence: Number(e.confidence),
+    origin: e.origin,
+    relationClass: resolveEdgeClass(e.relation_class, e.relation_type),
+    granularity: e.granularity ?? 'DATASET',
+    method: e.method ?? 'SYSTEM_CATALOG',
+    fieldMappings: mappings as GraphEdgeDto['fieldMappings'],
+    evidence: (e.evidence ?? undefined) as GraphEdgeDto['evidence'],
+  };
+}
+
+/** `type:id`, the key both rewrites use to identify a node. */
+function nodeKey(type: string, id: string): string {
+  return `${type}:${id}`;
+}
+
+function splitKey(key: string): { type: string; id: string } {
+  const idx = key.indexOf(':');
+  return { type: key.slice(0, idx), id: key.slice(idx + 1) };
+}
+
+function nodeTupleList(nodes: GraphNodeDto[]): Prisma.Sql {
+  return Prisma.join(nodes.map((n) => Prisma.sql`(${n.type}, ${n.id})`));
+}
+
+/**
+ * Map every node onto a representative and rebuild the graph around it.
+ *
+ * Shared by the two lineage controls, because collapsing into containers and
+ * merging identical nodes are the same operation with a different choice of
+ * representative. Self-edges are dropped (a node does not flow into itself
+ * once its parts are folded together) and parallel edges collapse to the
+ * strongest one, so a rolled-up schema shows one arrow rather than forty.
+ */
+function rewriteGraph(
+  graph: GraphResponseDto,
+  representativeOf: (node: GraphNodeDto) => string,
+): GraphResponseDto {
+  const mapping = new Map<string, string>();
+  const survivors = new Map<string, GraphNodeDto>();
+
+  for (const node of graph.nodes) {
+    const key = nodeKey(node.type, node.id);
+    const rep = representativeOf(node);
+    mapping.set(key, rep);
+    if (rep === key) survivors.set(rep, node);
+  }
+  // A representative that was not itself in the traversal (a container pulled
+  // in from outside) still needs a node; depth is inherited from the shallowest
+  // member so ordering by distance stays meaningful.
+  for (const [key, rep] of mapping) {
+    if (survivors.has(rep)) continue;
+    const member = graph.nodes.find((n) => nodeKey(n.type, n.id) === key);
+    const { type, id } = splitKey(rep);
+    survivors.set(rep, {
+      id,
+      type,
+      label: '',
+      depth: member?.depth ?? 0,
+    });
+  }
+  for (const [key, rep] of mapping) {
+    const member = graph.nodes.find((n) => nodeKey(n.type, n.id) === key);
+    const survivor = survivors.get(rep);
+    if (member && survivor && member.depth < survivor.depth) {
+      survivor.depth = member.depth;
+    }
+  }
+
+  const edges = new Map<string, GraphEdgeDto>();
+  for (const edge of graph.edges) {
+    const from = mapping.get(nodeKey(edge.fromType, edge.fromId));
+    const to = mapping.get(nodeKey(edge.toType, edge.toId));
+    if (!from || !to || from === to) continue;
+    const fromParts = splitKey(from);
+    const toParts = splitKey(to);
+    const dedupe = `${from}->${to}:${edge.relationType}`;
+    const existing = edges.get(dedupe);
+    if (existing && existing.confidence >= edge.confidence) continue;
+    edges.set(dedupe, {
+      ...edge,
+      fromType: fromParts.type,
+      fromId: fromParts.id,
+      toType: toParts.type,
+      toId: toParts.id,
+    });
+  }
+
+  return {
+    nodes: [...survivors.values()],
+    edges: [...edges.values()],
+    truncated: graph.truncated,
+  };
 }
 
 @Injectable()
@@ -228,48 +385,488 @@ export class GraphService {
   async upsertEdges(
     dto: BulkIngestEdgesDto,
   ): Promise<BulkIngestEdgesResponseDto> {
-    // Collect all hashes that need UUID resolution.
-    const fromHashes = dto.edges
-      .filter((e) => e.fromHash)
-      .map((e) => e.fromHash!);
-    const toHashes = dto.edges.filter((e) => e.toHash).map((e) => e.toHash!);
-    const allHashes = Array.from(new Set([...fromHashes, ...toHashes]));
+    const edges = dto.edges ?? [];
+    if (edges.length === 0) return { upserted: 0, external: 0, dropped: 0 };
 
-    let hashToId = new Map<string, string>();
-    if (allHashes.length > 0) {
-      // Assets use a base64-encoded hash stored in their `hash` column (via deterministic UUID).
-      // The asset table uses `id` (UUID) as PK but the CLI-generated hash is the `hash` column.
-      const assets = await this.prisma.asset.findMany({
-        where: { hash: { in: allHashes } },
-        select: { id: true, hash: true },
-      });
-      hashToId = new Map(assets.map((a) => [a.hash, a.id]));
+    // An asset hash is only unique per source (`@@unique([sourceId, hash])`),
+    // so resolving one globally picks an arbitrary winner when two sources
+    // share a hash. Scope it to the source that emitted the batch; naming an
+    // asset in *another* source is what a URN is for.
+    const hashes = new Set<string>();
+    const urns = new Set<string>();
+    for (const e of edges) {
+      if (e.fromHash) hashes.add(e.fromHash);
+      if (e.toHash) hashes.add(e.toHash);
+      if (e.viaId) hashes.add(e.viaId);
+      for (const raw of [e.fromUrn, e.toUrn, e.viaUrn]) {
+        const normalized = tryNormalizeUrn(raw);
+        if (normalized) urns.add(normalized);
+      }
     }
 
-    const rows: Prisma.EdgeCreateManyInput[] = [];
-    for (const e of dto.edges) {
-      const fromId =
-        e.fromId ?? (e.fromHash ? hashToId.get(e.fromHash) : undefined);
-      const toId = e.toId ?? (e.toHash ? hashToId.get(e.toHash) : undefined);
-      if (!fromId || !toId) continue; // skip unresolvable
+    const [hashToId, urnToId] = await Promise.all([
+      this.resolveHashes([...hashes], dto.sourceId),
+      this.resolveUrns([...urns], dto.sourceId),
+    ]);
 
-      rows.push({
-        fromType: e.fromType,
-        fromId,
-        toType: e.toType,
-        toId,
-        relationType: e.relationType,
-        confidence: e.confidence ?? 1,
-        origin: 'SOURCE_DERIVED',
-      });
+    interface Endpoint {
+      type: string;
+      id: string;
+      external: boolean;
     }
 
-    if (rows.length === 0) return { upserted: 0 };
-    const result = await this.prisma.edge.createMany({
-      data: rows,
-      skipDuplicates: true,
+    const endpointOf = (
+      kind: string,
+      id?: string,
+      hash?: string,
+      urn?: string,
+    ): Endpoint | null => {
+      if (id) return { type: kind, id, external: false };
+      if (hash) {
+        const resolved = hashToId.get(hash);
+        if (resolved) return { type: kind, id: resolved, external: false };
+        // A hash the emitting source produced should exist. If it does not,
+        // the asset was filtered out of this run and there is nothing to point
+        // at — unlike a URN, there is no later scan that will supply it.
+        return null;
+      }
+      const normalized = tryNormalizeUrn(urn);
+      if (!normalized) return null;
+      const resolved = urnToId.get(normalized);
+      return resolved
+        ? { type: kind, id: resolved, external: false }
+        : // Kept, not dropped: the other system simply has not been scanned
+          // yet. `stitchExternalEdges` binds it whenever that happens, so the
+          // two scans can run in either order.
+          { type: EXTERNAL_NODE, id: normalized, external: true };
+    };
+
+    const rows: Prisma.Sql[] = [];
+    let external = 0;
+    let dropped = 0;
+
+    for (const e of edges) {
+      const from = endpointOf(e.fromType, e.fromId, e.fromHash, e.fromUrn);
+      const to = endpointOf(e.toType, e.toId, e.toHash, e.toUrn);
+      if (!from || !to) {
+        dropped += 1;
+        continue;
+      }
+      if (from.external || to.external) external += 1;
+
+      const relationClass = resolveEdgeClass(e.relationClass, e.relationType);
+      const mappings = Array.isArray(e.fieldMappings) ? e.fieldMappings : null;
+      const granularity =
+        e.granularity === 'FIELD' || (mappings && mappings.length > 0)
+          ? 'FIELD'
+          : 'DATASET';
+      const via = e.viaId
+        ? hashToId.get(e.viaId)
+        : tryNormalizeUrn(e.viaUrn)
+          ? urnToId.get(tryNormalizeUrn(e.viaUrn)!)
+          : undefined;
+
+      // Every column is cast explicitly. Postgres types an untyped placeholder
+      // inside a VALUES list as `text`, so without these the numeric and
+      // timestamp columns fail the insert outright — and the enum columns
+      // would too.
+      rows.push(Prisma.sql`(
+        ${from.type}::text, ${from.id}::text, ${to.type}::text, ${to.id}::text,
+        ${e.relationType}::text,
+        ${e.confidence ?? 1}::numeric(3,2),
+        'SOURCE_DERIVED'::"EdgeOrigin",
+        ${relationClass}::"EdgeClass",
+        ${granularity}::"EdgeGranularity",
+        ${normalizeMethod(e.method)}::"EdgeMethod",
+        ${mappings ? JSON.stringify(mappings) : null}::jsonb,
+        ${e.evidence ? JSON.stringify(e.evidence) : null}::jsonb,
+        ${via ? 'asset' : null}::text, ${via ?? null}::text,
+        now()::timestamp(3)
+      )`);
+    }
+
+    if (rows.length === 0) return { upserted: 0, external, dropped };
+
+    // Raw upsert rather than createMany({ skipDuplicates }): skipping a
+    // duplicate silently discards the re-ingest, so a changed confidence, a
+    // newly-discovered column mapping, or a refreshed last_seen_at would never
+    // land. Expiry and provenance both depend on the refresh happening.
+    //
+    // MANUAL origin is preserved: a person drew that edge, and a connector
+    // later deriving the same relationship should not erase who put it there.
+    const upserted = await this.prisma.$executeRaw(Prisma.sql`
+      INSERT INTO "edges" (
+        "id", "from_type", "from_id", "to_type", "to_id",
+        "relation_type", "confidence", "origin",
+        "relation_class", "granularity", "method",
+        "field_mappings", "evidence", "via_type", "via_id", "last_seen_at"
+      )
+      SELECT gen_random_uuid(), v.* FROM (VALUES ${Prisma.join(rows)}) AS v
+      ON CONFLICT ("from_type", "from_id", "to_type", "to_id", "relation_type")
+      DO UPDATE SET
+        "confidence"     = EXCLUDED."confidence",
+        "relation_class" = EXCLUDED."relation_class",
+        "granularity"    = EXCLUDED."granularity",
+        "method"         = EXCLUDED."method",
+        "field_mappings" = COALESCE(EXCLUDED."field_mappings", "edges"."field_mappings"),
+        "evidence"       = COALESCE(EXCLUDED."evidence", "edges"."evidence"),
+        "via_type"       = COALESCE(EXCLUDED."via_type", "edges"."via_type"),
+        "via_id"         = COALESCE(EXCLUDED."via_id", "edges"."via_id"),
+        "last_seen_at"   = EXCLUDED."last_seen_at",
+        "origin"         = CASE
+          WHEN "edges"."origin" = 'MANUAL'::"EdgeOrigin" THEN "edges"."origin"
+          ELSE EXCLUDED."origin"
+        END
+    `);
+
+    return { upserted, external, dropped };
+  }
+
+  // ─── Lineage ─────────────────────────────────────────────────────────
+  //
+  // Lineage is the FLOW subset of the graph and nothing else. Containment and
+  // identity still matter here, but as *controls* rather than as hops: one
+  // collapses the picture, the other merges duplicated nodes. That separation
+  // is the whole reason edges carry a class.
+
+  async lineage(dto: LineageGraphDto): Promise<GraphResponseDto> {
+    const asset = await this.prisma.asset.findUnique({
+      where: { id: dto.assetId },
+      select: { id: true },
     });
-    return { upserted: result.count };
+    if (!asset) throw new NotFoundException('Asset not found');
+
+    const depth = Math.min(dto.depth ?? 2, MAX_DEPTH);
+    // Flow edges point the way the data moves, so "where did this come from"
+    // is an inward walk and "what breaks if I change it" is an outward one.
+    const direction: GraphDirection =
+      dto.direction === 'up' ? 'in' : dto.direction === 'down' ? 'out' : 'both';
+
+    let graph = await this.traverse(
+      [{ type: 'asset', id: dto.assetId }],
+      depth,
+      direction,
+      undefined,
+      LINEAGE_CLASS,
+    );
+
+    if (dto.mergeIdentity !== false) {
+      graph = await this.mergeIdentityNodes(graph, dto.assetId);
+    }
+    if (dto.collapseContainers) {
+      graph = await this.collapseIntoContainers(graph, dto.assetId);
+    }
+    return graph;
+  }
+
+  /**
+   * Fold nodes joined by an IDENTITY edge into a single node.
+   *
+   * A dbt model and the warehouse table it is are one thing described twice.
+   * Left alone they appear as two hops in every path that crosses them, which
+   * both doubles the graph and makes "how far upstream is this?" wrong.
+   */
+  private async mergeIdentityNodes(
+    graph: GraphResponseDto,
+    seedId: string,
+  ): Promise<GraphResponseDto> {
+    const keys = graph.nodes.map((n) => nodeKey(n.type, n.id));
+    if (keys.length < 2) return graph;
+
+    const identityRows = await this.prisma.$queryRaw<
+      { from_type: string; from_id: string; to_type: string; to_id: string }[]
+    >(Prisma.sql`
+      SELECT from_type, from_id, to_type, to_id FROM "edges"
+      WHERE relation_class = 'IDENTITY'::"EdgeClass"
+        AND (from_type, from_id) IN (${nodeTupleList(graph.nodes)})
+        AND (to_type, to_id) IN (${nodeTupleList(graph.nodes)})
+    `);
+    if (identityRows.length === 0) return graph;
+
+    // Union-find over the identity pairs, with the seed pinned as its own
+    // representative so the node the user asked about never disappears.
+    const parent = new Map<string, string>(keys.map((k) => [k, k]));
+    const find = (k: string): string => {
+      let root = k;
+      while (parent.get(root) !== root) root = parent.get(root)!;
+      return root;
+    };
+    const seedKey = nodeKey('asset', seedId);
+    for (const row of identityRows) {
+      const a = find(nodeKey(row.from_type, row.from_id));
+      const b = find(nodeKey(row.to_type, row.to_id));
+      if (a === b) continue;
+      // Keep the seed's root as the survivor wherever it is involved.
+      const [winner, loser] = b === seedKey ? [b, a] : [a, b];
+      parent.set(loser, winner);
+    }
+
+    return rewriteGraph(graph, (node) => find(nodeKey(node.type, node.id)));
+  }
+
+  /**
+   * Roll each node up into whatever contains it.
+   *
+   * The point is scale, not tidiness: a warehouse lineage graph is unreadable
+   * at table granularity and obvious at schema granularity, and it is the same
+   * data either way.
+   */
+  private async collapseIntoContainers(
+    graph: GraphResponseDto,
+    seedId: string,
+  ): Promise<GraphResponseDto> {
+    if (graph.nodes.length === 0) return graph;
+    const parents = await this.prisma.$queryRaw<
+      { child_id: string; parent_type: string; parent_id: string }[]
+    >(Prisma.sql`
+      SELECT to_id AS child_id, from_type AS parent_type, from_id AS parent_id
+      FROM "edges"
+      WHERE relation_class = 'CONTAINMENT'::"EdgeClass"
+        AND (to_type, to_id) IN (${nodeTupleList(graph.nodes)})
+    `);
+    if (parents.length === 0) return graph;
+
+    const parentOf = new Map(
+      parents.map((r) => [r.child_id, nodeKey(r.parent_type, r.parent_id)]),
+    );
+    // The seed stays itself: collapsing the node the user is standing on into
+    // its container answers a question they did not ask.
+    parentOf.delete(seedId);
+
+    const collapsed = rewriteGraph(graph, (node) =>
+      node.type === 'asset'
+        ? (parentOf.get(node.id) ?? nodeKey(node.type, node.id))
+        : nodeKey(node.type, node.id),
+    );
+
+    // Containers pulled in as representatives are not in the traversal result,
+    // so they have no label yet.
+    const unlabelled = collapsed.nodes.filter((n) => !n.label);
+    if (unlabelled.length > 0) {
+      const hydrated = await this.hydrateNodes(
+        unlabelled.map((n) => ({
+          node_type: n.type,
+          node_id: n.id,
+          depth: BigInt(n.depth),
+        })),
+      );
+      const byKey = new Map(hydrated.map((n) => [nodeKey(n.type, n.id), n]));
+      collapsed.nodes = collapsed.nodes.map(
+        (n) => byKey.get(nodeKey(n.type, n.id)) ?? n,
+      );
+    }
+    return collapsed;
+  }
+
+  /**
+   * Trace one column back through the field mappings on flow edges.
+   *
+   * Column lineage rides on the dataset edges rather than living in its own
+   * node type: a column graph has one to two orders of magnitude more nodes
+   * than a table graph, and materialising it is what made the column-as-entity
+   * catalogs expensive enough that nobody repeated the design.
+   */
+  async columnLineage(
+    dto: ColumnLineageDto,
+  ): Promise<ColumnLineageResponseDto> {
+    const maxDepth = Math.min(dto.depth ?? 3, 5);
+    const steps: ColumnLineageStepDto[] = [];
+    const indirect: ColumnLineageStepDto[] = [];
+
+    // (assetId, column) pairs still to explain.
+    let frontier: { id: string; column: string }[] = [
+      { id: dto.assetId, column: dto.column },
+    ];
+    const seen = new Set<string>([`${dto.assetId}::${dto.column}`]);
+
+    for (let depth = 1; depth <= maxDepth && frontier.length > 0; depth++) {
+      const rows = await this.prisma.$queryRaw<
+        {
+          from_type: string;
+          from_id: string;
+          to_id: string;
+          field_mappings: unknown;
+        }[]
+      >(Prisma.sql`
+        SELECT from_type, from_id, to_id, field_mappings FROM "edges"
+        WHERE relation_class = 'FLOW'::"EdgeClass"
+          AND granularity = 'FIELD'::"EdgeGranularity"
+          AND to_type = 'asset'
+          AND to_id IN (${Prisma.join(frontier.map((f) => f.id))})
+      `);
+      if (rows.length === 0) break;
+
+      const upstreamIds = rows
+        .filter((r) => r.from_type === 'asset')
+        .map((r) => r.from_id);
+      const labels = await this.labelsFor(upstreamIds);
+
+      const next: { id: string; column: string }[] = [];
+      for (const row of rows) {
+        const wanted = frontier
+          .filter((f) => f.id === row.to_id)
+          .map((f) => f.column);
+        const mappings = Array.isArray(row.field_mappings)
+          ? (row.field_mappings as FieldMappingDto[])
+          : [];
+        const external = row.from_type === EXTERNAL_NODE;
+
+        for (const mapping of mappings) {
+          const isIndirect =
+            mapping.downstream == null || mapping.type === 'INDIRECT';
+          if (!isIndirect && !wanted.includes(mapping.downstream!)) continue;
+
+          const step: ColumnLineageStepDto = {
+            assetId: row.from_id,
+            assetLabel: external
+              ? externalLabel(row.from_id)
+              : (labels.get(row.from_id) ?? '(deleted asset)'),
+            urn: external ? row.from_id : undefined,
+            column: mapping.downstream ?? '(rows)',
+            upstreams: mapping.upstreams ?? [],
+            transform: mapping.transform ?? null,
+            type: mapping.type ?? 'TRANSFORMED',
+            depth,
+          };
+
+          if (isIndirect) {
+            // An ORDER BY column shaped the result without feeding this
+            // column's values. Reported apart so it does not read as if the
+            // value was computed from it.
+            indirect.push(step);
+            continue;
+          }
+          steps.push(step);
+
+          if (external) continue; // nothing further to walk into yet
+          for (const upstream of step.upstreams) {
+            const key = `${row.from_id}::${upstream}`;
+            if (seen.has(key)) continue;
+            seen.add(key);
+            next.push({ id: row.from_id, column: upstream });
+          }
+        }
+      }
+      frontier = next;
+    }
+
+    return { steps, indirect };
+  }
+
+  private async labelsFor(ids: string[]): Promise<Map<string, string>> {
+    if (ids.length === 0) return new Map();
+    const assets = await this.prisma.asset.findMany({
+      where: { id: { in: ids } },
+      select: { id: true, name: true },
+    });
+    return new Map(assets.map((a) => [a.id, a.name]));
+  }
+
+  /** Asset hashes to UUIDs, scoped to one source when the caller named one. */
+  private async resolveHashes(
+    hashes: string[],
+    sourceId?: string,
+  ): Promise<Map<string, string>> {
+    if (hashes.length === 0) return new Map();
+    const assets = await this.prisma.asset.findMany({
+      where: { hash: { in: hashes }, ...(sourceId ? { sourceId } : {}) },
+      select: { id: true, hash: true, updatedAt: true },
+      orderBy: { updatedAt: 'asc' },
+    });
+    // Ordered oldest-first so the last write wins: without a sourceId this is
+    // the most recently updated asset carrying that hash.
+    return new Map(assets.map((a) => [a.hash, a.id]));
+  }
+
+  /**
+   * Platform URNs to asset UUIDs.
+   *
+   * `assets.urn` is deliberately not unique — two source configs may
+   * legitimately scan the same warehouse — so a URN can match several assets.
+   * Prefer one in the emitting source, then the most recently updated, so the
+   * choice is at least deterministic and points at live data.
+   */
+  private async resolveUrns(
+    urns: string[],
+    sourceId?: string,
+  ): Promise<Map<string, string>> {
+    if (urns.length === 0) return new Map();
+    const assets = await this.prisma.asset.findMany({
+      where: { urn: { in: urns } },
+      select: { id: true, urn: true, sourceId: true, updatedAt: true },
+      orderBy: { updatedAt: 'asc' },
+    });
+    const resolved = new Map<string, string>();
+    const fromSameSource = new Set<string>();
+    for (const asset of assets) {
+      if (!asset.urn) continue;
+      const preferred = sourceId != null && asset.sourceId === sourceId;
+      if (fromSameSource.has(asset.urn) && !preferred) continue;
+      resolved.set(asset.urn, asset.id);
+      if (preferred) fromSameSource.add(asset.urn);
+    }
+    return resolved;
+  }
+
+  /**
+   * Bind `external` endpoints whose URN now resolves to a real asset.
+   *
+   * This is what makes cross-system lineage independent of scan order: a
+   * Tableau scan can name a Snowflake table months before anyone scans
+   * Snowflake, and the edge completes itself when they do.
+   *
+   * Called after a bulk asset ingest, with the URNs that run produced.
+   */
+  async stitchExternalEdges(urns: string[]): Promise<number> {
+    const normalized = urns
+      .map((value) => tryNormalizeUrn(value))
+      .filter((value): value is string => value !== null);
+    if (normalized.length === 0) return 0;
+
+    const resolved = await this.resolveUrns(normalized);
+    if (resolved.size === 0) return 0;
+
+    let stitched = 0;
+    for (const [urn, assetId] of resolved) {
+      // Rewrite, then delete whatever could not be rewritten because the same
+      // edge already existed in resolved form. Doing it the other way round
+      // would hit the unique constraint and abort the batch.
+      stitched += await this.prisma.$transaction(async (tx) => {
+        const outgoing = await tx.$executeRaw`
+          UPDATE "edges" SET "from_type" = 'asset', "from_id" = ${assetId}
+          WHERE "from_type" = ${EXTERNAL_NODE} AND "from_id" = ${urn}
+            AND NOT EXISTS (
+              SELECT 1 FROM "edges" existing
+              WHERE existing."from_type" = 'asset'
+                AND existing."from_id" = ${assetId}
+                AND existing."to_type" = "edges"."to_type"
+                AND existing."to_id" = "edges"."to_id"
+                AND existing."relation_type" = "edges"."relation_type"
+            )
+        `;
+        const incoming = await tx.$executeRaw`
+          UPDATE "edges" SET "to_type" = 'asset', "to_id" = ${assetId}
+          WHERE "to_type" = ${EXTERNAL_NODE} AND "to_id" = ${urn}
+            AND NOT EXISTS (
+              SELECT 1 FROM "edges" existing
+              WHERE existing."to_type" = 'asset'
+                AND existing."to_id" = ${assetId}
+                AND existing."from_type" = "edges"."from_type"
+                AND existing."from_id" = "edges"."from_id"
+                AND existing."relation_type" = "edges"."relation_type"
+            )
+        `;
+        // Anything still external for this URN is now a duplicate of a
+        // resolved edge, so it carries no information.
+        await tx.$executeRaw`
+          DELETE FROM "edges"
+          WHERE ("from_type" = ${EXTERNAL_NODE} AND "from_id" = ${urn})
+             OR ("to_type" = ${EXTERNAL_NODE} AND "to_id" = ${urn})
+        `;
+        return outgoing + incoming;
+      });
+    }
+    return stitched;
   }
 
   /**
@@ -323,19 +920,36 @@ export class GraphService {
 
   // ─── Phase 2: Manual edges ───────────────────────────────────────
 
+  // The suggested vocabulary, grouped by what each type means. GENERATED_FROM
+  // is gone: it pointed downstream -> upstream while every other flow type
+  // points the way the data moves, and the migration flipped the rows it had
+  // into TRANSFORM. Offering it again would reintroduce the inconsistency.
   private static readonly BUILTIN_RELATION_TYPES = [
+    // FLOW — lineage
+    'TRANSFORM',
+    'VIEW',
+    'COPY',
+    'WRITE',
+    'EXPORT',
+    'SEND',
+    // CONTAINMENT
     'CONTAINS',
+    'ATTACHED_TO',
+    // IDENTITY
+    'SAME_AS',
+    // REFERENCE
     'REFERENCES',
+    'MENTIONS',
+    'FOREIGN_KEY',
+    // USAGE
     'OWNS',
     'ACCESSED',
     'READS',
-    'WRITES',
-    'GENERATED_FROM',
-    'EXPORTED_TO',
-    'ATTACHED_TO',
-    'SENT_TO',
     'EXECUTED',
-    'MENTIONS',
+    // Retained for compatibility with edges already drawn under these names.
+    'WRITES',
+    'EXPORTED_TO',
+    'SENT_TO',
   ];
 
   async getRelationTypes(): Promise<RelationTypesResponseDto> {
@@ -361,7 +975,13 @@ export class GraphService {
       .forEach((t) => {
         if (!suggestions.includes(t)) suggestions.push(t);
       });
-    return { inUse, suggestions };
+    const counts = new Map(rows.map((r) => [r.relation_type, Number(r.cnt)]));
+    const classified = suggestions.map((type) => ({
+      type,
+      relationClass: resolveEdgeClass(null, type),
+      count: counts.get(type) ?? 0,
+    }));
+    return { inUse, suggestions, classified };
   }
 
   async createManualEdge(dto: CreateManualEdgeDto): Promise<EdgeDetailDto> {
@@ -655,6 +1275,7 @@ export class GraphService {
     depth: number,
     direction: GraphDirection,
     relationTypes?: string[],
+    relationClass?: string,
   ): Promise<GraphResponseDto> {
     if (seeds.length === 0) {
       return { nodes: [], edges: [], truncated: false };
@@ -663,10 +1284,16 @@ export class GraphService {
     const seedValues = Prisma.join(
       seeds.map((s) => Prisma.sql`(${s.type}, ${s.id})`),
     );
+    // Filtering by class is what separates "what breaks if I change this" from
+    // "what lives inside what". Without it a lineage walk wanders through
+    // containment and reference edges and answers a different question.
+    const classFilter = relationClass
+      ? Prisma.sql`AND e.relation_class = ${relationClass}::"EdgeClass"`
+      : Prisma.empty;
     const relFilter =
       relationTypes && relationTypes.length > 0
-        ? Prisma.sql`AND e.relation_type IN (${Prisma.join(relationTypes)})`
-        : Prisma.empty;
+        ? Prisma.sql`AND e.relation_type IN (${Prisma.join(relationTypes)}) ${classFilter}`
+        : classFilter;
 
     const outward = Prisma.sql`
       SELECT e.to_type AS node_type, e.to_id AS node_id
@@ -703,28 +1330,28 @@ export class GraphService {
     `);
 
     const truncated = nodeRows.length >= NODE_CAP;
+    // The seed itself is normally in the result, so this is only empty when the
+    // traversal genuinely found nothing. Guarded because `Prisma.join([])`
+    // throws rather than producing an empty IN list, which would surface as a
+    // 500 on a perfectly ordinary "this node has no lineage" answer.
+    if (nodeRows.length === 0) {
+      return { nodes: [], edges: [], truncated: false };
+    }
     const nodes = await this.hydrateNodes(nodeRows);
 
     const nodeTuples = Prisma.join(
       nodeRows.map((n) => Prisma.sql`(${n.node_type}, ${n.node_id})`),
     );
     const edgeRows = await this.prisma.$queryRaw<EdgeRow[]>(Prisma.sql`
-      SELECT id, from_type, from_id, to_type, to_id, relation_type, confidence, origin
+      SELECT id, from_type, from_id, to_type, to_id, relation_type, confidence, origin,
+             relation_class, granularity, method, field_mappings, evidence, last_seen_at
       FROM edges e
       WHERE (e.from_type, e.from_id) IN (${nodeTuples})
         AND (e.to_type, e.to_id) IN (${nodeTuples})
+        ${classFilter}
     `);
 
-    const edges: GraphEdgeDto[] = edgeRows.map((e) => ({
-      id: e.id,
-      fromType: e.from_type,
-      fromId: e.from_id,
-      toType: e.to_type,
-      toId: e.to_id,
-      relationType: e.relation_type,
-      confidence: Number(e.confidence),
-      origin: e.origin,
-    }));
+    const edges: GraphEdgeDto[] = edgeRows.map(toGraphEdge);
 
     return { nodes, edges, truncated };
   }
@@ -746,6 +1373,12 @@ export class GraphService {
           assetType: true,
           sourceType: true,
           status: true,
+          urn: true,
+          // A lineage graph exists to span systems, so which system a node is
+          // in is not decoration. GraphNodeDto has always declared these; only
+          // the correlation path ever filled them.
+          sourceId: true,
+          source: { select: { name: true } },
         },
       }),
       this.prisma.finding.findMany({
@@ -780,6 +1413,21 @@ export class GraphService {
 
     return rows.map((r) => {
       const depth = Number(r.depth);
+      if (r.node_type === EXTERNAL_NODE) {
+        // An endpoint naming an object no scan has produced yet. It has to be
+        // hydrated into a real node: dropping it here while its edge still
+        // ships in `edges` would leave the canvas drawing an edge to a node
+        // that does not exist.
+        return {
+          id: r.node_id,
+          type: EXTERNAL_NODE,
+          depth,
+          label: externalLabel(r.node_id),
+          status: 'external',
+          urn: r.node_id,
+          missing: false,
+        };
+      }
       if (r.node_type === 'asset') {
         const a = assetMap.get(r.node_id);
         return {
@@ -789,6 +1437,9 @@ export class GraphService {
           label: a?.name ?? '(deleted asset)',
           assetType: a?.assetType,
           sourceType: a ? String(a.sourceType) : undefined,
+          sourceId: a?.sourceId ?? undefined,
+          sourceName: a?.source?.name ?? undefined,
+          urn: a?.urn ?? undefined,
           status: a ? String(a.status) : undefined,
           missing: !a,
         };

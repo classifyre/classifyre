@@ -94,6 +94,9 @@ docs/ChatBotsApi.md
 docs/CliRunnerControllerUpdateRunnerStatusRequest.md
 docs/CloseCaseDto.md
 docs/CloseCaseResponseDto.md
+docs/ColumnLineageDto.md
+docs/ColumnLineageResponseDto.md
+docs/ColumnLineageStepDto.md
 docs/CorrelationApi.md
 docs/CorrelationConfigResponseDto.md
 docs/CorrelationGraphResponseDto.md
@@ -143,6 +146,7 @@ docs/EmbeddingsApi.md
 docs/EvidenceEntityDto.md
 docs/ExclusionRuleDto.md
 docs/ExpandGraphDto.md
+docs/FieldMappingDto.md
 docs/FinalizeIngestRunDto.md
 docs/FindingEvidenceAnalysisDto.md
 docs/FindingHistoryEntryDto.md
@@ -188,6 +192,7 @@ docs/InquiryResponseDto.md
 docs/InstanceSettingsApi.md
 docs/InstanceSettingsResponseDto.md
 docs/LatestRunnerSummaryDto.md
+docs/LineageGraphDto.md
 docs/LinkInquiriesDto.md
 docs/LinkThreadSupportDto.md
 docs/ListRunnersResponseDto.md
@@ -234,6 +239,7 @@ docs/RebuildEdgesResponseDto.md
 docs/RecomputeCorrelationResponseDto.md
 docs/RegisterDiscoveredAssetsDto.md
 docs/RegisterDiscoveredAssetsResponseDto.md
+docs/RelationTypeDto.md
 docs/RelationTypesResponseDto.md
 docs/RematchResponseDto.md
 docs/ReviewCaseLeadDto.md
@@ -479,6 +485,9 @@ src/models/ChatBotTestResultDto.ts
 src/models/CliRunnerControllerUpdateRunnerStatusRequest.ts
 src/models/CloseCaseDto.ts
 src/models/CloseCaseResponseDto.ts
+src/models/ColumnLineageDto.ts
+src/models/ColumnLineageResponseDto.ts
+src/models/ColumnLineageStepDto.ts
 src/models/CorrelationConfigResponseDto.ts
 src/models/CorrelationGraphResponseDto.ts
 src/models/CorrelationLabelWeightDto.ts
@@ -522,6 +531,7 @@ src/models/EmbeddingStatusResponseDto.ts
 src/models/EvidenceEntityDto.ts
 src/models/ExclusionRuleDto.ts
 src/models/ExpandGraphDto.ts
+src/models/FieldMappingDto.ts
 src/models/FinalizeIngestRunDto.ts
 src/models/FindingEvidenceAnalysisDto.ts
 src/models/FindingHistoryEntryDto.ts
@@ -561,6 +571,7 @@ src/models/InquiryMatchListResponseDto.ts
 src/models/InquiryResponseDto.ts
 src/models/InstanceSettingsResponseDto.ts
 src/models/LatestRunnerSummaryDto.ts
+src/models/LineageGraphDto.ts
 src/models/LinkInquiriesDto.ts
 src/models/LinkThreadSupportDto.ts
 src/models/ListRunnersResponseDto.ts
@@ -604,6 +615,7 @@ src/models/RebuildEdgesResponseDto.ts
 src/models/RecomputeCorrelationResponseDto.ts
 src/models/RegisterDiscoveredAssetsDto.ts
 src/models/RegisterDiscoveredAssetsResponseDto.ts
+src/models/RelationTypeDto.ts
 src/models/RelationTypesResponseDto.ts
 src/models/RematchResponseDto.ts
 src/models/ReviewCaseLeadDto.ts

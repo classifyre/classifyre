@@ -68,6 +68,12 @@ export default function SourcesPage() {
       description:
         "What a scan produces — assets, their kinds and change status, the metadata attached to each, and how it feeds detectors.",
     },
+    {
+      href: "/sources/lineage",
+      title: "Lineage & Relationships",
+      description:
+        "Where data came from and what breaks if it changes — the relationship classes, column-level lineage, and which sources report it.",
+    },
   ];
 
   const catalogEntries: SourceCatalogEntry[] = sources
@@ -113,8 +119,9 @@ export default function SourcesPage() {
             </Link>{" "}
             over them, and records any{" "}
             <strong className="text-foreground">findings</strong>. Each source
-            type below has its own reference page generated from its schema; the
-            concept guides explain the ideas shared by all of them.
+            type below has its own reference page — what it extracts, what it
+            needs to connect, and every setting — and the concept guides explain
+            the ideas they all share.
           </p>
         </header>
 
