@@ -31,6 +31,12 @@ export interface UpdateMcpTokenDto {
      * @memberof UpdateMcpTokenDto
      */
     isActive?: boolean;
+    /**
+     * MCP capability group ids this token may call (see GET .../mcp/tools for the group list). Omit or send null for unrestricted access to every current and future group.
+     * @type {Array<string>}
+     * @memberof UpdateMcpTokenDto
+     */
+    toolGroupIds?: Array<string> | null;
 }
 
 /**
@@ -52,6 +58,7 @@ export function UpdateMcpTokenDtoFromJSONTyped(json: any, ignoreDiscriminator: b
         
         'name': json['name'] == null ? undefined : json['name'],
         'isActive': json['isActive'] == null ? undefined : json['isActive'],
+        'toolGroupIds': json['toolGroupIds'] == null ? undefined : json['toolGroupIds'],
     };
 }
 
@@ -68,6 +75,7 @@ export function UpdateMcpTokenDtoToJSONTyped(value?: UpdateMcpTokenDto | null, i
         
         'name': value['name'],
         'isActive': value['isActive'],
+        'toolGroupIds': value['toolGroupIds'],
     };
 }
 

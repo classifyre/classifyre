@@ -3,6 +3,7 @@
 import * as React from "react";
 import {
   api,
+  type McpCapabilityGroupDto,
   type McpTokenCreatedResponseDto,
   type McpOverviewResponseDto,
   type McpTokenResponseDto,
@@ -25,6 +26,7 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
+  Checkbox,
   Dialog,
   DialogContent,
   DialogDescription,
@@ -66,7 +68,99 @@ type EditableToken = {
   id: string;
   name: string;
   isActive: boolean;
+  toolGroupIds: string[] | null;
 };
+
+/** `null` reads as "every group" — the unrestricted default every existing
+ * token has. Toggling that switch off seeds the explicit list from the
+ * current full group set, so unchecking one box narrows instead of starting
+ * from an empty allowlist. */
+function ToolGroupPicker({
+  groups,
+  value,
+  onChange,
+  disabled,
+}: {
+  groups: McpCapabilityGroupDto[];
+  value: string[] | null;
+  onChange: (next: string[] | null) => void;
+  disabled?: boolean;
+}) {
+  const { t } = useTranslation();
+  const unrestricted = value === null;
+  const selected = new Set(value ?? []);
+
+  return (
+    <div className="space-y-2 rounded-[4px] border border-border bg-muted/20 p-3">
+      <label className="flex items-center justify-between gap-3">
+        <span className="space-y-0.5">
+          <span className="block text-sm font-medium">
+            {t("mcp.allTools")}
+          </span>
+          <span className="block text-xs text-muted-foreground">
+            {t("mcp.allToolsDesc")}
+          </span>
+        </span>
+        <Switch
+          checked={unrestricted}
+          disabled={disabled}
+          onCheckedChange={(checked) =>
+            onChange(checked ? null : groups.map((group) => group.id))
+          }
+        />
+      </label>
+
+      {!unrestricted ? (
+        <div className="grid gap-1.5 border-t border-dashed border-border pt-2 sm:grid-cols-2">
+          {groups.map((group) => (
+            <label
+              key={group.id}
+              className="flex items-start gap-2 rounded-[4px] px-1.5 py-1 hover:bg-background"
+            >
+              <Checkbox
+                className="mt-0.5"
+                checked={selected.has(group.id)}
+                disabled={disabled}
+                onCheckedChange={(checked) =>
+                  onChange(
+                    checked
+                      ? [...(value ?? []), group.id]
+                      : (value ?? []).filter((id) => id !== group.id),
+                  )
+                }
+              />
+              <span className="space-y-0.5">
+                <span className="block text-xs font-medium">
+                  {group.title}
+                </span>
+                <span className="block text-[11px] leading-snug text-muted-foreground">
+                  {group.description}
+                </span>
+              </span>
+            </label>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function toolScopeLabel(
+  toolGroupIds: string[] | null,
+  totalGroups: number,
+  t: ReturnType<typeof useTranslation>["t"],
+): string {
+  if (toolGroupIds === null) {
+    return t("mcp.allTools");
+  }
+  if (toolGroupIds.length === 0) {
+    return t("mcp.noTools");
+  }
+  return t("mcp.groupCount", {
+    count: toolGroupIds.length,
+    total: totalGroups,
+  });
+}
 
 function sortTokens(tokens: McpTokenResponseDto[]): McpTokenResponseDto[] {
   return [...tokens].sort(
@@ -136,6 +230,9 @@ export function McpSettingsCard() {
 
   const [createOpen, setCreateOpen] = React.useState(false);
   const [createName, setCreateName] = React.useState("");
+  const [createGroupIds, setCreateGroupIds] = React.useState<string[] | null>(
+    null,
+  );
   const [creating, setCreating] = React.useState(false);
   const [reveal, setReveal] = React.useState<RevealState | null>(null);
 
@@ -207,6 +304,7 @@ export function McpSettingsCard() {
         await api.instanceSettings.mcpSettingsControllerCreateToken({
           createMcpTokenDto: {
             name,
+            toolGroupIds: createGroupIds,
           },
         });
 
@@ -217,6 +315,7 @@ export function McpSettingsCard() {
         preview: created.tokenPreview,
       });
       setCreateName("");
+      setCreateGroupIds(null);
       setCreateOpen(false);
       toast.success(t("mcp.tokenCreated"));
     } catch (createError) {
@@ -228,7 +327,7 @@ export function McpSettingsCard() {
     } finally {
       setCreating(false);
     }
-  }, [createName]);
+  }, [createName, createGroupIds]);
 
   const handleCopy = React.useCallback(async (value: string, label: string) => {
     try {
@@ -297,6 +396,7 @@ export function McpSettingsCard() {
           updateMcpTokenDto: {
             name,
             isActive: editing.isActive,
+            toolGroupIds: editing.toolGroupIds,
           },
         });
 
@@ -619,6 +719,27 @@ export function McpSettingsCard() {
                                   {t("mcp.neverUsed")}
                                 </Badge>
                               )}
+                              <Badge
+                                variant="outline"
+                                title={
+                                  token.toolGroupIds && overview
+                                    ? token.toolGroupIds
+                                        .map(
+                                          (id) =>
+                                            overview.capabilityGroups.find(
+                                              (group) => group.id === id,
+                                            )?.title ?? id,
+                                        )
+                                        .join(", ")
+                                    : undefined
+                                }
+                              >
+                                {toolScopeLabel(
+                                  token.toolGroupIds ?? null,
+                                  overview?.capabilityGroups.length ?? 0,
+                                  t,
+                                )}
+                              </Badge>
                             </div>
 
                             <div className="rounded-[4px] border border-border bg-background px-3 py-2 font-mono text-xs">
@@ -660,6 +781,7 @@ export function McpSettingsCard() {
                                   id: token.id,
                                   name: token.name,
                                   isActive: token.isActive,
+                                  toolGroupIds: token.toolGroupIds ?? null,
                                 })
                               }
                             >
@@ -708,7 +830,15 @@ export function McpSettingsCard() {
         </CardContent>
       </Card>
 
-      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+      <Dialog
+        open={createOpen}
+        onOpenChange={(open) => {
+          setCreateOpen(open);
+          if (!open) {
+            setCreateGroupIds(null);
+          }
+        }}
+      >
         <DialogContent className="rounded-[6px] border-2 border-border">
           <DialogHeader>
             <DialogTitle>{t("mcp.createTitle")}</DialogTitle>
@@ -727,6 +857,16 @@ export function McpSettingsCard() {
                 placeholder={t("mcp.cursorWorkspace")}
                 disabled={creating}
                 maxLength={120}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>{t("mcp.toolAccess")}</Label>
+              <ToolGroupPicker
+                groups={overview?.capabilityGroups ?? []}
+                value={createGroupIds}
+                onChange={setCreateGroupIds}
+                disabled={creating}
               />
             </div>
 
@@ -808,6 +948,20 @@ export function McpSettingsCard() {
                   onCheckedChange={(checked) =>
                     setEditing((current) =>
                       current ? { ...current, isActive: checked } : current,
+                    )
+                  }
+                  disabled={savingTokenId === editing.id}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>{t("mcp.toolAccess")}</Label>
+                <ToolGroupPicker
+                  groups={overview?.capabilityGroups ?? []}
+                  value={editing.toolGroupIds}
+                  onChange={(next) =>
+                    setEditing((current) =>
+                      current ? { ...current, toolGroupIds: next } : current,
                     )
                   }
                   disabled={savingTokenId === editing.id}
