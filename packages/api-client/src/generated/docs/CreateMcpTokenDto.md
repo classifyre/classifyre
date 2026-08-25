@@ -7,6 +7,7 @@
 Name | Type
 ------------ | -------------
 `name` | string
+`toolGroupIds` | Array&lt;string&gt;
 
 ## Example
 
@@ -16,6 +17,7 @@ import type { CreateMcpTokenDto } from '@workspace/api-client'
 // TODO: Update the object below with actual values
 const example = {
   "name": Cursor local agent,
+  "toolGroupIds": ["sources","custom_detectors"],
 } satisfies CreateMcpTokenDto
 
 console.log(example)
