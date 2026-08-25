@@ -17,6 +17,27 @@
       "insertText": "Asset"
     },
     {
+      "label": "Ref",
+      "kind": "class",
+      "detail": "Ref.asset(id) | Ref.urn(urn)",
+      "documentation": "One end of an edge.\n\n``asset`` names something this run produced, by its hash. ``urn`` names an\nobject by what its *platform* calls it -- which is how a connector points at\na table in a system it does not scan. An unresolved URN is kept and stitched\nwhen the other system is eventually ingested, rather than dropped.",
+      "insertText": "Ref"
+    },
+    {
+      "label": "FieldMapping",
+      "kind": "class",
+      "detail": "FieldMapping(downstream, upstreams, transform)",
+      "documentation": "One column-level dependency inside a dataset-level flow edge.\n\n``downstream=None`` records an *indirect* dependency -- a column that shaped\nwhich rows came out (an ``ORDER BY``, a ``WHERE``, a join key) without\nfeeding any particular output column. Keeping it against the dataset instead\nof against every output column is what stops indirect dependencies from\nfanning out across the whole mapping, and it is the one thing warehouse\nlineage tables have no way to say at all.",
+      "insertText": "FieldMapping"
+    },
+    {
+      "label": "FlowType",
+      "kind": "class",
+      "detail": "TRANSFORM | VIEW | COPY | WRITE | EXPORT | SEND",
+      "documentation": "Subtypes of lineage, named so they do not imply a direction.\n\nA verb would: \"DERIVED_FROM\" reads backwards on an edge that points\ndownstream. These are the *nature* of the derivation instead, and the\ndirection is carried by the edge itself.",
+      "insertText": "FlowType"
+    },
+    {
       "label": "parse",
       "kind": "function",
       "detail": "(source: 'Any', *, name: 'str' = '', mime_type: 'str | None' = None) -> 'ParsedContent'",
@@ -29,6 +50,48 @@
       "detail": "(source: 'Any', *, name: 'str' = '', mime_type: 'str | None' = None, page_size: 'int' = 100) -> 'Iterator[str]'",
       "documentation": "Read a payload in pages instead of all at once.\n\nFor a Parquet file or a large CSV, ``parse()`` materialises the whole thing\nas one string. This yields rows (tabular) or lines (everything else) a page\nat a time, so a multi-gigabyte dump can become many assets without ever\nbeing held whole.\n\n    for index, page in enumerate(pages(ctx.file(\"dump.parquet\"))):\n        yield Asset(id=f\"dump-{index}\", content=page, kind=\"table\")",
       "insertText": "pages(${1:source})"
+    },
+    {
+      "label": "flow",
+      "kind": "function",
+      "detail": "(*, upstream: 'Ref', downstream: 'Ref', type: 'FlowType' = <FlowType.TRANSFORM: 'TRANSFORM'>, fields: 'Iterable[FieldMapping] | None' = None, via: 'Ref | None' = None, sql: 'str | None' = None, method: 'Method' = <Method.SYSTEM_CATALOG: 'SYSTEM_CATALOG'>, confidence: 'float | None' = None, evidence: 'dict[str, Any] | None' = None) -> 'Edge'",
+      "documentation": "Data moves from ``upstream`` into ``downstream``.\n\nBoth ends are keyword-only on purpose: a reversed lineage edge is silently\nwrong rather than loudly broken, and it is the mistake everyone makes once.",
+      "insertText": "flow(upstream=${1:upstream}, downstream=${2:downstream})"
+    },
+    {
+      "label": "contains",
+      "kind": "function",
+      "detail": "(parent: 'Ref', child: 'Ref', *, type: 'ContainmentType' = <ContainmentType.CONTAINS: 'CONTAINS'>) -> 'Edge'",
+      "documentation": "``child`` is a part of ``parent`` -- structural, not temporal.",
+      "insertText": "contains(${1:parent}, ${2:child})"
+    },
+    {
+      "label": "references",
+      "kind": "function",
+      "detail": "(frm: 'Ref', to: 'Ref', *, type: 'ReferenceType' = <ReferenceType.REFERENCES: 'REFERENCES'>, method: 'Method' = <Method.SYSTEM_CATALOG: 'SYSTEM_CATALOG'>) -> 'Edge'",
+      "documentation": "``frm`` points at ``to``. No data moves -- a foreign key is not lineage.",
+      "insertText": "references(${1:frm}, ${2:to})"
+    },
+    {
+      "label": "same_as",
+      "kind": "function",
+      "detail": "(a: 'Ref', b: 'Ref', *, method: 'Method' = <Method.SYSTEM_CATALOG: 'SYSTEM_CATALOG'>) -> 'Edge'",
+      "documentation": "The same real-world object, seen from two systems.",
+      "insertText": "same_as(${1:a}, ${2:b})"
+    },
+    {
+      "label": "uses",
+      "kind": "function",
+      "detail": "(actor: 'Ref', target: 'Ref', *, type: 'UsageType' = <UsageType.ACCESSED: 'ACCESSED'>) -> 'Edge'",
+      "documentation": "``actor`` touched ``target``. Answers \"who\", not \"where did this come from\".",
+      "insertText": "uses(${1:actor}, ${2:target})"
+    },
+    {
+      "label": "urn_for",
+      "kind": "function",
+      "detail": "(platform: 'str', authority: 'str', *path: 'str') -> 'str'",
+      "documentation": "The name another system would know this object by.\n\n``urn_for(\"snowflake\", \"acme\", \"PROD\", \"PUBLIC\", \"ORDERS\")``. The point of\nbuilding it here rather than writing the string yourself is that the same\nfolding rules apply as when the Snowflake connector names that table --\ncapitalisation and default ports differ between tools, and a URN that\ndiffers by either never matches.\n\n``authority`` is the account, host, workspace or bucket; the rest is the\npath within it.",
+      "insertText": "urn_for(${1:platform}, ${2:authority})"
     }
   ],
   "objects": {
@@ -272,6 +335,13 @@
           "detail": "str | None",
           "required": false,
           "insertText": "location="
+        },
+        {
+          "label": "urn",
+          "kind": "field",
+          "detail": "str | None",
+          "required": false,
+          "insertText": "urn="
         }
       ]
     },
@@ -384,6 +454,39 @@
           "insertText": "read_text()"
         }
       ]
+    },
+    "FieldMapping": {
+      "documentation": "One column-level dependency inside a dataset-level flow edge.\n\n``downstream=None`` records an *indirect* dependency -- a column that shaped\nwhich rows came out (an ``ORDER BY``, a ``WHERE``, a join key) without\nfeeding any particular output column. Keeping it against the dataset instead\nof against every output column is what stops indirect dependencies from\nfanning out across the whole mapping, and it is the one thing warehouse\nlineage tables have no way to say at all.",
+      "fields": [
+        {
+          "label": "downstream",
+          "kind": "field",
+          "detail": "str | None",
+          "required": true,
+          "insertText": "downstream="
+        },
+        {
+          "label": "upstreams",
+          "kind": "field",
+          "detail": "Sequence[str]",
+          "required": false,
+          "insertText": "upstreams="
+        },
+        {
+          "label": "transform",
+          "kind": "field",
+          "detail": "str | None",
+          "required": false,
+          "insertText": "transform="
+        },
+        {
+          "label": "type",
+          "kind": "field",
+          "detail": "FieldTransform",
+          "required": false,
+          "insertText": "type="
+        }
+      ]
     }
   },
   "contract": {
@@ -393,7 +496,8 @@
     ],
     "optional": [
       "discover",
-      "fetch_content"
+      "fetch_content",
+      "relationships"
     ]
   }
 }

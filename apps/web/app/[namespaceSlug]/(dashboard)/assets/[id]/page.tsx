@@ -26,11 +26,31 @@ import {
 } from "@workspace/ui/components";
 import { FindingsTable } from "@/components/findings-table";
 import { FingerprintsGraph } from "@/components/fingerprints-graph";
+import { LineageView } from "@/components/lineage-view";
+import { ColumnLineagePanel } from "@/components/column-lineage-panel";
 import { AssetMetadataCard } from "@/components/asset-metadata-card";
 import { AssetKindBadge } from "@/components/asset-kind-badge";
 import { formatAssetKind } from "@/lib/asset-kind";
 import { DetailBackButton } from "@/components/detail-back-button";
 import { useTranslation } from "@/hooks/use-translation";
+
+/**
+ * Column names off an asset's normalized metadata.
+ *
+ * The tabular sources record `columns` as `[{name, type}]`; anything else has
+ * no columns and the column-lineage panel hides itself.
+ */
+function columnNames(metadata: unknown): string[] {
+  const columns = (metadata as { columns?: unknown } | null)?.columns;
+  if (!Array.isArray(columns)) return [];
+  return columns
+    .map((column) =>
+      typeof column === "string"
+        ? column
+        : ((column as { name?: unknown })?.name ?? ""),
+    )
+    .filter((name): name is string => typeof name === "string" && name.length > 0);
+}
 
 export default function AssetDetailPage() {
   const nsPath = useNsPath();
@@ -288,6 +308,9 @@ export default function AssetDetailPage() {
             <TabsTrigger value="related">
               {t("correlation.relatedTab")}
             </TabsTrigger>
+            <TabsTrigger value="lineage">
+              {t("lineage.tab")}
+            </TabsTrigger>
           </TabsList>
           <TabsContent value="findings">
             <Suspense>
@@ -298,6 +321,15 @@ export default function AssetDetailPage() {
             <div className="h-[60vh]">
               <FingerprintsGraph assetId={assetDetails.id} />
             </div>
+          </TabsContent>
+          <TabsContent value="lineage" className="space-y-4">
+            <div className="h-[60vh]">
+              <LineageView assetId={assetDetails.id} />
+            </div>
+            <ColumnLineagePanel
+              assetId={assetDetails.id}
+              columns={columnNames(assetDetails.metadata)}
+            />
           </TabsContent>
         </Tabs>
       )}

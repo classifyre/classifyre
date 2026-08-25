@@ -11,7 +11,7 @@ from ...models.generated_input import (
 )
 from ..dependencies import require_module
 from ..tabular_base import BaseTabularSource
-from ..tabular_utils import TableRef
+from ..tabular_utils import TableRef, ViewLineage
 
 logger = logging.getLogger(__name__)
 
@@ -154,6 +154,11 @@ class PostgreSQLSource(BaseTabularSource):
 
     # ── Foreign key links (PostgreSQL uses pg_constraint) ────────────────
 
+    # ── Cross-system identity ────────────────────────────────────────────
+
+    def _urn_authority(self) -> str:
+        return f"{self.config.required.host}:{self.config.required.port}"
+
     def _collect_foreign_key_links(
         self,
         tables: list[TableRef],
@@ -194,6 +199,73 @@ class PostgreSQLSource(BaseTabularSource):
                     exc,
                 )
         return links
+
+    # ── View lineage (pg_depend / pg_rewrite) ────────────────────────────
+
+    def _collect_view_lineage(self, tables: list[TableRef]) -> list[ViewLineage]:
+        """What each view in this database selects from.
+
+        `pg_depend` records the dependency the planner already tracks, so this
+        is the catalog's own answer rather than a guess parsed out of SQL. The
+        view definition comes along for the ride because column-level mappings
+        are not in the catalog and have to be recovered from it.
+        """
+        by_database: dict[str, set[tuple[str, ...]]] = {}
+        for t in tables:
+            by_database.setdefault(t.database, set()).add(t.table_key)
+
+        results: list[ViewLineage] = []
+        for database, scoped_keys in by_database.items():
+            try:
+                conn = self._get_cached_connection(database)
+                with conn.cursor() as cursor:
+                    cursor.execute(
+                        """
+                        SELECT DISTINCT
+                            view_ns.nspname     AS view_schema,
+                            view_cls.relname    AS view_name,
+                            source_ns.nspname   AS source_schema,
+                            source_cls.relname  AS source_table,
+                            pg_get_viewdef(view_cls.oid, true) AS view_sql
+                        FROM pg_depend      AS dep
+                        JOIN pg_rewrite     AS rw         ON rw.oid = dep.objid
+                        JOIN pg_class       AS view_cls   ON view_cls.oid = rw.ev_class
+                        JOIN pg_class       AS source_cls ON source_cls.oid = dep.refobjid
+                        JOIN pg_namespace   AS view_ns    ON view_ns.oid = view_cls.relnamespace
+                        JOIN pg_namespace   AS source_ns  ON source_ns.oid = source_cls.relnamespace
+                        WHERE dep.classid = 'pg_rewrite'::regclass
+                          AND dep.refclassid = 'pg_class'::regclass
+                          AND dep.deptype = 'n'
+                          -- A view depends on itself through its own rewrite
+                          -- rule; that is not lineage.
+                          AND view_cls.oid <> source_cls.oid
+                          AND view_cls.relkind IN ('v', 'm')
+                          AND source_ns.nspname NOT IN ('pg_catalog', 'information_schema')
+                        """
+                    )
+                    rows = cursor.fetchall()
+            except Exception as exc:
+                logger.warning("Could not resolve view lineage for database %s: %s", database, exc)
+                continue
+
+            upstreams: dict[tuple[str, ...], set[tuple[str, ...]]] = {}
+            definitions: dict[tuple[str, ...], str | None] = {}
+            for view_schema, view_name, src_schema, src_table, view_sql in rows:
+                view_key = (database, view_schema, view_name)
+                if view_key not in scoped_keys:
+                    continue
+                upstreams.setdefault(view_key, set()).add((database, src_schema, src_table))
+                definitions.setdefault(view_key, view_sql)
+
+            results.extend(
+                ViewLineage(
+                    view=view_key,
+                    upstreams=tuple(sorted(sources)),
+                    sql=definitions.get(view_key),
+                )
+                for view_key, sources in upstreams.items()
+            )
+        return results
 
     # ── External URL ─────────────────────────────────────────────────────
 

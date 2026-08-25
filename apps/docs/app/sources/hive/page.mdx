@@ -1,0 +1,63 @@
+---
+title: Apache Hive
+sidebarTitle: Hive
+description: Scan Apache Hive tables and views over HiveServer2 or Spark SQL — extraction, metadata, view lineage, transport options, and every connection setting.
+---
+
+import { SourceFacts, SourceParameters, SourceMetadata } from "@/components/source-reference";
+import { SqlSourceNotes, LineageNote, SharedSettingsNote } from "@/components/source-notes";
+
+# Apache Hive
+
+<SourceFacts
+  type="HIVE"
+  vendor={{ label: "Apache Hive", href: "https://hive.apache.org/" }}
+  auth={{ label: "HiveServer2 clients and authentication", href: "https://cwiki.apache.org/confluence/display/Hive/Setting+Up+HiveServer2" }}
+/>
+
+Hive is the SQL layer over Hadoop-era data lakes, and the metastore behind a lot
+of Spark platforms. Where it's still running, it usually holds the oldest and
+least-governed data in the estate.
+
+## What you need to connect
+
+Host and port for HiveServer2, plus a username and password. The **transport
+scheme** is a setting: native binary, HTTP, HTTPS, Spark SQL, or the Databricks
+flavour. Anything else the driver needs — Kerberos service name, an HTTP path —
+goes in the extra connection arguments.
+
+## What Classifyre reads
+
+Tables and views, in one database or across all visible databases, with a
+denylist for the ones you don't want and an object allowlist for the ones you
+do.
+
+<SqlSourceNotes foreignKeys={false} />
+
+## Metadata on every asset
+
+<SourceMetadata type="HIVE" />
+
+## Lineage
+
+<LineageNote>
+
+Views and the tables they read are recovered from the metastore and recorded as
+lineage, with column detail parsed from the view SQL where it can be. Hive has
+no enforced foreign keys, so there are no reference edges to record. See
+[Lineage & Relationships](/sources/lineage/).
+
+</LineageNote>
+
+## Worth knowing
+
+- **Row counts** come from table statistics where they exist. Tables that have
+  never been analysed report no estimate rather than a wrong one.
+- **Spark SQL endpoints** connect through the same source — pick the Spark SQL
+  scheme.
+
+## Configuration
+
+<SharedSettingsNote />
+
+<SourceParameters type="HIVE" />

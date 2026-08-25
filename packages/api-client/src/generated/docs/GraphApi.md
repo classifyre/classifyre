@@ -4,15 +4,84 @@ All URIs are relative to *http://localhost*
 
 | Method | HTTP request | Description |
 |------------- | ------------- | -------------|
+| [**graphControllerColumnLineage**](GraphApi.md#graphcontrollercolumnlineage) | **POST** /graph/lineage/column | Trace one column back through the transformations that produced it |
 | [**graphControllerCreateManualEdge**](GraphApi.md#graphcontrollercreatemanualedge) | **POST** /graph/edges/manual | Create a manual edge between two entities (user-defined relation type) |
 | [**graphControllerDeleteEdge**](GraphApi.md#graphcontrollerdeleteedge) | **DELETE** /graph/edges/{id} | Delete an edge |
 | [**graphControllerExpand**](GraphApi.md#graphcontrollerexpand) | **POST** /graph/expand | Expand the graph around a seed entity (recursive traversal) |
 | [**graphControllerIngestEdges**](GraphApi.md#graphcontrolleringestedges) | **POST** /graph/edges | Bulk-upsert source-derived edges from a connector. Idempotent. |
+| [**graphControllerLineage**](GraphApi.md#graphcontrollerlineage) | **POST** /graph/lineage | Trace where an asset came from, or what breaks if it changes |
 | [**graphControllerPivot**](GraphApi.md#graphcontrollerpivot) | **POST** /graph/pivot | Named pivot question on a node (e.g. who_touched, upstream_lineage, emails) |
 | [**graphControllerRebuildEdges**](GraphApi.md#graphcontrollerrebuildedges) | **POST** /graph/rebuild-edges | Rebuild all inferred edges from existing assets and findings |
 | [**graphControllerRelationTypes**](GraphApi.md#graphcontrollerrelationtypes) | **GET** /graph/relation-types | Get all relation types in use + vocabulary suggestions |
 | [**graphControllerUpdateEdge**](GraphApi.md#graphcontrollerupdateedge) | **PATCH** /graph/edges/{id} | Rename an edge relation type |
 
+
+
+## graphControllerColumnLineage
+
+> ColumnLineageResponseDto graphControllerColumnLineage(columnLineageDto)
+
+Trace one column back through the transformations that produced it
+
+Indirect dependencies — an ORDER BY or a join key that shaped which rows came out without feeding the value — are returned separately, so they do not read as if the column was computed from them.
+
+### Example
+
+```ts
+import {
+  Configuration,
+  GraphApi,
+} from '@workspace/api-client';
+import type { GraphControllerColumnLineageRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new GraphApi();
+
+  const body = {
+    // ColumnLineageDto
+    columnLineageDto: ...,
+  } satisfies GraphControllerColumnLineageRequest;
+
+  try {
+    const data = await api.graphControllerColumnLineage(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **columnLineageDto** | [ColumnLineageDto](ColumnLineageDto.md) |  | |
+
+### Return type
+
+[**ColumnLineageResponseDto**](ColumnLineageResponseDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: `application/json`
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
 
 
 ## graphControllerCreateManualEdge
@@ -256,6 +325,73 @@ example().catch(console.error);
 ### Return type
 
 [**BulkIngestEdgesResponseDto**](BulkIngestEdgesResponseDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: `application/json`
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## graphControllerLineage
+
+> GraphResponseDto graphControllerLineage(lineageGraphDto)
+
+Trace where an asset came from, or what breaks if it changes
+
+Walks FLOW edges only. Containment and identity are controls here rather than hops: collapseContainers rolls tables up into their schemas, and mergeIdentity folds an asset and its twin in another system into one node so a path across them costs one hop instead of two.
+
+### Example
+
+```ts
+import {
+  Configuration,
+  GraphApi,
+} from '@workspace/api-client';
+import type { GraphControllerLineageRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new GraphApi();
+
+  const body = {
+    // LineageGraphDto
+    lineageGraphDto: ...,
+  } satisfies GraphControllerLineageRequest;
+
+  try {
+    const data = await api.graphControllerLineage(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **lineageGraphDto** | [LineageGraphDto](LineageGraphDto.md) |  | |
+
+### Return type
+
+[**GraphResponseDto**](GraphResponseDto.md)
 
 ### Authorization
 

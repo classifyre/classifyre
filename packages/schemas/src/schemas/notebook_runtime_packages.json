@@ -181,7 +181,7 @@
     },
     {
       "name": "litellm",
-      "version": "1.97.0",
+      "version": "1.98.0",
       "modules": [
         "litellm"
       ],
@@ -409,6 +409,15 @@
       ],
       "availability": "on-demand",
       "group": "snowflake"
+    },
+    {
+      "name": "sqlglot",
+      "version": "30.17.0",
+      "modules": [
+        "sqlglot"
+      ],
+      "availability": "on-demand",
+      "group": "lineage"
     },
     {
       "name": "striprtf",

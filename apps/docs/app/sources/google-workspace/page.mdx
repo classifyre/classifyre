@@ -1,0 +1,67 @@
+---
+title: Google Workspace
+description: Scan Google Drive, Docs, Sheets and Slides — service account with domain-wide delegation or OAuth, drive and folder scoping, and every setting.
+---
+
+import { SourceFacts, SourceParameters, SourceMetadata } from "@/components/source-reference";
+import { LineageNote, SharedSettingsNote, FileHandlingNote } from "@/components/source-notes";
+
+# Google Workspace
+
+<SourceFacts
+  type="GOOGLE_WORKSPACE"
+  vendor={{ label: "Google Workspace", href: "https://workspace.google.com/" }}
+  auth={{ label: "Domain-wide delegation for a service account", href: "https://support.google.com/a/answer/162106" }}
+  links={[{ label: "Drive API scopes", href: "https://developers.google.com/workspace/drive/api/guides/api-specific-auth" }]}
+/>
+
+Google Drive is where the working documents live — the spreadsheets, the
+exported reports, the shared folder someone made public in 2019 and forgot.
+
+## What you need to connect
+
+Two ways in:
+
+| Method | What you supply | Use it when |
+|---|---|---|
+| **Service account** | The service account JSON, plus the user to impersonate | Scanning on behalf of the organisation, with domain-wide delegation |
+| **OAuth** | Client ID, client secret and a refresh token | Scanning one account's own Drive |
+
+The read-only Drive scope is enough. For domain-wide delegation, authorise the
+service account's client ID against that scope in the Admin console.
+
+## What Classifyre reads
+
+**My Drive**, **shared drives**, or both — narrowed to specific drive IDs, to
+folders, and by file extension.
+
+**Google-native files** (Docs, Sheets, Slides) have no downloadable bytes of
+their own, so they're exported to Office formats before being read — meaning
+your actual documents are scanned, not just their titles.
+
+Optionally, sharing **permissions** are captured too, which turns "this document
+has customer data in it" into "this document has customer data and is shared
+with anyone who has the link".
+
+<FileHandlingNote what="Files in Drive" />
+
+## Metadata on every asset
+
+<SourceMetadata type="GOOGLE_WORKSPACE" />
+
+## Lineage
+
+<LineageNote />
+
+## Worth knowing
+
+- **Domain-wide delegation is powerful.** The delegated user determines what the
+  scan can see; pick that account deliberately.
+- **Shared drives are usually the priority** — they're where cross-team data
+  accumulates without a clear owner.
+
+## Configuration
+
+<SharedSettingsNote />
+
+<SourceParameters type="GOOGLE_WORKSPACE" />

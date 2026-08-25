@@ -1,0 +1,57 @@
+---
+title: SQLite
+description: Scan a SQLite database file — tables, sampled rows, column metadata, foreign keys, and the single setting it needs.
+---
+
+import { SourceFacts, SourceParameters, SourceMetadata } from "@/components/source-reference";
+import { SqlSourceNotes, LineageNote, SharedSettingsNote } from "@/components/source-notes";
+
+# SQLite
+
+<SourceFacts
+  type="SQLITE"
+  vendor={{ label: "SQLite", href: "https://www.sqlite.org/" }}
+/>
+
+SQLite is a whole database in a single file — which is why it turns up in mobile
+app backups, desktop applications, exported archives, and forensic images. If
+you have the file, you can scan it.
+
+## What you need to connect
+
+A **path to the file**. There are no credentials, no host, no port — SQLite has
+no server and no login. The file must be readable by the scanning process, which
+in practice means a path on the desktop application's machine or a volume
+mounted into the cluster.
+
+## What Classifyre reads
+
+Every table in the file, or just the tables you list.
+
+<SqlSourceNotes viewLineage={false} />
+
+## Metadata on every asset
+
+<SourceMetadata type="SQLITE" />
+
+## Lineage
+
+<LineageNote>
+
+**Foreign keys** are read and recorded as references, which maps out how the
+tables relate. SQLite exposes nothing about data movement, so there is no
+lineage — see [Lineage & Relationships](/sources/lineage/) for the difference.
+
+</LineageNote>
+
+## Worth knowing
+
+- **The file is opened read-only.** Scanning a database an application is
+  actively using does not interfere with it.
+- Internal `sqlite_*` tables are skipped.
+
+## Configuration
+
+<SharedSettingsNote />
+
+<SourceParameters type="SQLITE" />

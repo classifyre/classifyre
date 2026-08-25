@@ -1,5 +1,6 @@
 import {
   Injectable,
+  Logger,
   NotFoundException,
   BadRequestException,
   Optional,
@@ -50,6 +51,8 @@ import { FindingStatsScheduler } from './stats/finding-stats-scheduler.service';
 import { FindingStatsService } from './stats/finding-stats.service';
 import { CorrelationGraphCacheService } from './correlation/correlation-graph-cache.service';
 import { citedFindingIds as citedFindingIdsForSource } from './utils/cited-findings';
+import { GraphService } from './graph.service';
+import { tryNormalizeUrn } from './graph/urn';
 
 /**
  * Maps a run's per-asset change_type onto the asset-level status enum so a
@@ -183,6 +186,8 @@ type RawAssetsChartsQueryRow = {
 
 @Injectable()
 export class AssetService {
+  private readonly logger = new Logger(AssetService.name);
+
   constructor(
     private prisma: PrismaService,
     private readonly customDetectorExtractionsService: CustomDetectorExtractionsService,
@@ -197,6 +202,10 @@ export class AssetService {
     @Optional() private readonly graphCache?: CorrelationGraphCacheService,
     @Optional() private readonly statsJobs?: FindingStatsScheduler,
     @Optional() private readonly stats?: FindingStatsService,
+    // Optional like its neighbours, and a *value* import above rather than a
+    // type-only one: a type-only import of an injected class makes Nest inject
+    // undefined, which would silently stop cross-system lineage from stitching.
+    @Optional() private readonly graph?: GraphService,
   ) {}
 
   private async assertSourceAndRunner(sourceId: string, runnerId: string) {
@@ -2466,6 +2475,9 @@ export class AssetService {
         // Categorize assets for bulk operations
         const assetsToCreate: Prisma.AssetCreateManyInput[] = [];
         const assetsToUpdate: { id: string; data: any }[] = [];
+        // Platform names this batch supplied. Another source may already have
+        // drawn a lineage edge at one of them, waiting for it to exist.
+        const ingestedUrns = new Set<string>();
         const assetsUnchanged: string[] = [];
         // What this run did to each asset, recorded per hash for the
         // runner_assets rows below. DELETED is excluded: only
@@ -2527,11 +2539,22 @@ export class AssetService {
           const payloadCursor = this.normalizePayloadCursor(asset);
           const payloadCursorPayload = payloadCursor ?? {};
 
+          // The platform's own name for this object, when the connector could
+          // work one out. This is what lets another source's lineage edge point
+          // at this asset without knowing its hash — see
+          // GraphService.stitchExternalEdges.
+          const urn = tryNormalizeUrn(
+            typeof asset.urn === 'string' ? asset.urn : null,
+          );
+
+          if (urn) ingestedUrns.add(urn);
+
           const assetData = {
             checksum: String(checksum),
             name: String(name),
             externalUrl: String(external_url),
             links: mergedLinks,
+            ...(urn ? { urn } : {}),
             assetType: this.normalizeAssetKind(asset.asset_kind, asset_type),
             sourceType,
             runnerId,
@@ -3149,6 +3172,7 @@ export class AssetService {
           unchanged: assetsUnchanged.length,
           findings: newFindings,
           staleStatsDays,
+          ingestedUrns: [...ingestedUrns],
         };
       },
       {
@@ -3166,12 +3190,35 @@ export class AssetService {
     // window, so the cost here is one `ON CONFLICT DO NOTHING` insert.
     // `new Date()` covers the rows this batch wrote; staleStatsDays covers the
     // rows it moved off an earlier day.
-    const { staleStatsDays = [], ...ingestResult } = result;
+    const { staleStatsDays = [], ingestedUrns = [], ...ingestResult } = result;
     if (ingestResult.findings > 0 || staleStatsDays.length > 0) {
       await this.statsJobs?.scheduleForDays(
         [new Date(), ...staleStatsDays],
         'findings ingested',
       );
+    }
+
+    // Another source may have drawn a lineage edge at one of these objects
+    // before it existed here. Binding them now is what makes cross-system
+    // lineage independent of the order the two sources were scanned in.
+    //
+    // After the commit, and never fatal: a scan that ingested its assets has
+    // done its job even if the stitch fails, and the next run retries it.
+    if (ingestedUrns.length > 0 && this.graph) {
+      try {
+        const stitched = await this.graph.stitchExternalEdges(ingestedUrns);
+        if (stitched > 0) {
+          this.logger.log(
+            `Stitched ${stitched} cross-system lineage edge(s) onto newly ingested assets`,
+          );
+        }
+      } catch (error) {
+        this.logger.warn(
+          `Could not stitch cross-system lineage edges: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+      }
     }
     return ingestResult;
   }

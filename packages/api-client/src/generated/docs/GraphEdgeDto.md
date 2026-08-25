@@ -15,6 +15,11 @@ Name | Type
 `confidence` | number
 `origin` | string
 `crossHypothesis` | boolean
+`relationClass` | string
+`granularity` | string
+`method` | string
+`fieldMappings` | [Array&lt;FieldMappingDto&gt;](FieldMappingDto.md)
+`evidence` | { [key: string]: any; }
 
 ## Example
 
@@ -32,6 +37,11 @@ const example = {
   "confidence": null,
   "origin": null,
   "crossHypothesis": null,
+  "relationClass": null,
+  "granularity": null,
+  "method": null,
+  "fieldMappings": null,
+  "evidence": null,
 } satisfies GraphEdgeDto
 
 console.log(example)

@@ -3133,6 +3133,9 @@
     "legendAsset": "Asset in dieser Quelle",
     "legendExternal": "Verknüpftes Asset in anderer Quelle"
   },
+  "lineage": {
+    "tab": "Herkunft"
+  },
   "harness": {
     "title": "Harness-KI-Autopilot",
     "subtitle": "Autonome Steuerungsebene",

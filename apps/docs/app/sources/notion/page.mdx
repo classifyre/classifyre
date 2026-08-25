@@ -1,0 +1,63 @@
+---
+title: Notion
+description: Scan Notion pages, databases, comments and files — integration token setup, what the integration can see, scoping, and every setting.
+---
+
+import { SourceFacts, SourceParameters, SourceMetadata } from "@/components/source-reference";
+import { LineageNote, SharedSettingsNote, FileHandlingNote } from "@/components/source-notes";
+
+# Notion
+
+<SourceFacts
+  type="NOTION"
+  vendor={{ label: "Notion", href: "https://www.notion.so/" }}
+  auth={{ label: "Create an internal integration", href: "https://developers.notion.com/docs/create-a-notion-integration" }}
+  links={[{ label: "Notion API reference", href: "https://developers.notion.com/reference/intro" }]}
+/>
+
+Notion is a wiki, a database and a file cabinet at once, which is why it tends
+to hold a bit of everything — hiring notes, vendor contracts, a table of API
+keys someone made "temporarily".
+
+## What you need to connect
+
+An **integration token**. Create an internal integration in Notion, copy its
+secret, then **share the pages and databases you want scanned with it** — Notion
+integrations see nothing by default. An OAuth access token works too.
+
+That sharing step is also your scope control: the integration can only read what
+someone deliberately gave it.
+
+## What Classifyre reads
+
+- **Pages** — the text of the page's blocks.
+- **Data sources (databases)** — their schema, with their row pages linked.
+- **Comments** — page and block comments, as one comments asset per page.
+- **Files** — attachments, images, PDFs and video blocks, page icons and covers,
+  materialised as their own assets.
+- **Links between pages** — parent, relation and mention references, wired into
+  the graph.
+
+Narrow further by page id, data source id, or a search query.
+
+<FileHandlingNote what="Files attached in Notion" />
+
+## Metadata on every asset
+
+<SourceMetadata type="NOTION" />
+
+## Lineage
+
+<LineageNote />
+
+## Worth knowing
+
+- **Nothing shared, nothing scanned.** An empty scan almost always means the
+  integration hasn't been given access to any pages yet.
+- **Rate limits are respected** with retries and an optional fixed delay.
+
+## Configuration
+
+<SharedSettingsNote />
+
+<SourceParameters type="NOTION" />

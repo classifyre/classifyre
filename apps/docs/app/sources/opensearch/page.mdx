@@ -1,0 +1,53 @@
+---
+title: OpenSearch
+description: Discover OpenSearch indices and sample documents — API key or basic auth, index scoping, what gets extracted, and every setting.
+---
+
+import { SourceFacts, SourceParameters, SourceMetadata } from "@/components/source-reference";
+import { SearchIndexNotes, LineageNote, SharedSettingsNote } from "@/components/source-notes";
+
+# OpenSearch
+
+<SourceFacts
+  type="OPENSEARCH"
+  vendor={{ label: "OpenSearch", href: "https://opensearch.org/" }}
+  auth={{ label: "OpenSearch security and access control", href: "https://docs.opensearch.org/latest/security/access-control/index/" }}
+/>
+
+OpenSearch holds the same kind of denormalised copies as any search cluster —
+logs, product catalogues, customer records flattened for fast retrieval — and,
+being log-heavy, is a frequent home for data that was never meant to be
+retained.
+
+## What you need to connect
+
+The **cluster URL**, and either nothing, **basic auth**, or an **API key**. A
+read-only role scoped to the indices you want is the right level of access.
+
+Amazon OpenSearch Service and self-managed clusters connect the same way.
+
+## What Classifyre reads
+
+<SearchIndexNotes indexWord="index" />
+
+Scope by index allow- and denylist, cap the index count, and decide whether
+system indices are included.
+
+## Metadata on every asset
+
+<SourceMetadata type="OPENSEARCH" />
+
+## Lineage
+
+<LineageNote />
+
+## Worth knowing
+
+- **Log indices roll over daily.** Use an allowlist pattern or a cap so a scan
+  doesn't spend itself on a thousand dated indices of the same shape.
+
+## Configuration
+
+<SharedSettingsNote />
+
+<SourceParameters type="OPENSEARCH" />

@@ -1,0 +1,56 @@
+---
+title: WordPress
+description: Scan WordPress posts and pages through the REST API — including drafts and private posts with an application password — plus every setting.
+---
+
+import { SourceFacts, SourceParameters, SourceMetadata } from "@/components/source-reference";
+import { LineageNote, SharedSettingsNote } from "@/components/source-notes";
+
+# WordPress
+
+<SourceFacts
+  type="WORDPRESS"
+  vendor={{ label: "WordPress", href: "https://wordpress.org/" }}
+  auth={{ label: "Application passwords", href: "https://wordpress.org/documentation/article/application-passwords/" }}
+  links={[{ label: "WordPress REST API reference", href: "https://developer.wordpress.org/rest-api/" }]}
+/>
+
+A public site is a published surface — and the things that shouldn't be on it
+are usually in a **draft**, a private page, or a post that was published before
+anyone reviewed it.
+
+## What you need to connect
+
+The **site URL**. That's all, if you only want published content — the WordPress
+REST API serves it publicly.
+
+To reach drafts, pending, future-dated and private posts, add a username and an
+**application password** (generated per user in the WordPress admin, and
+revocable without changing the account password).
+
+## What Classifyre reads
+
+**Posts** and **pages**, filtered by status: published, draft, pending,
+scheduled, private. Images referenced by the content are captured as image
+assets.
+
+## Metadata on every asset
+
+<SourceMetadata type="WORDPRESS" />
+
+## Lineage
+
+<LineageNote />
+
+## Worth knowing
+
+- **Drafts are the interesting part.** Published content has usually had a pair
+  of eyes on it; a three-year-old draft has not.
+- **Multisite installations** are scanned one site at a time — add a source per
+  site URL.
+
+## Configuration
+
+<SharedSettingsNote />
+
+<SourceParameters type="WORDPRESS" />

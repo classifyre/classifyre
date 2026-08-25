@@ -1,0 +1,59 @@
+---
+title: Apache Iceberg
+sidebarTitle: Iceberg
+description: Scan Apache Iceberg tables directly from object storage — no catalog service and no Spark. Discovery, snapshots, row sampling, and every setting.
+---
+
+import { SourceFacts, SourceParameters, SourceMetadata } from "@/components/source-reference";
+import { LakehouseNotes, LineageNote, SharedSettingsNote } from "@/components/source-notes";
+
+# Apache Iceberg
+
+<SourceFacts
+  type="ICEBERG"
+  vendor={{ label: "Apache Iceberg", href: "https://iceberg.apache.org/" }}
+  links={[{ label: "Iceberg table spec", href: "https://iceberg.apache.org/spec/" }]}
+/>
+
+Iceberg is the open table format behind an increasing share of lakehouse
+platforms. This source reads Iceberg tables straight from the bucket they sit
+in, so you don't need a REST catalog, a Glue registration, or a Spark cluster to
+find out what's in them.
+
+## What you need to connect
+
+A **bucket**, optional static credentials (leave them empty to use the
+environment's ambient cloud credentials), and — for non-AWS S3-compatible
+providers — an endpoint URL and region.
+
+Point it at a **prefix** to auto-discover every Iceberg table beneath it, found
+by its `metadata/` directory, or list exact table roots when you already know
+them.
+
+<LakehouseNotes format="Iceberg" />
+
+## What Classifyre reads
+
+One asset per table: schema and column types, the current snapshot, partition
+information, and a sample of real rows.
+
+## Metadata on every asset
+
+<SourceMetadata type="ICEBERG" />
+
+## Lineage
+
+<LineageNote />
+
+## Worth knowing
+
+- **Tables registered in a catalog can still be scanned this way** — the source
+  reads the table's own metadata files, so catalog access is not required.
+- **Discovery is a bucket walk.** Narrow the prefix, or list table paths, on
+  buckets with millions of objects.
+
+## Configuration
+
+<SharedSettingsNote />
+
+<SourceParameters type="ICEBERG" />
