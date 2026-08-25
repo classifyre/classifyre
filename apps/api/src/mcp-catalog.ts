@@ -205,7 +205,39 @@ export const MCP_CAPABILITY_GROUPS: McpCapabilityGroupDto[] = [
       'Trace where a normalized finding value appears across assets',
     ],
   },
+  {
+    id: 'custom_source_code',
+    title: 'Custom Source Code',
+    description:
+      'Author, run, and debug the Python notebook behind a CUSTOM source: cells, packages, local folders, uploaded files, and executions.',
+    toolNames: [
+      'get_notebook',
+      'add_notebook_cell',
+      'update_notebook_cell',
+      'delete_notebook_cell',
+      'set_notebook_packages',
+      'set_notebook_local_folders',
+      'list_notebook_runtime_packages',
+      'upload_notebook_file',
+      'list_notebook_files',
+      'delete_notebook_file',
+      'run_notebook',
+      'get_notebook_execution',
+      'list_notebook_executions',
+      'cancel_notebook_execution',
+    ],
+    operations: [
+      'Read and edit notebook cells, packages, and local folders',
+      'Upload input files and manage declared dependencies',
+      'Run a single cell, a connection test, or the whole notebook, then poll for output and errors',
+    ],
+  },
 ];
+
+/** Every selectable MCP token scope id, for validating `toolGroupIds`. */
+export const MCP_CAPABILITY_GROUP_IDS: string[] = MCP_CAPABILITY_GROUPS.map(
+  (group) => group.id,
+);
 
 export const MCP_PROMPTS: McpPromptSummaryDto[] = [
   {

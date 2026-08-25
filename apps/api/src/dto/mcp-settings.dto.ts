@@ -1,12 +1,19 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
+  IsArray,
   IsBoolean,
+  IsIn,
   IsOptional,
   IsString,
   IsUUID,
   MaxLength,
   MinLength,
 } from 'class-validator';
+import { MCP_CAPABILITY_GROUP_IDS } from '../mcp-catalog';
+
+const TOOL_GROUP_IDS_DESCRIPTION =
+  'MCP capability group ids this token may call (see GET .../mcp/tools for the group list). ' +
+  'Omit or send null for unrestricted access to every current and future group.';
 
 export class CreateMcpTokenDto {
   @ApiProperty({
@@ -17,6 +24,17 @@ export class CreateMcpTokenDto {
   @MinLength(1)
   @MaxLength(120)
   name: string;
+
+  @ApiPropertyOptional({
+    description: TOOL_GROUP_IDS_DESCRIPTION,
+    type: [String],
+    nullable: true,
+    example: ['sources', 'custom_detectors'],
+  })
+  @IsOptional()
+  @IsArray()
+  @IsIn(MCP_CAPABILITY_GROUP_IDS, { each: true })
+  toolGroupIds?: string[] | null;
 }
 
 export class UpdateMcpTokenDto {
@@ -38,6 +56,17 @@ export class UpdateMcpTokenDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+
+  @ApiPropertyOptional({
+    description: TOOL_GROUP_IDS_DESCRIPTION,
+    type: [String],
+    nullable: true,
+    example: ['sources', 'custom_detectors'],
+  })
+  @IsOptional()
+  @IsArray()
+  @IsIn(MCP_CAPABILITY_GROUP_IDS, { each: true })
+  toolGroupIds?: string[] | null;
 }
 
 export class McpTokenResponseDto {
@@ -62,6 +91,15 @@ export class McpTokenResponseDto {
     example: true,
   })
   isActive: boolean;
+
+  @ApiPropertyOptional({
+    description:
+      'MCP capability group ids this token is restricted to. Null means unrestricted (every group).',
+    type: [String],
+    nullable: true,
+    example: ['sources', 'custom_detectors'],
+  })
+  toolGroupIds: string[] | null;
 
   @ApiPropertyOptional({
     description: 'Most recent successful authorization timestamp.',

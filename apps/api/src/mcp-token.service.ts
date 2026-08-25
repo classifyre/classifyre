@@ -12,7 +12,7 @@ import {
   McpTokenResponseDto,
   UpdateMcpTokenDto,
 } from './dto/mcp-settings.dto';
-import { MCP_TOKEN_PREFIX } from './mcp-catalog';
+import { MCP_CAPABILITY_GROUP_IDS, MCP_TOKEN_PREFIX } from './mcp-catalog';
 import { resolveApplicationSecretKey } from './secret-key.util';
 
 const TOKEN_PATTERN = new RegExp(
@@ -32,6 +32,7 @@ type StoredMcpAccessToken = {
   name: string;
   tokenHash: string;
   tokenPreview: string;
+  toolGroupIds: string[] | null;
   lastUsedAt: Date | null;
   revokedAt: Date | null;
   createdAt: Date;
@@ -73,6 +74,7 @@ export class McpTokenService {
         name: dto.name.trim(),
         tokenHash: this.hashToken(generated.raw),
         tokenPreview: this.buildPreview(generated),
+        toolGroupIds: this.normalizeToolGroupIds(dto.toolGroupIds),
       },
     });
     return {
@@ -99,10 +101,33 @@ export class McpTokenService {
         ...(dto.isActive !== undefined
           ? { revokedAt: dto.isActive ? null : new Date() }
           : {}),
+        ...(dto.toolGroupIds !== undefined
+          ? { toolGroupIds: this.normalizeToolGroupIds(dto.toolGroupIds) }
+          : {}),
       },
     });
 
     return this.toResponse(token);
+  }
+
+  /**
+   * There is no global ValidationPipe in this app, so `@IsIn` on the DTO is
+   * documentation only -- an unknown group id must be rejected here, not
+   * silently stored and silently ignored by the factory's filter.
+   */
+  private normalizeToolGroupIds(
+    ids: string[] | null | undefined,
+  ): string[] | null {
+    if (ids === undefined || ids === null) {
+      return null;
+    }
+    const unknown = ids.filter((id) => !MCP_CAPABILITY_GROUP_IDS.includes(id));
+    if (unknown.length > 0) {
+      throw new BadRequestException(
+        `Unknown MCP capability group id(s): ${unknown.join(', ')}`,
+      );
+    }
+    return [...new Set(ids)];
   }
 
   async deleteToken(id: string): Promise<{ deleted: true }> {
@@ -154,6 +179,7 @@ export class McpTokenService {
       name: token.name,
       tokenPreview: token.tokenPreview,
       isActive: token.revokedAt === null,
+      toolGroupIds: token.toolGroupIds ?? null,
       lastUsedAt: token.lastUsedAt,
       revokedAt: token.revokedAt,
       createdAt: token.createdAt,

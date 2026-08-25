@@ -44,6 +44,12 @@ export interface McpTokenCreatedResponseDto {
      */
     isActive: boolean;
     /**
+     * MCP capability group ids this token is restricted to. Null means unrestricted (every group).
+     * @type {Array<string>}
+     * @memberof McpTokenCreatedResponseDto
+     */
+    toolGroupIds?: Array<string> | null;
+    /**
      * Most recent successful authorization timestamp.
      * @type {Date}
      * @memberof McpTokenCreatedResponseDto
@@ -103,6 +109,7 @@ export function McpTokenCreatedResponseDtoFromJSONTyped(json: any, ignoreDiscrim
         'name': json['name'],
         'tokenPreview': json['tokenPreview'],
         'isActive': json['isActive'],
+        'toolGroupIds': json['toolGroupIds'] == null ? undefined : json['toolGroupIds'],
         'lastUsedAt': json['lastUsedAt'] == null ? undefined : (new Date(json['lastUsedAt'])),
         'revokedAt': json['revokedAt'] == null ? undefined : (new Date(json['revokedAt'])),
         'createdAt': (new Date(json['createdAt'])),
@@ -126,6 +133,7 @@ export function McpTokenCreatedResponseDtoToJSONTyped(value?: McpTokenCreatedRes
         'name': value['name'],
         'tokenPreview': value['tokenPreview'],
         'isActive': value['isActive'],
+        'toolGroupIds': value['toolGroupIds'],
         'lastUsedAt': value['lastUsedAt'] == null ? value['lastUsedAt'] : value['lastUsedAt'].toISOString(),
         'revokedAt': value['revokedAt'] == null ? value['revokedAt'] : value['revokedAt'].toISOString(),
         'createdAt': value['createdAt'].toISOString(),
