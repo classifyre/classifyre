@@ -1,8 +1,13 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import {
   McpServer,
   ResourceTemplate,
 } from '@modelcontextprotocol/sdk/server/mcp.js';
+import * as fs from 'fs';
 
 import * as z from 'zod';
 import { AssetService } from './asset.service';
@@ -11,6 +16,10 @@ import { CustomDetectorsService } from './custom-detectors.service';
 import { CustomDetectorExtractionsService } from './custom-detector-extractions.service';
 import { FindingsService } from './findings.service';
 import { MCP_CAPABILITY_GROUPS, MCP_PROMPTS } from './mcp-catalog';
+import { NotebookService } from './notebook/notebook.service';
+import { NotebookExecutionService } from './notebook/notebook-execution.service';
+import { SourceFilesService } from './source-files.service';
+import { resolveSchemaFile } from './utils/schema-path';
 import {
   searchAssetsAssetFilters,
   searchAssetsFindingFilters,
@@ -263,9 +272,23 @@ export class McpServerFactoryService {
     private readonly caseLeadsService: CaseLeadsService,
     private readonly caseEventsService: CaseEventsService,
     private readonly autopilotService: AutopilotService,
+    private readonly notebookService: NotebookService,
+    private readonly notebookExecutionService: NotebookExecutionService,
+    private readonly sourceFilesService: SourceFilesService,
   ) {}
 
-  createServer(): McpServer {
+  /**
+   * Build the MCP server. `toolGroupIds` restricts which tools an authorized
+   * token can see/call: null (the default) is unrestricted, an array is an
+   * explicit allowlist of {@link MCP_CAPABILITY_GROUPS} ids.
+   *
+   * Every tool is still registered either way -- restricting is a post-pass
+   * that disables the disallowed ones -- so {@link McpToolsCatalogService},
+   * which introspects an unrestricted server for the settings UI, and this
+   * enforcement path read the exact same name<->group mapping and can never
+   * drift apart.
+   */
+  createServer(options?: { toolGroupIds?: string[] | null }): McpServer {
     const server = new McpServer({
       name: 'classifyre-mcp',
       version: '1.0.0',
@@ -275,6 +298,7 @@ export class McpServerFactoryService {
     this.registerResources(srv);
     this.registerPrompts(srv);
     this.registerSourceTools(srv);
+    this.registerNotebookTools(srv);
     this.registerCustomDetectorTools(srv);
     this.registerExtractionTools(srv);
     this.registerRunTools(srv);
@@ -286,7 +310,42 @@ export class McpServerFactoryService {
     this.registerGlossaryTools(srv);
     this.registerCaseLeadTools(srv);
     this.registerAutopilotTools(srv);
+
+    if (options?.toolGroupIds) {
+      this.restrictToGroups(server, options.toolGroupIds);
+    }
+
     return server;
+  }
+
+  /** Disable every registered tool that is not in an allowed group. Tools with
+   * no group (none, today) are treated as always-allowed rather than always
+   * hidden, so a future ungrouped tool fails open into visibility, not silently
+   * out of reach for every scoped token. */
+  private restrictToGroups(server: McpServer, allowedGroupIds: string[]): void {
+    const allowed = new Set<string>();
+    for (const group of MCP_CAPABILITY_GROUPS) {
+      if (allowedGroupIds.includes(group.id)) {
+        for (const toolName of group.toolNames) {
+          allowed.add(toolName);
+        }
+      }
+    }
+    const grouped = new Set(
+      MCP_CAPABILITY_GROUPS.flatMap((group) => group.toolNames),
+    );
+
+    const registered = (
+      server as unknown as {
+        _registeredTools: Record<string, { disable(): void }>;
+      }
+    )._registeredTools;
+
+    for (const [name, tool] of Object.entries(registered)) {
+      if (grouped.has(name) && !allowed.has(name)) {
+        tool.disable();
+      }
+    }
   }
 
   private registerAutopilotTools(server: McpServerCompat) {
@@ -1232,6 +1291,430 @@ export class McpServerFactoryService {
         }
       },
     );
+  }
+
+  /**
+   * The Python notebook behind a CUSTOM source: cells, packages, local
+   * folders, and uploaded files live in `source.config` (cells under
+   * `required.notebook`, packages/local_folders under `optional`), so cell
+   * edits go through {@link NotebookService} while packages/folders go
+   * through the generic source-config path ({@link McpToolExecutorService}),
+   * which re-validates the whole config against the CUSTOM JSON Schema.
+   */
+  private registerNotebookTools(server: McpServerCompat) {
+    server.registerTool(
+      'get_notebook',
+      {
+        title: 'Get Notebook',
+        description:
+          'Read a CUSTOM source’s notebook: cells, revision, variables, secret keys, packages, and local folders.',
+        inputSchema: {
+          sourceId: z.string().uuid(),
+        },
+        annotations: {
+          readOnlyHint: true,
+          idempotentHint: true,
+        },
+      },
+      async ({ sourceId }) => {
+        const notebook = await this.notebookService.get(sourceId);
+        const optional = await this.notebookOptionalConfig(sourceId);
+        return jsonResult({
+          ...notebook,
+          packages: optional.packages ?? [],
+          localFolders: optional.local_folders ?? [],
+        });
+      },
+    );
+
+    server.registerTool(
+      'add_notebook_cell',
+      {
+        title: 'Add Notebook Cell',
+        description:
+          'Insert a new cell into a notebook. Appended at the end unless afterCellId is given.',
+        inputSchema: {
+          sourceId: z.string().uuid(),
+          baseRevision: z.number().int().min(1),
+          cellId: z
+            .string()
+            .regex(/^[A-Za-z0-9_-]{1,64}$/)
+            .optional()
+            .describe('Defaults to a generated id if omitted.'),
+          type: z.enum(['code', 'markdown']).default('code'),
+          source: z.string(),
+          afterCellId: z.string().optional(),
+        },
+        annotations: {
+          readOnlyHint: false,
+          destructiveHint: false,
+        },
+      },
+      async ({ sourceId, baseRevision, cellId, type, source, afterCellId }) => {
+        this.mcpToolExecutor.assertNotDemoMode();
+        const notebook = await this.notebookService.get(sourceId);
+        const newCell = {
+          id: cellId ?? `cell-${Date.now().toString(36)}`,
+          type,
+          source,
+        };
+        if (notebook.cells.some((cell) => cell.id === newCell.id)) {
+          throw new BadRequestException(
+            `Cell id '${newCell.id}' already exists.`,
+          );
+        }
+        const cells = [...notebook.cells];
+        const insertAt = afterCellId
+          ? cells.findIndex((cell) => cell.id === afterCellId) + 1
+          : cells.length;
+        if (afterCellId && insertAt === 0) {
+          throw new NotFoundException(
+            `No cell with id '${afterCellId}' to insert after.`,
+          );
+        }
+        cells.splice(insertAt, 0, newCell);
+        const result = await this.notebookService.update(sourceId, {
+          baseRevision,
+          cells,
+        });
+        return jsonResult({ ...result, cellId: newCell.id });
+      },
+    );
+
+    server.registerTool(
+      'update_notebook_cell',
+      {
+        title: 'Update Notebook Cell',
+        description: 'Replace one cell’s source (and optionally its type).',
+        inputSchema: {
+          sourceId: z.string().uuid(),
+          baseRevision: z.number().int().min(1),
+          cellId: z.string(),
+          source: z.string(),
+          type: z.enum(['code', 'markdown']).optional(),
+        },
+        annotations: {
+          readOnlyHint: false,
+          destructiveHint: false,
+        },
+      },
+      async ({ sourceId, baseRevision, cellId, source, type }) => {
+        this.mcpToolExecutor.assertNotDemoMode();
+        const notebook = await this.notebookService.get(sourceId);
+        const index = notebook.cells.findIndex((cell) => cell.id === cellId);
+        if (index === -1) {
+          throw new NotFoundException(`No cell with id '${cellId}'.`);
+        }
+        const cells = [...notebook.cells];
+        cells[index] = { ...cells[index], source, ...(type ? { type } : {}) };
+        const result = await this.notebookService.update(sourceId, {
+          baseRevision,
+          cells,
+        });
+        return jsonResult(result);
+      },
+    );
+
+    server.registerTool(
+      'delete_notebook_cell',
+      {
+        title: 'Delete Notebook Cell',
+        description: 'Remove one cell from a notebook.',
+        inputSchema: {
+          sourceId: z.string().uuid(),
+          baseRevision: z.number().int().min(1),
+          cellId: z.string(),
+        },
+        annotations: {
+          readOnlyHint: false,
+          destructiveHint: true,
+        },
+      },
+      async ({ sourceId, baseRevision, cellId }) => {
+        this.mcpToolExecutor.assertNotDemoMode();
+        const notebook = await this.notebookService.get(sourceId);
+        if (!notebook.cells.some((cell) => cell.id === cellId)) {
+          throw new NotFoundException(`No cell with id '${cellId}'.`);
+        }
+        const cells = notebook.cells.filter((cell) => cell.id !== cellId);
+        const result = await this.notebookService.update(sourceId, {
+          baseRevision,
+          cells,
+        });
+        return jsonResult(result);
+      },
+    );
+
+    server.registerTool(
+      'set_notebook_packages',
+      {
+        title: 'Set Notebook Packages',
+        description:
+          'Replace the Python packages installed into the notebook’s run environment before any cell executes. Call list_notebook_runtime_packages first — the base image’s own dependencies do not need listing.',
+        inputSchema: {
+          sourceId: z.string().uuid(),
+          packages: z.array(
+            z.object({ name: z.string(), version: z.string().optional() }),
+          ),
+        },
+        annotations: {
+          readOnlyHint: false,
+          destructiveHint: false,
+        },
+      },
+      async ({ sourceId, packages }) => {
+        this.mcpToolExecutor.assertNotDemoMode();
+        return jsonResult(
+          await this.updateNotebookOptionalConfig(sourceId, { packages }),
+        );
+      },
+    );
+
+    server.registerTool(
+      'set_notebook_local_folders',
+      {
+        title: 'Set Notebook Local Folders',
+        description:
+          'Replace the local folders a notebook reads with ctx.folder("name"). Desktop only — not available in Kubernetes deployments, where files are uploaded to the source instead (upload_notebook_file).',
+        inputSchema: {
+          sourceId: z.string().uuid(),
+          folders: z.array(z.object({ name: z.string(), path: z.string() })),
+        },
+        annotations: {
+          readOnlyHint: false,
+          destructiveHint: false,
+        },
+      },
+      async ({ sourceId, folders }) => {
+        this.mcpToolExecutor.assertNotDemoMode();
+        return jsonResult(
+          await this.updateNotebookOptionalConfig(sourceId, {
+            local_folders: folders,
+          }),
+        );
+      },
+    );
+
+    server.registerTool(
+      'list_notebook_runtime_packages',
+      {
+        title: 'List Notebook Runtime Packages',
+        description:
+          'Python packages already baked into the notebook runtime image — do not declare these again with set_notebook_packages.',
+        inputSchema: {},
+        annotations: {
+          readOnlyHint: true,
+          idempotentHint: true,
+        },
+      },
+      () => {
+        const path = resolveSchemaFile(
+          __dirname,
+          'notebook_runtime_packages.json',
+        );
+        return jsonResult(JSON.parse(fs.readFileSync(path, 'utf8')));
+      },
+    );
+
+    server.registerTool(
+      'upload_notebook_file',
+      {
+        title: 'Upload Notebook File',
+        description:
+          'Upload a file for the notebook to read via ctx.files. Stored in Postgres and deduplicated by content hash.',
+        inputSchema: {
+          sourceId: z.string().uuid(),
+          fileName: z.string(),
+          contentBase64: z.string().describe('File bytes, base64-encoded.'),
+          mimeType: z.string().optional(),
+        },
+        annotations: {
+          readOnlyHint: false,
+          destructiveHint: false,
+        },
+      },
+      async ({ sourceId, fileName, contentBase64, mimeType }) => {
+        this.mcpToolExecutor.assertNotDemoMode();
+        const file = await this.sourceFilesService.create({
+          sourceId,
+          fileName,
+          declaredMimeType: mimeType ?? 'application/octet-stream',
+          data: Buffer.from(contentBase64, 'base64'),
+        });
+        return jsonResult(file);
+      },
+    );
+
+    server.registerTool(
+      'list_notebook_files',
+      {
+        title: 'List Notebook Files',
+        description: 'List files uploaded to a CUSTOM source.',
+        inputSchema: {
+          sourceId: z.string().uuid(),
+        },
+        annotations: {
+          readOnlyHint: true,
+          idempotentHint: true,
+        },
+      },
+      async ({ sourceId }) =>
+        jsonResult(await this.sourceFilesService.list(sourceId)),
+    );
+
+    server.registerTool(
+      'delete_notebook_file',
+      {
+        title: 'Delete Notebook File',
+        description: 'Delete one uploaded file from a CUSTOM source.',
+        inputSchema: {
+          sourceId: z.string().uuid(),
+          fileId: z.string().uuid(),
+        },
+        annotations: {
+          readOnlyHint: false,
+          destructiveHint: true,
+        },
+      },
+      async ({ sourceId, fileId }) => {
+        this.mcpToolExecutor.assertNotDemoMode();
+        await this.sourceFilesService.delete(sourceId, fileId);
+        return jsonResult({ deleted: true, fileId });
+      },
+    );
+
+    server.registerTool(
+      'run_notebook',
+      {
+        title: 'Run Notebook',
+        description:
+          'Start a notebook execution and return immediately — poll get_notebook_execution for the result. Modes: "cell" runs one cell (requires targetCellId), "test_connection" is the connection/auth smoke test, "preview_extract" samples a few assets end-to-end, "all" replays every cell in order (the closest thing to a full local test of the whole connector).',
+        inputSchema: {
+          sourceId: z.string().uuid(),
+          mode: z.enum(['cell', 'all', 'test_connection', 'preview_extract']),
+          targetCellId: z
+            .string()
+            .optional()
+            .describe('Required when mode is "cell".'),
+          maxAssets: z.number().int().min(1).optional(),
+        },
+        annotations: {
+          readOnlyHint: false,
+          destructiveHint: false,
+        },
+      },
+      async ({ sourceId, mode, targetCellId, maxAssets }) => {
+        this.mcpToolExecutor.assertNotDemoMode();
+        const notebook = await this.notebookService.get(sourceId);
+        const execution = await this.notebookExecutionService.create(
+          sourceId,
+          { revision: notebook.revision, mode, targetCellId, maxAssets },
+          'mcp',
+        );
+        return jsonResult(this.notebookExecutionService.toDto(execution));
+      },
+    );
+
+    server.registerTool(
+      'get_notebook_execution',
+      {
+        title: 'Get Notebook Execution',
+        description:
+          'Poll one notebook execution: status, per-cell outputs, and structured error/failedCellId once it finishes.',
+        inputSchema: {
+          executionId: z.string().uuid(),
+        },
+        annotations: {
+          readOnlyHint: true,
+          idempotentHint: true,
+        },
+      },
+      async ({ executionId }) =>
+        jsonResult(
+          this.notebookExecutionService.toDto(
+            await this.notebookService.getExecution(executionId),
+          ),
+        ),
+    );
+
+    server.registerTool(
+      'list_notebook_executions',
+      {
+        title: 'List Notebook Executions',
+        description: 'Recent notebook executions for a source, newest first.',
+        inputSchema: {
+          sourceId: z.string().uuid(),
+          limit: z.number().int().min(1).max(100).optional(),
+        },
+        annotations: {
+          readOnlyHint: true,
+          idempotentHint: true,
+        },
+      },
+      async ({ sourceId, limit }) => {
+        const executions = await this.notebookService.listExecutions(
+          sourceId,
+          limit,
+        );
+        return jsonResult(
+          executions.map((execution) =>
+            this.notebookExecutionService.toDto(execution),
+          ),
+        );
+      },
+    );
+
+    server.registerTool(
+      'cancel_notebook_execution',
+      {
+        title: 'Cancel Notebook Execution',
+        description:
+          'Stop a running notebook execution. Cells cannot be interrupted from inside Python, so this ends the process or deletes the Job.',
+        inputSchema: {
+          executionId: z.string().uuid(),
+        },
+        annotations: {
+          readOnlyHint: false,
+          destructiveHint: false,
+        },
+      },
+      async ({ executionId }) => {
+        this.mcpToolExecutor.assertNotDemoMode();
+        return jsonResult(
+          await this.notebookExecutionService.cancel(executionId),
+        );
+      },
+    );
+  }
+
+  /** `optional.packages` / `optional.local_folders` live beside the notebook
+   * in source config, not inside it -- see the CustomOptional schema. */
+  private async notebookOptionalConfig(
+    sourceId: string,
+  ): Promise<Record<string, any>> {
+    const source = await this.requireSource(sourceId);
+    const config = this.sourceService.decryptSourceConfig(source.config);
+    return (config.optional ?? {}) as Record<string, any>;
+  }
+
+  private async updateNotebookOptionalConfig(
+    sourceId: string,
+    patch: Record<string, unknown>,
+  ) {
+    const source = await this.requireSource(sourceId);
+    const config = this.sourceService.decryptSourceConfig(source.config);
+    const merged = {
+      ...config,
+      optional: {
+        ...((config.optional as Record<string, unknown>) ?? {}),
+        ...patch,
+      },
+    };
+    const updated = await this.mcpToolExecutor.updateSource({
+      id: sourceId,
+      config: merged,
+    });
+    return updated;
   }
 
   private registerCustomDetectorTools(server: McpServerCompat) {

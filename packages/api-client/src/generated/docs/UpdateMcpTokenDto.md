@@ -8,6 +8,7 @@ Name | Type
 ------------ | -------------
 `name` | string
 `isActive` | boolean
+`toolGroupIds` | Array&lt;string&gt;
 
 ## Example
 
@@ -18,6 +19,7 @@ import type { UpdateMcpTokenDto } from '@workspace/api-client'
 const example = {
   "name": Cursor staging workspace,
   "isActive": false,
+  "toolGroupIds": ["sources","custom_detectors"],
 } satisfies UpdateMcpTokenDto
 
 console.log(example)

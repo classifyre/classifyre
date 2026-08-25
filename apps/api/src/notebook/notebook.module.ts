@@ -15,6 +15,6 @@ import { MaskedConfigCryptoService } from '../masked-config-crypto.service';
     PrismaService,
     MaskedConfigCryptoService,
   ],
-  exports: [NotebookService],
+  exports: [NotebookService, NotebookExecutionService],
 })
 export class NotebookModule {}
