@@ -30,7 +30,7 @@
     },
     {
       "name": "boto3",
-      "version": "1.43.78",
+      "version": "1.43.79",
       "modules": [
         "boto3"
       ],
@@ -128,7 +128,7 @@
     },
     {
       "name": "google-auth",
-      "version": "2.56.3",
+      "version": "2.57.0",
       "modules": [
         "google.auth"
       ],

@@ -25,6 +25,12 @@ export interface CreateMcpTokenDto {
      * @memberof CreateMcpTokenDto
      */
     name: string;
+    /**
+     * MCP capability group ids this token may call (see GET .../mcp/tools for the group list). Omit or send null for unrestricted access to every current and future group.
+     * @type {Array<string>}
+     * @memberof CreateMcpTokenDto
+     */
+    toolGroupIds?: Array<string> | null;
 }
 
 /**
@@ -46,6 +52,7 @@ export function CreateMcpTokenDtoFromJSONTyped(json: any, ignoreDiscriminator: b
     return {
         
         'name': json['name'],
+        'toolGroupIds': json['toolGroupIds'] == null ? undefined : json['toolGroupIds'],
     };
 }
 
@@ -61,6 +68,7 @@ export function CreateMcpTokenDtoToJSONTyped(value?: CreateMcpTokenDto | null, i
     return {
         
         'name': value['name'],
+        'toolGroupIds': value['toolGroupIds'],
     };
 }
 

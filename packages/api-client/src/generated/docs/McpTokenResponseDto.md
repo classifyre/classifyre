@@ -10,6 +10,7 @@ Name | Type
 `name` | string
 `tokenPreview` | string
 `isActive` | boolean
+`toolGroupIds` | Array&lt;string&gt;
 `lastUsedAt` | Date
 `revokedAt` | Date
 `createdAt` | Date
@@ -26,6 +27,7 @@ const example = {
   "name": Cursor local agent,
   "tokenPreview": inmcp_6c0ae0a4...VC-TM,
   "isActive": true,
+  "toolGroupIds": ["sources","custom_detectors"],
   "lastUsedAt": null,
   "revokedAt": null,
   "createdAt": null,

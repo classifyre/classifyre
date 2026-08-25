@@ -26,6 +26,7 @@ type ToolGroup = {
 /** Group id → editorial order; unknown groups fall to the end alphabetically. */
 const GROUP_ORDER = [
   "sources",
+  "custom_source_code",
   "custom_detectors",
   "runs",
   "findings",
@@ -33,6 +34,7 @@ const GROUP_ORDER = [
   "inquiries",
   "cases",
   "correlation",
+  "autopilot",
 ];
 
 function groupTools(tools: McpToolSummaryDto[]): ToolGroup[] {

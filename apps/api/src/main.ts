@@ -302,8 +302,9 @@ async function bootstrap() {
         return;
       }
 
+      let authorizedToken: { toolGroupIds: string[] | null };
       try {
-        await mcpTokenService.authorizeBearerToken(
+        authorizedToken = await mcpTokenService.authorizeBearerToken(
           request.headers.authorization,
         );
       } catch {
@@ -320,7 +321,9 @@ async function bootstrap() {
       reply.hijack();
 
       try {
-        const server = mcpServerFactory.createServer();
+        const server = mcpServerFactory.createServer({
+          toolGroupIds: authorizedToken.toolGroupIds,
+        });
         const transport = new StreamableHTTPServerTransport({
           sessionIdGenerator: undefined,
           enableJsonResponse: true,

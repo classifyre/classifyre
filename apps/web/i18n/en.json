@@ -2084,6 +2084,11 @@
     "deleteDesc": "Delete {{name}} and permanently invalidate its bearer token.",
     "deleteDescGeneral": "Delete this token and permanently invalidate its bearer token.",
     "deleteWarning": "Deleted tokens cannot be recovered. Any MCP client using this token will stop authenticating immediately.",
+    "toolAccess": "Tool access",
+    "allTools": "All tools",
+    "allToolsDesc": "This token can call every current and future tool group.",
+    "noTools": "No tools",
+    "groupCount": "{{count}}/{{total}} groups",
     "catalog": {
       "title": "Tools",
       "subtitle": "Every tool this MCP server exposes",
