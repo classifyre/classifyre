@@ -45,6 +45,43 @@ export function transformMaskedConfig(
   };
 }
 
+/**
+ * Merge an incoming `masked` section onto the existing one, leaf by leaf.
+ *
+ * Secret/credential values are write-only: an API response never sends one
+ * back, so a caller resupplying a source's whole config cannot round-trip a
+ * leaf it wasn't actually changing -- that leaf simply comes back blank or
+ * missing. Treating "blank or missing" as "clear it" means saving anything
+ * about a source, for any reason, wipes every credential on it. This treats
+ * each leaf independently instead: a non-empty string overwrites (the
+ * caller supplied a fresh value, or the leaf is new), `null`/`""` deletes it
+ * (an explicit clear), and anything absent from `incoming` keeps whatever
+ * was already there.
+ *
+ * Nests to arbitrary depth so it works for both shapes actually in use --
+ * flat (`masked.password`) and one level deeper (`masked.secrets.API_KEY`,
+ * the CUSTOM source's per-notebook-secret bag).
+ */
+export function mergeMaskedConfig(
+  existing: unknown,
+  incoming: unknown,
+): Record<string, unknown> {
+  const existingObj = isPlainObject(existing) ? existing : {};
+  const incomingObj = isPlainObject(incoming) ? incoming : {};
+
+  const merged: Record<string, unknown> = { ...existingObj };
+  for (const [key, value] of Object.entries(incomingObj)) {
+    if (value === null || value === '') {
+      delete merged[key];
+    } else if (isPlainObject(value) || isPlainObject(existingObj[key])) {
+      merged[key] = mergeMaskedConfig(existingObj[key], value);
+    } else {
+      merged[key] = value;
+    }
+  }
+  return merged;
+}
+
 export function isEncryptedMaskedValue(value: unknown): value is string {
   return (
     typeof value === 'string' &&

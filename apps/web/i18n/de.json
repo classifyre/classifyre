@@ -215,6 +215,7 @@
     "cancel": "Abbrechen",
     "delete": "Löschen",
     "edit": "Bearbeiten",
+    "moreActions": "Weitere Aktionen",
     "create": "Erstellen",
     "submit": "Absenden",
     "send": "Senden",
@@ -861,6 +862,16 @@
       "confirm": "Findings löschen",
       "success": "Findings bereinigt",
       "failed": "Findings konnten nicht bereinigt werden"
+    },
+    "purgeAssets": {
+      "button": "Assets bereinigen",
+      "title": "Alle Assets endgültig löschen?",
+      "cannotUndo": "Dies löscht alle Assets dieser Quelle samt ihrer Findings unwiderruflich.",
+      "permanentTitle": "Endgültige Entfernung",
+      "permanentBody": "Alle Assets dieser Quelle werden endgültig gelöscht — einschließlich extrahiertem Text, Findings, Korrelationsdaten und Chunks. Evidenz-Fingerprints werden im Hintergrund neu berechnet.",
+      "confirm": "Assets löschen",
+      "success": "Assets bereinigt",
+      "failed": "Assets konnten nicht bereinigt werden"
     },
     "schedule": {
       "resumed": "Automatische Scans fortgesetzt."
@@ -2327,7 +2338,37 @@
       "updatedHint": "Aus einem vorab aggregierten Index gelesen, der sich automatisch aktualisiert, sobald neue Funde eintreffen – deshalb lädt diese Seite sofort, statt Millionen Zeilen zu zählen.",
       "never": "Noch nicht erstellt",
       "refresh": "Statistiken jetzt neu berechnen"
+    },
+    "assetDiscovery": {
+      "title": "Assets Discovery",
+      "subtitle": "Alle Assets in diesem Namespace, verbunden durch Links und Herkunft"
     }
+  },
+  "assetDiscovery": {
+    "title": "Assets Discovery",
+    "assetCount": "{{count}} Assets",
+    "loadFailed": "Assets Discovery konnte nicht geladen werden",
+    "empty": "Keine Assets",
+    "emptyDesc": "Dieser Namespace hat noch keine Assets.",
+    "truncated": "Teilweise",
+    "searchPlaceholder": "Assets suchen…",
+    "allSources": "Alle Quellen",
+    "allRelations": "Alle Beziehungen",
+    "external": "Extern ({{count}})",
+    "asset": "Asset",
+    "unresolved": "Nicht aufgelöst",
+    "externalBadge": "Nicht gescannte Referenz",
+    "sourceLabel": "Quelle",
+    "typeLabel": "Typ",
+    "findingsLabel": "Funde",
+    "highestSeverity": "Höchster Schweregrad",
+    "lastDetected": "Zuletzt erkannt",
+    "noFindings": "Keine offenen Funde",
+    "openAsset": "Asset öffnen",
+    "legend": "Legende",
+    "legendHint": "Assets sind durch ihre Link-Referenzen und jede vom Connector deklarierte Herkunft verbunden.",
+    "legendAsset": "Asset",
+    "legendExternal": "Nicht gescannte oder quellenübergreifende Referenz"
   },
   "breadcrumb": {
     "home": "Startseite",

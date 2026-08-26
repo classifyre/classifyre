@@ -5,6 +5,7 @@ All URIs are relative to *http://localhost*
 | Method | HTTP request | Description |
 |------------- | ------------- | -------------|
 | [**correlationControllerAddExclusion**](CorrelationApi.md#correlationcontrolleraddexclusion) | **POST** /correlation/exclusions | Add an exclusion rule (ignore noisy values) and recompute |
+| [**correlationControllerAssetMap**](CorrelationApi.md#correlationcontrollerassetmap) | **GET** /correlation/asset-map | Whole-namespace asset map: every asset (capped) connected by its links and typed relationships |
 | [**correlationControllerCaseAction**](CorrelationApi.md#correlationcontrollercaseaction) | **POST** /correlation/case-action | Create a case (or add to one) from assets selected in the fingerprints graph |
 | [**correlationControllerGetConfig**](CorrelationApi.md#correlationcontrollergetconfig) | **GET** /correlation/config | Correlation tuning: per-label weights (dynamic) + match thresholds |
 | [**correlationControllerGraph**](CorrelationApi.md#correlationcontrollergraph) | **GET** /correlation/graph | Correlation (\&quot;evidence fingerprints\&quot;) graph: assets linked through the findings they share |
@@ -70,6 +71,63 @@ No authorization required
 ### HTTP request headers
 
 - **Content-Type**: `application/json`
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## correlationControllerAssetMap
+
+> CorrelationGraphResponseDto correlationControllerAssetMap()
+
+Whole-namespace asset map: every asset (capped) connected by its links and typed relationships
+
+### Example
+
+```ts
+import {
+  Configuration,
+  CorrelationApi,
+} from '@workspace/api-client';
+import type { CorrelationControllerAssetMapRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new CorrelationApi();
+
+  try {
+    const data = await api.correlationControllerAssetMap();
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+This endpoint does not need any parameter.
+
+### Return type
+
+[**CorrelationGraphResponseDto**](CorrelationGraphResponseDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
 - **Accept**: `application/json`
 
 

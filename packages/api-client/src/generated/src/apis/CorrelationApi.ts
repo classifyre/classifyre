@@ -123,6 +123,35 @@ export class CorrelationApi extends runtime.BaseAPI {
     }
 
     /**
+     * Whole-namespace asset map: every asset (capped) connected by its links and typed relationships
+     */
+    async correlationControllerAssetMapRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<CorrelationGraphResponseDto>> {
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/correlation/asset-map`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => CorrelationGraphResponseDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * Whole-namespace asset map: every asset (capped) connected by its links and typed relationships
+     */
+    async correlationControllerAssetMap(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<CorrelationGraphResponseDto> {
+        const response = await this.correlationControllerAssetMapRaw(initOverrides);
+        return await response.value();
+    }
+
+    /**
      * Create a case (or add to one) from assets selected in the fingerprints graph
      */
     async correlationControllerCaseActionRaw(requestParameters: CorrelationControllerCaseActionRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<CaseActionResponseDto>> {

@@ -133,6 +133,7 @@ All URIs are relative to *http://localhost*
 *ChatBotsApi* | [**chatBotsControllerTest**](docs/ChatBotsApi.md#chatbotscontrollertest) | **POST** /instance-settings/chat/bots/{id}/test | Test chat bot connection
 *ChatBotsApi* | [**chatBotsControllerUpdate**](docs/ChatBotsApi.md#chatbotscontrollerupdate) | **PATCH** /instance-settings/chat/bots/{id} | Update a chat bot
 *CorrelationApi* | [**correlationControllerAddExclusion**](docs/CorrelationApi.md#correlationcontrolleraddexclusion) | **POST** /correlation/exclusions | Add an exclusion rule (ignore noisy values) and recompute
+*CorrelationApi* | [**correlationControllerAssetMap**](docs/CorrelationApi.md#correlationcontrollerassetmap) | **GET** /correlation/asset-map | Whole-namespace asset map: every asset (capped) connected by its links and typed relationships
 *CorrelationApi* | [**correlationControllerCaseAction**](docs/CorrelationApi.md#correlationcontrollercaseaction) | **POST** /correlation/case-action | Create a case (or add to one) from assets selected in the fingerprints graph
 *CorrelationApi* | [**correlationControllerGetConfig**](docs/CorrelationApi.md#correlationcontrollergetconfig) | **GET** /correlation/config | Correlation tuning: per-label weights (dynamic) + match thresholds
 *CorrelationApi* | [**correlationControllerGraph**](docs/CorrelationApi.md#correlationcontrollergraph) | **GET** /correlation/graph | Correlation (\&quot;evidence fingerprints\&quot;) graph: assets linked through the findings they share
@@ -282,6 +283,7 @@ All URIs are relative to *http://localhost*
 *SourcesApi* | [**sourcesControllerGetSchedule**](docs/SourcesApi.md#sourcescontrollergetschedule) | **GET** /sources/{id}/schedule | Get source schedule
 *SourcesApi* | [**sourcesControllerGetSource**](docs/SourcesApi.md#sourcescontrollergetsource) | **GET** /sources/{id} | Get source by ID
 *SourcesApi* | [**sourcesControllerListSources**](docs/SourcesApi.md#sourcescontrollerlistsources) | **GET** /sources | List all data sources
+*SourcesApi* | [**sourcesControllerPurgeAssets**](docs/SourcesApi.md#sourcescontrollerpurgeassets) | **DELETE** /sources/{id}/assets | Purge all assets of a data source
 *SourcesApi* | [**sourcesControllerPurgeFindings**](docs/SourcesApi.md#sourcescontrollerpurgefindings) | **DELETE** /sources/{id}/findings | Purge all findings of a data source
 *SourcesApi* | [**sourcesControllerResumeSchedule**](docs/SourcesApi.md#sourcescontrollerresumeschedule) | **POST** /sources/{id}/schedule/resume | Resume automatic scanning
 *SourcesApi* | [**sourcesControllerStartRun**](docs/SourcesApi.md#sourcescontrollerstartrun) | **POST** /sources/{id}/runs | Start a new ingestion run

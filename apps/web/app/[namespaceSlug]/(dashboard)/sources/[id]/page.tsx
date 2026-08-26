@@ -12,6 +12,9 @@ import {
   Play,
   ArrowUpRight,
   TriangleAlert,
+  MoreHorizontal,
+  Eraser,
+  Trash2,
 } from "lucide-react";
 import {
   api,
@@ -42,6 +45,13 @@ import {
 } from "@workspace/ui/components/tooltip";
 import { Separator } from "@workspace/ui/components/separator";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@workspace/ui/components/dropdown-menu";
+import {
   Tabs,
   TabsContent,
   TabsList,
@@ -55,6 +65,7 @@ import { AssetLinksGraph } from "@/components/asset-links-graph";
 import { DetailBackButton } from "@/components/detail-back-button";
 import { DeleteSourceAction } from "@/components/delete-source-action";
 import { PurgeFindingsAction } from "@/components/purge-findings-action";
+import { PurgeAssetsAction } from "@/components/purge-assets-action";
 import { FindingsTable } from "@/components/findings-table";
 import type { FindingSelection } from "@/components/findings-table";
 import { BulkUpdateDialog } from "@/components/bulk-update-dialog";
@@ -117,6 +128,9 @@ export default function SourceViewPage() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [isStartingScan, setIsStartingScan] = useState(false);
   const [autopilotOpen, setAutopilotOpen] = useState(false);
+  const [purgeFindingsOpen, setPurgeFindingsOpen] = useState(false);
+  const [purgeAssetsOpen, setPurgeAssetsOpen] = useState(false);
+  const [deleteSourceOpen, setDeleteSourceOpen] = useState(false);
 
   // Findings tab bulk update
   const [findingsSelection, setFindingsSelection] =
@@ -470,28 +484,54 @@ export default function SourceViewPage() {
         </div>
         <div className="flex flex-col items-start gap-2 sm:items-end">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => router.push(nsPath(`/sources/${sourceId}/edit`))}
-            >
-              <Pencil className="h-4 w-4" />
-              {t("sources.editSource")}
-            </Button>
-            <PurgeFindingsAction
-              sourceId={sourceId}
-              onPurged={() => void fetchSourceData(false)}
-            />
-            <DeleteSourceAction sourceId={sourceId} />
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setAutopilotOpen(true)}
-              title="Have the AI autopilot review this source's findings with your instruction"
-            >
-              <Bot className="h-4 w-4 text-[#d97706]" />
-              AI autopilot
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  aria-label={t("common.moreActions")}
+                >
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem
+                  onClick={() =>
+                    router.push(nsPath(`/sources/${sourceId}/edit`))
+                  }
+                >
+                  <Pencil className="h-4 w-4" />
+                  {t("sources.editSource")}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setAutopilotOpen(true)}>
+                  <Bot className="h-4 w-4 text-[#d97706]" />
+                  AI autopilot
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  variant="destructive"
+                  onClick={() => setPurgeFindingsOpen(true)}
+                >
+                  <Eraser className="h-4 w-4" />
+                  {t("sources.purgeFindings.button")}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  variant="destructive"
+                  onClick={() => setPurgeAssetsOpen(true)}
+                >
+                  <Eraser className="h-4 w-4" />
+                  {t("sources.purgeAssets.button")}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  variant="destructive"
+                  onClick={() => setDeleteSourceOpen(true)}
+                >
+                  <Trash2 className="h-4 w-4" />
+                  {t("sources.deleteSource")}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <Button
               size="sm"
               onClick={handleStartScan}
@@ -516,6 +556,27 @@ export default function SourceViewPage() {
         onOpenChange={setAutopilotOpen}
         defaultSourceId={sourceId}
         onTriggered={() => router.push(nsPath("/harness?tab=runs"))}
+      />
+
+      <PurgeFindingsAction
+        sourceId={sourceId}
+        hideTrigger
+        open={purgeFindingsOpen}
+        onOpenChange={setPurgeFindingsOpen}
+        onPurged={() => void fetchSourceData(false)}
+      />
+      <PurgeAssetsAction
+        sourceId={sourceId}
+        hideTrigger
+        open={purgeAssetsOpen}
+        onOpenChange={setPurgeAssetsOpen}
+        onPurged={() => void fetchSourceData(false)}
+      />
+      <DeleteSourceAction
+        sourceId={sourceId}
+        hideTrigger
+        open={deleteSourceOpen}
+        onOpenChange={setDeleteSourceOpen}
       />
 
       <Tabs defaultValue="overview" urlParam="tab" className="space-y-4">

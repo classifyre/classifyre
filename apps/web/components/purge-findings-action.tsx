@@ -26,12 +26,19 @@ type PurgeFindingsActionProps = {
   sourceId: string;
   className?: string;
   onPurged?: () => void;
+  /** Render only the confirmation dialog, controlled by `open`/`onOpenChange` — for embedding the action in a menu that owns its own trigger. */
+  hideTrigger?: boolean;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 };
 
 export function PurgeFindingsAction({
   sourceId,
   className,
   onPurged,
+  hideTrigger = false,
+  open,
+  onOpenChange,
 }: PurgeFindingsActionProps) {
   const { t } = useTranslation();
   const [isPurging, setIsPurging] = useState(false);
@@ -55,26 +62,28 @@ export function PurgeFindingsAction({
   };
 
   return (
-    <AlertDialog>
-      <AlertDialogTrigger asChild>
-        <Button
-          size="sm"
-          variant="outline"
-          disabled={isPurging}
-          className={cn(
-            "rounded-[4px] border-2 border-destructive text-destructive hover:bg-destructive/10",
-            className,
-          )}
-          data-testid="btn-purge-findings"
-        >
-          {isPurging ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <Eraser className="h-4 w-4" />
-          )}
-          {t("sources.purgeFindings.button")}
-        </Button>
-      </AlertDialogTrigger>
+    <AlertDialog open={open} onOpenChange={onOpenChange}>
+      {!hideTrigger && (
+        <AlertDialogTrigger asChild>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={isPurging}
+            className={cn(
+              "rounded-[4px] border-2 border-destructive text-destructive hover:bg-destructive/10",
+              className,
+            )}
+            data-testid="btn-purge-findings"
+          >
+            {isPurging ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Eraser className="h-4 w-4" />
+            )}
+            {t("sources.purgeFindings.button")}
+          </Button>
+        </AlertDialogTrigger>
+      )}
       <AlertDialogContent className="rounded-[6px] border-2 border-border">
         <AlertDialogHeader>
           <AlertDialogTitle>{t("sources.purgeFindings.title")}</AlertDialogTitle>
