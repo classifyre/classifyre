@@ -34,6 +34,8 @@ export class AiModelNotFoundError extends Error {
   }
 }
 
+import type { AiUsage } from './types';
+
 /** One failed structured-output attempt: the raw model response + why it was rejected. */
 export interface AiSchemaAttempt {
   raw: string;
@@ -53,10 +55,7 @@ export class AiSchemaError extends Error {
     message: string,
     public readonly cause?: unknown,
     public readonly attempts: AiSchemaAttempt[] = [],
-    public readonly usage: {
-      inputTokens: number;
-      outputTokens: number;
-    } | null = null,
+    public readonly usage: AiUsage | null = null,
   ) {
     super(message);
     this.name = 'AiSchemaError';

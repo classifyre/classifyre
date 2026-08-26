@@ -9,6 +9,7 @@ Name | Type
 `runs` | number
 `inputTokens` | number
 `outputTokens` | number
+`cachedInputTokens` | number
 `costUsd` | number
 `avgDurationMs` | number
 
@@ -22,6 +23,7 @@ const example = {
   "runs": null,
   "inputTokens": null,
   "outputTokens": null,
+  "cachedInputTokens": null,
   "costUsd": null,
   "avgDurationMs": null,
 } satisfies AgentUsageTotalsDto

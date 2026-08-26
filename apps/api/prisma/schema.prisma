@@ -935,33 +935,38 @@ model InstanceSettings {
 }
 
 model AiProviderConfig {
-  id                String         @id @default(uuid())
-  name              String
-  provider          AiProviderType @default(CLAUDE)
-  model             String         @default("")
-  apiKeyEnc         String?        @map("api_key_enc")
-  baseUrl           String?        @map("base_url")
-  contextSize       Int?           @map("context_size")
-  supportsVision    Boolean        @default(false) @map("supports_vision")
+  id                     String         @id @default(uuid())
+  name                   String
+  provider               AiProviderType @default(CLAUDE)
+  model                  String         @default("")
+  apiKeyEnc              String?        @map("api_key_enc")
+  baseUrl                String?        @map("base_url")
+  contextSize            Int?           @map("context_size")
+  supportsVision         Boolean        @default(false) @map("supports_vision")
   // Whether this provider serves an *embeddings* endpoint rather than (or as
   // well as) chat completions. They are different APIs with different models,
   // and picking a chat model to embed with fails at request time — so the
   // embedding picker filters on this rather than offering every saved
   // provider and letting the user find out later.
-  supportsEmbedding Boolean        @default(false) @map("supports_embedding")
+  supportsEmbedding      Boolean        @default(false) @map("supports_embedding")
   // Properties of the embedding model itself, captured here rather than in the
   // embedding configuration: they belong to the model, not to the workspace
   // that uses it, and a workspace picking this provider should not have to
   // re-state facts the provider already knows. Only meaningful when
   // supportsEmbedding is true.
-  embeddingDimensions Int?         @map("embedding_dimensions")
-  embeddingPooling    String?      @map("embedding_pooling")
+  embeddingDimensions    Int?           @map("embedding_dimensions")
+  embeddingPooling       String?        @map("embedding_pooling")
   // Optional pricing in USD per 1M tokens — enables cost estimates on
   // autopilot runs and the harness usage charts. Null = unknown/not billed.
-  inputCostPerMTok  Decimal?       @map("input_cost_per_mtok") @db.Decimal(10, 4)
-  outputCostPerMTok Decimal?       @map("output_cost_per_mtok") @db.Decimal(10, 4)
-  createdAt         DateTime       @default(now()) @map("created_at")
-  updatedAt         DateTime       @updatedAt @map("updated_at")
+  inputCostPerMTok       Decimal?       @map("input_cost_per_mtok") @db.Decimal(10, 4)
+  outputCostPerMTok      Decimal?       @map("output_cost_per_mtok") @db.Decimal(10, 4)
+  // Discounted price for input tokens served from the provider's prompt
+  // cache (OpenAI-compatible `prompt_tokens_details.cached_tokens`). Null
+  // means "unknown" — cached tokens are then costed at the full input rate,
+  // same as before this field existed, rather than assumed free.
+  cachedInputCostPerMTok Decimal?       @map("cached_input_cost_per_mtok") @db.Decimal(10, 4)
+  createdAt              DateTime       @default(now()) @map("created_at")
+  updatedAt              DateTime       @updatedAt @map("updated_at")
 
   assistantInstanceSettings InstanceSettings[]  @relation("AssistantAiProvider")
   harnessInstanceSettings   InstanceSettings[]  @relation("HarnessAiProvider")
@@ -987,7 +992,7 @@ model McpAccessToken {
   // tool group). A non-null array is an explicit allowlist of
   // MCP_CAPABILITY_GROUPS ids. Existing tokens stay NULL on migration so
   // nothing that already worked starts failing.
-  toolGroupIds Json? @map("tool_group_ids")
+  toolGroupIds Json?     @map("tool_group_ids")
   lastUsedAt   DateTime? @map("last_used_at")
   revokedAt    DateTime? @map("revoked_at")
   createdAt    DateTime  @default(now()) @map("created_at")
@@ -2007,34 +2012,38 @@ model AgentSystemBrief {
 // stepState make the pipeline resumable across pg-boss redeliveries without
 // repeating LLM calls whose validated output is already stored.
 model AgentRun {
-  id           String         @id @default(uuid())
-  agentKind    AgentKind      @map("agent_kind")
-  status       AgentRunStatus @default(PENDING)
-  sourceId     String?        @map("source_id")
-  runnerId     String?        @map("runner_id")
+  id                String         @id @default(uuid())
+  agentKind         AgentKind      @map("agent_kind")
+  status            AgentRunStatus @default(PENDING)
+  sourceId          String?        @map("source_id")
+  runnerId          String?        @map("runner_id")
   // Case this run is focused on (case-targeted manual runs) — lets the case
   // workspace show "AI is working here" and surface the results.
-  caseId       String?        @map("case_id")
-  trigger      String         @default("scan_completed")
+  caseId            String?        @map("case_id")
+  trigger           String         @default("scan_completed")
   // Operator instruction for manually triggered cycles ("steer" runs).
-  instruction  String?        @db.Text
+  instruction       String?        @db.Text
   // Stable identity of the cycle that produced this run — used to resume the
   // right run on pg-boss redelivery (scan: source:runner, manual: uuid).
-  cycleKey     String?        @map("cycle_key")
-  currentStep  String?        @map("current_step")
-  stepState    Json?          @map("step_state") @db.JsonB
-  attempts     Int            @default(0)
-  error        String?        @db.Text
-  summary      String?        @db.Text
+  cycleKey          String?        @map("cycle_key")
+  currentStep       String?        @map("current_step")
+  stepState         Json?          @map("step_state") @db.JsonB
+  attempts          Int            @default(0)
+  error             String?        @db.Text
+  summary           String?        @db.Text
   // LLM token consumption of this run (all iterations/attempts summed) and the
   // estimated cost derived from the provider's configured per-MTok prices at
   // the time the tokens were recorded. costUsd stays null when no pricing set.
-  inputTokens  Int            @default(0) @map("input_tokens")
-  outputTokens Int            @default(0) @map("output_tokens")
-  costUsd      Decimal?       @map("cost_usd") @db.Decimal(14, 6)
-  startedAt    DateTime?      @map("started_at")
-  finishedAt   DateTime?      @map("finished_at")
-  createdAt    DateTime       @default(now()) @map("created_at")
+  inputTokens       Int            @default(0) @map("input_tokens")
+  outputTokens      Int            @default(0) @map("output_tokens")
+  // Subset of inputTokens the provider served from its prompt cache (billed,
+  // when known, at AiProviderConfig.cachedInputCostPerMTok instead of the
+  // full input rate). 0 on a provider/run that reported no cache usage.
+  cachedInputTokens Int            @default(0) @map("cached_input_tokens")
+  costUsd           Decimal?       @map("cost_usd") @db.Decimal(14, 6)
+  startedAt         DateTime?      @map("started_at")
+  finishedAt        DateTime?      @map("finished_at")
+  createdAt         DateTime       @default(now()) @map("created_at")
 
   decisions AgentDecision[]
   logs      AgentLog[]

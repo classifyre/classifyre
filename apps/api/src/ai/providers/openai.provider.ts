@@ -87,6 +87,11 @@ export class OpenAiProvider implements IAiProvider {
           ? {
               inputTokens: completion.usage.prompt_tokens ?? 0,
               outputTokens: completion.usage.completion_tokens ?? 0,
+              // Reported by OpenAI and most OpenAI-compatible gateways
+              // (vLLM, etc.) once automatic prefix caching kicks in — a
+              // subset of prompt_tokens, not additional tokens.
+              cachedInputTokens:
+                completion.usage.prompt_tokens_details?.cached_tokens ?? 0,
             }
           : null,
       };

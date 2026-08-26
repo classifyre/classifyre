@@ -237,6 +237,8 @@ function addUsage(total: AiUsage | null, next: AiUsage | null): AiUsage | null {
   return {
     inputTokens: (total?.inputTokens ?? 0) + next.inputTokens,
     outputTokens: (total?.outputTokens ?? 0) + next.outputTokens,
+    cachedInputTokens:
+      (total?.cachedInputTokens ?? 0) + (next.cachedInputTokens ?? 0),
   };
 }
 
