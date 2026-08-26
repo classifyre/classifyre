@@ -318,10 +318,12 @@ export class McpServerFactoryService {
     return server;
   }
 
-  /** Disable every registered tool that is not in an allowed group. Tools with
-   * no group (none, today) are treated as always-allowed rather than always
-   * hidden, so a future ungrouped tool fails open into visibility, not silently
-   * out of reach for every scoped token. */
+  /** Disable every registered tool that is not in an allowed group. Fails
+   * closed: a tool with no group is disabled like any other disallowed tool,
+   * not left always-visible, because every tool is expected to carry a group
+   * (enforced by a spec that diffs MCP_CAPABILITY_GROUPS against the live
+   * registry) -- a scoped token must never see a tool that slipped through
+   * ungrouped. */
   private restrictToGroups(server: McpServer, allowedGroupIds: string[]): void {
     const allowed = new Set<string>();
     for (const group of MCP_CAPABILITY_GROUPS) {
@@ -331,9 +333,6 @@ export class McpServerFactoryService {
         }
       }
     }
-    const grouped = new Set(
-      MCP_CAPABILITY_GROUPS.flatMap((group) => group.toolNames),
-    );
 
     const registered = (
       server as unknown as {
@@ -342,7 +341,7 @@ export class McpServerFactoryService {
     )._registeredTools;
 
     for (const [name, tool] of Object.entries(registered)) {
-      if (grouped.has(name) && !allowed.has(name)) {
+      if (!allowed.has(name)) {
         tool.disable();
       }
     }
