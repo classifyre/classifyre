@@ -288,6 +288,17 @@ export const MCP_CAPABILITY_GROUPS: McpCapabilityGroupDto[] = [
       'Add or update a term definition',
     ],
   },
+  {
+    id: 'lineage',
+    title: 'Lineage',
+    description:
+      'Trace how data flows between assets via the stitched edge graph, and look up what a relation type means.',
+    toolNames: ['get_asset_lineage', 'get_relation_types'],
+    operations: [
+      "Walk an asset's upstream/downstream FLOW lineage",
+      'List relation types in use and their FLOW/CONTAINMENT/IDENTITY/REFERENCE/USAGE class',
+    ],
+  },
 ];
 
 /** Every selectable MCP token scope id, for validating `toolGroupIds`. */
