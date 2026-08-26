@@ -48,6 +48,13 @@ const AGENT_COLORS: Record<string, { light: string; dark: string }> = {
 
 const INPUT_COLOR = AGENT_COLORS.INQUIRY!;
 const OUTPUT_COLOR = AGENT_COLORS.CASE!;
+// Cached input tokens are billed at a discount (or free) — a visually
+// distinct, muted shade of the input color reads as "same series, cheaper
+// share" rather than a fourth unrelated category.
+const CACHED_INPUT_COLOR: { light: string; dark: string } = {
+  light: "#93C5FD",
+  dark: "#60A5FA",
+};
 
 const ALL_VALUE = "__all__";
 
@@ -61,6 +68,10 @@ export function formatTokens(n: number): string {
 
 export function formatCost(usd: number): string {
   return usd >= 100 ? `$${usd.toFixed(0)}` : `$${usd.toFixed(2)}`;
+}
+
+export function formatPercent(ratio: number): string {
+  return `${Math.round(ratio * 100)}%`;
 }
 
 /** Enumerate UTC days (YYYY-MM-DD) between two instants, inclusive. */
@@ -130,19 +141,27 @@ export function HarnessUsage() {
   // ── Per-day input/output series (respecting the agent filter) ──
   const perDay = React.useMemo(() => {
     const input = new Map<string, number>();
+    const cachedInput = new Map<string, number>();
     const output = new Map<string, number>();
     const cost = new Map<string, number>();
     for (const b of data?.buckets ?? []) {
-      input.set(b.date, (input.get(b.date) ?? 0) + b.inputTokens);
+      // inputTokens already includes cachedInputTokens (it's a subset, not
+      // additional) — split it here so the chart stacks two non-overlapping
+      // shares rather than double-counting the cached slice.
+      const cached = Math.min(b.cachedInputTokens, b.inputTokens);
+      input.set(b.date, (input.get(b.date) ?? 0) + (b.inputTokens - cached));
+      cachedInput.set(b.date, (cachedInput.get(b.date) ?? 0) + cached);
       output.set(b.date, (output.get(b.date) ?? 0) + b.outputTokens);
       if (b.costUsd != null)
         cost.set(b.date, (cost.get(b.date) ?? 0) + b.costUsd);
     }
     return {
       input: days.map((d) => input.get(d) ?? 0),
+      cachedInput: days.map((d) => cachedInput.get(d) ?? 0),
       output: days.map((d) => output.get(d) ?? 0),
       cost: days.map((d) => cost.get(d) ?? 0),
       hasCost: cost.size > 0,
+      hasCache: [...cachedInput.values()].some((v) => v > 0),
     };
   }, [data, days]);
 
@@ -197,7 +216,20 @@ export function HarnessUsage() {
       output: number[],
       dataEndRadius: [number, number, number, number],
       barMaxWidth: number,
+      cachedInput?: number[],
     ) => [
+      ...(cachedInput
+        ? [
+            {
+              name: t("harness.usage.seriesCachedInput"),
+              type: "bar" as const,
+              stack: "tokens",
+              data: cachedInput,
+              itemStyle: { color: CACHED_INPUT_COLOR[mode] },
+              barMaxWidth,
+            },
+          ]
+        : []),
       {
         name: t("harness.usage.seriesInput"),
         type: "bar" as const,
@@ -229,7 +261,13 @@ export function HarnessUsage() {
         ...chartBase.categoryAxis,
       },
       yAxis: { type: "value" as const, ...chartBase.tokenValueAxis },
-      series: tokenSeries(perDay.input, perDay.output, [3, 3, 0, 0], 22),
+      series: tokenSeries(
+        perDay.input,
+        perDay.output,
+        [3, 3, 0, 0],
+        22,
+        perDay.hasCache ? perDay.cachedInput : undefined,
+      ),
     }),
     [chartBase, dayLabels, perDay, tokenSeries],
   );
@@ -290,6 +328,11 @@ export function HarnessUsage() {
 
   const totals = data?.totals;
   const hasAny = (totals?.runs ?? 0) > 0;
+  const hasCacheData = (totals?.cachedInputTokens ?? 0) > 0;
+  const cacheHitRate =
+    hasCacheData && totals && totals.inputTokens > 0
+      ? totals.cachedInputTokens / totals.inputTokens
+      : null;
 
   return (
     <div className="space-y-4">
@@ -332,7 +375,7 @@ export function HarnessUsage() {
       </div>
 
       {/* ── KPI tiles ── */}
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
         <HarnessStatTile
           label={t("harness.usage.kpi.runs")}
           value={totals ? String(totals.runs) : "—"}
@@ -357,6 +400,11 @@ export function HarnessUsage() {
           label={t("harness.usage.kpi.cost")}
           value={totals?.costUsd != null ? formatCost(totals.costUsd) : "—"}
           accent={totals?.costUsd != null ? "amber" : "none"}
+        />
+        <HarnessStatTile
+          label={t("harness.usage.kpi.cacheHitRate")}
+          value={cacheHitRate != null ? formatPercent(cacheHitRate) : "—"}
+          accent={cacheHitRate != null ? "amber" : "none"}
         />
       </div>
 

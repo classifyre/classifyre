@@ -18,6 +18,7 @@ Name | Type
 `embeddingPooling` | string
 `inputCostPerMTok` | number
 `outputCostPerMTok` | number
+`cachedInputCostPerMTok` | number
 
 ## Example
 
@@ -38,6 +39,7 @@ const example = {
   "embeddingPooling": mean,
   "inputCostPerMTok": 3,
   "outputCostPerMTok": 15,
+  "cachedInputCostPerMTok": 0.3,
 } satisfies UpdateAiProviderConfigDto
 
 console.log(example)

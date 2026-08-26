@@ -66,6 +66,10 @@ export class AiProviderConfigService {
         config.outputCostPerMTok != null
           ? Number(config.outputCostPerMTok)
           : null,
+      cachedInputCostPerMTok:
+        config.cachedInputCostPerMTok != null
+          ? Number(config.cachedInputCostPerMTok)
+          : null,
       createdAt: config.createdAt,
       updatedAt: config.updatedAt,
     };
@@ -112,6 +116,7 @@ export class AiProviderConfigService {
         embeddingPooling: dto.embeddingPooling ?? null,
         inputCostPerMTok: dto.inputCostPerMTok ?? null,
         outputCostPerMTok: dto.outputCostPerMTok ?? null,
+        cachedInputCostPerMTok: dto.cachedInputCostPerMTok ?? null,
       },
     });
     return this.toResponse(created);
@@ -161,6 +166,9 @@ export class AiProviderConfigService {
     }
     if (dto.outputCostPerMTok !== undefined) {
       data.outputCostPerMTok = dto.outputCostPerMTok;
+    }
+    if (dto.cachedInputCostPerMTok !== undefined) {
+      data.cachedInputCostPerMTok = dto.cachedInputCostPerMTok;
     }
 
     const updated = await this.prisma.aiProviderConfig.update({

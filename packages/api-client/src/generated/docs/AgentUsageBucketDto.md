@@ -11,6 +11,7 @@ Name | Type
 `runs` | number
 `inputTokens` | number
 `outputTokens` | number
+`cachedInputTokens` | number
 `costUsd` | number
 
 ## Example
@@ -25,6 +26,7 @@ const example = {
   "runs": null,
   "inputTokens": null,
   "outputTokens": null,
+  "cachedInputTokens": null,
   "costUsd": null,
 } satisfies AgentUsageBucketDto
 

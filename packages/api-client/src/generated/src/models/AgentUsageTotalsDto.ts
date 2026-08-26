@@ -38,6 +38,12 @@ export interface AgentUsageTotalsDto {
      */
     outputTokens: number;
     /**
+     * Subset of inputTokens served from cache.
+     * @type {number}
+     * @memberof AgentUsageTotalsDto
+     */
+    cachedInputTokens: number;
+    /**
      * 
      * @type {number}
      * @memberof AgentUsageTotalsDto
@@ -58,6 +64,7 @@ export function instanceOfAgentUsageTotalsDto(value: object): value is AgentUsag
     if (!('runs' in value) || value['runs'] === undefined) return false;
     if (!('inputTokens' in value) || value['inputTokens'] === undefined) return false;
     if (!('outputTokens' in value) || value['outputTokens'] === undefined) return false;
+    if (!('cachedInputTokens' in value) || value['cachedInputTokens'] === undefined) return false;
     return true;
 }
 
@@ -74,6 +81,7 @@ export function AgentUsageTotalsDtoFromJSONTyped(json: any, ignoreDiscriminator:
         'runs': json['runs'],
         'inputTokens': json['inputTokens'],
         'outputTokens': json['outputTokens'],
+        'cachedInputTokens': json['cachedInputTokens'],
         'costUsd': json['costUsd'] == null ? undefined : json['costUsd'],
         'avgDurationMs': json['avgDurationMs'] == null ? undefined : json['avgDurationMs'],
     };
@@ -93,6 +101,7 @@ export function AgentUsageTotalsDtoToJSONTyped(value?: AgentUsageTotalsDto | nul
         'runs': value['runs'],
         'inputTokens': value['inputTokens'],
         'outputTokens': value['outputTokens'],
+        'cachedInputTokens': value['cachedInputTokens'],
         'costUsd': value['costUsd'],
         'avgDurationMs': value['avgDurationMs'],
     };
