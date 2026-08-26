@@ -77,6 +77,7 @@ type Draft = {
   embeddingPooling: string;
   inputCostPerMTok: string;
   outputCostPerMTok: string;
+  cachedInputCostPerMTok: string;
 };
 
 type CapabilityProgressState = {
@@ -149,6 +150,7 @@ function buildDraft(config: AiProviderConfigResponseDto | null): Draft {
       embeddingPooling: "mean",
       inputCostPerMTok: "",
       outputCostPerMTok: "",
+      cachedInputCostPerMTok: "",
     };
   }
   return {
@@ -169,6 +171,10 @@ function buildDraft(config: AiProviderConfigResponseDto | null): Draft {
       config.inputCostPerMTok != null ? String(config.inputCostPerMTok) : "",
     outputCostPerMTok:
       config.outputCostPerMTok != null ? String(config.outputCostPerMTok) : "",
+    cachedInputCostPerMTok:
+      config.cachedInputCostPerMTok != null
+        ? String(config.cachedInputCostPerMTok)
+        : "",
   };
 }
 
@@ -192,6 +198,7 @@ function buildCreatePayload(draft: Draft): CreateAiProviderConfigDto {
     draft.provider === AiProviderConfigResponseDtoProviderEnum.OpenaiCompatible;
   const inputCost = parseCost(draft.inputCostPerMTok);
   const outputCost = parseCost(draft.outputCostPerMTok);
+  const cachedInputCost = parseCost(draft.cachedInputCostPerMTok);
   return {
     name: draft.name.trim(),
     provider: draft.provider,
@@ -217,6 +224,9 @@ function buildCreatePayload(draft: Draft): CreateAiProviderConfigDto {
     ...(typeof outputCost === "number"
       ? { outputCostPerMTok: outputCost }
       : {}),
+    ...(typeof cachedInputCost === "number"
+      ? { cachedInputCostPerMTok: cachedInputCost }
+      : {}),
   };
 }
 
@@ -225,6 +235,7 @@ function buildUpdatePayload(draft: Draft): UpdateAiProviderConfigDto {
     draft.provider === AiProviderConfigResponseDtoProviderEnum.OpenaiCompatible;
   const inputCost = parseCost(draft.inputCostPerMTok);
   const outputCost = parseCost(draft.outputCostPerMTok);
+  const cachedInputCost = parseCost(draft.cachedInputCostPerMTok);
   return {
     name: draft.name.trim(),
     provider: draft.provider,
@@ -251,6 +262,9 @@ function buildUpdatePayload(draft: Draft): UpdateAiProviderConfigDto {
       : {}),
     ...(inputCost !== undefined ? { inputCostPerMTok: inputCost } : {}),
     ...(outputCost !== undefined ? { outputCostPerMTok: outputCost } : {}),
+    ...(cachedInputCost !== undefined
+      ? { cachedInputCostPerMTok: cachedInputCost }
+      : {}),
   };
 }
 
@@ -592,6 +606,28 @@ export function AiProviderForm({
                   }
                 />
               </div>
+              {isOpenAiCompatible ? (
+                <div className="space-y-2">
+                  <Label>{t("aiProvider.cachedInputCost")}</Label>
+                  <Input
+                    className="h-11 rounded-[4px] border-2 font-mono"
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    placeholder={t("aiProvider.cachedInputCostPlaceholder")}
+                    value={draft.cachedInputCostPerMTok}
+                    onChange={(event) =>
+                      setDraft((current) => ({
+                        ...current,
+                        cachedInputCostPerMTok: event.target.value,
+                      }))
+                    }
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    {t("aiProvider.cachedInputCostDesc")}
+                  </p>
+                </div>
+              ) : null}
               <p className="text-xs text-muted-foreground sm:col-span-2">
                 {t("aiProvider.tokenCostsDesc")}
               </p>

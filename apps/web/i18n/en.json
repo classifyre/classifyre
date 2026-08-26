@@ -2256,6 +2256,9 @@
     "inputCostPlaceholder": "e.g. 3.00",
     "outputCost": "USD per 1M output tokens",
     "outputCostPlaceholder": "e.g. 15.00",
+    "cachedInputCost": "USD per 1M cached input tokens",
+    "cachedInputCostPlaceholder": "e.g. 0.30",
+    "cachedInputCostDesc": "Discounted rate the endpoint charges for input tokens it served from its prompt cache. Leave blank to cost cached tokens at the full input rate.",
     "tokenCostsDesc": "Used to estimate autopilot run costs and power the harness usage charts."
   },
   "csvExport": {
@@ -3530,15 +3533,18 @@
         "inputTokens": "Input tokens",
         "outputTokens": "Output tokens",
         "avgDuration": "Avg run time",
-        "cost": "Est. cost"
+        "cost": "Est. cost",
+        "cacheHitRate": "Cache hit rate"
       },
       "tokensPerDay": "Tokens per day",
       "tokensByAgent": "Tokens by agent",
       "costPerDay": "Estimated cost per day (USD)",
       "seriesInput": "Input",
+      "seriesCachedInput": "Cached input",
       "seriesOutput": "Output",
       "empty": "No agent runs in this period yet.",
-      "noPricing": "Add token prices to your AI provider in Harness AI → Configuration to see cost estimates."
+      "noPricing": "Add token prices to your AI provider in Harness AI → Configuration to see cost estimates.",
+      "noCacheData": "No provider in this range reported cache usage."
     }
   },
   "aiHealth": {

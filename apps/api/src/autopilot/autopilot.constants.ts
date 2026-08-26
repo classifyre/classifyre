@@ -60,6 +60,19 @@ export const AGENT_RUN_BUDGET_MS = 20 * 60 * 1000;
  */
 export const AGENT_RUN_STALE_AFTER_MS = 60 * 60 * 1000;
 
+/**
+ * How long HarnessService reuses a composed SystemBrief across agent runs
+ * instead of recomposing it (fresh DB counts) for each one.
+ *
+ * The brief is byte-identical for every agent kind and source within this
+ * window, which is what lets an OpenAI-compatible endpoint's automatic
+ * prompt-prefix caching actually hit across runs — a brief recomposed on
+ * every call changes its numbers every time and defeats that caching before
+ * it can start. Kept shorter than the coalesce window (600s) so operators
+ * see fresh coverage numbers within one cycle, not stale ones from the last.
+ */
+export const HARNESS_BRIEF_CACHE_TTL_MS = 5 * 60 * 1000;
+
 // ── Cadence: coalescing many scan completions into one corpus cycle ──────────
 /**
  * Scan completions used to fire one cycle each, debounced only per source

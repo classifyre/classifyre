@@ -91,6 +91,12 @@ export interface UpdateAiProviderConfigDto {
      * @memberof UpdateAiProviderConfigDto
      */
     outputCostPerMTok?: number | null;
+    /**
+     * Discounted cost in USD per 1M cached input tokens. Pass null to clear the price.
+     * @type {number}
+     * @memberof UpdateAiProviderConfigDto
+     */
+    cachedInputCostPerMTok?: number | null;
 }
 
 
@@ -134,6 +140,7 @@ export function UpdateAiProviderConfigDtoFromJSONTyped(json: any, ignoreDiscrimi
         'embeddingPooling': json['embeddingPooling'] == null ? undefined : json['embeddingPooling'],
         'inputCostPerMTok': json['inputCostPerMTok'] == null ? undefined : json['inputCostPerMTok'],
         'outputCostPerMTok': json['outputCostPerMTok'] == null ? undefined : json['outputCostPerMTok'],
+        'cachedInputCostPerMTok': json['cachedInputCostPerMTok'] == null ? undefined : json['cachedInputCostPerMTok'],
     };
 }
 
@@ -160,6 +167,7 @@ export function UpdateAiProviderConfigDtoToJSONTyped(value?: UpdateAiProviderCon
         'embeddingPooling': value['embeddingPooling'],
         'inputCostPerMTok': value['inputCostPerMTok'],
         'outputCostPerMTok': value['outputCostPerMTok'],
+        'cachedInputCostPerMTok': value['cachedInputCostPerMTok'],
     };
 }
 

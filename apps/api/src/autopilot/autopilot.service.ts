@@ -673,6 +673,7 @@ export class AutopilotService {
           runs: number;
           input_tokens: bigint;
           output_tokens: bigint;
+          cached_input_tokens: bigint;
           cost_usd: number | null;
         }>
         // created_at is a naive timestamp already storing UTC, so truncate it
@@ -685,6 +686,7 @@ export class AutopilotService {
           COUNT(*)::int AS runs,
           COALESCE(SUM(input_tokens), 0)::bigint AS input_tokens,
           COALESCE(SUM(output_tokens), 0)::bigint AS output_tokens,
+          COALESCE(SUM(cached_input_tokens), 0)::bigint AS cached_input_tokens,
           SUM(cost_usd)::float8 AS cost_usd
         FROM agent_runs
         WHERE created_at >= ${since} AND created_at <= ${until}
@@ -717,6 +719,7 @@ export class AutopilotService {
       runs: Number(r.runs),
       inputTokens: Number(r.input_tokens),
       outputTokens: Number(r.output_tokens),
+      cachedInputTokens: Number(r.cached_input_tokens),
       costUsd: r.cost_usd != null ? Number(r.cost_usd) : null,
     }));
 
@@ -724,6 +727,7 @@ export class AutopilotService {
       runs: buckets.reduce((a, b) => a + b.runs, 0),
       inputTokens: buckets.reduce((a, b) => a + b.inputTokens, 0),
       outputTokens: buckets.reduce((a, b) => a + b.outputTokens, 0),
+      cachedInputTokens: buckets.reduce((a, b) => a + b.cachedInputTokens, 0),
       costUsd: buckets.some((b) => b.costUsd != null)
         ? buckets.reduce((a, b) => a + (b.costUsd ?? 0), 0)
         : null,
