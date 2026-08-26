@@ -80,6 +80,16 @@ export class CorrelationController {
     await reply.send(await this.correlation.buildGraph());
   }
 
+  @Get('correlation/asset-map')
+  @ApiOperation({
+    summary:
+      'Whole-namespace asset map: every asset (capped) connected by its links and typed relationships',
+  })
+  @ApiResponse({ status: 200, type: CorrelationGraphResponseDto })
+  async assetMap(): Promise<CorrelationGraphResponseDto> {
+    return this.correlation.buildAssetMapGraph();
+  }
+
   @Get('correlation/links-graph')
   @ApiOperation({
     summary: "A source's assets connected by their links (hash references)",

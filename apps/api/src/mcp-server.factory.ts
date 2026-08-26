@@ -48,6 +48,7 @@ import { GlossaryService } from './glossary/glossary.service';
 import { CaseLeadsService } from './case-leads.service';
 import { CaseEventsService } from './case-events.service';
 import { AutopilotService } from './autopilot/autopilot.service';
+import { GraphService } from './graph.service';
 
 const jsonObjectSchema = z.record(z.string(), z.unknown());
 
@@ -275,6 +276,7 @@ export class McpServerFactoryService {
     private readonly notebookService: NotebookService,
     private readonly notebookExecutionService: NotebookExecutionService,
     private readonly sourceFilesService: SourceFilesService,
+    private readonly graphService: GraphService,
   ) {}
 
   /**
@@ -299,6 +301,7 @@ export class McpServerFactoryService {
     this.registerPrompts(srv);
     this.registerSourceTools(srv);
     this.registerNotebookTools(srv);
+    this.registerLineageTools(srv);
     this.registerCustomDetectorTools(srv);
     this.registerExtractionTools(srv);
     this.registerRunTools(srv);
@@ -318,10 +321,12 @@ export class McpServerFactoryService {
     return server;
   }
 
-  /** Disable every registered tool that is not in an allowed group. Tools with
-   * no group (none, today) are treated as always-allowed rather than always
-   * hidden, so a future ungrouped tool fails open into visibility, not silently
-   * out of reach for every scoped token. */
+  /** Disable every registered tool that is not in an allowed group. Fails
+   * closed: a tool with no group is disabled like any other disallowed tool,
+   * not left always-visible, because every tool is expected to carry a group
+   * (enforced by a spec that diffs MCP_CAPABILITY_GROUPS against the live
+   * registry) -- a scoped token must never see a tool that slipped through
+   * ungrouped. */
   private restrictToGroups(server: McpServer, allowedGroupIds: string[]): void {
     const allowed = new Set<string>();
     for (const group of MCP_CAPABILITY_GROUPS) {
@@ -331,9 +336,6 @@ export class McpServerFactoryService {
         }
       }
     }
-    const grouped = new Set(
-      MCP_CAPABILITY_GROUPS.flatMap((group) => group.toolNames),
-    );
 
     const registered = (
       server as unknown as {
@@ -342,7 +344,7 @@ export class McpServerFactoryService {
     )._registeredTools;
 
     for (const [name, tool] of Object.entries(registered)) {
-      if (grouped.has(name) && !allowed.has(name)) {
+      if (!allowed.has(name)) {
         tool.disable();
       }
     }
@@ -1715,6 +1717,66 @@ export class McpServerFactoryService {
       config: merged,
     });
     return updated;
+  }
+
+  /**
+   * The `edges` table has no direct MCP surface -- only the hydrated graph
+   * views (`GraphService.lineage`/`getRelationTypes`) do. That is deliberate:
+   * an edge row alone is meaningless without the node it points at, and the
+   * hydrated view is what the web graph explorer itself renders, so an agent
+   * verifying a stitched lineage path sees exactly what a human would.
+   */
+  private registerLineageTools(server: McpServerCompat) {
+    server.registerTool(
+      'get_asset_lineage',
+      {
+        title: 'Get Asset Lineage',
+        description:
+          "Trace an asset's FLOW lineage (where its data came from / what depends on it), walking edges up to `depth` hops. Returns the same hydrated node/edge graph the web graph explorer renders, so this is how to verify a stitched cross-source lineage edge (e.g. two assets linked by a shared external URN) without a browser.",
+        inputSchema: {
+          assetId: z.string().uuid(),
+          direction: z.enum(['up', 'down', 'both']).optional(),
+          depth: z.number().int().min(1).max(3).optional(),
+          collapseContainers: z.boolean().optional(),
+          mergeIdentity: z.boolean().optional(),
+        },
+        annotations: {
+          readOnlyHint: true,
+          idempotentHint: true,
+        },
+      },
+      async ({
+        assetId,
+        direction,
+        depth,
+        collapseContainers,
+        mergeIdentity,
+      }) =>
+        jsonResult(
+          await this.graphService.lineage({
+            assetId,
+            direction,
+            depth,
+            collapseContainers,
+            mergeIdentity,
+          }),
+        ),
+    );
+
+    server.registerTool(
+      'get_relation_types',
+      {
+        title: 'Get Relation Types',
+        description:
+          'Edge relation types actually in use, plus builtin suggestions, each classified as FLOW | CONTAINMENT | IDENTITY | REFERENCE | USAGE. Call before get_asset_lineage to know what a relationType on a returned edge means.',
+        inputSchema: {},
+        annotations: {
+          readOnlyHint: true,
+          idempotentHint: true,
+        },
+      },
+      async () => jsonResult(await this.graphService.getRelationTypes()),
+    );
   }
 
   private registerCustomDetectorTools(server: McpServerCompat) {

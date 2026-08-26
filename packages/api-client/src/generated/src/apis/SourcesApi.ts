@@ -137,6 +137,10 @@ export interface SourcesControllerGetSourceRequest {
     id: string;
 }
 
+export interface SourcesControllerPurgeAssetsRequest {
+    id: string;
+}
+
 export interface SourcesControllerPurgeFindingsRequest {
     id: string;
 }
@@ -827,6 +831,44 @@ export class SourcesApi extends runtime.BaseAPI {
     async sourcesControllerListSources(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<Array<SourceResponseDto>> {
         const response = await this.sourcesControllerListSourcesRaw(initOverrides);
         return await response.value();
+    }
+
+    /**
+     * Permanently delete every asset of the source, along with their findings, extractions, correlation values, signatures and chunks (all cascade via FK). Correlation fingerprints are recomputed in the background. Irreversible.
+     * Purge all assets of a data source
+     */
+    async sourcesControllerPurgeAssetsRaw(requestParameters: SourcesControllerPurgeAssetsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
+        if (requestParameters['id'] == null) {
+            throw new runtime.RequiredError(
+                'id',
+                'Required parameter "id" was null or undefined when calling sourcesControllerPurgeAssets().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/sources/{id}/assets`;
+        urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'DELETE',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.VoidApiResponse(response);
+    }
+
+    /**
+     * Permanently delete every asset of the source, along with their findings, extractions, correlation values, signatures and chunks (all cascade via FK). Correlation fingerprints are recomputed in the background. Irreversible.
+     * Purge all assets of a data source
+     */
+    async sourcesControllerPurgeAssets(requestParameters: SourcesControllerPurgeAssetsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
+        await this.sourcesControllerPurgeAssetsRaw(requestParameters, initOverrides);
     }
 
     /**

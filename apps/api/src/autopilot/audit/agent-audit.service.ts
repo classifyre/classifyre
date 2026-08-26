@@ -126,24 +126,40 @@ export class AgentAuditService {
    * tokens ADDED since the last save are priced, at the Harness provider's
    * current per-MTok prices, so a mid-run price change never re-prices tokens
    * that were already recorded.
+   *
+   * `cachedInputTokens` is a SUBSET of `inputTokens` (tokens the provider
+   * served from its prompt cache), not additional tokens — it is priced at
+   * `cachedInputCostPerMTok` and the remainder of the input tokens at the
+   * full `inputCostPerMTok`. Defaults to 0 for callers that don't track it
+   * (e.g. the chat agent loop) — an untracked run simply reports no cache use.
    */
   async saveUsage(
     runId: string,
     inputTokens: number,
     outputTokens: number,
+    cachedInputTokens = 0,
   ): Promise<void> {
     const [settings, run] = await Promise.all([
       this.prisma.instanceSettings.findUnique({
         where: { id: 1 },
         select: {
           harnessAiProviderConfig: {
-            select: { inputCostPerMTok: true, outputCostPerMTok: true },
+            select: {
+              inputCostPerMTok: true,
+              outputCostPerMTok: true,
+              cachedInputCostPerMTok: true,
+            },
           },
         },
       }),
       this.prisma.agentRun.findUnique({
         where: { id: runId },
-        select: { inputTokens: true, outputTokens: true, costUsd: true },
+        select: {
+          inputTokens: true,
+          outputTokens: true,
+          cachedInputTokens: true,
+          costUsd: true,
+        },
       }),
     ]);
     if (!run) return; // run row gone (retention cleanup) — nothing to record
@@ -154,8 +170,22 @@ export class AgentAuditService {
       (pricing.inputCostPerMTok != null || pricing.outputCostPerMTok != null);
     const addedInput = Math.max(0, inputTokens - run.inputTokens);
     const addedOutput = Math.max(0, outputTokens - run.outputTokens);
+    // Cached tokens are a subset of addedInput — split it into cached and
+    // uncached shares so each is priced at its own rate, falling back to the
+    // full input rate for the cached share when no discounted price is set
+    // (unpriced caching still costs the same as before this feature).
+    const addedCached = Math.min(
+      addedInput,
+      Math.max(0, cachedInputTokens - (run.cachedInputTokens ?? 0)),
+    );
+    const addedUncached = addedInput - addedCached;
+    const cachedRate =
+      pricing?.cachedInputCostPerMTok != null
+        ? Number(pricing.cachedInputCostPerMTok)
+        : Number(pricing?.inputCostPerMTok ?? 0);
     const addedCost = priced
-      ? (addedInput / 1_000_000) * Number(pricing.inputCostPerMTok ?? 0) +
+      ? (addedUncached / 1_000_000) * Number(pricing.inputCostPerMTok ?? 0) +
+        (addedCached / 1_000_000) * cachedRate +
         (addedOutput / 1_000_000) * Number(pricing.outputCostPerMTok ?? 0)
       : null;
     const costUsd =
@@ -170,6 +200,7 @@ export class AgentAuditService {
       data: {
         inputTokens,
         outputTokens,
+        cachedInputTokens,
         costUsd: costUsd != null ? costUsd.toFixed(6) : null,
       },
     });

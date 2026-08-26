@@ -45,6 +45,13 @@ export interface AiCompletionOptions {
 export interface AiUsage {
   inputTokens: number;
   outputTokens: number;
+  /**
+   * Subset of inputTokens served from the provider's prompt cache (currently
+   * only populated for OPENAI_COMPATIBLE, via `usage.prompt_tokens_details.
+   * cached_tokens`). Undefined/0 means the provider reported no cache usage
+   * — not necessarily that nothing was cached.
+   */
+  cachedInputTokens?: number;
 }
 
 export interface AiResponse<T = string> {

@@ -22,7 +22,7 @@ import {
 import { cn } from "@workspace/ui/lib/utils";
 import { toast } from "sonner";
 
-type PurgeFindingsActionProps = {
+type PurgeAssetsActionProps = {
   sourceId: string;
   className?: string;
   onPurged?: () => void;
@@ -32,29 +32,29 @@ type PurgeFindingsActionProps = {
   onOpenChange?: (open: boolean) => void;
 };
 
-export function PurgeFindingsAction({
+export function PurgeAssetsAction({
   sourceId,
   className,
   onPurged,
   hideTrigger = false,
   open,
   onOpenChange,
-}: PurgeFindingsActionProps) {
+}: PurgeAssetsActionProps) {
   const { t } = useTranslation();
   const [isPurging, setIsPurging] = useState(false);
 
   const handlePurge = async () => {
     try {
       setIsPurging(true);
-      await api.sources.sourcesControllerPurgeFindings({ id: sourceId });
-      toast.success(t("sources.purgeFindings.success"));
+      await api.sources.sourcesControllerPurgeAssets({ id: sourceId });
+      toast.success(t("sources.purgeAssets.success"));
       onPurged?.();
     } catch (error) {
-      console.error("Failed to purge findings:", error);
+      console.error("Failed to purge assets:", error);
       toast.error(
         error instanceof Error
           ? error.message
-          : t("sources.purgeFindings.failed"),
+          : t("sources.purgeAssets.failed"),
       );
     } finally {
       setIsPurging(false);
@@ -73,29 +73,29 @@ export function PurgeFindingsAction({
               "rounded-[4px] border-2 border-destructive text-destructive hover:bg-destructive/10",
               className,
             )}
-            data-testid="btn-purge-findings"
+            data-testid="btn-purge-assets"
           >
             {isPurging ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
               <Eraser className="h-4 w-4" />
             )}
-            {t("sources.purgeFindings.button")}
+            {t("sources.purgeAssets.button")}
           </Button>
         </AlertDialogTrigger>
       )}
       <AlertDialogContent className="rounded-[6px] border-2 border-border">
         <AlertDialogHeader>
-          <AlertDialogTitle>{t("sources.purgeFindings.title")}</AlertDialogTitle>
+          <AlertDialogTitle>{t("sources.purgeAssets.title")}</AlertDialogTitle>
           <AlertDialogDescription>
-            {t("sources.purgeFindings.cannotUndo")}
+            {t("sources.purgeAssets.cannotUndo")}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <Alert variant="destructive" className="border-destructive/40">
           <ShieldAlert className="h-4 w-4" />
-          <AlertTitle>{t("sources.purgeFindings.permanentTitle")}</AlertTitle>
+          <AlertTitle>{t("sources.purgeAssets.permanentTitle")}</AlertTitle>
           <AlertDescription>
-            {t("sources.purgeFindings.permanentBody")}
+            {t("sources.purgeAssets.permanentBody")}
           </AlertDescription>
         </Alert>
         <AlertDialogFooter>
@@ -107,9 +107,9 @@ export function PurgeFindingsAction({
             disabled={isPurging}
             onClick={handlePurge}
             className="rounded-[4px] border-2 border-border shadow-[3px_3px_0_var(--color-border)]"
-            data-testid="btn-purge-findings-confirm"
+            data-testid="btn-purge-assets-confirm"
           >
-            {t("sources.purgeFindings.confirm")}
+            {t("sources.purgeAssets.confirm")}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

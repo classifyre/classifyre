@@ -50,6 +50,12 @@ export interface AgentUsageBucketDto {
      */
     outputTokens: number;
     /**
+     * Subset of inputTokens served from the provider prompt cache (0 on providers/runs that report no cache usage).
+     * @type {number}
+     * @memberof AgentUsageBucketDto
+     */
+    cachedInputTokens: number;
+    /**
      * Estimated cost (USD); null when no run that day was priced
      * @type {number}
      * @memberof AgentUsageBucketDto
@@ -83,6 +89,7 @@ export function instanceOfAgentUsageBucketDto(value: object): value is AgentUsag
     if (!('runs' in value) || value['runs'] === undefined) return false;
     if (!('inputTokens' in value) || value['inputTokens'] === undefined) return false;
     if (!('outputTokens' in value) || value['outputTokens'] === undefined) return false;
+    if (!('cachedInputTokens' in value) || value['cachedInputTokens'] === undefined) return false;
     return true;
 }
 
@@ -101,6 +108,7 @@ export function AgentUsageBucketDtoFromJSONTyped(json: any, ignoreDiscriminator:
         'runs': json['runs'],
         'inputTokens': json['inputTokens'],
         'outputTokens': json['outputTokens'],
+        'cachedInputTokens': json['cachedInputTokens'],
         'costUsd': json['costUsd'] == null ? undefined : json['costUsd'],
     };
 }
@@ -121,6 +129,7 @@ export function AgentUsageBucketDtoToJSONTyped(value?: AgentUsageBucketDto | nul
         'runs': value['runs'],
         'inputTokens': value['inputTokens'],
         'outputTokens': value['outputTokens'],
+        'cachedInputTokens': value['cachedInputTokens'],
         'costUsd': value['costUsd'],
     };
 }

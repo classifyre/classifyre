@@ -11,6 +11,17 @@ api:
     tag: latest
     pullPolicy: Always
 
+  # Fixed rather than autoGenerate: the chart's default `randAlphaNum` value is
+  # only stable across a `helm upgrade` (guarded by a Secret `lookup`) -- it is
+  # NOT stable across a full `helm uninstall`/reinstall (e.g. `skaffold dev`
+  # exiting with its default cleanup, or a `k3d cluster delete`), which deletes
+  # the Secret object outright. If the Postgres PVC survives that but the key
+  # doesn't, every previously issued MCP token (and any other masked-config
+  # ciphertext) becomes permanently unverifiable/undecryptable even though the
+  # rows are still there. A fixed local-only dev value survives any of that.
+  maskedConfigEncryption:
+    value: "classifyre-dev-fixed-key-0000001"
+
   embedding:
     enabled: false
 

@@ -213,6 +213,70 @@ describe('SourceService', () => {
     ).toBe(true);
   });
 
+  it('does not wipe a secret the update payload omits entirely', async () => {
+    // Regression test: secret values are write-only, so a full-config update
+    // (the web UI's generic "Edit Source" save, or update_source) can never
+    // resupply one it isn't actively changing -- that key is simply absent
+    // from the payload. Before mergeMaskedConfig, that meant saving anything
+    // about a source -- even something unrelated, like renaming a variable --
+    // silently deleted every credential on it.
+    const { service, prisma, maskedConfigCryptoService } = createService();
+    const stored = maskedConfigCryptoService.encryptMaskedConfig({
+      type: 'CUSTOM',
+      required: { notebook: { revision: 1, cells: [] } },
+      masked: { secrets: { GISA_API_KEY: 'super-secret-value' } },
+    });
+    prisma.source.findUnique.mockResolvedValue({ config: stored });
+    prisma.source.update.mockImplementation(({ data }: any) => ({
+      id: 'source-1',
+      ...data,
+    }));
+
+    // A cell-add/delete-style save: touches the notebook, says nothing about
+    // secrets at all.
+    await service.updateFromConfig('source-1', {
+      config: {
+        type: 'CUSTOM',
+        required: { notebook: { revision: 2, cells: [{ id: 'new-cell' }] } },
+        masked: { secrets: {} },
+      },
+    });
+
+    const updatePayload = prisma.source.update.mock.calls[0][0].data.config;
+    const preservedSecret = maskedConfigCryptoService.decryptMaskedConfig(
+      updatePayload,
+    ).masked as { secrets: Record<string, string> };
+    expect(preservedSecret.secrets.GISA_API_KEY).toBe('super-secret-value');
+  });
+
+  it('overwrites a secret the update payload supplies a fresh value for', async () => {
+    const { service, prisma, maskedConfigCryptoService } = createService();
+    const stored = maskedConfigCryptoService.encryptMaskedConfig({
+      type: 'CUSTOM',
+      required: { notebook: { revision: 1, cells: [] } },
+      masked: { secrets: { GISA_API_KEY: 'old-value' } },
+    });
+    prisma.source.findUnique.mockResolvedValue({ config: stored });
+    prisma.source.update.mockImplementation(({ data }: any) => ({
+      id: 'source-1',
+      ...data,
+    }));
+
+    await service.updateFromConfig('source-1', {
+      config: {
+        type: 'CUSTOM',
+        required: { notebook: { revision: 1, cells: [] } },
+        masked: { secrets: { GISA_API_KEY: 'new-value' } },
+      },
+    });
+
+    const updatePayload = prisma.source.update.mock.calls[0][0].data.config;
+    const decrypted = maskedConfigCryptoService.decryptMaskedConfig(
+      updatePayload,
+    ).masked as { secrets: Record<string, string> };
+    expect(decrypted.secrets.GISA_API_KEY).toBe('new-value');
+  });
+
   it('deletes runner log directories when source is deleted', async () => {
     const { service, prisma, runnerLogStorage } = createService();
     prisma.source.findUnique.mockResolvedValue({ id: 'source-1' });

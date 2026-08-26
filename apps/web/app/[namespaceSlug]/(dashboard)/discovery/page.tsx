@@ -30,6 +30,7 @@ import { FINDING_SEVERITY_COLOR_BY_LEVEL } from "@workspace/ui/lib/finding-sever
 import { formatRelative } from "@/lib/date";
 import { useTranslation } from "@/hooks/use-translation";
 import { StatsFreshness } from "@/components/stats-freshness";
+import { AssetDiscoveryGraph } from "@/components/asset-discovery-graph";
 import type { TranslationKey } from "@/i18n";
 
 type DiscoveryWindowDays = 7 | 30 | 90;
@@ -750,6 +751,21 @@ export default function DiscoveryPage() {
           </button>
         </PanelCard>
       </div>
+
+      {/* ── ASSETS DISCOVERY ─── */}
+      <PanelCard className="flex flex-col p-0 sm:p-0 overflow-hidden">
+        <div className="px-4 py-3.5 sm:px-6">
+          <h3 className="font-serif text-lg font-black uppercase tracking-[0.06em] text-foreground">
+            {t("discovery.assetDiscovery.title")}
+          </h3>
+          <p className="text-[10px] text-muted-foreground font-mono uppercase tracking-[0.15em]">
+            {t("discovery.assetDiscovery.subtitle")}
+          </p>
+        </div>
+        <div className="h-[80vh] border-t-2 border-border">
+          <AssetDiscoveryGraph />
+        </div>
+      </PanelCard>
     </div>
   );
 }
