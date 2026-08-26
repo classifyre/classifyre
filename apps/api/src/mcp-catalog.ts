@@ -85,11 +85,15 @@ export const MCP_CAPABILITY_GROUPS: McpCapabilityGroupDto[] = [
       'bulk_update_findings',
       'get_findings_discovery',
       'purge_source_findings',
+      'find_similar_findings',
+      'find_boilerplate_clusters',
+      'explain_finding',
     ],
     operations: [
       'Search and filter findings by status, severity, type, and text',
       'Resolve or reopen findings',
       'Summarize discovery totals for MCP clients',
+      'Find semantic neighbours, boilerplate clusters, and ranking explanations',
     ],
   },
   {
@@ -230,6 +234,58 @@ export const MCP_CAPABILITY_GROUPS: McpCapabilityGroupDto[] = [
       'Read and edit notebook cells, packages, and local folders',
       'Upload input files and manage declared dependencies',
       'Run a single cell, a connection test, or the whole notebook, then poll for output and errors',
+    ],
+  },
+  {
+    id: 'extractions',
+    title: 'Extractions',
+    description:
+      'Inspect structured field extractions and how much of a run’s content was actually covered.',
+    toolNames: [
+      'get_finding_extraction',
+      'search_extractions',
+      'get_extraction_coverage',
+      'list_extractor_schema',
+    ],
+    operations: [
+      'Search structured extraction records and read one in full',
+      'Check what fraction of a run’s assets were text-extracted',
+      'List the fields an extractor schema declares',
+    ],
+  },
+  {
+    id: 'case_leads',
+    title: 'Case Leads',
+    description:
+      'AI-proposed next steps for a case: generate, review, and track supporting events.',
+    toolNames: [
+      'list_case_leads',
+      'propose_case_lead',
+      'generate_case_leads',
+      'review_case_lead',
+      'list_case_events',
+      'create_case_event',
+      'delete_case_event',
+    ],
+    operations: [
+      'Generate or propose candidate leads for a case',
+      'Accept, reject, or otherwise review a lead',
+      'Track the events a lead is based on',
+    ],
+  },
+  {
+    id: 'glossary',
+    title: 'Glossary',
+    description:
+      'The shared term glossary findings and detectors resolve abbreviations and jargon against.',
+    toolNames: [
+      'list_glossary_terms',
+      'lookup_glossary',
+      'upsert_glossary_term',
+    ],
+    operations: [
+      'List and look up glossary terms',
+      'Add or update a term definition',
     ],
   },
 ];
