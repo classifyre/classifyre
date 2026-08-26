@@ -290,7 +290,11 @@ describe('AiClientService', () => {
         value: number;
       }>([{ role: 'user', content: 'Go' }], simpleSchema, { maxRetries: 1 });
 
-      expect(result.usage).toEqual({ inputTokens: 220, outputTokens: 25 });
+      expect(result.usage).toEqual({
+        inputTokens: 220,
+        outputTokens: 25,
+        cachedInputTokens: 0,
+      });
     });
 
     it('retry turn includes bad output as assistant + correction user message', async () => {

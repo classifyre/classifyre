@@ -15273,6 +15273,12 @@
             "example": 15,
             "nullable": true
           },
+          "cachedInputCostPerMTok": {
+            "type": "number",
+            "description": "Discounted cost in USD per 1M cached input tokens (prompt caching). Null when pricing is not configured — cached tokens are then costed at the full input rate.",
+            "example": 0.3,
+            "nullable": true
+          },
           "createdAt": {
             "format": "date-time",
             "type": "string"
@@ -15297,6 +15303,7 @@
           "embeddingPooling",
           "inputCostPerMTok",
           "outputCostPerMTok",
+          "cachedInputCostPerMTok",
           "createdAt",
           "updatedAt"
         ]
@@ -15368,6 +15375,12 @@
             "type": "number",
             "description": "Optional cost in USD per 1M output tokens (enables cost estimates on autopilot runs).",
             "example": 15,
+            "nullable": true
+          },
+          "cachedInputCostPerMTok": {
+            "type": "number",
+            "description": "Optional discounted cost in USD per 1M cached input tokens (prompt caching).",
+            "example": 0.3,
             "nullable": true
           }
         },
@@ -15443,6 +15456,12 @@
             "type": "number",
             "description": "Cost in USD per 1M output tokens. Pass null to clear the price.",
             "example": 15,
+            "nullable": true
+          },
+          "cachedInputCostPerMTok": {
+            "type": "number",
+            "description": "Discounted cost in USD per 1M cached input tokens. Pass null to clear the price.",
+            "example": 0.3,
             "nullable": true
           }
         }
@@ -21289,6 +21308,10 @@
           "outputTokens": {
             "type": "number"
           },
+          "cachedInputTokens": {
+            "type": "number",
+            "description": "Subset of inputTokens served from the provider prompt cache (0 on providers/runs that report no cache usage)."
+          },
           "costUsd": {
             "type": "number",
             "nullable": true,
@@ -21300,7 +21323,8 @@
           "agentKind",
           "runs",
           "inputTokens",
-          "outputTokens"
+          "outputTokens",
+          "cachedInputTokens"
         ]
       },
       "AgentUsageTotalsDto": {
@@ -21315,6 +21339,10 @@
           "outputTokens": {
             "type": "number"
           },
+          "cachedInputTokens": {
+            "type": "number",
+            "description": "Subset of inputTokens served from cache."
+          },
           "costUsd": {
             "type": "number",
             "nullable": true
@@ -21328,7 +21356,8 @@
         "required": [
           "runs",
           "inputTokens",
-          "outputTokens"
+          "outputTokens",
+          "cachedInputTokens"
         ]
       },
       "AgentUsageResponseDto": {

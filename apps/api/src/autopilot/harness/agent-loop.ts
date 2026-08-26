@@ -101,6 +101,8 @@ interface LoopProgress {
    */
   inputTokens?: number;
   outputTokens?: number;
+  /** Subset of inputTokens served from the provider's prompt cache. */
+  cachedInputTokens?: number;
   /** Mutations performed. Each one has a persisted decision row. */
   applied: number;
   /**
@@ -207,6 +209,9 @@ export async function runAgentLoop(
           (progress.inputTokens ?? 0) + error.usage.inputTokens;
         progress.outputTokens =
           (progress.outputTokens ?? 0) + error.usage.outputTokens;
+        progress.cachedInputTokens =
+          (progress.cachedInputTokens ?? 0) +
+          (error.usage.cachedInputTokens ?? 0);
         await persist(ctx, deps.audit, progress);
       }
       throw error;
@@ -215,6 +220,8 @@ export async function runAgentLoop(
     if (usage) {
       progress.inputTokens = (progress.inputTokens ?? 0) + usage.inputTokens;
       progress.outputTokens = (progress.outputTokens ?? 0) + usage.outputTokens;
+      progress.cachedInputTokens =
+        (progress.cachedInputTokens ?? 0) + (usage.cachedInputTokens ?? 0);
     }
 
     await deps.log.business(runId, `Thinking: ${turn.thought}`);
@@ -328,6 +335,7 @@ function loadProgress(
     toolCalls: 0,
     inputTokens: 0,
     outputTokens: 0,
+    cachedInputTokens: 0,
     applied: 0,
     readOk: 0,
     skippedObserveOnly: 0,
@@ -354,6 +362,7 @@ async function persist(
       ctx.run.id,
       progress.inputTokens ?? 0,
       progress.outputTokens ?? 0,
+      progress.cachedInputTokens ?? 0,
     ),
   ]);
 }
@@ -496,6 +505,21 @@ function pushCreated(
   }
 }
 
+/**
+ * Ordered so the byte-identical part of the prompt comes first and the part
+ * that changes every run comes last.
+ *
+ * `mission.goal`, the tool catalog and RESPONSE_PROTOCOL are a pure function
+ * of `mission.kind` — same text on every run, every source, every cycle.
+ * `systemBrief` and the operator instruction are recomputed from live state
+ * ({@link SystemBriefService.compose}) and differ run to run. OpenAI-compatible
+ * endpoints (and most self-hosted gateways sitting behind them) cache a
+ * request's prompt automatically, keyed on a byte-identical prefix — putting
+ * the volatile section last is what lets that prefix actually stay stable
+ * across runs instead of invalidating on the first line. The detector-type
+ * primer is mission-stable too (same registry text for every DETECTOR_AUTHOR
+ * run) and stays in the stable half.
+ */
 function buildSystemPrompt(
   ctx: AgentContext,
   mission: Mission,
@@ -504,21 +528,21 @@ function buildSystemPrompt(
   allowed: string[],
   missionPrimer: string | undefined,
 ): string {
-  const guidance = ctx.instruction
-    ? `\n\nOperator instruction for this run:\n${ctx.instruction}`
-    : '';
-  const brief = systemBrief?.trim() ? `\n${systemBrief.trim()}\n` : '';
   const primer = missionPrimer?.trim()
     ? `\n## Detector type registry\n${missionPrimer.trim()}\n`
     : '';
+  const brief = systemBrief?.trim() ? `\n${systemBrief.trim()}\n` : '';
+  const guidance = ctx.instruction
+    ? `\n\nOperator instruction for this run:\n${ctx.instruction}`
+    : '';
   return [
     mission.goal,
-    primer,
-    brief,
-    guidance,
     '\n## Tools you may call',
     registry.catalog(allowed),
     ...RESPONSE_PROTOCOL,
+    primer,
+    brief,
+    guidance,
   ].join('\n');
 }
 

@@ -7,6 +7,7 @@ import { AgentLoggerService } from '../audit/agent-logger.service';
 import { ToolRegistry } from '../tools/tool-registry.service';
 import { ToolDispatcherService } from '../tools/tool-dispatcher.service';
 import { runPipeline, stepOutput } from '../agent-runtime';
+import { HARNESS_BRIEF_CACHE_TTL_MS } from '../autopilot.constants';
 import type { ApplySummary } from '../decision-applier.service';
 import type { AgentContext } from '../autopilot.types';
 import { runAgentLoop, type AgentLoopResult } from './agent-loop';
@@ -37,9 +38,28 @@ export class HarnessService {
     private readonly detectors: CustomDetectorsService,
   ) {}
 
+  /**
+   * The rendered brief, reused across agent runs for
+   * {@link HARNESS_BRIEF_CACHE_TTL_MS}. Recomposing it fresh on every run
+   * (SystemBriefService.compose() reads live counts) meant the system prompt
+   * changed on every single call, so no HTTP-side prompt cache could ever
+   * hit — see the module doc on the TTL constant.
+   */
+  private briefCache: { text: string; expiresAt: number } | null = null;
+
   /** True when the given AgentKind has a harness mission. */
   supports(kind: AgentContext['run']['agentKind']): boolean {
     return missionFor(kind) !== null;
+  }
+
+  private async cachedBriefText(): Promise<string> {
+    const now = Date.now();
+    if (this.briefCache && this.briefCache.expiresAt > now) {
+      return this.briefCache.text;
+    }
+    const text = this.brief.render(await this.brief.compose());
+    this.briefCache = { text, expiresAt: now + HARNESS_BRIEF_CACHE_TTL_MS };
+    return text;
   }
 
   async execute(ctx: AgentContext, mission?: Mission): Promise<ApplySummary> {
@@ -49,7 +69,7 @@ export class HarnessService {
       throw new Error(`No harness mission for agent kind ${ctx.run.agentKind}`);
     }
 
-    const briefText = this.brief.render(await this.brief.compose());
+    const briefText = await this.cachedBriefText();
     // null here means "use the instance budget"; the loop resolves it.
     const runBudgetMinutes = await this.agentConfig.runBudgetMinutes(
       resolved.kind,

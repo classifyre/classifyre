@@ -2256,6 +2256,9 @@
     "inputCostPlaceholder": "z. B. 3.00",
     "outputCost": "USD pro 1 Mio. Output-Tokens",
     "outputCostPlaceholder": "z. B. 15.00",
+    "cachedInputCost": "USD pro 1 Mio. gecachte Input-Tokens",
+    "cachedInputCostPlaceholder": "z. B. 0.30",
+    "cachedInputCostDesc": "Vergünstigter Preis, den der Endpunkt für Input-Tokens aus seinem Prompt-Cache berechnet. Leer lassen, um gecachte Tokens zum vollen Input-Preis zu berechnen.",
     "tokenCostsDesc": "Wird zur Kostenschätzung von Autopilot-Läufen und für die Verbrauchs-Diagramme genutzt."
   },
   "csvExport": {
@@ -3530,15 +3533,18 @@
         "inputTokens": "Input-Tokens",
         "outputTokens": "Output-Tokens",
         "avgDuration": "Ø Laufzeit",
-        "cost": "Gesch. Kosten"
+        "cost": "Gesch. Kosten",
+        "cacheHitRate": "Cache-Trefferquote"
       },
       "tokensPerDay": "Tokens pro Tag",
       "tokensByAgent": "Tokens pro Agent",
       "costPerDay": "Geschätzte Kosten pro Tag (USD)",
       "seriesInput": "Input",
+      "seriesCachedInput": "Gecachter Input",
       "seriesOutput": "Output",
       "empty": "Noch keine Agentenläufe in diesem Zeitraum.",
-      "noPricing": "Hinterlegen Sie Token-Preise beim KI-Anbieter unter Harness AI → Konfiguration, um Kostenschätzungen zu sehen."
+      "noPricing": "Hinterlegen Sie Token-Preise beim KI-Anbieter unter Harness AI → Konfiguration, um Kostenschätzungen zu sehen.",
+      "noCacheData": "Kein Anbieter in diesem Zeitraum hat Cache-Nutzung gemeldet."
     }
   },
   "aiHealth": {

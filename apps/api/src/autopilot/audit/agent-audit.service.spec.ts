@@ -29,10 +29,12 @@ describe('AgentAuditService.saveUsage', () => {
     inputTokens: number,
     outputTokens: number,
     costUsd: string | null,
+    cachedInputTokens = 0,
   ) {
     prisma.agentRun.findUnique.mockResolvedValue({
       inputTokens,
       outputTokens,
+      cachedInputTokens,
       costUsd,
     });
   }
@@ -40,9 +42,14 @@ describe('AgentAuditService.saveUsage', () => {
   function mockPricing(
     inputCostPerMTok: number | null,
     outputCostPerMTok: number | null,
+    cachedInputCostPerMTok: number | null = null,
   ) {
     prisma.instanceSettings.findUnique.mockResolvedValue({
-      harnessAiProviderConfig: { inputCostPerMTok, outputCostPerMTok },
+      harnessAiProviderConfig: {
+        inputCostPerMTok,
+        outputCostPerMTok,
+        cachedInputCostPerMTok,
+      },
     });
   }
 
@@ -57,6 +64,7 @@ describe('AgentAuditService.saveUsage', () => {
       data: {
         inputTokens: 1_000_000,
         outputTokens: 200_000,
+        cachedInputTokens: 0,
         // 1M in × $3/MTok + 0.2M out × $15/MTok = $6
         costUsd: '6.000000',
       },
@@ -90,6 +98,7 @@ describe('AgentAuditService.saveUsage', () => {
       data: {
         inputTokens: 500_000,
         outputTokens: 100_000,
+        cachedInputTokens: 0,
         costUsd: null,
       },
     });
@@ -140,7 +149,65 @@ describe('AgentAuditService.saveUsage', () => {
       data: {
         inputTokens: 1_000_000,
         outputTokens: 200_000,
+        cachedInputTokens: 0,
         costUsd: '6.000000',
+      },
+    });
+  });
+
+  it('prices cached input tokens at the discounted rate, not the full input rate', async () => {
+    mockRun(0, 0, null);
+    mockPricing(3, 15, 0.3);
+
+    // 800k uncached + 200k cached, of 1M total input.
+    await service.saveUsage('run-1', 1_000_000, 0, 200_000);
+
+    expect(prisma.agentRun.update).toHaveBeenCalledWith({
+      where: { id: 'run-1' },
+      data: {
+        inputTokens: 1_000_000,
+        outputTokens: 0,
+        cachedInputTokens: 200_000,
+        // 0.8M × $3/MTok + 0.2M × $0.30/MTok = $2.4 + $0.06 = $2.46
+        costUsd: '2.460000',
+      },
+    });
+  });
+
+  it('falls back to the full input rate for cached tokens when no cached price is set', async () => {
+    mockRun(0, 0, null);
+    mockPricing(3, 15); // no cachedInputCostPerMTok
+
+    await service.saveUsage('run-1', 1_000_000, 0, 200_000);
+
+    expect(prisma.agentRun.update).toHaveBeenCalledWith({
+      where: { id: 'run-1' },
+      data: expect.objectContaining({
+        // Same as if every token were priced at the full input rate: $3.
+        costUsd: '3.000000',
+      }),
+    });
+  });
+
+  it('only prices the newly added cached tokens on a subsequent save', async () => {
+    // 500k input already recorded, 100k of it cached, priced at $3 / $0.30.
+    mockRun(500_000, 0, '1.530000', 100_000);
+    mockPricing(3, 15, 0.3);
+
+    // Now at 1M total input, 300k cached (200k new input, 200k new cached —
+    // more cached tokens than new input is impossible in practice, so cap at
+    // the new input delta).
+    await service.saveUsage('run-1', 1_000_000, 0, 300_000);
+
+    expect(prisma.agentRun.update).toHaveBeenCalledWith({
+      where: { id: 'run-1' },
+      data: {
+        inputTokens: 1_000_000,
+        outputTokens: 0,
+        cachedInputTokens: 300_000,
+        // Added 500k input, of which 200k newly cached: 0.3M × $3 + 0.2M × $0.30
+        // = $0.9 + $0.06 = $0.96, on top of the $1.53 already recorded.
+        costUsd: '2.490000',
       },
     });
   });

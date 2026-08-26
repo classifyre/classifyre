@@ -91,6 +91,12 @@ export interface CreateAiProviderConfigDto {
      * @memberof CreateAiProviderConfigDto
      */
     outputCostPerMTok?: number | null;
+    /**
+     * Optional discounted cost in USD per 1M cached input tokens (prompt caching).
+     * @type {number}
+     * @memberof CreateAiProviderConfigDto
+     */
+    cachedInputCostPerMTok?: number | null;
 }
 
 
@@ -136,6 +142,7 @@ export function CreateAiProviderConfigDtoFromJSONTyped(json: any, ignoreDiscrimi
         'embeddingPooling': json['embeddingPooling'] == null ? undefined : json['embeddingPooling'],
         'inputCostPerMTok': json['inputCostPerMTok'] == null ? undefined : json['inputCostPerMTok'],
         'outputCostPerMTok': json['outputCostPerMTok'] == null ? undefined : json['outputCostPerMTok'],
+        'cachedInputCostPerMTok': json['cachedInputCostPerMTok'] == null ? undefined : json['cachedInputCostPerMTok'],
     };
 }
 
@@ -162,6 +169,7 @@ export function CreateAiProviderConfigDtoToJSONTyped(value?: CreateAiProviderCon
         'embeddingPooling': value['embeddingPooling'],
         'inputCostPerMTok': value['inputCostPerMTok'],
         'outputCostPerMTok': value['outputCostPerMTok'],
+        'cachedInputCostPerMTok': value['cachedInputCostPerMTok'],
     };
 }
 
