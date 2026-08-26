@@ -29,11 +29,14 @@ const GROUP_ORDER = [
   "custom_source_code",
   "custom_detectors",
   "runs",
+  "extractions",
   "findings",
   "assets",
   "inquiries",
   "cases",
+  "case_leads",
   "correlation",
+  "glossary",
   "autopilot",
 ];
 

@@ -140,7 +140,12 @@ describe('McpServerFactoryService notebook tools', () => {
 
     expect(notebookExecutionService.create).toHaveBeenCalledWith(
       'source-1',
-      { revision: 4, mode: 'test_connection', targetCellId: undefined, maxAssets: undefined },
+      {
+        revision: 4,
+        mode: 'test_connection',
+        targetCellId: undefined,
+        maxAssets: undefined,
+      },
       'mcp',
     );
   });
