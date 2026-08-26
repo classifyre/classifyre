@@ -9,7 +9,7 @@ import { PrismaService } from './prisma.service';
 import { AssetType, Source, Prisma, RunnerStatus } from '@prisma/client';
 import * as crypto from 'crypto';
 import { MaskedConfigCryptoService } from './masked-config-crypto.service';
-import { stableStringify } from './utils/masked-config.utils';
+import { mergeMaskedConfig, stableStringify } from './utils/masked-config.utils';
 import { normalizeSourceConfig } from './utils/source-config-normalizer';
 import { RunnerLogStorageService } from './cli-runner/runner-log-storage.service';
 import { CorrelationJobScheduler } from './correlation/correlation-job-scheduler.service';
@@ -184,10 +184,25 @@ export class SourceService {
     }
 
     if (updateSourceDto.config !== undefined) {
+      // A full-config update (this endpoint, and the web UI's generic "Edit
+      // Source" save) never receives existing secret/credential VALUES back
+      // -- they are write-only -- so it can only resupply a leaf it actually
+      // has a fresh value for. Merge onto the stored `masked` section rather
+      // than replacing it outright, or saving anything about a source wipes
+      // every credential on it. See mergeMaskedConfig's docstring.
+      const existing = await this.prisma.source.findUnique({
+        where: { id: sourceId },
+        select: { config: true },
+      });
+      const mergedConfig: Record<string, unknown> = {
+        ...updateSourceDto.config,
+        masked: mergeMaskedConfig(
+          (existing?.config as Record<string, unknown> | undefined)?.masked,
+          updateSourceDto.config.masked,
+        ),
+      };
       const encryptedConfig =
-        this.maskedConfigCryptoService.encryptMaskedConfig(
-          updateSourceDto.config,
-        );
+        this.maskedConfigCryptoService.encryptMaskedConfig(mergedConfig);
       updateData.config = assertSerializableConfig(encryptedConfig);
     }
 
@@ -303,6 +318,35 @@ export class SourceService {
     await this.correlationJobs.scheduleFull('source findings purged');
 
     return { purgedFindings: result.count };
+  }
+
+  /**
+   * Permanently delete every asset of a source. Findings, extractions,
+   * correlation values, signatures, cluster memberships and chunks all
+   * cascade via FK (onDelete: Cascade from Asset). Correlation fingerprints
+   * are derived from findings, so a full background recompute is scheduled
+   * afterwards.
+   */
+  async purgeAssets(sourceId: string): Promise<{ purgedAssets: number }> {
+    const source = await this.prisma.source.findUnique({
+      where: { id: sourceId },
+      select: { id: true },
+    });
+    if (!source) {
+      throw new NotFoundException(`Source with ID ${sourceId} not found`);
+    }
+
+    const result = await this.prisma.asset.deleteMany({
+      where: { sourceId },
+    });
+
+    this.logger.warn(
+      `Purged ${result.count} asset(s) (with findings) from source ${sourceId}; scheduling correlation recompute.`,
+    );
+
+    await this.correlationJobs.scheduleFull('source assets purged');
+
+    return { purgedAssets: result.count };
   }
 
   async searchSources(

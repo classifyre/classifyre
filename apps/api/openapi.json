@@ -1023,6 +1023,36 @@
         ]
       }
     },
+    "/sources/{id}/assets": {
+      "delete": {
+        "description": "Permanently delete every asset of the source, along with their findings, extractions, correlation values, signatures and chunks (all cascade via FK). Correlation fingerprints are recomputed in the background. Irreversible.",
+        "operationId": "SourcesController_purgeAssets",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Source unique identifier",
+            "schema": {
+              "example": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Assets purged; returns the number of deleted assets"
+          },
+          "404": {
+            "description": "Source not found"
+          }
+        },
+        "summary": "Purge all assets of a data source",
+        "tags": [
+          "Sources"
+        ]
+      }
+    },
     "/sources/{sourceId}/files": {
       "get": {
         "operationId": "SourceFilesController_list",
@@ -9423,6 +9453,28 @@
           }
         },
         "summary": "Correlation (\"evidence fingerprints\") graph: assets linked through the findings they share",
+        "tags": [
+          "correlation"
+        ]
+      }
+    },
+    "/correlation/asset-map": {
+      "get": {
+        "operationId": "CorrelationController_assetMap",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CorrelationGraphResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Whole-namespace asset map: every asset (capped) connected by its links and typed relationships",
         "tags": [
           "correlation"
         ]

@@ -29,6 +29,10 @@ type DeleteSourceActionProps = {
   className?: string;
   iconOnly?: boolean;
   onDeleted?: () => void;
+  /** Render only the confirmation dialog, controlled by `open`/`onOpenChange` — for embedding the action in a menu that owns its own trigger. */
+  hideTrigger?: boolean;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 };
 
 export function DeleteSourceAction({
@@ -36,6 +40,9 @@ export function DeleteSourceAction({
   className,
   iconOnly = false,
   onDeleted,
+  hideTrigger = false,
+  open,
+  onOpenChange,
 }: DeleteSourceActionProps) {
   const router = useRouter();
   const { t } = useTranslation();
@@ -62,44 +69,46 @@ export function DeleteSourceAction({
   };
 
   return (
-    <AlertDialog>
-      <AlertDialogTrigger asChild>
-        {iconOnly ? (
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={isDeleting}
-            className={cn(
-              "h-8 rounded-[4px] border-2 border-destructive text-destructive hover:bg-destructive/10",
-              className,
-            )}
-            data-testid="btn-delete-source"
-          >
-            {isDeleting ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <Trash2 className="h-3.5 w-3.5" />
-            )}
-          </Button>
-        ) : (
-          <Button
-            size="sm"
-            disabled={isDeleting}
-            className={cn(
-              "rounded-[4px] border-2 border-border bg-destructive text-white shadow-[3px_3px_0_var(--color-border)] hover:bg-destructive/90",
-              className,
-            )}
-            data-testid="btn-delete-source"
-          >
-            {isDeleting ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Trash2 className="h-4 w-4" />
-            )}
-            {t("sources.deleteSource")}
-          </Button>
-        )}
-      </AlertDialogTrigger>
+    <AlertDialog open={open} onOpenChange={onOpenChange}>
+      {!hideTrigger && (
+        <AlertDialogTrigger asChild>
+          {iconOnly ? (
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={isDeleting}
+              className={cn(
+                "h-8 rounded-[4px] border-2 border-destructive text-destructive hover:bg-destructive/10",
+                className,
+              )}
+              data-testid="btn-delete-source"
+            >
+              {isDeleting ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Trash2 className="h-3.5 w-3.5" />
+              )}
+            </Button>
+          ) : (
+            <Button
+              size="sm"
+              disabled={isDeleting}
+              className={cn(
+                "rounded-[4px] border-2 border-border bg-destructive text-white shadow-[3px_3px_0_var(--color-border)] hover:bg-destructive/90",
+                className,
+              )}
+              data-testid="btn-delete-source"
+            >
+              {isDeleting ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Trash2 className="h-4 w-4" />
+              )}
+              {t("sources.deleteSource")}
+            </Button>
+          )}
+        </AlertDialogTrigger>
+      )}
       <AlertDialogContent className="rounded-[6px] border-2 border-border">
         <AlertDialogHeader>
           <AlertDialogTitle>{t("sources.delete.title")}</AlertDialogTitle>

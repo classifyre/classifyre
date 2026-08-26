@@ -215,6 +215,7 @@
     "cancel": "Cancel",
     "delete": "Delete",
     "edit": "Edit",
+    "moreActions": "More actions",
     "create": "Create",
     "submit": "Submit",
     "send": "Send",
@@ -861,6 +862,16 @@
       "confirm": "Purge findings",
       "success": "Findings purged",
       "failed": "Failed to purge findings"
+    },
+    "purgeAssets": {
+      "button": "Purge assets",
+      "title": "Purge all assets?",
+      "cannotUndo": "This permanently deletes every asset of this source, along with their findings, and cannot be undone.",
+      "permanentTitle": "Permanent removal",
+      "permanentBody": "All assets of this source will be permanently deleted — including their extracted text, findings, correlation data and chunks. Evidence fingerprints are recomputed in the background.",
+      "confirm": "Purge assets",
+      "success": "Assets purged",
+      "failed": "Failed to purge assets"
     },
     "schedule": {
       "resumed": "Automatic scanning resumed."
@@ -2327,7 +2338,37 @@
       "updatedHint": "Read from a pre-aggregated index that refreshes automatically as findings arrive, which is why this page loads instantly instead of counting millions of rows.",
       "never": "Not yet built",
       "refresh": "Rebuild statistics now"
+    },
+    "assetDiscovery": {
+      "title": "Assets discovery",
+      "subtitle": "Every asset in this namespace, connected by links and lineage"
     }
+  },
+  "assetDiscovery": {
+    "title": "Assets discovery",
+    "assetCount": "{{count}} assets",
+    "loadFailed": "Failed to load assets discovery",
+    "empty": "No assets",
+    "emptyDesc": "This namespace has no assets yet.",
+    "truncated": "Partial",
+    "searchPlaceholder": "Search assets…",
+    "allSources": "All sources",
+    "allRelations": "All relations",
+    "external": "External ({{count}})",
+    "asset": "Asset",
+    "unresolved": "Unresolved",
+    "externalBadge": "Unscanned reference",
+    "sourceLabel": "Source",
+    "typeLabel": "Type",
+    "findingsLabel": "Findings",
+    "highestSeverity": "Highest severity",
+    "lastDetected": "Last detected",
+    "noFindings": "No open findings",
+    "openAsset": "Open asset",
+    "legend": "Legend",
+    "legendHint": "Assets are connected by their link references and any lineage a connector declared.",
+    "legendAsset": "Asset",
+    "legendExternal": "Unscanned or cross-source reference"
   },
   "breadcrumb": {
     "home": "Home",
