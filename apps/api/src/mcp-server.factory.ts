@@ -48,6 +48,7 @@ import { GlossaryService } from './glossary/glossary.service';
 import { CaseLeadsService } from './case-leads.service';
 import { CaseEventsService } from './case-events.service';
 import { AutopilotService } from './autopilot/autopilot.service';
+import { GraphService } from './graph.service';
 
 const jsonObjectSchema = z.record(z.string(), z.unknown());
 
@@ -275,6 +276,7 @@ export class McpServerFactoryService {
     private readonly notebookService: NotebookService,
     private readonly notebookExecutionService: NotebookExecutionService,
     private readonly sourceFilesService: SourceFilesService,
+    private readonly graphService: GraphService,
   ) {}
 
   /**
@@ -299,6 +301,7 @@ export class McpServerFactoryService {
     this.registerPrompts(srv);
     this.registerSourceTools(srv);
     this.registerNotebookTools(srv);
+    this.registerLineageTools(srv);
     this.registerCustomDetectorTools(srv);
     this.registerExtractionTools(srv);
     this.registerRunTools(srv);
@@ -1714,6 +1717,66 @@ export class McpServerFactoryService {
       config: merged,
     });
     return updated;
+  }
+
+  /**
+   * The `edges` table has no direct MCP surface -- only the hydrated graph
+   * views (`GraphService.lineage`/`getRelationTypes`) do. That is deliberate:
+   * an edge row alone is meaningless without the node it points at, and the
+   * hydrated view is what the web graph explorer itself renders, so an agent
+   * verifying a stitched lineage path sees exactly what a human would.
+   */
+  private registerLineageTools(server: McpServerCompat) {
+    server.registerTool(
+      'get_asset_lineage',
+      {
+        title: 'Get Asset Lineage',
+        description:
+          "Trace an asset's FLOW lineage (where its data came from / what depends on it), walking edges up to `depth` hops. Returns the same hydrated node/edge graph the web graph explorer renders, so this is how to verify a stitched cross-source lineage edge (e.g. two assets linked by a shared external URN) without a browser.",
+        inputSchema: {
+          assetId: z.string().uuid(),
+          direction: z.enum(['up', 'down', 'both']).optional(),
+          depth: z.number().int().min(1).max(3).optional(),
+          collapseContainers: z.boolean().optional(),
+          mergeIdentity: z.boolean().optional(),
+        },
+        annotations: {
+          readOnlyHint: true,
+          idempotentHint: true,
+        },
+      },
+      async ({
+        assetId,
+        direction,
+        depth,
+        collapseContainers,
+        mergeIdentity,
+      }) =>
+        jsonResult(
+          await this.graphService.lineage({
+            assetId,
+            direction,
+            depth,
+            collapseContainers,
+            mergeIdentity,
+          }),
+        ),
+    );
+
+    server.registerTool(
+      'get_relation_types',
+      {
+        title: 'Get Relation Types',
+        description:
+          'Edge relation types actually in use, plus builtin suggestions, each classified as FLOW | CONTAINMENT | IDENTITY | REFERENCE | USAGE. Call before get_asset_lineage to know what a relationType on a returned edge means.',
+        inputSchema: {},
+        annotations: {
+          readOnlyHint: true,
+          idempotentHint: true,
+        },
+      },
+      async () => jsonResult(await this.graphService.getRelationTypes()),
+    );
   }
 
   private registerCustomDetectorTools(server: McpServerCompat) {
