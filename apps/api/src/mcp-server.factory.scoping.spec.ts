@@ -46,11 +46,11 @@ describe('McpServerFactoryService token scoping', () => {
     }
   });
 
-  it('never disables a tool that belongs to no group', () => {
+  it('fails closed: disables a tool that belongs to no group', () => {
     const { server, disable } = stubServer(['ungrouped_tool']);
 
     (factory() as any).restrictToGroups(server, ['sources']);
 
-    expect(disable.get('ungrouped_tool')).not.toHaveBeenCalled();
+    expect(disable.get('ungrouped_tool')).toHaveBeenCalledTimes(1);
   });
 });
