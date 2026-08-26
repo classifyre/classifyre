@@ -221,6 +221,21 @@ export function readGraphMaxFanOut(env: NodeJS.ProcessEnv): number {
   return parsed === 0 ? Number.POSITIVE_INFINITY : parsed;
 }
 
+/**
+ * Reads ASSET_MAP_NODE_CAP. Unset means unlimited — the asset map is meant to
+ * show every asset in the namespace, with the clustering worker's semantic
+ * zoom (already proven on the 61k-node unscoped correlation graph) absorbing
+ * the density. This exists purely as an emergency override for a pathological
+ * instance, not a default ceiling.
+ */
+export function readAssetMapNodeCap(env: NodeJS.ProcessEnv): number {
+  const raw = env.ASSET_MAP_NODE_CAP;
+  if (raw === undefined || raw.trim() === '') return Number.POSITIVE_INFINITY;
+  const parsed = Number.parseInt(raw, 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) return Number.POSITIVE_INFINITY;
+  return parsed;
+}
+
 /** Progress callback threaded into long-running recompute passes. */
 type ProgressFn = (
   msg: string,
@@ -266,6 +281,7 @@ export class CorrelationService {
    * in the overview.
    */
   private readonly graphMaxFanOut = readGraphMaxFanOut(process.env);
+  private readonly assetMapNodeCap = readAssetMapNodeCap(process.env);
   private readonly batches: CorrelationBatchSizes;
 
   constructor(
@@ -1953,6 +1969,81 @@ export class CorrelationService {
   }
 
   /**
+   * Whole-namespace asset map: every asset, connected by both kinds of edge
+   * `buildLinksGraph` draws for one source — `links` references and typed
+   * SOURCE_DERIVED/MANUAL relationships — but without the source scope.
+   *
+   * Unbounded by default: the point of this view is to see everything, and
+   * the canvas's clustering worker (semantic zoom, already proven on a
+   * 61k-node unscoped correlation graph) is what keeps that renderable, not a
+   * node cap. `ASSET_MAP_NODE_CAP` exists only as an emergency override for a
+   * pathological instance. Ordered by most recently updated so a cap, if one
+   * is set, truncates the stale tail rather than whatever a stable asset id
+   * happened to sort after.
+   */
+  async buildAssetMapGraph(): Promise<CorrelationGraphResult> {
+    const cap = this.assetMapNodeCap;
+    const assets = await this.prisma.asset.findMany({
+      orderBy: { updatedAt: 'desc' },
+      ...(Number.isFinite(cap) ? { take: cap } : {}),
+      select: { ...ASSET_NODE_SELECT, hash: true, links: true },
+    });
+    if (assets.length === 0)
+      return { nodes: [], edges: [], truncated: false, similarities: [] };
+    const truncated = Number.isFinite(cap) && assets.length >= cap;
+
+    const nodeById = new Map<string, GraphNodeDto>();
+    for (const a of assets) nodeById.set(a.id, assetNode(a));
+
+    // Link-hash edges, scoped to this page of assets — resolving every hash
+    // against the whole namespace (as buildLinksGraph does for one source)
+    // would pull in assets outside the cap just to draw one reference edge.
+    const linkHashes = new Set<string>();
+    for (const a of assets) {
+      const links = Array.isArray(a.links) ? (a.links as unknown[]) : [];
+      for (const l of links) if (typeof l === 'string' && l) linkHashes.add(l);
+    }
+    const byHash = new Map<string, string>();
+    for (const a of assets) if (a.hash) byHash.set(a.hash, a.id);
+
+    const edges: GraphEdgeDto[] = [];
+    const seen = new Set<string>();
+    for (const a of assets) {
+      const links = Array.isArray(a.links) ? (a.links as unknown[]) : [];
+      for (const l of links) {
+        if (typeof l !== 'string') continue;
+        const targetId = byHash.get(l);
+        if (!targetId || targetId === a.id) continue;
+        const key =
+          a.id < targetId ? `${a.id}|${targetId}` : `${targetId}|${a.id}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        edges.push({
+          id: `link:${key}`,
+          fromType: ASSET_REL,
+          fromId: a.id,
+          toType: ASSET_REL,
+          toId: targetId,
+          relationType: 'links_to',
+          confidence: 1,
+          origin: EdgeOrigin.INFERRED,
+          relationClass: 'REFERENCE',
+        });
+      }
+    }
+
+    const typed = await this.typedEdgesFor(Array.from(nodeById.keys()), nodeById);
+    edges.push(...typed);
+
+    return {
+      nodes: Array.from(nodeById.values()),
+      edges,
+      truncated,
+      similarities: [],
+    };
+  }
+
+  /**
    * Asset-link graph for a source: assets connected by their `links` (each link
    * is a hash; a hash may resolve to several assets). Assets in other sources
    * are flagged external. Lone assets (no links) still render. Returns the
@@ -2029,6 +2120,7 @@ export class CorrelationService {
     const typed = await this.typedEdgesFor(
       Array.from(nodeById.keys()),
       nodeById,
+      sourceId,
     );
     edges.push(...typed);
 
@@ -2041,18 +2133,23 @@ export class CorrelationService {
   }
 
   /**
-   * Persisted edges among a set of nodes, plus the unresolved endpoints they
-   * point at.
+   * Persisted edges among a set of nodes, plus the unresolved/foreign
+   * endpoints they point at.
    *
-   * An `external` endpoint names an object by platform URN that nothing has
-   * scanned yet. It is hydrated into a ghost node here rather than filtered
-   * out: an edge whose far end is missing from `nodes` renders as an arrow to
-   * nowhere, and quietly dropping it would hide the most interesting thing on
-   * the canvas — that this source feeds something nobody is watching.
+   * Two kinds of endpoint are missing from `nodeById` when this runs: an
+   * `external` one names an object by platform URN that nothing has scanned
+   * yet, and an `asset` one may simply belong to a source other than the one
+   * this canvas is scoped to (e.g. an identity edge stitching a GISA record to
+   * a Firmenbuch one). Both are hydrated into ghost/ringed nodes here rather
+   * than filtered out: an edge whose far end is missing from `nodes` renders
+   * as an arrow to nowhere, and quietly dropping it would hide the most
+   * interesting thing on the canvas — that this source is linked to something
+   * outside it.
    */
   private async typedEdgesFor(
     assetIds: string[],
     nodeById: Map<string, GraphNodeDto>,
+    scopeSourceId?: string,
   ): Promise<GraphEdgeDto[]> {
     if (assetIds.length === 0) return [];
     const rows = await this.prisma.edge.findMany({
@@ -2065,6 +2162,26 @@ export class CorrelationService {
       },
       take: 2000,
     });
+
+    // Resolve every asset-typed endpoint not already on the canvas — the
+    // other side of a cross-source edge — in one batched query rather than
+    // per-row, then hydrate them the same way `external` endpoints are.
+    const missingAssetIds = new Set<string>();
+    for (const row of rows) {
+      for (const [type, id] of [
+        [row.fromType, row.fromId],
+        [row.toType, row.toId],
+      ] as const) {
+        if (type === ASSET_REL && !nodeById.has(id)) missingAssetIds.add(id);
+      }
+    }
+    if (missingAssetIds.size > 0) {
+      const foreign = await this.prisma.asset.findMany({
+        where: { id: { in: Array.from(missingAssetIds) } },
+        select: ASSET_NODE_SELECT,
+      });
+      for (const a of foreign) nodeById.set(a.id, assetNode(a, scopeSourceId));
+    }
 
     const edges: GraphEdgeDto[] = [];
     for (const row of rows) {
@@ -2083,8 +2200,8 @@ export class CorrelationService {
           });
         }
       }
-      // Both ends have to be on the canvas; an edge to an asset in a source
-      // this view is not showing has nothing to attach to.
+      // Both ends have to be on the canvas; an asset that no longer exists
+      // (deleted since the edge was written) has nothing to attach to.
       if (!nodeById.has(row.fromId) || !nodeById.has(row.toId)) continue;
       edges.push({
         id: row.id,

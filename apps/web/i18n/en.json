@@ -215,6 +215,7 @@
     "cancel": "Cancel",
     "delete": "Delete",
     "edit": "Edit",
+    "moreActions": "More actions",
     "create": "Create",
     "submit": "Submit",
     "send": "Send",
@@ -861,6 +862,16 @@
       "confirm": "Purge findings",
       "success": "Findings purged",
       "failed": "Failed to purge findings"
+    },
+    "purgeAssets": {
+      "button": "Purge assets",
+      "title": "Purge all assets?",
+      "cannotUndo": "This permanently deletes every asset of this source, along with their findings, and cannot be undone.",
+      "permanentTitle": "Permanent removal",
+      "permanentBody": "All assets of this source will be permanently deleted — including their extracted text, findings, correlation data and chunks. Evidence fingerprints are recomputed in the background.",
+      "confirm": "Purge assets",
+      "success": "Assets purged",
+      "failed": "Failed to purge assets"
     },
     "schedule": {
       "resumed": "Automatic scanning resumed."
@@ -2256,6 +2267,9 @@
     "inputCostPlaceholder": "e.g. 3.00",
     "outputCost": "USD per 1M output tokens",
     "outputCostPlaceholder": "e.g. 15.00",
+    "cachedInputCost": "USD per 1M cached input tokens",
+    "cachedInputCostPlaceholder": "e.g. 0.30",
+    "cachedInputCostDesc": "Discounted rate the endpoint charges for input tokens it served from its prompt cache. Leave blank to cost cached tokens at the full input rate.",
     "tokenCostsDesc": "Used to estimate autopilot run costs and power the harness usage charts."
   },
   "csvExport": {
@@ -2324,7 +2338,37 @@
       "updatedHint": "Read from a pre-aggregated index that refreshes automatically as findings arrive, which is why this page loads instantly instead of counting millions of rows.",
       "never": "Not yet built",
       "refresh": "Rebuild statistics now"
+    },
+    "assetDiscovery": {
+      "title": "Assets discovery",
+      "subtitle": "Every asset in this namespace, connected by links and lineage"
     }
+  },
+  "assetDiscovery": {
+    "title": "Assets discovery",
+    "assetCount": "{{count}} assets",
+    "loadFailed": "Failed to load assets discovery",
+    "empty": "No assets",
+    "emptyDesc": "This namespace has no assets yet.",
+    "truncated": "Partial",
+    "searchPlaceholder": "Search assets…",
+    "allSources": "All sources",
+    "allRelations": "All relations",
+    "external": "External ({{count}})",
+    "asset": "Asset",
+    "unresolved": "Unresolved",
+    "externalBadge": "Unscanned reference",
+    "sourceLabel": "Source",
+    "typeLabel": "Type",
+    "findingsLabel": "Findings",
+    "highestSeverity": "Highest severity",
+    "lastDetected": "Last detected",
+    "noFindings": "No open findings",
+    "openAsset": "Open asset",
+    "legend": "Legend",
+    "legendHint": "Assets are connected by their link references and any lineage a connector declared.",
+    "legendAsset": "Asset",
+    "legendExternal": "Unscanned or cross-source reference"
   },
   "breadcrumb": {
     "home": "Home",
@@ -3530,15 +3574,18 @@
         "inputTokens": "Input tokens",
         "outputTokens": "Output tokens",
         "avgDuration": "Avg run time",
-        "cost": "Est. cost"
+        "cost": "Est. cost",
+        "cacheHitRate": "Cache hit rate"
       },
       "tokensPerDay": "Tokens per day",
       "tokensByAgent": "Tokens by agent",
       "costPerDay": "Estimated cost per day (USD)",
       "seriesInput": "Input",
+      "seriesCachedInput": "Cached input",
       "seriesOutput": "Output",
       "empty": "No agent runs in this period yet.",
-      "noPricing": "Add token prices to your AI provider in Harness AI → Configuration to see cost estimates."
+      "noPricing": "Add token prices to your AI provider in Harness AI → Configuration to see cost estimates.",
+      "noCacheData": "No provider in this range reported cache usage."
     }
   },
   "aiHealth": {

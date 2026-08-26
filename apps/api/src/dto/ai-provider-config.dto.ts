@@ -113,6 +113,16 @@ export class AiProviderConfigResponseDto {
   })
   outputCostPerMTok: number | null;
 
+  @ApiProperty({
+    description:
+      'Discounted cost in USD per 1M cached input tokens (prompt caching). ' +
+      'Null when pricing is not configured — cached tokens are then costed ' +
+      'at the full input rate.',
+    example: 0.3,
+    nullable: true,
+  })
+  cachedInputCostPerMTok: number | null;
+
   @ApiProperty()
   createdAt: Date;
 
@@ -229,6 +239,17 @@ export class CreateAiProviderConfigDto {
   @IsNumber()
   @Min(0)
   outputCostPerMTok?: number | null;
+
+  @ApiPropertyOptional({
+    description:
+      'Optional discounted cost in USD per 1M cached input tokens (prompt caching).',
+    example: 0.3,
+    nullable: true,
+  })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  cachedInputCostPerMTok?: number | null;
 }
 
 export class UpdateAiProviderConfigDto {
@@ -339,6 +360,17 @@ export class UpdateAiProviderConfigDto {
   @IsNumber()
   @Min(0)
   outputCostPerMTok?: number | null;
+
+  @ApiPropertyOptional({
+    description:
+      'Discounted cost in USD per 1M cached input tokens. Pass null to clear the price.',
+    example: 0.3,
+    nullable: true,
+  })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  cachedInputCostPerMTok?: number | null;
 }
 
 export class AiProviderConfigTestResultDto {

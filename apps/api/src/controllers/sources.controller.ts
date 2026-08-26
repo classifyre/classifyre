@@ -1200,6 +1200,33 @@ export class SourcesController {
   ): Promise<{ purgedFindings: number }> {
     return this.sourceService.purgeFindings(id);
   }
+
+  @Delete(':id/assets')
+  @ApiOperation({
+    summary: 'Purge all assets of a data source',
+    description:
+      'Permanently delete every asset of the source, along with their findings, extractions, ' +
+      'correlation values, signatures and chunks (all cascade via FK). Correlation fingerprints ' +
+      'are recomputed in the background. Irreversible.',
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'Source unique identifier',
+    example: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Assets purged; returns the number of deleted assets',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Source not found',
+  })
+  async purgeAssets(
+    @Param('id') id: string,
+  ): Promise<{ purgedAssets: number }> {
+    return this.sourceService.purgeAssets(id);
+  }
 }
 
 @AllowInDemoMode()

@@ -1013,6 +1013,12 @@ export class AgentUsageBucketDto {
   @ApiProperty()
   outputTokens!: number;
 
+  @ApiProperty({
+    description:
+      'Subset of inputTokens served from the provider prompt cache (0 on providers/runs that report no cache usage).',
+  })
+  cachedInputTokens!: number;
+
   @ApiPropertyOptional({
     nullable: true,
     description: 'Estimated cost (USD); null when no run that day was priced',
@@ -1029,6 +1035,9 @@ export class AgentUsageTotalsDto {
 
   @ApiProperty()
   outputTokens!: number;
+
+  @ApiProperty({ description: 'Subset of inputTokens served from cache.' })
+  cachedInputTokens!: number;
 
   @ApiPropertyOptional({ nullable: true })
   costUsd!: number | null;

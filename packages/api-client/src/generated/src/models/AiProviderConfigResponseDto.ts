@@ -104,6 +104,12 @@ export interface AiProviderConfigResponseDto {
      */
     outputCostPerMTok: number | null;
     /**
+     * Discounted cost in USD per 1M cached input tokens (prompt caching). Null when pricing is not configured — cached tokens are then costed at the full input rate.
+     * @type {number}
+     * @memberof AiProviderConfigResponseDto
+     */
+    cachedInputCostPerMTok: number | null;
+    /**
      * 
      * @type {Date}
      * @memberof AiProviderConfigResponseDto
@@ -147,6 +153,7 @@ export function instanceOfAiProviderConfigResponseDto(value: object): value is A
     if (!('embeddingPooling' in value) || value['embeddingPooling'] === undefined) return false;
     if (!('inputCostPerMTok' in value) || value['inputCostPerMTok'] === undefined) return false;
     if (!('outputCostPerMTok' in value) || value['outputCostPerMTok'] === undefined) return false;
+    if (!('cachedInputCostPerMTok' in value) || value['cachedInputCostPerMTok'] === undefined) return false;
     if (!('createdAt' in value) || value['createdAt'] === undefined) return false;
     if (!('updatedAt' in value) || value['updatedAt'] === undefined) return false;
     return true;
@@ -176,6 +183,7 @@ export function AiProviderConfigResponseDtoFromJSONTyped(json: any, ignoreDiscri
         'embeddingPooling': json['embeddingPooling'],
         'inputCostPerMTok': json['inputCostPerMTok'],
         'outputCostPerMTok': json['outputCostPerMTok'],
+        'cachedInputCostPerMTok': json['cachedInputCostPerMTok'],
         'createdAt': (new Date(json['createdAt'])),
         'updatedAt': (new Date(json['updatedAt'])),
     };
@@ -206,6 +214,7 @@ export function AiProviderConfigResponseDtoToJSONTyped(value?: AiProviderConfigR
         'embeddingPooling': value['embeddingPooling'],
         'inputCostPerMTok': value['inputCostPerMTok'],
         'outputCostPerMTok': value['outputCostPerMTok'],
+        'cachedInputCostPerMTok': value['cachedInputCostPerMTok'],
         'createdAt': value['createdAt'].toISOString(),
         'updatedAt': value['updatedAt'].toISOString(),
     };
