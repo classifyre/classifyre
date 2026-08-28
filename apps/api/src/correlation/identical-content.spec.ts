@@ -37,7 +37,7 @@ describe('exact duplicate linking from the content hash', () => {
     {} as never,
     // Review index: a derived read model the recompute tolerates failing, so
     // these unit tests don't need a real one.
-    { refresh: async () => undefined } as never,
+    { refresh: () => Promise.resolve(undefined) } as never,
   );
 
   const link = (touched: string[], full = false) =>

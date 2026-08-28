@@ -34,7 +34,7 @@ describe('verdicts suppress cluster union', () => {
     prisma as unknown as PrismaService,
     { runExclusive: (fn: () => Promise<unknown>) => fn() } as never,
     {} as never,
-    { refresh: async () => undefined } as never,
+    { refresh: () => Promise.resolve(undefined) } as never,
   );
 
   const cfg = {
@@ -79,9 +79,11 @@ describe('verdicts suppress cluster union', () => {
     );
 
   const rebuild = () =>
-    (service as never as {
-      rebuildAllClusters: (c: unknown) => Promise<number>;
-    }).rebuildAllClusters(cfg);
+    (
+      service as never as {
+        rebuildAllClusters: (c: unknown) => Promise<number>;
+      }
+    ).rebuildAllClusters(cfg);
 
   it('joins the whole chain when nothing has been ruled out', () => {
     prisma.edge.findMany.mockResolvedValueOnce(chain).mockResolvedValue([]);

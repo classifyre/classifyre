@@ -44,8 +44,8 @@ export function buildWaterfall(input: {
   const phonetic = metadata.phoneticOnly === true;
 
   const countFor = (assetId: string, label: string): number =>
-    profiles.find((p) => p.assetId === assetId && p.label === label)
-      ?.nfCount ?? 0;
+    profiles.find((p) => p.assetId === assetId && p.label === label)?.nfCount ??
+    0;
 
   const labels = new Set<string>([
     ...Object.keys(contrib),

@@ -1713,14 +1713,6 @@ export class AssetService {
       data,
       where,
     });
-    if (
-      data.name !== undefined ||
-      data.externalUrl !== undefined ||
-      data.assetType !== undefined ||
-      data.sourceType !== undefined ||
-      data.source !== undefined
-    ) {
-    }
     return asset;
   }
 

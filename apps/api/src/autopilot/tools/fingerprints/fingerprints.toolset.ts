@@ -226,7 +226,8 @@ export class FingerprintsToolset {
             ),
             entityType: 'system',
           }),
-        handler: async (input) => this.review.agentClearSafeBand(Number(input.limit) || 500),
+        handler: async (input) =>
+          this.review.agentClearSafeBand(Number(input.limit) || 500),
       },
       {
         name: 'fingerprints.decisions',
@@ -265,7 +266,10 @@ export class FingerprintsToolset {
               type: 'array',
               items: {
                 type: 'object',
-                properties: { aId: { type: 'string' }, bId: { type: 'string' } },
+                properties: {
+                  aId: { type: 'string' },
+                  bId: { type: 'string' },
+                },
                 required: ['aId', 'bId'],
                 additionalProperties: false,
               },
@@ -295,8 +299,7 @@ export class FingerprintsToolset {
               );
           return { mode, entityType: 'case', entityId: caseId };
         },
-        handler: async (input) =>
-          this.review.decisionsToCase(input as never),
+        handler: async (input) => this.review.decisionsToCase(input as never),
       },
       {
         name: 'fingerprints.match_cause',

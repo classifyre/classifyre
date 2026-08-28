@@ -49,7 +49,7 @@ export class GraphController {
       'system into one node so a path across them costs one hop instead of ' +
       'two. Note this is deliberately broader than the derivation test the ' +
       'duplicate-review queue uses — see DERIVATION_CLASSES in graph/edge-class.ts, ' +
-      'which excludes the correlation engine\'s own edges so that similarity ' +
+      "which excludes the correlation engine's own edges so that similarity " +
       'cannot be used as evidence about similarity.',
   })
   @ApiResponse({ status: 200, type: GraphResponseDto })

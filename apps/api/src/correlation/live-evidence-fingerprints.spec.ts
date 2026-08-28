@@ -30,7 +30,7 @@ describe('correlation fingerprints follow live evidence', () => {
     {} as never,
     // Review index: a derived read model the recompute tolerates failing, so
     // these unit tests don't need a real one.
-    { refresh: async () => undefined } as never,
+    { refresh: () => Promise.resolve(undefined) } as never,
   );
 
   beforeEach(() => {

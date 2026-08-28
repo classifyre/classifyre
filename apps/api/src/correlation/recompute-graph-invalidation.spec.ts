@@ -53,9 +53,9 @@ describe('recompute → review index', () => {
 
   it('does not build a graph for a batch of assets', async () => {
     const h = harness();
-    await expect(h.service.recomputeForAssets(['a', 'b', 'b'])).resolves.toEqual(
-      { assetsProcessed: 1 },
-    );
+    await expect(
+      h.service.recomputeForAssets(['a', 'b', 'b']),
+    ).resolves.toEqual({ assetsProcessed: 1 });
   });
 
   it('does not build a graph after a full recompute', async () => {
