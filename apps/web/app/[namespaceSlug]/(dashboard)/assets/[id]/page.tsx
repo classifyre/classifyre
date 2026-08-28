@@ -152,9 +152,21 @@ export default function AssetDetailPage() {
 
   useEffect(() => {
     if (assetLabel && assetLabel !== assetId) {
-      document.title = `${assetLabel} | ${t("app.name")}`;
+      document.title = `${t("seo.assetDetail.titleWithEntity", { name: assetLabel })} | ${t("app.name")}`;
+      const meta = document.querySelector('meta[name="description"]');
+      if (meta) {
+        const desc = t("seo.assetDetail.descriptionWithEntity", {
+          name: assetLabel,
+          type: assetDetails?.assetType ?? "",
+          source: sourceLabel,
+        });
+        meta.setAttribute("content", desc);
+      }
+    } else if (assetId) {
+      // Fallback to id-based title for crawlers/static export before data loads
+      document.title = `${t("seo.assetDetail.titleWithEntity", { name: assetId })} | ${t("app.name")}`;
     }
-  }, [assetLabel, assetId, t]);
+  }, [assetLabel, assetId, assetDetails?.assetType, sourceLabel, t]);
 
   if (loading) {
     return (

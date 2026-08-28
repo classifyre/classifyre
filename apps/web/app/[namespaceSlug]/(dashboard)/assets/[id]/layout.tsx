@@ -3,12 +3,33 @@ import enTranslations from "@/i18n/en";
 import { translate } from "@/i18n";
 import { dynamicIdParams } from "@/lib/dynamic-route";
 
-export const metadata: Metadata = {
-  title: translate(enTranslations, "assets.detail.title"),
-};
+export async function generateMetadata({ params }: { params: Promise<Record<string, string>> }): Promise<Metadata> {
+  const resolved = await params;
+  const entityId = resolved["id"] ?? resolved["id"] ?? "";
+  const isPlaceholder = !entityId || entityId === "__id__" || entityId === "placeholder";
+  if (isPlaceholder) {
+    return {
+      title: translate(enTranslations, "seo.assetDetail.title"),
+      description: translate(enTranslations, "seo.assetDetail.description"),
+      openGraph: {
+        title: translate(enTranslations, "seo.assetDetail.ogTitle"),
+        description: translate(enTranslations, "seo.assetDetail.ogDescription"),
+      },
+    };
+  }
+  // Entity-specific title/description. At build time this is the short id;
+  // in a server-rendered request the same branch can be expanded to fetch
+  // the real name (asset name, source name, finding snippet) via the API.
+  return {
+    title: translate(enTranslations, "seo.assetDetail.titleWithEntity", { entity: entityId, name: entityId, title: entityId }),
+    description: translate(enTranslations, "seo.assetDetail.descriptionWithEntity", { entity: entityId, name: entityId, title: entityId, type: "", severity: "", source: "" }),
+    openGraph: {
+      title: translate(enTranslations, "seo.assetDetail.titleWithEntity", { entity: entityId, name: entityId, title: entityId }),
+      description: translate(enTranslations, "seo.assetDetail.descriptionWithEntity", { entity: entityId, name: entityId, title: entityId, type: "", severity: "", source: "" }),
+    },
+  };
+}
 
-// Static export: emit a single placeholder shell for this dynamic segment; the
-// page reads the real id from the URL at runtime (see @/lib/use-route-id).
 export function generateStaticParams() {
   return dynamicIdParams();
 }

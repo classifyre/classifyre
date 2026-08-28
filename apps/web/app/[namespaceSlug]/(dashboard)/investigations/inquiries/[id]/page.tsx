@@ -147,6 +147,25 @@ function InquiryDetailInner() {
     void load();
   }, [load]);
 
+  React.useEffect(() => {
+    if (inquiry?.title) {
+      document.title = `${t("seo.inquiryDetail.titleWithEntity", { title: inquiry.title })} | ${t("app.name")}`;
+      const meta = document.querySelector('meta[name="description"]');
+      if (meta) {
+        const scope = inquiry.matchAllSources
+          ? "all sources"
+          : `${inquiry.sourceIds?.length ?? 0} sources`;
+        meta.setAttribute(
+          "content",
+          t("seo.inquiryDetail.descriptionWithEntity", {
+            title: inquiry.title,
+            scope,
+          }),
+        );
+      }
+    }
+  }, [inquiry?.title, inquiry?.matchAllSources, inquiry?.sourceIds, t]);
+
   // Load the target case's findings so we can mark matches already in it.
   React.useEffect(() => {
     if (!targetCaseId) {

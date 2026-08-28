@@ -208,6 +208,26 @@ export default function FindingDetailPage() {
     fetchFinding();
   }, [findingId]);
 
+  // Dynamic, SEO-friendly tab title with entity context (finding type + matched snippet).
+  useEffect(() => {
+    if (!finding) return;
+    const label =
+      finding.findingType || finding.category || finding.detectorType || "Finding";
+    const snippet = (finding.matchedContent || "").trim().slice(0, 50);
+    const entity = snippet ? `${label}: ${snippet}` : label;
+    const baseTitle = t("seo.findingDetail.title");
+    // Keep template `%s | Classifyre` semantics but enrich with entity.
+    document.title = `${entity} — ${baseTitle} | ${t("app.name")}`;
+    // Also update meta description for crawlers that execute JS (e.g. Google)
+    const meta = document.querySelector('meta[name=\"description\"]');
+    if (meta) {
+      const desc = finding.matchedContent
+        ? `${label} — ${finding.matchedContent.slice(0, 150)}`
+        : t("seo.findingDetail.description");
+      meta.setAttribute("content", desc);
+    }
+  }, [finding, t]);
+
   const handleSave = async (data: FindingDrawerSaveData) => {
     if (!finding) return;
     try {

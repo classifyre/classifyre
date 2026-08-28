@@ -211,6 +211,23 @@ function CaseWorkspaceInner() {
     void loadEvents();
   }, [loadCase, loadThreads, loadRecentActivity, loadGraph, loadLeads, loadEvents]);
 
+  React.useEffect(() => {
+    if (caseData?.title) {
+      document.title = `${t("seo.caseDetail.titleWithEntity", { title: caseData.title })} | ${t("app.name")}`;
+      const meta = document.querySelector('meta[name="description"]');
+      if (meta) {
+        meta.setAttribute(
+          "content",
+          t("seo.caseDetail.descriptionWithEntity", {
+            title: caseData.title,
+            status: caseData.status ?? "",
+            inquiries: String(caseData.inquiries?.length ?? 0),
+          }),
+        );
+      }
+    }
+  }, [caseData?.title, caseData?.status, caseData?.inquiries, t]);
+
   const reloadAll = React.useCallback(() => {
     void loadCase();
     void loadThreads();

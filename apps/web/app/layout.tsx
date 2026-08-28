@@ -40,11 +40,52 @@ const fontHero = League_Gothic({
   variable: "--font-hero",
 });
 
+const siteUrl =
+  process.env.PUBLIC_BASE_URL ??
+  process.env.SITEMAP_BASE_URL ??
+  "https://classifyre.com";
+
 export const metadata: Metadata = {
+  metadataBase: new URL(siteUrl),
   title: {
     template: `%s | ${translate(enTranslations, "app.name")}`,
-    default: translate(enTranslations, "app.name"),
+    default: translate(enTranslations, "seo.site.title"),
   },
+  description: translate(enTranslations, "seo.site.description"),
+  keywords: translate(enTranslations, "seo.site.keywords").split(", "),
+  authors: [{ name: "Classifyre", url: siteUrl }],
+  creator: "Classifyre",
+  publisher: "Classifyre",
+  category: "Technology",
+  alternates: {
+    canonical: "/",
+  },
+  openGraph: {
+    type: "website",
+    locale: "en_US",
+    siteName: translate(enTranslations, "app.name"),
+    title: translate(enTranslations, "seo.site.ogTitle"),
+    description: translate(enTranslations, "seo.site.ogDescription"),
+    url: "/",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: translate(enTranslations, "seo.site.twitterTitle"),
+    description: translate(enTranslations, "seo.site.twitterDescription"),
+    creator: "@classifyre",
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+      "max-video-preview": -1,
+    },
+  },
+  manifest: "/manifest.json",
 };
 
 export default function RootLayout({
