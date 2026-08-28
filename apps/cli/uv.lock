@@ -942,7 +942,7 @@ wheels = [
 
 [[package]]
 name = "classifyre-cli"
-version = "0.4.133"
+version = "0.4.134"
 source = { editable = "." }
 dependencies = [
     { name = "beautifulsoup4" },
@@ -1489,7 +1489,7 @@ youtube = [
 
 [[package]]
 name = "classifyre-schemas"
-version = "0.4.133"
+version = "0.4.134"
 source = { editable = "../../packages/schemas" }
 dependencies = [
     { name = "fastjsonschema" },
@@ -1872,14 +1872,14 @@ wheels = [
 
 [[package]]
 name = "docling"
-version = "2.123.0"
+version = "2.123.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "docling-slim", extra = ["standard"] },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/f4/d0/a9db20eff07574cb9aa6bee5a9d0cbb4ee17f70d6d0405d11fac9297ff6b/docling-2.123.0.tar.gz", hash = "sha256:d4ce15371d4fcaad57a2a31672fe69d9ebb8100c9473b6de06ff5d84499674bf", size = 9070, upload-time = "2026-08-26T16:36:22.461Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/dc/44/0b1c143a5156c170ee1247b60e7272d4b6e1b1ef07e6c7e14c6129338888/docling-2.123.1.tar.gz", hash = "sha256:6ded4775206b40a8959956d0e17c5e6f6fbe9425a6e4eb12e6032a40e5796853", size = 9068, upload-time = "2026-08-28T15:15:45.899Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/32/4b/cdea48e4e914d246ece99f1bf97b3f983f4db91ec355024d50657cf587f1/docling-2.123.0-py3-none-any.whl", hash = "sha256:95c0a4d9bc1beafc6097c8573ec3a8dc317e8bcf67e3234aa7c050b7d73fde9c", size = 5223, upload-time = "2026-08-26T16:36:21.197Z" },
+    { url = "https://files.pythonhosted.org/packages/d2/e2/21defca766bffa7c93c7dfee2a32a098121dbd734307b170a6592676f48c/docling-2.123.1-py3-none-any.whl", hash = "sha256:ec012ac0cd6bfc97b357f6aedd33aadbbc9a23ba08e5cee598081baff756030e", size = 5226, upload-time = "2026-08-28T15:15:44.521Z" },
 ]
 
 [[package]]
@@ -1920,29 +1920,23 @@ chunking = [
 
 [[package]]
 name = "docling-ibm-models"
-version = "3.15.0"
+version = "4.0.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "accelerate" },
-    { name = "docling-core" },
     { name = "huggingface-hub" },
-    { name = "jsonlines" },
     { name = "numpy" },
     { name = "pillow" },
-    { name = "pydantic" },
-    { name = "rtree" },
     { name = "safetensors", extra = ["torch"] },
     { name = "torch", version = "2.13.0", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'linux'" },
     { name = "torch", version = "2.13.0+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform == 'linux'" },
     { name = "torchvision", version = "0.28.0", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'linux'" },
     { name = "torchvision", version = "0.28.0+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform == 'linux'" },
-    { name = "tqdm" },
     { name = "transformers", version = "5.8.1", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform == 'darwin'" },
     { name = "transformers", version = "5.16.1", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'darwin'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/86/17/6ff282d494a6d2f4299ca2edb2d4f353ff46f4512868284565ad77e0221e/docling_ibm_models-3.15.0.tar.gz", hash = "sha256:bea2c97a65657e6343877126c8c9a815599724edae6eda63df55e612276c2d3a", size = 105732, upload-time = "2026-08-28T07:04:10.307Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/de/c4/fbcc095e817ee3079235a7d43c270778e2f3bbdea42c3aae02ba64b050b4/docling_ibm_models-4.0.0.tar.gz", hash = "sha256:dcca49209816135a0d68bc8c6b5040f0608d921e67e87cc9075d600cb1b39816", size = 72098, upload-time = "2026-08-28T14:43:21.956Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/5c/ca/a74621564f89f0e37223e5037f280cb0cc2b6c473f22451febb12d5ef63f/docling_ibm_models-3.15.0-py3-none-any.whl", hash = "sha256:5220773b8731c269b4edf3e0b02dd1703aff22721d84c40773af8f39da421db5", size = 95702, upload-time = "2026-08-28T07:04:08.844Z" },
+    { url = "https://files.pythonhosted.org/packages/a1/0c/724efe4bb0e2fbe1760f5a1a0ea8a490d15fbb13f64d51a4fcafdc704c4b/docling_ibm_models-4.0.0-py3-none-any.whl", hash = "sha256:b4dc321ca9203bfa7cda6092e6b996845fd592457dfe49dd69247fa75d3770aa", size = 67283, upload-time = "2026-08-28T14:43:20.409Z" },
 ]
 
 [[package]]
@@ -1976,7 +1970,7 @@ wheels = [
 
 [[package]]
 name = "docling-slim"
-version = "2.123.0"
+version = "2.123.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "certifi" },
@@ -1988,9 +1982,9 @@ dependencies = [
     { name = "requests" },
     { name = "tqdm" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/3c/3c/b803618e98924c76e291a595d70c0db30c2fa175ac13e9d72d2522525634/docling_slim-2.123.0.tar.gz", hash = "sha256:3d78255443c1c734cabd6e84b4de7c8dcfeb7c1b0b0a2dc39185bfa22410638e", size = 612318, upload-time = "2026-08-26T16:35:00.445Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ce/06/9345b77dad465bc8fd92e6a32075a5d9bb3ac31127121a6a9998f00bb81c/docling_slim-2.123.1.tar.gz", hash = "sha256:87966cabd0fd3c76333e238772c999f0f4e3a36e264df4242a48e1502616a52c", size = 621960, upload-time = "2026-08-28T15:14:27.269Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/e4/47/a5a1761580d46fda4d6023da961822d9416501f4f35bad0672f613819555/docling_slim-2.123.0-py3-none-any.whl", hash = "sha256:f46394d7595adf44a8068109d51b65fd6582227a7ff636125dc555deb4d2b4da", size = 767567, upload-time = "2026-08-26T16:34:58.236Z" },
+    { url = "https://files.pythonhosted.org/packages/16/68/d0fd3a479fe63f1f78d5be21a97788308db73bb5199b8354b34eab859f3e/docling_slim-2.123.1-py3-none-any.whl", hash = "sha256:bdb99f2ed3bed1e1ad5b18b8e139cbe16ef729c93945f6b0a7f99f63a8fc9770", size = 778390, upload-time = "2026-08-28T15:14:25.341Z" },
 ]
 
 [package.optional-dependencies]
@@ -2935,18 +2929,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/41/f2/d34e8b3a08a9cc79a50b2208a93dce981fe615b64d5a4d4abee421d898df/joblib-1.5.3.tar.gz", hash = "sha256:8561a3269e6801106863fd0d6d84bb737be9e7631e33aaed3fb9ce5953688da3", size = 331603, upload-time = "2025-12-15T08:41:46.427Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/7b/91/984aca2ec129e2757d1e4e3c81c3fcda9d0f85b74670a094cc443d9ee949/joblib-1.5.3-py3-none-any.whl", hash = "sha256:5fc3c5039fc5ca8c0276333a188bbd59d6b7ab37fe6632daa76bc7f9ec18e713", size = 309071, upload-time = "2025-12-15T08:41:44.973Z" },
-]
-
-[[package]]
-name = "jsonlines"
-version = "4.0.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "attrs" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/35/87/bcda8e46c88d0e34cad2f09ee2d0c7f5957bccdb9791b0b934ec84d84be4/jsonlines-4.0.0.tar.gz", hash = "sha256:0c6d2c09117550c089995247f605ae4cf77dd1533041d366351f6f298822ea74", size = 11359, upload-time = "2023-09-01T12:34:44.187Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/f8/62/d9ba6323b9202dd2fe166beab8a86d29465c41a0288cbe229fac60c1ab8d/jsonlines-4.0.0-py3-none-any.whl", hash = "sha256:185b334ff2ca5a91362993f42e83588a360cf95ce4b71a73548502bda52a7c55", size = 8701, upload-time = "2023-09-01T12:34:42.563Z" },
 ]
 
 [[package]]
@@ -6869,7 +6851,7 @@ wheels = [
 
 [[package]]
 name = "timm"
-version = "1.0.28"
+version = "1.0.29"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "huggingface-hub" },
@@ -6880,9 +6862,9 @@ dependencies = [
     { name = "torchvision", version = "0.28.0", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'linux'" },
     { name = "torchvision", version = "0.28.0+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform == 'linux'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/35/03/e41389ac641747bfec48d016fde8be1eade1901e6f2c1aedcb0c8cb4b5d9/timm-1.0.28.tar.gz", hash = "sha256:3789d313fdd5541a327b60180d70dbb4bdec73db8ff0655e413db3c3d134a9a4", size = 2451413, upload-time = "2026-07-11T17:24:32.615Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/cf/72/58b8363e22508418d5fac897ac68e2c33f01f84d9d471edc38cbb6523dc6/timm-1.0.29.tar.gz", hash = "sha256:1af8d12bb7e15c5f96e98d60b7b8319cd7f31730778bf1af58e912a7ce171576", size = 2497559, upload-time = "2026-08-28T15:07:31.007Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/c1/76/de1bfac17d183c49c6d0887903d3064ced51cf1d9ba7a8d611c1a8808c4f/timm-1.0.28-py3-none-any.whl", hash = "sha256:e577b88da96b3a722ea5e2f042455ce6f715d398304d8e63b17d126ed7d89968", size = 2597944, upload-time = "2026-07-11T17:24:30.869Z" },
+    { url = "https://files.pythonhosted.org/packages/5e/b7/19267ec60740ef1899d265272bff3623f19fe7f7bf1022fb098766db2134/timm-1.0.29-py3-none-any.whl", hash = "sha256:4266486e355c9beb9432e689de580d09e2efe7fa92a9a79e76c03e7763eac724", size = 2633555, upload-time = "2026-08-28T15:07:29.348Z" },
 ]
 
 [[package]]
