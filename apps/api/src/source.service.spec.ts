@@ -41,13 +41,11 @@ describe('SourceService', () => {
     };
     const maskedConfigCryptoService = new MaskedConfigCryptoService();
     const correlationJobs = { scheduleFull: jest.fn() };
-    const graphCache = { invalidate: jest.fn() };
     const service = new SourceService(
       prisma as any,
       maskedConfigCryptoService,
       runnerLogStorage as any,
       correlationJobs as any,
-      graphCache as any,
     );
     return {
       service,
@@ -55,7 +53,6 @@ describe('SourceService', () => {
       maskedConfigCryptoService,
       runnerLogStorage,
       correlationJobs,
-      graphCache,
     };
   }
 

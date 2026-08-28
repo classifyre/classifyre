@@ -14,6 +14,7 @@ import {
   EXPRESS_IMPORTANCE_SCORE,
 } from '../autopilot/autopilot.constants';
 import { CORRELATION_QUEUE } from './correlation.constants';
+import { CORRELATION_RELATION_TYPES } from './correlation.service';
 import { DuplicatesFinderAgentService } from './duplicates-finder-agent.service';
 import {
   CorrelationJobScheduler,
@@ -52,7 +53,37 @@ export class CorrelationWorker {
     await this.pgBoss.work(CORRELATION_QUEUE, { localConcurrency: 1 }, (jobs) =>
       this.handle(jobs as Job[]),
     );
-    await this.jobs.scheduleGraphRefresh('namespace worker warm-up');
+    // A namespace scanned before the review queue existed has all the
+    // correlation data and none of the rollups, so its queue would read empty
+    // until the next scan — which on a quiet instance could be never.
+    //
+    // Rebuilding the index is enough; a full recompute would refingerprint the
+    // whole corpus to produce edges that are already there. Only done when the
+    // index is empty AND there is something to roll up, so a genuinely fresh
+    // namespace does no work at boot.
+    try {
+      const [patterns, pairs] = await Promise.all([
+        this.prisma.correlationPattern.count(),
+        this.prisma.edge.count({
+          where: {
+            fromType: 'asset',
+            toType: 'asset',
+            relationType: { in: CORRELATION_RELATION_TYPES },
+          },
+        }),
+      ]);
+      if (patterns === 0 && pairs > 0) {
+        this.logger.log(
+          `Review index empty with ${pairs} correlation edge(s) — building it now.`,
+        );
+        await this.correlationService.refreshReviewIndexNow();
+      }
+    } catch (e) {
+      // A namespace mid-migration has no such table yet; the next scan covers it.
+      this.logger.warn(
+        `Review index warm-up skipped: ${e instanceof Error ? e.message : String(e)}`,
+      );
+    }
     this.logger.log(`Registered worker for queue ${CORRELATION_QUEUE}`);
   }
 
@@ -83,10 +114,6 @@ export class CorrelationWorker {
   private async handle(jobs: Job[]): Promise<void> {
     for (const job of jobs) {
       const data = job.data as CorrelationJobPayload;
-      if (data?.refreshGraph) {
-        await this.correlationService.refreshGraphSnapshot();
-        continue;
-      }
       if (data?.recomputeAll) {
         await this.duplicatesFinder.runForConfigChange();
         continue;
