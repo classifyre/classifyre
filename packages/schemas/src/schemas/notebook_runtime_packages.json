@@ -13,7 +13,7 @@
     },
     {
       "name": "azure-storage-blob",
-      "version": "12.30.0",
+      "version": "12.30.1",
       "modules": [
         "azure.storage.blob"
       ],
@@ -30,7 +30,7 @@
     },
     {
       "name": "boto3",
-      "version": "1.43.80",
+      "version": "1.43.82",
       "modules": [
         "boto3"
       ],
@@ -155,7 +155,7 @@
     },
     {
       "name": "huggingface-hub",
-      "version": "1.28.0",
+      "version": "1.29.0",
       "modules": [
         "huggingface_hub"
       ],
@@ -207,7 +207,7 @@
     },
     {
       "name": "neo4j",
-      "version": "6.2.0",
+      "version": "6.3.0",
       "modules": [
         "neo4j"
       ],
@@ -306,7 +306,7 @@
     },
     {
       "name": "pydantic",
-      "version": "2.13.4",
+      "version": "2.13.5",
       "modules": [
         "pydantic"
       ],
@@ -394,7 +394,7 @@
     },
     {
       "name": "slack-sdk",
-      "version": "3.43.0",
+      "version": "3.44.0",
       "modules": [
         "slack_sdk"
       ],
