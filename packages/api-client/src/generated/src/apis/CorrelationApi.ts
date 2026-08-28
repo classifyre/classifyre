@@ -123,35 +123,6 @@ export class CorrelationApi extends runtime.BaseAPI {
     }
 
     /**
-     * Whole-namespace asset map: every asset (capped) connected by its links and typed relationships
-     */
-    async correlationControllerAssetMapRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<CorrelationGraphResponseDto>> {
-        const queryParameters: any = {};
-
-        const headerParameters: runtime.HTTPHeaders = {};
-
-
-        let urlPath = `/correlation/asset-map`;
-
-        const response = await this.request({
-            path: urlPath,
-            method: 'GET',
-            headers: headerParameters,
-            query: queryParameters,
-        }, initOverrides);
-
-        return new runtime.JSONApiResponse(response, (jsonValue) => CorrelationGraphResponseDtoFromJSON(jsonValue));
-    }
-
-    /**
-     * Whole-namespace asset map: every asset (capped) connected by its links and typed relationships
-     */
-    async correlationControllerAssetMap(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<CorrelationGraphResponseDto> {
-        const response = await this.correlationControllerAssetMapRaw(initOverrides);
-        return await response.value();
-    }
-
-    /**
      * Create a case (or add to one) from assets selected in the fingerprints graph
      */
     async correlationControllerCaseActionRaw(requestParameters: CorrelationControllerCaseActionRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<CaseActionResponseDto>> {
@@ -220,7 +191,8 @@ export class CorrelationApi extends runtime.BaseAPI {
     }
 
     /**
-     * Correlation (\"evidence fingerprints\") graph: assets linked through the findings they share
+     * Always scoped. The unscoped whole-corpus graph was removed along with the canvas it fed: it assembled every cluster in the namespace on every request, which is what made the fingerprints page slow. Corpus-wide duplicate work is served by /correlation/review/_* instead, from pre-aggregated rollups.
+     * Correlation (\"evidence fingerprints\") graph for ONE asset or ONE source
      */
     async correlationControllerGraphRaw(requestParameters: CorrelationControllerGraphRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<CorrelationGraphResponseDto>> {
         const queryParameters: any = {};
@@ -249,7 +221,8 @@ export class CorrelationApi extends runtime.BaseAPI {
     }
 
     /**
-     * Correlation (\"evidence fingerprints\") graph: assets linked through the findings they share
+     * Always scoped. The unscoped whole-corpus graph was removed along with the canvas it fed: it assembled every cluster in the namespace on every request, which is what made the fingerprints page slow. Corpus-wide duplicate work is served by /correlation/review/_* instead, from pre-aggregated rollups.
+     * Correlation (\"evidence fingerprints\") graph for ONE asset or ONE source
      */
     async correlationControllerGraph(requestParameters: CorrelationControllerGraphRequest = {}, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<CorrelationGraphResponseDto> {
         const response = await this.correlationControllerGraphRaw(requestParameters, initOverrides);

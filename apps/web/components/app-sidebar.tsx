@@ -64,7 +64,7 @@ const NAV_GROUPS: NavGroup[] = [
       },
       {
         titleKey: "nav.fingerprints",
-        href: "/fingerprints",
+        href: "/duplicates",
         icon: Fingerprint,
       },
     ],

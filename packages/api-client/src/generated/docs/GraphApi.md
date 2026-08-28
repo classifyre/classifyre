@@ -350,7 +350,7 @@ No authorization required
 
 Trace where an asset came from, or what breaks if it changes
 
-Walks FLOW edges only. Containment and identity are controls here rather than hops: collapseContainers rolls tables up into their schemas, and mergeIdentity folds an asset and its twin in another system into one node so a path across them costs one hop instead of two.
+Walks every edge class, so a connector-declared SAME_AS or REFERENCE is visible here rather than silently dropped. Containment and identity are also controls: collapseContainers rolls tables up into their schemas, and mergeIdentity folds an asset and its twin in another system into one node so a path across them costs one hop instead of two. Note this is deliberately broader than the derivation test the duplicate-review queue uses — see DERIVATION_CLASSES in graph/edge-class.ts, which excludes the correlation engine\&#39;s own edges so that similarity cannot be used as evidence about similarity.
 
 ### Example
 

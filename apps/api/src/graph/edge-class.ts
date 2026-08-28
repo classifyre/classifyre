@@ -31,6 +31,51 @@ export const EDGE_CLASSES: readonly EdgeClassName[] = [
 /** Lineage is the FLOW subset. Every other class is a different question. */
 export const LINEAGE_CLASS: EdgeClassName = 'FLOW';
 
+/**
+ * Edge classes that count as INDEPENDENT evidence that two assets are related
+ * by derivation — used by the fingerprints review queue's similarity/lineage
+ * 2x2, and deliberately NOT the same set the lineage view walks.
+ *
+ * The distinction matters because the correlation engine's own output is
+ * classified here too: `related` and `likely_duplicate` resolve to REFERENCE
+ * and `identical_content` to IDENTITY (see BY_RELATION_TYPE below). Asking
+ * "is there a path between these two assets?" over every class would find the
+ * similarity edge that put the pair in the queue in the first place, so every
+ * pair would report a derivation path, nothing would ever be escalated as
+ * unexplained, and the 2x2 would look like it was working.
+ *
+ * Lineage is only useful here because it comes from a different source than
+ * fingerprints — query logs, dbt manifests, connector-declared relationships.
+ * An edge this engine produced cannot be evidence about this engine's output.
+ */
+export const DERIVATION_CLASSES: readonly EdgeClassName[] = [
+  'FLOW',
+  'CONTAINMENT',
+  'IDENTITY',
+];
+
+/**
+ * Relation types excluded from derivation evidence even though their class is
+ * in DERIVATION_CLASSES. `identical_content` is IDENTITY but is produced by
+ * CorrelationService.linkIdenticalContent — the same engine — so counting it
+ * would be circular. A connector-declared SAME_AS stays in: different source,
+ * genuine evidence.
+ */
+export const DERIVATION_EXCLUDED_TYPES: readonly string[] = [
+  'identical_content',
+  'related',
+  'likely_duplicate',
+];
+
+/** Whether an edge is independent evidence of derivation for the 2x2. */
+export function isDerivationEvidence(
+  declared: string | null | undefined,
+  relationType: string,
+): boolean {
+  if (DERIVATION_EXCLUDED_TYPES.includes(relationType)) return false;
+  return DERIVATION_CLASSES.includes(resolveEdgeClass(declared, relationType));
+}
+
 const BY_RELATION_TYPE: Record<string, EdgeClassName> = {
   // Structural. What the lineage view collapses *by* — never a hop in a path.
   CONTAINS: 'CONTAINMENT',

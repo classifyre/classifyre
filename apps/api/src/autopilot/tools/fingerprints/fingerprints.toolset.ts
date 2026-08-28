@@ -2,9 +2,11 @@ import { Injectable } from '@nestjs/common';
 import {
   AgentDecisionAction,
   AiManagementMode,
+  Prisma,
   Severity,
 } from '@prisma/client';
 import { PrismaService } from '../../../prisma.service';
+import { CorrelationReviewService } from '../../../correlation/review/correlation-review.service';
 import {
   CORRELATION_RELATION_TYPES,
   CorrelationService,
@@ -32,6 +34,7 @@ export class FingerprintsToolset {
     private readonly correlation: CorrelationService,
     private readonly duplicates: DuplicatesFinderAgentService,
     private readonly applier: DecisionApplierService,
+    private readonly review: CorrelationReviewService,
   ) {}
 
   list(): Tool[] {
@@ -39,7 +42,7 @@ export class FingerprintsToolset {
       {
         name: 'fingerprints.similar_assets',
         description:
-          'For one asset, return its identity cluster members and top correlated assets (similarity % + shared-value reasons) — the data behind the fingerprints card.',
+          'For one asset, return its identity cluster members and top correlated assets (similarity % + shared-value reasons), each annotated with the review pattern it belongs to, whether lineage explains the match, and any verdict a human already recorded.',
         inputSchema: {
           type: 'object',
           properties: { assetId: { type: 'string' } },
@@ -71,6 +74,42 @@ export class FingerprintsToolset {
             orderBy: { confidence: 'desc' },
             take: 50,
           });
+
+          // Review state, keyed by pair. Without it an agent has no way to
+          // know a human already ruled on a match, and will keep proposing
+          // work that was settled — or argue against a decision it cannot see.
+          const pairKeys = edges.map((e) =>
+            e.fromId < e.toId
+              ? { aId: e.fromId, bId: e.toId }
+              : { aId: e.toId, bId: e.fromId },
+          );
+          const [signatures, verdicts] = pairKeys.length
+            ? await Promise.all([
+                this.prisma.correlationPairSignature.findMany({
+                  where: { OR: pairKeys },
+                  select: {
+                    aId: true,
+                    bId: true,
+                    patternKey: true,
+                    lineageState: true,
+                    lineageRelation: true,
+                  },
+                }),
+                this.prisma.correlationPairVerdict.findMany({
+                  where: { OR: pairKeys },
+                  select: { aId: true, bId: true, verdict: true },
+                }),
+              ])
+            : [[], []];
+          const key = (a: string, b: string) =>
+            a < b ? `${a}|${b}` : `${b}|${a}`;
+          const signatureBy = new Map(
+            signatures.map((x) => [key(x.aId, x.bId), x]),
+          );
+          const verdictBy = new Map(
+            verdicts.map((x) => [key(x.aId, x.bId), x.verdict]),
+          );
+
           return {
             assetId,
             clusterIds,
@@ -82,6 +121,8 @@ export class FingerprintsToolset {
                 weighted?: number;
                 reasons?: string[];
               };
+              const k = key(e.fromId, e.toId);
+              const signature = signatureBy.get(k);
               return {
                 otherAssetId: e.fromId === assetId ? e.toId : e.fromId,
                 relationType: e.relationType,
@@ -89,10 +130,187 @@ export class FingerprintsToolset {
                   (meta.weighted ?? Number(e.confidence)) * 100,
                 ),
                 reasons: meta.reasons ?? [],
+                patternKey: signature?.patternKey ?? null,
+                // PATH means lineage explains the resemblance (a derived copy).
+                // NO_PATH means both sides have lineage and nothing connects
+                // them, which is the case worth raising. UNKNOWN means we have
+                // no lineage here and it is evidence of nothing either way.
+                lineageState: signature?.lineageState ?? 'UNKNOWN',
+                lineageRelation: signature?.lineageRelation ?? 'UNKNOWN',
+                verdict: verdictBy.get(k) ?? null,
               };
             }),
           };
         },
+      },
+      {
+        name: 'fingerprints.review_queue',
+        description:
+          'The duplicate-review backlog: failure patterns ranked by how much work each one settles, with how many pairs are still undecided and how many the lineage graph cannot explain. Read-only — recording a verdict is a human decision.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            limit: {
+              type: 'number',
+              description: 'Patterns to return (default 20, max 60)',
+            },
+          },
+          additionalProperties: false,
+        },
+        sideEffect: 'read',
+        handler: async (input) => {
+          const raw = Number(input.limit);
+          const limit = Number.isFinite(raw)
+            ? Math.min(60, Math.max(1, Math.trunc(raw)))
+            : 20;
+          const [patterns, remaining] = await Promise.all([
+            this.prisma.correlationPattern.findMany({
+              orderBy: { pairCount: 'desc' },
+              take: limit,
+            }),
+            this.prisma.$queryRaw<Array<{ count: bigint }>>(Prisma.sql`
+              SELECT COUNT(*)::bigint AS count
+              FROM correlation_pair_signatures s
+              LEFT JOIN correlation_pair_verdicts v
+                ON v.a_id = s.a_id AND v.b_id = s.b_id
+              WHERE v.a_id IS NULL
+            `),
+          ]);
+          return {
+            workRemaining: Number(remaining[0]?.count ?? 0),
+            patterns: patterns.map((p) => ({
+              patternKey: p.patternKey,
+              family: p.family,
+              labels: p.labels,
+              pairCount: p.pairCount,
+              clusterCount: p.clusterCount,
+              assetCount: p.assetCount,
+              avgWeighted: Number(p.avgWeighted),
+              topologyShape: p.topologyShape,
+              ruleKind: p.ruleKind,
+              // The cell worth acting on: similar, both sides have lineage,
+              // and no path between them.
+              unexplainedPairs: p.lineageNoPathPairs,
+              explainedPairs: p.lineagePathPairs,
+              unknownLineagePairs: p.lineageUnknownPairs,
+            })),
+          };
+        },
+      },
+      {
+        name: 'fingerprints.clear_safe_band',
+        description:
+          'Confirm the duplicate pairs that need no human judgement: a near-perfect score AND a lineage path explaining it (a derived copy). Deliberately narrow — anything the lineage graph cannot explain is left for a person, however high it scores, because an unexplained near-identical pair is the finding worth surfacing. Decisions are recorded as agent decisions and counted separately from human work.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            limit: {
+              type: 'number',
+              description: 'Maximum pairs to confirm (default 500, max 5000)',
+            },
+          },
+          additionalProperties: false,
+        },
+        sideEffect: 'mutate',
+        domain: 'system',
+        decisionAction: AgentDecisionAction.TUNE_CORRELATION,
+        // Gated with the rest of the correlation controls. This writes
+        // verdicts, so it must be unreachable when autopilot is off for the
+        // workspace: an agent silently marking duplicates reviewed would empty
+        // a person's queue without their knowledge.
+        resolveGate: (_input, tc): Promise<ToolGate> =>
+          Promise.resolve({
+            mode: this.applier.effectiveMode(
+              AiManagementMode.INHERIT,
+              tc.ctx.settings.autopilotConfigEnabled,
+            ),
+            entityType: 'system',
+          }),
+        handler: async (input) => this.review.agentClearSafeBand(Number(input.limit) || 500),
+      },
+      {
+        name: 'fingerprints.decisions',
+        description:
+          'Duplicate decisions already taken, and what became of them. Use `unactionedOnly` to find pairs a person confirmed as duplicates but never took into a case — those are the ready-made evidence for one. Never re-raise a pair that already has a verdict.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            verdict: {
+              type: 'string',
+              enum: ['CONFIRMED', 'REJECTED', 'UNSURE', 'SPLIT'],
+            },
+            patternKey: { type: 'string' },
+            unactionedOnly: { type: 'boolean' },
+            limit: { type: 'number' },
+          },
+          additionalProperties: false,
+        },
+        sideEffect: 'read',
+        handler: async (input) =>
+          this.review.decisions({
+            verdict: input.verdict,
+            patternKey: input.patternKey,
+            unactionedOnly: input.unactionedOnly,
+            limit: input.limit,
+          }),
+      },
+      {
+        name: 'fingerprints.decisions_to_case',
+        description:
+          'Take confirmed duplicate pairs into a case as evidence, creating the case or extending an existing one. This is how a duplicate finding becomes something a person can work: the assets are attached as evidence and the verdicts are linked to the case so the decision can be traced back.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            pairs: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: { aId: { type: 'string' }, bId: { type: 'string' } },
+                required: ['aId', 'bId'],
+                additionalProperties: false,
+              },
+            },
+            caseId: { type: 'string' },
+            title: { type: 'string' },
+            description: { type: 'string' },
+            attachFindings: { type: 'boolean' },
+          },
+          required: ['pairs'],
+          additionalProperties: false,
+        },
+        sideEffect: 'mutate',
+        domain: 'case',
+        decisionAction: AgentDecisionAction.CREATE_CASE,
+        resolveGate: async (input, tc): Promise<ToolGate> => {
+          const caseId =
+            typeof input.caseId === 'string' ? input.caseId : undefined;
+          const mode = caseId
+            ? await this.applier.caseGate(
+                caseId,
+                tc.ctx.settings.autopilotCaseEnabled,
+              )
+            : this.applier.effectiveMode(
+                AiManagementMode.INHERIT,
+                tc.ctx.settings.autopilotCaseEnabled,
+              );
+          return { mode, entityType: 'case', entityId: caseId };
+        },
+        handler: async (input) =>
+          this.review.decisionsToCase(input as never),
+      },
+      {
+        name: 'fingerprints.match_cause',
+        description:
+          'Why one pair matched, as something to fix: the label carrying most of the score, the values that matched, and how many other pairs the same combination produced. Use before proposing a weight change or an exclusion, so the fix is aimed at the actual driver.',
+        inputSchema: {
+          type: 'object',
+          properties: { aId: { type: 'string' }, bId: { type: 'string' } },
+          required: ['aId', 'bId'],
+          additionalProperties: false,
+        },
+        sideEffect: 'read',
+        handler: async (input) =>
+          this.review.rejectCause(String(input.aId), String(input.bId)),
       },
       {
         name: 'fingerprints.value_occurrences',

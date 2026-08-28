@@ -91,14 +91,6 @@ export interface FingerprintsGraphData {
   truncated: boolean;
 }
 
-/** Snapshot pushed up when `externalRail` is set, so a host page can render the rail itself. */
-export interface FingerprintsRailState {
-  selection: GraphSelection;
-  selectionRail: React.ReactNode;
-  /** Deselect (back affordance) — clears the graph's node/edge/bundle selection. */
-  onBack: () => void;
-}
-
 /**
  * Unified external focus: sidebar interactions (connection row, near-duplicate
  * cluster, sidebar filters) all funnel into this one object. The focused
@@ -127,13 +119,6 @@ export function FingerprintsGraph({
   assetId,
   sourceId,
   onTune,
-  pendingRecomputeAt,
-  graphData,
-  graphLoading,
-  graphError,
-  onReloadGraph,
-  externalRail = false,
-  onRailStateChange,
   focus,
   onExitFocus,
   occurrencesCache,
@@ -143,17 +128,6 @@ export function FingerprintsGraph({
   sourceId?: string;
   /** When set, the toolbar "Tune" button calls this instead of opening a dialog. */
   onTune?: () => void;
-  /** Bump (e.g. timestamp) to make the graph wait for a recompute + reload. */
-  pendingRecomputeAt?: number;
-  /** Externally-fetched graph payload (shared with sibling panels). Falls back to an internal fetch when omitted. */
-  graphData?: FingerprintsGraphData;
-  graphLoading?: boolean;
-  graphError?: string | null;
-  /** Called instead of the internal fetch when `graphData` is externally managed. */
-  onReloadGraph?: () => void;
-  /** When true, suppress the built-in right rail and report its content via `onRailStateChange` instead. */
-  externalRail?: boolean;
-  onRailStateChange?: (state: FingerprintsRailState) => void;
   /** Externally-driven focus: the subset keeps full colour, the rest dims. */
   focus?: FingerprintsFocus;
   /** Clear `focus` — invoked from the floating pill's Reset and from a background click. */
@@ -165,7 +139,6 @@ export function FingerprintsGraph({
   const localOccurrencesCache = React.useRef<FingerprintOccurrencesCache>(new Map());
   const effectiveOccurrencesCache =
     occurrencesCache ?? localOccurrencesCache.current;
-  const externallyManaged = graphData !== undefined;
   const [fetchedNodes, setFetchedNodes] = React.useState<GraphNodeDto[]>([]);
   const [fetchedEdges, setFetchedEdges] = React.useState<GraphEdgeDto[]>([]);
   const [fetchedSimilarities, setFetchedSimilarities] = React.useState<AssetSimilarityDto[]>([]);
@@ -173,12 +146,12 @@ export function FingerprintsGraph({
   const [fetchLoading, setFetchLoading] = React.useState(true);
   const [fetchError, setFetchError] = React.useState<string | null>(null);
 
-  const nodes = externallyManaged ? graphData.nodes : fetchedNodes;
-  const edges = externallyManaged ? graphData.edges : fetchedEdges;
-  const similarities = externallyManaged ? graphData.similarities : fetchedSimilarities;
-  const truncated = externallyManaged ? graphData.truncated : fetchedTruncated;
-  const loading = externallyManaged ? (graphLoading ?? false) : fetchLoading;
-  const error = externallyManaged ? (graphError ?? null) : fetchError;
+  const nodes = fetchedNodes;
+  const edges = fetchedEdges;
+  const similarities = fetchedSimilarities;
+  const truncated = fetchedTruncated;
+  const loading = fetchLoading;
+  const error = fetchError;
 
   const [recomputing, setRecomputing] = React.useState(false);
   const [search, setSearch] = React.useState("");
@@ -219,14 +192,13 @@ export function FingerprintsGraph({
   );
 
   const load = React.useCallback(() => {
-    if (externallyManaged) {
-      onReloadGraph?.();
-      return () => undefined;
-    }
     let active = true;
     setFetchLoading(true);
     setFetchError(null);
-    const req = assetId ? { assetId } : sourceId ? { sourceId } : {};
+    // Always scoped. The unscoped graph was the whole-corpus download that
+    // made the old fingerprints page unusable; it no longer exists, and this
+    // component is only ever mounted against one asset or one source.
+    const req = assetId ? { assetId } : { sourceId: sourceId ?? "" };
     api.correlation
       .correlationControllerGraph(req)
       .then((g) => {
@@ -248,13 +220,12 @@ export function FingerprintsGraph({
     return () => {
       active = false;
     };
-  }, [externallyManaged, onReloadGraph, assetId, sourceId, t]);
+  }, [assetId, sourceId, t]);
 
   React.useEffect(() => {
-    if (externallyManaged) return;
     return load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [externallyManaged, assetId, sourceId]);
+  }, [assetId, sourceId]);
 
   /**
    * After a config/exclusion change the recompute runs as a background
@@ -294,12 +265,6 @@ export function FingerprintsGraph({
     },
     [load],
   );
-
-  // External trigger (e.g. the Tune tab saved) → wait for recompute + reload.
-  React.useEffect(() => {
-    if (pendingRecomputeAt) void waitForRecompute(pendingRecomputeAt);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pendingRecomputeAt]);
 
   const exclude = React.useCallback(
     async (node: GraphNodeDto, mode: "value" | "label") => {
@@ -842,11 +807,7 @@ export function FingerprintsGraph({
     [rawNodeByKey],
   );
 
-  // ── Rail content: rendered inline by default, lifted to the host page when
-  //    `externalRail` is set (the workspace-style Fingerprints page). Memoized
-  //    so its identity is stable across no-op renders — `externalRail` mode
-  //    pushes this to the host page in an effect, and an unstable identity
-  //    there would re-trigger that effect (and the host's setState) forever. ─
+  // ── Rail content. Memoized so its identity is stable across no-op renders. ─
   const selectionRail = React.useMemo(
     () => (
       <FingerprintsGraphSelectionRail
@@ -898,11 +859,6 @@ export function FingerprintsGraph({
   // change on its own, so this can never loop. The trade-off: sidebar-only
   // hover highlighting inside the selection panel may lag the canvas by
   // one selection cycle — the canvas itself is unaffected.
-  React.useEffect(() => {
-    if (!externalRail) return;
-    onRailStateChange?.({ selection, selectionRail, onBack: clearFocus });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [externalRail, selection]);
 
   return (
     <div className="flex h-full flex-col border-2 border-border bg-card">
@@ -1001,23 +957,6 @@ export function FingerprintsGraph({
         <ClusterControls clustered={clustered} />
 
         <div className="ml-auto flex items-center gap-1">
-          {externalRail && (
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="h-8 w-8"
-                  aria-label={t("correlation.fingerprints.legend")}
-                >
-                  <Info className="h-4 w-4" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent align="end" className="max-h-[70vh] w-80 space-y-4 overflow-y-auto">
-                {overviewFooter}
-              </PopoverContent>
-            </Popover>
-          )}
           <Button
             size="sm"
             className="h-8"
@@ -1112,12 +1051,10 @@ export function FingerprintsGraph({
           )}
         </div>
 
-        {/* ── Detail / actions rail (self-contained embeds only) ── */}
-        {!externalRail && (
-          <aside className="w-[260px] shrink-0 space-y-4 overflow-y-auto border-l-2 border-border bg-background p-3">
-            {selection ? selectionRail : overviewFooter}
-          </aside>
-        )}
+        {/* ── Detail / actions rail ── */}
+        <aside className="w-[260px] shrink-0 space-y-4 overflow-y-auto border-l-2 border-border bg-background p-3">
+          {selection ? selectionRail : overviewFooter}
+        </aside>
       </div>
 
       {/* Right-click quick-exclude menu */}

@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -9,9 +10,7 @@ import {
   Post,
   Put,
   Query,
-  Res,
 } from '@nestjs/common';
-import type { FastifyReply } from 'fastify';
 import { ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { CorrelationService } from './correlation.service';
 import { DuplicatesFinderAgentService } from './duplicates-finder-agent.service';
@@ -37,7 +36,9 @@ export class CorrelationController {
   @Get('correlation/graph')
   @ApiOperation({
     summary:
-      'Correlation ("evidence fingerprints") graph: assets linked through the findings they share',
+      'Correlation ("evidence fingerprints") graph for ONE asset or ONE source',
+    description:
+      'Always scoped. The unscoped whole-corpus graph was removed along with the canvas it fed: it assembled every cluster in the namespace on every request, which is what made the fingerprints page slow. Corpus-wide duplicate work is served by /correlation/review/* instead, from pre-aggregated rollups.',
   })
   @ApiQuery({
     name: 'assetId',
@@ -51,43 +52,14 @@ export class CorrelationController {
   })
   @ApiResponse({ status: 200, type: CorrelationGraphResponseDto })
   async graph(
-    @Res() reply: FastifyReply,
     @Query('assetId') assetId?: string,
     @Query('sourceId') sourceId?: string,
-  ): Promise<void> {
-    if (assetId) {
-      await reply.send(await this.correlation.buildGraph({ assetId }));
-      return;
-    }
-    if (sourceId) {
-      await reply.send(await this.correlation.buildGraph({ sourceId }));
-      return;
-    }
-
-    // The unscoped graph is the large one and is served straight from the
-    // cached snapshot, so forward the stored JSON as-is rather than parsing it
-    // into objects only to serialize the same bytes back. Fastify writes a
-    // string payload verbatim once the content type says JSON, so this is one
-    // copy of the graph instead of three — see
-    // CorrelationGraphCacheService.readPayloadJson.
-    const cached = await this.correlation.getGraphSnapshotJson();
-    if (cached) {
-      await reply.type('application/json').send(cached);
-      return;
-    }
-
-    // No snapshot published yet: build one (and cache it) the normal way.
-    await reply.send(await this.correlation.buildGraph());
-  }
-
-  @Get('correlation/asset-map')
-  @ApiOperation({
-    summary:
-      'Whole-namespace asset map: every asset (capped) connected by its links and typed relationships',
-  })
-  @ApiResponse({ status: 200, type: CorrelationGraphResponseDto })
-  async assetMap(): Promise<CorrelationGraphResponseDto> {
-    return this.correlation.buildAssetMapGraph();
+  ): Promise<CorrelationGraphResponseDto> {
+    if (assetId) return this.correlation.buildGraph({ assetId });
+    if (sourceId) return this.correlation.buildGraph({ sourceId });
+    throw new BadRequestException(
+      'assetId or sourceId is required — there is no unscoped correlation graph.',
+    );
   }
 
   @Get('correlation/links-graph')

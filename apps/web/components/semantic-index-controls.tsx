@@ -53,6 +53,7 @@ export function SemanticIndexControls() {
   }, [busy, refresh]);
 
   const reindex = async () => {
+    if (!status?.workerRegistered) return;
     setReindexing(true);
     try {
       await api.embeddings.embeddingControllerReindex();
@@ -108,6 +109,47 @@ export function SemanticIndexControls() {
               })}
             </span>
           </div>
+
+          {/* "Scheduled" on its own says nothing about whether the index is
+              any good. These are the numbers that do. */}
+          <dl className="grid grid-cols-2 gap-1.5 pt-1">
+            <Stat
+              label={t("review.index.vectors")}
+              value={
+                status.embeddedRows != null
+                  ? status.embeddedRows.toLocaleString()
+                  : "—"
+              }
+            />
+            <Stat
+              label={t("review.index.queued")}
+              value={status.pendingQueueWrites.toLocaleString()}
+            />
+            <Stat
+              label={t("review.index.model")}
+              value={`${status.model} · ${status.dimensions}d`}
+            />
+            <Stat
+              label={t("review.index.worker")}
+              value={
+                status.workerRegistered
+                  ? t("review.index.workerUp")
+                  : t("review.index.workerDown")
+              }
+              warn={!status.workerRegistered}
+            />
+          </dl>
+
+          {/* The reindex runs in the process that owns the embedding queue.
+              In a split api/worker deployment that is the worker, so firing it
+              from here returns a 500 — better to say so than to let someone
+              click a button that cannot work. */}
+          {!status.workerRegistered && (
+            <p className="flex items-start gap-1.5 text-[11px] text-muted-foreground">
+              <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
+              {t("review.index.workerDownHint")}
+            </p>
+          )}
           <div className="flex flex-wrap gap-1.5 pt-1">
             {status.backfillRunning && (
               <Badge variant="outline" className="gap-1 text-[10px] uppercase">
@@ -156,7 +198,11 @@ export function SemanticIndexControls() {
             size="sm"
             variant="outline"
             className="w-full"
-            disabled={reindexing || status?.backfillRunning}
+            disabled={
+              reindexing ||
+              status?.backfillRunning ||
+              !status?.workerRegistered
+            }
             onClick={() => void reindex()}
           >
             <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
@@ -187,6 +233,31 @@ export function SemanticIndexControls() {
           </p>
         </div>
       </div>
+    </div>
+  );
+}
+
+function Stat({
+  label,
+  value,
+  warn,
+}: {
+  label: string;
+  value: string;
+  warn?: boolean;
+}) {
+  return (
+    <div className="rounded-[3px] border border-border bg-background px-2 py-1">
+      <dt className="font-mono text-[9px] uppercase tracking-[0.12em] text-muted-foreground">
+        {label}
+      </dt>
+      <dd
+        className={`truncate font-mono text-[11px] ${
+          warn ? "text-destructive" : "text-foreground"
+        }`}
+      >
+        {value}
+      </dd>
     </div>
   );
 }
