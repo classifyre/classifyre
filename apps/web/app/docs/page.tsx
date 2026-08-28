@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import enTranslations from "@/i18n/en";
+import { translate } from "@/i18n";
 
 import {
   Badge,
@@ -12,13 +14,14 @@ import {
 } from "@workspace/ui/components";
 
 export const metadata: Metadata = {
-  title: "Documentation",
-  description:
-    "Classifyre documentation — how the app works, section by section: connect sources, scan them, review findings, and investigate what matters.",
+  title: translate(enTranslations, "seo.docs.title"),
+  description: translate(enTranslations, "seo.docs.description"),
+  alternates: {
+    canonical: "/docs/",
+  },
   openGraph: {
-    title: "Documentation | Classifyre",
-    description:
-      "Connect sources, scan them, review findings, and investigate what matters — with an AI autopilot doing the legwork.",
+    title: translate(enTranslations, "seo.docs.ogTitle"),
+    description: translate(enTranslations, "seo.docs.ogDescription"),
   },
 };
 

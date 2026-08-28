@@ -313,7 +313,14 @@ export default function RunnerDetailPage() {
 
   useEffect(() => {
     if (sourceName && runner) {
-      document.title = `${t("scans.sourceRun", { source: sourceName })} | ${t("app.name")}`;
+      document.title = `${t("seo.scanDetail.titleWithEntity", { source: sourceName })} | ${t("app.name")}`;
+      const meta = document.querySelector('meta[name="description"]');
+      if (meta) {
+        meta.setAttribute(
+          "content",
+          t("seo.scanDetail.descriptionWithEntity", { source: sourceName }),
+        );
+      }
     }
   }, [sourceName, runner, t]);
 

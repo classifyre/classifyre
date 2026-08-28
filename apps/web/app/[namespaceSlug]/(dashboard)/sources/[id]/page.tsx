@@ -421,9 +421,19 @@ export default function SourceViewPage() {
 
   useEffect(() => {
     if (source?.name) {
-      document.title = `${source.name} | ${t("app.name")}`;
+      document.title = `${t("seo.sourceDetail.titleWithEntity", { name: source.name })} | ${t("app.name")}`;
+      const meta = document.querySelector('meta[name="description"]');
+      if (meta) {
+        meta.setAttribute(
+          "content",
+          t("seo.sourceDetail.descriptionWithEntity", {
+            name: source.name,
+            type: source.type ?? "",
+          }),
+        );
+      }
     }
-  }, [source?.name, t]);
+  }, [source?.name, source?.type, t]);
 
   if (isLoading) {
     return (

@@ -3,11 +3,11 @@ import enTranslations from "@/i18n/en";
 import { translate } from "@/i18n";
 
 export const metadata: Metadata = {
-  title: translate(enTranslations, "seo.settings.title"),
-  description: translate(enTranslations, "seo.settings.description"),
+  title: translate(enTranslations, "seo.glossary.title"),
+  description: translate(enTranslations, "seo.glossary.description"),
   openGraph: {
-    title: translate(enTranslations, "seo.settings.ogTitle"),
-    description: translate(enTranslations, "seo.settings.ogDescription"),
+    title: translate(enTranslations, "seo.glossary.ogTitle"),
+    description: translate(enTranslations, "seo.glossary.ogDescription"),
   },
 };
 
