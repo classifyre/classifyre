@@ -17,7 +17,7 @@ const ROUTE_TITLE_KEYS: Record<string, string> = {
   "/notifications": "notifications.title",
   "/settings": "settings.title",
   "/investigations": "nav.investigations",
-  "/fingerprints": "nav.fingerprints",
+  "/duplicates": "nav.fingerprints",
   "/glossary": "glossary.title",
   "/harness": "nav.harness",
 };

@@ -33,14 +33,12 @@ import type {
 import { useNsPath } from "@/lib/ns-path";
 
 /**
- * Where an asset's data came from, and what breaks if it changes.
- *
- * Only FLOW edges are traversed — that is the whole point of the class on an
- * edge. Containment and identity still matter here, but as controls rather than
- * hops: one collapses tables into their schemas, the other folds an asset and
- * its twin in another system into a single node. Both are the difference
- * between a readable graph and a hairball, and neither changes the underlying
- * data.
+ * Everything this asset is connected to: where its data came from, what
+ * breaks if it changes, its link references, and any cross-source identity
+ * match — the same full picture the namespace-wide asset map and a source's
+ * links view draw, scoped to one asset. Containment can still collapse tables
+ * into their schemas, and identity nodes can still be merged instead of drawn
+ * as an edge, but both are opt-in controls now rather than the default.
  */
 
 type Direction = "up" | "down" | "both";
@@ -69,9 +67,10 @@ export function LineageView({ assetId }: { assetId: string }) {
           direction,
           depth: 3,
           collapseContainers: collapse,
-          // A dbt model and the warehouse table it *is* should cost one hop,
-          // not two. Off would silently double every path that crosses them.
-          mergeIdentity: true,
+          // Left off: a cross-source SAME_AS match is exactly what this view
+          // exists to surface, and merging would fold it away instead of
+          // drawing it as a visible edge.
+          mergeIdentity: false,
         },
       })
       .then((g) => {
@@ -205,8 +204,8 @@ export function LineageView({ assetId }: { assetId: string }) {
               icon={Waypoints}
               title="No lineage yet"
               description={
-                "Nothing has recorded where this asset's data comes from. " +
-                "Lineage appears after the next scan of a source that can report it."
+                "Nothing connects this asset to anything else yet — no data flow, " +
+                "link reference, or cross-source match. This fills in as sources are scanned."
               }
             />
           )

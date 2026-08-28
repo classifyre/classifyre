@@ -49,7 +49,6 @@ import { InquiryMatchingService } from './matching/inquiry-matching.service';
 import { CorrelationJobScheduler } from './correlation/correlation-job-scheduler.service';
 import { FindingStatsScheduler } from './stats/finding-stats-scheduler.service';
 import { FindingStatsService } from './stats/finding-stats.service';
-import { CorrelationGraphCacheService } from './correlation/correlation-graph-cache.service';
 import { citedFindingIds as citedFindingIdsForSource } from './utils/cited-findings';
 import { GraphService } from './graph.service';
 import { tryNormalizeUrn } from './graph/urn';
@@ -199,7 +198,6 @@ export class AssetService {
     // behaviour rather than failing to construct.
     @Optional() private readonly inquiryMatching?: InquiryMatchingService,
     @Optional() private readonly correlationJobs?: CorrelationJobScheduler,
-    @Optional() private readonly graphCache?: CorrelationGraphCacheService,
     @Optional() private readonly statsJobs?: FindingStatsScheduler,
     @Optional() private readonly stats?: FindingStatsService,
     // Optional like its neighbours, and a *value* import above rather than a
@@ -1715,15 +1713,6 @@ export class AssetService {
       data,
       where,
     });
-    if (
-      data.name !== undefined ||
-      data.externalUrl !== undefined ||
-      data.assetType !== undefined ||
-      data.sourceType !== undefined ||
-      data.source !== undefined
-    ) {
-      await this.graphCache?.invalidate('asset display metadata changed');
-    }
     return asset;
   }
 

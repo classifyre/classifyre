@@ -5,10 +5,9 @@ All URIs are relative to *http://localhost*
 | Method | HTTP request | Description |
 |------------- | ------------- | -------------|
 | [**correlationControllerAddExclusion**](CorrelationApi.md#correlationcontrolleraddexclusion) | **POST** /correlation/exclusions | Add an exclusion rule (ignore noisy values) and recompute |
-| [**correlationControllerAssetMap**](CorrelationApi.md#correlationcontrollerassetmap) | **GET** /correlation/asset-map | Whole-namespace asset map: every asset (capped) connected by its links and typed relationships |
 | [**correlationControllerCaseAction**](CorrelationApi.md#correlationcontrollercaseaction) | **POST** /correlation/case-action | Create a case (or add to one) from assets selected in the fingerprints graph |
 | [**correlationControllerGetConfig**](CorrelationApi.md#correlationcontrollergetconfig) | **GET** /correlation/config | Correlation tuning: per-label weights (dynamic) + match thresholds |
-| [**correlationControllerGraph**](CorrelationApi.md#correlationcontrollergraph) | **GET** /correlation/graph | Correlation (\&quot;evidence fingerprints\&quot;) graph: assets linked through the findings they share |
+| [**correlationControllerGraph**](CorrelationApi.md#correlationcontrollergraph) | **GET** /correlation/graph | Correlation (\&quot;evidence fingerprints\&quot;) graph for ONE asset or ONE source |
 | [**correlationControllerLinksGraph**](CorrelationApi.md#correlationcontrollerlinksgraph) | **GET** /correlation/links-graph | A source\&#39;s assets connected by their links (hash references) |
 | [**correlationControllerOccurrences**](CorrelationApi.md#correlationcontrolleroccurrences) | **GET** /findings/occurrences | Where else a normalized finding value appears (reverse index) |
 | [**correlationControllerRecompute**](CorrelationApi.md#correlationcontrollerrecompute) | **POST** /assets/{id}/recompute-correlation | Recompute correlation for a single asset (on demand) |
@@ -71,63 +70,6 @@ No authorization required
 ### HTTP request headers
 
 - **Content-Type**: `application/json`
-- **Accept**: `application/json`
-
-
-### HTTP response details
-| Status code | Description | Response headers |
-|-------------|-------------|------------------|
-| **200** |  |  -  |
-
-[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
-
-
-## correlationControllerAssetMap
-
-> CorrelationGraphResponseDto correlationControllerAssetMap()
-
-Whole-namespace asset map: every asset (capped) connected by its links and typed relationships
-
-### Example
-
-```ts
-import {
-  Configuration,
-  CorrelationApi,
-} from '@workspace/api-client';
-import type { CorrelationControllerAssetMapRequest } from '@workspace/api-client';
-
-async function example() {
-  console.log("🚀 Testing @workspace/api-client SDK...");
-  const api = new CorrelationApi();
-
-  try {
-    const data = await api.correlationControllerAssetMap();
-    console.log(data);
-  } catch (error) {
-    console.error(error);
-  }
-}
-
-// Run the test
-example().catch(console.error);
-```
-
-### Parameters
-
-This endpoint does not need any parameter.
-
-### Return type
-
-[**CorrelationGraphResponseDto**](CorrelationGraphResponseDto.md)
-
-### Authorization
-
-No authorization required
-
-### HTTP request headers
-
-- **Content-Type**: Not defined
 - **Accept**: `application/json`
 
 
@@ -265,7 +207,9 @@ No authorization required
 
 > CorrelationGraphResponseDto correlationControllerGraph(assetId, sourceId)
 
-Correlation (\&quot;evidence fingerprints\&quot;) graph: assets linked through the findings they share
+Correlation (\&quot;evidence fingerprints\&quot;) graph for ONE asset or ONE source
+
+Always scoped. The unscoped whole-corpus graph was removed along with the canvas it fed: it assembled every cluster in the namespace on every request, which is what made the fingerprints page slow. Corpus-wide duplicate work is served by /correlation/review/_* instead, from pre-aggregated rollups.
 
 ### Example
 

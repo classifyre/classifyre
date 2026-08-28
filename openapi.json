@@ -5980,7 +5980,7 @@
     },
     "/graph/lineage": {
       "post": {
-        "description": "Walks FLOW edges only. Containment and identity are controls here rather than hops: collapseContainers rolls tables up into their schemas, and mergeIdentity folds an asset and its twin in another system into one node so a path across them costs one hop instead of two.",
+        "description": "Walks every edge class, so a connector-declared SAME_AS or REFERENCE is visible here rather than silently dropped. Containment and identity are also controls: collapseContainers rolls tables up into their schemas, and mergeIdentity folds an asset and its twin in another system into one node so a path across them costs one hop instead of two. Note this is deliberately broader than the derivation test the duplicate-review queue uses — see DERIVATION_CLASSES in graph/edge-class.ts, which excludes the correlation engine's own edges so that similarity cannot be used as evidence about similarity.",
         "operationId": "GraphController_lineage",
         "parameters": [],
         "requestBody": {
@@ -9419,6 +9419,7 @@
     },
     "/correlation/graph": {
       "get": {
+        "description": "Always scoped. The unscoped whole-corpus graph was removed along with the canvas it fed: it assembled every cluster in the namespace on every request, which is what made the fingerprints page slow. Corpus-wide duplicate work is served by /correlation/review/* instead, from pre-aggregated rollups.",
         "operationId": "CorrelationController_graph",
         "parameters": [
           {
@@ -9452,29 +9453,7 @@
             }
           }
         },
-        "summary": "Correlation (\"evidence fingerprints\") graph: assets linked through the findings they share",
-        "tags": [
-          "correlation"
-        ]
-      }
-    },
-    "/correlation/asset-map": {
-      "get": {
-        "operationId": "CorrelationController_assetMap",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CorrelationGraphResponseDto"
-                }
-              }
-            }
-          }
-        },
-        "summary": "Whole-namespace asset map: every asset (capped) connected by its links and typed relationships",
+        "summary": "Correlation (\"evidence fingerprints\") graph for ONE asset or ONE source",
         "tags": [
           "correlation"
         ]
@@ -9733,6 +9712,673 @@
         "summary": "Where else a normalized finding value appears (reverse index)",
         "tags": [
           "correlation"
+        ]
+      }
+    },
+    "/correlation/review/portfolio": {
+      "get": {
+        "description": "Includes a 20-bin score histogram per pattern so the client can recompute every count on the page as a cutoff moves, without another request.",
+        "operationId": "CorrelationReviewController_portfolio",
+        "parameters": [
+          {
+            "name": "sourceIds",
+            "required": false,
+            "in": "query",
+            "description": "Narrow to pairs touching any of these sources (comma separated). Either side counts — restricting to both would hide the cross-system pairs.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewPortfolioResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Level 1: work remaining, the pattern queue, and the source meta-graph",
+        "tags": [
+          "correlation-review"
+        ]
+      }
+    },
+    "/correlation/review/rebuild": {
+      "post": {
+        "description": "Derived from edges, clusters and correlation values that are already stored — this does not re-scan or re-fingerprint anything. Use it when a namespace was scanned before the review queue existed and its queue reads empty.",
+        "operationId": "CorrelationReviewController_rebuild",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RebuildIndexResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Rebuild the review rollups from existing correlation data",
+        "tags": [
+          "correlation-review"
+        ]
+      }
+    },
+    "/correlation/review/patterns/{patternKey}/clusters": {
+      "get": {
+        "operationId": "CorrelationReviewController_clusters",
+        "parameters": [
+          {
+            "name": "patternKey",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "min",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "max",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "lineage",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "PATH",
+                "NO_PATH",
+                "UNKNOWN"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sourceIds",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewClustersResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Level 2: clusters inside one pattern",
+        "tags": [
+          "correlation-review"
+        ]
+      }
+    },
+    "/correlation/review/patterns/{patternKey}/sample": {
+      "get": {
+        "operationId": "CorrelationReviewController_sample",
+        "parameters": [
+          {
+            "name": "patternKey",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "n",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "min",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "max",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "lineage",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sourceIds",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewSampleResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "The next undecided pairs in a pattern, strongest first",
+        "tags": [
+          "correlation-review"
+        ]
+      }
+    },
+    "/correlation/review/pairs/{aId}/{bId}": {
+      "get": {
+        "operationId": "CorrelationReviewController_pair",
+        "parameters": [
+          {
+            "name": "aId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "bId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewPairResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Level 3: one pair — comparison, match-weight decomposition, local graph, lineage evidence",
+        "tags": [
+          "correlation-review"
+        ]
+      }
+    },
+    "/correlation/review/decisions": {
+      "get": {
+        "description": "The other half of the queue. A decision that cannot be found again is a keystroke, not a judgement — this lists what was decided, whether a person or an agent decided it, and whether it was ever taken into a case or an inquiry. Filter to the ones that went nowhere with unactionedOnly.",
+        "operationId": "CorrelationReviewController_decisions",
+        "parameters": [
+          {
+            "name": "verdict",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "patternKey",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "unactionedOnly",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewDecisionsResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "What has been decided, and what became of it",
+        "tags": [
+          "correlation-review"
+        ]
+      }
+    },
+    "/correlation/review/decisions/reopen": {
+      "post": {
+        "description": "Removes the verdict, and re-clusters the neighbourhood when the verdict was one that had been suppressing it.",
+        "operationId": "CorrelationReviewController_reopen",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReopenDecisionsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReopenDecisionsResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Put decided pairs back in the queue",
+        "tags": [
+          "correlation-review"
+        ]
+      }
+    },
+    "/correlation/review/decisions/case": {
+      "post": {
+        "operationId": "CorrelationReviewController_decisionsToCase",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DecisionsToCaseDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DecisionsToCaseResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Take decided pairs into a case as evidence",
+        "tags": [
+          "correlation-review"
+        ]
+      }
+    },
+    "/correlation/review/decisions/inquiry": {
+      "post": {
+        "operationId": "CorrelationReviewController_decisionsToInquiry",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DecisionsToInquiryDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DecisionsToInquiryResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Open an inquiry that keeps watching for what these pairs had in common",
+        "tags": [
+          "correlation-review"
+        ]
+      }
+    },
+    "/correlation/review/pairs/{aId}/{bId}/cause": {
+      "get": {
+        "description": "Rejecting a pair without addressing the cause means the next scan produces it again. This names the label carrying the score and how many other pairs the same combination produced.",
+        "operationId": "CorrelationReviewController_cause",
+        "parameters": [
+          {
+            "name": "aId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "bId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RejectCauseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "What drove this match, framed as something to fix",
+        "tags": [
+          "correlation-review"
+        ]
+      }
+    },
+    "/correlation/review/verdicts": {
+      "post": {
+        "operationId": "CorrelationReviewController_recordVerdicts",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecordVerdictDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecordVerdictResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Record a decision on one or more pairs",
+        "tags": [
+          "correlation-review"
+        ]
+      }
+    },
+    "/correlation/review/verdicts/undo": {
+      "post": {
+        "operationId": "CorrelationReviewController_undo",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UndoBatchDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UndoBatchResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Revert one batch of decisions",
+        "tags": [
+          "correlation-review"
+        ]
+      }
+    },
+    "/correlation/review/undo-log": {
+      "get": {
+        "operationId": "CorrelationReviewController_undoLog",
+        "parameters": [
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UndoLogResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Recent bulk actions, newest first",
+        "tags": [
+          "correlation-review"
+        ]
+      }
+    },
+    "/correlation/review/patterns/{patternKey}/preview": {
+      "post": {
+        "operationId": "CorrelationReviewController_preview",
+        "parameters": [
+          {
+            "name": "patternKey",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatternActionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PatternPreviewResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "What a bulk action would do. Read-only — nothing is applied.",
+        "tags": [
+          "correlation-review"
+        ]
+      }
+    },
+    "/correlation/review/patterns/{patternKey}/apply": {
+      "post": {
+        "operationId": "CorrelationReviewController_apply",
+        "parameters": [
+          {
+            "name": "patternKey",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatternActionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PatternApplyResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Decide a whole pattern at once, reversibly via the undo log",
+        "tags": [
+          "correlation-review"
+        ]
+      }
+    },
+    "/correlation/review/pairs/{aId}/{bId}/split": {
+      "post": {
+        "operationId": "CorrelationReviewController_split",
+        "parameters": [
+          {
+            "name": "aId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "bId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SplitPairResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Cut the link between two assets. The verdict keeps later scans from rejoining them.",
+        "tags": [
+          "correlation-review"
         ]
       }
     },
@@ -17660,8 +18306,8 @@
           },
           "mergeIdentity": {
             "type": "boolean",
-            "description": "Merge nodes joined by an IDENTITY edge into one. Without this a dbt model and the warehouse table it is show up as two hops in every path that crosses them, silently doubling the graph.",
-            "default": true
+            "description": "Merge nodes joined by an IDENTITY edge into one, instead of drawing the IDENTITY edge itself. Useful when a dbt model and the warehouse table it is would otherwise show up as two hops in every path that crosses them — but off by default, because lineage now walks IDENTITY/REFERENCE edges as first-class hops (a cross-source SAME_AS match is exactly the kind of thing this view exists to surface, not fold away).",
+            "default": false
           }
         },
         "required": [
@@ -23203,6 +23849,1332 @@
           "value",
           "valueHash",
           "assets"
+        ]
+      },
+      "ReviewPatternDto": {
+        "type": "object",
+        "properties": {
+          "patternKey": {
+            "type": "string"
+          },
+          "family": {
+            "type": "string",
+            "description": "SHARED_LABELS | PHONETIC | IDENTICAL_CONTENT | NEAR_DUPLICATE_TEXT"
+          },
+          "labels": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "pairCount": {
+            "type": "number"
+          },
+          "truePairCount": {
+            "type": "number",
+            "description": "Uncapped size. Differs from pairCount only for near-duplicate text groups, whose asset-pair projection is capped."
+          },
+          "clusterCount": {
+            "type": "number"
+          },
+          "assetCount": {
+            "type": "number"
+          },
+          "avgWeighted": {
+            "type": "number"
+          },
+          "maxWeighted": {
+            "type": "number"
+          },
+          "scoreBuckets": {
+            "description": "Twenty bins over [0,1]. The client sums slices of these to recompute every count on the page when a cutoff moves, so dragging costs no request.",
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "decidedBuckets": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "clusterBuckets": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "lineagePathPairs": {
+            "type": "number"
+          },
+          "lineageNoPathPairs": {
+            "type": "number"
+          },
+          "lineageUnknownPairs": {
+            "type": "number"
+          },
+          "topologyShape": {
+            "type": "string",
+            "description": "clique | star | chain | bridge | pair | mixed"
+          },
+          "ruleKind": {
+            "type": "string",
+            "description": "THRESHOLD | EXCLUSION | MERGE | JUDGEMENT"
+          }
+        },
+        "required": [
+          "patternKey",
+          "family",
+          "labels",
+          "pairCount",
+          "truePairCount",
+          "clusterCount",
+          "assetCount",
+          "avgWeighted",
+          "maxWeighted",
+          "scoreBuckets",
+          "decidedBuckets",
+          "clusterBuckets",
+          "lineagePathPairs",
+          "lineageNoPathPairs",
+          "lineageUnknownPairs",
+          "topologyShape",
+          "ruleKind"
+        ]
+      },
+      "ReviewSourceNodeDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "description": "Connector type, so the UI can show the system's own icon rather than an anonymous circle."
+          },
+          "pairCount": {
+            "type": "number"
+          },
+          "internalPairs": {
+            "type": "number",
+            "description": "Pairs whose two assets are both inside this source."
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "type",
+          "pairCount",
+          "internalPairs"
+        ]
+      },
+      "ReviewSourceEdgeDto": {
+        "type": "object",
+        "properties": {
+          "sourceAId": {
+            "type": "string"
+          },
+          "sourceBId": {
+            "type": "string"
+          },
+          "pairCount": {
+            "type": "number"
+          },
+          "assetCount": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "sourceAId",
+          "sourceBId",
+          "pairCount",
+          "assetCount"
+        ]
+      },
+      "ReviewSourceGraphDto": {
+        "type": "object",
+        "properties": {
+          "nodes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReviewSourceNodeDto"
+            }
+          },
+          "edges": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReviewSourceEdgeDto"
+            }
+          },
+          "topShare": {
+            "type": "number",
+            "description": "Share of pairs on the single heaviest source pairing. High means the duplicates have one findable cause; even spread points at the matcher instead."
+          }
+        },
+        "required": [
+          "nodes",
+          "edges",
+          "topShare"
+        ]
+      },
+      "ReviewPortfolioResponseDto": {
+        "type": "object",
+        "properties": {
+          "patterns": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReviewPatternDto"
+            }
+          },
+          "sources": {
+            "$ref": "#/components/schemas/ReviewSourceGraphDto"
+          },
+          "totalPairs": {
+            "type": "number"
+          },
+          "decidedPairs": {
+            "type": "number"
+          },
+          "decidedByAgent": {
+            "type": "number",
+            "description": "Of the decided pairs, how many an agent decided. Kept apart so the headline stays a count of human work — an agent clearing the safe band must not make the queue look worked through."
+          },
+          "assetsAffected": {
+            "type": "number",
+            "description": "Distinct assets appearing in at least one scored pair. The duplicate rate is this over totalAssets — a cluster count says nothing without a denominator."
+          },
+          "totalAssets": {
+            "type": "number"
+          },
+          "relatedMin": {
+            "type": "number",
+            "description": "Current relatedMin from the tuning config"
+          },
+          "duplicateMin": {
+            "type": "number",
+            "description": "Current duplicateMin from the tuning config"
+          },
+          "computedAt": {
+            "type": "string",
+            "nullable": true
+          },
+          "lineageHairball": {
+            "type": "boolean",
+            "description": "True when a dominant lineage component made the derivation test unusable, so lineage states read UNKNOWN rather than claiming a path."
+          }
+        },
+        "required": [
+          "patterns",
+          "sources",
+          "totalPairs",
+          "decidedPairs",
+          "decidedByAgent",
+          "assetsAffected",
+          "totalAssets",
+          "relatedMin",
+          "duplicateMin",
+          "lineageHairball"
+        ]
+      },
+      "RebuildIndexResponseDto": {
+        "type": "object",
+        "properties": {
+          "pairs": {
+            "type": "number"
+          },
+          "patterns": {
+            "type": "number"
+          },
+          "lineageCovered": {
+            "type": "number"
+          },
+          "hairballDemoted": {
+            "type": "boolean",
+            "description": "True when a dominant lineage component made the derivation test unusable, so lineage reads UNKNOWN rather than claiming a path."
+          },
+          "durationMs": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "pairs",
+          "patterns",
+          "lineageCovered",
+          "hairballDemoted",
+          "durationMs"
+        ]
+      },
+      "ReviewClusterRowDto": {
+        "type": "object",
+        "properties": {
+          "clusterId": {
+            "type": "string"
+          },
+          "patternKey": {
+            "type": "string"
+          },
+          "pairCount": {
+            "type": "number"
+          },
+          "undecidedPairs": {
+            "type": "number"
+          },
+          "memberCount": {
+            "type": "number"
+          },
+          "sourceCount": {
+            "type": "number"
+          },
+          "maxWeighted": {
+            "type": "number"
+          },
+          "avgWeighted": {
+            "type": "number"
+          },
+          "shape": {
+            "type": "string",
+            "description": "clique | star | chain | bridge | pair"
+          },
+          "lineageState": {
+            "type": "string",
+            "description": "PATH | NO_PATH | UNKNOWN"
+          },
+          "labels": {
+            "description": "Full label set, not the truncated pattern key",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "sampleAssetIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "clusterId",
+          "patternKey",
+          "pairCount",
+          "undecidedPairs",
+          "memberCount",
+          "sourceCount",
+          "maxWeighted",
+          "avgWeighted",
+          "shape",
+          "lineageState",
+          "labels",
+          "sampleAssetIds"
+        ]
+      },
+      "ReviewClustersResponseDto": {
+        "type": "object",
+        "properties": {
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReviewClusterRowDto"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          },
+          "total": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "rows",
+          "total"
+        ]
+      },
+      "ReviewSamplePairDto": {
+        "type": "object",
+        "properties": {
+          "aId": {
+            "type": "string"
+          },
+          "bId": {
+            "type": "string"
+          },
+          "aName": {
+            "type": "string"
+          },
+          "bName": {
+            "type": "string"
+          },
+          "weighted": {
+            "type": "number"
+          },
+          "lineageState": {
+            "type": "string"
+          },
+          "labels": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "sharedValues": {
+            "description": "The values the two assets actually share, capped. Lets a reviewer tell a distinctive match from shared boilerplate without opening the pair.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "clusterId": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "aId",
+          "bId",
+          "aName",
+          "bName",
+          "weighted",
+          "lineageState",
+          "labels",
+          "sharedValues"
+        ]
+      },
+      "ReviewSampleResponseDto": {
+        "type": "object",
+        "properties": {
+          "pairs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReviewSamplePairDto"
+            }
+          },
+          "undecidedTotal": {
+            "type": "number",
+            "description": "Undecided pairs matching the same filters"
+          }
+        },
+        "required": [
+          "pairs",
+          "undecidedTotal"
+        ]
+      },
+      "ReviewPairAssetDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "assetType": {
+            "type": "string"
+          },
+          "sourceId": {
+            "type": "string"
+          },
+          "sourceName": {
+            "type": "string"
+          },
+          "externalUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "lineageDegree": {
+            "type": "number",
+            "description": "Count of derivation edges touching this asset. Zero means we have no lineage here — which is not the same as knowing there is no path."
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "assetType",
+          "sourceId",
+          "sourceName",
+          "lineageDegree"
+        ]
+      },
+      "ReviewSharedValueDto": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "string"
+          },
+          "valueHash": {
+            "type": "string",
+            "description": "Reverse-index key, so the token disclosure can ask where else this value appears without re-deriving the hash in the browser."
+          }
+        },
+        "required": [
+          "value",
+          "valueHash"
+        ]
+      },
+      "ReviewFieldRowDto": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string"
+          },
+          "aValues": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "bValues": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "sharedValues": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReviewSharedValueDto"
+            }
+          },
+          "differs": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "label",
+          "aValues",
+          "bValues",
+          "sharedValues",
+          "differs"
+        ]
+      },
+      "ReviewWaterfallRowDto": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string"
+          },
+          "potential": {
+            "type": "number",
+            "description": "Weight this label could have contributed if it matched perfectly. Positive bar."
+          },
+          "actual": {
+            "type": "number",
+            "description": "Weight it actually contributed, from the scorer. potential + penalty."
+          },
+          "penalty": {
+            "type": "number",
+            "description": "actual - potential. Never positive: this is the evidence against, and it is inside the sum rather than hidden in a blend."
+          },
+          "sharedCount": {
+            "type": "number"
+          },
+          "aCount": {
+            "type": "number"
+          },
+          "bCount": {
+            "type": "number"
+          },
+          "weight": {
+            "type": "number",
+            "description": "Raw label weight, for the tooltip"
+          }
+        },
+        "required": [
+          "label",
+          "potential",
+          "actual",
+          "penalty",
+          "sharedCount",
+          "aCount",
+          "bCount",
+          "weight"
+        ]
+      },
+      "ReviewWaterfallDto": {
+        "type": "object",
+        "properties": {
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReviewWaterfallRowDto"
+            }
+          },
+          "total": {
+            "type": "number",
+            "description": "Sum of the bars — equals the displayed score"
+          },
+          "perfect": {
+            "type": "number",
+            "description": "Sum of every potential bar. Always 1 for an exact-pass pair: the score is the fraction of available weight that matched."
+          },
+          "storedScore": {
+            "type": "number",
+            "description": "The score as stored. Should equal total; a mismatch means the scorer and this decomposition disagree."
+          },
+          "phonetic": {
+            "type": "boolean",
+            "description": "True when the pair came from the phonetic pass, whose contributions are fuzzy match sums rather than whole-value counts."
+          }
+        },
+        "required": [
+          "rows",
+          "total",
+          "perfect",
+          "storedScore",
+          "phonetic"
+        ]
+      },
+      "ReviewEgoNodeDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "sourceId": {
+            "type": "string"
+          },
+          "isSeed": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "sourceId",
+          "isSeed"
+        ]
+      },
+      "ReviewEgoEdgeDto": {
+        "type": "object",
+        "properties": {
+          "aId": {
+            "type": "string"
+          },
+          "bId": {
+            "type": "string"
+          },
+          "weighted": {
+            "type": "number"
+          },
+          "isWeakest": {
+            "type": "boolean",
+            "description": "The weakest edge whose removal disconnects the cluster — the one worth cutting."
+          }
+        },
+        "required": [
+          "aId",
+          "bId",
+          "weighted",
+          "isWeakest"
+        ]
+      },
+      "ReviewEgoGraphDto": {
+        "type": "object",
+        "properties": {
+          "nodes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReviewEgoNodeDto"
+            }
+          },
+          "edges": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReviewEgoEdgeDto"
+            }
+          },
+          "truncated": {
+            "type": "number",
+            "description": "Members omitted to keep the picture readable"
+          }
+        },
+        "required": [
+          "nodes",
+          "edges",
+          "truncated"
+        ]
+      },
+      "ReviewLineageEvidenceDto": {
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string",
+            "description": "PATH | NO_PATH | UNKNOWN"
+          },
+          "relation": {
+            "type": "string",
+            "description": "ANCESTOR_DESCENDANT | SIBLING | CONNECTED_OTHER | DISCONNECTED | UNKNOWN"
+          },
+          "sharedRoots": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "aDegree": {
+            "type": "number",
+            "description": "Derivation edges touching asset A"
+          },
+          "bDegree": {
+            "type": "number"
+          },
+          "escalate": {
+            "type": "boolean",
+            "description": "Whether this pair should be escalated: similar, both sides have lineage, and no path between them — convergent duplication rather than a derived copy."
+          }
+        },
+        "required": [
+          "state",
+          "relation",
+          "sharedRoots",
+          "aDegree",
+          "bDegree",
+          "escalate"
+        ]
+      },
+      "ReviewPairResponseDto": {
+        "type": "object",
+        "properties": {
+          "a": {
+            "$ref": "#/components/schemas/ReviewPairAssetDto"
+          },
+          "b": {
+            "$ref": "#/components/schemas/ReviewPairAssetDto"
+          },
+          "patternKey": {
+            "type": "string"
+          },
+          "weighted": {
+            "type": "number"
+          },
+          "labels": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "clusterId": {
+            "type": "string",
+            "nullable": true
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReviewFieldRowDto"
+            }
+          },
+          "waterfall": {
+            "$ref": "#/components/schemas/ReviewWaterfallDto"
+          },
+          "ego": {
+            "$ref": "#/components/schemas/ReviewEgoGraphDto"
+          },
+          "lineage": {
+            "$ref": "#/components/schemas/ReviewLineageEvidenceDto"
+          },
+          "verdict": {
+            "type": "string",
+            "nullable": true,
+            "description": "Existing verdict, if this pair was already decided"
+          },
+          "verdictStale": {
+            "type": "boolean",
+            "description": "True when the pair has been re-scored materially since it was decided, so the standing judgement was made about a different number."
+          }
+        },
+        "required": [
+          "a",
+          "b",
+          "patternKey",
+          "weighted",
+          "labels",
+          "fields",
+          "waterfall",
+          "ego",
+          "lineage",
+          "verdictStale"
+        ]
+      },
+      "ReviewDecisionRowDto": {
+        "type": "object",
+        "properties": {
+          "aId": {
+            "type": "string"
+          },
+          "bId": {
+            "type": "string"
+          },
+          "aName": {
+            "type": "string"
+          },
+          "bName": {
+            "type": "string"
+          },
+          "verdict": {
+            "type": "string"
+          },
+          "patternKey": {
+            "type": "string"
+          },
+          "scoreAtVerdict": {
+            "type": "number",
+            "description": "Score the reviewer saw when they decided"
+          },
+          "currentScore": {
+            "type": "number",
+            "nullable": true,
+            "description": "Score now. Null when the pair is no longer in the index at all."
+          },
+          "stale": {
+            "type": "boolean",
+            "description": "The pair has been re-scored materially since the decision was taken."
+          },
+          "decidedByKind": {
+            "type": "string",
+            "description": "'ai' when an agent decided it, else 'operator'"
+          },
+          "decidedAt": {
+            "type": "string"
+          },
+          "caseId": {
+            "type": "string",
+            "nullable": true
+          },
+          "inquiryId": {
+            "type": "string",
+            "nullable": true
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "aId",
+          "bId",
+          "aName",
+          "bName",
+          "verdict",
+          "patternKey",
+          "scoreAtVerdict",
+          "stale",
+          "decidedByKind",
+          "decidedAt"
+        ]
+      },
+      "ReviewDecisionsResponseDto": {
+        "type": "object",
+        "properties": {
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReviewDecisionRowDto"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          },
+          "total": {
+            "type": "number"
+          },
+          "unactioned": {
+            "type": "number",
+            "description": "Decided but not yet taken anywhere"
+          },
+          "byVerdict": {
+            "type": "object",
+            "description": "Counts by verdict across the whole namespace"
+          },
+          "byAgent": {
+            "type": "number",
+            "description": "Decisions an agent took, not a person"
+          }
+        },
+        "required": [
+          "rows",
+          "total",
+          "unactioned",
+          "byVerdict",
+          "byAgent"
+        ]
+      },
+      "ReviewPairRefDto": {
+        "type": "object",
+        "properties": {
+          "aId": {
+            "type": "string"
+          },
+          "bId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "aId",
+          "bId"
+        ]
+      },
+      "ReopenDecisionsDto": {
+        "type": "object",
+        "properties": {
+          "pairs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReviewPairRefDto"
+            }
+          }
+        },
+        "required": [
+          "pairs"
+        ]
+      },
+      "ReopenDecisionsResponseDto": {
+        "type": "object",
+        "properties": {
+          "reopened": {
+            "type": "number"
+          },
+          "workRemaining": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "reopened",
+          "workRemaining"
+        ]
+      },
+      "DecisionsToCaseDto": {
+        "type": "object",
+        "properties": {
+          "pairs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReviewPairRefDto"
+            }
+          },
+          "caseId": {
+            "type": "string",
+            "description": "Extend this case instead of creating one"
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "severity": {
+            "type": "string"
+          },
+          "attachFindings": {
+            "type": "boolean",
+            "description": "Attach the assets' findings too"
+          }
+        },
+        "required": [
+          "pairs"
+        ]
+      },
+      "DecisionsToCaseResponseDto": {
+        "type": "object",
+        "properties": {
+          "caseId": {
+            "type": "string"
+          },
+          "caseTitle": {
+            "type": "string"
+          },
+          "created": {
+            "type": "boolean"
+          },
+          "assetsAdded": {
+            "type": "number"
+          },
+          "findingsAttached": {
+            "type": "number"
+          },
+          "pairsLinked": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "caseId",
+          "caseTitle",
+          "created",
+          "assetsAdded",
+          "findingsAttached",
+          "pairsLinked"
+        ]
+      },
+      "DecisionsToInquiryDto": {
+        "type": "object",
+        "properties": {
+          "pairs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReviewPairRefDto"
+            }
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "pairs"
+        ]
+      },
+      "DecisionsToInquiryResponseDto": {
+        "type": "object",
+        "properties": {
+          "inquiryId": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "matchCount": {
+            "type": "number"
+          },
+          "pairsLinked": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "inquiryId",
+          "title",
+          "matchCount",
+          "pairsLinked"
+        ]
+      },
+      "RejectCauseLabelDto": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string"
+          },
+          "share": {
+            "type": "number",
+            "description": "Share of the score this label contributed"
+          },
+          "weight": {
+            "type": "number"
+          },
+          "values": {
+            "description": "The values that matched",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "label",
+          "share",
+          "weight",
+          "values"
+        ]
+      },
+      "RejectCauseDto": {
+        "type": "object",
+        "properties": {
+          "drivers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RejectCauseLabelDto"
+            }
+          },
+          "dominantLabel": {
+            "type": "string",
+            "nullable": true,
+            "description": "The single label responsible for most of the score, when there is one — the thing to lower or exclude."
+          },
+          "similarPairs": {
+            "type": "number",
+            "description": "How many other pairs in the corpus this same label combination produced. A big number means fixing it clears a lot at once."
+          }
+        },
+        "required": [
+          "drivers",
+          "similarPairs"
+        ]
+      },
+      "RecordVerdictDto": {
+        "type": "object",
+        "properties": {
+          "pairs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReviewPairRefDto"
+            }
+          },
+          "verdict": {
+            "type": "string",
+            "enum": [
+              "CONFIRMED",
+              "REJECTED",
+              "UNSURE",
+              "SPLIT"
+            ]
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "pairs",
+          "verdict"
+        ]
+      },
+      "RecordVerdictResponseDto": {
+        "type": "object",
+        "properties": {
+          "batchId": {
+            "type": "string"
+          },
+          "applied": {
+            "type": "number"
+          },
+          "skipped": {
+            "type": "number",
+            "description": "Pairs skipped because they are not in the index"
+          },
+          "workRemaining": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "batchId",
+          "applied",
+          "skipped",
+          "workRemaining"
+        ]
+      },
+      "UndoBatchDto": {
+        "type": "object",
+        "properties": {
+          "batchId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "batchId"
+        ]
+      },
+      "UndoBatchResponseDto": {
+        "type": "object",
+        "properties": {
+          "batchId": {
+            "type": "string"
+          },
+          "reverted": {
+            "type": "number"
+          },
+          "workRemaining": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "batchId",
+          "reverted",
+          "workRemaining"
+        ]
+      },
+      "UndoLogEntryDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string"
+          },
+          "patternKey": {
+            "type": "string",
+            "nullable": true
+          },
+          "pairCount": {
+            "type": "number"
+          },
+          "clusterCount": {
+            "type": "number"
+          },
+          "assetCount": {
+            "type": "number"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "undoneAt": {
+            "type": "string",
+            "nullable": true
+          },
+          "undoable": {
+            "type": "boolean",
+            "description": "False when the index was rebuilt after this batch, so replaying it may not restore what the reviewer saw. Undo is not unbounded time travel and the UI must say so rather than failing quietly."
+          }
+        },
+        "required": [
+          "id",
+          "action",
+          "pairCount",
+          "clusterCount",
+          "assetCount",
+          "summary",
+          "createdAt",
+          "undoable"
+        ]
+      },
+      "UndoLogResponseDto": {
+        "type": "object",
+        "properties": {
+          "entries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UndoLogEntryDto"
+            }
+          }
+        },
+        "required": [
+          "entries"
+        ]
+      },
+      "PatternActionDto": {
+        "type": "object",
+        "properties": {
+          "verdict": {
+            "type": "string",
+            "enum": [
+              "CONFIRMED",
+              "REJECTED",
+              "UNSURE",
+              "SPLIT"
+            ]
+          },
+          "min": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "max": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "lineage": {
+            "type": "string",
+            "enum": [
+              "PATH",
+              "NO_PATH",
+              "UNKNOWN"
+            ]
+          },
+          "excludeLabel": {
+            "type": "string",
+            "description": "For EXCLUSION patterns: also write a correlation exclusion rule for this label, so the boilerplate stops driving matches at all."
+          }
+        },
+        "required": [
+          "verdict"
+        ]
+      },
+      "PatternPreviewResponseDto": {
+        "type": "object",
+        "properties": {
+          "patternKey": {
+            "type": "string"
+          },
+          "pairsAffected": {
+            "type": "number"
+          },
+          "clustersAffected": {
+            "type": "number"
+          },
+          "assetsAffected": {
+            "type": "number"
+          },
+          "sampleClusterIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "ruleKind": {
+            "type": "string"
+          },
+          "ruleDescription": {
+            "type": "string"
+          },
+          "workRemainingBefore": {
+            "type": "number",
+            "description": "Undecided pairs before this action, across the whole corpus"
+          },
+          "workRemainingAfter": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "patternKey",
+          "pairsAffected",
+          "clustersAffected",
+          "assetsAffected",
+          "sampleClusterIds",
+          "ruleKind",
+          "ruleDescription",
+          "workRemainingBefore",
+          "workRemainingAfter"
+        ]
+      },
+      "PatternApplyResponseDto": {
+        "type": "object",
+        "properties": {
+          "batchId": {
+            "type": "string"
+          },
+          "applied": {
+            "type": "number"
+          },
+          "workRemaining": {
+            "type": "number"
+          },
+          "exclusionRuleId": {
+            "type": "string",
+            "nullable": true,
+            "description": "Exclusion rule created, when the pattern warranted one"
+          }
+        },
+        "required": [
+          "batchId",
+          "applied",
+          "workRemaining"
+        ]
+      },
+      "SplitPairResponseDto": {
+        "type": "object",
+        "properties": {
+          "batchId": {
+            "type": "string"
+          },
+          "clusterSplit": {
+            "type": "boolean",
+            "description": "Whether the two assets ended up in different clusters. False means the evidence still binds them through another member of the cluster, and the split alone did not separate them."
+          },
+          "workRemaining": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "batchId",
+          "clusterSplit",
+          "workRemaining"
         ]
       },
       "EmbeddingSettingValueDto": {

@@ -18,7 +18,19 @@ const ID_PARENTS = new Set([
   "investigations",
   "inquiries",
   "providers",
+  // Duplicate review: /duplicates/patterns/<key> and /duplicates/pairs/<a..b>
+  "patterns",
+  "pairs",
 ]);
+
+/** `decodeURIComponent` throws on a malformed sequence; an id is not worth a crash. */
+function safeDecode(value: string): string {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
 
 function idFromLocationPath(pathname: string): string {
   const segments = pathname.split("/").filter(Boolean);
@@ -29,7 +41,7 @@ function idFromLocationPath(pathname: string): string {
   segments.forEach((segment, i) => {
     if (ID_PARENTS.has(segment) && i + 1 < segments.length) idIndex = i + 1;
   });
-  return idIndex >= 0 ? decodeURIComponent(segments[idIndex]!) : "";
+  return idIndex >= 0 ? safeDecode(segments[idIndex]!) : "";
 }
 
 /**
@@ -58,7 +70,12 @@ export function useRouteId(): string {
   const fromParams = Array.isArray(raw) ? raw[0] : raw;
 
   // Normal runtime / client navigation: useParams already holds the real id.
-  if (fromParams && fromParams !== DYNAMIC_ID_SENTINEL) return fromParams;
+  // Decoded, because the URL-path fallback below decodes and the two must agree
+  // — an id that survives encoding unchanged (a uuid) hides the difference,
+  // while one containing a reserved character (a `+` in a pattern key) does not.
+  if (fromParams && fromParams !== DYNAMIC_ID_SENTINEL) {
+    return safeDecode(fromParams);
+  }
 
   // Static-export placeholder shell. Keep the first (hydrating) render id-free to
   // match the server shell, then resolve the real id from the URL after mount.
@@ -77,12 +94,14 @@ export function useStaticRouteParam(
 
   const raw = params?.[paramName];
   const fromParams = Array.isArray(raw) ? raw[0] : raw;
-  if (fromParams && fromParams !== DYNAMIC_ID_SENTINEL) return fromParams;
+  if (fromParams && fromParams !== DYNAMIC_ID_SENTINEL) {
+    return safeDecode(fromParams);
+  }
   if (!mounted || typeof window === "undefined") return "";
 
   const segments = window.location.pathname.split("/").filter(Boolean);
   const parentIndex = segments.lastIndexOf(parentSegment);
   return parentIndex >= 0 && parentIndex + 1 < segments.length
-    ? decodeURIComponent(segments[parentIndex + 1]!)
+    ? safeDecode(segments[parentIndex + 1]!)
     : "";
 }
