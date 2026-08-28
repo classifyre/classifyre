@@ -21,6 +21,18 @@ import {
 const ASSET_REL = 'asset';
 const STREAM_PAGE = 5000;
 
+/**
+ * Ceiling for one rebuild phase.
+ *
+ * Well above the 30s default because a phase here is a full corpus pass, and
+ * the failure this guards against is worse than a slow one: a phase that
+ * truncates and then fails leaves the table empty, and every reader shows an
+ * empty queue with nothing left to do while the edges it summarises are still
+ * there. Wrapping truncate+insert together means an overrun rolls back to the
+ * previous index — stale, but true.
+ */
+const REBUILD_TX_TIMEOUT_MS = 10 * 60 * 1000;
+
 /** Relation types the review queue reads pairs from. */
 const REVIEWABLE_RELATION_TYPES = [
   'related',
@@ -191,10 +203,14 @@ export class CorrelationReviewIndexService {
       cursor = rows.at(-1)!.id;
     }
 
-    await this.prisma.$executeRaw(Prisma.sql`TRUNCATE TABLE asset_lineage_profiles`);
-
     const covered = degree.size;
-    if (covered === 0) return { covered: 0, hairball: false };
+    if (covered === 0) {
+      // Nothing to write, so the table is emptied on its own.
+      await this.prisma.$executeRaw(
+        Prisma.sql`TRUNCATE TABLE asset_lineage_profiles`,
+      );
+      return { covered: 0, hairball: false };
+    }
 
     const sizes = new Map<string, number>();
     for (const id of degree.keys()) {
@@ -220,25 +236,38 @@ export class CorrelationReviewIndexService {
     const computedAt = new Date();
 
     const ids = Array.from(degree.keys());
-    for (let i = 0; i < ids.length; i += 1000) {
-      const slice = ids.slice(i, i + 1000);
-      await this.prisma.assetLineageProfile.createMany({
-        data: slice.map((assetId) => {
-          const root = uf.find(assetId);
-          return {
-            assetId,
-            degree: degree.get(assetId) ?? 0,
-            // A component that swallows the corpus explains nothing, so it is
-            // recorded as no component at all rather than as a shared origin.
-            componentId: hairball && sizes.get(root) === largest ? null : root,
-            componentSize: sizes.get(root) ?? 1,
-            upstreamRoots: roots.get(assetId) ?? [],
-            computedAt,
-          };
-        }),
-        skipDuplicates: true,
-      });
-    }
+    const rows = ids.map((assetId) => {
+      const root = uf.find(assetId);
+      return {
+        assetId,
+        degree: degree.get(assetId) ?? 0,
+        // A component that swallows the corpus explains nothing, so it is
+        // recorded as no component at all rather than as a shared origin.
+        componentId: hairball && sizes.get(root) === largest ? null : root,
+        componentSize: sizes.get(root) ?? 1,
+        upstreamRoots: roots.get(assetId) ?? [],
+        computedAt,
+      };
+    });
+
+    // Truncate and repopulate together. Split apart, a failure between them
+    // leaves every asset looking like it has no lineage at all, which the 2x2
+    // reads as UNKNOWN — it would silently stop escalating the unexplained
+    // duplicates this whole feature exists to surface.
+    await this.prisma.$transaction(
+      [
+        this.prisma.$executeRaw(
+          Prisma.sql`TRUNCATE TABLE asset_lineage_profiles`,
+        ),
+        ...chunk(rows, 1000).map((slice) =>
+          this.prisma.assetLineageProfile.createMany({
+            data: slice,
+            skipDuplicates: true,
+          }),
+        ),
+      ],
+      { timeout: REBUILD_TX_TIMEOUT_MS },
+    );
 
     return { covered, hairball };
   }
@@ -298,10 +327,6 @@ export class CorrelationReviewIndexService {
    *                         evidence of anything, and never presented as such.
    */
   private async refreshPairSignatures(computedAt: Date): Promise<number> {
-    await this.prisma.$executeRaw(
-      Prisma.sql`TRUNCATE TABLE correlation_pair_signatures`,
-    );
-
     // Membership in a component that was demoted (component_id nulled) is not
     // evidence — see refreshLineageProfiles.
     const hairballGuard = Prisma.sql`
@@ -316,7 +341,12 @@ export class CorrelationReviewIndexService {
       OR la.upstream_roots && lb.upstream_roots
     )`;
 
-    await this.prisma.$executeRaw(Prisma.sql`
+    await this.prisma.$transaction(
+      [
+        this.prisma.$executeRaw(
+          Prisma.sql`TRUNCATE TABLE correlation_pair_signatures`,
+        ),
+        this.prisma.$executeRaw(Prisma.sql`
       -- Normalised so a_id < b_id ALWAYS.
       --
       -- The scorer writes an edge in whatever order its self-join produced, so
@@ -407,7 +437,10 @@ export class CorrelationReviewIndexService {
       LEFT JOIN asset_lineage_profiles la ON la.asset_id = n.a_id
       LEFT JOIN asset_lineage_profiles lb ON lb.asset_id = n.b_id
       ON CONFLICT (a_id, b_id) DO NOTHING
-    `);
+    `),
+      ],
+      { timeout: REBUILD_TX_TIMEOUT_MS },
+    );
 
     await this.foldInBoilerplate(computedAt);
 
@@ -576,10 +609,12 @@ export class CorrelationReviewIndexService {
   }
 
   private async refreshClusterPatterns(): Promise<void> {
-    await this.prisma.$executeRaw(
-      Prisma.sql`TRUNCATE TABLE correlation_cluster_patterns`,
-    );
-    await this.prisma.$executeRaw(Prisma.sql`
+    await this.prisma.$transaction(
+      [
+        this.prisma.$executeRaw(
+          Prisma.sql`TRUNCATE TABLE correlation_cluster_patterns`,
+        ),
+        this.prisma.$executeRaw(Prisma.sql`
       INSERT INTO correlation_cluster_patterns (
         cluster_id, pattern_key, pair_count, undecided_pairs, member_count,
         source_count, max_weighted, avg_weighted, shape, lineage_state, labels
@@ -626,12 +661,19 @@ export class CorrelationReviewIndexService {
       LEFT JOIN correlation_pair_verdicts v ON v.a_id = s.a_id AND v.b_id = s.b_id
       WHERE s.cluster_id IS NOT NULL
       GROUP BY s.cluster_id, s.pattern_key
-    `);
+    `),
+      ],
+      { timeout: REBUILD_TX_TIMEOUT_MS },
+    );
   }
 
   private async refreshPatterns(computedAt: Date): Promise<number> {
-    await this.prisma.$executeRaw(Prisma.sql`TRUNCATE TABLE correlation_patterns`);
-    await this.prisma.$executeRaw(Prisma.sql`
+    await this.prisma.$transaction(
+      [
+        this.prisma.$executeRaw(
+          Prisma.sql`TRUNCATE TABLE correlation_patterns`,
+        ),
+        this.prisma.$executeRaw(Prisma.sql`
       WITH buckets AS (
         SELECT s.pattern_key,
                b.bucket,
@@ -733,7 +775,10 @@ export class CorrelationReviewIndexService {
       JOIN hist ON hist.pattern_key = agg.pattern_key
       LEFT JOIN assets ON assets.pattern_key = agg.pattern_key
       LEFT JOIN shapes ON shapes.pattern_key = agg.pattern_key
-    `);
+    `),
+      ],
+      { timeout: REBUILD_TX_TIMEOUT_MS },
+    );
 
     // Boilerplate pair counts are capped per group; restore the true size so
     // the level-1 row does not understate the pattern's reach.
@@ -766,10 +811,12 @@ export class CorrelationReviewIndexService {
    * responses, and nothing else on the page distinguishes them.
    */
   private async refreshSourcePairs(): Promise<void> {
-    await this.prisma.$executeRaw(
-      Prisma.sql`TRUNCATE TABLE correlation_source_pairs`,
-    );
-    await this.prisma.$executeRaw(Prisma.sql`
+    await this.prisma.$transaction(
+      [
+        this.prisma.$executeRaw(
+          Prisma.sql`TRUNCATE TABLE correlation_source_pairs`,
+        ),
+        this.prisma.$executeRaw(Prisma.sql`
       INSERT INTO correlation_source_pairs (source_a_id, source_b_id, pair_count, asset_count)
       SELECT LEAST(source_a_id, source_b_id),
              GREATEST(source_a_id, source_b_id),
@@ -777,6 +824,17 @@ export class CorrelationReviewIndexService {
              COUNT(DISTINCT a_id) + COUNT(DISTINCT b_id)
       FROM correlation_pair_signatures
       GROUP BY 1, 2
-    `);
+    `),
+      ],
+      { timeout: REBUILD_TX_TIMEOUT_MS },
+    );
   }
+}
+
+/** Split an array into fixed-size batches (bounds one statement's parameters). */
+function chunk<T>(items: T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < items.length; i += size)
+    out.push(items.slice(i, i + size));
+  return out;
 }

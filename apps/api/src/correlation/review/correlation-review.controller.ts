@@ -83,7 +83,11 @@ export class CorrelationReviewController {
   @ApiOperation({ summary: 'Level 2: clusters inside one pattern' })
   @ApiQuery({ name: 'min', required: false })
   @ApiQuery({ name: 'max', required: false })
-  @ApiQuery({ name: 'lineage', required: false, enum: ['PATH', 'NO_PATH', 'UNKNOWN'] })
+  @ApiQuery({
+    name: 'lineage',
+    required: false,
+    enum: ['PATH', 'NO_PATH', 'UNKNOWN'],
+  })
   @ApiQuery({ name: 'cursor', required: false })
   @ApiQuery({ name: 'limit', required: false })
   @ApiQuery({ name: 'sourceIds', required: false })

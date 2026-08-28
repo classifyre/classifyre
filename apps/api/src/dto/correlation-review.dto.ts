@@ -64,7 +64,7 @@ export class ReviewSourceNodeDto {
   @ApiProperty() name!: string;
   @ApiProperty({
     description:
-      'Connector type, so the UI can show the system\'s own icon rather than an anonymous circle.',
+      "Connector type, so the UI can show the system's own icon rather than an anonymous circle.",
   })
   type!: string;
   @ApiProperty() pairCount!: number;
@@ -342,7 +342,7 @@ export class RecordVerdictDto {
   pairs!: ReviewPairRefDto[];
 
   @ApiProperty({ enum: REVIEW_VERDICTS })
-  @IsIn(REVIEW_VERDICTS as unknown as string[])
+  @IsIn(REVIEW_VERDICTS)
   verdict!: ReviewVerdictName;
 
   @ApiPropertyOptional() @IsOptional() @IsString() note?: string;
@@ -393,7 +393,7 @@ export class UndoLogResponseDto {
 
 export class PatternActionDto {
   @ApiProperty({ enum: REVIEW_VERDICTS })
-  @IsIn(REVIEW_VERDICTS as unknown as string[])
+  @IsIn(REVIEW_VERDICTS)
   verdict!: ReviewVerdictName;
 
   @ApiPropertyOptional({ minimum: 0, maximum: 1 })
@@ -412,7 +412,7 @@ export class PatternActionDto {
 
   @ApiPropertyOptional({ enum: LINEAGE_STATES })
   @IsOptional()
-  @IsIn(LINEAGE_STATES as unknown as string[])
+  @IsIn(LINEAGE_STATES)
   lineage?: string;
 
   @ApiPropertyOptional({
@@ -466,7 +466,12 @@ export class ReviewQueryDto {
   @ApiPropertyOptional() @IsOptional() @IsNumber() max?: number;
   @ApiPropertyOptional() @IsOptional() @IsString() lineage?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() cursor?: string;
-  @ApiPropertyOptional() @IsOptional() @IsInt() @Min(1) @Max(200) limit?: number;
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(200)
+  limit?: number;
 }
 
 export class RebuildIndexResponseDto {
@@ -504,7 +509,9 @@ export class ReviewDecisionRowDto {
       'The pair has been re-scored materially since the decision was taken.',
   })
   stale!: boolean;
-  @ApiProperty({ description: "'ai' when an agent decided it, else 'operator'" })
+  @ApiProperty({
+    description: "'ai' when an agent decided it, else 'operator'",
+  })
   decidedByKind!: string;
   @ApiProperty() decidedAt!: string;
   @ApiPropertyOptional({ nullable: true, type: String }) caseId!: string | null;
@@ -530,7 +537,7 @@ export class ReviewDecisionsResponseDto {
 export class DecisionsQueryDto {
   @ApiPropertyOptional({ enum: REVIEW_VERDICTS })
   @IsOptional()
-  @IsIn(REVIEW_VERDICTS as unknown as string[])
+  @IsIn(REVIEW_VERDICTS)
   verdict?: ReviewVerdictName;
 
   @ApiPropertyOptional() @IsOptional() @IsString() patternKey?: string;
@@ -549,7 +556,9 @@ export class DecisionsToCaseDto {
   @Type(() => ReviewPairRefDto)
   pairs!: ReviewPairRefDto[];
 
-  @ApiPropertyOptional({ description: 'Extend this case instead of creating one' })
+  @ApiPropertyOptional({
+    description: 'Extend this case instead of creating one',
+  })
   @IsOptional()
   @IsString()
   caseId?: string;
@@ -557,7 +566,7 @@ export class DecisionsToCaseDto {
   @ApiPropertyOptional() @IsOptional() @IsString() title?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() description?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() severity?: string;
-  @ApiPropertyOptional({ description: 'Attach the assets\' findings too' })
+  @ApiPropertyOptional({ description: "Attach the assets' findings too" })
   @IsOptional()
   attachFindings?: boolean;
 }

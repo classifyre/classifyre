@@ -1,5 +1,10 @@
 import { randomUUID } from 'node:crypto';
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma.service';
 import { UnionFind } from '../../utils/union-find';
@@ -30,8 +35,6 @@ import type {
   ReviewPairResponseDto,
   ReviewPortfolioResponseDto,
   ReviewSampleResponseDto,
-  ReviewWaterfallDto,
-  ReviewWaterfallRowDto,
   SplitPairResponseDto,
   UndoBatchResponseDto,
   UndoLogResponseDto,
@@ -113,6 +116,27 @@ export class CorrelationReviewService {
       out.push(key);
     }
     return out;
+  }
+
+  /**
+   * The verdict, or a 400.
+   *
+   * This application registers no global ValidationPipe, so the `@IsIn` on the
+   * DTO never executes — the value arrives exactly as the caller sent it and
+   * is written straight into a Postgres enum column. Without this check a
+   * misspelled verdict surfaced as a 500 from Prisma rather than a 400 naming
+   * the bad field, and any caller could trigger it.
+   */
+  private assertVerdict(value: unknown): ReviewVerdictName {
+    if (
+      typeof value === 'string' &&
+      (REVIEW_VERDICTS as readonly string[]).includes(value)
+    ) {
+      return value as ReviewVerdictName;
+    }
+    throw new BadRequestException(
+      `verdict must be one of ${REVIEW_VERDICTS.join(', ')}`,
+    );
   }
 
   /** Ids the caller narrowed to, cleaned; empty means no narrowing. */
@@ -230,13 +254,19 @@ export class CorrelationReviewService {
     const nodeCounts = new Map<string, number>();
     const internalCounts = new Map<string, number>();
     for (const p of sourcePairs) {
-      nodeCounts.set(p.sourceAId, (nodeCounts.get(p.sourceAId) ?? 0) + p.pairCount);
+      nodeCounts.set(
+        p.sourceAId,
+        (nodeCounts.get(p.sourceAId) ?? 0) + p.pairCount,
+      );
       if (p.sourceBId === p.sourceAId) {
         // Duplicates inside one system are a different problem from duplicates
         // between two, so they are counted separately rather than folded in.
         internalCounts.set(p.sourceAId, p.pairCount);
       } else {
-        nodeCounts.set(p.sourceBId, (nodeCounts.get(p.sourceBId) ?? 0) + p.pairCount);
+        nodeCounts.set(
+          p.sourceBId,
+          (nodeCounts.get(p.sourceBId) ?? 0) + p.pairCount,
+        );
       }
     }
     const totalSourcePairs = sourcePairs.reduce((a, p) => a + p.pairCount, 0);
@@ -748,7 +778,7 @@ export class CorrelationReviewService {
         : Number(signature.weighted),
       labels: signature.labels,
       clusterId: signature.clusterId,
-      fields: this.buildFields(values, aId, bId),
+      fields: this.buildFields(values, aId),
       waterfall,
       ego: await this.buildEgoGraph(signature.clusterId, aId, bId),
       lineage: {
@@ -799,8 +829,8 @@ export class CorrelationReviewService {
       valueHash: string;
     }>,
     aId: string,
-    bId: string,
   ) {
+    // Values are only fetched for the two assets in the pair, so "not A" is B.
     const byLabel = new Map<string, { a: Set<string>; b: Set<string> }>();
     const hashes = new Map<string, string>();
     for (const v of values) {
@@ -809,23 +839,25 @@ export class CorrelationReviewService {
       byLabel.set(v.label, entry);
       hashes.set(`${v.label}:${v.normalizedValue}`, v.valueHash);
     }
-    return Array.from(byLabel.entries())
-      .map(([label, { a, b }]) => {
-        const shared = [...a].filter((x) => b.has(x));
-        return {
-          label,
-          aValues: [...a].slice(0, 20),
-          bValues: [...b].slice(0, 20),
-          sharedValues: shared.slice(0, 20).map((value) => ({
-            value,
-            valueHash: hashes.get(`${label}:${value}`) ?? '',
-          })),
-          differs: shared.length === 0 || a.size !== b.size,
-        };
-      })
-      // Strongest agreement first: what matched is what the reviewer is being
-      // asked to accept.
-      .sort((x, y) => y.sharedValues.length - x.sharedValues.length);
+    return (
+      Array.from(byLabel.entries())
+        .map(([label, { a, b }]) => {
+          const shared = [...a].filter((x) => b.has(x));
+          return {
+            label,
+            aValues: [...a].slice(0, 20),
+            bValues: [...b].slice(0, 20),
+            sharedValues: shared.slice(0, 20).map((value) => ({
+              value,
+              valueHash: hashes.get(`${label}:${value}`) ?? '',
+            })),
+            differs: shared.length === 0 || a.size !== b.size,
+          };
+        })
+        // Strongest agreement first: what matched is what the reviewer is being
+        // asked to accept.
+        .sort((x, y) => y.sharedValues.length - x.sharedValues.length)
+    );
   }
 
   /**
@@ -928,10 +960,12 @@ export class CorrelationReviewService {
 
   // ── Verdicts ──────────────────────────────────────────────────────────────
 
-  async recordVerdicts(dto: RecordVerdictDto): Promise<RecordVerdictResponseDto> {
+  async recordVerdicts(
+    dto: RecordVerdictDto,
+  ): Promise<RecordVerdictResponseDto> {
+    const verdict = this.assertVerdict(dto?.verdict);
     const pairs = this.cleanPairs(dto?.pairs);
-    const verdict = dto?.verdict;
-    if (pairs.length === 0 || !verdict) {
+    if (pairs.length === 0) {
       return {
         batchId: '',
         applied: 0,
@@ -1147,7 +1181,12 @@ export class CorrelationReviewService {
   }> {
     const take = Math.min(5000, Math.max(1, Math.trunc(Number(limit) || 500)));
     const targets = await this.prisma.$queryRaw<
-      Array<{ a_id: string; b_id: string; weighted: string; pattern_key: string }>
+      Array<{
+        a_id: string;
+        b_id: string;
+        weighted: string;
+        pattern_key: string;
+      }>
     >(Prisma.sql`
       SELECT s.a_id, s.b_id, s.weighted::text, s.pattern_key
       FROM correlation_pair_signatures s
@@ -1162,7 +1201,11 @@ export class CorrelationReviewService {
     `);
 
     if (targets.length === 0) {
-      return { confirmed: 0, batchId: null, workRemaining: await this.workRemaining() };
+      return {
+        confirmed: 0,
+        batchId: null,
+        workRemaining: await this.workRemaining(),
+      };
     }
 
     const batchId = randomUUID();
@@ -1420,7 +1463,12 @@ export class CorrelationReviewService {
 
     const signatures = await this.prisma.correlationPairSignature.findMany({
       where: { OR: pairs.map((p) => ({ aId: p.aId, bId: p.bId })) },
-      select: { labels: true, sourceAId: true, sourceBId: true, patternKey: true },
+      select: {
+        labels: true,
+        sourceAId: true,
+        sourceBId: true,
+        patternKey: true,
+      },
     });
     const labels = [...new Set(signatures.flatMap((s) => s.labels))];
     const sourceIds = [
@@ -1437,7 +1485,7 @@ export class CorrelationReviewService {
       matchAllSources: false,
       sourceIds,
       findingTypes: labels,
-    } as never);
+    });
 
     const linked = await this.prisma.correlationPairVerdict.updateMany({
       where: { OR: pairs.map((p) => ({ aId: p.aId, bId: p.bId })) },
@@ -1465,7 +1513,8 @@ export class CorrelationReviewService {
     const signature = await this.prisma.correlationPairSignature.findUnique({
       where: { aId_bId: { aId, bId } },
     });
-    if (!signature) throw new NotFoundException('That pair is not in the index');
+    if (!signature)
+      throw new NotFoundException('That pair is not in the index');
 
     const [edge, values, config, similar] = await Promise.all([
       this.prisma.edge.findFirst({
@@ -1497,7 +1546,8 @@ export class CorrelationReviewService {
     const sharedByLabel = new Map<string, string[]>();
     for (const label of Object.keys(contrib)) {
       const a = new Set(
-        values.filter((v) => v.assetId === aId && v.label === label)
+        values
+          .filter((v) => v.assetId === aId && v.label === label)
           .map((v) => v.normalizedValue),
       );
       sharedByLabel.set(
@@ -1505,7 +1555,9 @@ export class CorrelationReviewService {
         values
           .filter(
             (v) =>
-              v.assetId === bId && v.label === label && a.has(v.normalizedValue),
+              v.assetId === bId &&
+              v.label === label &&
+              a.has(v.normalizedValue),
           )
           .map((v) => v.normalizedValue)
           .slice(0, 8),
@@ -1526,7 +1578,7 @@ export class CorrelationReviewService {
     // "Dominant" only when one label really carries the match. Offering to
     // retune on a 40/35/25 split would be advice to break the other two.
     const dominant =
-      drivers.length > 0 && drivers[0]!.share >= 0.6 ? drivers[0]!.label : null;
+      drivers.length > 0 && drivers[0].share >= 0.6 ? drivers[0].label : null;
 
     return { drivers, dominantLabel: dominant, similarPairs: similar };
   }
@@ -1612,12 +1664,16 @@ export class CorrelationReviewService {
       where: { patternKey },
     });
     if (!pattern) throw new NotFoundException('No such pattern');
-    const verdict = dto?.verdict;
-    if (!verdict) throw new NotFoundException('A verdict is required');
+    const verdict = this.assertVerdict(dto?.verdict);
 
     const where = this.patternFilterSql(patternKey, dto);
     const targets = await this.prisma.$queryRaw<
-      Array<{ a_id: string; b_id: string; weighted: string; cluster_id: string | null }>
+      Array<{
+        a_id: string;
+        b_id: string;
+        weighted: string;
+        cluster_id: string | null;
+      }>
     >(Prisma.sql`
       SELECT s.a_id, s.b_id, s.weighted::text, s.cluster_id
       FROM correlation_pair_signatures s
@@ -1692,12 +1748,16 @@ export class CorrelationReviewService {
    * later recompute, so the next scan cannot quietly rejoin what a reviewer
    * separated.
    */
-  async splitPair(aIdRaw: string, bIdRaw: string): Promise<SplitPairResponseDto> {
+  async splitPair(
+    aIdRaw: string,
+    bIdRaw: string,
+  ): Promise<SplitPairResponseDto> {
     const { aId, bId } = this.canonical(aIdRaw, bIdRaw);
     const signature = await this.prisma.correlationPairSignature.findUnique({
       where: { aId_bId: { aId, bId } },
     });
-    if (!signature) throw new NotFoundException('That pair is not in the index');
+    if (!signature)
+      throw new NotFoundException('That pair is not in the index');
 
     // The edge is the scorer's opinion and is re-derived from the findings on
     // every recompute; the verdict is the reviewer's ruling and is not.
@@ -1717,35 +1777,42 @@ export class CorrelationReviewService {
     });
 
     const batchId = randomUUID();
-    await this.prisma.correlationReviewBatch.create({
-      data: {
-        id: batchId,
-        action: 'split',
-        patternKey: signature.patternKey,
-        pairCount: 1,
-        clusterCount: signature.clusterId ? 1 : 0,
-        assetCount: 2,
-        summary: `Split ${aId} from ${bId}`,
-        undoPayload: {
-          kind: 'split',
+    // One transaction, like recordVerdicts and agentClearSafeBand. Written
+    // separately, a crash between the batch insert and the verdict left a
+    // batch in the undo log that suppressed nothing — it claimed a split that
+    // had not happened — and two concurrent splits on the same pair could
+    // interleave so that the surviving state had a reported batch and no
+    // verdict at all.
+    await this.prisma.$transaction([
+      this.prisma.correlationReviewBatch.create({
+        data: {
+          id: batchId,
+          action: 'split',
+          patternKey: signature.patternKey,
+          pairCount: 1,
+          clusterCount: signature.clusterId ? 1 : 0,
+          assetCount: 2,
+          summary: `Split ${aId} from ${bId}`,
+          undoPayload: {
+            kind: 'split',
+            aId,
+            bId,
+            edge: edge ? JSON.parse(JSON.stringify(edge)) : null,
+          },
+        },
+      }),
+      this.prisma.correlationPairVerdict.deleteMany({ where: { aId, bId } }),
+      this.prisma.correlationPairVerdict.create({
+        data: {
           aId,
           bId,
-          edge: edge ? JSON.parse(JSON.stringify(edge)) : null,
+          verdict: 'SPLIT',
+          patternKey: signature.patternKey,
+          scoreAtVerdict: signature.weighted,
+          batchId,
         },
-      },
-    });
-
-    await this.prisma.correlationPairVerdict.deleteMany({ where: { aId, bId } });
-    await this.prisma.correlationPairVerdict.create({
-      data: {
-        aId,
-        bId,
-        verdict: 'SPLIT',
-        patternKey: signature.patternKey,
-        scoreAtVerdict: signature.weighted,
-        batchId,
-      },
-    });
+      }),
+    ]);
 
     // Re-cluster the neighbourhood now, so the reviewer sees the split take
     // effect instead of waiting for the next scan.

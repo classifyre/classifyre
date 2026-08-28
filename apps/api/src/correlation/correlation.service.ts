@@ -313,16 +313,12 @@ export class CorrelationService {
 
   /** On-demand correlation for a single asset (and its neighbourhood). */
   async recomputeForAsset(assetId: string): Promise<CorrelationRunSummary> {
-    return this.runRecompute(() =>
-      this.recompute([assetId]),
-    );
+    return this.runRecompute(() => this.recompute([assetId]));
   }
 
   async recomputeForAssets(assetIds: string[]): Promise<CorrelationRunSummary> {
     const unique = [...new Set(assetIds)].filter(Boolean);
-    return this.runRecompute(() =>
-      this.recompute(unique),
-    );
+    return this.runRecompute(() => this.recompute(unique));
   }
 
   /**
@@ -331,9 +327,7 @@ export class CorrelationService {
    * once. Fingerprint rebuild is also paged with GC yields between pages.
    */
   async recomputeAll(onProgress?: ProgressFn): Promise<CorrelationRunSummary> {
-    return this.runRecompute(() =>
-      this.recomputeAllUnlocked(onProgress),
-    );
+    return this.runRecompute(() => this.recomputeAllUnlocked(onProgress));
   }
 
   private async recomputeAllUnlocked(
@@ -627,6 +621,11 @@ export class CorrelationService {
     //    system of record; this is a derived read model, and the next scan
     //    rebuilds it. Losing a scan's edges to a rollup bug would be far worse
     //    than serving a stale queue for one cycle.
+    //
+    //    Swallowing is only safe because each rebuild phase is transactional:
+    //    a failure rolls back to the previous index, so the queue is stale
+    //    rather than empty. An empty queue reads as "nothing left to review",
+    //    which is the one wrong answer this feature must never give.
     try {
       await this.reviewIndex.refresh({
         labelWeights: cfg.rawWeights,

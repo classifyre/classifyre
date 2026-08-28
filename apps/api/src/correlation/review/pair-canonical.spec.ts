@@ -33,14 +33,20 @@ describe('pair identity is canonical', () => {
   it('agrees with the SQL ordering the index writes', () => {
     // LEAST/GREATEST use byte order, and so does JS `<=` on these ids.
     const ids = [
-      ['55524e69-6857-4b13-baf9-745d34273796', '2e5d3ab6-7bdd-40c0-b22a-5366e7f883de'],
-      ['0d73318b-24cf-4eb3-a234-c299ef376f67', '1bcdf8e6-dcba-4a0c-82a1-d8f1640513fc'],
+      [
+        '55524e69-6857-4b13-baf9-745d34273796',
+        '2e5d3ab6-7bdd-40c0-b22a-5366e7f883de',
+      ],
+      [
+        '0d73318b-24cf-4eb3-a234-c299ef376f67',
+        '1bcdf8e6-dcba-4a0c-82a1-d8f1640513fc',
+      ],
       ['zzz', 'aaa'],
     ];
     for (const [x, y] of ids) {
-      const sqlOrder = { aId: x! < y! ? x! : y!, bId: x! < y! ? y! : x! };
-      expect(canonical(x!, y!)).toEqual(sqlOrder);
-      expect(canonical(y!, x!)).toEqual(sqlOrder);
+      const sqlOrder = { aId: x < y ? x : y, bId: x < y ? y : x };
+      expect(canonical(x, y)).toEqual(sqlOrder);
+      expect(canonical(y, x)).toEqual(sqlOrder);
     }
   });
 
@@ -58,5 +64,43 @@ describe('pair identity is canonical', () => {
     ]);
 
     expect(clean).toEqual([{ aId: 'a', bId: 'b' }]);
+  });
+});
+
+/**
+ * The verdict reaches a Postgres enum column directly.
+ *
+ * This application registers no global ValidationPipe, so the `@IsIn` on the
+ * DTO never executes — a misspelled verdict used to arrive at Prisma and come
+ * back as a 500 rather than a 400 naming the field.
+ */
+describe('verdict is validated before it reaches the enum column', () => {
+  const service = Object.create(
+    CorrelationReviewService.prototype,
+  ) as CorrelationReviewService;
+
+  const assertVerdict = (value: unknown) =>
+    (
+      service as unknown as { assertVerdict: (v: unknown) => string }
+    ).assertVerdict(value);
+
+  it('accepts every verdict the schema declares', () => {
+    for (const v of ['CONFIRMED', 'REJECTED', 'UNSURE', 'SPLIT']) {
+      expect(assertVerdict(v)).toBe(v);
+    }
+  });
+
+  it('rejects a misspelling rather than passing it to Prisma', () => {
+    expect(() => assertVerdict('CONFIRMD')).toThrow(/verdict must be one of/);
+  });
+
+  it('rejects lower case, which the enum would not accept either', () => {
+    expect(() => assertVerdict('confirmed')).toThrow();
+  });
+
+  it('rejects a missing or non-string verdict', () => {
+    for (const bad of [undefined, null, 42, {}, []]) {
+      expect(() => assertVerdict(bad)).toThrow();
+    }
   });
 });

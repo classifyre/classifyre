@@ -9,7 +9,10 @@ import { PrismaService } from './prisma.service';
 import { AssetType, Source, Prisma, RunnerStatus } from '@prisma/client';
 import * as crypto from 'crypto';
 import { MaskedConfigCryptoService } from './masked-config-crypto.service';
-import { mergeMaskedConfig, stableStringify } from './utils/masked-config.utils';
+import {
+  mergeMaskedConfig,
+  stableStringify,
+} from './utils/masked-config.utils';
 import { normalizeSourceConfig } from './utils/source-config-normalizer';
 import { RunnerLogStorageService } from './cli-runner/runner-log-storage.service';
 import { CorrelationJobScheduler } from './correlation/correlation-job-scheduler.service';
@@ -208,8 +211,6 @@ export class SourceService {
       where: { id: sourceId },
       data: updateData,
     });
-    if (updateSourceDto.name !== undefined) {
-    }
     return source;
   }
 
@@ -222,8 +223,6 @@ export class SourceService {
       data,
       where,
     });
-    if (data.name !== undefined) {
-    }
     return source;
   }
 
