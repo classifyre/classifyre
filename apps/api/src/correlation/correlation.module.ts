@@ -4,6 +4,7 @@ import { MatchingModule } from '../matching/matching.module';
 import { GraphService } from '../graph.service';
 import { CaseActivityService } from '../case-activity.service';
 import { CasesService } from '../cases.service';
+import { InquiriesService } from '../inquiries.service';
 import { AgentMemoryService } from '../autopilot/memory/agent-memory.service';
 import { AgentAuditService } from '../autopilot/audit/agent-audit.service';
 import { AgentLoggerService } from '../autopilot/audit/agent-logger.service';
@@ -11,9 +12,11 @@ import { CorrelationService } from './correlation.service';
 import { DuplicatesFinderAgentService } from './duplicates-finder-agent.service';
 import { CorrelationWorker } from './correlation.worker';
 import { CorrelationController } from './correlation.controller';
-import { CorrelationGraphCacheService } from './correlation-graph-cache.service';
 import { CorrelationJobScheduler } from './correlation-job-scheduler.service';
 import { CorrelationLockService } from './correlation-lock.service';
+import { CorrelationReviewIndexService } from './review/correlation-review-index.service';
+import { CorrelationReviewService } from './review/correlation-review.service';
+import { CorrelationReviewController } from './review/correlation-review.controller';
 
 /**
  * Deterministic asset correlation / duplicate detection. Derives evidence
@@ -24,25 +27,28 @@ import { CorrelationLockService } from './correlation-lock.service';
  */
 @Module({
   imports: [MatchingModule],
-  controllers: [CorrelationController],
+  controllers: [CorrelationController, CorrelationReviewController],
   providers: [
     PrismaService,
     GraphService,
     CaseActivityService,
     AgentMemoryService,
     CasesService,
+    InquiriesService,
     AgentAuditService,
     AgentLoggerService,
     CorrelationLockService,
     CorrelationJobScheduler,
-    CorrelationGraphCacheService,
+    CorrelationReviewIndexService,
     CorrelationService,
+    CorrelationReviewService,
     DuplicatesFinderAgentService,
     CorrelationWorker,
   ],
   exports: [
     CorrelationService,
-    CorrelationGraphCacheService,
+    CorrelationReviewIndexService,
+    CorrelationReviewService,
     CorrelationJobScheduler,
     DuplicatesFinderAgentService,
     CorrelationWorker,

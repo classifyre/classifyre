@@ -1,4 +1,10 @@
-import { resolveEdgeClass, isEdgeClass, LINEAGE_CLASS } from './edge-class';
+import {
+  resolveEdgeClass,
+  isEdgeClass,
+  isDerivationEvidence,
+  LINEAGE_CLASS,
+  DERIVATION_CLASSES,
+} from './edge-class';
 
 /**
  * This table has to stay identical to the backfill in
@@ -84,5 +90,55 @@ describe('resolveEdgeClass', () => {
     expect(isEdgeClass('FLOW')).toBe(true);
     expect(isEdgeClass('LINEAGE')).toBe(false);
     expect(isEdgeClass(undefined)).toBe(false);
+  });
+
+  // ── Derivation evidence for the fingerprints 2x2 ─────────────────────────
+  //
+  // These guard the one way this feature can fail while looking healthy: if
+  // the correlation engine's own edges counted as evidence about the
+  // correlation engine's output, every duplicate pair would report a
+  // derivation path and nothing would ever be escalated.
+
+  it('never treats a correlation edge as derivation evidence', () => {
+    for (const type of ['related', 'likely_duplicate']) {
+      // Their class is REFERENCE, so they fail on the class test...
+      expect(resolveEdgeClass(null, type)).toBe('REFERENCE');
+      expect(isDerivationEvidence(null, type)).toBe(false);
+      // ...and they must still fail when a caller declares a class that would
+      // otherwise pass. A declared class does not launder the relation type.
+      expect(isDerivationEvidence('FLOW', type)).toBe(false);
+      expect(isDerivationEvidence('IDENTITY', type)).toBe(false);
+    }
+  });
+
+  it('excludes identical_content despite it being IDENTITY', () => {
+    // CorrelationService.linkIdenticalContent produces it, so using it as
+    // independent evidence about that same service's output is circular.
+    expect(resolveEdgeClass(null, 'identical_content')).toBe('IDENTITY');
+    expect(isDerivationEvidence(null, 'identical_content')).toBe(false);
+  });
+
+  it('keeps connector-declared SAME_AS, which is a different source', () => {
+    expect(isDerivationEvidence(null, 'SAME_AS')).toBe(true);
+  });
+
+  it('accepts flow and containment as derivation evidence', () => {
+    expect(isDerivationEvidence(null, 'TRANSFORM')).toBe(true);
+    expect(isDerivationEvidence(null, 'EXPORTED_TO')).toBe(true);
+    expect(isDerivationEvidence(null, 'CONTAINS')).toBe(true);
+  });
+
+  it('rejects usage and plain references', () => {
+    // "who read this" and "this links to that" say nothing about derivation.
+    expect(isDerivationEvidence(null, 'READS')).toBe(false);
+    expect(isDerivationEvidence(null, 'links_to')).toBe(false);
+    expect(isDerivationEvidence(null, 'MENTIONS')).toBe(false);
+  });
+
+  it('is a different question from lineage', () => {
+    // The lineage view walks FLOW; the 2x2 also accepts structure and identity.
+    // If these ever collapse into one set, one of the two is wrong.
+    expect(DERIVATION_CLASSES).toContain(LINEAGE_CLASS);
+    expect(DERIVATION_CLASSES.length).toBeGreaterThan(1);
   });
 });

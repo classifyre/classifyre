@@ -39,6 +39,7 @@ import type { DetectionImpactService } from '../detection-impact.service';
 import type { DetectionPostureService } from '../detection-posture.service';
 import { ScheduleToolset } from './schedule/schedule.toolset';
 import { HypothesesToolset } from './hypotheses/hypotheses.toolset';
+import type { CorrelationReviewService } from '../../correlation/review/correlation-review.service';
 
 describe('ToolRegistry', () => {
   // list() does not touch deps; safe to pass empty stubs.
@@ -71,6 +72,7 @@ describe('ToolRegistry', () => {
       {} as CorrelationService,
       {} as DuplicatesFinderAgentService,
       {} as DecisionApplierService,
+      {} as CorrelationReviewService,
     ),
     new AlertToolset({} as PrismaService, {} as NotificationsService),
     new SemanticToolset({} as AgentSemanticService),

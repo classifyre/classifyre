@@ -9,11 +9,13 @@ import { PrismaService } from './prisma.service';
 import { AssetType, Source, Prisma, RunnerStatus } from '@prisma/client';
 import * as crypto from 'crypto';
 import { MaskedConfigCryptoService } from './masked-config-crypto.service';
-import { mergeMaskedConfig, stableStringify } from './utils/masked-config.utils';
+import {
+  mergeMaskedConfig,
+  stableStringify,
+} from './utils/masked-config.utils';
 import { normalizeSourceConfig } from './utils/source-config-normalizer';
 import { RunnerLogStorageService } from './cli-runner/runner-log-storage.service';
 import { CorrelationJobScheduler } from './correlation/correlation-job-scheduler.service';
-import { CorrelationGraphCacheService } from './correlation/correlation-graph-cache.service';
 import {
   SearchSourcesRequestDto,
   SearchSourcesSortBy,
@@ -65,7 +67,6 @@ export class SourceService {
     private maskedConfigCryptoService: MaskedConfigCryptoService,
     private runnerLogStorage: RunnerLogStorageService,
     private correlationJobs: CorrelationJobScheduler,
-    private graphCache: CorrelationGraphCacheService,
   ) {}
 
   generateId(data: any): string {
@@ -210,9 +211,6 @@ export class SourceService {
       where: { id: sourceId },
       data: updateData,
     });
-    if (updateSourceDto.name !== undefined) {
-      await this.graphCache.invalidate('source display name changed');
-    }
     return source;
   }
 
@@ -225,9 +223,6 @@ export class SourceService {
       data,
       where,
     });
-    if (data.name !== undefined) {
-      await this.graphCache.invalidate('source display name changed');
-    }
     return source;
   }
 
