@@ -133,15 +133,30 @@ All URIs are relative to *http://localhost*
 *ChatBotsApi* | [**chatBotsControllerTest**](docs/ChatBotsApi.md#chatbotscontrollertest) | **POST** /instance-settings/chat/bots/{id}/test | Test chat bot connection
 *ChatBotsApi* | [**chatBotsControllerUpdate**](docs/ChatBotsApi.md#chatbotscontrollerupdate) | **PATCH** /instance-settings/chat/bots/{id} | Update a chat bot
 *CorrelationApi* | [**correlationControllerAddExclusion**](docs/CorrelationApi.md#correlationcontrolleraddexclusion) | **POST** /correlation/exclusions | Add an exclusion rule (ignore noisy values) and recompute
-*CorrelationApi* | [**correlationControllerAssetMap**](docs/CorrelationApi.md#correlationcontrollerassetmap) | **GET** /correlation/asset-map | Whole-namespace asset map: every asset (capped) connected by its links and typed relationships
 *CorrelationApi* | [**correlationControllerCaseAction**](docs/CorrelationApi.md#correlationcontrollercaseaction) | **POST** /correlation/case-action | Create a case (or add to one) from assets selected in the fingerprints graph
 *CorrelationApi* | [**correlationControllerGetConfig**](docs/CorrelationApi.md#correlationcontrollergetconfig) | **GET** /correlation/config | Correlation tuning: per-label weights (dynamic) + match thresholds
-*CorrelationApi* | [**correlationControllerGraph**](docs/CorrelationApi.md#correlationcontrollergraph) | **GET** /correlation/graph | Correlation (\&quot;evidence fingerprints\&quot;) graph: assets linked through the findings they share
+*CorrelationApi* | [**correlationControllerGraph**](docs/CorrelationApi.md#correlationcontrollergraph) | **GET** /correlation/graph | Correlation (\&quot;evidence fingerprints\&quot;) graph for ONE asset or ONE source
 *CorrelationApi* | [**correlationControllerLinksGraph**](docs/CorrelationApi.md#correlationcontrollerlinksgraph) | **GET** /correlation/links-graph | A source\&#39;s assets connected by their links (hash references)
 *CorrelationApi* | [**correlationControllerOccurrences**](docs/CorrelationApi.md#correlationcontrolleroccurrences) | **GET** /findings/occurrences | Where else a normalized finding value appears (reverse index)
 *CorrelationApi* | [**correlationControllerRecompute**](docs/CorrelationApi.md#correlationcontrollerrecompute) | **POST** /assets/{id}/recompute-correlation | Recompute correlation for a single asset (on demand)
 *CorrelationApi* | [**correlationControllerRemoveExclusion**](docs/CorrelationApi.md#correlationcontrollerremoveexclusion) | **DELETE** /correlation/exclusions/{id} | Remove an exclusion rule and recompute
 *CorrelationApi* | [**correlationControllerUpdateConfig**](docs/CorrelationApi.md#correlationcontrollerupdateconfig) | **PUT** /correlation/config | Update correlation tuning and schedule a full recompute (logged)
+*CorrelationReviewApi* | [**correlationReviewControllerApply**](docs/CorrelationReviewApi.md#correlationreviewcontrollerapply) | **POST** /correlation/review/patterns/{patternKey}/apply | Decide a whole pattern at once, reversibly via the undo log
+*CorrelationReviewApi* | [**correlationReviewControllerCause**](docs/CorrelationReviewApi.md#correlationreviewcontrollercause) | **GET** /correlation/review/pairs/{aId}/{bId}/cause | What drove this match, framed as something to fix
+*CorrelationReviewApi* | [**correlationReviewControllerClusters**](docs/CorrelationReviewApi.md#correlationreviewcontrollerclusters) | **GET** /correlation/review/patterns/{patternKey}/clusters | Level 2: clusters inside one pattern
+*CorrelationReviewApi* | [**correlationReviewControllerDecisions**](docs/CorrelationReviewApi.md#correlationreviewcontrollerdecisions) | **GET** /correlation/review/decisions | What has been decided, and what became of it
+*CorrelationReviewApi* | [**correlationReviewControllerDecisionsToCase**](docs/CorrelationReviewApi.md#correlationreviewcontrollerdecisionstocase) | **POST** /correlation/review/decisions/case | Take decided pairs into a case as evidence
+*CorrelationReviewApi* | [**correlationReviewControllerDecisionsToInquiry**](docs/CorrelationReviewApi.md#correlationreviewcontrollerdecisionstoinquiry) | **POST** /correlation/review/decisions/inquiry | Open an inquiry that keeps watching for what these pairs had in common
+*CorrelationReviewApi* | [**correlationReviewControllerPair**](docs/CorrelationReviewApi.md#correlationreviewcontrollerpair) | **GET** /correlation/review/pairs/{aId}/{bId} | Level 3: one pair — comparison, match-weight decomposition, local graph, lineage evidence
+*CorrelationReviewApi* | [**correlationReviewControllerPortfolio**](docs/CorrelationReviewApi.md#correlationreviewcontrollerportfolio) | **GET** /correlation/review/portfolio | Level 1: work remaining, the pattern queue, and the source meta-graph
+*CorrelationReviewApi* | [**correlationReviewControllerPreview**](docs/CorrelationReviewApi.md#correlationreviewcontrollerpreview) | **POST** /correlation/review/patterns/{patternKey}/preview | What a bulk action would do. Read-only — nothing is applied.
+*CorrelationReviewApi* | [**correlationReviewControllerRebuild**](docs/CorrelationReviewApi.md#correlationreviewcontrollerrebuild) | **POST** /correlation/review/rebuild | Rebuild the review rollups from existing correlation data
+*CorrelationReviewApi* | [**correlationReviewControllerRecordVerdicts**](docs/CorrelationReviewApi.md#correlationreviewcontrollerrecordverdicts) | **POST** /correlation/review/verdicts | Record a decision on one or more pairs
+*CorrelationReviewApi* | [**correlationReviewControllerReopen**](docs/CorrelationReviewApi.md#correlationreviewcontrollerreopen) | **POST** /correlation/review/decisions/reopen | Put decided pairs back in the queue
+*CorrelationReviewApi* | [**correlationReviewControllerSample**](docs/CorrelationReviewApi.md#correlationreviewcontrollersample) | **GET** /correlation/review/patterns/{patternKey}/sample | The next undecided pairs in a pattern, strongest first
+*CorrelationReviewApi* | [**correlationReviewControllerSplit**](docs/CorrelationReviewApi.md#correlationreviewcontrollersplit) | **POST** /correlation/review/pairs/{aId}/{bId}/split | Cut the link between two assets. The verdict keeps later scans from rejoining them.
+*CorrelationReviewApi* | [**correlationReviewControllerUndo**](docs/CorrelationReviewApi.md#correlationreviewcontrollerundo) | **POST** /correlation/review/verdicts/undo | Revert one batch of decisions
+*CorrelationReviewApi* | [**correlationReviewControllerUndoLog**](docs/CorrelationReviewApi.md#correlationreviewcontrollerundolog) | **GET** /correlation/review/undo-log | Recent bulk actions, newest first
 *CustomDetectorExtractionsApi* | [**customDetectorExtractionsControllerCoverage**](docs/CustomDetectorExtractionsApi.md#customdetectorextractionscontrollercoverage) | **GET** /custom-detectors/{id}/extractions/coverage | 
 *CustomDetectorExtractionsApi* | [**customDetectorExtractionsControllerGetByFinding**](docs/CustomDetectorExtractionsApi.md#customdetectorextractionscontrollergetbyfinding) | **GET** /findings/{findingId}/extraction | 
 *CustomDetectorExtractionsApi* | [**customDetectorExtractionsControllerSearch**](docs/CustomDetectorExtractionsApi.md#customdetectorextractionscontrollersearch) | **GET** /custom-detectors/{id}/extractions | 
@@ -417,6 +432,10 @@ All URIs are relative to *http://localhost*
 - [CustomDetectorTrainingRunDto](docs/CustomDetectorTrainingRunDto.md)
 - [DataTransferJobDto](docs/DataTransferJobDto.md)
 - [DataTransferJobListDto](docs/DataTransferJobListDto.md)
+- [DecisionsToCaseDto](docs/DecisionsToCaseDto.md)
+- [DecisionsToCaseResponseDto](docs/DecisionsToCaseResponseDto.md)
+- [DecisionsToInquiryDto](docs/DecisionsToInquiryDto.md)
+- [DecisionsToInquiryResponseDto](docs/DecisionsToInquiryResponseDto.md)
 - [DeleteDataTransferJobResponseDto](docs/DeleteDataTransferJobResponseDto.md)
 - [DeleteGlossaryTermResponseDto](docs/DeleteGlossaryTermResponseDto.md)
 - [DeleteRunnerResponseDto](docs/DeleteRunnerResponseDto.md)
@@ -508,6 +527,9 @@ All URIs are relative to *http://localhost*
 - [ParseTrainingExamplesResponseDto](docs/ParseTrainingExamplesResponseDto.md)
 - [ParseTrainingExamplesSkippedReasonsDto](docs/ParseTrainingExamplesSkippedReasonsDto.md)
 - [ParsedTrainingExampleDto](docs/ParsedTrainingExampleDto.md)
+- [PatternActionDto](docs/PatternActionDto.md)
+- [PatternApplyResponseDto](docs/PatternApplyResponseDto.md)
+- [PatternPreviewResponseDto](docs/PatternPreviewResponseDto.md)
 - [PayloadCursorEntryDto](docs/PayloadCursorEntryDto.md)
 - [PivotGraphDto](docs/PivotGraphDto.md)
 - [PreviewInquiryDto](docs/PreviewInquiryDto.md)
@@ -517,13 +539,42 @@ All URIs are relative to *http://localhost*
 - [PullFromInquiryResponseDto](docs/PullFromInquiryResponseDto.md)
 - [PutAssetChunksDto](docs/PutAssetChunksDto.md)
 - [RebuildEdgesResponseDto](docs/RebuildEdgesResponseDto.md)
+- [RebuildIndexResponseDto](docs/RebuildIndexResponseDto.md)
 - [RecomputeCorrelationResponseDto](docs/RecomputeCorrelationResponseDto.md)
+- [RecordVerdictDto](docs/RecordVerdictDto.md)
+- [RecordVerdictResponseDto](docs/RecordVerdictResponseDto.md)
 - [RegisterDiscoveredAssetsDto](docs/RegisterDiscoveredAssetsDto.md)
 - [RegisterDiscoveredAssetsResponseDto](docs/RegisterDiscoveredAssetsResponseDto.md)
+- [RejectCauseDto](docs/RejectCauseDto.md)
+- [RejectCauseLabelDto](docs/RejectCauseLabelDto.md)
 - [RelationTypeDto](docs/RelationTypeDto.md)
 - [RelationTypesResponseDto](docs/RelationTypesResponseDto.md)
 - [RematchResponseDto](docs/RematchResponseDto.md)
+- [ReopenDecisionsDto](docs/ReopenDecisionsDto.md)
+- [ReopenDecisionsResponseDto](docs/ReopenDecisionsResponseDto.md)
 - [ReviewCaseLeadDto](docs/ReviewCaseLeadDto.md)
+- [ReviewClusterRowDto](docs/ReviewClusterRowDto.md)
+- [ReviewClustersResponseDto](docs/ReviewClustersResponseDto.md)
+- [ReviewDecisionRowDto](docs/ReviewDecisionRowDto.md)
+- [ReviewDecisionsResponseDto](docs/ReviewDecisionsResponseDto.md)
+- [ReviewEgoEdgeDto](docs/ReviewEgoEdgeDto.md)
+- [ReviewEgoGraphDto](docs/ReviewEgoGraphDto.md)
+- [ReviewEgoNodeDto](docs/ReviewEgoNodeDto.md)
+- [ReviewFieldRowDto](docs/ReviewFieldRowDto.md)
+- [ReviewLineageEvidenceDto](docs/ReviewLineageEvidenceDto.md)
+- [ReviewPairAssetDto](docs/ReviewPairAssetDto.md)
+- [ReviewPairRefDto](docs/ReviewPairRefDto.md)
+- [ReviewPairResponseDto](docs/ReviewPairResponseDto.md)
+- [ReviewPatternDto](docs/ReviewPatternDto.md)
+- [ReviewPortfolioResponseDto](docs/ReviewPortfolioResponseDto.md)
+- [ReviewSamplePairDto](docs/ReviewSamplePairDto.md)
+- [ReviewSampleResponseDto](docs/ReviewSampleResponseDto.md)
+- [ReviewSharedValueDto](docs/ReviewSharedValueDto.md)
+- [ReviewSourceEdgeDto](docs/ReviewSourceEdgeDto.md)
+- [ReviewSourceGraphDto](docs/ReviewSourceGraphDto.md)
+- [ReviewSourceNodeDto](docs/ReviewSourceNodeDto.md)
+- [ReviewWaterfallDto](docs/ReviewWaterfallDto.md)
+- [ReviewWaterfallRowDto](docs/ReviewWaterfallRowDto.md)
 - [RunnerAssetItemDto](docs/RunnerAssetItemDto.md)
 - [RunnerAssetProgressDto](docs/RunnerAssetProgressDto.md)
 - [RunnerAssetStatusUpdateItem](docs/RunnerAssetStatusUpdateItem.md)
@@ -593,6 +644,7 @@ All URIs are relative to *http://localhost*
 - [SourceResponseDto](docs/SourceResponseDto.md)
 - [SourcesControllerGetSchedule200Response](docs/SourcesControllerGetSchedule200Response.md)
 - [SourcesControllerUpdateStatusRequest](docs/SourcesControllerUpdateStatusRequest.md)
+- [SplitPairResponseDto](docs/SplitPairResponseDto.md)
 - [StartExportDto](docs/StartExportDto.md)
 - [StartImportDto](docs/StartImportDto.md)
 - [StartRunnerDto](docs/StartRunnerDto.md)
@@ -611,6 +663,10 @@ All URIs are relative to *http://localhost*
 - [TransferScopeDto](docs/TransferScopeDto.md)
 - [TriggerAutopilotDto](docs/TriggerAutopilotDto.md)
 - [TriggerAutopilotResponseDto](docs/TriggerAutopilotResponseDto.md)
+- [UndoBatchDto](docs/UndoBatchDto.md)
+- [UndoBatchResponseDto](docs/UndoBatchResponseDto.md)
+- [UndoLogEntryDto](docs/UndoLogEntryDto.md)
+- [UndoLogResponseDto](docs/UndoLogResponseDto.md)
 - [UpdateAgentConfigDto](docs/UpdateAgentConfigDto.md)
 - [UpdateAgentMemoryDto](docs/UpdateAgentMemoryDto.md)
 - [UpdateAiProviderConfigDto](docs/UpdateAiProviderConfigDto.md)

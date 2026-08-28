@@ -28,9 +28,12 @@ import { useRouter } from "next/navigation";
 import { cn } from "@workspace/ui/lib/utils";
 import { FINDING_SEVERITY_COLOR_BY_LEVEL } from "@workspace/ui/lib/finding-severity";
 import { formatRelative } from "@/lib/date";
+import {
+  PanelCard,
+  panelInsetCardClass,
+} from "@/components/panel-card";
 import { useTranslation } from "@/hooks/use-translation";
 import { StatsFreshness } from "@/components/stats-freshness";
-import { AssetDiscoveryGraph } from "@/components/asset-discovery-graph";
 import type { TranslationKey } from "@/i18n";
 
 type DiscoveryWindowDays = 7 | 30 | 90;
@@ -51,26 +54,6 @@ const severityAccentColor: Record<
   none: "#111827",
 };
 
-const panelCardBaseClass =
-  "min-w-0 rounded-[10px] panel-card bg-card p-4 sm:p-6 text-card-foreground";
-const panelInsetCardClass =
-  "rounded-[4px] border-2 border-border bg-background px-3 py-2";
-
-function PanelCard({
-  className,
-  style,
-  children,
-}: {
-  className?: string;
-  style?: CSSProperties;
-  children: ReactNode;
-}) {
-  return (
-    <div className={cn(panelCardBaseClass, className)} style={style}>
-      {children}
-    </div>
-  );
-}
 
 function toSeverityBadgeValue(
   severity?: string | null,
@@ -752,20 +735,6 @@ export default function DiscoveryPage() {
         </PanelCard>
       </div>
 
-      {/* ── ASSETS DISCOVERY ─── */}
-      <PanelCard className="flex flex-col p-0 sm:p-0 overflow-hidden">
-        <div className="px-4 py-3.5 sm:px-6">
-          <h3 className="font-serif text-lg font-black uppercase tracking-[0.06em] text-foreground">
-            {t("discovery.assetDiscovery.title")}
-          </h3>
-          <p className="text-[10px] text-muted-foreground font-mono uppercase tracking-[0.15em]">
-            {t("discovery.assetDiscovery.subtitle")}
-          </p>
-        </div>
-        <div className="h-[80vh] border-t-2 border-border">
-          <AssetDiscoveryGraph />
-        </div>
-      </PanelCard>
     </div>
   );
 }

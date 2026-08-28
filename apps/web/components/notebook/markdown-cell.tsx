@@ -3,12 +3,8 @@
 import * as React from "react";
 import DOMPurify from "dompurify";
 import {
-  ChevronDown,
-  ChevronUp,
-  Copy,
   Eye,
   Pencil,
-  Trash2,
 } from "lucide-react";
 import { Button } from "@workspace/ui/components/button";
 import { Textarea } from "@workspace/ui/components/textarea";

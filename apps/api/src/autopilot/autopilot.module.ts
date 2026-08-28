@@ -6,7 +6,6 @@ import { AiProviderConfigService } from '../ai-provider-config.service';
 import { AiClientService } from '../ai';
 import { MatchingModule } from '../matching/matching.module';
 import { CorrelationModule } from '../correlation/correlation.module';
-import { InquiriesService } from '../inquiries.service';
 import { CasesService } from '../cases.service';
 import { CaseThreadsService } from '../case-threads.service';
 import { CaseActivityService } from '../case-activity.service';
@@ -53,6 +52,8 @@ import { AutopilotWorker } from './autopilot.worker';
 import { AutopilotService } from './autopilot.service';
 import { AutopilotController } from './autopilot.controller';
 import { AssistantCapabilityService } from './capability/assistant-capability.service';
+import { CorrelationReviewService } from '../correlation/review/correlation-review.service';
+import { InquiriesService } from '../inquiries.service';
 
 /**
  * Investigation autopilot: autonomous background agents that manage inquiries
@@ -99,6 +100,7 @@ import { AssistantCapabilityService } from './capability/assistant-capability.se
     KnowledgeToolset,
     ConfigToolset,
     DetectorToolset,
+    CorrelationReviewService,
     FingerprintsToolset,
     AlertToolset,
     SemanticToolset,

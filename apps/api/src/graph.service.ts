@@ -5,7 +5,7 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from './prisma.service';
-import { resolveEdgeClass, LINEAGE_CLASS } from './graph/edge-class';
+import { resolveEdgeClass } from './graph/edge-class';
 import { tryNormalizeUrn } from './graph/urn';
 import {
   BulkIngestEdgesDto,
@@ -524,10 +524,14 @@ export class GraphService {
 
   // ─── Lineage ─────────────────────────────────────────────────────────
   //
-  // Lineage is the FLOW subset of the graph and nothing else. Containment and
-  // identity still matter here, but as *controls* rather than as hops: one
-  // collapses the picture, the other merges duplicated nodes. That separation
-  // is the whole reason edges carry a class.
+  // "Lineage" here means everything this asset is connected to — data flow,
+  // link references, and cross-source identity matches alike — the same
+  // full picture the namespace-wide asset map and a source's links view
+  // already draw. It used to walk the FLOW subset only, but that made a
+  // connector-declared SAME_AS/REFERENCE edge invisible on the one page an
+  // investigator actually looks at an asset from. Containment and identity
+  // still double as *controls* (collapsing the picture / merging duplicated
+  // nodes) on top of being walked as hops now.
 
   async lineage(dto: LineageGraphDto): Promise<GraphResponseDto> {
     const asset = await this.prisma.asset.findUnique({
@@ -539,6 +543,8 @@ export class GraphService {
     const depth = Math.min(dto.depth ?? 2, MAX_DEPTH);
     // Flow edges point the way the data moves, so "where did this come from"
     // is an inward walk and "what breaks if I change it" is an outward one.
+    // Non-flow edges (links, identity) aren't directional in that sense, but
+    // the same in/out split still just means "which end of the edge is the seed".
     const direction: GraphDirection =
       dto.direction === 'up' ? 'in' : dto.direction === 'down' ? 'out' : 'both';
 
@@ -546,11 +552,9 @@ export class GraphService {
       [{ type: 'asset', id: dto.assetId }],
       depth,
       direction,
-      undefined,
-      LINEAGE_CLASS,
     );
 
-    if (dto.mergeIdentity !== false) {
+    if (dto.mergeIdentity === true) {
       graph = await this.mergeIdentityNodes(graph, dto.assetId);
     }
     if (dto.collapseContainers) {

@@ -258,6 +258,8 @@ model Asset {
   signature                 AssetSignature?
   clusterMember             AssetClusterMember?
   chunks                    AssetChunk[]
+  labelProfiles             AssetLabelProfile[]
+  lineageProfile            AssetLineageProfile?
 
   @@unique([sourceId, hash])
   @@index([urn])
@@ -1436,25 +1438,6 @@ model CorrelationConfig {
   @@map("correlation_config")
 }
 
-// Last complete payload returned by the unscoped correlation graph endpoint.
-// A single row per namespace keeps the expensive graph assembly off the HTTP
-// read path while requested/built versions make invalidation lossless across
-// API and worker replicas. The previous payload remains readable while a new
-// version is being assembled.
-model CorrelationGraphSnapshot {
-  id               Int       @id @default(1)
-  requestedVersion BigInt    @default(1) @map("requested_version")
-  builtVersion     BigInt    @default(0) @map("built_version")
-  payload          Json?     @db.JsonB
-  builtAt          DateTime? @map("built_at")
-  buildDurationMs  Int?      @map("build_duration_ms")
-  lastError        String?   @map("last_error") @db.Text
-  lastInvalidation String?   @map("last_invalidation") @db.Text
-  updatedAt        DateTime  @updatedAt @map("updated_at")
-
-  @@map("correlation_graph_snapshot")
-}
-
 // Scratch space for a recompute pass: the pairwise overlap aggregation
 // (GROUP BY over the asset_correlation_values self-join) runs as a single
 // INSERT ... SELECT so the heavy intermediate state lives in Postgres
@@ -1471,6 +1454,263 @@ model CorrelationPairStaging {
 
   @@index([runId, id])
   @@map("correlation_pair_staging")
+}
+
+// ─── Review queue ────────────────────────────────────────────────────────────
+//
+// The correlation engine produces pairs; these tables turn that output into a
+// queue with a completion state. Everything below `CorrelationPairVerdict` is
+// DERIVED — rebuilt wholesale by CorrelationService.refreshReviewIndex() after
+// every recompute — and carries no foreign keys, because a cascade fights a
+// rebuild. Verdicts are the one authored table here and outlive everything.
+
+enum CorrelationVerdict {
+  CONFIRMED
+  REJECTED
+  UNSURE
+  SPLIT
+}
+
+enum CorrelationPatternFamily {
+  SHARED_LABELS
+  PHONETIC
+  IDENTICAL_CONTENT
+  NEAR_DUPLICATE_TEXT
+}
+
+// Three states, never two. "No path" and "we have no lineage for these assets"
+// are different claims, and only the first is evidence. See DERIVATION_CLASSES
+// in graph/edge-class.ts for what counts as a derivation edge.
+enum CorrelationLineageState {
+  PATH
+  NO_PATH
+  UNKNOWN
+}
+
+enum CorrelationLineageRelation {
+  ANCESTOR_DESCENDANT
+  SIBLING
+  CONNECTED_OTHER
+  DISCONNECTED
+  UNKNOWN
+}
+
+// One reviewer decision about one asset pair.
+//
+// Deliberately NOT a column on Edge: scoreAndLink deletes and re-creates every
+// correlation edge on each recompute, so a verdict stored there would be erased
+// by the next scan. The asset pair survives; the edge does not.
+//
+// `scoreAtVerdict` is the score the reviewer actually saw. When the pair is
+// re-scored materially above it the decision is stale, and the UI says so
+// rather than pretending the judgement still stands.
+model CorrelationPairVerdict {
+  id             String             @id @default(uuid())
+  // Canonical order (aId < bId), matching how scoreAndLink writes edges.
+  aId            String             @map("a_id")
+  bId            String             @map("b_id")
+  verdict        CorrelationVerdict
+  // Snapshot of the pattern this pair sat in when it was decided. Patterns are
+  // rebuilt and can drift; the verdict must not.
+  patternKey     String             @map("pattern_key")
+  scoreAtVerdict Decimal            @map("score_at_verdict") @db.Decimal(4, 3)
+  batchId        String             @map("batch_id")
+  note           String?            @db.Text
+  /// `ai-autopilot` when an agent decided it, the operator otherwise. The
+  /// review queue counts human work separately: an agent clearing the safe
+  /// band must not make "work remaining" look like a person did it.
+  decidedBy      String?            @map("decided_by")
+  /// Where this decision was taken further, if anywhere. A confirmed duplicate
+  /// that went nowhere is the common case and stays null — which is exactly
+  /// what the decisions view filters on, so someone can come back later and
+  /// act on what they already judged.
+  caseId         String?            @map("case_id")
+  inquiryId      String?            @map("inquiry_id")
+  decidedAt      DateTime           @default(now()) @map("decided_at")
+
+  @@unique([aId, bId])
+  @@index([patternKey, verdict])
+  @@index([batchId])
+  @@index([decidedAt])
+  @@index([verdict, decidedAt])
+  @@map("correlation_pair_verdicts")
+}
+
+// Header row for one action, so the undo log reads as a list of decisions
+// rather than a list of 840 rows. Written for single verdicts too (pairCount 1)
+// so undo has exactly one shape.
+model CorrelationReviewBatch {
+  id           String    @id @default(uuid())
+  // confirm | reject | unsure | split | exclude
+  action       String
+  patternKey   String?   @map("pattern_key")
+  pairCount    Int       @map("pair_count")
+  clusterCount Int       @map("cluster_count")
+  assetCount   Int       @map("asset_count")
+  summary      String    @db.Text
+  // What undo has to put back: the deleted Edge for a split, the created
+  // exclusion rule id for an exclude. Null when deleting the verdicts suffices.
+  undoPayload  Json?     @map("undo_payload") @db.JsonB
+  undoneAt     DateTime? @map("undone_at")
+  createdBy    String?   @map("created_by")
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  @@index([createdAt])
+  @@map("correlation_review_batches")
+}
+
+// The level-1 list: one row per failure signature, tens of rows in total.
+//
+// Grouping pairs by the label set that matched them is what makes the estate
+// navigable — 18,140 clusters is unusable however it is sorted, but the same
+// corpus is five or six patterns, and the top one is usually a normalisation
+// rule someone can write in an afternoon.
+//
+// The three bucket arrays hold a 20-bin histogram each (bin =
+// least(19, floor(weighted * 20))), which is everything the level-1 cutoff
+// sliders need. Dragging a cutoff is therefore arithmetic in the browser, not
+// a round trip — the property that makes the page feel instant.
+model CorrelationPattern {
+  patternKey          String                   @id @map("pattern_key")
+  family              CorrelationPatternFamily
+  labels              String[]
+  pairCount           Int                      @map("pair_count")
+  clusterCount        Int                      @map("cluster_count")
+  assetCount          Int                      @map("asset_count")
+  // For NEAR_DUPLICATE_TEXT, pairCount is capped at BOILERPLATE_PAIR_CAP per
+  // group; this is the uncapped size so the row does not overstate its reach.
+  truePairCount       Int                      @map("true_pair_count")
+  avgWeighted         Decimal                  @map("avg_weighted") @db.Decimal(4, 3)
+  maxWeighted         Decimal                  @map("max_weighted") @db.Decimal(4, 3)
+  scoreBuckets        Int[]                    @map("score_buckets")
+  decidedBuckets      Int[]                    @map("decided_buckets")
+  clusterBuckets      Int[]                    @map("cluster_buckets")
+  lineagePathPairs    Int                      @map("lineage_path_pairs")
+  lineageNoPathPairs  Int                      @map("lineage_no_path_pairs")
+  lineageUnknownPairs Int                      @map("lineage_unknown_pairs")
+  // clique | star | chain | bridge | pair | mixed
+  topologyShape       String                   @map("topology_shape")
+  // THRESHOLD | EXCLUSION | MERGE | JUDGEMENT — what the bulk action offers.
+  ruleKind            String                   @map("rule_kind")
+  computedAt          DateTime                 @map("computed_at")
+
+  @@index([pairCount])
+  @@map("correlation_patterns")
+}
+
+// One row per scored pair: the seek index behind levels 2 and 3.
+//
+// Narrow on purpose. The alternative — grouping over Edge.metadata->'sharedByLabel'
+// at read time — cannot use an index, because the grouping key lives inside a
+// JsonB column with variable arity. That is a sequential scan of every
+// correlation edge on every page load and every cutoff drag, which is the same
+// mistake as the unscoped graph this queue replaces.
+model CorrelationPairSignature {
+  aId             String                     @map("a_id")
+  bId             String                     @map("b_id")
+  patternKey      String                     @map("pattern_key")
+  family          CorrelationPatternFamily
+  // 3dp, unlike the 2dp copy in Edge.metadata: the queue orders by this.
+  weighted        Decimal                    @db.Decimal(4, 3)
+  sharedCount     Int                        @map("shared_count")
+  // The labels that actually matched, before patternKey truncated them to
+  // three. The pattern key is a display handle and is lossy by design; this is
+  // what the cluster rollup and the pair screen show, so a reviewer can always
+  // see what got folded together.
+  labels          String[]
+  clusterId       String?                    @map("cluster_id")
+  sourceAId       String                     @map("source_a_id")
+  sourceBId       String                     @map("source_b_id")
+  lineageState    CorrelationLineageState    @map("lineage_state")
+  lineageRelation CorrelationLineageRelation @map("lineage_relation")
+  computedAt      DateTime                   @map("computed_at")
+
+  @@id([aId, bId])
+  // "the next N undecided pairs in this pattern" as a range seek.
+  @@index([patternKey, weighted(sort: Desc)])
+  @@index([clusterId])
+  // "412 disconnected similarity pairs" — a work queue someone picks up.
+  @@index([lineageState, weighted(sort: Desc)])
+  @@map("correlation_pair_signatures")
+}
+
+// The level-2 list: clusters rolled up within one pattern.
+model CorrelationClusterPattern {
+  clusterId      String                  @map("cluster_id")
+  patternKey     String                  @map("pattern_key")
+  pairCount      Int                     @map("pair_count")
+  undecidedPairs Int                     @map("undecided_pairs")
+  memberCount    Int                     @map("member_count")
+  sourceCount    Int                     @map("source_count")
+  maxWeighted    Decimal                 @map("max_weighted") @db.Decimal(4, 3)
+  avgWeighted    Decimal                 @map("avg_weighted") @db.Decimal(4, 3)
+  shape          String
+  lineageState   CorrelationLineageState @map("lineage_state")
+  // The FULL label set. CorrelationPattern.labels is truncated to three for its
+  // display key, so this is where a reviewer sees what got folded together.
+  labels         String[]
+
+  @@id([clusterId, patternKey])
+  @@index([patternKey, undecidedPairs(sort: Desc), maxWeighted(sort: Desc)])
+  @@map("correlation_cluster_patterns")
+}
+
+// Nodes are SOURCES, not assets. Duplicates concentrated in one source point at
+// a real data problem with a findable root cause; duplicates spread evenly
+// across every source point at the matcher instead. That distinction is the
+// whole reason this tile exists.
+model CorrelationSourcePair {
+  // Canonical order; sourceAId == sourceBId for intra-source pairs.
+  sourceAId  String @map("source_a_id")
+  sourceBId  String @map("source_b_id")
+  pairCount  Int    @map("pair_count")
+  assetCount Int    @map("asset_count")
+
+  @@id([sourceAId, sourceBId])
+  @@map("correlation_source_pairs")
+}
+
+// Fanout-filtered value counts and weights per asset per label, as of the last
+// scoring pass.
+//
+// Materialised rather than computed on demand because the fanout filter
+// (`owners <= FANOUT_CAP`) is corpus-scoped: deciding whether one pair's values
+// are distinctive requires knowing how many OTHER assets hold them, which
+// cannot be re-derived for a single pair without scanning the whole table.
+// This is what makes the "evidence against" bars in the waterfall possible.
+model AssetLabelProfile {
+  assetId  String  @map("asset_id")
+  label    String
+  nfCount  Int     @map("nf_count")
+  nfWeight Decimal @map("nf_weight") @db.Decimal(12, 4)
+
+  asset Asset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@id([assetId, label])
+  @@map("asset_label_profiles")
+}
+
+// Per-asset derivation-graph position, so the similarity/lineage 2x2 is a map
+// lookup instead of a breadth-first search seeded at every asset in the corpus.
+//
+// `degree` is the count of DERIVATION_CLASSES edges touching this asset, and
+// zero means UNKNOWN — we have no lineage here, which is not the same as
+// knowing there is no path. `componentSize` exists so a single hairball
+// component can be recognised and demoted to UNKNOWN rather than making
+// everything look connected.
+model AssetLineageProfile {
+  assetId       String   @id @map("asset_id")
+  degree        Int
+  componentId   String?  @map("component_id")
+  componentSize Int      @map("component_size")
+  // Up to 8 FLOW roots within 3 hops, for the sibling / ancestor test.
+  upstreamRoots String[] @map("upstream_roots")
+  computedAt    DateTime @map("computed_at")
+
+  asset Asset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@index([componentId])
+  @@map("asset_lineage_profiles")
 }
 
 enum InquiryStatus {
