@@ -26,9 +26,12 @@ import {
   type CorrelationBatchSizes,
   computeCorrelationBatchSizes,
 } from './batch-sizing';
-import { CorrelationGraphCacheService } from './correlation-graph-cache.service';
 import { CorrelationJobScheduler } from './correlation-job-scheduler.service';
 import { CorrelationLockService } from './correlation-lock.service';
+import {
+  CorrelationReviewIndexService,
+  type ReviewIndexStats,
+} from './review/correlation-review-index.service';
 import {
   hashSet,
   jaroWinkler,
@@ -221,21 +224,6 @@ export function readGraphMaxFanOut(env: NodeJS.ProcessEnv): number {
   return parsed === 0 ? Number.POSITIVE_INFINITY : parsed;
 }
 
-/**
- * Reads ASSET_MAP_NODE_CAP. Unset means unlimited — the asset map is meant to
- * show every asset in the namespace, with the clustering worker's semantic
- * zoom (already proven on the 61k-node unscoped correlation graph) absorbing
- * the density. This exists purely as an emergency override for a pathological
- * instance, not a default ceiling.
- */
-export function readAssetMapNodeCap(env: NodeJS.ProcessEnv): number {
-  const raw = env.ASSET_MAP_NODE_CAP;
-  if (raw === undefined || raw.trim() === '') return Number.POSITIVE_INFINITY;
-  const parsed = Number.parseInt(raw, 10);
-  if (!Number.isFinite(parsed) || parsed <= 0) return Number.POSITIVE_INFINITY;
-  return parsed;
-}
-
 /** Progress callback threaded into long-running recompute passes. */
 type ProgressFn = (
   msg: string,
@@ -281,14 +269,13 @@ export class CorrelationService {
    * in the overview.
    */
   private readonly graphMaxFanOut = readGraphMaxFanOut(process.env);
-  private readonly assetMapNodeCap = readAssetMapNodeCap(process.env);
   private readonly batches: CorrelationBatchSizes;
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly graphCache: CorrelationGraphCacheService,
     private readonly correlationLock: CorrelationLockService,
     private readonly jobs: CorrelationJobScheduler,
+    private readonly reviewIndex: CorrelationReviewIndexService,
   ) {
     this.batches = computeCorrelationBatchSizes();
     this.logger.log(
@@ -315,7 +302,7 @@ export class CorrelationService {
       await onProgress(`Found ${touched.length} asset(s) to fingerprint.`, {
         total: touched.length,
       });
-    return this.runRecomputeAndInvalidate(`runner:${runnerId}`, () =>
+    return this.runRecompute(() =>
       this.recompute(
         touched.map((a) => a.id),
         false,
@@ -326,16 +313,12 @@ export class CorrelationService {
 
   /** On-demand correlation for a single asset (and its neighbourhood). */
   async recomputeForAsset(assetId: string): Promise<CorrelationRunSummary> {
-    return this.runRecomputeAndInvalidate(`asset:${assetId}`, () =>
-      this.recompute([assetId]),
-    );
+    return this.runRecompute(() => this.recompute([assetId]));
   }
 
   async recomputeForAssets(assetIds: string[]): Promise<CorrelationRunSummary> {
     const unique = [...new Set(assetIds)].filter(Boolean);
-    return this.runRecomputeAndInvalidate(`assets:${unique.length}`, () =>
-      this.recompute(unique),
-    );
+    return this.runRecompute(() => this.recompute(unique));
   }
 
   /**
@@ -344,9 +327,7 @@ export class CorrelationService {
    * once. Fingerprint rebuild is also paged with GC yields between pages.
    */
   async recomputeAll(onProgress?: ProgressFn): Promise<CorrelationRunSummary> {
-    return this.runRecomputeAndInvalidate('full recompute', () =>
-      this.recomputeAllUnlocked(onProgress),
-    );
+    return this.runRecompute(() => this.recomputeAllUnlocked(onProgress));
   }
 
   private async recomputeAllUnlocked(
@@ -434,9 +415,12 @@ export class CorrelationService {
   async getConfig(): Promise<CorrelationConfigDto> {
     const [row, labelRows] = await Promise.all([
       this.prisma.correlationConfig.findUnique({ where: { id: 1 } }),
-      this.prisma.assetCorrelationValue.findMany({
-        select: { label: true },
-        distinct: ['label'],
+      // groupBy, not findMany+distinct: Prisma applies `distinct` on a
+      // findMany in the client, so that form read every correlation value in
+      // the corpus to produce a few dozen labels — on every config load, and
+      // again inside every save.
+      this.prisma.assetCorrelationValue.groupBy({
+        by: ['label'],
         orderBy: { label: 'asc' },
       }),
     ]);
@@ -546,37 +530,17 @@ export class CorrelationService {
   }
 
   /**
-   * Runs a correlation recompute and marks the graph snapshot stale.
+   * Run a recompute under the exclusive correlation lock.
    *
-   * This used to rebuild and publish the whole graph inline, under the
-   * correlation lock, on *every* recompute — including `recomputeForAsset`,
-   * which can be one asset. A whole-graph build assembles every node and edge
-   * in the namespace: on a real corpus that is 61k nodes and 272k edges and
-   * over 2 GB of live JS objects, which is enough to exhaust the API's heap by
-   * itself ("Ineffective mark-compacts near heap limit" at 2041 MB of a
-   * 2144 MB ceiling, repeatedly, until the restart budget gave out).
-   *
-   * Worse, it was invisible to the coalescing added for graph refreshes: that
-   * only throttles the `refreshGraph` job, and this path never enqueued one.
-   * A scan ingesting steadily therefore rebuilt the entire graph per batch of
-   * touched assets, with no window between rebuilds at all.
-   *
-   * Invalidating instead costs a version bump and a coalesced job. Reads keep
-   * working throughout — a read against a stale snapshot serves the last-good
-   * payload and nudges the refresh — so what this trades away is graph
-   * freshness within the coalescing window, in exchange for the API surviving
-   * the scan that is updating it.
+   * This used to rebuild the whole correlation graph afterwards, which on a
+   * real corpus meant 61k nodes and 272k edges — over 2 GB of live JS objects,
+   * enough to exhaust the API heap on its own, once per batch of touched
+   * assets during a steady scan. That graph no longer exists: the review queue
+   * reads pre-aggregated rollups instead, refreshed inside `recompute` as part
+   * of the same pass.
    */
-  private async runRecomputeAndInvalidate<T>(
-    reason: string,
-    operation: () => Promise<T>,
-  ): Promise<T> {
-    const result = await this.correlationLock.runExclusive(operation);
-    // Outside the lock: invalidation only bumps a version and enqueues, and
-    // holding the correlation lock across it would serialise callers behind
-    // queue I/O for no benefit.
-    await this.graphCache.invalidate(reason);
-    return result;
+  private async runRecompute<T>(operation: () => Promise<T>): Promise<T> {
+    return this.correlationLock.runExclusive(operation);
   }
 
   private async recompute(
@@ -648,6 +612,32 @@ export class CorrelationService {
     const clustersTouched = full
       ? await this.rebuildAllClusters(cfg)
       : await this.reconcileClusters(clusterSeed, cfg);
+
+    // 5. Roll the result up into the review queue. Deliberately last: cluster
+    //    ids are an input, and a pair rolled up against a stale cluster would
+    //    put a reviewer in front of a group that no longer exists.
+    //
+    //    A failure here must not fail the recompute. The scoring above is the
+    //    system of record; this is a derived read model, and the next scan
+    //    rebuilds it. Losing a scan's edges to a rollup bug would be far worse
+    //    than serving a stale queue for one cycle.
+    //
+    //    Swallowing is only safe because each rebuild phase is transactional:
+    //    a failure rolls back to the previous index, so the queue is stale
+    //    rather than empty. An empty queue reads as "nothing left to review",
+    //    which is the one wrong answer this feature must never give.
+    try {
+      await this.reviewIndex.refresh({
+        labelWeights: cfg.rawWeights,
+        defaultWeight: cfg.defaultWeight,
+      });
+    } catch (e) {
+      this.logger.error(
+        `Review index refresh failed (correlation itself is unaffected): ${
+          e instanceof Error ? e.message : String(e)
+        }`,
+      );
+    }
 
     return {
       assetsProcessed: touchedIds.length,
@@ -1045,6 +1035,17 @@ export class CorrelationService {
           const isDuplicate = weighted >= cfg.duplicateMin || exact;
           const byLabel = r.sharedByLabel as Record<string, number>;
           const reasons = buildReasons(byLabel, cfg.weightOf);
+          // Per-label share of the numerator, so the review queue can show a
+          // decomposition that sums back to the score. In this pass
+          // stagePairAggregates groups by (a, b, label) and the weight is a
+          // pure function of the label, so w_L * count_L is exact — but the
+          // phonetic pass below cannot say the same, which is why the
+          // contribution is written out rather than reconstructed by the
+          // reader. See buildWaterfall in review/correlation-review.service.ts.
+          const contribByLabel: Record<string, number> = {};
+          for (const [label, count] of Object.entries(byLabel)) {
+            contribByLabel[label] = round4(cfg.weightOf(label) * count);
+          }
           buffer.push({
             fromType: ASSET_REL,
             fromId: r.aId,
@@ -1054,12 +1055,18 @@ export class CorrelationService {
             confidence: roundConfidence(weighted),
             origin: 'INFERRED',
             metadata: {
+              // Two decimals, kept because the scoped graph, the MCP tools and
+              // the finding UI all read this key. The 4dp companions below
+              // exist for arithmetic, not display.
               weighted: round2(weighted),
               jaccard: round2(jaccard),
               sharedCount,
               sharedByLabel: byLabel,
               exact,
               reasons,
+              denom: round4(denom),
+              weightedShared: round4(weightedShared),
+              contribByLabel,
             },
           });
           affected.add(r.aId);
@@ -1423,6 +1430,15 @@ export class CorrelationService {
               sharedByLabel: byLabel,
               exact: false,
               reasons,
+              // `sharedByLabel` here is a COUNT of Jaro-Winkler matches, while
+              // the numerator is a sum of jw * weight with jw in [0.75, 1).
+              // w_L * matchCount therefore overstates this pair's contribution
+              // by up to 25%, so anything reconstructing a decomposition from
+              // sharedByLabel would be silently wrong on every phonetic edge.
+              // These three keys are the truth; readers must use them.
+              denom: round4(denom),
+              weightedShared: round4(jwWeighted),
+              contribByLabel: { [group.label]: round4(jwWeighted) },
               phoneticOnly: true,
             },
           });
@@ -1522,11 +1538,39 @@ export class CorrelationService {
     return Array.from(working);
   }
 
+  /**
+   * Pairs a reviewer has ruled out, as `aId|bId` keys.
+   *
+   * Cluster union has to honour these or the product lies: a reviewer splits a
+   * cluster, the next scan re-scores the same pair, union-find joins it back,
+   * and the decision silently disappears. Only REJECTED and SPLIT suppress —
+   * UNSURE is explicitly not a decision, and CONFIRMED agrees with the engine
+   * anyway.
+   *
+   * Bounded by the number of decisions ever made, not by the number of edges,
+   * so this stays small even on a corpus where everything else is large.
+   */
+  private async getSuppressedPairs(): Promise<Set<string>> {
+    const rows = await this.prisma.correlationPairVerdict.findMany({
+      where: { verdict: { in: ['REJECTED', 'SPLIT'] } },
+      select: { aId: true, bId: true },
+    });
+    const set = new Set<string>();
+    for (const v of rows) {
+      // Edges are written in canonical order, but store both directions so a
+      // verdict recorded from either side of the pair still suppresses.
+      set.add(`${v.aId}|${v.bId}`);
+      set.add(`${v.bId}|${v.aId}`);
+    }
+    return set;
+  }
+
   /** Rebuild every cluster from scratch (full recompute): union-find over all
    * likely-duplicate edges, streamed so memory stays bounded. */
   private async rebuildAllClusters(cfg: ResolvedConfig): Promise<number> {
     await this.prisma.assetCluster.deleteMany({});
 
+    const suppressed = await this.getSuppressedPairs();
     const uf = new UnionFind([]);
     let cursor: string | undefined;
     for (;;) {
@@ -1542,7 +1586,10 @@ export class CorrelationService {
         ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
       });
       if (rows.length === 0) break;
-      for (const e of rows) uf.union(e.fromId, e.toId);
+      for (const e of rows) {
+        if (suppressed.has(`${e.fromId}|${e.toId}`)) continue;
+        uf.union(e.fromId, e.toId);
+      }
       if (rows.length < this.batches.streamPage) break;
       cursor = rows.at(-1)!.id;
     }
@@ -1617,8 +1664,12 @@ export class CorrelationService {
       select: { fromId: true, toId: true },
     });
 
+    const suppressed = await this.getSuppressedPairs();
     const uf = new UnionFind(workingIds);
-    for (const e of allDupEdges) uf.union(e.fromId, e.toId);
+    for (const e of allDupEdges) {
+      if (suppressed.has(`${e.fromId}|${e.toId}`)) continue;
+      uf.union(e.fromId, e.toId);
+    }
 
     // Group working assets into components.
     const components = new Map<string, string[]>();
@@ -1753,34 +1804,31 @@ export class CorrelationService {
    * through the shared finding-values that bind them — "Asset ↔ value ↔ Asset".
    * Scope is one asset's cluster (assetId) or the largest clusters instance-wide.
    */
-  async buildGraph(opts?: {
+  async buildGraph(opts: {
     assetId?: string;
     /** Scope to clusters that touch this source; flags external members. */
     sourceId?: string;
   }): Promise<CorrelationGraphResult> {
-    if (!opts?.assetId && !opts?.sourceId) {
-      return this.graphCache.getOrBuild(() => this.buildGraphFromDatabase());
-    }
     return this.buildGraphFromDatabase(opts);
   }
 
   /**
-   * The unscoped graph as raw JSON text, or null when none is cached yet.
+   * Rebuild the review queue's rollups from the correlation data already in
+   * the database.
    *
-   * Only for handlers that forward the body untouched — see
-   * CorrelationGraphCacheService.readPayloadJson for why that matters. Anything
-   * that inspects the graph should use {@link buildGraph}.
+   * Deliberately NOT a recompute. The index is derived entirely from edges,
+   * clusters and correlation values that a previous scan already produced, so
+   * refingerprinting the corpus to populate it would be doing the expensive
+   * half of the work for none of the benefit. This is what a namespace that
+   * has been scanned but never had a review index needs, and it is cheap
+   * enough to run on worker boot.
    */
-  async getGraphSnapshotJson(): Promise<string | null> {
-    return this.graphCache.readPayloadJson();
-  }
-
-  async refreshGraphSnapshot(): Promise<void> {
-    await this.graphCache.refreshIfStale(() => this.buildGraphFromDatabase());
-  }
-
-  async invalidateGraphSnapshot(reason: string): Promise<void> {
-    await this.graphCache.invalidate(reason);
+  async refreshReviewIndexNow(): Promise<ReviewIndexStats> {
+    const cfg = await this.loadConfig();
+    return this.reviewIndex.refresh({
+      labelWeights: cfg.rawWeights,
+      defaultWeight: cfg.defaultWeight,
+    });
   }
 
   async scheduleFullRecompute(reason: string, manual = false): Promise<void> {
@@ -1968,87 +2016,6 @@ export class CorrelationService {
     return { nodes, edges, truncated: droppedHubValues > 0, similarities };
   }
 
-  /**
-   * Whole-namespace asset map: every asset, connected by both kinds of edge
-   * `buildLinksGraph` draws for one source — `links` references and typed
-   * SOURCE_DERIVED/MANUAL relationships — but without the source scope.
-   *
-   * Unbounded by default: the point of this view is to see everything, and
-   * the canvas's clustering worker (semantic zoom, already proven on a
-   * 61k-node unscoped correlation graph) is what keeps that renderable, not a
-   * node cap. `ASSET_MAP_NODE_CAP` exists only as an emergency override for a
-   * pathological instance. Ordered by most recently updated so a cap, if one
-   * is set, truncates the stale tail rather than whatever a stable asset id
-   * happened to sort after.
-   */
-  async buildAssetMapGraph(): Promise<CorrelationGraphResult> {
-    const cap = this.assetMapNodeCap;
-    const assets = await this.prisma.asset.findMany({
-      orderBy: { updatedAt: 'desc' },
-      ...(Number.isFinite(cap) ? { take: cap } : {}),
-      select: { ...ASSET_NODE_SELECT, hash: true, links: true },
-    });
-    if (assets.length === 0)
-      return { nodes: [], edges: [], truncated: false, similarities: [] };
-    const truncated = Number.isFinite(cap) && assets.length >= cap;
-
-    const nodeById = new Map<string, GraphNodeDto>();
-    for (const a of assets) nodeById.set(a.id, assetNode(a));
-
-    // Link-hash edges, scoped to this page of assets — resolving every hash
-    // against the whole namespace (as buildLinksGraph does for one source)
-    // would pull in assets outside the cap just to draw one reference edge.
-    const linkHashes = new Set<string>();
-    for (const a of assets) {
-      const links = Array.isArray(a.links) ? (a.links as unknown[]) : [];
-      for (const l of links) if (typeof l === 'string' && l) linkHashes.add(l);
-    }
-    const byHash = new Map<string, string>();
-    for (const a of assets) if (a.hash) byHash.set(a.hash, a.id);
-
-    const edges: GraphEdgeDto[] = [];
-    const seen = new Set<string>();
-    for (const a of assets) {
-      const links = Array.isArray(a.links) ? (a.links as unknown[]) : [];
-      for (const l of links) {
-        if (typeof l !== 'string') continue;
-        const targetId = byHash.get(l);
-        if (!targetId || targetId === a.id) continue;
-        const key =
-          a.id < targetId ? `${a.id}|${targetId}` : `${targetId}|${a.id}`;
-        if (seen.has(key)) continue;
-        seen.add(key);
-        edges.push({
-          id: `link:${key}`,
-          fromType: ASSET_REL,
-          fromId: a.id,
-          toType: ASSET_REL,
-          toId: targetId,
-          relationType: 'links_to',
-          confidence: 1,
-          origin: EdgeOrigin.INFERRED,
-          relationClass: 'REFERENCE',
-        });
-      }
-    }
-
-    const typed = await this.typedEdgesFor(Array.from(nodeById.keys()), nodeById);
-    edges.push(...typed);
-
-    return {
-      nodes: Array.from(nodeById.values()),
-      edges,
-      truncated,
-      similarities: [],
-    };
-  }
-
-  /**
-   * Asset-link graph for a source: assets connected by their `links` (each link
-   * is a hash; a hash may resolve to several assets). Assets in other sources
-   * are flagged external. Lone assets (no links) still render. Returns the
-   * shared graph shape so it draws on the case-graph canvas.
-   */
   async buildLinksGraph(sourceId: string): Promise<CorrelationGraphResult> {
     const sourceAssets = await this.prisma.asset.findMany({
       where: { sourceId },
@@ -2601,6 +2568,15 @@ function clampUnit(n: number): number {
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
+}
+
+/**
+ * Four decimals, for the numbers the review queue does arithmetic with.
+ * `weighted` stays at two because everything already displaying it expects
+ * that, but a waterfall built from 2dp inputs does not land on the 2dp total.
+ */
+function round4(n: number): number {
+  return Math.round(n * 10000) / 10000;
 }
 
 /** Clamp + round to fit Decimal(3,2) in [0,1]. */

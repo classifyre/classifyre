@@ -98,7 +98,8 @@ export const NAMESPACE_STATIC_PATHS: ReadonlyArray<{
   { path: "/investigations", changeFrequency: "daily", priority: 0.7 },
   { path: "/scans", changeFrequency: "daily", priority: 0.6 },
   { path: "/detectors", changeFrequency: "weekly", priority: 0.6 },
-  { path: "/fingerprints", changeFrequency: "weekly", priority: 0.5 },
+  { path: "/duplicates", changeFrequency: "weekly", priority: 0.5 },
+  { path: "/duplicates/decisions", changeFrequency: "weekly", priority: 0.4 },
   { path: "/glossary", changeFrequency: "weekly", priority: 0.5 },
   { path: "/harness", changeFrequency: "weekly", priority: 0.4 },
 ];

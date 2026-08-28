@@ -71,6 +71,7 @@ export { GraphApi } from "./generated/src/apis/GraphApi";
 export { ThreadsApi } from "./generated/src/apis/ThreadsApi";
 export { AutopilotApi } from "./generated/src/apis/AutopilotApi";
 export { CorrelationApi } from "./generated/src/apis/CorrelationApi";
+export { CorrelationReviewApi } from "./generated/src/apis/CorrelationReviewApi";
 export { ChatBotsApi } from "./generated/src/apis/ChatBotsApi";
 export { EmbeddingsApi } from "./generated/src/apis/EmbeddingsApi";
 export { GlossaryApi } from "./generated/src/apis/GlossaryApi";
@@ -80,6 +81,53 @@ export { WorkerQueuesApi } from "./generated/src/apis/WorkerQueuesApi";
 // Notebook DTOs must be listed by name: this file re-exports selectively,
 // so a generated model that is not named here is not importable from the
 // package root however cleanly codegen produced it.
+// Fingerprints review queue. Same rule as the notebook block below: named
+// explicitly, because this file re-exports selectively.
+export type {
+  ReviewPortfolioResponseDto,
+  ReviewPatternDto,
+  ReviewSourceGraphDto,
+  ReviewSourceNodeDto,
+  ReviewSourceEdgeDto,
+  ReviewClustersResponseDto,
+  ReviewClusterRowDto,
+  ReviewSampleResponseDto,
+  ReviewSamplePairDto,
+  ReviewPairResponseDto,
+  ReviewPairAssetDto,
+  ReviewPairRefDto,
+  ReviewFieldRowDto,
+  ReviewSharedValueDto,
+  PatternActionDtoLineageEnum,
+  ReviewWaterfallDto,
+  ReviewWaterfallRowDto,
+  ReviewEgoGraphDto,
+  ReviewEgoNodeDto,
+  ReviewEgoEdgeDto,
+  ReviewLineageEvidenceDto,
+  RecordVerdictDto,
+  RecordVerdictResponseDto,
+  UndoBatchDto,
+  UndoBatchResponseDto,
+  UndoLogEntryDto,
+  UndoLogResponseDto,
+  PatternActionDto,
+  PatternPreviewResponseDto,
+  PatternApplyResponseDto,
+  SplitPairResponseDto,
+  RebuildIndexResponseDto,
+  ReviewDecisionRowDto,
+  ReviewDecisionsResponseDto,
+  DecisionsToCaseDto,
+  DecisionsToCaseResponseDto,
+  DecisionsToInquiryDto,
+  DecisionsToInquiryResponseDto,
+  RejectCauseDto,
+  RejectCauseLabelDto,
+  ReopenDecisionsDto,
+  ReopenDecisionsResponseDto,
+} from "./generated/src/models";
+
 export type {
   NotebookDto,
   NotebookCellDto,
@@ -1082,6 +1130,7 @@ import { GraphApi } from "./generated/src/apis/GraphApi";
 import { ThreadsApi } from "./generated/src/apis/ThreadsApi";
 import { AutopilotApi } from "./generated/src/apis/AutopilotApi";
 import { CorrelationApi } from "./generated/src/apis/CorrelationApi";
+import { CorrelationReviewApi } from "./generated/src/apis/CorrelationReviewApi";
 import { ChatBotsApi } from "./generated/src/apis/ChatBotsApi";
 import { EmbeddingsApi } from "./generated/src/apis/EmbeddingsApi";
 import { GlossaryApi } from "./generated/src/apis/GlossaryApi";
@@ -1383,6 +1432,7 @@ class ApiClient {
   public threads: ThreadsApi;
   public autopilot: AutopilotApi;
   public correlation: CorrelationApi;
+  public correlationReview: CorrelationReviewApi;
   public chatBots: ChatBotsApi;
   public embeddings: EmbeddingsApi;
   public glossary: GlossaryApi;
@@ -1409,6 +1459,7 @@ class ApiClient {
     this.threads = new ThreadsApi(this.config);
     this.autopilot = new AutopilotApi(this.config);
     this.correlation = new CorrelationApi(this.config);
+    this.correlationReview = new CorrelationReviewApi(this.config);
     this.chatBots = new ChatBotsApi(this.config);
     this.embeddings = new EmbeddingsApi(this.config);
     this.glossary = new GlossaryApi(this.config);

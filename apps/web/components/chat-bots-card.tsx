@@ -40,7 +40,6 @@ import {
 } from "@workspace/ui/components";
 import {
   Activity,
-  Bot,
   CheckCircle2,
   Hash,
   Loader2,

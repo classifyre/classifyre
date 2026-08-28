@@ -1,0 +1,15 @@
+-- Drop the unscoped correlation graph snapshot.
+--
+-- It cached the payload of GET /correlation/graph with no scope: every cluster
+-- in the namespace, assembled into one JSON document. On a real corpus that was
+-- 61k nodes and 272k edges, took 13-24s to build, and drove the API heap from
+-- ~160 MB to ~1.8 GB per rebuild — which is why it needed a 180-second
+-- coalescing window and a versioned last-good payload in the first place.
+--
+-- The endpoint it served is gone. Corpus-wide duplicate work is answered by
+-- correlation_patterns / correlation_pair_signatures instead, which are
+-- pre-aggregated and indexed for the specific questions the review queue asks.
+--
+-- Separate from the migration that added those tables, so that the review queue
+-- can be shipped and exercised before anything is dropped.
+DROP TABLE IF EXISTS "correlation_graph_snapshot";

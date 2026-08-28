@@ -3,6 +3,7 @@ import type { PrismaService } from '../../../prisma.service';
 import type { CorrelationService } from '../../../correlation/correlation.service';
 import type { DuplicatesFinderAgentService } from '../../../correlation/duplicates-finder-agent.service';
 import type { DecisionApplierService } from '../../decision-applier.service';
+import type { CorrelationReviewService } from '../../../correlation/review/correlation-review.service';
 
 describe('FingerprintsToolset', () => {
   const toolset = new FingerprintsToolset(
@@ -10,6 +11,7 @@ describe('FingerprintsToolset', () => {
     {} as CorrelationService,
     {} as DuplicatesFinderAgentService,
     {} as DecisionApplierService,
+    {} as CorrelationReviewService,
   );
 
   it('every mutating fingerprint tool declares a gate and domain', () => {

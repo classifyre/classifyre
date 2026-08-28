@@ -33,9 +33,11 @@ describe('exact duplicate linking from the content hash', () => {
   };
   const service = new CorrelationService(
     prisma as unknown as PrismaService,
-    {} as never,
     { runExclusive: (fn: () => Promise<unknown>) => fn() } as never,
     {} as never,
+    // Review index: a derived read model the recompute tolerates failing, so
+    // these unit tests don't need a real one.
+    { refresh: () => Promise.resolve(undefined) } as never,
   );
 
   const link = (touched: string[], full = false) =>

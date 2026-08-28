@@ -534,10 +534,13 @@ export class LineageGraphDto {
 
   @ApiPropertyOptional({
     description:
-      'Merge nodes joined by an IDENTITY edge into one. Without this a dbt model ' +
-      'and the warehouse table it is show up as two hops in every path that ' +
-      'crosses them, silently doubling the graph.',
-    default: true,
+      'Merge nodes joined by an IDENTITY edge into one, instead of drawing the ' +
+      'IDENTITY edge itself. Useful when a dbt model and the warehouse table it ' +
+      'is would otherwise show up as two hops in every path that crosses them — ' +
+      'but off by default, because lineage now walks IDENTITY/REFERENCE edges as ' +
+      'first-class hops (a cross-source SAME_AS match is exactly the kind of ' +
+      'thing this view exists to surface, not fold away).',
+    default: false,
   })
   @IsOptional()
   mergeIdentity?: boolean;

@@ -17,7 +17,7 @@ describe('correlation value occurrences', () => {
     prisma as unknown as PrismaService,
     {} as never,
     {} as never,
-    {} as never,
+    { refresh: () => Promise.resolve(undefined) } as never,
   );
 
   beforeEach(() => {
