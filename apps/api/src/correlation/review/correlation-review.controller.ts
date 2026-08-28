@@ -9,6 +9,7 @@ import {
   Query,
 } from '@nestjs/common';
 import { ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { AllowInDemoMode } from '../../demo-mode.decorator';
 import { CorrelationReviewService } from './correlation-review.service';
 import {
   PatternActionDto,
@@ -254,6 +255,7 @@ export class CorrelationReviewController {
 
   @Post('patterns/:patternKey/preview')
   @HttpCode(HttpStatus.OK)
+  @AllowInDemoMode()
   @ApiOperation({
     summary: 'What a bulk action would do. Read-only — nothing is applied.',
   })
