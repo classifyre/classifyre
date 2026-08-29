@@ -99,6 +99,19 @@ All URIs are relative to *http://localhost*
 *AutopilotApi* | [**mcpServersControllerRemove**](docs/AutopilotApi.md#mcpserverscontrollerremove) | **DELETE** /autopilot/mcp-servers/{id} | Remove an MCP server
 *AutopilotApi* | [**mcpServersControllerTest**](docs/AutopilotApi.md#mcpserverscontrollertest) | **POST** /autopilot/mcp-servers/{id}/test | Probe a server: connect and list its tools
 *AutopilotApi* | [**mcpServersControllerUpdate**](docs/AutopilotApi.md#mcpserverscontrollerupdate) | **PATCH** /autopilot/mcp-servers/{id} | Update an MCP server
+*AutopilotApi* | [**supervisorControllerAnnotate**](docs/AutopilotApi.md#supervisorcontrollerannotate) | **POST** /autopilot/supervisor/journal/{id}/note | Correct an entry. Read back on the next wake as authoritative.
+*AutopilotApi* | [**supervisorControllerCapabilities**](docs/AutopilotApi.md#supervisorcontrollercapabilities) | **GET** /autopilot/supervisor/capabilities | What the supervisor is allowed to do
+*AutopilotApi* | [**supervisorControllerCreateGoal**](docs/AutopilotApi.md#supervisorcontrollercreategoal) | **POST** /autopilot/supervisor/goals | Set a goal
+*AutopilotApi* | [**supervisorControllerDeleteGoal**](docs/AutopilotApi.md#supervisorcontrollerdeletegoal) | **DELETE** /autopilot/supervisor/goals/{id} | Delete a goal
+*AutopilotApi* | [**supervisorControllerGoals**](docs/AutopilotApi.md#supervisorcontrollergoals) | **GET** /autopilot/supervisor/goals | Goals and tasks, including the charter
+*AutopilotApi* | [**supervisorControllerJournal**](docs/AutopilotApi.md#supervisorcontrollerjournal) | **GET** /autopilot/supervisor/journal | What it did, wake by wake
+*AutopilotApi* | [**supervisorControllerRevert**](docs/AutopilotApi.md#supervisorcontrollerrevert) | **POST** /autopilot/supervisor/undo/{id} | Revert one agent action
+*AutopilotApi* | [**supervisorControllerSetCapabilities**](docs/AutopilotApi.md#supervisorcontrollersetcapabilities) | **PUT** /autopilot/supervisor/capabilities | Switch capability groups off
+*AutopilotApi* | [**supervisorControllerState**](docs/AutopilotApi.md#supervisorcontrollerstate) | **GET** /autopilot/supervisor | Supervisor state, budget and pacing
+*AutopilotApi* | [**supervisorControllerUndoLog**](docs/AutopilotApi.md#supervisorcontrollerundolog) | **GET** /autopilot/supervisor/undo | Agent actions that can still be taken back
+*AutopilotApi* | [**supervisorControllerUpdate**](docs/AutopilotApi.md#supervisorcontrollerupdate) | **PATCH** /autopilot/supervisor | Enable, pause, or re-budget the supervisor
+*AutopilotApi* | [**supervisorControllerUpdateGoal**](docs/AutopilotApi.md#supervisorcontrollerupdategoal) | **PATCH** /autopilot/supervisor/goals/{id} | Edit a goal
+*AutopilotApi* | [**supervisorControllerWake**](docs/AutopilotApi.md#supervisorcontrollerwake) | **POST** /autopilot/supervisor/wake | Wake the supervisor now
 *CasesApi* | [**caseEventsControllerCreate**](docs/CasesApi.md#caseeventscontrollercreate) | **POST** /cases/{caseId}/events | Add a dated event to the case chronology
 *CasesApi* | [**caseEventsControllerList**](docs/CasesApi.md#caseeventscontrollerlist) | **GET** /cases/{caseId}/events | List the case chronology (real-world events, ordered by date)
 *CasesApi* | [**caseEventsControllerRemove**](docs/CasesApi.md#caseeventscontrollerremove) | **DELETE** /cases/{caseId}/events/{eventId} | Remove a chronology event
@@ -338,6 +351,8 @@ All URIs are relative to *http://localhost*
 - [AgentRunDto](docs/AgentRunDto.md)
 - [AgentRunListResponseDto](docs/AgentRunListResponseDto.md)
 - [AgentSystemBriefDto](docs/AgentSystemBriefDto.md)
+- [AgentUndoEntryDto](docs/AgentUndoEntryDto.md)
+- [AgentUndoListDto](docs/AgentUndoListDto.md)
 - [AgentUsageBucketDto](docs/AgentUsageBucketDto.md)
 - [AgentUsageResponseDto](docs/AgentUsageResponseDto.md)
 - [AgentUsageTotalsDto](docs/AgentUsageTotalsDto.md)
@@ -346,6 +361,7 @@ All URIs are relative to *http://localhost*
 - [AiMessageDto](docs/AiMessageDto.md)
 - [AiProviderConfigResponseDto](docs/AiProviderConfigResponseDto.md)
 - [AiProviderConfigTestResultDto](docs/AiProviderConfigTestResultDto.md)
+- [AnnotateJournalDto](docs/AnnotateJournalDto.md)
 - [ArchivePreviewDto](docs/ArchivePreviewDto.md)
 - [AssetChunkDto](docs/AssetChunkDto.md)
 - [AssetFindingDetectorCountDto](docs/AssetFindingDetectorCountDto.md)
@@ -426,6 +442,7 @@ All URIs are relative to *http://localhost*
 - [CreateMcpTokenDto](docs/CreateMcpTokenDto.md)
 - [CreateNotebookExecutionDto](docs/CreateNotebookExecutionDto.md)
 - [CreateSourceDto](docs/CreateSourceDto.md)
+- [CreateSupervisorGoalDto](docs/CreateSupervisorGoalDto.md)
 - [CreateThreadDto](docs/CreateThreadDto.md)
 - [CustomDetectorExampleDto](docs/CustomDetectorExampleDto.md)
 - [CustomDetectorResponseDto](docs/CustomDetectorResponseDto.md)
@@ -555,6 +572,7 @@ All URIs are relative to *http://localhost*
 - [RematchResponseDto](docs/RematchResponseDto.md)
 - [ReopenDecisionsDto](docs/ReopenDecisionsDto.md)
 - [ReopenDecisionsResponseDto](docs/ReopenDecisionsResponseDto.md)
+- [RevertResultDto](docs/RevertResultDto.md)
 - [ReviewCaseLeadDto](docs/ReviewCaseLeadDto.md)
 - [ReviewClusterRowDto](docs/ReviewClusterRowDto.md)
 - [ReviewClustersResponseDto](docs/ReviewClustersResponseDto.md)
@@ -652,6 +670,14 @@ All URIs are relative to *http://localhost*
 - [StartImportDto](docs/StartImportDto.md)
 - [StartRunnerDto](docs/StartRunnerDto.md)
 - [StopRunnerResponseDto](docs/StopRunnerResponseDto.md)
+- [SupervisorBudgetDto](docs/SupervisorBudgetDto.md)
+- [SupervisorCapabilityDto](docs/SupervisorCapabilityDto.md)
+- [SupervisorCapabilityListDto](docs/SupervisorCapabilityListDto.md)
+- [SupervisorGoalDto](docs/SupervisorGoalDto.md)
+- [SupervisorGoalListDto](docs/SupervisorGoalListDto.md)
+- [SupervisorJournalEntryDto](docs/SupervisorJournalEntryDto.md)
+- [SupervisorJournalListDto](docs/SupervisorJournalListDto.md)
+- [SupervisorStateDto](docs/SupervisorStateDto.md)
 - [TestConnectionResponseDto](docs/TestConnectionResponseDto.md)
 - [TextCoverageDto](docs/TextCoverageDto.md)
 - [ThreadEntriesResponseDto](docs/ThreadEntriesResponseDto.md)
@@ -673,6 +699,7 @@ All URIs are relative to *http://localhost*
 - [UpdateAgentConfigDto](docs/UpdateAgentConfigDto.md)
 - [UpdateAgentMemoryDto](docs/UpdateAgentMemoryDto.md)
 - [UpdateAiProviderConfigDto](docs/UpdateAiProviderConfigDto.md)
+- [UpdateCapabilitiesDto](docs/UpdateCapabilitiesDto.md)
 - [UpdateCaseDto](docs/UpdateCaseDto.md)
 - [UpdateCaseEventDto](docs/UpdateCaseEventDto.md)
 - [UpdateCaseFindingNoteDto](docs/UpdateCaseFindingNoteDto.md)
@@ -693,6 +720,8 @@ All URIs are relative to *http://localhost*
 - [UpdateNotificationImportanceDto](docs/UpdateNotificationImportanceDto.md)
 - [UpdateRunnerAssetStatusDto](docs/UpdateRunnerAssetStatusDto.md)
 - [UpdateSourceDto](docs/UpdateSourceDto.md)
+- [UpdateSupervisorDto](docs/UpdateSupervisorDto.md)
+- [UpdateSupervisorGoalDto](docs/UpdateSupervisorGoalDto.md)
 - [UpdateSystemBriefDto](docs/UpdateSystemBriefDto.md)
 - [UpdateThreadDto](docs/UpdateThreadDto.md)
 - [UploadedSourceFileDto](docs/UploadedSourceFileDto.md)
@@ -701,6 +730,7 @@ All URIs are relative to *http://localhost*
 - [ValueOccurrenceAssetDto](docs/ValueOccurrenceAssetDto.md)
 - [ValueOccurrencesResponseDto](docs/ValueOccurrencesResponseDto.md)
 - [VerifyGlossaryTermDto](docs/VerifyGlossaryTermDto.md)
+- [WakeSupervisorDto](docs/WakeSupervisorDto.md)
 - [WorkerOverviewDto](docs/WorkerOverviewDto.md)
 - [WorkerQueueDto](docs/WorkerQueueDto.md)
 - [WorkerQueueInstanceDto](docs/WorkerQueueInstanceDto.md)

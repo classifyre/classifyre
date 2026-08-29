@@ -57,6 +57,7 @@ describe('AutopilotWorker.handle (no cross-namespace guard needed)', () => {
         markTriggered: jest.fn().mockResolvedValue(undefined),
         runBudgetMinutes: jest.fn().mockResolvedValue(null),
       } as any,
+      { publish: () => Promise.resolve() } as never,
     );
 
   it('runs the cycle for a scan-completed job', async () => {

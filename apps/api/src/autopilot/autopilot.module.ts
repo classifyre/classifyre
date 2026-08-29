@@ -36,6 +36,13 @@ import { GlossaryService } from '../glossary/glossary.service';
 import { CaseLeadsToolset } from './tools/leads/case-leads.toolset';
 import { ScheduleToolset } from './tools/schedule/schedule.toolset';
 import { HypothesesToolset } from './tools/hypotheses/hypotheses.toolset';
+import { SupervisorToolset } from './tools/supervisor/supervisor.toolset';
+import { SupervisorService } from './supervisor/supervisor.service';
+import { TOOL_CATALOG } from './tools/tool-catalog';
+import { SupervisorWorker } from './supervisor/supervisor.worker';
+import { UndoService } from './supervisor/undo.service';
+import { SupervisorController } from './supervisor/supervisor.controller';
+import { HygieneToolset } from './tools/hygiene/hygiene.toolset';
 import { SchedulerModule } from '../scheduler/scheduler.module';
 import { CaseLeadsService } from '../case-leads.service';
 import { CaseEventsService } from '../case-events.service';
@@ -72,7 +79,11 @@ import { InquiriesService } from '../inquiries.service';
     // each having their own idea of when a source should run.
     SchedulerModule,
   ],
-  controllers: [AutopilotController, McpServersController],
+  controllers: [
+    AutopilotController,
+    McpServersController,
+    SupervisorController,
+  ],
   providers: [
     PrismaService,
     MaskedConfigCryptoService,
@@ -111,8 +122,16 @@ import { InquiriesService } from '../inquiries.service';
     CaseLeadsToolset,
     ScheduleToolset,
     HypothesesToolset,
+    SupervisorToolset,
+    SupervisorService,
+    SupervisorWorker,
+    UndoService,
+    HygieneToolset,
     NotificationsService,
     ToolRegistry,
+    // The catalog interface AgentConfigService depends on, backed by the one
+    // live registry so there is never a second catalog to drift.
+    { provide: TOOL_CATALOG, useExisting: ToolRegistry },
     ToolDispatcherService,
     SystemBriefService,
     McpClientService,
@@ -126,6 +145,9 @@ import { InquiriesService } from '../inquiries.service';
   exports: [
     AutopilotService,
     AutopilotWorker,
+    SupervisorWorker,
+    SupervisorService,
+    UndoService,
     // Shared harness infrastructure consumed by the chat gateway (AppModule):
     // the same registry/dispatcher instances, so tools the gateway bridges are
     // dispatched with identical gating and audit behavior.

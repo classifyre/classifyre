@@ -2656,6 +2656,34 @@ export class McpServerFactoryService {
         return jsonResult(await this.sourceService.purgeFindings(source_id));
       },
     );
+
+    server.registerTool(
+      'purge_source_assets',
+      {
+        title: 'Purge Source Assets',
+        description:
+          'Permanently delete EVERY asset of a source, and with them every finding, ' +
+          'extraction, correlation value and chunk derived from those assets. ' +
+          'Heavier than purge_source_findings: it removes the ingested material ' +
+          'itself, so the source must be re-scanned before anything from it can be ' +
+          'examined again. Use it when a source ingested the wrong thing entirely. ' +
+          'Correlation fingerprints are recomputed in the background afterwards.',
+        inputSchema: {
+          source_id: z.string().describe('Source whose assets to purge'),
+          confirm: z
+            .literal(true)
+            .describe('Must be true — acknowledges the purge is irreversible'),
+        },
+        annotations: {
+          readOnlyHint: false,
+          destructiveHint: true,
+        },
+      },
+      async ({ source_id }) => {
+        this.mcpToolExecutor.assertNotDemoMode();
+        return jsonResult(await this.sourceService.purgeAssets(source_id));
+      },
+    );
   }
 
   private registerAssetTools(server: McpServerCompat) {

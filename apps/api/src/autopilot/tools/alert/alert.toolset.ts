@@ -5,6 +5,7 @@ import {
   Severity,
 } from '@prisma/client';
 import { PrismaService } from '../../../prisma.service';
+import { SupervisorService } from '../../supervisor/supervisor.service';
 import { NotificationsService } from '../../../notifications.service';
 import {
   NotificationType,
@@ -41,6 +42,7 @@ export class AlertToolset {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
+    private readonly supervisor: SupervisorService,
   ) {}
 
   /**
@@ -162,6 +164,15 @@ export class AlertToolset {
               caseSeverity: found.severity,
               caseStatus: found.status,
             },
+          });
+          // Escalation is the one thing in this system that already means "a
+          // human is needed", which makes it the clearest signal the supervisor
+          // can be woken by.
+          await this.supervisor.publish({
+            type: 'case_escalated',
+            severity: severity === Severity.CRITICAL ? 'error' : 'warn',
+            summary: `Case escalated to an operator (${severity}): ${String(input.title)}`,
+            payload: { caseId, caseTitle: found.title, severity },
           });
           return { notificationId: notification.id, caseId };
         },

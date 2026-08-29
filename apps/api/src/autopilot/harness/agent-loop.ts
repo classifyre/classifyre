@@ -115,6 +115,13 @@ interface LoopProgress {
   failed: number;
   createdInquiries: Array<{ id: string; title: string }>;
   createdCases: Array<{ id: string; title: string }>;
+  /**
+   * Tools successfully called this run, for `Mission.requiredBeforeFinish`.
+   * Optional: progress persisted before this existed lacks it.
+   */
+  calledTools?: string[];
+  /** True once the closing contract has been pointed out. Nudge once, not forever. */
+  closingNudged?: boolean;
   done: boolean;
   summary: string;
 }
@@ -148,13 +155,38 @@ export async function runAgentLoop(
   opts: {
     systemBrief?: string;
     allowedTools?: string[];
+    /**
+     * Tools the agent may CALL, when that is a wider set than the tools whose
+     * schemas are DISCLOSED in its prompt.
+     *
+     * Authority and disclosure are different axes, and conflating them is what
+     * stops an agent with broad reach from being affordable. `allowedTools`
+     * renders the catalog; this list is what the dispatch check consults. An
+     * agent given a small resident catalog plus `tools.search` can discover and
+     * then call anything in here without ever carrying 200 schemas in context.
+     *
+     * Defaults to `allowedTools`, so every existing mission is unchanged: for
+     * them the two sets are the same list.
+     */
+    grantedTools?: string[];
     missionPrimer?: string;
+    /**
+     * Per-run context rendered after the system brief.
+     *
+     * Its own slot rather than an addition to `systemBrief` because the two
+     * have different lifetimes: the brief is cached for minutes and shared
+     * across agents, while this changes on every single run. Keeping them
+     * separate is what lets the stable half of the prompt stay byte-identical.
+     */
+    extraContext?: string;
     /** Per-agent override of the instance run budget, in minutes. */
     runBudgetMinutes?: number | null;
   } = {},
 ): Promise<AgentLoopResult> {
   const runId = ctx.run.id;
   const allowed = opts.allowedTools ?? mission.allowedTools;
+  // What may be called, as opposed to what is described. See `grantedTools`.
+  const granted = opts.grantedTools ?? allowed;
   const progress = loadProgress(
     ctx,
     mission,
@@ -162,6 +194,7 @@ export async function runAgentLoop(
     opts.systemBrief,
     allowed,
     opts.missionPrimer,
+    opts.extraContext,
   );
 
   // Wall-clock budget, not just an iteration budget. Iterations bound how many
@@ -229,6 +262,23 @@ export async function runAgentLoop(
 
     const calls = turn.toolCalls ?? [];
     if (calls.length === 0 || turn.finish) {
+      const owed = unmetClosingContract(mission, progress);
+      // Nudged at most once. A model that ignores the reminder is not going to
+      // be persuaded by a second one, and spending the rest of a bounded
+      // iteration budget asking would turn a missing journal entry into a run
+      // that does nothing at all. The worker's fallback covers what is left.
+      if (owed.length > 0 && !progress.closingNudged) {
+        progress.closingNudged = true;
+        progress.messages.push({
+          role: 'user',
+          content:
+            `You have not finished. This mission cannot end until you have ` +
+            `called: ${owed.join(', ')}. ` +
+            `Call ${owed.length === 1 ? 'it' : 'them'} now, then finish.`,
+        });
+        await persist(ctx, deps.audit, progress);
+        continue;
+      }
       progress.done = true;
       progress.summary = turn.finish?.summary ?? turn.thought;
       await persist(ctx, deps.audit, progress);
@@ -237,7 +287,7 @@ export async function runAgentLoop(
 
     const observations: Observation[] = [];
     for (const [i, call] of calls.entries()) {
-      const tool = allowed.includes(call.tool) && deps.registry.get(call.tool);
+      const tool = granted.includes(call.tool) && deps.registry.get(call.tool);
       if (!tool) {
         observations.push({
           tool: call.tool,
@@ -255,6 +305,11 @@ export async function runAgentLoop(
         call.rationale,
       );
       tallyResult(progress, call.tool, result);
+      if (result.outcome === 'APPLIED' || result.outcome === 'READ_OK') {
+        progress.calledTools = [
+          ...new Set([...(progress.calledTools ?? []), call.tool]),
+        ];
+      }
       observations.push(result);
     }
 
@@ -313,6 +368,7 @@ function loadProgress(
   systemBrief: string | undefined,
   allowed: string[],
   missionPrimer: string | undefined,
+  extraContext: string | undefined,
 ): LoopProgress {
   const existing = ctx.state[PROGRESS_KEY] as LoopProgress | undefined;
   if (existing && Array.isArray(existing.messages)) return existing;
@@ -327,6 +383,7 @@ function loadProgress(
           systemBrief,
           allowed,
           missionPrimer,
+          extraContext,
         ),
       },
       { role: 'user', content: buildUserPrompt(ctx, mission) },
@@ -342,6 +399,7 @@ function loadProgress(
     failed: 0,
     createdInquiries: [],
     createdCases: [],
+    calledTools: [],
     done: false,
     summary: '',
   };
@@ -372,6 +430,17 @@ export interface Observation {
   tool: string;
   outcome: string;
   result: unknown;
+}
+
+/** Closing-contract tools this run still owes, in the mission's own order. */
+function unmetClosingContract(
+  mission: Mission,
+  progress: LoopProgress,
+): string[] {
+  const required = mission.requiredBeforeFinish ?? [];
+  if (required.length === 0) return [];
+  const called = new Set(progress.calledTools ?? []);
+  return required.filter((name) => !called.has(name));
 }
 
 /**
@@ -527,11 +596,13 @@ function buildSystemPrompt(
   systemBrief: string | undefined,
   allowed: string[],
   missionPrimer: string | undefined,
+  extraContext: string | undefined,
 ): string {
   const primer = missionPrimer?.trim()
     ? `\n## Detector type registry\n${missionPrimer.trim()}\n`
     : '';
   const brief = systemBrief?.trim() ? `\n${systemBrief.trim()}\n` : '';
+  const extra = extraContext?.trim() ? `\n${extraContext.trim()}\n` : '';
   const guidance = ctx.instruction
     ? `\n\nOperator instruction for this run:\n${ctx.instruction}`
     : '';
@@ -542,6 +613,7 @@ function buildSystemPrompt(
     ...RESPONSE_PROTOCOL,
     primer,
     brief,
+    extra,
     guidance,
   ].join('\n');
 }

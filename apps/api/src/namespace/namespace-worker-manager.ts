@@ -16,6 +16,7 @@ import { AutoScheduleService } from '../scheduler/auto-schedule.service';
 import { InquiryMatchingService } from '../matching/inquiry-matching.service';
 import { CorrelationWorker } from '../correlation/correlation.worker';
 import { AutopilotWorker } from '../autopilot/autopilot.worker';
+import { SupervisorWorker } from '../autopilot/supervisor/supervisor.worker';
 import { EmbeddingQueueService } from '../embedding/embedding-queue.service';
 import { EmbeddingService } from '../embedding/embedding.service';
 import { EmbeddingCapabilityService } from '../embedding/embedding-capability.service';
@@ -65,6 +66,7 @@ export class NamespaceWorkerManager
     private readonly matching: InquiryMatchingService,
     private readonly correlation: CorrelationWorker,
     private readonly autopilot: AutopilotWorker,
+    private readonly supervisor: SupervisorWorker,
     private readonly embedding: EmbeddingQueueService,
     private readonly embeddingService: EmbeddingService,
     private readonly embeddingCapability: EmbeddingCapabilityService,
@@ -190,6 +192,7 @@ export class NamespaceWorkerManager
         await this.matching.registerForNamespace();
         await this.correlation.registerForNamespace();
         await this.autopilot.registerForNamespace();
+        await this.supervisor.registerForNamespace();
         await this.embedding.registerForNamespace();
         await this.dataTransfer.registerForNamespace();
         await this.findingStats.registerForNamespace();

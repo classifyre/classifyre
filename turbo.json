@@ -46,6 +46,16 @@
     "codegen": {
       "cache": false
     },
+    "@classifyre/api#codegen": {
+      "cache": false,
+      // Generating the OpenAPI spec boots the whole Nest application, which
+      // imports PrismaService — so it needs a generated Prisma client, exactly
+      // as build/lint/check-types do. Locally that client is already there from
+      // an earlier task and the dependency is invisible; on a clean CI checkout
+      // it is not, and the task fails with "Cannot find module
+      // '.prisma/client/default'".
+      "dependsOn": ["prisma:generate"]
+    },
     "@workspace/api-client#codegen": {
       "cache": false,
       // The client is generated FROM apps/api/openapi.json, so the spec has to

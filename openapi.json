@@ -8458,7 +8458,8 @@
                 "CONFIG",
                 "DETECTOR_AUTHOR",
                 "ESCALATION",
-                "CHAT"
+                "CHAT",
+                "SUPERVISOR"
               ]
             }
           },
@@ -8517,7 +8518,8 @@
                 "CONFIG",
                 "DETECTOR_AUTHOR",
                 "ESCALATION",
-                "CHAT"
+                "CHAT",
+                "SUPERVISOR"
               ]
             }
           },
@@ -8559,6 +8561,14 @@
                 "RECOMPUTE_CORRELATION",
                 "TUNE_CORRELATION",
                 "NOTIFY_OPERATOR",
+                "SET_GOAL",
+                "COMMAND_AGENT",
+                "CONFIGURE_AGENT",
+                "PURGE_FINDINGS",
+                "PURGE_ASSETS",
+                "SCHEDULE_WAKE",
+                "WRITE_JOURNAL",
+                "REVERT_ACTION",
                 "NO_ACTION"
               ]
             }
@@ -8711,7 +8721,8 @@
                 "CONFIG",
                 "DETECTOR_AUTHOR",
                 "ESCALATION",
-                "CHAT"
+                "CHAT",
+                "SUPERVISOR"
               ]
             }
           }
@@ -8814,7 +8825,8 @@
                 "CONFIG",
                 "DETECTOR_AUTHOR",
                 "ESCALATION",
-                "CHAT"
+                "CHAT",
+                "SUPERVISOR"
               ]
             }
           },
@@ -9412,6 +9424,394 @@
           }
         },
         "summary": "Remove an MCP server",
+        "tags": [
+          "autopilot"
+        ]
+      }
+    },
+    "/autopilot/supervisor": {
+      "get": {
+        "operationId": "SupervisorController_state",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupervisorStateDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Supervisor state, budget and pacing",
+        "tags": [
+          "autopilot"
+        ]
+      },
+      "patch": {
+        "operationId": "SupervisorController_update",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSupervisorDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupervisorStateDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Enable, pause, or re-budget the supervisor",
+        "tags": [
+          "autopilot"
+        ]
+      }
+    },
+    "/autopilot/supervisor/wake": {
+      "post": {
+        "operationId": "SupervisorController_wake",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WakeSupervisorDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": ""
+          }
+        },
+        "summary": "Wake the supervisor now",
+        "tags": [
+          "autopilot"
+        ]
+      }
+    },
+    "/autopilot/supervisor/goals": {
+      "get": {
+        "operationId": "SupervisorController_goals",
+        "parameters": [
+          {
+            "name": "includeFinished",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupervisorGoalListDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Goals and tasks, including the charter",
+        "tags": [
+          "autopilot"
+        ]
+      },
+      "post": {
+        "operationId": "SupervisorController_createGoal",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSupervisorGoalDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupervisorGoalDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Set a goal",
+        "tags": [
+          "autopilot"
+        ]
+      }
+    },
+    "/autopilot/supervisor/goals/{id}": {
+      "patch": {
+        "operationId": "SupervisorController_updateGoal",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSupervisorGoalDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupervisorGoalDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Edit a goal",
+        "tags": [
+          "autopilot"
+        ]
+      },
+      "delete": {
+        "operationId": "SupervisorController_deleteGoal",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "summary": "Delete a goal",
+        "tags": [
+          "autopilot"
+        ]
+      }
+    },
+    "/autopilot/supervisor/journal": {
+      "get": {
+        "operationId": "SupervisorController_journal",
+        "parameters": [
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "before",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupervisorJournalListDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "What it did, wake by wake",
+        "tags": [
+          "autopilot"
+        ]
+      }
+    },
+    "/autopilot/supervisor/journal/{id}/note": {
+      "post": {
+        "operationId": "SupervisorController_annotate",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnnotateJournalDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Correct an entry. Read back on the next wake as authoritative.",
+        "tags": [
+          "autopilot"
+        ]
+      }
+    },
+    "/autopilot/supervisor/capabilities": {
+      "get": {
+        "operationId": "SupervisorController_capabilities",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupervisorCapabilityListDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "What the supervisor is allowed to do",
+        "tags": [
+          "autopilot"
+        ]
+      },
+      "put": {
+        "operationId": "SupervisorController_setCapabilities",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCapabilitiesDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupervisorCapabilityListDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Switch capability groups off",
+        "tags": [
+          "autopilot"
+        ]
+      }
+    },
+    "/autopilot/supervisor/undo": {
+      "get": {
+        "operationId": "SupervisorController_undoLog",
+        "parameters": [
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentUndoListDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Agent actions that can still be taken back",
+        "tags": [
+          "autopilot"
+        ]
+      }
+    },
+    "/autopilot/supervisor/undo/{id}": {
+      "post": {
+        "operationId": "SupervisorController_revert",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RevertResultDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Revert one agent action",
         "tags": [
           "autopilot"
         ]
@@ -21911,7 +22311,8 @@
                 "CONFIG",
                 "DETECTOR_AUTHOR",
                 "ESCALATION",
-                "CHAT"
+                "CHAT",
+                "SUPERVISOR"
               ]
             }
           },
@@ -22025,7 +22426,8 @@
               "CONFIG",
               "DETECTOR_AUTHOR",
               "ESCALATION",
-              "CHAT"
+              "CHAT",
+              "SUPERVISOR"
             ]
           },
           "runs": {
@@ -22133,7 +22535,8 @@
               "CONFIG",
               "DETECTOR_AUTHOR",
               "ESCALATION",
-              "CHAT"
+              "CHAT",
+              "SUPERVISOR"
             ]
           },
           "runStatus": {
@@ -22181,6 +22584,14 @@
               "RECOMPUTE_CORRELATION",
               "TUNE_CORRELATION",
               "NOTIFY_OPERATOR",
+              "SET_GOAL",
+              "COMMAND_AGENT",
+              "CONFIGURE_AGENT",
+              "PURGE_FINDINGS",
+              "PURGE_ASSETS",
+              "SCHEDULE_WAKE",
+              "WRITE_JOURNAL",
+              "REVERT_ACTION",
               "NO_ACTION"
             ]
           },
@@ -22293,7 +22704,8 @@
               "CONFIG",
               "DETECTOR_AUTHOR",
               "ESCALATION",
-              "CHAT"
+              "CHAT",
+              "SUPERVISOR"
             ]
           },
           "goal": {
@@ -22352,7 +22764,8 @@
               "CONFIG",
               "DETECTOR_AUTHOR",
               "ESCALATION",
-              "CHAT"
+              "CHAT",
+              "SUPERVISOR"
             ]
           },
           "enabled": {
@@ -22483,7 +22896,8 @@
               "CONFIG",
               "DETECTOR_AUTHOR",
               "ESCALATION",
-              "CHAT"
+              "CHAT",
+              "SUPERVISOR"
             ],
             "nullable": true,
             "description": "The agent immediately before this one, whose output it uses"
@@ -22752,7 +23166,8 @@
               "CONFIG",
               "DETECTOR_AUTHOR",
               "ESCALATION",
-              "CHAT"
+              "CHAT",
+              "SUPERVISOR"
             ]
           },
           "status": {
@@ -22913,6 +23328,14 @@
               "RECOMPUTE_CORRELATION",
               "TUNE_CORRELATION",
               "NOTIFY_OPERATOR",
+              "SET_GOAL",
+              "COMMAND_AGENT",
+              "CONFIGURE_AGENT",
+              "PURGE_FINDINGS",
+              "PURGE_ASSETS",
+              "SCHEDULE_WAKE",
+              "WRITE_JOURNAL",
+              "REVERT_ACTION",
               "NO_ACTION"
             ]
           },
@@ -22971,7 +23394,8 @@
               "CONFIG",
               "DETECTOR_AUTHOR",
               "ESCALATION",
-              "CHAT"
+              "CHAT",
+              "SUPERVISOR"
             ]
           },
           "status": {
@@ -23416,7 +23840,8 @@
                 "CONFIG",
                 "DETECTOR_AUTHOR",
                 "ESCALATION",
-                "CHAT"
+                "CHAT",
+                "SUPERVISOR"
               ]
             }
           },
@@ -23503,7 +23928,8 @@
                 "CONFIG",
                 "DETECTOR_AUTHOR",
                 "ESCALATION",
-                "CHAT"
+                "CHAT",
+                "SUPERVISOR"
               ]
             }
           },
@@ -23514,6 +23940,548 @@
             }
           }
         }
+      },
+      "SupervisorBudgetDto": {
+        "type": "object",
+        "properties": {
+          "spentTodayUsd": {
+            "type": "number",
+            "nullable": true,
+            "description": "Spent today. Null when the provider has no pricing configured, which is not the same as free."
+          },
+          "limitUsd": {
+            "type": "number",
+            "nullable": true
+          },
+          "remainingUsd": {
+            "type": "number",
+            "nullable": true
+          },
+          "exhausted": {
+            "type": "boolean"
+          },
+          "wakesToday": {
+            "type": "number"
+          },
+          "purgesToday": {
+            "type": "number"
+          },
+          "purgeBudgetPerDay": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "exhausted",
+          "wakesToday",
+          "purgesToday",
+          "purgeBudgetPerDay"
+        ]
+      },
+      "SupervisorStateDto": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "description": "InstanceSettings.supervisorEnabled."
+          },
+          "nextWakeAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "wakeOnEvents": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "wakeReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "lastWakeAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "pausedUntil": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "consecutiveNoops": {
+            "type": "number",
+            "description": "Wakes in a row that changed nothing. A few are healthy; a run of them means the pacing or the goals are wrong."
+          },
+          "pendingEvents": {
+            "type": "number",
+            "description": "Inbox events not yet read by a wake."
+          },
+          "activeGoals": {
+            "type": "number",
+            "description": "Active goals and tasks, charter excluded."
+          },
+          "budget": {
+            "$ref": "#/components/schemas/SupervisorBudgetDto"
+          },
+          "providerConfigured": {
+            "type": "boolean",
+            "description": "False when no AI provider is assigned to the harness — nothing runs without one."
+          }
+        },
+        "required": [
+          "enabled",
+          "wakeOnEvents",
+          "consecutiveNoops",
+          "pendingEvents",
+          "activeGoals",
+          "budget",
+          "providerConfigured"
+        ]
+      },
+      "UpdateSupervisorDto": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "pausedUntil": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "Pause without switching off. Null clears the pause."
+          },
+          "dailyCostLimitUsd": {
+            "type": "number",
+            "nullable": true
+          },
+          "maxSleepHours": {
+            "type": "number"
+          },
+          "purgeBudgetPerDay": {
+            "type": "number"
+          },
+          "undoRetentionDays": {
+            "type": "number"
+          }
+        }
+      },
+      "WakeSupervisorDto": {
+        "type": "object",
+        "properties": {
+          "instruction": {
+            "type": "string",
+            "description": "Steering for this wake only. Not stored as a goal."
+          }
+        }
+      },
+      "SupervisorGoalDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "CHARTER",
+              "GOAL",
+              "TASK"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "PAUSED",
+              "DONE",
+              "ABANDONED"
+            ]
+          },
+          "origin": {
+            "type": "string",
+            "enum": [
+              "AGENT",
+              "OPERATOR"
+            ],
+            "description": "OPERATOR goals are authoritative: the agent may record progress on one but never rewrite it."
+          },
+          "title": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string",
+            "nullable": true
+          },
+          "priority": {
+            "type": "number"
+          },
+          "parentId": {
+            "type": "string",
+            "nullable": true
+          },
+          "dueAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "progress": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "status",
+          "origin",
+          "title",
+          "priority",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "SupervisorGoalListDto": {
+        "type": "object",
+        "properties": {
+          "goals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SupervisorGoalDto"
+            }
+          }
+        },
+        "required": [
+          "goals"
+        ]
+      },
+      "CreateSupervisorGoalDto": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string",
+            "nullable": true
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "CHARTER",
+              "GOAL",
+              "TASK"
+            ]
+          },
+          "priority": {
+            "type": "number"
+          },
+          "parentId": {
+            "type": "string",
+            "nullable": true
+          },
+          "dueAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "required": [
+          "title"
+        ]
+      },
+      "UpdateSupervisorGoalDto": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "PAUSED",
+              "DONE",
+              "ABANDONED"
+            ]
+          },
+          "priority": {
+            "type": "number"
+          },
+          "progress": {
+            "type": "string",
+            "nullable": true
+          },
+          "dueAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        }
+      },
+      "SupervisorJournalEntryDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "runId": {
+            "type": "string",
+            "nullable": true
+          },
+          "wakeReason": {
+            "type": "string"
+          },
+          "situation": {
+            "type": "string",
+            "description": "What it found."
+          },
+          "did": {
+            "type": "string",
+            "description": "What it changed, and why."
+          },
+          "next": {
+            "type": "string",
+            "description": "The concrete next step it left itself."
+          },
+          "goalIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "nextWakeAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "costUsd": {
+            "type": "number",
+            "nullable": true
+          },
+          "operatorNote": {
+            "type": "string",
+            "nullable": true,
+            "description": "An operator correction. Read back on the next wake and treated as authoritative over what the agent wrote."
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "wakeReason",
+          "situation",
+          "did",
+          "next",
+          "goalIds",
+          "createdAt"
+        ]
+      },
+      "SupervisorJournalListDto": {
+        "type": "object",
+        "properties": {
+          "entries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SupervisorJournalEntryDto"
+            }
+          }
+        },
+        "required": [
+          "entries"
+        ]
+      },
+      "AnnotateJournalDto": {
+        "type": "object",
+        "properties": {
+          "note": {
+            "type": "string",
+            "description": "What the agent got wrong, or should do instead."
+          }
+        },
+        "required": [
+          "note"
+        ]
+      },
+      "SupervisorCapabilityDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "labelKey": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "alwaysOn": {
+            "type": "boolean",
+            "description": "Cannot be switched off."
+          },
+          "defaultOn": {
+            "type": "boolean",
+            "description": "Ships switched on."
+          },
+          "destructive": {
+            "type": "boolean",
+            "description": "Deletes data in a way a re-scan cannot fully rebuild."
+          },
+          "toolCount": {
+            "type": "number",
+            "description": "Mutating tools this group currently grants."
+          }
+        },
+        "required": [
+          "id",
+          "labelKey",
+          "description",
+          "enabled",
+          "alwaysOn",
+          "defaultOn",
+          "destructive",
+          "toolCount"
+        ]
+      },
+      "SupervisorCapabilityListDto": {
+        "type": "object",
+        "properties": {
+          "capabilities": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SupervisorCapabilityDto"
+            }
+          }
+        },
+        "required": [
+          "capabilities"
+        ]
+      },
+      "UpdateCapabilitiesDto": {
+        "type": "object",
+        "properties": {
+          "disabled": {
+            "description": "Group ids to switch OFF. Anything not listed is on.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "disabled"
+        ]
+      },
+      "AgentUndoEntryDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "entityType": {
+            "type": "string",
+            "nullable": true
+          },
+          "entityId": {
+            "type": "string",
+            "nullable": true
+          },
+          "revertKind": {
+            "type": "string",
+            "description": "\"restore_value\" replays a snapshot; \"rescan\" re-derives from the source instead."
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "expiresAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "revertedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "revertedBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "undoable": {
+            "type": "boolean",
+            "description": "Whether reverting it now would still mean what it says."
+          },
+          "blockedReason": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "action",
+          "label",
+          "revertKind",
+          "createdAt",
+          "expiresAt",
+          "undoable"
+        ]
+      },
+      "AgentUndoListDto": {
+        "type": "object",
+        "properties": {
+          "entries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AgentUndoEntryDto"
+            }
+          }
+        },
+        "required": [
+          "entries"
+        ]
+      },
+      "RevertResultDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "revertKind": {
+            "type": "string"
+          },
+          "outcome": {
+            "type": "string",
+            "description": "What the revert actually did."
+          }
+        },
+        "required": [
+          "id",
+          "revertKind",
+          "outcome"
+        ]
       },
       "AssetSimilarityDto": {
         "type": "object",

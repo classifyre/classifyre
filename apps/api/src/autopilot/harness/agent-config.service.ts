@@ -1,7 +1,7 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable } from '@nestjs/common';
 import { AgentKind, AgentTriggerMode, InstanceSettings } from '@prisma/client';
 import { PrismaService } from '../../prisma.service';
-import { ToolRegistry } from '../tools/tool-registry.service';
+import { TOOL_CATALOG, type ToolCatalog } from '../tools/tool-catalog';
 import {
   DEFAULT_MISSIONS,
   missionFor,
@@ -57,6 +57,9 @@ const ENABLE_FLAG: Partial<Record<AgentKind, keyof InstanceSettings>> = {
   [AgentKind.CONFIG]: 'autopilotConfigEnabled',
   [AgentKind.DETECTOR_AUTHOR]: 'autopilotDetectorEnabled',
   [AgentKind.ESCALATION]: 'autopilotEscalationEnabled',
+  // Here rather than on SupervisorState so there is exactly one place to switch
+  // the supervisor off, and so the existing agent card toggle drives it.
+  [AgentKind.SUPERVISOR]: 'supervisorEnabled',
 };
 
 /**
@@ -145,7 +148,9 @@ export interface UpdateAgentInput {
 export class AgentConfigService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly registry: ToolRegistry,
+    // The interface, not the class: see tool-catalog.ts for the two cycles this
+    // breaks and why both fixes are needed.
+    @Inject(TOOL_CATALOG) private readonly registry: ToolCatalog,
   ) {}
 
   /** Effective mission for the agent loop, or null when the kind has none. */

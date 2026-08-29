@@ -98,6 +98,7 @@ describe('AgentConfigService', () => {
       AgentKind.DETECTOR_AUTHOR,
       AgentKind.ESCALATION,
       AgentKind.DREAM,
+      AgentKind.SUPERVISOR,
     ]);
     const inquiry = list.find((a) => a.kind === AgentKind.INQUIRY)!;
     expect(inquiry.enabled).toBe(true);
