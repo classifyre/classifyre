@@ -1,0 +1,370 @@
+---
+title: "We Deleted Our Prettiest Screen: From Fingerprints to Near-Duplicate Review"
+description: Why we replaced the fingerprints similarity graph with a duplicate review queue — what the canvas cost us, what changed for cases, and what the new numbers actually mean.
+date: 2026-08-29T00:00:00.000Z
+tags:
+  - product
+  - duplicates
+  - data-quality
+  - lineage
+categories:
+  - Product
+author: Classifyre Team
+keywords:
+  - duplicate detection
+  - near-duplicate detection
+  - entity resolution
+  - data quality
+  - record linkage
+  - data lineage
+  - Classifyre
+alternates:
+  canonical: /blog/articles/from-fingerprints-to-near-duplicates
+openGraph:
+  type: article
+  title: "We Deleted Our Prettiest Screen: From Fingerprints to Near-Duplicate Review"
+  description: Why we replaced the fingerprints similarity graph with a duplicate review queue — what the canvas cost us, what changed for cases, and what the new numbers actually mean.
+  url: /blog/articles/from-fingerprints-to-near-duplicates
+  siteName: Classifyre
+  publishedTime: 2026-08-29T00:00:00.000Z
+  modifiedTime: 2026-08-29T00:00:00.000Z
+  authors:
+    - Classifyre Team
+  section: Product
+twitter:
+  card: summary
+  title: "We Deleted Our Prettiest Screen: From Fingerprints to Near-Duplicate Review"
+  description: Why we replaced the fingerprints similarity graph with a duplicate review queue.
+---
+
+# We Deleted Our Prettiest Screen
+
+For about a year, Classifyre had a feature called **Fingerprints**. It was the
+screen people pointed at in demos: a force-directed graph of your whole estate,
+assets floating as nodes, similarity links drawn between them, clusters glowing
+where the same customer turned up in four systems. Drag a slider and the graph
+thinned out or thickened up. It looked like intelligence.
+
+We removed it. What replaced it is a list.
+
+This is the story of why, and what it changed — including the part we didn't
+expect, which is what happened to cases.
+
+---
+
+## What fingerprints actually did
+
+The underlying idea was sound, and we kept all of it.
+
+Every finding a detector raises carries a **value**: an email address, an IBAN, a
+national ID, a person's name. Normalise those values, hash them, and you can ask
+a cheap question across an entire estate — *which assets contain the same
+values?* Weight the answer so that a shared credit card counts for more than a
+shared country code, and you get a score: the share of two assets' evidence that
+actually matches.
+
+That machinery works. It is deterministic, it is explainable, and for any link
+it produces you can point at the exact values responsible. We have never wanted
+to replace it.
+
+The problem was never the matching. It was the screen we put on top of it.
+
+---
+
+## The canvas problem
+
+<FingerprintsVsQueue />
+
+Here is what we watched happen, over and over, on real corpora.
+
+**A canvas is a destination, not a step in a task.** It has no completion state.
+A reviewer opening the fingerprints graph on Tuesday had no way to know what they
+had looked at on Monday, how much was left, or whether they were making progress.
+So they looked at it, said "huh, interesting", and closed it. Nobody worked a
+backlog through a force-directed graph, because a force-directed graph does not
+have a backlog. It has a shape.
+
+**It had no notion of what mattered, so it fetched everything.** On a corpus of
+61,000 assets the graph was 61,000 nodes and 272,000 edges — over two gigabytes
+of live JavaScript objects. It exhausted the API heap on its own, once per batch
+of touched assets during a steady scan. The screen that was meant to show you
+your data was the reason the process holding your data kept dying. We wrote about
+some of that at the time; the fix always came back to the same root cause. *A
+canvas has no reason to ask for less, because it can't tell you what less would
+mean.*
+
+**The similarity slider was a lie about the work.** Dragging it changed which
+links were drawn. It did not change which decisions still needed making, because
+there were no decisions — nothing on the screen recorded a judgement. Every
+session started from zero. You could stare at the same false cluster on Monday,
+Wednesday and Friday, and the product would never know.
+
+**And it treated every duplicate as equally interesting.** A staging table that
+resembles the production table it was built from is not a finding. It is a
+pipeline doing its job. When your duplicate tool reports those alongside real
+problems, at the same visual weight, people learn to ignore the tool. This is,
+we think, the single main reason metadata-only duplicate detection has a bad
+reputation.
+
+---
+
+## What we replaced it with
+
+The new feature is called **Duplicate review**, and it is a queue with three
+levels. Each level answers one question and ends in an action.
+
+<Card>
+  <CardHeader>
+    <CardTitle>Level 1 — Which patterns are worth my time?</CardTitle>
+    <CardDescription>
+      Every match is filed under the reason it matched: the set of value labels
+      the two assets had in common. 18,000 pairs turn out to be five or six
+      patterns.
+    </CardDescription>
+  </CardHeader>
+</Card>
+
+<Card>
+  <CardHeader>
+    <CardTitle>Level 2 — Can one decision settle this whole group?</CardTitle>
+    <CardDescription>
+      A pattern says what kind of decision it is: a cutoff, an exclusion rule, a
+      no-op, or genuine per-pair judgement. Then it shows exactly how much of
+      your backlog acting on it removes.
+    </CardDescription>
+  </CardHeader>
+</Card>
+
+<Card>
+  <CardHeader>
+    <CardTitle>Level 3 — Are these two the same thing?</CardTitle>
+    <CardDescription>
+      One pair, the values behind the match, the evidence against, and five
+      keys. Deciding advances to the next one.
+    </CardDescription>
+  </CardHeader>
+</Card>
+
+The three ideas that make it finishable are simple enough to state in a sentence
+each.
+
+### 1. Group by cause, not by pair
+
+A pair is a symptom. The cause is *why* it matched. When you file matches under
+their cause, the top row on a real corpus is nearly always something with a
+one-line fix: a placeholder your ETL writes into empty fields, a support address
+in every ticket footer, a boilerplate confidentiality notice on four hundred
+contracts.
+
+Finding that took ten minutes of dragging a slider before. Now it is row one.
+
+### 2. Say what a decision is worth
+
+Every pattern carries a number we call **After / Before**: how many undecided
+pairs remain across your whole workspace before this action, and after it. A
+pattern that takes 8,400 pairs off a backlog of 12,000 is worth doing first,
+whatever else is on the screen.
+
+Patterns are ordered by that leverage, not by size. Ordering by size floats
+unfixable noise to the top; ordering by score buries the easy wins at the bottom.
+Ordering by *how much one decision settles* puts the afternoon's work in the
+first three rows.
+
+### 3. Separate expected duplicates from surprising ones
+
+This is the change we are proudest of, and it needed a second, independent
+signal.
+
+Duplicate matching reads the **contents** of your assets. Lineage reads something
+completely different: connector catalogs, view SQL, query logs, dbt manifests.
+Because the two don't share a source, combining them adds real information:
+
+| Two assets look nearly identical, and… | It means | Priority |
+| --- | --- | --- |
+| there is a lineage path between them | A derived copy. A mart resembling its source. | Low — expected |
+| there is **no** path, and both sides have lineage | Two teams built the same thing independently | **High** |
+| we have no lineage for one side | A coverage gap, not evidence | Judge on the values |
+
+That middle row is the reason to have a duplicate tool at all. It is expensive —
+two pipelines, two sets of maintenance, two chances to silently diverge — and it
+is *invisible*, because neither team has any reason to look. Nobody files a
+ticket about a thing they don't know exists.
+
+In the app that row gets the alarm colour and one sentence of copy:
+
+> Two teams appear to have built the same thing independently. This is the case
+> worth chasing.
+
+There is one implementation detail here we want to name, because it is the kind
+of mistake that would have made the whole feature quietly worthless. Classifyre's
+own similarity links are stored in the same relationship graph as lineage. If the
+"is there a path between these two assets?" test walked those, **every pair in
+the queue would find a path — to itself.** Everything would report as explained,
+nothing would ever escalate, and the check would look like it was working
+perfectly. So relationships produced by the duplicate engine are excluded by
+name. A check is only worth running if something other than the thing being
+checked can answer it.
+
+---
+
+## Near-duplicate, not just duplicate
+
+The other half of the rewrite is in the name. "Fingerprints" implied exact
+identity: same values, same thing. Real estates are messier.
+
+Four different things can make two assets the same thing, and we now keep them
+apart instead of averaging them into one number:
+
+| Family | Matches on | Catches |
+| --- | --- | --- |
+| **Shared values** | The concrete values inside findings | The same customer in three systems |
+| **Similar spelling** | Phonetic codes on name-like values | `Jon Smyth` and `John Smith` |
+| **Identical content** | The same bytes | A file copied between buckets |
+| **Repeated text** | Meaning, via embeddings | The same paragraph rewritten |
+
+That last one is genuinely new, and it is where "near-duplicate" earns the word.
+It comes from the semantic layer rather than from value overlap: two passages
+whose embeddings sit close together are saying the same thing even when they
+share no literal values at all.
+
+We kept the families separate for a reason that took a while to learn: **they
+fail differently, and averaging two measures that fail differently gives you a
+number that is wrong in both directions and impossible to debug.** Kept apart,
+each family gets its own fix — value overlap is tuned with weights and
+exclusions; repeated text is fixed by excluding the boilerplate. Blended, neither
+fix would be findable.
+
+---
+
+## What a decision looks like now
+
+<MatchWeightMock />
+
+The pair screen owed the reviewer three things the canvas never gave them.
+
+**A number that can be checked.** The **match weight** is the share of the two
+assets' available weighted evidence that actually matched. The breakdown
+underneath it is one bar per label, and the bars add up to the number above them.
+Nothing is hidden in a blend. If they ever failed to add up, that would be the
+one unforgivable bug on the screen, so the arithmetic is built to make it
+impossible.
+
+**Evidence against, in the same units as evidence for.** A label present on only
+one of the two assets produces a positive bar for what it could have contributed
+and an equal negative one for what it didn't. That is the honest way to show
+disagreement: as weight that was available and went unclaimed. Most similarity
+tools simply omit it, which is how you end up with a confident 0.8 between two
+records that share a name and disagree about everything else.
+
+**Four verdicts, not two.** *Confirm* and *Not a duplicate* are the obvious ones.
+*Split the cluster here* is a statement about the cluster's shape rather than the
+pair — the fix for the classic false cluster where A matches B, B matches C, and
+A and C have nothing to do with each other. And **Unsure** is a first-class
+button, not a way out: forcing a binary on a genuinely ambiguous pair produces
+bad records, and a pile of "unsure" is itself the signal that your review band is
+sitting where the evidence doesn't separate.
+
+Then the queue advances. Press <kbd>c</kbd> and you are on the next pair, under
+the same cutoffs and the same filters, with the count of what's left visible.
+Sounds small. It is the difference between a queue and a form.
+
+---
+
+## The part we didn't expect: what it did to cases
+
+We rebuilt this screen to make duplicate review finishable. The bigger effect
+turned out to be downstream.
+
+Under fingerprints, promoting a cluster into a [case](https://docs.classifyre.com/investigations/cases/) was one click and
+almost nobody used it. Looking back, the reason is obvious: **a cluster is not
+evidence.** It is a machine's opinion, and pulling it into a case meant importing
+an unreviewed assertion into a file that is supposed to hold things somebody
+checked. The cases that did start this way were weaker for it — an investigator
+opening one found a pile of assets and no record of why anyone thought they
+belonged together.
+
+A confirmed duplicate is different in kind. Somebody looked at two assets, saw
+the values behind the match, saw the evidence against, and said yes. That is
+evidence, with provenance and a timestamp.
+
+Three concrete changes followed from taking that seriously.
+
+**Decisions outlive the queue.** A queue on its own is write-only — you judge a
+pair and it vanishes, which makes the judgement worthless five minutes later. So
+there is now a decisions ledger: what was judged, by whom, against what score,
+and what became of it. Its most useful filter is **"went nowhere yet"**:
+duplicates confirmed as real and never taken into a case. That list is the
+cheapest possible start to an investigation, because every entry has already been
+verified by a human.
+
+**A verdict knows when it went stale.** Verdicts store the score they were made
+against. Re-score the corpus — new weights, a new exclusion, fresh findings — and
+any pair whose score moved materially is flagged as *re-scored since you decided*.
+The judgement isn't thrown away, because that would discard real work. It also
+isn't presented as current, because it was made about a different number.
+
+**Cases and duplicates finally point at each other.** An inquiry opened from a
+pair inherits the actual match signature: the labels that matched, scoped to the
+sources they came from. It watches for the same thing rather than starting from a
+blank form. And the agents working your cases can see human verdicts — so an
+agent never re-raises a pair somebody already settled, and never argues against a
+decision it cannot see.
+
+---
+
+## Where the agents fit
+
+We had a standing rule that we tightened during this rewrite: **an agent may
+clear the boring cases and nothing else.**
+
+The matching itself has no language model in it. It is deterministic — normalise,
+hash, score, cluster — and it runs after every scan, before the autopilot cycle,
+so agents never reason about stale duplicates.
+
+Beyond that there is exactly one situation where an agent records a verdict on
+its own: a match weight at or above 0.95 **and** a lineage path explaining it.
+That combination is a derived copy, where a human decision adds nothing. Both
+conditions are required, and the second is the interesting one — a near-perfect
+score with *no* explanation is the single most valuable thing this product can
+surface, and it is precisely what a person should see.
+
+Every agent decision is stamped and counted separately from human work. An agent
+that quietly emptied your queue would have destroyed the one number the screen
+exists to report.
+
+---
+
+## What we learned
+
+**A screen that cannot be finished will not be used.** Not "used less" — not used.
+People are good at recognising work with no end and declining to start it. If
+your feature has no completion state, adding polish to it does not help.
+
+**Grouping by cause is worth more than any amount of ranking.** We spent real
+effort on ranking pairs well. It mattered far less than filing them under why
+they matched, because the second thing occasionally reveals that four hundred
+pairs share one fixable cause, and no ranking of four hundred individual pairs
+ever tells you that.
+
+**Two independent signals beat one good one.** Lineage is not a better similarity
+measure than value overlap. It is a *different question*, answered from a
+different source, and that is exactly why crossing the two produces the finding
+worth having. Stacking two lexical measures would have produced almost nothing,
+because they mostly agree.
+
+**Explainability has to be arithmetic, not narration.** "These matched because
+they share an email and a name" is narration. Bars that sum to the number above
+them, with the disagreement shown at the same scale as the agreement, is
+arithmetic. Only one of those survives someone checking it.
+
+---
+
+The canvas really was the prettiest screen we ever shipped. It is not in the
+product any more, and the numbers it used to draw are now attached to decisions
+somebody made. That trade was worth it.
+
+If you want the details, the
+[documentation](https://docs.classifyre.com/duplicates/) covers every screen and
+every action. There is also a page that does nothing but
+[explain the numbers one by one](https://docs.classifyre.com/duplicates/glossary/),
+because we got tired of answering the same questions.

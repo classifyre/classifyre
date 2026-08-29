@@ -29,9 +29,9 @@ graph TD
     Assets --> Findings["Findings<br/>sensitive matches"]
     Findings --> Ranking["Ranking<br/>importance score"]
     Ranking --> Inquiries["Inquiries<br/>standing questions"]
-    Ranking --> Fingerprints["Fingerprints<br/>shared-value links"]
+    Ranking --> Duplicates["Duplicate review<br/>shared-value links"]
     Inquiries --> Cases["Cases<br/>the investigation case file"]
-    Fingerprints --> Cases
+    Duplicates --> Cases
     Glossary["Glossary"] -.-> Cases
     Autopilot["Autopilot"] -.-> Ranking
     Autopilot -.-> Cases
@@ -60,9 +60,9 @@ documents, context quality, and whether it looks like test data. See
 [Ranking & the Semantic Layer](/how-it-works/ranking-and-semantics/).
 
 **5. Watch and connect.** **Inquiries** are saved questions that keep watching
-for matching findings; **fingerprints** link assets sharing concrete values
+for matching findings; **duplicate matching** links assets sharing concrete values
 like an email or ID — revealing when the same record shows up in several
-systems. See [Connections & Fingerprints](/how-it-works/connections-and-fingerprints/).
+systems. See [Connections & Duplicates](/how-it-works/duplicates-and-similarity/).
 
 **6. Investigate.** A **case** is where the real work happens. Promising
 findings arrive as **leads** — a triage queue you accept into **evidence** or
@@ -102,7 +102,7 @@ Two ideas run through the whole product:
 | [A Tour of the App](/how-it-works/in-the-app/) | Every screen in the app, what it's for, and where to learn more. |
 | [From Documents to Findings](/how-it-works/documents-to-findings/) | Sources, scans, assets, detectors. |
 | [Ranking & the Semantic Layer](/how-it-works/ranking-and-semantics/) | Importance vs severity, recalibration. |
-| [Connections & Fingerprints](/how-it-works/connections-and-fingerprints/) | Shared-value correlation vs semantic similarity. |
+| [Connections & Duplicates](/how-it-works/duplicates-and-similarity/) | Shared-value matching vs semantic similarity, and what lineage adds. |
 | [Leads, Evidence & Events](/how-it-works/investigating/) | Ranked finding to case conclusion. |
 | [Glossary & Shared Vocabulary](/how-it-works/glossary/) | Shared vocabulary for people and AI. |
 | [Autopilot & AI Assistance](/how-it-works/autopilot/) | What the AI agents do, and how to supervise them. |

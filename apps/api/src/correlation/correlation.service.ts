@@ -17,6 +17,7 @@ import {
   FANOUT_CAP,
   IDENTICAL_GROUP_CAP,
   IDENTICAL_GROUP_PAGE,
+  LABEL_WEIGHTS,
   MAX_CLUSTER_TOP_VALUES,
   PHONETIC_FANOUT_CAP,
   PHONETIC_MIN_JW,
@@ -398,11 +399,21 @@ export class CorrelationService {
     const row = await this.prisma.correlationConfig.findUnique({
       where: { id: 1 },
     });
-    const weights =
+    const stored =
       (row?.labelWeights as Record<string, number> | undefined) ?? {};
     const def = row?.defaultWeight ?? DEFAULT_LABEL_WEIGHT;
+    // The shipped weights are the floor, not a code comment. `label_weights`
+    // defaults to `{}`, so reading only the stored map gave every label the
+    // same weight of 1 — a credit card counted exactly as much as a country
+    // code, and every "match weight" in the review queue was really a raw
+    // count of shared values. Stored entries still win, so an operator (or
+    // fingerprints.tune_config) can override any of them.
+    const weights = effectiveLabelWeights(stored);
     return {
       weightOf: (label: string) => weights[normalizeLabel(label)] ?? def,
+      // The scoring SQL and the review index both read this, so they have to
+      // see the same table `weightOf` does or the waterfall bars stop adding
+      // up to the score above them.
       rawWeights: weights,
       defaultWeight: def,
       relatedMin: row ? Number(row.relatedMin) : RELATED_MIN,
@@ -424,12 +435,16 @@ export class CorrelationService {
         orderBy: { label: 'asc' },
       }),
     ]);
-    const weights =
-      (row?.labelWeights as Record<string, number> | undefined) ?? {};
+    const weights = effectiveLabelWeights(
+      (row?.labelWeights as Record<string, number> | undefined) ?? {},
+    );
     const defaultWeight = row?.defaultWeight ?? DEFAULT_LABEL_WEIGHT;
 
     const inUse = new Set(labelRows.map((r) => r.label));
     // Union of in-use labels and any explicitly configured (possibly retired).
+    // The built-ins are folded in by effectiveLabelWeights, so the tuning
+    // screen shows the weight that is actually being applied rather than a
+    // flat default the scorer never used.
     const labels = [...new Set([...inUse, ...Object.keys(weights)])]
       .sort()
       .map((label) => ({
@@ -481,16 +496,22 @@ export class CorrelationService {
       ...((existing?.labelWeights as Record<string, number> | undefined) ?? {}),
       ...(input.labelWeights ?? {}),
     };
-    // Drop weights equal to the default to keep the map lean.
     const defaultWeight = clampWeight(
       input.defaultWeight ?? existing?.defaultWeight ?? DEFAULT_LABEL_WEIGHT,
     );
+    // Drop only entries that restate the weight this label would get anyway,
+    // which for a built-in label is the built-in — NOT the flat default.
+    // Pruning against `defaultWeight` alone would silently discard someone
+    // deliberately setting `email` down to 1 and let the built-in 5 come back
+    // through the fallback.
     const labelWeights: Record<string, number> = {};
     for (const [label, w] of Object.entries(mergedWeights)) {
       const key = normalizeLabel(label);
       if (!key) continue;
       const weight = clampWeight(w);
-      if (weight !== defaultWeight) labelWeights[key] = weight;
+      if (weight !== (LABEL_WEIGHTS[key] ?? defaultWeight)) {
+        labelWeights[key] = weight;
+      }
     }
     const relatedMin = clampUnit(
       input.relatedMin ??
@@ -2552,6 +2573,27 @@ function buildExclusionPredicate(
         return true;
     return false;
   };
+}
+
+/**
+ * The stored weight map laid over the shipped defaults.
+ *
+ * `correlation_config.label_weights` starts as `{}` and only ever holds the
+ * entries an operator changed, so it is not the whole picture — reading it
+ * alone made LABEL_WEIGHTS dead code and flattened every score to a count of
+ * shared values. Stored entries win, including one that deliberately lowers a
+ * built-in.
+ */
+function effectiveLabelWeights(
+  stored: Record<string, number>,
+): Record<string, number> {
+  const out: Record<string, number> = { ...LABEL_WEIGHTS };
+  for (const [label, weight] of Object.entries(stored)) {
+    const key = normalizeLabel(label);
+    if (!key || !Number.isFinite(Number(weight))) continue;
+    out[key] = Number(weight);
+  }
+  return out;
 }
 
 /** Weights are small positive integers. */

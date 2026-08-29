@@ -1,0 +1,193 @@
+---
+title: Tuning
+description: Change how duplicate matching behaves — label weights, the related and duplicate thresholds, exclusion rules, and the health of both indexes that feed the queue.
+---
+
+# Tuning
+
+Everything on this screen changes **what matches in the first place**, as
+opposed to what you decide about it. Saving here re-scores the whole corpus, so
+it's the strongest lever in duplicate review — and the one to reach for when a
+pattern is [rule candidate or cutoff
+candidate](/duplicates/patterns/#what-kind-of-decision-is-this) rather than a
+per-pair judgement.
+
+The screen is split deliberately: **weights and thresholds decide what matches;
+embeddings decide what reads as repeated text.** Tuning one without seeing the
+other is how the two drift apart.
+
+---
+
+## Label weights
+
+Every finding label gets a weight. The
+[score](/duplicates/how-matching-works/#the-score) is a weighted overlap, so
+these decide what "similar" means.
+
+Labels are **dynamic** — anything your detectors produce shows up here,
+including [custom detectors](/detectors/custom/). Labels that are configured but
+no longer appear in the data are marked *not in data* rather than being dropped,
+so you don't lose a setting when a source is disconnected.
+
+### The shipped defaults
+
+Classifyre ships a weight table so scoring is meaningful out of the box:
+
+| Weight | Labels | Reasoning |
+|---|---|---|
+| 6 | `credit_card`, `iban`, `ssn`, `passport` | Uniquely identifying. Two documents sharing one are about the same person. |
+| 5 | `national_id`, `email`, `api_key`, `secret` | Nearly as strong |
+| 4 | `phone` | Strong, but shared numbers exist |
+| 3 | `address` | Households, offices |
+| 2 | `person`, `name` | Common names collide constantly |
+| 1 | `url`, `domain`, `ip`, `country` | Near-worthless on their own |
+
+**Default weight** applies to every label not in that table — including all
+custom ones. Leave it at 1 unless you have a reason.
+
+### Changing a weight
+
+Raise a label when it's identifying in *your* estate and lower it when it's
+noise. Two common cases:
+
+- **A custom detector that extracts a real key** — a policy number, a case
+  reference — deserves a weight of 4 or 5. At the default of 1 it's competing
+  with country codes.
+- **A label that dominates every match for the wrong reason** — usually `person`
+  or `name` in a corpus full of the same few staff names. Lower it to 1, or
+  [exclude](#exclusions) the specific values.
+
+The [cause dialog](/duplicates/pairs/#not-a-duplicate) offers a one-click weight
+drop when a single label is carrying a bad match, which is usually a better way
+to find the right number than guessing here.
+
+> A weight you set is kept even when it happens to equal the shipped value for a
+> different label — deliberately lowering `email` to 1 stays at 1 and does not
+> spring back to 5.
+
+---
+
+## The two thresholds
+
+These are the saved versions of the [cutoffs on the
+histogram](/duplicates/review-queue/#score-distribution-and-the-two-cutoffs).
+
+| Setting | On the histogram | What it controls |
+|---|---|---|
+| **Related threshold** | *review* | The minimum weighted match to record a link at all. Below it, nothing is stored. |
+| **Duplicate threshold** | *merge* | The minimum match to treat two assets as the same thing. **These links drive clustering.** |
+
+Defaults are **0.30** and **0.60**.
+
+The difference matters. *Related* affects what exists; *duplicate* affects what
+gets grouped. Raising the duplicate threshold breaks up clusters; lowering it
+merges them, which is where accidental mega-clusters come from.
+
+> The practical way to set these is not on this screen. Go to the [review
+> queue](/duplicates/review-queue/), drag the cutoffs on the histogram while
+> watching every count on the page follow, find a setting you like, then save.
+
+---
+
+## Exclusions
+
+An exclusion says **"this value carries no signal — ignore it when matching."**
+It's applied at indexing time, so excluded values never produce a match at all
+rather than being filtered out afterwards.
+
+Three modes:
+
+| Mode | Ignores | Use for |
+|---|---|---|
+| **Value** | One exact value, optionally scoped to a label | `null`, `N/A`, `unknown`, `noreply@company.com` |
+| **Regex** | Anything matching a pattern | Test data (`^test-`), sequential placeholders |
+| **Label** | Every value of a label | A detector whose output turned out to be useless for matching |
+
+Exclusions are the right answer whenever a match is caused by **something that
+appears everywhere**:
+
+- A pattern marked **rule candidate** — shared boilerplate. Exclude it and the
+  whole pattern evaporates.
+- The support address on every ticket.
+- A placeholder your ETL writes into empty fields.
+- The company name in every document footer.
+
+The [cause dialog](/duplicates/pairs/#not-a-duplicate) will write one for you
+from a rejected pair, which is the easiest route: it already knows which label
+was doing the damage and how many other pairs the same combination produced.
+
+Removing an exclusion is also a recompute — the values come back and the matches
+they cause return.
+
+---
+
+## Save & recompute
+
+Nothing here takes effect until you save, and saving **re-scores every asset**.
+It runs in the background as a Duplicates Finder run you can watch in
+[Scans](/flow/).
+
+While it runs, the queue shows the previous index — stale, but true. It's never
+emptied mid-rebuild.
+
+Expect the following to change after a recompute:
+
+- Every match weight, and therefore the whole histogram
+- Cluster membership, wherever the duplicate threshold moved
+- Which patterns exist at all — patterns are named after the labels that matched,
+  so excluding a label renames or removes patterns
+- **Verdicts survive.** They're keyed by asset pair, not by pattern, so nothing
+  you decided is lost when a pattern is renamed. Pairs whose score moved
+  materially are flagged as *re-scored since you decided* in
+  [Decisions](/duplicates/decisions/).
+
+---
+
+## Index health
+
+The right-hand column shows the two indexes the queue depends on.
+
+### Duplicate index
+
+The rollups behind the three levels: pairs, patterns, when it was last built, and
+how much [lineage](/sources/lineage/) coverage it found.
+
+It's rebuilt automatically as part of every scan. **Rebuild** rolls up
+correlation data that has already been scanned — it does not re-scan or re-score
+anything, and takes seconds rather than minutes.
+
+Use it when:
+
+- The workspace was scanned **before duplicate review existed** and the queue
+  reads empty although you know there are duplicates.
+- The counts look obviously stale after an import or a restore.
+
+If it reports **no lineage coverage**, every pair in the queue reads *lineage
+unknown* — see [Lineage & Relationships](/sources/lineage/) for what produces it.
+
+### Semantic index
+
+Vectors, queue depth, model, and whether the embedding worker is running. This is
+what powers **repeated text** patterns and the near-duplicate engine. Without it,
+that whole pattern family is simply absent; nothing else in duplicate review is
+affected.
+
+See [Embeddings](/settings/embeddings/).
+
+---
+
+## A tuning routine that works
+
+1. Work the [queue](/duplicates/review-queue/) for twenty minutes without
+   changing anything. You need real examples.
+2. Every time you reject a pair, read the cause dialog. Note which label keeps
+   coming up.
+3. If **one label** keeps causing bad matches → lower its weight.
+4. If **one value** keeps causing bad matches → exclude the value.
+5. If **whole boilerplate passages** keep causing matches → exclude the label, or
+   fix the detector producing it.
+6. Go back to the histogram, place the cutoffs in the valley, and save once.
+7. Re-check the queue after the recompute. The backlog should be materially
+   smaller and the remainder more interesting.
+
+Changing five things at once and saving tells you nothing about which one helped.
