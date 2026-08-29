@@ -82,6 +82,7 @@ describe('AutopilotWorker cycle chains', () => {
         markTriggered: jest.fn().mockResolvedValue(undefined),
         runBudgetMinutes: jest.fn().mockResolvedValue(null),
       } as never,
+      { publish: () => Promise.resolve() } as never,
     ) as unknown as WorkerInternals;
     jest
       .spyOn(worker, 'agentEnabled')
@@ -293,6 +294,7 @@ describe('AutopilotWorker chain failure isolation', () => {
         markTriggered: jest.fn().mockResolvedValue(undefined),
         runBudgetMinutes: jest.fn().mockResolvedValue(null),
       } as never,
+      { publish: () => Promise.resolve() } as never,
     ) as unknown as {
       agentEnabled: (k: AgentKind, c: unknown) => Promise<boolean>;
       runAgent: (k: AgentKind) => Promise<void>;

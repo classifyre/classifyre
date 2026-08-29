@@ -230,6 +230,24 @@ export type {
   CreateMcpServerDto,
   UpdateMcpServerDto,
   McpServerTestResultDto,
+  // Supervisor: goals, journal, capabilities and the undo log.
+  SupervisorStateDto,
+  SupervisorBudgetDto,
+  UpdateSupervisorDto,
+  SupervisorGoalDto,
+  SupervisorGoalListDto,
+  CreateSupervisorGoalDto,
+  UpdateSupervisorGoalDto,
+  SupervisorJournalEntryDto,
+  SupervisorJournalListDto,
+  AnnotateJournalDto,
+  WakeSupervisorDto,
+  SupervisorCapabilityDto,
+  SupervisorCapabilityListDto,
+  UpdateCapabilitiesDto,
+  AgentUndoEntryDto,
+  AgentUndoListDto,
+  RevertResultDto,
 } from "./generated/src/models";
 
 // Investigation (cases / inquiries / graph / hypotheses) model types
@@ -480,6 +498,13 @@ export {
   // them rather than duplicating the chain definition it is meant to reflect.
   AgentConfigDtoChainEnum,
   UpdateAgentConfigDtoTriggerModeEnum,
+  // Runtime enums (values, not types) — these must be exported as values or a
+  // consumer can name the type but never construct one.
+  SupervisorGoalDtoKindEnum,
+  SupervisorGoalDtoStatusEnum,
+  SupervisorGoalDtoOriginEnum,
+  CreateSupervisorGoalDtoKindEnum,
+  UpdateSupervisorGoalDtoStatusEnum,
   // Finding enums used by web components
   FindingResponseDtoDetectorTypeEnum,
   FindingResponseDtoSeverityEnum,

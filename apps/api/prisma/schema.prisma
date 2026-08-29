@@ -886,6 +886,29 @@ model InstanceSettings {
   autopilotEscalationEnabled Boolean @default(true) @map("autopilot_escalation_enabled")
   // Allow the harness to call tools from connected external MCP servers.
   autopilotMcpEnabled        Boolean @default(true) @map("autopilot_mcp_enabled")
+  // The self-directed supervisor. Ships OFF: it sets its own pace, commands the
+  // other agents and — once its hygiene capability is granted — deletes data.
+  // That is a switch to throw deliberately, after reading a journal, not one to
+  // inherit from an upgrade.
+  supervisorEnabled          Boolean @default(false) @map("supervisor_enabled")
+
+  // ── Supervisor budgets ─────────────────────────────────────────────────────
+  // A self-paced agent decides how often it costs money, so the ceiling has to
+  // live outside its own reasoning. Spend is summed from AgentRun.costUsd, which
+  // already records cached and uncached input separately.
+  //
+  // 0 disables the cap. Null pricing on the provider means cost cannot be
+  // computed at all, in which case the cap cannot bind and the supervisor is
+  // told so rather than silently running unbounded.
+  supervisorDailyCostLimitUsd Decimal? @map("supervisor_daily_cost_limit_usd") @db.Decimal(10, 4)
+  // Longest it may sleep. The backstop against an agent that schedules itself
+  // into next year, and the reason a lost wake cannot strand it forever.
+  supervisorMaxSleepHours     Int      @default(24) @map("supervisor_max_sleep_hours")
+  // Destructive calls allowed per day, counted across purge tools. Separate
+  // from the cost cap because the expensive mistake here is not the tokens.
+  supervisorPurgeBudgetPerDay Int      @default(2) @map("supervisor_purge_budget_per_day")
+  // How long an undo entry stays actionable.
+  supervisorUndoRetentionDays Int      @default(30) @map("supervisor_undo_retention_days")
 
   // Harness limits, promoted from hardcoded constants so an operator can size
   // them to their corpus. Defaults are the values those constants held, so an
@@ -2058,6 +2081,11 @@ enum AgentKind {
   // Conversational chat-gateway turn (Telegram/Slack bot). Never enqueued by
   // the autopilot pipeline; one run per inbound chat message for usage/audit.
   CHAT
+  // The self-directed control loop above the other missions. Owns durable
+  // goals, wakes itself, keeps a journal, and commands the workers. Unlike
+  // every kind above it, one run is one WAKE rather than one cycle step: its
+  // continuity comes from the journal, not from a carried transcript.
+  SUPERVISOR
 }
 
 enum AgentRunStatus {
@@ -2118,6 +2146,22 @@ enum AgentDecisionAction {
   TUNE_CORRELATION
   // Escalation agent: raised an operator notification about a high-severity case.
   NOTIFY_OPERATOR
+  // Supervisor: created or revised one of its own goals/tasks.
+  SET_GOAL
+  // Supervisor: woke a worker, or left an instruction for its next run.
+  COMMAND_AGENT
+  // Supervisor: changed a worker's trigger mode, gates or guardrails.
+  CONFIGURE_AGENT
+  // Supervisor: deleted findings to remove noise from the evidence base.
+  PURGE_FINDINGS
+  // Supervisor: deleted assets to remove noise from the corpus.
+  PURGE_ASSETS
+  // Supervisor: declared when it next wakes, and on what.
+  SCHEDULE_WAKE
+  // Supervisor: recorded what it did and what it intends to do next.
+  WRITE_JOURNAL
+  // An earlier agent action was reverted from the undo log.
+  REVERT_ACTION
   NO_ACTION
 }
 
@@ -2222,6 +2266,12 @@ model AgentConfig {
   // Per-agent override of the instance run budget, for one agent that is
   // legitimately slower than the rest.
   runBudgetMinutes   Int?              @map("run_budget_minutes")
+  // Per-agent override of the harness AI provider. null = the instance's
+  // harnessAiProviderConfigId. Agents are not alike in what they need from a
+  // model — escalation triages one case in three minutes, the supervisor
+  // decides what the whole instance does next — and paying the same rate for
+  // both is the easiest cost mistake to make here.
+  aiProviderConfigId String?           @map("ai_provider_config_id")
   // Last time this agent actually started, which is what the two guardrails
   // above compare against. Not derived from agent_runs: a run that never
   // started leaves no row, and the floor has to hold regardless.
@@ -2365,6 +2415,14 @@ model AgentMemory {
   // real system state; operator-authored memory is authoritative. Refreshing
   // content clears verification — the new claim has not been checked yet.
   origin     AgentMemoryOrigin @default(AGENT)
+  // Which mission this memory belongs to. NULL means shared — the historical
+  // behaviour and still the default, because a source profile or a decision
+  // precedent is worth the same to every agent that meets that source.
+  //
+  // The supervisor is the exception that motivated the column: its lessons are
+  // about pacing, delegation and its own past plans, and recalling those into
+  // an INQUIRY run would spend context on advice that agent cannot act on.
+  scope      AgentKind?
   verifiedAt DateTime?         @map("verified_at")
   verifiedBy String?           @map("verified_by")
   createdAt  DateTime          @default(now()) @map("created_at")
@@ -2372,6 +2430,7 @@ model AgentMemory {
 
   @@unique([kind, key])
   @@index([kind])
+  @@index([scope])
   @@index([tags], type: Gin)
   @@map("agent_memories")
 }
@@ -2379,6 +2438,174 @@ model AgentMemory {
 enum AgentMemoryOrigin {
   AGENT
   OPERATOR
+}
+
+// ── Supervisor ───────────────────────────────────────────────────────────────
+// The self-directed control loop. Everything below exists so that one agent can
+// hold an intention across days without holding a conversation across days: its
+// continuity is these rows, not a transcript, which is what keeps it affordable
+// and what makes every step of it reviewable.
+
+enum SupervisorGoalKind {
+  // The standing charter — what this instance is for. Exactly one is expected.
+  CHARTER
+  // A durable objective pursued across many wakes.
+  GOAL
+  // A concrete piece of work that finishes.
+  TASK
+}
+
+enum SupervisorGoalStatus {
+  ACTIVE
+  PAUSED
+  DONE
+  ABANDONED
+}
+
+// Singleton (id = 1) holding when the supervisor next intends to wake.
+//
+// Deliberately NOT the enable switch: that is InstanceSettings.supervisorEnabled,
+// so the existing per-agent toggle keeps working and there is exactly one place
+// to turn the supervisor off.
+model SupervisorState {
+  id               Int       @id @default(1)
+  // When it asked to be woken. Null means it has never run.
+  nextWakeAt       DateTime? @map("next_wake_at")
+  // Event types that should wake it sooner than nextWakeAt.
+  wakeOnEvents     String[]  @default([]) @map("wake_on_events")
+  // Its own words for why it chose this wake — shown to the operator, and read
+  // back to the agent so a wake it planned does not arrive as a surprise.
+  wakeReason       String?   @map("wake_reason") @db.Text
+  lastWakeAt       DateTime? @map("last_wake_at")
+  // Operator "not for a while" without switching the agent off entirely.
+  pausedUntil      DateTime? @map("paused_until")
+  // Capability groups the operator has switched OFF (see capabilities.ts).
+  //
+  // Stored as the exception list rather than the allow list on purpose: a group
+  // added in a later release should arrive switched on for an instance that
+  // never expressed an opinion about it, and an allow list would silently
+  // withhold it forever.
+  //
+  // Deliberately NOT AgentConfig.toolNames. That column is the RESIDENT
+  // toolset — what gets described in the prompt — and it means the same thing
+  // for every agent. What the supervisor may call is a different and much
+  // longer list, and conflating them would put two hundred schemas back into
+  // the context this whole design exists to keep small.
+  disabledCapabilities String[] @default([]) @map("disabled_capabilities")
+  // Consecutive wakes that changed nothing. A deliberate no-op is a valid
+  // outcome, but a long run of them means the pacing is wrong, so it is counted
+  // rather than merely permitted.
+  consecutiveNoops Int       @default(0) @map("consecutive_noops")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  @@map("supervisor_state")
+}
+
+// What the supervisor is trying to achieve. Operator-authored goals are
+// authoritative; the agent may propose its own and may always record progress,
+// but it can never rewrite what a person asked for.
+model SupervisorGoal {
+  id        String               @id @default(uuid())
+  kind      SupervisorGoalKind   @default(GOAL)
+  status    SupervisorGoalStatus @default(ACTIVE)
+  origin    AgentMemoryOrigin    @default(OPERATOR)
+  title     String
+  body      String?              @db.Text
+  // Higher runs first when the supervisor has to choose.
+  priority  Int                  @default(0)
+  parentId  String?              @map("parent_id")
+  dueAt     DateTime?            @map("due_at")
+  // Agent-maintained "where this stands", rewritten as it learns.
+  progress  String?              @db.Text
+  createdAt DateTime             @default(now()) @map("created_at")
+  updatedAt DateTime             @updatedAt @map("updated_at")
+
+  parent   SupervisorGoal?  @relation("SupervisorGoalTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children SupervisorGoal[] @relation("SupervisorGoalTree")
+
+  @@index([status, priority(sort: Desc)])
+  @@index([parentId])
+  @@map("supervisor_goals")
+}
+
+// One entry per wake: what it found, what it changed, what it will do next.
+//
+// Append-only, and the supervisor's actual memory of itself. The projection fed
+// into each wake is built from these rows, which is why `next` is a column
+// rather than prose buried in a summary — the next run reads it as its own
+// standing intention.
+model SupervisorJournalEntry {
+  id           String    @id @default(uuid())
+  // The AgentRun for this wake. Nullable so a refusal that opens no run (out of
+  // budget, paused) can still leave a trace of why nothing happened.
+  runId        String?   @map("run_id")
+  wakeReason   String    @map("wake_reason")
+  situation    String    @db.Text
+  did          String    @db.Text
+  next         String    @db.Text
+  goalIds      String[]  @default([]) @map("goal_ids")
+  nextWakeAt   DateTime? @map("next_wake_at")
+  costUsd      Decimal?  @map("cost_usd") @db.Decimal(14, 6)
+  // The operator's correction channel. Read back prominently on the next wake:
+  // this is how a person steers without editing the agent's own record of what
+  // it did.
+  operatorNote String?   @map("operator_note") @db.Text
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  @@index([createdAt(sort: Desc)])
+  @@index([runId])
+  @@map("supervisor_journal_entries")
+}
+
+// The observation filter's output: the few facts worth waking for.
+//
+// The supervisor is an LLM loop, so it only "sees" what enters its context.
+// Piping every session event through it would exhaust its window in a handful
+// of worker turns, so significant facts are written here and everything else
+// stays in agent_runs/agent_decisions, retrievable on demand.
+model SupervisorInboxEvent {
+  id         String    @id @default(uuid())
+  type       String
+  severity   String    @default("info")
+  summary    String    @db.Text
+  payload    Json?     @db.JsonB
+  // Set when a wake has read it. Rows are drained, not deleted, so the journal
+  // can be reconciled against what the agent was actually told.
+  consumedAt DateTime? @map("consumed_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  @@index([consumedAt, createdAt])
+  @@index([type, createdAt(sort: Desc)])
+  @@map("supervisor_inbox_events")
+}
+
+// How an agent action gets taken back.
+//
+// Modelled on CorrelationDecisionBatch, which is the undo log in this codebase
+// that already works — including its honesty: undo is not time travel. A
+// restore_value entry replays a snapshot; a rescan entry only names the source
+// whose derived rows a re-scan would rebuild. Whether either still applies is a
+// freshness question answered when the log is read, never a flag stored here.
+model AgentUndoEntry {
+  id            String              @id @default(uuid())
+  runId         String              @map("run_id")
+  decisionId    String?             @map("decision_id")
+  action        AgentDecisionAction
+  // Operator-readable: "disabled 3 detectors on Payroll S3".
+  label         String              @db.Text
+  entityType    String?             @map("entity_type")
+  entityId      String?             @map("entity_id")
+  // "restore_value" replays revertPayload; "rescan" re-derives from the source.
+  revertKind    String              @map("revert_kind")
+  revertPayload Json                @map("revert_payload") @db.JsonB
+  revertedAt    DateTime?           @map("reverted_at")
+  revertedBy    String?             @map("reverted_by")
+  expiresAt     DateTime            @map("expires_at")
+  createdAt     DateTime            @default(now()) @map("created_at")
+
+  @@index([revertedAt, createdAt(sort: Desc)])
+  @@index([runId])
+  @@map("agent_undo_entries")
 }
 
 // ── Investigation glossary ───────────────────────────────────────────────────

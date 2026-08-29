@@ -82,6 +82,7 @@ describe('AutopilotWorker readiness and batch consumption', () => {
         markTriggered: jest.fn().mockResolvedValue(undefined),
         runBudgetMinutes: jest.fn().mockResolvedValue(null),
       } as any,
+      { publish: () => Promise.resolve() } as never,
     );
   };
 
@@ -526,6 +527,7 @@ describe('AutopilotWorker heartbeat', () => {
         markTriggered: jest.fn().mockResolvedValue(undefined),
         runBudgetMinutes: jest.fn().mockResolvedValue(null),
       } as never,
+      { publish: () => Promise.resolve() } as never,
     );
     (worker as unknown as { runAgent: unknown }).runAgent = runAgent;
     return { worker, runAgent };

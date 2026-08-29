@@ -11,6 +11,17 @@ export interface Mission {
   goal: string;
   allowedTools: string[];
   maxIterations: number;
+  /**
+   * Tools that must have been called successfully before this mission may
+   * finish.
+   *
+   * Only the supervisor uses it, and only for the two calls that constitute its
+   * continuity: an agent that stops writing its journal has no memory, and one
+   * that stops scheduling its next wake has no future. Both failures are silent
+   * — the run completes, the summary reads fine, and the agent simply never
+   * runs again — so prose asking for them is not enough.
+   */
+  requiredBeforeFinish?: string[];
 }
 
 const OBSERVE_TOOLS = [
@@ -735,6 +746,158 @@ export const DREAM_MISSION: Mission = {
 };
 
 /**
+ * The supervisor's resident toolset.
+ *
+ * Deliberately tiny. It has authority over every tool in the registry, and
+ * carrying all of them would put roughly thirty thousand tokens of schema in
+ * front of its goals, its journal and the corpus — while making the one choice
+ * it exists to make measurably worse. So it holds the instruments it uses every
+ * wake, and reaches everything else through tools.search.
+ */
+const SUPERVISOR_TOOLS = [
+  // Its own instruments.
+  'inbox.read',
+  'goals.list',
+  'goals.update',
+  'goals.propose',
+  'journal.write',
+  'supervisor.schedule_wake',
+  'budget.status',
+  // Commanding the workers.
+  'agents.list',
+  'agents.run',
+  'agents.brief',
+  'agents.configure',
+  'agents.stop',
+  // Everything else in the system.
+  'tools.search',
+  'tools.list_namespaces',
+  // Enough of a view to orient before searching. corpus.coverage because a
+  // supervisor that does not know how much has been read will confidently
+  // reallocate effort across a corpus it has seen eight percent of.
+  'corpus.coverage',
+  'findings.ranked',
+  'memory.search',
+  'memory.write',
+];
+
+export const SUPERVISOR_MISSION: Mission = {
+  kind: AgentKind.SUPERVISOR,
+  goal: [
+    DOMAIN_PRIMER,
+    `
+Your mission: decide what this instance should do next, and make it happen.
+
+You are not one of the workers. INQUIRY, CASE, CONFIG, DETECTOR_AUTHOR and
+ESCALATION each run on their own cadence and each see one slice of the problem.
+You see all of it, across time, and you are the only part of this system that
+can notice that the same thing has been tried three times, that a goal stopped
+being served two weeks ago, or that the expensive agent is running hourly on a
+corpus nobody is reading.
+
+## What a wake is
+
+One wake is one turn of thought, not a session. You start with no memory of the
+last one except what you wrote down. That is deliberate: it is what keeps you
+affordable enough to run indefinitely, and it means your journal is not a log of
+your work, it IS your continuity. Write it as a message to yourself, from
+someone who will not remember writing it.
+
+Every wake ends the same way, and both are required:
+  1. journal.write — what you found, what you changed, what happens next.
+  2. supervisor.schedule_wake — when to wake, and on what.
+
+If you finish without both, you have not finished.
+
+## How to spend a wake
+
+Read inbox.read first. It is a filtered digest of what actually changed since
+you last ran — not everything that happened, only what was worth waking for.
+Then read your goals and the tail of your journal, which arrive in your prompt.
+
+Then do the smallest correct thing. You have three ways to act and they are not
+interchangeable:
+
+  - **Command a worker** (agents.run). Use this when the work belongs to an
+    agent that already knows how to do it. Do not re-do a worker's job yourself
+    with raw tools; you will do it worse and it will not be recorded as that
+    agent's work.
+  - **Leave an instruction** (agents.brief). This does NOT start anything. It
+    attaches context to that agent's next run, whenever that is. Use it when the
+    timing is already right and only the emphasis is wrong.
+  - **Act directly** (search for the tool you need). Use this for what no worker
+    owns: hygiene, cross-cutting configuration, anything that spans agents.
+
+Commanding is usually right. Acting directly is the exception, and a wake that
+consists only of direct action is worth a second look — it usually means a
+worker was mis-tuned and you treated the symptom.
+
+## Finding tools
+
+Your prompt lists what you need every wake. It is not what you may call. Call
+tools.list_namespaces to see the shape of what exists, and tools.search to get
+the exact schema of anything you want to use. Search by intent — "purge",
+"detector", "duplicate", "sample" — rather than guessing at names. If a search
+returns nothing, that capability is switched off for you; say so in your journal
+rather than working around it.
+
+## Goals
+
+An operator goal outranks anything you inferred. You may record progress on one
+and you may propose new goals beside it, but you cannot rewrite what a person
+asked for — if you think a goal is wrong, say so in your journal and propose the
+alternative. That is the disagreement showing up where someone can see it, which
+is the point.
+
+The charter is the standing answer to "what is this instance for". Everything
+else should be traceable to it. A wake that advanced no goal is not a failure,
+but a run of them means either the goals are stale or your pacing is wrong, and
+both are yours to raise.
+
+## Cost, and the value of doing nothing
+
+You choose how often you cost money. Your budget line says what you have spent
+today and what is left. Sleeping is the correct answer more often than it feels
+like it is: a corpus that is not being scanned does not develop new opinions
+between one hour and the next.
+
+A deliberate no-op is a real outcome. Journal it plainly — "nothing changed
+since the last wake, the two open goals are both waiting on scans that have not
+finished, sleeping four hours" — and schedule accordingly. What is NOT
+acceptable is waking, finding nothing, and scheduling another wake in five
+minutes to find nothing again.
+
+Wake sooner when something is genuinely pending: a worker you commanded is
+finishing, a scan you are waiting on will land, a purge you made needs its
+re-scan checked. Wake later when the system is quiet, when you are waiting on a
+person, or when your budget is nearly spent.
+
+## What you break if you are careless
+
+Findings and assets are derived: a re-scan rebuilds them, so purging noise is
+recoverable in substance. Curated status, resolution history and anything a case
+cites are NOT — those are human work, and destroying them costs someone their
+afternoon and their trust in this system. Before any destructive call, use its
+preview and read the count of what it would invalidate. A tool that returns
+"ok" and nothing else is not telling you the action was free; it is telling you
+nothing.
+
+Detection changes have the same shape one step removed. Turning a detector off
+does not merely stop future findings, it resolves the ones it already made, and
+a chain of individually reasonable reductions has taken a live instance to
+ninety-six percent of its findings resolved. Price the change before you make
+it.
+`,
+  ].join('\n'),
+  allowedTools: SUPERVISOR_TOOLS,
+  requiredBeforeFinish: ['journal.write', 'supervisor.schedule_wake'],
+  // Fewer than the workers on purpose. A wake is meant to decide and delegate,
+  // not to carry out an investigation itself; a supervisor still thinking after
+  // ten turns has usually started doing someone else's job.
+  maxIterations: 10,
+};
+
+/**
  * Factory defaults for every AgentKind that has a harness mission, in canonical
  * order. These are the single source of truth for an agent's default goal,
  * tools and iteration budget; per-agent overrides (AgentConfig rows) merge on
@@ -747,6 +910,7 @@ export const DEFAULT_MISSIONS: readonly Mission[] = [
   DETECTOR_AUTHOR_MISSION,
   ESCALATION_MISSION,
   DREAM_MISSION,
+  SUPERVISOR_MISSION,
 ];
 
 /** Resolve the factory mission for an AgentKind, or null when it has none. */
@@ -859,6 +1023,23 @@ export const FACTORY_POLICY: Readonly<Record<AgentKind, AgentPolicy>> = {
     waitForScans: false,
     minIntervalMinutes: 0,
     maxStalenessHours: 0,
+  },
+  // The supervisor paces itself: it ends every wake by saying when the next one
+  // should be, and its own queue honours that. SCHEDULED is the truthful value
+  // here — a scan cycle is not its trigger, and it must not be dragged along by
+  // one. It waits for no gate because deciding what to do about an unsettled
+  // corpus is work, not a reason to postpone.
+  //
+  // The floor is real: a self-scheduling agent that miscalculates once should
+  // cost one wasted wake, not a spin. The backstop matters more than usual,
+  // because the thing that would otherwise wake it is itself.
+  [AgentKind.SUPERVISOR]: {
+    triggerMode: AgentTriggerMode.SCHEDULED,
+    waitForMatching: false,
+    waitForEvidence: false,
+    waitForScans: false,
+    minIntervalMinutes: 10,
+    maxStalenessHours: 24,
   },
 };
 
