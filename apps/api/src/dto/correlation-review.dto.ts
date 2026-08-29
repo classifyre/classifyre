@@ -422,6 +422,51 @@ export class PatternActionDto {
   @IsOptional()
   @IsString()
   excludeLabel?: string;
+
+  @ApiPropertyOptional({
+    type: [String],
+    description:
+      'Reverse-index keys of the specific values to stop matching on, from the exclusion-candidates endpoint. Hashes rather than raw values so the rule can only ever name something that is actually indexed — a pattern endpoint must not be a way to write arbitrary instance-wide config.',
+  })
+  @IsOptional()
+  @IsArray()
+  excludeValueHashes?: string[];
+}
+
+// ── What a boilerplate pattern is really made of ────────────────────────────
+
+export class PatternExclusionCandidateDto {
+  @ApiProperty() label!: string;
+  @ApiProperty({ description: 'The normalized value, as the engine stores it' })
+  value!: string;
+  @ApiProperty() valueHash!: string;
+  @ApiProperty({
+    description:
+      'Assets holding this value anywhere in the corpus — how far excluding it reaches.',
+  })
+  assetCount!: number;
+}
+
+export class PatternExclusionCandidatesResponseDto {
+  @ApiProperty() patternKey!: string;
+  @ApiProperty({ description: 'THRESHOLD | EXCLUSION | MERGE | JUDGEMENT' })
+  ruleKind!: string;
+  @ApiProperty({ type: [PatternExclusionCandidateDto] })
+  candidates!: PatternExclusionCandidateDto[];
+  @ApiProperty({
+    description: 'Distinct values in the group before the list was capped',
+  })
+  totalCandidates!: number;
+  @ApiProperty({
+    description:
+      'Scored pairs elsewhere in the corpus that hold one of these values on BOTH sides — the matches the template is actually driving. This is the number the exclusion removes, and it is not the same as the pairs in this pattern.',
+  })
+  pairsDriven!: number;
+  @ApiProperty({
+    description:
+      'True when the near-duplicate group is bigger than one request should read; the candidate list is the strongest part of it rather than all of it.',
+  })
+  truncated!: boolean;
 }
 
 export class PatternPreviewResponseDto {
@@ -446,9 +491,16 @@ export class PatternApplyResponseDto {
   @ApiPropertyOptional({
     nullable: true,
     type: String,
-    description: 'Exclusion rule created, when the pattern warranted one',
+    description:
+      'First exclusion rule created, when the pattern warranted one. Kept for callers written before an action could create several; prefer exclusionRuleIds.',
   })
   exclusionRuleId!: string | null;
+
+  @ApiProperty({
+    type: [String],
+    description: 'Every exclusion rule this action created. Empty when none.',
+  })
+  exclusionRuleIds!: string[];
 }
 
 export class SplitPairResponseDto {

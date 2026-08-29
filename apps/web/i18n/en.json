@@ -3926,6 +3926,19 @@
       "after": "After",
       "confirmAll": "Confirm all in band"
     },
+    "exclude": {
+      "action": "Stop matching on these values",
+      "title": "Stop the template from driving matches",
+      "intro": "These assets share the same passage of text. The values inside it are what make them match documents elsewhere — excluding them stops that, everywhere, from the next scan on.",
+      "impact": "{{pairs}} matched pairs in other patterns rest on one of these {{values}} values. This does not change the pairs in this pattern: those come from the repeated text itself, and are recorded as not-duplicates.",
+      "assets": "in {{count}} assets",
+      "none": "Nothing to exclude — no value in this group appears in more than one asset.",
+      "capped": "Showing the {{shown}} widest of {{total}} values.",
+      "recomputeNote": "Writes instance-wide exclusion rules and re-scores the corpus. Reversible from the undo log.",
+      "apply": "Exclude {{count}} values",
+      "cancel": "Cancel",
+      "applied": "{{rules}} exclusion rules written, {{pairs}} pairs decided. A recompute is running."
+    },
     "undo": {
       "title": "Recent actions",
       "empty": "Nothing to undo yet.",

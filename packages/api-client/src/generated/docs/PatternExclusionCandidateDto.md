@@ -1,30 +1,28 @@
 
-# PatternApplyResponseDto
+# PatternExclusionCandidateDto
 
 
 ## Properties
 
 Name | Type
 ------------ | -------------
-`batchId` | string
-`applied` | number
-`workRemaining` | number
-`exclusionRuleId` | string
-`exclusionRuleIds` | Array&lt;string&gt;
+`label` | string
+`value` | string
+`valueHash` | string
+`assetCount` | number
 
 ## Example
 
 ```typescript
-import type { PatternApplyResponseDto } from '@workspace/api-client'
+import type { PatternExclusionCandidateDto } from '@workspace/api-client'
 
 // TODO: Update the object below with actual values
 const example = {
-  "batchId": null,
-  "applied": null,
-  "workRemaining": null,
-  "exclusionRuleId": null,
-  "exclusionRuleIds": null,
-} satisfies PatternApplyResponseDto
+  "label": null,
+  "value": null,
+  "valueHash": null,
+  "assetCount": null,
+} satisfies PatternExclusionCandidateDto
 
 console.log(example)
 
@@ -33,7 +31,7 @@ const exampleJSON: string = JSON.stringify(example)
 console.log(exampleJSON)
 
 // Parse the JSON string back to an object
-const exampleParsed = JSON.parse(exampleJSON) as PatternApplyResponseDto
+const exampleParsed = JSON.parse(exampleJSON) as PatternExclusionCandidateDto
 console.log(exampleParsed)
 ```
 

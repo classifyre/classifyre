@@ -3926,6 +3926,19 @@
       "after": "Nachher",
       "confirmAll": "Alle im Bereich bestätigen"
     },
+    "exclude": {
+      "action": "Diese Werte nicht mehr abgleichen",
+      "title": "Verhindern, dass die Vorlage Treffer erzeugt",
+      "intro": "Diese Assets teilen denselben Textabschnitt. Die Werte darin sorgen dafür, dass sie zu Dokumenten anderswo passen — sie auszuschließen beendet das ab dem nächsten Scan, überall.",
+      "impact": "{{pairs}} Treffer­paare in anderen Mustern beruhen auf einem dieser {{values}} Werte. An den Paaren in diesem Muster ändert das nichts: die stammen aus dem wiederholten Text selbst und werden als Nicht-Duplikate erfasst.",
+      "assets": "in {{count}} Assets",
+      "none": "Nichts auszuschließen — kein Wert dieser Gruppe kommt in mehr als einem Asset vor.",
+      "capped": "Es werden die {{shown}} weitesten von {{total}} Werten gezeigt.",
+      "recomputeNote": "Schreibt instanzweite Ausschlussregeln und bewertet den Korpus neu. Über das Undo-Protokoll umkehrbar.",
+      "apply": "{{count}} Werte ausschließen",
+      "cancel": "Abbrechen",
+      "applied": "{{rules}} Ausschlussregeln geschrieben, {{pairs}} Paare entschieden. Eine Neuberechnung läuft."
+    },
     "undo": {
       "title": "Letzte Aktionen",
       "empty": "Noch nichts zum Rückgängigmachen.",

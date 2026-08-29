@@ -114,6 +114,8 @@ export type {
   PatternActionDto,
   PatternPreviewResponseDto,
   PatternApplyResponseDto,
+  PatternExclusionCandidateDto,
+  PatternExclusionCandidatesResponseDto,
   SplitPairResponseDto,
   RebuildIndexResponseDto,
   ReviewDecisionRowDto,

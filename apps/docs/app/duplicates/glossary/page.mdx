@@ -185,9 +185,10 @@ Byte-identical content. Confirming is bookkeeping. Confirm the lot.
 
 ### rule candidate
 
-Shared boilerplate is doing the matching. Don't grind the pairs — write an
-[exclusion](/duplicates/tuning/#exclusions) so the text stops driving matches at
-all, and the whole pattern evaporates.
+Shared boilerplate is doing the matching. Don't grind the pairs — press **Stop
+matching on these values**, which excludes the values inside the template so it
+stops driving matches everywhere else. See
+[Patterns](/duplicates/patterns/#rule-candidate-stop-matching-on-these-values).
 
 ### cutoff candidate
 
@@ -350,6 +351,19 @@ separate — the fix is on the [tuning](/duplicates/tuning/) screen.
 Records **Confirm** on every undecided pair in the pattern, inside the current
 cutoffs and lineage filter. Never touches an already-decided pair. Reversible
 from the undo log.
+
+### Stop matching on these values
+
+On a boilerplate pattern only. Writes an exclusion rule for each value inside
+the repeated passage, and records *Not a duplicate* on the pattern's own pairs.
+The values are listed with how many assets hold each one, so you approve a list
+rather than a promise. One undo-log entry; undoing it removes every rule.
+
+### matched pairs in other patterns rest on these values
+
+The number in the exclusion dialog, and the one the action actually changes. The
+pattern's own pairs come from repeated text and survive the exclusion; what
+disappears are the shared-value matches the template was causing elsewhere.
 
 ### Reopen
 
