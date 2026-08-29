@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Mapping
 from typing import Protocol, runtime_checkable
 
 from ..models.generated_single_asset_scan_results import DetectionResult, SingleAssetScanResults
@@ -15,6 +15,8 @@ class ContentProvider(Protocol):
     async def fetch_text_pages(self, asset_id: str) -> AsyncGenerator[str, None]: ...
 
     async def fetch_bytes(self, asset_id: str) -> tuple[bytes, str] | None: ...
+
+    def asset_tags(self, asset_hash: str) -> Mapping[str, str]: ...
 
     def enrich_finding_location(
         self,

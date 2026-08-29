@@ -14,14 +14,19 @@ _PIPELINE_TYPE_DEFAULTS: dict[str, str] = {
     "GLiNER2PipelineSchema": "GLINER2",
     "RegexPipelineSchema": "REGEX",
     "LLMPipelineSchema": "LLM",
+    "TagPipelineSchema": "TAG",
 }
 
 # Pipeline schema classes whose `severity` field has a string default from JSON schema
 # ('info') but must be an enum instance to avoid Pydantic serialization warnings
 # ("Expected `enum` - serialized value may not be as expected").
+# Maps class name -> the severity member its JSON-schema default names. The enum
+# type is whatever codegen assigned (``Severity``, ``Severity2``, ...), so it is
+# captured from the emitted source rather than hardcoded here.
 _SEVERITY_ENUM_DEFAULT_CLASSES = {
-    "LLMPipelineSchema",
-    "TextClassificationPipelineSchema",
+    "LLMPipelineSchema": "info",
+    "TextClassificationPipelineSchema": "info",
+    "TagPipelineSchema": "medium",
 }
 
 
@@ -37,17 +42,20 @@ def _patch_pipeline_type_defaults(source: str) -> str:
 
 
 def _patch_severity_enum_defaults(source: str) -> str:
-    """Replace string 'info' severity Field defaults with Severity.info enum instances.
+    """Replace string string severity Field defaults with enum instances.
 
     datamodel-codegen emits Field('info', ...) from the JSON schema default, but
     Pydantic v2 warns at serialization time when the stored value is a plain string
     rather than a Severity enum member.  This patch rewrites only the severity field
     inside each affected class so the fix survives future codegen runs.
     """
-    for cls_name in _SEVERITY_ENUM_DEFAULT_CLASSES:
+    for cls_name, member in _SEVERITY_ENUM_DEFAULT_CLASSES.items():
         # Match from the class definition up through the severity Field default string.
-        pattern = rf"(class {re.escape(cls_name)}\(.*?severity: Severity \| None = Field\(\n\s+)'info'(\s*,)"
-        replacement = rf"\1Severity.info\2"
+        pattern = (
+            rf"(class {re.escape(cls_name)}\(.*?severity: (Severity\d*) \| None = Field\(\n\s+)"
+            rf"'{re.escape(member)}'(\s*,)"
+        )
+        replacement = rf"\1\2.{member}\3"
         source = re.sub(pattern, replacement, source, flags=re.DOTALL)
     return source
 

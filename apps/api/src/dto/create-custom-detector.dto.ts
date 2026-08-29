@@ -57,7 +57,7 @@ export class CreateCustomDetectorDto {
 
   @ApiProperty({
     description:
-      'Pipeline schema defining the detector behaviour (type: GLINER2 | REGEX | LLM | TEXT_CLASSIFICATION | IMAGE_CLASSIFICATION | OBJECT_DETECTION)',
+      'Pipeline schema defining the detector behaviour (type: GLINER2 | REGEX | LLM | TEXT_CLASSIFICATION | IMAGE_CLASSIFICATION | OBJECT_DETECTION | TAG). TAG is a placeholder that runs nothing: it exists so a CUSTOM connector notebook can assert a fact it already knows with Asset(tags={"<key>": "<value>"}), and it is not selectable on a source.',
   })
   @IsObject()
   pipelineSchema: Record<string, unknown>;

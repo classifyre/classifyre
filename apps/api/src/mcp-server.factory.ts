@@ -1837,7 +1837,7 @@ export class McpServerFactoryService {
       {
         title: 'Create Custom Detector',
         description:
-          'Create a custom detector. The pipeline_schema.type selects the engine: GLINER2 (default), REGEX, LLM (AI), TEXT_CLASSIFICATION, IMAGE_CLASSIFICATION, or OBJECT_DETECTION. GLiNER2 needs at least one entity or classification task. LLM detectors require aiProviderConfigId and a system_prompt.',
+          'Create a custom detector. The pipeline_schema.type selects the engine: GLINER2 (default), REGEX, LLM (AI), TEXT_CLASSIFICATION, IMAGE_CLASSIFICATION, OBJECT_DETECTION, or TAG. GLiNER2 needs at least one entity or classification task. LLM detectors require aiProviderConfigId and a system_prompt. TAG is a placeholder that runs nothing: it exists so a CUSTOM connector notebook can assert a fact it already knows with Asset(tags={"<key>": "<value>"}), and it is not selectable on a source.',
         inputSchema: {
           key: z.string().optional(),
           name: z.string(),
@@ -1850,7 +1850,7 @@ export class McpServerFactoryService {
               'AI provider credential ID. Required for LLM (AI) detectors.',
             ),
           pipeline_schema: jsonObjectSchema.describe(
-            'Pipeline schema. GLiNER2 example: { type: "GLINER2", entities: { order_id: { description: "Order ID like ORD-123", required: true } }, classification: { intent: { labels: ["refund", "bug"], multi_label: false } } }. LLM (AI) example: { type: "LLM", system_prompt: "Classify the sentiment of the text.", labels: [{ name: "good" }, { name: "bad" }, { name: "violent" }], severity_map: [{ pattern: "violent", severity: "critical" }], output_fields: [{ name: "language", type: "string" }] }',
+            'Pipeline schema. GLiNER2 example: { type: "GLINER2", entities: { order_id: { description: "Order ID like ORD-123", required: true } }, classification: { intent: { labels: ["refund", "bug"], multi_label: false } } }. LLM (AI) example: { type: "LLM", system_prompt: "Classify the sentiment of the text.", labels: [{ name: "good" }, { name: "bad" }, { name: "violent" }], severity_map: [{ pattern: "violent", severity: "critical" }], output_fields: [{ name: "language", type: "string" }] }. TAG example: { type: "TAG", label: "Cardholder data", severity: "high" }',
           ),
           isActive: z.boolean().optional(),
         },

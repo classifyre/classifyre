@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Mapping
 
 from ..models.generated_single_asset_scan_results import DetectionResult, SingleAssetScanResults
 from ..sources.base import BaseSource
@@ -68,6 +68,9 @@ class ParsedContentProvider:
 
     async def fetch_bytes(self, asset_id: str) -> tuple[bytes, str] | None:
         return await self._source.fetch_content_bytes(asset_id)
+
+    def asset_tags(self, asset_hash: str) -> Mapping[str, str]:
+        return self._source.asset_tags(asset_hash)
 
     def enrich_finding_location(
         self,

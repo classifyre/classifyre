@@ -1607,7 +1607,9 @@
     "select": "Auswählen →",
     "typeGroups": {
       "general": "Allgemein",
-      "transformers": "HuggingFace Transformers"
+      "transformers": "HuggingFace Transformers",
+      "manual": "Manuell",
+      "manualNote": "Keine Engine. Ein Tag-Detektor läuft nie über Inhalte — er existiert, damit ein Custom-Connector-Notebook eine Tatsache festhalten kann, die das Quellsystem bereits kennt. Er erscheint nicht in der Detektorliste einer Quelle."
     },
     "types": {
       "gliner2": {
@@ -1645,7 +1647,36 @@
         "tagline": "Objekte in Bildern lokalisieren und labeln",
         "description": "Führe jedes HuggingFace Objekterkennungsmodell auf Bildern aus. Befunde enthalten Begrenzungsrahmen, Konfidenzwerte und label-basierte Schweregrad-Zuordnung.",
         "tags": "Begrenzungsrahmen, Objekt-Labels, Schweregrad-Zuordnung"
+      },
+      "tag": {
+        "title": "Tag",
+        "tagline": "Manuell, ohne Klassifizierung",
+        "description": "Ein Platzhalter für eine Tatsache, die Sie bereits kennen. Er führt nichts aus und liest keine Inhalte: Ein Custom-Connector-Notebook wendet ihn per Schlüssel mit Asset(tags={\"key\": \"value\"}) an, und der Wert wird zum Fund. Verwenden Sie ihn, wenn das Quellsystem die Antwort bereits hat.",
+        "tags": "Manuell, Custom-Quellen, Kein Modell"
       }
+    },
+    "tag": {
+      "stepIdentity": "Identität",
+      "stepIdentityDesc": "Name, Schlüssel und Status",
+      "identityTitle": "Detektor-Identität",
+      "name": "Name",
+      "namePlaceholder": "z. B. Karteninhaberdaten",
+      "keyLabel": "Schlüssel",
+      "keyHint": "Dies ist der Schlüssel, den Sie im Notebook schreiben. Wird aus dem Namen abgeleitet, wenn leer.",
+      "descriptionLabel": "Beschreibung",
+      "descriptionPlaceholder": "Was sagt dieses Tag aus, und wer hat das entschieden?",
+      "activeLabel": "Aktiv — aus einem Custom-Connector-Notebook nutzbar",
+      "tagTitle": "Was das Tag festhält",
+      "labelLabel": "Label",
+      "labelPlaceholder": "z. B. Karteninhaberdaten",
+      "labelHint": "Wird von jedem Fund dieses Detektors getragen. Standard ist der Name.",
+      "severityLabel": "Schweregrad",
+      "severityHint": "Jeder Fund dieses Tags erhält diesen Schweregrad. Ein Tag wird behauptet, nicht abgeleitet — es gibt keine Konfidenz, aus der sich einer ergeben könnte.",
+      "usageTitle": "Verwendung im Notebook",
+      "usageHint": "Fügen Sie diesen Schlüssel jedem Asset hinzu, das Ihr Custom-Connector liefert. Der übergebene Wert wird zum Treffer-Inhalt des Funds.",
+      "usageCopy": "Snippet kopieren",
+      "usageCopied": "Kopiert",
+      "notSelectable": "Tag-Detektoren erscheinen nicht in der Detektorliste einer Quelle. Jeder aktive steht automatisch jedem Custom-Connector zur Verfügung."
     }
   },
   "scans": {

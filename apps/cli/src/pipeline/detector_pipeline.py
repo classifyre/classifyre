@@ -10,6 +10,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from ..detectors.base import BaseDetector
+from ..detectors.custom.runners._tag import TagRunner
 from ..models.generated_single_asset_scan_results import (
     AssetType as OutputAssetType,
 )
@@ -267,6 +268,18 @@ class DetectorPipeline:
 
             for finding in link_findings:
                 self.content_provider.enrich_finding_location(finding, asset, "")
+
+        tag_findings, tag_warnings, tag_detector_types_run = self._apply_asset_tags(
+            asset=asset,
+            detectors=active_detectors,
+            outcome_sink=outcome_sink,
+        )
+        findings.extend(tag_findings)
+        scan_warnings.extend(tag_warnings)
+        detector_types_run = self._merge_detector_types(
+            detector_types_run,
+            tag_detector_types_run,
+        )
 
         scan_duration = int((datetime.now(UTC) - scan_started).total_seconds() * 1000)
 
@@ -932,6 +945,63 @@ class DetectorPipeline:
                 f"This is missing coverage, not proof the asset is empty."
             )
         return f"No content available for asset {asset.name}"
+
+    def _apply_asset_tags(
+        self,
+        *,
+        asset: SingleAssetScanResults,
+        detectors: list[BaseDetector],
+        outcome_sink: dict[tuple[DetectorType, str | None], DetectorOutcome] | None,
+    ) -> tuple[list[DetectionResult], list[str], list[DetectorType]]:
+        """Turn the source's asserted tags into findings.
+
+        A tag is the one finding that does not come from reading anything. The
+        connector already knew the answer; the Tag detector named by the key
+        supplies the label and severity, and the value the connector supplied
+        becomes the matched content.
+        """
+        tags = self.content_provider.asset_tags(str(asset.hash))
+        if not tags:
+            return [], [], []
+
+        runners = self._tag_runners(detectors)
+        findings: list[DetectionResult] = []
+        warnings: list[str] = []
+        types_run: list[DetectorType] = []
+
+        for key, value in tags.items():
+            entry = runners.get(key)
+            if entry is None:
+                # Almost always a typo in the notebook or a detector that was
+                # deleted. Silence would look like the tag simply not working,
+                # so name the key and what was available instead.
+                available = ", ".join(sorted(runners)) or "none configured"
+                warnings.append(
+                    f"Tag '{key}' on asset '{asset.name}' matches no Tag detector "
+                    f"and was skipped (available: {available})"
+                )
+                continue
+            detector, runner = entry
+            finding = runner.tag_finding(value)
+            self.content_provider.enrich_finding_location(finding, asset, "")
+            findings.append(finding)
+            self._record_outcome(outcome_sink, detector, None)
+            types_run = self._merge_detector_types(types_run, [DetectorType.CUSTOM])
+
+        return findings, warnings, types_run
+
+    @staticmethod
+    def _tag_runners(detectors: list[BaseDetector]) -> dict[str, tuple[BaseDetector, Any]]:
+        """Tag detectors in this run, keyed by the key a notebook writes."""
+        found: dict[str, tuple[BaseDetector, Any]] = {}
+        for detector in detectors:
+            runner = getattr(detector, "runner", None)
+            if not isinstance(runner, TagRunner):
+                continue
+            key = getattr(getattr(detector, "custom_config", None), "custom_detector_key", None)
+            if isinstance(key, str) and key:
+                found[key] = (detector, runner)
+        return found
 
     @staticmethod
     def _detector_identity(detector: BaseDetector) -> tuple[DetectorType, str | None] | None:

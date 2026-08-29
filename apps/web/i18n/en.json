@@ -1607,7 +1607,9 @@
     "select": "Select →",
     "typeGroups": {
       "general": "General",
-      "transformers": "HuggingFace Transformers"
+      "transformers": "HuggingFace Transformers",
+      "manual": "Manual",
+      "manualNote": "Not an engine. A Tag detector never runs on content — it exists so a Custom connector notebook can record a fact the source system already holds. It does not appear in a source's detector list."
     },
     "types": {
       "gliner2": {
@@ -1645,7 +1647,36 @@
         "tagline": "Locate and label objects in images",
         "description": "Run any HuggingFace object-detection model on images. Findings include bounding boxes, confidence scores, and label-based severity mapping.",
         "tags": "Bounding boxes, Object labels, Severity map"
+      },
+      "tag": {
+        "title": "Tag",
+        "tagline": "Manual, no classification",
+        "description": "A placeholder for a fact you already know. It runs nothing and reads no content: a Custom connector notebook applies it by key with Asset(tags={\"key\": \"value\"}), and the value becomes a finding. Use it when the source system already has the answer.",
+        "tags": "Manual, Custom sources, No model"
       }
+    },
+    "tag": {
+      "stepIdentity": "Identity",
+      "stepIdentityDesc": "Name, key, and status",
+      "identityTitle": "Detector identity",
+      "name": "Name",
+      "namePlaceholder": "e.g. Cardholder Data",
+      "keyLabel": "Key",
+      "keyHint": "This is the key you write in a notebook. Auto-derived from the name if left blank.",
+      "descriptionLabel": "Description",
+      "descriptionPlaceholder": "What does this tag assert, and who decided it?",
+      "activeLabel": "Active — usable from a Custom connector notebook",
+      "tagTitle": "What the tag records",
+      "labelLabel": "Label",
+      "labelPlaceholder": "e.g. Cardholder data",
+      "labelHint": "Carried by every finding this detector produces. Defaults to the name.",
+      "severityLabel": "Severity",
+      "severityHint": "Every finding from this tag gets this severity. A tag is asserted, not inferred, so there is no confidence to derive one from.",
+      "usageTitle": "Using it in a notebook",
+      "usageHint": "Add this key to any asset your Custom connector yields. The value you pass becomes the finding's matched content.",
+      "usageCopy": "Copy snippet",
+      "usageCopied": "Copied",
+      "notSelectable": "Tag detectors do not appear in a source's detector list. Every active one is available to every Custom connector automatically."
     }
   },
   "scans": {

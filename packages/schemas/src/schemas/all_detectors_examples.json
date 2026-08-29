@@ -946,6 +946,20 @@
   ],
   "CUSTOM": [
     {
+      "name": "Cardholder Data (tag)",
+      "description": "A placeholder detector for a fact the source system already knows. It runs nothing: a CUSTOM connector notebook applies it with Asset(tags={\"cardholder_data\": \"<value>\"}) and the value becomes the finding. Use a tag when re-deriving the answer with a classifier would only add error.",
+      "config": {
+        "custom_detector_key": "cardholder_data",
+        "name": "Cardholder Data (tag)",
+        "description": "Marks assets the upstream system has already classified as holding cardholder data",
+        "pipeline_schema": {
+          "type": "TAG",
+          "label": "Cardholder data",
+          "severity": "high"
+        }
+      }
+    },
+    {
       "name": "Control-Evasion Intent Detector",
       "description": "Use an LLM where lexical matches are misleading: distinguish ordinary urgency or process discussion from an explicit request to conceal activity, bypass approval, or evade a control, and extract the evidence supporting that judgement.",
       "config": {
