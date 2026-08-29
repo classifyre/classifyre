@@ -3940,7 +3940,9 @@
       "noValues": "Keine vergleichbaren Werte.",
       "notFound": "Dieses Paar ist nicht mehr in der Prüfliste.",
       "alreadyDecided": "Bereits entschieden: {{verdict}}",
-      "staleVerdict": "Dieses Paar wurde seit der Entscheidung neu bewertet."
+      "staleVerdict": "Dieses Paar wurde seit der Entscheidung neu bewertet.",
+      "remaining": "{{count}} in diesem Muster übrig",
+      "queueClear": "In diesem Muster gibt es nichts mehr zu prüfen."
     },
     "waterfall": {
       "title": "Warum {{score}}",

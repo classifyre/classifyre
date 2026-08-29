@@ -3940,7 +3940,9 @@
       "noValues": "No comparable values.",
       "notFound": "That pair is no longer in the review queue.",
       "alreadyDecided": "Already decided: {{verdict}}",
-      "staleVerdict": "This pair has been re-scored since it was decided."
+      "staleVerdict": "This pair has been re-scored since it was decided.",
+      "remaining": "{{count}} left in this pattern",
+      "queueClear": "Nothing left to review in this pattern."
     },
     "waterfall": {
       "title": "Why it scored {{score}}",

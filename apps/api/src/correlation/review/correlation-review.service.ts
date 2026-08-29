@@ -1619,12 +1619,25 @@ export class CorrelationReviewService {
         sample: string[];
       }>
     >(Prisma.sql`
-      SELECT COUNT(*)::bigint AS pairs,
-             COUNT(DISTINCT s.cluster_id)::bigint AS clusters,
-             COUNT(DISTINCT s.a_id) + COUNT(DISTINCT s.b_id)::bigint AS assets,
-             (ARRAY_AGG(DISTINCT s.cluster_id) FILTER (WHERE s.cluster_id IS NOT NULL))[1:5] AS sample
-      FROM correlation_pair_signatures s
-      WHERE ${where}
+      WITH scoped AS (
+        SELECT s.a_id, s.b_id, s.cluster_id
+        FROM correlation_pair_signatures s
+        WHERE ${where}
+      )
+      SELECT (SELECT COUNT(*) FROM scoped)::bigint AS pairs,
+             (SELECT COUNT(DISTINCT cluster_id) FROM scoped)::bigint AS clusters,
+             -- Distinct over BOTH sides together. Summing the two column-wise
+             -- distincts counted every asset that is the left side of one pair
+             -- and the right side of another twice, so this number -- the one
+             -- someone reads before confirming several thousand pairs at once
+             -- -- could report nearly double what the action would touch.
+             (SELECT COUNT(*) FROM (
+                SELECT a_id AS id FROM scoped
+                UNION
+                SELECT b_id FROM scoped) u)::bigint AS assets,
+             (SELECT (ARRAY_AGG(DISTINCT cluster_id)
+                        FILTER (WHERE cluster_id IS NOT NULL))[1:5]
+                FROM scoped) AS sample
     `);
 
     const before = await this.workRemaining();
@@ -1700,37 +1713,71 @@ export class CorrelationReviewService {
         config.exclusions.find((e) => e.label === dto.excludeLabel)?.id ?? null;
     }
 
-    await this.prisma.$transaction([
-      this.prisma.correlationReviewBatch.create({
-        data: {
-          id: batchId,
-          action: exclusionRuleId ? 'exclude' : verdict.toLowerCase(),
-          patternKey,
-          pairCount: targets.length,
-          clusterCount: new Set(
-            targets.map((t) => t.cluster_id).filter(Boolean),
-          ).size,
-          assetCount: new Set(targets.flatMap((t) => [t.a_id, t.b_id])).size,
-          summary: `${verdict} on pattern ${patternKey} (${targets.length} pairs)`,
-          undoPayload: exclusionRuleId
-            ? { kind: 'exclusion', ruleId: exclusionRuleId }
-            : Prisma.DbNull,
-        },
-      }),
-      this.prisma.correlationPairVerdict.createMany({
-        data: targets.map((t) => ({
-          aId: t.a_id,
-          bId: t.b_id,
-          verdict: verdict as never,
-          patternKey,
-          scoreAtVerdict: t.weighted,
-          batchId,
-        })),
-        skipDuplicates: true,
-      }),
-    ]);
+    try {
+      await this.prisma.$transaction([
+        this.prisma.correlationReviewBatch.create({
+          data: {
+            id: batchId,
+            action: exclusionRuleId ? 'exclude' : verdict.toLowerCase(),
+            patternKey,
+            pairCount: targets.length,
+            clusterCount: new Set(
+              targets.map((t) => t.cluster_id).filter(Boolean),
+            ).size,
+            assetCount: new Set(targets.flatMap((t) => [t.a_id, t.b_id])).size,
+            summary: `${verdict} on pattern ${patternKey} (${targets.length} pairs)`,
+            undoPayload: exclusionRuleId
+              ? { kind: 'exclusion', ruleId: exclusionRuleId }
+              : Prisma.DbNull,
+          },
+        }),
+        this.prisma.correlationPairVerdict.createMany({
+          data: targets.map((t) => ({
+            aId: t.a_id,
+            bId: t.b_id,
+            verdict: verdict as never,
+            patternKey,
+            scoreAtVerdict: t.weighted,
+            batchId,
+          })),
+          skipDuplicates: true,
+        }),
+      ]);
+    } catch (error) {
+      // The exclusion has to be written before the verdicts, or a crash in
+      // between marks the queue done without the rule that justified it. The
+      // other order fails worse: an instance-wide matching rule with no batch
+      // in the undo log, which nothing in the UI can reach to take back. So
+      // roll it back by hand and let the caller see the failure.
+      if (exclusionRuleId) {
+        await this.correlation.removeExclusion(exclusionRuleId).catch((e) => {
+          this.logger.error(
+            `Bulk action on ${patternKey} failed and its exclusion rule ` +
+              `${exclusionRuleId} could not be rolled back: ${String(e)}`,
+          );
+        });
+      }
+      throw error;
+    }
 
     await this.refreshUndecidedCounts();
+
+    // REJECTED and SPLIT are the two verdicts cluster union consults, so a
+    // bulk one changes what the clusters should be. `splitPair` recomputes its
+    // own two assets inline; a pattern can cover thousands, which is a
+    // background job rather than something to hold a request open for.
+    // Without this the clusters silently disagreed with the decisions until
+    // whenever the next scan happened to run.
+    if (
+      targets.length > 0 &&
+      (verdict === 'REJECTED' || verdict === 'SPLIT') &&
+      !exclusionRuleId // an exclusion already scheduled one via saveConfig
+    ) {
+      await this.correlation.scheduleFullRecompute(
+        `bulk ${verdict.toLowerCase()} on pattern ${patternKey}`,
+      );
+    }
+
     return {
       batchId,
       applied: targets.length,

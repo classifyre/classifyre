@@ -151,6 +151,64 @@ through that Classifyre isn't watching yet.
 
 ---
 
+## Lineage as evidence in duplicate review
+
+Lineage has a second job beyond "where did this come from". It is the cross-check
+that makes [duplicate review](/duplicates/) worth reading.
+
+When two assets look nearly identical, the interesting question is not *how
+similar are they* but **why**. Duplicate matching answers that from the contents
+of the assets; lineage answers it from a completely different direction —
+connector catalogs, query logs, view SQL. Because the two do not share a source,
+combining them genuinely adds information.
+
+| Similar, and… | Reads as | What it means | Priority |
+|---|---|---|---|
+| there is a **path** | **Shared upstream** | A derived copy — one comes from the other, or both from the same place | Low. Expected redundancy; a mart that resembles its source is doing its job. |
+| there is **no path**, and both sides have lineage | **No path** | Convergent duplication — two teams built the same thing and nothing connects them | **High.** Expensive and invisible; nobody has a reason to look. |
+| we have **no lineage** for one side | **Lineage unknown** | A coverage gap | Neither. Judge on the values. |
+
+Reporting derived copies as if they were problems is the main reason
+metadata-only duplicate detection gets ignored, which is why the first row is
+deprioritised and the second gets the alarm colour in the app.
+
+### Which classes count as derivation evidence
+
+Not the same set the lineage view walks. For this test, `FLOW`, `CONTAINMENT`
+and `IDENTITY` all count as evidence that two assets are related by derivation —
+containment and identity both imply a real relationship between the *things*,
+not just a pointer. `REFERENCE` and `USAGE` never count: a foreign key moves no
+data, and somebody opening a file says nothing about where it came from.
+
+### The one exclusion that matters
+
+**Classifyre's own similarity edges are never counted as lineage evidence.**
+
+The duplicate engine writes its results into the same relationship store, classed
+as `REFERENCE` (similar, likely duplicate) and `IDENTITY` (identical content). If
+the derivation test walked those, every pair in the review queue would find a
+"path" — to itself — every pair would report as explained, nothing would ever be
+escalated, and the whole check would look like it was working.
+
+So relationships produced by the duplicate engine are excluded by name. A
+connector-declared **same as** stays in: different source, genuine evidence. The
+test is only useful because it is answered by something other than the thing it
+is checking.
+
+### When lineage stops being usable
+
+The test approximates "is there a path between these two assets" with "are they
+in the same connected component", which is far cheaper. That approximation fails
+in one direction: a single hairball component makes *everything* look derived,
+and the queue would quietly escalate nothing.
+
+So when one component swallows too much of the lineage graph, Classifyre reports
+**lineage unknown** rather than claiming a path — and says so on screen. It is
+the honest answer to a question the shape of the graph has made unanswerable. The
+guard stays off on small estates, where lineage is sparse and every edge matters.
+
+---
+
 ## Where to see it in the app
 
 Open any asset and choose the **Lineage** tab.
@@ -163,9 +221,10 @@ Open any asset and choose the **Lineage** tab.
 
 Below the graph, the **column lineage** panel traces a single column.
 
-Relationships also appear throughout [investigations](/investigations/) — in the
-case graph, relationship types are grouped by class, so lineage is visually
-distinct from containment, duplicates, and references. Selecting any
+Relationships also appear throughout [investigations](/investigations/) and in
+[duplicate review](/duplicates/) — in the case graph, relationship types are
+grouped by class, so lineage is visually distinct from containment, duplicates,
+and references. Selecting any
 relationship shows its class, how it was derived, whether it carries column
 detail, and the SQL behind it where there is any.
 

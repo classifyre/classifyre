@@ -38,7 +38,11 @@ export default async function MovedInvestigationsPage({
   params: Promise<{ slug?: string[] }>;
 }) {
   const { slug } = await params;
-  const target = `/investigations/${slug?.length ? `${slug.join("/")}/` : ""}`;
+  const path = slug?.length ? `${slug.join("/")}/` : "";
+  // Fingerprints did not just move sections, it was replaced. Sending this one
+  // to /investigations/fingerprints/ would land on another redirect stub.
+  const target =
+    path === "fingerprints/" ? "/duplicates/" : `/investigations/${path}`;
 
   return (
     <main className="mx-auto flex min-h-[60vh] max-w-xl flex-col items-start justify-center gap-4 px-6 py-16">

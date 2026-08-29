@@ -1,0 +1,385 @@
+---
+title: Every Number Explained
+sidebarTitle: Every Number Explained
+description: A plain-language reference for every figure, label and phrase on the duplicate review screens — what it means, how it is calculated, and when to act on it.
+---
+
+# Every Number Explained
+
+A reference for every number and phrase you'll meet in duplicate review. If you
+landed here from a screen, use the sidebar or search for the exact words you saw.
+
+---
+
+## The core objects
+
+### Matching pair
+
+Two assets the engine linked because they look like the same thing. **A pair is
+one decision** — it's the unit everything else is counted in.
+
+Pairs have no direction: "A and B" and "B and A" are the same pair, and a verdict
+recorded from either side applies to both.
+
+### Cluster
+
+A set of assets joined **transitively** by strong matches, treated as one thing.
+If A matches B and B matches C strongly enough, all three are one cluster — even
+if A and C never matched each other directly.
+
+Every asset belongs to at most one cluster. Clusters are what
+[splitting](/duplicates/pairs/#split-the-cluster-here) acts on, and the reason
+[cluster shape](/duplicates/patterns/#cluster-shapes) is worth checking: one weak
+link can chain two unrelated groups.
+
+### Pattern
+
+A group of pairs that matched **for the same reason** — the same set of value
+labels, from the same engine. `email + person` is a pattern. Patterns are what
+make a corpus navigable: 18,000 pairs is usually five or six of them.
+
+### Verdict
+
+Your recorded judgement about one pair: **Duplicate**, **Not a duplicate**,
+**Unsure**, or **Split**. Verdicts are keyed by asset pair, so they survive
+re-scoring, renaming and re-clustering.
+
+---
+
+## Numbers on the queue screen
+
+### Pairs remaining
+
+Undecided matched pairs **inside your review band**. The headline number. Moves
+when you move a cutoff. Decisions taken by an agent are reported separately so
+this stays a count of human work.
+
+### Duplicate rate
+
+Assets appearing in at least one matched pair, over all assets in the workspace.
+
+A cluster count means nothing without a denominator — "4,100 clusters" is
+meaningless until you know whether it's out of nine thousand assets or two
+million. This is the number to quote to someone who didn't run the scan.
+
+### Above your merge cutoff · Needs your review · Below your review cutoff
+
+The three bands, split by your two cutoffs. See
+[Where the matches stand](/duplicates/review-queue/#where-the-matches-stand).
+
+### review cutoff
+
+The lower line on the [histogram](/duplicates/review-queue/#score-distribution-and-the-two-cutoffs).
+Below it, matches are treated as rejected — not worth looking at.
+
+Saved, it becomes the **related threshold**: the minimum weighted match at which
+a link is recorded at all.
+
+### merge cutoff
+
+The upper line. At or above it, matches are strong enough not to need a person.
+
+Saved, it becomes the **duplicate threshold**: the minimum match at which two
+assets are treated as the same thing. **These are the links that drive
+clustering**, so moving it changes cluster membership, not just what you review.
+
+### Unsaved — this view only
+
+You've dragged a cutoff but not saved. Every number on the page reflects the new
+position; nothing has been written and nothing has been re-scored. Saving
+re-scores the whole corpus.
+
+### Share (in *where duplicates come from*)
+
+The proportion of all matched pairs running between a given pair of systems. A
+high share on one pairing means the duplicates have **one findable cause**. An
+even spread across everything more often points at [the
+matcher](/duplicates/tuning/) than at the data.
+
+---
+
+## Numbers on a pattern
+
+### left
+
+Undecided pairs in this pattern, **inside the current band**. Not the pattern's
+total size.
+
+### clusters
+
+How many clusters this pattern's pairs touch. An **upper bound**: a cluster can
+have pairs in several score bins, and the bins can't be added without counting it
+twice. The app labels it as an estimate rather than presenting it as exact.
+
+### avg
+
+The average match weight across the pattern. A high average with a **cutoff
+candidate** label is the signature of a pattern you should settle with a
+threshold rather than by hand.
+
+### pairs / clusters / assets (the header figures)
+
+What a bulk action would touch **right now**, under your current cutoffs and
+filters. Live — they follow the cutoffs.
+
+### After / Before
+
+Total pairs remaining across the whole workspace, before and after this bulk
+action. The honest measure of leverage: a pattern that takes 8,400 off a backlog
+of 12,000 is worth doing first.
+
+### showing *n* of *m* pairs
+
+For **repeated text** patterns only. Near-duplicate groups are found at the
+finding level and projected onto asset pairs, which is quadratic — a 50-asset
+group is 1,225 pairs — so the projection is capped. The row shows the capped
+count next to the true size, rather than silently printing a truncated number.
+
+### `+N` in a pattern name
+
+A pattern key names at most three labels and collapses the rest.
+`email+person+phone+2` matched on five labels; the full set is on the pattern
+page.
+
+### `misc` / Everything else
+
+Patterns with only a handful of pairs, folded into a remainder bucket per family.
+A pattern is something you write one rule for; a "pattern" of two pairs is just
+two pairs.
+
+---
+
+## Kinds of pattern
+
+### Shared values
+
+Matched on the concrete values inside findings — emails, account numbers, IBANs,
+names. The main engine.
+
+### Similar spelling
+
+Matched **phonetically**: name-like values that sound the same, spelled
+differently — `Jon Smyth` and `John Smith`. Only applied to name-like labels, and
+only above a spelling-similarity floor. These are the ones most worth
+spot-checking as a group.
+
+### Identical content
+
+The same bytes, twice. A stronger and differently-derived claim than value
+overlap, so it's kept separate.
+
+### Repeated text
+
+Matched by **meaning** rather than by literal values, using
+[embeddings](/settings/embeddings/). This is what catches boilerplate — the
+confidentiality notice on four hundred contracts. Needs a configured embedding
+model; without one, this family is simply absent.
+
+---
+
+## What kind of decision is this?
+
+### no judgement needed
+
+Byte-identical content. Confirming is bookkeeping. Confirm the lot.
+
+### rule candidate
+
+Shared boilerplate is doing the matching. Don't grind the pairs — write an
+[exclusion](/duplicates/tuning/#exclusions) so the text stops driving matches at
+all, and the whole pattern evaporates.
+
+### cutoff candidate
+
+These labels match closely and consistently — average weight at or above 0.85. So
+*where you draw the line* is the only real question. Go to the histogram, set the
+merge cutoff above this pattern's mass, and save. Every pair above it stops
+needing a person, permanently.
+
+### needs judgement
+
+The labels overlap but the rest of the evidence doesn't agree. No threshold
+separates these, so they're genuinely per-pair. Sample a dozen first: if they're
+all the same mistake, the real fix is a weight change or an exclusion.
+
+---
+
+## Cluster shapes
+
+| Shape | Meaning | Read it as |
+|---|---|---|
+| **pair** | Two assets | The simple case |
+| **clique** | Every member matches every other | Genuinely one thing |
+| **chain** | Matches form a line; the ends don't match | **Suspicious** — transitivity dragged in unrelated members |
+| **partial** | Some members match, others don't | Mixed; worth opening |
+| **mixed** | *(pattern level)* Its clusters aren't all one shape | No signal either way |
+
+---
+
+## Lineage phrases
+
+### Shared upstream
+
+One of these assets derives from the other, or both come from the same place. A
+derived copy. **Expected, not a problem** — and the reason most metadata-only
+duplicate tools get ignored is that they report this as if it were one.
+
+### No path — both sides have lineage
+
+*"Two teams appear to have built the same thing independently. This is the case
+worth chasing."*
+
+The most valuable cell in the product. Both assets have lineage — so we're not
+guessing from missing data — and nothing connects them, yet they look nearly
+identical. Somebody rebuilt something that already existed, and nobody knows.
+
+It's expensive (two pipelines, two sets of maintenance, two chances to diverge)
+and invisible (neither team has a reason to look). Patterns with a fifth or more
+of these get the alarm colour, and an agent is never allowed to clear them.
+
+### Lineage unknown
+
+We have no lineage for at least one of these assets. **A coverage gap, not
+evidence either way.** Judge on the values.
+
+If everything reads unknown, check whether your sources produce lineage at all —
+see [Lineage & Relationships](/sources/lineage/).
+
+### Lineage is too interconnected to tell assets apart
+
+A safety valve. The similarity/lineage test approximates "is there a path between
+these two" with "are they in the same connected component". When one giant
+component swallows most of your lineage graph, that approximation makes
+*everything* look derived and nothing would ever be escalated. Past a threshold
+Classifyre reports **unknown** instead, which is honest about not being able to
+tell.
+
+---
+
+## On the pair screen
+
+### Match weight
+
+The share of the two assets' available weighted evidence that actually matched,
+0 to 1. Not a percentage of similarity and not a confidence. See [Reviewing a
+Pair](/duplicates/pairs/#match-weight).
+
+### Why it scored *n*
+
+The waterfall breakdown, one bar per label. **The bars add up to the number above
+them** — nothing is hidden in a blend.
+
+### for / against
+
+Per label: what it **contributed** to the score, and the gap between that and
+what it **could have** contributed. A label present on only one asset produces a
+full positive potential and an equal negative — that's the evidence against,
+shown in the same units as the evidence for.
+
+### Perfect match = *n*
+
+The reference line: the total weight that was available. Normally 1. If it sits
+elsewhere, the label profiles and the scorer have drifted (usually mid-recompute)
+and the line moves visibly rather than the discrepancy being hidden.
+
+### weight *n* × *m* values
+
+The tooltip on a bar: this label's weight, times how many values it matched.
+
+### The values behind this match
+
+The table of actual shared values. **This is the evidence** — everything above it
+is a summary of it. Read it before the score.
+
+### Where else this value appears
+
+A reverse lookup. A value present in four hundred assets isn't identifying this
+pair — it's furniture, and the right response is an exclusion, not a verdict.
+
+### cut point
+
+In the cluster graph: the weakest link whose removal would split the cluster in
+two. Its score says how real the split would be. A *low* score means one weak
+match is chaining two groups; a *high* score means splitting is a genuine
+judgement call.
+
+### No single link holds this cluster together
+
+There's no cut point, so cutting one edge would separate nothing. **Split** is
+disabled rather than pretending.
+
+### Already decided · re-scored since
+
+This pair has a standing verdict, and the score has moved materially since. The
+judgement was made about a different number — worth another look.
+
+---
+
+## Actions
+
+### Confirm
+
+*These two are the same thing.* Records a duplicate. Doesn't merge or delete
+anything — Classifyre records judgements and never writes back to your systems.
+
+### Not a duplicate
+
+*These two are different things.* Also **suppresses** the pair: later scans will
+not rejoin them into a cluster. Opens the cause dialog so you can fix what caused
+the match, not just dismiss it.
+
+### Split the cluster here
+
+*These two shouldn't be in the same cluster.* Cuts the link and re-clusters
+immediately. Available **only when a single link holds the cluster together**.
+The verdict makes it stick across future scans.
+
+Afterwards you're told whether they actually ended up apart — two assets inside a
+larger cluster can stay joined through a third member.
+
+### Unsure, next
+
+*I can't tell.* A real verdict, not a way out. Forcing a binary on an ambiguous
+pair produces bad records. It suppresses nothing.
+
+A pile of these is a signal that your review band sits where the evidence doesn't
+separate — the fix is on the [tuning](/duplicates/tuning/) screen.
+
+### Confirm all in band
+
+Records **Confirm** on every undecided pair in the pattern, inside the current
+cutoffs and lineage filter. Never touches an already-decided pair. Reversible
+from the undo log.
+
+### Reopen
+
+Removes verdicts and returns pairs to the queue. For *not a duplicate* and
+*split*, also un-suppresses and re-clusters.
+
+---
+
+## Elsewhere
+
+### Went nowhere yet
+
+Pairs confirmed as duplicates that were never taken into a case or an inquiry.
+The common outcome — and ready-made evidence, since someone already looked at
+each one and said yes.
+
+### decided by an agent
+
+Verdicts recorded by the autopilot rather than a person, counted separately
+everywhere. See [AI Agents & Duplicates](/duplicates/ai-agents/).
+
+### The index was rebuilt after this action
+
+An undo-log entry that can no longer be reversed cleanly: since it was recorded,
+the pairs it referred to may have been re-scored or re-clustered. Use
+[Reopen](/duplicates/decisions/#reopen-and-what-it-undoes) instead, which works
+off the current state.
+
+### Rolls up correlation data that has already been scanned
+
+What **Rebuild** does in [Tuning](/duplicates/tuning/#duplicate-index). It
+re-derives the queue's rollups from data already in the database — it does not
+re-scan or re-score anything, and it takes seconds.
