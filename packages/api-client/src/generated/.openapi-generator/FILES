@@ -234,6 +234,8 @@ docs/ParseTrainingExamplesSkippedReasonsDto.md
 docs/ParsedTrainingExampleDto.md
 docs/PatternActionDto.md
 docs/PatternApplyResponseDto.md
+docs/PatternExclusionCandidateDto.md
+docs/PatternExclusionCandidatesResponseDto.md
 docs/PatternPreviewResponseDto.md
 docs/PayloadCursorEntryDto.md
 docs/PivotGraphDto.md
@@ -652,6 +654,8 @@ src/models/ParseTrainingExamplesSkippedReasonsDto.ts
 src/models/ParsedTrainingExampleDto.ts
 src/models/PatternActionDto.ts
 src/models/PatternApplyResponseDto.ts
+src/models/PatternExclusionCandidateDto.ts
+src/models/PatternExclusionCandidatesResponseDto.ts
 src/models/PatternPreviewResponseDto.ts
 src/models/PayloadCursorEntryDto.ts
 src/models/PivotGraphDto.ts

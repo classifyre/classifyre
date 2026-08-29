@@ -3,7 +3,7 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { ArrowLeft, Check, Eye, Loader2, Undo2 } from "lucide-react";
+import { ArrowLeft, Ban, Check, Eye, Loader2, Undo2 } from "lucide-react";
 import {
   api,
   type PatternPreviewResponseDto,
@@ -36,6 +36,7 @@ import { useTranslation } from "@/hooks/use-translation";
 import type { TranslationKey } from "@/i18n";
 import { LineageEvidenceChip } from "./lineage-evidence-chip";
 import { UndoLogDialog } from "./undo-log-dialog";
+import { ExcludeValuesDialog } from "./exclude-values-dialog";
 import {
   encodePairId,
   fmt,
@@ -89,6 +90,10 @@ export function PatternLevel({
   const [lineage, setLineage] = React.useState<LineageFilter | null>(null);
   const [selection, setSelection] = React.useState<Set<string>>(new Set());
   const [undoOpen, setUndoOpen] = React.useState(false);
+  const [excludeOpen, setExcludeOpen] = React.useState(false);
+  // Only a near-duplicate text pattern has a template to read values out of;
+  // every other rule kind is settled with a verdict or a cutoff.
+  const canExclude = pattern.ruleKind === "EXCLUSION";
 
   const band = patternBand(pattern, cutoffs);
 
@@ -274,11 +279,31 @@ export function PatternLevel({
             </p>
           </div>
           <div className="flex shrink-0 gap-2">
+            {/* On a boilerplate pattern the exclusion is the primary action and
+                confirming is the secondary one: the header says shared template
+                text is doing the matching, and confirming four hundred pairs
+                does nothing about that — the next scan produces them again. */}
+            {canExclude ? (
+              <Button
+                size="sm"
+                onClick={() => setExcludeOpen(true)}
+                disabled={applying}
+                className="border-2 border-white/30 bg-white text-black hover:bg-white/90"
+              >
+                <Ban className="mr-1.5 h-3.5 w-3.5" aria-hidden />
+                {t("review.exclude.action")}
+              </Button>
+            ) : null}
             <Button
               size="sm"
               onClick={applyRule}
               disabled={applying}
-              className="border-2 border-white/30 bg-white text-black hover:bg-white/90"
+              className={
+                canExclude
+                  ? "border-2 border-white/30 bg-transparent text-white hover:bg-white/10"
+                  : "border-2 border-white/30 bg-white text-black hover:bg-white/90"
+              }
+              variant={canExclude ? "outline" : "default"}
             >
               {applying ? (
                 <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
@@ -669,6 +694,18 @@ export function PatternLevel({
         onOpenChange={setUndoOpen}
         onUndone={(m) => {
           toast.success(m);
+          refresh();
+          load();
+        }}
+      />
+
+      <ExcludeValuesDialog
+        open={excludeOpen}
+        onOpenChange={setExcludeOpen}
+        patternKey={pattern.patternKey}
+        cutoffs={cutoffs}
+        lineage={lineage}
+        onApplied={() => {
           refresh();
           load();
         }}

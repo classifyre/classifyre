@@ -55,9 +55,65 @@ tuning screen or the pair queue.
 | Rule kind | Reads as | What it means | What to do |
 |---|---|---|---|
 | `MERGE` | **no judgement needed** | Byte-identical content | Confirm the lot. There is nothing to decide. |
-| `EXCLUSION` | **rule candidate** | Shared boilerplate is doing the matching | Don't grind the pairs — write an [exclusion](/duplicates/tuning/#exclusions) so the text stops driving matches at all |
+| `EXCLUSION` | **rule candidate** | Shared boilerplate is doing the matching | Don't grind the pairs — press **Stop matching on these values**. See [below](#rule-candidate-stop-matching-on-these-values). |
 | `THRESHOLD` | **cutoff candidate** | These labels match closely and consistently (average weight ≥ 0.85) | A **cutoff** decision, not a per-pair one. Set the merge cutoff and move on. |
 | `JUDGEMENT` | **needs judgement** | The labels overlap but the rest doesn't agree | Genuinely per-pair. Open pairs and work them. |
+
+### "Rule candidate": Stop matching on these values
+
+The primary button on a boilerplate pattern, and the one place in the app where
+a single click writes instance-wide configuration. It's worth understanding
+exactly what it does, because the thing it fixes is **not** the pattern you're
+looking at.
+
+A repeated-text pattern is a **diagnosis, not the damage.** Its own pairs come
+from [embedding similarity](/duplicates/how-matching-works/#4-repeated-text-near-duplicate)
+— "these two documents contain the same passage" — and no exclusion will make
+those go away.
+
+The damage is second-order. The template *contains findings*: the mailbox in a
+signature block, the address in a footer, the company name in a legal notice.
+Those values then produce **shared-value matches between every document carrying
+the template**, and those matches live in completely different patterns. That's
+what the exclusion removes.
+
+```mermaid
+graph TD
+    B["Boilerplate passage<br/>on 400 documents"] --> P["Repeated text pattern<br/>the diagnosis"]
+    B --> V["Values inside it<br/>support@acme.example, …"]
+    V --> M["Shared-value matches<br/>in other patterns — the damage"]
+    P -.->|recorded as not-duplicates| Done["Cleared from the queue"]
+    M -.->|exclusion| Gone["Stops happening, from the next scan"]
+```
+
+So the dialog does two things at once:
+
+1. **Writes an exclusion rule per value you tick.** Those values stop being
+   indexed for matching everywhere, permanently, from the next scan.
+2. **Records *Not a duplicate* on the pattern's own pairs** — because assets
+   that matched on shared template text are, by definition, not the same thing.
+   That also stops later scans re-clustering them.
+
+Before you press it, the dialog tells you:
+
+| Figure | Meaning |
+|---|---|
+| **The values themselves** | Every value that would stop matching, with its label. You approve a list, not a promise. |
+| **in *n* assets** | How many assets hold that value — how far excluding it reaches |
+| **matched pairs in other patterns** | The matches the template is actually driving. **This is the number the action changes.** |
+
+Values held by only a single asset are filtered out — those aren't boilerplate.
+Everything is ticked by default; untick anything you'd rather keep, such as a
+value that is genuinely identifying and only happens to appear in the template
+too.
+
+The whole thing is one entry in the **undo log**, and undoing it removes every
+rule it wrote.
+
+> **The blunt version.** Excluding a whole *label* — "this detector's output is
+> useless for matching" — is a different and much wider decision, so it lives on
+> the [tuning screen](/duplicates/tuning/#exclusions) rather than behind a
+> one-click button here.
 
 ### "Cutoff candidate" in practice
 
@@ -157,8 +213,12 @@ clusters aren't all the same shape.
 
 ## Confirm all in band
 
-The bulk action. It records **Confirm** on every undecided pair in this pattern,
-inside the current cutoffs and lineage filter.
+The other bulk action — the primary one on every pattern except a boilerplate
+one, where [Stop matching on these values](#rule-candidate-stop-matching-on-these-values)
+takes the lead.
+
+It records **Confirm** on every undecided pair in this pattern, inside the
+current cutoffs and lineage filter.
 
 Before you press it:
 

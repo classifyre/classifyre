@@ -106,15 +106,22 @@ Three modes:
 Exclusions are the right answer whenever a match is caused by **something that
 appears everywhere**:
 
-- A pattern marked **rule candidate** — shared boilerplate. Exclude it and the
-  whole pattern evaporates.
+- A pattern marked **rule candidate** — shared boilerplate. Its one-click action
+  writes these rules for you.
 - The support address on every ticket.
 - A placeholder your ETL writes into empty fields.
 - The company name in every document footer.
 
-The [cause dialog](/duplicates/pairs/#not-a-duplicate) will write one for you
-from a rejected pair, which is the easiest route: it already knows which label
-was doing the damage and how many other pairs the same combination produced.
+Two places will write one for you, and both are easier than filling this form
+in by hand:
+
+- The [cause dialog](/duplicates/pairs/#not-a-duplicate) on a rejected pair — it
+  already knows which label was doing the damage and how many other pairs the
+  same combination produced.
+- **Stop matching on these values** on a
+  [boilerplate pattern](/duplicates/patterns/#rule-candidate-stop-matching-on-these-values)
+  — it reads the values out of the repeated passage and writes one rule per
+  value, in a single action you can undo as a unit.
 
 Removing an exclusion is also a recompute — the values come back and the matches
 they cause return.

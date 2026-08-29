@@ -474,6 +474,57 @@ export class CorrelationService {
     return this.saveConfig({ exclusions: rules });
   }
 
+  /**
+   * Append several exclusion rules in one write, returning the ids created.
+   *
+   * Looping `addExclusion` would read-modify-write the singleton config once
+   * per rule and schedule a full recompute each time — and a caller that has
+   * to undo the batch would have no way to name what it created. Rules that
+   * normalise to something unusable, or that restate a rule already present,
+   * are dropped rather than stored twice.
+   */
+  async addExclusions(
+    rules: Array<Omit<ExclusionRule, 'id'>>,
+  ): Promise<{ config: CorrelationConfigDto; added: ExclusionRule[] }> {
+    const existing = await this.prisma.correlationConfig.findUnique({
+      where: { id: 1 },
+    });
+    const current = parseExclusions(existing?.exclusions);
+    const seen = new Set(
+      current.map((r) => `${r.mode}|${r.label ?? ''}|${r.value ?? ''}`),
+    );
+
+    const added: ExclusionRule[] = [];
+    for (const raw of rules) {
+      const normalized = { ...normalizeRule(raw), id: randomUUID() };
+      if (!isUsableRule(normalized)) continue;
+      const key = `${normalized.mode}|${normalized.label ?? ''}|${normalized.value ?? ''}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      added.push(normalized);
+    }
+    if (added.length === 0) {
+      return { config: await this.getConfig(), added: [] };
+    }
+    const config = await this.saveConfig({
+      exclusions: [...current, ...added],
+    });
+    return { config, added };
+  }
+
+  /** Remove several exclusion rules in one write. */
+  async removeExclusions(ids: string[]): Promise<CorrelationConfigDto> {
+    const drop = new Set(ids.filter(Boolean));
+    if (drop.size === 0) return this.getConfig();
+    const existing = await this.prisma.correlationConfig.findUnique({
+      where: { id: 1 },
+    });
+    const rules = parseExclusions(existing?.exclusions).filter(
+      (r) => !drop.has(r.id),
+    );
+    return this.saveConfig({ exclusions: rules });
+  }
+
   /** Remove an exclusion rule by id. Caller schedules recompute. */
   async removeExclusion(id: string): Promise<CorrelationConfigDto> {
     const existing = await this.prisma.correlationConfig.findUnique({

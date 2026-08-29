@@ -10302,6 +10302,38 @@
         ]
       }
     },
+    "/correlation/review/patterns/{patternKey}/exclusion-candidates": {
+      "get": {
+        "description": "What an exclusion on this pattern would actually stop matching. Empty for any pattern whose rule kind is not EXCLUSION — the other kinds have no template to read values out of. Read-only.",
+        "operationId": "CorrelationReviewController_exclusionCandidates",
+        "parameters": [
+          {
+            "name": "patternKey",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PatternExclusionCandidatesResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "The values inside a near-duplicate text group, and their reach",
+        "tags": [
+          "correlation-review"
+        ]
+      }
+    },
     "/correlation/review/patterns/{patternKey}/apply": {
       "post": {
         "operationId": "CorrelationReviewController_apply",
@@ -25080,6 +25112,13 @@
           "excludeLabel": {
             "type": "string",
             "description": "For EXCLUSION patterns: also write a correlation exclusion rule for this label, so the boilerplate stops driving matches at all."
+          },
+          "excludeValueHashes": {
+            "description": "Reverse-index keys of the specific values to stop matching on, from the exclusion-candidates endpoint. Hashes rather than raw values so the rule can only ever name something that is actually indexed — a pattern endpoint must not be a way to write arbitrary instance-wide config.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         },
         "required": [
@@ -25133,6 +25172,69 @@
           "workRemainingAfter"
         ]
       },
+      "PatternExclusionCandidateDto": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string"
+          },
+          "value": {
+            "type": "string",
+            "description": "The normalized value, as the engine stores it"
+          },
+          "valueHash": {
+            "type": "string"
+          },
+          "assetCount": {
+            "type": "number",
+            "description": "Assets holding this value anywhere in the corpus — how far excluding it reaches."
+          }
+        },
+        "required": [
+          "label",
+          "value",
+          "valueHash",
+          "assetCount"
+        ]
+      },
+      "PatternExclusionCandidatesResponseDto": {
+        "type": "object",
+        "properties": {
+          "patternKey": {
+            "type": "string"
+          },
+          "ruleKind": {
+            "type": "string",
+            "description": "THRESHOLD | EXCLUSION | MERGE | JUDGEMENT"
+          },
+          "candidates": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PatternExclusionCandidateDto"
+            }
+          },
+          "totalCandidates": {
+            "type": "number",
+            "description": "Distinct values in the group before the list was capped"
+          },
+          "pairsDriven": {
+            "type": "number",
+            "description": "Scored pairs elsewhere in the corpus that hold one of these values on BOTH sides — the matches the template is actually driving. This is the number the exclusion removes, and it is not the same as the pairs in this pattern."
+          },
+          "truncated": {
+            "type": "boolean",
+            "description": "True when the near-duplicate group is bigger than one request should read; the candidate list is the strongest part of it rather than all of it."
+          }
+        },
+        "required": [
+          "patternKey",
+          "ruleKind",
+          "candidates",
+          "totalCandidates",
+          "pairsDriven",
+          "truncated"
+        ]
+      },
       "PatternApplyResponseDto": {
         "type": "object",
         "properties": {
@@ -25148,13 +25250,21 @@
           "exclusionRuleId": {
             "type": "string",
             "nullable": true,
-            "description": "Exclusion rule created, when the pattern warranted one"
+            "description": "First exclusion rule created, when the pattern warranted one. Kept for callers written before an action could create several; prefer exclusionRuleIds."
+          },
+          "exclusionRuleIds": {
+            "description": "Every exclusion rule this action created. Empty when none.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         },
         "required": [
           "batchId",
           "applied",
-          "workRemaining"
+          "workRemaining",
+          "exclusionRuleIds"
         ]
       },
       "SplitPairResponseDto": {

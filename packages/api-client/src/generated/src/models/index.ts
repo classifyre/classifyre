@@ -210,6 +210,8 @@ export * from './ParseTrainingExamplesSkippedReasonsDto';
 export * from './ParsedTrainingExampleDto';
 export * from './PatternActionDto';
 export * from './PatternApplyResponseDto';
+export * from './PatternExclusionCandidateDto';
+export * from './PatternExclusionCandidatesResponseDto';
 export * from './PatternPreviewResponseDto';
 export * from './PayloadCursorEntryDto';
 export * from './PivotGraphDto';

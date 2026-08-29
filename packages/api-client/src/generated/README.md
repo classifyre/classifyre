@@ -147,6 +147,7 @@ All URIs are relative to *http://localhost*
 *CorrelationReviewApi* | [**correlationReviewControllerDecisions**](docs/CorrelationReviewApi.md#correlationreviewcontrollerdecisions) | **GET** /correlation/review/decisions | What has been decided, and what became of it
 *CorrelationReviewApi* | [**correlationReviewControllerDecisionsToCase**](docs/CorrelationReviewApi.md#correlationreviewcontrollerdecisionstocase) | **POST** /correlation/review/decisions/case | Take decided pairs into a case as evidence
 *CorrelationReviewApi* | [**correlationReviewControllerDecisionsToInquiry**](docs/CorrelationReviewApi.md#correlationreviewcontrollerdecisionstoinquiry) | **POST** /correlation/review/decisions/inquiry | Open an inquiry that keeps watching for what these pairs had in common
+*CorrelationReviewApi* | [**correlationReviewControllerExclusionCandidates**](docs/CorrelationReviewApi.md#correlationreviewcontrollerexclusioncandidates) | **GET** /correlation/review/patterns/{patternKey}/exclusion-candidates | The values inside a near-duplicate text group, and their reach
 *CorrelationReviewApi* | [**correlationReviewControllerPair**](docs/CorrelationReviewApi.md#correlationreviewcontrollerpair) | **GET** /correlation/review/pairs/{aId}/{bId} | Level 3: one pair — comparison, match-weight decomposition, local graph, lineage evidence
 *CorrelationReviewApi* | [**correlationReviewControllerPortfolio**](docs/CorrelationReviewApi.md#correlationreviewcontrollerportfolio) | **GET** /correlation/review/portfolio | Level 1: work remaining, the pattern queue, and the source meta-graph
 *CorrelationReviewApi* | [**correlationReviewControllerPreview**](docs/CorrelationReviewApi.md#correlationreviewcontrollerpreview) | **POST** /correlation/review/patterns/{patternKey}/preview | What a bulk action would do. Read-only — nothing is applied.
@@ -529,6 +530,8 @@ All URIs are relative to *http://localhost*
 - [ParsedTrainingExampleDto](docs/ParsedTrainingExampleDto.md)
 - [PatternActionDto](docs/PatternActionDto.md)
 - [PatternApplyResponseDto](docs/PatternApplyResponseDto.md)
+- [PatternExclusionCandidateDto](docs/PatternExclusionCandidateDto.md)
+- [PatternExclusionCandidatesResponseDto](docs/PatternExclusionCandidatesResponseDto.md)
 - [PatternPreviewResponseDto](docs/PatternPreviewResponseDto.md)
 - [PayloadCursorEntryDto](docs/PayloadCursorEntryDto.md)
 - [PivotGraphDto](docs/PivotGraphDto.md)
