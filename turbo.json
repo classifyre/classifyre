@@ -46,6 +46,14 @@
     "codegen": {
       "cache": false
     },
+    "@workspace/api-client#codegen": {
+      "cache": false,
+      // The client is generated FROM apps/api/openapi.json, so the spec has to
+      // be rebuilt first or `bun codegen` silently produces a client for
+      // whatever the API looked like the last time someone remembered to run
+      // `openapi:generate` by hand.
+      "dependsOn": ["@classifyre/api#codegen"]
+    },
     "check-types": {
       "dependsOn": ["^check-types", "prisma:generate"]
     },

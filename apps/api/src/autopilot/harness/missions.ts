@@ -305,11 +305,27 @@ const INVESTIGATION_CASE_TOOLS = [
   'cases.close',
   'cases.reopen',
   'cases.link_inquiry',
-  // Fingerprints (asset similarity) — observe + act within an investigation.
+  // Duplicates — observe + act within an investigation.
+  //
+  // The read side matters more than it looks: `similar_assets` reports any
+  // verdict a person already recorded, so the agent argues from the same
+  // evidence a reviewer saw instead of re-raising something that was settled.
   'fingerprints.similar_assets',
   'fingerprints.value_occurrences',
   'fingerprints.recompute_asset',
   'cases.from_cluster',
+  // The review queue and its ledger. A confirmed duplicate that went nowhere
+  // is the cheapest case this agent can open — somebody already looked at the
+  // pair and said yes, so it is evidence with provenance rather than the
+  // engine's unreviewed opinion. That is what `decisions` (with
+  // unactionedOnly) finds and what these two act on.
+  'fingerprints.review_queue',
+  'fingerprints.decisions',
+  'fingerprints.decisions_to_case',
+  'fingerprints.decisions_to_inquiry',
+  // Why a pair matched, before arguing that it did. Without this the agent can
+  // see a score but not what produced it.
+  'fingerprints.match_cause',
   // Lead triage + chronology: propose, don't silently mutate evidence.
   'cases.list_leads',
   'cases.propose_lead',
@@ -409,6 +425,17 @@ export const CASE_MISSION: Mission = {
     'operator-created case on that basis.',
     '\nRECURRENCE: scan cases.closed; if a closed case’s issue reappears, cases.reopen it (this',
     'reactivates the inquiries archived with it) and add a note explaining what recurred.',
+    "\nDUPLICATES: a cluster is the engine's opinion and is NOT evidence — promoting one imports",
+    'an unreviewed assertion into a case file. A CONFIRMED pair is different: a person saw the',
+    'values behind the match and said yes. So call fingerprints.decisions with unactionedOnly —',
+    'pairs confirmed as duplicates and never taken anywhere are the cheapest sound case you can',
+    'open — and use fingerprints.decisions_to_case, which stamps the verdicts so the ledger shows',
+    'follow-through. Use fingerprints.decisions_to_inquiry instead when the duplication is',
+    'recurring rather than historical: it watches for the same signature instead of asking someone',
+    'to review it again. Never re-raise a pair that already carries a verdict — similar_assets',
+    'reports them — and never argue against a decision without reading fingerprints.match_cause.',
+    'The pairs worth chasing are similar with NO lineage path: two teams built the same thing',
+    'independently, which is expensive and which nobody has a reason to notice.',
   ].join('\n'),
   allowedTools: [
     ...OBSERVE_TOOLS,
@@ -463,13 +490,20 @@ export const CONFIG_MISSION: Mission = {
     'and producing nothing worth the cost, and resweep when something outside your config change',
     'means the existing assets deserve another look. Sources an operator put on a cron schedule',
     'are not yours to change.',
-    '\nFINGERPRINTS: you also own the correlation (fingerprint/duplicate) tuning. Check',
-    'duplicates.summary; if clusters look wrong — obvious duplicates missed, or unrelated assets',
-    'lumped together — inspect the shared values behind them (fingerprints.value_occurrences,',
-    'fingerprints.similar_assets) and make ONE targeted fingerprints.tune_config change: adjust',
-    'label weights, the related/duplicate thresholds, or add an exclusion for a noisy label.',
-    'Record a memory note of what you tuned and why, tagged "pending-verification", and judge the',
-    'next cycle’s clusters against it.',
+    '\nDUPLICATES: you also own the correlation (duplicate-matching) tuning. Start at',
+    'fingerprints.review_queue, not duplicates.summary — it ranks patterns by how much work one',
+    'decision settles and tells you what KIND of fix each admits. Then act on the kind:',
+    '• EXCLUSION ("rule candidate") — shared template text is doing the matching. Read',
+    '  fingerprints.exclusion_candidates and call fingerprints.exclude_pattern_values on the',
+    '  widest-reaching values. This is the highest-leverage action available to you.',
+    '• THRESHOLD ("cutoff candidate") — one fingerprints.tune_config change to duplicateMin.',
+    '• JUDGEMENT — inspect a pair with fingerprints.match_cause; if ONE label drives it, lower',
+    "  that label's weight. If no single label dominates, leave it: it is a human call.",
+    'fingerprints.clear_safe_band settles derived copies that need no judgement — run it before',
+    'proposing anything, so you are reading a queue of real work rather than expected redundancy.',
+    'Check fingerprints.decisions first: never tune against pairs a reviewer already settled.',
+    'Make ONE targeted change per cycle. Record a memory note of what you tuned and why, tagged',
+    '"pending-verification", and judge the next cycle’s queue against it.',
   ].join('\n'),
   allowedTools: [
     'findings.search',
@@ -495,6 +529,26 @@ export const CONFIG_MISSION: Mission = {
     'fingerprints.value_occurrences',
     'fingerprints.similar_assets',
     'fingerprints.tune_config',
+    // The duplicate-review queue, which is where a matcher problem is
+    // actually visible. `review_queue` ranks patterns by how much work each
+    // one settles and says how many matches lineage cannot explain;
+    // `match_cause` names the label driving a bad pair and how many other
+    // pairs the same combination produced. Tuning without those two is
+    // guesswork over an aggregate.
+    'fingerprints.review_queue',
+    'fingerprints.match_cause',
+    // A boilerplate pattern's real fix. Read the candidates, then exclude the
+    // widest-reaching values — the same gate as tune_config, because it is the
+    // same kind of instance-wide change.
+    'fingerprints.exclusion_candidates',
+    'fingerprints.exclude_pattern_values',
+    // Derived copies at a near-perfect score with lineage explaining them.
+    // Narrow on purpose: it clears the band where a human adds nothing and
+    // leaves everything unexplained for a person, however high it scores.
+    'fingerprints.clear_safe_band',
+    // What has already been judged, so a tuning proposal is not made against
+    // pairs a reviewer settled last week.
+    'fingerprints.decisions',
     // Carries per-source text coverage, which `sources.list` does not — the
     // signal for "this source scanned successfully but no content was read",
     // which is a config problem and this mission's job.

@@ -16,11 +16,7 @@ import {
   AGENT_SAFE_BAND_MIN,
   SCORE_BUCKET_COUNT,
 } from '../correlation.constants';
-import {
-  normalizeLabel,
-  normalizeValue,
-  valueHash,
-} from '../value-normalizer';
+import { normalizeLabel, normalizeValue, valueHash } from '../value-normalizer';
 import { buildWaterfall } from './waterfall';
 import {
   REVIEW_VERDICTS,
@@ -1811,7 +1807,9 @@ export class CorrelationReviewService {
       // Reach first: the value in every copy of the template is the one worth
       // excluding, and a value only one asset holds is not boilerplate at all.
       .filter((c) => c.assetCount > 1)
-      .sort((a, b) => b.assetCount - a.assetCount || a.value.localeCompare(b.value));
+      .sort(
+        (a, b) => b.assetCount - a.assetCount || a.value.localeCompare(b.value),
+      );
 
     return {
       patternKey,
@@ -1857,9 +1855,17 @@ export class CorrelationReviewService {
     }));
   }
 
+  /**
+   * @param actor `AI_ACTOR` when an agent is calling, undefined for a person.
+   *   Every other write path that an agent can reach stamps this, and the
+   *   headline "pairs remaining" is only a count of human work because they do.
+   *   A bulk action that landed unattributed would show up in the decisions
+   *   ledger and the undo log as something an operator did.
+   */
   async applyPattern(
     patternKey: string,
     dto: PatternActionDto,
+    actor?: string,
   ): Promise<PatternApplyResponseDto> {
     const pattern = await this.prisma.correlationPattern.findUnique({
       where: { patternKey },
@@ -1924,6 +1930,7 @@ export class CorrelationReviewService {
             ).size,
             assetCount: new Set(targets.flatMap((t) => [t.a_id, t.b_id])).size,
             summary: `${verdict} on pattern ${patternKey} (${targets.length} pairs)`,
+            createdBy: actor ?? null,
             undoPayload: excluding
               ? { kind: 'exclusion', ruleIds: exclusionRuleIds }
               : Prisma.DbNull,
@@ -1937,6 +1944,7 @@ export class CorrelationReviewService {
             patternKey,
             scoreAtVerdict: t.weighted,
             batchId,
+            decidedBy: actor ?? null,
           })),
           skipDuplicates: true,
         }),
