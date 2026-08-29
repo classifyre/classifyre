@@ -342,6 +342,13 @@
           "detail": "str | None",
           "required": false,
           "insertText": "urn="
+        },
+        {
+          "label": "tags",
+          "kind": "field",
+          "detail": "dict[str, str]",
+          "required": false,
+          "insertText": "tags="
         }
       ]
     },

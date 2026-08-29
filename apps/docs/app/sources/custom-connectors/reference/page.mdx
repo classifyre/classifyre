@@ -1,20 +1,26 @@
 ---
 title: Notebook Reference
-description: Every ctx method and Asset field available to a Custom connector notebook, plus limits, binary content, and what to do when a scan goes wrong.
+description: The complete Custom connector SDK — every function you define, every Asset field, parse and pages, links and lineage, tags, and every ctx method, each with a runnable example.
 ---
 
 import { Callout } from "nextra/components";
 
 # Notebook Reference
 
-Everything a Custom connector notebook can use. For how notebooks work — running
-cells, previewing, packages and secrets — start with
-**[Custom Connectors](/sources/custom-connectors/)**.
+Everything a Custom connector notebook can use, with an example for each entry.
+For how notebooks work — running cells, previewing, packages and secrets — start
+with **[Custom Connectors](/sources/custom-connectors/)**.
 
-Two names are available in every cell, with or without the import:
+Every name lives in one module, and is pre-bound in every cell whether or not you
+import it:
 
 ```python
-from classifyre import Asset, ctx
+from classifyre import (
+    Asset, ctx,                                       # the two you always use
+    parse, pages,                                     # reading files
+    Ref, FieldMapping, FlowType, urn_for,             # naming things
+    flow, contains, references, same_as, uses,        # relationships
+)
 ```
 
 <Callout type="info">
@@ -23,14 +29,42 @@ from classifyre import Asset, ctx
   what the editor shows, trust the editor.
 </Callout>
 
+## The shortest connector that works
+
+Two functions. Everything else on this page is optional.
+
+```python
+from classifyre import Asset, ctx
+
+
+def test_connection() -> dict:
+    return {"status": "SUCCESS", "message": "Ready."}
+
+
+def extract():
+    for row in api.list():
+        yield Asset(id=str(row["id"]), name=row["title"], content=row["body"])
+```
+
 ---
 
 ## The functions you define
 
+| Function | Required | Called |
+| --- | --- | --- |
+| `test_connection() -> dict` | **yes** | On **Test connection**, and once before every scan |
+| `extract()` | **yes** | Every scan |
+| `discover() -> dict` | no | On demand, to summarise what the source can see |
+| `fetch_content(asset_id)` | no | Only for an asset whose content `extract()` did not supply |
+| `relationships()` | no | Once per scan, after `extract()` |
+
+They must be defined at the **top level of a code cell**. A function nested
+inside a class or another function is not found.
+
 ### `test_connection() -> dict`
 
-Called by **Test connection**, and once at the start of every scan — a scan
-stops before ingesting anything if this fails.
+A scan stops before ingesting anything if this fails, so make it actually reach
+the system.
 
 ```python
 def test_connection() -> dict:
@@ -41,8 +75,8 @@ def test_connection() -> dict:
 ```
 
 Return `{"status": "SUCCESS" | "FAILURE", "message": str}`. Anything else is
-treated as a failure, with a message saying so. Raising works too — the
-traceback becomes the failure message.
+treated as a failure with a message saying so. Raising works too — the traceback
+becomes the failure message.
 
 ### `extract()`
 
@@ -51,49 +85,217 @@ The heart of a connector. Yields the things to scan.
 ```python
 def extract():
     for row in api.list(offset=ctx.offset, limit=ctx.limit):
+        if ctx.should_abort:
+            return
         yield Asset(id=str(row["id"]), name=row["title"], content=row["body"])
 ```
 
 **Yield as you go.** A generator lets a large source start being scanned before
 it has finished listing; building a list first means holding all of it in memory
-and waiting.
+and waiting. Yielding a `dict` of `Asset` fields works too, but you lose the
+validation `Asset` does.
 
 ### `discover() -> dict` _(optional)_
 
-A summary of what this source can see — indexes, projects, buckets. Free-form.
+A summary of what this source can see — indexes, projects, buckets. Free-form;
+a non-dict return is wrapped as `{"result": ...}`.
 
-### `fetch_content(asset_id) -> tuple[str, str] | None` _(optional)_
+```python
+def discover() -> dict:
+    return {
+        "projects": [p.key for p in api.projects()],
+        "total_issues": api.count(),
+    }
+```
 
-Content on demand for one asset. Only reached when the asset's content wasn't
+### `fetch_content(asset_id) -> str | tuple[str, str] | None` _(optional)_
+
+Content on demand for one asset. Only reached when the asset's content was not
 already supplied by `extract()`, so most connectors never need it. Return
-`(raw, text)`.
+`(raw, text)`, or one string used as both.
+
+```python
+def fetch_content(asset_id: str):
+    body = api.get_body(asset_id)
+    if body is None:
+        return None
+    return (body.html, body.plain_text)
+```
+
+Reach for it when listing is cheap and fetching is not: `extract()` yields
+metadata for ten thousand documents, and only the ones that survive sampling get
+downloaded.
+
+### `relationships()` _(optional)_
+
+Typed edges between assets. See [Relating assets](#relating-assets).
+
+```python
+def relationships():
+    yield flow(upstream=Ref.asset("orders"), downstream=Ref.asset("daily_totals"))
+```
+
+Yield only edges built by `flow`, `contains`, `references`, `same_as` or `uses`.
+A raw dict is rejected on purpose — the value of this function is that you had to
+say *which* relationship you mean.
 
 ---
 
 ## `Asset`
 
-What `extract()` yields.
+What `extract()` yields. One thing worth scanning.
 
-| Field                       | Type        | Notes                                                                                                                                         |
-| --------------------------- | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| `id`                        | `str`       | **Required.** Must be stable across runs — it's what ties this run's asset to the same asset last run, so findings and history stay attached. |
-| `name`                      | `str`       | Display name. Defaults to `id`.                                                                                                               |
-| `url`                       | `str`       | Where a person would go to see this. Defaults to a generated `custom://` reference.                                                           |
-| `content`                   | `str`       | The text detectors scan.                                                                                                                      |
-| `kind`                      | `str`       | `record` _(default)_, `document`, `page`, `file`, or `table`.                                                                                 |
-| `metadata`                  | `dict`      | Anything useful about the item. Free-form for Custom sources.                                                                                 |
-| `links`                     | `list[str]` | Other assets' **ids**, resolved into graph edges for you.                                                                                     |
-| `urn`                       | `str`       | What the *platform* calls this object. Only for things another source also sees — see [Lineage](#lineage).                                     |
-| `content_type`              | `str`       | Usually leave unset — inferred from the payload.                                                                                              |
-| `content_bytes`             | `bytes`     | For file connectors — see below.                                                                                                              |
-| `mime_type`                 | `str`       | Content type of `content_bytes`. Detected when omitted.                                                                                       |
-| `created_at` / `updated_at` | `datetime`  | Defaults to now.                                                                                                                              |
-| `location`                  | `str`       | Where inside the system this came from.                                                                                                       |
+| Field | Type | Notes |
+| --- | --- | --- |
+| `id` | `str` | **Required.** Must be stable across runs — it ties this run's asset to the same asset last run, so findings and history stay attached. |
+| `name` | `str` | Display name. Defaults to `id`. |
+| `url` | `str` | Where a person would go to see this. Defaults to a generated `custom://` reference. |
+| `content` | `str` | The text detectors scan. |
+| `kind` | `str` | `record` _(default)_, `document`, `page`, `file`, `table`. |
+| `metadata` | `dict` | Anything useful about the item. Free-form for Custom sources. |
+| `links` | `list[str]` | Other assets' **ids**. See [Relating assets](#relating-assets). |
+| `tags` | `dict[str, str]` | Facts you already know, keyed by Tag detector key. See [Tagging](#tagging-what-you-already-know). |
+| `urn` | `str` | What the *platform* calls this object. Only for things another source also sees. |
+| `content_type` | `str` | Usually leave unset — inferred from the payload. |
+| `content_bytes` | `bytes` | For file connectors — see [Files and images](#files-and-images). |
+| `mime_type` | `str` | Content type of `content_bytes`. Detected when omitted. |
+| `created_at` / `updated_at` | `datetime \| str` | Defaults to now. A string must be ISO 8601. |
+| `location` | `str` | Where inside the system this came from. |
 
-### Linking assets
+### Choosing `kind`
 
-`links` takes the ids you already use, and Classifyre resolves them into the
-investigation graph:
+`kind` decides how the asset is presented and which metadata fields apply. An
+unrecognised value is corrected to `record` with a warning rather than failing
+the scan — losing a four-hour run at asset 40,000 over a typo is the worse
+outcome.
+
+| Kind | Use for | Example |
+| --- | --- | --- |
+| `record` | One row, item or object from an API or database | A Jira issue, a CRM contact, a log entry |
+| `document` | A written artefact with a body | A policy PDF, a contract, a report |
+| `page` | One addressable page of a larger site or space | A Confluence page, a wiki article |
+| `file` | A file with bytes, identified by its path or key | An S3 object, an attachment |
+| `table` | A structured dataset with columns | A database table, a Parquet file, a CSV |
+
+### Choosing `content_type`
+
+Leave it unset unless the payload is not plain text. It routes which detectors
+run — set it wrong and image detectors run over text, or never run at all.
+
+`TXT` · `TABLE` · `IMAGE` · `VIDEO` · `AUDIO` · `URL` · `BINARY` · `OTHER`
+
+If you set `content_bytes`, the type is detected from the bytes and you can skip
+this entirely.
+
+### Files and images
+
+Set `content_bytes` and the connector gets everything a built-in file source
+gets: text extraction, normalized file metadata, and the binary and image
+detectors.
+
+```python
+def extract():
+    for item in bucket.list():
+        yield Asset(
+            id=item.key,
+            name=item.filename,
+            content_bytes=bucket.download(item.key),
+            mime_type=item.content_type,   # detected if you omit it
+            kind="file",
+        )
+```
+
+You do not need to parse anything here — a PDF's text, an image's dimensions and
+the file's size are all filled in for you. Parse it yourself only when you want
+the text *before* yielding, for example to skip empty documents.
+
+---
+
+## Reading files: `parse` and `pages`
+
+The same extractor every built-in file source uses, so a notebook never
+implements format handling.
+
+Handled formats include PDF, DOCX, XLSX, PPTX, the OpenDocument formats, EML and
+MSG, RTF, HTML, JSON, CSV/TSV, Parquet and Arrow, archives, and images — images
+and scanned PDFs are OCR'd.
+
+### `parse(source, *, name="", mime_type=None) -> ParsedContent`
+
+`source` may be a `Path`, a `str` path, `bytes`, an open binary handle, or a
+`NotebookFile` from `ctx.files`. `mime_type` is a hint, trusted over sniffing
+when you already know it — useful for a payload an API declared.
+
+| Field | Is |
+| --- | --- |
+| `.text` | Extracted text, ready for `Asset(content=...)`. |
+| `.mime_type` | Detected content type. |
+| `.is_binary` | Whether the payload is binary rather than plain text. |
+| `.size_bytes` | Size of what was parsed. |
+| `.error` | Why extraction produced nothing. `None` on success. |
+
+**It never raises.** A corrupt or unreadable file comes back with `.error` set
+and empty text, so one bad attachment costs one asset rather than the run. The
+object is falsey when `.error` is set:
+
+```python
+parsed = parse(path)
+if not parsed:
+    ctx.log(f"skipping {path.name}: {parsed.error}")
+    continue
+
+yield Asset(id=path.name, content=parsed.text, kind="file")
+```
+
+**A PDF fetched over HTTP** — bytes, with the declared type as a hint:
+
+```python
+response = httpx.get(url)
+parsed = parse(response.content, name="policy.pdf", mime_type="application/pdf")
+yield Asset(id=url, name="policy.pdf", content=parsed.text, kind="document")
+```
+
+**An `.eml` on disk** — the parser reads headers, body and attachments:
+
+```python
+for path in ctx.folder("mail").rglob("*.eml"):
+    parsed = parse(path)
+    yield Asset(id=str(path), name=path.name, content=parsed.text, kind="document")
+```
+
+### `pages(source, *, page_size=100) -> Iterator[str]`
+
+Reads a payload a page at a time instead of whole: rows for a tabular file, lines
+for everything else. A multi-gigabyte dump becomes many assets and is never in
+memory at once.
+
+```python
+for index, page in enumerate(pages(ctx.file("dump.parquet"), page_size=500)):
+    yield Asset(id=f"dump-{index}", content=page, kind="table")
+```
+
+Use `parse` when the file fits comfortably in memory and you want one asset out
+of it. Use `pages` when it does not, or when each page is worth investigating on
+its own.
+
+---
+
+## Relating assets
+
+Two mechanisms, and the difference matters.
+
+**`Asset.links`** says two assets are connected. It does not say **how**, and
+that turns out to be the whole question: an attachment, a foreign key and a
+derived table are three different relationships, and only one of them answers
+*"if I change this, what breaks?"*
+
+**`relationships()`** types the relationship. Reach for it whenever the *kind* of
+connection is part of the answer.
+
+### `links` — connected, unspecified how
+
+Takes the ids you already use. Cheap, and enough when "these belong together" is
+all you mean.
 
 ```python
 yield Asset(
@@ -104,18 +306,25 @@ yield Asset(
 )
 ```
 
-### Lineage
+Order does not matter — a link to an asset yielded later resolves fine. A link to
+an id this run never yields simply has nothing on the other end. Links are
+directional as written; link both ways when both directions are worth following.
 
-`links` says two assets are connected. It does not say **how**, and that turns
-out to be the whole question: an attachment, a foreign key and a derived table
-are three different relationships, and only one of them answers *"if I change
-this, what breaks?"*.
+### The five builders
 
-Define a `relationships()` function and pick the builder that matches what you
-mean. Assets are named by the same ids you gave them in `extract()`.
+| Builder | Means | In the lineage graph? |
+| --- | --- | --- |
+| `flow(upstream=, downstream=)` | the values in one came from the other | **yes — this is lineage** |
+| `contains(parent, child)` | one is a part of the other | no — used to collapse it |
+| `same_as(a, b)` | the same real thing, twice | no — used to merge nodes |
+| `references(a, b)` | one points at the other | no |
+| `uses(actor, target)` | someone touched it | as weight, not as a path |
 
 ```python
-from classifyre import Ref, FieldMapping, FlowType, flow, contains, references, same_as
+from classifyre import (
+    Ref, FieldMapping, FlowType, flow, contains, references, same_as, uses,
+)
+
 
 def relationships():
     # Lineage. The only class an impact question follows.
@@ -132,28 +341,37 @@ def relationships():
         ],
     )
 
-    yield contains(Ref.asset("orders"), Ref.asset("orders_2024"))   # part of
-    yield references(Ref.asset("orders"), Ref.asset("customers"))   # points at
+    # A partition is part of its table — collapse them in the graph.
+    yield contains(Ref.asset("orders"), Ref.asset("orders_2024"))
+
+    # A foreign key points somewhere; it does not move values.
+    yield references(Ref.asset("orders"), Ref.asset("customers"))
+
+    # The export and the table are the same real thing under two names.
+    yield same_as(Ref.asset("orders"), Ref.asset("orders_export"))
+
+    # A person read it. Weight on the node, not a path through it.
+    yield uses(Ref.asset("analyst-88"), Ref.asset("orders"))
 ```
 
-| Builder | Means | In the lineage graph? |
-| --- | --- | --- |
-| `flow(upstream=, downstream=)` | the values in one came from the other | **yes — this is lineage** |
-| `contains(parent, child)` | one is a part of the other | no — used to collapse it |
-| `same_as(a, b)` | the same real thing, twice | no — used to merge nodes |
-| `references(a, b)` | one points at the other | no |
-| `uses(actor, target)` | someone touched it | as weight, not as a path |
+**`flow` takes both ends as keyword arguments on purpose.** A reversed lineage
+edge is silently wrong rather than loudly broken, so it is not something you can
+write by accident. `FlowType` is `TRANSFORM` _(default)_, `VIEW`, `COPY`,
+`WRITE`, `EXPORT` or `SEND`.
 
-`flow` takes both ends as keyword arguments on purpose. A reversed lineage edge
-is silently wrong rather than loudly broken, so it is not something you can
-write by accident.
+### Naming an endpoint: `Ref`
 
-#### Lineage across systems
+| | Names |
+| --- | --- |
+| `Ref.asset(id)` | An asset **this notebook yields**, by the id you gave it. |
+| `Ref.urn(urn)` | An object in **any** system, by what that platform calls it. |
+| `Ref.finding(id)` | An existing finding. |
 
-`Ref.urn(...)` names an object by what its *platform* calls it, so you can point
-at a table this connector does not produce and has never seen. If a source for
-that system is scanned — before this run or a month after it — the two halves
-find each other and the edge completes itself.
+### Lineage across systems
+
+`Ref.urn(...)` lets you point at a table this connector does not produce and has
+never seen. If a source for that system is scanned — before this run or a month
+after it — the two halves find each other and the edge completes itself.
 
 ```python
 from classifyre import urn_for
@@ -165,80 +383,77 @@ yield flow(
 )
 ```
 
-Build the URN with `urn_for(...)` rather than writing the string yourself: each
-connector folds capitalisation and default ports its own way, and a URN that
-differs by one letter never matches. Setting `Asset.urn` does the same thing in
-the other direction — it lets another source's lineage point at *your* asset.
+`urn_for(platform, authority, *path)` — `authority` is the account, host,
+workspace or bucket; the rest is the path within it. Build the URN with it rather
+than writing the string yourself: each connector folds capitalisation and default
+ports its own way, and a URN that differs by one letter never matches.
+
+Setting `Asset.urn` does the same thing in the other direction — it lets another
+source's lineage point at *your* asset.
 
 Start from the **Lineage and links** template, which has all of this running.
 
-### Files and images
+---
 
-Set `content_bytes` and a connector that fetches files gets everything a
-built-in file source gets: text extraction, normalized file metadata, and the
-binary and image detectors.
+## Tagging what you already know
+
+Some facts do not need detecting. The system you are reading from already knows
+that a table holds cardholder data, that a folder is under legal hold, that a
+dataset came from a regulated jurisdiction. Running a classifier over the content
+to re-derive that can only lose information.
+
+`Asset.tags` records those facts directly. Each **key is the key of a
+[Tag detector](/detectors/custom-detectors/tag/)**; the value is what you are
+asserting.
+
+```python
+yield Asset(
+    id="prod.payments.transactions",
+    name="transactions",
+    content=sample_csv,
+    kind="table",
+    tags={"cardholder_data": "primary-account-numbers"},
+)
+```
+
+Each entry becomes a finding on the asset, carrying that detector's label and
+severity, and behaves like any other finding from there: it appears on the asset,
+filters by severity, and can be cited in a case.
+
+Build the dict from what the source told you, and skip a key rather than
+asserting an empty value:
 
 ```python
 def extract():
-    for item in bucket.list():
-        yield Asset(
-            id=item.key,
-            name=item.filename,
-            content_bytes=bucket.download(item.key),
-            mime_type=item.content_type,   # detected if you omit it
-            kind="file",
-        )
+    for table in catalog.tables():
+        tags = {}
+        if table.classification:
+            tags["cardholder_data"] = table.classification
+        if table.legal_hold:
+            tags["legal_hold"] = "retained-pending-litigation"
+
+        yield Asset(id=table.id, name=table.name, content=table.sample, tags=tags)
 ```
 
-You don't need to parse anything — a PDF's text, an image's dimensions and the
-file's size all get filled in for you.
+**Before this works**, create the Tag detector — *Detectors → New → Tag* — and
+give it the key you write here.
 
----
+<Callout type="warning">
+  A tag whose key matches no Tag detector is reported as a **scan warning** and
+  skipped. If a tag does not appear, check the scan log for the key: it is almost
+  always a typo or a detector that was deleted.
+</Callout>
 
-## `parse` and `pages`
+### When to tag and when to detect
 
-`from classifyre import pages, parse` — the same extractor every built-in file
-source uses, so a notebook never implements format handling.
+| Reach for | When |
+| --- | --- |
+| **A tag** | The source system already holds the answer. You are copying a fact, not finding one. |
+| **A Regex detector** | The answer is a fixed, structured token in the content — an ID, a key, an account code. |
+| **A GLiNER2 or AI detector** | The answer is in the content and has to be judged. |
 
-### `parse(source, *, name="", mime_type=None) -> ParsedContent`
-
-`source` may be a path, `bytes`, an open binary handle, or a `NotebookFile` from
-`ctx.files`. `mime_type` is a hint, trusted over sniffing when you already know
-it — useful for a payload an API declared.
-
-| Field                | Is                                                          |
-| -------------------- | ----------------------------------------------------------- |
-| `.text`              | Extracted text, ready for `Asset(content=...)`.             |
-| `.mime_type`         | Detected content type.                                      |
-| `.is_binary`         | Whether the payload is binary rather than plain text.       |
-| `.size_bytes`        | Size of what was parsed.                                    |
-| `.error`             | Why extraction produced nothing. `None` on success.         |
-
-**It never raises.** A corrupt or unreadable file comes back with `.error` set
-and empty text, so one bad attachment costs one asset rather than the run. The
-object is falsey when `.error` is set:
-
-```python
-parsed = parse(path)
-if not parsed:
-    ctx.log(f"skipping {path.name}: {parsed.error}")
-    continue
-```
-
-Handled formats include PDF, DOCX, XLSX, PPTX, the OpenDocument formats, EML and
-MSG, RTF, HTML, JSON, CSV/TSV, Parquet and Arrow, archives, and images — images
-and scanned PDFs are OCR'd.
-
-### `pages(source, *, page_size=100) -> Iterator[str]`
-
-Reads a payload a page at a time instead of whole: rows for a tabular file,
-lines for everything else. A multi-gigabyte dump becomes many assets and is
-never in memory at once.
-
-```python
-for index, page in enumerate(pages(ctx.file("dump.parquet"), page_size=500)):
-    yield Asset(id=f"dump-{index}", content=page, kind="table")
-```
+You do not select Tag detectors on a source. Every active one is available to
+every Custom connector automatically, so a new tag needs no source change.
 
 ---
 
@@ -249,32 +464,42 @@ for index, page in enumerate(pages(ctx.file("dump.parquet"), page_size=500)):
 Files uploaded to the source, downloaded to local disk before any cell runs.
 Empty is a normal state, not an error. Available in every deployment.
 
-|                        | Returns                                                   |
-| ---------------------- | ---------------------------------------------------------- |
-| `ctx.files`            | Every file, ordered by name.                               |
-| `ctx.file(name)`       | One by name. Raises naming the files that *are* there.     |
+| | Returns |
+| --- | --- |
+| `ctx.files` | Every file, ordered by name. |
+| `ctx.file(name)` | One by name. Raises naming the files that *are* there. |
 
 Each entry is a `NotebookFile`:
 
-|                       | Is                                                       |
-| --------------------- | -------------------------------------------------------- |
-| `.name`               | The name it was uploaded under.                          |
-| `.path`               | A `pathlib.Path` on local disk.                          |
-| `.size_bytes`         | Size on disk.                                            |
-| `.read_bytes()`       | Every byte, in memory.                                   |
-| `.read_text()`        | Decoded as UTF-8, replacing what won't decode.           |
-| `.open()`             | A binary handle. You close it.                           |
-| `.parse()`            | `ParsedContent` for this file.                           |
-| `.pages(page_size)`   | Read it a page at a time.                                |
+| | Is |
+| --- | --- |
+| `.name` | The name it was uploaded under. |
+| `.path` | A `pathlib.Path` on local disk. |
+| `.size_bytes` | Size on disk. |
+| `.read_bytes()` | Every byte, in memory. |
+| `.read_text(encoding="utf-8")` | Decoded text, replacing what will not decode. |
+| `.open()` | A binary handle. You close it. |
+| `.parse()` | `ParsedContent` for this file. |
+| `.pages(page_size=100)` | Read it a page at a time. |
+
+```python
+def extract():
+    for file in ctx.files:
+        parsed = file.parse()
+        if not parsed:
+            ctx.log(f"skipping {file.name}: {parsed.error}")
+            continue
+        yield Asset(id=file.name, name=file.name, content=parsed.text, kind="file")
+```
 
 ### `ctx.folders` — local folders _(desktop only)_
 
 Folders configured on the source, as `pathlib.Path`. Nothing is copied — the
 notebook opens files where they are.
 
-|                    | Returns                                                    |
-| ------------------ | ---------------------------------------------------------- |
-| `ctx.folders`      | All configured folders, as `{name: Path}`.                 |
+| | Returns |
+| --- | --- |
+| `ctx.folders` | All configured folders, as `{name: Path}`. |
 | `ctx.folder(name)` | One by name. Raises naming the folders that are configured. |
 
 Empty in a Kubernetes deployment: there is no such machine there, and the API
@@ -293,32 +518,40 @@ refuses to save a source that carries folders. Upload the files instead.
 
 ### Configuration
 
-|                                              | Returns                                                                       |
-| -------------------------------------------- | ----------------------------------------------------------------------------- |
-| `ctx.var(name, default=None)`                | A **variable**. Raises if it isn't configured and no default is given.        |
-| `ctx.secret(name, default=None)`             | A **secret**. Same behaviour, and the value is redacted from logs and output. |
-| `ctx.has_var(name)` / `ctx.has_secret(name)` | Whether one is configured.                                                    |
-| `ctx.variables`                              | All variables, as a dict.                                                     |
-| `ctx.secret_names`                           | Secret **names** only — never the values.                                     |
+| | Returns |
+| --- | --- |
+| `ctx.var(name, default=None)` | A **variable**. Raises if it is not configured and no default is given. |
+| `ctx.secret(name, default=None)` | A **secret**. Same behaviour, and the value is redacted from logs and output. |
+| `ctx.has_var(name)` / `ctx.has_secret(name)` | Whether one is configured. |
+| `ctx.variables` | All variables, as a dict. |
+| `ctx.secret_names` | Secret **names** only — never the values. |
+
+```python
+client = ApiClient(
+    base_url=ctx.var("api_base"),
+    token=ctx.secret("api_token"),
+    verify=ctx.var("verify_tls", "true") == "true",
+)
+```
 
 ### This run
 
-|                        | Returns                                                        |
-| ---------------------- | -------------------------------------------------------------- |
-| `ctx.strategy`         | `"ALL"`, `"AUTOMATIC"`, `"LATEST"` or `"RANDOM"`.              |
-| `ctx.limit`            | How many assets this run wants, or `None` under **All**.       |
-| `ctx.offset`           | Where to start. **Reading it means you apply it** — see below. |
-| `ctx.page_size`        | The configured rows-per-page.                                  |
-| `ctx.sampling`         | The whole sampling config.                                     |
-| `ctx.cursor`           | What the previous run recorded. Empty on the first run.        |
-| `ctx.set_cursor(dict)` | Record where this run got to, for the next one.                |
-| `ctx.should_abort`     | `True` once the run has been asked to stop.                    |
-| `ctx.log(*parts)`      | Write to the scan log.                                         |
-| `ctx.now()`            | Current UTC time.                                              |
+| | Returns |
+| --- | --- |
+| `ctx.strategy` | `"ALL"`, `"AUTOMATIC"`, `"LATEST"` or `"RANDOM"`. |
+| `ctx.limit` | How many assets this run wants, or `None` under **All**. |
+| `ctx.offset` | Where to start. **Reading it means you apply it** — see below. |
+| `ctx.page_size` | The configured rows-per-page. |
+| `ctx.sampling` | The whole sampling config. |
+| `ctx.cursor` | What the previous run recorded. Empty on the first run. |
+| `ctx.set_cursor(dict)` | Record where this run got to, for the next one. |
+| `ctx.should_abort` | `True` once the run has been asked to stop. |
+| `ctx.log(*parts)` | Write to the scan log. |
+| `ctx.now()` | Current UTC time. |
 
 <Callout type="warning">
   **`ctx.offset` is a hand-off, not just a number.** Reading it tells Classifyre
-  you've applied it yourself, so it stops skipping on your behalf. Read it
+  you have applied it yourself, so it stops skipping on your behalf. Read it
   *before* you yield anything, and use it in your query. Ignore it entirely and
   paging still works — just less efficiently.
 </Callout>
@@ -342,7 +575,7 @@ def extract():
 ### Long-running work
 
 `ctx.should_abort` turns `True` when someone presses Stop or the run is
-cancelled. Python can't be interrupted from outside, so a loop that never checks
+cancelled. Python cannot be interrupted from outside, so a loop that never checks
 it only ends when the execution times out.
 
 ```python
@@ -358,11 +591,14 @@ for row in huge_result_set:
 
 Set under the notebook's options:
 
-| Limit          | Default  | Does                                                              |
-| -------------- | -------- | ----------------------------------------------------------------- |
-| **Timeout**    | 900s     | Stops an execution that runs too long.                            |
-| **Max assets** | _(none)_ | Caps how many assets one scan ingests.                            |
-| **Max output** | 2 MB     | Caps stored cell output; larger output is truncated, not dropped. |
+| Limit | Default | Does |
+| --- | --- | --- |
+| **Timeout** | 900s | Stops an execution that runs too long. |
+| **Max assets** | _(none)_ | Caps how many assets one scan ingests. |
+| **Max output** | 2 MB | Caps stored cell output; larger output is truncated, not dropped. |
+
+Fixed limits: a notebook holds at most **200 cells** of **100,000 characters**
+each, and may declare at most **50 packages**.
 
 ---
 
@@ -373,24 +609,31 @@ Set under the notebook's options:
   module in production.
 - **Top-level functions only.** `test_connection` and `extract` have to be
   defined at the top level of a cell — a function nested inside a class or
-  another function isn't found.
-- **Packages are declared, not installed in code.** Use the packages table
-  rather than a `pip install` cell; the declared list is what gets installed
-  before your cells run.
+  another function is not found.
+- **Packages are declared, not installed in code.** Use the packages table rather
+  than a `pip install` cell; the declared list is what gets installed before your
+  cells run.
+- **There is no persistent kernel.** Running cell N re-runs the *current* source
+  of cells 1 through N. State from an earlier run does not survive.
+- **`id` must be stable.** Everything — findings, history, the scan cache, tags —
+  hangs off it. A run that renumbers its ids looks like a source that deleted
+  everything and created it again.
 
 ---
 
 ## When something goes wrong
 
-| What you see                                  | Usually means                                                                                            |
-| --------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| _"'extract' is not defined"_                  | The function isn't at the top level of a code cell, or is spelled differently.                           |
-| A cell you didn't run is highlighted          | That's the cell that raised while rebuilding state — the error is there, not in the one you clicked.     |
-| _"Could not install the notebook's packages"_ | A name or version in the packages table doesn't resolve. The installer's own message names which.        |
-| _"No variable named …"_                       | The key isn't in the variables table, or is spelled differently. Keys are case-sensitive.                |
-| Preview shows no assets                       | `extract()` returned without yielding. Check filters, and that it's a generator (`yield`, not `return`). |
-| `••••` where you expected a value             | Working as intended — that's a secret being redacted from output.                                        |
-| A scan is slower each run                     | Under **Automatic**, `extract()` is probably producing and discarding earlier items. Use `ctx.offset`.   |
+| What you see | Usually means |
+| --- | --- |
+| _"'extract' is not defined"_ | The function is not at the top level of a code cell, or is spelled differently. |
+| A cell you did not run is highlighted | That is the cell that raised while rebuilding state — the error is there, not in the one you clicked. |
+| _"Could not install the notebook's packages"_ | A name or version in the packages table does not resolve. The installer's own message names which. |
+| _"No variable named …"_ | The key is not in the variables table, or is spelled differently. Keys are case-sensitive. |
+| Preview shows no assets | `extract()` returned without yielding. Check filters, and that it is a generator (`yield`, not `return`). |
+| _"Tag '…' matches no Tag detector"_ | The key in `tags` has no Tag detector. The warning lists the keys that do exist. |
+| _"uses unknown kind …"_ | A typo in `kind`. The asset was recorded as `record`; the warning names the valid kinds. |
+| `••••` where you expected a value | Working as intended — that is a secret being redacted from output. |
+| A scan is slower each run | Under **Automatic**, `extract()` is probably producing and discarding earlier items. Use `ctx.offset`. |
 
 ---
 

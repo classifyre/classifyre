@@ -174,6 +174,49 @@ def test_checksum_changes_when_content_changes(source) -> None:
     assert first.checksum != second.checksum
 
 
+# -- tags --------------------------------------------------------------------
+
+
+TAGGING_NOTEBOOK = """from classifyre import Asset
+
+
+def test_connection() -> dict:
+    return {"status": "SUCCESS", "message": "Ready."}
+
+
+def extract():
+    yield Asset(
+        id="tbl-1",
+        name="transactions",
+        content="card_last4,amount",
+        kind="table",
+        tags={"cardholder_data": "primary-account-numbers"},
+    )
+"""
+
+
+def test_tags_reach_the_source_from_the_notebook(source) -> None:
+    instance = source(build_recipe(TAGGING_NOTEBOOK))
+    asset = collect(instance)[0]
+    assert instance.asset_tags(asset.hash) == {"cardholder_data": "primary-account-numbers"}
+
+
+def test_an_untagged_asset_reports_no_tags(source) -> None:
+    instance = source()
+    asset = collect(instance)[0]
+    assert instance.asset_tags(asset.hash) == {}
+
+
+def test_checksum_changes_when_only_a_tag_changes(source) -> None:
+    # Without tags in the checksum the scan cache skips the asset and the new
+    # tag never becomes a finding -- the whole feature silently stops working.
+    first = collect(source(build_recipe(TAGGING_NOTEBOOK)))[0]
+    changed = TAGGING_NOTEBOOK.replace("primary-account-numbers", "tokenized-pan")
+    second = collect(source(build_recipe(changed)))[0]
+    assert first.hash == second.hash
+    assert first.checksum != second.checksum
+
+
 # -- content -----------------------------------------------------------------
 
 

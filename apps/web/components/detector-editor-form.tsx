@@ -20,6 +20,9 @@ import {
 import type { CustomDetectorEditorHandle } from "@/components/custom-detector-editor";
 import { LLMDetectorEditor } from "@/components/llm-detector-editor";
 import type { LLMDetectorEditorHandle } from "@/components/llm-detector-editor";
+import { TagDetectorEditor } from "@/components/tag-detector-editor";
+import type { TagDetectorEditorHandle } from "@/components/tag-detector-editor";
+import { TAG_PIPELINE_TYPE } from "@/lib/custom-detector-badge";
 import { useTranslation } from "@/hooks/use-translation";
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -57,6 +60,7 @@ export const DetectorEditorForm = React.forwardRef<
   const regexRef = React.useRef<RegexDetectorEditorHandle>(null);
   const transformerRef = React.useRef<TransformerDetectorEditorHandle>(null);
   const llmRef = React.useRef<LLMDetectorEditorHandle>(null);
+  const tagRef = React.useRef<TagDetectorEditorHandle>(null);
   const customRef = React.useRef<CustomDetectorEditorHandle>(null);
 
   const isPipelineDetector = Boolean(
@@ -67,6 +71,8 @@ export const DetectorEditorForm = React.forwardRef<
   )?.type as string | undefined;
   const isRegexPipeline = isPipelineDetector && pipelineSchemaType === "REGEX";
   const isLLMPipeline = isPipelineDetector && pipelineSchemaType === "LLM";
+  const isTagPipeline =
+    isPipelineDetector && pipelineSchemaType === TAG_PIPELINE_TYPE;
   const isTransformerPipeline =
     isPipelineDetector &&
     !!pipelineSchemaType &&
@@ -123,6 +129,10 @@ export const DetectorEditorForm = React.forwardRef<
             await llmRef.current?.submit();
             return true;
           }
+          if (isTagPipeline) {
+            await tagRef.current?.submit();
+            return true;
+          }
           if (isRegexPipeline) {
             await regexRef.current?.submit();
             return true;
@@ -138,7 +148,13 @@ export const DetectorEditorForm = React.forwardRef<
         }
       },
     }),
-    [isPipelineDetector, isRegexPipeline, isLLMPipeline, isTransformerPipeline],
+    [
+      isPipelineDetector,
+      isRegexPipeline,
+      isLLMPipeline,
+      isTagPipeline,
+      isTransformerPipeline,
+    ],
   );
 
   if (isTransformerPipeline) {
@@ -195,6 +211,32 @@ export const DetectorEditorForm = React.forwardRef<
             isActive: payload.isActive,
             pipelineSchema: payload.pipelineSchema,
             aiProviderConfigId: payload.aiProviderConfigId,
+          });
+        }}
+      />
+    );
+  }
+
+  if (isTagPipeline) {
+    return (
+      <TagDetectorEditor
+        ref={tagRef}
+        mode="edit"
+        submitLabel={t("common.save")}
+        isSubmitting={isSaving}
+        embedded={embedded}
+        initialPipelineSchema={detector.pipelineSchema}
+        initialName={detector.name}
+        initialKey={detector.key}
+        initialDescription={detector.description ?? ""}
+        initialIsActive={detector.isActive}
+        onSubmit={async (payload) => {
+          await handleSave({
+            name: payload.name,
+            key: payload.key,
+            description: payload.description,
+            isActive: payload.isActive,
+            pipelineSchema: payload.pipelineSchema,
           });
         }}
       />

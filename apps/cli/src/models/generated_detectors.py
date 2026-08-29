@@ -1313,6 +1313,41 @@ class ObjectDetectionPipelineSchema(BaseModel):
     )
 
 
+class Type8(StrEnum):
+    TAG = 'TAG'
+
+
+class Severity2(StrEnum):
+    """
+    Severity assigned to every finding this detector produces. There is no confidence to derive it from: a tag is asserted, not inferred.
+    """
+
+    critical = 'critical'
+    high = 'high'
+    medium = 'medium'
+    low = 'low'
+    info = 'info'
+
+
+class TagPipelineSchema(BaseModel):
+    """
+    A placeholder detector that runs no classification and never reads content. It exists only to give a manual assertion a stable identity. A CUSTOM connector notebook applies it by the detector's key: Asset(tags={"<detector key>": "<value>"}). Not selectable in a source's detector list.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    type: Literal['TAG'] = 'TAG'
+    label: str | None = Field(
+        None,
+        description="Label carried by every finding this detector produces (finding_type is 'tag:<label>'). Defaults to the detector's name when omitted.",
+    )
+    severity: Severity2 | None = Field(
+        Severity2.medium,
+        description='Severity assigned to every finding this detector produces. There is no confidence to derive it from: a tag is asserted, not inferred.',
+    )
+
+
 class CustomDetectorConfig(DetectorConfig):
     """
     Configuration for user-defined detector execution
@@ -1338,6 +1373,7 @@ class CustomDetectorConfig(DetectorConfig):
         | TextClassificationPipelineSchema
         | ImageClassificationPipelineSchema
         | ObjectDetectionPipelineSchema
+        | TagPipelineSchema
         | None
     ) = Field(None, discriminator='type', title='AnyPipelineSchema')
     max_findings: int | None = Field(

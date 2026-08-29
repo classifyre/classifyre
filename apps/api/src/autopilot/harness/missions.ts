@@ -547,6 +547,8 @@ export const DETECTOR_AUTHOR_MISSION: Mission = {
     '     sentiment, toxicity, language, prompt-injection); copy a candidate model id from the registry.',
     '   • IMAGE_CLASSIFICATION / OBJECT_DETECTION — image assets (NSFW, scene/category, or locating',
     '     objects like weapons/people/logos).',
+    '   • TAG — NOT for you. It runs nothing; it only records a fact a human CUSTOM connector',
+    '     notebook already asserted. It can never surface something you have not been told.',
     '   • LLM — nuanced contextual relationships, intent, concealment or policy judgement that no',
     '     smaller model captures. Call ai.providers and choose any usable aiProviderConfigId; for',
     '     image/PDF reasoning supportsVision MUST be true. Never include provider_runtime.',

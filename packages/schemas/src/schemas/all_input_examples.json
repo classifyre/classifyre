@@ -3888,6 +3888,40 @@
           "rows_per_page": 100
         }
       }
+    },
+    {
+      "name": "Tagging what you already know",
+      "description": "Records facts the source system already holds -- a classification, a legal hold -- as findings, without running any classifier over the content. Each key is the key of a Tag detector.",
+      "config": {
+        "type": "CUSTOM",
+        "required": {
+          "notebook": {
+            "revision": 1,
+            "cells": [
+              {
+                "id": "intro",
+                "type": "markdown",
+                "source": "# Tagging what you already know\n\nSome facts do not need detecting. The system you are reading from already knows\nthat a table holds cardholder data, that a folder is under legal hold, that a\ndataset came from a regulated jurisdiction. Running a classifier over the\ncontent to re-derive that can only lose information.\n\n`Asset.tags` records those facts directly. Each key is the **key of a Tag\ndetector**; the value is what you are asserting:\n\n    yield Asset(id=\"accounts\", tags={\"cardholder_data\": \"primary-account-numbers\"})\n\nEach entry becomes a finding on the asset, carrying that detector's label and\nseverity, and behaves like any other finding from there: it shows on the asset,\nfilters by severity, and can be cited in a case.\n\n**Before this runs**, create the Tag detector: *Detectors -> New -> Tag*. The key\nyou give it is the key you write here. A tag whose key matches no Tag detector is\nreported as a scan warning and skipped -- so if a tag does not appear, check the\nscan log for the key.\n\nReach for a tag when the source already has the answer. Reach for a Regex,\nGLiNER2 or AI detector when the answer is in the content and has to be found.\n"
+              },
+              {
+                "id": "imports",
+                "type": "code",
+                "source": "from classifyre import Asset, ctx\n"
+              },
+              {
+                "id": "test-connection",
+                "type": "code",
+                "source": "def test_connection() -> dict:\n    return {\"status\": \"SUCCESS\", \"message\": \"Ready.\"}\n"
+              },
+              {
+                "id": "extract",
+                "type": "code",
+                "source": "#: Stand-in for whatever catalog you actually read from.\nTABLES = [\n    {\n        \"id\": \"prod.payments.transactions\",\n        \"name\": \"transactions\",\n        \"sample\": \"card_last4,amount,captured_at\\n4242,240.00,2026-08-01\\n\",\n        \"classification\": \"cardholder-data\",\n        \"legal_hold\": True,\n    },\n    {\n        \"id\": \"prod.analytics.daily_active\",\n        \"name\": \"daily_active\",\n        \"sample\": \"day,users\\n2026-08-01,18422\\n\",\n        \"classification\": None,\n        \"legal_hold\": False,\n    },\n]\n\n\ndef extract():\n    for table in TABLES:\n        if ctx.should_abort:\n            break\n\n        # Build the tags from what the catalog already told you. Each key is a\n        # Tag detector's key; skip a key rather than asserting an empty value.\n        tags = {}\n        if table[\"classification\"]:\n            tags[\"cardholder_data\"] = table[\"classification\"]\n        if table[\"legal_hold\"]:\n            tags[\"legal_hold\"] = \"retained-pending-litigation\"\n\n        yield Asset(\n            id=table[\"id\"],\n            name=table[\"name\"],\n            content=table[\"sample\"],\n            kind=\"table\",\n            tags=tags,\n        )\n"
+              }
+            ]
+          }
+        }
+      }
     }
   ]
 }

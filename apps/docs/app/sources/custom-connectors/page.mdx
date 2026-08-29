@@ -310,11 +310,36 @@ Full details in the [reference](/sources/custom-connectors/reference/).
 
 ---
 
+## Tagging what you already know
+
+Some facts do not need detecting. If the system you are reading from already
+knows that a table holds cardholder data or that a folder is under legal hold,
+running a classifier over the content to re-derive it can only lose information.
+
+Create a [Tag detector](/detectors/custom-detectors/tag/), then write its key in
+`Asset.tags`. The value you pass becomes a finding on the asset, with that
+detector's label and severity:
+
+```python
+yield Asset(
+    id="prod.payments.transactions",
+    name="transactions",
+    kind="table",
+    tags={"cardholder_data": "primary-account-numbers"},
+)
+```
+
+Tag detectors are not selectable on a source. Every active one is available to
+every Custom connector automatically, so a new tag needs no source change.
+
+---
+
 ## Templates
 
 The **Templates** button under the cells inserts a complete worked notebook —
-uploaded files, local folders, file parsing, linked assets, a paged REST API.
-Its cells are added below what you already have; nothing you wrote is replaced.
+uploaded files, local folders, file parsing, linked assets, lineage, tagging, a
+paged REST API. Its cells are added below what you already have; nothing you
+wrote is replaced.
 
 ---
 

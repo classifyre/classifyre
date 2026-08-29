@@ -615,7 +615,7 @@ describe('CustomDetectorsService', () => {
     // it does not unconfigure it.
     expect(prisma.customDetector.findMany).toHaveBeenCalledWith({
       where: { OR: [{ id: { in: ['det-1'] } }, { key: { in: ['det-1'] } }] },
-      select: { id: true, key: true },
+      select: { id: true, key: true, pipelineSchema: true },
     });
   });
 
@@ -1025,6 +1025,110 @@ describe('CustomDetectorsService', () => {
       expect(registry).toContain(
         'mrm8488/bert-tiny-finetuned-sms-spam-detection',
       );
+    });
+  });
+
+  describe('TAG detectors', () => {
+    const tagSchema = {
+      type: 'TAG',
+      label: 'Cardholder data',
+      severity: 'high',
+    };
+
+    function tagRow(overrides: Record<string, unknown> = {}) {
+      return {
+        id: 'det-tag',
+        key: 'cardholder_data',
+        name: 'Cardholder Data',
+        description: null,
+        isActive: true,
+        version: 1,
+        pipelineSchema: tagSchema,
+        aiProviderConfigId: null,
+        lastTrainedAt: null,
+        lastTrainingSummary: null,
+        createdAt: new Date('2026-01-01T00:00:00.000Z'),
+        updatedAt: new Date('2026-01-01T00:00:00.000Z'),
+        trainingRuns: [],
+        _count: { findings: 0 },
+        ...overrides,
+      };
+    }
+
+    it('stores the schema raw rather than merging GLINER2 defaults on top', async () => {
+      const { service, prisma } = createService();
+      prisma.customDetector.create.mockResolvedValue(tagRow());
+
+      const result = await service.create({
+        name: 'Cardholder Data',
+        key: 'cardholder_data',
+        pipelineSchema: tagSchema,
+      });
+
+      expect(result.pipelineSchema).toEqual(tagSchema);
+      const created = prisma.customDetector.create.mock.calls[0][0].data;
+      // GLINER2 defaults (entities/classification/validation) would make a tag
+      // detector look trainable and give it content-driven config it never uses.
+      expect(created.pipelineSchema).toEqual(tagSchema);
+    });
+
+    it('accepts a schema with no label or severity', () => {
+      const { service } = createService();
+      expect(() => service.validatePipelineSchema({ type: 'TAG' })).not.toThrow();
+    });
+
+    it('rejects a blank label', () => {
+      const { service } = createService();
+      expect(() =>
+        service.validatePipelineSchema({ type: 'TAG', label: '   ' }),
+      ).toThrow(BadRequestException);
+    });
+
+    it('rejects a severity outside the five levels', () => {
+      const { service } = createService();
+      expect(() =>
+        service.validatePipelineSchema({ type: 'TAG', severity: 'urgent' }),
+      ).toThrow(BadRequestException);
+    });
+
+    it('builds a runtime entry for every active tag detector', async () => {
+      const { service, prisma } = createService();
+      prisma.customDetector.findMany.mockResolvedValue([
+        tagRow(),
+        tagRow({
+          id: 'det-regex',
+          key: 'invoice_id',
+          pipelineSchema: { type: 'REGEX', patterns: { inv: { pattern: 'INV-\\d+' } } },
+        }),
+      ]);
+
+      const entries = await service.buildRuntimeTagDetectors();
+
+      expect(entries).toHaveLength(1);
+      expect(entries[0].key).toBe('cardholder_data');
+      expect(entries[0].detector.config.pipeline_schema).toEqual(tagSchema);
+    });
+
+    it('drops a tag detector from a source selection', async () => {
+      // A source can never select one, so a selection naming a tag detector is
+      // stale config from before that detector was converted.
+      const { service, prisma } = createService();
+      prisma.customDetector.findMany.mockResolvedValue([
+        { id: 'det-tag', key: 'cardholder_data', pipelineSchema: tagSchema },
+        {
+          id: 'det-regex',
+          key: 'invoice_id',
+          pipelineSchema: { type: 'REGEX', patterns: {} },
+        },
+      ]);
+
+      const { ids, dropped } = await service.resolveDetectorSelections([
+        'det-tag',
+        'det-regex',
+      ]);
+
+      expect(ids).toEqual(['det-regex']);
+      expect(dropped).toEqual(['det-tag']);
     });
   });
 });

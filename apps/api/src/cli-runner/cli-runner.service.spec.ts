@@ -38,6 +38,7 @@ describe('CliRunnerService', () => {
   function createService(options?: {
     prismaSource?: any;
     kubernetesCliJobService?: any;
+    customDetectorsService?: Record<string, unknown>;
   }) {
     const prisma = {
       source: {
@@ -88,6 +89,9 @@ describe('CliRunnerService', () => {
     };
     const customDetectorsService = {
       buildRuntimeCustomDetectors: jest.fn().mockResolvedValue([]),
+      buildRuntimeCustomDetectorsByKeys: jest.fn().mockResolvedValue([]),
+      buildRuntimeTagDetectors: jest.fn().mockResolvedValue([]),
+      ...(options?.customDetectorsService ?? {}),
     };
     const runnerLogStorage = {
       initializeRunner: jest.fn().mockResolvedValue(undefined),
@@ -121,7 +125,13 @@ describe('CliRunnerService', () => {
       cls as any,
     );
 
-    return { service, prisma, maskedConfigCryptoService, runnerLogStorage };
+    return {
+      service,
+      prisma,
+      maskedConfigCryptoService,
+      runnerLogStorage,
+      customDetectorsService,
+    };
   }
 
   it('decrypts masked config before writing local CLI recipe', async () => {
@@ -1409,6 +1419,70 @@ describe('CliRunnerService', () => {
         jobName: true,
         jobNamespace: true,
       },
+    });
+  });
+
+  describe('tag detectors in the recipe', () => {
+    const tagEntry = {
+      id: 'det-tag',
+      key: 'cardholder_data',
+      name: 'Cardholder Data',
+      detector: {
+        type: 'CUSTOM' as const,
+        enabled: true as const,
+        config: {
+          custom_detector_key: 'cardholder_data',
+          name: 'Cardholder Data',
+          pipeline_schema: { type: 'TAG', label: 'Cardholder data' },
+        },
+      },
+    };
+
+    async function hydrate(
+      recipe: Record<string, any>,
+      entries: unknown[] = [tagEntry],
+    ) {
+      const { service, customDetectorsService } = createService({
+        customDetectorsService: {
+          buildRuntimeTagDetectors: jest.fn().mockResolvedValue(entries),
+        },
+      });
+      const merged = await (service as any).hydrateCustomDetectorsForRun(
+        'source-1',
+        recipe,
+      );
+      return { merged, customDetectorsService };
+    }
+
+    it('adds every active tag detector to a CUSTOM source recipe', async () => {
+      // Nothing in a source config can name a tag detector, so if the runner
+      // does not add them the key a notebook writes resolves to nothing.
+      const { merged } = await hydrate({ type: 'CUSTOM', detectors: [] });
+
+      expect(merged.detectors).toHaveLength(1);
+      expect(merged.detectors[0].config.custom_detector_key).toBe(
+        'cardholder_data',
+      );
+    });
+
+    it('leaves a non-CUSTOM source alone', async () => {
+      const { merged, customDetectorsService } = await hydrate({
+        type: 'POSTGRESQL',
+        detectors: [],
+      });
+
+      expect(customDetectorsService.buildRuntimeTagDetectors).not.toHaveBeenCalled();
+      expect(merged.detectors).toEqual([]);
+    });
+
+    it('keeps built-in detectors alongside the tag detectors', async () => {
+      const { merged } = await hydrate({
+        type: 'CUSTOM',
+        detectors: [{ type: 'SECRETS', enabled: true }],
+      });
+
+      expect(merged.detectors).toHaveLength(2);
+      expect(merged.detectors[0].type).toBe('SECRETS');
     });
   });
 });

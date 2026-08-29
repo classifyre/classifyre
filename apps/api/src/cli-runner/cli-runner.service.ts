@@ -900,11 +900,25 @@ export class CliRunnerService {
           )
         : [];
 
-    // Merge both sets, deduplicating by key (key-based wins over id-based).
+    // TAG detectors are never selectable on a source, so nothing in the stored
+    // config can name them. A CUSTOM connector applies one by writing its key in
+    // a notebook — Asset(tags={"<key>": "<value>"}) — and that key has to resolve
+    // at scan time or the tag is dropped with a warning. Sending every active
+    // one costs nothing: a tag detector loads no model and never reads content.
+    const isCustomSource =
+      String(recipe?.type || '')
+        .trim()
+        .toUpperCase() === 'CUSTOM';
+    const runtimeTagDetectors = isCustomSource
+      ? await this.customDetectorsService.buildRuntimeTagDetectors()
+      : [];
+
+    // Merge all three sets, deduplicating by key (key-based wins over id-based).
     const seenKeys = new Set<string>();
     const allRuntimeCustomDetectors = [
       ...runtimeByKeys,
       ...runtimeByIds,
+      ...runtimeTagDetectors,
     ].filter((entry) => {
       if (seenKeys.has(entry.key)) return false;
       seenKeys.add(entry.key);
