@@ -14,7 +14,11 @@ import { valueHash } from '../value-normalizer';
 describe('pattern exclusion', () => {
   const prisma = {
     correlationPattern: { findUnique: jest.fn() },
-    correlationReviewBatch: { create: jest.fn(), findUnique: jest.fn(), update: jest.fn() },
+    correlationReviewBatch: {
+      create: jest.fn(),
+      findUnique: jest.fn(),
+      update: jest.fn(),
+    },
     correlationPairVerdict: { createMany: jest.fn(), deleteMany: jest.fn() },
     $queryRaw: jest.fn(),
     $executeRaw: jest.fn(),
@@ -52,7 +56,9 @@ describe('pattern exclusion', () => {
     };
 
     /** findings in the group, then owner counts, then the pairs-driven count. */
-    const wireReads = (opts?: { owners?: Array<{ value_hash: string; assets: number }> }) => {
+    const wireReads = (opts?: {
+      owners?: Array<{ value_hash: string; assets: number }>;
+    }) => {
       prisma.$queryRaw
         .mockResolvedValueOnce([
           { finding_type: 'email', matched_content: ' Support@ACME.example ' },

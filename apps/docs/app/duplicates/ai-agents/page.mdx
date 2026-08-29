@@ -44,9 +44,19 @@ about stale duplicates. It also runs on demand after a
 | Agent | What it does with duplicates | When |
 |---|---|---|
 | **Duplicates Finder** | Computes matches, clusters, and the review index | After every scan; after a tuning change |
-| **Case agent** | Reads the queue, pulls confirmed duplicates into cases as evidence, checks whether an asset it's investigating has near-identical twins elsewhere | During the autopilot cycle, while working a case |
-| **Config agent** | Proposes weight, threshold and exclusion changes when the queue shows a matcher problem rather than a data problem | During the autopilot cycle, when tuning is enabled |
+| **Case agent** | Turns confirmed duplicates into cases and inquiries; checks whether an asset it's investigating has near-identical twins elsewhere | During the autopilot cycle, while working a case |
+| **Config agent** | Works the queue as a *matcher* problem: clears the safe band, excludes boilerplate, proposes weight and threshold changes | During the autopilot cycle, when tuning is enabled |
 | **Inquiry agent** | Uses duplicate context to avoid re-raising the same finding from five copies of the same document | While triaging findings |
+
+> **Why there is no "duplicates agent".** The work splits cleanly along a line
+> that already exists. Acting on a duplicate *as evidence* is case work, and the
+> case agent already owns evidence, provenance and follow-through. Fixing the
+> *matcher* is configuration, and the config agent already owns weights,
+> thresholds and exclusions with the gating that implies. A third agent would
+> re-implement one of those two, add a sixth kind to the cycle, and — because
+> **Duplicates Finder** already occupies the name — make every "duplicates run"
+> in the autopilot log ambiguous about whether it was a re-score or a reasoning
+> pass.
 
 The tools are gated the way the rest of autopilot is: nothing that writes is
 reachable when autopilot is switched off for the workspace, and mutating tools
@@ -63,8 +73,9 @@ These are read-only and always available to the agents above.
 |---|---|
 | **similar assets** | "What else looks like this asset?" — cluster members and top matches, each annotated with its pattern, whether lineage explains it, and **any verdict a person already recorded** |
 | **review queue** | The backlog: patterns ranked by how much work each settles, undecided counts, and how many matches lineage cannot explain |
-| **decisions** | What has already been judged and what became of it |
+| **decisions** | What has already been judged and what became of it. `unactionedOnly` finds duplicates a person confirmed and never used. |
 | **match cause** | Why one pair matched, as something to fix: the dominant label, the values, and how many other pairs the same combination produced |
+| **exclusion candidates** | For a [boilerplate pattern](/duplicates/patterns/#rule-candidate-stop-matching-on-these-values), the values inside the template and how many matches they drive elsewhere |
 | **value occurrences** | Where else a specific value appears across the estate |
 
 The first of those carries the most important design decision on this page: an
@@ -107,19 +118,34 @@ The safe band is also reversible from the undo log like any other batch.
 
 ## What an agent may propose
 
-Two mutating tools exist beyond the safe band, both gated by autopilot mode:
+Everything else an agent can do here is a mutation gated by autopilot mode: in
+*suggest* mode it becomes a proposal you approve, and only in *managed* mode is
+it applied directly.
 
-- **Promote a cluster into a case** — the same path the *Add to case* button
-  uses, so it lands with the normal case activity trail rather than through a
-  second, subtly different route.
-- **Tune the matcher** — weights, thresholds and exclusions. This affects scoring
-  workspace-wide, so it goes through the same decision gate as every other config
-  change: in *suggest* mode it becomes a proposal you approve; only in *managed*
-  mode is it applied directly.
+**Taking duplicates somewhere** — case agent:
 
-The **match cause** tool exists specifically so a tuning proposal is aimed at the
-actual driver rather than guessed at. An agent that proposes lowering a weight
-without reading the cause is proposing a change it cannot justify.
+- **Decisions to case** — confirmed pairs become evidence in a case, through the
+  same path the *Add to case* button uses, so it lands with the normal case
+  activity trail rather than a second, subtly different route. The verdicts are
+  stamped with the case, so the ledger shows follow-through.
+- **Decisions to inquiry** — for duplication that is *recurring* rather than
+  historical: opens an inquiry watching for the same match signature instead of
+  asking someone to review it again next month.
+- **Promote a cluster into a case** — the coarse version, kept for a cluster
+  that has not been through review.
+
+**Fixing the matcher** — config agent:
+
+- **Exclude a pattern's values** — the one-click fix for a
+  [boilerplate pattern](/duplicates/patterns/#rule-candidate-stop-matching-on-these-values),
+  aimed at the values the *exclusion candidates* tool named. Same gate as any
+  other correlation tuning, and one reversible entry in the undo log.
+- **Tune the matcher** — weights, thresholds and exclusion rules, workspace-wide.
+
+The **match cause** and **exclusion candidates** tools exist specifically so a
+proposal is aimed at the actual driver rather than guessed at. An agent that
+proposes lowering a weight without reading the cause is proposing a change it
+cannot justify.
 
 ---
 
@@ -127,11 +153,33 @@ without reading the cause is proposing a change it cannot justify.
 
 | Never | Why |
 |---|---|
-| Record a **Not a duplicate** verdict | It suppresses future clustering. A wrong one is invisible and permanent-feeling. |
-| **Split** a cluster | Same reason, plus it changes the shape of your data. |
+| Confirm an arbitrary pair | There is no tool for it. The safe band is the only route to a duplicate verdict, and it is narrow by construction. |
+| Bulk-confirm a whole pattern | *Confirm all in band* is a human action. An agent has no basis for it. |
+| Reject or **split** on judgement | Both suppress future clustering, and a wrong one is invisible and feels permanent. The only rejection an agent can record is the one attached to a boilerplate exclusion, where the reason is structural rather than a judgement about the two assets. |
 | Confirm anything lineage cannot explain | That is the finding, not the noise. |
 | Confirm anything below the safe band | Below it, judgement is the whole job. |
 | Merge, delete or edit anything in your source systems | Classifyre records judgements; it never writes back. |
+
+## Everything is on the record
+
+Every mutating tool call writes an **agent decision** — the action, whether it
+was applied, skipped as observe-only or failed, the reasoning the agent gave,
+and the inputs. Reads are logged too, but as technical entries rather than
+decisions: a read must never be reported as work done.
+
+On top of that, anything an agent does in the queue shows up where a person
+would look for it:
+
+| Where | What you see |
+|---|---|
+| [Decisions](/duplicates/decisions/) | Agent verdicts marked **agent**, counted apart from yours |
+| **Pairs remaining** | Never reduced by agent work — the headline stays a count of human work |
+| The **undo log** | Agent batches sit alongside yours and are reversible the same way |
+| [Autopilot](/investigations/autopilot/) | The run, its reasoning, and every decision it took |
+
+That attribution is not cosmetic. An agent quietly clearing five thousand
+derived copies would otherwise make the queue look worked through, and the one
+number the screen exists to report would be a lie.
 
 ---
 

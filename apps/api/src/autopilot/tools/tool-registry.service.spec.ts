@@ -124,19 +124,45 @@ describe('ToolRegistry', () => {
     }
   });
 
+  const MISSIONS = [
+    INQUIRY_MISSION,
+    CASE_MISSION,
+    CONFIG_MISSION,
+    DETECTOR_AUTHOR_MISSION,
+    ESCALATION_MISSION,
+    DREAM_MISSION,
+  ];
+
   it('every tool referenced by a mission exists in the registry', () => {
-    for (const mission of [
-      INQUIRY_MISSION,
-      CASE_MISSION,
-      CONFIG_MISSION,
-      DETECTOR_AUTHOR_MISSION,
-      ESCALATION_MISSION,
-      DREAM_MISSION,
-    ]) {
+    for (const mission of MISSIONS) {
       for (const name of mission.allowedTools) {
         expect(registry.get(name)).toBeDefined();
       }
     }
+  });
+
+  /**
+   * The other direction, which is the one that actually goes wrong.
+   *
+   * A tool reaches an agent only by being named in a mission's `allowedTools`;
+   * registering it does nothing on its own. So a toolset can grow a tool, be
+   * merged, pass every test, and the tool is simply unreachable — which is
+   * what happened to the five duplicate-review tools added with the review
+   * queue. Nothing failed, nothing warned, and the harness could not see the
+   * feature at all.
+   *
+   * There is no allowlist here on purpose. A tool no mission may call is
+   * either an oversight or dead code, and both should be fixed rather than
+   * recorded as an exception.
+   */
+  it('every registered tool is reachable by at least one mission', () => {
+    const reachable = new Set(MISSIONS.flatMap((m) => m.allowedTools));
+    const orphaned = registry
+      .list()
+      .map((t) => t.name)
+      .filter((name) => !reachable.has(name))
+      .sort();
+    expect(orphaned).toEqual([]);
   });
 
   it('renders a catalog for an allowed subset', () => {
