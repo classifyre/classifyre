@@ -130,6 +130,43 @@ describe('CompiledMatcher', () => {
     ).toBe(false);
   });
 
+  it('custom keys restrict CUSTOM findings even when CUSTOM is also listed', () => {
+    // The combination the API's own match-options endpoint invites: pick the
+    // CUSTOM detector type, then pick the keys you care about. Read as a plain
+    // OR this matched every custom finding in the namespace.
+    const m = new CompiledMatcher({
+      ...base,
+      matchAllSources: true,
+      detectorTypes: ['CUSTOM'] as never,
+      customDetectorKeys: ['fb_shell_risk'],
+    });
+    expect(
+      m.matches(
+        finding({ detectorType: 'CUSTOM', customDetectorKey: 'fb_shell_risk' }),
+      ),
+    ).toBe(true);
+    expect(
+      m.matches(
+        finding({
+          detectorType: 'CUSTOM',
+          customDetectorKey: 'fb_trade_category',
+        }),
+      ),
+    ).toBe(false);
+  });
+
+  it('keys do not narrow non-CUSTOM detector types', () => {
+    const m = new CompiledMatcher({
+      ...base,
+      matchAllSources: true,
+      detectorTypes: ['PII'] as never,
+      customDetectorKeys: ['fb_shell_risk'],
+    });
+    expect(
+      m.matches(finding({ detectorType: 'PII', customDetectorKey: null })),
+    ).toBe(true);
+  });
+
   it('ignores invalid regex patterns without throwing', () => {
     const m = new CompiledMatcher({
       ...base,
