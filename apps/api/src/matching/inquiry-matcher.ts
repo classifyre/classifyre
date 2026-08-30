@@ -28,7 +28,8 @@ export interface FindingCandidate {
  * A finding matches iff ALL non-empty dimensions match:
  *   source AND detector AND type (exact OR typeRegex) AND valueRegex
  * Empty list for a dimension means "any". The detector dimension is satisfied by
- * either a built-in detectorType or a customDetectorKey.
+ * either a built-in detectorType or a customDetectorKey -- except that naming
+ * custom keys narrows CUSTOM findings rather than widening them: see matches().
  */
 export class CompiledMatcher {
   private readonly matchAllSources: boolean;
@@ -57,10 +58,20 @@ export class CompiledMatcher {
     const hasDetectorFilter =
       this.detectorTypes.size > 0 || this.customDetectorKeys.size > 0;
     if (hasDetectorFilter) {
-      const detectorOk =
-        this.detectorTypes.has(f.detectorType) ||
-        (f.customDetectorKey != null &&
-          this.customDetectorKeys.has(f.customDetectorKey));
+      // CUSTOM is the supertype of every custom key, so a plain OR between the
+      // two made `detectorTypes: ['CUSTOM']` swallow the key list entirely: the
+      // type matched first and every custom finding in the namespace came back.
+      // A question asking for one tag key got all of them, silently, with no
+      // error to notice. When keys are named they therefore *restrict* CUSTOM
+      // findings; other detector types are unaffected and still match by type.
+      const keyFilterApplies =
+        this.customDetectorKeys.size > 0 && f.detectorType === 'CUSTOM';
+      const detectorOk = keyFilterApplies
+        ? f.customDetectorKey != null &&
+          this.customDetectorKeys.has(f.customDetectorKey)
+        : this.detectorTypes.has(f.detectorType) ||
+          (f.customDetectorKey != null &&
+            this.customDetectorKeys.has(f.customDetectorKey));
       if (!detectorOk) return false;
     }
 

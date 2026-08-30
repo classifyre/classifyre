@@ -800,13 +800,30 @@ export class InquiryMatchingService {
     const where: Prisma.FindingWhereInput = { status: 'OPEN' };
     if (!m.matchAllSources) where.sourceId = { in: m.sourceIds };
     if (hasDetectorFilter) {
-      where.OR = [
-        ...(m.detectorTypes.length > 0
-          ? [{ detectorType: { in: m.detectorTypes } }]
-          : []),
-        ...(m.customDetectorKeys.length > 0
+      // Must stay an exact mirror of `CompiledMatcher.matches`, because when no
+      // regex dimension is configured this `where` IS the answer -- `previewRows`
+      // returns a COUNT(*) over it and never consults the matcher at all. So a
+      // divergence here does not merely widen a prefilter, it returns a wrong
+      // number to the caller.
+      //
+      // Naming custom keys RESTRICTS custom findings rather than widening them:
+      // CUSTOM is the supertype of every custom key, so the plain OR below let
+      // `detectorTypes: ['CUSTOM']` swallow the key list and match every custom
+      // finding in the namespace.
+      const nonCustomTypes = m.detectorTypes.filter(
+        (t) => t !== DetectorType.CUSTOM,
+      );
+      const custom: Prisma.FindingWhereInput[] =
+        m.customDetectorKeys.length > 0
           ? [{ customDetectorKey: { in: m.customDetectorKeys } }]
+          : m.detectorTypes.includes(DetectorType.CUSTOM)
+            ? [{ detectorType: DetectorType.CUSTOM }]
+            : [];
+      where.OR = [
+        ...(nonCustomTypes.length > 0
+          ? [{ detectorType: { in: nonCustomTypes } }]
           : []),
+        ...custom,
       ];
     }
     // Exact-type SQL prefilter: only safe when there are no type-regexes AND no value-regexes.
