@@ -263,14 +263,21 @@ export default function SourceViewPage() {
     // describes the source at a glance.
     if (source.type === "CUSTOM") {
       const config = source.config as Record<string, any>;
+      // GET /sources/{id} no longer inlines the cells (they are the whole
+      // connector program); it reports `cellCount` instead. The array branch
+      // stays for `?include=notebook` reads and for anything cached.
       const notebook = config?.required?.notebook ?? {};
+      const cellCount =
+        typeof notebook.cellCount === "number"
+          ? notebook.cellCount
+          : (notebook.cells ?? []).length;
       const variables = Object.keys(config?.optional?.variables ?? {});
       const secrets = Object.keys(config?.masked?.secrets ?? {});
       return [
         {
           key: "notebook",
           label: "notebook",
-          value: `${(notebook.cells ?? []).length} cell(s), revision ${notebook.revision ?? 1}`,
+          value: `${cellCount} cell(s), revision ${notebook.revision ?? 1}`,
         },
         ...(variables.length
           ? [

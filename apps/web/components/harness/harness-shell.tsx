@@ -30,6 +30,7 @@ import { AutopilotActivity } from "@/components/autopilot/autopilot-activity";
 import { AutopilotMemory } from "@/components/autopilot/autopilot-memory";
 import { RunAutopilotDialog } from "@/components/autopilot/run-autopilot-dialog";
 import { HarnessActivity } from "./harness-activity";
+import { SupervisorPanel } from "./supervisor/supervisor-panel";
 import { HarnessAgents } from "./harness-agents";
 import { HarnessBrief } from "./harness-brief";
 import { HarnessConfig } from "./harness-config";
@@ -39,6 +40,7 @@ import { HarnessUsage, formatCost, formatTokens } from "./harness-usage";
 
 type View =
   | "activity"
+  | "supervisor"
   | "runs"
   | "usage"
   | "agents"
@@ -89,6 +91,7 @@ export function HarnessShell() {
 
   const tabs: { value: View; label: string; icon: LucideIcon }[] = [
     { value: "activity", label: t("harness.nav.activity"), icon: Activity },
+    { value: "supervisor", label: t("harness.nav.supervisor"), icon: Bot },
     { value: "runs", label: t("harness.nav.runs"), icon: Workflow },
     { value: "usage", label: t("harness.nav.usage"), icon: BarChart3 },
     { value: "agents", label: t("harness.nav.agents"), icon: Users },
@@ -159,6 +162,10 @@ export function HarnessShell() {
         </TabsList>
 
         {/* ── Views ── */}
+        <TabsContent value="supervisor">
+          <SupervisorPanel />
+        </TabsContent>
+
         <TabsContent value="activity">
           <HarnessActivity onOpenRun={openRun} />
         </TabsContent>

@@ -69,6 +69,25 @@ export class ExclusionRuleDto {
   value?: string | null;
 }
 
+export class CorrelationRecomputeNoteDto {
+  @ApiProperty({
+    description:
+      'Whether this call queued a full recompute. False on a read, and false ' +
+      'on a write whose recompute could not be queued.',
+  })
+  scheduled!: boolean;
+
+  @ApiProperty({
+    description: 'Seconds a queued recompute may wait before it starts.',
+  })
+  startsWithinSeconds!: number;
+
+  @ApiProperty({
+    description: 'One sentence a client can show verbatim.',
+  })
+  note!: string;
+}
+
 export class CorrelationConfigResponseDto {
   @ApiProperty({ description: 'Fallback weight for any unlisted label' })
   defaultWeight!: number;
@@ -84,6 +103,16 @@ export class CorrelationConfigResponseDto {
   labels!: CorrelationLabelWeightDto[];
   @ApiProperty({ type: [ExclusionRuleDto] })
   exclusions!: ExclusionRuleDto[];
+
+  @ApiProperty({
+    type: CorrelationRecomputeNoteDto,
+    description:
+      'When this tuning starts governing the queue. Weights and exclusions are ' +
+      "applied while a scan indexes an asset's correlation values, so a change " +
+      'is not retroactive on its own — a write schedules a full recompute and ' +
+      'this says whether that succeeded.',
+  })
+  recompute!: CorrelationRecomputeNoteDto;
 }
 
 export class UpdateCorrelationConfigDto {

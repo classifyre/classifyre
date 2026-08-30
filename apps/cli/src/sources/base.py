@@ -4,7 +4,7 @@ import logging
 import os
 import threading
 from abc import ABC, abstractmethod
-from collections.abc import AsyncGenerator, Generator
+from collections.abc import AsyncGenerator, Generator, Mapping
 from typing import TYPE_CHECKING, Any, TypeVar
 
 from ..models.generated_single_asset_scan_results import DetectionResult, SingleAssetScanResults
@@ -492,6 +492,15 @@ class BaseSource(ABC):
             integration should override this method.
         """
         return None
+
+    def asset_tags(self, asset_hash: str) -> Mapping[str, str]:
+        """Facts this source asserted about an asset, keyed by Tag detector key.
+
+        Only the CUSTOM source has these: a connector notebook is the one place
+        that can know something the content does not say. Every other source
+        returns nothing, and the pipeline skips the tag pass entirely.
+        """
+        return {}
 
     def enrich_finding_location(
         self,

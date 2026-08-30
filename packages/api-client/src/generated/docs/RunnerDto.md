@@ -25,6 +25,10 @@ Name | Type
 `assetsOutOfScope` | number
 `assetsSkippedCached` | number
 `detectorRunsSkipped` | number
+`relationshipsEmitted` | number
+`relationshipsFailed` | number
+`relationshipsLost` | number
+`relationshipsDropped` | number
 `scopeFingerprint` | string
 `totalFindings` | number
 `findingsCreated` | number
@@ -64,6 +68,10 @@ const example = {
   "assetsOutOfScope": null,
   "assetsSkippedCached": null,
   "detectorRunsSkipped": null,
+  "relationshipsEmitted": null,
+  "relationshipsFailed": null,
+  "relationshipsLost": null,
+  "relationshipsDropped": null,
   "scopeFingerprint": null,
   "totalFindings": null,
   "findingsCreated": null,

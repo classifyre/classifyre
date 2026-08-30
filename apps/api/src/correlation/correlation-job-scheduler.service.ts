@@ -19,8 +19,9 @@ export class CorrelationJobScheduler {
 
   constructor(private readonly pgBoss: PgBossService) {}
 
-  async scheduleFull(reason: string, manual = false): Promise<void> {
-    await this.sendBestEffort(
+  /** Queue a full recompute. Returns false when the queue could not take it. */
+  async scheduleFull(reason: string, manual = false): Promise<boolean> {
+    return this.sendBestEffort(
       { recomputeAll: true, manual },
       {
         singletonKey: 'correlation:recompute-all',
@@ -35,10 +36,10 @@ export class CorrelationJobScheduler {
     );
   }
 
-  async scheduleAssets(assetIds: string[], reason: string): Promise<void> {
+  async scheduleAssets(assetIds: string[], reason: string): Promise<boolean> {
     const unique = [...new Set(assetIds)].filter(Boolean);
-    if (unique.length === 0) return;
-    await this.sendBestEffort(
+    if (unique.length === 0) return false;
+    return this.sendBestEffort(
       { assetIds: unique },
       {
         expireInSeconds: 3 * 3600,
@@ -54,16 +55,29 @@ export class CorrelationJobScheduler {
     data: CorrelationJobPayload,
     options: Record<string, unknown>,
     reason: string,
-  ): Promise<void> {
+  ): Promise<boolean> {
     try {
       const boss = await this.pgBoss.getBossAsync();
       await boss.send(CORRELATION_QUEUE, data, options);
+      return true;
     } catch (error) {
       // The mutation has already committed. Keep it successful and make the
       // missed background work visible; stale graph reads will nudge refreshes.
       this.logger.warn(
         `Could not schedule correlation work (${reason}): ${String(error)}`,
       );
+      return false;
     }
   }
+
+  /**
+   * Seconds a scheduled full recompute may sit before it starts.
+   *
+   * Surfaced to callers so a config response can say when the change actually
+   * takes effect. Tuning is applied while a scan indexes an asset's correlation
+   * values, so until that recompute runs the review queue still reflects the
+   * OLD weights — which is exactly why one re-weighting looked instant (a scan
+   * happened to be running) and the next looked like it did nothing.
+   */
+  readonly coalesceSeconds = COALESCE_SECONDS;
 }

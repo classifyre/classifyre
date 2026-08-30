@@ -8,6 +8,7 @@ from ....models.generated_detectors import (
     LLMPipelineSchema,
     ObjectDetectionPipelineSchema,
     RegexPipelineSchema,
+    TagPipelineSchema,
     TextClassificationPipelineSchema,
 )
 from ._base import BaseRunner
@@ -16,6 +17,7 @@ from ._image_classification import ImageClassificationRunner
 from ._llm import LLMRunner
 from ._object_detection import ObjectDetectionRunner
 from ._regex import RegexRunner
+from ._tag import TagRunner
 from ._text_classification import TextClassificationRunner
 
 
@@ -27,6 +29,7 @@ def create_runner(
         | TextClassificationPipelineSchema
         | ImageClassificationPipelineSchema
         | ObjectDetectionPipelineSchema
+        | TagPipelineSchema
     ),
     detector_key: str = "",
     detector_name: str = "",
@@ -42,5 +45,10 @@ def create_runner(
         return RegexRunner(schema, detector_key, detector_name)
     if isinstance(schema, LLMPipelineSchema):
         return LLMRunner(schema, detector_key, detector_name)
+    # Branched explicitly, not left to the fall-through below: a TAG schema that
+    # reached the GLiNER2 default would try to load a transformer model for a
+    # detector that is not supposed to run anything at all.
+    if isinstance(schema, TagPipelineSchema):
+        return TagRunner(schema, detector_key, detector_name)
     # GLiNER2PipelineSchema is the default / backward-compat path
     return GLiNER2Runner(schema, detector_key, detector_name)

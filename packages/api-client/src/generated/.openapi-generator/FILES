@@ -21,6 +21,8 @@ docs/AgentRunDetailDto.md
 docs/AgentRunDto.md
 docs/AgentRunListResponseDto.md
 docs/AgentSystemBriefDto.md
+docs/AgentUndoEntryDto.md
+docs/AgentUndoListDto.md
 docs/AgentUsageBucketDto.md
 docs/AgentUsageResponseDto.md
 docs/AgentUsageTotalsDto.md
@@ -29,6 +31,7 @@ docs/AiCompleteResponseDto.md
 docs/AiMessageDto.md
 docs/AiProviderConfigResponseDto.md
 docs/AiProviderConfigTestResultDto.md
+docs/AnnotateJournalDto.md
 docs/ArchivePreviewDto.md
 docs/AssetChunkDto.md
 docs/AssetFindingDetectorCountDto.md
@@ -101,6 +104,7 @@ docs/CorrelationApi.md
 docs/CorrelationConfigResponseDto.md
 docs/CorrelationGraphResponseDto.md
 docs/CorrelationLabelWeightDto.md
+docs/CorrelationRecomputeNoteDto.md
 docs/CorrelationReviewApi.md
 docs/CreateAgentMemoryDto.md
 docs/CreateAiProviderConfigDto.md
@@ -116,6 +120,7 @@ docs/CreateMcpServerDto.md
 docs/CreateMcpTokenDto.md
 docs/CreateNotebookExecutionDto.md
 docs/CreateSourceDto.md
+docs/CreateSupervisorGoalDto.md
 docs/CreateThreadDto.md
 docs/CustomDetectorExampleDto.md
 docs/CustomDetectorExtractionsApi.md
@@ -234,14 +239,19 @@ docs/ParseTrainingExamplesSkippedReasonsDto.md
 docs/ParsedTrainingExampleDto.md
 docs/PatternActionDto.md
 docs/PatternApplyResponseDto.md
+docs/PatternExclusionCandidateDto.md
+docs/PatternExclusionCandidatesResponseDto.md
+docs/PatternLabelExclusionCandidateDto.md
 docs/PatternPreviewResponseDto.md
 docs/PayloadCursorEntryDto.md
 docs/PivotGraphDto.md
+docs/PreviewDiagnosticDto.md
 docs/PreviewInquiryDto.md
 docs/PreviewResponseDto.md
 docs/ProposeCaseLeadDto.md
 docs/PullFromInquiryDto.md
 docs/PullFromInquiryResponseDto.md
+docs/PurgeSourceAssetsResponseDto.md
 docs/PutAssetChunksDto.md
 docs/RebuildEdgesResponseDto.md
 docs/RebuildIndexResponseDto.md
@@ -257,6 +267,7 @@ docs/RelationTypesResponseDto.md
 docs/RematchResponseDto.md
 docs/ReopenDecisionsDto.md
 docs/ReopenDecisionsResponseDto.md
+docs/RevertResultDto.md
 docs/ReviewCaseLeadDto.md
 docs/ReviewClusterRowDto.md
 docs/ReviewClustersResponseDto.md
@@ -357,6 +368,14 @@ docs/StartExportDto.md
 docs/StartImportDto.md
 docs/StartRunnerDto.md
 docs/StopRunnerResponseDto.md
+docs/SupervisorBudgetDto.md
+docs/SupervisorCapabilityDto.md
+docs/SupervisorCapabilityListDto.md
+docs/SupervisorGoalDto.md
+docs/SupervisorGoalListDto.md
+docs/SupervisorJournalEntryDto.md
+docs/SupervisorJournalListDto.md
+docs/SupervisorStateDto.md
 docs/TestConnectionResponseDto.md
 docs/TextCoverageDto.md
 docs/ThreadEntriesResponseDto.md
@@ -379,6 +398,7 @@ docs/UndoLogResponseDto.md
 docs/UpdateAgentConfigDto.md
 docs/UpdateAgentMemoryDto.md
 docs/UpdateAiProviderConfigDto.md
+docs/UpdateCapabilitiesDto.md
 docs/UpdateCaseDto.md
 docs/UpdateCaseEventDto.md
 docs/UpdateCaseFindingNoteDto.md
@@ -399,6 +419,8 @@ docs/UpdateNotebookResponseDto.md
 docs/UpdateNotificationImportanceDto.md
 docs/UpdateRunnerAssetStatusDto.md
 docs/UpdateSourceDto.md
+docs/UpdateSupervisorDto.md
+docs/UpdateSupervisorGoalDto.md
 docs/UpdateSystemBriefDto.md
 docs/UpdateThreadDto.md
 docs/UploadedSourceFileDto.md
@@ -407,6 +429,7 @@ docs/UpsertGlossaryTermResponseDto.md
 docs/ValueOccurrenceAssetDto.md
 docs/ValueOccurrencesResponseDto.md
 docs/VerifyGlossaryTermDto.md
+docs/WakeSupervisorDto.md
 docs/WorkerOverviewDto.md
 docs/WorkerQueueDto.md
 docs/WorkerQueueInstanceDto.md
@@ -460,6 +483,8 @@ src/models/AgentRunDetailDto.ts
 src/models/AgentRunDto.ts
 src/models/AgentRunListResponseDto.ts
 src/models/AgentSystemBriefDto.ts
+src/models/AgentUndoEntryDto.ts
+src/models/AgentUndoListDto.ts
 src/models/AgentUsageBucketDto.ts
 src/models/AgentUsageResponseDto.ts
 src/models/AgentUsageTotalsDto.ts
@@ -468,6 +493,7 @@ src/models/AiCompleteResponseDto.ts
 src/models/AiMessageDto.ts
 src/models/AiProviderConfigResponseDto.ts
 src/models/AiProviderConfigTestResultDto.ts
+src/models/AnnotateJournalDto.ts
 src/models/ArchivePreviewDto.ts
 src/models/AssetChunkDto.ts
 src/models/AssetFindingDetectorCountDto.ts
@@ -534,6 +560,7 @@ src/models/ColumnLineageStepDto.ts
 src/models/CorrelationConfigResponseDto.ts
 src/models/CorrelationGraphResponseDto.ts
 src/models/CorrelationLabelWeightDto.ts
+src/models/CorrelationRecomputeNoteDto.ts
 src/models/CreateAgentMemoryDto.ts
 src/models/CreateAiProviderConfigDto.ts
 src/models/CreateCaseDto.ts
@@ -548,6 +575,7 @@ src/models/CreateMcpServerDto.ts
 src/models/CreateMcpTokenDto.ts
 src/models/CreateNotebookExecutionDto.ts
 src/models/CreateSourceDto.ts
+src/models/CreateSupervisorGoalDto.ts
 src/models/CreateThreadDto.ts
 src/models/CustomDetectorExampleDto.ts
 src/models/CustomDetectorResponseDto.ts
@@ -652,14 +680,19 @@ src/models/ParseTrainingExamplesSkippedReasonsDto.ts
 src/models/ParsedTrainingExampleDto.ts
 src/models/PatternActionDto.ts
 src/models/PatternApplyResponseDto.ts
+src/models/PatternExclusionCandidateDto.ts
+src/models/PatternExclusionCandidatesResponseDto.ts
+src/models/PatternLabelExclusionCandidateDto.ts
 src/models/PatternPreviewResponseDto.ts
 src/models/PayloadCursorEntryDto.ts
 src/models/PivotGraphDto.ts
+src/models/PreviewDiagnosticDto.ts
 src/models/PreviewInquiryDto.ts
 src/models/PreviewResponseDto.ts
 src/models/ProposeCaseLeadDto.ts
 src/models/PullFromInquiryDto.ts
 src/models/PullFromInquiryResponseDto.ts
+src/models/PurgeSourceAssetsResponseDto.ts
 src/models/PutAssetChunksDto.ts
 src/models/RebuildEdgesResponseDto.ts
 src/models/RebuildIndexResponseDto.ts
@@ -675,6 +708,7 @@ src/models/RelationTypesResponseDto.ts
 src/models/RematchResponseDto.ts
 src/models/ReopenDecisionsDto.ts
 src/models/ReopenDecisionsResponseDto.ts
+src/models/RevertResultDto.ts
 src/models/ReviewCaseLeadDto.ts
 src/models/ReviewClusterRowDto.ts
 src/models/ReviewClustersResponseDto.ts
@@ -772,6 +806,14 @@ src/models/StartExportDto.ts
 src/models/StartImportDto.ts
 src/models/StartRunnerDto.ts
 src/models/StopRunnerResponseDto.ts
+src/models/SupervisorBudgetDto.ts
+src/models/SupervisorCapabilityDto.ts
+src/models/SupervisorCapabilityListDto.ts
+src/models/SupervisorGoalDto.ts
+src/models/SupervisorGoalListDto.ts
+src/models/SupervisorJournalEntryDto.ts
+src/models/SupervisorJournalListDto.ts
+src/models/SupervisorStateDto.ts
 src/models/TestConnectionResponseDto.ts
 src/models/TextCoverageDto.ts
 src/models/ThreadEntriesResponseDto.ts
@@ -793,6 +835,7 @@ src/models/UndoLogResponseDto.ts
 src/models/UpdateAgentConfigDto.ts
 src/models/UpdateAgentMemoryDto.ts
 src/models/UpdateAiProviderConfigDto.ts
+src/models/UpdateCapabilitiesDto.ts
 src/models/UpdateCaseDto.ts
 src/models/UpdateCaseEventDto.ts
 src/models/UpdateCaseFindingNoteDto.ts
@@ -813,6 +856,8 @@ src/models/UpdateNotebookResponseDto.ts
 src/models/UpdateNotificationImportanceDto.ts
 src/models/UpdateRunnerAssetStatusDto.ts
 src/models/UpdateSourceDto.ts
+src/models/UpdateSupervisorDto.ts
+src/models/UpdateSupervisorGoalDto.ts
 src/models/UpdateSystemBriefDto.ts
 src/models/UpdateThreadDto.ts
 src/models/UploadedSourceFileDto.ts
@@ -821,6 +866,7 @@ src/models/UpsertGlossaryTermResponseDto.ts
 src/models/ValueOccurrenceAssetDto.ts
 src/models/ValueOccurrencesResponseDto.ts
 src/models/VerifyGlossaryTermDto.ts
+src/models/WakeSupervisorDto.ts
 src/models/WorkerOverviewDto.ts
 src/models/WorkerQueueDto.ts
 src/models/WorkerQueueInstanceDto.ts

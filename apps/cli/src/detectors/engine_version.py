@@ -30,7 +30,7 @@ DETECTOR_ENGINE_VERSION: Final[dict[str, int]] = {
     "YARA": 1,
     "BROKEN_LINKS": 1,
     "CODE_SECURITY": 1,
-    "CUSTOM": 1,
+    "CUSTOM": 2,
 }
 
 # Detectors whose verdict depends on state outside the asset, so identical

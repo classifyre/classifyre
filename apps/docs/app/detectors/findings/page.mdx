@@ -10,6 +10,12 @@ It's the unit you triage, filter, and investigate. This page covers everything a
 finding carries — its fields, its severity, its confidence, and how it lives
 across repeated scans.
 
+Almost every finding is *detected* — a detector read the content and judged it.
+One kind is *asserted* instead: a [Tag](/detectors/custom-detectors/tag/) records
+a fact a [Custom connector](/sources/custom-connectors/) already knew, without
+reading anything. Once raised, the two are the same object and share everything
+below.
+
 ---
 
 ## Anatomy of a finding
@@ -68,6 +74,8 @@ Alongside severity, each finding carries a **confidence** score from **0 to 1**
 showing how certain the detector is about the match:
 
 - **1.0** — the detector is fully confident (typical of exact pattern matches).
+  A tag finding is always 1.0: it was asserted, not inferred, so there is nothing
+  for a score to express.
 - **Lower scores** — the signal is more ambiguous and may deserve a human check.
 
 Severity and confidence answer different questions: severity is *how bad is it if
@@ -127,7 +135,7 @@ working them:
 
 - **[Investigations](/investigations/)** — group related findings into
   inquiries and cases with hypotheses and evidence.
-- **[Fingerprints](/investigations/fingerprints/)** — connect findings that
+- **[Duplicate review](/duplicates/)** — connect findings that
   share identity into duplicate and similarity clusters.
 - **[Autopilot](/investigations/autopilot/)** — let AI agents open inquiries,
   build cases, and draft hypotheses from new findings automatically.

@@ -27,7 +27,11 @@ export interface ExecutionRecord {
     }>;
     result?: { status: string; message: string };
     assets?: unknown[];
-    contract?: { ok: boolean; violations: unknown[] };
+    // `warnings` are not contract failures — `ok` stays true — so they are a
+    // separate list. The one they exist for is a later cell silently replacing
+    // an earlier cell's helper, which leaves a valid notebook that breaks at
+    // runtime with no other symptom.
+    contract?: { ok: boolean; violations: unknown[]; warnings?: unknown[] };
   } | null;
   error?: {
     type?: string;

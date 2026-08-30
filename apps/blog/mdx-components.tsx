@@ -37,6 +37,8 @@ import {
   TabsTrigger,
 } from "@workspace/ui/components";
 import { cn } from "@workspace/ui/lib/utils";
+import { FingerprintsVsQueue } from "@/components/fingerprints-vs-queue";
+import { MatchWeightMock } from "@/components/match-weight-mock";
 import { ArticleHero } from "@/components/article-hero";
 import { ArticleJsonLd } from "@/components/article-json-ld";
 import { LiveCaseLink } from "@/components/live-case-link";
@@ -293,6 +295,8 @@ function TableCaptionElement(
 }
 
 const sharedMdxComponents: MDXComponents = {
+  FingerprintsVsQueue,
+  MatchWeightMock,
   ArticleHero,
   ArticleJsonLd,
   LiveCaseLink,

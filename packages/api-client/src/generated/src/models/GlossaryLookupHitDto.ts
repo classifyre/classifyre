@@ -86,7 +86,7 @@ export interface GlossaryLookupHitDto {
      */
     updatedAt: Date;
     /**
-     * 
+     * How this term was reached, and the order results come back in: an exact term, then an exact alias, then a prefix or substring, then a semantic neighbour. The alias tier ranks above substring on purpose — in a domain of two- and three-letter register codes, 'GES' has to resolve to the entry whose alias it is, not to the longest word it is a prefix of.
      * @type {string}
      * @memberof GlossaryLookupHitDto
      */
@@ -119,6 +119,7 @@ export type GlossaryLookupHitDtoEntityTypeEnum = typeof GlossaryLookupHitDtoEnti
 export const GlossaryLookupHitDtoMatchTypeEnum = {
     Exact: 'exact',
     Alias: 'alias',
+    Partial: 'partial',
     Semantic: 'semantic'
 } as const;
 export type GlossaryLookupHitDtoMatchTypeEnum = typeof GlossaryLookupHitDtoMatchTypeEnum[keyof typeof GlossaryLookupHitDtoMatchTypeEnum];

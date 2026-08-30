@@ -40,7 +40,10 @@ import { DetectorCreatorForm } from "@/components/detector-creator-form";
 import { DetectorEditorForm } from "@/components/detector-editor-form";
 import type { DetectorEditorFormHandle } from "@/components/detector-editor-form";
 import { CustomDetectorTypeBadge, VisualScanBadge } from "@/components/detector-type-badge";
-import { isVisualDetector } from "@/lib/custom-detector-badge";
+import {
+  isTagDetector,
+  isVisualDetector,
+} from "@/lib/custom-detector-badge";
 import { useDetectorVision } from "@/hooks/use-detector-vision";
 
 export interface DetectorConfigInput {
@@ -774,11 +777,17 @@ export const SourceScanConfig = React.forwardRef<
   );
   const selectableCustomDetectors = useMemo(
     () =>
-      customDetectors.filter(
-        (detector) =>
+      customDetectors.filter((detector) => {
+        // A tag detector is never chosen here: it runs nothing, and every active
+        // one is available to every Custom connector automatically. The
+        // already-selected escape hatch below is deliberately skipped, so a
+        // detector converted to TAG disappears from a source that had it.
+        if (isTagDetector(detector)) return false;
+        return (
           detector.isActive !== false ||
-          selectedCustomDetectorSet.has(detector.id),
-      ),
+          selectedCustomDetectorSet.has(detector.id)
+        );
+      }),
     [customDetectors, selectedCustomDetectorSet],
   );
   const visibleCustomDetectors = useMemo(

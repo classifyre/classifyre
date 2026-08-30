@@ -38,6 +38,7 @@ describe('CliRunnerService', () => {
   function createService(options?: {
     prismaSource?: any;
     kubernetesCliJobService?: any;
+    customDetectorsService?: Record<string, unknown>;
   }) {
     const prisma = {
       source: {
@@ -88,6 +89,9 @@ describe('CliRunnerService', () => {
     };
     const customDetectorsService = {
       buildRuntimeCustomDetectors: jest.fn().mockResolvedValue([]),
+      buildRuntimeCustomDetectorsByKeys: jest.fn().mockResolvedValue([]),
+      buildRuntimeTagDetectors: jest.fn().mockResolvedValue([]),
+      ...(options?.customDetectorsService ?? {}),
     };
     const runnerLogStorage = {
       initializeRunner: jest.fn().mockResolvedValue(undefined),
@@ -121,7 +125,13 @@ describe('CliRunnerService', () => {
       cls as any,
     );
 
-    return { service, prisma, maskedConfigCryptoService, runnerLogStorage };
+    return {
+      service,
+      prisma,
+      maskedConfigCryptoService,
+      runnerLogStorage,
+      customDetectorsService,
+    };
   }
 
   it('decrypts masked config before writing local CLI recipe', async () => {
@@ -1103,6 +1113,79 @@ describe('CliRunnerService', () => {
     });
   });
 
+  // Lineage is output, not a side effect. A connector's relationships() can
+  // raise, or its edges can fail to send, while every asset lands perfectly —
+  // invisible to asset errors and to detector outcomes alike. That is how a run
+  // shipped 920 assets, ZERO edges, and a COMPLETED status whose cause was only
+  // ever in a Kubernetes job log.
+  describe('lineage failures in run status', () => {
+    const arrangeRun = (prisma: any, lineage: Record<string, number> = {}) => {
+      prisma.runner.findUnique.mockResolvedValue({
+        id: 'runner-1',
+        sourceId: 'source-1',
+        startedAt: new Date('2026-02-18T10:00:00.000Z'),
+        source: { id: 'source-1', name: 'Source', type: 'WORDPRESS' },
+        relationshipsEmitted: 0,
+        relationshipsFailed: 0,
+        relationshipsLost: 0,
+        relationshipsDropped: 0,
+        ...lineage,
+      });
+      prisma.asset.count.mockResolvedValue(0);
+      prisma.finding.count.mockResolvedValue(0);
+      prisma.runnerAsset.count.mockResolvedValue(0);
+      prisma.runner.update.mockResolvedValue({});
+      prisma.source.update.mockResolvedValue({});
+    };
+
+    it('marks the run WARNING when a relationship pass failed, despite zero asset errors', async () => {
+      const { service, prisma } = createService();
+      arrangeRun(prisma, { relationshipsFailed: 1 });
+
+      await service.updateRunnerStatus('runner-1', RunnerStatus.COMPLETED);
+
+      const call = prisma.runner.update.mock.calls.at(-1)?.[0];
+      expect(call.data.status).toBe('WARNING');
+      expect(call.data.errorMessage).toContain('lineage incomplete');
+      expect(call.data.errorMessage).toContain(
+        '1 relationship pass(es) failed',
+      );
+    });
+
+    it('marks the run WARNING when assembled edges could not be sent', async () => {
+      const { service, prisma } = createService();
+      arrangeRun(prisma, { relationshipsLost: 42 });
+
+      await service.updateRunnerStatus('runner-1', RunnerStatus.COMPLETED);
+
+      const call = prisma.runner.update.mock.calls.at(-1)?.[0];
+      expect(call.data.status).toBe('WARNING');
+      expect(call.data.errorMessage).toContain('42 edge(s) could not be sent');
+    });
+
+    it('leaves the run COMPLETED when edges were only unresolved', async () => {
+      // The other half of a cross-source edge may simply not be ingested yet.
+      // Making that amber would teach operators to ignore the colour.
+      const { service, prisma } = createService();
+      arrangeRun(prisma, { relationshipsEmitted: 10, relationshipsDropped: 3 });
+
+      await service.updateRunnerStatus('runner-1', RunnerStatus.COMPLETED);
+
+      const call = prisma.runner.update.mock.calls.at(-1)?.[0];
+      expect(call.data.status).toBe('COMPLETED');
+    });
+
+    it('leaves a clean lineage pass COMPLETED', async () => {
+      const { service, prisma } = createService();
+      arrangeRun(prisma, { relationshipsEmitted: 920 });
+
+      await service.updateRunnerStatus('runner-1', RunnerStatus.COMPLETED);
+
+      const call = prisma.runner.update.mock.calls.at(-1)?.[0];
+      expect(call.data.status).toBe('COMPLETED');
+    });
+  });
+
   it('updates source runnerStatus when stopping a running runner', async () => {
     const { service, prisma, runnerLogStorage } = createService();
     prisma.runner.findUnique
@@ -1409,6 +1492,72 @@ describe('CliRunnerService', () => {
         jobName: true,
         jobNamespace: true,
       },
+    });
+  });
+
+  describe('tag detectors in the recipe', () => {
+    const tagEntry = {
+      id: 'det-tag',
+      key: 'cardholder_data',
+      name: 'Cardholder Data',
+      detector: {
+        type: 'CUSTOM' as const,
+        enabled: true as const,
+        config: {
+          custom_detector_key: 'cardholder_data',
+          name: 'Cardholder Data',
+          pipeline_schema: { type: 'TAG', label: 'Cardholder data' },
+        },
+      },
+    };
+
+    async function hydrate(
+      recipe: Record<string, any>,
+      entries: unknown[] = [tagEntry],
+    ) {
+      const { service, customDetectorsService } = createService({
+        customDetectorsService: {
+          buildRuntimeTagDetectors: jest.fn().mockResolvedValue(entries),
+        },
+      });
+      const merged = await (service as any).hydrateCustomDetectorsForRun(
+        'source-1',
+        recipe,
+      );
+      return { merged, customDetectorsService };
+    }
+
+    it('adds every active tag detector to a CUSTOM source recipe', async () => {
+      // Nothing in a source config can name a tag detector, so if the runner
+      // does not add them the key a notebook writes resolves to nothing.
+      const { merged } = await hydrate({ type: 'CUSTOM', detectors: [] });
+
+      expect(merged.detectors).toHaveLength(1);
+      expect(merged.detectors[0].config.custom_detector_key).toBe(
+        'cardholder_data',
+      );
+    });
+
+    it('leaves a non-CUSTOM source alone', async () => {
+      const { merged, customDetectorsService } = await hydrate({
+        type: 'POSTGRESQL',
+        detectors: [],
+      });
+
+      expect(
+        customDetectorsService.buildRuntimeTagDetectors,
+      ).not.toHaveBeenCalled();
+      expect(merged.detectors).toEqual([]);
+    });
+
+    it('keeps built-in detectors alongside the tag detectors', async () => {
+      const { merged } = await hydrate({
+        type: 'CUSTOM',
+        detectors: [{ type: 'SECRETS', enabled: true }],
+      });
+
+      expect(merged.detectors).toHaveLength(2);
+      expect(merged.detectors[0].type).toBe('SECRETS');
     });
   });
 });

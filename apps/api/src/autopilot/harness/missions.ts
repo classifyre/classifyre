@@ -11,6 +11,17 @@ export interface Mission {
   goal: string;
   allowedTools: string[];
   maxIterations: number;
+  /**
+   * Tools that must have been called successfully before this mission may
+   * finish.
+   *
+   * Only the supervisor uses it, and only for the two calls that constitute its
+   * continuity: an agent that stops writing its journal has no memory, and one
+   * that stops scheduling its next wake has no future. Both failures are silent
+   * — the run completes, the summary reads fine, and the agent simply never
+   * runs again — so prose asking for them is not enough.
+   */
+  requiredBeforeFinish?: string[];
 }
 
 const OBSERVE_TOOLS = [
@@ -305,11 +316,27 @@ const INVESTIGATION_CASE_TOOLS = [
   'cases.close',
   'cases.reopen',
   'cases.link_inquiry',
-  // Fingerprints (asset similarity) — observe + act within an investigation.
+  // Duplicates — observe + act within an investigation.
+  //
+  // The read side matters more than it looks: `similar_assets` reports any
+  // verdict a person already recorded, so the agent argues from the same
+  // evidence a reviewer saw instead of re-raising something that was settled.
   'fingerprints.similar_assets',
   'fingerprints.value_occurrences',
   'fingerprints.recompute_asset',
   'cases.from_cluster',
+  // The review queue and its ledger. A confirmed duplicate that went nowhere
+  // is the cheapest case this agent can open — somebody already looked at the
+  // pair and said yes, so it is evidence with provenance rather than the
+  // engine's unreviewed opinion. That is what `decisions` (with
+  // unactionedOnly) finds and what these two act on.
+  'fingerprints.review_queue',
+  'fingerprints.decisions',
+  'fingerprints.decisions_to_case',
+  'fingerprints.decisions_to_inquiry',
+  // Why a pair matched, before arguing that it did. Without this the agent can
+  // see a score but not what produced it.
+  'fingerprints.match_cause',
   // Lead triage + chronology: propose, don't silently mutate evidence.
   'cases.list_leads',
   'cases.propose_lead',
@@ -409,6 +436,17 @@ export const CASE_MISSION: Mission = {
     'operator-created case on that basis.',
     '\nRECURRENCE: scan cases.closed; if a closed case’s issue reappears, cases.reopen it (this',
     'reactivates the inquiries archived with it) and add a note explaining what recurred.',
+    "\nDUPLICATES: a cluster is the engine's opinion and is NOT evidence — promoting one imports",
+    'an unreviewed assertion into a case file. A CONFIRMED pair is different: a person saw the',
+    'values behind the match and said yes. So call fingerprints.decisions with unactionedOnly —',
+    'pairs confirmed as duplicates and never taken anywhere are the cheapest sound case you can',
+    'open — and use fingerprints.decisions_to_case, which stamps the verdicts so the ledger shows',
+    'follow-through. Use fingerprints.decisions_to_inquiry instead when the duplication is',
+    'recurring rather than historical: it watches for the same signature instead of asking someone',
+    'to review it again. Never re-raise a pair that already carries a verdict — similar_assets',
+    'reports them — and never argue against a decision without reading fingerprints.match_cause.',
+    'The pairs worth chasing are similar with NO lineage path: two teams built the same thing',
+    'independently, which is expensive and which nobody has a reason to notice.',
   ].join('\n'),
   allowedTools: [
     ...OBSERVE_TOOLS,
@@ -463,13 +501,20 @@ export const CONFIG_MISSION: Mission = {
     'and producing nothing worth the cost, and resweep when something outside your config change',
     'means the existing assets deserve another look. Sources an operator put on a cron schedule',
     'are not yours to change.',
-    '\nFINGERPRINTS: you also own the correlation (fingerprint/duplicate) tuning. Check',
-    'duplicates.summary; if clusters look wrong — obvious duplicates missed, or unrelated assets',
-    'lumped together — inspect the shared values behind them (fingerprints.value_occurrences,',
-    'fingerprints.similar_assets) and make ONE targeted fingerprints.tune_config change: adjust',
-    'label weights, the related/duplicate thresholds, or add an exclusion for a noisy label.',
-    'Record a memory note of what you tuned and why, tagged "pending-verification", and judge the',
-    'next cycle’s clusters against it.',
+    '\nDUPLICATES: you also own the correlation (duplicate-matching) tuning. Start at',
+    'fingerprints.review_queue, not duplicates.summary — it ranks patterns by how much work one',
+    'decision settles and tells you what KIND of fix each admits. Then act on the kind:',
+    '• EXCLUSION ("rule candidate") — shared template text is doing the matching. Read',
+    '  fingerprints.exclusion_candidates and call fingerprints.exclude_pattern_values on the',
+    '  widest-reaching values. This is the highest-leverage action available to you.',
+    '• THRESHOLD ("cutoff candidate") — one fingerprints.tune_config change to duplicateMin.',
+    '• JUDGEMENT — inspect a pair with fingerprints.match_cause; if ONE label drives it, lower',
+    "  that label's weight. If no single label dominates, leave it: it is a human call.",
+    'fingerprints.clear_safe_band settles derived copies that need no judgement — run it before',
+    'proposing anything, so you are reading a queue of real work rather than expected redundancy.',
+    'Check fingerprints.decisions first: never tune against pairs a reviewer already settled.',
+    'Make ONE targeted change per cycle. Record a memory note of what you tuned and why, tagged',
+    '"pending-verification", and judge the next cycle’s queue against it.',
   ].join('\n'),
   allowedTools: [
     'findings.search',
@@ -495,6 +540,26 @@ export const CONFIG_MISSION: Mission = {
     'fingerprints.value_occurrences',
     'fingerprints.similar_assets',
     'fingerprints.tune_config',
+    // The duplicate-review queue, which is where a matcher problem is
+    // actually visible. `review_queue` ranks patterns by how much work each
+    // one settles and says how many matches lineage cannot explain;
+    // `match_cause` names the label driving a bad pair and how many other
+    // pairs the same combination produced. Tuning without those two is
+    // guesswork over an aggregate.
+    'fingerprints.review_queue',
+    'fingerprints.match_cause',
+    // A boilerplate pattern's real fix. Read the candidates, then exclude the
+    // widest-reaching values — the same gate as tune_config, because it is the
+    // same kind of instance-wide change.
+    'fingerprints.exclusion_candidates',
+    'fingerprints.exclude_pattern_values',
+    // Derived copies at a near-perfect score with lineage explaining them.
+    // Narrow on purpose: it clears the band where a human adds nothing and
+    // leaves everything unexplained for a person, however high it scores.
+    'fingerprints.clear_safe_band',
+    // What has already been judged, so a tuning proposal is not made against
+    // pairs a reviewer settled last week.
+    'fingerprints.decisions',
     // Carries per-source text coverage, which `sources.list` does not — the
     // signal for "this source scanned successfully but no content was read",
     // which is a config problem and this mission's job.
@@ -547,6 +612,8 @@ export const DETECTOR_AUTHOR_MISSION: Mission = {
     '     sentiment, toxicity, language, prompt-injection); copy a candidate model id from the registry.',
     '   • IMAGE_CLASSIFICATION / OBJECT_DETECTION — image assets (NSFW, scene/category, or locating',
     '     objects like weapons/people/logos).',
+    '   • TAG — NOT for you. It runs nothing; it only records a fact a human CUSTOM connector',
+    '     notebook already asserted. It can never surface something you have not been told.',
     '   • LLM — nuanced contextual relationships, intent, concealment or policy judgement that no',
     '     smaller model captures. Call ai.providers and choose any usable aiProviderConfigId; for',
     '     image/PDF reasoning supportsVision MUST be true. Never include provider_runtime.',
@@ -679,6 +746,158 @@ export const DREAM_MISSION: Mission = {
 };
 
 /**
+ * The supervisor's resident toolset.
+ *
+ * Deliberately tiny. It has authority over every tool in the registry, and
+ * carrying all of them would put roughly thirty thousand tokens of schema in
+ * front of its goals, its journal and the corpus — while making the one choice
+ * it exists to make measurably worse. So it holds the instruments it uses every
+ * wake, and reaches everything else through tools.search.
+ */
+const SUPERVISOR_TOOLS = [
+  // Its own instruments.
+  'inbox.read',
+  'goals.list',
+  'goals.update',
+  'goals.propose',
+  'journal.write',
+  'supervisor.schedule_wake',
+  'budget.status',
+  // Commanding the workers.
+  'agents.list',
+  'agents.run',
+  'agents.brief',
+  'agents.configure',
+  'agents.stop',
+  // Everything else in the system.
+  'tools.search',
+  'tools.list_namespaces',
+  // Enough of a view to orient before searching. corpus.coverage because a
+  // supervisor that does not know how much has been read will confidently
+  // reallocate effort across a corpus it has seen eight percent of.
+  'corpus.coverage',
+  'findings.ranked',
+  'memory.search',
+  'memory.write',
+];
+
+export const SUPERVISOR_MISSION: Mission = {
+  kind: AgentKind.SUPERVISOR,
+  goal: [
+    DOMAIN_PRIMER,
+    `
+Your mission: decide what this instance should do next, and make it happen.
+
+You are not one of the workers. INQUIRY, CASE, CONFIG, DETECTOR_AUTHOR and
+ESCALATION each run on their own cadence and each see one slice of the problem.
+You see all of it, across time, and you are the only part of this system that
+can notice that the same thing has been tried three times, that a goal stopped
+being served two weeks ago, or that the expensive agent is running hourly on a
+corpus nobody is reading.
+
+## What a wake is
+
+One wake is one turn of thought, not a session. You start with no memory of the
+last one except what you wrote down. That is deliberate: it is what keeps you
+affordable enough to run indefinitely, and it means your journal is not a log of
+your work, it IS your continuity. Write it as a message to yourself, from
+someone who will not remember writing it.
+
+Every wake ends the same way, and both are required:
+  1. journal.write — what you found, what you changed, what happens next.
+  2. supervisor.schedule_wake — when to wake, and on what.
+
+If you finish without both, you have not finished.
+
+## How to spend a wake
+
+Read inbox.read first. It is a filtered digest of what actually changed since
+you last ran — not everything that happened, only what was worth waking for.
+Then read your goals and the tail of your journal, which arrive in your prompt.
+
+Then do the smallest correct thing. You have three ways to act and they are not
+interchangeable:
+
+  - **Command a worker** (agents.run). Use this when the work belongs to an
+    agent that already knows how to do it. Do not re-do a worker's job yourself
+    with raw tools; you will do it worse and it will not be recorded as that
+    agent's work.
+  - **Leave an instruction** (agents.brief). This does NOT start anything. It
+    attaches context to that agent's next run, whenever that is. Use it when the
+    timing is already right and only the emphasis is wrong.
+  - **Act directly** (search for the tool you need). Use this for what no worker
+    owns: hygiene, cross-cutting configuration, anything that spans agents.
+
+Commanding is usually right. Acting directly is the exception, and a wake that
+consists only of direct action is worth a second look — it usually means a
+worker was mis-tuned and you treated the symptom.
+
+## Finding tools
+
+Your prompt lists what you need every wake. It is not what you may call. Call
+tools.list_namespaces to see the shape of what exists, and tools.search to get
+the exact schema of anything you want to use. Search by intent — "purge",
+"detector", "duplicate", "sample" — rather than guessing at names. If a search
+returns nothing, that capability is switched off for you; say so in your journal
+rather than working around it.
+
+## Goals
+
+An operator goal outranks anything you inferred. You may record progress on one
+and you may propose new goals beside it, but you cannot rewrite what a person
+asked for — if you think a goal is wrong, say so in your journal and propose the
+alternative. That is the disagreement showing up where someone can see it, which
+is the point.
+
+The charter is the standing answer to "what is this instance for". Everything
+else should be traceable to it. A wake that advanced no goal is not a failure,
+but a run of them means either the goals are stale or your pacing is wrong, and
+both are yours to raise.
+
+## Cost, and the value of doing nothing
+
+You choose how often you cost money. Your budget line says what you have spent
+today and what is left. Sleeping is the correct answer more often than it feels
+like it is: a corpus that is not being scanned does not develop new opinions
+between one hour and the next.
+
+A deliberate no-op is a real outcome. Journal it plainly — "nothing changed
+since the last wake, the two open goals are both waiting on scans that have not
+finished, sleeping four hours" — and schedule accordingly. What is NOT
+acceptable is waking, finding nothing, and scheduling another wake in five
+minutes to find nothing again.
+
+Wake sooner when something is genuinely pending: a worker you commanded is
+finishing, a scan you are waiting on will land, a purge you made needs its
+re-scan checked. Wake later when the system is quiet, when you are waiting on a
+person, or when your budget is nearly spent.
+
+## What you break if you are careless
+
+Findings and assets are derived: a re-scan rebuilds them, so purging noise is
+recoverable in substance. Curated status, resolution history and anything a case
+cites are NOT — those are human work, and destroying them costs someone their
+afternoon and their trust in this system. Before any destructive call, use its
+preview and read the count of what it would invalidate. A tool that returns
+"ok" and nothing else is not telling you the action was free; it is telling you
+nothing.
+
+Detection changes have the same shape one step removed. Turning a detector off
+does not merely stop future findings, it resolves the ones it already made, and
+a chain of individually reasonable reductions has taken a live instance to
+ninety-six percent of its findings resolved. Price the change before you make
+it.
+`,
+  ].join('\n'),
+  allowedTools: SUPERVISOR_TOOLS,
+  requiredBeforeFinish: ['journal.write', 'supervisor.schedule_wake'],
+  // Fewer than the workers on purpose. A wake is meant to decide and delegate,
+  // not to carry out an investigation itself; a supervisor still thinking after
+  // ten turns has usually started doing someone else's job.
+  maxIterations: 10,
+};
+
+/**
  * Factory defaults for every AgentKind that has a harness mission, in canonical
  * order. These are the single source of truth for an agent's default goal,
  * tools and iteration budget; per-agent overrides (AgentConfig rows) merge on
@@ -691,6 +910,7 @@ export const DEFAULT_MISSIONS: readonly Mission[] = [
   DETECTOR_AUTHOR_MISSION,
   ESCALATION_MISSION,
   DREAM_MISSION,
+  SUPERVISOR_MISSION,
 ];
 
 /** Resolve the factory mission for an AgentKind, or null when it has none. */
@@ -803,6 +1023,23 @@ export const FACTORY_POLICY: Readonly<Record<AgentKind, AgentPolicy>> = {
     waitForScans: false,
     minIntervalMinutes: 0,
     maxStalenessHours: 0,
+  },
+  // The supervisor paces itself: it ends every wake by saying when the next one
+  // should be, and its own queue honours that. SCHEDULED is the truthful value
+  // here — a scan cycle is not its trigger, and it must not be dragged along by
+  // one. It waits for no gate because deciding what to do about an unsettled
+  // corpus is work, not a reason to postpone.
+  //
+  // The floor is real: a self-scheduling agent that miscalculates once should
+  // cost one wasted wake, not a spin. The backstop matters more than usual,
+  // because the thing that would otherwise wake it is itself.
+  [AgentKind.SUPERVISOR]: {
+    triggerMode: AgentTriggerMode.SCHEDULED,
+    waitForMatching: false,
+    waitForEvidence: false,
+    waitForScans: false,
+    minIntervalMinutes: 10,
+    maxStalenessHours: 24,
   },
 };
 

@@ -132,4 +132,94 @@ describe('InquiriesService', () => {
     expect(result?.matchCount).toBe(7);
     expect(result?.newMatchCount).toBe(2);
   });
+
+  // Two inquiries sat at zero matches for hours while their detector was
+  // producing findings the whole time. The cause is a shape difference that is
+  // invisible from either DTO: a TAG detector's answer is in matchedContent
+  // (`hoch (5/12): amtswegig gelöscht`), an LLM detector's answer IS the
+  // finding type (`insolvenzgefahr_hoch`). A matcher written for one matches
+  // nothing at all on the other, silently.
+  describe('matchOptions answer dimension', () => {
+    const arrange = (detectors: Array<Record<string, unknown>>) => {
+      mockPrisma.source.findMany.mockResolvedValue([]);
+      mockPrisma.customDetector.findMany.mockResolvedValue(detectors);
+      mockPrisma.finding.groupBy
+        // Corpus-wide finding types.
+        .mockResolvedValueOnce([])
+        // Per-custom-detector finding types.
+        .mockResolvedValueOnce([
+          {
+            customDetectorKey: 'fb_shell_risk',
+            findingType: 'tag:Shell-company risk',
+            _count: { _all: 26 },
+          },
+          {
+            customDetectorKey: 'fb_solvency_outlook',
+            findingType: 'insolvenzgefahr_hoch',
+            _count: { _all: 42 },
+          },
+          {
+            customDetectorKey: 'fb_solvency_outlook',
+            findingType: 'stabil',
+            _count: { _all: 83 },
+          },
+        ]);
+    };
+
+    it('points a TAG detector at findingValueRegex and an LLM at findingTypes', async () => {
+      arrange([
+        {
+          key: 'fb_shell_risk',
+          name: 'Shell-company risk',
+          pipelineSchema: { type: 'TAG' },
+        },
+        {
+          key: 'fb_solvency_outlook',
+          name: 'Solvency outlook',
+          pipelineSchema: { type: 'LLM' },
+        },
+      ]);
+
+      const options = await service.matchOptions();
+      const tag = options.customDetectors.find(
+        (d) => d.key === 'fb_shell_risk',
+      )!;
+      const llm = options.customDetectors.find(
+        (d) => d.key === 'fb_solvency_outlook',
+      )!;
+
+      expect(tag.answerDimension).toBe('matchedContent');
+      expect(tag.suggestedMatcher).toBe('findingValueRegex');
+      expect(llm.answerDimension).toBe('findingType');
+      expect(llm.suggestedMatcher).toBe('findingTypes');
+    });
+
+    it('lists the types a classifier actually emits, commonest first', async () => {
+      arrange([
+        {
+          key: 'fb_solvency_outlook',
+          name: 'Solvency outlook',
+          pipelineSchema: { type: 'LLM' },
+        },
+      ]);
+
+      const options = await service.matchOptions();
+      const llm = options.customDetectors[0];
+
+      // These are exactly the values that belong in `findingTypes`, which is
+      // what turns the hint from advice into something copy-pasteable.
+      expect(llm.findingTypes).toEqual(['stabil', 'insolvenzgefahr_hoch']);
+      expect(llm.openFindings).toBe(125);
+    });
+
+    it('defaults an unrecognised engine to the value dimension', async () => {
+      arrange([
+        { key: 'mystery', name: 'Mystery', pipelineSchema: { type: 'FUTURE' } },
+      ]);
+
+      const options = await service.matchOptions();
+      expect(options.customDetectors[0].answerDimension).toBe('matchedContent');
+      expect(options.customDetectors[0].pipelineType).toBe('FUTURE');
+    });
+  });
 });

@@ -11,6 +11,7 @@ Name | Type
 `max` | number
 `lineage` | string
 `excludeLabel` | string
+`excludeValueHashes` | Array&lt;string&gt;
 
 ## Example
 
@@ -24,6 +25,7 @@ const example = {
   "max": null,
   "lineage": null,
   "excludeLabel": null,
+  "excludeValueHashes": null,
 } satisfies PatternActionDto
 
 console.log(example)

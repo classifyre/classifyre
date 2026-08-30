@@ -67,6 +67,7 @@ describe('AutopilotWorker agent gating (G-027/G-029)', () => {
         markTriggered: jest.fn().mockResolvedValue(undefined),
         runBudgetMinutes: jest.fn().mockResolvedValue(null),
       } as any,
+      { publish: () => Promise.resolve() } as never,
     );
   };
 
@@ -269,6 +270,7 @@ describe('AutopilotWorker per-agent gating', () => {
         markTriggered: jest.fn().mockResolvedValue(undefined),
         runBudgetMinutes: jest.fn().mockResolvedValue(null),
       } as never,
+      { publish: () => Promise.resolve() } as never,
     );
     return worker as unknown as {
       policyDecision: (

@@ -45,7 +45,10 @@ import {
 import { CustomDetectorTrainingHistoryTable } from "@/components/custom-detector-training-history-table";
 import { CustomDetectorExtractionCoverage } from "@/components/custom-detector-extraction-coverage";
 import { VisualScanBadge } from "@/components/detector-type-badge";
-import { isVisualDetector } from "@/lib/custom-detector-badge";
+import {
+  isVisualDetector,
+  TAG_PIPELINE_TYPE,
+} from "@/lib/custom-detector-badge";
 import { formatDate } from "@/lib/date";
 import { useTranslation } from "@/hooks/use-translation";
 import {
@@ -98,6 +101,7 @@ export default function CustomDetectorDetailsPage() {
       )?.type as string | undefined;
       const isRegex = isPipeline && loadedType === "REGEX";
       const isLlm = isPipeline && loadedType === "LLM";
+      const isTag = isPipeline && loadedType === TAG_PIPELINE_TYPE;
       const isTransformer =
         isPipeline &&
         !!loadedType &&
@@ -109,6 +113,7 @@ export default function CustomDetectorDetailsPage() {
       if (
         !isRegex &&
         !isLlm &&
+        !isTag &&
         !isTransformer &&
         (isPipeline || detectorPayload.method !== "RULESET")
       ) {
@@ -255,13 +260,16 @@ export default function CustomDetectorDetailsPage() {
   )?.type as string | undefined;
   const isRegexPipeline = isPipelineDetector && pipelineSchemaType === "REGEX";
   const isLLMPipeline = isPipelineDetector && pipelineSchemaType === "LLM";
+  const isTagPipeline =
+    isPipelineDetector && pipelineSchemaType === TAG_PIPELINE_TYPE;
   const isTransformerPipeline =
     isPipelineDetector &&
     !!pipelineSchemaType &&
     TRANSFORMER_PIPELINE_TYPES.has(pipelineSchemaType);
-  // Detectors that have no model-training step (regex / LLM / transformer).
+  // Detectors that have no model-training step (regex / LLM / transformer /
+  // tag). A tag detector has nothing to train on at all: it never runs.
   const isNonTrainable =
-    isRegexPipeline || isLLMPipeline || isTransformerPipeline;
+    isRegexPipeline || isLLMPipeline || isTagPipeline || isTransformerPipeline;
 
   return (
     <div className="space-y-6">

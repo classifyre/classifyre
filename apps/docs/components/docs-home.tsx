@@ -29,7 +29,7 @@ const PIPELINE: Array<{
   {
     step: "04",
     name: "Connect the dots",
-    blurb: "Inquiries keep watch; fingerprints link the same thing everywhere.",
+    blurb: "Inquiries keep watch; duplicate review finds the same thing twice.",
     href: "/investigations/",
   },
   {
@@ -77,9 +77,10 @@ const START_HERE: Array<{
     label: "Working results",
     title: "Investigate",
     blurb:
-      "Findings are the start, not the answer. Watch them with inquiries, connect them with fingerprints, and close them as cases.",
+      "Findings are the start, not the answer. Watch them with inquiries, work the duplicates they reveal, and close them as cases.",
     links: [
       { text: "Investigations overview", href: "/investigations/" },
+      { text: "Duplicate review", href: "/duplicates/" },
       { text: "Cases & hypotheses", href: "/investigations/cases/" },
       { text: "Put it on Autopilot", href: "/investigations/autopilot/" },
     ],
@@ -116,8 +117,13 @@ const DIRECTORY: Array<{ name: string; blurb: string; href: string }> = [
   },
   {
     name: "Investigations",
-    blurb: "Inquiries, fingerprints, cases, hypotheses — and the AI autopilot.",
+    blurb: "Inquiries, cases, hypotheses — and the AI autopilot.",
     href: "/investigations/",
+  },
+  {
+    name: "Duplicate review",
+    blurb: "Assets that look like the same thing, queued so the list can be finished.",
+    href: "/duplicates/",
   },
   {
     name: "Notifications",

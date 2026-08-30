@@ -24,7 +24,7 @@ import subprocess
 import sys
 import tempfile
 import time
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Mapping
 from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
@@ -90,6 +90,7 @@ class CustomSource(BaseSource):
         self._id_by_hash: dict[str, str] = {}
         self._url_by_hash: dict[str, str] = {}
         self._mime_by_hash: dict[str, str] = {}
+        self._tags_by_hash: dict[str, dict[str, str]] = {}
         self._stats = {"produced": 0, "seen": 0}
         self._packages_installed = False
 
@@ -501,6 +502,20 @@ class CustomSource(BaseSource):
         self._id_by_hash[asset_hash] = asset_id
         self._url_by_hash[asset_hash] = external_url
 
+        # Facts the notebook asserted, keyed by Tag detector key. Held here
+        # rather than on the result because they are not part of the asset the
+        # API stores: the pipeline turns them into findings.
+        tags = data.get("tags")
+        tags = (
+            {str(key): str(value) for key, value in tags.items() if str(key) and str(value)}
+            if isinstance(tags, dict)
+            else {}
+        )
+        if tags:
+            self._tags_by_hash[asset_hash] = tags
+        else:
+            self._tags_by_hash.pop(asset_hash, None)
+
         # The notebook links assets by *its* ids; the graph needs hashes.
         links = [self.generate_hash_id(str(link)) for link in data.get("links") or []]
 
@@ -515,6 +530,11 @@ class CustomSource(BaseSource):
             "metadata": metadata,
             "content_length": len(content),
             "content_sha256": hashlib.sha256(content.encode("utf-8")).hexdigest(),
+            # Tags belong in the checksum: they are the only part of a tagged
+            # asset that can change while its content does not, and leaving them
+            # out would let the scan cache skip the asset and never surface the
+            # new tag.
+            "tags": dict(sorted(tags.items())),
         }
 
         # Normalized here rather than trusted as typed: a notebook can write
@@ -581,6 +601,15 @@ class CustomSource(BaseSource):
             return
         self._mime_by_hash[asset_hash] = mime_type or "application/octet-stream"
 
+    def declares_relationships(self) -> bool:
+        """Whether the notebook defines ``relationships()`` at all.
+
+        Lets the runner tell "this connector has no lineage to declare" from
+        "this connector tried to declare lineage and produced none", which are
+        the same empty list and very different facts.
+        """
+        return self._notebook_defines("relationships")
+
     async def collect_relationships(self) -> list[Any]:
         """Typed relationships the notebook declared.
 
@@ -595,11 +624,13 @@ class CustomSource(BaseSource):
         """
         if not self._notebook_defines("relationships"):
             return []
-        try:
-            payloads = self._call("relationships") or []
-        except Exception as exc:
-            logger.warning("Notebook relationships() failed (non-fatal): %s", exc)
-            return []
+        # Deliberately NOT caught here. Swallowing it made a notebook whose
+        # relationships() raised — `Ref.id()` instead of `Ref.asset()` was the
+        # real case — produce 920 assets, zero edges, and a COMPLETED run whose
+        # only trace of the failure was a warning in a Kubernetes job log. The
+        # caller (`main._emit_relationships`) keeps the run alive; what it no
+        # longer does is keep the run *quiet*.
+        payloads = self._call("relationships") or []
 
         edges: list[Any] = []
         for payload in payloads:
@@ -652,6 +683,10 @@ class CustomSource(BaseSource):
         except OSError:
             return None
         return raw, self._mime_by_hash.get(asset_id, "application/octet-stream")
+
+    def asset_tags(self, asset_hash: str) -> Mapping[str, str]:
+        """Tag-detector keys and values the notebook attached to this asset."""
+        return self._tags_by_hash.get(asset_hash, {})
 
     def evict_asset_cache(self, asset_hash: str) -> None:
         if not self._content_dir:

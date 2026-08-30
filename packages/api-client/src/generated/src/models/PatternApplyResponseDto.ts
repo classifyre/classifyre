@@ -38,11 +38,17 @@ export interface PatternApplyResponseDto {
      */
     workRemaining: number;
     /**
-     * Exclusion rule created, when the pattern warranted one
+     * First exclusion rule created, when the pattern warranted one. Kept for callers written before an action could create several; prefer exclusionRuleIds.
      * @type {string}
      * @memberof PatternApplyResponseDto
      */
     exclusionRuleId?: string | null;
+    /**
+     * Every exclusion rule this action created. Empty when none.
+     * @type {Array<string>}
+     * @memberof PatternApplyResponseDto
+     */
+    exclusionRuleIds: Array<string>;
 }
 
 /**
@@ -52,6 +58,7 @@ export function instanceOfPatternApplyResponseDto(value: object): value is Patte
     if (!('batchId' in value) || value['batchId'] === undefined) return false;
     if (!('applied' in value) || value['applied'] === undefined) return false;
     if (!('workRemaining' in value) || value['workRemaining'] === undefined) return false;
+    if (!('exclusionRuleIds' in value) || value['exclusionRuleIds'] === undefined) return false;
     return true;
 }
 
@@ -69,6 +76,7 @@ export function PatternApplyResponseDtoFromJSONTyped(json: any, ignoreDiscrimina
         'applied': json['applied'],
         'workRemaining': json['workRemaining'],
         'exclusionRuleId': json['exclusionRuleId'] == null ? undefined : json['exclusionRuleId'],
+        'exclusionRuleIds': json['exclusionRuleIds'],
     };
 }
 
@@ -87,6 +95,7 @@ export function PatternApplyResponseDtoToJSONTyped(value?: PatternApplyResponseD
         'applied': value['applied'],
         'workRemaining': value['workRemaining'],
         'exclusionRuleId': value['exclusionRuleId'],
+        'exclusionRuleIds': value['exclusionRuleIds'],
     };
 }
 

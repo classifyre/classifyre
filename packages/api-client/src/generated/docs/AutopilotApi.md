@@ -29,6 +29,19 @@ All URIs are relative to *http://localhost*
 | [**mcpServersControllerRemove**](AutopilotApi.md#mcpserverscontrollerremove) | **DELETE** /autopilot/mcp-servers/{id} | Remove an MCP server |
 | [**mcpServersControllerTest**](AutopilotApi.md#mcpserverscontrollertest) | **POST** /autopilot/mcp-servers/{id}/test | Probe a server: connect and list its tools |
 | [**mcpServersControllerUpdate**](AutopilotApi.md#mcpserverscontrollerupdate) | **PATCH** /autopilot/mcp-servers/{id} | Update an MCP server |
+| [**supervisorControllerAnnotate**](AutopilotApi.md#supervisorcontrollerannotate) | **POST** /autopilot/supervisor/journal/{id}/note | Correct an entry. Read back on the next wake as authoritative. |
+| [**supervisorControllerCapabilities**](AutopilotApi.md#supervisorcontrollercapabilities) | **GET** /autopilot/supervisor/capabilities | What the supervisor is allowed to do |
+| [**supervisorControllerCreateGoal**](AutopilotApi.md#supervisorcontrollercreategoal) | **POST** /autopilot/supervisor/goals | Set a goal |
+| [**supervisorControllerDeleteGoal**](AutopilotApi.md#supervisorcontrollerdeletegoal) | **DELETE** /autopilot/supervisor/goals/{id} | Delete a goal |
+| [**supervisorControllerGoals**](AutopilotApi.md#supervisorcontrollergoals) | **GET** /autopilot/supervisor/goals | Goals and tasks, including the charter |
+| [**supervisorControllerJournal**](AutopilotApi.md#supervisorcontrollerjournal) | **GET** /autopilot/supervisor/journal | What it did, wake by wake |
+| [**supervisorControllerRevert**](AutopilotApi.md#supervisorcontrollerrevert) | **POST** /autopilot/supervisor/undo/{id} | Revert one agent action |
+| [**supervisorControllerSetCapabilities**](AutopilotApi.md#supervisorcontrollersetcapabilities) | **PUT** /autopilot/supervisor/capabilities | Switch capability groups off |
+| [**supervisorControllerState**](AutopilotApi.md#supervisorcontrollerstate) | **GET** /autopilot/supervisor | Supervisor state, budget and pacing |
+| [**supervisorControllerUndoLog**](AutopilotApi.md#supervisorcontrollerundolog) | **GET** /autopilot/supervisor/undo | Agent actions that can still be taken back |
+| [**supervisorControllerUpdate**](AutopilotApi.md#supervisorcontrollerupdate) | **PATCH** /autopilot/supervisor | Enable, pause, or re-budget the supervisor |
+| [**supervisorControllerUpdateGoal**](AutopilotApi.md#supervisorcontrollerupdategoal) | **PATCH** /autopilot/supervisor/goals/{id} | Edit a goal |
+| [**supervisorControllerWake**](AutopilotApi.md#supervisorcontrollerwake) | **POST** /autopilot/supervisor/wake | Wake the supervisor now |
 
 
 
@@ -540,7 +553,7 @@ async function example() {
   const api = new AutopilotApi();
 
   const body = {
-    // 'INQUIRY' | 'CASE' | 'DREAM' | 'DUPLICATES' | 'CONFIG' | 'DETECTOR_AUTHOR' | 'ESCALATION' | 'CHAT' (optional)
+    // 'INQUIRY' | 'CASE' | 'DREAM' | 'DUPLICATES' | 'CONFIG' | 'DETECTOR_AUTHOR' | 'ESCALATION' | 'CHAT' | 'SUPERVISOR' (optional)
     agentKind: agentKind_example,
     // string | ISO lower bound for run creation (default: 30 days ago) (optional)
     since: since_example,
@@ -565,7 +578,7 @@ example().catch(console.error);
 
 | Name | Type | Description  | Notes |
 |------------- | ------------- | ------------- | -------------|
-| **agentKind** | `INQUIRY`, `CASE`, `DREAM`, `DUPLICATES`, `CONFIG`, `DETECTOR_AUTHOR`, `ESCALATION`, `CHAT` |  | [Optional] [Defaults to `undefined`] [Enum: INQUIRY, CASE, DREAM, DUPLICATES, CONFIG, DETECTOR_AUTHOR, ESCALATION, CHAT] |
+| **agentKind** | `INQUIRY`, `CASE`, `DREAM`, `DUPLICATES`, `CONFIG`, `DETECTOR_AUTHOR`, `ESCALATION`, `CHAT`, `SUPERVISOR` |  | [Optional] [Defaults to `undefined`] [Enum: INQUIRY, CASE, DREAM, DUPLICATES, CONFIG, DETECTOR_AUTHOR, ESCALATION, CHAT, SUPERVISOR] |
 | **since** | `string` | ISO lower bound for run creation (default: 30 days ago) | [Optional] [Defaults to `undefined`] |
 | **until** | `string` | ISO upper bound for run creation | [Optional] [Defaults to `undefined`] |
 
@@ -611,9 +624,9 @@ async function example() {
   const api = new AutopilotApi();
 
   const body = {
-    // 'INQUIRY' | 'CASE' | 'DREAM' | 'DUPLICATES' | 'CONFIG' | 'DETECTOR_AUTHOR' | 'ESCALATION' | 'CHAT' (optional)
+    // 'INQUIRY' | 'CASE' | 'DREAM' | 'DUPLICATES' | 'CONFIG' | 'DETECTOR_AUTHOR' | 'ESCALATION' | 'CHAT' | 'SUPERVISOR' (optional)
     agentKind: agentKind_example,
-    // 'CREATE_INQUIRY' | 'UPDATE_INQUIRY' | 'ENRICH_INQUIRY_MATCHERS' | 'SIGNAL_CASE_READY' | 'CREATE_CASE' | 'UPDATE_CASE' | 'ADD_HYPOTHESIS' | 'UPDATE_HYPOTHESIS' | 'ADD_EVIDENCE' | 'ATTACH_FINDINGS' | 'ADD_NOTE' | 'ADD_THREAD_ENTRY' | 'CREATE_EDGE' | 'REMOVE_EDGE' | 'LINK_SUPPORT' | 'CHANGE_STATUS' | 'LINK_INQUIRY' | 'CONSOLIDATE_MEMORY' | 'LINK_DUPLICATE' | 'UPDATE_CLUSTER' | 'TOOL_CALL' | 'TUNE_SOURCE' | 'CREATE_DETECTOR' | 'TRAIN_DETECTOR' | 'UPDATE_DETECTOR' | 'DELETE_DETECTOR' | 'TRIGGER_SCAN' | 'UPDATE_SYSTEM_BRIEF' | 'RECOMPUTE_CORRELATION' | 'TUNE_CORRELATION' | 'NOTIFY_OPERATOR' | 'NO_ACTION' (optional)
+    // 'CREATE_INQUIRY' | 'UPDATE_INQUIRY' | 'ENRICH_INQUIRY_MATCHERS' | 'SIGNAL_CASE_READY' | 'CREATE_CASE' | 'UPDATE_CASE' | 'ADD_HYPOTHESIS' | 'UPDATE_HYPOTHESIS' | 'ADD_EVIDENCE' | 'ATTACH_FINDINGS' | 'ADD_NOTE' | 'ADD_THREAD_ENTRY' | 'CREATE_EDGE' | 'REMOVE_EDGE' | 'LINK_SUPPORT' | 'CHANGE_STATUS' | 'LINK_INQUIRY' | 'CONSOLIDATE_MEMORY' | 'LINK_DUPLICATE' | 'UPDATE_CLUSTER' | 'TOOL_CALL' | 'TUNE_SOURCE' | 'CREATE_DETECTOR' | 'TRAIN_DETECTOR' | 'UPDATE_DETECTOR' | 'DELETE_DETECTOR' | 'TRIGGER_SCAN' | 'UPDATE_SYSTEM_BRIEF' | 'RECOMPUTE_CORRELATION' | 'TUNE_CORRELATION' | 'NOTIFY_OPERATOR' | 'SET_GOAL' | 'COMMAND_AGENT' | 'CONFIGURE_AGENT' | 'PURGE_FINDINGS' | 'PURGE_ASSETS' | 'SCHEDULE_WAKE' | 'WRITE_JOURNAL' | 'REVERT_ACTION' | 'NO_ACTION' (optional)
     action: action_example,
     // 'APPLIED' | 'SKIPPED_OBSERVE_ONLY' | 'FAILED' (optional)
     outcome: outcome_example,
@@ -648,8 +661,8 @@ example().catch(console.error);
 
 | Name | Type | Description  | Notes |
 |------------- | ------------- | ------------- | -------------|
-| **agentKind** | `INQUIRY`, `CASE`, `DREAM`, `DUPLICATES`, `CONFIG`, `DETECTOR_AUTHOR`, `ESCALATION`, `CHAT` |  | [Optional] [Defaults to `undefined`] [Enum: INQUIRY, CASE, DREAM, DUPLICATES, CONFIG, DETECTOR_AUTHOR, ESCALATION, CHAT] |
-| **action** | `CREATE_INQUIRY`, `UPDATE_INQUIRY`, `ENRICH_INQUIRY_MATCHERS`, `SIGNAL_CASE_READY`, `CREATE_CASE`, `UPDATE_CASE`, `ADD_HYPOTHESIS`, `UPDATE_HYPOTHESIS`, `ADD_EVIDENCE`, `ATTACH_FINDINGS`, `ADD_NOTE`, `ADD_THREAD_ENTRY`, `CREATE_EDGE`, `REMOVE_EDGE`, `LINK_SUPPORT`, `CHANGE_STATUS`, `LINK_INQUIRY`, `CONSOLIDATE_MEMORY`, `LINK_DUPLICATE`, `UPDATE_CLUSTER`, `TOOL_CALL`, `TUNE_SOURCE`, `CREATE_DETECTOR`, `TRAIN_DETECTOR`, `UPDATE_DETECTOR`, `DELETE_DETECTOR`, `TRIGGER_SCAN`, `UPDATE_SYSTEM_BRIEF`, `RECOMPUTE_CORRELATION`, `TUNE_CORRELATION`, `NOTIFY_OPERATOR`, `NO_ACTION` |  | [Optional] [Defaults to `undefined`] [Enum: CREATE_INQUIRY, UPDATE_INQUIRY, ENRICH_INQUIRY_MATCHERS, SIGNAL_CASE_READY, CREATE_CASE, UPDATE_CASE, ADD_HYPOTHESIS, UPDATE_HYPOTHESIS, ADD_EVIDENCE, ATTACH_FINDINGS, ADD_NOTE, ADD_THREAD_ENTRY, CREATE_EDGE, REMOVE_EDGE, LINK_SUPPORT, CHANGE_STATUS, LINK_INQUIRY, CONSOLIDATE_MEMORY, LINK_DUPLICATE, UPDATE_CLUSTER, TOOL_CALL, TUNE_SOURCE, CREATE_DETECTOR, TRAIN_DETECTOR, UPDATE_DETECTOR, DELETE_DETECTOR, TRIGGER_SCAN, UPDATE_SYSTEM_BRIEF, RECOMPUTE_CORRELATION, TUNE_CORRELATION, NOTIFY_OPERATOR, NO_ACTION] |
+| **agentKind** | `INQUIRY`, `CASE`, `DREAM`, `DUPLICATES`, `CONFIG`, `DETECTOR_AUTHOR`, `ESCALATION`, `CHAT`, `SUPERVISOR` |  | [Optional] [Defaults to `undefined`] [Enum: INQUIRY, CASE, DREAM, DUPLICATES, CONFIG, DETECTOR_AUTHOR, ESCALATION, CHAT, SUPERVISOR] |
+| **action** | `CREATE_INQUIRY`, `UPDATE_INQUIRY`, `ENRICH_INQUIRY_MATCHERS`, `SIGNAL_CASE_READY`, `CREATE_CASE`, `UPDATE_CASE`, `ADD_HYPOTHESIS`, `UPDATE_HYPOTHESIS`, `ADD_EVIDENCE`, `ATTACH_FINDINGS`, `ADD_NOTE`, `ADD_THREAD_ENTRY`, `CREATE_EDGE`, `REMOVE_EDGE`, `LINK_SUPPORT`, `CHANGE_STATUS`, `LINK_INQUIRY`, `CONSOLIDATE_MEMORY`, `LINK_DUPLICATE`, `UPDATE_CLUSTER`, `TOOL_CALL`, `TUNE_SOURCE`, `CREATE_DETECTOR`, `TRAIN_DETECTOR`, `UPDATE_DETECTOR`, `DELETE_DETECTOR`, `TRIGGER_SCAN`, `UPDATE_SYSTEM_BRIEF`, `RECOMPUTE_CORRELATION`, `TUNE_CORRELATION`, `NOTIFY_OPERATOR`, `SET_GOAL`, `COMMAND_AGENT`, `CONFIGURE_AGENT`, `PURGE_FINDINGS`, `PURGE_ASSETS`, `SCHEDULE_WAKE`, `WRITE_JOURNAL`, `REVERT_ACTION`, `NO_ACTION` |  | [Optional] [Defaults to `undefined`] [Enum: CREATE_INQUIRY, UPDATE_INQUIRY, ENRICH_INQUIRY_MATCHERS, SIGNAL_CASE_READY, CREATE_CASE, UPDATE_CASE, ADD_HYPOTHESIS, UPDATE_HYPOTHESIS, ADD_EVIDENCE, ATTACH_FINDINGS, ADD_NOTE, ADD_THREAD_ENTRY, CREATE_EDGE, REMOVE_EDGE, LINK_SUPPORT, CHANGE_STATUS, LINK_INQUIRY, CONSOLIDATE_MEMORY, LINK_DUPLICATE, UPDATE_CLUSTER, TOOL_CALL, TUNE_SOURCE, CREATE_DETECTOR, TRAIN_DETECTOR, UPDATE_DETECTOR, DELETE_DETECTOR, TRIGGER_SCAN, UPDATE_SYSTEM_BRIEF, RECOMPUTE_CORRELATION, TUNE_CORRELATION, NOTIFY_OPERATOR, SET_GOAL, COMMAND_AGENT, CONFIGURE_AGENT, PURGE_FINDINGS, PURGE_ASSETS, SCHEDULE_WAKE, WRITE_JOURNAL, REVERT_ACTION, NO_ACTION] |
 | **outcome** | `APPLIED`, `SKIPPED_OBSERVE_ONLY`, `FAILED` |  | [Optional] [Defaults to `undefined`] [Enum: APPLIED, SKIPPED_OBSERVE_ONLY, FAILED] |
 | **entityType** | `string` | inquiry | case | source | detector | memory | system | asset | [Optional] [Defaults to `undefined`] |
 | **search** | `string` | Substring search over the rationale | [Optional] [Defaults to `undefined`] |
@@ -848,7 +861,7 @@ async function example() {
   const api = new AutopilotApi();
 
   const body = {
-    // 'INQUIRY' | 'CASE' | 'DREAM' | 'DUPLICATES' | 'CONFIG' | 'DETECTOR_AUTHOR' | 'ESCALATION' | 'CHAT' (optional)
+    // 'INQUIRY' | 'CASE' | 'DREAM' | 'DUPLICATES' | 'CONFIG' | 'DETECTOR_AUTHOR' | 'ESCALATION' | 'CHAT' | 'SUPERVISOR' (optional)
     agentKind: agentKind_example,
     // string | Only runs focused on this case (optional)
     caseId: caseId_example,
@@ -887,7 +900,7 @@ example().catch(console.error);
 
 | Name | Type | Description  | Notes |
 |------------- | ------------- | ------------- | -------------|
-| **agentKind** | `INQUIRY`, `CASE`, `DREAM`, `DUPLICATES`, `CONFIG`, `DETECTOR_AUTHOR`, `ESCALATION`, `CHAT` |  | [Optional] [Defaults to `undefined`] [Enum: INQUIRY, CASE, DREAM, DUPLICATES, CONFIG, DETECTOR_AUTHOR, ESCALATION, CHAT] |
+| **agentKind** | `INQUIRY`, `CASE`, `DREAM`, `DUPLICATES`, `CONFIG`, `DETECTOR_AUTHOR`, `ESCALATION`, `CHAT`, `SUPERVISOR` |  | [Optional] [Defaults to `undefined`] [Enum: INQUIRY, CASE, DREAM, DUPLICATES, CONFIG, DETECTOR_AUTHOR, ESCALATION, CHAT, SUPERVISOR] |
 | **caseId** | `string` | Only runs focused on this case | [Optional] [Defaults to `undefined`] |
 | **sourceId** | `string` | Only runs for this source | [Optional] [Defaults to `undefined`] |
 | **status** | `PENDING`, `RUNNING`, `COMPLETED`, `FAILED`, `SKIPPED`, `CANCELLED` |  | [Optional] [Defaults to `undefined`] [Enum: PENDING, RUNNING, COMPLETED, FAILED, SKIPPED, CANCELLED] |
@@ -1127,7 +1140,7 @@ async function example() {
   const api = new AutopilotApi();
 
   const body = {
-    // 'INQUIRY' | 'CASE' | 'DREAM' | 'DUPLICATES' | 'CONFIG' | 'DETECTOR_AUTHOR' | 'ESCALATION' | 'CHAT'
+    // 'INQUIRY' | 'CASE' | 'DREAM' | 'DUPLICATES' | 'CONFIG' | 'DETECTOR_AUTHOR' | 'ESCALATION' | 'CHAT' | 'SUPERVISOR'
     kind: kind_example,
     // UpdateAgentConfigDto
     updateAgentConfigDto: ...,
@@ -1150,7 +1163,7 @@ example().catch(console.error);
 
 | Name | Type | Description  | Notes |
 |------------- | ------------- | ------------- | -------------|
-| **kind** | `INQUIRY`, `CASE`, `DREAM`, `DUPLICATES`, `CONFIG`, `DETECTOR_AUTHOR`, `ESCALATION`, `CHAT` |  | [Defaults to `undefined`] [Enum: INQUIRY, CASE, DREAM, DUPLICATES, CONFIG, DETECTOR_AUTHOR, ESCALATION, CHAT] |
+| **kind** | `INQUIRY`, `CASE`, `DREAM`, `DUPLICATES`, `CONFIG`, `DETECTOR_AUTHOR`, `ESCALATION`, `CHAT`, `SUPERVISOR` |  | [Defaults to `undefined`] [Enum: INQUIRY, CASE, DREAM, DUPLICATES, CONFIG, DETECTOR_AUTHOR, ESCALATION, CHAT, SUPERVISOR] |
 | **updateAgentConfigDto** | [UpdateAgentConfigDto](UpdateAgentConfigDto.md) |  | |
 
 ### Return type
@@ -1681,6 +1694,844 @@ No authorization required
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
 | **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## supervisorControllerAnnotate
+
+> supervisorControllerAnnotate(id, annotateJournalDto)
+
+Correct an entry. Read back on the next wake as authoritative.
+
+### Example
+
+```ts
+import {
+  Configuration,
+  AutopilotApi,
+} from '@workspace/api-client';
+import type { SupervisorControllerAnnotateRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new AutopilotApi();
+
+  const body = {
+    // string
+    id: id_example,
+    // AnnotateJournalDto
+    annotateJournalDto: ...,
+  } satisfies SupervisorControllerAnnotateRequest;
+
+  try {
+    const data = await api.supervisorControllerAnnotate(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **id** | `string` |  | [Defaults to `undefined`] |
+| **annotateJournalDto** | [AnnotateJournalDto](AnnotateJournalDto.md) |  | |
+
+### Return type
+
+`void` (Empty response body)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: `application/json`
+- **Accept**: Not defined
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **201** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## supervisorControllerCapabilities
+
+> SupervisorCapabilityListDto supervisorControllerCapabilities()
+
+What the supervisor is allowed to do
+
+### Example
+
+```ts
+import {
+  Configuration,
+  AutopilotApi,
+} from '@workspace/api-client';
+import type { SupervisorControllerCapabilitiesRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new AutopilotApi();
+
+  try {
+    const data = await api.supervisorControllerCapabilities();
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+This endpoint does not need any parameter.
+
+### Return type
+
+[**SupervisorCapabilityListDto**](SupervisorCapabilityListDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## supervisorControllerCreateGoal
+
+> SupervisorGoalDto supervisorControllerCreateGoal(createSupervisorGoalDto)
+
+Set a goal
+
+### Example
+
+```ts
+import {
+  Configuration,
+  AutopilotApi,
+} from '@workspace/api-client';
+import type { SupervisorControllerCreateGoalRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new AutopilotApi();
+
+  const body = {
+    // CreateSupervisorGoalDto
+    createSupervisorGoalDto: ...,
+  } satisfies SupervisorControllerCreateGoalRequest;
+
+  try {
+    const data = await api.supervisorControllerCreateGoal(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **createSupervisorGoalDto** | [CreateSupervisorGoalDto](CreateSupervisorGoalDto.md) |  | |
+
+### Return type
+
+[**SupervisorGoalDto**](SupervisorGoalDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: `application/json`
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **201** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## supervisorControllerDeleteGoal
+
+> supervisorControllerDeleteGoal(id)
+
+Delete a goal
+
+### Example
+
+```ts
+import {
+  Configuration,
+  AutopilotApi,
+} from '@workspace/api-client';
+import type { SupervisorControllerDeleteGoalRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new AutopilotApi();
+
+  const body = {
+    // string
+    id: id_example,
+  } satisfies SupervisorControllerDeleteGoalRequest;
+
+  try {
+    const data = await api.supervisorControllerDeleteGoal(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **id** | `string` |  | [Defaults to `undefined`] |
+
+### Return type
+
+`void` (Empty response body)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: Not defined
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **204** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## supervisorControllerGoals
+
+> SupervisorGoalListDto supervisorControllerGoals(includeFinished)
+
+Goals and tasks, including the charter
+
+### Example
+
+```ts
+import {
+  Configuration,
+  AutopilotApi,
+} from '@workspace/api-client';
+import type { SupervisorControllerGoalsRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new AutopilotApi();
+
+  const body = {
+    // string
+    includeFinished: includeFinished_example,
+  } satisfies SupervisorControllerGoalsRequest;
+
+  try {
+    const data = await api.supervisorControllerGoals(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **includeFinished** | `string` |  | [Defaults to `undefined`] |
+
+### Return type
+
+[**SupervisorGoalListDto**](SupervisorGoalListDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## supervisorControllerJournal
+
+> SupervisorJournalListDto supervisorControllerJournal(limit, before)
+
+What it did, wake by wake
+
+### Example
+
+```ts
+import {
+  Configuration,
+  AutopilotApi,
+} from '@workspace/api-client';
+import type { SupervisorControllerJournalRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new AutopilotApi();
+
+  const body = {
+    // string
+    limit: limit_example,
+    // string
+    before: before_example,
+  } satisfies SupervisorControllerJournalRequest;
+
+  try {
+    const data = await api.supervisorControllerJournal(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **limit** | `string` |  | [Defaults to `undefined`] |
+| **before** | `string` |  | [Defaults to `undefined`] |
+
+### Return type
+
+[**SupervisorJournalListDto**](SupervisorJournalListDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## supervisorControllerRevert
+
+> RevertResultDto supervisorControllerRevert(id)
+
+Revert one agent action
+
+### Example
+
+```ts
+import {
+  Configuration,
+  AutopilotApi,
+} from '@workspace/api-client';
+import type { SupervisorControllerRevertRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new AutopilotApi();
+
+  const body = {
+    // string
+    id: id_example,
+  } satisfies SupervisorControllerRevertRequest;
+
+  try {
+    const data = await api.supervisorControllerRevert(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **id** | `string` |  | [Defaults to `undefined`] |
+
+### Return type
+
+[**RevertResultDto**](RevertResultDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## supervisorControllerSetCapabilities
+
+> SupervisorCapabilityListDto supervisorControllerSetCapabilities(updateCapabilitiesDto)
+
+Switch capability groups off
+
+### Example
+
+```ts
+import {
+  Configuration,
+  AutopilotApi,
+} from '@workspace/api-client';
+import type { SupervisorControllerSetCapabilitiesRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new AutopilotApi();
+
+  const body = {
+    // UpdateCapabilitiesDto
+    updateCapabilitiesDto: ...,
+  } satisfies SupervisorControllerSetCapabilitiesRequest;
+
+  try {
+    const data = await api.supervisorControllerSetCapabilities(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **updateCapabilitiesDto** | [UpdateCapabilitiesDto](UpdateCapabilitiesDto.md) |  | |
+
+### Return type
+
+[**SupervisorCapabilityListDto**](SupervisorCapabilityListDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: `application/json`
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## supervisorControllerState
+
+> SupervisorStateDto supervisorControllerState()
+
+Supervisor state, budget and pacing
+
+### Example
+
+```ts
+import {
+  Configuration,
+  AutopilotApi,
+} from '@workspace/api-client';
+import type { SupervisorControllerStateRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new AutopilotApi();
+
+  try {
+    const data = await api.supervisorControllerState();
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+This endpoint does not need any parameter.
+
+### Return type
+
+[**SupervisorStateDto**](SupervisorStateDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## supervisorControllerUndoLog
+
+> AgentUndoListDto supervisorControllerUndoLog(limit)
+
+Agent actions that can still be taken back
+
+### Example
+
+```ts
+import {
+  Configuration,
+  AutopilotApi,
+} from '@workspace/api-client';
+import type { SupervisorControllerUndoLogRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new AutopilotApi();
+
+  const body = {
+    // string
+    limit: limit_example,
+  } satisfies SupervisorControllerUndoLogRequest;
+
+  try {
+    const data = await api.supervisorControllerUndoLog(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **limit** | `string` |  | [Defaults to `undefined`] |
+
+### Return type
+
+[**AgentUndoListDto**](AgentUndoListDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## supervisorControllerUpdate
+
+> SupervisorStateDto supervisorControllerUpdate(updateSupervisorDto)
+
+Enable, pause, or re-budget the supervisor
+
+### Example
+
+```ts
+import {
+  Configuration,
+  AutopilotApi,
+} from '@workspace/api-client';
+import type { SupervisorControllerUpdateRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new AutopilotApi();
+
+  const body = {
+    // UpdateSupervisorDto
+    updateSupervisorDto: ...,
+  } satisfies SupervisorControllerUpdateRequest;
+
+  try {
+    const data = await api.supervisorControllerUpdate(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **updateSupervisorDto** | [UpdateSupervisorDto](UpdateSupervisorDto.md) |  | |
+
+### Return type
+
+[**SupervisorStateDto**](SupervisorStateDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: `application/json`
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## supervisorControllerUpdateGoal
+
+> SupervisorGoalDto supervisorControllerUpdateGoal(id, updateSupervisorGoalDto)
+
+Edit a goal
+
+### Example
+
+```ts
+import {
+  Configuration,
+  AutopilotApi,
+} from '@workspace/api-client';
+import type { SupervisorControllerUpdateGoalRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new AutopilotApi();
+
+  const body = {
+    // string
+    id: id_example,
+    // UpdateSupervisorGoalDto
+    updateSupervisorGoalDto: ...,
+  } satisfies SupervisorControllerUpdateGoalRequest;
+
+  try {
+    const data = await api.supervisorControllerUpdateGoal(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **id** | `string` |  | [Defaults to `undefined`] |
+| **updateSupervisorGoalDto** | [UpdateSupervisorGoalDto](UpdateSupervisorGoalDto.md) |  | |
+
+### Return type
+
+[**SupervisorGoalDto**](SupervisorGoalDto.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: `application/json`
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** |  |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## supervisorControllerWake
+
+> supervisorControllerWake(wakeSupervisorDto)
+
+Wake the supervisor now
+
+### Example
+
+```ts
+import {
+  Configuration,
+  AutopilotApi,
+} from '@workspace/api-client';
+import type { SupervisorControllerWakeRequest } from '@workspace/api-client';
+
+async function example() {
+  console.log("🚀 Testing @workspace/api-client SDK...");
+  const api = new AutopilotApi();
+
+  const body = {
+    // WakeSupervisorDto
+    wakeSupervisorDto: ...,
+  } satisfies SupervisorControllerWakeRequest;
+
+  try {
+    const data = await api.supervisorControllerWake(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **wakeSupervisorDto** | [WakeSupervisorDto](WakeSupervisorDto.md) |  | |
+
+### Return type
+
+`void` (Empty response body)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: `application/json`
+- **Accept**: Not defined
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **202** |  |  -  |
 
 [[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
 

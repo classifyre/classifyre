@@ -52,7 +52,7 @@ including edges that point at objects in systems this connector doesn't scan.
 That last part is how a connector for your in-house pipeline can wire its
 outputs to the warehouse tables another source ingests.
 
-See the [lineage section of the notebook reference](/sources/custom-connectors/reference/#lineage)
+See the [relationships section of the notebook reference](/sources/custom-connectors/reference/#relating-assets)
 and [Lineage & Relationships](/sources/lineage/).
 
 </LineageNote>
@@ -67,6 +67,9 @@ and [Lineage & Relationships](/sources/lineage/).
   limit, so a runaway loop can't consume a cluster.
 - **Local folders** can be exposed to the notebook by name on desktop
   deployments.
+- **Facts you already know** can be recorded directly with a
+  [Tag detector](/detectors/custom-detectors/tag/), rather than re-derived by a
+  classifier.
 
 ## Configuration
 

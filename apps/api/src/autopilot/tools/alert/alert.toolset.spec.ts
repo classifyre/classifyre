@@ -14,6 +14,7 @@ describe('AlertToolset — operator.notify', () => {
   const toolset = new AlertToolset(
     mockPrisma as unknown as PrismaService,
     mockNotifications as unknown as NotificationsService,
+    { publish: () => Promise.resolve() } as never,
   );
   const notify = toolset
     .list()
@@ -113,6 +114,7 @@ describe('AlertToolset — alerts.recent', () => {
   const toolset = new AlertToolset(
     mockPrisma as unknown as PrismaService,
     { create: jest.fn() } as unknown as NotificationsService,
+    { publish: () => Promise.resolve() } as never,
   );
   const recent = toolset.list().find((t) => t.name === 'alerts.recent') as Tool;
   const tc = {} as ToolContext;

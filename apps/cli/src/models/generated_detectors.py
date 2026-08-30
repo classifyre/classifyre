@@ -932,6 +932,40 @@ class PipelineSeverityRule(BaseModel):
     severity: Severity
 
 
+class AssetKind(StrEnum):
+    record = 'record'
+    document = 'document'
+    page = 'page'
+    file = 'file'
+    table = 'table'
+
+
+class DetectorScope(BaseModel):
+    """
+    Restricts which of a source's assets this detector runs on.
+
+    A custom detector is attached to a SOURCE, so without this it runs on every asset that source produces. For an expensive engine that is not a tuning problem but a design problem: attaching an LLM detector to a documents source meant one model call per filed PDF and per raw XML blob — 3 to 25 seconds each, on inputs the model had no business reading — and the run spent its entire life in the detector pool. The only workaround was splitting one source in two, which is a defensible architecture but was forced rather than chosen.
+
+    Every field is optional and they AND together; an empty scope runs everywhere, which is the previous behaviour.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    asset_kinds: list[AssetKind] | None = Field(
+        None,
+        description='Catalog kinds this detector applies to. ["record"] is the natural expression of "run on the derived summaries, not on the source documents they came from".',
+    )
+    content_types: list[str] | None = Field(
+        None,
+        description="MIME types or prefixes (application/pdf, text/). Narrower than the engine's own supported types, never wider: a detector still never sees content its runner cannot read.",
+    )
+    metadata: dict[str, Any] | None = Field(
+        None,
+        description='Asset-metadata equality predicate, e.g. {"doc_type": "jab"}. Every named key must be present on the asset and equal (compared as strings, so 4 and "4" match). A key the asset does not carry excludes it — an absent field is not a match.',
+    )
+
+
 class Type1(StrEnum):
     GLINER2 = 'GLINER2'
 
@@ -939,6 +973,10 @@ class Type1(StrEnum):
 class GLiNER2PipelineSchema(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
+    )
+    scope: DetectorScope | None = Field(
+        None,
+        description='Restrict this detector to part of a source (asset kind, content type, or an asset-metadata predicate). Null runs it on everything the source produces.',
     )
     type: Literal['GLINER2'] = 'GLINER2'
     entities: dict[str, PipelineEntityDefinition] | None = None
@@ -954,6 +992,10 @@ class Type2(StrEnum):
 class RegexPipelineSchema(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
+    )
+    scope: DetectorScope | None = Field(
+        None,
+        description='Restrict this detector to part of a source (asset kind, content type, or an asset-metadata predicate). Null runs it on everything the source produces.',
     )
     type: Literal['REGEX'] = 'REGEX'
     patterns: dict[str, RegexPatternDefinition] | None = None
@@ -1059,6 +1101,10 @@ class LLMPipelineSchema(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
+    scope: DetectorScope | None = Field(
+        None,
+        description='Restrict this detector to part of a source (asset kind, content type, or an asset-metadata predicate). Null runs it on everything the source produces.',
+    )
     type: Literal['LLM'] = 'LLM'
     system_prompt: str = Field(
         ...,
@@ -1095,7 +1141,7 @@ class LLMPipelineSchema(BaseModel):
     )
     confidence_threshold: float | None = Field(
         0.5,
-        description='Minimum model confidence to report a label as a finding (0-1).',
+        description='Minimum model confidence to report a label as a finding (0-1). Applied BEFORE the finding is recorded, so anything below it leaves no trace but a count in the run log — and a systematically under-confident model (free routers are) then looks like a model that never answered. The finding already carries the confidence, so 0 records every answer and lets you filter downstream.',
         ge=0.0,
         le=1.0,
     )
@@ -1154,6 +1200,10 @@ class TextClassificationPipelineSchema(BaseModel):
 
     model_config = ConfigDict(
         extra='forbid',
+    )
+    scope: DetectorScope | None = Field(
+        None,
+        description='Restrict this detector to part of a source (asset kind, content type, or an asset-metadata predicate). Null runs it on everything the source produces.',
     )
     type: Literal['TEXT_CLASSIFICATION']
     model: str = Field(
@@ -1225,6 +1275,10 @@ class ImageClassificationPipelineSchema(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
+    scope: DetectorScope | None = Field(
+        None,
+        description='Restrict this detector to part of a source (asset kind, content type, or an asset-metadata predicate). Null runs it on everything the source produces.',
+    )
     type: Literal['IMAGE_CLASSIFICATION']
     model: str | None = Field(
         None,
@@ -1277,6 +1331,10 @@ class ObjectDetectionPipelineSchema(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
     )
+    scope: DetectorScope | None = Field(
+        None,
+        description='Restrict this detector to part of a source (asset kind, content type, or an asset-metadata predicate). Null runs it on everything the source produces.',
+    )
     type: Literal['OBJECT_DETECTION']
     model: str = Field(
         ...,
@@ -1313,6 +1371,45 @@ class ObjectDetectionPipelineSchema(BaseModel):
     )
 
 
+class Type8(StrEnum):
+    TAG = 'TAG'
+
+
+class Severity2(StrEnum):
+    """
+    Severity assigned to every finding this detector produces. There is no confidence to derive it from: a tag is asserted, not inferred.
+    """
+
+    critical = 'critical'
+    high = 'high'
+    medium = 'medium'
+    low = 'low'
+    info = 'info'
+
+
+class TagPipelineSchema(BaseModel):
+    """
+    A placeholder detector that runs no classification and never reads content. It exists only to give a manual assertion a stable identity. A CUSTOM connector notebook applies it by the detector's key: Asset(tags={"<detector key>": "<value>"}). Not selectable in a source's detector list.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    scope: DetectorScope | None = Field(
+        None,
+        description='Restrict this detector to part of a source (asset kind, content type, or an asset-metadata predicate). Null runs it on everything the source produces.',
+    )
+    type: Literal['TAG'] = 'TAG'
+    label: str | None = Field(
+        None,
+        description="Label carried by every finding this detector produces (finding_type is 'tag:<label>'). Defaults to the detector's name when omitted.",
+    )
+    severity: Severity2 | None = Field(
+        Severity2.medium,
+        description='Severity assigned to every finding this detector produces. There is no confidence to derive it from: a tag is asserted, not inferred.',
+    )
+
+
 class CustomDetectorConfig(DetectorConfig):
     """
     Configuration for user-defined detector execution
@@ -1338,6 +1435,7 @@ class CustomDetectorConfig(DetectorConfig):
         | TextClassificationPipelineSchema
         | ImageClassificationPipelineSchema
         | ObjectDetectionPipelineSchema
+        | TagPipelineSchema
         | None
     ) = Field(None, discriminator='type', title='AnyPipelineSchema')
     max_findings: int | None = Field(

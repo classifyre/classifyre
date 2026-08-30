@@ -85,6 +85,7 @@ export const MCP_CAPABILITY_GROUPS: McpCapabilityGroupDto[] = [
       'bulk_update_findings',
       'get_findings_discovery',
       'purge_source_findings',
+      'purge_source_assets',
       'find_similar_findings',
       'find_boilerplate_clusters',
       'explain_finding',

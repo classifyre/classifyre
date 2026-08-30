@@ -420,4 +420,130 @@ describe('SourceService', () => {
       });
     });
   });
+
+  // A connector that narrows its scope leaves orphans no scan can ever clear:
+  // retirement requires a run that covered the WHOLE scope and found the asset
+  // gone, and a rotating-sample connector never has one. When financial-year
+  // records moved out of one source into another, 372 of them stayed behind,
+  // got re-paired by the correlation engine (correctly — they really were
+  // duplicates now), and the only remedy was all-or-nothing: destroying 1,352
+  // good document assets to retire 372 stale ones.
+  describe('purgeAssets predicate', () => {
+    const arrange = (count = 7) => {
+      const deleteMany = jest.fn().mockResolvedValue({ count });
+      const assetCount = jest.fn().mockResolvedValue(count);
+      const built = createService({
+        source: { findUnique: jest.fn().mockResolvedValue({ id: 'src-1' }) },
+        asset: { deleteMany, count: assetCount },
+      });
+      return { ...built, deleteMany, assetCount };
+    };
+
+    it('deletes everything when no predicate is given', async () => {
+      const { service, deleteMany } = arrange(1352);
+
+      const result = await service.purgeAssets('src-1');
+
+      expect(deleteMany).toHaveBeenCalledWith({ where: { sourceId: 'src-1' } });
+      expect(result).toMatchObject({
+        purgedAssets: 1352,
+        dryRun: false,
+        predicate: {},
+      });
+    });
+
+    it('retires only the assets an external-id prefix names', async () => {
+      const { service, deleteMany } = arrange(372);
+
+      const result = await service.purgeAssets('src-1', {
+        externalIdPrefix: 'fin-',
+      });
+
+      expect(deleteMany).toHaveBeenCalledWith({
+        where: {
+          sourceId: 'src-1',
+          metadata: { path: ['external_id'], string_starts_with: 'fin-' },
+        },
+      });
+      expect(result.purgedAssets).toBe(372);
+      expect(result.predicate).toEqual({ externalIdPrefix: 'fin-' });
+    });
+
+    it('counts without deleting for a dry run', async () => {
+      const { service, deleteMany, assetCount } = arrange(372);
+
+      const result = await service.purgeAssets('src-1', {
+        externalIdPrefix: 'fin-',
+        dryRun: true,
+      });
+
+      expect(assetCount).toHaveBeenCalled();
+      expect(deleteMany).not.toHaveBeenCalled();
+      expect(result).toMatchObject({
+        purgedAssets: 0,
+        matchedAssets: 372,
+        dryRun: true,
+      });
+    });
+
+    it('ANDs kind, name, urn and staleness together', async () => {
+      const { service, deleteMany } = arrange(3);
+
+      await service.purgeAssets('src-1', {
+        assetKind: 'record',
+        namePrefix: 'Jahresabschluss',
+        urnPrefix: 'document://at/firmenbuch/',
+        notScannedSince: '2026-08-01T00:00:00Z',
+      });
+
+      expect(deleteMany).toHaveBeenCalledWith({
+        where: {
+          sourceId: 'src-1',
+          assetType: 'record',
+          name: { startsWith: 'Jahresabschluss' },
+          urn: { startsWith: 'document://at/firmenbuch/' },
+          // Never scanned counts as stale: an asset ingested before scan
+          // tracking existed is exactly this predicate's target.
+          OR: [
+            { lastScannedAt: { lt: new Date('2026-08-01T00:00:00Z') } },
+            { lastScannedAt: null },
+          ],
+        },
+      });
+    });
+
+    it('rejects an unparseable timestamp rather than deleting everything', async () => {
+      const { service, deleteMany } = arrange();
+
+      await expect(
+        service.purgeAssets('src-1', { notScannedSince: 'last tuesday' }),
+      ).rejects.toThrow('ISO-8601');
+      expect(deleteMany).not.toHaveBeenCalled();
+    });
+
+    it('ignores blank predicate fields instead of matching on empty strings', async () => {
+      const { service, deleteMany } = arrange();
+
+      const result = await service.purgeAssets('src-1', {
+        externalIdPrefix: '   ',
+        assetKind: '',
+      });
+
+      expect(deleteMany).toHaveBeenCalledWith({ where: { sourceId: 'src-1' } });
+      expect(result.predicate).toEqual({});
+    });
+
+    it('404s for an unknown source without deleting anything', async () => {
+      const deleteMany = jest.fn();
+      const { service } = createService({
+        source: { findUnique: jest.fn().mockResolvedValue(null) },
+        asset: { deleteMany, count: jest.fn() },
+      });
+
+      await expect(service.purgeAssets('missing')).rejects.toThrow(
+        'Source with ID missing not found',
+      );
+      expect(deleteMany).not.toHaveBeenCalled();
+    });
+  });
 });

@@ -21,6 +21,7 @@ import type {
   DecisionsToInquiryResponseDto,
   PatternActionDto,
   PatternApplyResponseDto,
+  PatternExclusionCandidatesResponseDto,
   PatternPreviewResponseDto,
   RebuildIndexResponseDto,
   RecordVerdictDto,
@@ -51,6 +52,8 @@ import {
     PatternActionDtoToJSON,
     PatternApplyResponseDtoFromJSON,
     PatternApplyResponseDtoToJSON,
+    PatternExclusionCandidatesResponseDtoFromJSON,
+    PatternExclusionCandidatesResponseDtoToJSON,
     PatternPreviewResponseDtoFromJSON,
     PatternPreviewResponseDtoToJSON,
     RebuildIndexResponseDtoFromJSON,
@@ -119,6 +122,10 @@ export interface CorrelationReviewControllerDecisionsToCaseRequest {
 
 export interface CorrelationReviewControllerDecisionsToInquiryRequest {
     decisionsToInquiryDto: DecisionsToInquiryDto;
+}
+
+export interface CorrelationReviewControllerExclusionCandidatesRequest {
+    patternKey: string;
 }
 
 export interface CorrelationReviewControllerPairRequest {
@@ -451,6 +458,45 @@ export class CorrelationReviewApi extends runtime.BaseAPI {
      */
     async correlationReviewControllerDecisionsToInquiry(requestParameters: CorrelationReviewControllerDecisionsToInquiryRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<DecisionsToInquiryResponseDto> {
         const response = await this.correlationReviewControllerDecisionsToInquiryRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * What an exclusion on this pattern would actually stop matching. Empty for any pattern whose rule kind is not EXCLUSION — the other kinds have no template to read values out of. Read-only.
+     * The values inside a near-duplicate text group, and their reach
+     */
+    async correlationReviewControllerExclusionCandidatesRaw(requestParameters: CorrelationReviewControllerExclusionCandidatesRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<PatternExclusionCandidatesResponseDto>> {
+        if (requestParameters['patternKey'] == null) {
+            throw new runtime.RequiredError(
+                'patternKey',
+                'Required parameter "patternKey" was null or undefined when calling correlationReviewControllerExclusionCandidates().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/correlation/review/patterns/{patternKey}/exclusion-candidates`;
+        urlPath = urlPath.replace(`{${"patternKey"}}`, encodeURIComponent(String(requestParameters['patternKey'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => PatternExclusionCandidatesResponseDtoFromJSON(jsonValue));
+    }
+
+    /**
+     * What an exclusion on this pattern would actually stop matching. Empty for any pattern whose rule kind is not EXCLUSION — the other kinds have no template to read values out of. Read-only.
+     * The values inside a near-duplicate text group, and their reach
+     */
+    async correlationReviewControllerExclusionCandidates(requestParameters: CorrelationReviewControllerExclusionCandidatesRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<PatternExclusionCandidatesResponseDto> {
+        const response = await this.correlationReviewControllerExclusionCandidatesRaw(requestParameters, initOverrides);
         return await response.value();
     }
 

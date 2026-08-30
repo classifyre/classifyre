@@ -1,5 +1,6 @@
 import { AiManagementMode } from '@prisma/client';
 import type { Tool, ToolContext } from '../autopilot/tools/tool.types';
+import { bridgeMutationsAllowed } from '../autopilot/tools/mcp-bridge-gate';
 
 /** Namespace of the bridged built-in Classifyre MCP tools in the registry. */
 export const BUILTIN_MCP_PREFIX = 'mcp.builtin.';
@@ -39,9 +40,11 @@ export interface BuiltinRemoteTool {
 /**
  * Adapt one built-in Classifyre MCP tool into a harness Tool, namespaced as
  * `mcp.builtin.<name>`. Read tools (readOnlyHint) run ungated; everything else
- * is treated as mutating (fail-closed) and only runs when the invoking chat
- * bot allows mutations — outside a chat turn the gate resolves OBSERVE_ONLY,
- * so the dispatcher records the call without executing it.
+ * is treated as mutating (fail-closed) and only runs for a caller that has
+ * declared itself authorised — a chat bot whose bot record allows mutations, or
+ * a run that set the bridge flag (see {@link bridgeMutationsAllowed}). For any
+ * other caller the gate resolves OBSERVE_ONLY, so the dispatcher records the
+ * call without executing it.
  */
 export function adaptBuiltinMcpTool(opts: {
   remote: BuiltinRemoteTool;
@@ -65,9 +68,10 @@ export function adaptBuiltinMcpTool(opts: {
       ? undefined
       : (_input, tc: ToolContext) =>
           Promise.resolve({
-            mode: chatBotState(tc)?.allowMutations
-              ? AiManagementMode.MANAGED
-              : AiManagementMode.OBSERVE_ONLY,
+            mode:
+              chatBotState(tc)?.allowMutations || bridgeMutationsAllowed(tc)
+                ? AiManagementMode.MANAGED
+                : AiManagementMode.OBSERVE_ONLY,
             entityType: 'system' as const,
           }),
     handler: async (input) => opts.call(opts.remote.name, input),

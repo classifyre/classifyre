@@ -1,3 +1,17 @@
+/**
+ * The placeholder engine. A Tag detector runs no classification and reads no
+ * content: it names a fact a Custom connector notebook asserts with
+ * `Asset(tags={"<key>": "<value>"})`. It is never selectable on a source.
+ */
+export const TAG_PIPELINE_TYPE = "TAG";
+
+/** Whether a detector row is a Tag placeholder rather than a real engine. */
+export function isTagDetector(detector: unknown): boolean {
+  const schema = (detector as { pipelineSchema?: { type?: unknown } } | null)
+    ?.pipelineSchema;
+  return typeof schema?.type === "string" && schema.type.toUpperCase() === TAG_PIPELINE_TYPE;
+}
+
 export type DetectorCatalogStatus = "ACTIVE" | "INACTIVE";
 export type DetectorTrainingStatus =
   | "PENDING"
@@ -11,7 +25,8 @@ export type PipelineSubtype =
   | "LLM"
   | "TEXT_CLASSIFICATION"
   | "IMAGE_CLASSIFICATION"
-  | "OBJECT_DETECTION";
+  | "OBJECT_DETECTION"
+  | "TAG";
 
 export type DetectorMethod = "RULESET" | "CLASSIFIER" | "ENTITY";
 
@@ -107,6 +122,7 @@ export function detectorTypeIconName(
   if (normalizedPipeline === "TEXT_CLASSIFICATION") return "Brain";
   if (normalizedPipeline === "IMAGE_CLASSIFICATION") return "Image";
   if (normalizedPipeline === "OBJECT_DETECTION") return "ScanSearch";
+  if (normalizedPipeline === TAG_PIPELINE_TYPE) return "Tag";
 
   if (normalizedMethod === "SECRETS" || normalizedMethod === "CODE_SECURITY")
     return "Shield";

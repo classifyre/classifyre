@@ -49,6 +49,36 @@ export interface FinalizeIngestRunDto {
      * @memberof FinalizeIngestRunDto
      */
     detectorRunsSkipped?: number;
+    /**
+     * Relationship edges the API accepted and resolved during this run.
+     * @type {number}
+     * @memberof FinalizeIngestRunDto
+     */
+    relationshipsEmitted?: number;
+    /**
+     * Relationship passes that raised. Counts passes, not edges: a pass that failed never got to say how many edges it would have produced. Any value above zero downgrades the run to WARNING — lineage is not optional output, and a green run with none used to be indistinguishable from a green run with all of it.
+     * @type {number}
+     * @memberof FinalizeIngestRunDto
+     */
+    relationshipsFailed?: number;
+    /**
+     * Edges the connector assembled and could not send. A real edge count, and also a run downgrade.
+     * @type {number}
+     * @memberof FinalizeIngestRunDto
+     */
+    relationshipsLost?: number;
+    /**
+     * Edges accepted but with an endpoint that could not be resolved. Expected in small numbers — the other half of a cross-source edge may be ingested later — so this alone never downgrades a run.
+     * @type {number}
+     * @memberof FinalizeIngestRunDto
+     */
+    relationshipsDropped?: number;
+    /**
+     * Up to five distinct relationship errors, verbatim, so the cause is in the run record rather than only in a job log.
+     * @type {Array<string>}
+     * @memberof FinalizeIngestRunDto
+     */
+    relationshipErrors?: Array<string>;
 }
 
 /**
@@ -75,6 +105,11 @@ export function FinalizeIngestRunDtoFromJSONTyped(json: any, ignoreDiscriminator
         'samplingCursor': json['samplingCursor'] == null ? undefined : json['samplingCursor'],
         'assetsSkippedCached': json['assetsSkippedCached'] == null ? undefined : json['assetsSkippedCached'],
         'detectorRunsSkipped': json['detectorRunsSkipped'] == null ? undefined : json['detectorRunsSkipped'],
+        'relationshipsEmitted': json['relationshipsEmitted'] == null ? undefined : json['relationshipsEmitted'],
+        'relationshipsFailed': json['relationshipsFailed'] == null ? undefined : json['relationshipsFailed'],
+        'relationshipsLost': json['relationshipsLost'] == null ? undefined : json['relationshipsLost'],
+        'relationshipsDropped': json['relationshipsDropped'] == null ? undefined : json['relationshipsDropped'],
+        'relationshipErrors': json['relationshipErrors'] == null ? undefined : json['relationshipErrors'],
     };
 }
 
@@ -94,6 +129,11 @@ export function FinalizeIngestRunDtoToJSONTyped(value?: FinalizeIngestRunDto | n
         'samplingCursor': value['samplingCursor'],
         'assetsSkippedCached': value['assetsSkippedCached'],
         'detectorRunsSkipped': value['detectorRunsSkipped'],
+        'relationshipsEmitted': value['relationshipsEmitted'],
+        'relationshipsFailed': value['relationshipsFailed'],
+        'relationshipsLost': value['relationshipsLost'],
+        'relationshipsDropped': value['relationshipsDropped'],
+        'relationshipErrors': value['relationshipErrors'],
     };
 }
 

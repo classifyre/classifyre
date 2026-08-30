@@ -480,6 +480,11 @@ export class SourceAssetsController {
       samplingCursor,
       assetsSkippedCached,
       detectorRunsSkipped,
+      relationshipsEmitted,
+      relationshipsFailed,
+      relationshipsLost,
+      relationshipsDropped,
+      relationshipErrors,
     } = finalizeDto;
     if (!runnerId) {
       throw new BadRequestException('runnerId is required');
@@ -522,6 +527,17 @@ export class SourceAssetsController {
     await this.assetService.recordScanCacheSavings(runnerId, {
       assetsSkippedCached,
       detectorRunsSkipped,
+    });
+
+    // Recorded before finalizeIngestRun for the same reason as the cache
+    // savings: that method returns early for every sampling strategy but ALL,
+    // and a run that lost its lineage is degraded however it sampled.
+    await this.assetService.recordRelationshipOutcome(runnerId, {
+      relationshipsEmitted,
+      relationshipsFailed,
+      relationshipsLost,
+      relationshipsDropped,
+      relationshipErrors,
     });
 
     return this.assetService.finalizeIngestRun(
