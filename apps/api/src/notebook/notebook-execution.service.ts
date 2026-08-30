@@ -50,9 +50,21 @@ export class NotebookExecutionService {
   ) {
     const notebook = await this.notebooks.get(sourceId);
 
-    if (dto.revision !== notebook.revision) {
+    // `revision` here and `baseRevision` on the notebook PUT are the same
+    // concept under two names, and there is no global ValidationPipe to
+    // normalise either — so both are read here. Sending the PUT's name used to
+    // produce "Revision undefined is not the current notebook revision":
+    // accurate about the value and silent about the field that caused it.
+    const requested = dto.revision ?? dto.baseRevision;
+    if (requested === undefined) {
       throw new BadRequestException(
-        `Revision ${dto.revision} is not the current notebook revision (${notebook.revision}). ` +
+        'A revision is required: send `revision` (or `baseRevision`, which is ' +
+          `an alias). The notebook is currently at revision ${notebook.revision}.`,
+      );
+    }
+    if (requested !== notebook.revision) {
+      throw new BadRequestException(
+        `Revision ${requested} is not the current notebook revision (${notebook.revision}). ` +
           'Save your changes first, then run.',
       );
     }

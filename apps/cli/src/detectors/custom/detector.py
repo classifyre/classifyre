@@ -17,7 +17,12 @@ logger = logging.getLogger(__name__)
 
 
 class CustomDetector(BaseDetector):
-    """Schema-driven detector backed by a pluggable runner (GLINER2 | REGEX | LLM | transformer)."""
+    """Schema-driven detector backed by a pluggable runner.
+
+    GLINER2 | REGEX | LLM | transformer run over content. TAG does not: it
+    produces findings only from tags a CUSTOM connector attached to an asset,
+    which the pipeline applies through ``runner.tag_finding``.
+    """
 
     detector_type = "custom"
     detector_name = "custom"
@@ -46,6 +51,16 @@ class CustomDetector(BaseDetector):
         if isinstance(max_findings, int) and max_findings > 0:
             findings = findings[:max_findings]
         return findings
+
+    @property
+    def runner(self) -> BaseRunner:
+        """The pipeline strategy behind this detector.
+
+        Public because the tag pass has to ask what kind of runner this is: a
+        TAG detector never reaches ``detect()``, so recognising it is the only
+        way its findings get produced at all.
+        """
+        return self._runner
 
     def get_supported_content_types(self) -> list[str]:
         return self._runner.get_supported_content_types()

@@ -1607,7 +1607,9 @@
     "select": "Select →",
     "typeGroups": {
       "general": "General",
-      "transformers": "HuggingFace Transformers"
+      "transformers": "HuggingFace Transformers",
+      "manual": "Manual",
+      "manualNote": "Not an engine. A Tag detector never runs on content — it exists so a Custom connector notebook can record a fact the source system already holds. It does not appear in a source's detector list."
     },
     "types": {
       "gliner2": {
@@ -1645,7 +1647,36 @@
         "tagline": "Locate and label objects in images",
         "description": "Run any HuggingFace object-detection model on images. Findings include bounding boxes, confidence scores, and label-based severity mapping.",
         "tags": "Bounding boxes, Object labels, Severity map"
+      },
+      "tag": {
+        "title": "Tag",
+        "tagline": "Manual, no classification",
+        "description": "A placeholder for a fact you already know. It runs nothing and reads no content: a Custom connector notebook applies it by key with Asset(tags={\"key\": \"value\"}), and the value becomes a finding. Use it when the source system already has the answer.",
+        "tags": "Manual, Custom sources, No model"
       }
+    },
+    "tag": {
+      "stepIdentity": "Identity",
+      "stepIdentityDesc": "Name, key, and status",
+      "identityTitle": "Detector identity",
+      "name": "Name",
+      "namePlaceholder": "e.g. Cardholder Data",
+      "keyLabel": "Key",
+      "keyHint": "This is the key you write in a notebook. Auto-derived from the name if left blank.",
+      "descriptionLabel": "Description",
+      "descriptionPlaceholder": "What does this tag assert, and who decided it?",
+      "activeLabel": "Active — usable from a Custom connector notebook",
+      "tagTitle": "What the tag records",
+      "labelLabel": "Label",
+      "labelPlaceholder": "e.g. Cardholder data",
+      "labelHint": "Carried by every finding this detector produces. Defaults to the name.",
+      "severityLabel": "Severity",
+      "severityHint": "Every finding from this tag gets this severity. A tag is asserted, not inferred, so there is no confidence to derive one from.",
+      "usageTitle": "Using it in a notebook",
+      "usageHint": "Add this key to any asset your Custom connector yields. The value you pass becomes the finding's matched content.",
+      "usageCopy": "Copy snippet",
+      "usageCopied": "Copied",
+      "notSelectable": "Tag detectors do not appear in a source's detector list. Every active one is available to every Custom connector automatically."
     }
   },
   "scans": {
@@ -1777,7 +1808,9 @@
       "engineUnavailable": "{{count}} assets could not be read because a text or OCR engine was unavailable.",
       "zeroFrames": "{{count}} videos decoded zero frames, so visual OCR inspected no content.",
       "failed": "{{count}} assets had another text extraction failure.",
-      "outOfScope": "{{count}} assets were retained because the scan scope changed; absence was not treated as deletion."
+      "outOfScope": "{{count}} assets were retained because the scan scope changed; absence was not treated as deletion.",
+      "relationshipsFailed": "{{count}} relationship pass(es) failed inside the connector, so this run's lineage is incomplete.",
+      "relationshipsLost": "{{count}} relationship edges were assembled but could not be sent."
     },
     "sourceContext": {
       "title": "Source Context",
@@ -3117,6 +3150,7 @@
     },
     "nav": {
       "activity": "Activity",
+      "supervisor": "Supervisor",
       "runs": "Runs",
       "usage": "Usage",
       "agents": "Agents",
@@ -3424,7 +3458,8 @@
       "ESCALATION": "Escalation",
       "DREAM": "Dream",
       "DUPLICATES": "Duplicates",
-      "CHAT": "Chat"
+      "CHAT": "Chat",
+      "SUPERVISOR": "Supervisor"
     },
     "outcomes": {
       "APPLIED": "Applied",
@@ -3495,6 +3530,129 @@
       "empty": "No agent runs in this period yet.",
       "noPricing": "Add token prices to your AI provider in Harness AI → Configuration to see cost estimates.",
       "noCacheData": "No provider in this range reported cache usage."
+    },
+    "supervisor": {
+      "title": "Supervisor",
+      "desc": "The agent above the others. It holds the goals, decides when it next runs, keeps a journal of what it did, and commands the workers.",
+      "enabled": "Enabled",
+      "off": "Off",
+      "offDesc": "The supervisor sets its own pace, commands the other agents, and — once you grant it — deletes data. Switch it on deliberately.",
+      "providerMissing": "Assign a Harness provider under Configuration before the supervisor can run.",
+      "wakeNow": "Wake now",
+      "wakeInstruction": "Optional: what should it concentrate on this wake?",
+      "wakeQueued": "Wake queued.",
+      "nextWake": "Next wake",
+      "nextWakeNever": "Not scheduled",
+      "nextWakeDue": "Due now",
+      "lastWake": "Last wake",
+      "lastWakeNever": "Never run",
+      "wakeReason": "Why",
+      "pendingEvents": "Unread events",
+      "noopStreak": "Quiet wakes",
+      "noopWarning": "It has woken {{count}} times in a row without changing anything. Either the goals no longer describe useful work, or it is waking too often.",
+      "pausedUntil": "Paused until {{when}}",
+      "resume": "Resume",
+      "pause": "Pause for a day",
+      "spentToday": "Spent today",
+      "costUnknown": "Not priced",
+      "costUnknownHint": "This provider has no pricing configured, so cost cannot be measured. That is not the same as free.",
+      "noLimit": "no cap",
+      "wakesToday": "Wakes today",
+      "tabs": {
+        "goals": "Goals",
+        "journal": "Journal",
+        "capabilities": "Capabilities",
+        "undo": "Undo",
+        "settings": "Limits"
+      },
+      "goals": {
+        "desc": "What you want it to achieve. A goal you set outranks anything it infers: it can record progress on yours, but it cannot rewrite them.",
+        "charter": "Charter",
+        "charterHint": "The standing answer to what this workspace is for. Everything else should be traceable to it.",
+        "add": "Add a goal",
+        "titlePlaceholder": "What should it achieve?",
+        "bodyPlaceholder": "Any detail that changes how it should go about this.",
+        "save": "Save",
+        "cancel": "Cancel",
+        "edit": "Edit",
+        "delete": "Delete",
+        "empty": "No goals beyond the charter. It will work from the charter alone until you add one.",
+        "priority": "Priority",
+        "progress": "Where it stands",
+        "byOperator": "You set this",
+        "byAgent": "It proposed this",
+        "statuses": {
+          "ACTIVE": "Active",
+          "PAUSED": "Paused",
+          "DONE": "Done",
+          "ABANDONED": "Abandoned"
+        },
+        "kinds": {
+          "CHARTER": "Charter",
+          "GOAL": "Goal",
+          "TASK": "Task"
+        },
+        "showFinished": "Show finished"
+      },
+      "journal": {
+        "desc": "One entry per wake, written by the agent to itself. It starts each wake with no memory of the last one except this — which is what makes correcting an entry the most direct way to steer it.",
+        "empty": "Nothing yet. The first entry appears after its first wake.",
+        "found": "Found",
+        "did": "Did",
+        "next": "Next",
+        "cost": "Cost",
+        "scheduled": "Scheduled",
+        "openRun": "Open run",
+        "correct": "Correct this",
+        "correctPlaceholder": "What did it get wrong, or what should it do instead?",
+        "correctHint": "Read back on its next wake and treated as authoritative over what it wrote.",
+        "correctionSaved": "Correction saved.",
+        "operatorNote": "Your correction",
+        "loadMore": "Load more"
+      },
+      "capabilities": {
+        "desc": "What it is allowed to change. Switching a group off removes those tools from what it can call, and from what its prompt describes — it is never told about a power it does not have.",
+        "alwaysOn": "Always on",
+        "destructive": "Destructive",
+        "toolCount": "{{count}} tools",
+        "saved": "Capabilities updated.",
+        "readsNote": "Reads are never withheld. A group controls what it may change, not what it may see.",
+        "readCorpus": "Read the corpus",
+        "controlAgents": "Command the other agents",
+        "investigations": "Inquiries and cases",
+        "detectionConfig": "Detection configuration",
+        "detectorAuthoring": "Detector authoring",
+        "duplicateReview": "Duplicate review",
+        "knowledge": "Memory and glossary",
+        "alerts": "Operator alerts",
+        "corpusHygiene": "Delete findings and assets",
+        "customSourceCode": "Custom source code",
+        "externalMcp": "External MCP tools"
+      },
+      "undo": {
+        "desc": "Agent actions that can still be taken back. Undo is not time travel: a re-scan rebuilds findings and assets, but it does not rebuild anyone's judgement about them.",
+        "empty": "Nothing to undo.",
+        "revert": "Revert",
+        "reverting": "Reverting…",
+        "revertedAt": "Reverted {{when}}",
+        "revertedBy": "by {{who}}",
+        "expired": "Expired",
+        "rescan": "Re-scan",
+        "restoreValue": "Restore value",
+        "confirm": "Revert this action?"
+      },
+      "settings": {
+        "desc": "The bounds it works inside. It sees its remaining budget in its prompt and paces itself against it.",
+        "dailyCap": "Daily spend cap (USD)",
+        "dailyCapHint": "0 or empty means no cap. Summed from what its runs actually cost.",
+        "maxSleep": "Longest sleep (hours)",
+        "maxSleepHint": "The backstop against an agent that schedules itself out of existence.",
+        "purgeBudget": "Destructive calls per day",
+        "purgeBudgetHint": "A series of individually reasonable deletions is how an evidence base gets emptied.",
+        "undoRetention": "Keep undo entries (days)",
+        "save": "Save limits",
+        "saved": "Limits saved."
+      }
     }
   },
   "aiHealth": {
@@ -3709,7 +3867,8 @@
       "missingFunction": "Add a '{{name}}' function.",
       "insert": "Insert {{name}} cell",
       "ok": "Defines test_connection() and extract()",
-      "syntaxError": "Cell '{{cell}}' has a syntax error on line {{line}}: {{message}}"
+      "syntaxError": "Cell '{{cell}}' has a syntax error on line {{line}}: {{message}}",
+      "warningsTitle": "Worth checking before you run this"
     },
     "data": {
       "title": "Files & folders",
@@ -3895,6 +4054,19 @@
       "after": "After",
       "confirmAll": "Confirm all in band"
     },
+    "exclude": {
+      "action": "Stop matching on these values",
+      "title": "Stop the template from driving matches",
+      "intro": "These assets share the same passage of text. The values inside it are what make them match documents elsewhere — excluding them stops that, everywhere, from the next scan on.",
+      "impact": "{{pairs}} matched pairs in other patterns rest on one of these {{values}} values. This does not change the pairs in this pattern: those come from the repeated text itself, and are recorded as not-duplicates.",
+      "assets": "in {{count}} assets",
+      "none": "Nothing to exclude — no value in this group appears in more than one asset.",
+      "capped": "Showing the {{shown}} widest of {{total}} values.",
+      "recomputeNote": "Writes instance-wide exclusion rules and re-scores the corpus. Reversible from the undo log.",
+      "apply": "Exclude {{count}} values",
+      "cancel": "Cancel",
+      "applied": "{{rules}} exclusion rules written, {{pairs}} pairs decided. A recompute is running."
+    },
     "undo": {
       "title": "Recent actions",
       "empty": "Nothing to undo yet.",
@@ -3909,7 +4081,9 @@
       "noValues": "No comparable values.",
       "notFound": "That pair is no longer in the review queue.",
       "alreadyDecided": "Already decided: {{verdict}}",
-      "staleVerdict": "This pair has been re-scored since it was decided."
+      "staleVerdict": "This pair has been re-scored since it was decided.",
+      "remaining": "{{count}} left in this pattern",
+      "queueClear": "Nothing left to review in this pattern."
     },
     "waterfall": {
       "title": "Why it scored {{score}}",

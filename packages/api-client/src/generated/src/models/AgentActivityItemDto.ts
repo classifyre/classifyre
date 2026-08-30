@@ -99,7 +99,8 @@ export const AgentActivityItemDtoAgentKindEnum = {
     Config: 'CONFIG',
     DetectorAuthor: 'DETECTOR_AUTHOR',
     Escalation: 'ESCALATION',
-    Chat: 'CHAT'
+    Chat: 'CHAT',
+    Supervisor: 'SUPERVISOR'
 } as const;
 export type AgentActivityItemDtoAgentKindEnum = typeof AgentActivityItemDtoAgentKindEnum[keyof typeof AgentActivityItemDtoAgentKindEnum];
 
@@ -151,6 +152,14 @@ export const AgentActivityItemDtoActionEnum = {
     RecomputeCorrelation: 'RECOMPUTE_CORRELATION',
     TuneCorrelation: 'TUNE_CORRELATION',
     NotifyOperator: 'NOTIFY_OPERATOR',
+    SetGoal: 'SET_GOAL',
+    CommandAgent: 'COMMAND_AGENT',
+    ConfigureAgent: 'CONFIGURE_AGENT',
+    PurgeFindings: 'PURGE_FINDINGS',
+    PurgeAssets: 'PURGE_ASSETS',
+    ScheduleWake: 'SCHEDULE_WAKE',
+    WriteJournal: 'WRITE_JOURNAL',
+    RevertAction: 'REVERT_ACTION',
     NoAction: 'NO_ACTION'
 } as const;
 export type AgentActivityItemDtoActionEnum = typeof AgentActivityItemDtoActionEnum[keyof typeof AgentActivityItemDtoActionEnum];

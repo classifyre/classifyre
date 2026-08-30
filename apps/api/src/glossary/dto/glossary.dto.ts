@@ -228,8 +228,16 @@ export class GlossaryListResponseDto {
 }
 
 export class GlossaryLookupHitDto extends GlossaryTermDto {
-  @ApiProperty({ enum: ['exact', 'alias', 'semantic'] })
-  matchType!: 'exact' | 'alias' | 'semantic';
+  @ApiProperty({
+    enum: ['exact', 'alias', 'partial', 'semantic'],
+    description:
+      'How this term was reached, and the order results come back in: an exact ' +
+      'term, then an exact alias, then a prefix or substring, then a semantic ' +
+      'neighbour. The alias tier ranks above substring on purpose — in a domain ' +
+      "of two- and three-letter register codes, 'GES' has to resolve to the " +
+      'entry whose alias it is, not to the longest word it is a prefix of.',
+  })
+  matchType!: 'exact' | 'alias' | 'partial' | 'semantic';
 
   @ApiPropertyOptional({ minimum: -1, maximum: 1 })
   similarity?: number;

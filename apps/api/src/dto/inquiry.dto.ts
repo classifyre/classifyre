@@ -346,6 +346,31 @@ export class InquiryMatchListResponseDto {
 /** Preview the current matches of a matcher config before saving a question. */
 export class PreviewInquiryDto extends InquiryMatchersDto {}
 
+export class PreviewDiagnosticDto {
+  @ApiProperty({
+    enum: [
+      'sources',
+      'detectors',
+      'findingTypes',
+      'findingTypeRegex',
+      'findingValueRegex',
+      'corpus',
+    ],
+    description: 'The matcher dimension this diagnostic is about.',
+  })
+  dimension!: string;
+
+  @ApiProperty({
+    description:
+      'Findings that survive every dimension EXCEPT this one. A large number ' +
+      'here with a total of zero means this dimension is what eliminated them.',
+  })
+  survivingWithout!: number;
+
+  @ApiProperty({ description: 'What is wrong, and what to change.' })
+  message!: string;
+}
+
 export class PreviewResponseDto {
   @ApiProperty({ description: 'Total findings currently matching' })
   total!: number;
@@ -355,6 +380,19 @@ export class PreviewResponseDto {
     description: 'Sample of matches (capped)',
   })
   sample!: InquiryMatchDto[];
+
+  @ApiProperty({
+    type: [PreviewDiagnosticDto],
+    description:
+      'Why a preview returned nothing. Empty whenever there are matches.\n\n' +
+      'A question that matches nothing and a question that is wired wrong look ' +
+      'identical from a total of zero, and two real inquiries sat at zero for ' +
+      'hours while their detector was producing findings the whole time. Each ' +
+      'entry names one dimension, how many findings survive without it, and ' +
+      'what to change — including the common case of pointing a value regex at ' +
+      'a detector whose answer lives in the finding type.',
+  })
+  diagnostics!: PreviewDiagnosticDto[];
 }
 
 class MatchOptionSourceDto {
@@ -366,6 +404,53 @@ class MatchOptionSourceDto {
 class MatchOptionCustomDetectorDto {
   @ApiProperty() key!: string;
   @ApiProperty() name!: string;
+
+  @ApiProperty({
+    enum: ['findingType', 'matchedContent'],
+    description:
+      "Which dimension of this detector's findings carries the ANSWER, and so " +
+      'which matcher dimension a question about it should use.\n\n' +
+      'The two are not interchangeable and the difference is invisible from the ' +
+      'finding DTO. A TAG detector puts its label in `findingType` ' +
+      '(`tag:Shell-company risk`) and its verdict in `matchedContent` ' +
+      '(`hoch (5/12): amtswegig gelöscht; …`), so `findingValueRegex` is right. ' +
+      'An LLM detector is the other way round: the answer IS the type ' +
+      '(`insolvenzgefahr_hoch`) and the value is prose reasoning, so the same ' +
+      'matcher matches nothing. Two questions sat at zero for hours for exactly ' +
+      'this reason, and an inquiry with a wrong matcher looks identical to an ' +
+      'inquiry with nothing to match.',
+  })
+  answerDimension!: 'findingType' | 'matchedContent';
+
+  @ApiProperty({
+    enum: ['findingTypes', 'findingValueRegex'],
+    description:
+      'The matcher field to fill in for this detector — the actionable form of ' +
+      'answerDimension.',
+  })
+  suggestedMatcher!: 'findingTypes' | 'findingValueRegex';
+
+  @ApiProperty({
+    type: [String],
+    description:
+      'Finding types this detector has actually produced (capped). For an ' +
+      'answerDimension of `findingType`, these are the values to put in ' +
+      '`findingTypes`.',
+  })
+  findingTypes!: string[];
+
+  @ApiProperty({
+    description: 'Open findings this detector currently has.',
+  })
+  openFindings!: number;
+
+  @ApiPropertyOptional({
+    nullable: true,
+    description:
+      'Pipeline engine (TAG, LLM, REGEX, GLINER2, …), which is what decides ' +
+      'answerDimension.',
+  })
+  pipelineType?: string | null;
 }
 
 class MatchOptionFindingTypeDto {

@@ -587,7 +587,7 @@
     },
     "/sources/{id}": {
       "get": {
-        "description": "Retrieve detailed information about a specific data source",
+        "description": "Retrieve detailed information about a specific data source.\n\nA CUSTOM source's notebook cells are NOT inlined by default: the whole program is many kilobytes and blows a response budget for a caller that wanted the variables. `config.required.notebook` comes back as `{ revision, cellCount, cellsOmitted: true }`. Pass `?include=notebook` for the cells, or use GET /sources/{id}/notebook, which is what the editor uses.",
         "operationId": "SourcesController_getSource",
         "parameters": [
           {
@@ -597,6 +597,16 @@
             "description": "Source unique identifier",
             "schema": {
               "example": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+              "type": "string"
+            }
+          },
+          {
+            "name": "include",
+            "required": false,
+            "in": "query",
+            "description": "Comma-separated extras to inline. Only 'notebook' is recognised.",
+            "schema": {
+              "example": "notebook",
               "type": "string"
             }
           }
@@ -1025,7 +1035,7 @@
     },
     "/sources/{id}/assets": {
       "delete": {
-        "description": "Permanently delete every asset of the source, along with their findings, extractions, correlation values, signatures and chunks (all cascade via FK). Correlation fingerprints are recomputed in the background. Irreversible.",
+        "description": "Permanently delete assets of the source, along with their findings, extractions, correlation values, signatures and chunks (all cascade via FK). Correlation fingerprints are recomputed in the background. Irreversible.\n\nWith no query parameters this deletes EVERY asset of the source. The optional predicate exists for the case a scan can never resolve on its own: when a connector narrows its scope (one source split into two), the assets it used to produce stay behind forever, because retirement requires a run that covered the whole scope and found them gone — and a rotating-sample connector never has one. Pass dryRun=true first to see what a predicate would take with it.",
         "operationId": "SourcesController_purgeAssets",
         "parameters": [
           {
@@ -1037,17 +1047,64 @@
               "example": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
               "type": "string"
             }
+          },
+          {
+            "name": "dryRun",
+            "required": false,
+            "in": "query",
+            "description": "Report what matches and delete nothing.",
+            "schema": {}
+          },
+          {
+            "name": "notScannedSince",
+            "required": false,
+            "in": "query",
+            "description": "ISO-8601 timestamp; also matches assets that were never scanned.",
+            "schema": {}
+          },
+          {
+            "name": "urnPrefix",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "namePrefix",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "assetKind",
+            "required": false,
+            "in": "query",
+            "description": "Catalog kind: record | document | page | file | table.",
+            "schema": {}
+          },
+          {
+            "name": "externalIdPrefix",
+            "required": false,
+            "in": "query",
+            "description": "Connector-assigned id prefix (metadata.external_id), e.g. 'fin-'.",
+            "schema": {}
           }
         ],
         "responses": {
           "200": {
-            "description": "Assets purged; returns the number of deleted assets"
+            "description": "What was deleted (or would be), plus the predicate the server understood",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PurgeSourceAssetsResponseDto"
+                }
+              }
+            }
           },
           "404": {
             "description": "Source not found"
           }
         },
-        "summary": "Purge all assets of a data source",
+        "summary": "Retire a source's assets — all of them, or a named subset",
         "tags": [
           "Sources"
         ]
@@ -8458,7 +8515,8 @@
                 "CONFIG",
                 "DETECTOR_AUTHOR",
                 "ESCALATION",
-                "CHAT"
+                "CHAT",
+                "SUPERVISOR"
               ]
             }
           },
@@ -8517,7 +8575,8 @@
                 "CONFIG",
                 "DETECTOR_AUTHOR",
                 "ESCALATION",
-                "CHAT"
+                "CHAT",
+                "SUPERVISOR"
               ]
             }
           },
@@ -8559,6 +8618,14 @@
                 "RECOMPUTE_CORRELATION",
                 "TUNE_CORRELATION",
                 "NOTIFY_OPERATOR",
+                "SET_GOAL",
+                "COMMAND_AGENT",
+                "CONFIGURE_AGENT",
+                "PURGE_FINDINGS",
+                "PURGE_ASSETS",
+                "SCHEDULE_WAKE",
+                "WRITE_JOURNAL",
+                "REVERT_ACTION",
                 "NO_ACTION"
               ]
             }
@@ -8711,7 +8778,8 @@
                 "CONFIG",
                 "DETECTOR_AUTHOR",
                 "ESCALATION",
-                "CHAT"
+                "CHAT",
+                "SUPERVISOR"
               ]
             }
           }
@@ -8814,7 +8882,8 @@
                 "CONFIG",
                 "DETECTOR_AUTHOR",
                 "ESCALATION",
-                "CHAT"
+                "CHAT",
+                "SUPERVISOR"
               ]
             }
           },
@@ -9412,6 +9481,394 @@
           }
         },
         "summary": "Remove an MCP server",
+        "tags": [
+          "autopilot"
+        ]
+      }
+    },
+    "/autopilot/supervisor": {
+      "get": {
+        "operationId": "SupervisorController_state",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupervisorStateDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Supervisor state, budget and pacing",
+        "tags": [
+          "autopilot"
+        ]
+      },
+      "patch": {
+        "operationId": "SupervisorController_update",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSupervisorDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupervisorStateDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Enable, pause, or re-budget the supervisor",
+        "tags": [
+          "autopilot"
+        ]
+      }
+    },
+    "/autopilot/supervisor/wake": {
+      "post": {
+        "operationId": "SupervisorController_wake",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WakeSupervisorDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": ""
+          }
+        },
+        "summary": "Wake the supervisor now",
+        "tags": [
+          "autopilot"
+        ]
+      }
+    },
+    "/autopilot/supervisor/goals": {
+      "get": {
+        "operationId": "SupervisorController_goals",
+        "parameters": [
+          {
+            "name": "includeFinished",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupervisorGoalListDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Goals and tasks, including the charter",
+        "tags": [
+          "autopilot"
+        ]
+      },
+      "post": {
+        "operationId": "SupervisorController_createGoal",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSupervisorGoalDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupervisorGoalDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Set a goal",
+        "tags": [
+          "autopilot"
+        ]
+      }
+    },
+    "/autopilot/supervisor/goals/{id}": {
+      "patch": {
+        "operationId": "SupervisorController_updateGoal",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSupervisorGoalDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupervisorGoalDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Edit a goal",
+        "tags": [
+          "autopilot"
+        ]
+      },
+      "delete": {
+        "operationId": "SupervisorController_deleteGoal",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "summary": "Delete a goal",
+        "tags": [
+          "autopilot"
+        ]
+      }
+    },
+    "/autopilot/supervisor/journal": {
+      "get": {
+        "operationId": "SupervisorController_journal",
+        "parameters": [
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "before",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupervisorJournalListDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "What it did, wake by wake",
+        "tags": [
+          "autopilot"
+        ]
+      }
+    },
+    "/autopilot/supervisor/journal/{id}/note": {
+      "post": {
+        "operationId": "SupervisorController_annotate",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnnotateJournalDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Correct an entry. Read back on the next wake as authoritative.",
+        "tags": [
+          "autopilot"
+        ]
+      }
+    },
+    "/autopilot/supervisor/capabilities": {
+      "get": {
+        "operationId": "SupervisorController_capabilities",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupervisorCapabilityListDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "What the supervisor is allowed to do",
+        "tags": [
+          "autopilot"
+        ]
+      },
+      "put": {
+        "operationId": "SupervisorController_setCapabilities",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCapabilitiesDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupervisorCapabilityListDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Switch capability groups off",
+        "tags": [
+          "autopilot"
+        ]
+      }
+    },
+    "/autopilot/supervisor/undo": {
+      "get": {
+        "operationId": "SupervisorController_undoLog",
+        "parameters": [
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentUndoListDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Agent actions that can still be taken back",
+        "tags": [
+          "autopilot"
+        ]
+      }
+    },
+    "/autopilot/supervisor/undo/{id}": {
+      "post": {
+        "operationId": "SupervisorController_revert",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RevertResultDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Revert one agent action",
         "tags": [
           "autopilot"
         ]
@@ -10297,6 +10754,38 @@
           }
         },
         "summary": "What a bulk action would do. Read-only — nothing is applied.",
+        "tags": [
+          "correlation-review"
+        ]
+      }
+    },
+    "/correlation/review/patterns/{patternKey}/exclusion-candidates": {
+      "get": {
+        "description": "What an exclusion on this pattern would actually stop matching. Empty for any pattern whose rule kind is not EXCLUSION — the other kinds have no template to read values out of. Read-only.",
+        "operationId": "CorrelationReviewController_exclusionCandidates",
+        "parameters": [
+          {
+            "name": "patternKey",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PatternExclusionCandidatesResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "The values inside a near-duplicate text group, and their reach",
         "tags": [
           "correlation-review"
         ]
@@ -11694,6 +12183,34 @@
         },
         "required": [
           "status"
+        ]
+      },
+      "PurgeSourceAssetsResponseDto": {
+        "type": "object",
+        "properties": {
+          "purgedAssets": {
+            "type": "number",
+            "description": "Assets actually deleted. Always 0 for a dry run."
+          },
+          "matchedAssets": {
+            "type": "number",
+            "description": "Assets the predicate selected. Equals purgedAssets outside a dry run."
+          },
+          "dryRun": {
+            "type": "boolean",
+            "description": "Whether this call deleted anything."
+          },
+          "predicate": {
+            "type": "object",
+            "description": "The predicate the server understood, field by field. Empty means the whole source was targeted. Compare it against what you sent: an unrecognised parameter is rejected, never silently dropped.",
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "purgedAssets",
+          "matchedAssets",
+          "dryRun",
+          "predicate"
         ]
       },
       "UploadedSourceFileDto": {
@@ -13703,6 +14220,33 @@
             "type": "number",
             "description": "Individual detector runs avoided across all assets, counting the partial skips on assets where only some detectors had to re-run.",
             "minimum": 0
+          },
+          "relationshipsEmitted": {
+            "type": "number",
+            "description": "Relationship edges the API accepted and resolved during this run.",
+            "minimum": 0
+          },
+          "relationshipsFailed": {
+            "type": "number",
+            "description": "Relationship passes that raised. Counts passes, not edges: a pass that failed never got to say how many edges it would have produced. Any value above zero downgrades the run to WARNING — lineage is not optional output, and a green run with none used to be indistinguishable from a green run with all of it.",
+            "minimum": 0
+          },
+          "relationshipsLost": {
+            "type": "number",
+            "description": "Edges the connector assembled and could not send. A real edge count, and also a run downgrade.",
+            "minimum": 0
+          },
+          "relationshipsDropped": {
+            "type": "number",
+            "description": "Edges accepted but with an endpoint that could not be resolved. Expected in small numbers — the other half of a cross-source edge may be ingested later — so this alone never downgrades a run.",
+            "minimum": 0
+          },
+          "relationshipErrors": {
+            "description": "Up to five distinct relationship errors, verbatim, so the cause is in the run record rather than only in a job log.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         },
         "required": [
@@ -13824,6 +14368,21 @@
             "type": "object",
             "additionalProperties": true
           },
+          "detectorType": {
+            "type": "string",
+            "nullable": true,
+            "description": "The engine this detector runs on (TAG, REGEX, LLM, GLINER2, TEXT_CLASSIFICATION, IMAGE_CLASSIFICATION, OBJECT_DETECTION). Lifted out of pipelineSchema so a list response can be audited as it stands: the type and severity of twenty detectors used to mean introspecting twenty opaque pipeline blobs."
+          },
+          "severity": {
+            "type": "string",
+            "nullable": true,
+            "description": "Default severity of the findings this detector produces, where its engine has one. Null for engines that derive severity per label."
+          },
+          "answerDimension": {
+            "type": "string",
+            "nullable": true,
+            "description": "Which dimension of this detector's findings carries the answer — `findingType` for classifiers (the predicted label IS the answer), `matchedContent` for TAG and REGEX (the type names the rule, the value is the answer). The same distinction /inquiries/match-options reports, repeated here so a detector audit and a question author see one story."
+          },
           "aiProviderConfigId": {
             "type": "string",
             "description": "AI provider credential ID backing this detector (LLM detectors only).",
@@ -13893,6 +14452,9 @@
           "key",
           "name",
           "pipelineSchema",
+          "detectorType",
+          "severity",
+          "answerDimension",
           "isActive",
           "version",
           "findingsCount",
@@ -13934,7 +14496,7 @@
           },
           "pipelineSchema": {
             "type": "object",
-            "description": "Pipeline schema defining the detector behaviour (type: GLINER2 | REGEX | LLM | TEXT_CLASSIFICATION | IMAGE_CLASSIFICATION | OBJECT_DETECTION)"
+            "description": "Pipeline schema defining the detector behaviour (type: GLINER2 | REGEX | LLM | TEXT_CLASSIFICATION | IMAGE_CLASSIFICATION | OBJECT_DETECTION | TAG). TAG is a placeholder that runs nothing: it exists so a CUSTOM connector notebook can assert a fact it already knows with Asset(tags={\"<key>\": \"<value>\"}), and it is not selectable on a source."
           }
         },
         "required": [
@@ -14083,7 +14645,7 @@
           },
           "pipelineSchema": {
             "type": "object",
-            "description": "Pipeline schema defining the detector behaviour (type: GLINER2 | REGEX | LLM | TEXT_CLASSIFICATION | IMAGE_CLASSIFICATION | OBJECT_DETECTION)"
+            "description": "Pipeline schema defining the detector behaviour (type: GLINER2 | REGEX | LLM | TEXT_CLASSIFICATION | IMAGE_CLASSIFICATION | OBJECT_DETECTION | TAG). TAG is a placeholder that runs nothing: it exists so a CUSTOM connector notebook can assert a fact it already knows with Asset(tags={\"<key>\": \"<value>\"}), and it is not selectable on a source."
           }
         }
       },
@@ -17609,6 +18171,36 @@
           "isNew"
         ]
       },
+      "PreviewDiagnosticDto": {
+        "type": "object",
+        "properties": {
+          "dimension": {
+            "type": "string",
+            "enum": [
+              "sources",
+              "detectors",
+              "findingTypes",
+              "findingTypeRegex",
+              "findingValueRegex",
+              "corpus"
+            ],
+            "description": "The matcher dimension this diagnostic is about."
+          },
+          "survivingWithout": {
+            "type": "number",
+            "description": "Findings that survive every dimension EXCEPT this one. A large number here with a total of zero means this dimension is what eliminated them."
+          },
+          "message": {
+            "type": "string",
+            "description": "What is wrong, and what to change."
+          }
+        },
+        "required": [
+          "dimension",
+          "survivingWithout",
+          "message"
+        ]
+      },
       "PreviewResponseDto": {
         "type": "object",
         "properties": {
@@ -17622,11 +18214,19 @@
             "items": {
               "$ref": "#/components/schemas/InquiryMatchDto"
             }
+          },
+          "diagnostics": {
+            "description": "Why a preview returned nothing. Empty whenever there are matches.\n\nA question that matches nothing and a question that is wired wrong look identical from a total of zero, and two real inquiries sat at zero for hours while their detector was producing findings the whole time. Each entry names one dimension, how many findings survive without it, and what to change — including the common case of pointing a value regex at a detector whose answer lives in the finding type.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PreviewDiagnosticDto"
+            }
           }
         },
         "required": [
           "total",
-          "sample"
+          "sample",
+          "diagnostics"
         ]
       },
       "MatchOptionSourceDto": {
@@ -17656,11 +18256,47 @@
           },
           "name": {
             "type": "string"
+          },
+          "answerDimension": {
+            "type": "string",
+            "enum": [
+              "findingType",
+              "matchedContent"
+            ],
+            "description": "Which dimension of this detector's findings carries the ANSWER, and so which matcher dimension a question about it should use.\n\nThe two are not interchangeable and the difference is invisible from the finding DTO. A TAG detector puts its label in `findingType` (`tag:Shell-company risk`) and its verdict in `matchedContent` (`hoch (5/12): amtswegig gelöscht; …`), so `findingValueRegex` is right. An LLM detector is the other way round: the answer IS the type (`insolvenzgefahr_hoch`) and the value is prose reasoning, so the same matcher matches nothing. Two questions sat at zero for hours for exactly this reason, and an inquiry with a wrong matcher looks identical to an inquiry with nothing to match."
+          },
+          "suggestedMatcher": {
+            "type": "string",
+            "enum": [
+              "findingTypes",
+              "findingValueRegex"
+            ],
+            "description": "The matcher field to fill in for this detector — the actionable form of answerDimension."
+          },
+          "findingTypes": {
+            "description": "Finding types this detector has actually produced (capped). For an answerDimension of `findingType`, these are the values to put in `findingTypes`.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "openFindings": {
+            "type": "number",
+            "description": "Open findings this detector currently has."
+          },
+          "pipelineType": {
+            "type": "string",
+            "nullable": true,
+            "description": "Pipeline engine (TAG, LLM, REGEX, GLINER2, …), which is what decides answerDimension."
           }
         },
         "required": [
           "key",
-          "name"
+          "name",
+          "answerDimension",
+          "suggestedMatcher",
+          "findingTypes",
+          "openFindings"
         ]
       },
       "MatchOptionFindingTypeDto": {
@@ -19289,8 +19925,10 @@
             "enum": [
               "exact",
               "alias",
+              "partial",
               "semantic"
-            ]
+            ],
+            "description": "How this term was reached, and the order results come back in: an exact term, then an exact alias, then a prefix or substring, then a semantic neighbour. The alias tier ranks above substring on purpose — in a domain of two- and three-letter register codes, 'GES' has to resolve to the entry whose alias it is, not to the longest word it is a prefix of."
           },
           "similarity": {
             "type": "number",
@@ -20378,6 +21016,26 @@
             "default": 0,
             "description": "Individual detector runs the scan cache avoided across all assets, including partial skips where only some detectors had to re-run."
           },
+          "relationshipsEmitted": {
+            "type": "number",
+            "default": 0,
+            "description": "Relationship edges this run emitted and the API resolved."
+          },
+          "relationshipsFailed": {
+            "type": "number",
+            "default": 0,
+            "description": "Relationship passes that raised inside the connector's own code. Counts passes, not edges — a pass that failed never got to say how many edges it would have produced. Any non-zero value makes the run WARNING: lineage can otherwise be entirely absent from a green run."
+          },
+          "relationshipsLost": {
+            "type": "number",
+            "default": 0,
+            "description": "Edges the connector assembled and could not send. Also makes the run WARNING."
+          },
+          "relationshipsDropped": {
+            "type": "number",
+            "default": 0,
+            "description": "Edges accepted with an endpoint that could not be resolved. Routinely the other half of a cross-source edge that has not been ingested yet, so this never downgrades a run on its own."
+          },
           "scopeFingerprint": {
             "type": "string",
             "nullable": true,
@@ -20451,6 +21109,10 @@
           "assetsOutOfScope",
           "assetsSkippedCached",
           "detectorRunsSkipped",
+          "relationshipsEmitted",
+          "relationshipsFailed",
+          "relationshipsLost",
+          "relationshipsDropped",
           "totalFindings",
           "findingsCreated",
           "findingsResolved",
@@ -21146,6 +21808,26 @@
             "default": 0,
             "description": "Individual detector runs the scan cache avoided across all assets, including partial skips where only some detectors had to re-run."
           },
+          "relationshipsEmitted": {
+            "type": "number",
+            "default": 0,
+            "description": "Relationship edges this run emitted and the API resolved."
+          },
+          "relationshipsFailed": {
+            "type": "number",
+            "default": 0,
+            "description": "Relationship passes that raised inside the connector's own code. Counts passes, not edges — a pass that failed never got to say how many edges it would have produced. Any non-zero value makes the run WARNING: lineage can otherwise be entirely absent from a green run."
+          },
+          "relationshipsLost": {
+            "type": "number",
+            "default": 0,
+            "description": "Edges the connector assembled and could not send. Also makes the run WARNING."
+          },
+          "relationshipsDropped": {
+            "type": "number",
+            "default": 0,
+            "description": "Edges accepted with an endpoint that could not be resolved. Routinely the other half of a cross-source edge that has not been ingested yet, so this never downgrades a run on its own."
+          },
           "scopeFingerprint": {
             "type": "string",
             "nullable": true,
@@ -21218,6 +21900,10 @@
           "assetsOutOfScope",
           "assetsSkippedCached",
           "detectorRunsSkipped",
+          "relationshipsEmitted",
+          "relationshipsFailed",
+          "relationshipsLost",
+          "relationshipsDropped",
           "totalFindings",
           "findingsCreated",
           "findingsResolved",
@@ -21759,7 +22445,11 @@
         "properties": {
           "revision": {
             "type": "number",
-            "description": "The revision to execute. Executions run a snapshot, never \"whatever is in the database now\"."
+            "description": "The revision to execute. Executions run a snapshot, never \"whatever is in the database now\". Either this or `baseRevision` is required — they mean the same thing. The alias exists because the notebook PUT next to this endpoint spells the same concept `baseRevision`, and sending that name here used to be rejected with \"Revision undefined is not the current notebook revision\": correct about the value, silent about the field name that produced it."
+          },
+          "baseRevision": {
+            "type": "number",
+            "description": "Alias of `revision`, matching the notebook PUT. Supply either one."
           },
           "mode": {
             "type": "string",
@@ -21780,7 +22470,6 @@
           }
         },
         "required": [
-          "revision",
           "mode"
         ]
       },
@@ -21879,7 +22568,8 @@
                 "CONFIG",
                 "DETECTOR_AUTHOR",
                 "ESCALATION",
-                "CHAT"
+                "CHAT",
+                "SUPERVISOR"
               ]
             }
           },
@@ -21993,7 +22683,8 @@
               "CONFIG",
               "DETECTOR_AUTHOR",
               "ESCALATION",
-              "CHAT"
+              "CHAT",
+              "SUPERVISOR"
             ]
           },
           "runs": {
@@ -22101,7 +22792,8 @@
               "CONFIG",
               "DETECTOR_AUTHOR",
               "ESCALATION",
-              "CHAT"
+              "CHAT",
+              "SUPERVISOR"
             ]
           },
           "runStatus": {
@@ -22149,6 +22841,14 @@
               "RECOMPUTE_CORRELATION",
               "TUNE_CORRELATION",
               "NOTIFY_OPERATOR",
+              "SET_GOAL",
+              "COMMAND_AGENT",
+              "CONFIGURE_AGENT",
+              "PURGE_FINDINGS",
+              "PURGE_ASSETS",
+              "SCHEDULE_WAKE",
+              "WRITE_JOURNAL",
+              "REVERT_ACTION",
               "NO_ACTION"
             ]
           },
@@ -22261,7 +22961,8 @@
               "CONFIG",
               "DETECTOR_AUTHOR",
               "ESCALATION",
-              "CHAT"
+              "CHAT",
+              "SUPERVISOR"
             ]
           },
           "goal": {
@@ -22320,7 +23021,8 @@
               "CONFIG",
               "DETECTOR_AUTHOR",
               "ESCALATION",
-              "CHAT"
+              "CHAT",
+              "SUPERVISOR"
             ]
           },
           "enabled": {
@@ -22451,7 +23153,8 @@
               "CONFIG",
               "DETECTOR_AUTHOR",
               "ESCALATION",
-              "CHAT"
+              "CHAT",
+              "SUPERVISOR"
             ],
             "nullable": true,
             "description": "The agent immediately before this one, whose output it uses"
@@ -22720,7 +23423,8 @@
               "CONFIG",
               "DETECTOR_AUTHOR",
               "ESCALATION",
-              "CHAT"
+              "CHAT",
+              "SUPERVISOR"
             ]
           },
           "status": {
@@ -22881,6 +23585,14 @@
               "RECOMPUTE_CORRELATION",
               "TUNE_CORRELATION",
               "NOTIFY_OPERATOR",
+              "SET_GOAL",
+              "COMMAND_AGENT",
+              "CONFIGURE_AGENT",
+              "PURGE_FINDINGS",
+              "PURGE_ASSETS",
+              "SCHEDULE_WAKE",
+              "WRITE_JOURNAL",
+              "REVERT_ACTION",
               "NO_ACTION"
             ]
           },
@@ -22939,7 +23651,8 @@
               "CONFIG",
               "DETECTOR_AUTHOR",
               "ESCALATION",
-              "CHAT"
+              "CHAT",
+              "SUPERVISOR"
             ]
           },
           "status": {
@@ -23384,7 +24097,8 @@
                 "CONFIG",
                 "DETECTOR_AUTHOR",
                 "ESCALATION",
-                "CHAT"
+                "CHAT",
+                "SUPERVISOR"
               ]
             }
           },
@@ -23471,7 +24185,8 @@
                 "CONFIG",
                 "DETECTOR_AUTHOR",
                 "ESCALATION",
-                "CHAT"
+                "CHAT",
+                "SUPERVISOR"
               ]
             }
           },
@@ -23482,6 +24197,548 @@
             }
           }
         }
+      },
+      "SupervisorBudgetDto": {
+        "type": "object",
+        "properties": {
+          "spentTodayUsd": {
+            "type": "number",
+            "nullable": true,
+            "description": "Spent today. Null when the provider has no pricing configured, which is not the same as free."
+          },
+          "limitUsd": {
+            "type": "number",
+            "nullable": true
+          },
+          "remainingUsd": {
+            "type": "number",
+            "nullable": true
+          },
+          "exhausted": {
+            "type": "boolean"
+          },
+          "wakesToday": {
+            "type": "number"
+          },
+          "purgesToday": {
+            "type": "number"
+          },
+          "purgeBudgetPerDay": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "exhausted",
+          "wakesToday",
+          "purgesToday",
+          "purgeBudgetPerDay"
+        ]
+      },
+      "SupervisorStateDto": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "description": "InstanceSettings.supervisorEnabled."
+          },
+          "nextWakeAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "wakeOnEvents": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "wakeReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "lastWakeAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "pausedUntil": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "consecutiveNoops": {
+            "type": "number",
+            "description": "Wakes in a row that changed nothing. A few are healthy; a run of them means the pacing or the goals are wrong."
+          },
+          "pendingEvents": {
+            "type": "number",
+            "description": "Inbox events not yet read by a wake."
+          },
+          "activeGoals": {
+            "type": "number",
+            "description": "Active goals and tasks, charter excluded."
+          },
+          "budget": {
+            "$ref": "#/components/schemas/SupervisorBudgetDto"
+          },
+          "providerConfigured": {
+            "type": "boolean",
+            "description": "False when no AI provider is assigned to the harness — nothing runs without one."
+          }
+        },
+        "required": [
+          "enabled",
+          "wakeOnEvents",
+          "consecutiveNoops",
+          "pendingEvents",
+          "activeGoals",
+          "budget",
+          "providerConfigured"
+        ]
+      },
+      "UpdateSupervisorDto": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "pausedUntil": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "Pause without switching off. Null clears the pause."
+          },
+          "dailyCostLimitUsd": {
+            "type": "number",
+            "nullable": true
+          },
+          "maxSleepHours": {
+            "type": "number"
+          },
+          "purgeBudgetPerDay": {
+            "type": "number"
+          },
+          "undoRetentionDays": {
+            "type": "number"
+          }
+        }
+      },
+      "WakeSupervisorDto": {
+        "type": "object",
+        "properties": {
+          "instruction": {
+            "type": "string",
+            "description": "Steering for this wake only. Not stored as a goal."
+          }
+        }
+      },
+      "SupervisorGoalDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "CHARTER",
+              "GOAL",
+              "TASK"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "PAUSED",
+              "DONE",
+              "ABANDONED"
+            ]
+          },
+          "origin": {
+            "type": "string",
+            "enum": [
+              "AGENT",
+              "OPERATOR"
+            ],
+            "description": "OPERATOR goals are authoritative: the agent may record progress on one but never rewrite it."
+          },
+          "title": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string",
+            "nullable": true
+          },
+          "priority": {
+            "type": "number"
+          },
+          "parentId": {
+            "type": "string",
+            "nullable": true
+          },
+          "dueAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "progress": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "status",
+          "origin",
+          "title",
+          "priority",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "SupervisorGoalListDto": {
+        "type": "object",
+        "properties": {
+          "goals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SupervisorGoalDto"
+            }
+          }
+        },
+        "required": [
+          "goals"
+        ]
+      },
+      "CreateSupervisorGoalDto": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string",
+            "nullable": true
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "CHARTER",
+              "GOAL",
+              "TASK"
+            ]
+          },
+          "priority": {
+            "type": "number"
+          },
+          "parentId": {
+            "type": "string",
+            "nullable": true
+          },
+          "dueAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "required": [
+          "title"
+        ]
+      },
+      "UpdateSupervisorGoalDto": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "PAUSED",
+              "DONE",
+              "ABANDONED"
+            ]
+          },
+          "priority": {
+            "type": "number"
+          },
+          "progress": {
+            "type": "string",
+            "nullable": true
+          },
+          "dueAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        }
+      },
+      "SupervisorJournalEntryDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "runId": {
+            "type": "string",
+            "nullable": true
+          },
+          "wakeReason": {
+            "type": "string"
+          },
+          "situation": {
+            "type": "string",
+            "description": "What it found."
+          },
+          "did": {
+            "type": "string",
+            "description": "What it changed, and why."
+          },
+          "next": {
+            "type": "string",
+            "description": "The concrete next step it left itself."
+          },
+          "goalIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "nextWakeAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "costUsd": {
+            "type": "number",
+            "nullable": true
+          },
+          "operatorNote": {
+            "type": "string",
+            "nullable": true,
+            "description": "An operator correction. Read back on the next wake and treated as authoritative over what the agent wrote."
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "wakeReason",
+          "situation",
+          "did",
+          "next",
+          "goalIds",
+          "createdAt"
+        ]
+      },
+      "SupervisorJournalListDto": {
+        "type": "object",
+        "properties": {
+          "entries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SupervisorJournalEntryDto"
+            }
+          }
+        },
+        "required": [
+          "entries"
+        ]
+      },
+      "AnnotateJournalDto": {
+        "type": "object",
+        "properties": {
+          "note": {
+            "type": "string",
+            "description": "What the agent got wrong, or should do instead."
+          }
+        },
+        "required": [
+          "note"
+        ]
+      },
+      "SupervisorCapabilityDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "labelKey": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "alwaysOn": {
+            "type": "boolean",
+            "description": "Cannot be switched off."
+          },
+          "defaultOn": {
+            "type": "boolean",
+            "description": "Ships switched on."
+          },
+          "destructive": {
+            "type": "boolean",
+            "description": "Deletes data in a way a re-scan cannot fully rebuild."
+          },
+          "toolCount": {
+            "type": "number",
+            "description": "Mutating tools this group currently grants."
+          }
+        },
+        "required": [
+          "id",
+          "labelKey",
+          "description",
+          "enabled",
+          "alwaysOn",
+          "defaultOn",
+          "destructive",
+          "toolCount"
+        ]
+      },
+      "SupervisorCapabilityListDto": {
+        "type": "object",
+        "properties": {
+          "capabilities": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SupervisorCapabilityDto"
+            }
+          }
+        },
+        "required": [
+          "capabilities"
+        ]
+      },
+      "UpdateCapabilitiesDto": {
+        "type": "object",
+        "properties": {
+          "disabled": {
+            "description": "Group ids to switch OFF. Anything not listed is on.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "disabled"
+        ]
+      },
+      "AgentUndoEntryDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "entityType": {
+            "type": "string",
+            "nullable": true
+          },
+          "entityId": {
+            "type": "string",
+            "nullable": true
+          },
+          "revertKind": {
+            "type": "string",
+            "description": "\"restore_value\" replays a snapshot; \"rescan\" re-derives from the source instead."
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "expiresAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "revertedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "revertedBy": {
+            "type": "string",
+            "nullable": true
+          },
+          "undoable": {
+            "type": "boolean",
+            "description": "Whether reverting it now would still mean what it says."
+          },
+          "blockedReason": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "action",
+          "label",
+          "revertKind",
+          "createdAt",
+          "expiresAt",
+          "undoable"
+        ]
+      },
+      "AgentUndoListDto": {
+        "type": "object",
+        "properties": {
+          "entries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AgentUndoEntryDto"
+            }
+          }
+        },
+        "required": [
+          "entries"
+        ]
+      },
+      "RevertResultDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "revertKind": {
+            "type": "string"
+          },
+          "outcome": {
+            "type": "string",
+            "description": "What the revert actually did."
+          }
+        },
+        "required": [
+          "id",
+          "revertKind",
+          "outcome"
+        ]
       },
       "AssetSimilarityDto": {
         "type": "object",
@@ -23594,6 +24851,28 @@
           "mode"
         ]
       },
+      "CorrelationRecomputeNoteDto": {
+        "type": "object",
+        "properties": {
+          "scheduled": {
+            "type": "boolean",
+            "description": "Whether this call queued a full recompute. False on a read, and false on a write whose recompute could not be queued."
+          },
+          "startsWithinSeconds": {
+            "type": "number",
+            "description": "Seconds a queued recompute may wait before it starts."
+          },
+          "note": {
+            "type": "string",
+            "description": "One sentence a client can show verbatim."
+          }
+        },
+        "required": [
+          "scheduled",
+          "startsWithinSeconds",
+          "note"
+        ]
+      },
       "CorrelationConfigResponseDto": {
         "type": "object",
         "properties": {
@@ -23620,6 +24899,14 @@
             "items": {
               "$ref": "#/components/schemas/ExclusionRuleDto"
             }
+          },
+          "recompute": {
+            "description": "When this tuning starts governing the queue. Weights and exclusions are applied while a scan indexes an asset's correlation values, so a change is not retroactive on its own — a write schedules a full recompute and this says whether that succeeded.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CorrelationRecomputeNoteDto"
+              }
+            ]
           }
         },
         "required": [
@@ -23627,7 +24914,8 @@
           "relatedMin",
           "duplicateMin",
           "labels",
-          "exclusions"
+          "exclusions",
+          "recompute"
         ]
       },
       "UpdateCorrelationConfigDto": {
@@ -24098,6 +25386,10 @@
           },
           "durationMs": {
             "type": "number"
+          },
+          "note": {
+            "type": "string",
+            "description": "What this rebuild did NOT do. It re-derives the rollups from the correlation values, edges and clusters that are already stored — it does not re-fingerprint any asset. A weight or exclusion change is applied when a scan indexes an asset, so rebuilding after one leaves the queue unchanged and looks like the change did nothing. Use PUT /correlation/config (which queues a full recompute) for that."
           }
         },
         "required": [
@@ -24105,7 +25397,8 @@
           "patterns",
           "lineageCovered",
           "hairballDemoted",
-          "durationMs"
+          "durationMs",
+          "note"
         ]
       },
       "ReviewClusterRowDto": {
@@ -25079,7 +26372,14 @@
           },
           "excludeLabel": {
             "type": "string",
-            "description": "For EXCLUSION patterns: also write a correlation exclusion rule for this label, so the boilerplate stops driving matches at all."
+            "description": "Also write a correlation exclusion rule for this label, so it stops driving matches at all. For a shared-label pattern the label must be one the pattern itself names — that is the fix the exclusion-candidates endpoint proposes when a corpus constant is the only label on a large body of assets, where no weight change can move a score that is 1.0 by construction."
+          },
+          "excludeValueHashes": {
+            "description": "Reverse-index keys of the specific values to stop matching on, from the exclusion-candidates endpoint. Hashes rather than raw values so the rule can only ever name something that is actually indexed — a pattern endpoint must not be a way to write arbitrary instance-wide config.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         },
         "required": [
@@ -25133,6 +26433,109 @@
           "workRemainingAfter"
         ]
       },
+      "PatternExclusionCandidateDto": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string"
+          },
+          "value": {
+            "type": "string",
+            "description": "The normalized value, as the engine stores it"
+          },
+          "valueHash": {
+            "type": "string"
+          },
+          "assetCount": {
+            "type": "number",
+            "description": "Assets holding this value anywhere in the corpus — how far excluding it reaches."
+          }
+        },
+        "required": [
+          "label",
+          "value",
+          "valueHash",
+          "assetCount"
+        ]
+      },
+      "PatternLabelExclusionCandidateDto": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string",
+            "description": "The label an exclusion would silence entirely"
+          },
+          "assetCount": {
+            "type": "number",
+            "description": "Assets carrying this label anywhere in the corpus"
+          },
+          "distinctValues": {
+            "type": "number",
+            "description": "Distinct values under this label. Many values each held by many assets is the multi-clique shape: no single value dominates, so a value-level exclusion cannot reach the pattern and the label itself is the handle."
+          },
+          "soleLabelAssets": {
+            "type": "number",
+            "description": "Assets whose ONLY correlation label is this one. The decisive number: the score is a weighted Jaccard over shared labels, so an asset with a single label scores 1.0 against any other asset sharing it — whatever weight that label carries. Lowering a weight cannot fix a single-label corpus; only an exclusion can."
+          }
+        },
+        "required": [
+          "label",
+          "assetCount",
+          "distinctValues",
+          "soleLabelAssets"
+        ]
+      },
+      "PatternExclusionCandidatesResponseDto": {
+        "type": "object",
+        "properties": {
+          "patternKey": {
+            "type": "string"
+          },
+          "ruleKind": {
+            "type": "string",
+            "description": "THRESHOLD | EXCLUSION | MERGE | JUDGEMENT"
+          },
+          "candidates": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PatternExclusionCandidateDto"
+            }
+          },
+          "totalCandidates": {
+            "type": "number",
+            "description": "Distinct values in the group before the list was capped"
+          },
+          "pairsDriven": {
+            "type": "number",
+            "description": "Scored pairs elsewhere in the corpus that hold one of these values on BOTH sides — the matches the template is actually driving. This is the number the exclusion removes, and it is not the same as the pairs in this pattern."
+          },
+          "truncated": {
+            "type": "boolean",
+            "description": "True when the near-duplicate group is bigger than one request should read; the candidate list is the strongest part of it rather than all of it."
+          },
+          "labelCandidates": {
+            "description": "Labels worth excluding outright. Populated for shared-label patterns, where the values are per-clique rather than one dominant template and a value-level exclusion therefore proposes nothing. Empty for boilerplate patterns, which have a template to read values out of.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PatternLabelExclusionCandidateDto"
+            }
+          },
+          "recommendation": {
+            "type": "string",
+            "description": "Plain sentence naming what would actually stop this pattern, including the case where nothing here can — so an empty candidate list is a stated answer rather than an unexplained zero."
+          }
+        },
+        "required": [
+          "patternKey",
+          "ruleKind",
+          "candidates",
+          "totalCandidates",
+          "pairsDriven",
+          "truncated",
+          "labelCandidates",
+          "recommendation"
+        ]
+      },
       "PatternApplyResponseDto": {
         "type": "object",
         "properties": {
@@ -25148,13 +26551,21 @@
           "exclusionRuleId": {
             "type": "string",
             "nullable": true,
-            "description": "Exclusion rule created, when the pattern warranted one"
+            "description": "First exclusion rule created, when the pattern warranted one. Kept for callers written before an action could create several; prefer exclusionRuleIds."
+          },
+          "exclusionRuleIds": {
+            "description": "Every exclusion rule this action created. Empty when none.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         },
         "required": [
           "batchId",
           "applied",
-          "workRemaining"
+          "workRemaining",
+          "exclusionRuleIds"
         ]
       },
       "SplitPairResponseDto": {

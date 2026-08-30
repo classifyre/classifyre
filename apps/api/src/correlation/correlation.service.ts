@@ -17,6 +17,7 @@ import {
   FANOUT_CAP,
   IDENTICAL_GROUP_CAP,
   IDENTICAL_GROUP_PAGE,
+  LABEL_WEIGHTS,
   MAX_CLUSTER_TOP_VALUES,
   PHONETIC_FANOUT_CAP,
   PHONETIC_MIN_JW,
@@ -160,6 +161,25 @@ export interface CorrelationConfigDto {
   /** Every label currently present in the index, with its effective weight. */
   labels: Array<{ label: string; weight: number; inUse: boolean }>;
   exclusions: ExclusionRule[];
+  /**
+   * When the tuning in this response actually starts governing the queue.
+   *
+   * Weights and exclusions are applied while a scan indexes an asset's
+   * correlation values, so a change is NOT retroactive on its own — the review
+   * queue keeps showing the old scores until every asset is re-fingerprinted.
+   * A write therefore queues a full recompute, and this block says whether that
+   * queueing succeeded. Without it, one re-weighting looked instant (a scan was
+   * running and did the work) and the next looked like it did nothing, with
+   * neither the config response nor `review/rebuild` explaining the difference.
+   */
+  recompute: {
+    /** True when this call queued a full recompute. False on a plain read. */
+    scheduled: boolean;
+    /** Seconds the queued recompute may wait before starting. */
+    startsWithinSeconds: number;
+    /** One sentence a client can show verbatim. */
+    note: string;
+  };
 }
 
 export interface SaveCorrelationConfigInput {
@@ -398,11 +418,21 @@ export class CorrelationService {
     const row = await this.prisma.correlationConfig.findUnique({
       where: { id: 1 },
     });
-    const weights =
+    const stored =
       (row?.labelWeights as Record<string, number> | undefined) ?? {};
     const def = row?.defaultWeight ?? DEFAULT_LABEL_WEIGHT;
+    // The shipped weights are the floor, not a code comment. `label_weights`
+    // defaults to `{}`, so reading only the stored map gave every label the
+    // same weight of 1 — a credit card counted exactly as much as a country
+    // code, and every "match weight" in the review queue was really a raw
+    // count of shared values. Stored entries still win, so an operator (or
+    // fingerprints.tune_config) can override any of them.
+    const weights = effectiveLabelWeights(stored);
     return {
       weightOf: (label: string) => weights[normalizeLabel(label)] ?? def,
+      // The scoring SQL and the review index both read this, so they have to
+      // see the same table `weightOf` does or the waterfall bars stop adding
+      // up to the score above them.
       rawWeights: weights,
       defaultWeight: def,
       relatedMin: row ? Number(row.relatedMin) : RELATED_MIN,
@@ -412,7 +442,9 @@ export class CorrelationService {
   }
 
   /** Current config plus every in-use label with its effective weight. */
-  async getConfig(): Promise<CorrelationConfigDto> {
+  async getConfig(
+    recompute?: CorrelationConfigDto['recompute'],
+  ): Promise<CorrelationConfigDto> {
     const [row, labelRows] = await Promise.all([
       this.prisma.correlationConfig.findUnique({ where: { id: 1 } }),
       // groupBy, not findMany+distinct: Prisma applies `distinct` on a
@@ -424,12 +456,16 @@ export class CorrelationService {
         orderBy: { label: 'asc' },
       }),
     ]);
-    const weights =
-      (row?.labelWeights as Record<string, number> | undefined) ?? {};
+    const weights = effectiveLabelWeights(
+      (row?.labelWeights as Record<string, number> | undefined) ?? {},
+    );
     const defaultWeight = row?.defaultWeight ?? DEFAULT_LABEL_WEIGHT;
 
     const inUse = new Set(labelRows.map((r) => r.label));
     // Union of in-use labels and any explicitly configured (possibly retired).
+    // The built-ins are folded in by effectiveLabelWeights, so the tuning
+    // screen shows the weight that is actually being applied rather than a
+    // flat default the scorer never used.
     const labels = [...new Set([...inUse, ...Object.keys(weights)])]
       .sort()
       .map((label) => ({
@@ -444,6 +480,48 @@ export class CorrelationService {
       duplicateMin: row ? Number(row.duplicateMin) : DUPLICATE_MIN,
       labels,
       exclusions: parseExclusions(row?.exclusions),
+      recompute: recompute ?? this.recomputeNote(null),
+    };
+  }
+
+  /**
+   * The "when does this take effect" note attached to every config response.
+   *
+   * `scheduled === null` means this was a read, so nothing was queued and the
+   * stored tuning is already whatever the last recompute applied.
+   */
+  private recomputeNote(
+    scheduled: boolean | null,
+  ): CorrelationConfigDto['recompute'] {
+    const startsWithinSeconds = this.jobs.coalesceSeconds;
+    if (scheduled === null) {
+      return {
+        scheduled: false,
+        startsWithinSeconds,
+        note:
+          'Read-only. Correlation tuning is applied when a scan indexes an ' +
+          "asset's correlation values, so changing it schedules a full " +
+          'recompute — the queue does not change before that recompute runs.',
+      };
+    }
+    if (scheduled) {
+      return {
+        scheduled: true,
+        startsWithinSeconds,
+        note:
+          'A full recompute was queued and starts within ' +
+          `${startsWithinSeconds}s. This change is NOT retroactive until it ` +
+          'finishes: scores and the review queue still reflect the previous ' +
+          'tuning until every asset has been re-fingerprinted.',
+      };
+    }
+    return {
+      scheduled: false,
+      startsWithinSeconds,
+      note:
+        'The change was saved but a full recompute could NOT be queued (the ' +
+        'job queue rejected it). Nothing will re-score until a scan touches ' +
+        'the affected sources or a recompute is triggered again.',
     };
   }
 
@@ -456,6 +534,57 @@ export class CorrelationService {
     });
     const rules = parseExclusions(existing?.exclusions);
     rules.push({ ...normalizeRule(rule), id: randomUUID() });
+    return this.saveConfig({ exclusions: rules });
+  }
+
+  /**
+   * Append several exclusion rules in one write, returning the ids created.
+   *
+   * Looping `addExclusion` would read-modify-write the singleton config once
+   * per rule and schedule a full recompute each time — and a caller that has
+   * to undo the batch would have no way to name what it created. Rules that
+   * normalise to something unusable, or that restate a rule already present,
+   * are dropped rather than stored twice.
+   */
+  async addExclusions(
+    rules: Array<Omit<ExclusionRule, 'id'>>,
+  ): Promise<{ config: CorrelationConfigDto; added: ExclusionRule[] }> {
+    const existing = await this.prisma.correlationConfig.findUnique({
+      where: { id: 1 },
+    });
+    const current = parseExclusions(existing?.exclusions);
+    const seen = new Set(
+      current.map((r) => `${r.mode}|${r.label ?? ''}|${r.value ?? ''}`),
+    );
+
+    const added: ExclusionRule[] = [];
+    for (const raw of rules) {
+      const normalized = { ...normalizeRule(raw), id: randomUUID() };
+      if (!isUsableRule(normalized)) continue;
+      const key = `${normalized.mode}|${normalized.label ?? ''}|${normalized.value ?? ''}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      added.push(normalized);
+    }
+    if (added.length === 0) {
+      return { config: await this.getConfig(), added: [] };
+    }
+    const config = await this.saveConfig({
+      exclusions: [...current, ...added],
+    });
+    return { config, added };
+  }
+
+  /** Remove several exclusion rules in one write. */
+  async removeExclusions(ids: string[]): Promise<CorrelationConfigDto> {
+    const drop = new Set(ids.filter(Boolean));
+    if (drop.size === 0) return this.getConfig();
+    const existing = await this.prisma.correlationConfig.findUnique({
+      where: { id: 1 },
+    });
+    const rules = parseExclusions(existing?.exclusions).filter(
+      (r) => !drop.has(r.id),
+    );
     return this.saveConfig({ exclusions: rules });
   }
 
@@ -481,16 +610,22 @@ export class CorrelationService {
       ...((existing?.labelWeights as Record<string, number> | undefined) ?? {}),
       ...(input.labelWeights ?? {}),
     };
-    // Drop weights equal to the default to keep the map lean.
     const defaultWeight = clampWeight(
       input.defaultWeight ?? existing?.defaultWeight ?? DEFAULT_LABEL_WEIGHT,
     );
+    // Drop only entries that restate the weight this label would get anyway,
+    // which for a built-in label is the built-in — NOT the flat default.
+    // Pruning against `defaultWeight` alone would silently discard someone
+    // deliberately setting `email` down to 1 and let the built-in 5 come back
+    // through the fallback.
     const labelWeights: Record<string, number> = {};
     for (const [label, w] of Object.entries(mergedWeights)) {
       const key = normalizeLabel(label);
       if (!key) continue;
       const weight = clampWeight(w);
-      if (weight !== defaultWeight) labelWeights[key] = weight;
+      if (weight !== (LABEL_WEIGHTS[key] ?? defaultWeight)) {
+        labelWeights[key] = weight;
+      }
     }
     const relatedMin = clampUnit(
       input.relatedMin ??
@@ -524,9 +659,10 @@ export class CorrelationService {
         exclusions: exclusions,
       },
     });
-    const config = await this.getConfig();
-    await this.jobs.scheduleFull('correlation config changed');
-    return config;
+    const scheduled = await this.jobs.scheduleFull(
+      'correlation config changed',
+    );
+    return this.getConfig(this.recomputeNote(scheduled));
   }
 
   /**
@@ -2552,6 +2688,27 @@ function buildExclusionPredicate(
         return true;
     return false;
   };
+}
+
+/**
+ * The stored weight map laid over the shipped defaults.
+ *
+ * `correlation_config.label_weights` starts as `{}` and only ever holds the
+ * entries an operator changed, so it is not the whole picture — reading it
+ * alone made LABEL_WEIGHTS dead code and flattened every score to a count of
+ * shared values. Stored entries win, including one that deliberately lowers a
+ * built-in.
+ */
+function effectiveLabelWeights(
+  stored: Record<string, number>,
+): Record<string, number> {
+  const out: Record<string, number> = { ...LABEL_WEIGHTS };
+  for (const [label, weight] of Object.entries(stored)) {
+    const key = normalizeLabel(label);
+    if (!key || !Number.isFinite(Number(weight))) continue;
+    out[key] = Number(weight);
+  }
+  return out;
 }
 
 /** Weights are small positive integers. */

@@ -161,7 +161,8 @@ export const AgentRunDetailDtoAgentKindEnum = {
     Config: 'CONFIG',
     DetectorAuthor: 'DETECTOR_AUTHOR',
     Escalation: 'ESCALATION',
-    Chat: 'CHAT'
+    Chat: 'CHAT',
+    Supervisor: 'SUPERVISOR'
 } as const;
 export type AgentRunDetailDtoAgentKindEnum = typeof AgentRunDetailDtoAgentKindEnum[keyof typeof AgentRunDetailDtoAgentKindEnum];
 

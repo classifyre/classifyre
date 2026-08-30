@@ -1607,7 +1607,9 @@
     "select": "Auswählen →",
     "typeGroups": {
       "general": "Allgemein",
-      "transformers": "HuggingFace Transformers"
+      "transformers": "HuggingFace Transformers",
+      "manual": "Manuell",
+      "manualNote": "Keine Engine. Ein Tag-Detektor läuft nie über Inhalte — er existiert, damit ein Custom-Connector-Notebook eine Tatsache festhalten kann, die das Quellsystem bereits kennt. Er erscheint nicht in der Detektorliste einer Quelle."
     },
     "types": {
       "gliner2": {
@@ -1645,7 +1647,36 @@
         "tagline": "Objekte in Bildern lokalisieren und labeln",
         "description": "Führe jedes HuggingFace Objekterkennungsmodell auf Bildern aus. Befunde enthalten Begrenzungsrahmen, Konfidenzwerte und label-basierte Schweregrad-Zuordnung.",
         "tags": "Begrenzungsrahmen, Objekt-Labels, Schweregrad-Zuordnung"
+      },
+      "tag": {
+        "title": "Tag",
+        "tagline": "Manuell, ohne Klassifizierung",
+        "description": "Ein Platzhalter für eine Tatsache, die Sie bereits kennen. Er führt nichts aus und liest keine Inhalte: Ein Custom-Connector-Notebook wendet ihn per Schlüssel mit Asset(tags={\"key\": \"value\"}) an, und der Wert wird zum Fund. Verwenden Sie ihn, wenn das Quellsystem die Antwort bereits hat.",
+        "tags": "Manuell, Custom-Quellen, Kein Modell"
       }
+    },
+    "tag": {
+      "stepIdentity": "Identität",
+      "stepIdentityDesc": "Name, Schlüssel und Status",
+      "identityTitle": "Detektor-Identität",
+      "name": "Name",
+      "namePlaceholder": "z. B. Karteninhaberdaten",
+      "keyLabel": "Schlüssel",
+      "keyHint": "Dies ist der Schlüssel, den Sie im Notebook schreiben. Wird aus dem Namen abgeleitet, wenn leer.",
+      "descriptionLabel": "Beschreibung",
+      "descriptionPlaceholder": "Was sagt dieses Tag aus, und wer hat das entschieden?",
+      "activeLabel": "Aktiv — aus einem Custom-Connector-Notebook nutzbar",
+      "tagTitle": "Was das Tag festhält",
+      "labelLabel": "Label",
+      "labelPlaceholder": "z. B. Karteninhaberdaten",
+      "labelHint": "Wird von jedem Fund dieses Detektors getragen. Standard ist der Name.",
+      "severityLabel": "Schweregrad",
+      "severityHint": "Jeder Fund dieses Tags erhält diesen Schweregrad. Ein Tag wird behauptet, nicht abgeleitet — es gibt keine Konfidenz, aus der sich einer ergeben könnte.",
+      "usageTitle": "Verwendung im Notebook",
+      "usageHint": "Fügen Sie diesen Schlüssel jedem Asset hinzu, das Ihr Custom-Connector liefert. Der übergebene Wert wird zum Treffer-Inhalt des Funds.",
+      "usageCopy": "Snippet kopieren",
+      "usageCopied": "Kopiert",
+      "notSelectable": "Tag-Detektoren erscheinen nicht in der Detektorliste einer Quelle. Jeder aktive steht automatisch jedem Custom-Connector zur Verfügung."
     }
   },
   "scans": {
@@ -1777,7 +1808,9 @@
       "engineUnavailable": "{{count}} Assets konnten nicht gelesen werden, weil eine Text- oder OCR-Engine nicht verfügbar war.",
       "zeroFrames": "Bei {{count}} Videos wurden null Frames dekodiert; die visuelle OCR prüfte daher keinen Inhalt.",
       "failed": "Bei {{count}} Assets trat ein anderer Fehler bei der Textextraktion auf.",
-      "outOfScope": "{{count}} Assets wurden wegen eines geänderten Scan-Umfangs beibehalten; ihr Fehlen wurde nicht als Löschung behandelt."
+      "outOfScope": "{{count}} Assets wurden wegen eines geänderten Scan-Umfangs beibehalten; ihr Fehlen wurde nicht als Löschung behandelt.",
+      "relationshipsFailed": "{{count}} Beziehungsdurchlauf/-durchläufe im Konnektor sind fehlgeschlagen; die Lineage dieses Laufs ist unvollständig.",
+      "relationshipsLost": "{{count}} Beziehungskanten wurden erstellt, konnten aber nicht gesendet werden."
     },
     "sourceContext": {
       "title": "Quellkontext",
@@ -3117,6 +3150,7 @@
     },
     "nav": {
       "activity": "Aktivität",
+      "supervisor": "Supervisor",
       "runs": "Läufe",
       "usage": "Verbrauch",
       "agents": "Agenten",
@@ -3424,7 +3458,8 @@
       "ESCALATION": "Eskalation",
       "DREAM": "Dream",
       "DUPLICATES": "Duplicates",
-      "CHAT": "Chat"
+      "CHAT": "Chat",
+      "SUPERVISOR": "Supervisor"
     },
     "outcomes": {
       "APPLIED": "Applied",
@@ -3495,6 +3530,129 @@
       "empty": "Noch keine Agentenläufe in diesem Zeitraum.",
       "noPricing": "Hinterlegen Sie Token-Preise beim KI-Anbieter unter Harness AI → Konfiguration, um Kostenschätzungen zu sehen.",
       "noCacheData": "Kein Anbieter in diesem Zeitraum hat Cache-Nutzung gemeldet."
+    },
+    "supervisor": {
+      "title": "Supervisor",
+      "desc": "Der Agent über den anderen. Er hält die Ziele, entscheidet, wann er das nächste Mal läuft, führt ein Journal über sein Tun und steuert die Worker.",
+      "enabled": "Aktiviert",
+      "off": "Aus",
+      "offDesc": "Der Supervisor bestimmt sein eigenes Tempo, steuert die anderen Agenten und löscht — sobald Sie es erlauben — Daten. Schalten Sie ihn bewusst ein.",
+      "providerMissing": "Weisen Sie unter Konfiguration einen Harness-Provider zu, bevor der Supervisor laufen kann.",
+      "wakeNow": "Jetzt wecken",
+      "wakeInstruction": "Optional: Worauf soll er sich bei diesem Aufwachen konzentrieren?",
+      "wakeQueued": "Aufwachen eingereiht.",
+      "nextWake": "Nächstes Aufwachen",
+      "nextWakeNever": "Nicht geplant",
+      "nextWakeDue": "Jetzt fällig",
+      "lastWake": "Letztes Aufwachen",
+      "lastWakeNever": "Nie gelaufen",
+      "wakeReason": "Warum",
+      "pendingEvents": "Ungelesene Ereignisse",
+      "noopStreak": "Stille Durchläufe",
+      "noopWarning": "Er ist {{count}} Mal hintereinander aufgewacht, ohne etwas zu ändern. Entweder beschreiben die Ziele keine sinnvolle Arbeit mehr, oder er wacht zu oft auf.",
+      "pausedUntil": "Pausiert bis {{when}}",
+      "resume": "Fortsetzen",
+      "pause": "Für einen Tag pausieren",
+      "spentToday": "Heute ausgegeben",
+      "costUnknown": "Ohne Preis",
+      "costUnknownHint": "Für diesen Provider sind keine Preise hinterlegt, die Kosten sind also nicht messbar. Das ist nicht dasselbe wie kostenlos.",
+      "noLimit": "kein Limit",
+      "wakesToday": "Aufwachen heute",
+      "tabs": {
+        "goals": "Ziele",
+        "journal": "Journal",
+        "capabilities": "Fähigkeiten",
+        "undo": "Rückgängig",
+        "settings": "Grenzen"
+      },
+      "goals": {
+        "desc": "Was er erreichen soll. Ein Ziel von Ihnen wiegt schwerer als alles, was er selbst ableitet: Er darf Fortschritt festhalten, aber Ihre Ziele nicht umschreiben.",
+        "charter": "Auftrag",
+        "charterHint": "Die stehende Antwort darauf, wofür dieser Workspace da ist. Alles andere sollte darauf zurückführbar sein.",
+        "add": "Ziel hinzufügen",
+        "titlePlaceholder": "Was soll er erreichen?",
+        "bodyPlaceholder": "Jedes Detail, das ändert, wie er dabei vorgehen soll.",
+        "save": "Speichern",
+        "cancel": "Abbrechen",
+        "edit": "Bearbeiten",
+        "delete": "Löschen",
+        "empty": "Keine Ziele außer dem Auftrag. Er arbeitet allein daraus, bis Sie eines hinzufügen.",
+        "priority": "Priorität",
+        "progress": "Stand der Dinge",
+        "byOperator": "Von Ihnen gesetzt",
+        "byAgent": "Von ihm vorgeschlagen",
+        "statuses": {
+          "ACTIVE": "Aktiv",
+          "PAUSED": "Pausiert",
+          "DONE": "Erledigt",
+          "ABANDONED": "Verworfen"
+        },
+        "kinds": {
+          "CHARTER": "Auftrag",
+          "GOAL": "Ziel",
+          "TASK": "Aufgabe"
+        },
+        "showFinished": "Abgeschlossene anzeigen"
+      },
+      "journal": {
+        "desc": "Ein Eintrag pro Aufwachen, vom Agenten an sich selbst geschrieben. Er beginnt jedes Aufwachen ohne Erinnerung an das letzte — außer dieser. Deshalb ist das Korrigieren eines Eintrags der direkteste Weg, ihn zu steuern.",
+        "empty": "Noch nichts. Der erste Eintrag erscheint nach dem ersten Aufwachen.",
+        "found": "Vorgefunden",
+        "did": "Getan",
+        "next": "Als Nächstes",
+        "cost": "Kosten",
+        "scheduled": "Geplant",
+        "openRun": "Lauf öffnen",
+        "correct": "Korrigieren",
+        "correctPlaceholder": "Was hat er falsch verstanden, oder was soll er stattdessen tun?",
+        "correctHint": "Wird beim nächsten Aufwachen gelesen und wiegt schwerer als das, was er selbst geschrieben hat.",
+        "correctionSaved": "Korrektur gespeichert.",
+        "operatorNote": "Ihre Korrektur",
+        "loadMore": "Mehr laden"
+      },
+      "capabilities": {
+        "desc": "Was er ändern darf. Eine abgeschaltete Gruppe verschwindet aus dem, was er aufrufen kann, und aus dem, was sein Prompt beschreibt — er erfährt nie von einer Fähigkeit, die er nicht hat.",
+        "alwaysOn": "Immer an",
+        "destructive": "Zerstörend",
+        "toolCount": "{{count}} Werkzeuge",
+        "saved": "Fähigkeiten aktualisiert.",
+        "readsNote": "Lesezugriffe werden nie entzogen. Eine Gruppe steuert, was er ändern darf, nicht was er sehen darf.",
+        "readCorpus": "Korpus lesen",
+        "controlAgents": "Die anderen Agenten steuern",
+        "investigations": "Fragen und Fälle",
+        "detectionConfig": "Erkennungs-Konfiguration",
+        "detectorAuthoring": "Detektoren erstellen",
+        "duplicateReview": "Duplikatprüfung",
+        "knowledge": "Gedächtnis und Glossar",
+        "alerts": "Benachrichtigungen",
+        "corpusHygiene": "Funde und Assets löschen",
+        "customSourceCode": "Eigener Quellcode",
+        "externalMcp": "Externe MCP-Werkzeuge"
+      },
+      "undo": {
+        "desc": "Agenten-Aktionen, die sich noch zurücknehmen lassen. Rückgängig ist keine Zeitreise: Ein erneuter Scan baut Funde und Assets wieder auf, aber nicht das Urteil, das jemand darüber gefällt hat.",
+        "empty": "Nichts rückgängig zu machen.",
+        "revert": "Zurücknehmen",
+        "reverting": "Wird zurückgenommen…",
+        "revertedAt": "Zurückgenommen {{when}}",
+        "revertedBy": "von {{who}}",
+        "expired": "Abgelaufen",
+        "rescan": "Erneut scannen",
+        "restoreValue": "Wert wiederherstellen",
+        "confirm": "Diese Aktion zurücknehmen?"
+      },
+      "settings": {
+        "desc": "Die Grenzen, in denen er arbeitet. Er sieht sein verbleibendes Budget im Prompt und richtet sein Tempo danach.",
+        "dailyCap": "Tageslimit (USD)",
+        "dailyCapHint": "0 oder leer bedeutet kein Limit. Summiert aus dem, was seine Läufe tatsächlich gekostet haben.",
+        "maxSleep": "Längster Schlaf (Stunden)",
+        "maxSleepHint": "Die Absicherung gegen einen Agenten, der sich selbst aus der Existenz plant.",
+        "purgeBudget": "Zerstörende Aufrufe pro Tag",
+        "purgeBudgetHint": "Eine Reihe für sich genommen vernünftiger Löschungen ist der Weg, auf dem eine Beweisbasis leer wird.",
+        "undoRetention": "Rückgängig-Einträge aufbewahren (Tage)",
+        "save": "Grenzen speichern",
+        "saved": "Grenzen gespeichert."
+      }
     }
   },
   "aiHealth": {
@@ -3709,7 +3867,8 @@
       "missingFunction": "Fügen Sie eine '{{name}}'-Funktion hinzu.",
       "insert": "{{name}}-Zelle einfügen",
       "ok": "Definiert test_connection() und extract()",
-      "syntaxError": "Zelle '{{cell}}' hat einen Syntaxfehler in Zeile {{line}}: {{message}}"
+      "syntaxError": "Zelle '{{cell}}' hat einen Syntaxfehler in Zeile {{line}}: {{message}}",
+      "warningsTitle": "Vor dem Ausführen prüfen"
     },
     "data": {
       "title": "Dateien & Ordner",
@@ -3895,6 +4054,19 @@
       "after": "Nachher",
       "confirmAll": "Alle im Bereich bestätigen"
     },
+    "exclude": {
+      "action": "Diese Werte nicht mehr abgleichen",
+      "title": "Verhindern, dass die Vorlage Treffer erzeugt",
+      "intro": "Diese Assets teilen denselben Textabschnitt. Die Werte darin sorgen dafür, dass sie zu Dokumenten anderswo passen — sie auszuschließen beendet das ab dem nächsten Scan, überall.",
+      "impact": "{{pairs}} Treffer­paare in anderen Mustern beruhen auf einem dieser {{values}} Werte. An den Paaren in diesem Muster ändert das nichts: die stammen aus dem wiederholten Text selbst und werden als Nicht-Duplikate erfasst.",
+      "assets": "in {{count}} Assets",
+      "none": "Nichts auszuschließen — kein Wert dieser Gruppe kommt in mehr als einem Asset vor.",
+      "capped": "Es werden die {{shown}} weitesten von {{total}} Werten gezeigt.",
+      "recomputeNote": "Schreibt instanzweite Ausschlussregeln und bewertet den Korpus neu. Über das Undo-Protokoll umkehrbar.",
+      "apply": "{{count}} Werte ausschließen",
+      "cancel": "Abbrechen",
+      "applied": "{{rules}} Ausschlussregeln geschrieben, {{pairs}} Paare entschieden. Eine Neuberechnung läuft."
+    },
     "undo": {
       "title": "Letzte Aktionen",
       "empty": "Noch nichts zum Rückgängigmachen.",
@@ -3909,7 +4081,9 @@
       "noValues": "Keine vergleichbaren Werte.",
       "notFound": "Dieses Paar ist nicht mehr in der Prüfliste.",
       "alreadyDecided": "Bereits entschieden: {{verdict}}",
-      "staleVerdict": "Dieses Paar wurde seit der Entscheidung neu bewertet."
+      "staleVerdict": "Dieses Paar wurde seit der Entscheidung neu bewertet.",
+      "remaining": "{{count}} in diesem Muster übrig",
+      "queueClear": "In diesem Muster gibt es nichts mehr zu prüfen."
     },
     "waterfall": {
       "title": "Warum {{score}}",

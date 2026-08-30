@@ -13,6 +13,13 @@
  */
 
 import { mapValues } from '../runtime';
+import type { CorrelationRecomputeNoteDto } from './CorrelationRecomputeNoteDto';
+import {
+    CorrelationRecomputeNoteDtoFromJSON,
+    CorrelationRecomputeNoteDtoFromJSONTyped,
+    CorrelationRecomputeNoteDtoToJSON,
+    CorrelationRecomputeNoteDtoToJSONTyped,
+} from './CorrelationRecomputeNoteDto';
 import type { ExclusionRuleDto } from './ExclusionRuleDto';
 import {
     ExclusionRuleDtoFromJSON,
@@ -64,6 +71,12 @@ export interface CorrelationConfigResponseDto {
      * @memberof CorrelationConfigResponseDto
      */
     exclusions: Array<ExclusionRuleDto>;
+    /**
+     * When this tuning starts governing the queue. Weights and exclusions are applied while a scan indexes an asset's correlation values, so a change is not retroactive on its own — a write schedules a full recompute and this says whether that succeeded.
+     * @type {CorrelationRecomputeNoteDto}
+     * @memberof CorrelationConfigResponseDto
+     */
+    recompute: CorrelationRecomputeNoteDto;
 }
 
 /**
@@ -75,6 +88,7 @@ export function instanceOfCorrelationConfigResponseDto(value: object): value is 
     if (!('duplicateMin' in value) || value['duplicateMin'] === undefined) return false;
     if (!('labels' in value) || value['labels'] === undefined) return false;
     if (!('exclusions' in value) || value['exclusions'] === undefined) return false;
+    if (!('recompute' in value) || value['recompute'] === undefined) return false;
     return true;
 }
 
@@ -93,6 +107,7 @@ export function CorrelationConfigResponseDtoFromJSONTyped(json: any, ignoreDiscr
         'duplicateMin': json['duplicateMin'],
         'labels': ((json['labels'] as Array<any>).map(CorrelationLabelWeightDtoFromJSON)),
         'exclusions': ((json['exclusions'] as Array<any>).map(ExclusionRuleDtoFromJSON)),
+        'recompute': CorrelationRecomputeNoteDtoFromJSON(json['recompute']),
     };
 }
 
@@ -112,6 +127,7 @@ export function CorrelationConfigResponseDtoToJSONTyped(value?: CorrelationConfi
         'duplicateMin': value['duplicateMin'],
         'labels': ((value['labels'] as Array<any>).map(CorrelationLabelWeightDtoToJSON)),
         'exclusions': ((value['exclusions'] as Array<any>).map(ExclusionRuleDtoToJSON)),
+        'recompute': CorrelationRecomputeNoteDtoToJSON(value['recompute']),
     };
 }
 

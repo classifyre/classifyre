@@ -17,6 +17,36 @@ export class CustomDetectorResponseDto {
   @ApiProperty({ type: 'object', additionalProperties: true })
   pipelineSchema: Record<string, unknown>;
 
+  @ApiProperty({
+    nullable: true,
+    description:
+      'The engine this detector runs on (TAG, REGEX, LLM, GLINER2, ' +
+      'TEXT_CLASSIFICATION, IMAGE_CLASSIFICATION, OBJECT_DETECTION). Lifted out ' +
+      'of pipelineSchema so a list response can be audited as it stands: the ' +
+      'type and severity of twenty detectors used to mean introspecting twenty ' +
+      'opaque pipeline blobs.',
+  })
+  detectorType: string | null;
+
+  @ApiProperty({
+    nullable: true,
+    description:
+      'Default severity of the findings this detector produces, where its ' +
+      'engine has one. Null for engines that derive severity per label.',
+  })
+  severity: string | null;
+
+  @ApiProperty({
+    nullable: true,
+    description:
+      "Which dimension of this detector's findings carries the answer — " +
+      '`findingType` for classifiers (the predicted label IS the answer), ' +
+      '`matchedContent` for TAG and REGEX (the type names the rule, the value ' +
+      'is the answer). The same distinction /inquiries/match-options reports, ' +
+      'repeated here so a detector audit and a question author see one story.',
+  })
+  answerDimension: 'findingType' | 'matchedContent' | null;
+
   @ApiPropertyOptional({
     description:
       'AI provider credential ID backing this detector (LLM detectors only).',

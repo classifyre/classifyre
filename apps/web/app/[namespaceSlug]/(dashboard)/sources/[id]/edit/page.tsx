@@ -129,6 +129,10 @@ export default function EditSourcePage() {
         setIsLoading(true);
         const data = await api.sources.sourcesControllerGetSource({
           id: sourceId,
+          // The editor is the one caller that genuinely needs the cells
+          // inlined. Everyone else gets `{ revision, cellCount }` — the whole
+          // connector program is many kilobytes and most reads discard it.
+          include: "notebook",
         });
         if (!data) {
           throw new Error("Source not found");

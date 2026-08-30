@@ -2,7 +2,21 @@ import { AgentTriggerMode } from '@prisma/client';
 import type { AgentPolicy } from './missions';
 
 /** What kicked this evaluation off. */
-export type CycleTrigger = 'scan' | 'express' | 'manual' | 'schedule';
+export type CycleTrigger =
+  | 'scan'
+  | 'express'
+  | 'manual'
+  | 'schedule'
+  /**
+   * The supervisor decided this agent should run now.
+   *
+   * Treated like a manual trigger by the policy and only by the policy: timing
+   * is precisely what the supervisor is for, so gates and guardrails yield to
+   * it. What does NOT yield is the operator's enable switch — that is checked
+   * separately, and a commanded run of a disabled agent still does nothing.
+   * Keeping the two apart is the whole reason this is not just `manual`.
+   */
+  | 'commanded';
 
 /**
  * The state of the instance, gathered once per cycle and shared by every agent.
@@ -87,6 +101,9 @@ export function shouldRun(input: PolicyInput): PolicyDecision {
   const { policy, signals, trigger, lastTriggeredAt, now } = input;
 
   if (trigger === 'manual') return { run: true, reason: 'triggered manually' };
+  if (trigger === 'commanded') {
+    return { run: true, reason: 'commanded by the supervisor' };
+  }
 
   const idleMinutes = minutesSince(now, lastTriggeredAt);
 

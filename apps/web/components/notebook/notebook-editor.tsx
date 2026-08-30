@@ -400,6 +400,32 @@ export function NotebookEditor({
         </Card>
       )}
 
+      {/* Shown independently of `ok`: a warning never blocks a save, and the
+          one it exists for — a later cell silently replacing an earlier cell's
+          helper, because cells share one module namespace — leaves a notebook
+          that is perfectly valid and quietly broken at runtime. */}
+      {contract &&
+        Array.isArray(contract.warnings) &&
+        (contract.warnings as Array<{ message: string }>).length > 0 && (
+          <Card className="border-amber-500/30">
+            <CardContent className="flex items-start gap-3 pt-6">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+              <div className="space-y-1">
+                <p className="text-sm font-medium">
+                  {t("notebook.contract.warningsTitle")}
+                </p>
+                <ul className="space-y-0.5 text-sm text-muted-foreground">
+                  {(contract.warnings as Array<{ message: string }>).map(
+                    (warning, index) => (
+                      <li key={index}>{warning.message}</li>
+                    ),
+                  )}
+                </ul>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
       {verdict && (
         <Card
           className={cn(

@@ -14,6 +14,7 @@ import {
   Shield,
   ShieldAlert,
   Sparkles,
+  Tag,
   type LucideIcon,
 } from "lucide-react";
 import { Badge } from "@workspace/ui/components/badge";
@@ -37,6 +38,7 @@ const ICON_MAP: Record<string, LucideIcon> = {
   Shield,
   ShieldAlert,
   Sparkles,
+  Tag,
 };
 
 export function CustomDetectorTypeBadge({

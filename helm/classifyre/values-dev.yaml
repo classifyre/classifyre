@@ -288,11 +288,18 @@ api:
     resources:
       requests:
         cpu: 100m
-        memory: 256Mi
+        # Kept small so several scans still schedule side by side on the single
+        # k3d node -- the limit below is the headroom that matters, not this.
+        memory: 512Mi
         ephemeral-storage: 1Gi
       limits:
         cpu: "2"
-        memory: 4Gi
+        # 4Gi was not enough for a real scanned PDF. A filing with no text layer
+        # falls through to docling's StandardPdfPipeline (layout transformer +
+        # TableFormer, on CPU), which OOMKilled the job (exit 137) mid-scan and
+        # lost the whole run. The node has 16Gi and limits may overcommit, so
+        # the ceiling is raised rather than the request.
+        memory: 10Gi
         ephemeral-storage: 10Gi
     uvCache:
       enabled: true

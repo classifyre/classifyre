@@ -326,12 +326,21 @@ class LLMRunner(BaseRunner):
         )
 
         results: list[DetectionResult] = []
+        # Answers the threshold threw away. Recorded because discarding them
+        # silently is indistinguishable from the model never answering: at the
+        # schema-ish default of 0.55 every call logged "clean" and produced
+        # nothing, and the model had in fact answered every time — a free
+        # router model is simply systematically under-confident. The finding
+        # already carries the model's own confidence, so a threshold applied
+        # here only hides that the model was asked at all.
+        suppressed: list[tuple[str, float]] = []
         for entry in label_entries:
             label = str(entry.get("name", "")).strip()
             if not label:
                 continue
             confidence = float(entry.get("confidence", 1.0) or 0.0)
             if confidence < threshold:
+                suppressed.append((label, confidence))
                 continue
             severity = _resolve_pipeline_severity(label, schema.severity_map, default_severity)
             matched = str(entry.get("matched_content") or "").strip() or snippet[:320]
@@ -359,6 +368,19 @@ class LLMRunner(BaseRunner):
                     extracted_data=extracted or None,
                     extraction_method="LLM",
                 )
+            )
+
+        if suppressed:
+            logger.warning(
+                "%s: confidence_threshold %.2f discarded %d model answer(s): %s%s. "
+                "The model answered — lower confidence_threshold (0 records every "
+                "answer with its confidence, to filter downstream) if this is not "
+                "what you meant.",
+                self._detector_key,
+                threshold,
+                len(suppressed),
+                ", ".join(f"{label}={score:.2f}" for label, score in suppressed[:5]),
+                " and more" if len(suppressed) > 5 else "",
             )
 
         results.sort(key=lambda r: r.confidence, reverse=True)

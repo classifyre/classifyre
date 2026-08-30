@@ -44,11 +44,17 @@ export interface PatternActionDto {
      */
     lineage?: PatternActionDtoLineageEnum;
     /**
-     * For EXCLUSION patterns: also write a correlation exclusion rule for this label, so the boilerplate stops driving matches at all.
+     * Also write a correlation exclusion rule for this label, so it stops driving matches at all. For a shared-label pattern the label must be one the pattern itself names — that is the fix the exclusion-candidates endpoint proposes when a corpus constant is the only label on a large body of assets, where no weight change can move a score that is 1.0 by construction.
      * @type {string}
      * @memberof PatternActionDto
      */
     excludeLabel?: string;
+    /**
+     * Reverse-index keys of the specific values to stop matching on, from the exclusion-candidates endpoint. Hashes rather than raw values so the rule can only ever name something that is actually indexed — a pattern endpoint must not be a way to write arbitrary instance-wide config.
+     * @type {Array<string>}
+     * @memberof PatternActionDto
+     */
+    excludeValueHashes?: Array<string>;
 }
 
 
@@ -97,6 +103,7 @@ export function PatternActionDtoFromJSONTyped(json: any, ignoreDiscriminator: bo
         'max': json['max'] == null ? undefined : json['max'],
         'lineage': json['lineage'] == null ? undefined : json['lineage'],
         'excludeLabel': json['excludeLabel'] == null ? undefined : json['excludeLabel'],
+        'excludeValueHashes': json['excludeValueHashes'] == null ? undefined : json['excludeValueHashes'],
     };
 }
 
@@ -116,6 +123,7 @@ export function PatternActionDtoToJSONTyped(value?: PatternActionDto | null, ign
         'max': value['max'],
         'lineage': value['lineage'],
         'excludeLabel': value['excludeLabel'],
+        'excludeValueHashes': value['excludeValueHashes'],
     };
 }
 

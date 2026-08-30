@@ -11,6 +11,11 @@ Name | Type
 `samplingCursor` | { [key: string]: any; }
 `assetsSkippedCached` | number
 `detectorRunsSkipped` | number
+`relationshipsEmitted` | number
+`relationshipsFailed` | number
+`relationshipsLost` | number
+`relationshipsDropped` | number
+`relationshipErrors` | Array&lt;string&gt;
 
 ## Example
 
@@ -24,6 +29,11 @@ const example = {
   "samplingCursor": null,
   "assetsSkippedCached": null,
   "detectorRunsSkipped": null,
+  "relationshipsEmitted": null,
+  "relationshipsFailed": null,
+  "relationshipsLost": null,
+  "relationshipsDropped": null,
+  "relationshipErrors": null,
 } satisfies FinalizeIngestRunDto
 
 console.log(example)

@@ -1,0 +1,198 @@
+---
+title: Tag
+description: A placeholder detector that runs no classification. It records a fact a Custom connector already knows, so that fact becomes a finding.
+---
+
+import { PipelineSchemaTable } from "@/components/pipeline-schema-table"
+import { Badge, Separator } from "@workspace/ui/components"
+import { Callout } from "nextra/components"
+
+# Tag
+
+<Badge variant="secondary" className="rounded-[4px] border-2 border-border bg-accent px-2 py-1 font-mono text-[10px] uppercase tracking-[0.16em] text-accent-foreground">
+  Manual · Custom sources · No model
+</Badge>
+
+A Tag detector runs nothing. It loads no model, reads no content, and can never
+find anything on its own. It exists to give a fact you already know a stable
+identity — a key, a label, a severity — so that a
+[Custom connector](/sources/custom-connectors/) can record it and have it behave
+like any other finding.
+
+<Callout type="info">
+  A Tag detector is only usable from a **Custom (notebook) connector**. It does
+  not appear in a source's detector list, and nothing else can trigger it.
+</Callout>
+
+<Separator className="my-6" />
+
+## When to use
+
+Use a tag when the **source system already holds the answer** and running a
+classifier over the content could only re-derive it less reliably.
+
+- **A catalog classification** — the data catalog already says this table holds
+  cardholder data. Copy the fact; do not try to re-detect it.
+- **A legal hold or retention flag** — something a person decided, recorded
+  upstream, and that appears nowhere in the content.
+- **Jurisdiction or ownership** — where a dataset came from, or which team owns
+  it, when that lives in metadata rather than text.
+- **An upstream review outcome** — a prior audit's verdict you want visible next
+  to what Classifyre finds itself.
+
+Do **not** use a tag when the answer is in the content and has to be found. That
+is what the other engines are for.
+
+| Reach for | When |
+| --- | --- |
+| **Tag** | The source system already holds the answer. |
+| **[Regex](/detectors/custom-detectors/regex/)** | The answer is a fixed, structured token in the content. |
+| **[GLiNER2](/detectors/custom-detectors/gliner2/)** | An entity or category has to be extracted, with no labelled data. |
+| **[AI Detector](/detectors/custom-detectors/llm/)** | The answer needs judgement about context or intent. |
+
+<Separator className="my-6" />
+
+## How it works
+
+Three steps, and no scan configuration in between.
+
+**1. Create the detector.** *Detectors → New → Tag*. Give it a name, a **key**, a
+**label** and a **severity**. The key is the only part your notebook has to know.
+
+**2. Apply it in a notebook.** Each key in `Asset.tags` is a Tag detector's key;
+the value is what you are asserting.
+
+```python
+from classifyre import Asset
+
+
+def extract():
+    for table in catalog.tables():
+        tags = {}
+        if table.classification:
+            tags["cardholder_data"] = table.classification
+
+        yield Asset(
+            id=table.id,
+            name=table.name,
+            content=table.sample,
+            kind="table",
+            tags=tags,
+        )
+```
+
+**3. Scan.** Every tag becomes a finding on that asset:
+
+| Finding field | Comes from |
+| --- | --- |
+| Detector | The Tag detector the key names. |
+| Type | `tag:<label>` |
+| Severity | The detector's severity. |
+| Matched content | The value your notebook passed. |
+| Confidence | Always `1.0` — a tag is asserted, not inferred. |
+
+There is no step where you add the detector to a source. Every **active** Tag
+detector is available to every Custom connector automatically, so a new tag needs
+no source change.
+
+<Callout type="warning">
+  A tag whose key matches no Tag detector is reported as a **scan warning** and
+  skipped — the warning names the key and lists the keys that do exist. If a tag
+  does not appear on an asset, look there first.
+</Callout>
+
+<Separator className="my-6" />
+
+## Configuration
+
+<PipelineSchemaTable definition="TagPipelineSchema" />
+
+The detector's **key**, **name** and **description** are set alongside the schema,
+as they are for every custom detector. The key is what a notebook writes; the
+label is what every finding is called.
+
+<Separator className="my-6" />
+
+## Examples
+
+### Cardholder data, from a catalog classification
+
+```json
+{
+  "type": "TAG",
+  "label": "Cardholder data",
+  "severity": "high"
+}
+```
+
+```python
+yield Asset(
+    id="prod.payments.transactions",
+    name="transactions",
+    kind="table",
+    tags={"cardholder_data": "primary-account-numbers"},
+)
+```
+
+### Legal hold, where severity is informational
+
+```json
+{
+  "type": "TAG",
+  "label": "Legal hold",
+  "severity": "info"
+}
+```
+
+```python
+yield Asset(
+    id="matter-4471/exports",
+    name="Matter 4471 exports",
+    kind="file",
+    tags={"legal_hold": "retained-pending-litigation"},
+)
+```
+
+### Several tags on one asset
+
+```python
+yield Asset(
+    id="prod.hr.employees",
+    name="employees",
+    kind="table",
+    tags={
+        "cardholder_data": "none",
+        "jurisdiction": "EU",
+        "legal_hold": "retained-pending-litigation",
+    },
+)
+```
+
+<Separator className="my-6" />
+
+## Lifecycle
+
+A tag finding lives the same life as any other finding, with one difference worth
+knowing.
+
+- **Changing a tag's value** resolves the old finding and opens a new one. The
+  value is part of the finding's identity, so `"EU"` becoming `"UK"` is a
+  different assertion, not an edited one.
+- **Changing only a tag** re-scans the asset. Tags are part of the asset's
+  checksum, so a value that changes while content does not still takes effect.
+- **Deactivating a Tag detector** stops it being applied. A notebook still
+  writing its key gets the unknown-key scan warning.
+- **Deleting a Tag detector** resolves its findings, like deleting any other
+  detector.
+
+<Separator className="my-6" />
+
+## Not trainable
+
+There is nothing to train. A Tag detector has no model, no examples and no
+inference step, so the detector page shows no training history and no **Train
+now** button. Its accuracy is exactly the accuracy of the system you copied the
+fact from.
+
+Full notebook syntax is in the
+**[Notebook Reference](/sources/custom-connectors/reference/#tagging-what-you-already-know)**.

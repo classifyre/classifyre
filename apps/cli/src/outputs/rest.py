@@ -12,7 +12,7 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry  # type: ignore[import-untyped]
 
 from ..pipeline.text_artifact import TextArtifact
-from .base import OutputRuntimeContext, OutputType
+from .base import OutputRuntimeContext, OutputType, RelationshipReport
 
 logger = logging.getLogger(__name__)
 
@@ -189,6 +189,14 @@ class FinalizeIngestRunRequest(BaseModel):
     # What the scan cache saved, so the run can report it.
     assets_skipped_cached: int | None = Field(None, serialization_alias="assetsSkippedCached")
     detector_runs_skipped: int | None = Field(None, serialization_alias="detectorRunsSkipped")
+    # What happened to this run's lineage. See outputs.base.RelationshipReport:
+    # a failed or lost relationship pass must downgrade the run, because a green
+    # run with no edges is indistinguishable from a green run with edges.
+    relationships_emitted: int | None = Field(None, serialization_alias="relationshipsEmitted")
+    relationships_failed: int | None = Field(None, serialization_alias="relationshipsFailed")
+    relationships_lost: int | None = Field(None, serialization_alias="relationshipsLost")
+    relationships_dropped: int | None = Field(None, serialization_alias="relationshipsDropped")
+    relationship_errors: list[str] | None = Field(None, serialization_alias="relationshipErrors")
 
 
 class UpdateRunnerStatusRequest(BaseModel):
@@ -236,6 +244,7 @@ class RestOutputSink:
         self._seen_hashes: set[str] = set()
         self._sampling_cursor: dict[str, Any] | None = None
         self._scan_cache_savings: tuple[int, int] | None = None
+        self.relationship_report = RelationshipReport()
 
     def set_sampling_cursor(self, cursor: dict[str, Any] | None) -> None:
         """Record the AUTOMATIC sampling cursor to persist on finalize."""
@@ -332,12 +341,21 @@ class RestOutputSink:
         runner_id = self._require_runner_id()
 
         savings = self._scan_cache_savings
+        lineage = self.relationship_report
         payload = FinalizeIngestRunRequest(
             runner_id=runner_id,
             seen_hashes=sorted(self._seen_hashes),
             sampling_cursor=self._sampling_cursor,
             assets_skipped_cached=savings[0] if savings else None,
             detector_runs_skipped=savings[1] if savings else None,
+            # Sent even when zero: "this run emitted edges and lost none" is a
+            # different claim from "this run never reported on its lineage",
+            # and only the first should let a run finish as COMPLETED.
+            relationships_emitted=lineage.emitted,
+            relationships_failed=lineage.failed,
+            relationships_lost=lineage.lost,
+            relationships_dropped=lineage.dropped,
+            relationship_errors=lineage.errors or None,
         )
         self._request_json(
             "POST",
