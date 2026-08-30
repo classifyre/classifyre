@@ -4,6 +4,7 @@ import { DetectorType, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
 import { PgBossService } from '../scheduler/pg-boss.service';
 import {
+  candidateWhere,
   CompiledMatcher,
   FindingCandidate,
   InquiryMatchers,
@@ -11,6 +12,7 @@ import {
 import { INQUIRY_MATCH_QUEUE } from './matching.constants';
 import { OPERATOR_CREATED } from '../autopilot/autopilot.constants';
 import {
+  PreviewDiagnosticDto,
   PreviewResponseDto,
   InquiryMatchDto,
   InquiryMatchListResponseDto,
@@ -68,6 +70,15 @@ const PREVIEW_CAP = 50;
  * enough that no single batch is a heap risk.
  */
 const PREVIEW_SCAN_BATCH = 5000;
+
+/**
+ * Rows a leave-one-out diagnostic will scan before answering.
+ *
+ * The claim a diagnostic makes is "findings survive without this dimension",
+ * not "exactly N do", so a full scan past this point would cost a lot to say
+ * something the caller cannot act on differently.
+ */
+const DIAGNOSTIC_SCAN_CAP = 5000;
 
 /**
  * Candidate rows a bounded probe will pull before giving up. Sized so the
@@ -672,7 +683,198 @@ export class InquiryMatchingService {
       matchedAt: new Date(),
       isNew: false,
     }));
-    return { total: rows.total, sample };
+    return {
+      total: rows.total,
+      sample,
+      diagnostics:
+        rows.total === 0 ? await this.diagnoseEmptyPreview(matchers) : [],
+    };
+  }
+
+  /**
+   * Why a preview returned nothing.
+   *
+   * A total of zero is ambiguous in the worst possible way: an inquiry with a
+   * wrong matcher and an inquiry with nothing to match are indistinguishable,
+   * and both look like a finished, working question. Two real inquiries sat at
+   * zero for hours while their detector produced findings the entire time.
+   *
+   * The method is leave-one-out: for each configured dimension, count what
+   * would match if that one dimension were dropped. A dimension whose removal
+   * unlocks findings is the one doing the eliminating, and it is named. Only
+   * runs when the answer is already zero, so the cost is paid exactly when it
+   * buys something.
+   */
+  private async diagnoseEmptyPreview(
+    m: InquiryMatchers,
+  ): Promise<PreviewDiagnosticDto[]> {
+    const diagnostics: PreviewDiagnosticDto[] = [];
+
+    const countWith = async (override: Partial<InquiryMatchers>) => {
+      const relaxed: InquiryMatchers = { ...m, ...override };
+      const where = candidateWhere(relaxed);
+      if (
+        relaxed.findingTypeRegex.length === 0 &&
+        relaxed.findingValueRegex.length === 0
+      ) {
+        return this.prisma.finding.count({ where });
+      }
+      const matcher = new CompiledMatcher(relaxed);
+      // Bounded: this is a diagnostic, and "some findings survive without this
+      // dimension" is the whole claim — an exact number past the cap would cost
+      // a full scan to say something the caller cannot act on differently.
+      const rows = await this.prisma.finding.findMany({
+        where,
+        select: {
+          id: true,
+          sourceId: true,
+          detectorType: true,
+          customDetectorKey: true,
+          findingType: true,
+          matchedContent: true,
+        },
+        take: DIAGNOSTIC_SCAN_CAP,
+      });
+      return rows.filter((r) => matcher.matches(r as FindingCandidate)).length;
+    };
+
+    const corpus = await this.prisma.finding.count({
+      where: { status: 'OPEN' },
+    });
+    if (corpus === 0) {
+      return [
+        {
+          dimension: 'corpus',
+          survivingWithout: 0,
+          message:
+            'There are no open findings at all, so no matcher could match ' +
+            'anything. Run a scan first.',
+        },
+      ];
+    }
+
+    if (!m.matchAllSources && m.sourceIds.length > 0) {
+      const without = await countWith({ matchAllSources: true, sourceIds: [] });
+      if (without > 0) {
+        diagnostics.push({
+          dimension: 'sources',
+          survivingWithout: without,
+          message:
+            `${without} finding(s) match everything else but come from other ` +
+            'sources. Widen sourceIds, or set matchAllSources.',
+        });
+      }
+    }
+
+    if (m.detectorTypes.length > 0 || m.customDetectorKeys.length > 0) {
+      const without = await countWith({
+        detectorTypes: [],
+        customDetectorKeys: [],
+      });
+      if (without > 0) {
+        diagnostics.push({
+          dimension: 'detectors',
+          survivingWithout: without,
+          message:
+            `${without} finding(s) match everything else but come from other ` +
+            'detectors. Check the detector keys against ' +
+            'GET /inquiries/match-options.',
+        });
+      }
+    }
+
+    if (m.findingTypes.length > 0) {
+      const without = await countWith({ findingTypes: [] });
+      if (without > 0) {
+        diagnostics.push({
+          dimension: 'findingTypes',
+          survivingWithout: without,
+          message:
+            `${without} finding(s) match everything else but have a different ` +
+            'finding type. match-options lists the types each detector ' +
+            'actually emits.',
+        });
+      }
+    }
+
+    if (m.findingTypeRegex.length > 0) {
+      const without = await countWith({ findingTypeRegex: [] });
+      if (without > 0) {
+        diagnostics.push({
+          dimension: 'findingTypeRegex',
+          survivingWithout: without,
+          message:
+            `${without} finding(s) match everything else but no ` +
+            'findingTypeRegex pattern matches their finding type.',
+        });
+      }
+    }
+
+    if (m.findingValueRegex.length > 0) {
+      const without = await countWith({ findingValueRegex: [] });
+      if (without > 0) {
+        // The §5.10 trap, called by name: an AI detector's answer is the
+        // finding TYPE and its matchedContent is prose reasoning, so a value
+        // regex written for a TAG detector matches nothing at all.
+        const answersInType = await this.findingsAnsweringInType(m);
+        diagnostics.push({
+          dimension: 'findingValueRegex',
+          survivingWithout: without,
+          message:
+            `${without} finding(s) match everything else but no ` +
+            'findingValueRegex pattern matches their content.' +
+            (answersInType.length > 0
+              ? ` Note: ${answersInType.join(', ')} put the answer in the ` +
+                'finding TYPE, not the value — for those, use findingTypes ' +
+                'instead of findingValueRegex.'
+              : ''),
+        });
+      }
+    }
+
+    if (diagnostics.length === 0) {
+      diagnostics.push({
+        dimension: 'corpus',
+        survivingWithout: 0,
+        message:
+          'Every dimension is satisfiable on its own; no finding satisfies all ' +
+          'of them together. The question is wired consistently and simply has ' +
+          'no matches yet.',
+      });
+    }
+    return diagnostics;
+  }
+
+  /**
+   * Named custom detectors whose findings answer in `findingType`.
+   *
+   * Detected from the data rather than from the pipeline schema, which this
+   * service does not read: a detector emitting many distinct finding types is
+   * classifying (the label IS the answer), while one emitting a single
+   * `tag:<label>` type is asserting (the value is the answer).
+   */
+  private async findingsAnsweringInType(m: InquiryMatchers): Promise<string[]> {
+    if (m.customDetectorKeys.length === 0) return [];
+    const rows = await this.prisma.finding.groupBy({
+      by: ['customDetectorKey', 'findingType'],
+      where: {
+        status: 'OPEN',
+        detectorType: 'CUSTOM',
+        customDetectorKey: { in: m.customDetectorKeys },
+      },
+    });
+    const typesByKey = new Map<string, Set<string>>();
+    for (const row of rows) {
+      if (!row.customDetectorKey) continue;
+      const set = typesByKey.get(row.customDetectorKey) ?? new Set<string>();
+      set.add(row.findingType);
+      typesByKey.set(row.customDetectorKey, set);
+    }
+    return [...typesByKey.entries()]
+      .filter(
+        ([, types]) => types.size > 1 || ![...types][0]?.startsWith('tag:'),
+      )
+      .map(([key]) => `'${key}'`);
   }
 
   /**
@@ -701,7 +903,7 @@ export class InquiryMatchingService {
   private async previewRows(
     m: InquiryMatchers,
   ): Promise<{ total: number; sample: FindingRow[] }> {
-    const where = this.candidateWhere(m);
+    const where = candidateWhere(m);
     const previewSelect = {
       ...FINDING_SELECT,
       asset: { select: { name: true, sourceType: true } },
@@ -789,55 +991,6 @@ export class InquiryMatchingService {
   } satisfies Prisma.InquirySelect;
 
   /**
-   * The SQL half of a matcher: source, detector and (when safe) exact type.
-   *
-   * Shared by the scanning paths and by `previewRows`, so the fast count path
-   * can never drift from the predicate the scanning path applies.
-   */
-  private candidateWhere(m: InquiryMatchers): Prisma.FindingWhereInput {
-    const hasDetectorFilter =
-      m.detectorTypes.length > 0 || m.customDetectorKeys.length > 0;
-    const where: Prisma.FindingWhereInput = { status: 'OPEN' };
-    if (!m.matchAllSources) where.sourceId = { in: m.sourceIds };
-    if (hasDetectorFilter) {
-      // Must stay an exact mirror of `CompiledMatcher.matches`, because when no
-      // regex dimension is configured this `where` IS the answer -- `previewRows`
-      // returns a COUNT(*) over it and never consults the matcher at all. So a
-      // divergence here does not merely widen a prefilter, it returns a wrong
-      // number to the caller.
-      //
-      // Naming custom keys RESTRICTS custom findings rather than widening them:
-      // CUSTOM is the supertype of every custom key, so the plain OR below let
-      // `detectorTypes: ['CUSTOM']` swallow the key list and match every custom
-      // finding in the namespace.
-      const nonCustomTypes = m.detectorTypes.filter(
-        (t) => t !== DetectorType.CUSTOM,
-      );
-      const custom: Prisma.FindingWhereInput[] =
-        m.customDetectorKeys.length > 0
-          ? [{ customDetectorKey: { in: m.customDetectorKeys } }]
-          : m.detectorTypes.includes(DetectorType.CUSTOM)
-            ? [{ detectorType: DetectorType.CUSTOM }]
-            : [];
-      where.OR = [
-        ...(nonCustomTypes.length > 0
-          ? [{ detectorType: { in: nonCustomTypes } }]
-          : []),
-        ...custom,
-      ];
-    }
-    // Exact-type SQL prefilter: only safe when there are no type-regexes AND no value-regexes.
-    if (
-      m.findingTypeRegex.length === 0 &&
-      m.findingValueRegex.length === 0 &&
-      m.findingTypes.length > 0
-    ) {
-      where.findingType = { in: m.findingTypes };
-    }
-    return where;
-  }
-
-  /**
    * SQL-prefilter by source/detector/exact-type, then app-filter (regex) via
    * the matcher — a page at a time, retaining nothing between pages.
    *
@@ -867,7 +1020,7 @@ export class InquiryMatchingService {
     withAsset: boolean,
     scanLimit?: number,
   ): AsyncGenerator<{ rows: FindingRow[]; scanned: number }> {
-    const where = this.candidateWhere(m);
+    const where = candidateWhere(m);
     const matcher = new CompiledMatcher(m);
     const select = withAsset
       ? {

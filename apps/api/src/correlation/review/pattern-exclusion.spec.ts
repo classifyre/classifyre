@@ -123,17 +123,56 @@ describe('pattern exclusion', () => {
       expect(res.totalCandidates).toBe(1);
     });
 
-    it('returns nothing for a pattern with no template to read', async () => {
+    // A shared-label pattern has no template to read values out of, so the
+    // value list is correctly empty — but it is not the answer "nothing can be
+    // done". The largest pattern in a real corpus was exactly this shape:
+    // `tag_trade_category`, ten cliques, 917 assets, 144,242 pairs, every one
+    // scored 1.0, and this endpoint replied `totalCandidates: 0`. The label is
+    // the handle there, and the reason is arithmetic: a weighted Jaccard over a
+    // single shared label is 1.0 for any weight.
+    it('proposes the LABEL for a shared-label pattern with no template', async () => {
       prisma.correlationPattern.findUnique.mockResolvedValue({
-        patternKey: 'email+person',
+        patternKey: 'tag_trade_category',
         ruleKind: 'JUDGEMENT',
-        labels: ['email', 'person'],
+        labels: ['tag_trade_category'],
       });
+      prisma.$queryRaw
+        .mockResolvedValueOnce([
+          { label: 'tag_trade_category', assets: 917, values: 10 },
+        ])
+        .mockResolvedValueOnce([{ label: 'tag_trade_category', sole: 903 }]);
 
-      const res = await service.exclusionCandidates('email+person');
+      const res = await service.exclusionCandidates('tag_trade_category');
 
       expect(res.candidates).toEqual([]);
-      // No query is worth running: only EXCLUSION patterns have a group.
+      expect(res.labelCandidates).toEqual([
+        {
+          label: 'tag_trade_category',
+          assetCount: 917,
+          distinctValues: 10,
+          soleLabelAssets: 903,
+        },
+      ]);
+      // The sentence has to carry the arithmetic, or the reviewer reaches for
+      // the weight slider — which cannot move a score that is 1.0 by
+      // construction.
+      expect(res.recommendation).toContain('903 asset(s) carry no other label');
+      expect(res.recommendation).toContain('whatever weight');
+    });
+
+    it('says so plainly when a pattern names no labels at all', async () => {
+      prisma.correlationPattern.findUnique.mockResolvedValue({
+        patternKey: 'identical:abc',
+        ruleKind: 'MERGE',
+        labels: [],
+      });
+
+      const res = await service.exclusionCandidates('identical:abc');
+
+      expect(res.candidates).toEqual([]);
+      expect(res.labelCandidates).toEqual([]);
+      expect(res.recommendation).toContain('nothing to exclude');
+      // No query is worth running when there is no label to ask about.
       expect(prisma.$queryRaw).not.toHaveBeenCalled();
     });
   });

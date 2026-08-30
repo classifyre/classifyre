@@ -761,6 +761,22 @@ model Runner {
   // skips on assets where only some detectors had to re-run. This is the number
   // that shows what the cache is actually worth.
   detectorRunsSkipped  Int                  @default(0) @map("detector_runs_skipped")
+  // Lineage outcome for this run, reported by the CLI at finalize.
+  //
+  // A connector's relationships() can raise, or its edges can fail to send,
+  // while every asset lands perfectly — so asset errors and detector outcomes
+  // cannot see it. Without these a run that shipped ZERO lineage reported an
+  // unqualified COMPLETED, with the cause visible only in a job log.
+  relationshipsEmitted Int                  @default(0) @map("relationships_emitted")
+  // Relationship *passes* that raised, not edges: a pass that failed never got
+  // to say how many edges it would have produced.
+  relationshipsFailed  Int                  @default(0) @map("relationships_failed")
+  // Edges assembled and then not sent (transport failure). A real edge count.
+  relationshipsLost    Int                  @default(0) @map("relationships_lost")
+  // Edges the API accepted but could not resolve to an endpoint. Expected in
+  // small numbers — the other half may be ingested later — so this alone never
+  // downgrades a run.
+  relationshipsDropped Int                  @default(0) @map("relationships_dropped")
   // Fingerprint of the scope-determining config this run covered.
   scopeFingerprint     String?              @map("scope_fingerprint") @db.VarChar(64)
   // Fingerprint of the DETECTION-determining config (detectors, custom

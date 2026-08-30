@@ -20,11 +20,17 @@ import { mapValues } from '../runtime';
  */
 export interface CreateNotebookExecutionDto {
     /**
-     * The revision to execute. Executions run a snapshot, never "whatever is in the database now".
+     * The revision to execute. Executions run a snapshot, never "whatever is in the database now". Either this or `baseRevision` is required — they mean the same thing. The alias exists because the notebook PUT next to this endpoint spells the same concept `baseRevision`, and sending that name here used to be rejected with "Revision undefined is not the current notebook revision": correct about the value, silent about the field name that produced it.
      * @type {number}
      * @memberof CreateNotebookExecutionDto
      */
-    revision: number;
+    revision?: number;
+    /**
+     * Alias of `revision`, matching the notebook PUT. Supply either one.
+     * @type {number}
+     * @memberof CreateNotebookExecutionDto
+     */
+    baseRevision?: number;
     /**
      * 
      * @type {string}
@@ -62,7 +68,6 @@ export type CreateNotebookExecutionDtoModeEnum = typeof CreateNotebookExecutionD
  * Check if a given object implements the CreateNotebookExecutionDto interface.
  */
 export function instanceOfCreateNotebookExecutionDto(value: object): value is CreateNotebookExecutionDto {
-    if (!('revision' in value) || value['revision'] === undefined) return false;
     if (!('mode' in value) || value['mode'] === undefined) return false;
     return true;
 }
@@ -77,7 +82,8 @@ export function CreateNotebookExecutionDtoFromJSONTyped(json: any, ignoreDiscrim
     }
     return {
         
-        'revision': json['revision'],
+        'revision': json['revision'] == null ? undefined : json['revision'],
+        'baseRevision': json['baseRevision'] == null ? undefined : json['baseRevision'],
         'mode': json['mode'],
         'targetCellId': json['targetCellId'] == null ? undefined : json['targetCellId'],
         'maxAssets': json['maxAssets'] == null ? undefined : json['maxAssets'],
@@ -96,6 +102,7 @@ export function CreateNotebookExecutionDtoToJSONTyped(value?: CreateNotebookExec
     return {
         
         'revision': value['revision'],
+        'baseRevision': value['baseRevision'],
         'mode': value['mode'],
         'targetCellId': value['targetCellId'],
         'maxAssets': value['maxAssets'],

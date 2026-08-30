@@ -16,6 +16,10 @@ import {
 import { normalizeSourceConfig } from './utils/source-config-normalizer';
 import { RunnerLogStorageService } from './cli-runner/runner-log-storage.service';
 import { CorrelationJobScheduler } from './correlation/correlation-job-scheduler.service';
+import type {
+  PurgeSourceAssetsQueryDto,
+  PurgeSourceAssetsResponseDto,
+} from './dto/purge-source-assets.dto';
 import {
   SearchSourcesRequestDto,
   SearchSourcesSortBy,
@@ -322,7 +326,30 @@ export class SourceService {
    * are derived from findings, so a full background recompute is scheduled
    * afterwards.
    */
-  async purgeAssets(sourceId: string): Promise<{ purgedAssets: number }> {
+  /**
+   * Retire a source's assets — all of them, or the subset a predicate names.
+   *
+   * The predicate exists because "the connector no longer produces this" has no
+   * other expression. Assets are retired when a scan sees the source's *whole*
+   * scope and finds them gone, so a connector whose scope is a rotating sample
+   * (a different window every run) can never trigger deletion on its own: the
+   * platform cannot tell "no longer produced" from "not in this run's cohort",
+   * and guessing wrong in the deleting direction is far worse than leaving
+   * strays. When a connector genuinely narrows — one source split into two —
+   * the assets it used to make stay behind forever, get re-paired by the
+   * correlation engine (correctly: they really are duplicates now), and the
+   * only remedy used to be all-or-nothing. Retiring 372 stale financial-year
+   * records meant also destroying 1,352 good document assets and waiting out a
+   * full re-ingest.
+   *
+   * `dryRun` answers "what would this take with it" before anything is
+   * destroyed, which is the difference between a usable predicate and a loaded
+   * gun. With no predicate the behaviour is the original: everything.
+   */
+  async purgeAssets(
+    sourceId: string,
+    predicate?: PurgeSourceAssetsQueryDto,
+  ): Promise<PurgeSourceAssetsResponseDto> {
     const source = await this.prisma.source.findUnique({
       where: { id: sourceId },
       select: { id: true },
@@ -331,17 +358,106 @@ export class SourceService {
       throw new NotFoundException(`Source with ID ${sourceId} not found`);
     }
 
-    const result = await this.prisma.asset.deleteMany({
-      where: { sourceId },
-    });
+    const { where, applied } = this.buildPurgeWhere(sourceId, predicate);
+    const dryRun = predicate?.dryRun === true;
+
+    if (dryRun) {
+      const matched = await this.prisma.asset.count({ where });
+      return {
+        purgedAssets: 0,
+        matchedAssets: matched,
+        dryRun: true,
+        predicate: applied,
+      };
+    }
+
+    const result = await this.prisma.asset.deleteMany({ where });
 
     this.logger.warn(
-      `Purged ${result.count} asset(s) (with findings) from source ${sourceId}; scheduling correlation recompute.`,
+      `Purged ${result.count} asset(s) (with findings) from source ${sourceId}` +
+        (Object.keys(applied).length > 0
+          ? ` matching ${JSON.stringify(applied)}`
+          : ' (entire source)') +
+        '; scheduling correlation recompute.',
     );
 
     await this.correlationJobs.scheduleFull('source assets purged');
 
-    return { purgedAssets: result.count };
+    return {
+      purgedAssets: result.count,
+      matchedAssets: result.count,
+      dryRun: false,
+      predicate: applied,
+    };
+  }
+
+  /**
+   * Translate a purge predicate into a `where`, echoing back what it understood.
+   *
+   * The echo is not decoration. Query strings arrive untyped and there is no
+   * global ValidationPipe, so a misspelled parameter would otherwise be
+   * silently ignored — and an ignored predicate on a delete means deleting the
+   * whole source. Anything unrecognised is rejected rather than dropped.
+   */
+  private buildPurgeWhere(
+    sourceId: string,
+    predicate?: PurgeSourceAssetsQueryDto,
+  ): { where: Prisma.AssetWhereInput; applied: Record<string, unknown> } {
+    const where: Prisma.AssetWhereInput = { sourceId };
+    const applied: Record<string, unknown> = {};
+    if (!predicate) return { where, applied };
+
+    const text = (value: unknown): string | undefined => {
+      if (typeof value !== 'string') return undefined;
+      const trimmed = value.trim();
+      return trimmed.length > 0 ? trimmed : undefined;
+    };
+
+    const externalIdPrefix = text(predicate.externalIdPrefix);
+    if (externalIdPrefix) {
+      // `metadata.external_id` is the id the connector itself used —
+      // a notebook's `Asset(id="fin-<fn>-<year>")` — which is the only handle
+      // an author can reason about. `hash` is derived from it and unreadable.
+      where.metadata = {
+        path: ['external_id'],
+        string_starts_with: externalIdPrefix,
+      };
+      applied.externalIdPrefix = externalIdPrefix;
+    }
+
+    const assetKind = text(predicate.assetKind);
+    if (assetKind) {
+      where.assetType = assetKind;
+      applied.assetKind = assetKind;
+    }
+
+    const namePrefix = text(predicate.namePrefix);
+    if (namePrefix) {
+      where.name = { startsWith: namePrefix };
+      applied.namePrefix = namePrefix;
+    }
+
+    const urnPrefix = text(predicate.urnPrefix);
+    if (urnPrefix) {
+      where.urn = { startsWith: urnPrefix };
+      applied.urnPrefix = urnPrefix;
+    }
+
+    const notScannedSinceRaw = text(predicate.notScannedSince);
+    if (notScannedSinceRaw) {
+      const cutoff = new Date(notScannedSinceRaw);
+      if (Number.isNaN(cutoff.getTime())) {
+        throw new BadRequestException(
+          `notScannedSince must be an ISO-8601 timestamp, got '${notScannedSinceRaw}'.`,
+        );
+      }
+      // Never scanned counts as stale: an asset ingested before scan tracking
+      // existed is exactly the kind of leftover this predicate is for.
+      where.OR = [{ lastScannedAt: { lt: cutoff } }, { lastScannedAt: null }];
+      applied.notScannedSince = cutoff.toISOString();
+    }
+
+    return { where, applied };
   }
 
   async searchSources(

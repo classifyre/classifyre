@@ -312,7 +312,7 @@ All URIs are relative to *http://localhost*
 *SourcesApi* | [**sourcesControllerGetSchedule**](docs/SourcesApi.md#sourcescontrollergetschedule) | **GET** /sources/{id}/schedule | Get source schedule
 *SourcesApi* | [**sourcesControllerGetSource**](docs/SourcesApi.md#sourcescontrollergetsource) | **GET** /sources/{id} | Get source by ID
 *SourcesApi* | [**sourcesControllerListSources**](docs/SourcesApi.md#sourcescontrollerlistsources) | **GET** /sources | List all data sources
-*SourcesApi* | [**sourcesControllerPurgeAssets**](docs/SourcesApi.md#sourcescontrollerpurgeassets) | **DELETE** /sources/{id}/assets | Purge all assets of a data source
+*SourcesApi* | [**sourcesControllerPurgeAssets**](docs/SourcesApi.md#sourcescontrollerpurgeassets) | **DELETE** /sources/{id}/assets | Retire a source\&#39;s assets — all of them, or a named subset
 *SourcesApi* | [**sourcesControllerPurgeFindings**](docs/SourcesApi.md#sourcescontrollerpurgefindings) | **DELETE** /sources/{id}/findings | Purge all findings of a data source
 *SourcesApi* | [**sourcesControllerResumeSchedule**](docs/SourcesApi.md#sourcescontrollerresumeschedule) | **POST** /sources/{id}/schedule/resume | Resume automatic scanning
 *SourcesApi* | [**sourcesControllerStartRun**](docs/SourcesApi.md#sourcescontrollerstartrun) | **POST** /sources/{id}/runs | Start a new ingestion run
@@ -428,6 +428,7 @@ All URIs are relative to *http://localhost*
 - [CorrelationConfigResponseDto](docs/CorrelationConfigResponseDto.md)
 - [CorrelationGraphResponseDto](docs/CorrelationGraphResponseDto.md)
 - [CorrelationLabelWeightDto](docs/CorrelationLabelWeightDto.md)
+- [CorrelationRecomputeNoteDto](docs/CorrelationRecomputeNoteDto.md)
 - [CreateAgentMemoryDto](docs/CreateAgentMemoryDto.md)
 - [CreateAiProviderConfigDto](docs/CreateAiProviderConfigDto.md)
 - [CreateCaseDto](docs/CreateCaseDto.md)
@@ -549,14 +550,17 @@ All URIs are relative to *http://localhost*
 - [PatternApplyResponseDto](docs/PatternApplyResponseDto.md)
 - [PatternExclusionCandidateDto](docs/PatternExclusionCandidateDto.md)
 - [PatternExclusionCandidatesResponseDto](docs/PatternExclusionCandidatesResponseDto.md)
+- [PatternLabelExclusionCandidateDto](docs/PatternLabelExclusionCandidateDto.md)
 - [PatternPreviewResponseDto](docs/PatternPreviewResponseDto.md)
 - [PayloadCursorEntryDto](docs/PayloadCursorEntryDto.md)
 - [PivotGraphDto](docs/PivotGraphDto.md)
+- [PreviewDiagnosticDto](docs/PreviewDiagnosticDto.md)
 - [PreviewInquiryDto](docs/PreviewInquiryDto.md)
 - [PreviewResponseDto](docs/PreviewResponseDto.md)
 - [ProposeCaseLeadDto](docs/ProposeCaseLeadDto.md)
 - [PullFromInquiryDto](docs/PullFromInquiryDto.md)
 - [PullFromInquiryResponseDto](docs/PullFromInquiryResponseDto.md)
+- [PurgeSourceAssetsResponseDto](docs/PurgeSourceAssetsResponseDto.md)
 - [PutAssetChunksDto](docs/PutAssetChunksDto.md)
 - [RebuildEdgesResponseDto](docs/RebuildEdgesResponseDto.md)
 - [RebuildIndexResponseDto](docs/RebuildIndexResponseDto.md)

@@ -18,6 +18,7 @@ import {
 } from "@workspace/ui/components";
 import { useTranslation } from "@/hooks/use-translation";
 import { TAG_PIPELINE_TYPE } from "@/lib/custom-detector-badge";
+import { preserveDetectorScope } from "@/lib/detector-scope";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -147,7 +148,7 @@ export const TagDetectorEditor = React.forwardRef<
       key: effectiveKey,
       description: form.description,
       isActive: form.isActive,
-      pipelineSchema,
+      pipelineSchema: preserveDetectorScope(initialPipelineSchema, pipelineSchema),
     });
   }
 

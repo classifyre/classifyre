@@ -132,13 +132,29 @@ export const NOTEBOOK_EXECUTION_MODES = [
 ] as const;
 
 export class CreateNotebookExecutionDto {
-  @ApiProperty({
+  @ApiPropertyOptional({
     description:
-      'The revision to execute. Executions run a snapshot, never "whatever is in the database now".',
+      'The revision to execute. Executions run a snapshot, never "whatever is ' +
+      'in the database now". Either this or `baseRevision` is required — they ' +
+      'mean the same thing. The alias exists because the notebook PUT next to ' +
+      'this endpoint spells the same concept `baseRevision`, and sending that ' +
+      'name here used to be rejected with "Revision undefined is not the ' +
+      'current notebook revision": correct about the value, silent about the ' +
+      'field name that produced it.',
   })
+  @IsOptional()
   @IsInt()
   @Min(1)
-  revision!: number;
+  revision?: number;
+
+  @ApiPropertyOptional({
+    description:
+      'Alias of `revision`, matching the notebook PUT. Supply either one.',
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  baseRevision?: number;
 
   @ApiProperty({ enum: NOTEBOOK_EXECUTION_MODES })
   @IsIn(NOTEBOOK_EXECUTION_MODES)

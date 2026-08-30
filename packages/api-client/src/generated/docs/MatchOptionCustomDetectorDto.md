@@ -8,6 +8,11 @@ Name | Type
 ------------ | -------------
 `key` | string
 `name` | string
+`answerDimension` | string
+`suggestedMatcher` | string
+`findingTypes` | Array&lt;string&gt;
+`openFindings` | number
+`pipelineType` | string
 
 ## Example
 
@@ -18,6 +23,11 @@ import type { MatchOptionCustomDetectorDto } from '@workspace/api-client'
 const example = {
   "key": null,
   "name": null,
+  "answerDimension": null,
+  "suggestedMatcher": null,
+  "findingTypes": null,
+  "openFindings": null,
+  "pipelineType": null,
 } satisfies MatchOptionCustomDetectorDto
 
 console.log(example)

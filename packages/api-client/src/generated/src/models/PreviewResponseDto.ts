@@ -13,6 +13,13 @@
  */
 
 import { mapValues } from '../runtime';
+import type { PreviewDiagnosticDto } from './PreviewDiagnosticDto';
+import {
+    PreviewDiagnosticDtoFromJSON,
+    PreviewDiagnosticDtoFromJSONTyped,
+    PreviewDiagnosticDtoToJSON,
+    PreviewDiagnosticDtoToJSONTyped,
+} from './PreviewDiagnosticDto';
 import type { InquiryMatchDto } from './InquiryMatchDto';
 import {
     InquiryMatchDtoFromJSON,
@@ -39,6 +46,14 @@ export interface PreviewResponseDto {
      * @memberof PreviewResponseDto
      */
     sample: Array<InquiryMatchDto>;
+    /**
+     * Why a preview returned nothing. Empty whenever there are matches.
+     * 
+     * A question that matches nothing and a question that is wired wrong look identical from a total of zero, and two real inquiries sat at zero for hours while their detector was producing findings the whole time. Each entry names one dimension, how many findings survive without it, and what to change — including the common case of pointing a value regex at a detector whose answer lives in the finding type.
+     * @type {Array<PreviewDiagnosticDto>}
+     * @memberof PreviewResponseDto
+     */
+    diagnostics: Array<PreviewDiagnosticDto>;
 }
 
 /**
@@ -47,6 +62,7 @@ export interface PreviewResponseDto {
 export function instanceOfPreviewResponseDto(value: object): value is PreviewResponseDto {
     if (!('total' in value) || value['total'] === undefined) return false;
     if (!('sample' in value) || value['sample'] === undefined) return false;
+    if (!('diagnostics' in value) || value['diagnostics'] === undefined) return false;
     return true;
 }
 
@@ -62,6 +78,7 @@ export function PreviewResponseDtoFromJSONTyped(json: any, ignoreDiscriminator: 
         
         'total': json['total'],
         'sample': ((json['sample'] as Array<any>).map(InquiryMatchDtoFromJSON)),
+        'diagnostics': ((json['diagnostics'] as Array<any>).map(PreviewDiagnosticDtoFromJSON)),
     };
 }
 
@@ -78,6 +95,7 @@ export function PreviewResponseDtoToJSONTyped(value?: PreviewResponseDto | null,
         
         'total': value['total'],
         'sample': ((value['sample'] as Array<any>).map(InquiryMatchDtoToJSON)),
+        'diagnostics': ((value['diagnostics'] as Array<any>).map(PreviewDiagnosticDtoToJSON)),
     };
 }
 

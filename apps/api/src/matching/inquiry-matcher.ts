@@ -1,4 +1,4 @@
-import { DetectorType } from '@prisma/client';
+import { DetectorType, Prisma } from '@prisma/client';
 
 /** A question's matcher configuration (which findings the query selects). */
 export interface InquiryMatchers {
@@ -93,6 +93,59 @@ export class CompiledMatcher {
 
     return true;
   }
+}
+
+/**
+ * The SQL half of the same matcher: source, detector and (when safe) exact type.
+ *
+ * Deliberately in THIS file, next to {@link CompiledMatcher.matches}, and not
+ * in the service that calls it. The two halves have to agree dimension for
+ * dimension, the old code said so in a comment — and then drifted from its own
+ * comment anyway, because the halves lived in different files and nobody read
+ * them together. `inquiry-matcher.spec.ts` runs both over the same fixtures so
+ * a future divergence fails a test rather than a customer's investigation.
+ *
+ * The stakes are higher than "coarse prefilter": when no regex dimension is
+ * configured this `where` IS the answer — `previewRows` returns a COUNT(*) over
+ * it and never consults the matcher — so a divergence returns a wrong *number*,
+ * not merely a wide candidate set.
+ */
+export function candidateWhere(m: InquiryMatchers): Prisma.FindingWhereInput {
+  const hasDetectorFilter =
+    m.detectorTypes.length > 0 || m.customDetectorKeys.length > 0;
+  const where: Prisma.FindingWhereInput = { status: 'OPEN' };
+  if (!m.matchAllSources) where.sourceId = { in: m.sourceIds };
+  if (hasDetectorFilter) {
+    // Naming custom keys RESTRICTS custom findings rather than widening them:
+    // CUSTOM is the supertype of every custom key, so a plain OR let
+    // `detectorTypes: ['CUSTOM']` swallow the key list and match every custom
+    // finding in the namespace. Mirrors the `keyFilterApplies` branch above.
+    const nonCustomTypes = m.detectorTypes.filter(
+      (t) => t !== DetectorType.CUSTOM,
+    );
+    const custom: Prisma.FindingWhereInput[] =
+      m.customDetectorKeys.length > 0
+        ? [{ customDetectorKey: { in: m.customDetectorKeys } }]
+        : m.detectorTypes.includes(DetectorType.CUSTOM)
+          ? [{ detectorType: DetectorType.CUSTOM }]
+          : [];
+    where.OR = [
+      ...(nonCustomTypes.length > 0
+        ? [{ detectorType: { in: nonCustomTypes } }]
+        : []),
+      ...custom,
+    ];
+  }
+  // Exact-type SQL prefilter: only safe when there are no type-regexes AND no
+  // value-regexes, because either can match a type this list does not name.
+  if (
+    m.findingTypeRegex.length === 0 &&
+    m.findingValueRegex.length === 0 &&
+    m.findingTypes.length > 0
+  ) {
+    where.findingType = { in: m.findingTypes };
+  }
+  return where;
 }
 
 function compilePatterns(patterns: string[]): RegExp[] {

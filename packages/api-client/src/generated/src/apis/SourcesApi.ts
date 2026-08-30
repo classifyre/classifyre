@@ -23,6 +23,7 @@ import type {
   BulkUpdateSourcesResponseDto,
   CreateSourceDto,
   FinalizeIngestRunDto,
+  PurgeSourceAssetsResponseDto,
   SearchSourcesRequestDto,
   SearchSourcesResponseDto,
   SourceAssetsControllerBulkIngest201Response,
@@ -50,6 +51,8 @@ import {
     CreateSourceDtoToJSON,
     FinalizeIngestRunDtoFromJSON,
     FinalizeIngestRunDtoToJSON,
+    PurgeSourceAssetsResponseDtoFromJSON,
+    PurgeSourceAssetsResponseDtoToJSON,
     SearchSourcesRequestDtoFromJSON,
     SearchSourcesRequestDtoToJSON,
     SearchSourcesResponseDtoFromJSON,
@@ -135,10 +138,17 @@ export interface SourcesControllerGetScheduleRequest {
 
 export interface SourcesControllerGetSourceRequest {
     id: string;
+    include?: string;
 }
 
 export interface SourcesControllerPurgeAssetsRequest {
     id: string;
+    dryRun?: any;
+    notScannedSince?: any;
+    urnPrefix?: any;
+    namePrefix?: any;
+    assetKind?: any;
+    externalIdPrefix?: any;
 }
 
 export interface SourcesControllerPurgeFindingsRequest {
@@ -764,7 +774,7 @@ export class SourcesApi extends runtime.BaseAPI {
     }
 
     /**
-     * Retrieve detailed information about a specific data source
+     * Retrieve detailed information about a specific data source.  A CUSTOM source\'s notebook cells are NOT inlined by default: the whole program is many kilobytes and blows a response budget for a caller that wanted the variables. `config.required.notebook` comes back as `{ revision, cellCount, cellsOmitted: true }`. Pass `?include=notebook` for the cells, or use GET /sources/{id}/notebook, which is what the editor uses.
      * Get source by ID
      */
     async sourcesControllerGetSourceRaw(requestParameters: SourcesControllerGetSourceRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<SourceResponseDto>> {
@@ -776,6 +786,10 @@ export class SourcesApi extends runtime.BaseAPI {
         }
 
         const queryParameters: any = {};
+
+        if (requestParameters['include'] != null) {
+            queryParameters['include'] = requestParameters['include'];
+        }
 
         const headerParameters: runtime.HTTPHeaders = {};
 
@@ -794,7 +808,7 @@ export class SourcesApi extends runtime.BaseAPI {
     }
 
     /**
-     * Retrieve detailed information about a specific data source
+     * Retrieve detailed information about a specific data source.  A CUSTOM source\'s notebook cells are NOT inlined by default: the whole program is many kilobytes and blows a response budget for a caller that wanted the variables. `config.required.notebook` comes back as `{ revision, cellCount, cellsOmitted: true }`. Pass `?include=notebook` for the cells, or use GET /sources/{id}/notebook, which is what the editor uses.
      * Get source by ID
      */
     async sourcesControllerGetSource(requestParameters: SourcesControllerGetSourceRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<SourceResponseDto> {
@@ -834,10 +848,10 @@ export class SourcesApi extends runtime.BaseAPI {
     }
 
     /**
-     * Permanently delete every asset of the source, along with their findings, extractions, correlation values, signatures and chunks (all cascade via FK). Correlation fingerprints are recomputed in the background. Irreversible.
-     * Purge all assets of a data source
+     * Permanently delete assets of the source, along with their findings, extractions, correlation values, signatures and chunks (all cascade via FK). Correlation fingerprints are recomputed in the background. Irreversible.  With no query parameters this deletes EVERY asset of the source. The optional predicate exists for the case a scan can never resolve on its own: when a connector narrows its scope (one source split into two), the assets it used to produce stay behind forever, because retirement requires a run that covered the whole scope and found them gone — and a rotating-sample connector never has one. Pass dryRun=true first to see what a predicate would take with it.
+     * Retire a source\'s assets — all of them, or a named subset
      */
-    async sourcesControllerPurgeAssetsRaw(requestParameters: SourcesControllerPurgeAssetsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
+    async sourcesControllerPurgeAssetsRaw(requestParameters: SourcesControllerPurgeAssetsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<PurgeSourceAssetsResponseDto>> {
         if (requestParameters['id'] == null) {
             throw new runtime.RequiredError(
                 'id',
@@ -846,6 +860,30 @@ export class SourcesApi extends runtime.BaseAPI {
         }
 
         const queryParameters: any = {};
+
+        if (requestParameters['dryRun'] != null) {
+            queryParameters['dryRun'] = requestParameters['dryRun'];
+        }
+
+        if (requestParameters['notScannedSince'] != null) {
+            queryParameters['notScannedSince'] = requestParameters['notScannedSince'];
+        }
+
+        if (requestParameters['urnPrefix'] != null) {
+            queryParameters['urnPrefix'] = requestParameters['urnPrefix'];
+        }
+
+        if (requestParameters['namePrefix'] != null) {
+            queryParameters['namePrefix'] = requestParameters['namePrefix'];
+        }
+
+        if (requestParameters['assetKind'] != null) {
+            queryParameters['assetKind'] = requestParameters['assetKind'];
+        }
+
+        if (requestParameters['externalIdPrefix'] != null) {
+            queryParameters['externalIdPrefix'] = requestParameters['externalIdPrefix'];
+        }
 
         const headerParameters: runtime.HTTPHeaders = {};
 
@@ -860,15 +898,16 @@ export class SourcesApi extends runtime.BaseAPI {
             query: queryParameters,
         }, initOverrides);
 
-        return new runtime.VoidApiResponse(response);
+        return new runtime.JSONApiResponse(response, (jsonValue) => PurgeSourceAssetsResponseDtoFromJSON(jsonValue));
     }
 
     /**
-     * Permanently delete every asset of the source, along with their findings, extractions, correlation values, signatures and chunks (all cascade via FK). Correlation fingerprints are recomputed in the background. Irreversible.
-     * Purge all assets of a data source
+     * Permanently delete assets of the source, along with their findings, extractions, correlation values, signatures and chunks (all cascade via FK). Correlation fingerprints are recomputed in the background. Irreversible.  With no query parameters this deletes EVERY asset of the source. The optional predicate exists for the case a scan can never resolve on its own: when a connector narrows its scope (one source split into two), the assets it used to produce stay behind forever, because retirement requires a run that covered the whole scope and found them gone — and a rotating-sample connector never has one. Pass dryRun=true first to see what a predicate would take with it.
+     * Retire a source\'s assets — all of them, or a named subset
      */
-    async sourcesControllerPurgeAssets(requestParameters: SourcesControllerPurgeAssetsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
-        await this.sourcesControllerPurgeAssetsRaw(requestParameters, initOverrides);
+    async sourcesControllerPurgeAssets(requestParameters: SourcesControllerPurgeAssetsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<PurgeSourceAssetsResponseDto> {
+        const response = await this.sourcesControllerPurgeAssetsRaw(requestParameters, initOverrides);
+        return await response.value();
     }
 
     /**

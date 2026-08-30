@@ -417,7 +417,7 @@ export class PatternActionDto {
 
   @ApiPropertyOptional({
     description:
-      'For EXCLUSION patterns: also write a correlation exclusion rule for this label, so the boilerplate stops driving matches at all.',
+      'Also write a correlation exclusion rule for this label, so it stops driving matches at all. For a shared-label pattern the label must be one the pattern itself names — that is the fix the exclusion-candidates endpoint proposes when a corpus constant is the only label on a large body of assets, where no weight change can move a score that is 1.0 by construction.',
   })
   @IsOptional()
   @IsString()
@@ -447,6 +447,31 @@ export class PatternExclusionCandidateDto {
   assetCount!: number;
 }
 
+export class PatternLabelExclusionCandidateDto {
+  @ApiProperty({ description: 'The label an exclusion would silence entirely' })
+  label!: string;
+  @ApiProperty({
+    description: 'Assets carrying this label anywhere in the corpus',
+  })
+  assetCount!: number;
+  @ApiProperty({
+    description:
+      'Distinct values under this label. Many values each held by many assets ' +
+      'is the multi-clique shape: no single value dominates, so a value-level ' +
+      'exclusion cannot reach the pattern and the label itself is the handle.',
+  })
+  distinctValues!: number;
+  @ApiProperty({
+    description:
+      'Assets whose ONLY correlation label is this one. The decisive number: ' +
+      'the score is a weighted Jaccard over shared labels, so an asset with a ' +
+      'single label scores 1.0 against any other asset sharing it — whatever ' +
+      'weight that label carries. Lowering a weight cannot fix a single-label ' +
+      'corpus; only an exclusion can.',
+  })
+  soleLabelAssets!: number;
+}
+
 export class PatternExclusionCandidatesResponseDto {
   @ApiProperty() patternKey!: string;
   @ApiProperty({ description: 'THRESHOLD | EXCLUSION | MERGE | JUDGEMENT' })
@@ -467,6 +492,24 @@ export class PatternExclusionCandidatesResponseDto {
       'True when the near-duplicate group is bigger than one request should read; the candidate list is the strongest part of it rather than all of it.',
   })
   truncated!: boolean;
+
+  @ApiProperty({
+    type: [PatternLabelExclusionCandidateDto],
+    description:
+      'Labels worth excluding outright. Populated for shared-label patterns, ' +
+      'where the values are per-clique rather than one dominant template and a ' +
+      'value-level exclusion therefore proposes nothing. Empty for boilerplate ' +
+      'patterns, which have a template to read values out of.',
+  })
+  labelCandidates!: PatternLabelExclusionCandidateDto[];
+
+  @ApiProperty({
+    description:
+      'Plain sentence naming what would actually stop this pattern, including ' +
+      'the case where nothing here can — so an empty candidate list is a ' +
+      'stated answer rather than an unexplained zero.',
+  })
+  recommendation!: string;
 }
 
 export class PatternPreviewResponseDto {
@@ -536,6 +579,17 @@ export class RebuildIndexResponseDto {
   })
   hairballDemoted!: boolean;
   @ApiProperty() durationMs!: number;
+
+  @ApiProperty({
+    description:
+      'What this rebuild did NOT do. It re-derives the rollups from the ' +
+      'correlation values, edges and clusters that are already stored — it ' +
+      'does not re-fingerprint any asset. A weight or exclusion change is ' +
+      'applied when a scan indexes an asset, so rebuilding after one leaves ' +
+      'the queue unchanged and looks like the change did nothing. Use ' +
+      'PUT /correlation/config (which queues a full recompute) for that.',
+  })
+  note!: string;
 }
 
 // ── Decisions: what was judged, and what became of it ───────────────────────

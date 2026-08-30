@@ -1074,7 +1074,9 @@ describe('CustomDetectorsService', () => {
 
     it('accepts a schema with no label or severity', () => {
       const { service } = createService();
-      expect(() => service.validatePipelineSchema({ type: 'TAG' })).not.toThrow();
+      expect(() =>
+        service.validatePipelineSchema({ type: 'TAG' }),
+      ).not.toThrow();
     });
 
     it('rejects a blank label', () => {
@@ -1098,7 +1100,10 @@ describe('CustomDetectorsService', () => {
         tagRow({
           id: 'det-regex',
           key: 'invoice_id',
-          pipelineSchema: { type: 'REGEX', patterns: { inv: { pattern: 'INV-\\d+' } } },
+          pipelineSchema: {
+            type: 'REGEX',
+            patterns: { inv: { pattern: 'INV-\\d+' } },
+          },
         }),
       ]);
 

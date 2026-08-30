@@ -25,6 +25,7 @@ import {
 import type {
   DecisionsToCaseDto,
   PatternExclusionCandidatesResponseDto,
+  RebuildIndexResponseDto,
   DecisionsToInquiryDto,
   RejectCauseDto,
   ReviewDecisionsResponseDto,
@@ -205,8 +206,20 @@ export class CorrelationReviewService {
    * and waiting for the next scan is not an answer when someone is looking at
    * an empty queue right now.
    */
-  async rebuild() {
-    return this.correlation.refreshReviewIndexNow();
+  async rebuild(): Promise<RebuildIndexResponseDto> {
+    const stats = await this.correlation.refreshReviewIndexNow();
+    return {
+      ...stats,
+      // Said in the response because it could not be inferred from it. A
+      // rebuild after a re-weighting returns healthy-looking numbers and an
+      // unchanged queue, which reads as "the exclusion did not work" rather
+      // than "nothing has been re-fingerprinted under it yet".
+      note:
+        'Rebuilt from stored correlation values, edges and clusters. No asset ' +
+        'was re-fingerprinted, so a weight or exclusion changed since the last ' +
+        'scan is NOT reflected here — PUT /correlation/config queues the full ' +
+        'recompute that applies it.',
+    };
   }
 
   // ── Level 1 ───────────────────────────────────────────────────────────────
@@ -1735,13 +1748,26 @@ export class CorrelationReviewService {
       totalCandidates: 0,
       pairsDriven: 0,
       truncated: false,
+      labelCandidates: [],
+      recommendation: '',
     };
-    // Only near-duplicate text patterns carry a group to read values out of.
-    if (pattern.ruleKind !== 'EXCLUSION') return empty;
-    const groupPrefix = patternKey.startsWith(BOILERPLATE_PREFIX)
-      ? patternKey.slice(BOILERPLATE_PREFIX.length)
-      : null;
-    if (!groupPrefix) return empty;
+
+    // Only near-duplicate text patterns carry a *template* to read values out
+    // of. Every other pattern is driven by shared labels, and the values under
+    // one of those labels are per-clique rather than one repeated string: ten
+    // trade categories, each forming its own clique of 900 assets, with no
+    // dominant value anywhere. That is why this endpoint used to answer
+    // `totalCandidates: 0` for the single largest pattern in a corpus —
+    // 144,242 pairs scored 1.0 — which is precisely the boilerplate the
+    // feature exists for. Labels are the handle in that shape.
+    const groupPrefix =
+      pattern.ruleKind === 'EXCLUSION' &&
+      patternKey.startsWith(BOILERPLATE_PREFIX)
+        ? patternKey.slice(BOILERPLATE_PREFIX.length)
+        : null;
+    if (!groupPrefix) {
+      return this.labelExclusionCandidates(patternKey, pattern, empty);
+    }
 
     const findings = await this.prisma.$queryRaw<
       Array<{ finding_type: string; matched_content: string | null }>
@@ -1764,7 +1790,13 @@ export class CorrelationReviewService {
       byHash.set(valueHash(f.finding_type, value), { label, value });
     }
     if (byHash.size === 0) {
-      return { ...empty, truncated };
+      return {
+        ...empty,
+        truncated,
+        recommendation:
+          'No repeated value could be read out of this near-duplicate group. ' +
+          'Decide it as a pattern instead — an exclusion has nothing to name.',
+      };
     }
 
     const hashes = [...byHash.keys()];
@@ -1811,13 +1843,130 @@ export class CorrelationReviewService {
         (a, b) => b.assetCount - a.assetCount || a.value.localeCompare(b.value),
       );
 
+    const pairsDriven = Number(driven[0]?.count ?? 0);
     return {
       patternKey,
       ruleKind: pattern.ruleKind,
       candidates: candidates.slice(0, EXCLUSION_CANDIDATE_CAP),
       totalCandidates: candidates.length,
-      pairsDriven: Number(driven[0]?.count ?? 0),
+      pairsDriven,
       truncated,
+      labelCandidates: [],
+      recommendation:
+        candidates.length === 0
+          ? 'Every value in this group is held by a single asset, so none of ' +
+            'them is boilerplate. Decide the pattern rather than excluding a value.'
+          : `Exclude the top value(s): ${candidates.length} candidate(s) here ` +
+            `drive ${pairsDriven} scored pair(s) elsewhere in the corpus.`,
+    };
+  }
+
+  /**
+   * Exclusion candidates for a pattern driven by shared labels.
+   *
+   * The multi-clique case. `tag_trade_category` produced ten cliques, one per
+   * regulatory category, 917 assets and 144,242 pairs all scored **1.0** — and
+   * the reason matters, because it decides what the fix can be: the score is a
+   * weighted Jaccard over shared labels, so an asset carrying exactly one label
+   * has numerator and denominator equal and scores 1.0 against any other asset
+   * sharing it, *whatever weight that label carries*. Lowering a weight cannot
+   * fix a single-label corpus. Only an exclusion can.
+   *
+   * So the proposal here is the label, with the three numbers that justify it:
+   * how far it reaches, how many distinct values it spreads across (many values
+   * each with reach = no dominant template = value-level exclusion is useless),
+   * and how many assets hold nothing else.
+   */
+  private async labelExclusionCandidates(
+    patternKey: string,
+    pattern: { ruleKind: string; labels: string[] },
+    empty: PatternExclusionCandidatesResponseDto,
+  ): Promise<PatternExclusionCandidatesResponseDto> {
+    const labels = [...new Set(pattern.labels.map(normalizeLabel))].filter(
+      Boolean,
+    );
+    if (labels.length === 0) {
+      return {
+        ...empty,
+        recommendation:
+          'This pattern names no labels, so there is nothing to exclude. ' +
+          'Decide it as a pattern instead.',
+      };
+    }
+
+    const [reach, sole] = await Promise.all([
+      this.prisma.$queryRaw<
+        Array<{ label: string; assets: number; values: number }>
+      >(Prisma.sql`
+        SELECT label,
+               COUNT(DISTINCT asset_id)::int  AS assets,
+               COUNT(DISTINCT value_hash)::int AS values
+        FROM asset_correlation_values
+        WHERE label = ANY(${labels})
+        GROUP BY label
+      `),
+      // Assets whose entire correlation footprint is one label. Counted with a
+      // per-asset HAVING rather than a NOT EXISTS over the other labels: an
+      // asset can hold many values of the SAME label (ten trade categories) and
+      // still be single-label, and that is the population being counted.
+      this.prisma.$queryRaw<Array<{ label: string; sole: number }>>(Prisma.sql`
+        SELECT label, COUNT(*)::int AS sole
+        FROM (
+          SELECT asset_id, MIN(label) AS label
+          FROM asset_correlation_values
+          GROUP BY asset_id
+          HAVING COUNT(DISTINCT label) = 1
+        ) single
+        WHERE label = ANY(${labels})
+        GROUP BY label
+      `),
+    ]);
+
+    const soleByLabel = new Map(sole.map((r) => [r.label, r.sole]));
+    const labelCandidates = labels
+      .map((label) => {
+        const row = reach.find((r) => r.label === label);
+        return {
+          label,
+          assetCount: row?.assets ?? 0,
+          distinctValues: row?.values ?? 0,
+          soleLabelAssets: soleByLabel.get(label) ?? 0,
+        };
+      })
+      .filter((c) => c.assetCount > 0)
+      .sort((a, b) => b.assetCount - a.assetCount);
+
+    if (labelCandidates.length === 0) {
+      return {
+        ...empty,
+        recommendation:
+          "This pattern's labels are no longer present in the correlation " +
+          'index, so an exclusion would match nothing. Rebuild the review ' +
+          'index, or decide the pattern.',
+      };
+    }
+
+    const weightProof = labelCandidates.filter((c) => c.soleLabelAssets > 0);
+    const recommendation =
+      weightProof.length > 0
+        ? `Exclude ${weightProof
+            .map((c) => `'${c.label}'`)
+            .join(', ')}: ${weightProof
+            .map((c) => c.soleLabelAssets)
+            .reduce((a, b) => a + b, 0)} asset(s) carry no other label, so ` +
+          'those pairs score 1.0 whatever weight the label is given — only an ' +
+          'exclusion can move them.'
+        : `Exclude '${labelCandidates[0].label}' (${labelCandidates[0].assetCount} ` +
+          `assets across ${labelCandidates[0].distinctValues} distinct values), ` +
+          'or lower its weight — every asset here carries other labels too, so ' +
+          'a weight change will still shift these scores.';
+
+    return {
+      ...empty,
+      ruleKind: pattern.ruleKind,
+      patternKey,
+      labelCandidates,
+      recommendation,
     };
   }
 
@@ -1901,19 +2050,41 @@ export class CorrelationReviewService {
     // caller that really means "this detector's output is useless for
     // matching" — the tuning screen and the harness both have reason to say
     // that, and neither should have to go through the pair screen to do it.
-    if (pattern.ruleKind === 'EXCLUSION') {
-      const rules: Array<{
-        mode: 'value' | 'label';
-        label: string | null;
-        value: string | null;
-      }> = await this.rulesForValueHashes(dto.excludeValueHashes);
-      if (typeof dto.excludeLabel === 'string' && dto.excludeLabel) {
-        rules.push({ mode: 'label', label: dto.excludeLabel, value: null });
+    const rules: Array<{
+      mode: 'value' | 'label';
+      label: string | null;
+      value: string | null;
+    }> =
+      pattern.ruleKind === 'EXCLUSION'
+        ? await this.rulesForValueHashes(dto.excludeValueHashes)
+        : [];
+
+    // A label exclusion is NOT restricted to boilerplate patterns. The pattern
+    // that most needs one is the shared-label clique — a single corpus-constant
+    // label held by hundreds of assets and by nothing else, scoring 1.0 because
+    // a weighted Jaccard over one shared label is 1.0 for any weight. Refusing
+    // the blunt fix there left the largest pattern in the corpus (144,242 pairs)
+    // with no fix at all, only a verdict that came back on the next ingest.
+    //
+    // The label must be one this pattern actually names, for the same reason
+    // rulesForValueHashes takes hashes: a pattern endpoint must not become a
+    // way to write arbitrary instance-wide config.
+    if (typeof dto.excludeLabel === 'string' && dto.excludeLabel) {
+      const requested = normalizeLabel(dto.excludeLabel);
+      const patternLabels = new Set(pattern.labels.map(normalizeLabel));
+      if (pattern.ruleKind !== 'EXCLUSION' && !patternLabels.has(requested)) {
+        throw new BadRequestException(
+          `Label '${dto.excludeLabel}' is not one of this pattern's labels ` +
+            `(${[...patternLabels].join(', ') || 'none'}). Exclude it from the ` +
+            'correlation tuning screen if that is really what you mean.',
+        );
       }
-      if (rules.length > 0) {
-        const { added } = await this.correlation.addExclusions(rules);
-        exclusionRuleIds = added.map((r) => r.id);
-      }
+      rules.push({ mode: 'label', label: requested, value: null });
+    }
+
+    if (rules.length > 0) {
+      const { added } = await this.correlation.addExclusions(rules);
+      exclusionRuleIds = added.map((r) => r.id);
     }
     const excluding = exclusionRuleIds.length > 0;
 

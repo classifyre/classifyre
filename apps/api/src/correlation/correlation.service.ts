@@ -161,6 +161,25 @@ export interface CorrelationConfigDto {
   /** Every label currently present in the index, with its effective weight. */
   labels: Array<{ label: string; weight: number; inUse: boolean }>;
   exclusions: ExclusionRule[];
+  /**
+   * When the tuning in this response actually starts governing the queue.
+   *
+   * Weights and exclusions are applied while a scan indexes an asset's
+   * correlation values, so a change is NOT retroactive on its own — the review
+   * queue keeps showing the old scores until every asset is re-fingerprinted.
+   * A write therefore queues a full recompute, and this block says whether that
+   * queueing succeeded. Without it, one re-weighting looked instant (a scan was
+   * running and did the work) and the next looked like it did nothing, with
+   * neither the config response nor `review/rebuild` explaining the difference.
+   */
+  recompute: {
+    /** True when this call queued a full recompute. False on a plain read. */
+    scheduled: boolean;
+    /** Seconds the queued recompute may wait before starting. */
+    startsWithinSeconds: number;
+    /** One sentence a client can show verbatim. */
+    note: string;
+  };
 }
 
 export interface SaveCorrelationConfigInput {
@@ -423,7 +442,9 @@ export class CorrelationService {
   }
 
   /** Current config plus every in-use label with its effective weight. */
-  async getConfig(): Promise<CorrelationConfigDto> {
+  async getConfig(
+    recompute?: CorrelationConfigDto['recompute'],
+  ): Promise<CorrelationConfigDto> {
     const [row, labelRows] = await Promise.all([
       this.prisma.correlationConfig.findUnique({ where: { id: 1 } }),
       // groupBy, not findMany+distinct: Prisma applies `distinct` on a
@@ -459,6 +480,48 @@ export class CorrelationService {
       duplicateMin: row ? Number(row.duplicateMin) : DUPLICATE_MIN,
       labels,
       exclusions: parseExclusions(row?.exclusions),
+      recompute: recompute ?? this.recomputeNote(null),
+    };
+  }
+
+  /**
+   * The "when does this take effect" note attached to every config response.
+   *
+   * `scheduled === null` means this was a read, so nothing was queued and the
+   * stored tuning is already whatever the last recompute applied.
+   */
+  private recomputeNote(
+    scheduled: boolean | null,
+  ): CorrelationConfigDto['recompute'] {
+    const startsWithinSeconds = this.jobs.coalesceSeconds;
+    if (scheduled === null) {
+      return {
+        scheduled: false,
+        startsWithinSeconds,
+        note:
+          'Read-only. Correlation tuning is applied when a scan indexes an ' +
+          "asset's correlation values, so changing it schedules a full " +
+          'recompute — the queue does not change before that recompute runs.',
+      };
+    }
+    if (scheduled) {
+      return {
+        scheduled: true,
+        startsWithinSeconds,
+        note:
+          'A full recompute was queued and starts within ' +
+          `${startsWithinSeconds}s. This change is NOT retroactive until it ` +
+          'finishes: scores and the review queue still reflect the previous ' +
+          'tuning until every asset has been re-fingerprinted.',
+      };
+    }
+    return {
+      scheduled: false,
+      startsWithinSeconds,
+      note:
+        'The change was saved but a full recompute could NOT be queued (the ' +
+        'job queue rejected it). Nothing will re-score until a scan touches ' +
+        'the affected sources or a recompute is triggered again.',
     };
   }
 
@@ -596,9 +659,10 @@ export class CorrelationService {
         exclusions: exclusions,
       },
     });
-    const config = await this.getConfig();
-    await this.jobs.scheduleFull('correlation config changed');
-    return config;
+    const scheduled = await this.jobs.scheduleFull(
+      'correlation config changed',
+    );
+    return this.getConfig(this.recomputeNote(scheduled));
   }
 
   /**

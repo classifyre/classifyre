@@ -58,4 +58,62 @@ export class FinalizeIngestRunDto {
   @IsInt()
   @Min(0)
   detectorRunsSkipped?: number;
+
+  @ApiPropertyOptional({
+    description:
+      'Relationship edges the API accepted and resolved during this run.',
+    minimum: 0,
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  relationshipsEmitted?: number;
+
+  @ApiPropertyOptional({
+    description:
+      'Relationship passes that raised. Counts passes, not edges: a pass that ' +
+      'failed never got to say how many edges it would have produced. Any ' +
+      'value above zero downgrades the run to WARNING — lineage is not ' +
+      'optional output, and a green run with none used to be indistinguishable ' +
+      'from a green run with all of it.',
+    minimum: 0,
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  relationshipsFailed?: number;
+
+  @ApiPropertyOptional({
+    description:
+      'Edges the connector assembled and could not send. A real edge count, ' +
+      'and also a run downgrade.',
+    minimum: 0,
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  relationshipsLost?: number;
+
+  @ApiPropertyOptional({
+    description:
+      'Edges accepted but with an endpoint that could not be resolved. ' +
+      'Expected in small numbers — the other half of a cross-source edge may ' +
+      'be ingested later — so this alone never downgrades a run.',
+    minimum: 0,
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  relationshipsDropped?: number;
+
+  @ApiPropertyOptional({
+    description:
+      'Up to five distinct relationship errors, verbatim, so the cause is in ' +
+      'the run record rather than only in a job log.',
+    type: [String],
+  })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  relationshipErrors?: string[];
 }

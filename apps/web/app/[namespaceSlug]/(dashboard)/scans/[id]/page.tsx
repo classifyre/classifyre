@@ -551,7 +551,10 @@ export default function RunnerDetailPage() {
               </Card>
             )}
 
-          {(runner.assetsWithoutText > 0 || runner.assetsOutOfScope > 0) && (
+          {(runner.assetsWithoutText > 0 ||
+            runner.assetsOutOfScope > 0 ||
+            (runner.relationshipsFailed ?? 0) > 0 ||
+            (runner.relationshipsLost ?? 0) > 0) && (
             <div className="flex gap-3 border-l-4 border-amber-500 bg-amber-50 px-4 py-3 text-sm dark:bg-amber-950/20">
               <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-700 dark:text-amber-400" />
               <div className="space-y-1">
@@ -599,6 +602,20 @@ export default function RunnerDetailPage() {
                   <p className="text-amber-900/80 dark:text-amber-200/80">
                     {t("scans.coverage.outOfScope", {
                       count: runner.assetsOutOfScope.toLocaleString(),
+                    })}
+                  </p>
+                )}
+                {(runner.relationshipsFailed ?? 0) > 0 && (
+                  <p className="text-amber-900/80 dark:text-amber-200/80">
+                    {t("scans.coverage.relationshipsFailed", {
+                      count: (runner.relationshipsFailed ?? 0).toLocaleString(),
+                    })}
+                  </p>
+                )}
+                {(runner.relationshipsLost ?? 0) > 0 && (
+                  <p className="text-amber-900/80 dark:text-amber-200/80">
+                    {t("scans.coverage.relationshipsLost", {
+                      count: (runner.relationshipsLost ?? 0).toLocaleString(),
                     })}
                   </p>
                 )}

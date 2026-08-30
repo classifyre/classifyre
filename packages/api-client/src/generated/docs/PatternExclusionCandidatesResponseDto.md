@@ -12,6 +12,8 @@ Name | Type
 `totalCandidates` | number
 `pairsDriven` | number
 `truncated` | boolean
+`labelCandidates` | [Array&lt;PatternLabelExclusionCandidateDto&gt;](PatternLabelExclusionCandidateDto.md)
+`recommendation` | string
 
 ## Example
 
@@ -26,6 +28,8 @@ const example = {
   "totalCandidates": null,
   "pairsDriven": null,
   "truncated": null,
+  "labelCandidates": null,
+  "recommendation": null,
 } satisfies PatternExclusionCandidatesResponseDto
 
 console.log(example)

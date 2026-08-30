@@ -20,6 +20,13 @@ import {
     PatternExclusionCandidateDtoToJSON,
     PatternExclusionCandidateDtoToJSONTyped,
 } from './PatternExclusionCandidateDto';
+import type { PatternLabelExclusionCandidateDto } from './PatternLabelExclusionCandidateDto';
+import {
+    PatternLabelExclusionCandidateDtoFromJSON,
+    PatternLabelExclusionCandidateDtoFromJSONTyped,
+    PatternLabelExclusionCandidateDtoToJSON,
+    PatternLabelExclusionCandidateDtoToJSONTyped,
+} from './PatternLabelExclusionCandidateDto';
 
 /**
  * 
@@ -63,6 +70,18 @@ export interface PatternExclusionCandidatesResponseDto {
      * @memberof PatternExclusionCandidatesResponseDto
      */
     truncated: boolean;
+    /**
+     * Labels worth excluding outright. Populated for shared-label patterns, where the values are per-clique rather than one dominant template and a value-level exclusion therefore proposes nothing. Empty for boilerplate patterns, which have a template to read values out of.
+     * @type {Array<PatternLabelExclusionCandidateDto>}
+     * @memberof PatternExclusionCandidatesResponseDto
+     */
+    labelCandidates: Array<PatternLabelExclusionCandidateDto>;
+    /**
+     * Plain sentence naming what would actually stop this pattern, including the case where nothing here can — so an empty candidate list is a stated answer rather than an unexplained zero.
+     * @type {string}
+     * @memberof PatternExclusionCandidatesResponseDto
+     */
+    recommendation: string;
 }
 
 /**
@@ -75,6 +94,8 @@ export function instanceOfPatternExclusionCandidatesResponseDto(value: object): 
     if (!('totalCandidates' in value) || value['totalCandidates'] === undefined) return false;
     if (!('pairsDriven' in value) || value['pairsDriven'] === undefined) return false;
     if (!('truncated' in value) || value['truncated'] === undefined) return false;
+    if (!('labelCandidates' in value) || value['labelCandidates'] === undefined) return false;
+    if (!('recommendation' in value) || value['recommendation'] === undefined) return false;
     return true;
 }
 
@@ -94,6 +115,8 @@ export function PatternExclusionCandidatesResponseDtoFromJSONTyped(json: any, ig
         'totalCandidates': json['totalCandidates'],
         'pairsDriven': json['pairsDriven'],
         'truncated': json['truncated'],
+        'labelCandidates': ((json['labelCandidates'] as Array<any>).map(PatternLabelExclusionCandidateDtoFromJSON)),
+        'recommendation': json['recommendation'],
     };
 }
 
@@ -114,6 +137,8 @@ export function PatternExclusionCandidatesResponseDtoToJSONTyped(value?: Pattern
         'totalCandidates': value['totalCandidates'],
         'pairsDriven': value['pairsDriven'],
         'truncated': value['truncated'],
+        'labelCandidates': ((value['labelCandidates'] as Array<any>).map(PatternLabelExclusionCandidateDtoToJSON)),
+        'recommendation': value['recommendation'],
     };
 }
 

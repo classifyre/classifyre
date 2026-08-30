@@ -1808,7 +1808,9 @@
       "engineUnavailable": "{{count}} assets could not be read because a text or OCR engine was unavailable.",
       "zeroFrames": "{{count}} videos decoded zero frames, so visual OCR inspected no content.",
       "failed": "{{count}} assets had another text extraction failure.",
-      "outOfScope": "{{count}} assets were retained because the scan scope changed; absence was not treated as deletion."
+      "outOfScope": "{{count}} assets were retained because the scan scope changed; absence was not treated as deletion.",
+      "relationshipsFailed": "{{count}} relationship pass(es) failed inside the connector, so this run's lineage is incomplete.",
+      "relationshipsLost": "{{count}} relationship edges were assembled but could not be sent."
     },
     "sourceContext": {
       "title": "Source Context",
@@ -3865,7 +3867,8 @@
       "missingFunction": "Add a '{{name}}' function.",
       "insert": "Insert {{name}} cell",
       "ok": "Defines test_connection() and extract()",
-      "syntaxError": "Cell '{{cell}}' has a syntax error on line {{line}}: {{message}}"
+      "syntaxError": "Cell '{{cell}}' has a syntax error on line {{line}}: {{message}}",
+      "warningsTitle": "Worth checking before you run this"
     },
     "data": {
       "title": "Files & folders",

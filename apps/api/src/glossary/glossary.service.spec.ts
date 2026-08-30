@@ -306,4 +306,58 @@ describe('GlossaryService', () => {
     // skipped because query embedding failed.
     expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
   });
+
+  // 'GES' is the Austrian register's own legal-form code for a GmbH, and it is
+  // also a prefix of Geschäftsführer and Gesellschafter. Alphabetical ordering
+  // over a substring match put both of those ahead of the term whose ALIAS is
+  // literally the query — in a vocabulary built on two- and three-letter codes,
+  // that made the glossary answer the wrong question every time.
+  it('ranks an exact alias above a substring match', async () => {
+    const term = (id: string, name: string, aliases: string[] = []) => ({
+      ...baseTerm,
+      id,
+      term: name,
+      aliases,
+      entityType: 'TERM',
+    });
+    // The alias query returns only the GmbH entry: its alias is exactly 'GES'.
+    prisma.$queryRaw.mockResolvedValue([{ id: 'gmbh' }]);
+    // Alphabetical, as the database returns it — the order that used to win.
+    prisma.glossaryTerm.findMany.mockResolvedValue([
+      term('gf', 'Geschäftsführer'),
+      term('gs', 'Gesellschafter'),
+      term('gmbh', 'GmbH', ['GES']),
+    ]);
+    queryEmbedding.embed.mockRejectedValue(new Error('disabled'));
+
+    const hits = await service.lookup('GES', 5);
+
+    expect(hits[0].term).toBe('GmbH');
+    expect(hits[0].matchType).toBe('alias');
+    expect(hits.slice(1).map((h) => h.matchType)).toEqual([
+      'partial',
+      'partial',
+    ]);
+  });
+
+  it('ranks an exact term above an exact alias on another term', async () => {
+    const term = (id: string, name: string, aliases: string[] = []) => ({
+      ...baseTerm,
+      id,
+      term: name,
+      aliases,
+      entityType: 'TERM',
+    });
+    prisma.$queryRaw.mockResolvedValue([{ id: 'other' }]);
+    prisma.glossaryTerm.findMany.mockResolvedValue([
+      term('other', 'Aufsichtsrat', ['AR']),
+      term('self', 'AR'),
+    ]);
+    queryEmbedding.embed.mockRejectedValue(new Error('disabled'));
+
+    const hits = await service.lookup('AR', 5);
+
+    expect(hits[0].term).toBe('AR');
+    expect(hits[0].matchType).toBe('exact');
+  });
 });

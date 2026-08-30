@@ -44,7 +44,7 @@ export interface PatternActionDto {
      */
     lineage?: PatternActionDtoLineageEnum;
     /**
-     * For EXCLUSION patterns: also write a correlation exclusion rule for this label, so the boilerplate stops driving matches at all.
+     * Also write a correlation exclusion rule for this label, so it stops driving matches at all. For a shared-label pattern the label must be one the pattern itself names — that is the fix the exclusion-candidates endpoint proposes when a corpus constant is the only label on a large body of assets, where no weight change can move a score that is 1.0 by construction.
      * @type {string}
      * @memberof PatternActionDto
      */

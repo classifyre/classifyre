@@ -49,6 +49,7 @@ import { CaseLeadsService } from './case-leads.service';
 import { CaseEventsService } from './case-events.service';
 import { AutopilotService } from './autopilot/autopilot.service';
 import { GraphService } from './graph.service';
+import { summarizeNotebook } from './utils/notebook-summary';
 
 const jsonObjectSchema = z.record(z.string(), z.unknown());
 
@@ -1088,21 +1089,33 @@ export class McpServerFactoryService {
       'get_source',
       {
         title: 'Get Source',
-        description: 'Fetch a single source by ID.',
+        description:
+          "Fetch a single source by ID. A CUSTOM source's notebook cells are " +
+          'summarised rather than inlined — the whole connector program would ' +
+          'otherwise land in context on every read. Pass include_notebook when ' +
+          'you actually need the code, or use get_notebook.',
         inputSchema: {
           id: z.string().uuid(),
+          include_notebook: z
+            .boolean()
+            .optional()
+            .describe(
+              'Inline the notebook cells instead of just { revision, cellCount }',
+            ),
         },
         annotations: {
           readOnlyHint: true,
           idempotentHint: true,
         },
       },
-      async ({ id }) => {
+      async ({ id, include_notebook }) => {
         const source = await this.sourceService.source({ id });
         if (!source) {
           throw new NotFoundException(`Source with ID ${id} not found`);
         }
-        return jsonResult(source);
+        return jsonResult(
+          include_notebook === true ? source : summarizeNotebook(source),
+        );
       },
     );
 
@@ -2662,26 +2675,78 @@ export class McpServerFactoryService {
       {
         title: 'Purge Source Assets',
         description:
-          'Permanently delete EVERY asset of a source, and with them every finding, ' +
+          'Permanently delete assets of a source, and with them every finding, ' +
           'extraction, correlation value and chunk derived from those assets. ' +
           'Heavier than purge_source_findings: it removes the ingested material ' +
           'itself, so the source must be re-scanned before anything from it can be ' +
-          'examined again. Use it when a source ingested the wrong thing entirely. ' +
-          'Correlation fingerprints are recomputed in the background afterwards.',
+          'examined again. Correlation fingerprints are recomputed afterwards.\n\n' +
+          'With no filter this deletes EVERY asset of the source. The filters exist ' +
+          'for the case a scan can never resolve on its own: when a connector narrows ' +
+          'its scope, the assets it used to produce are stranded, because retirement ' +
+          'requires a run that saw the whole scope and found them gone — and a ' +
+          'rotating-sample connector never has one. ALWAYS call once with dry_run ' +
+          'first and report what it matched before deleting.',
         inputSchema: {
           source_id: z.string().describe('Source whose assets to purge'),
           confirm: z
             .literal(true)
             .describe('Must be true — acknowledges the purge is irreversible'),
+          external_id_prefix: z
+            .string()
+            .optional()
+            .describe(
+              "Only assets whose connector-assigned id (metadata.external_id) starts with this, e.g. 'fin-'",
+            ),
+          asset_kind: z
+            .string()
+            .optional()
+            .describe(
+              'Only assets of this catalog kind: record | document | page | file | table',
+            ),
+          name_prefix: z
+            .string()
+            .optional()
+            .describe('Only assets whose display name starts with this'),
+          urn_prefix: z
+            .string()
+            .optional()
+            .describe('Only assets whose URN starts with this'),
+          not_scanned_since: z
+            .string()
+            .optional()
+            .describe(
+              'ISO-8601 timestamp; only assets last scanned before it, plus assets never scanned',
+            ),
+          dry_run: z
+            .boolean()
+            .optional()
+            .describe('Report what matches and delete nothing'),
         },
         annotations: {
           readOnlyHint: false,
           destructiveHint: true,
         },
       },
-      async ({ source_id }) => {
+      async ({
+        source_id,
+        external_id_prefix,
+        asset_kind,
+        name_prefix,
+        urn_prefix,
+        not_scanned_since,
+        dry_run,
+      }) => {
         this.mcpToolExecutor.assertNotDemoMode();
-        return jsonResult(await this.sourceService.purgeAssets(source_id));
+        return jsonResult(
+          await this.sourceService.purgeAssets(source_id, {
+            externalIdPrefix: external_id_prefix,
+            assetKind: asset_kind,
+            namePrefix: name_prefix,
+            urnPrefix: urn_prefix,
+            notScannedSince: not_scanned_since,
+            dryRun: dry_run === true,
+          }),
+        );
       },
     );
   }
