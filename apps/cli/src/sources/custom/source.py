@@ -601,6 +601,15 @@ class CustomSource(BaseSource):
             return
         self._mime_by_hash[asset_hash] = mime_type or "application/octet-stream"
 
+    def declares_relationships(self) -> bool:
+        """Whether the notebook defines ``relationships()`` at all.
+
+        Lets the runner tell "this connector has no lineage to declare" from
+        "this connector tried to declare lineage and produced none", which are
+        the same empty list and very different facts.
+        """
+        return self._notebook_defines("relationships")
+
     async def collect_relationships(self) -> list[Any]:
         """Typed relationships the notebook declared.
 
@@ -615,11 +624,13 @@ class CustomSource(BaseSource):
         """
         if not self._notebook_defines("relationships"):
             return []
-        try:
-            payloads = self._call("relationships") or []
-        except Exception as exc:
-            logger.warning("Notebook relationships() failed (non-fatal): %s", exc)
-            return []
+        # Deliberately NOT caught here. Swallowing it made a notebook whose
+        # relationships() raised — `Ref.id()` instead of `Ref.asset()` was the
+        # real case — produce 920 assets, zero edges, and a COMPLETED run whose
+        # only trace of the failure was a warning in a Kubernetes job log. The
+        # caller (`main._emit_relationships`) keeps the run alive; what it no
+        # longer does is keep the run *quiet*.
+        payloads = self._call("relationships") or []
 
         edges: list[Any] = []
         for payload in payloads:

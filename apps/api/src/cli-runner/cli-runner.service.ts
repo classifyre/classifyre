@@ -2482,8 +2482,22 @@ export class CliRunnerService {
           textCoverage.zeroFrames +
           textCoverage.failed;
         const hasExtractionFailures = extractionFailureCount > 0;
+        // Lineage is output, not a side effect. A connector's relationships()
+        // can raise, or its edges can fail to send, while every asset lands
+        // perfectly — invisible to asset errors and to detector outcomes alike.
+        // That is how a run shipped 920 assets, ZERO edges, and a COMPLETED
+        // status whose cause was only ever in a job log. Dropped edges are NOT
+        // counted here: an unresolved endpoint is routinely the other half of a
+        // cross-source edge that has not been ingested yet.
+        const relationshipsFailed = runner.relationshipsFailed ?? 0;
+        const relationshipsLost = runner.relationshipsLost ?? 0;
+        const hasLineageFailures =
+          relationshipsFailed > 0 || relationshipsLost > 0;
         const status =
-          hasAssetErrors || hasDetectorFailures || hasExtractionFailures
+          hasAssetErrors ||
+          hasDetectorFailures ||
+          hasExtractionFailures ||
+          hasLineageFailures
             ? RunnerStatus.WARNING
             : RunnerStatus.COMPLETED;
 
@@ -2504,6 +2518,21 @@ export class CliRunnerService {
             `${extractionFailureCount} assets had incomplete text extraction ` +
               `(${textCoverage.engineUnavailable} engine unavailable, ` +
               `${textCoverage.zeroFrames} zero-frame video, ${textCoverage.failed} other failures)`,
+          );
+        }
+        if (hasLineageFailures) {
+          const lineageParts: string[] = [];
+          if (relationshipsFailed > 0) {
+            lineageParts.push(
+              `${relationshipsFailed} relationship pass(es) failed`,
+            );
+          }
+          if (relationshipsLost > 0) {
+            lineageParts.push(`${relationshipsLost} edge(s) could not be sent`);
+          }
+          messageParts.push(
+            `lineage incomplete: ${lineageParts.join(' and ')} ` +
+              `(${runner.relationshipsEmitted ?? 0} edge(s) emitted)`,
           );
         }
         const message =

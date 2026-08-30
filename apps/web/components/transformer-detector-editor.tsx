@@ -25,6 +25,7 @@ import {
 } from "@workspace/ui/components";
 import { VerticalCustomDetectorStepperNav } from "@/components/custom-detector-stepper";
 import { useTranslation } from "@/hooks/use-translation";
+import { preserveDetectorScope } from "@/lib/detector-scope";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -326,7 +327,10 @@ export const TransformerDetectorEditor = React.forwardRef<
     if (!isValid) {
       throw new Error("Validation failed");
     }
-    const pipelineSchema = buildPipelineSchema(pipelineType, form);
+    const pipelineSchema = preserveDetectorScope(
+      initialPipelineSchema,
+      buildPipelineSchema(pipelineType, form),
+    );
     await onSubmit({
       name: form.name,
       key: form.key || toSlug(form.name),

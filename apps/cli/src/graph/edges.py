@@ -33,7 +33,7 @@ from __future__ import annotations
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 from enum import StrEnum
-from typing import Any
+from typing import Any, ClassVar
 
 from ..utils.urn import Urn
 
@@ -171,8 +171,38 @@ class FieldMapping:
         }
 
 
+class _RefMeta(type):
+    """Turn a wrong constructor name into an instruction instead of a riddle.
+
+    ``Ref.id(...)`` is the natural guess and does not exist. The resulting
+    ``AttributeError`` was raised inside ``relationships()``, which the runner
+    caught as non-fatal -- so a notebook shipped 920 assets, zero edges, and a
+    COMPLETED run, with `type object 'Ref' has no attribute 'id'` visible only
+    in a Kubernetes job log. The visibility half of that is fixed elsewhere;
+    this half makes the message itself say what to write.
+    """
+
+    _SUGGESTIONS: ClassVar[dict[str, str]] = {
+        "id": "Ref.asset(<the id you gave Asset(id=...)>)",
+        "hash": "Ref.asset(<the id you gave Asset(id=...)>)",
+        "asset_id": "Ref.asset(<the id you gave Asset(id=...)>)",
+        "uri": "Ref.urn(<a urn like 'company://at/firmenbuchnummer/606601k'>)",
+        "url": "Ref.urn(<a urn like 'company://at/firmenbuchnummer/606601k'>)",
+        "external": "Ref.urn(<a urn naming the object in its own system>)",
+    }
+
+    def __getattr__(cls, name: str) -> Any:
+        suggestion = cls._SUGGESTIONS.get(name)
+        hint = f" Did you mean {suggestion}?" if suggestion else ""
+        raise AttributeError(
+            f"Ref has no '{name}'. An edge endpoint is one of "
+            f"Ref.asset(<asset id>), Ref.urn(<urn>) or Ref.finding(<finding id>)."
+            f"{hint}"
+        )
+
+
 @dataclass(frozen=True)
-class Ref:
+class Ref(metaclass=_RefMeta):
     """One end of an edge.
 
     ``asset`` names something this run produced, by its hash. ``urn`` names an

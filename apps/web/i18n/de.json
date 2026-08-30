@@ -1808,7 +1808,9 @@
       "engineUnavailable": "{{count}} Assets konnten nicht gelesen werden, weil eine Text- oder OCR-Engine nicht verfügbar war.",
       "zeroFrames": "Bei {{count}} Videos wurden null Frames dekodiert; die visuelle OCR prüfte daher keinen Inhalt.",
       "failed": "Bei {{count}} Assets trat ein anderer Fehler bei der Textextraktion auf.",
-      "outOfScope": "{{count}} Assets wurden wegen eines geänderten Scan-Umfangs beibehalten; ihr Fehlen wurde nicht als Löschung behandelt."
+      "outOfScope": "{{count}} Assets wurden wegen eines geänderten Scan-Umfangs beibehalten; ihr Fehlen wurde nicht als Löschung behandelt.",
+      "relationshipsFailed": "{{count}} Beziehungsdurchlauf/-durchläufe im Konnektor sind fehlgeschlagen; die Lineage dieses Laufs ist unvollständig.",
+      "relationshipsLost": "{{count}} Beziehungskanten wurden erstellt, konnten aber nicht gesendet werden."
     },
     "sourceContext": {
       "title": "Quellkontext",
@@ -3865,7 +3867,8 @@
       "missingFunction": "Fügen Sie eine '{{name}}'-Funktion hinzu.",
       "insert": "{{name}}-Zelle einfügen",
       "ok": "Definiert test_connection() und extract()",
-      "syntaxError": "Zelle '{{cell}}' hat einen Syntaxfehler in Zeile {{line}}: {{message}}"
+      "syntaxError": "Zelle '{{cell}}' hat einen Syntaxfehler in Zeile {{line}}: {{message}}",
+      "warningsTitle": "Vor dem Ausführen prüfen"
     },
     "data": {
       "title": "Dateien & Ordner",

@@ -175,11 +175,14 @@ async def _emit_relationships(source: Any, sink: Any, *, partial: bool = False) 
     Best-effort by design — a connector that cannot describe its relationships
     should still deliver its assets — but *loudly* best-effort. Edge loss used
     to be invisible at three separate layers, so a scan could report success
-    having silently produced no lineage at all. Anything dropped is counted and
-    logged here, and the count travels with the run.
+    having silently produced no lineage at all. Anything lost is counted here
+    and handed to the sink, which carries it into the run record so the run
+    stops reporting an unqualified success (see ``set_relationship_losses``).
     """
     if not hasattr(sink, "emit_edges"):
         return
+
+    report = sink.relationship_report if hasattr(sink, "relationship_report") else None
 
     edges: list[Any] = []
     try:
@@ -193,7 +196,21 @@ async def _emit_relationships(source: Any, sink: Any, *, partial: bool = False) 
             if collected:
                 edges.extend(collected)
     except Exception as collect_error:
+        # The connector's relationship code raised. How many edges that cost is
+        # unknowable — it never got to say — so this is counted as one failed
+        # relationship pass rather than as N lost edges.
         logger.warning("Could not collect relationships (non-fatal): %s", collect_error)
+        if report is not None:
+            report.record_failure(
+                f"{type(collect_error).__name__}: {collect_error}",
+            )
+
+    # A connector that declares relationships() but produced nothing is not the
+    # same as one that has no lineage to declare, and the difference is exactly
+    # the failure mode this reporting exists for: an exception inside
+    # relationships() used to leave a green run with zero edges.
+    if report is not None and not edges and _declares_relationships(source):
+        report.record_empty()
 
     if not edges:
         return
@@ -206,15 +223,37 @@ async def _emit_relationships(source: Any, sink: Any, *, partial: bool = False) 
             len(edges),
             emit_error,
         )
+        if report is not None:
+            report.record_lost(
+                len(edges),
+                f"{type(emit_error).__name__}: {emit_error}",
+            )
         return
 
-    unresolved = (result or {}).get("dropped", 0) if isinstance(result, dict) else 0
+    tally = result if isinstance(result, dict) else {}
+    unresolved = tally.get("dropped", 0) or 0
+    if report is not None:
+        report.record_emitted(
+            emitted=len(edges) - unresolved,
+            dropped=unresolved,
+        )
     logger.info(
         "Emitted %d relationship edge(s)%s%s",
         len(edges),
         " (partial run)" if partial else "",
         f"; {unresolved} had an endpoint the API could not resolve" if unresolved else "",
     )
+
+
+def _declares_relationships(source: Any) -> bool:
+    """Whether this connector claims to describe relationships at all."""
+    declares = getattr(source, "declares_relationships", None)
+    if callable(declares):
+        try:
+            return bool(declares())
+        except Exception:  # pragma: no cover - a probe must never fail a scan
+            return False
+    return hasattr(source, "collect_relationships")
 
 
 async def run_command_async(args: argparse.Namespace, recipe: dict[str, Any]) -> None:

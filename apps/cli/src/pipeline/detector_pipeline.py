@@ -32,6 +32,76 @@ from .worker_pool import DetectorWorkerPool, is_io_bound_detector
 logger = logging.getLogger(__name__)
 
 
+def _detector_scope(detector: BaseDetector) -> Any | None:
+    """The `scope` block on a custom detector's pipeline schema, if it has one."""
+    config = getattr(detector, "custom_config", None)
+    schema = getattr(config, "pipeline_schema", None) if config is not None else None
+    return getattr(schema, "scope", None) if schema is not None else None
+
+
+def _detector_covers_asset(detector: BaseDetector, asset: SingleAssetScanResults) -> bool:
+    """Whether a scoped detector applies to this asset at all.
+
+    Kind and metadata only — the content type is checked separately, at the
+    point where the payload's real MIME type is known rather than guessed from
+    the asset record.
+
+    Absence of a predicate means "any", so an unscoped detector — every detector
+    that existed before scoping — is unaffected.
+
+    Metadata is compared as strings on purpose: an asset's metadata is
+    connector-authored JSON where a year can arrive as 2024 or "2024", and a
+    scope that silently stopped matching on the type of a number would be a
+    worse trap than the one scoping exists to fix. A key the asset does not
+    carry excludes it: an absent field is not a match.
+    """
+    scope = _detector_scope(detector)
+    if scope is None:
+        return True
+
+    kinds = getattr(scope, "asset_kinds", None)
+    if kinds:
+        kind = (getattr(asset, "asset_kind", None) or "").strip().lower()
+        if kind not in {str(k).strip().lower() for k in kinds}:
+            return False
+
+    predicate = getattr(scope, "metadata", None)
+    if predicate:
+        metadata = getattr(asset, "metadata", None) or {}
+        if not isinstance(metadata, dict):
+            return False
+        for key, expected in predicate.items():
+            if key not in metadata:
+                return False
+            if str(metadata[key]) != str(expected):
+                return False
+
+    return True
+
+
+def _detector_covers_content_type(detector: BaseDetector, content_type: str) -> bool:
+    """Whether a scoped detector accepts this payload's content type.
+
+    Checked here rather than on the asset record because the asset carries a
+    content *family* (TXT/BINARY/IMAGE) while a scope names MIME types, and the
+    real MIME type is only resolved once the payload is in hand.
+
+    Narrowing only. A scope can keep a detector away from PDFs; it can never
+    hand a runner content it cannot read, because the engine's own
+    ``get_supported_content_types`` still applies on top of this.
+    """
+    scope = _detector_scope(detector)
+    if scope is None:
+        return True
+    content_types = getattr(scope, "content_types", None)
+    if not content_types:
+        return True
+    actual = (content_type or "").strip().lower()
+    if not actual:
+        return False
+    return any(actual.startswith(str(prefix).strip().lower()) for prefix in content_types)
+
+
 class _DetectorInfo:
     """Serialisable metadata for routing a detector through the process pool."""
 
@@ -138,6 +208,22 @@ class DetectorPipeline:
             active_detectors = [
                 detector for detector in self.detectors if self.detector_cache_key(detector) in only
             ]
+
+        # A custom detector is attached to a SOURCE, so by default it runs on
+        # every asset that source produces. That is fine for a regex and ruinous
+        # for an LLM: one model call per filed PDF and per raw XML blob, 3-25
+        # seconds each, on inputs the model had no business reading. Declaring a
+        # scope is how a detector says which part of a source it is for, instead
+        # of the source being split in two to say it.
+        scoped_out = [d for d in active_detectors if not _detector_covers_asset(d, asset)]
+        if scoped_out:
+            active_detectors = [d for d in active_detectors if d not in scoped_out]
+            logger.debug(
+                "%s: %d detector(s) out of scope (%s)",
+                asset.name,
+                len(scoped_out),
+                ", ".join(self._detector_log_label(d) for d in scoped_out),
+            )
 
         text_detectors = []
         if text_content_type:
@@ -715,6 +801,10 @@ class DetectorPipeline:
         for detector in detectors:
             supported = detector.get_supported_content_types()
             if not self._supports_content_type(supported, content_type):
+                continue
+            # A declared scope narrows what the engine already supports; it can
+            # never widen it, so this runs after the engine's own check.
+            if not _detector_covers_content_type(detector, content_type):
                 continue
 
             runnable_detectors.append(detector)

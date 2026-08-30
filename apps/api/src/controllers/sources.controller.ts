@@ -11,6 +11,7 @@ import {
   HttpStatus,
   BadRequestException,
   NotFoundException,
+  Query,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -18,6 +19,7 @@ import {
   ApiResponse,
   ApiParam,
   ApiBody,
+  ApiQuery,
 } from '@nestjs/swagger';
 import { SourceService } from '../source.service';
 import { ValidationService } from '../validation.service';
@@ -35,6 +37,8 @@ import {
   SourceScheduleMode,
 } from '@prisma/client';
 import { CreateSourceDto } from '../dto/create-source.dto';
+import { PurgeSourceAssetsResponseDto } from '../dto/purge-source-assets.dto';
+import { summarizeNotebook } from '../utils/notebook-summary';
 import { UpdateSourceDto } from '../dto/update-source.dto';
 import {
   BulkUpdateSourcesDto,
@@ -666,12 +670,26 @@ export class SourcesController {
   @Get(':id')
   @ApiOperation({
     summary: 'Get source by ID',
-    description: 'Retrieve detailed information about a specific data source',
+    description:
+      'Retrieve detailed information about a specific data source.\n\n' +
+      "A CUSTOM source's notebook cells are NOT inlined by default: the whole " +
+      'program is many kilobytes and blows a response budget for a caller that ' +
+      'wanted the variables. `config.required.notebook` comes back as ' +
+      '`{ revision, cellCount, cellsOmitted: true }`. Pass `?include=notebook` ' +
+      'for the cells, or use GET /sources/{id}/notebook, which is what the ' +
+      'editor uses.',
   })
   @ApiParam({
     name: 'id',
     description: 'Source unique identifier',
     example: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+  })
+  @ApiQuery({
+    name: 'include',
+    required: false,
+    description:
+      "Comma-separated extras to inline. Only 'notebook' is recognised.",
+    example: 'notebook',
   })
   @ApiResponse({
     status: 200,
@@ -679,12 +697,21 @@ export class SourcesController {
     type: SourceResponseDto,
   })
   @ApiResponse({ status: 404, description: 'Source not found' })
-  async getSource(@Param('id') id: string): Promise<SourceModel> {
+  async getSource(
+    @Param('id') id: string,
+    @Query('include') include?: string,
+  ): Promise<SourceModel> {
     const source = await this.sourceService.source({ id });
     if (!source) {
       throw new NotFoundException(`Source with ID ${id} not found`);
     }
-    return source;
+    const wanted = new Set(
+      (include ?? '')
+        .split(',')
+        .map((part) => part.trim().toLowerCase())
+        .filter(Boolean),
+    );
+    return wanted.has('notebook') ? source : summarizeNotebook(source);
   }
 
   @Put(':id')
@@ -1203,20 +1230,52 @@ export class SourcesController {
 
   @Delete(':id/assets')
   @ApiOperation({
-    summary: 'Purge all assets of a data source',
+    summary: "Retire a source's assets — all of them, or a named subset",
     description:
-      'Permanently delete every asset of the source, along with their findings, extractions, ' +
+      'Permanently delete assets of the source, along with their findings, extractions, ' +
       'correlation values, signatures and chunks (all cascade via FK). Correlation fingerprints ' +
-      'are recomputed in the background. Irreversible.',
+      'are recomputed in the background. Irreversible.\n\n' +
+      'With no query parameters this deletes EVERY asset of the source. The optional predicate ' +
+      'exists for the case a scan can never resolve on its own: when a connector narrows its ' +
+      'scope (one source split into two), the assets it used to produce stay behind forever, ' +
+      'because retirement requires a run that covered the whole scope and found them gone — and ' +
+      'a rotating-sample connector never has one. Pass dryRun=true first to see what a predicate ' +
+      'would take with it.',
   })
   @ApiParam({
     name: 'id',
     description: 'Source unique identifier',
     example: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
   })
+  @ApiQuery({
+    name: 'externalIdPrefix',
+    required: false,
+    description:
+      "Connector-assigned id prefix (metadata.external_id), e.g. 'fin-'.",
+  })
+  @ApiQuery({
+    name: 'assetKind',
+    required: false,
+    description: 'Catalog kind: record | document | page | file | table.',
+  })
+  @ApiQuery({ name: 'namePrefix', required: false })
+  @ApiQuery({ name: 'urnPrefix', required: false })
+  @ApiQuery({
+    name: 'notScannedSince',
+    required: false,
+    description:
+      'ISO-8601 timestamp; also matches assets that were never scanned.',
+  })
+  @ApiQuery({
+    name: 'dryRun',
+    required: false,
+    description: 'Report what matches and delete nothing.',
+  })
   @ApiResponse({
     status: 200,
-    description: 'Assets purged; returns the number of deleted assets',
+    description:
+      'What was deleted (or would be), plus the predicate the server understood',
+    type: PurgeSourceAssetsResponseDto,
   })
   @ApiResponse({
     status: 404,
@@ -1224,8 +1283,35 @@ export class SourcesController {
   })
   async purgeAssets(
     @Param('id') id: string,
-  ): Promise<{ purgedAssets: number }> {
-    return this.sourceService.purgeAssets(id);
+    @Query() query: Record<string, string | undefined>,
+  ): Promise<PurgeSourceAssetsResponseDto> {
+    // Query strings arrive untyped and there is no global ValidationPipe, so
+    // an unrecognised parameter would otherwise be silently ignored — and a
+    // silently ignored predicate on a delete means deleting the whole source.
+    const allowed = new Set([
+      'externalIdPrefix',
+      'assetKind',
+      'namePrefix',
+      'urnPrefix',
+      'notScannedSince',
+      'dryRun',
+    ]);
+    const unknown = Object.keys(query ?? {}).filter((k) => !allowed.has(k));
+    if (unknown.length > 0) {
+      throw new BadRequestException(
+        `Unknown purge filter(s): ${unknown.join(', ')}. ` +
+          `Supported: ${[...allowed].join(', ')}.`,
+      );
+    }
+
+    return this.sourceService.purgeAssets(id, {
+      externalIdPrefix: query?.externalIdPrefix,
+      assetKind: query?.assetKind,
+      namePrefix: query?.namePrefix,
+      urnPrefix: query?.urnPrefix,
+      notScannedSince: query?.notScannedSince,
+      dryRun: query?.dryRun === 'true' || (query?.dryRun as unknown) === true,
+    });
   }
 }
 

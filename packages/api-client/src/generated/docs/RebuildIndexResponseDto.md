@@ -11,6 +11,7 @@ Name | Type
 `lineageCovered` | number
 `hairballDemoted` | boolean
 `durationMs` | number
+`note` | string
 
 ## Example
 
@@ -24,6 +25,7 @@ const example = {
   "lineageCovered": null,
   "hairballDemoted": null,
   "durationMs": null,
+  "note": null,
 } satisfies RebuildIndexResponseDto
 
 console.log(example)

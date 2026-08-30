@@ -75,6 +75,39 @@ export class PrismaExceptionFilter implements ExceptionFilter<
           ? (exception.errorCode ?? 'P1000')
           : 'P1000';
 
+    // A unique violation is a *client* mistake with a knowable cause, and it
+    // used to come back as `500 {"code":"P2002"}` with the only useful part —
+    // "Unique constraint failed on the fields: (source_id, hash)" — left behind
+    // in the API log. That answer cost a caller a 1,140-asset ingest and told
+    // them nothing about what to change. Report the constraint's own fields.
+    if (
+      code === 'P2002' &&
+      exception instanceof PrismaClientKnownRequestError
+    ) {
+      const target = (exception.meta as { target?: unknown } | undefined)
+        ?.target;
+      const fields = Array.isArray(target)
+        ? target.map(String)
+        : typeof target === 'string'
+          ? [target]
+          : [];
+      const on = fields.length > 0 ? ` on (${fields.join(', ')})` : '';
+      this.logger.warn(
+        `Unique constraint violation${on}: ${exception.message}`,
+      );
+      void reply.status(HttpStatus.CONFLICT).send({
+        statusCode: HttpStatus.CONFLICT,
+        error: 'Conflict',
+        message:
+          `A record with the same value already exists${on}. ` +
+          'Two rows in one request carrying the same identity is the usual ' +
+          'cause; give each object a distinct id.',
+        code,
+        fields,
+      });
+      return;
+    }
+
     this.logger.error(`Unhandled Prisma error [${code}]: ${exception.message}`);
     void reply.status(HttpStatus.INTERNAL_SERVER_ERROR).send({
       statusCode: HttpStatus.INTERNAL_SERVER_ERROR,

@@ -24,6 +24,7 @@ import {
 } from "@/components/custom-detector-stepper";
 import { useTranslation } from "@/hooks/use-translation";
 import type { TranslationKey } from "@/i18n";
+import { preserveDetectorScope } from "@/lib/detector-scope";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -687,7 +688,10 @@ export const RegexDetectorEditor = React.forwardRef<
       key: key.trim() || undefined,
       description: description.trim() || undefined,
       isActive,
-      pipelineSchema: toApiSchema(patterns),
+      pipelineSchema: preserveDetectorScope(
+        initialPipelineSchema,
+        toApiSchema(patterns),
+      ),
     });
   };
 

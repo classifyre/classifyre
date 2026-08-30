@@ -138,6 +138,32 @@ function normalizeHeaderCell(value: string): string {
   return value.trim().toLowerCase().replace(/\s+/g, '_');
 }
 
+/**
+ * Which dimension of a detector's findings carries the answer.
+ *
+ * A property of the ENGINE, not of the data. A TAG detector's finding type is
+ * the label it asserts (`tag:Shell-company risk`) and its matched content is
+ * the verdict (`hoch (5/12): amtswegig gelöscht; …`) — the answer. A classifier
+ * is the other way round: the predicted label IS the finding type and the value
+ * is prose reasoning. Written here and in `inquiries.service.ts` against the
+ * same list, because a detector audit and a question author must not disagree
+ * about it — getting it backwards produces zero matches and no error.
+ */
+function answerDimensionFor(
+  pipelineType: string | null,
+): 'findingType' | 'matchedContent' | null {
+  if (!pipelineType) return null;
+  switch (pipelineType.toUpperCase()) {
+    case 'LLM':
+    case 'TEXT_CLASSIFICATION':
+    case 'IMAGE_CLASSIFICATION':
+    case 'OBJECT_DETECTION':
+      return 'findingType';
+    default:
+      return 'matchedContent';
+  }
+}
+
 @Injectable()
 export class CustomDetectorsService {
   private readonly logger = new Logger(CustomDetectorsService.name);
@@ -945,12 +971,25 @@ export class CustomDetectorsService {
     usage?: DetectorUsageStats,
   ): CustomDetectorResponseDto {
     const latestRun = detector.trainingRuns?.[0] ?? null;
+    const pipelineSchema = asRecord((detector as any).pipelineSchema);
+    const detectorType =
+      typeof pipelineSchema.type === 'string' && pipelineSchema.type
+        ? pipelineSchema.type
+        : null;
     return {
       id: detector.id,
       key: detector.key,
       name: detector.name,
       description: detector.description,
-      pipelineSchema: asRecord((detector as any).pipelineSchema),
+      pipelineSchema,
+      // Lifted out of the pipeline blob so `GET /custom-detectors | jq` is an
+      // audit rather than the first of twenty round-trips.
+      detectorType,
+      severity:
+        typeof pipelineSchema.severity === 'string'
+          ? pipelineSchema.severity
+          : null,
+      answerDimension: answerDimensionFor(detectorType),
       aiProviderConfigId: (detector as any).aiProviderConfigId ?? null,
       isActive: detector.isActive,
       version: detector.version,

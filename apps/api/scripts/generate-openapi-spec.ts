@@ -2,6 +2,13 @@
 /**
  * Generate OpenAPI spec from NestJS application
  * Run with: bun run scripts/generate-openapi-spec.ts
+ *
+ * Builds the whole Nest DI graph but never opens a connection to anything: the
+ * spec is derived from decorators alone. Several providers nonetheless parse
+ * DATABASE_URL in a *field initialiser* (the registry pool, the correlation
+ * lock, the scheduler pools), which runs while Nest is instantiating them — so
+ * a checkout with no `.env` used to die here with a bare `exit 1`. See the
+ * placeholder below and the error-visibility notes on `NestFactory.create`.
  */
 import { NestFactory } from '@nestjs/core';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
@@ -9,10 +16,34 @@ import { AppModule } from '../src/app.module';
 import { writeFileSync } from 'fs';
 import { join } from 'path';
 
+/**
+ * A syntactically valid connection URL for providers that build a pg Pool at
+ * construction time. `new Pool(...)` is lazy — it connects on first query, and
+ * this script never issues one — so a placeholder is enough and is strictly
+ * better than requiring CI to provision a database to generate a spec.
+ */
+const PLACEHOLDER_DATABASE_URL =
+  'postgresql://openapi:openapi@127.0.0.1:5432/openapi';
+
 async function generateSpec() {
   console.log('🚀 Generating OpenAPI specification...\n');
 
-  const app = await NestFactory.create(AppModule, { logger: false });
+  if (!process.env.DATABASE_URL) {
+    process.env.DATABASE_URL = PLACEHOLDER_DATABASE_URL;
+    console.log(
+      'ℹ️  DATABASE_URL is unset — using an in-memory placeholder. ' +
+        'No connection is opened while generating the spec.\n',
+    );
+  }
+
+  // `abortOnError: false` makes Nest reject the promise instead of logging
+  // through its own logger and calling process.exit(1). With `logger: false`
+  // that exit printed nothing whatsoever, which is how a real initialisation
+  // failure reached CI as an unexplained "exited with code 1".
+  const app = await NestFactory.create(AppModule, {
+    logger: false,
+    abortOnError: false,
+  });
 
   const config = new DocumentBuilder()
     .setTitle('Classifyre API')

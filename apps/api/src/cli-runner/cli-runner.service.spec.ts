@@ -1113,6 +1113,79 @@ describe('CliRunnerService', () => {
     });
   });
 
+  // Lineage is output, not a side effect. A connector's relationships() can
+  // raise, or its edges can fail to send, while every asset lands perfectly —
+  // invisible to asset errors and to detector outcomes alike. That is how a run
+  // shipped 920 assets, ZERO edges, and a COMPLETED status whose cause was only
+  // ever in a Kubernetes job log.
+  describe('lineage failures in run status', () => {
+    const arrangeRun = (prisma: any, lineage: Record<string, number> = {}) => {
+      prisma.runner.findUnique.mockResolvedValue({
+        id: 'runner-1',
+        sourceId: 'source-1',
+        startedAt: new Date('2026-02-18T10:00:00.000Z'),
+        source: { id: 'source-1', name: 'Source', type: 'WORDPRESS' },
+        relationshipsEmitted: 0,
+        relationshipsFailed: 0,
+        relationshipsLost: 0,
+        relationshipsDropped: 0,
+        ...lineage,
+      });
+      prisma.asset.count.mockResolvedValue(0);
+      prisma.finding.count.mockResolvedValue(0);
+      prisma.runnerAsset.count.mockResolvedValue(0);
+      prisma.runner.update.mockResolvedValue({});
+      prisma.source.update.mockResolvedValue({});
+    };
+
+    it('marks the run WARNING when a relationship pass failed, despite zero asset errors', async () => {
+      const { service, prisma } = createService();
+      arrangeRun(prisma, { relationshipsFailed: 1 });
+
+      await service.updateRunnerStatus('runner-1', RunnerStatus.COMPLETED);
+
+      const call = prisma.runner.update.mock.calls.at(-1)?.[0];
+      expect(call.data.status).toBe('WARNING');
+      expect(call.data.errorMessage).toContain('lineage incomplete');
+      expect(call.data.errorMessage).toContain(
+        '1 relationship pass(es) failed',
+      );
+    });
+
+    it('marks the run WARNING when assembled edges could not be sent', async () => {
+      const { service, prisma } = createService();
+      arrangeRun(prisma, { relationshipsLost: 42 });
+
+      await service.updateRunnerStatus('runner-1', RunnerStatus.COMPLETED);
+
+      const call = prisma.runner.update.mock.calls.at(-1)?.[0];
+      expect(call.data.status).toBe('WARNING');
+      expect(call.data.errorMessage).toContain('42 edge(s) could not be sent');
+    });
+
+    it('leaves the run COMPLETED when edges were only unresolved', async () => {
+      // The other half of a cross-source edge may simply not be ingested yet.
+      // Making that amber would teach operators to ignore the colour.
+      const { service, prisma } = createService();
+      arrangeRun(prisma, { relationshipsEmitted: 10, relationshipsDropped: 3 });
+
+      await service.updateRunnerStatus('runner-1', RunnerStatus.COMPLETED);
+
+      const call = prisma.runner.update.mock.calls.at(-1)?.[0];
+      expect(call.data.status).toBe('COMPLETED');
+    });
+
+    it('leaves a clean lineage pass COMPLETED', async () => {
+      const { service, prisma } = createService();
+      arrangeRun(prisma, { relationshipsEmitted: 920 });
+
+      await service.updateRunnerStatus('runner-1', RunnerStatus.COMPLETED);
+
+      const call = prisma.runner.update.mock.calls.at(-1)?.[0];
+      expect(call.data.status).toBe('COMPLETED');
+    });
+  });
+
   it('updates source runnerStatus when stopping a running runner', async () => {
     const { service, prisma, runnerLogStorage } = createService();
     prisma.runner.findUnique
@@ -1471,7 +1544,9 @@ describe('CliRunnerService', () => {
         detectors: [],
       });
 
-      expect(customDetectorsService.buildRuntimeTagDetectors).not.toHaveBeenCalled();
+      expect(
+        customDetectorsService.buildRuntimeTagDetectors,
+      ).not.toHaveBeenCalled();
       expect(merged.detectors).toEqual([]);
     });
 

@@ -11,6 +11,9 @@ Name | Type
 `name` | string
 `description` | string
 `pipelineSchema` | { [key: string]: any; }
+`detectorType` | string
+`severity` | string
+`answerDimension` | string
 `aiProviderConfigId` | string
 `isActive` | boolean
 `version` | number
@@ -37,6 +40,9 @@ const example = {
   "name": null,
   "description": null,
   "pipelineSchema": null,
+  "detectorType": null,
+  "severity": null,
+  "answerDimension": null,
   "aiProviderConfigId": null,
   "isActive": null,
   "version": null,

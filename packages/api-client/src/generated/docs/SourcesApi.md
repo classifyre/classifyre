@@ -19,7 +19,7 @@ All URIs are relative to *http://localhost*
 | [**sourcesControllerGetSchedule**](SourcesApi.md#sourcescontrollergetschedule) | **GET** /sources/{id}/schedule | Get source schedule |
 | [**sourcesControllerGetSource**](SourcesApi.md#sourcescontrollergetsource) | **GET** /sources/{id} | Get source by ID |
 | [**sourcesControllerListSources**](SourcesApi.md#sourcescontrollerlistsources) | **GET** /sources | List all data sources |
-| [**sourcesControllerPurgeAssets**](SourcesApi.md#sourcescontrollerpurgeassets) | **DELETE** /sources/{id}/assets | Purge all assets of a data source |
+| [**sourcesControllerPurgeAssets**](SourcesApi.md#sourcescontrollerpurgeassets) | **DELETE** /sources/{id}/assets | Retire a source\&#39;s assets — all of them, or a named subset |
 | [**sourcesControllerPurgeFindings**](SourcesApi.md#sourcescontrollerpurgefindings) | **DELETE** /sources/{id}/findings | Purge all findings of a data source |
 | [**sourcesControllerResumeSchedule**](SourcesApi.md#sourcescontrollerresumeschedule) | **POST** /sources/{id}/schedule/resume | Resume automatic scanning |
 | [**sourcesControllerStartRun**](SourcesApi.md#sourcescontrollerstartrun) | **POST** /sources/{id}/runs | Start a new ingestion run |
@@ -933,11 +933,11 @@ No authorization required
 
 ## sourcesControllerGetSource
 
-> SourceResponseDto sourcesControllerGetSource(id)
+> SourceResponseDto sourcesControllerGetSource(id, include)
 
 Get source by ID
 
-Retrieve detailed information about a specific data source
+Retrieve detailed information about a specific data source.  A CUSTOM source\&#39;s notebook cells are NOT inlined by default: the whole program is many kilobytes and blows a response budget for a caller that wanted the variables. &#x60;config.required.notebook&#x60; comes back as &#x60;{ revision, cellCount, cellsOmitted: true }&#x60;. Pass &#x60;?include&#x3D;notebook&#x60; for the cells, or use GET /sources/{id}/notebook, which is what the editor uses.
 
 ### Example
 
@@ -955,6 +955,8 @@ async function example() {
   const body = {
     // string | Source unique identifier
     id: a1b2c3d4-e5f6-7890-abcd-ef1234567890,
+    // string | Comma-separated extras to inline. Only \'notebook\' is recognised. (optional)
+    include: notebook,
   } satisfies SourcesControllerGetSourceRequest;
 
   try {
@@ -975,6 +977,7 @@ example().catch(console.error);
 | Name | Type | Description  | Notes |
 |------------- | ------------- | ------------- | -------------|
 | **id** | `string` | Source unique identifier | [Defaults to `undefined`] |
+| **include** | `string` | Comma-separated extras to inline. Only \&#39;notebook\&#39; is recognised. | [Optional] [Defaults to `undefined`] |
 
 ### Return type
 
@@ -1060,11 +1063,11 @@ No authorization required
 
 ## sourcesControllerPurgeAssets
 
-> sourcesControllerPurgeAssets(id)
+> PurgeSourceAssetsResponseDto sourcesControllerPurgeAssets(id, dryRun, notScannedSince, urnPrefix, namePrefix, assetKind, externalIdPrefix)
 
-Purge all assets of a data source
+Retire a source\&#39;s assets — all of them, or a named subset
 
-Permanently delete every asset of the source, along with their findings, extractions, correlation values, signatures and chunks (all cascade via FK). Correlation fingerprints are recomputed in the background. Irreversible.
+Permanently delete assets of the source, along with their findings, extractions, correlation values, signatures and chunks (all cascade via FK). Correlation fingerprints are recomputed in the background. Irreversible.  With no query parameters this deletes EVERY asset of the source. The optional predicate exists for the case a scan can never resolve on its own: when a connector narrows its scope (one source split into two), the assets it used to produce stay behind forever, because retirement requires a run that covered the whole scope and found them gone — and a rotating-sample connector never has one. Pass dryRun&#x3D;true first to see what a predicate would take with it.
 
 ### Example
 
@@ -1082,6 +1085,18 @@ async function example() {
   const body = {
     // string | Source unique identifier
     id: a1b2c3d4-e5f6-7890-abcd-ef1234567890,
+    // any | Report what matches and delete nothing. (optional)
+    dryRun: ...,
+    // any | ISO-8601 timestamp; also matches assets that were never scanned. (optional)
+    notScannedSince: ...,
+    // any (optional)
+    urnPrefix: ...,
+    // any (optional)
+    namePrefix: ...,
+    // any | Catalog kind: record | document | page | file | table. (optional)
+    assetKind: ...,
+    // any | Connector-assigned id prefix (metadata.external_id), e.g. \'fin-\'. (optional)
+    externalIdPrefix: ...,
   } satisfies SourcesControllerPurgeAssetsRequest;
 
   try {
@@ -1102,10 +1117,16 @@ example().catch(console.error);
 | Name | Type | Description  | Notes |
 |------------- | ------------- | ------------- | -------------|
 | **id** | `string` | Source unique identifier | [Defaults to `undefined`] |
+| **dryRun** | `any` | Report what matches and delete nothing. | [Optional] [Defaults to `undefined`] |
+| **notScannedSince** | `any` | ISO-8601 timestamp; also matches assets that were never scanned. | [Optional] [Defaults to `undefined`] |
+| **urnPrefix** | `any` |  | [Optional] [Defaults to `undefined`] |
+| **namePrefix** | `any` |  | [Optional] [Defaults to `undefined`] |
+| **assetKind** | `any` | Catalog kind: record | document | page | file | table. | [Optional] [Defaults to `undefined`] |
+| **externalIdPrefix** | `any` | Connector-assigned id prefix (metadata.external_id), e.g. \&#39;fin-\&#39;. | [Optional] [Defaults to `undefined`] |
 
 ### Return type
 
-`void` (Empty response body)
+[**PurgeSourceAssetsResponseDto**](PurgeSourceAssetsResponseDto.md)
 
 ### Authorization
 
@@ -1114,13 +1135,13 @@ No authorization required
 ### HTTP request headers
 
 - **Content-Type**: Not defined
-- **Accept**: Not defined
+- **Accept**: `application/json`
 
 
 ### HTTP response details
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
-| **200** | Assets purged; returns the number of deleted assets |  -  |
+| **200** | What was deleted (or would be), plus the predicate the server understood |  -  |
 | **404** | Source not found |  -  |
 
 [[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)

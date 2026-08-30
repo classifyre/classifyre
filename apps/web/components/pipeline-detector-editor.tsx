@@ -26,6 +26,7 @@ import {
 import { api } from "@workspace/api-client";
 import type { TrainingExampleItem, TrainingExampleDto } from "@workspace/api-client";
 import type { ParseTrainingExamplesResponseDto } from "@workspace/api-client";
+import { preserveDetectorScope } from "@/lib/detector-scope";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -1109,7 +1110,10 @@ export const PipelineDetectorEditor = React.forwardRef<
       key: key.trim() || undefined,
       description: description.trim() || undefined,
       isActive,
-      pipelineSchema: toApiSchema(pipeline),
+      pipelineSchema: preserveDetectorScope(
+        initialPipelineSchema,
+        toApiSchema(pipeline),
+      ),
     });
   };
 
