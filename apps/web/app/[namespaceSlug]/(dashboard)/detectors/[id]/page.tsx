@@ -140,6 +140,22 @@ export default function CustomDetectorDetailsPage() {
     }
   }, [detectorId, load]);
 
+  useEffect(() => {
+    if (detector?.name) {
+      document.title = `${t("seo.detectorDetail.titleWithEntity", { name: detector.name })} | ${t("app.name")}`;
+      const meta = document.querySelector('meta[name="description"]');
+      if (meta) {
+        meta.setAttribute(
+          "content",
+          t("seo.detectorDetail.descriptionWithEntity", {
+            name: detector.name,
+            method: detector.method ?? "",
+          }),
+        );
+      }
+    }
+  }, [detector?.name, detector?.method, t]);
+
   const handleSave = async (payload: CustomDetectorEditorSubmit) => {
     const updateRequest: UpdateCustomDetectorDto = {
       name: payload.name,

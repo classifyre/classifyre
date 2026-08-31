@@ -1,9 +1,14 @@
 import type { Metadata } from "next";
+import enTranslations from "@/i18n/en";
+import { translate } from "@/i18n";
 
 export const metadata: Metadata = {
-  title: "Decisions",
-  description:
-    "Duplicate decisions already taken, and whether they were used in a case or an inquiry.",
+  title: translate(enTranslations, "seo.duplicatesDecisions.title"),
+  description: translate(enTranslations, "seo.duplicatesDecisions.description"),
+  openGraph: {
+    title: translate(enTranslations, "seo.duplicatesDecisions.ogTitle"),
+    description: translate(enTranslations, "seo.duplicatesDecisions.ogDescription"),
+  },
 };
 
 export default function Layout({ children }: { children: React.ReactNode }) {

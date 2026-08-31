@@ -4255,5 +4255,223 @@
     },
     "backToPatterns": "Zurück zu den Mustern",
     "backToPattern": "Zurück zum Muster"
+  },
+  "seo": {
+    "site": {
+      "title": "Classifyre — Detection Platform for Unstructured Data",
+      "description": "Open source detection platform that scans Confluence, Jira, SharePoint, Notion, databases and file shares to surface PII, secrets, security issues and duplicates — then triages findings into investigations with an AI autopilot. Self-hosted, private by default.",
+      "keywords": "Classifyre, detection platform, PII detection, secrets scanning, unstructured data, DLP, data security, Confluence scanner, Jira scanner, SharePoint DLP, duplicate detection, entity resolution, AI autopilot, open source security",
+      "ogTitle": "Classifyre — Detection Platform for Unstructured Data",
+      "ogDescription": "Scan every source you already run, surface what matters, and investigate with an AI autopilot. Open source, self-hosted, private by default.",
+      "twitterTitle": "Classifyre — Detection Platform for Unstructured Data",
+      "twitterDescription": "Open source detection platform for PII, secrets, security and duplicates across all your unstructured data."
+    },
+    "workspaces": {
+      "title": "Workspaces",
+      "description": "Choose an isolated workspace to continue an investigation, or open a fresh case file. Each workspace has its own sources, scans and findings."
+    },
+    "discovery": {
+      "title": "Overview — Security Brief & Workspace Health",
+      "description": "The workspace security brief: open vs resolved findings, risk clusters by asset and source, recent scan runs and resolution mix — your starting point after every scan.",
+      "ogTitle": "Overview — Security Brief | Classifyre",
+      "ogDescription": "Open findings, risk clusters, recent scans and resolution — the health of this workspace at a glance."
+    },
+    "findings": {
+      "title": "Findings — Triage Every Detection by Severity, Source & Detector",
+      "description": "Triage every detection in one place — filter by severity, status, confidence, source and detector. Track PII, secrets, security issues and custom detections from open to resolved across every scan.",
+      "ogTitle": "Findings — Triage Every Detection | Classifyre",
+      "ogDescription": "Filter by severity, status and source — review matched content, signals and history for every PII, secrets and security finding."
+    },
+    "findingDetail": {
+      "title": "Finding Details — Evidence, Risk & Review History",
+      "description": "Inspect a single finding with its matched content, signals, location, confidence and status history. Adjust severity, add triage notes and follow every touchpoint from detection to resolution.",
+      "ogTitle": "Finding Details — Evidence & Review History | Classifyre",
+      "ogDescription": "Matched content, signals, location and full status history for one detection — triage severity and track every review.",
+      "titleWithEntity": "{{entity}} — Finding Details",
+      "descriptionWithEntity": "{{entity}} — {{type}} detection ({{severity}}). Review matched content, signals and triage history."
+    },
+    "assets": {
+      "title": "Assets — All Ingested Documents & Source Content",
+      "description": "Browse every ingested asset across all connected sources. Search by source, detector and severity, see top findings per asset and expand text coverage and status mix.",
+      "ogTitle": "Assets — All Ingested Documents | Classifyre",
+      "ogDescription": "Every document, page and row ingested from Confluence, Jira, SharePoint and more — with detector coverage and finding breakdowns."
+    },
+    "assetDetail": {
+      "title": "Asset Details — Metadata, Source Properties & Findings",
+      "description": "Review an asset's metadata, source properties, extracted text and every finding it triggered. Jump to its source, timeline and lineage in one place.",
+      "ogTitle": "Asset Details — Metadata & Findings | Classifyre",
+      "ogDescription": "Source properties, extracted content and every PII, secrets or security finding for one ingested asset.",
+      "titleWithEntity": "{{name}} — Asset Details",
+      "descriptionWithEntity": "{{name}} — {{type}} from {{source}}. Review metadata, source properties and related findings."
+    },
+    "sources": {
+      "title": "Sources — Connected Data Connectors & Health",
+      "description": "Manage every connected source — Confluence, Jira, SharePoint, Notion, databases, file shares and sandboxes. Track health, last run stats, schedule and sampling at a glance.",
+      "ogTitle": "Sources — Connected Data Connectors | Classifyre",
+      "ogDescription": "Connect and monitor Confluence, Jira, SharePoint, databases and more — health, last scan and schedule for every source."
+    },
+    "sourceNew": {
+      "title": "Add New Source — Connect Confluence, Jira, SharePoint & More",
+      "description": "Connect a new data source in minutes. Configure connection, credentials, sampling and detectors, test the connection and start your first scan.",
+      "ogTitle": "Add New Source — Connect a Data System | Classifyre",
+      "ogDescription": "Step-by-step source setup: credentials, sampling, detectors and a live connection test."
+    },
+    "sourceDetail": {
+      "title": "Source Details — Health, Schedule & Recent Runs",
+      "description": "Operational overview for one source: last scan status and duration, schedule, required configuration, active detectors and the last three runs with findings and asset delta.",
+      "ogTitle": "Source Details — Health & Recent Runs | Classifyre",
+      "ogDescription": "Health, schedule, detector coverage and recent run outcomes for one connected source.",
+      "titleWithEntity": "{{name}} — Source Details",
+      "descriptionWithEntity": "{{name}} — {{type}} source. Health, schedule, detector coverage and recent runs."
+    },
+    "sourceEdit": {
+      "title": "Edit Source — Update Connection & Detector Settings",
+      "description": "Update this source's connection, sampling, schedule and detector thresholds. Test, save and re-scan without rebuilding the source.",
+      "ogTitle": "Edit Source — Update Connection & Detectors | Classifyre",
+      "ogDescription": "Modify credentials, sampling and detector configuration for an existing source."
+    },
+    "scans": {
+      "title": "Scans — Run History, Status & Duration",
+      "description": "See every scan run across all sources — by trigger, status and duration. Track pending, running, completed and failed runs and open any run for logs, assets and findings.",
+      "ogTitle": "Scans — Run History & Status | Classifyre",
+      "ogDescription": "All scan runs by trigger and status — duration, asset counts and findings for every source."
+    },
+    "scanDetail": {
+      "title": "Scan Details — Timeline, Progress & Asset Changes",
+      "description": "Track a single scan run from trigger to completion: progress, run timeline, asset delta, coverage gaps and per-asset outcomes with logs, findings and source context.",
+      "ogTitle": "Scan Details — Timeline & Asset Changes | Classifyre",
+      "ogDescription": "Progress, timeline and asset delta for one scan run — with logs, coverage and every finding it produced.",
+      "titleWithEntity": "{{source}} Run — Scan Details",
+      "descriptionWithEntity": "Scan run for {{source}} — progress, timeline, asset delta and coverage."
+    },
+    "detectors": {
+      "title": "Custom Detectors — Build, Train & Manage Detection Logic",
+      "description": "Browse and manage all custom detectors — regex rulesets, classifiers and entity extractors. Create, train with examples, test scenarios and see which sources use each detector.",
+      "ogTitle": "Custom Detectors — Detection Logic Catalog | Classifyre",
+      "ogDescription": "Regex, classifier and entity detectors you build yourself — training, testing and source usage in one catalog."
+    },
+    "detectorNew": {
+      "title": "New Detector — Create a Custom Ruleset, Classifier or Entity Detector",
+      "description": "Create a reusable custom detector from regex patterns, text classification or entity extraction. Define patterns, labels, severity and tests without code and deploy to any source.",
+      "ogTitle": "New Detector — Build Custom Detection | Classifyre",
+      "ogDescription": "Start from a template or from scratch — regex, classifier or GLiNER entity detector with tests and severity mapping."
+    },
+    "detectorDetail": {
+      "title": "Detector Details — Configuration, Training & Test Results",
+      "description": "Manage one custom detector's identity, patterns, model and training. Review sources using it, findings count, version, training history and test scenarios in one place.",
+      "ogTitle": "Detector Details — Configuration & Training | Classifyre",
+      "ogDescription": "Identity, validation, model settings and training history for one custom detector.",
+      "titleWithEntity": "{{name}} — Detector Details",
+      "descriptionWithEntity": "{{name}} — {{method}} detector. Configuration, training history and test scenarios."
+    },
+    "investigations": {
+      "title": "Investigations — Cases, Inquiries & AI Autopilot",
+      "description": "Run investigations where findings become answers: inquiries watch for matches, fingerprints link duplicates across systems, and cases collect evidence, hypotheses and a conclusion — with or without the AI autopilot.",
+      "ogTitle": "Investigations — Cases & Inquiries | Classifyre",
+      "ogDescription": "Inquiries that watch for matches, duplicate fingerprints and evidence-backed cases — autopilot or manual."
+    },
+    "caseDetail": {
+      "title": "Case Details — Evidence Graph, Hypotheses & Timeline",
+      "description": "Investigate a case with its evidence graph, threads, chronology and case file. Link inquiries, pull matches, add hypotheses and capture a conclusion — or let the AI harness run on the case.",
+      "ogTitle": "Case Details — Evidence & Hypotheses | Classifyre",
+      "ogDescription": "Evidence graph, linked inquiries, hypotheses and activity timeline for one investigation case.",
+      "titleWithEntity": "{{title}} — Case Details",
+      "descriptionWithEntity": "{{title}} — {{status}} case with {{inquiries}} inquiries. Evidence graph, hypotheses and timeline."
+    },
+    "inquiryDetail": {
+      "title": "Inquiry Details — Saved Query, Matches & Linked Cases",
+      "description": "A saved inquiry that watches all findings matching its filters. Review live matches, see cases it drives, rescan for new hits and pull findings into a case as evidence.",
+      "ogTitle": "Inquiry Details — Matches & Cases | Classifyre",
+      "ogDescription": "Live matches for a saved finding query — plus cases it drives and one-click evidence pull.",
+      "titleWithEntity": "{{title}} — Inquiry Details",
+      "descriptionWithEntity": "{{title}} — inquiry watching {{scope}}. Live matches and linked cases."
+    },
+    "inquiryNew": {
+      "title": "New Inquiry — Create a Saved Finding Query",
+      "description": "Create a saved inquiry that watches all future findings matching its filters — by source, detector, type and value. Preview live matches before saving.",
+      "ogTitle": "New Inquiry — Saved Finding Query | Classifyre",
+      "ogDescription": "Define a question that keeps answering — filters, preview and one-click case creation."
+    },
+    "caseNew": {
+      "title": "Open a Case — Collect Evidence & Hypotheses",
+      "description": "Open a new investigation case. Add a title, description, severity and driving inquiries — pull their live matches as initial evidence or start empty and attach findings later.",
+      "ogTitle": "Open a Case — New Investigation | Classifyre",
+      "ogDescription": "Title, severity, inquiries and evidence — start a new investigation case."
+    },
+    "duplicates": {
+      "titleTemplate": "%s · Duplicate Review",
+      "defaultTitle": "Duplicate Review — Find Copies Across All Sources",
+      "description": "Find assets that look like the same thing — grouped by shared fingerprint values and match reason. Review clusters, compare pairs, tune correlation and track every decision.",
+      "ogTitle": "Duplicate Review — Clusters & Pairs | Classifyre",
+      "ogDescription": "Near-duplicates by shared values and fingerprints — clusters, pairs and tuning for the whole workspace."
+    },
+    "duplicatesDecisions": {
+      "title": "Duplicate Decisions — Resolution History & Case Use",
+      "description": "Audit every duplicate decision — kept, dismissed or escalated — and see whether each was used in a case or an inquiry. The full history of duplicate review for this workspace.",
+      "ogTitle": "Duplicate Decisions — Resolution History | Classifyre",
+      "ogDescription": "Every duplicate decision taken and where it was used — cases and inquiries."
+    },
+    "duplicatePair": {
+      "title": "Duplicate Pair — Compare Two Assets Side by Side",
+      "description": "Why two assets matched: shared fingerprint values, similarity score and snippet comparison. Confirm as duplicate or dismiss — every decision is audited and can feed cases.",
+      "ogTitle": "Duplicate Pair — Why Two Assets Matched | Classifyre",
+      "ogDescription": "Shared values, similarity and evidence for one duplicate pair — confirm or dismiss."
+    },
+    "duplicatePattern": {
+      "title": "Duplicate Pattern — Clustered by Shared Reason",
+      "description": "One duplicate pattern and the asset cluster behind it: every pair that matched for the same shared value or fingerprint, grouped for bulk review and case action.",
+      "ogTitle": "Duplicate Pattern — Cluster by Reason | Classifyre",
+      "ogDescription": "All pairs that matched for the same shared value — review the cluster together."
+    },
+    "duplicateTune": {
+      "title": "Tuning — Weights, Thresholds & Fingerprint Health",
+      "description": "Tune duplicate detection: per-label weights, related and duplicate thresholds, default weight and semantic index health. Saving recomputes fingerprints for the whole workspace.",
+      "ogTitle": "Tuning — Duplicate Detection Settings | Classifyre",
+      "ogDescription": "Label weights, thresholds and index health for fingerprint-based duplicate detection."
+    },
+    "settings": {
+      "title": "Settings — Workspace, Region & Harness Configuration",
+      "description": "Configure this workspace: language and time defaults, instance version, AI providers, Harness autopilot, embedding, MCP servers and export/import. All settings are workspace-scoped.",
+      "ogTitle": "Settings — Workspace Configuration | Classifyre",
+      "ogDescription": "Region, AI providers, harness, embedding and data transfer — workspace settings in one place."
+    },
+    "notifications": {
+      "title": "Notifications — Alerts & System Signals",
+      "description": "All notifications for scans, findings, sources and system events — filtered by type and severity. Mark important, mark read and stay on top of critical signals.",
+      "ogTitle": "Notifications — Alerts & Signals | Classifyre",
+      "ogDescription": "Scan, finding, source and system notifications — importance and read state at a glance."
+    },
+    "glossary": {
+      "title": "Glossary — Canonical Vocabulary & Entity Map",
+      "description": "Canonical vocabulary shared by operators, cases and every AI Harness run. Add terms, aliases and entity types — person, organization, location — and verify what the autopilot should treat as ground truth.",
+      "ogTitle": "Glossary — Canonical Vocabulary | Classifyre",
+      "ogDescription": "Shared terms, aliases and entity annotations that operators, cases and the AI Harness all rely on."
+    },
+    "fingerprints": {
+      "title": "Fingerprints — Evidence Correlations & Shared Values",
+      "description": "Evidence fingerprints that connect assets sharing the same findings — emails, phones, identifiers and more. Search the graph, filter by source and exclude noise while duplicates recompute in the background.",
+      "ogTitle": "Fingerprints — Evidence Correlations | Classifyre",
+      "ogDescription": "Assets linked by shared finding values — fingerprints, graph and correlation tuning."
+    },
+    "harness": {
+      "title": "Harness AI — Autopilot Control Plane",
+      "description": "Autonomous control plane for the AI autopilot: agents that triage findings, build cases and draft hypotheses after every scan. Review activity, runs, memory, system brief and configuration.",
+      "ogTitle": "Harness AI — Autopilot Control Plane | Classifyre",
+      "ogDescription": "Agents, runs, memory and brief — the autopilot that turns findings into investigations."
+    },
+    "harnessProvider": {
+      "title": "AI Provider — Model, Credentials & Feature Assignment",
+      "description": "Manage one AI provider's endpoint, model, credentials, context size and feature assignment. Test connection and Harness capability, then assign to Assistant, Harness or detectors.",
+      "ogTitle": "AI Provider — Configuration | Classifyre",
+      "ogDescription": "Endpoint, model and credential for one Harness AI provider.",
+      "titleWithEntity": "{{name}} — AI Provider",
+      "descriptionWithEntity": "{{name}} — {{provider}} / {{model}}. Credentials, context and feature assignment."
+    },
+    "docs": {
+      "title": "Documentation — Connect, Scan & Investigate with Classifyre",
+      "description": "Classifyre documentation — how the app works, section by section: connect Confluence, Jira, SharePoint and more, run scans, triage findings, dedupe assets and investigate with the AI autopilot.",
+      "ogTitle": "Documentation — Connect, Scan & Investigate | Classifyre",
+      "ogDescription": "Connect sources, scan them, review findings and investigate what matters — with an AI autopilot doing the legwork. Guides for every workflow."
+    }
   }
 }
