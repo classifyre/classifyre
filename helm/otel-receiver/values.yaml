@@ -22,7 +22,7 @@ opentelemetry-collector:
 
   image:
     repository: otel/opentelemetry-collector-contrib
-    tag: "0.155.0"
+    tag: "0.159.0"
 
   replicaCount: 1
 
@@ -103,7 +103,15 @@ opentelemetry-collector:
     service:
       telemetry:
         metrics:
-          address: "0.0.0.0:8888"
+          # The collector chart dropped `metrics.address` in 0.161.0; the
+          # equivalent is an explicit Prometheus pull reader on the same
+          # host/port the `metrics` port above exposes.
+          readers:
+            - pull:
+                exporter:
+                  prometheus:
+                    host: "0.0.0.0"
+                    port: 8888
       pipelines:
         traces:
           receivers: [otlp]
