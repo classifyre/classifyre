@@ -263,7 +263,7 @@ youtube = [
 reddit = [
     # Official Reddit API wrapper. Handles OAuth (all three PRAW flows), token
     # refresh and Reddit's own ratelimit headers.
-    "praw>=7.8.1,<8.0.0",
+    "praw>=7.8.1,<9.0.0",
     # Reddit posts routinely embed YouTube/Vimeo links; those are analysed with
     # the same yt-dlp + captions + Whisper + frame-OCR pipeline the YouTube
     # source uses (src/utils/external_video.py).
